@@ -193,6 +193,12 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
     invalidateSoon(qc, ['initiativeRisk']);
   }
 
+  if (['elements', 'subelements', 'element_assignees', 'element_objects', 'element_edges', 'objects',
+    'workers', 'domains', 'object_domains', 'activity_space_members', 'domain_members', 'object_members'].includes(d.table)) {
+    invalidateSoon(qc, ['nowWork']);
+    invalidateSoon(qc, ['coordination-element']);
+  }
+
   switch (d.table) {
     case 'elements': {
       if (!id) return;

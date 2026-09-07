@@ -36,7 +36,7 @@ interface CommandPaletteProps {
 // labels; only the `view` target is shared, and it's typed against ViewId
 // so a typo'd destination is a compile error.
 const NAV_COMMANDS = [
-  { id: 'home',         label: 'Go to Home',         icon: Home,     view: 'home' },
+  { id: 'home',         label: 'Go to Now',         icon: Home,     view: 'home' },
   { id: 'my-elements',  label: 'My Elements',        icon: ListTodo, view: 'my-elements' },
   { id: 'inbox',        label: 'Open Inbox',         icon: Inbox,    view: 'inbox' },
   { id: 'domain-elements',      label: 'Domain Elements',    icon: ListTodo, view: 'domain-elements' },

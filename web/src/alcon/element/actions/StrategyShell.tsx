@@ -26,6 +26,12 @@ import { ObjectIcon } from '@/shell/icons';
 import { InitiativeIntentProvider } from '@/alcon/element/actions/InitiativeIntent';
 import { StrategyCommentsPanel } from '@/alcon/element/actions/StrategyCommentsPanel';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
+import { useAuthContext } from '@/providers/AuthProvider';
+import { canEditInitiative } from './initiativeAccess';
+import { useInitiativeHealth } from './useInitiativeHealth';
+import type { InitiativeHealth } from './initiativeHealthModel';
+import { useNow } from '@/alcon/shared/useNow';
+import { formatRelative } from '@/alcon/shared/dateUtils';
 import {
   useBoard,
   WidgetSurface,
@@ -170,6 +176,58 @@ function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
 // Portfolio Initiative list — the entire root view. Selecting a row pushes
 // into that Initiative's detail page.
 // =============================================================
+// What a person scans a portfolio for, and nothing more: how far along, how
+// recently anything moved, and whether something is on fire. Counts come from
+// the same predicates the Initiative page uses (initiativeRiskModel), so the
+// row never disagrees with the page it opens. Quiet register throughout — a
+// row is not the place to shout; the number is the signal.
+function InitiativeHealthCell({ health }: { health: InitiativeHealth | undefined }) {
+  if (!health) {
+    return <span className="text-[11px] text-muted-foreground/50">…</span>;
+  }
+  const { risk } = health;
+  const alerts: string[] = [];
+  if (risk.overdue > 0) alerts.push(`${risk.overdue} overdue`);
+  if (risk.stalled > 0) alerts.push(`${risk.stalled} stalled`);
+  if (risk.blocked > 0) alerts.push(`${risk.blocked} blocked`);
+  const moved = health.lastActivityAt !== null
+    ? formatRelative(new Date(health.lastActivityAt).toISOString())
+    : null;
+  const unmeasured = health.risk.openTotal > 0 && !health.scheduleMeasured;
+  return (
+    <div className="flex items-center gap-3 min-w-0 text-[11px] text-muted-foreground tabular-nums">
+      {health.progressPct === null ? (
+        <span className="shrink-0 text-muted-foreground/60">No Elements</span>
+      ) : (
+        <span className="flex items-center gap-1.5 shrink-0 w-24">
+          <SegmentedProgress value={health.progressPct} className="flex-1" />
+          <span className="w-7 text-right">{health.progressPct}%</span>
+        </span>
+      )}
+      {/* An empty Initiative already said "No Elements"; "No activity" would
+          be the same fact twice. */}
+      {!(health.total === 0 && moved === null) && (
+        <span className="shrink-0 min-w-0 truncate text-muted-foreground/70" title={moved ? `Last movement ${moved}` : 'Nothing has reported yet'}>
+          {moved ?? 'No activity'}
+        </span>
+      )}
+      {alerts.length > 0 ? (
+        <span
+          className="min-w-0 truncate text-foreground/80"
+          // The alerts take the slot, but an unmeasured schedule is still a
+          // fact — it rides in the title rather than costing width.
+          title={unmeasured ? `${alerts.join(' · ')} — open Elements carry no due dates, so the schedule is unmeasured` : alerts.join(' · ')}
+        >
+          {alerts.join(' · ')}
+        </span>
+      ) : unmeasured ? (
+        // 0 overdue with no dated work is not "on time" — it is unmeasured.
+        <span className="min-w-0 truncate text-muted-foreground/60" title="Open Elements carry no due dates, so the schedule is unmeasured">No dates</span>
+      ) : null}
+    </div>
+  );
+}
+
 function StrategyListView({
   strategies,
   onSelectStrategy,
@@ -177,10 +235,16 @@ function StrategyListView({
   strategies: StrategyWithObjects[];
   onSelectStrategy: (strategy: StrategyWithObjects) => void;
 }) {
+  // Health for every row from one read (progress / last movement / risk).
+  const { byId: health } = useInitiativeHealth(strategies);
+  // Subscribe to the shared tick so "Today" / "3m ago" in the cells ages
+  // honestly while the list stays open; the cells re-render with this view.
+  useNow();
   return (
     <div className="h-full overflow-auto px-2 pb-2 pt-2">
-      <div className="grid grid-cols-[1fr_120px] gap-3 px-4 py-2 text-[11px] tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
+      <div className="grid grid-cols-[1fr_minmax(0,18rem)_120px] gap-3 px-4 py-2 text-[11px] tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
         <span>Name</span>
+        <span>Health</span>
         <span className="text-right">Objects</span>
       </div>
       <div className="flex flex-col gap-1.5">
@@ -189,12 +253,13 @@ function StrategyListView({
             type="button"
             key={s.id}
             onClick={() => onSelectStrategy(s)}
-            className="w-full grid grid-cols-[1fr_120px] gap-3 px-4 py-3.5 min-h-[3.25rem] bg-transparent hover:bg-muted/30 border border-border rounded-lg transition-colors items-center text-left"
+            className="w-full grid grid-cols-[1fr_minmax(0,18rem)_120px] gap-3 px-4 py-3.5 min-h-[3.25rem] bg-transparent hover:bg-muted/30 border border-border rounded-lg transition-colors items-center text-left"
           >
             <div className="flex items-center gap-2 min-w-0">
               <NavStrategyIcon size={13} className="text-muted-foreground" />
               <span className="text-[13px] font-semibold text-foreground/95 truncate">{s.name}</span>
             </div>
+            <InitiativeHealthCell health={health.get(s.id)} />
             <span className="text-[12px] text-muted-foreground tabular-nums text-right">
               {s.objectIds.length}
             </span>
@@ -350,8 +415,17 @@ function StrategyDetailView({
   const descriptionCancel = useCancelOnEscape();
 
   // Re-sync local edit state when switching to a different Strategy.
+  // The database answers "may this user write?" with owner-only RLS; the UI
+  // has to give the same answer before the write, or a non-owner sees an
+  // edit take and vanish on reload (ELE_STR-021).
+  const { user } = useAuthContext();
+  const userId = user?.id ?? null;
+  const canEdit = canEditInitiative(userId, strategy.created_by);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   useEffect(() => {
     setName(strategy.name);
+    setSaveError(null);
     setDescription(strategy.description ?? '');
     setSelectedIds(new Set(strategy.objectIds));
   }, [strategy.id, strategy.name, strategy.description, strategy.objectIds]);
@@ -419,32 +493,42 @@ function StrategyDetailView({
   const childCandidates = useMemo(() => {
     const existingChildIds = new Set(childStrategies.map((c) => c.id));
     const q = childQuery.trim().toLowerCase();
+    // strategy_children's INSERT policy needs the caller to own the child as
+    // well as the parent, so a colleague's Initiative — visible since the
+    // Space-wide SELECT — is not something this picker may offer.
     return allStrategies.filter((s) =>
       !ancestorIds.has(s.id) &&
       !existingChildIds.has(s.id) &&
+      canEditInitiative(userId, s.created_by) &&
       (q === '' || s.name.toLowerCase().includes(q)));
-  }, [allStrategies, ancestorIds, childStrategies, childQuery]);
+  }, [allStrategies, ancestorIds, childStrategies, childQuery, userId]);
 
   const linkChild = async (childId: string) => {
+    if (!canEdit) return;
     setLinkingChildId(childId);
     try {
       await addStrategyChild(strategy.id, childId);
+      setSaveError(null);
       onSaved();
       setChildPickerOpen(false);
       setChildQuery('');
     } catch (e) {
       console.error('Failed to nest Initiative:', e);
+      setSaveError('Could not nest that Initiative');
     } finally {
       setLinkingChildId(null);
     }
   };
 
   const unlinkChild = async (childId: string) => {
+    if (!canEdit) return;
     try {
       await removeStrategyChild(strategy.id, childId);
+      setSaveError(null);
       onSaved();
     } catch (e) {
       console.error('Failed to un-nest Initiative:', e);
+      setSaveError('Could not remove that Initiative');
     }
   };
 
@@ -480,25 +564,50 @@ function StrategyDetailView({
     if (nameCancel.consumeCancel()) return;
     const trimmed = name.trim() || strategy.name;
     if (trimmed === strategy.name) return;
-    await updateStrategy(strategy.id, { name: trimmed });
-    onSaved();
+    if (!canEdit) { setName(strategy.name); return; }
+    try {
+      await updateStrategy(strategy.id, { name: trimmed });
+      setSaveError(null);
+      onSaved();
+    } catch (e) {
+      console.error('Failed to rename Initiative:', e);
+      setName(strategy.name);
+      setSaveError('Could not save the name');
+    }
   };
 
   const saveDescription = async () => {
     if (descriptionCancel.consumeCancel()) return;
     const trimmed = description.trim() || null;
     if (trimmed === (strategy.description ?? null)) return;
-    await updateStrategy(strategy.id, { description: trimmed });
-    onSaved();
+    if (!canEdit) { setDescription(strategy.description ?? ''); return; }
+    try {
+      await updateStrategy(strategy.id, { description: trimmed });
+      setSaveError(null);
+      onSaved();
+    } catch (e) {
+      console.error('Failed to save Initiative description:', e);
+      setDescription(strategy.description ?? '');
+      setSaveError('Could not save the description');
+    }
   };
 
   const toggleObject = async (id: string) => {
+    if (!canEdit) return;
+    const previous = selectedIds;
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setSelectedIds(next);
-    await setStrategyObjects(strategy.id, Array.from(next));
-    onSaved();
+    try {
+      await setStrategyObjects(strategy.id, Array.from(next));
+      setSaveError(null);
+      onSaved();
+    } catch (e) {
+      console.error('Failed to update Initiative Objects:', e);
+      setSelectedIds(previous);
+      setSaveError('Could not change the Objects');
+    }
   };
 
   const closePicker = () => {
@@ -550,6 +659,23 @@ function StrategyDetailView({
         <span className="px-1.5 py-0.5 text-[12px] font-semibold text-foreground truncate max-w-[240px]">
           {strategy.name}
         </span>
+        {!canEdit && (
+          // Said once, where the eye lands first. The Initiative's own
+          // structure — name, description, Objects, nested Initiatives —
+          // is locked to match. The board's intent sections keep their own
+          // policy and report their own failures (ELE_STR-025).
+          <span
+            className="ml-1 px-1.5 py-0.5 rounded-full bg-muted/60 ring-1 ring-border/60 text-[11px] text-foreground/90"
+            title="Only the Initiative's owner can edit it"
+          >
+            Read-only
+          </span>
+        )}
+        {saveError && (
+          <span role="status" className="ml-auto text-[11px] text-muted-foreground truncate">
+            {saveError} — change reverted
+          </span>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto">
@@ -585,6 +711,9 @@ function StrategyDetailView({
                 }
               }}
               placeholder="Initiative name"
+              readOnly={!canEdit}
+              aria-readonly={!canEdit}
+              tabIndex={canEdit ? undefined : -1}
               className="w-full text-2xl font-semibold text-foreground bg-transparent border-none resize-none leading-tight overflow-hidden tracking-normal"
             />
           </div>
@@ -606,7 +735,10 @@ function StrategyDetailView({
                 e.currentTarget.blur();
               }
             }}
-            placeholder="Add description..."
+            placeholder={canEdit ? 'Add description...' : ''}
+            readOnly={!canEdit}
+            aria-readonly={!canEdit}
+            tabIndex={canEdit ? undefined : -1}
             className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
           />
 
@@ -625,6 +757,7 @@ function StrategyDetailView({
             <div className="h-px bg-border mb-3" />
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-[13px] font-medium text-foreground/90">Initiatives</h2>
+              {canEdit && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -644,6 +777,7 @@ function StrategyDetailView({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
             </div>
 
             {childStrategies.length === 0 && childPickerOpen === false && (
@@ -665,6 +799,7 @@ function StrategyDetailView({
                     <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
                       {child.objectIds.length} object{child.objectIds.length === 1 ? '' : 's'}
                     </span>
+                    {canEdit && (
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); void unlinkChild(child.id); }}
@@ -673,6 +808,7 @@ function StrategyDetailView({
                     >
                       <X size={12} />
                     </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -725,6 +861,7 @@ function StrategyDetailView({
             <div className="h-px bg-border mb-3" />
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-[13px] font-medium text-foreground/90">Objects</h2>
+              {canEdit && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -744,6 +881,7 @@ function StrategyDetailView({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
             </div>
 
             {selectedIds.size > 0 && (

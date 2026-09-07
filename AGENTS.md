@@ -56,7 +56,8 @@ CRM / SCM は `operations-planner` ウィジェットを既定配置する App�
 UI では Strategy と Execution を明確に分ける（ModeRail の別モード）。混ぜて一覧化すると「意図」と「行動」の区別が崩れる。ただし遮断もしない —— Initiative は配下 Object と実行上のリスク・負荷を、Object は貢献先 Initiative と戦略上の意図を常に見せる。この一クリックの往復可能性が Alcon の核。
 
 ### Home — 横断サーフェス
-分類に属さない個人ビュー。
+分類に属さない個人ビュー。Nowを既定の入口にし、既存の明示的な初期view設定は保持する。
+- **Now**：現在Spaceの可視な仕事を、動ける候補・確認が必要な仕事・待ちに分けて理由付きで示す。既存案件をコピーで取り込み、状態・次の一手・共有コメントをまとめて更新する
 - **My Elements**：自分が所有・アサインされた Element
 - **Inbox**：通知フィード
 - **Calendar**：自分の Element の期日
@@ -79,7 +80,7 @@ Property は**データ**であり、その既定の見せ方が Properties ウ�
 - **ModeRail** (`shell/ModeRail.tsx`, 46px)：常時表示のモードセレクタ。折りたたまれない外殻の背骨。上段は固定の Home / Strategy / Execution、区切り線の下がユーザーが Apps ランチャーから追加した App と、追加用の Apps ボタン。`railModeOf(view)` が view→モードの単一情報源で、レールのハイライトと AppSidebar の中身分岐を同時に駆動する。Initiative→Object / Object→Initiative のリンクを辿ると `activeView` が変わり、レールのモードも自動で切り替わる
 - **Apps ランチャー**：カタログ・モードのメタ・追加状態は `shell/railApps.ts` の単一情報源（`CORE_MODES` / `APP_GROUPS` / `MODE_META` / `useRailApps`）。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / Calendar / CRM / SCM）の2グループに分けて表示するが、概念上はどちらも Sustainment（仕事道具）。タイルを押すとレールに追加してそのまま開く。追加済みタイルの右上に出るチェックを外すとレールから外れ、カタログに戻る。追加状態は `alcon:railApps` に localStorage 永続。追加していない App も、開いている間だけレールに現れる
 - **AppSidebar**（折りたたみ可）：最上部に Space 名（`SpaceSwitcher`）＋ Discover(検索) ＋ Create(+)。本体は現在のモードに応じて切替：
-  - **Home**：Inbox / Calendar / My Elements
+  - **Home**：Now / Inbox / Calendar / My Elements
   - **Strategy**：Initiative / Phase / Timeline
   - **Execution**：Domain ツリー（各 Domain を開くと Objects／Elements）
   - **Workload / Calendar / CRM / SCM / Notebook / Table / Team**：Apps から追加する独立モード。それぞれ単一サーフェスをメインに開き、サイドバーはモード名ラベルのみ
