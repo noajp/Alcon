@@ -246,7 +246,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "moveElement",
-    description: "Element の primary object_id を変更し、element_objects も新 Object 1 件に張り替える。",
+    description: "Element の primary object_id を変更する。element_objects の primary 行はトリガが追従し、他の multi-home 先は残る。",
     input_schema: {
       type: "object",
       properties: {
@@ -272,7 +272,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "unlinkElementFromObject",
-    description: "Element の multi-home リンクを 1 本解除する。それが唯一のホームで primary なら拒否される。",
+    description: "Element の multi-home リンクを 1 本解除する。それが唯一のホームなら拒否され、primary のホームなら残る別のホームが primary になる。",
     input_schema: {
       type: "object",
       properties: {
@@ -706,10 +706,9 @@ async function runTool(
           .select("id, display_id, seq_number, title, status, priority, object_id")
           .single();
         if (error) throw error;
-        // multi-home junction (primary entry)
-        await supabase.from("element_objects").insert({
-          element_id: data.id, object_id: objectId, order_index: 0,
-        }).then(() => {}, () => {});
+        // The primary junction row is the trigger's job (sync_element_primary_object):
+        // it follows elements.object_id on insert and on every move, so nothing
+        // written here can disagree with it.
         // initial assignees
         if (Array.isArray(input.assigneeWorkerIds) && input.assigneeWorkerIds.length > 0) {
           const rows = (input.assigneeWorkerIds as string[]).map((wid) => ({
@@ -753,11 +752,9 @@ async function runTool(
         const { error: elErr } = await supabase
           .from("elements").update({ object_id: targetObjectId }).eq("id", id);
         if (elErr) throw elErr;
-        // refresh the multi-home junction so the new primary is the only link
-        await supabase.from("element_objects").delete().eq("element_id", id);
-        await supabase.from("element_objects").insert({
-          element_id: id, object_id: targetObjectId, order_index: 0,
-        });
+        // The junction follows: the trigger drops the old primary row, marks the
+        // new one primary and leaves the Element's other homes alone. Deleting
+        // every row here used to erase the primary the trigger had just written.
         return { ok: true, data: { id, targetObjectId }, meta: { rows: 1 } };
       }
 
@@ -787,6 +784,17 @@ async function runTool(
           .from("element_objects").select("object_id").eq("element_id", id);
         if (el?.object_id === objectId && (links?.length ?? 0) <= 1) {
           return { ok: false, error: "cannot remove the only home of an Element; move it first" };
+        }
+        if (el?.object_id === objectId) {
+          // Unlinking the primary home: another home takes over as primary
+          // first, and the trigger removes the old primary row with the move.
+          // Deleting the row outright would leave object_id pointing at an
+          // Object the junction no longer records.
+          const next = links!.find((l) => l.object_id !== objectId)!.object_id;
+          const { error: mvErr } = await supabase
+            .from("elements").update({ object_id: next }).eq("id", id);
+          if (mvErr) throw mvErr;
+          return { ok: true, data: { id, objectId, newPrimaryObjectId: next }, meta: { rows: 1 } };
         }
         const { error } = await supabase
           .from("element_objects").delete()
