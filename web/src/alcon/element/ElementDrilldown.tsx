@@ -19,6 +19,10 @@ interface Props {
   children: (openElement: (id: string) => void) => ReactNode;
   onNavigate?: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
+  /** Named on the breadcrumb root, so a detail opened from a tool says where
+   *  it came back to. Without it the root reads "Back" and the Element floats
+   *  free of the Domain it belongs to. */
+  domainName?: string | null;
 }
 
 /** Keep a tool's filters and scroll position while editing the actual Element. */
@@ -28,7 +32,7 @@ export function ElementDrilldown(props: Props) {
   return <Drilldown key={`${userId}:${spaceId}`} {...props} />;
 }
 
-function Drilldown({ label, children, onNavigate, onViewChange }: Props) {
+function Drilldown({ label, children, onNavigate, onViewChange, domainName }: Props) {
   const [elementId, setElementId] = useState<string | null>(null);
   const [navigationError, setNavigationError] = useState<string | null>(null);
   const { data: domains } = useSustainmentDomains();
@@ -60,6 +64,7 @@ function Drilldown({ label, children, onNavigate, onViewChange }: Props) {
             key={elementId}
             element={query.data}
             objectPath={query.data.objects ?? []}
+            domainName={domainName}
             onBack={back}
             onNavigateRoot={back}
             onRefresh={refresh}
