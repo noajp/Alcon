@@ -186,7 +186,7 @@ const priorityOptions = [
 // ============================================
 // Types for local-only features (until DB tables exist)
 // ============================================
-// Activity entries live in elementActivity.ts (localStorage-backed). The
+// Activity entries live in elementActivity.ts (element_activity, live over the delta stream). The
 // detail screen renders both the persisted log + a derived "created"
 // entry pulled from element.created_at.
 
