@@ -262,7 +262,8 @@ function InitiativeMeasuresContent({
         variant="ghost"
         size="xs"
         aria-label="Add condition"
-        disabled={!data || saving || composing}
+        disabled={!data || saving || composing || !initiative.canEdit}
+        title={initiative.lockReason ?? undefined}
         onClick={openCreate}
       >
         <Plus size={12} />
@@ -307,7 +308,7 @@ function InitiativeMeasuresContent({
             <MeasureRow
               key={measure.id}
               measure={measure}
-              disabled={saving || composing || deleting !== null}
+              disabled={saving || composing || deleting !== null || !initiative.canEdit}
               onReading={(value) => setReadingOn(measure.id, value)}
               onEdit={() => openEdit(measure)}
               onDelete={() => {

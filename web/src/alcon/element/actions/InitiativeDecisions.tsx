@@ -413,7 +413,8 @@ export function InitiativeDecisions({
           <button
             type="button"
             aria-label="Record a decision"
-            disabled={!data}
+            disabled={!data || !initiative.canEdit}
+            title={initiative.lockReason ?? undefined}
             onClick={() => {
               setComposing(true);
               setReviewing(null);
@@ -454,6 +455,7 @@ export function InitiativeDecisions({
               landings={landings.get(decision.id) ?? []}
               candidates={candidates(decision.id)}
               scopeError={scopeError}
+              canEdit={initiative.canEdit}
               onLink={(target) => void link(decision.id, target)}
               onUnlink={(bindingId) => void unlink(bindingId)}
               onOpenObject={onOpenObject}
@@ -633,6 +635,7 @@ function DecisionRow({
   landings,
   candidates,
   scopeError,
+  canEdit,
   onLink,
   onUnlink,
   onOpenObject,
@@ -644,6 +647,9 @@ function DecisionRow({
   landings: Landing[];
   candidates: PickerTarget[];
   scopeError: Error | null;
+  /** A reader who is not the owner sees the decision, its reviews and its
+   *  landings, and none of the controls that would change them. */
+  canEdit: boolean;
   onLink: (target: PickerTarget) => void;
   onUnlink: (bindingId: string) => void;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
@@ -677,8 +683,9 @@ function DecisionRow({
           size="xs"
           aria-label={`${reviewLabel(decision)}. Record a review of ${decision.title}`}
           aria-expanded={review.open}
+          disabled={!canEdit}
           onClick={review.open ? review.onClose : review.onOpen}
-          className={`shrink-0 ${reviewTone(decision)}`}
+          className={`shrink-0 ${reviewTone(decision)} disabled:opacity-100 disabled:pointer-events-none`}
         >
           {reviewLabel(decision)}
         </Button>
@@ -687,6 +694,7 @@ function DecisionRow({
             <Button
               variant="ghost"
               size="icon-xs"
+              disabled={!canEdit}
               aria-label={`Options for ${decision.title}`}
               className="shrink-0"
             >
@@ -761,19 +769,21 @@ function DecisionRow({
                 ? () => onOpenObject(landing.objectId as string, landing.domainId)
                 : undefined
             }
-            onRemove={() => onUnlink(landing.bindingId)}
+            onRemove={canEdit ? () => onUnlink(landing.bindingId) : undefined}
           />
         ))}
-        <IntentTargetPicker
-          label={landings.length === 0 ? 'Link what this moved' : 'Link another'}
-          targets={candidates}
-          onPick={onLink}
-          empty={
-            scopeError
-              ? 'Could not read this Initiative’s Objects, Elements and Phases.'
-              : 'This Initiative covers no Objects yet — add some to link what a decision moved.'
-          }
-        />
+        {canEdit && (
+          <IntentTargetPicker
+            label={landings.length === 0 ? 'Link what this moved' : 'Link another'}
+            targets={candidates}
+            onPick={onLink}
+            empty={
+              scopeError
+                ? 'Could not read this Initiative’s Objects, Elements and Phases.'
+                : 'This Initiative covers no Objects yet — add some to link what a decision moved.'
+            }
+          />
+        )}
       </div>
 
       {/* The ledger. Newest first, and it only ever grows — a decision that was

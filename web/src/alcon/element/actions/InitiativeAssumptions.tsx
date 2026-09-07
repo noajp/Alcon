@@ -269,7 +269,8 @@ export function InitiativeAssumptions({
           <button
             type="button"
             aria-label="Record an assumption"
-            disabled={!data}
+            disabled={!data || !initiative.canEdit}
+            title={initiative.lockReason ?? undefined}
             onClick={() => {
               setComposing(true);
               setFailure(null);
@@ -322,6 +323,7 @@ export function InitiativeAssumptions({
               onWatch={(target) => void watch(assumption.id, target)}
               onUnwatch={(bindingId) => void unwatch(bindingId)}
               scopeError={scopeError}
+              canEdit={initiative.canEdit}
               onOpenObject={onOpenObject}
             />
           ))}
@@ -430,6 +432,7 @@ function AssumptionRow({
   assumption,
   candidates,
   scopeError,
+  canEdit,
   onDelete,
   onWatch,
   onUnwatch,
@@ -438,6 +441,9 @@ function AssumptionRow({
   assumption: Assumption;
   candidates: PickerTarget[];
   scopeError: Error | null;
+  /** A reader who is not the owner sees what is watched and how it is
+   *  faring, and none of the controls that would change the watch list. */
+  canEdit: boolean;
   onDelete: () => void;
   onWatch: (target: PickerTarget) => void;
   onUnwatch: (bindingId: string) => void;
@@ -471,6 +477,7 @@ function AssumptionRow({
             <Button
               variant="ghost"
               size="icon-xs"
+              disabled={!canEdit}
               aria-label={`Options for ${assumption.title}`}
               className="shrink-0"
             >
@@ -520,7 +527,7 @@ function AssumptionRow({
                 ? () => onOpenObject(w.objectId as string, w.domainId)
                 : undefined
             }
-            onRemove={() => onUnwatch(w.bindingId)}
+            onRemove={canEdit ? () => onUnwatch(w.bindingId) : undefined}
           />
         ))}
         {/* People sit in the same row as Elements, after them. They are the
@@ -534,19 +541,21 @@ function AssumptionRow({
             label={w.name}
             hint={w.role}
             signal={workerSignalOf(w)}
-            onRemove={() => onUnwatch(w.bindingId)}
+            onRemove={canEdit ? () => onUnwatch(w.bindingId) : undefined}
           />
         ))}
-        <IntentTargetPicker
-          label={assumption.unwatched ? 'Watch an Element or Worker' : 'Watch another'}
-          targets={candidates}
-          onPick={onWatch}
-          empty={
-            scopeError
-              ? 'Could not read this Initiative’s Elements.'
-              : 'Nothing left to watch — link Objects with work in them, or add Workers.'
-          }
-        />
+        {canEdit && (
+          <IntentTargetPicker
+            label={assumption.unwatched ? 'Watch an Element or Worker' : 'Watch another'}
+            targets={candidates}
+            onPick={onWatch}
+            empty={
+              scopeError
+                ? 'Could not read this Initiative’s Elements.'
+                : 'Nothing left to watch — link Objects with work in them, or add Workers.'
+            }
+          />
+        )}
       </div>
 
       {/* An assumption nothing can contradict is not a safe one; it is one

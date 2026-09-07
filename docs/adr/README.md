@@ -53,3 +53,4 @@
 | [0019](0019-one-delta-stream.md) | サーバーが確定した変更は 1 本の差分ストリームで受ける |
 | [0020](0020-widget-data-and-addressable-boards.md) | Widget は永続データを参照し、配置を対象別に保存する |
 | [0021](0021-the-lease-is-taken-by-rpc-not-by-prose.md) | リースは RPC で取る — 散文は記録であって取得ではない。保持者は表示名ではなくセッショントークン |
+| [0022](0022-intents-are-read-with-the-initiative-and-written-by-its-owner.md) | Intent は Initiative と一緒に読め、書けるのはそのオーナーだけ |
