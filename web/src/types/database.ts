@@ -1067,6 +1067,8 @@ export interface Notification {
   /** Initiative thread: comment_id's FK points at element_comments, so a
    *  Initiative comment hangs off these two instead. */
   strategy_id: string | null
+  /** The decision a review-due notification is about. */
+  intent_id: string | null
   strategy_comment_id: string | null
   object_id: string | null
   brief_id: string | null

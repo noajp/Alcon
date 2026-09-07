@@ -31,6 +31,7 @@ function notification(over: Partial<Notification> = {}): Notification {
     element_id: 'el-1',
     comment_id: 'c-9',
     strategy_id: null,
+    intent_id: null,
     strategy_comment_id: null,
     object_id: null,
     brief_id: null,
