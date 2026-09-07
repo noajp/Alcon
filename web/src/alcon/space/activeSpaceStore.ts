@@ -7,7 +7,7 @@ import { useSyncExternalStore } from 'react';
 // the shell and the Domain list react to a space switch. The active Domain is
 // resolved *within* the active space.
 const ACTIVE_KEY = 'alcon:active-space';
-export const ACTIVE_SPACE_CHANGE_EVENT = 'alcon:active-space-change';
+const ACTIVE_SPACE_CHANGE_EVENT = 'alcon:active-space-change';
 export const CREATE_SPACE_EVENT = 'alcon:create-space';
 
 export function getActiveSpaceId(): string | null {
