@@ -92,9 +92,11 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   // value a save merges onto. Keeping this rather than the copy the tab
   // loaded is what stops one writer from overwriting another's fields.
   const serverRef = useRef<ElementDirection>(initial);
-  // The criteria as this tab last agreed with the server. The diff a save
-  // sends is measured against this, not against whatever the list looks like
-  // now — that is what tells an edit apart from a row somebody else added.
+  // The criteria as this tab last had them — its own view, not the merged
+  // list that went to the server. The rows on screen are never re-seeded from
+  // elsewhere, so this is the only thing the current rows can honestly be
+  // diffed against: measure against the merged list and a row somebody else
+  // added, which this tab never showed, reads as a row this tab deleted.
   const loadedAcceptanceRef = useRef<AcceptanceLine[]>(initial.acceptance);
   // Every value this tab has sent. A refetch can arrive out of order, and one
   // carrying an earlier write of ours is behind rather than news — taking it
@@ -109,7 +111,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   // fire-and-forget, so a slow request can't land after a faster later one
   // and resurrect stale field values.
   const writeChainRef = useRef<Promise<void>>(Promise.resolve());
-  const pendingRef = useRef<{ value: ElementDirection; detail: string } | null>(null);
+  const pendingRef = useRef<{ value: ElementDirection; detail: string; acceptanceView?: AcceptanceLine[] } | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // What a save merges onto: the newest the server is known to hold, then the
@@ -137,7 +139,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
         // refetch, so an edit made in the meantime merges onto the write that
         // just landed instead of onto the value it replaced.
         serverRef.current = pending.value;
-        loadedAcceptanceRef.current = pending.value.acceptance;
+        if (pending.acceptanceView) loadedAcceptanceRef.current = pending.acceptanceView;
         onSaved(pending.detail);
       } catch (e) {
         console.error('Failed to save direction', e);
@@ -157,14 +159,14 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   // flushes right away (field blur — editing this field just ended);
   // otherwise the write is debounced so a streak of Enters produces one
   // write instead of one per keystroke.
-  const persist = useCallback((patch: Partial<ElementDirection>, detail: string, opts?: { immediate?: boolean }) => {
+  const persist = useCallback((patch: Partial<ElementDirection>, detail: string, opts?: { immediate?: boolean; acceptanceView?: AcceptanceLine[] }) => {
     // The base is the newest thing the server has said, with whatever this
     // tab has already queued on top of it. Merging onto the loaded copy
     // instead is what used to erase a field another writer had just changed.
     const prev = currentBase();
     const merged: ElementDirection = { ...prev, ...patch };
     if (directionEqual(merged, prev)) return;
-    pendingRef.current = { value: merged, detail };
+    pendingRef.current = { value: merged, detail, acceptanceView: opts?.acceptanceView ?? pendingRef.current?.acceptanceView };
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     if (opts?.immediate) {
       flush();
@@ -182,9 +184,10 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     // An earlier write of ours, arriving late. Behind, not news.
     if (writtenRef.current.has(directionKey(incoming))) return;
     serverRef.current = incoming;
-    // Rows this tab is not editing follow the server. The ones it is editing
-    // are held in `rows` and reconciled by the merge at save time.
-    loadedAcceptanceRef.current = incoming.acceptance;
+    // `loadedAcceptanceRef` deliberately does not move here. It is what this
+    // tab last agreed to, and the diff a save sends is measured against it —
+    // adopt someone else's list into it and their new rows read as rows this
+    // tab deleted, and their edits read as rows this tab reverted.
   }, [element.direction]);
 
   // Auto-grow the approach textarea (same pattern as the title field).
@@ -233,10 +236,11 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     // What this tab changed, applied to the list the server holds now — so a
     // criterion somebody else added while this one was being edited survives,
     // and one deleted here still goes.
+    const mine = acceptanceOf(nextRows);
     persist(
-      { acceptance: mergeAcceptance(loadedAcceptanceRef.current, acceptanceOf(nextRows), currentBase().acceptance) },
+      { acceptance: mergeAcceptance(loadedAcceptanceRef.current, mine, currentBase().acceptance) },
       'Updated acceptance criteria',
-      opts,
+      { ...opts, acceptanceView: mine },
     );
   }, [persist, currentBase]);
 
