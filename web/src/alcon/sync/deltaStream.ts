@@ -199,6 +199,12 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
     invalidateSoon(qc, ['coordination-element']);
   }
 
+  if (['elements', 'element_assignees', 'element_objects', 'objects', 'object_domains',
+    'domains', 'strategies', 'strategy_objects', 'domain_members', 'object_members', 'activity_space_members'].includes(d.table)) {
+    invalidateSoon(qc, ['domain-overview']);
+    invalidateSoon(qc, ['initiative-domains']);
+  }
+
   switch (d.table) {
     case 'elements': {
       if (!id) return;

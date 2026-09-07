@@ -34,7 +34,7 @@ export interface ModeMeta {
 export const MODE_META: Record<RailMode, ModeMeta> = {
   home:      { label: 'Home',      icon: NavHomeIcon, defaultView: 'home', views: ['home', 'inbox', 'calendar', 'my-elements', 'profile'] },
   strategy:  { label: 'Strategy',  icon: NavStrategyModeIcon, defaultView: 'strategy', views: ['strategy', 'phase', 'timeline'] },
-  execution: { label: 'Execution', icon: NavExecutionModeIcon, defaultView: 'objects', views: ['objects', 'domain-elements', 'domains'] },
+  execution: { label: 'Execution', icon: NavExecutionModeIcon, defaultView: 'objects', views: ['objects', 'domain-elements', 'domains', 'domain-overview'] },
   workload:  { label: 'Workload',  icon: NavWorkloadIcon, defaultView: 'workload', views: ['workload'] },
   notebook:  { label: 'Notebook',  icon: NavNoteIcon, defaultView: 'note', views: ['note'] },
   tables:    { label: 'Table',     icon: NavTableIcon, defaultView: 'tables', views: ['tables'] },

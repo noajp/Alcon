@@ -24,6 +24,21 @@ const DEFAULT_FLOW: Dimension[] = ['assignee', 'object', 'campaign'];
 // =============================================================
 
 export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
+  'domain-objects': {
+    type: 'domain-objects', label: 'Objects', group: 'core',
+    accepts: ['domain'], zones: ['main'], singleton: true, defaultSize: 'full',
+    load: async () => (await import('./widgets/DomainObjectsWidget')).DomainObjectsWidget,
+  },
+  'initiative-domains': {
+    type: 'initiative-domains', label: 'Related Domains', group: 'core',
+    accepts: ['initiative'], zones: ['main'], singleton: true, defaultSize: 'full',
+    load: async () => (await import('./widgets/InitiativeDomainsWidget')).InitiativeDomainsWidget,
+  },
+  'domain-initiatives': {
+    type: 'domain-initiatives', label: 'Related Initiatives', group: 'core',
+    accepts: ['domain'], zones: ['main'], singleton: true, defaultSize: 'full',
+    load: async () => (await import('./widgets/DomainInitiativesWidget')).DomainInitiativesWidget,
+  },
   'operations-planner': {
     type: 'operations-planner',
     label: 'Operations planner',
@@ -281,7 +296,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Key numbers',
     description: 'Completion, active, overdue, hours',
     group: 'progress',
-    accepts: ['object', 'me', 'initiative'],
+    accepts: ['object', 'me', 'initiative', 'domain'],
     zones: ['main'],
     singleton: true,
     padded: false,
@@ -355,7 +370,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Breakdown',
     description: 'How many, counted by whichever column you choose',
     group: 'chart',
-    accepts: ['object', 'me', 'initiative', 'domain'],
+    accepts: ['object', 'me', 'initiative'],
     zones: ['main', 'rail'],
     padded: false,
     normalizeParams: (raw) => {
