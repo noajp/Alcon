@@ -42,6 +42,11 @@ export interface DecisionInput {
   decidedBy: string | null;
   /** ISO timestamp. */
   decidedAt: string | null;
+  /** The decision that replaced this one, when a review reversed it. The
+   *  reversal and its replacement are one event read from two rows, and
+   *  neither row is worth much without the other. Optional: a surface that
+   *  only ranks decisions by their review day never reads it. */
+  supersededById?: string | null;
   orderIndex: number;
   /**
    * When this decision was last looked at again — the newest `revision` entry

@@ -171,6 +171,7 @@ export function InitiativeDecisions({
         status: i.status ?? null,
         decidedBy: i.decided_by_name ?? null,
         decidedAt: i.decided_at ?? null,
+        supersededById: i.superseded_by_intent_id ?? null,
         orderIndex: i.order_index ?? 0,
         // collectDecisionReviews sorts each list newest first.
         lastReviewedAt: reviews.get(i.id)?.[0]?.occurredAt ?? null,
@@ -180,6 +181,18 @@ export function InitiativeDecisions({
   }, [data?.subs, edits, removed, reviews]);
 
   const dueCount = countDueForReview(decisions);
+
+  // One decision reversed another: the link is stored on the reversed row, and
+  // both rows say so. Titles are resolved here, once, because a row that had to
+  // find its own counterpart would need the whole list to do it.
+  const titleOf = useMemo(() => new Map(decisions.map((d) => [d.id, d.title])), [decisions]);
+  const supersedes = useMemo(() => {
+    const back = new Map<string, string>();
+    for (const d of decisions) {
+      if (d.supersededById) back.set(d.supersededById, d.title);
+    }
+    return back;
+  }, [decisions]);
 
   /** Every decision's targets, keyed by decision. Merged by id so a link is
    *  drawn once whether it came from the write or the refetch. */
@@ -318,6 +331,23 @@ export function InitiativeDecisions({
         action_kind: 'revision',
         body: encodeReviewBody(draft.outcome, draft.reason),
       });
+      // The link is part of the same review: a reversal that does not say what
+      // replaced it leaves the reader where they started. Written after the
+      // lineage entry, because the entry is the record and this is a pointer —
+      // a failure here must not cost the review itself.
+      //
+      // Every review settles the link, including to null. A decision reversed
+      // in March and upheld in June is not still reversed, and a row that kept
+      // saying so would contradict the newest entry underneath it.
+      const link = draft.outcome === 'reversed' ? draft.supersededBy : null;
+      let linkFailed = false;
+      try {
+        await updateIntent(id, { superseded_by_intent_id: link });
+        setEdits((prev) => ({ ...prev, [id]: { ...prev[id], superseded_by_intent_id: link } }));
+      } catch (e) {
+        console.error('link superseding decision failed:', e);
+        linkFailed = true;
+      }
       setWritten((prev) => [...prev, entry]);
       setDrafts((prev) => {
         const next = { ...prev };
@@ -326,7 +356,15 @@ export function InitiativeDecisions({
       });
       setReviewing(null);
       const next = draft.alsoStatus ? suggestedStatusAfter(draft.outcome) : null;
+      // After the status write, not before: setStatus clears the failure line,
+      // and a reversal always suggests a status — so reporting the broken link
+      // any earlier would report it to nobody.
       if (next) await setStatus(id, next);
+      if (linkFailed) {
+        setFailure(link
+          ? 'The review was recorded, but the decision that replaced it was not linked.'
+          : 'The review was recorded, but the earlier reversal is still linked.');
+      }
       refetch();
     } catch (e) {
       console.error('record review failed:', e);
@@ -456,6 +494,8 @@ export function InitiativeDecisions({
               candidates={candidates(decision.id)}
               scopeError={scopeError}
               canEdit={initiative.canEdit}
+              supersededBy={titleOf.get(decision.supersededById ?? '') ?? null}
+              supersedes={supersedes.get(decision.id) ?? null}
               onLink={(target) => void link(decision.id, target)}
               onUnlink={(bindingId) => void unlink(bindingId)}
               onOpenObject={onOpenObject}
@@ -463,6 +503,7 @@ export function InitiativeDecisions({
               onDelete={() => void remove(decision.id)}
               review={{
                 entries: reviews.get(decision.id) ?? [],
+                siblings: decisions.filter((d) => d.id !== decision.id).map((d) => ({ id: d.id, title: d.title })),
                 open: reviewing === decision.id,
                 saving: reviewSaving,
                 reviewedBy,
@@ -605,14 +646,19 @@ interface ReviewDraft {
   outcome: ReviewOutcome | null;
   reason: string;
   alsoStatus: boolean;
+  /** Only a reversal has one: the decision taken in this one's place. */
+  supersededBy: string | null;
 }
 
-const EMPTY_DRAFT: ReviewDraft = { outcome: null, reason: '', alsoStatus: true };
+const EMPTY_DRAFT: ReviewDraft = { outcome: null, reason: '', alsoStatus: true, supersededBy: null };
 
 /** Everything the row needs to show and take reviews. Grouped because it is
  *  one concern, and nine loose props would read as nine. */
 interface RowReview {
   entries: DecisionReview[];
+  /** The Initiative's other decisions, offered when a review reverses this
+   *  one. Empty when this is the only decision on the board. */
+  siblings: { id: string; title: string }[];
   open: boolean;
   saving: boolean;
   reviewedBy: string;
@@ -636,6 +682,8 @@ function DecisionRow({
   candidates,
   scopeError,
   canEdit,
+  supersededBy,
+  supersedes,
   onLink,
   onUnlink,
   onOpenObject,
@@ -650,6 +698,12 @@ function DecisionRow({
   /** A reader who is not the owner sees the decision, its reviews and its
    *  landings, and none of the controls that would change them. */
   canEdit: boolean;
+  /** Title of the decision taken in this one's place, when a review reversed
+   *  it. */
+  supersededBy: string | null;
+  /** Title of the decision this one replaced — the same edge read from the
+   *  other end, so the successor is not a row that appeared from nowhere. */
+  supersedes: string | null;
   onLink: (target: PickerTarget) => void;
   onUnlink: (bindingId: string) => void;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
@@ -753,6 +807,27 @@ function DecisionRow({
         {horizonDay ? ` · review ${horizonDay}` : ''}
       </p>
 
+      {/* What happened to this call in the end. A reversal that does not name
+          its replacement, and a decision that does not say what it replaced,
+          are the same record with the interesting half missing. */}
+      {(supersededBy || supersedes) && (
+        <p className="text-[11px] text-muted-foreground/70 pl-3.5 mt-0.5">
+          {supersededBy && (
+            <span>
+              <span className="text-[var(--status-danger)]">Reversed by </span>
+              {supersededBy}
+            </span>
+          )}
+          {supersededBy && supersedes && ' · '}
+          {supersedes && (
+            <span>
+              <span className="text-[var(--text-tertiary)]">Replaces </span>
+              {supersedes}
+            </span>
+          )}
+        </p>
+      )}
+
       {/* Where the choice landed. The row above says what was decided; this
           says what in the Initiative now carries it, which is the half that
           exists nowhere else — the Object's own surface has no way to name the
@@ -825,7 +900,7 @@ function ReviewComposer({
   decisionTitle: string;
   review: RowReview;
 }) {
-  const { draft, reviewedBy, saving, onDraft, onReviewedBy, onSubmit, onClose } = review;
+  const { draft, reviewedBy, saving, siblings, onDraft, onReviewedBy, onSubmit, onClose } = review;
   const suggested = draft.outcome ? suggestedStatusAfter(draft.outcome) : null;
 
   // Escape closes and nothing else — the draft is the parent's, so reopening
@@ -863,6 +938,26 @@ function ReviewComposer({
         aria-label={`Why the review of ${decisionTitle} landed that way`}
         className={`${FIELD} text-[13px]`}
       />
+      {/* Only a reversal asks this, and only when there is something to point
+          at. The replacement is usually recorded first — a person reverses a
+          call because they have made another one — so this offers the
+          Initiative's other decisions rather than creating one. */}
+      {draft.outcome === 'reversed' && siblings.length > 0 && (
+        <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
+          Replaced by
+          <select
+            value={draft.supersededBy ?? ''}
+            onChange={(e) => onDraft({ supersededBy: e.target.value || null })}
+            aria-label={`The decision taken in place of ${decisionTitle}`}
+            className={`${FIELD} flex-1 min-w-0 text-[12px]`}
+          >
+            <option value="">Not recorded</option>
+            {siblings.map((s) => (
+              <option key={s.id} value={s.id}>{s.title}</option>
+            ))}
+          </select>
+        </label>
+      )}
       <div className="flex items-center gap-2">
         <input
           value={reviewedBy}

@@ -1401,6 +1401,9 @@ export interface Intent {
   decided_by_name: string | null
   decided_by_role: string | null
   decided_at: string | null
+  /** decision only — the decision that replaced this one when a review
+   *  reversed it. Null while this decision still stands. */
+  superseded_by_intent_id: string | null
   order_index: number
   created_by: string
   created_at: string
@@ -1428,6 +1431,7 @@ export interface IntentInsert {
   decided_by_name?: string | null
   decided_by_role?: string | null
   decided_at?: string | null
+  superseded_by_intent_id?: string | null
   order_index?: number
   created_by?: string
 }
@@ -1451,6 +1455,7 @@ export interface IntentUpdate {
   decided_by_name?: string | null
   decided_by_role?: string | null
   decided_at?: string | null
+  superseded_by_intent_id?: string | null
   order_index?: number
 }
 
