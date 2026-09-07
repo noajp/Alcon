@@ -32,11 +32,12 @@ function OperationsSurface({ kind, spaceId, onNavigate, onViewChange }: {
   const Icon = kind === 'crm' ? CrmIcon : ScmIcon;
   return (
     <div className="min-w-0 flex-1 overflow-y-auto bg-card">
-      <div className="mx-auto max-w-6xl space-y-4 p-4 sm:p-6">
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
         <header className="space-y-2">
-          <h1 className="flex items-center gap-2 text-lg font-semibold"><Icon size={20} />{kind === 'crm' ? 'CRM' : 'SCM'}</h1>
-          <p className="text-sm text-muted-foreground">
-            {kind === 'crm' ? 'Track opportunities, focus follow-ups, and turn sales risks into action.' : 'Anticipate shortages, test demand changes, and plan replenishment.'}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon size={16} />{kind === 'crm' ? 'CRM' : 'SCM'}</div>
+          <h1 className="text-2xl font-semibold">{kind === 'crm' ? 'Sales pipeline' : 'Inventory planning'}</h1>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            {kind === 'crm' ? 'Know which opportunities need a conversation, and what is likely to close.' : 'See what will run short, when it matters, and how much to replenish.'}
           </p>
         </header>
         <WidgetSurface board={board} host={host} zones={ZONES}>
