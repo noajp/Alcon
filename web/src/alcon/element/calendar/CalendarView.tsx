@@ -1,6 +1,6 @@
 'use client';
 
-import { parseDateOnly, toDateOnlyString as fmtDateOnly } from '@/alcon/shared/dateUtils';
+import { parseDateOnly, toDateOnlyString as fmtDateOnly, dayNumberOf, shiftDateOnly } from '@/alcon/shared/dateUtils';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { CalendarPlus, ChevronLeft, ChevronRight, ChevronDown, X } from 'lucide-react';
 import { Button } from '@/ui/button';
@@ -255,6 +255,32 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
     }
   };
 
+  // Dragging a chip to another day moves the whole Element, not just its end:
+  // an Element that runs a week stays a week long, shifted by the days the
+  // chip travelled. Grabbing it on any of the days it covers works — the day
+  // under the pointer at pick-up is the anchor, so the shift is what the hand
+  // actually did rather than a jump measured from the end date.
+  const [dragging, setDragging] = useState<{ id: string; from: string } | null>(null);
+  const [dragError, setDragError] = useState<string | null>(null);
+
+  const moveTo = async (entry: CalendarEntry, grabbedOn: string, dropOn: string) => {
+    if (!entry.element || grabbedOn === dropOn) return;
+    const shift = dayNumberOf(dropOn) - dayNumberOf(grabbedOn);
+    if (!shift) return;
+    const patch: { start_date?: string; due_date?: string } = {};
+    if (entry.start_date) patch.start_date = shiftDateOnly(entry.start_date, shift);
+    if (entry.due_date) patch.due_date = shiftDateOnly(entry.due_date, shift);
+    if (!patch.start_date && !patch.due_date) return;
+    setDragError(null);
+    try {
+      await updateElement(entry.id, patch);
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to move element:', e);
+      setDragError(`${entry.title} could not be moved. It is still on its original date.`);
+    }
+  };
+
   // Resolve final pastel pair for an element — custom color wins, else status pastel
   const getCardStyle = (
     element: CalendarEntry
@@ -302,6 +328,14 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
 
   return (
     <div className="flex flex-col h-full bg-card">
+      {dragError && (
+        // A move that did not land has to say so: the chip springs back to
+        // where it was, which on its own looks like the drag was never taken.
+        <p role="alert" className="flex items-center gap-2 px-4 py-2 text-[12px] text-[var(--status-danger)] bg-[var(--status-danger)]/10">
+          {dragError}
+          <Button size="xs" variant="ghost" onClick={() => setDragError(null)}>Dismiss</Button>
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[var(--border-subtle)] bg-card">
         <Button size="sm" variant="secondary" onClick={goToToday}>Today</Button>
         <Button size="icon-sm" variant="ghost" onClick={goToPrevious} aria-label="Previous period"><ChevronLeft size={16} /></Button>
@@ -354,6 +388,15 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
               <div
                 key={index}
                 onClick={(e) => setDayPicker({ date: day.date, x: e.clientX, y: e.clientY })}
+                onDragOver={(e) => { if (dragging) e.preventDefault(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (!dragging) return;
+                  const entry = elements.find((el) => el.id === dragging.id);
+                  const from = dragging.from;
+                  setDragging(null);
+                  if (entry) void moveTo(entry, from, fmtDateOnly(day.date));
+                }}
                 className={`
                   group min-h-28 border-b border-r border-[var(--border-subtle)] p-2
                   transition-colors duration-150 cursor-pointer flex flex-col
@@ -397,6 +440,15 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                     return (
                       <button
                         key={element.id}
+                        draggable={Boolean(element.element)}
+                        onDragStart={(e) => {
+                          e.stopPropagation();
+                          e.dataTransfer.effectAllowed = 'move';
+                          // Firefox refuses to start a drag without payload.
+                          e.dataTransfer.setData('text/plain', element.id);
+                          setDragging({ id: element.id, from: fmtDateOnly(day.date) });
+                        }}
+                        onDragEnd={() => setDragging(null)}
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedElement(element);
@@ -413,6 +465,8 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                           ${cardStyle.className}
                           ${overdue ? 'ring-1 ring-red-400/60' : ''}
                           ${isDone ? 'opacity-70' : ''}
+                          ${dragging?.id === element.id ? 'opacity-40' : ''}
+                          ${element.element ? 'cursor-grab active:cursor-grabbing' : ''}
                         `}
                         style={cardStyle.style}
                         title={`${element.title}${overdue ? ' (Overdue)' : ''}\nRight-click to change color`}
