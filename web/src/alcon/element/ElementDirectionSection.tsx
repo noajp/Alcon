@@ -15,14 +15,25 @@ import { normalizeDirection, type ElementDirection } from '@/types/database';
 //
 // Writes are queued (one in flight at a time) and debounced while a streak
 // of Enters is still landing, then flushed immediately on blur. A failed
-// write rolls baseRef back to the last value the server actually confirmed,
-// so a dropped save doesn't get silently treated as persisted.
+// write leaves the known server value alone, so a dropped save is not
+// mistaken for a persisted one by whatever is typed next.
 //
 // The parent mounts this with key={element.id} so switching Elements resets
-// all local editing state. NOTE: it does NOT re-sync if `element.direction`
-// changes from elsewhere (another tab, another user) while the same Element
-// stays open — that needs a real conflict/merge story and is tracked
-// separately (see el_QLT: Direction concurrent-edit follow-up).
+// all local editing state.
+//
+// A direction written somewhere else (another tab, another person) while the
+// same Element stays open is not lost: every save merges its one changed
+// field onto the newest direction the server has sent, not onto the copy this
+// tab loaded, so the other writer's fields survive. A field this tab merely
+// focused and left says nothing, since the only value it could contribute is
+// the one it loaded.
+//
+// Two limits remain, both from the inputs not re-seeding while open. What
+// this tab shows for a field it is not editing lags until the Element is
+// reopened. And the criteria are one field holding a list, so two people
+// editing *the list* concurrently is still last-writer-wins for the whole
+// list — protecting a row at a time needs the rows to have identity of their
+// own, which is the relational move el_TRJ-009 named and did not take.
 
 const EMPTY_DIRECTION: ElementDirection = { approach: null, acceptance: [], next: null };
 const WRITE_DEBOUNCE_MS = 400;
@@ -39,6 +50,17 @@ interface AcceptanceRow {
 
 function hasContent(dir: ElementDirection): boolean {
   return !!dir.approach || dir.acceptance.length > 0 || !!dir.next;
+}
+
+/** Stable identity for a direction, so "have we sent this before" is a set
+ *  lookup rather than a scan. */
+function directionKey(d: ElementDirection): string {
+  return JSON.stringify([d.approach, d.acceptance, d.next]);
+}
+
+/** The criteria a row list actually carries: trimmed, blanks dropped. */
+function acceptanceOf(rows: { text: string }[]): string[] {
+  return rows.map((r) => r.text.trim()).filter(Boolean);
 }
 
 function directionEqual(a: ElementDirection, b: ElementDirection): boolean {
@@ -68,19 +90,33 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   );
   const [next, setNext] = useState(initial.next ?? '');
 
-  // Latest direction the UI reflects (optimistic — may be ahead of the DB
-  // while a write is queued or in flight).
-  const baseRef = useRef<ElementDirection>(initial);
-  // Latest direction the server actually confirmed. A failed write rolls
-  // baseRef back to this instead of leaving it pointing at data that never
-  // made it to the DB.
-  const confirmedRef = useRef<ElementDirection>(initial);
+  // The newest direction the server is known to hold, whoever wrote it: the
+  // value a save merges onto. Keeping this rather than the copy the tab
+  // loaded is what stops one writer from overwriting another's fields.
+  const serverRef = useRef<ElementDirection>(initial);
+  // Every value this tab has sent. A refetch can arrive out of order, and one
+  // carrying an earlier write of ours is behind rather than news — taking it
+  // would hand the next save a base that undoes the later write. A value we
+  // never wrote is always news, including one that restores what we replaced.
+  const writtenRef = useRef(new Set<string>());
+  // The value currently being written. It is no longer pending and not yet
+  // the server's, and an edit made in that window has to merge onto it or it
+  // writes the field back to what it was before the request left.
+  const inflightRef = useRef<ElementDirection | null>(null);
   // One write in flight at a time — a Promise chain instead of a bare
   // fire-and-forget, so a slow request can't land after a faster later one
   // and resurrect stale field values.
   const writeChainRef = useRef<Promise<void>>(Promise.resolve());
   const pendingRef = useRef<{ value: ElementDirection; detail: string } | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // What a save merges onto: the newest the server is known to hold, then the
+  // write on its way there, then anything queued behind it.
+  const currentBase = useCallback((): ElementDirection => ({
+    ...serverRef.current,
+    ...inflightRef.current,
+    ...pendingRef.current?.value,
+  }), []);
 
   const flush = useCallback(() => {
     if (debounceTimerRef.current) {
@@ -91,16 +127,25 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     if (!pending) return;
     pendingRef.current = null;
     writeChainRef.current = writeChainRef.current.then(async () => {
+      inflightRef.current = pending.value;
       try {
+        writtenRef.current.add(directionKey(pending.value));
         await updateElement(element.id, { direction: hasContent(pending.value) ? pending.value : null });
-        confirmedRef.current = pending.value;
+        // The server now holds this. Said here rather than waiting for the
+        // refetch, so an edit made in the meantime merges onto the write that
+        // just landed instead of onto the value it replaced.
+        serverRef.current = pending.value;
         onSaved(pending.detail);
       } catch (e) {
         console.error('Failed to save direction', e);
-        // The write never landed — fall back to the last value we know is
-        // actually in the DB, rather than leaving baseRef pointing at data
-        // only this tab believes is saved.
-        baseRef.current = confirmedRef.current;
+        // The write never landed, so the server still holds what it held.
+        // The value is put back in the queue rather than dropped: nothing
+        // retries on its own, but the next edit carries it along instead of
+        // silently leaving this tab's text unsaved.
+        writtenRef.current.delete(directionKey(pending.value));
+        if (!pendingRef.current) pendingRef.current = pending;
+      } finally {
+        inflightRef.current = null;
       }
     });
   }, [element.id, onSaved]);
@@ -110,10 +155,12 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   // otherwise the write is debounced so a streak of Enters produces one
   // write instead of one per keystroke.
   const persist = useCallback((patch: Partial<ElementDirection>, detail: string, opts?: { immediate?: boolean }) => {
-    const prev = baseRef.current;
+    // The base is the newest thing the server has said, with whatever this
+    // tab has already queued on top of it. Merging onto the loaded copy
+    // instead is what used to erase a field another writer had just changed.
+    const prev = currentBase();
     const merged: ElementDirection = { ...prev, ...patch };
     if (directionEqual(merged, prev)) return;
-    baseRef.current = merged;
     pendingRef.current = { value: merged, detail };
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     if (opts?.immediate) {
@@ -121,7 +168,18 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     } else {
       debounceTimerRef.current = setTimeout(flush, WRITE_DEBOUNCE_MS);
     }
-  }, [flush]);
+  }, [flush, currentBase]);
+
+  // The detail query is invalidated when the row changes (alcon/sync), so a
+  // direction written elsewhere arrives here as a prop. Recording it costs
+  // nothing and is what the next merge reads.
+  useEffect(() => {
+    const incoming = normalizeDirection(element.direction) ?? EMPTY_DIRECTION;
+    if (directionEqual(incoming, serverRef.current)) return;
+    // An earlier write of ours, arriving late. Behind, not news.
+    if (writtenRef.current.has(directionKey(incoming))) return;
+    serverRef.current = incoming;
+  }, [element.direction]);
 
   // Auto-grow the approach textarea (same pattern as the title field).
   const approachRef = useRef<HTMLTextAreaElement | null>(null);
@@ -167,7 +225,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
 
   const saveAcceptance = useCallback((nextRows: AcceptanceRow[], opts?: { immediate?: boolean }) => {
     persist(
-      { acceptance: nextRows.map((r) => r.text.trim()).filter(Boolean) },
+      { acceptance: acceptanceOf(nextRows) },
       'Updated acceptance criteria',
       opts,
     );
@@ -177,6 +235,10 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     const cancelled = approachCancelRef.current;
     approachCancelRef.current = null;
     const value = cancelled !== null ? cancelled : approach;
+    // Focused and left without typing: there is nothing of this tab's to
+    // save, and writing the value it loaded would overwrite whatever someone
+    // else put there in the meantime.
+    if (value === approachSnapshotRef.current) return;
     persist({ approach: value.trim() || null }, 'Updated approach', { immediate: true });
   };
 
@@ -184,6 +246,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     const cancelled = nextCancelRef.current;
     nextCancelRef.current = null;
     const value = cancelled !== null ? cancelled : next;
+    if (value === nextSnapshotRef.current) return;
     persist({ next: value.trim() || null }, 'Updated next step', { immediate: true });
   };
 
@@ -239,6 +302,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
 
   const handleRowBlur = (index: number) => {
     const row = rows[index];
+    const snapshot = rowSnapshotsRef.current.get(row.key);
     rowSnapshotsRef.current.delete(row.key);
     const cancel = rowCancelRef.current;
     rowCancelRef.current = null;
@@ -247,6 +311,15 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     // here can still be the just-typed text. Use the cancelled value
     // directly rather than trusting `row.text` caught up in time.
     const text = cancel && cancel.key === row.key ? cancel.text : row.text;
+    // Left exactly as it was found. Writing the list back would send this
+    // tab's copy over a criterion somebody else added since — the same reason
+    // a bare blur on approach or next now says nothing. An untouched row that
+    // was blank was never a criterion at all, so it just goes.
+    if (snapshot !== undefined && text === snapshot) {
+      if (text.trim()) return;
+      setRows(rows.filter((_, i) => i !== index));
+      return;
+    }
     if (!text.trim()) {
       const nextRows = rows.filter((_, i) => i !== index);
       setRows(nextRows);
