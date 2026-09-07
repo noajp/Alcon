@@ -37,6 +37,10 @@ export interface InitiativeIntentState {
    *  Reading follows the Initiative (ADR 0022); writing does not, and every
    *  composer reads this one answer instead of finding out from a refusal. */
   canEdit: boolean;
+  /** Why a composer is locked, or null when it is not. Empty while the owner
+   *  is still being looked up — a "owner only" notice shown to the owner for
+   *  a frame is a small lie, and a lookup that failed is not a refusal. */
+  lockReason: string | null;
 }
 
 export function useInitiativeIntent(initiativeId: string, initiativeName: string, createdBy?: string | null): InitiativeIntentState {
@@ -57,6 +61,13 @@ export function useInitiativeIntent(initiativeId: string, initiativeName: string
   });
   const resolvedOwner = createdBy === undefined ? owner.data : createdBy;
   const canEdit = resolvedOwner !== undefined && canEditInitiative(userId, resolvedOwner);
+  const lockReason = canEdit
+    ? null
+    : owner.isError
+      ? "Could not tell who owns this Initiative — reload to try again"
+      : resolvedOwner === undefined
+        ? null
+        : "Only the Initiative's owner can change its intent";
   const { data, error, refetch } = useStrategyIntentBundle(initiativeId);
   const { scope, error: scopeError } = useInitiativeScope(initiativeId);
 
@@ -94,5 +105,6 @@ export function useInitiativeIntent(initiativeId: string, initiativeName: string
     scope,
     scopeError,
     canEdit,
+    lockReason,
   };
 }

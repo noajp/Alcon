@@ -16,6 +16,10 @@ el_STR-008 で Initiative の SELECT を Space 境界（配下 Object が見え�
 
 2。`intents_select` は `user_can_see_strategy(strategy_id)` — `strategies` の SELECT が使っているのと同じ述語 — で判定し、Initiative とその Intent は一緒に見えるか、一緒に見えないか、のどちらかにする。INSERT / UPDATE / DELETE は従来のオーナー判定を `intents_write` として残す。`intent_bindings` も同じ形（Intent 経由）。
 
+Intent にぶら下がる7表（`intent_lineage` / `intent_audits` / `intent_predictions` / `intent_resources` / `intent_alignments` / `intent_escalations` / `intent_next_actions`）も同じ形にする。Decisions のレビュー済み判定は `intent_lineage` を読むので、ここを閉じたままだと閲覧者にはレビュー済みの決定が「Overdue」に見える —— 読めるはずの事実が別の事実に化ける。
+
+コンポーザだけでなく行のコントロール（Edit / Delete / Reading / レビュー記録 / リンクの追加と解除 / ステータス変更）も `canEdit` で閉じる。ロックの理由はオーナーが判明してから出す。判明前に「オーナーだけ」と言えばオーナー自身に一瞬嘘をつくし、照会に失敗したなら拒否ではなく失敗と言う。
+
 UI 側は `InitiativeIntentProvider` が Initiative の `created_by` を受け取り、`canEdit` を Intent の state として配る。Measures / Decisions / Assumptions のコンポーザは `canEdit` が偽なら disabled + 理由。判定は ELE_STR-021 と同じ `canEditInitiative`（表示名ではなく `created_by` と `auth.uid()`）。
 
 ## 根拠

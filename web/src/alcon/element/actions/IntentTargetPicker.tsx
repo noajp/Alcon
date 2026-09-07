@@ -91,7 +91,9 @@ export function BoundTarget({
   hint: string | null;
   signal?: { text: string; tone: string; title?: string } | null;
   onOpen?: () => void;
-  onRemove: () => void;
+  /** Absent for a reader who may not change the Initiative — the chip
+   *  then shows the link without offering to break it. */
+  onRemove?: () => void;
 }) {
   const Icon = GLYPH[type];
   return (
@@ -114,15 +116,19 @@ export function BoundTarget({
           {signal.text}
         </span>
       )}
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        aria-label={`Unlink ${label}`}
-        onClick={onRemove}
-        className="size-5 shrink-0"
-      >
-        <X size={11} />
-      </Button>
+      {onRemove ? (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={`Unlink ${label}`}
+          onClick={onRemove}
+          className="size-5 shrink-0"
+        >
+          <X size={11} />
+        </Button>
+      ) : (
+        <span className="w-1" aria-hidden />
+      )}
     </span>
   );
 }
