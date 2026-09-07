@@ -39,6 +39,14 @@ describe('calendar intervals', () => {
     const range = { start_date: '2026-08-31', due_date: '2026-09-02' };
     expect(['2026-08-30', '2026-08-31', '2026-09-01', '2026-09-02', '2026-09-03'].map(day => occursOn(range, day))).toEqual([false, true, true, true, false]);
   });
+  it('covers its own first day when the start column carries a time', () => {
+    // elements.start_date is a timestamp and arrives with one; due_date does
+    // not. Compared as raw strings the timestamp sorts after its own day, so
+    // the Element used to be missing from the day it starts.
+    const ranged = { start_date: '2026-09-12T00:00:00+00:00', due_date: '2026-09-14' };
+    expect(['2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14', '2026-09-15'].map(day => occursOn(ranged, day)))
+      .toEqual([false, true, true, true, false]);
+  });
   it('supports due-only and start-only dates, and leaves undated entries off the grid', () => {
     expect(occursOn({ start_date: null, due_date: '2026-09-06' }, '2026-09-06')).toBe(true);
     expect(occursOn({ start_date: '2026-09-06', due_date: null }, '2026-09-06')).toBe(true);

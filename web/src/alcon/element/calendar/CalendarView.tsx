@@ -265,6 +265,14 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
 
   const moveTo = async (entry: CalendarEntry, grabbedOn: string, dropOn: string) => {
     if (!entry.element || grabbedOn === dropOn) return;
+    // The Element can move underneath a drag — another tab, or the sync
+    // stream. The shift is measured from the day the chip was picked up, so
+    // once that day is no longer one the Element covers, the measurement is of
+    // a position nobody is looking at any more.
+    if (!occursOn(entry, grabbedOn)) {
+      setDragError(`${entry.title} changed dates while you were dragging it. Nothing was moved.`);
+      return;
+    }
     const shift = dayNumberOf(dropOn) - dayNumberOf(grabbedOn);
     if (!shift) return;
     const patch: { start_date?: string; due_date?: string } = {};
@@ -331,7 +339,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
       {dragError && (
         // A move that did not land has to say so: the chip springs back to
         // where it was, which on its own looks like the drag was never taken.
-        <p role="alert" className="flex items-center gap-2 px-4 py-2 text-[12px] text-[var(--status-danger)] bg-[var(--status-danger)]/10">
+        <p role="alert" className="flex items-center gap-2 px-4 py-2 text-sm text-destructive">
           {dragError}
           <Button size="xs" variant="ghost" onClick={() => setDragError(null)}>Dismiss</Button>
         </p>
@@ -523,6 +531,17 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                             return (
                               <button
                                 key={element.id}
+                                // The overflow list is where a crowded day
+                                // keeps its Elements, which is exactly the day
+                                // somebody wants to move one off.
+                                draggable={Boolean(element.element)}
+                                onDragStart={(e) => {
+                                  e.stopPropagation();
+                                  e.dataTransfer.effectAllowed = 'move';
+                                  e.dataTransfer.setData('text/plain', element.id);
+                                  setDragging({ id: element.id, from: fmtDateOnly(day.date) });
+                                }}
+                                onDragEnd={() => setDragging(null)}
                                 onClick={() => {
                                   setSelectedElement(element);
                                   onElementClick?.(element);
