@@ -168,7 +168,7 @@ describe('describeBlocker', () => {
   it('names an upstream by its display_id and title', () => {
     expect(
       describeBlocker({ id: 'a', title: 'Ship the API', display_id: 'el_MED-001', status: 'todo' }),
-    ).toBe('el_MED-001 Ship the API');
+    ).toBe('MED-001 Ship the API');
   });
 
   // display_id is generated from the owning Object's prefix, so an Element can

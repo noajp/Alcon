@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { selectIn } from '@/hooks/chunkedIn';
 import { fetchStrategyElements } from '@/hooks/useSupabase';
 import type { Phase } from '@/types/database';
+import { displayIdOf } from '@/alcon/element/displayId';
 
 // =============================================================
 // What a Initiative can point at.
@@ -97,7 +98,7 @@ async function loadInitiativeScope(initiativeId: string): Promise<InitiativeScop
     const inScope = homes.find((id) => home.has(id)) ?? el.object_id ?? null;
     return {
       id: el.id,
-      displayId: el.display_id,
+      displayId: displayIdOf(el),
       title: el.title,
       status: el.status,
       dueDate: el.due_date,

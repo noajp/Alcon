@@ -40,9 +40,9 @@ describe('Decision Lab durable decision record', () => {
     expect(record.targetId).toBe('launch');
     expect(record.subtitle).toContain('Why: Meet the customer launch commitment.');
     expect(record.subtitle).toContain('Plan: Focus first');
-    expect(record.subtitle).toContain('ELE_launch · launch delivery: 2026-09-08 → 2026-09-07');
-    expect(record.subtitle).toContain('ELE_outside · outside delivery: 2026-09-07 → 2026-09-08 [outside Initiative]');
-    expect(record.abandoned).toContain('ELE_outside · outside delivery: 2026-09-07 → 2026-09-08 [outside Initiative]');
+    expect(record.subtitle).toContain('launch · launch delivery: 2026-09-08 → 2026-09-07');
+    expect(record.subtitle).toContain('outside · outside delivery: 2026-09-07 → 2026-09-08 [outside Initiative]');
+    expect(record.abandoned).toContain('outside · outside delivery: 2026-09-07 → 2026-09-08 [outside Initiative]');
     expect(record.subtitle).toContain('Other work late Elements: 0 → 1');
   });
 
@@ -52,7 +52,7 @@ describe('Decision Lab durable decision record', () => {
     const comparison = compareDecisionLab(input, scenario);
     const record = decisionLabRecord(input, comparison, scenario, 'Focus first', 'Protect launch.');
     expect(record.subtitle).toContain('Initiative unestimated Elements: 1 → 1');
-    expect(record.subtitle).toContain('ELE_unknown · unknown delivery: Unestimated → Unestimated (missing_estimate)');
+    expect(record.subtitle).toContain('unknown · unknown delivery: Unestimated → Unestimated (missing_estimate)');
     expect(record.subtitle).toContain('Other work unestimated Elements: 0 → 0');
     expect(record.subtitle).toContain('Assumptions:');
     for (const assumption of comparison.scenario.assumptions) expect(record.subtitle).toContain(assumption);

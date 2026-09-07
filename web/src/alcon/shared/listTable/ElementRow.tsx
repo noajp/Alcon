@@ -15,11 +15,12 @@ import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { useSortable } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
-import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
+import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent } from '@/ui/context-menu';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
-import { PRIORITY_OPTIONS } from '@/alcon/shared/PriorityPicker';
+import { PRIORITY_OPTIONS, PriorityPicker } from '@/alcon/shared/PriorityPicker';
 import { ActivitySignal } from '@/alcon/element/ActivitySignal';
+import { StatusPicker } from '@/alcon/element/StatusPicker';
 import { type DataColumn } from '@/alcon/object/useListColumns';
 import { STATUS_OPTIONS, type ElementUpdate, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, selectionSquareClass, STICKY_TINT_SELECTED, STICKY_TINT_HOVER } from './shared';
 import { ElementCell } from './cells';
@@ -179,8 +180,29 @@ export const ElementRow = memo(function ElementRow({
           </button>
         )}
       </td>
+      {/* Priority — the row opens on it, ahead of the id. Urgency is what a
+          person scans a list for, so it sits at the leading edge where the
+          eye already lands, not in an optional column off to the right. */}
       <td className="sticky left-7 z-10 bg-card w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
-
+        {canUpdate ? (
+          <PriorityPicker
+            value={el.priority ?? null}
+            onChange={(p) => onElementUpdate(el.id, { priority: p as ElementWithDetails['priority'] })}
+            trigger={
+              <button
+                type="button"
+                title={el.priority ? `Priority: ${el.priority}` : 'Set priority'}
+                className="flex w-full items-center justify-center rounded-md py-0.5 transition-colors hover:bg-muted/40"
+              >
+                <PriorityMark priority={el.priority ?? null} />
+              </button>
+            }
+          />
+        ) : (
+          <span className="flex items-center justify-center">
+            <PriorityMark priority={el.priority ?? null} />
+          </span>
+        )}
       </td>
       <td className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         {/* @container: the lease chip below decides how much of itself to
@@ -188,6 +210,29 @@ export const ElementRow = memo(function ElementRow({
             column is user-resizable and shares the row with the sidebar. */}
         <div className="@container flex items-center gap-2 min-w-0 min-h-[1.625rem]">
           <DisplayIdChip id={rowId} size="xs" fit="column" />
+          {/* Status — between the id and the title, so Priority · id · Status
+              read as one leading cluster: how urgent, which row, how far
+              along. The Status column can still be shown; this mark is the
+              one a person gets without configuring anything. */}
+          <span className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            {canUpdate ? (
+              <StatusPicker
+                element={el}
+                onChanged={() => { void onRefresh?.(); }}
+                trigger={
+                  <button
+                    type="button"
+                    title={`Status: ${(el.status ?? 'todo').replaceAll('_', ' ')}`}
+                    className="flex items-center justify-center rounded-md p-0.5 transition-colors hover:bg-muted/40"
+                  >
+                    <ElementProgressMark status={el.status} progress={getElementProgress(el, allCustomColumns)} size={14} />
+                  </button>
+                }
+              />
+            ) : (
+              <ElementProgressMark status={el.status} progress={getElementProgress(el, allCustomColumns)} size={14} />
+            )}
+          </span>
           <span className="text-[13px] font-medium truncate flex-1 min-w-0 text-foreground">
             {el.title}
           </span>

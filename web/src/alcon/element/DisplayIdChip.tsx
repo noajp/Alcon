@@ -5,9 +5,9 @@
 // a sub-element row and a drag preview can't drift into three shapes.
 //
 // Truncates from the FRONT. `dir="rtl"` only flips which side the ellipsis
-// lands on; the characters keep their reading order, because every id opens
-// with an ASCII run (`el_` / `ELE_` / `sub_`) that pulls the whole string
-// into one left-to-right bidi run. Selection and copy take DOM order and
+// lands on; the characters keep their reading order, because an id is made
+// only of strong left-to-right characters (Latin, CJK, digits) that pull the
+// whole string into one left-to-right bidi run. Selection and copy take DOM order and
 // are unaffected. Front-truncation is the point: ids under one Object share
 // their prefix and differ only in the trailing sequence number, so clipping
 // the back makes separate rows read identically — the failure this
@@ -39,13 +39,12 @@ export function DisplayIdChip({
    *    wide the row is — list and detail columns move with the sidebar and
    *    the right rail, so a wide window still hands a row a narrow box.
    *  - `column`: reserve a floor so titles start at the same x down a long
-   *    column, capped so one outlier can't run away. 7rem clears every
-   *    object prefix in the database at this size (worst case measured
-   *    `ELE_P1—こ-999` at 105px, against `el_` ids at 80px), so the two id
-   *    conventions in use line up instead of sitting a few px apart; the
-   *    11rem ceiling is far enough out that nothing real reaches it, and a
-   *    hypothetical longer prefix front-truncates rather than widening the
-   *    column. Plain rem because a column wants one width, not one per row.
+   *    column, capped so one outlier can't run away. 5rem clears every
+   *    object prefix in the database at this size once the entity prefix is
+   *    off the front (worst case `P1—こ-999`, ~75px); the 9rem ceiling is far
+   *    enough out that nothing real reaches it, and a hypothetical longer
+   *    prefix front-truncates rather than widening the column. Plain rem
+   *    because a column wants one width, not one per row.
    *  - `full`: never truncate. For surfaces with no hover to fall back on,
    *    like the drag preview, where a clipped id can't be recovered. */
   fit?: 'row' | 'column' | 'full';
@@ -53,7 +52,7 @@ export function DisplayIdChip({
   if (!id) return null;
   const FIT = {
     row: 'max-w-[min(10rem,35%)] truncate',
-    column: 'min-w-28 max-w-44 truncate text-left',
+    column: 'min-w-20 max-w-36 truncate text-left',
     full: '',
   }[fit];
   return (
