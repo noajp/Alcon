@@ -4,9 +4,9 @@
 // in the denominator made an Object with 2 done / 1 cancelled / 1 todo read
 // 50% on its own page and 67% in the Initiative list that opens it
 // (ELE_STR-024) — two answers to one question, at exactly the place a person
-// compares them. Every surface that draws a progress bar reads this, and the
-// risk model's notion of "open" reads the same set, so the bar and the risk
-// counts can never disagree about what is still on the plate.
+// compares them. Every progress bar, the KPI completion rate, the overdue
+// filters beside them and the models' notion of "open" read this one set, so
+// none of them can disagree about what is still on the plate.
 //
 // Pure. No React, no clock.
 

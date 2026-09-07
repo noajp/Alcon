@@ -168,7 +168,6 @@ export function parseRiskThresholds(raw: unknown): InitiativeRiskOptions {
 /** Statuses that mean nobody has picked the work up yet. */
 const UNSTARTED = new Set(['backlog', 'todo']);
 
-
 /** Not done, not cancelled — the work still on the Initiative's plate. */
 export function isOpen(el: RiskElement): boolean {
   return isOpenStatus(el.status);

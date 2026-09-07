@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { isBefore, addDays, startOfDay } from 'date-fns';
 import { STATUS, PRIORITY, STATUS_ORDER, PRIORITY_ORDER, priorityColor, statusColor } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
+import { completionOf } from '@/alcon/shared/completion';
 
 interface StatusCount {
   status: string;
@@ -63,7 +64,8 @@ export function useDashboardData(elements: ElementWithDetails[]): DashboardData 
     }));
 
     const completedCount = statusMap.get('done') ?? 0;
-    const completionRate = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+    // The same denominator every progress bar uses — cancelled work is not pending.
+    const completionRate = completionOf(elements).pct;
 
     // --- Priority counts ---
     const priorityMap = new Map<string, number>();

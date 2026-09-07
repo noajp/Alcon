@@ -24,6 +24,7 @@ import {
   type CapacitySpan,
   type CapacityWorker,
 } from '@/alcon/shared/workerCapacity';
+import { isOpenStatus } from '@/alcon/shared/completion';
 
 /** The parts of an Element that decide whether it rests on one person. */
 export interface BusElement {
@@ -89,11 +90,10 @@ export interface InitiativeBusFactor {
   holders: SoleHolder[];
 }
 
-const CLOSED = new Set(['done', 'cancelled']);
 
 /** Not done, not cancelled — the work still on the Initiative's plate. */
 function isOpen(el: BusElement): boolean {
-  return !CLOSED.has(el.status ?? '');
+  return isOpenStatus(el.status);
 }
 
 /** The window's local calendar days, today first. */

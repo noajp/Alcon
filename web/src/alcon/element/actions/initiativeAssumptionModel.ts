@@ -41,6 +41,7 @@ import {
   type CapacityWorker,
 } from '@/alcon/shared/workerCapacity';
 import type { IntentKind } from '@/types/database';
+import { isOpenStatus } from '@/alcon/shared/completion';
 
 /**
  * What marks an `intents` row as an assumption rather than a decision.
@@ -144,7 +145,6 @@ export interface Assumption extends Omit<AssumptionInput, 'watches' | 'workers'>
 }
 
 /** Statuses that take an Element out of play — neither can shake anything. */
-const CLOSED = new Set(['done', 'cancelled']);
 
 const BLOCKED = 'blocked';
 
@@ -168,7 +168,7 @@ function dayNumber(day: string): number | null {
  * and a cancelled one cannot block anything.
  */
 export function evaluateWatch(input: WatchInput, now: Date): Watch {
-  const closed = CLOSED.has(input.status ?? '');
+  const closed = !isOpenStatus(input.status);
   const today = dayNumber(toDateOnlyString(now));
   const due = input.dueDate ? dayNumber(input.dueDate) : null;
   const late = !closed && today !== null && due !== null && due < today;
