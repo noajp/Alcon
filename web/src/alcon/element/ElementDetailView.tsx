@@ -88,7 +88,7 @@ import { Smile, FileText } from 'lucide-react';
 import { isCancelKey, isCommitEnter, isSubmitChord, useCancelOnEscape, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { NotePicker } from '@/alcon/brief/NotePicker';
 import { LinkedNoteEmbed } from '@/alcon/brief/LinkedNoteEmbed';
-import { logActivity, useElementActivity, mergeActivity, type ActivityKind } from './elementActivity';
+import { logActivity, useElementActivityLog, invalidateElementActivity, mergeActivity, type ActivityKind } from './elementActivity';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { formatElementDate } from '@/alcon/shared/dateUtils';
@@ -380,7 +380,7 @@ function ElementDetailBody({
 
   // Activity log — element_activity rows (status ones written by the DB
   // trigger, the rest by log() below) plus a synthetic "created" line.
-  const { data: activityEntries } = useElementActivity(element.id);
+  const { data: activityEntries } = useElementActivityLog(element.id);
   const activityLog = useMemo(
     () => mergeActivity(activityEntries ?? [], element),
     [activityEntries, element],
@@ -470,7 +470,9 @@ function ElementDetailBody({
     // StatusPicker has already persisted the status change; this just
     // records the activity-log entry and notifies assignees.
     try {
-      // Status changes are recorded by the element_activity trigger — from here, from an agent, or from SQL alike.
+      // The status row is written by the element_activity trigger — from here,
+      // from an agent, or from SQL alike — so ask the rail to look again.
+      void invalidateElementActivity(element.id);
       const assigneeUserIds = (element.assignees || [])
         .map(a => a.worker?.user_id)
         .filter((u): u is string => !!u && u !== user?.id);

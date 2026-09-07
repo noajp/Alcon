@@ -54,12 +54,21 @@ async function fetchActivity(elementId: string): Promise<ActivityEntry[]> {
   return (data ?? []) as ActivityEntry[];
 }
 
-export function useElementActivity(elementId: string) {
+export function useElementActivityLog(elementId: string) {
   return useQuery({
     queryKey: KEY(elementId),
     queryFn: () => fetchActivity(elementId),
     staleTime: 15_000,
   });
+}
+
+/**
+ * Re-read the rail. Status rows are written by a database trigger, not by
+ * the client, so the caller that changed the status has to say "look again"
+ * — until element_activity rides the delta stream, nothing else will.
+ */
+export async function invalidateElementActivity(elementId: string): Promise<void> {
+  await getQueryClient().invalidateQueries({ queryKey: KEY(elementId) });
 }
 
 /** Append an entry and refresh the rail. actor_id is stamped by the database. */
@@ -73,7 +82,7 @@ export async function logActivity(
     .from('element_activity')
     .insert({ element_id: elementId, kind, detail, author });
   if (error) throw error;
-  await getQueryClient().invalidateQueries({ queryKey: KEY(elementId) });
+  await invalidateElementActivity(elementId);
 }
 
 /**
