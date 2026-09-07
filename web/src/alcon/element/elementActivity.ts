@@ -63,9 +63,9 @@ export function useElementActivityLog(elementId: string) {
 }
 
 /**
- * Re-read the rail. Status rows are written by a database trigger, not by
- * the client, so the caller that changed the status has to say "look again"
- * — until element_activity rides the delta stream, nothing else will.
+ * Re-read the rail now. Status rows are written by a database trigger, not by
+ * the client; the delta stream will announce the row too, but the person who
+ * just changed the status should not wait on a round trip to see it.
  */
 export async function invalidateElementActivity(elementId: string): Promise<void> {
   await getQueryClient().invalidateQueries({ queryKey: KEY(elementId) });

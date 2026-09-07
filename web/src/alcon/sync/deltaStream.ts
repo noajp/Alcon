@@ -58,7 +58,7 @@ import type {
 const WORKSPACE_TABLES = [
   'elements', 'subelements', 'element_assignees', 'element_objects',
   'custom_column_values', 'custom_columns', 'custom_column_placements',
-  'element_comments', 'element_reactions', 'element_edges',
+  'element_comments', 'element_reactions', 'element_edges', 'element_activity',
   'objects', 'workers', 'domains', 'worker_availability',
   'domain_members', 'object_members', 'activity_space_members', 'object_domains',
   'widget_boards', 'tables', 'table_columns', 'table_rows', 'table_cells',
@@ -225,6 +225,15 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
       forEachExplorer(qc, (data) => removeElementFromExplorer(data, id));
       forEachMyElements(qc, (list) => removeElementFromList(list, id));
       qc.removeQueries({ queryKey: ['element', id] });
+      return;
+    }
+
+    case 'element_activity': {
+      // Append-only; a DELETE carries only its id. A new row — a status the
+      // trigger recorded for an agent, a note another client left — asks the
+      // one Element's rail to look again. The key is elementActivity.ts's.
+      const a = row as { element_id?: string };
+      if (d.type === 'INSERT' && a.element_id) invalidateSoon(qc, ['elementActivity', a.element_id]);
       return;
     }
 
