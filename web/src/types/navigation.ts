@@ -1,4 +1,9 @@
+import type { OperationsQueue } from '@/alcon/sustainment/operationsQueues';
+
 export interface NavigationState {
+  /** Each operations App keeps its selected queue within this window tab. */
+  crmQueue?: OperationsQueue;
+  scmQueue?: OperationsQueue;
   objectId: string | null;
   /** Domain accompanying an explicit Object route. Keeps the destination
    * Object selected while the shell changes its active Domain. */

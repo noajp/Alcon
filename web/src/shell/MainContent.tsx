@@ -184,7 +184,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           )}
 
           {(activeActivity === 'crm' || activeActivity === 'scm') && (
-            <OperationsView kind={activeActivity} onNavigate={onNavigate} onViewChange={onViewChange} />
+            <OperationsView navigation={navigation} kind={activeActivity} onNavigate={onNavigate} onViewChange={onViewChange} />
           )}
 
           {activeActivity === 'team' && (

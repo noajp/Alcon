@@ -1,3 +1,4 @@
+import { operationsQueues } from '@/alcon/sustainment/operationsQueues';
 import { describe, expect, it } from 'vitest';
 import type { DataTableSchema } from '@/alcon/table/data';
 import type { Json } from '@/types/database';
@@ -277,5 +278,31 @@ describe('source integrity', () => {
   it('rejects an invalid reference date rather than reading the local clock', () => {
     const { schema, params } = fixture('crm', []);
     expect(() => analyzeOperations(schema, params, '2026-02-29')).toThrow('Analysis date must be a valid YYYY-MM-DD date.');
+  });
+});
+
+describe('operations queues', () => {
+  it('keeps invalid opportunities out of actionable work, and closed deals out of follow-ups', () => {
+    const analysis = crm([
+      opportunity({ nextActionDate: '2026-09-01' }),
+      opportunity({ amount: null, nextActionDate: '2026-09-01' }),
+      opportunity({ stage: 'won', nextActionDate: '2026-09-01' }),
+      opportunity(),
+    ]);
+    const queues = operationsQueues(analysis);
+    expect(queues.attention.map(row => row.rowId)).toEqual(['row-0']);
+    expect(queues.incomplete.map(row => row.rowId)).toEqual(['row-1']);
+  });
+
+  it('reclassifies corrected stock inputs and responds to scenario changes', () => {
+    const incomplete = operationsQueues(scm([item({ onHand: null })]));
+    expect(incomplete.attention).toHaveLength(0);
+    expect(incomplete.incomplete).toHaveLength(1);
+    const corrected = operationsQueues(scm([item({ onHand: 1000 })]));
+    expect(corrected.attention).toHaveLength(0);
+    expect(corrected.incomplete).toHaveLength(0);
+    const increasedDemand = operationsQueues(scm([item({ onHand: 1000 })], { demandMultiplier: 10 }));
+    expect(increasedDemand.attention).toHaveLength(1);
+    expect(increasedDemand.incomplete).toHaveLength(0);
   });
 });

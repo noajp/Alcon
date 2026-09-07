@@ -6,22 +6,27 @@ import { CRM_BOARD, SCM_BOARD } from '@/alcon/widget/defaults';
 import { useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
 import { CrmIcon, ScmIcon } from '@/alcon/shared/conceptIcons';
 import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+import type { NavigationState } from '@/types/navigation';
+import { OperationsNavigationContext } from './OperationsNavigation';
+import { operationsQueue, operationsQueueRoute } from './operationsQueues';
 import type { OperationsKind } from './operationsModel';
 
 const ZONES: Zone[] = ['main'];
 export function OperationsView(props: {
   kind: OperationsKind;
-  onNavigate: NonNullable<WidgetHost['onNavigate']>;
+  navigation: NavigationState;
+  onNavigate: (navigation: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
 }) {
   const spaceId = useActiveSpaceId();
   return <OperationsSurface key={`${props.kind}:${spaceId}`} {...props} spaceId={spaceId} />;
 }
 
-function OperationsSurface({ kind, spaceId, onNavigate, onViewChange }: {
+function OperationsSurface({ kind, navigation, spaceId, onNavigate, onViewChange }: {
   kind: OperationsKind;
+  navigation: NavigationState;
   spaceId: string | null;
-  onNavigate: NonNullable<WidgetHost['onNavigate']>;
+  onNavigate: (navigation: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
 }) {
   const board = useBoard(kind, kind === 'crm' ? CRM_BOARD : SCM_BOARD, spaceId ?? 'me');
@@ -29,6 +34,8 @@ function OperationsSurface({ kind, spaceId, onNavigate, onViewChange }: {
   const host = useMemo<WidgetHost>(() => ({
     subject: { kind: 'me', id: null }, elements: [], explorerData, onNavigate, onViewChange,
   }), [explorerData, onNavigate, onViewChange]);
+  const queue = operationsQueue(navigation, kind);
+  const navigationContext = useMemo(() => ({ kind, queue, onSelect: (value: typeof queue) => onNavigate(operationsQueueRoute(kind, value)) }), [kind, queue, onNavigate]);
   const Icon = kind === 'crm' ? CrmIcon : ScmIcon;
   return (
     <div className="min-w-0 flex-1 overflow-y-auto bg-card">
@@ -40,9 +47,11 @@ function OperationsSurface({ kind, spaceId, onNavigate, onViewChange }: {
             {kind === 'crm' ? 'Know which opportunities need a conversation, and what is likely to close.' : 'See what will run short, when it matters, and how much to replenish.'}
           </p>
         </header>
+        <OperationsNavigationContext.Provider value={navigationContext}>
         <WidgetSurface board={board} host={host} zones={ZONES}>
           <WidgetZone zone="main" columns={1} />
         </WidgetSurface>
+        </OperationsNavigationContext.Provider>
       </div>
     </div>
   );
