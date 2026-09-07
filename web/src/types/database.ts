@@ -769,6 +769,15 @@ export interface AlconObjectWithChildren extends AlconObject {
 }
 
 // Element with all details
+/** Comment rollup for one Element — how many comments, and when the thread
+ *  last moved. Computed by get_element_activity, not a stored row (the stored
+ *  audit trail is `ElementActivity`). */
+export interface ElementCommentActivity {
+  commentCount: number
+  /** created_at of the newest comment (ISO). */
+  lastCommentAt: string
+}
+
 export interface ElementWithDetails extends Element {
   subelements?: Subelement[]
   assignees?: ElementAssigneeWithWorker[]
@@ -782,6 +791,10 @@ export interface ElementWithDetails extends Element {
    *  column — e.g. My Elements' "Objects" column (Asana My Tasks "Projects").
    *  Optional: only populated where the view needs the names. */
   objects?: { id: string; name: string }[];
+  /** Comment rollup, attached by the surface that fetched it
+   *  (`withCommentActivity`). Absent means "not fetched here", not "no
+   *  comments" — a surface that never asks leaves it undefined. */
+  activity?: ElementCommentActivity;
 }
 
 // Element assignee with worker info

@@ -199,10 +199,11 @@ export {
   toggleReaction,
   updateElementComment,
   useCarryOverReasons,
-  useElementActivity,
+  useElementCommentActivity,
+  withCommentActivity,
   useElementComments,
   type CarryOverReason,
-  type ElementActivity,
+  type ElementCommentActivity,
 } from '@/alcon/element/commentData';
 
 export { globalSearch, type SearchResult } from '@/alcon/shared/searchData';

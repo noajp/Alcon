@@ -3,7 +3,7 @@
 import { memo, useState } from 'react';
 import { Grip, Lock, Check, Trash2, Fingerprint } from 'lucide-react';
 import { BUILTIN_COLUMN_ICONS } from '@/alcon/property/columnTypes';
-import type { CustomColumnWithValues, ElementActivity, ElementWithDetails, Worker } from '@/hooks/useSupabase';
+import type { CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { scheduleElementDetailPrefetch, cancelElementDetailPrefetch } from '@/alcon/element/elementDetailQueries';
 import { deleteElement, addElementAssignee, removeElementAssignee, fetchAllWorkers } from '@/hooks/useSupabase';
 import { describeBlocker, type DependencyBlocker } from '@/alcon/element/dependencyReadiness';
@@ -11,7 +11,6 @@ import { displayIdOf } from '@/alcon/element/displayId';
 import { DisplayIdChip } from '@/alcon/element/DisplayIdChip';
 import { liveLease, holderLabel, formatRemaining } from '@/alcon/element/lease';
 import { useNow } from '@/alcon/shared/useNow';
-import { formatRelative } from '@/alcon/shared/dateUtils';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { useSortable } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
@@ -20,7 +19,7 @@ import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent } from '@/ui/context-menu';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { PRIORITY_OPTIONS } from '@/alcon/shared/PriorityPicker';
-import { MessageIcon } from '@/alcon/shared/conceptIcons';
+import { ActivitySignal } from '@/alcon/element/ActivitySignal';
 import { type DataColumn } from '@/alcon/object/useListColumns';
 import { STATUS_OPTIONS, type ElementUpdate, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, selectionSquareClass, STICKY_TINT_SELECTED, STICKY_TINT_HOVER } from './shared';
 import { ElementCell } from './cells';
@@ -64,9 +63,6 @@ interface ElementRowProps {
    *  context menu's "More properties" edits from here, so a hidden column
    *  is still reachable per-row. */
   allCustomColumns: CustomColumnWithValues[];
-  /** Comment rollup (count + last activity) — undefined when the Element
-   *  has no comments, so the row shows nothing. */
-  activity?: ElementActivity;
   /** Unfinished `depends_on` upstreams — undefined when the Element is ready,
    *  so the row shows nothing. */
   blockers?: DependencyBlocker[];
@@ -77,13 +73,11 @@ export const ElementRow = memo(function ElementRow({
   hasTrailingCol, canUpdate, canRowSelect, canAddType, onAddType,
   canRemoveType, onRemoveType, dropEdge, selPrev, selNext,
   onElementUpdate, onRefresh, onSelectElement, onRowSelect, onCustomColumnValueChange,
-  allCustomColumns, activity, blockers,
+  allCustomColumns, blockers,
 }: ElementRowProps) {
   const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
+  const showsActivityColumn = visibleColumns.some((c) => c.id === 'activity');
   const rowId = displayIdOf(el);
-  // Computed once per render — the same string feeds the tooltip and the
-  // visible text, so the two can't disagree across a date boundary.
-  const activityRelative = activity ? formatRelative(activity.lastCommentAt) : null;
   // One shared 30s clock for the whole table; a lapsed lease disappears from
   // the row on the next tick without a refetch.
   const lease = liveLease(el, useNow());
@@ -218,19 +212,12 @@ export const ElementRow = memo(function ElementRow({
               <span className="hidden @[28rem]:inline truncate">{holderLabel(lease.holder)}</span>
             </span>
           )}
-          {activity && activityRelative && (
-            // Quiet activity signal — comment count + how recently the
-            // thread moved, so active vs stalled Elements read at a glance
-            // without opening the detail panel.
-            <span
-              className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70"
-              title={`${activity.commentCount} comment${activity.commentCount === 1 ? '' : 's'} · ${activityRelative}`}
-            >
-              <MessageIcon size={12} />
-              <span className="tabular-nums">{activity.commentCount}</span>
-              <span className="text-muted-foreground/50">{activityRelative}</span>
-            </span>
-          )}
+          {/* Quiet activity signal — comment count + how recently the thread
+              moved, so active vs stalled Elements read at a glance without
+              opening the detail panel. It is a stand-in for the Activity
+              column, so it steps aside when that column is on: the same
+              number twice on one row reads as two different facts. */}
+          {!showsActivityColumn && <ActivitySignal activity={el.activity} />}
           {blockers && blockers.length > 0 && (
             // Waiting on an unfinished dependency. Deliberately the same quiet
             // register as the activity signal beside it — a row that cannot be
