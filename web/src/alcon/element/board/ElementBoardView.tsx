@@ -96,7 +96,10 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
         e.dataTransfer.setData('text/id', element.id);
         draggingRef.current = false;
       }}
-      onMouseDown={(e) => { startPosRef.current = { x: e.clientX, y: e.clientY }; }}
+      // A new press starts clean: the drag flag used to stick after a
+      // text-select in the title (mousemove without a dragstart), swallowing
+      // every later click on the card.
+      onMouseDown={(e) => { draggingRef.current = false; startPosRef.current = { x: e.clientX, y: e.clientY }; }}
       onMouseMove={(e) => {
         if (!startPosRef.current) return;
         if (Math.abs(e.clientX - startPosRef.current.x) > 5 || Math.abs(e.clientY - startPosRef.current.y) > 5) {
@@ -104,10 +107,16 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
         }
       }}
       onMouseUp={() => { startPosRef.current = null; }}
-      // The drag heuristic above already tells a grab from a click; the
-      // inline controls (title, status, priority, assignee) stop propagation,
-      // so what reaches here is a click on the card itself.
-      onClick={() => { if (!draggingRef.current) onOpen?.(element); }}
+      // Opens on a plain click on the card itself. Two things are not that:
+      // a drag (the heuristic above), and a click inside one of the card's
+      // popovers — Radix renders those in a portal, so React still bubbles
+      // the event here even though the target is not a DOM descendant.
+      // Picking a due date must not also navigate away.
+      onClick={(e) => {
+        if (draggingRef.current) return;
+        if (!(e.target instanceof Node) || !e.currentTarget.contains(e.target)) return;
+        onOpen?.(element);
+      }}
       className="rounded-xl border border-border bg-card hover:shadow-sm transition-shadow cursor-grab active:cursor-grabbing"
     >
       <div className="p-4">
