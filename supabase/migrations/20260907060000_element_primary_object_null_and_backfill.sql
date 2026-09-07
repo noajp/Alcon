@@ -1,9 +1,10 @@
 -- Two ways a primary junction row could go missing are closed here. The
 -- trigger now also fires when object_id is cleared, dropping the old primary
--- row so the Element appears directly under its Domain (get_explorer_data's
--- rootElements requires zero junction rows). And every Element whose
--- junction row matching elements.object_id lacked is_primary is repaired.
--- Idempotent; safe to replay.
+-- row: with no other home left the Element appears directly under its Domain
+-- (get_explorer_data's rootElements requires zero junction rows), and with a
+-- side home left it is listed there, which is where it still lives. And every
+-- Element whose junction row matching elements.object_id lacked is_primary is
+-- repaired. Idempotent; safe to replay.
 do $m$
 begin
   if to_regclass('public.elements') is null or to_regclass('public.element_objects') is null then
@@ -14,9 +15,9 @@ begin
     create or replace function public.sync_element_primary_object()
     returns trigger language plpgsql security definer set search_path = public as $$
     begin
-      -- object_id cleared: the Element now lives directly under its Domain.
-      -- The row that recorded the old primary home goes; homes it was given
-      -- besides (is_primary false) stay, the junction being their record.
+      -- object_id cleared: the row that recorded the old primary home goes.
+      -- Homes the Element was given besides (is_primary false) stay, the
+      -- junction being their record; with none left it sits under its Domain.
       if new.object_id is null then
         if tg_op = 'UPDATE' and old.object_id is not null then
           delete from element_objects

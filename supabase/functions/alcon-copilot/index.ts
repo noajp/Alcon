@@ -272,7 +272,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "unlinkElementFromObject",
-    description: "Element の multi-home リンクを 1 本解除する。それが唯一のホームで primary なら拒否される。",
+    description: "Element の multi-home リンクを 1 本解除する。それが唯一のホームなら拒否され、primary のホームなら残る別のホームが primary になる。",
     input_schema: {
       type: "object",
       properties: {
@@ -784,6 +784,17 @@ async function runTool(
           .from("element_objects").select("object_id").eq("element_id", id);
         if (el?.object_id === objectId && (links?.length ?? 0) <= 1) {
           return { ok: false, error: "cannot remove the only home of an Element; move it first" };
+        }
+        if (el?.object_id === objectId) {
+          // Unlinking the primary home: another home takes over as primary
+          // first, and the trigger removes the old primary row with the move.
+          // Deleting the row outright would leave object_id pointing at an
+          // Object the junction no longer records.
+          const next = links!.find((l) => l.object_id !== objectId)!.object_id;
+          const { error: mvErr } = await supabase
+            .from("elements").update({ object_id: next }).eq("id", id);
+          if (mvErr) throw mvErr;
+          return { ok: true, data: { id, objectId, newPrimaryObjectId: next }, meta: { rows: 1 } };
         }
         const { error } = await supabase
           .from("element_objects").delete()
