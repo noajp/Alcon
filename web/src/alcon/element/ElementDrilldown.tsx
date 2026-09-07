@@ -1,0 +1,96 @@
+'use client';
+
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ElementDetailView } from '@/alcon/element/ElementDetailView';
+import { fetchElementWithDetails } from '@/alcon/element/data';
+import { fetchObjectDomainIds } from '@/alcon/object/data';
+import { getActiveDomainId } from '@/alcon/domain/domainsStore';
+import { useDomains } from '@/alcon/domain/data';
+import { useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
+import { objectDomainRoute } from '@/shell/navigationState';
+import { useCurrentUserId } from '@/providers/authContext';
+import { Button } from '@/ui/button';
+import type { NavigationState } from '@/types/navigation';
+
+interface Props {
+  label: string;
+  children: (openElement: (id: string) => void) => ReactNode;
+  onNavigate?: (nav: Partial<NavigationState>) => void;
+  onViewChange?: (view: string) => void;
+}
+
+/** Keep a tool's filters and scroll position while editing the actual Element. */
+export function ElementDrilldown(props: Props) {
+  const userId = useCurrentUserId();
+  const spaceId = useActiveSpaceId();
+  return <Drilldown key={`${userId}:${spaceId}`} {...props} />;
+}
+
+function Drilldown({ label, children, onNavigate, onViewChange }: Props) {
+  const [elementId, setElementId] = useState<string | null>(null);
+  const [navigationError, setNavigationError] = useState<string | null>(null);
+  const { data: domains } = useSustainmentDomains();
+  const { guestDomains } = useDomains();
+  const navigationRequest = useRef(0);
+  useEffect(() => () => { navigationRequest.current += 1; }, [elementId]);
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ['element-detail', elementId],
+    enabled: !!elementId,
+    queryFn: () => fetchElementWithDetails(elementId!),
+  });
+  const back = () => { setElementId(null); setNavigationError(null); };
+  const refresh = async () => {
+    await Promise.all([
+      query.refetch(),
+      qc.invalidateQueries({ queryKey: ['explorer'] }),
+      qc.invalidateQueries({ queryKey: ['my-elements'] }),
+      qc.invalidateQueries({ queryKey: ['worker-commitments'] }),
+      qc.invalidateQueries({ queryKey: ['team-roster'] }),
+    ]);
+  };
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      {elementId && (query.data ? (
+        <>
+          {navigationError && <p role="alert" className="px-4 py-2 text-sm text-destructive">{navigationError}</p>}
+          <ElementDetailView
+            key={elementId}
+            element={query.data}
+            objectPath={query.data.objects ?? []}
+            onBack={back}
+            onNavigateRoot={back}
+            onRefresh={refresh}
+            onNavigateObject={onNavigate && onViewChange ? (objectId) => {
+              const request = ++navigationRequest.current;
+              void fetchObjectDomainIds(objectId).then(domainIds => {
+                if (request !== navigationRequest.current) return;
+                const domainId = objectDomainRoute(domainIds, [...domains, ...guestDomains].map(domain => domain.id), getActiveDomainId());
+                if (!domainId) throw new Error('This Object has no accessible Domain in the current Space or your shared Domains.');
+                onNavigate({ objectId, objectDomainId: domainId });
+                onViewChange('objects');
+              }).catch(error => {
+                if (request === navigationRequest.current) setNavigationError(error instanceof Error ? error.message : 'Could not open this Object. Try again.');
+              });
+            } : undefined}
+            onOpenStrategy={onNavigate && onViewChange ? (strategyId) => {
+              onNavigate({ strategyId });
+              onViewChange('strategy');
+            } : undefined}
+          />
+        </>
+      ) : (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+          <p role={query.error ? 'alert' : 'status'}>{query.isPending ? 'Opening Element…' : 'This Element could not be loaded.'}</p>
+          {!query.isPending && <Button size="sm" onClick={() => void query.refetch()}>Retry</Button>}
+          <Button size="sm" onClick={back}>Back to {label}</Button>
+        </div>
+      ))}
+      <div className={elementId ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}>
+        {children(id => { setNavigationError(null); setElementId(id); })}
+      </div>
+    </div>
+  );
+}

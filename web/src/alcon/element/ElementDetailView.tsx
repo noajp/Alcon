@@ -2,12 +2,12 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUserId } from '@/providers/authContext';
-import { getActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
+import { useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
 import { Button } from '@/ui/button';
 import { ElementDependencies } from './ElementDependencies';
 import { CheckInDialog } from './now/CheckInDialog';
 import { STATUS, PRIORITY } from '@/shared/designTokens';
-import { useState, useEffect, useMemo, useRef, useCallback, useSyncExternalStore } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle, Tag,
   Ban, Send, Circle, Flag, History, Timer,
@@ -131,16 +131,11 @@ interface ElementDetailViewProps {
 }
 
 
-function subscribeSpace(callback: () => void) {
-  window.addEventListener(ACTIVE_SPACE_CHANGE_EVENT, callback);
-  return () => window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, callback);
-}
-const noSpace = () => null;
 
 /** Dependencies can be followed from every detail host, including Inbox and Calendar. */
 export function ElementDetailView(props: ElementDetailViewProps) {
   const userId = useCurrentUserId();
-  const activeSpace = useSyncExternalStore(subscribeSpace, getActiveSpaceId, noSpace);
+  const activeSpace = useActiveSpaceId();
   const spaceId = props.coordinationSpaceId === undefined ? activeSpace : props.coordinationSpaceId;
   return <ElementDetailRoute key={`${userId}:${spaceId}:${props.element.id}`} {...props} coordinationSpaceId={spaceId} />;
 }

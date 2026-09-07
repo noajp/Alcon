@@ -24,6 +24,42 @@ const delta = (table: Delta['table'], type: Delta['type'], row: Record<string, u
   ({ table, type, new: row, old });
 
 describe('applyWorkspaceDelta', () => {
+  it('keeps load warnings and every availability roster current across surfaces', () => {
+    vi.useFakeTimers();
+    try {
+      const qc = seed();
+      qc.setQueryData(['worker-availability', 'w1'], {});
+      qc.setQueryData(['worker-availability', 'w1\nw2'], {});
+      qc.setQueryData(['worker-commitments', 'w1'], {});
+      qc.setQueryData(['team-roster', 'me', 'space-a'], []);
+      qc.setQueryData(['element-detail', 'e1'], el('e1'));
+      applyWorkspaceDelta(qc, ctx, delta('worker_availability', 'DELETE', {}, { id: 'absence' }));
+      applyWorkspaceDelta(qc, ctx, delta('elements', 'UPDATE', { id: 'e1', estimated_hours: 16 }));
+      vi.advanceTimersByTime(160);
+      for (const queryKey of [
+        ['worker-availability', 'w1'], ['worker-availability', 'w1\nw2'],
+        ['worker-commitments', 'w1'], ['team-roster', 'me', 'space-a'], ['element-detail', 'e1'],
+      ]) expect(qc.getQueryState(queryKey)?.isInvalidated).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('rechecks visible scopes when Space membership changes', () => {
+    vi.useFakeTimers();
+    try {
+      const qc = seed();
+      qc.setQueryData(['domains', 'me'], []);
+      qc.setQueryData(['my-space-ids', 'me'], ['space-a']);
+      qc.setQueryData(['team-roster', 'me', 'space-a'], []);
+      qc.setQueryData(['sustainment-domains', 'me', 'space-a'], []);
+      applyWorkspaceDelta(qc, ctx, delta('activity_space_members', 'DELETE', {}, { id: 'membership' }));
+      vi.advanceTimersByTime(160);
+      for (const queryKey of [
+        ['domains', 'me'], ['my-space-ids', 'me'], ['team-roster', 'me', 'space-a'], ['explorer', '__all__'],
+        ['sustainment-domains', 'me', 'space-a'],
+      ]) expect(qc.getQueryState(queryKey)?.isInvalidated).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
   it('an elements UPDATE patches every cache that holds the row, and only that row', () => {
     const qc = seed();
     const before = qc.getQueryData<ExplorerData>(['explorer', '__all__'])!;

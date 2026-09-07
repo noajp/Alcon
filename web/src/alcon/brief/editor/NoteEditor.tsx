@@ -14,6 +14,8 @@ import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from './htmlSan
 
 export interface NoteEditorProps {
   initialHtml?: string;
+  /** Shared body. External changes reconcile the DOM; own edits preserve the caret. */
+  value?: string;
   onChange?: (html: string) => void;
   editable?: boolean;
   /** Called when the user right-clicks on a list item (bullet/check). */
@@ -62,6 +64,7 @@ const CONTAINER_BLOCKS = new Set(['BLOCKQUOTE', 'PRE']);
 
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEditor({
   initialHtml,
+  value,
   onChange,
   editable = true,
   onBulletContextMenu,
@@ -102,6 +105,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   // gets re-committed, duplicating characters. So we hold off until
   // compositionend.
   const composingRef = useRef(false);
+  const compositionStartHtmlRef = useRef('');
+  const deferredBodyRef = useRef<{ html: string } | null>(null);
   // Last known caret/selection inside the editor. The always-on header
   // toolbar lives outside the contentEditable, so clicking a button moves
   // focus out and the live selection is gone by the time the command runs.
@@ -157,24 +162,33 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     el.focus();
   }, []);
 
-  // Set initial HTML once. Avoid re-setting on every prop update — that
-  // would clobber the user's caret while they type.
-  useEffect(() => {
+  const replaceBody = useCallback((html: string | undefined) => {
     const el = ref.current;
-    if (!el || initRef.current) return;
-    initRef.current = true;
-    // New lines should be <p>, not the legacy <div> WebKit defaults to —
-    // <div> separators are what produced the malformed <div><br></div> +
-    // mis-nested list/heading soup in older notes.
-    try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch { /* not supported */ }
-    el.innerHTML = initialHtml ? sanitizeHtml(initialHtml) : '';
-    // Collapse effectively-empty bodies (incl. malformed empty scaffolding
-    // like <ul><li></li></ul>) to one clean paragraph so the placeholder
-    // shows and the caret has a home.
+    if (!el) return;
+    if (!initRef.current) {
+      // New lines are paragraphs, matching the sanitizer's block model.
+      try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch { /* not supported */ }
+      initRef.current = true;
+    }
+    el.innerHTML = html ? sanitizeHtml(html) : '';
+    savedRangeRef.current = null;
     if (isEditorEmpty(el)) el.innerHTML = '<p><br></p>';
     el.setAttribute('data-empty', isEditorEmpty(el) ? 'true' : 'false');
     lastEmittedRef.current = el.innerHTML;
-  }, [initialHtml]);
+  }, []);
+
+  // Own emitted input preserves the caret. An external body arriving during
+  // IME is held until compositionend; cancelling composition must still apply
+  // it even when React receives no subsequent value update.
+  useEffect(() => {
+    if (composingRef.current) {
+      deferredBodyRef.current = value === undefined ? null : { html: value };
+      return;
+    }
+    deferredBodyRef.current = null;
+    if (initRef.current && (value === undefined || value === lastEmittedRef.current)) return;
+    replaceBody(value ?? initialHtml);
+  }, [initialHtml, value, replaceBody]);
 
   const emit = useCallback(() => {
     const el = ref.current;
@@ -197,7 +211,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   // persists (only data-element-id, the link, survives a save).
   const applyElementStatuses = useCallback(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || composingRef.current) return;
+    const before = el.innerHTML;
     for (const li of Array.from(el.querySelectorAll<HTMLLIElement>('li[data-element-id]'))) {
       const id = li.getAttribute('data-element-id');
       const status = (id && elementStatusById?.[id]) || 'backlog';
@@ -207,12 +222,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         li.setAttribute('data-element-status', status);
       }
     }
+    // Derived status marks alone are not a user edit. Preserve a real pending
+    // DOM edit, but do not let a trailing IME input event autosave these marks.
+    if (lastEmittedRef.current === before) lastEmittedRef.current = el.innerHTML;
   }, [elementStatusById]);
 
   // Re-apply after the initial content loads and on every element change.
   useEffect(() => {
     applyElementStatuses();
-  }, [applyElementStatuses]);
+  }, [applyElementStatuses, value]);
 
   // Stamp the data-element-id link onto bullets just turned into Elements
   // (called by PageView after → Element 化), then persist.
@@ -280,13 +298,25 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   const handleCompositionStart = useCallback(() => {
     composingRef.current = true;
+    compositionStartHtmlRef.current = ref.current?.innerHTML ?? '';
+    deferredBodyRef.current = null;
   }, []);
 
   const handleCompositionEnd = useCallback(() => {
     composingRef.current = false;
-    normalizeAlignment(ref.current);
-    emit();
-  }, [emit]);
+    const locallyChanged = ref.current?.innerHTML !== compositionStartHtmlRef.current;
+    const deferred = deferredBodyRef.current;
+    deferredBodyRef.current = null;
+    if (!locallyChanged && deferred) {
+      replaceBody(deferred.html);
+    } else if (locallyChanged) {
+      // A committed local composition is the latest edit. Its own controlled
+      // echo will be recognized rather than replacing the composition's caret.
+      normalizeAlignment(ref.current);
+      emit();
+    }
+    applyElementStatuses();
+  }, [applyElementStatuses, emit, replaceBody]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     e.preventDefault();

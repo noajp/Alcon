@@ -1,7 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { getCurrentUserId, supabase } from '@/lib/supabase';
+import { useCurrentUserId } from '@/providers/authContext';
+import { createNoteContentStore, EMPTY_NOTE_CONTENT } from '@/alcon/brief/noteContentStore';
 import type {
   Brief,
   BriefComment,
@@ -393,57 +395,69 @@ export function useNotes() {
 }
 
 // ============================================
-// useNoteContent — single-file body (debounced save)
-// Reads/writes the `html` column. Note-style HTML is the only
-// supported format.
+// Note content — shared drafts and autosave queues, scoped to the signed-in user.
 // ============================================
-export function useNoteContent(noteId: string | null) {
-  const [state, setState] = useState<{ activeId: string | null; html: string; loading: boolean }>({
-    activeId: noteId,
-    html: '',
-    loading: !!noteId,
-  });
-  if (state.activeId !== noteId) {
-    setState({ activeId: noteId, html: '', loading: !!noteId });
+const contentStores = new Map<string, ReturnType<typeof createNoteContentStore>>();
+function contentStoreFor(userId: string) {
+  let store = contentStores.get(userId);
+  if (!store) {
+    const requireSameUser = async () => {
+      if (await getCurrentUserId() !== userId) throw new Error('Sign in again to sync your changes.');
+    };
+    store = createNoteContentStore({
+      async read(noteId) {
+        await requireSameUser();
+        const { data, error } = await supabase.from('note_contents').select('html').eq('note_id', noteId).maybeSingle();
+        if (error) throw error;
+        return (data as NoteContentRow | null)?.html ?? '';
+      },
+      async write(noteId, html) {
+        await requireSameUser();
+        const { error } = await supabase.from('note_contents')
+          .upsert({ note_id: noteId, html }, { onConflict: 'note_id' });
+        if (error) throw error;
+      },
+    });
+    contentStores.set(userId, store);
   }
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  return store;
+}
+
+export function useNoteContent(noteId: string | null) {
+  const userId = useCurrentUserId();
+  const store = userId ? contentStoreFor(userId) : null;
+  const subscribe = useCallback((listener: () => void) => {
+    return noteId && store ? store.subscribe(noteId, listener) : () => {};
+  }, [noteId, store]);
+  const snapshot = useCallback(() => noteId && store ? store.getSnapshot(noteId) : EMPTY_NOTE_CONTENT, [noteId, store]);
+  const state = useSyncExternalStore(subscribe, snapshot, () => EMPTY_NOTE_CONTENT);
 
   useEffect(() => {
-    if (!noteId) return;
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from('note_contents')
-        .select('html')
-        .eq('note_id', noteId)
-        .maybeSingle();
-      if (cancelled) return;
-      const next = !error && data ? ((data as NoteContentRow).html ?? '') : '';
-      setState((prev) =>
-        prev.activeId === noteId ? { activeId: noteId, html: next, loading: false } : prev
-      );
-    })();
-    return () => {
-      cancelled = true;
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    };
-  }, [noteId]);
+    if (!noteId || !store) return;
+    void store.load(noteId);
+    // Cleanup starts the save immediately; it never cancels the pending draft.
+    // The store owns the queue after this editor has gone away.
+    return () => { void store.flush(noteId); };
+  }, [noteId, store]);
 
-  const save = useCallback(
-    (nextHtml: string) => {
-      setState((prev) => (prev.activeId === noteId ? { ...prev, html: nextHtml } : prev));
-      if (!noteId) return;
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(async () => {
-        await supabase
-          .from('note_contents')
-          .upsert({ note_id: noteId, html: nextHtml }, { onConflict: 'note_id' });
-      }, 500);
-    },
-    [noteId]
-  );
+  const save = useCallback((html: string) => {
+    if (noteId && store?.getSnapshot(noteId).ready) store.edit(noteId, html);
+  }, [noteId, store]);
+  const retry = useCallback(() => {
+    if (noteId && store) void store.retry(noteId);
+  }, [noteId, store]);
 
-  return { html: state.html, loading: state.loading, save };
+  return {
+    html: state.html,
+    // Keep an unreadable Note out of the editor; status consumers show the
+    // read error and Retry without presenting a blank body as a saved one.
+    loading: !!noteId && (!state.ready || state.loading),
+    saving: state.saving || (state.dirty && !state.error),
+    error: state.error,
+    errorKind: state.errorKind,
+    retry,
+    save,
+  };
 }
 
 // ============================================
@@ -603,4 +617,3 @@ export function useBriefComments(briefId: string | null) {
     deleteComment,
   };
 }
-

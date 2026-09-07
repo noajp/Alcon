@@ -101,7 +101,7 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
-ModeRail の固定セレクタ Home / Strategy / Execution がこの構造の背骨に対応する。Sustainment の各道具は Apps ランチャーから各自がレールに追加する。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / CRM / SCM）の2グループで表示し、概念上はどちらも Sustainment に属する。
+ModeRail の固定セレクタ Home / Strategy / Execution がこの構造の背骨に対応する。Sustainment の各道具は Apps ランチャーから各自がレールに追加する。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / Calendar / CRM / SCM）の2グループで表示し、概念上はどちらも Sustainment に属する。
 
 ### Strategy と Execution の分離
 
@@ -156,14 +156,15 @@ Object は「箱」、Element は「中身」。箱は一段しかなく（ネ�
 
 | 道具 | 役割 | 実装 |
 |------|------|------|
-| **Workload** | Worker 別の日次負荷を Space 横断で俯瞰 | Apps ランチャーの App。Domain は自前のフィルタで絞る |
+| **Workload** | Space 内の Worker 別日次負荷・不在・未計画作業を俯瞰 | Apps ランチャーの App。Domain は自前のフィルタで絞る |
 | **CRM** | 商談の見通しと、優先して対応する顧客を把握 | Table の商談・顧客データを参照する `operations-planner`。通貨別の確度加重予測とフォローアップのリスクを表示 |
 | **SCM** | 欠品を予測し、需要の変化に応じた補充を計画 | 同じ `operations-planner` で在庫・需要・調達条件を参照。入荷前の欠品、推奨補充数量、通貨別費用を試算 |
 | **Notebook** | 思考・記録のドキュメント（議事録 / メモ） | 独自 HTML エディタ（`AppleNoteEditor` + `htmlSanitizer`）。**Folder → File の 2 階層**ツリー（`notes` + `note_contents.html`） |
 | **Table** | 任意の表 | `tables` + `table_columns` / `table_rows` / `table_cells`。所有者限定の RLS |
-| **Team** | Worker と所属の一覧 | `workers`（human \| ai_agent）。`element_assignees` で Element にアサイン |
-| **Calendar** | Element の期日を時間軸で管理 | 日 / 週 / 月ビュー |
+| **Team** | Worker の所属・担当・通常稼働時間を管理 | `workers`（human \| ai_agent）。`element_assignees` で Element にアサイン |
+| **Calendar** | Domain を横断して Element の予定を調整 | Apps から組織の予定を開く。Home は自分の予定を初期表示。同じ日 / 週 / 月ビューと保存先を使う |
 
+Team の名簿は Space メンバー、閲覧できる Domain のゲスト、実行に参加する Worker をまとめる。ゲストの取得はメンバー設定と同じ境界 RPC を使う。受信可能な変更イベントは名簿へ反映し、所属テーブルの RLS によりイベントを受信できない変更は、画面へのフォーカス復帰または Refresh で最新の名簿を取得する。
 
 **CRM** は商談名・顧客・段階（open / won / lost）・金額・確度・通貨・成約予定日・最終連絡日・次回アクション日を扱う。予測期間内の未成約商談を金額 × 確度で試算し、通貨ごとに集計する。連絡の停滞、次回アクションの未設定や期限超過、成約予定日の超過を示し、フォローアップ対象を絞れる。
 
@@ -213,9 +214,9 @@ check-inは、必要なstatus変更、短い更新文、任意の次の一手を
 
 ### レイアウト哲学
 - **常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス** の 3 列構成
-- **ModeRail**（46px）は分類セレクタ：固定の Home / Strategy / Execution ＋ Apps ランチャーから追加した App。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / CRM / SCM）の 2 グループで、すべて Sustainment の道具
+- **ModeRail**（46px）は分類セレクタ：固定の Home / Strategy / Execution ＋ Apps ランチャーから追加した App。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / Calendar / CRM / SCM）の 2 グループで、すべて Sustainment の道具
 - **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋ Create。本体は現在のモードに応じて切替（Home＝Now・Inbox・Calendar・My Elements / Strategy＝Initiative・Phase・Timeline / Execution＝Domain ツリー / App 各種＝モード名ラベルのみ）
-- view→モードの対応は `shell/ModeRail.tsx` の `VIEW_TO_MODE`、view id→ラベル / アイコンは `shell/viewRegistry.ts` が単一情報源
+- view→モードの対応は `shell/railApps.ts` の `MODE_META.views` / `railModeOf`、view id→ラベル / アイコンは `shell/viewRegistry.ts` が単一情報源
 
 ### ビジュアル原則
 - 入力フィールドにボーダー/リングを付けない。背景色の差だけでフィールドを示す

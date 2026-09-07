@@ -44,12 +44,12 @@ UI を作る・変えるときは design スキル（[`.claude/skills/design/SKI
 
 ### Sustainment — 兵站
 行動を支える**仕事道具**。Worker（human | ai_agent）は Execution で行動する主体であり、その Worker が働き続けられるよう支える道具が Sustainment に属する。
-- **Workload**：Worker 別の日次負荷
+- **Workload**：Worker 別の日次負荷・不在予定。Execution と同じ Element を参照し、詳細を開いて調整できる
 - **CRM**：商談・顧客の Table から、通貨別の確度加重予測とフォローアップのリスクを求める
 - **SCM**：在庫・需要・調達条件の Table から、入荷前の欠品リスクと補充数量・費用を試算する
 - **Notebook**：ドキュメント（議事録 / メモ）
 - **Table**：任意の表
-- **Team**：Worker と所属
+- **Team**：Space・Domain の所属と実行上の担当に基づく Worker 名簿。通常稼働時間の編集と Workload への導線
 - **Calendar**：Element の期日を時間軸で管理
 
 CRM / SCM は `operations-planner` ウィジェットを既定配置する App。業務入力は Table の行・セルに保存し、用途・Table ID・列 ID によるフィールド対応・シナリオ条件は `widget_boards` に保存する。App の配置はユーザー・active Space・`crm` / `scm` サーフェス別。Table の RLS は所有者限定であり、Space のメンバーシップによる共有とは別。検出したリスクから明示操作で Element を作成し、判断根拠と元データのスナップショットを説明に残す。
@@ -80,12 +80,12 @@ Property は**データ**であり、その既定の見せ方が Properties ウ�
 ```
 
 - **ModeRail** (`shell/ModeRail.tsx`, 46px)：常時表示のモードセレクタ。折りたたまれない外殻の背骨。上段は固定の Home / Strategy / Execution、区切り線の下がユーザーが Apps ランチャーから追加した App と、追加用の Apps ボタン。`railModeOf(view)` が view→モードの単一情報源で、レールのハイライトと AppSidebar の中身分岐を同時に駆動する。Initiative→Object / Object→Initiative のリンクを辿ると `activeView` が変わり、レールのモードも自動で切り替わる
-- **Apps ランチャー**：カタログ・モードのメタ・追加状態は `shell/railApps.ts` の単一情報源（`CORE_MODES` / `APP_GROUPS` / `MODE_META` / `useRailApps`）。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / CRM / SCM）の2グループに分けて表示するが、概念上はどちらも Sustainment（仕事道具）。タイルを押すとレールに追加してそのまま開く。追加済みタイルの右上に出るチェックを外すとレールから外れ、カタログに戻る。追加状態は `alcon:railApps` に localStorage 永続。追加していない App も、開いている間だけレールに現れる
+- **Apps ランチャー**：カタログ・モードのメタ・追加状態は `shell/railApps.ts` の単一情報源（`CORE_MODES` / `APP_GROUPS` / `MODE_META` / `useRailApps`）。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / Calendar / CRM / SCM）の2グループに分けて表示するが、概念上はどちらも Sustainment（仕事道具）。タイルを押すとレールに追加してそのまま開く。追加済みタイルの右上に出るチェックを外すとレールから外れ、カタログに戻る。追加状態は `alcon:railApps` に localStorage 永続。追加していない App も、開いている間だけレールに現れる
 - **AppSidebar**（折りたたみ可）：最上部に Space 名（`SpaceSwitcher`）＋ Discover(検索) ＋ Create(+)。本体は現在のモードに応じて切替：
   - **Home**：Now / Inbox / Calendar / My Elements
   - **Strategy**：Initiative / Phase / Timeline
   - **Execution**：Domain ツリー（各 Domain を開くと Objects／Elements）
-  - **Workload / CRM / SCM / Notebook / Table / Team**：Apps から追加する独立モード。それぞれ単一サーフェスをメインに開き、サイドバーはモード名ラベルのみ
+  - **Workload / Calendar / CRM / SCM / Notebook / Table / Team**：Apps から追加する独立モード。それぞれ単一サーフェスをメインに開き、サイドバーはモード名ラベルのみ
 - **TabBar**：Object 内 view 切替。`rightSlot` に view 固有コントロール（Widget の「+ Add widget」もここに入る）
 - **Widget / Board** (`alcon/widget/`)：サーフェスに乗る枠付きブロックと、その配置。サーフェスは固定の背骨（タイトル・説明など、そのものの同一性）を持ち、その周りに **Zone**（`band` 上部の帯 / `main` 本文カラム / `rail` 右レール）を置く。ウィジェットは「どの画面か」ではなく **Subject**（`object` / `initiative` / `phase` / `me` …）と Zone を宣言し、定義が自分の `import()` を持つ（`registry.tsx`）。枠は Zone が決める — `rail` は島（`RailCard`）、`main` は section、`band` は帯。どの枠もヘッダは `bg-muted/40` + `--border-subtle` の帯で、名前は枠の中にある。長押し（450ms）で arrange モードに入り、破線の輪郭・`−` バッジ・ゾーンをまたぐドラッグが有効になる（Esc / Done で抜ける）。配置は `widget_boards` にユーザー・対象・サーフェス別で永続し、バージョン検証と revision による競合検出を持つ。汎用 `data-view` は Table の列・行・値を参照し、表・カード・棒グラフとして表示する。データと構造は人間の編集UIとAIの `tableData`、配置は `widgetBoard` が同じ保存先をCRUDする
 - **CommandPalette**：⌘K でグローバル検索 + ナビ
@@ -161,7 +161,7 @@ npx vercel --prod            # 本番デプロイ
 
 1. **変更後は必ず `cd web && npx tsc --noEmit` と `cd web && npm test`**
 2. デザイントークンは `shared/designTokens.ts`。色ハードコード禁止
-3. 新 view 追加: `viewRegistry.ts` → `MainContent` 分岐 → ModeRail のモードに属させるなら `ModeRail.tsx`（`VIEW_TO_MODE` / `RAIL_DEFAULT_VIEW`）＋ `AppSidebar` のモード分岐。新モードを App にするなら `railApps.ts`（`RailMode` / `MODE_META` / `APP_GROUPS`）
+3. 新 view 追加: `viewRegistry.ts` → `MainContent` 分岐 → ModeRail のモードに属させるなら `railApps.ts` の `MODE_META`（`views` / `defaultView`）＋ `AppSidebar` のモード分岐。新モードを App にするなら `railApps.ts`（`RailMode` / `MODE_META` / `APP_GROUPS`）
 4. 新 Widget: 本体を `alcon/widget/widgets/` に置き、`registry.tsx` に定義を1つ足す（`accepts` に対応する Subject、`zones`、`load()` の動的 import）。既定の配置に入れるなら `defaults.ts` も。枠・並べ替え・削除・追加は基盤が持つので、ウィジェット側は中身だけ書く。既存ウィジェットを別の Subject に開放するのは `accepts` に1語足すだけ
 5. **図の軸を焼き込まない** — 「何を数えるか」は配置の設定であって部品の性質ではない。集計軸は `alcon/shared/dimensions.ts` の `Dimension`（リストの Grouping と同じ語彙）から選ばせ、`WidgetInstance.params` に持たせる。定義側は `normalizeParams` で既定と検証を書く。軸違いで2つ目のウィジェットを作らない
 6. 新規ファイルは `alcon/<concept>/` 配下。横断UI は `alcon/shared/`、外殻は `shell/`

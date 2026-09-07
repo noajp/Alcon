@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Check } from 'lucide-react';
 import { NavSustainmentModeIcon } from '@/shell/sidebar/NavIcons';
 import {
@@ -8,11 +8,14 @@ import {
   CORE_MODES,
   MODE_META,
   isAppMode,
+  railModeOf,
   useRailApps,
   type RailMode,
 } from '@/shell/railApps';
-import type { ViewId } from '@/shell/viewRegistry';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { Button } from '@/ui/button';
+import { Popover, PopoverTrigger } from '@/ui/popover';
+import { MenuShell, MenuSectionLabel } from '@/alcon/shared/menu';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 
 export type { RailMode };
@@ -35,53 +38,7 @@ export type { RailMode };
 // Below those three sits the launcher: the apps a person has added, then the
 // Sustainment launcher that adds them.
 
-// Which mode a given activity view belongs to — the single source of truth for
-// the rail highlight and for the AppSidebar's mode branch. Views not listed
-// (settings / account) belong to no mode, so the rail shows nothing active.
-const VIEW_TO_MODE: Record<string, RailMode> = {
-  inbox: 'home',
-  calendar: 'home',
-  'my-elements': 'home',
-  profile: 'home',
-  home: 'home',
-  // ── Strategy: Initiatives and their staging ──
-  // `strategy` is the Initiative portfolio — one artifact inside the layer, not
-  // the layer itself, which is why the mode and the view share a name without
-  // being the same thing.
-  strategy: 'strategy',
-  phase: 'strategy',
-  timeline: 'strategy',
-  // ── Execution: the fighting — Element → Object → Domain ──
-  objects: 'execution',
-  'domain-elements': 'execution',
-  domains: 'execution',
-  // ── Apps ──
-  workload: 'workload',
-  note: 'notebook',
-  tables: 'tables',
-  team: 'team',
-  crm: 'crm',
-  scm: 'scm',
-};
-
-export function railModeOf(view: string): RailMode | null {
-  return VIEW_TO_MODE[view] ?? null;
-}
-
-// The view each rail button lands on. Home opens the notifications feed;
-// Strategy opens the Initiative portfolio; Execution opens the active Domain's
-// Objects; the rest map 1:1.
-const RAIL_DEFAULT_VIEW: Record<RailMode, ViewId> = {
-  home: 'home',
-  strategy: 'strategy',
-  execution: 'objects',
-  workload: 'workload',
-  notebook: 'note',
-  tables: 'tables',
-  team: 'team',
-  crm: 'crm',
-  scm: 'scm',
-};
+export { railModeOf } from '@/shell/railApps';
 
 function RailButton({
   label,
@@ -156,8 +113,6 @@ export function ModeRail({
   const activeMode = railModeOf(activeView);
   const [apps, setApp] = useRailApps();
   const [launcherOpen, setLauncherOpen] = useState(false);
-  const [launcherPos, setLauncherPos] = useState({ left: 54, top: 12 });
-  const launcherRef = useRef<HTMLButtonElement>(null);
 
   // An app opened without being added still shows while you're inside it, so
   // the rail never leaves you without a marker for where you are.
@@ -166,19 +121,14 @@ export function ModeRail({
       ? [...apps, activeMode]
       : apps;
 
-  const openLauncher = () => {
-    const rect = launcherRef.current?.getBoundingClientRect();
-    if (rect) setLauncherPos({ left: rect.right + 8, top: rect.top });
-    setLauncherOpen(true);
-  };
-
   const open = (mode: RailMode) => {
     // Re-clicking the active mode keeps whatever sub-view is open; switching
     // modes lands on that mode's default surface.
-    if (activeMode !== mode) onViewChange(RAIL_DEFAULT_VIEW[mode]);
+    if (activeMode !== mode) onViewChange(MODE_META[mode].defaultView);
   };
 
   return (
+    <Popover open={launcherOpen} onOpenChange={setLauncherOpen}>
     <div className="flex w-[46px] shrink-0 flex-col items-center gap-1 border-r border-border bg-background py-2">
       {CORE_MODES.map((mode) => (
         <RailButton
@@ -204,10 +154,10 @@ export function ModeRail({
         />
       ))}
 
-      <button
-        ref={launcherRef}
-        type="button"
-        onClick={openLauncher}
+      <PopoverTrigger asChild>
+      <Button
+        variant="ghost"
+        size="icon-md"
         title="Sustainment"
         aria-label="Sustainment"
         aria-expanded={launcherOpen}
@@ -218,7 +168,8 @@ export function ModeRail({
         }`}
       >
         <NavSustainmentModeIcon size={18} />
-      </button>
+      </Button>
+      </PopoverTrigger>
 
       {/* Pinned to the foot of the spine regardless of how many modes/apps
           sit above — the one personal entry point on an otherwise all-work
@@ -228,18 +179,10 @@ export function ModeRail({
         <ProfileRailButton active={activeView === 'profile'} onClick={() => onViewChange('profile')} />
       </div>
 
-      {launcherOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setLauncherOpen(false)} />
-          <div
-            className="fixed z-50 w-[288px] overflow-hidden rounded-xl border border-border bg-popover p-2.5 shadow-xl"
-            style={{ left: launcherPos.left, top: launcherPos.top }}
-          >
+      <MenuShell width="wide" side="right" align="start" sideOffset={8} aria-label="Sustainment apps">
             {APP_GROUPS.map((group) => (
-              <div key={group.title} className="mb-2.5 last:mb-0">
-                <div className="px-1 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground/60">
-                  {group.title}
-                </div>
+              <div key={group.title} className="mb-2 last:mb-0">
+                <MenuSectionLabel>{group.title}</MenuSectionLabel>
                 <div className="grid grid-cols-3 gap-1">
                   {group.apps.map((mode) => {
                     const { label, icon: Icon } = MODE_META[mode];
@@ -250,28 +193,29 @@ export function ModeRail({
                             one press, no separate add step. The check on an
                             app you already keep is how it goes back to being
                             just a catalog entry. */}
-                        <button
-                          type="button"
+                        <Button
+                          variant="ghost"
                           onClick={() => {
                             setApp(mode, true);
-                            onViewChange(RAIL_DEFAULT_VIEW[mode]);
+                            onViewChange(MODE_META[mode].defaultView);
                             setLauncherOpen(false);
                           }}
-                          className="flex w-full flex-col items-center gap-1.5 rounded-lg px-2 py-3 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          className="h-20 w-full flex-col gap-2"
                         >
                           <Icon size={20} />
                           <span className="text-[11px] font-semibold">{label}</span>
-                        </button>
+                        </Button>
                         {added && (
-                          <button
-                            type="button"
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
                             onClick={() => setApp(mode, false)}
                             title={`Remove ${label} from the rail`}
                             aria-label={`Remove ${label} from the rail`}
                             className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-md text-foreground transition-colors hover:bg-sidebar-accent"
                           >
                             <Check size={12} />
-                          </button>
+                          </Button>
                         )}
                       </div>
                     );
@@ -279,9 +223,8 @@ export function ModeRail({
                 </div>
               </div>
             ))}
-          </div>
-        </>
-      )}
+      </MenuShell>
     </div>
+    </Popover>
   );
 }

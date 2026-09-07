@@ -12,7 +12,9 @@ import {
   NavWorkloadIcon,
   NavStrategyModeIcon,
   NavExecutionModeIcon,
+  NavCalendarIcon,
 } from '@/shell/sidebar/NavIcons';
+import type { ViewId } from '@/shell/viewRegistry';
 
 // The ModeRail's top-level modes, and which of them are permanent.
 //
@@ -20,24 +22,33 @@ import {
 // (Initiatives), and the fighting (Element → Object → Domain). They are always on
 // the rail and cannot be removed. Everything else is an app the user adds from the launcher, so the
 // rail stays as short as each person's actual work.
-export type RailMode = 'home' | 'strategy' | 'execution' | 'workload' | 'notebook' | 'tables' | 'team' | 'crm' | 'scm';
+export type RailMode = 'home' | 'strategy' | 'execution' | 'workload' | 'notebook' | 'tables' | 'team' | 'calendar' | 'crm' | 'scm';
 
 export interface ModeMeta {
   label: string;
   icon: React.ComponentType<{ size?: number }>;
+  defaultView: ViewId;
+  views: readonly ViewId[];
 }
 
 export const MODE_META: Record<RailMode, ModeMeta> = {
-  home:      { label: 'Home',      icon: NavHomeIcon },
-  strategy:  { label: 'Strategy',  icon: NavStrategyModeIcon },
-  execution: { label: 'Execution', icon: NavExecutionModeIcon },
-  workload:  { label: 'Workload',  icon: NavWorkloadIcon },
-  notebook:  { label: 'Notebook',  icon: NavNoteIcon },
-  tables:    { label: 'Table',     icon: NavTableIcon },
-  team:      { label: 'Team',      icon: NavTeamsIcon },
-  crm:       { label: 'CRM',       icon: NavCrmIcon },
-  scm:       { label: 'SCM',       icon: NavScmIcon },
+  home:      { label: 'Home',      icon: NavHomeIcon, defaultView: 'home', views: ['home', 'inbox', 'calendar', 'my-elements', 'profile'] },
+  strategy:  { label: 'Strategy',  icon: NavStrategyModeIcon, defaultView: 'strategy', views: ['strategy', 'phase', 'timeline'] },
+  execution: { label: 'Execution', icon: NavExecutionModeIcon, defaultView: 'objects', views: ['objects', 'domain-elements', 'domains'] },
+  workload:  { label: 'Workload',  icon: NavWorkloadIcon, defaultView: 'workload', views: ['workload'] },
+  notebook:  { label: 'Notebook',  icon: NavNoteIcon, defaultView: 'note', views: ['note'] },
+  tables:    { label: 'Table',     icon: NavTableIcon, defaultView: 'tables', views: ['tables'] },
+  team:      { label: 'Team',      icon: NavTeamsIcon, defaultView: 'team', views: ['team'] },
+  calendar:  { label: 'Calendar',  icon: NavCalendarIcon, defaultView: 'schedule', views: ['schedule'] },
+  crm:       { label: 'CRM',       icon: NavCrmIcon, defaultView: 'crm', views: ['crm'] },
+  scm:       { label: 'SCM',       icon: NavScmIcon, defaultView: 'scm', views: ['scm'] },
 };
+
+/** Navigation, highlighting and the launcher read the same mode definitions. */
+export function railModeOf(view: string): RailMode | null {
+  return (Object.keys(MODE_META) as RailMode[]).find(mode =>
+    MODE_META[mode].views.some(id => id === view)) ?? null;
+}
 
 export const CORE_MODES: RailMode[] = ['home', 'strategy', 'execution'];
 
@@ -46,7 +57,7 @@ export const CORE_MODES: RailMode[] = ['home', 'strategy', 'execution'];
 // are a display split only: Tools serve any surface, Workload watches capacity.
 export const APP_GROUPS: { title: string; apps: RailMode[] }[] = [
   { title: 'Tools', apps: ['notebook', 'tables', 'team'] },
-  { title: 'Sustainment', apps: ['workload', 'crm', 'scm'] },
+  { title: 'Sustainment', apps: ['workload', 'calendar', 'crm', 'scm'] },
 ];
 
 const APP_MODES: RailMode[] = APP_GROUPS.flatMap((g) => g.apps);

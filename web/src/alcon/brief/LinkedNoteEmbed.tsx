@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { FileText, ExternalLink, Unlink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useNoteContent } from '@/hooks/useNotesDb';
+import { NoteContentStatus } from './NoteContentStatus';
 // Editor is heavy and only mounts when a linked note is expanded — load it
 // on demand.
 const NoteEditor = dynamic(() => import('./editor/NoteEditor').then((m) => m.NoteEditor), {
@@ -36,8 +37,8 @@ export function LinkedNoteEmbed({
   onOpenInNotes,
   editable = true,
 }: LinkedNoteEmbedProps) {
-  const { html, loading, save } = useNoteContent(noteId);
-  const [name, setName] = useState<string>('');
+  const { html, loading, saving, error, errorKind, retry, save } = useNoteContent(noteId);
+  const [name, setName] = useState<{ noteId: string; value: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +48,7 @@ export function LinkedNoteEmbed({
         .select('name')
         .eq('id', noteId)
         .maybeSingle();
-      if (!cancelled && data) setName((data as { name: string }).name);
+      if (!cancelled && data) setName({ noteId, value: (data as { name: string }).name });
     })();
     return () => {
       cancelled = true;
@@ -59,7 +60,7 @@ export function LinkedNoteEmbed({
       <div className="flex items-center gap-2 px-3 h-9 border-b border-border/60 bg-muted/30">
         <FileText size={13} className="text-muted-foreground shrink-0" />
         <span className="text-[12px] font-semibold text-foreground truncate flex-1 min-w-0">
-          {name || 'Untitled note'}
+          {(name?.noteId === noteId && name.value) || 'Untitled note'}
         </span>
         {onOpenInNotes && (
           <button
@@ -82,12 +83,14 @@ export function LinkedNoteEmbed({
           </button>
         )}
       </div>
+      <NoteContentStatus loading={loading} saving={saving} error={error} errorKind={errorKind} onRetry={retry} />
       <div className="px-3 py-2 min-h-[120px]">
         {loading ? (
-          <p className="text-[12px] text-muted-foreground">Loading…</p>
+          !error && <p className="text-[12px] text-muted-foreground">Loading…</p>
         ) : (
           <NoteEditor
-            initialHtml={html}
+            key={noteId}
+            value={html}
             onChange={save}
             editable={editable}
           />

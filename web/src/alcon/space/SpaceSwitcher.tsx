@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Check, Plus, Trash2, Settings, Users, ChevronRight, LogOut, ArrowLeft } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { supabase } from '@/lib/supabase';
@@ -10,7 +10,7 @@ import {
   deleteActivitySpace,
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { getActiveSpaceId, setActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from './activeSpaceStore';
+import { useActiveSpaceId, setActiveSpaceId } from './activeSpaceStore';
 
 type Panel = 'main' | 'spaces' | 'create';
 
@@ -24,13 +24,7 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [panel, setPanel] = useState<Panel>('main');
   const [draft, setDraft] = useState('');
-  const [activeId, setActiveId] = useState<string>(() => getActiveSpaceId() ?? '');
-
-  useEffect(() => {
-    const h = (e: Event) => setActiveId((e as CustomEvent<string>).detail ?? '');
-    window.addEventListener(ACTIVE_SPACE_CHANGE_EVENT, h as EventListener);
-    return () => window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, h as EventListener);
-  }, []);
+  const activeId = useActiveSpaceId();
 
   const active = spaces.find((s) => s.id === activeId) ?? spaces[0];
 
@@ -38,7 +32,6 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
 
   const switchTo = (id: string) => {
     setActiveSpaceId(id);
-    setActiveId(id);
     setPanel('main');
   };
 

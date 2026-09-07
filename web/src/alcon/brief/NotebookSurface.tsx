@@ -11,6 +11,7 @@ import { useNotes, useNoteContent } from '@/hooks/useNotesDb';
 import { FilesPane } from '@/alcon/brief/FilesPane';
 import { NotebookBreadcrumb } from '@/alcon/brief/NotebookBreadcrumb';
 import { SectionDrawer } from '@/alcon/brief/SectionDrawer';
+import { NoteContentStatus } from '@/alcon/brief/NoteContentStatus';
 import {
   resolveFolderSelection,
   resolveSectionSelection,
@@ -84,7 +85,7 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
   const resolvedFileId = (selectedFileId && folderFiles.some((f) => f.id === selectedFileId))
     ? selectedFileId
     : (folderFiles[0]?.id ?? null);
-  const { html, loading: contentLoading, save: saveContent } = useNoteContent(resolvedFileId);
+  const { html, loading: contentLoading, saving: contentSaving, error: contentError, errorKind, retry: retryContent, save: saveContent } = useNoteContent(resolvedFileId);
   // Collapse the middle file-list pane to widen the editor (toggled from the
   // PageView header).
   const [filesPaneOpen, setFilesPaneOpen] = useState(true);
@@ -258,6 +259,9 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
                   the editor pane (it reappears once a file is chosen). On ≥sm
                   both always show side by side. */}
               <div className={`flex-1 min-w-0 flex flex-col overflow-hidden ${filesPaneOpen ? 'hidden sm:flex' : 'flex'}`}>
+              {selectedFile && (
+                <NoteContentStatus loading={contentLoading} saving={contentSaving} error={contentError} errorKind={errorKind} onRetry={retryContent} />
+              )}
               {selectedFile && !contentLoading ? (
                 <PageView
                   key={selectedFile.id}
@@ -276,6 +280,8 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
                   filesPaneOpen={filesPaneOpen}
                   onToggleFilesPane={() => setFilesPaneOpen((v) => !v)}
                 />
+              ) : selectedFile ? (
+                !contentError && <div role="status" className="flex-1 flex items-center justify-center text-sm text-muted-foreground">Loading Note…</div>
               ) : (
                 <BriefsEmptyState />
               )}

@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useSyncExternalStore } from 'react';
+import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ACTIVE_SPACE_CHANGE_EVENT, getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
+import { getActiveSpaceId, useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
 import { selectIn } from '@/hooks/chunkedIn';
+import { readAllPages as readDecisionLabPages, type CountedRows } from '@/hooks/readAllPages';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import { normalizeDirection } from '@/types/database';
@@ -11,6 +12,8 @@ import type {
   AlconObject, Element, ElementAssignee, ElementEdge, ElementObject,
   ElementWithDetails, Strategy, StrategyChild, StrategyObject, Worker, WorkerAvailability,
 } from '@/types/database';
+
+export { readAllPages as readDecisionLabPages } from '@/hooks/readAllPages';
 
 export interface DecisionLabData {
   elements: ElementWithDetails[];
@@ -28,55 +31,6 @@ const EMPTY: DecisionLabData = {
   elements: [], workers: [], availability: [], edges: [], scopeElementIds: [],
   objects: [], initiativeName: '', initiativeOwnerId: '', readAt: '',
 };
-
-interface CountedRows<Row> {
-  data: Row[] | null;
-  error: { message: string } | null;
-  count: number | null;
-}
-
-const PAGE_SIZE = 500;
-const MAX_ROWS_PER_READ = 100_000;
-
-/** An IN filter bounds URL length, not result length. Every query used by a
- * forecast must also read every server page, including a server configured with
- * a row cap smaller than our requested page. Exact counts make a short or
- * shifting result an explicit failure instead of an optimistic forecast. */
-export async function readDecisionLabPages<Row>(
-  label: string,
-  run: (from: number, to: number) => PromiseLike<CountedRows<Row>>,
-  identity: (row: Row) => string,
-): Promise<Row[]> {
-  const rows: Row[] = [];
-  const seen = new Set<string>();
-  let total: number | null = null;
-  do {
-    const result = await run(rows.length, rows.length + PAGE_SIZE - 1);
-    if (result.error) throw new Error(`Unable to read ${label}: ${result.error.message}`);
-    if (result.count === null || !Number.isSafeInteger(result.count) || result.count < 0) {
-      throw new Error(`Unable to verify the complete ${label} data. Refresh and try again.`);
-    }
-    if (result.count > MAX_ROWS_PER_READ) {
-      throw new Error(`${label} exceeds the Decision Lab read limit. Narrow the Space before forecasting.`);
-    }
-    if (total !== null && total !== result.count) {
-      throw new Error(`${label} changed while reading. Refresh and try again.`);
-    }
-    total = result.count;
-    const page = result.data ?? [];
-    if (page.length === 0 && rows.length < total) {
-      throw new Error(`The ${label} data was incomplete. Refresh and try again.`);
-    }
-    for (const row of page) {
-      const key = identity(row);
-      if (seen.has(key)) throw new Error(`${label} changed while reading. Refresh and try again.`);
-      seen.add(key);
-      rows.push(row);
-    }
-    if (rows.length > total) throw new Error(`${label} changed while reading. Refresh and try again.`);
-  } while (rows.length < total);
-  return rows;
-}
 
 function readIds<Row>(
   label: string,
@@ -245,18 +199,9 @@ export async function fetchDecisionLabData(
   };
 }
 
-function subscribeSpace(onChange: () => void) {
-  window.addEventListener(ACTIVE_SPACE_CHANGE_EVENT, onChange);
-  window.addEventListener('storage', onChange);
-  return () => {
-    window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, onChange);
-    window.removeEventListener('storage', onChange);
-  };
-}
-
 export function useDecisionLab(initiativeId: string | null) {
   const userId = useCurrentUserId();
-  const spaceId = useSyncExternalStore(subscribeSpace, getActiveSpaceId, () => null);
+  const spaceId = useActiveSpaceId();
   const enabled = Boolean(userId && spaceId && initiativeId);
   const query = useQuery({
     queryKey: ['decisionLab', userId, spaceId, initiativeId],

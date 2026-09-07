@@ -1,10 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCurrentUserId } from '@/providers/authContext';
 import { useDomains } from '@/hooks/useSupabase';
 import { useNowWork } from '@/hooks/useNowWork';
-import { setActiveDomainId } from '@/alcon/domain/domainsStore';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
+import { getActiveDomainId } from '@/alcon/domain/domainsStore';
+import { getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
+import { fetchObjectDomainIds } from '@/alcon/object/data';
+import { objectDomainRoute } from '@/shell/navigationState';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
@@ -29,35 +33,56 @@ export function NowScreen(props: NowScreenProps) {
 function NowSession({ spaceId, onNavigate, onViewChange }: NowScreenProps) {
   const userId = useCurrentUserId();
   const { data, loading, refreshing, error, refetch } = useNowWork(spaceId);
-  const { data: allDomains } = useDomains();
+  const { data: allDomains, guestDomains } = useDomains();
+  const { data: spaceDomains } = useSustainmentDomains();
   const domains = allDomains.filter(domain => domain.activity_space_id === spaceId);
+  const visibleDomains = [...spaceDomains.filter(domain => domain.activity_space_id === spaceId), ...guestDomains];
   const [scope, setScope] = useState<NowScope>('mine');
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [navigationError, setNavigationError] = useState<string | null>(null);
+  const navigationRequest = useRef(0);
+  useEffect(() => () => { navigationRequest.current += 1; }, [detailId]);
   const [editing, setEditing] = useState<ElementWithDetails | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const today = localWorkDate(new Date());
   const items = useMemo(() => buildNowItems(data.elements, data.edges, userId ?? "", scope, today), [data, userId, scope, today]);
   const detail = data.elements.find(element => element.id === detailId);
   const refresh = () => { void refetch().catch(() => {}); };
+  const openDetail = (elementId: string | null) => {
+    navigationRequest.current += 1;
+    setNavigationError(null);
+    setDetailId(elementId);
+  };
   const openObject = (objectId: string) => {
-    const domainId = data.objects.find(object => object.id === objectId)?.domain_id;
-    if (domainId) setActiveDomainId(domainId);
-    onNavigate({ objectId }); onViewChange?.('objects');
+    const request = ++navigationRequest.current;
+    setNavigationError(null);
+    void fetchObjectDomainIds(objectId).then(domainIds => {
+      if (request !== navigationRequest.current || getActiveSpaceId() !== spaceId) return;
+      const domainId = objectDomainRoute(domainIds, visibleDomains.map(domain => domain.id), getActiveDomainId());
+      if (!domainId) throw new Error('This Object has no accessible Domain in the current Space or your shared Domains.');
+      onNavigate({ objectId, objectDomainId: domainId });
+      onViewChange?.('objects');
+    }).catch(error => {
+      if (request === navigationRequest.current && getActiveSpaceId() === spaceId) {
+        setNavigationError(error instanceof Error ? error.message : 'Could not open this Object. Try again.');
+      }
+    });
   };
 
   if (loading) return <div role="status" className="flex-1 p-8 text-[13px] text-muted-foreground">Loading current work…</div>;
 
   return <>
+    {navigationError && <p role="alert" className="px-4 py-2 text-sm text-destructive">{navigationError}</p>}
     {detail ? <ElementDetailView key={detail.id} element={detail} coordinationSpaceId={spaceId}
-      domainName={domains.find(domain => domain.id === data.objects.find(object => object.id === detail.object_id)?.domain_id)?.name}
-      onBack={() => setDetailId(null)} onNavigateRoot={() => setDetailId(null)} onRefresh={refresh}
-      onOpenElement={setDetailId} onNavigateObject={openObject}
-      onOpenStrategy={strategyId => { onNavigate({ strategyId }); onViewChange?.('strategy'); }} />
+      domainName={visibleDomains.find(domain => domain.id === data.objects.find(object => object.id === detail.object_id)?.domain_id)?.name}
+      onBack={() => openDetail(null)} onNavigateRoot={() => openDetail(null)} onRefresh={refresh}
+      onOpenElement={openDetail} onNavigateObject={openObject}
+      onOpenStrategy={strategyId => { navigationRequest.current += 1; onNavigate({ strategyId }); onViewChange?.('strategy'); }} />
       : detailId ? <div className="p-8"><p role="alert" className="text-[13px] text-muted-foreground">This Element is no longer available in this Space.</p>
-        <Button className="mt-3" onClick={() => setDetailId(null)}>Back to Now</Button></div>
+        <Button className="mt-3" onClick={() => openDetail(null)}>Back to Now</Button></div>
         : <NowView items={items} scope={scope} onScopeChange={setScope} readAt={data.readAt} refreshing={refreshing}
           error={error?.message ?? null} onRefresh={refresh} onImport={() => setImportOpen(true)}
-          onOpenElement={element => setDetailId(element.id)} onCheckIn={setEditing}
+          onOpenElement={element => openDetail(element.id)} onCheckIn={setEditing}
           onPersonalWork={() => onViewChange?.('my-elements')} />}
     {editing && <CheckInDialog element={data.elements.find(element => element.id === editing.id) ?? editing}
       onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh(); }} />}
