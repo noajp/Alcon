@@ -8,11 +8,28 @@ import type { AcceptanceLine } from '@/types/database';
 // text changed, this one is gone, this one is new — and applied to the list
 // the server holds now. Rows nobody here touched stay exactly as they are,
 // including ones added while this tab was editing.
+/**
+ * A list written by a build that did not know about ids comes back with new
+ * ones derived from text and position, so none of the ids this tab is holding
+ * appear in it and every row reads as both deleted and added. Lining the two
+ * up by position recovers the correspondence: the rows are the same rows, and
+ * only their names were lost.
+ *
+ * Only when the two lists share no ids at all — one shared id means the other
+ * side kept them, and position is then the wrong thing to trust.
+ */
+function realign(base: AcceptanceLine[], theirs: AcceptanceLine[]): AcceptanceLine[] {
+  if (!base.length || !theirs.length) return theirs;
+  if (theirs.some((line) => base.some((b) => b.id === line.id))) return theirs;
+  return theirs.map((line, i) => (base[i] ? { ...line, id: base[i].id } : line));
+}
+
 export function mergeAcceptance(
   base: AcceptanceLine[],
   mine: AcceptanceLine[],
-  theirs: AcceptanceLine[],
+  theirsRaw: AcceptanceLine[],
 ): AcceptanceLine[] {
+  const theirs = realign(base, theirsRaw);
   const baseById = new Map(base.map((line) => [line.id, line]));
   const mineById = new Map(mine.map((line) => [line.id, line]));
 
@@ -35,10 +52,11 @@ export function mergeAcceptance(
   for (let i = 0; i < mine.length; i += 1) {
     const line = mine[i];
     if (baseById.has(line.id) || known.has(line.id)) continue;
-    // Kept where it was put: after the row it follows here, or at the front
-    // when it is the first line.
+    // Kept where it was put: after the row it follows here, at the front when
+    // it is the first line, and at the end when the row it followed is gone.
     const previous = mine[i - 1];
-    const at = previous ? merged.findIndex((m) => m.id === previous.id) : -1;
+    if (!previous) { merged.unshift(line); continue; }
+    const at = merged.findIndex((m) => m.id === previous.id);
     if (at === -1) merged.push(line);
     else merged.splice(at + 1, 0, line);
   }

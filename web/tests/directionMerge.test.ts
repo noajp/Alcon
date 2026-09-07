@@ -30,7 +30,12 @@ describe('merging acceptance criteria', () => {
 
   it('puts a criterion typed at the top at the top', () => {
     const mine = [line('new'), line('a'), line('b')];
-    expect(mergeAcceptance(base, mine, [line('a'), line('b')])).toEqual([line('a'), line('b'), line('new')]);
+    expect(mergeAcceptance(base, mine, [line('a'), line('b')])).toEqual([line('new'), line('a'), line('b')]);
+  });
+
+  it('keeps a new criterion whose neighbour was deleted on the other side', () => {
+    const mine = [line('a'), line('b'), line('new')];
+    expect(mergeAcceptance(base, mine, [line('a')])).toEqual([line('a'), line('new')]);
   });
 
   it('takes the other side of a row this tab did not touch', () => {
@@ -68,5 +73,31 @@ describe('comparing two criteria lists', () => {
   it('is true only for the same lines in the same order', () => {
     expect(sameAcceptance([line('a'), line('b')], [line('a'), line('b')])).toBe(true);
     expect(sameAcceptance([line('a'), line('b')], [line('b'), line('a')])).toBe(false);
+  });
+});
+
+// A client from before ids existed reads the list fine (it takes `.text`) and
+// writes it back as plain strings, so every id is regenerated from text and
+// position. Without lining the two lists up, this tab's rows would look both
+// deleted and added, and its edit would go nowhere.
+describe('a list that came back from a client without ids', () => {
+  const base = [line('u1', 'a'), line('u2', 'b')];
+
+  it('lands this tab\'s edit on the row the other client renamed, and gives the ids back', () => {
+    const mine = [line('u1', 'a'), line('u2', 'b edited here')];
+    const theirs = [line('legacy:0:A', 'A'), line('legacy:1:b', 'b')];
+    expect(mergeAcceptance(base, mine, theirs)).toEqual([line('u1', 'A'), line('u2', 'b edited here')]);
+  });
+
+  it('still deletes here, and keeps what the other client added', () => {
+    const mine = [line('u1', 'a')];
+    const theirs = [line('legacy:0:a', 'a'), line('legacy:1:b', 'b'), line('legacy:2:c', 'c')];
+    expect(mergeAcceptance(base, mine, theirs)).toEqual([line('u1', 'a'), line('legacy:2:c', 'c')]);
+  });
+
+  it('does not line up by position when the other side kept even one id', () => {
+    const mine = [line('u1', 'a edited here'), line('u2', 'b')];
+    const theirs = [line('u1', 'a'), line('legacy:1:B', 'B')];
+    expect(mergeAcceptance(base, mine, theirs)).toEqual([line('u1', 'a edited here'), line('legacy:1:B', 'B')]);
   });
 });

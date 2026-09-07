@@ -29,12 +29,14 @@ import { mergeAcceptance, sameAcceptance } from './directionMerge';
 // focused and left says nothing, since the only value it could contribute is
 // the one it loaded.
 //
-// Two limits remain, both from the inputs not re-seeding while open. What
-// this tab shows for a field it is not editing lags until the Element is
-// reopened. And the criteria are one field holding a list, so two people
-// editing *the list* concurrently is still last-writer-wins for the whole
-// list — protecting a row at a time needs the rows to have identity of their
-// own, which is the relational move el_TRJ-009 named and did not take.
+// The criteria are one field holding a list, and each line carries an id, so
+// a save sends the rows this tab changed rather than the list it is holding:
+// see directionMerge.ts. Two people editing different criteria both keep
+// their work; two people editing the same one is settled in favour of
+// whoever saves last.
+//
+// One limit remains, from the inputs not re-seeding while open: what this tab
+// shows for a field it is not editing lags until the Element is reopened.
 
 const EMPTY_DIRECTION: ElementDirection = { approach: null, acceptance: [], next: null };
 const WRITE_DEBOUNCE_MS = 400;
@@ -237,8 +239,12 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     // criterion somebody else added while this one was being edited survives,
     // and one deleted here still goes.
     const mine = acceptanceOf(nextRows);
+    const merged = mergeAcceptance(loadedAcceptanceRef.current, mine, currentBase().acceptance);
+    // Nothing to write means the server already holds this. The base still has
+    // to move, or the next diff is measured against rows this tab has dropped.
+    if (sameAcceptance(merged, currentBase().acceptance)) loadedAcceptanceRef.current = mine;
     persist(
-      { acceptance: mergeAcceptance(loadedAcceptanceRef.current, mine, currentBase().acceptance) },
+      { acceptance: merged },
       'Updated acceptance criteria',
       { ...opts, acceptanceView: mine },
     );

@@ -336,6 +336,7 @@ function legacyLineId(text: string, index: number): string {
 export function normalizeDirection(raw: unknown): ElementDirection | null {
   if (raw === null || raw === undefined || typeof raw !== 'object' || Array.isArray(raw)) return null
   const obj = raw as Record<string, unknown>
+  const seen = new Set<string>()
   const acceptance = (Array.isArray(obj.acceptance) ? obj.acceptance : [])
     .map((item, index): AcceptanceLine | null => {
       if (typeof item === 'string') return { id: legacyLineId(item, index), text: item }
@@ -351,6 +352,12 @@ export function normalizeDirection(raw: unknown): ElementDirection | null {
       return null
     })
     .filter((line): line is AcceptanceLine => line !== null)
+    // Two lines under one id would shadow each other in every lookup keyed by
+    // it — the merge's, and React's. The later one is renamed, not dropped.
+    .map((line, index) => {
+      if (!seen.has(line.id)) { seen.add(line.id); return line }
+      return { ...line, id: legacyLineId(line.text, index) }
+    })
   return {
     approach: typeof obj.approach === 'string' ? obj.approach : null,
     acceptance,
