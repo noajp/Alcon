@@ -1,12 +1,18 @@
-// localStorage-backed activity log per Element. We append an entry on
-// every meaningful change in ElementDetailView (status / priority /
-// assignee / due / estimate / title / description / direction /
-// subelement) and render the result in the Activity tab.
+'use client';
+
+// The Activity rail's data: what happened to an Element, when, by whom.
 //
-// Until a real element_activity table lands in Supabase, this is the
-// pragmatic fallback that keeps the feed populated for the user who
-// triggered the change. The shape mirrors what a future server-backed
-// table should hold so the swap is mechanical.
+// Backed by `element_activity`. The UI appends an entry on the changes it
+// makes (priority / assignee / due / estimate / title / description /
+// direction / subelement); status changes are written by a database trigger
+// instead, so a status set by an agent, by SQL, or by another client shows
+// up here too — that gap is what el_TRJ-005 was about. Reads go through the
+// query cache like every other Element read (ADR 0018).
+
+import { useQuery } from '@tanstack/react-query';
+import { getQueryClient } from '@/lib/queryClient';
+import { supabase } from '@/lib/supabase';
+import type { ElementActivity } from '@/types/database';
 
 export type ActivityKind =
   | 'created'
@@ -23,56 +29,76 @@ export type ActivityKind =
   | 'note'
   | 'comment';
 
-export interface ActivityEntry {
+type ActivityEntry = ElementActivity;
+
+/** What the rail draws: persisted entries plus the synthetic "created" line. */
+interface ActivityRow {
   id: string;
-  element_id: string;
-  kind: ActivityKind;
-  /** Plain-text summary, ready to render. */
+  kind: ActivityKind | 'created';
   detail: string;
-  /** Display name of who did it (or 'System'). */
   author: string;
-  created_at: string;
+  createdAt: Date;
 }
 
-const KEY = (elementId: string) => `alcon:activity:${elementId}`;
+const KEY = (elementId: string) => ['elementActivity', elementId] as const;
+const LIMIT = 200;
 
-function safeParse<T>(raw: string | null, fallback: T): T {
-  if (!raw) return fallback;
-  try { return JSON.parse(raw) as T; } catch { return fallback; }
+async function fetchActivity(elementId: string): Promise<ActivityEntry[]> {
+  const { data, error } = await supabase
+    .from('element_activity')
+    .select('*')
+    .eq('element_id', elementId)
+    .order('created_at', { ascending: false })
+    .limit(LIMIT);
+  if (error) throw error;
+  return (data ?? []) as ActivityEntry[];
 }
 
-function newId(): string {
-  return `act-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+export function useElementActivity(elementId: string) {
+  return useQuery({
+    queryKey: KEY(elementId),
+    queryFn: () => fetchActivity(elementId),
+    staleTime: 15_000,
+  });
 }
 
-export function loadActivity(elementId: string): ActivityEntry[] {
-  if (typeof window === 'undefined') return [];
-  return safeParse<ActivityEntry[]>(localStorage.getItem(KEY(elementId)), []);
-}
-
-export function logActivity(
+/** Append an entry and refresh the rail. actor_id is stamped by the database. */
+export async function logActivity(
   elementId: string,
   kind: ActivityKind,
   detail: string,
-  author: string = 'You'
-): ActivityEntry {
-  const entry: ActivityEntry = {
-    id: newId(),
-    element_id: elementId,
-    kind,
-    detail,
-    author,
-    created_at: new Date().toISOString(),
-  };
-  if (typeof window !== 'undefined') {
-    const all = loadActivity(elementId);
-    // Cap at 200 entries — anything older falls off the rail.
-    const trimmed = [entry, ...all].slice(0, 200);
-    localStorage.setItem(KEY(elementId), JSON.stringify(trimmed));
-  }
-  return entry;
+  author: string = 'You',
+): Promise<void> {
+  const { error } = await supabase
+    .from('element_activity')
+    .insert({ element_id: elementId, kind, detail, author });
+  if (error) throw error;
+  await getQueryClient().invalidateQueries({ queryKey: KEY(elementId) });
 }
 
-export function clearActivity(elementId: string): void {
-  if (typeof window !== 'undefined') localStorage.removeItem(KEY(elementId));
+/**
+ * Pure. Newest first; the Element's own creation is a row too, derived from
+ * created_at so it exists for Elements older than the table.
+ */
+export function mergeActivity(
+  entries: readonly ActivityEntry[],
+  element: { created_at: string | null; title: string },
+): ActivityRow[] {
+  const rows: ActivityRow[] = entries.map((e) => ({
+    id: e.id,
+    kind: e.kind as ActivityKind,
+    detail: e.detail,
+    author: e.author,
+    createdAt: new Date(e.created_at),
+  }));
+  if (element.created_at) {
+    rows.push({
+      id: 'created',
+      kind: 'created',
+      detail: `Created “${element.title}”`,
+      author: 'System',
+      createdAt: new Date(element.created_at),
+    });
+  }
+  return rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }

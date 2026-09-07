@@ -88,7 +88,7 @@ import { Smile, FileText } from 'lucide-react';
 import { isCancelKey, isCommitEnter, isSubmitChord, useCancelOnEscape, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { NotePicker } from '@/alcon/brief/NotePicker';
 import { LinkedNoteEmbed } from '@/alcon/brief/LinkedNoteEmbed';
-import { logActivity, loadActivity, type ActivityEntry as LoggedActivity, type ActivityKind } from './elementActivity';
+import { logActivity, useElementActivity, mergeActivity, type ActivityKind } from './elementActivity';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { formatElementDate } from '@/alcon/shared/dateUtils';
@@ -378,42 +378,17 @@ function ElementDetailBody({
     }
   }, [agent.isActive, onRefresh]);
 
-  // Activity log — persisted entries from localStorage + a synthetic
-  // "created" entry derived from element.created_at. We bump
-  // `activityTick` on each log() call to force a re-read.
-  const [activityTick, setActivityTick] = useState(0);
-  const loggedActivity = useMemo<LoggedActivity[]>(
-    () => loadActivity(element.id),
-    // activityTick is the cache-busting key here, not the element.id alone
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [element.id, activityTick]
+  // Activity log — element_activity rows (status ones written by the DB
+  // trigger, the rest by log() below) plus a synthetic "created" line.
+  const { data: activityEntries } = useElementActivity(element.id);
+  const activityLog = useMemo(
+    () => mergeActivity(activityEntries ?? [], element),
+    [activityEntries, element],
   );
-  const activityLog = useMemo(() => {
-    const entries: { id: string; kind: ActivityKind | 'created'; detail: string; author: string; createdAt: Date }[] =
-      loggedActivity.map((e) => ({
-        id: e.id,
-        kind: e.kind,
-        detail: e.detail,
-        author: e.author,
-        createdAt: new Date(e.created_at),
-      }));
-    if (element.created_at) {
-      entries.push({
-        id: 'created',
-        kind: 'created',
-        detail: `Created “${element.title}”`,
-        author: 'System',
-        createdAt: new Date(element.created_at),
-      });
-    }
-    return entries.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }, [loggedActivity, element.created_at, element.title]);
 
-  // Convenience wrapper around logActivity that bumps the tick.
   const author = (profile?.display_name || user?.email?.split('@')[0] || 'You');
   const log = (kind: ActivityKind, detail: string) => {
-    logActivity(element.id, kind, detail, author);
-    setActivityTick((t) => t + 1);
+    void logActivity(element.id, kind, detail, author).catch((e) => console.error('Failed to record activity:', e));
   };
 
   // Member Objects — every Object this Element is homed under (primary FK +
@@ -495,8 +470,7 @@ function ElementDetailBody({
     // StatusPicker has already persisted the status change; this just
     // records the activity-log entry and notifies assignees.
     try {
-      const newLabel = statusOptions.find((s) => s.status === newStatus)?.label ?? newStatus;
-      log('status', `Status → ${newLabel}`);
+      // Status changes are recorded by the element_activity trigger — from here, from an agent, or from SQL alike.
       const assigneeUserIds = (element.assignees || [])
         .map(a => a.worker?.user_id)
         .filter((u): u is string => !!u && u !== user?.id);
