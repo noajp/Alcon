@@ -415,8 +415,17 @@ function StrategyDetailView({
   const descriptionCancel = useCancelOnEscape();
 
   // Re-sync local edit state when switching to a different Strategy.
+  // The database answers "may this user write?" with owner-only RLS; the UI
+  // has to give the same answer before the write, or a non-owner sees an
+  // edit take and vanish on reload (ELE_STR-021).
+  const { user } = useAuthContext();
+  const userId = user?.id ?? null;
+  const canEdit = canEditInitiative(userId, strategy.created_by);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   useEffect(() => {
     setName(strategy.name);
+    setSaveError(null);
     setDescription(strategy.description ?? '');
     setSelectedIds(new Set(strategy.objectIds));
   }, [strategy.id, strategy.name, strategy.description, strategy.objectIds]);
@@ -484,11 +493,15 @@ function StrategyDetailView({
   const childCandidates = useMemo(() => {
     const existingChildIds = new Set(childStrategies.map((c) => c.id));
     const q = childQuery.trim().toLowerCase();
+    // strategy_children's INSERT policy needs the caller to own the child as
+    // well as the parent, so a colleague's Initiative — visible since the
+    // Space-wide SELECT — is not something this picker may offer.
     return allStrategies.filter((s) =>
       !ancestorIds.has(s.id) &&
       !existingChildIds.has(s.id) &&
+      canEditInitiative(userId, s.created_by) &&
       (q === '' || s.name.toLowerCase().includes(q)));
-  }, [allStrategies, ancestorIds, childStrategies, childQuery]);
+  }, [allStrategies, ancestorIds, childStrategies, childQuery, userId]);
 
   const linkChild = async (childId: string) => {
     if (!canEdit) return;
@@ -518,13 +531,6 @@ function StrategyDetailView({
       setSaveError('Could not remove that Initiative');
     }
   };
-
-  // The database answers "may this user write?" with owner-only RLS; the UI
-  // has to give the same answer before the write, or a non-owner sees an
-  // edit take and vanish on reload (ELE_STR-021).
-  const { user } = useAuthContext();
-  const canEdit = canEditInitiative(user?.id, strategy.created_by);
-  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Lead picker options — every Worker in the Space, not scoped to one
   // Domain, since a Strategy's Objects can span several.
@@ -654,11 +660,12 @@ function StrategyDetailView({
           {strategy.name}
         </span>
         {!canEdit && (
-          // Said once, where the eye lands first. The controls below are
-          // disabled to match, so nothing on the page pretends to accept
-          // an edit the database will refuse.
+          // Said once, where the eye lands first. The Initiative's own
+          // structure — name, description, Objects, nested Initiatives —
+          // is locked to match. The board's intent sections keep their own
+          // policy and report their own failures (ELE_STR-025).
           <span
-            className="ml-1 px-1.5 py-0.5 rounded text-[11px] text-muted-foreground bg-muted/40"
+            className="ml-1 px-1.5 py-0.5 rounded-full bg-muted/60 ring-1 ring-border/60 text-[11px] text-foreground/90"
             title="Only the Initiative's owner can edit it"
           >
             Read-only
@@ -706,6 +713,7 @@ function StrategyDetailView({
               placeholder="Initiative name"
               readOnly={!canEdit}
               aria-readonly={!canEdit}
+              tabIndex={canEdit ? undefined : -1}
               className="w-full text-2xl font-semibold text-foreground bg-transparent border-none resize-none leading-tight overflow-hidden tracking-normal"
             />
           </div>
@@ -730,6 +738,7 @@ function StrategyDetailView({
             placeholder={canEdit ? 'Add description...' : ''}
             readOnly={!canEdit}
             aria-readonly={!canEdit}
+            tabIndex={canEdit ? undefined : -1}
             className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
           />
 
