@@ -69,6 +69,7 @@ export function StrategyShell({
   activeStrategyId,
   onSelectStrategy,
   onOpenObject,
+  onOpenDomain,
 }: {
   /** Which Initiative the detail page shows; null = the portfolio root list.
    *  Controlled by the caller (navigation.strategyId) so other surfaces can
@@ -79,6 +80,7 @@ export function StrategyShell({
    *  span Domains, so the caller also gets the Object's domain_id to switch
    *  the active Domain context before navigating. */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
+  onOpenDomain?: (domainId: string) => void;
 } = {}) {
   const { data: strategies, loading, refetch: refetchStrategies } = useStrategies();
 
@@ -105,6 +107,7 @@ export function StrategyShell({
         onOpenStrategy={setOpenStrategyId}
         onSaved={() => refetchStrategies()}
         onOpenObject={onOpenObject}
+        onOpenDomain={onOpenDomain}
       />
     );
   }
@@ -378,6 +381,7 @@ function StrategyDetailView({
   onOpenStrategy,
   onSaved,
   onOpenObject,
+  onOpenDomain,
 }: {
   strategy: StrategyWithObjects;
   /** Every Strategy, so this page can list/pick its nested children. */
@@ -387,6 +391,7 @@ function StrategyDetailView({
   onOpenStrategy: (id: string) => void;
   onSaved: () => void;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
+  onOpenDomain?: (domainId: string) => void;
 }) {
   const [name, setName] = useState(strategy.name);
   const [description, setDescription] = useState(strategy.description ?? '');
@@ -471,9 +476,10 @@ function StrategyDetailView({
       onRefresh: onSaved,
       onNavigate: (nav) => {
         if (nav.objectId) onOpenObject?.(nav.objectId, nav.domainId ?? null);
+        else if (nav.domainId) onOpenDomain?.(nav.domainId);
       },
     }),
-    [strategy.id, initiativeElements, onSaved, onOpenObject],
+    [strategy.id, initiativeElements, onSaved, onOpenObject, onOpenDomain],
   );
   const grouped = useObjectPicker(query);
 

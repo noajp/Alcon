@@ -23,6 +23,7 @@ import {
   DEFAULT_STATE,
   type ListControlsState,
 } from '@/alcon/shared/listControls';
+import { DomainOverview } from './DomainOverview';
 import { HomeView } from '@/alcon/widget/home';
 import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/alcon/widget';
 import { GanttView } from '@/alcon/element/gantt';
@@ -331,7 +332,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
         <HierarchyHeader
           domainName={activeDomain?.name ?? 'Objects'}
           objectName={selectedObject?.name ?? null}
-          onDomainClick={() => onNavigate({ objectId: null })}
+          onDomainClick={() => { onNavigate({ objectId: null }); onViewChange?.('domain-overview'); }}
           objectSlot={selectedObject ? (
             <ObjectActionsMenu
               object={selectedObject}
@@ -456,7 +457,7 @@ interface DomainTabContentProps {
   domainName?: string | null;
   /** The tools' Element detail borrows these to reach an Object or an
    *  Initiative — the one-click round trip the List tab already has. */
-  onNavigate?: (nav: Partial<NavigationState>) => void;
+  onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
 }
 
@@ -480,14 +481,7 @@ function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, 
   }
 
   if (activeType === 'overview') {
-    // Overview = Domain dashboard (KPI / Milestones / Members / Activity
-    // widgets). Distinct from List, distinct from Dashboard (which surfaces
-    // the same widgets but lives behind a separate tab for now).
-    return (
-      <div className="flex-1 overflow-auto">
-        <HomeView />
-      </div>
-    );
+    return <DomainOverview key={domainId} domainId={domainId ?? null} onNavigate={onNavigate} onViewChange={onViewChange} />;
   }
 
   if (activeType === 'gantt') {

@@ -61,6 +61,7 @@ export const HOME_BOARD: BoardLayout = {
 export const INITIATIVE_BOARD: BoardLayout = {
   band: [],
   main: [
+    { id: 'initiative-domains', type: 'initiative-domains' },
     // Situation before Risk: whether it lands is the question someone opened
     // the page with; where it hurts is only actionable once that is known.
     { id: 'cmp-situation', type: 'campaign-situation' },
@@ -106,5 +107,16 @@ export const CRM_BOARD: BoardLayout = {
 export const SCM_BOARD: BoardLayout = {
   band: [],
   main: [{ id: 'scm-planner', type: 'operations-planner', size: 'full', params: { kind: 'scm' } }],
+  rail: [],
+};
+
+/** Domain identity is the spine; execution and strategic relationships are movable. */
+export const DOMAIN_OVERVIEW_BOARD: BoardLayout = {
+  band: [],
+  main: [
+    { id: 'domain-initiatives', type: 'domain-initiatives' },
+    { id: 'domain-kpi', type: 'kpi-cards' },
+    { id: 'domain-objects', type: 'domain-objects' },
+  ],
   rail: [],
 };

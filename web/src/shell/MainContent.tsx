@@ -26,6 +26,7 @@ const PhaseView = dynamic(() => import('@/alcon/phase/PhaseView').then(m => m.Ph
 const WorkloadView = dynamic(() => import('@/alcon/team/WorkloadView').then(m => m.WorkloadView), { ssr: false, loading: viewLoading });
 const TimelineView = dynamic(() => import('@/alcon/element/actions/TimelineView').then(m => m.TimelineView), { ssr: false, loading: viewLoading });
 const HomeScreen = dynamic(() => import('@/shell/HomeScreen').then(m => m.HomeScreen), { ssr: false, loading: viewLoading });
+import { DomainOverview } from '@/alcon/domain/DomainOverview';
 import { DomainView } from '@/alcon/domain/DomainView'; // eager — default landing view
 const DomainsView = dynamic(() => import('@/alcon/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
 const TableView = dynamic(() => import('@/alcon/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
@@ -86,9 +87,14 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               <StrategyShell
                 activeStrategyId={navigation.strategyId ?? null}
                 onSelectStrategy={(id) => onNavigate({ strategyId: id })}
+                onOpenDomain={(domainId) => {
+                  setActiveDomainId(domainId);
+                  onNavigate({ objectId: null });
+                  onViewChange?.('domain-overview');
+                }}
                 onOpenObject={(objectId, domainId) => {
                   if (domainId) setActiveDomainId(domainId);
-                  onNavigate({ objectId });
+                  onNavigate({ objectId, objectDomainId: domainId ?? undefined });
                   onViewChange?.('objects');
                 }}
               />
@@ -139,8 +145,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'domains' && (
             <div className="flex-1 overflow-auto bg-card">
-              <DomainsView onOpen={() => onViewChange?.('objects')} />
+              <DomainsView onOpen={(id) => { setActiveDomainId(id); onNavigate({ objectId: null }); onViewChange?.('domain-overview'); }} />
             </div>
+          )}
+
+          {activeActivity === 'domain-overview' && (
+            <DomainOverview key={activeDomainId} domainId={activeDomainId ?? null} onNavigate={onNavigate} onViewChange={onViewChange} />
           )}
 
           {activeActivity === 'domain-elements' && (

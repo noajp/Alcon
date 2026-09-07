@@ -55,6 +55,8 @@ CRM / SCM は `operations-planner` ウィジェットを既定配置する App�
 ### Strategy と Execution の分離
 UI では Strategy と Execution を明確に分ける（ModeRail の別モード）。混ぜて一覧化すると「意図」と「行動」の区別が崩れる。ただし遮断もしない —— Initiative は配下 Object と実行上のリスク・負荷を、Object は貢献先 Initiative と戦略上の意図を常に見せる。この一クリックの往復可能性が Alcon の核。
 
+Domain の概要は、その Domain の Objects と実行状況、Object を介して関連する Initiatives を示す。Initiative 側にも関連 Domains を示し、相互に移動できる。関係は可視の Object 所属から導出し、multi-homing を含む。Phase / Timeline のナビゲーション上の配置は、Phase の Domain スコープを変えない。
+
 ### Home — 横断サーフェス
 分類に属さない個人ビュー。Nowを既定の入口にし、既存の明示的な初期view設定は保持する。
 - **Now**：現在Spaceの可視な仕事を、動ける候補・確認が必要な仕事・待ちに分けて理由付きで示す。既存案件をコピーで取り込み、状態・次の一手・共有コメントをまとめて更新する
@@ -81,8 +83,8 @@ Property は**データ**であり、その既定の見せ方が Properties ウ�
 - **Apps ランチャー**：カタログ・モードのメタ・追加状態は `shell/railApps.ts` の単一情報源（`CORE_MODES` / `APP_GROUPS` / `MODE_META` / `useRailApps`）。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / Calendar / CRM / SCM）の2グループに分けて表示するが、概念上はどちらも Sustainment（仕事道具）。タイルを押すとレールに追加してそのまま開く。追加済みタイルの右上に出るチェックを外すとレールから外れ、カタログに戻る。追加状態は `alcon:railApps` に localStorage 永続。追加していない App も、開いている間だけレールに現れる
 - **AppSidebar**（折りたたみ可）：最上部に Space 名（`SpaceSwitcher`）＋ Discover(検索) ＋ Create(+)。本体は現在のモードに応じて切替：
   - **Home**：Now / Inbox / Calendar / My Elements
-  - **Strategy**：Initiative / Phase / Timeline
-  - **Execution**：Domain ツリー（各 Domain を開くと Objects／Elements）
+  - **Strategy**：Initiatives を親項目とし、その下に Phase / Timeline
+  - **Execution**：Domain ツリー。Domain 名は概要（説明・実行状況・関連 Initiative）を開き、矢印は配下 Objects／Elements を展開する
   - **Workload / Calendar / CRM / SCM / Notebook / Table / Team**：Apps から追加する独立モード。それぞれ単一サーフェスをメインに開き、サイドバーはモード名ラベルのみ
 - **TabBar**：Object 内 view 切替。`rightSlot` に view 固有コントロール（Widget の「+ Add widget」もここに入る）
 - **Widget / Board** (`alcon/widget/`)：サーフェスに乗る枠付きブロックと、その配置。サーフェスは固定の背骨（タイトル・説明など、そのものの同一性）を持ち、その周りに **Zone**（`band` 上部の帯 / `main` 本文カラム / `rail` 右レール）を置く。ウィジェットは「どの画面か」ではなく **Subject**（`object` / `initiative` / `phase` / `me` …）と Zone を宣言し、定義が自分の `import()` を持つ（`registry.tsx`）。枠は Zone が決める — `rail` は島（`RailCard`）、`main` は section、`band` は帯。どの枠もヘッダは `bg-muted/40` + `--border-subtle` の帯で、名前は枠の中にある。長押し（450ms）で arrange モードに入り、破線の輪郭・`−` バッジ・ゾーンをまたぐドラッグが有効になる（Esc / Done で抜ける）。配置は `widget_boards` にユーザー・対象・サーフェス別で永続し、バージョン検証と revision による競合検出を持つ。汎用 `data-view` は Table の列・行・値を参照し、表・カード・棒グラフとして表示する。データと構造は人間の編集UIとAIの `tableData`、配置は `widgetBoard` が同じ保存先をCRUDする

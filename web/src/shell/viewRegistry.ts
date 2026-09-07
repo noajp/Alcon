@@ -40,6 +40,7 @@ export type ViewId =
   | 'workload'
   | 'timeline'
   | 'note'
+  | 'domain-overview'
   | 'domains'
   | 'tables'
   | 'team'
@@ -69,6 +70,7 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   workload:      { label: 'Workload',    icon: NavWorkloadIcon },
   timeline:      { label: 'Timeline',    icon: NavTimelineIcon },
   note:          { label: 'Notebook',    icon: NavNoteIcon },
+  'domain-overview': { label: 'Domain overview', icon: NavDomainIcon },
   domains:       { label: 'Domains',     icon: NavDomainIcon },
   tables:        { label: 'Table',       icon: NavTableIcon },
   team:          { label: 'Team',        icon: NavTeamsIcon },

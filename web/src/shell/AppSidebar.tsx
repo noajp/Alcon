@@ -1,12 +1,14 @@
 'use client';
 
 
+import { StrategyNavigation } from './sidebar/StrategyNavigation';
+import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
 import { useNotifications } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, ChevronDown, FileText, MoreHorizontal, Settings, Users, X, Check, Search, Smile, Image as ImageIcon } from 'lucide-react';
+import { Plus, ChevronRight, FileText, Settings, Users, X, Check, Search, Smile, Image as ImageIcon } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';
@@ -77,14 +79,8 @@ const HOME_ITEMS = [navItem('home'), navItem('inbox'), navItem('calendar'), navI
 // Strategy — what we're trying to achieve and how we intend to win. Initiative
 // (view id 'strategy', display label "Initiatives") is the unit, and Initiatives
 // bundle into a strategy; Phase stages the effort; Timeline sequences the set.
-const STRATEGY_ITEMS = [
-  navItem('strategy'),
-  navItem('phase'),
-  navItem('timeline'),
-];
 // Execution — the fighting: the Domain tree, whose rows carry the D/O/E
 // surfaces below.
-const DOMAIN_ITEMS = [navItem('objects'), navItem('domain-elements')];
 
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;
@@ -519,26 +515,10 @@ export function AppSidebar({
           {railMode === 'strategy' && (
           <>
           <SidebarModeLabel label="Strategy" />
-          <div className="mb-1 mt-1">
-            {STRATEGY_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeView === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onViewChange(item.id)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                    isActive
-                      ? 'bg-sidebar-accent text-foreground'
-                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                  }`}
-                >
-                  <Icon size={16} />
-                  <span className="flex-1 text-left">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          <StrategyNavigation activeView={activeView} onSelect={(id) => {
+            if (id === 'strategy') onNavigate({ strategyId: null });
+            onViewChange(id);
+          }} />
           </>
           )}
 
@@ -549,7 +529,7 @@ export function AppSidebar({
           <SidebarModeLabel label="Execution" />
           <div className="mt-1" />
 
-          {/* All domains — each row sets itself active AND toggles its own expansion.
+          {/* All domains — the name opens the overview; the chevron expands the tree.
               Opening one does NOT collapse the others (multiple expanded at a time).
               The fixed "Individual Domain" is sorted to the top by useDomains and gets a
               fixed person icon + "Individual Domain" label so it reads as locked / non-editable. */}
@@ -561,27 +541,20 @@ export function AppSidebar({
                   isActive={d.id === activeDomain?.id}
                   expanded={expandedDomainIds.has(d.id)}
                   activeView={activeView}
-                  onActivateOrToggle={() => {
-                    if (d.id !== activeDomain?.id) {
-                      setActiveDomainId(d.id);
-                      setExpandedDomainIds((prev) => {
-                        if (prev.has(d.id)) return prev;
-                        const next = new Set(prev);
-                        next.add(d.id);
-                        return next;
-                      });
-                    } else {
-                      setExpandedDomainIds((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(d.id)) next.delete(d.id);
-                        else next.add(d.id);
-                        return next;
-                      });
-                    }
+                  onOpen={() => {
+                    setActiveDomainId(d.id);
+                    onNavigate({ objectId: null });
+                    onViewChange('domain-overview');
                   }}
+                  onToggle={() => setExpandedDomainIds(prev => {
+                    const next = new Set(prev);
+                    if (next.has(d.id)) next.delete(d.id); else next.add(d.id);
+                    return next;
+                  })}
                   onOpenSettings={() => setSettingsDomain(d)}
                   onSelectExecItem={(viewId) => {
                     if (d.id !== activeDomain?.id) setActiveDomainId(d.id);
+                    onNavigate({ objectId: null });
                     onViewChange(viewId);
                   }}
                 />
@@ -592,69 +565,16 @@ export function AppSidebar({
               member but NOT a member of their ActivitySpace). Listed inline with
               the active Space's Domains; a Domain invite never exposes the rest
               of a Space. */}
-          {guestDomains.map((d) => {
-                const isActive = d.id === activeDomain?.id;
-                const expanded = expandedDomainIds.has(d.id);
-                return (
-                  <div key={d.id} className="group/domain relative">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!isActive) {
-                          setActiveDomainId(d.id);
-                          setExpandedDomainIds((prev) => {
-                            if (prev.has(d.id)) return prev;
-                            const next = new Set(prev);
-                            next.add(d.id);
-                            return next;
-                          });
-                        } else {
-                          setExpandedDomainIds((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(d.id)) next.delete(d.id);
-                            else next.add(d.id);
-                            return next;
-                          });
-                        }
-                      }}
-                      className="w-full flex min-w-0 items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
-                      title={d.name}
-                    >
-                      <DomainMark domain={d} size={16} />
-                      <span className="min-w-0 text-left truncate">{d.name}</span>
-                      <span className="flex-shrink-0 text-muted-foreground/70">
-                        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                      </span>
-                      <span className="flex-1" />
-                    </button>
-                    {expanded && (
-                      <div className="mt-0.5">
-                        {DOMAIN_ITEMS.map((item) => {
-                          const Icon = item.icon;
-                          const itemActive = isActive && activeView === item.id;
-                          return (
-                            <button
-                              key={item.id}
-                              onClick={() => {
-                                if (!isActive) setActiveDomainId(d.id);
-                                onViewChange(item.id);
-                              }}
-                              className={`w-full flex items-center gap-2.5 pl-[34px] pr-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                                itemActive
-                                  ? 'bg-sidebar-accent text-foreground'
-                                  : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                              }`}
-                            >
-                              <Icon size={16} />
-                              <span>{item.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+          {guestDomains.map(d => <DomainNavigationRow key={d.id} name={d.name} mark={<DomainMark domain={d} size={16} />}
+            active={d.id === activeDomain?.id} expanded={expandedDomainIds.has(d.id)} activeView={activeView}
+            onOpen={() => { setActiveDomainId(d.id); onNavigate({ objectId: null }); onViewChange('domain-overview'); }}
+            onToggle={() => setExpandedDomainIds(prev => {
+              const next = new Set(prev);
+              if (next.has(d.id)) next.delete(d.id); else next.add(d.id);
+              return next;
+            })}
+            onSelect={view => { setActiveDomainId(d.id); onNavigate({ objectId: null }); onViewChange(view); }}
+          />)}
 
           </>
           )}
@@ -770,7 +690,8 @@ function SortableDomainRow({
   isActive,
   expanded,
   activeView,
-  onActivateOrToggle,
+  onOpen,
+  onToggle,
   onOpenSettings,
   onSelectExecItem,
 }: {
@@ -778,7 +699,8 @@ function SortableDomainRow({
   isActive: boolean;
   expanded: boolean;
   activeView: string;
-  onActivateOrToggle: () => void;
+  onOpen: () => void;
+  onToggle: () => void;
   onOpenSettings: () => void;
   onSelectExecItem: (viewId: string) => void;
 }) {
@@ -802,57 +724,10 @@ function SortableDomainRow({
       style={style}
       className="group/domain relative"
     >
-      <div className="w-full flex items-center rounded-md transition-colors duration-100 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground">
-        <button
-          type="button"
-          onClick={onActivateOrToggle}
-          className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 h-8 text-[12px] font-semibold cursor-pointer"
-          title={d.name}
-          {...attributes}
-          {...listeners}
-        >
-          <DomainMark domain={d} size={16} />
-          <span className="min-w-0 text-left truncate">{d.name}</span>
-          <span className="flex-shrink-0 text-muted-foreground/70">
-            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          </span>
-          <span className="flex-1" />
-        </button>
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
-          className={`mr-1 w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-opacity ${
-            isActive ? 'opacity-100' : 'opacity-0 group-hover/domain:opacity-100'
-          }`}
-          aria-label={`${d.name} settings`}
-          title="Domain settings"
-        >
-          <MoreHorizontal size={12} />
-        </button>
-      </div>
-
-      {expanded && (
-        <div className="mt-0.5">
-          {DOMAIN_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const itemActive = isActive && activeView === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onSelectExecItem(item.id)}
-                className={`w-full flex items-center gap-2.5 pl-[34px] pr-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                  itemActive
-                    ? 'bg-sidebar-accent text-foreground'
-                    : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                }`}
-              >
-                <Icon size={16} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <DomainNavigationRow name={d.name} mark={<DomainMark domain={d} size={16} />}
+        active={isActive} expanded={expanded} activeView={activeView}
+        onOpen={onOpen} onToggle={onToggle} onSelect={onSelectExecItem} onSettings={onOpenSettings}
+        dragProps={{ ...attributes, ...listeners }} />
     </div>
   );
 }
