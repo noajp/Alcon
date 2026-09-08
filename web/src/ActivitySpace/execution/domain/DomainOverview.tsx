@@ -37,7 +37,7 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <Button variant="secondary" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('objects'); }}>{explorer.objects.length} Objects</Button>
           <Button variant="ghost" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('domain-elements'); }}>{elements.length} Elements</Button>
-          <span>{initiatives.length} related Initiatives</span>
+          <span>{initiatives.length} Initiatives linked through Objects</span>
         </div>
       </header>
       <WidgetSurface key={domain.id} board={board} host={host} zones={['main']}>

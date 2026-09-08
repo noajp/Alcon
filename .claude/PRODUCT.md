@@ -200,6 +200,8 @@ Initiative を開くと、意図・状況・前提・決定・指標・リスク
 
 Object は「箱」、Element は「中身」。箱は一段しかなく（ネストしない）、中身は複数の箱に同時に入れられる。Object 詳細は貢献先 Initiative を常に表示し、Strategy へ一クリックで戻れる。
 
+**Domain の実現構想** — 有限の複数プロジェクトをどう組み合わせて Initiative を実現するかを記す。Domain は継続する活動の場であり、複数の構想を持てる。構想は Initiative と任意の既存成功条件（measure）を参照し、期待する変化・仮説・前提・見直し条件を持つ。成立条件に Object の貢献と役割・順序の理由を結び、進捗とは独立に、観測事実・出典・観測日・解釈を記録する。構想の変更後は以前の評価を再評価対象にする。継続・変更・停止の判断は判断者と当時の構想・根拠を保存し、対象 Object と Initiative へ戻れる。書き込みは Domain の owner/admin、閲覧は Domain と Initiative の両方にアクセスできる人。同じ Domain 内で共有する Object の役割を比較できる。Domain の既定画面は判断が必要な事項を先頭に置く。
+
 ### Sustainment（兵站）：横断的維持活動
 
 行動を支える**横断的維持活動**の分類。Worker（human | ai_agent）は Execution で行動する主体であり、Sustainment はその Worker が働き続けられるように支える道具を扱う。

@@ -63,7 +63,7 @@ const WORKSPACE_TABLES = [
   'domain_members', 'object_members', 'activity_space_members', 'object_domains',
   'widget_boards', 'tables', 'table_columns', 'table_rows', 'table_cells',
   'strategies', 'strategy_objects', 'strategy_children', 'strategy_comments',
-  'phases',
+  'phases', 'domain_approaches', 'approach_conditions', 'approach_contributions', 'approach_assessments', 'approach_reviews',
   'intents', 'intent_bindings', 'intent_lineage', 'intent_next_actions',
   'intent_escalations', 'intent_alignments', 'intent_audits', 'intent_predictions', 'intent_resources',
 ] as const;
@@ -203,6 +203,12 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
     'domains', 'strategies', 'strategy_objects', 'domain_members', 'object_members', 'activity_space_members'].includes(d.table)) {
     invalidateSoon(qc, ['domain-overview']);
     invalidateSoon(qc, ['initiative-domains']);
+  }
+
+  if (['domain_approaches', 'approach_conditions', 'approach_contributions', 'approach_assessments', 'approach_reviews',
+    'domains', 'strategies', 'intents', 'objects', 'object_domains', 'domain_members', 'object_members', 'activity_space_members'].includes(d.table)) {
+    invalidateSoon(qc, ['domain-approaches']);
+    invalidateSoon(qc, ['approach-references']);
   }
 
   switch (d.table) {

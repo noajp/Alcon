@@ -1,5 +1,7 @@
 'use client';
 
+import { setActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -36,7 +38,7 @@ interface OverviewViewProps {
   elements: ElementWithDetails[];
   object: AlconObjectWithChildren;
   onRefresh?: () => void;
-  onNavigate?: (nav: { objectId?: string; strategyId?: string }) => void;
+  onNavigate?: (nav: { objectId?: string | null; strategyId?: string }) => void;
   /** Switch the active top-level activity — the Initiative rows use this to
    *  jump out to the Strategy surface. */
   onViewChange?: (view: string) => void;
@@ -130,7 +132,13 @@ export function OverviewView({
       object,
       explorerData,
       onRefresh,
-      onNavigate,
+      onNavigate: nav => {
+        if (nav.domainId && !nav.objectId) {
+          setActiveDomainId(nav.domainId);
+          onNavigate?.({ objectId: null });
+          onViewChange?.('domain-overview');
+        } else onNavigate?.(nav);
+      },
       onViewChange,
     }),
     [object, elements, explorerData, onRefresh, onNavigate, onViewChange],

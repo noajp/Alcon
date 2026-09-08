@@ -24,6 +24,16 @@ const DEFAULT_FLOW: Dimension[] = ['assignee', 'object', 'campaign'];
 // =============================================================
 
 export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
+  'approach-references': {
+    type: 'approach-references', label: 'Domain approaches', group: 'core',
+    accepts: ['initiative', 'object'], zones: ['main', 'rail'], singleton: true, defaultSize: 'full',
+    load: async () => (await import('./widgets/ApproachReferencesWidget')).ApproachReferencesWidget,
+  },
+  'domain-approaches': {
+    type: 'domain-approaches', label: 'Approaches', group: 'core',
+    accepts: ['domain'], zones: ['main'], singleton: true, defaultSize: 'full',
+    load: async () => (await import('./widgets/DomainApproachesWidget')).DomainApproachesWidget,
+  },
   'domain-objects': {
     type: 'domain-objects', label: 'Objects', group: 'core',
     accepts: ['domain'], zones: ['main'], singleton: true, defaultSize: 'full',

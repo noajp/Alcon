@@ -61,7 +61,7 @@ export function ObjListView({
   const { selectedRowIds: selectedObjectIds, handleRowSelect: handleObjectRowSelect } = useElementSelection();
   const { data: domains } = useDomains();
   // Object (Project-level) Type catalog — its OWN list, never the Element
-  // (Task-level) one, so "Task" can't show up as an Object Type.
+  // Element-level one, so it cannot show up as an Object Type.
   const objectTypes = React.useMemo<string[]>(
     () => (domainId ? domains.find((d) => d.id === domainId)?.object_types ?? [] : []),
     [domains, domainId],

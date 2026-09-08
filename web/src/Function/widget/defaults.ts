@@ -18,6 +18,7 @@ export const OBJECT_OVERVIEW_BOARD: BoardLayout = {
   rail: [
     // Intent above Properties: opening an Object should answer what it is
     // trying to win before it answers who owns it and when it is due.
+    { id: 'ov-approaches', type: 'approach-references' },
     { id: 'ov-intent', type: 'campaign-intent' },
     // The return leg. The Initiative's written intent says why this Object
     // exists in prose; this says which decisions and assumptions actually
@@ -61,6 +62,7 @@ export const HOME_BOARD: BoardLayout = {
 export const INITIATIVE_BOARD: BoardLayout = {
   band: [],
   main: [
+    { id: 'initiative-approaches', type: 'approach-references' },
     { id: 'initiative-domains', type: 'initiative-domains' },
     // Situation before Risk: whether it lands is the question someone opened
     // the page with; where it hurts is only actionable once that is known.
@@ -114,6 +116,7 @@ export const SCM_BOARD: BoardLayout = {
 export const DOMAIN_OVERVIEW_BOARD: BoardLayout = {
   band: [],
   main: [
+    { id: 'domain-approaches', type: 'domain-approaches' },
     { id: 'domain-initiatives', type: 'domain-initiatives' },
     { id: 'domain-kpi', type: 'kpi-cards' },
     { id: 'domain-objects', type: 'domain-objects' },
