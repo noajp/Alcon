@@ -23,12 +23,16 @@ create function public.user_can_see_domain(d uuid) returns boolean language sql 
 create function public.user_can_see_object(o uuid) returns boolean language sql stable security definer set search_path=public as $$ select exists(select 1 from objects where id=o and (user_can_see_domain(domain_id) or exists(select 1 from object_domains where object_id=o and user_can_see_domain(domain_id)))) $$;
 create function public.user_can_see_strategy(s uuid) returns boolean language sql stable security definer set search_path=public as $$ select exists(select 1 from strategies where id=s and (created_by=auth.uid() or user_has_domain_role('10000000-0000-0000-0000-000000000001',array['owner','admin','member','guest']))) $$;
 grant select on domains,objects,object_domains,intents,strategies to authenticated;
-grant delete on objects to authenticated;
+grant delete,update on objects to authenticated;
+grant insert,update,delete on object_domains to authenticated;
 alter table domains enable row level security;
 create policy domain_read on domains for select to authenticated using(user_can_see_domain(id));
 alter table objects enable row level security;
 create policy object_read on objects for select to authenticated using(user_can_see_object(id));
 create policy object_delete on objects for delete to authenticated using(auth.uid()='00000000-0000-0000-0000-000000000003');
+create policy object_update on objects for update to authenticated using(auth.uid()='00000000-0000-0000-0000-000000000003') with check(auth.uid()='00000000-0000-0000-0000-000000000003');
+alter table object_domains enable row level security;
+create policy membership_access on object_domains for all to authenticated using(auth.uid()='00000000-0000-0000-0000-000000000003') with check(auth.uid()='00000000-0000-0000-0000-000000000003');
 insert into auth.users select ('00000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid from generate_series(1,4) n;
 insert into domains values('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001'),('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000004');
 insert into domain_members values('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','admin'),('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','guest');
@@ -61,6 +65,39 @@ do $$ declare a domain_approaches; r approach_reviews; begin
   begin update approach_reviews set reasoning='rewritten'; raise exception 'Audit update allowed'; exception when insufficient_privilege then null; end;
   begin delete from approach_assessments; raise exception 'Audit deletion allowed'; exception when insufficient_privilege then null; end;
 end $$;
+-- A permitted Object editor without approach-admin rights changes primary
+-- and secondary memberships. Every relevant transition invalidates evidence;
+-- temporary junction replacement preserves the original connection and audit.
+begin;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',true);
+insert into object_domains values('30000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001');
+update objects set domain_id='10000000-0000-0000-0000-000000000002' where id='30000000-0000-0000-0000-000000000001';
+delete from object_domains where object_id='30000000-0000-0000-0000-000000000001';
+do $$ begin
+  if (select plan_revision from domain_approaches)<>6 then raise exception 'Membership removal did not invalidate evidence'; end if;
+  if (select count(*) from approach_contributions)<>0 then raise exception 'Moved hidden Object leaked'; end if;
+end $$;
+insert into object_domains values('30000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001');
+do $$ begin
+  if (select plan_revision from domain_approaches)<>7 then raise exception 'Membership restoration did not invalidate evidence'; end if;
+  if (select count(*) from approach_contributions)<>1 then raise exception 'Secondary connection lost'; end if;
+  if (select jsonb_array_length(snapshot->'contributions') from approach_reviews)<>1 then raise exception 'Membership edit erased history'; end if;
+  if has_function_privilege('authenticated',(select p.oid from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='alcon_approach_internal' and p.proname='version_after_object_membership'),'EXECUTE') then raise exception 'Membership trigger exposed'; end if;
+end $$;
+update object_domains set domain_id='10000000-0000-0000-0000-000000000002' where object_id='30000000-0000-0000-0000-000000000001';
+do $$ begin
+  if (select plan_revision from domain_approaches)<>8 then raise exception 'Membership update not versioned'; end if;
+end $$;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',true);
+do $$ begin
+  begin
+    insert into approach_reviews(approach_id,expected_revision,action,reasoning) values('50000000-0000-0000-0000-000000000001',5,'continue','Old form');
+    raise exception 'Old membership review accepted'; exception when raise_exception then if sqlerrm='Old membership review accepted' then raise; end if; end;
+  begin
+    insert into approach_assessments(approach_id,condition_id,plan_revision,result,observation,evidence_source,observed_on,reasoning) values('50000000-0000-0000-0000-000000000001','60000000-0000-0000-0000-000000000001',3,'met','Old form','Old source',current_date,'Old judgment');
+    raise exception 'Old membership assessment accepted'; exception when raise_exception then if sqlerrm='Old membership assessment accepted' then raise; end if; end;
+end $$;
+rollback;
 -- Admin edits invalidate earlier evaluations, preserving history.
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
 select edit_approach_plan_item('condition','60000000-0000-0000-0000-000000000001',5,'{"title":"Demonstrate real demand","kind":"outcome","required":true,"success_criteria":"Observe an actual commitment","review_date":null}');

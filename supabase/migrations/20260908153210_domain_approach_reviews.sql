@@ -220,6 +220,38 @@ begin
   create trigger version_after_contribution_delete after delete on public.approach_contributions
     for each row execute function alcon_approach_internal.version_after_contribution_delete();
 
+  -- Membership updates may be several requests (primary, junction removal,
+  -- junction insertion). Preserve connections and conservatively invalidate
+  -- evidence at each relevant change, including restored memberships.
+  execute $fn$
+    create function alcon_approach_internal.version_after_object_membership() returns trigger
+    language plpgsql security definer set search_path = '' as $body$
+    declare old_object uuid; new_object uuid; old_domain uuid; new_domain uuid;
+    begin
+      if auth.uid() is null and coalesce(current_setting('role',true),'') not in ('none','service_role') then
+        raise insufficient_privilege using message='An authenticated membership change is required';
+      end if;
+      if tg_op <> 'INSERT' then
+        old_domain := old.domain_id;
+        if tg_table_name='objects' then old_object := old.id; else old_object := old.object_id; end if;
+      end if;
+      if tg_op <> 'DELETE' then
+        new_domain := new.domain_id;
+        if tg_table_name='objects' then new_object := new.id; else new_object := new.object_id; end if;
+      end if;
+      if tg_op='UPDATE' and old_domain is not distinct from new_domain and old_object is not distinct from new_object then return new; end if;
+      update public.domain_approaches a set revision=revision+1,plan_revision=plan_revision+1
+      where exists(select 1 from public.approach_contributions c where c.approach_id=a.id and
+        ((c.object_id=old_object and a.domain_id=old_domain) or (c.object_id=new_object and a.domain_id=new_domain)));
+      return null;
+    end $body$
+  $fn$;
+  revoke all on function alcon_approach_internal.version_after_object_membership() from public, anon, authenticated;
+  create trigger version_approach_object_membership after update of domain_id on public.objects
+    for each row execute function alcon_approach_internal.version_after_object_membership();
+  create trigger version_approach_junction_membership after insert or update or delete on public.object_domains
+    for each row execute function alcon_approach_internal.version_after_object_membership();
+
   execute $fn$
     create function public.edit_approach_plan_item(p_kind text, p_id uuid, p_revision integer, p_patch jsonb)
     returns void language plpgsql security invoker set search_path = public as $body$
