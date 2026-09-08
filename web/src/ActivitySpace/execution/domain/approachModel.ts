@@ -29,7 +29,7 @@ export interface ApproachData {
 }
 export const RESULT_LABELS = { met: 'Met', not_met: 'Not met', unverified: 'Unverified', refuted: 'Premise refuted', stale: 'Reassessment needed' } as const;
 export const ROLE_LABELS = { primary: 'Primary', alternative: 'Alternative', supporting: 'Supporting' } as const;
-export function latestRecord<T extends { id: string; created_at: string }>(records: readonly T[]): T | undefined {
+function latestRecord<T extends { id: string; created_at: string }>(records: readonly T[]): T | undefined {
   return records.reduce<T | undefined>((latest, row) => !latest || row.created_at > latest.created_at || (row.created_at === latest.created_at && row.id > latest.id) ? row : latest, undefined);
 }
 export function conditionAssessment(condition: ApproachCondition, approach: DomainApproach, assessments: ApproachAssessment[]) {
