@@ -62,6 +62,10 @@ describe('Domain approach data', () => {
     await saveDomainApproach('d', { kind: 'condition', id: 'c', approachId: 'a', revision: 2, values });
     expect(mock.rpc).toHaveBeenCalledWith('edit_approach_plan_item', { p_kind: 'condition', p_id: 'c', p_revision: 2, p_patch: values });
   });
+  it('disconnects with the same revision lock as plan editing', async () => {
+    await saveDomainApproach('d', { kind: 'disconnect', id: 'l', revision: 2 });
+    expect(mock.rpc).toHaveBeenCalledWith('edit_approach_plan_item', { p_kind: 'disconnect', p_id: 'l', p_revision: 2, p_patch: {} });
+  });
   it('reports denied/competing saves rather than claiming success', async () => {
     fail = 'approach_reviews';
     await expect(saveDomainApproach('d', { kind: 'review', approachId: 'a', values: { expected_revision: 2, action: 'stop', reasoning: 'Premise refuted', changes: '', next_review_date: null } })).rejects.toEqual({ message: 'conflict' });

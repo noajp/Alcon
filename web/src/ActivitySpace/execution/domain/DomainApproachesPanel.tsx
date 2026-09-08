@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { WidgetHeaderAction, useWidgetMeta } from '@/Function/widget/WidgetFrame';
@@ -17,6 +17,9 @@ export function DomainApproachesPanel({ data, objects, host, onSave }: {
   const [editor, setEditor] = useState<ApproachEditorTarget | null>(null);
   const [open, setOpen] = useState(false);
   const [editorEpoch, setEditorEpoch] = useState(0);
+  const actionLock = useRef(false);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const today = new Date().toLocaleDateString('en-CA');
   const attention = data.approaches.flatMap(a => approachAttention(a, data, today).map(reason => ({ approach: a, reason })));
   const shared = sharedApproachObjects(data);
@@ -41,6 +44,7 @@ export function DomainApproachesPanel({ data, objects, host, onSave }: {
     </div>;
   }
   return <div className="space-y-6">
+    {actionError && <p role="alert" className="text-sm text-destructive">{actionError}</p>}
     <WidgetHeaderAction>{data.canEdit && <Button variant="ghost" size="xs" onClick={() => edit({ kind: 'approach' })}><Plus size={14} />New approach</Button>}</WidgetHeaderAction>
     {!data.approaches.length ? <div className="space-y-3 py-4">
       <p className="text-sm">How will the work in this Domain realize an Initiative?</p>
@@ -105,7 +109,13 @@ export function DomainApproachesPanel({ data, objects, host, onSave }: {
           return <div key={c.id} className="space-y-2 border-t border-border/50 pt-3">
             <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h5 className="break-words text-sm font-medium">{c.title}</h5><p className="text-xs text-muted-foreground">{c.required ? 'Required' : 'Supporting'} · {c.kind} · {RESULT_LABELS[assessment.status]}</p></div>{data.canEdit && <div className="flex gap-1"><Button variant="ghost" size="xs" onClick={() => edit({ kind: 'condition', approach: a, condition: c })}>Edit</Button><Button variant="secondary" size="xs" onClick={() => edit({ kind: 'assessment', approach: a, condition: c })}>Assess</Button></div>}</div>
             <p className="whitespace-pre-wrap break-words text-xs text-muted-foreground">{c.success_criteria}{c.review_date && ` · Review ${c.review_date}`}</p>
-            {links.map(link => <div key={link.id} className="space-y-1 pl-2 text-xs"><div className="flex flex-wrap items-center gap-1">{objectButton(link.object_id)}<span className="text-muted-foreground">{ROLE_LABELS[link.role]}</span>{data.canEdit && <Button variant="ghost" size="xs" onClick={() => edit({ kind: 'contribution', approach: a, condition: c, contribution: link })}>Edit role</Button>}</div><p className="whitespace-pre-wrap break-words text-muted-foreground">{link.rationale}{link.sequence_note && ` · ${link.sequence_note}`}</p></div>)}
+            {links.map(link => <div key={link.id} className="space-y-1 pl-2 text-xs"><div className="flex flex-wrap items-center gap-1">{objectButton(link.object_id)}<span className="text-muted-foreground">{ROLE_LABELS[link.role]}</span>{data.canEdit && <><Button variant="ghost" size="xs" onClick={() => edit({ kind: 'contribution', approach: a, condition: c, contribution: link })}>Edit role</Button><Button variant="ghost" size="xs" disabled={removing !== null} onClick={async () => {
+              if (actionLock.current) return;
+              actionLock.current = true; setRemoving(link.id); setActionError(null);
+              try { await onSave({ kind: 'disconnect', id: link.id, revision: a.revision }); }
+              catch (error) { setActionError((error as { message?: string })?.message ?? 'Unable to disconnect Object.'); }
+              finally { actionLock.current = false; setRemoving(null); }
+            }}>{removing === link.id ? 'Disconnecting…' : 'Disconnect'}</Button></>}</div><p className="whitespace-pre-wrap break-words text-muted-foreground">{link.rationale}{link.sequence_note && ` · ${link.sequence_note}`}</p></div>)}
             {data.canEdit && <Button variant="ghost" size="xs" onClick={() => edit({ kind: 'contribution', approach: a, condition: c })}>Connect Object</Button>}
             {assessment.latest && evidence(assessment.latest)}
             {history.length > 1 && <details className="text-xs"><summary className="cursor-pointer py-2 text-muted-foreground">Earlier assessments ({history.length - 1})</summary>{history.filter(r => r.id !== assessment.latest?.id).map(evidence)}</details>}

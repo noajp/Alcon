@@ -133,6 +133,9 @@ begin
   grant select, insert on public.domain_approaches to authenticated;
   grant update(title, expected_change, hypothesis, assumptions, review_trigger, review_date, measure_id, revision, plan_revision) on public.domain_approaches to authenticated;
   grant update(title, kind, required, success_criteria, review_date) on public.approach_conditions to authenticated;
+  create policy contribution_delete on public.approach_contributions for delete to authenticated
+    using (public.user_can_see_object(object_id) and exists (select 1 from public.domain_approaches a where a.id=approach_id and public.can_edit_domain_approaches(a.domain_id)));
+  grant delete on public.approach_contributions to authenticated;
   grant update(role, rationale, sequence_note) on public.approach_contributions to authenticated;
 
   execute $fn$
@@ -163,6 +166,12 @@ begin
     security invoker set search_path = public as $body$
     declare a public.domain_approaches; plan_changed boolean;
     begin
+      if tg_op='DELETE' then
+        select * into a from public.domain_approaches where id=old.approach_id for update;
+        if not found or not public.can_edit_domain_approaches(a.domain_id) then raise exception 'You cannot edit this Domain approach'; end if;
+        update public.domain_approaches set revision=revision+1,plan_revision=plan_revision+1 where id=a.id;
+        return old;
+      end if;
       select * into a from public.domain_approaches where id=new.approach_id for update;
       if not found or not public.can_edit_domain_approaches(a.domain_id) then
         raise exception 'You cannot edit this Domain approach';
@@ -193,7 +202,7 @@ begin
   declare t text;
   begin
     foreach t in array array['approach_conditions','approach_contributions','approach_assessments','approach_reviews'] loop
-      execute format('create trigger stamp_child before insert or update on public.%I for each row execute function public.stamp_approach_child()', t);
+      execute format('create trigger stamp_child before insert or update or delete on public.%I for each row execute function public.stamp_approach_child()', t);
     end loop;
   end;
   execute $fn$
@@ -202,7 +211,7 @@ begin
     declare aid uuid; current_revision integer;
     begin
       if p_kind='condition' then select approach_id into aid from public.approach_conditions where id=p_id;
-      elsif p_kind='contribution' then select approach_id into aid from public.approach_contributions where id=p_id;
+      elsif p_kind in ('contribution','disconnect') then select approach_id into aid from public.approach_contributions where id=p_id;
       else raise exception 'Unknown approach item'; end if;
       select revision into current_revision from public.domain_approaches where id=aid for update;
       if current_revision is null or current_revision <> p_revision then
@@ -212,6 +221,8 @@ begin
         update public.approach_conditions set title=p_patch->>'title', kind=p_patch->>'kind',
           required=(p_patch->>'required')::boolean, success_criteria=p_patch->>'success_criteria',
           review_date=nullif(p_patch->>'review_date','')::date where id=p_id;
+      elsif p_kind='disconnect' then
+        delete from public.approach_contributions where id=p_id;
       else
         update public.approach_contributions set role=p_patch->>'role', rationale=p_patch->>'rationale',
           sequence_note=p_patch->>'sequence_note' where id=p_id;

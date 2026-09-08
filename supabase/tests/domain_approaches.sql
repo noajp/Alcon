@@ -67,6 +67,13 @@ do $$ declare a domain_approaches; begin select * into a from domain_approaches;
   if (select snapshot->'conditions'->0->>'title' from approach_reviews)<>'Visitors understand the concept' then raise exception 'Historical basis changed'; end if;
   begin insert into approach_assessments(approach_id,condition_id,plan_revision,result,observation,evidence_source,observed_on,reasoning) values(a.id,'60000000-0000-0000-0000-000000000001',3,'met','Old evidence','Old context',current_date,'Old judgment'); raise exception 'Stale assessment accepted'; exception when raise_exception then if sqlerrm='Stale assessment accepted' then raise; end if; end;
 end $$;
+-- Disconnecting current work versions the plan and keeps the prior decision basis.
+select edit_approach_plan_item('disconnect',(select id from approach_contributions),6,'{}');
+do $$ begin
+  if (select count(*) from approach_contributions)<>0 then raise exception 'Connection not removed'; end if;
+  if (select plan_revision from domain_approaches)<>5 then raise exception 'Disconnect did not invalidate old evidence'; end if;
+  if (select jsonb_array_length(snapshot->'contributions') from approach_reviews)<>1 then raise exception 'Disconnect erased historical context'; end if;
+end $$;
 -- A guest reads both the approach and its evidence, but cannot judge or edit.
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
 do $$ begin

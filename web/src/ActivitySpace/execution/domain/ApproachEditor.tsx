@@ -32,6 +32,7 @@ export function ApproachEditor({ target, data, objects, open, onOpenChange, onRe
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const lock = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const [more, setMore] = useState(target.kind === 'condition');
   let fields: Field[];
   if (target.kind === 'approach') fields = [
@@ -76,7 +77,7 @@ export function ApproachEditor({ target, data, objects, open, onOpenChange, onRe
   const title = { approach: a ? 'Edit approach' : 'New approach', condition: 'Success condition', contribution: 'Connect Object', assessment: 'Record assessment', review: 'Review approach' }[target.kind];
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (lock.current || outdated) return;
+    if (lock.current || outdated || !data.canEdit) return;
     if (fields.some(f => f.required && !values[f.name]?.trim())) { setError('Complete the required fields.'); return; }
     lock.current = true; setSaving(true); setError(null);
     const v = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, value.trim()]));
@@ -99,7 +100,10 @@ export function ApproachEditor({ target, data, objects, open, onOpenChange, onRe
     } };
     try {
       await onSave(command);
-      if (target.kind === 'condition' && !target.condition) setValues(prev => ({ ...prev, title: '', success_criteria: '' }));
+      if (target.kind === 'condition' && !target.condition) {
+        setValues(prev => ({ ...prev, title: '', success_criteria: '' }));
+        formRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+      }
       if (!(target.kind === 'condition' && !target.condition && more)) onOpenChange(false);
     } catch (cause) { setError(cause instanceof Error ? cause.message : (cause as { message?: string })?.message ?? 'Unable to save. Your draft is retained.'); }
     finally { lock.current = false; setSaving(false); }
@@ -114,8 +118,9 @@ export function ApproachEditor({ target, data, objects, open, onOpenChange, onRe
         <p className="text-muted-foreground">Affected Objects · {[...new Set(data.contributions.filter(c => c.approach_id === target.approach.id).map(c => c.object_id))].map(id => objects.find(o => o.id === id)?.name ?? 'Unavailable').join(', ') || 'None connected'}</p>
       </div>}
       {outdated && <div role="alert" className="space-y-2 text-sm"><p>This approach changed while you were editing. Review the latest version before saving. Your draft is still here.</p><Button variant="secondary" disabled={saving || !latest} onClick={onReload}>Discard draft and load latest</Button></div>}
-      <form onSubmit={submit} className="space-y-4">
-        <fieldset disabled={saving} className="space-y-4">
+      {!data.canEdit && <p role="alert" className="text-sm">Editing is unavailable until access and current data can be verified. Your draft is retained.</p>}
+      <form ref={formRef} onSubmit={submit} className="space-y-4">
+        <fieldset disabled={saving || !data.canEdit} className="space-y-4">
           {fields.map(f => <label key={f.name} className="block space-y-1 text-xs text-muted-foreground">
             <span>{f.label}{f.required && ' *'}</span>
             {f.type === 'select' ? <select className={inputClass} aria-label={f.label} required={f.required} disabled={f.disabled} value={values[f.name]} onChange={e => setValues(prev => ({ ...prev, [f.name]: e.target.value, ...(f.name === 'strategy_id' ? { measure_id: '' } : {}) }))}>
@@ -128,7 +133,7 @@ export function ApproachEditor({ target, data, objects, open, onOpenChange, onRe
         <div className="flex flex-wrap items-center justify-end gap-2">
           {target.kind === 'condition' && !target.condition && <label className="mr-auto flex items-center gap-2 text-xs"><input type="checkbox" checked={more} disabled={saving} onChange={e => setMore(e.target.checked)} />Add another</label>}
           <Button type="button" variant="ghost" disabled={saving} onClick={() => onOpenChange(false)}>Close</Button>
-          <Button type="submit" disabled={saving || outdated}>{saving ? 'Saving…' : 'Save'}</Button>
+          <Button type="submit" disabled={saving || outdated || !data.canEdit}>{saving ? 'Saving…' : 'Save'}</Button>
         </div>
       </form>
     </DialogContent>

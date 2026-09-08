@@ -44,6 +44,7 @@ export async function fetchDomainApproaches(domainId: string): Promise<DomainApp
 }
 
 export type ApproachCommand =
+  | { kind: 'disconnect'; id: string; revision: number }
   | { kind: 'approach'; id?: string; revision?: number; values: Pick<DomainApproach, 'title' | 'expected_change' | 'hypothesis' | 'assumptions' | 'review_trigger' | 'review_date' | 'measure_id'> & { strategy_id: string } }
   | { kind: 'condition'; id?: string; approachId: string; revision: number; values: Pick<ApproachCondition, 'title' | 'kind' | 'required' | 'success_criteria' | 'review_date'> }
   | { kind: 'contribution'; id?: string; approachId: string; revision: number; values: Pick<ApproachContribution, 'condition_id' | 'object_id' | 'role' | 'rationale' | 'sequence_note'> }
@@ -51,7 +52,10 @@ export type ApproachCommand =
   | { kind: 'review'; approachId: string; values: Pick<ApproachReview, 'expected_revision' | 'action' | 'reasoning' | 'changes' | 'next_review_date'> };
 
 export async function saveDomainApproach(domainId: string, command: ApproachCommand) {
-  if (command.kind === 'approach') {
+  if (command.kind === 'disconnect') {
+    const { error } = await supabase.rpc('edit_approach_plan_item', { p_kind: 'disconnect', p_id: command.id, p_revision: command.revision, p_patch: {} });
+    if (error) throw error;
+  } else if (command.kind === 'approach') {
     const { strategy_id, ...values } = command.values;
     const result = command.id
       ? await supabase.from('domain_approaches').update(values).eq('domain_id', domainId).eq('id', command.id).eq('revision', command.revision!).select('id').single()

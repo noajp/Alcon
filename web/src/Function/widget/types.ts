@@ -68,6 +68,8 @@ export interface WidgetSubject {
  * context for every existing widget.
  */
 export interface WidgetHost {
+  /** The surface cannot currently verify its data; preserve drafts but suspend writes. */
+  readOnly?: boolean;
   subject: WidgetSubject;
   /** Elements in the subject's scope. Empty for subjects that have none. */
   elements: ElementWithDetails[];
