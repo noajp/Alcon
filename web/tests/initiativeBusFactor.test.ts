@@ -14,9 +14,9 @@ import {
   holderAbsenceLabel,
   type BusElement,
   type BusWorkerInput,
-} from '@/alcon/element/actions/initiativeBusFactorModel';
-import { ABSENCE_WINDOW_DAYS } from '@/alcon/element/actions/initiativeAssumptionModel';
-import type { CapacitySpan } from '@/alcon/shared/workerCapacity';
+} from '@/ActivitySpace/strategy/initiative/initiativeBusFactorModel';
+import { ABSENCE_WINDOW_DAYS } from '@/ActivitySpace/strategy/initiative/initiativeAssumptionModel';
+import type { CapacitySpan } from '@/Function/shared/workerCapacity';
 
 // Local noon, so nothing in the window walk can be shifted a day by a timezone.
 const NOW = new Date(2026, 7, 31, 12, 0, 0);

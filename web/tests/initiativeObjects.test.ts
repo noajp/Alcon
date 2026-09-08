@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assembleStrategies } from '@/alcon/element/actions/initiativeObjects';
+import { assembleStrategies } from '@/ActivitySpace/strategy/initiative/initiativeObjects';
 import type { Strategy, StrategyChild, StrategyObject } from '@/types/database';
 
 // assembleStrategies is the one path that turns rows into a Initiative's

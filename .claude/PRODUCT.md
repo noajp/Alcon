@@ -126,7 +126,7 @@ AIによる変更も、バージョンと適用範囲を持つ業務設定とし
 | 分類 | 戦争論 | 何を扱うか | 単位 |
 |---|---|---|---|
 | **Strategy** | 戦略 | 何を達成し、どう勝つか | Initiative。複数の Initiative が束ねられて戦略となる |
-| **Execution** | 戦闘 | 実際に行動する | Element（最小単位）→ Object（Element の束）→ Domain（Object の集合） |
+| **Execution** | 戦闘 | 実際に行動する | Domain（活動の場）→ Object（成果物の束）→ Element（最小単位） |
 | **Sustainment** | 兵站 | 仕事道具 | Workload / CRM / SCM / Notebook / Table / Team / Calendar |
 
 ### Activity Space — 組織活動の文脈と信頼境界
@@ -139,8 +139,8 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ║ │  Strategy（戦略）— Initiative / Phase / Timeline            │ ║
 ║ │  何を達成し、どう勝つか。Initiative を束ねると戦略になる          │ ║
 ║ ├──────────────────────────────────────────────────────────┤ ║
-║ │  Execution（戦闘）— Element → Object → Domain             │ ║
-║ │  実際に行動する。労働・仕事・活動                             │ ║
+║ │  Execution（戦闘）— Domain → Object → Element             │ ║
+║ │  実際に行動する。活動・仕事・労働                             │ ║
 ║ ├──────────────────────────────────────────────────────────┤ ║
 ║ │  Sustainment（兵站）— Workload / CRM / SCM                │ ║
 ║ │                       / Notebook / Table / Team / Calendar │ ║
@@ -186,17 +186,17 @@ Initiative を開くと、意図・状況・前提・決定・指標・リスク
 
 **Decision Lab** は、重要な Element への集中・着手延期・担当変更を試し、条件付きの完了日と他の仕事への影響を現状と比較するウィジェット。同じ Space で閲覧できる仕事の工数・担当・依存関係・不在を使い、履歴の蓄積を待たずに試算する。未見積や解けない依存は未算定として示す。採択理由・前提・比較結果は Initiative の Decision に保存し、対象 Element に結び付ける。試算は実際の予定を変えず、Element の編集へ戻って判断を実行に反映する。完了日の試算と成功条件の達成は区別する。
 
-### Execution（戦闘）：Element → Object → Domain
+### Execution（戦闘）：Domain → Object → Element
 
 実際に行動する分類。担当・期限・進捗・依存関係・成果物を扱う。Initiativeに結び付いた実行も、目的の整理に先立って始まる日常の仕事も扱う。
 
-三層はアーレント『人間の条件』の **労働・仕事・活動** の三分に着想を得ている。製品ではElementを行動、Objectを成果や案件のまとまり、Domainを活動の場として使う。哲学上の区分への一致より、実際の仕事を探し、更新し、共有しやすい粒度を優先する。
+三層はアーレント『人間の条件』の **活動・仕事・労働** の三分に着想を得ている。製品ではDomainを活動の場、Objectを成果や案件のまとまり、Elementを行動として使う。哲学上の区分への一致より、実際の仕事を探し、更新し、共有しやすい粒度を優先する。
 
 | 概念 | 役割 | 構造ルール |
 |------|------|-----------|
-| **Element** | 行動の最小単位 | 個人の仕事、またはObjectに所属する仕事。multi-homing可（`object_id` + `element_objects` junction） |
-| **Object** | 成果や案件としてElementを束ねる単位 | 現在の構造はDomain直下のフラットな集合。multi-homingは `object_domains` |
 | **Domain** | Objectの集合、活動の場 | Space内の活動をまとめる。activeなDomainはlocalStorage永続 |
+| **Object** | 成果や案件としてElementを束ねる単位 | 現在の構造はDomain直下のフラットな集合。multi-homingは `object_domains` |
+| **Element** | 行動の最小単位 | 個人の仕事、またはObjectに所属する仕事。multi-homing可（`object_id` + `element_objects` junction） |
 
 Object は「箱」、Element は「中身」。箱は一段しかなく（ネストしない）、中身は複数の箱に同時に入れられる。Object 詳細は貢献先 Initiative を常に表示し、Strategy へ一クリックで戻れる。
 

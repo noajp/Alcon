@@ -1,7 +1,7 @@
 'use client';
 
 
-import { DomainAgentSettings } from '@/alcon/domain/DomainAgentSettings';
+import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { StrategyNavigation } from './sidebar/StrategyNavigation';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
@@ -31,23 +31,23 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { ObjectIcon } from '@/shell/icons';
-import { DomainIcon } from '@/alcon/shared/conceptIcons';
+import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { useDomains, reorderDomains } from '@/hooks/useSupabase';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
-import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
-import { DOMAIN_COLOR_SWATCHES } from '@/alcon/domain/domainColorPalette';
-import { SpaceSwitcher } from '@/alcon/space/SpaceSwitcher';
+import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/ActivitySpace/execution/domain/domainsStore';
+import { DOMAIN_COLOR_SWATCHES } from '@/ActivitySpace/execution/domain/domainColorPalette';
+import { SpaceSwitcher } from '@/Function/space/SpaceSwitcher';
 
 import { NavNoteIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
 import { useDataTables } from '@/hooks/useSupabase';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
 import { railModeOf } from '@/shell/ModeRail';
-import { seedNotebook } from '@/alcon/brief/notebookActions';
-import { SettingsSidebarPanel } from '@/alcon/settings/SettingsSidebarPanel';
+import { seedNotebook } from '@/ActivitySpace/sustainment/notebook/notebookActions';
+import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { useNotes } from '@/hooks/useNotesDb';
-import { TeamSettings } from '@/alcon/settings/TeamSettings';
-import { OperationsNavigation } from '@/alcon/sustainment/OperationsNavigation';
-import { operationsQueue, operationsQueueRoute } from '@/alcon/sustainment/operationsQueues';
+import { TeamSettings } from '@/Function/settings/TeamSettings';
+import { OperationsNavigation } from '@/ActivitySpace/sustainment/operations/OperationsNavigation';
+import { operationsQueue, operationsQueueRoute } from '@/ActivitySpace/sustainment/operations/operationsQueues';
 import type { NavigationState } from '@/types/navigation';
 
 export type { NavigationState };

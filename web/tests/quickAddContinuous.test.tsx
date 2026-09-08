@@ -11,7 +11,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
+import { QuickAddElementPopup } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
 
 afterEach(cleanup);
 

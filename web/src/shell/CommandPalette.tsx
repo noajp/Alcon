@@ -5,7 +5,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import { FileText, Inbox, Home, ListTodo, Settings } from 'lucide-react';
-import { ObjectIcon, ElementIcon } from '@/alcon/shared/conceptIcons';
+import { ObjectIcon, ElementIcon } from '@/Function/shared/conceptIcons';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { APP_GROUPS, MODE_META } from '@/shell/railApps';
 import {

@@ -211,7 +211,7 @@ describe('the converged surfaces go through the primitive', () => {
     // `w-[26px] h-[26px]` boxes — a size that exists nowhere else in the app —
     // and the direction toggles inside the Sort menu were 20px with a 4px
     // radius, inside rows whose every other corner is 6px.
-    const text = code('alcon/shared/listControls/ListControls.tsx');
+    const text = code('Function/shared/listControls/ListControls.tsx');
     expect(text).not.toMatch(/w-\[26px\]/);
     expect(text).not.toMatch(/h-\[26px\]/);
     expect(text).toMatch(/<Button\b/);
@@ -221,7 +221,7 @@ describe('the converged surfaces go through the primitive', () => {
     // It used to be a bare arrow whose only account of itself was
     // `title="Sorted by column (asc)"` — which does not even name the column.
     // DESIGN.md §5.11.5.
-    const text = code('alcon/shared/listControls/ListControls.tsx');
+    const text = code('Function/shared/listControls/ListControls.tsx');
     expect(text).not.toMatch(/Sorted by column/);
     expect(text).toMatch(/activeLabel/);
   });
@@ -229,7 +229,7 @@ describe('the converged surfaces go through the primitive', () => {
   it('the due-date filter leads with relative presets', () => {
     // DESIGN.md §5.11.6: the absolute picker is what you reach for after the
     // presets fail you, not the first thing offered.
-    const text = code('alcon/shared/listControls/ListControls.tsx');
+    const text = code('Function/shared/listControls/ListControls.tsx');
     expect(text).toMatch(/<DueDateFilter\b/);
     expect(text).not.toMatch(/filter\.dueFrom \?\? ''/);
   });
@@ -254,7 +254,7 @@ describe('the converged surfaces go through the primitive', () => {
     // text-white` inline, which is the `danger` tier being re-invented at the
     // call site — and re-invented differently from ChannelDialog's, which used
     // `variant="destructive"`.
-    for (const file of ['shell/sidebar/ObjectTree.tsx', 'alcon/object/ObjectDetailView.tsx']) {
+    for (const file of ['shell/sidebar/ObjectTree.tsx', 'ActivitySpace/execution/object/ObjectDetailView.tsx']) {
       expect(code(file)).not.toMatch(/bg-destructive hover:bg-destructive/);
     }
   });

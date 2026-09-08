@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { completionOf, isOpenStatus } from '../src/alcon/shared/completion';
+import { completionOf, isOpenStatus } from '../src/Function/shared/completion';
 
 const s = (...statuses: (string | null)[]) => statuses.map((status) => ({ status }));
 

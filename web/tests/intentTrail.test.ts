@@ -16,7 +16,7 @@
 //   - assumptions carry no review chip, whatever their horizon column says
 
 import { describe, expect, it } from 'vitest';
-import { intentTrailRows, type TrailScope } from '@/alcon/widget/widgets/intentTrailModel';
+import { intentTrailRows, type TrailScope } from '@/Function/widget/widgets/intentTrailModel';
 import type { Intent, IntentBinding } from '@/types/database';
 
 const NOW = new Date(2026, 8, 2); // 2026-09-02, local

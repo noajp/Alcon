@@ -5,7 +5,7 @@ import {
   decisionLabFingerprint,
   simulateDecisionLab,
   type DecisionLabInput,
-} from '@/alcon/element/actions/decisionLabModel';
+} from '@/ActivitySpace/strategy/initiative/decisionLabModel';
 
 const TODAY = '2026-09-07'; // Monday
 

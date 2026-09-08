@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { createElement } from '@/alcon/element/data';
+import { createElement } from '@/ActivitySpace/execution/element/data';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
 
 /** A deliberate, single Element creation with the source and reasoning preserved. */

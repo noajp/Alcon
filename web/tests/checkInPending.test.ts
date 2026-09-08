@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { checkInAttempt, checkInBase, checkInChange } from '../src/alcon/element/now/checkInDraft';
-import { clearPendingCheckIn, readPendingCheckIn, rememberPendingCheckIn, type PendingCheckIn } from '../src/alcon/element/now/checkInPending';
+import { checkInAttempt, checkInBase, checkInChange } from '../src/ActivitySpace/home/now/checkInDraft';
+import { clearPendingCheckIn, readPendingCheckIn, rememberPendingCheckIn, type PendingCheckIn } from '../src/ActivitySpace/home/now/checkInPending';
 
 const userId = '00000000-0000-0000-0000-000000000001';
 const elementId = '00000000-0000-0000-0000-000000000002';

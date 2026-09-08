@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { isBefore, addDays, startOfDay } from 'date-fns';
 import { STATUS, PRIORITY, STATUS_ORDER, PRIORITY_ORDER, priorityColor, statusColor } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
-import { completionOf } from '@/alcon/shared/completion';
+import { completionOf } from '@/Function/shared/completion';
 
 interface StatusCount {
   status: string;

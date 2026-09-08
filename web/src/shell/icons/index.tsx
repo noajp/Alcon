@@ -47,7 +47,7 @@ export const AgentIcon = ({ size = 15, className }: { size?: number; className?:
 
 // Object concept icon — re-exported from the canonical concept-icon source so
 // the cube glyph never drifts from the sidebar nav / detail-rail Object icon.
-export { ObjectIcon } from '@/alcon/shared/conceptIcons';
+export { ObjectIcon } from '@/Function/shared/conceptIcons';
 
 // Home icon
 export const HomeIcon = ({ size = 20 }: { size?: number }) => (

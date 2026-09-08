@@ -8,8 +8,8 @@
 // buckets splits that weight** — plus the shaping rules around it.
 
 import { describe, expect, it } from 'vitest';
-import { effortFlow, flowTitle, isFoldedNode } from '@/alcon/widget/widgets/effortFlowModel';
-import type { DimensionContext } from '@/alcon/shared/dimensions';
+import { effortFlow, flowTitle, isFoldedNode } from '@/Function/widget/widgets/effortFlowModel';
+import type { DimensionContext } from '@/Function/shared/dimensions';
 import type { ElementWithDetails } from '@/types/database';
 
 let seq = 0;

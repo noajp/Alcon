@@ -21,8 +21,8 @@ import {
   hoursPerDay,
   readAssignment,
   type LoadElement,
-} from '@/alcon/shared/assignmentLoad';
-import type { CapacitySpan, CapacityWorker } from '@/alcon/shared/workerCapacity';
+} from '@/Function/shared/assignmentLoad';
+import type { CapacitySpan, CapacityWorker } from '@/Function/shared/workerCapacity';
 
 const human: CapacityWorker = { type: 'human', capacity_hours_per_day: 8 };
 

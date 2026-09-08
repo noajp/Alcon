@@ -7,8 +7,8 @@
 // user arranged stays put, and a widget they removed on purpose stays gone.
 
 import { describe, expect, it } from 'vitest';
-import { migrateForTest, reconcileBoard } from '@/alcon/widget/useBoard';
-import type { BoardLayout } from '@/alcon/widget/types';
+import { migrateForTest, reconcileBoard } from '@/Function/widget/useBoard';
+import type { BoardLayout } from '@/Function/widget/types';
 
 const defaults: BoardLayout = {
   band: [],

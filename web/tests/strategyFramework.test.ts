@@ -19,8 +19,8 @@ import {
   objectiveTree,
   toMeasureInput,
   type ObjectiveInput,
-} from '@/alcon/widget/widgets/strategyFrameworkModel';
-import type { MeasureInput } from '@/alcon/element/actions/initiativeMeasureModel';
+} from '@/Function/widget/widgets/strategyFrameworkModel';
+import type { MeasureInput } from '@/ActivitySpace/strategy/initiative/initiativeMeasureModel';
 
 function measure(over: Partial<MeasureInput> & { id: string }): MeasureInput {
   return {

@@ -7,14 +7,14 @@
 
 import { describe, expect, it } from 'vitest';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
-import { applyFilter } from '@/alcon/shared/listControls/filter';
+import { applyFilter } from '@/Function/shared/listControls/filter';
 import {
   computeBlockers,
   describeBlocker,
   upstreamIdsOf,
   type DependencyEdgeRow,
   type DependencyUpstreamRow,
-} from '@/alcon/element/dependencyReadiness';
+} from '@/ActivitySpace/execution/element/dependencyReadiness';
 
 const el = (
   id: string,

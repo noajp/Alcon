@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { liveLease, holderLabel, formatRemaining } from '../src/alcon/element/lease';
-import { bucketsOf, DIMENSIONS, DIMENSION_LABEL } from '../src/alcon/shared/dimensions';
+import { liveLease, holderLabel, formatRemaining } from '../src/ActivitySpace/execution/element/lease';
+import { bucketsOf, DIMENSIONS, DIMENSION_LABEL } from '../src/Function/shared/dimensions';
 import type { ElementWithDetails } from '../src/types/database';
 
 const T0 = Date.parse('2026-09-06T12:00:00Z');

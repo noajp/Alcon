@@ -1,4 +1,4 @@
-import type { OperationsQueue } from '@/alcon/sustainment/operationsQueues';
+import type { OperationsQueue } from '@/ActivitySpace/sustainment/operations/operationsQueues';
 
 export interface NavigationState {
   /** Each operations App keeps its selected queue within this window tab. */

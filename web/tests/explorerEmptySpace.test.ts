@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/lib/supabase', () => ({ supabase: { rpc: vi.fn() } }));
 import { supabase } from '@/lib/supabase';
-import { fetchExplorerData } from '@/alcon/sync/explorerData';
-import { EMPTY_EXPLORER_DATA } from '@/alcon/sync/explorerPatch';
+import { fetchExplorerData } from '@/Function/sync/explorerData';
+import { EMPTY_EXPLORER_DATA } from '@/Function/sync/explorerPatch';
 
 describe('new Space explorer boundary', () => {
   it('an empty active Domain neither sends an invalid UUID nor expands to every Domain', async () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { computeInitiativeHealth } from '../src/alcon/element/actions/initiativeHealthModel';
-import type { RiskElement } from '../src/alcon/element/actions/initiativeRiskModel';
+import { computeInitiativeHealth } from '../src/ActivitySpace/strategy/initiative/initiativeHealthModel';
+import type { RiskElement } from '../src/ActivitySpace/strategy/initiative/initiativeRiskModel';
 
 const NOW = Date.parse('2026-09-06T12:00:00Z');
 const el = (o: Partial<RiskElement> & { id: string }): RiskElement => ({

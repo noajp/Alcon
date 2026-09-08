@@ -15,7 +15,7 @@ import {
   dailyCapacity,
   standingCapacity,
   type CapacitySpan,
-} from '@/alcon/shared/workerCapacity';
+} from '@/Function/shared/workerCapacity';
 
 const leave = (start: string, end: string, hours = 0): CapacitySpan => ({
   start_date: start,

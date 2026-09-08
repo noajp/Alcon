@@ -1,13 +1,13 @@
 'use client';
 
 import { useSustainmentDomains } from './useSustainmentDomains';
-import { useDomains } from '@/alcon/domain/data';
-import { useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
+import { useDomains } from '@/ActivitySpace/execution/domain/data';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
-import { fetchExplorerData } from '@/alcon/sync/explorerData';
-import { initiativesForObjects, domainsForObjects, type InitiativeRelation } from '@/alcon/domain/domainRelations';
+import { fetchExplorerData } from '@/Function/sync/explorerData';
+import { initiativesForObjects, domainsForObjects, type InitiativeRelation } from '@/ActivitySpace/execution/domain/domainRelations';
 import { chunkIds } from './chunkedIn';
 import { readAllPages, type CountedRows } from './readAllPages';
 import type { AlconObject, Domain } from '@/types/database';

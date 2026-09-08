@@ -2,8 +2,8 @@
 
 import { getCurrentUserId, supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
-import { notifyDomainsChanged } from '@/alcon/domain/domainsStore';
-import { ElementImportRejectedError, INTAKE_LIMIT, type ElementImportRow, type ElementImportResult } from '@/alcon/element/intake/intakeModel';
+import { notifyDomainsChanged } from '@/ActivitySpace/execution/domain/domainsStore';
+import { ElementImportRejectedError, INTAKE_LIMIT, type ElementImportRow, type ElementImportResult } from '@/ActivitySpace/execution/element/intake/intakeModel';
 
 export interface WorkImportTarget {
   userId: string;

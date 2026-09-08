@@ -17,7 +17,7 @@ import {
 // Fixtures are hand-written message objects rather than real lint runs: what
 // is under test is the mapping and the budgeting, not ESLint.
 
-const FILE = 'src/alcon/object/ListTable.tsx';
+const FILE = 'src/ActivitySpace/execution/object/ListTable.tsx';
 
 type Msg = { ruleId: string | null; severity: 1 | 2; message: string; line?: number };
 

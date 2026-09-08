@@ -2,7 +2,7 @@
 //
 // The menu skeleton, guarded from both ends.
 //
-// Before `alcon/shared/menu` existed, the twelve Radix menu surfaces in these
+// Before `Function/shared/menu` existed, the twelve Radix menu surfaces in these
 // six files were measured in Chrome against the compiled Tailwind bundle. They
 // rendered seven different widths (128 / 140 / 160 / 170 / 180 / 200 / 240 /
 // 288px), four surface paddings (0 / 4 / 6 / 8px), five row paddings and five
@@ -46,7 +46,7 @@ import {
   MENU_WIDTH,
   MENU_ROW,
   MENU_SECTION_LABEL,
-} from '@/alcon/shared/menu';
+} from '@/Function/shared/menu';
 import { Popover } from '@/ui/popover';
 import { DropdownMenu } from '@/ui/dropdown-menu';
 
@@ -61,10 +61,10 @@ function classesOf(el: Element): string[] {
 
 /** The menu-bearing files covered by this contract. */
 const CONVERGED = [
-  'alcon/property/AddPropertyButton.tsx',
-  'alcon/shared/listControls/ListControls.tsx',
-  'alcon/widget/WidgetPicker.tsx',
-  'alcon/shared/listTable/ColumnHeaderMenu.tsx',
+  'Function/property/AddPropertyButton.tsx',
+  'Function/shared/listControls/ListControls.tsx',
+  'Function/widget/WidgetPicker.tsx',
+  'Function/shared/listTable/ColumnHeaderMenu.tsx',
 ];
 
 // ---------------------------------------------------------------- rendering
@@ -182,7 +182,7 @@ describe('every menu in the converged files goes through MenuShell', () => {
   // ListTable's cell editors are Popovers but not menus: they host the
   // Calendar and the type picker and deliberately keep CELL_POPOVER_RADIUS.
   const CELL_EDITOR = /<PopoverContent[\s\S]{0,200}?CELL_POPOVER_RADIUS/;
-  const menuSurfaces = [...CONVERGED, 'alcon/shared/listTable/cells.tsx'];
+  const menuSurfaces = [...CONVERGED, 'Function/shared/listTable/cells.tsx'];
 
   for (const file of menuSurfaces) {
     it(`${file} has no hand-rolled menu surface`, () => {
@@ -205,7 +205,7 @@ describe('every menu in the converged files goes through MenuShell', () => {
   it('leaves the ListTable cell editors alone', () => {
     // Guards the exception from being "fixed" by a later sweep: these three
     // popovers are matched to the Calendar surface on purpose.
-    expect(src('alcon/shared/listTable/cells.tsx').match(/CELL_POPOVER_RADIUS/g)?.length).toBe(4);
+    expect(src('Function/shared/listTable/cells.tsx').match(/CELL_POPOVER_RADIUS/g)?.length).toBe(4);
   });
 });
 
@@ -220,7 +220,7 @@ describe('the section heading is used, not just exported', () => {
   }
 
   it('every converged file takes its headings from the shared component', () => {
-    const withHeadings = CONVERGED.filter((f) => /MenuSectionLabel/.test(src(f)) || (/FieldVisibility/.test(src(f)) && /MenuSectionLabel/.test(src('alcon/property/FieldVisibility.tsx'))));
+    const withHeadings = CONVERGED.filter((f) => /MenuSectionLabel/.test(src(f)) || (/FieldVisibility/.test(src(f)) && /MenuSectionLabel/.test(src('Function/property/FieldVisibility.tsx'))));
     expect(withHeadings).toEqual(CONVERGED);
   });
 });

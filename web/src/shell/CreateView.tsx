@@ -5,10 +5,10 @@ import type { ReactNode } from 'react';
 import { Input } from '@/ui/input';
 import { Button } from '@/ui/button';
 import { createDomain } from '@/hooks/useSupabase';
-import { getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
-import { suggestObjectPrefix } from '@/alcon/object/objectPrefix';
+import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { suggestObjectPrefix } from '@/ActivitySpace/execution/object/objectPrefix';
 import { Globe, Lock } from 'lucide-react';
-import { DomainIcon } from '@/alcon/shared/conceptIcons';
+import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { useAuthContext } from '@/providers/AuthProvider';
 import type { DomainPrivacy } from '@/types/database';
 

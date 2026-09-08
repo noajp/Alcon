@@ -20,7 +20,7 @@ Campaign（`strategies`）が束ねる Object の集合は、2つの場所に書
 
 1。`strategy_objects` が Campaign の Object 集合の唯一の置き場。`scope.object_ids` はどのコードも書かず、どのコードも読まない。`StrategyScope` 型からフィールドを消す。
 
-Object 集合を組み立てる経路は `alcon/element/actions/campaignObjects.ts` の `assembleStrategies` に1本化し、`web/tests/campaignObjects.test.ts` が「scope に古い `object_ids` が残っていて junction と食い違っていても、junction だけが採られる」ことを縛る。
+Object 集合を組み立てる経路は `ActivitySpace/strategy/initiative/initiativeObjects.ts` の `assembleStrategies` に1本化し、`web/tests/initiativeObjects.test.ts` が「scope に古い `object_ids` が残っていて junction と食い違っていても、junction だけが採られる」ことを縛る。
 
 既存行の `scope.object_ids` は消さない。前方互換のみ —— 読まれないキーが残っているだけで害は無く、消すための migration は「既存テーブルに触る migration」の負担（`to_regclass` ガード、preview replay）に見合わない。
 

@@ -7,7 +7,7 @@ import {
   reviewOutcomeLabel,
   suggestedStatusAfter,
   type ReviewInput,
-} from '@/alcon/element/actions/initiativeReviewModel';
+} from '@/ActivitySpace/strategy/initiative/initiativeReviewModel';
 
 // The same tabletop the decision rules were written against, carried one step
 // further. The commander chose sealift over airlift and set D+5 to re-check the

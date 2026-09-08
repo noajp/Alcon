@@ -66,7 +66,7 @@ vi.mock('@/hooks/useSupabase', () => ({
 
 // The detail view itself is not what is being tested — which Element it is
 // opened on, and at which comment, is.
-vi.mock('@/alcon/element/ElementDetailView', () => ({
+vi.mock('@/ActivitySpace/execution/element/ElementDetailView', () => ({
   ElementDetailView: (props: Record<string, unknown>) => {
     detailProps(props);
     return <div data-testid="element-detail">{(props.element as { title: string }).title}</div>;
@@ -77,7 +77,7 @@ vi.mock('@/providers/AuthProvider', () => ({
   useAuthContext: () => ({ user: { id: USER_ID }, profile: { display_name: 'Me' } }),
 }));
 
-const { InboxView } = await import('@/alcon/element/actions/InboxView');
+const { InboxView } = await import('@/ActivitySpace/home/InboxView');
 
 beforeEach(() => {
   feed = [notification()];

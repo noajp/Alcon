@@ -15,8 +15,8 @@ import {
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Button } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
-import { MenuShell, MenuSectionLabel } from '@/alcon/shared/menu';
-import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { MenuShell, MenuSectionLabel } from '@/Function/shared/menu';
+import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 
 export type { RailMode };
 

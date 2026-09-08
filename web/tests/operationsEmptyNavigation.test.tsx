@@ -2,10 +2,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useState, type ReactNode } from 'react';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { OperationsNavigation, OperationsNavigationContext } from '@/alcon/sustainment/OperationsNavigation';
-import { normalizeOperationsParams, OPERATIONS_FIELDS, type OperationsKind } from '@/alcon/sustainment/operationsModel';
-import type { OperationsQueue } from '@/alcon/sustainment/operationsQueues';
-import type { WidgetProps } from '@/alcon/widget/types';
+import { OperationsNavigation, OperationsNavigationContext } from '@/ActivitySpace/sustainment/operations/OperationsNavigation';
+import { normalizeOperationsParams, OPERATIONS_FIELDS, type OperationsKind } from '@/ActivitySpace/sustainment/operations/operationsModel';
+import type { OperationsQueue } from '@/ActivitySpace/sustainment/operations/operationsQueues';
+import type { WidgetProps } from '@/Function/widget/types';
 
 vi.mock('@/hooks/useOperationsTemplate', () => ({
   useOperationsTables: () => ({ data: [{ id: 'empty', name: 'Empty inventory' }], loading: false, error: null }),
@@ -16,10 +16,10 @@ vi.mock('@/hooks/useWidgetTableData', () => ({ useWidgetTableData: (id: string |
     columns: OPERATIONS_FIELDS.scm.map(field => ({ id: field.key, name: field.label, type: field.type })) } : null,
   loading: false, error: null, refetch: vi.fn(),
 }) }));
-vi.mock('@/alcon/widget/WidgetFrame', () => ({ WidgetHeaderAction: ({ children }: { children: ReactNode }) => <>{children}</>, useWidgetMeta: () => {} }));
+vi.mock('@/Function/widget/WidgetFrame', () => ({ WidgetHeaderAction: ({ children }: { children: ReactNode }) => <>{children}</>, useWidgetMeta: () => {} }));
 vi.mock('@/hooks/useOperationsAction', () => ({ useOperationsAction: () => ({}) }));
-vi.mock('@/alcon/shared/ExplorerDataContext', () => ({ useExplorerData: () => ({ objects: [] }) }));
-const { default: OperationsPlannerWidget } = await import('@/alcon/widget/widgets/OperationsPlannerWidget');
+vi.mock('@/Function/shared/ExplorerDataContext', () => ({ useExplorerData: () => ({ objects: [] }) }));
+const { default: OperationsPlannerWidget } = await import('@/Function/widget/widgets/OperationsPlannerWidget');
 
 const fields = Object.fromEntries(OPERATIONS_FIELDS.scm.map(field => [field.key, field.key]));
 function Harness({ kind = 'scm', connected = true, embedded = false }: { kind?: OperationsKind; connected?: boolean; embedded?: boolean }) {

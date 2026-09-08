@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createNoteContentStore } from '@/alcon/brief/noteContentStore';
+import { createNoteContentStore } from '@/ActivitySpace/sustainment/notebook/noteContentStore';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

@@ -13,7 +13,7 @@ import {
   type AssumptionInput,
   type WatchInput,
   type WorkerWatchInput,
-} from '@/alcon/element/actions/initiativeAssumptionModel';
+} from '@/ActivitySpace/strategy/initiative/initiativeAssumptionModel';
 
 // The whole point of the assumptions surface is one claim: "something this
 // assumption depends on has stopped moving". Everything below tests that claim

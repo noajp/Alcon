@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeOperations, normalizeOperationsParams, OPERATIONS_FIELDS, type OperationsKind } from '@/alcon/sustainment/operationsModel';
+import { analyzeOperations, normalizeOperationsParams, OPERATIONS_FIELDS, type OperationsKind } from '@/ActivitySpace/sustainment/operations/operationsModel';
 const { runOperationsTool } = await import(new URL('../../supabase/functions/alcon-copilot/operationsTools.ts', import.meta.url).pathname);
 const { runWidgetTool } = await import(new URL('../../supabase/functions/alcon-copilot/widgetTools.ts', import.meta.url).pathname);
 

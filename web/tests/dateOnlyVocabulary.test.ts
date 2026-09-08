@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { parseDateOnly, toDateOnlyString, fromDateOnlyString, shiftDateOnly, dayNumberOf } from '@/alcon/shared/dateUtils';
+import { parseDateOnly, toDateOnlyString, fromDateOnlyString, shiftDateOnly, dayNumberOf } from '@/Function/shared/dateUtils';
 import { STATUS, PRIORITY, STATUS_ORDER, PRIORITY_ORDER } from '@/shared/designTokens';
-import { labelForStatus, labelForPriority, priorityWeight } from '@/alcon/shared/listControls/types';
+import { labelForStatus, labelForPriority, priorityWeight } from '@/Function/shared/listControls/types';
 
 describe('date-only editor values', () => {
   it.each(['2026-03-08', '2026-11-01', '2024-02-29', '2026-12-31'])(

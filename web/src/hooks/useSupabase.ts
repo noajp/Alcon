@@ -2,7 +2,7 @@
 
 // Compatibility facade: existing imports retain the same API while data lives with each concept.
 
-export type { ExplorerData } from '@/alcon/sync/explorerPatch';
+export type { ExplorerData } from '@/Function/sync/explorerPatch';
 
 export type {
   AgentRun,
@@ -57,9 +57,9 @@ export type {
   WorkerAvailabilityKind,
 } from '@/types/database';
 
-export { invalidateElementDetail } from '@/alcon/sync/explorerCache';
+export { invalidateElementDetail } from '@/Function/sync/explorerCache';
 
-export { useObjects } from '@/alcon/sync/explorerData';
+export { useObjects } from '@/Function/sync/explorerData';
 
 export {
   createObject,
@@ -77,7 +77,7 @@ export {
   updateObject,
   updateObjectTab,
   useObjectTabs,
-} from '@/alcon/object/data';
+} from '@/ActivitySpace/execution/object/data';
 
 export {
   addElementAssignee,
@@ -103,7 +103,7 @@ export {
   updateElement,
   updateSubelement,
   useElementBlockers,
-} from '@/alcon/element/data';
+} from '@/ActivitySpace/execution/element/data';
 
 export {
   createCustomColumn,
@@ -118,7 +118,7 @@ export {
   setCustomColumnObjectValue,
   setCustomColumnValue,
   updateCustomColumn,
-} from '@/alcon/property/data';
+} from '@/Function/property/data';
 
 export {
   createWorker,
@@ -130,7 +130,7 @@ export {
   useWorkerAvailability,
   useWorkerCommitments,
   useWorkers,
-} from '@/alcon/team/data';
+} from '@/ActivitySpace/sustainment/team/data';
 
 export {
   addDomainElementType,
@@ -144,7 +144,7 @@ export {
   setDomainLabelColor,
   updateDomain,
   useDomains,
-} from '@/alcon/domain/data';
+} from '@/ActivitySpace/execution/domain/data';
 
 export {
   createActivitySpace,
@@ -153,7 +153,7 @@ export {
   updateActivitySpace,
   useActivitySpaces,
   type SpaceGuestRow,
-} from '@/alcon/space/data';
+} from '@/Function/space/data';
 
 export {
   addDataTableColumn,
@@ -168,7 +168,7 @@ export {
   useDataTables,
   type DataTableSchema,
   type DataTableWithRowCount,
-} from '@/alcon/table/data';
+} from '@/ActivitySpace/sustainment/table/data';
 
 export {
   archiveNotification,
@@ -178,14 +178,14 @@ export {
   markNotificationRead,
   notifyMany,
   useNotifications,
-} from '@/alcon/element/notificationData';
+} from '@/ActivitySpace/execution/element/notificationData';
 
 export {
   createElementTemplate,
   deleteElementTemplate,
   updateElementTemplate,
   useElementTemplates,
-} from '@/alcon/element/templateData';
+} from '@/ActivitySpace/execution/element/templateData';
 
 export {
   addReaction,
@@ -204,9 +204,9 @@ export {
   useElementComments,
   type CarryOverReason,
   type ElementCommentActivity,
-} from '@/alcon/element/commentData';
+} from '@/ActivitySpace/execution/element/commentData';
 
-export { globalSearch, type SearchResult } from '@/alcon/shared/searchData';
+export { globalSearch, type SearchResult } from '@/Function/shared/searchData';
 
 export {
   cancelAgentRun,
@@ -216,7 +216,7 @@ export {
   pingAgentRuntime,
   startAgentRun,
   useAgentRun,
-} from '@/alcon/copilot/agentData';
+} from '@/Function/copilot/agentData';
 
 export {
   addIntentBinding,
@@ -243,7 +243,7 @@ export {
   useStrategyComments,
   useStrategyIntentBundle,
   type IntentBundle,
-} from '@/alcon/element/actions/strategyData';
+} from '@/ActivitySpace/strategy/initiative/strategyData';
 
 export {
   closePhase,
@@ -256,7 +256,7 @@ export {
   usePhases,
   type PhaseCandidateElement,
   type PhaseReschedule,
-} from '@/alcon/phase/data';
+} from '@/ActivitySpace/strategy/phase/data';
 
 export {
   createObjectMilestone,
@@ -264,4 +264,4 @@ export {
   fetchObjectMilestones,
   updateObjectMilestone,
   useObjectMilestones,
-} from '@/alcon/object/milestoneData';
+} from '@/ActivitySpace/execution/object/milestoneData';

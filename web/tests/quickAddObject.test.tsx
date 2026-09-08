@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { afterEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { QuickAddObjectPopup } from '@/alcon/object/QuickAddObjectPopup';
+import { QuickAddObjectPopup } from '@/ActivitySpace/execution/object/QuickAddObjectPopup';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const domains = [{id:'active',name:'Active domain'}, {id:'other',name:'Other domain'}];

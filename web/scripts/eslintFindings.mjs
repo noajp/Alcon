@@ -30,7 +30,7 @@ export const NO_RULE = '(no rule)';
  * a stale disable directive, and dropping those would quietly excuse the file
  * ESLint could not even read.
  *
- * @param {string} file  path to show in the report, e.g. 'src/alcon/foo.tsx'
+ * @param {string} file  path to show in the report, e.g. 'src/ActivitySpace/foo.tsx'
  * @param {Array<{ ruleId?: string | null, severity?: number, message: string,
  *                 line?: number }>} [messages]
  * @returns {Finding[]}

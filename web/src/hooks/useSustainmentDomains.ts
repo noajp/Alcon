@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { readAllPages } from '@/hooks/readAllPages';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementWithDetails, Worker } from '@/types/database';
-import { compareDecisionLab, type DecisionLabInput } from '@/alcon/element/actions/decisionLabModel';
-import { decisionLabRecord } from '@/alcon/element/actions/decisionLabRecord';
+import { compareDecisionLab, type DecisionLabInput } from '@/ActivitySpace/strategy/initiative/decisionLabModel';
+import { decisionLabRecord } from '@/ActivitySpace/strategy/initiative/decisionLabRecord';
 
 function element(id: string, extra: Partial<ElementWithDetails> = {}): ElementWithDetails {
   return {

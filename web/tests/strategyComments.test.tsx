@@ -60,7 +60,7 @@ vi.mock('@/providers/AuthProvider', () => ({
 }));
 
 // Imported after the mocks so the component picks them up.
-const { StrategyCommentsPanel } = await import('@/alcon/element/actions/StrategyCommentsPanel');
+const { StrategyCommentsPanel } = await import('@/ActivitySpace/strategy/initiative/StrategyCommentsPanel');
 
 function setup(overrides: Partial<Parameters<typeof StrategyCommentsPanel>[0]> = {}) {
   render(

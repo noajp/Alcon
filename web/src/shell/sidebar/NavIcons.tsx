@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Notebook, BarChart3,
   ChartArea, ChartGantt, Users, Share2, Search, Workflow, Compass, Milestone,
 } from 'lucide-react';
-import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon, ScmIcon } from '@/alcon/shared/conceptIcons';
+import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon, ScmIcon } from '@/Function/shared/conceptIcons';
 
 // ── Nav / tab / item icons ───────────────────────────────────────────────
 // Everything uses Lucide at strokeWidth 2. Lucide draws on a 24-unit grid, so

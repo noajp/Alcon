@@ -13,12 +13,12 @@ UI レイアウト・データモデル・境界と権限・拡張構想の詳�
 | 分類 | 戦争論 | 何を扱うか | 単位 |
 |---|---|---|---|
 | **Strategy** | 戦略 | 何を達成し、どう勝つか | Initiative（束ねると戦略になる） |
-| **Execution** | 戦闘 | 実際に行動する | Element → Object → Domain |
+| **Execution** | 戦闘 | 実際に行動する | Domain → Object → Element |
 | **Sustainment** | 兵站 | 仕事道具 | Workload / CRM / SCM / Notebook / Table / Team / Calendar |
 
 **Strategy** — Initiative が単位。目的・前提・意思決定・成功条件を持ち、担当や進捗は持たない。Initiative が束ねられて戦略になる。ほかに Phase（努力を配分する時間箱）と Timeline がある。
 
-**Execution** — 担当・期限・進捗・依存・成果物を扱う層。三層はアーレント『人間の条件』の**労働・仕事・活動**の三分に着想を得ている。**Element** は行動の最小単位で、日々こなされる労働（患者 / タスク / 仕訳）。**Object** は Element を束ね、成果物として世界に残る仕事（病棟 / プロジェクト）。**Domain** は Object の集合で、複数の人が集い関わり合う活動の場（病院 / 会社 / 作戦）。
+**Execution** — 担当・期限・進捗・依存・成果物を扱う層。三層はアーレント『人間の条件』の**活動・仕事・労働**の三分に着想を得ている。**Domain** は複数の人が集い関わり合う活動の場（病院 / 会社 / 作戦）。**Object** はその中で成果物として世界に残る仕事（病棟 / プロジェクト）。**Element** は Object を構成する行動の最小単位で、日々こなされる労働（患者 / タスク / 仕訳）。
 
 **Sustainment** — 行動を支える仕事道具。Worker（human | ai_agent）が Execution で行動する主体であり、その Worker が働き続けられるよう支える道具がここに属する。
 
@@ -68,16 +68,52 @@ npx vercel --prod            # 本番デプロイ
 - **ウィジェットの枠を自作しない** — カードを足したくなったら `WIDGET_REGISTRY` に登録する。枠は `WidgetFrame`、ヘッダは `useWidgetMeta` / `WidgetHeaderAction`。専用の型・localStorage・カード UI を別経路で作らない
 - **recharts を使うコンポーネントは `'use client'` 必須** — SSR 非対応
 
+## ディレクトリ
+
+```
+Alcon/
+├── web/
+│   ├── src/
+│   │   ├── app/                  Next.js App Router。layout / page / globals.css だけ
+│   │   ├── shell/                外殻 — ModeRail / AppSidebar / TabBar / CommandPalette / MainContent / viewRegistry
+│   │   ├── ActivitySpace/        盤面そのもの — 三分類 ＋ Home
+│   │   │   ├── home/             Now / Inbox / My Elements / My Calendar / Profile
+│   │   │   ├── strategy/         initiative / phase / timeline
+│   │   │   ├── execution/        domain / object / element
+│   │   │   └── sustainment/      workload / notebook / table / team / calendar / operations（CRM・SCM）
+│   │   ├── Function/             盤面を成立させる仕組み。特定の概念に属さない
+│   │   │   ├── widget/           widgets/ 本体 + registry.tsx（定義）+ defaults.ts（既定配置）
+│   │   │   ├── property/         Object ごとの列定義と値
+│   │   │   ├── copilot/          AlconCopilotPanel と Edge Function 呼び出し
+│   │   │   ├── settings/
+│   │   │   ├── space/            Activity Space の切替とオンボーディング
+│   │   │   ├── sync/             deltaStream / explorerCache
+│   │   │   └── shared/           概念をまたぐ UI とロジック（dimensions.ts / phaseWindow.ts ほか）
+│   │   ├── shared/               designTokens.ts — デザイントークンの単一情報源
+│   │   ├── hooks/                Supabase の CRUD はすべてここ
+│   │   ├── lib/                  supabase クライアント / queryClient / utils
+│   │   ├── providers/            Auth / Query / Theme
+│   │   ├── auth/                 ログイン画面
+│   │   ├── types/                DB とナビの型
+│   │   └── ui/                   shadcn 由来のプリミティブ
+│   ├── tests/                    Vitest（node 環境、純粋ロジックのみ）
+│   └── scripts/                  design-lint / eslint-ratchet / unwired-lint
+├── supabase/                     migrations/ と functions/（root にのみ置く）
+├── ops/                          自走ループの運用スクリプト（lease / board-listen / stall-check ほか）
+├── docs/                         adr/ と friction-risk-register.md
+└── website/                      LP
+```
+
 ## 実装ルール
 
 1. 変更後は必ず `npx tsc --noEmit` と `npm test`
-2. 新規ファイルは `alcon/<concept>/` 配下。横断 UI は `alcon/shared/`、外殻（ModeRail / AppSidebar / TabBar / CommandPalette）は `shell/`
+2. 新規ファイルは、盤面の面なら `ActivitySpace/<分類>/<概念>/`、それを支える仕組みなら `Function/<concept>/` 配下。横断 UI は `Function/shared/`、外殻（ModeRail / AppSidebar / TabBar / CommandPalette）は `shell/`
 3. **新 view**：`viewRegistry.ts`（label/icon の単一情報源）→ `MainContent` 分岐 → `railApps.ts` の `MODE_META`。新モードを App にするなら `RailMode` / `APP_GROUPS` も
-4. **新 Widget**：本体を `alcon/widget/widgets/` に置き、`registry.tsx` に定義を1つ足す（`accepts` の Subject、`zones`、`load()` の動的 import）。既定配置は `defaults.ts`。既存ウィジェットを別 Subject に開放するのは `accepts` に1語足すだけ
-5. **図の軸を焼き込まない** — 集計軸は `alcon/shared/dimensions.ts` の `Dimension` から選ばせ、`WidgetInstance.params` に持たせる。軸違いで2つ目のウィジェットを作らない
+4. **新 Widget**：本体を `Function/widget/widgets/` に置き、`registry.tsx` に定義を1つ足す（`accepts` の Subject、`zones`、`load()` の動的 import）。既定配置は `defaults.ts`。既存ウィジェットを別 Subject に開放するのは `accepts` に1語足すだけ
+5. **図の軸を焼き込まない** — 集計軸は `Function/shared/dimensions.ts` の `Dimension` から選ばせ、`WidgetInstance.params` に持たせる。軸違いで2つ目のウィジェットを作らない
 6. **フレームワークは永続データの見せ方にする** — OKR / Gap は `intents` の measure の読み替え、任意分類の分析は Table の列・行・値、散文は Note。業界固有のデータや分析結果をコンポーネントや配置パラメータへ直書きしない
 7. **Object のネスト禁止**（`parent_object_id` も `object_parents` も無い）。Element の multi-homing は `object_id` + `element_objects` の二重書き
-8. Phase の `end_date` は**含む**（最終日はその Phase の稼働日）。日付を扱う処理は `alcon/shared/phaseWindow.ts` を通す
+8. Phase の `end_date` は**含む**（最終日はその Phase の稼働日）。日付を扱う処理は `Function/shared/phaseWindow.ts` を通す
 9. Note エディタは独自 `AppleNoteEditor`（HTML + `htmlSanitizer`）。BlockNote は使わない
 
 ## Supabase

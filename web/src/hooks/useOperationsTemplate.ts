@@ -2,11 +2,11 @@
 
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useDomains } from '@/alcon/domain/data';
-import { getActiveDomainId } from '@/alcon/domain/domainsStore';
-import { getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
-import { addDataTableColumns, createDataTable, deleteDataTable, DATA_TABLES_QUERY_KEY, useDataTables } from '@/alcon/table/data';
-import { OPERATIONS_FIELDS, type OperationsKind } from '@/alcon/sustainment/operationsModel';
+import { useDomains } from '@/ActivitySpace/execution/domain/data';
+import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { addDataTableColumns, createDataTable, deleteDataTable, DATA_TABLES_QUERY_KEY, useDataTables } from '@/ActivitySpace/sustainment/table/data';
+import { OPERATIONS_FIELDS, type OperationsKind } from '@/ActivitySpace/sustainment/operations/operationsModel';
 
 /** Domain-scoped tables stay in their Space; unscoped personal tables are portable. */
 export function useOperationsTables() {

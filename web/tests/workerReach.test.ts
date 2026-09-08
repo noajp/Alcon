@@ -10,7 +10,7 @@ import {
   isUnreachableWorker,
   unreachableWorkerTitle,
   workerTriggerLabel,
-} from '@/alcon/shared/workerReach';
+} from '@/Function/shared/workerReach';
 
 describe('isUnreachableWorker', () => {
   it('marks a human Worker whose user_id is null', () => {

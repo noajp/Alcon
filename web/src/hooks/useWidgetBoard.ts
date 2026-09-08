@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { migrateBoard, reconcileBoard } from '@/alcon/widget/boardModel';
-import type { BoardLayout, StoredBoard } from '@/alcon/widget/types';
+import { migrateBoard, reconcileBoard } from '@/Function/widget/boardModel';
+import type { BoardLayout, StoredBoard } from '@/Function/widget/types';
 
 interface BoardRow {
   id: string;

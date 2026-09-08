@@ -5,7 +5,7 @@ import {
   normalizeDataViewParams,
   numericCell,
   parseCell,
-} from "../src/alcon/widget/widgets/dataViewModel";
+} from "../src/Function/widget/widgets/dataViewModel";
 import type { DataTableRow } from "../src/types/database";
 const rows = ["a", "b", "c"].map((id) => ({ id }) as DataTableRow);
 describe("data view configuration and readings", () => {
