@@ -185,7 +185,7 @@ order by c.created_at desc limit 20;
   - `agent-*` 以外の今回の作業場は自動削除されない。完了した自分の worktree に限り、未コミット・未マージ・ロック・並行利用が無いことを確認し、別ディレクトリから `git worktree remove <path>`（force なし）で削除して sync を再実行する。削除対象は今回の PR と紐づけ、他セッションの作業場を推測で消さない。
   - 最後に `git ls-remote --heads origin <branch>`、`git branch --list <branch>`、`git worktree list` で削除を、`git rev-parse main origin/main` で同期を確認する。sync は worktree 削除後にブランチが残ることがあるので、必要なら再実行する。
 - **完了・Blocked でリースを返す**: `node ops/lease.mjs release <display_id> --text "✔ 完了 — …"`。返し忘れは 40 分で自然に切れるが、切れるまでの間は他セッションを待たせる
-- **並列規則**: `shell/` と DB migration を触る作業は**直列**。`alcon/<concept>/` 内で閉じる作業は worktree サブエージェントで**並列可**
+- **並列規則**: `shell/` と DB migration を触る作業は**直列**。`ActivitySpace/` / `Function/` の1概念に閉じる作業は worktree サブエージェントで**並列可**
 - **検証はメインセッションに集約**: `npx tsc --noEmit` / `npm test` / eslint（変更ファイルのみ、既存件数と比較）/ ブラウザ実機。UI 実装は design skill 経由
 - Subelement のデータには触らない
 

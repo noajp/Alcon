@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { ObjectFieldDialog } from '@/alcon/property/ObjectFieldDialog';
+import { ObjectFieldDialog } from '@/Function/property/ObjectFieldDialog';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 afterEach(cleanup);
 

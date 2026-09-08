@@ -638,7 +638,7 @@ button, a, input, select, textarea {
    Re-typed here rather than in a Tailwind variant on MenuShell: the block above
    is deliberately unlayered so `--fs` wins, and an unlayered `.text-sm` beats
    anything in @layer utilities regardless of specificity. Scoped to
-   `[data-menu-shell]` (alcon/shared/menu) so the app's other dropdowns are
+   `[data-menu-shell]` (Function/shared/menu) so the app's other dropdowns are
    untouched. */
 [data-menu-shell] [data-slot="dropdown-menu-item"],
 [data-menu-shell] [data-slot="dropdown-menu-checkbox-item"] {

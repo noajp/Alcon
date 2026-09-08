@@ -5,8 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { ObjectIcon } from '@/shell/icons';
-import { DomainIcon } from '@/alcon/shared/conceptIcons';
-import { notifyDomainsChanged } from '@/alcon/domain/domainsStore';
+import { DomainIcon } from '@/Function/shared/conceptIcons';
+import { notifyDomainsChanged } from '@/ActivitySpace/execution/domain/domainsStore';
 
 // "Things I haven't joined yet." Opens from the 🔍 in the ModeStrip and
 // lists Domains / Objects whose member tables don't yet have a row for the

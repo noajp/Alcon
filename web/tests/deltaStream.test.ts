@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/query-core';
-import { applyWorkspaceDelta, type Delta } from '@/alcon/sync/deltaStream';
-import type { ExplorerData } from '@/alcon/sync/explorerPatch';
+import { applyWorkspaceDelta, type Delta } from '@/Function/sync/deltaStream';
+import type { ExplorerData } from '@/Function/sync/explorerPatch';
 import type { ElementComment, ElementWithDetails, Worker } from '@/types/database';
 
 const el = (id: string, extra: Partial<ElementWithDetails> = {}): ElementWithDetails =>

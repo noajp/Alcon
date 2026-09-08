@@ -1,13 +1,13 @@
 /** @vitest-environment jsdom */
 //
 // Escape goes to one layer: the one that opened last. This is the rule every
-// hand-rolled dialog, picker and detail view in alcon/ now shares instead of
+// hand-rolled dialog, picker and detail view now shares instead of
 // each owning a window listener, and it is worth pinning because the failure
 // it replaces was silent — two listeners both fired, tsc and design-lint both
 // passed, and the user watched a modal and the page under it close together.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { dispatchEscape, escapeLayerDepth, pushEscapeLayer } from '@/alcon/shared/keyboard';
+import { dispatchEscape, escapeLayerDepth, pushEscapeLayer } from '@/Function/shared/keyboard';
 
 const cleanups: Array<() => void> = [];
 function open(onEscape: () => void, root?: () => Element | null) {

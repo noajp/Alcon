@@ -1,4 +1,4 @@
-import type { ListControlsState } from '@/alcon/shared/listControls/types'
+import type { ListControlsState } from '@/Function/shared/listControls/types'
 
 export type Json =
   | string
@@ -29,7 +29,7 @@ export interface DomainAIConfig {
 
 // Per-Domain thresholds for the Initiative risk cross-section, stored in
 // domains.risk_thresholds (jsonb). Every key optional; absent = the default
-// in alcon/element/actions/initiativeRiskModel.ts. Edited from Settings >
+// in ActivitySpace/strategy/initiative/initiativeRiskModel.ts. Edited from Settings >
 // Elements > SLAs.
 export interface DomainRiskThresholds {
   due_soon_days?: number   // days ahead that count as "due soon" (default 3)

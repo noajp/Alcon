@@ -126,7 +126,7 @@ AIによる変更も、バージョンと適用範囲を持つ業務設定とし
 | 分類 | 戦争論 | 何を扱うか | 単位 |
 |---|---|---|---|
 | **Strategy** | 戦略 | 何を達成し、どう勝つか | Initiative。複数の Initiative が束ねられて戦略となる |
-| **Execution** | 戦闘 | 実際に行動する | Element（最小単位）→ Object（Element の束）→ Domain（Object の集合） |
+| **Execution** | 戦闘 | 実際に行動する | Domain（活動の場）→ Object（成果物の束）→ Element（最小単位） |
 | **Sustainment** | 兵站 | 仕事道具 | Workload / CRM / SCM / Notebook / Table / Team / Calendar |
 
 ### Activity Space — 組織活動の文脈と信頼境界
@@ -139,8 +139,8 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ║ │  Strategy（戦略）— Initiative / Phase / Timeline            │ ║
 ║ │  何を達成し、どう勝つか。Initiative を束ねると戦略になる          │ ║
 ║ ├──────────────────────────────────────────────────────────┤ ║
-║ │  Execution（戦闘）— Element → Object → Domain             │ ║
-║ │  実際に行動する。労働・仕事・活動                             │ ║
+║ │  Execution（戦闘）— Domain → Object → Element             │ ║
+║ │  実際に行動する。活動・仕事・労働                             │ ║
 ║ ├──────────────────────────────────────────────────────────┤ ║
 ║ │  Sustainment（兵站）— Workload / CRM / SCM                │ ║
 ║ │                       / Notebook / Table / Team / Calendar │ ║
@@ -186,19 +186,21 @@ Initiative を開くと、意図・状況・前提・決定・指標・リスク
 
 **Decision Lab** は、重要な Element への集中・着手延期・担当変更を試し、条件付きの完了日と他の仕事への影響を現状と比較するウィジェット。同じ Space で閲覧できる仕事の工数・担当・依存関係・不在を使い、履歴の蓄積を待たずに試算する。未見積や解けない依存は未算定として示す。採択理由・前提・比較結果は Initiative の Decision に保存し、対象 Element に結び付ける。試算は実際の予定を変えず、Element の編集へ戻って判断を実行に反映する。完了日の試算と成功条件の達成は区別する。
 
-### Execution（戦闘）：Element → Object → Domain
+### Execution（戦闘）：Domain → Object → Element
 
 実際に行動する分類。担当・期限・進捗・依存関係・成果物を扱う。Initiativeに結び付いた実行も、目的の整理に先立って始まる日常の仕事も扱う。
 
-三層はアーレント『人間の条件』の **労働・仕事・活動** の三分に着想を得ている。製品ではElementを行動、Objectを成果や案件のまとまり、Domainを活動の場として使う。哲学上の区分への一致より、実際の仕事を探し、更新し、共有しやすい粒度を優先する。
+三層はアーレント『人間の条件』の **活動・仕事・労働** の三分に着想を得ている。製品ではDomainを活動の場、Objectを成果や案件のまとまり、Elementを行動として使う。哲学上の区分への一致より、実際の仕事を探し、更新し、共有しやすい粒度を優先する。
 
 | 概念 | 役割 | 構造ルール |
 |------|------|-----------|
-| **Element** | 行動の最小単位 | 個人の仕事、またはObjectに所属する仕事。multi-homing可（`object_id` + `element_objects` junction） |
-| **Object** | 成果や案件としてElementを束ねる単位 | 現在の構造はDomain直下のフラットな集合。multi-homingは `object_domains` |
 | **Domain** | Objectの集合、活動の場 | Space内の活動をまとめる。activeなDomainはlocalStorage永続 |
+| **Object** | 成果や案件としてElementを束ねる単位 | 現在の構造はDomain直下のフラットな集合。multi-homingは `object_domains` |
+| **Element** | 行動の最小単位 | 個人の仕事、またはObjectに所属する仕事。multi-homing可（`object_id` + `element_objects` junction） |
 
 Object は「箱」、Element は「中身」。箱は一段しかなく（ネストしない）、中身は複数の箱に同時に入れられる。Object 詳細は貢献先 Initiative を常に表示し、Strategy へ一クリックで戻れる。
+
+**Domain の実現構想** — 有限の複数プロジェクトをどう組み合わせて Initiative を実現するかを記す。Domain は継続する活動の場であり、複数の構想を持てる。構想は Initiative と任意の既存成功条件（measure）を参照し、期待する変化・仮説・前提・見直し条件を持つ。成立条件に Object の貢献と役割・順序の理由を結び、進捗とは独立に、観測事実・出典・観測日・解釈を記録する。構想の変更後は以前の評価を再評価対象にする。継続・変更・停止の判断は判断者と当時の構想・根拠を保存し、対象 Object と Initiative へ戻れる。書き込みは Domain の owner/admin、閲覧は Domain と Initiative の両方にアクセスできる人。同じ Domain 内で共有する Object の役割を比較できる。Domain の既定画面は判断が必要な事項を先頭に置く。
 
 ### Sustainment（兵站）：横断的維持活動
 
@@ -259,6 +261,33 @@ check-inは、必要なstatus変更、短い更新文、任意の次の一手を
 顧客への提案・連絡や、調達・出荷などの行動は Element として運用し、その実行に必要な属性を Object のフィールドで表現する。商談・在庫の業務台帳と試算は Sustainment の CRM / SCM が Table を使って扱う。Strategy・Execution・Sustainment の役割を保ったまま、分析から行動につなげる。必要な属性だけを足し、設定と保守の負担も評価する。
 
 データは `custom_columns`（定義）・`custom_column_placements`（配置）・`custom_column_values`（Elementの値）に分ける。保存済みのSpace・個人・Domainスコープのデータは保持するが、一覧の作成導線はObjectスコープに統一する。
+
+### コードの置き場 — 盤面と仕組み
+
+概念モデルはディレクトリにそのまま現れる。`web/src/` 直下は、組織活動そのものを映す面（**ActivitySpace**）と、その面を成立させる仕組み（**Function**）の二つに分かれる。Activity Space が組織活動の文脈である以上、分類・概念・画面はその下に入り、どこにも属さない道具立てだけが Function に残る。
+
+```
+web/src/
+├── ActivitySpace/        盤面そのもの — 三分類 ＋ Home
+│   ├── home/             Now / Inbox / My Elements / My Calendar / Profile
+│   ├── strategy/         initiative / phase / timeline
+│   ├── execution/        domain / object / element
+│   └── sustainment/      workload / notebook / table / team / calendar / operations（CRM・SCM）
+├── Function/             盤面を成立させる仕組み。特定の概念に属さない
+│   ├── widget/           WidgetFrame と widgets/ + registry.tsx + defaults.ts
+│   ├── property/         Object ごとの列定義と値
+│   ├── copilot/          Copilot パネルと Edge Function 呼び出し
+│   ├── settings/
+│   ├── space/            Activity Space の切替とオンボーディング
+│   ├── sync/             差分ストリームと正規化キャッシュ
+│   └── shared/           概念をまたぐ UI とロジック
+├── shell/                外殻 — ModeRail / AppSidebar / TabBar / CommandPalette
+├── app/                  Next.js App Router
+├── hooks/                Supabase の CRUD
+├── lib/ providers/ auth/ types/ ui/ shared/
+```
+
+Execution が Domain → Object → Element の順に並ぶのは、上位ほど文脈が広く、下位ほど行動が具体になるため。Sustainment の各道具は ModeRail の Apps ランチャーに1対1で対応する。
 
 ## UI デザイン原則
 

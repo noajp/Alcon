@@ -4,7 +4,7 @@
 // bugs each field used to reintroduce on its own.
 
 import { describe, expect, it } from 'vitest';
-import { isCancelKey, isCommitEnter, isSubmitChord, type KeyLike } from '@/alcon/shared/keyboard';
+import { isCancelKey, isCommitEnter, isSubmitChord, type KeyLike } from '@/Function/shared/keyboard';
 
 function key(overrides: Partial<KeyLike> = {}): KeyLike {
   return { key: 'Enter', shiftKey: false, altKey: false, metaKey: false, ctrlKey: false, ...overrides };

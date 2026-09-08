@@ -2,12 +2,12 @@
 
 import dynamic from 'next/dynamic';
 import type { NavigationState } from '@/types/navigation';
-import { setActiveDomainId } from '@/alcon/domain/domainsStore';
-import { NotebookSurface } from '@/alcon/brief/NotebookSurface';
-import { ElementDrilldown } from '@/alcon/element/ElementDrilldown';
+import { setActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+import { NotebookSurface } from '@/ActivitySpace/sustainment/notebook/NotebookSurface';
+import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
 
-import { ElementsListView } from '@/alcon/element/actions/ElementsListView';
-import { MyElementsView } from '@/alcon/element/actions/MyElementsView';
+import { ElementsListView } from '@/ActivitySpace/execution/element/ElementsListView';
+import { MyElementsView } from '@/ActivitySpace/home/MyElementsView';
 
 // Lazy-loaded views — the landing view is 'objects' (DomainView), and the
 // core list views (DomainView / ElementsListView / MyElementsView) stay
@@ -20,21 +20,21 @@ const viewLoading = () => (
     Loading…
   </div>
 );
-const InboxView = dynamic(() => import('@/alcon/element/actions/InboxView').then(m => m.InboxView), { ssr: false, loading: viewLoading });
-const StrategyShell = dynamic(() => import('@/alcon/element/actions/StrategyShell').then(m => m.StrategyShell), { ssr: false, loading: viewLoading });
-const PhaseView = dynamic(() => import('@/alcon/phase/PhaseView').then(m => m.PhaseView), { ssr: false, loading: viewLoading });
-const WorkloadView = dynamic(() => import('@/alcon/team/WorkloadView').then(m => m.WorkloadView), { ssr: false, loading: viewLoading });
-const TimelineView = dynamic(() => import('@/alcon/element/actions/TimelineView').then(m => m.TimelineView), { ssr: false, loading: viewLoading });
+const InboxView = dynamic(() => import('@/ActivitySpace/home/InboxView').then(m => m.InboxView), { ssr: false, loading: viewLoading });
+const StrategyShell = dynamic(() => import('@/ActivitySpace/strategy/initiative/StrategyShell').then(m => m.StrategyShell), { ssr: false, loading: viewLoading });
+const PhaseView = dynamic(() => import('@/ActivitySpace/strategy/phase/PhaseView').then(m => m.PhaseView), { ssr: false, loading: viewLoading });
+const WorkloadView = dynamic(() => import('@/ActivitySpace/sustainment/workload/WorkloadView').then(m => m.WorkloadView), { ssr: false, loading: viewLoading });
+const TimelineView = dynamic(() => import('@/ActivitySpace/strategy/timeline/TimelineView').then(m => m.TimelineView), { ssr: false, loading: viewLoading });
 const HomeScreen = dynamic(() => import('@/shell/HomeScreen').then(m => m.HomeScreen), { ssr: false, loading: viewLoading });
-import { DomainOverview } from '@/alcon/domain/DomainOverview';
-import { DomainView } from '@/alcon/domain/DomainView'; // eager — default landing view
-const DomainsView = dynamic(() => import('@/alcon/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
-const TableView = dynamic(() => import('@/alcon/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
-const OperationsView = dynamic(() => import('@/alcon/sustainment/OperationsView').then(m => m.OperationsView), { ssr: false, loading: viewLoading });
-const TeamView = dynamic(() => import('@/alcon/team/TeamView').then(m => m.TeamView), { ssr: false, loading: viewLoading });
-const MyCalendarView = dynamic(() => import('@/alcon/element/actions/MyCalendarView').then(m => m.MyCalendarView), { ssr: false, loading: viewLoading });
-const ProfileView = dynamic(() => import('@/alcon/settings/ProfileView').then(m => m.ProfileView), { ssr: false, loading: viewLoading });
-const SettingsView = dynamic(() => import('@/alcon/settings/SettingsView').then(m => m.SettingsView), { ssr: false, loading: viewLoading });
+import { DomainOverview } from '@/ActivitySpace/execution/domain/DomainOverview';
+import { DomainView } from '@/ActivitySpace/execution/domain/DomainView'; // eager — default landing view
+const DomainsView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
+const TableView = dynamic(() => import('@/ActivitySpace/sustainment/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
+const OperationsView = dynamic(() => import('@/ActivitySpace/sustainment/operations/OperationsView').then(m => m.OperationsView), { ssr: false, loading: viewLoading });
+const TeamView = dynamic(() => import('@/ActivitySpace/sustainment/team/TeamView').then(m => m.TeamView), { ssr: false, loading: viewLoading });
+const MyCalendarView = dynamic(() => import('@/ActivitySpace/home/MyCalendarView').then(m => m.MyCalendarView), { ssr: false, loading: viewLoading });
+const ProfileView = dynamic(() => import('@/ActivitySpace/home/ProfileView').then(m => m.ProfileView), { ssr: false, loading: viewLoading });
+const SettingsView = dynamic(() => import('@/Function/settings/SettingsView').then(m => m.SettingsView), { ssr: false, loading: viewLoading });
 import { IslandCard } from '@/shell/IslandCard';
 
 export { IslandCard };

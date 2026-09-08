@@ -8,7 +8,7 @@ import {
   reviewLabel,
   toDecision,
   type DecisionInput,
-} from '@/alcon/element/actions/initiativeDecisionModel';
+} from '@/ActivitySpace/strategy/initiative/initiativeDecisionModel';
 
 // The scenario these rules were written against: a relief operation hits a fuel
 // crisis, the commander picks sealift over airlift, and the choice is only

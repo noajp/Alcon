@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calendarEntries, occursOn, selectCalendarScope, layoutTimedEntries } from '../src/alcon/element/calendar/schedule';
+import { calendarEntries, occursOn, selectCalendarScope, layoutTimedEntries } from '../src/ActivitySpace/sustainment/calendar/schedule';
 import type { AlconObjectWithChildren, ElementWithDetails } from '../src/types/database';
 
 const element = (id: string) => ({ id, title: id, start_date: '2026-09-06', due_date: '2026-09-08' } as ElementWithDetails);

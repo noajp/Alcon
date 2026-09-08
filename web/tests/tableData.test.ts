@@ -3,10 +3,10 @@ import { createElement, type ReactNode } from 'react';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DataTableSchema } from '@/alcon/table/data';
+import type { DataTableSchema } from '@/ActivitySpace/sustainment/table/data';
 
 const mocks = vi.hoisted(() => ({ read: vi.fn(), setCell: vi.fn() }));
-vi.mock('@/alcon/table/data', () => ({
+vi.mock('@/ActivitySpace/sustainment/table/data', () => ({
   DATA_TABLES_QUERY_KEY: ['data-tables'],
   fetchDataTableSchema: mocks.read,
   setDataTableCell: mocks.setCell,
@@ -25,7 +25,7 @@ vi.mock('@/lib/supabase', () => ({
   } },
 }));
 
-import { useTableData } from '@/alcon/table/useTableData';
+import { useTableData } from '@/ActivitySpace/sustainment/table/useTableData';
 import { useWidgetTableData } from '@/hooks/useWidgetTableData';
 
 function deferred<T>() {

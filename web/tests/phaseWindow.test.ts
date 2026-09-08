@@ -8,7 +8,7 @@
 // one-day window, not a malformed zero-length one.
 
 import { describe, expect, it } from 'vitest';
-import { businessDaysBetween, phaseElapsedRemaining, phaseWindowMs } from '@/alcon/shared/phaseWindow';
+import { businessDaysBetween, phaseElapsedRemaining, phaseWindowMs } from '@/Function/shared/phaseWindow';
 
 describe('phaseWindowMs', () => {
   it('gives the final day width instead of collapsing it to midnight', () => {

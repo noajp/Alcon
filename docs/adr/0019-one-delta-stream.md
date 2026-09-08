@@ -8,8 +8,8 @@ ADR 0018 で共有データを query cache に載せた結果、「変更がど�
 
 ## 決定
 
-- **ingress は 1 本。** `alcon/sync/deltaStream.ts` がワークスペース形の全表を 1 チャネルで購読し、届いた行を正規化キャッシュへ差分として当てる。Element の UPDATE はその Element が居るすべてのキャッシュを patch、Subelement / 担当 / コメント / リアクションは親に着地、コメントの INSERT は活動ロールアップも進める。所属（multi-homing / edge / Property 定義）のように行ではなく集合が変わるものは、同じ場所から該当キーを invalidate する
-- **patch は純粋関数。** `alcon/sync/explorerPatch.ts` は I/O を持たず、触れなかった参照を必ず保つ（no-op は同一参照を返す）。楽観更新と差分ストリームはこれを共用し、`tests/` で振る舞いを固定する
+- **ingress は 1 本。** `Function/sync/deltaStream.ts` がワークスペース形の全表を 1 チャネルで購読し、届いた行を正規化キャッシュへ差分として当てる。Element の UPDATE はその Element が居るすべてのキャッシュを patch、Subelement / 担当 / コメント / リアクションは親に着地、コメントの INSERT は活動ロールアップも進める。所属（multi-homing / edge / Property 定義）のように行ではなく集合が変わるものは、同じ場所から該当キーを invalidate する
+- **patch は純粋関数。** `Function/sync/explorerPatch.ts` は I/O を持たず、触れなかった参照を必ず保つ（no-op は同一参照を返す）。楽観更新と差分ストリームはこれを共用し、`tests/` で振る舞いを固定する
 - **表ごとの購読は持たない。** データフックは読むだけで、realtime を知らない。新しい表を足すときは deltaStream の表リストと publication migration に 1 行ずつ足す
 - **楽観更新は前借り。** 書き込みはキャッシュへ先に当ててよいが、確定は差分ストリームから戻ってくる行で行う。書き込み側は invalidate を書かない（例外: 差分が届かない集合の変化）
 - **publication は migration で管理する。** 購読している表が `supabase_realtime` に無いと黙って届かない。`20260904130000_workspace_realtime_publication.sql` が全表を冪等に足す

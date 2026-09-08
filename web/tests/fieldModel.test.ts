@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fieldValueText, formatFieldNumber, validateField } from '@/alcon/property/fieldModel';
+import { fieldValueText, formatFieldNumber, validateField } from '@/Function/property/fieldModel';
 describe('Object custom fields', () => {
   it('renames and retires options without changing stored values', () => {
     expect(fieldValueText(['legacy', 'unknown'], { options: [{ value: 'legacy', label: 'Qualified', archived: true }] })).toBe('Qualified, unknown');

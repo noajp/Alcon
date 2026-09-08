@@ -1,3 +1,3 @@
 'use client';
 
-export { NowScreen as HomeScreen } from '@/alcon/element/now/NowScreen';
+export { NowScreen as HomeScreen } from '@/ActivitySpace/home/now/NowScreen';

@@ -1,6 +1,6 @@
 'use client';
 
-import { ExplorerDataProvider } from '@/alcon/shared/ExplorerDataContext';
+import { ExplorerDataProvider } from '@/Function/shared/ExplorerDataContext';
 
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { WorkspaceActionsProvider } from '@/shell/WorkspaceActionsContext';
@@ -11,19 +11,19 @@ import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
 import { CommandPalette } from '@/shell/CommandPalette';
 import { QuickAddElementLauncher } from '@/shell/QuickAddElementLauncher';
-import { AlconCopilotPanel } from '@/alcon/copilot';
+import { AlconCopilotPanel } from '@/Function/copilot';
 import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
 import { mergeNavigation, navigationAfterDomainChange } from '@/shell/navigationState';
 import type { NavigationState } from '@/types/navigation';
 import { useDomains, useObjects, createObject, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
-import { QuickAddObjectPopup } from '@/alcon/object/QuickAddObjectPopup';
+import { QuickAddObjectPopup } from '@/ActivitySpace/execution/object/QuickAddObjectPopup';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
-import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/alcon/domain/domainsStore';
-import { useActiveSpaceId, setActiveSpaceId } from '@/alcon/space/activeSpaceStore';
-import { OnboardingCreate } from '@/alcon/space/OnboardingCreate';
-import { getCachedHomeViewId } from '@/alcon/settings/preferencesStore';
-import { useWorkspaceDeltaStream } from '@/alcon/sync/deltaStream';
+import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/ActivitySpace/execution/domain/domainsStore';
+import { useActiveSpaceId, setActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { OnboardingCreate } from '@/Function/space/OnboardingCreate';
+import { getCachedHomeViewId } from '@/Function/settings/preferencesStore';
+import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
 

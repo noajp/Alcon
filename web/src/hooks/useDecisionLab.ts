@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getActiveSpaceId, useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
+import { getActiveSpaceId, useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { selectIn } from '@/hooks/chunkedIn';
 import { readAllPages as readDecisionLabPages, type CountedRows } from '@/hooks/readAllPages';
 import { supabase } from '@/lib/supabase';

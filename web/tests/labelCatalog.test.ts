@@ -15,7 +15,7 @@ import {
   renameTouchedColorKeys,
   restoreColorKeys,
   type LabelUsageRow,
-} from '@/alcon/settings/labelCatalog';
+} from '@/Function/settings/labelCatalog';
 
 // A label is not a row anywhere — it is a string inside `elements.labels`
 // plus, maybe, a key in `domains.label_colors`. Settings › Labels joins the

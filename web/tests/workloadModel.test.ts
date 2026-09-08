@@ -31,8 +31,8 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-import { workloadBar, workloadDailyHours, workloadDomainIds, workloadElementsInWindow, selectWorkloadElements, resolveWorkloadScope } from '@/alcon/team/workloadModel';
-import { fetchWorkloadObject } from '@/alcon/team/useWorkloadData';
+import { workloadBar, workloadDailyHours, workloadDomainIds, workloadElementsInWindow, selectWorkloadElements, resolveWorkloadScope } from '@/ActivitySpace/sustainment/workload/workloadModel';
+import { fetchWorkloadObject } from '@/ActivitySpace/sustainment/workload/useWorkloadData';
 import { fetchSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/types/database';
 

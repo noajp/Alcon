@@ -1,9 +1,9 @@
 'use client';
 
-import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
+import { QuickAddElementPopup, type NewElementInput } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
 import {
   addElementAssignee,
   createElement,

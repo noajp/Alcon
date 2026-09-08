@@ -2,7 +2,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
-import { invalidateElementDetail } from '@/alcon/sync/explorerCache';
+import { invalidateElementDetail } from '@/Function/sync/explorerCache';
 import { normalizeDirection } from '@/types/database';
 import type { Element, ElementComment, ElementEdge, ElementStatus, ElementWithDetails, Worker } from '@/types/database';
 

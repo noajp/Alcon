@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { operationsQueue, operationsQueueRoute } from '@/alcon/sustainment/operationsQueues';
+import { operationsQueue, operationsQueueRoute } from '@/ActivitySpace/sustainment/operations/operationsQueues';
 import { mergeNavigation, navigationAfterDomainChange } from '@/shell/navigationState';
 import type { NavigationState } from '@/types/navigation';
 

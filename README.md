@@ -9,10 +9,10 @@
 | 分類 | 戦争論 | 何を扱うか | 単位 |
 |---|---|---|---|
 | **Strategy** | 戦略 | 何を達成し、どう勝つか | Initiative。複数の Initiative が束ねられて戦略となる |
-| **Execution** | 戦闘 | 実際に行動する | Element（行動の最小単位）→ Object（Element の束）→ Domain（Object の集合） |
+| **Execution** | 戦闘 | 実際に行動する | Domain（活動の場）→ Object（成果物の束）→ Element（行動の最小単位） |
 | **Sustainment** | 兵站 | 仕事道具 | Workload / Notebook / Table / Team / Calendar |
 
-Execution の三層はアーレント『人間の条件』の 労働・仕事・活動 に着想を得ている。
+Execution の三層はアーレント『人間の条件』の 活動・仕事・労働 に着想を得ている。
 
 設計思想の全体は [.claude/PRODUCT.md](.claude/PRODUCT.md)、開発の規約は [.claude/CLAUDE.md](.claude/CLAUDE.md)、判断の履歴は [docs/adr/](docs/adr/README.md)。
 

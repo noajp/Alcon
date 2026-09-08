@@ -12,7 +12,7 @@ import {
   NOTIFICATION_KINDS,
   NOTIFICATION_KIND_META,
   notificationKindMeta,
-} from '@/alcon/shared/notificationKinds';
+} from '@/Function/shared/notificationKinds';
 
 describe('notificationKindMeta', () => {
   it('returns the declared meta for every known kind', () => {

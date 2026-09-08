@@ -2,8 +2,8 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { memo } from 'react';
 import { afterEach, expect, it } from 'vitest';
-import { ExplorerDataProvider, useExplorerData } from '@/alcon/shared/ExplorerDataContext';
-import { EMPTY_EXPLORER_DATA, type ExplorerData } from '@/alcon/sync/explorerPatch';
+import { ExplorerDataProvider, useExplorerData } from '@/Function/shared/ExplorerDataContext';
+import { EMPTY_EXPLORER_DATA, type ExplorerData } from '@/Function/sync/explorerPatch';
 import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
 
 afterEach(cleanup);

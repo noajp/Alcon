@@ -14,7 +14,7 @@ import {
   targetLabel,
   targetSentence,
   type MeasureInput,
-} from '@/alcon/element/actions/initiativeMeasureModel';
+} from '@/ActivitySpace/strategy/initiative/initiativeMeasureModel';
 
 // The measures surface makes exactly one claim per row — "the number somebody
 // read does, or does not, satisfy the number the condition names" — and it has

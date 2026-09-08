@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getActiveSpaceId, useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
-import { buildTeamRoster, mergeTeamDomainMembers, type TeamElement, type TeamRosterSource } from '@/alcon/team/teamRoster';
-import type { SpaceGuestRow } from '@/alcon/space/data';
-import { updateWorker } from '@/alcon/team/data';
+import { getActiveSpaceId, useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { buildTeamRoster, mergeTeamDomainMembers, type TeamElement, type TeamRosterSource } from '@/ActivitySpace/sustainment/team/teamRoster';
+import type { SpaceGuestRow } from '@/Function/space/data';
+import { updateWorker } from '@/ActivitySpace/sustainment/team/data';
 import { selectIn } from '@/hooks/chunkedIn';
 import { readAllPages, type CountedRows } from '@/hooks/readAllPages';
 import { fetchSustainmentDomains } from '@/hooks/useSustainmentDomains';

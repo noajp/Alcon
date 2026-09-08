@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildNowItems, validWorkDate } from '../src/alcon/element/now/nowModel';
+import { buildNowItems, validWorkDate } from '../src/ActivitySpace/home/now/nowModel';
 import type { ElementWithDetails, ElementEdge } from '../src/types/database';
 
 const element = (id: string, patch: Partial<ElementWithDetails> = {}): ElementWithDetails => ({

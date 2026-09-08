@@ -51,7 +51,7 @@ export default function RootLayout({
       <head>
         {/* Apply the Font size (text scale --fs) before first paint. Default is
             the slightly-large baseline (1.075) when nothing is saved. Keep the
-            map in sync with FONT_SIZES in alcon/settings/appearanceOptions. */}
+            map in sync with FONT_SIZES in Function/settings/appearanceOptions. */}
         <script
           dangerouslySetInnerHTML={{
             __html:

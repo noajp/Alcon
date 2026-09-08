@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/lib/supabase', () => ({ supabase: { rpc: vi.fn() } }));
 vi.mock('@/lib/queryClient', () => ({ getQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
-vi.mock('@/alcon/sync/explorerCache', () => ({ invalidateElementDetail: vi.fn() }));
+vi.mock('@/Function/sync/explorerCache', () => ({ invalidateElementDetail: vi.fn() }));
 import { supabase } from '@/lib/supabase';
 import { checkInElement, CoordinationError, fetchNowWork, setElementDependency } from '@/hooks/coordinationData';
 

@@ -21,7 +21,7 @@ import {
   todayYMD,
   unfinishedIn,
   type PhaseElementRow,
-} from '@/alcon/phase/phaseClose';
+} from '@/ActivitySpace/strategy/phase/phaseClose';
 import type { Phase, PhaseStatus } from '@/types/database';
 
 const phase = (over: Partial<Phase> & { id: string }): Phase => ({

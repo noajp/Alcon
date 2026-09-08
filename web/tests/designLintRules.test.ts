@@ -16,7 +16,7 @@ function ruleIds(file: string, source: string): string[] {
   return scan(file, source).map((f) => f.rule.id);
 }
 
-const TSX = 'src/alcon/example/Example.tsx';
+const TSX = 'src/ActivitySpace/example/Example.tsx';
 
 describe('the rule table', () => {
   it('has a unique id per rule, so findings group correctly in the report', () => {
@@ -123,7 +123,7 @@ describe('no-task-wording', () => {
   });
 
   it('only applies to .tsx — it is about copy, not internal .ts naming', () => {
-    expect(ruleIds('src/alcon/example/model.ts', "const label = 'New Task';")).not.toContain(
+    expect(ruleIds('src/ActivitySpace/example/model.ts', "const label = 'New Task';")).not.toContain(
       'no-task-wording',
     );
   });

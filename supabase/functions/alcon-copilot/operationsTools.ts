@@ -2,7 +2,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   analyzeOperations, normalizeOperationsParams, OPERATIONS_FIELDS,
   type OperationsAnalysis, type OperationsParams, type OperationsSchema,
-} from "../../../web/src/alcon/sustainment/operationsModel.ts";
+} from "../../../web/src/ActivitySpace/sustainment/operations/operationsModel.ts";
 
 export const OPERATIONS_TOOLS = [{
   name: 'analyzeOperations',

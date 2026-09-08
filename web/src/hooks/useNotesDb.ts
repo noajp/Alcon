@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
-import { createNoteContentStore, EMPTY_NOTE_CONTENT } from '@/alcon/brief/noteContentStore';
+import { createNoteContentStore, EMPTY_NOTE_CONTENT } from '@/ActivitySpace/sustainment/notebook/noteContentStore';
 import type {
   Brief,
   BriefComment,

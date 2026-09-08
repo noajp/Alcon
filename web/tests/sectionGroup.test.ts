@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
-import { groupAndOrder } from '@/alcon/shared/listControls/group';
-import type { ListDisplay, ListGroupBy } from '@/alcon/shared/listControls/types';
+import { groupAndOrder } from '@/Function/shared/listControls/group';
+import type { ListDisplay, ListGroupBy } from '@/Function/shared/listControls/types';
 import {
   NO_VALUE_BUCKET,
   sectionGroupValues,
-} from '@/alcon/shared/listControls/sectionGroup';
+} from '@/Function/shared/listControls/sectionGroup';
 
 // Grouping and creating are two halves of one rule: a row added under
 // "In progress" has to stay under "In progress". `bucketize` decides which

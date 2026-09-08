@@ -3,7 +3,7 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUserId } from '@/providers/authContext';
-import { getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
+import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { CoordinationError, fetchNowWork, type NowWorkData } from '@/hooks/coordinationData';
 
 const EMPTY: NowWorkData = { elements: [], workers: [], objects: [], edges: [], readAt: '' };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canEditObject, canManageDomainTypes } from '../src/alcon/object/objectAccess';
+import { canEditObject, canManageDomainTypes } from '../src/ActivitySpace/execution/object/objectAccess';
 
 describe('canEditObject', () => {
   it('only members edit', () => {

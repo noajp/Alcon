@@ -35,7 +35,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-const { InitiativeSituation } = await import('@/alcon/element/actions/InitiativeSituation');
+const { InitiativeSituation } = await import('@/ActivitySpace/strategy/initiative/InitiativeSituation');
 
 // Every case here is business-day arithmetic, so the weekday the suite runs on
 // would otherwise change the answers. The clock is pinned to a Monday and all

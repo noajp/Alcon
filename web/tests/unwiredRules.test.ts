@@ -70,7 +70,7 @@ describe('importedNamesOf', () => {
   it('reads the dynamic form the shell loads every view through', () => {
     // Missing this one would report the entire application as unwired.
     expect(imported(`
-      const InboxView = dynamic(() => import('@/alcon/element/actions/InboxView').then(m => m.InboxView));
+      const InboxView = dynamic(() => import('@/ActivitySpace/home/InboxView').then(m => m.InboxView));
     `)).toContain('InboxView');
   });
 
@@ -95,7 +95,7 @@ describe('isEntryPoint', () => {
   });
 
   it('does not treat ordinary modules as entry points', () => {
-    expect(isEntryPoint('src/alcon/object/ListTable.tsx')).toBe(false);
+    expect(isEntryPoint('src/ActivitySpace/execution/object/ListTable.tsx')).toBe(false);
     expect(isEntryPoint('src/hooks/useSupabase.ts')).toBe(false);
   });
 });

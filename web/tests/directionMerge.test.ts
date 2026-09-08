@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeAcceptance, sameAcceptance } from '@/alcon/element/directionMerge';
+import { mergeAcceptance, sameAcceptance } from '@/ActivitySpace/execution/element/directionMerge';
 import type { AcceptanceLine } from '@/types/database';
 
 const line = (id: string, text = id): AcceptanceLine => ({ id, text });

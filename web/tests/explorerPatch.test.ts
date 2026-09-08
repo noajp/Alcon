@@ -14,7 +14,7 @@ import {
   patchObjectInExplorer,
   patchElementInList,
   appendElementToList,
-} from '@/alcon/sync/explorerPatch';
+} from '@/Function/sync/explorerPatch';
 import type { ElementWithDetails, Subelement, Worker } from '@/types/database';
 
 const el = (id: string, extra: Partial<ElementWithDetails> = {}): ElementWithDetails =>

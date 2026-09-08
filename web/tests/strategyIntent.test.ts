@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractStrategyIntent } from '@/alcon/object/overview/strategyIntent';
+import { extractStrategyIntent } from '@/ActivitySpace/execution/object/overview/strategyIntent';
 
 // extractStrategyIntent is what stands between a Initiative description and a
 // side rail a few rows tall. Its contract: cut only on seams the author wrote

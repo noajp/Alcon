@@ -10,7 +10,7 @@ import {
   convertEmoticons,
   firstDayOfWeekToIndex,
   getCachedSendCommentShortcut,
-} from '@/alcon/settings/preferencesStore';
+} from '@/Function/settings/preferencesStore';
 
 describe('formatDisplayName', () => {
   it('uses the full name as-is in Full name mode', () => {

@@ -53,8 +53,8 @@ import {
   priorityColor,
   statusLabel,
 } from '@/shared/designTokens';
-import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
-import { PriorityMark } from '@/alcon/shared/PriorityMark';
+import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
+import { PriorityMark } from '@/Function/shared/PriorityMark';
 
 afterEach(cleanup);
 
@@ -73,12 +73,12 @@ function varsIn(value: string): string[] {
 
 /** Files that converged onto the shared tables in this Element. */
 const CONVERGED = [
-  'alcon/shared/ElementProgressMark.tsx',
-  'alcon/shared/PriorityMark.tsx',
-  'alcon/element/gantt/GanttView.tsx',
-  'alcon/element/calendar/CalendarView.tsx',
-  'alcon/property/EditBuiltInPropertyModal.tsx',
-  'alcon/widget/widgets/KpiCardsWidget.tsx',
+  'Function/shared/ElementProgressMark.tsx',
+  'Function/shared/PriorityMark.tsx',
+  'ActivitySpace/execution/element/gantt/GanttView.tsx',
+  'ActivitySpace/sustainment/calendar/CalendarView.tsx',
+  'Function/property/EditBuiltInPropertyModal.tsx',
+  'Function/widget/widgets/KpiCardsWidget.tsx',
   'shell/sidebar/ObjectTree.tsx',
   'hooks/useDashboardData.ts',
 ];
@@ -225,13 +225,13 @@ describe('no surface keeps a status palette of its own', () => {
   });
 
   it('leaves the user-chosen event palette alone', () => {
-    // COLOR_PALETTE (alcon/element/calendar/calendarColorPalette.ts) is a
+    // COLOR_PALETTE (ActivitySpace/sustainment/calendar/calendarColorPalette.ts) is a
     // picker of ten colours a user assigns to an Element by hand. It is not
     // a status ramp and must not be converged into one — `element.color`
     // deliberately overrides the status hue.
-    const palette = src('alcon/element/calendar/calendarColorPalette.ts');
+    const palette = src('ActivitySpace/sustainment/calendar/calendarColorPalette.ts');
     expect(palette).toMatch(/export const COLOR_PALETTE = \[/);
-    const calendar = src('alcon/element/calendar/CalendarView.tsx');
+    const calendar = src('ActivitySpace/sustainment/calendar/CalendarView.tsx');
     expect(calendar).toMatch(/element\.color \|\| statusColor\(/);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sortElements, sortKeyOf, type ColumnSort, type ElementLike } from '@/alcon/object/useListColumns';
+import { sortElements, sortKeyOf, type ColumnSort, type ElementLike } from '@/ActivitySpace/execution/object/useListColumns';
 import type { CustomColumnValue, CustomColumnWithValues } from '@/types/database';
 
 // List sorting is the one piece of the table every list surface shares —

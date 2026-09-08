@@ -21,22 +21,22 @@ import ts from 'typescript';
 export const COLOR_ALLOWLIST = [
   'src/app/globals.css',
   'src/shared/designTokens.ts',
-  'src/alcon/shared/labelColor.ts',
-  'src/alcon/property/builtInColumns.ts',
-  'src/alcon/settings/AppearanceSettings.tsx',
+  'src/Function/shared/labelColor.ts',
+  'src/Function/property/builtInColumns.ts',
+  'src/Function/settings/AppearanceSettings.tsx',
   // Theme-preview swatch data feeding SettingsView.tsx's theme picker.
-  'src/alcon/settings/appearanceOptions.ts',
+  'src/Function/settings/appearanceOptions.ts',
   // Domain "Color" swatch grid — same shape as labelColor.ts.
-  'src/alcon/domain/domainColorPalette.ts',
+  'src/ActivitySpace/execution/domain/domainColorPalette.ts',
   // Random pastel for a freshly-typed Select/Status option.
-  'src/alcon/property/optionColorPalette.ts',
+  'src/Function/property/optionColorPalette.ts',
   // Calendar's event-color picker — same shape as labelColor.ts.
-  'src/alcon/element/calendar/calendarColorPalette.ts',
+  'src/ActivitySpace/sustainment/calendar/calendarColorPalette.ts',
   // CustomView.tsx's two color schemes (fixed flag-type legend + the draw
   // tool's swatch picker) — kept in their own file, not a blanket exemption
   // for the whole 600+ line component, so the linter still watches
   // everything else in it.
-  'src/alcon/element/custom/customColorScheme.ts',
+  'src/ActivitySpace/execution/element/custom/customColorScheme.ts',
   // <meta name="theme-color"> — a literal string is the only thing the
   // browser-chrome API accepts; it cannot read a CSS custom property.
   'src/app/layout.tsx',
@@ -131,7 +131,7 @@ function hasCopiedElementInitializer(source, file, lineIndex) {
  * Every violation in one file's source. Pure — `file` is only ever matched
  * against a rule's `files` / `allowlist`, never read from disk.
  *
- * @param {string} file    repo-relative path, e.g. 'src/alcon/foo.tsx'
+ * @param {string} file    repo-relative path, e.g. 'src/ActivitySpace/foo.tsx'
  * @param {string} source  the file's contents
  * @returns {Finding[]}
  */

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { checkInAttempt, checkInBase, checkInChange, checkInFailure, hasNewerCheckInVersion, type CheckInDraft } from '../src/alcon/element/now/checkInDraft';
+import { checkInAttempt, checkInBase, checkInChange, checkInFailure, hasNewerCheckInVersion, type CheckInDraft } from '../src/ActivitySpace/home/now/checkInDraft';
 import type { Element } from '../src/types/database';
 
 const element = (patch: Partial<Element> = {}): Element => ({
