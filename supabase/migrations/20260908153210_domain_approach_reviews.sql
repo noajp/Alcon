@@ -166,12 +166,6 @@ begin
     security invoker set search_path = public as $body$
     declare a public.domain_approaches; plan_changed boolean;
     begin
-      if tg_op='DELETE' then
-        select * into a from public.domain_approaches where id=old.approach_id for update;
-        if not found or not public.can_edit_domain_approaches(a.domain_id) then raise exception 'You cannot edit this Domain approach'; end if;
-        update public.domain_approaches set revision=revision+1,plan_revision=plan_revision+1 where id=a.id;
-        return old;
-      end if;
       select * into a from public.domain_approaches where id=new.approach_id for update;
       if not found or not public.can_edit_domain_approaches(a.domain_id) then
         raise exception 'You cannot edit this Domain approach';
@@ -202,9 +196,30 @@ begin
   declare t text;
   begin
     foreach t in array array['approach_conditions','approach_contributions','approach_assessments','approach_reviews'] loop
-      execute format('create trigger stamp_child before insert or update or delete on public.%I for each row execute function public.stamp_approach_child()', t);
+      execute format('create trigger stamp_child before insert or update on public.%I for each row execute function public.stamp_approach_child()', t);
     end loop;
   end;
+  -- Referential cascades can originate from an Object deletion by somebody
+  -- who cannot edit the approach. Only this internal trigger may reconcile
+  -- its version; the originating DELETE still goes through its own RLS.
+  create schema if not exists alcon_approach_internal;
+  revoke all on schema alcon_approach_internal from public, anon, authenticated;
+  execute $fn$
+    create function alcon_approach_internal.version_after_contribution_delete() returns trigger
+    language plpgsql security definer set search_path = '' as $body$
+    begin
+      if auth.uid() is null and coalesce(current_setting('role',true),'') not in ('none','service_role') then
+        raise insufficient_privilege using message='An authenticated deletion is required';
+      end if;
+      -- The parent may already be gone during Domain/approach deletion.
+      update public.domain_approaches set revision=revision+1,plan_revision=plan_revision+1 where id=old.approach_id;
+      return old;
+    end $body$
+  $fn$;
+  revoke all on function alcon_approach_internal.version_after_contribution_delete() from public, anon, authenticated;
+  create trigger version_after_contribution_delete after delete on public.approach_contributions
+    for each row execute function alcon_approach_internal.version_after_contribution_delete();
+
   execute $fn$
     create function public.edit_approach_plan_item(p_kind text, p_id uuid, p_revision integer, p_patch jsonb)
     returns void language plpgsql security invoker set search_path = public as $body$

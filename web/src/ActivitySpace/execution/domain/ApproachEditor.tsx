@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/ui/dialog';
 import { Button } from '@/ui/button';
 import type { ApproachCommand, DomainApproachData } from '@/hooks/useDomainApproaches';
@@ -33,6 +33,13 @@ export function ApproachEditor({ target, data, objects, open, onOpenChange, onRe
   const [saving, setSaving] = useState(false);
   const lock = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const focusAfterSave = useRef(false);
+  useEffect(() => {
+    if (!saving && focusAfterSave.current) {
+      focusAfterSave.current = false;
+      formRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+    }
+  }, [saving]);
   const [more, setMore] = useState(target.kind === 'condition');
   let fields: Field[];
   if (target.kind === 'approach') fields = [
@@ -102,7 +109,7 @@ export function ApproachEditor({ target, data, objects, open, onOpenChange, onRe
       await onSave(command);
       if (target.kind === 'condition' && !target.condition) {
         setValues(prev => ({ ...prev, title: '', success_criteria: '' }));
-        formRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+        focusAfterSave.current = true;
       }
       if (!(target.kind === 'condition' && !target.condition && more)) onOpenChange(false);
     } catch (cause) { setError(cause instanceof Error ? cause.message : (cause as { message?: string })?.message ?? 'Unable to save. Your draft is retained.'); }

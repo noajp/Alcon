@@ -23,10 +23,12 @@ create function public.user_can_see_domain(d uuid) returns boolean language sql 
 create function public.user_can_see_object(o uuid) returns boolean language sql stable security definer set search_path=public as $$ select exists(select 1 from objects where id=o and (user_can_see_domain(domain_id) or exists(select 1 from object_domains where object_id=o and user_can_see_domain(domain_id)))) $$;
 create function public.user_can_see_strategy(s uuid) returns boolean language sql stable security definer set search_path=public as $$ select exists(select 1 from strategies where id=s and (created_by=auth.uid() or user_has_domain_role('10000000-0000-0000-0000-000000000001',array['owner','admin','member','guest']))) $$;
 grant select on domains,objects,object_domains,intents,strategies to authenticated;
+grant delete on objects to authenticated;
 alter table domains enable row level security;
 create policy domain_read on domains for select to authenticated using(user_can_see_domain(id));
 alter table objects enable row level security;
 create policy object_read on objects for select to authenticated using(user_can_see_object(id));
+create policy object_delete on objects for delete to authenticated using(auth.uid()='00000000-0000-0000-0000-000000000003');
 insert into auth.users select ('00000000-0000-0000-0000-' || lpad(n::text,12,'0'))::uuid from generate_series(1,4) n;
 insert into domains values('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001'),('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000004');
 insert into domain_members values('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','admin'),('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','guest');
@@ -74,15 +76,32 @@ do $$ begin
   if (select plan_revision from domain_approaches)<>5 then raise exception 'Disconnect did not invalidate old evidence'; end if;
   if (select jsonb_array_length(snapshot->'contributions') from approach_reviews)<>1 then raise exception 'Disconnect erased historical context'; end if;
 end $$;
+-- Reconnect, then exercise a normal Object deletion by a non-admin reader.
+insert into approach_contributions(approach_id,condition_id,object_id,role,rationale) values('50000000-0000-0000-0000-000000000001','60000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','primary','New connection');
 -- A guest reads both the approach and its evidence, but cannot judge or edit.
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
 do $$ begin
   if (select count(*) from approach_reviews)<>1 then raise exception 'Guest cannot read visible history'; end if;
   begin insert into approach_reviews(approach_id,expected_revision,action,reasoning) select id,revision,'stop','guest' from domain_approaches; raise exception 'Guest wrote review'; exception when insufficient_privilege then null; when raise_exception then if sqlerrm='Guest wrote review' then raise; end if; end;
 end $$;
+delete from objects where id='30000000-0000-0000-0000-000000000001';
+do $$ begin
+  if (select count(*) from approach_contributions)<>0 then raise exception 'Object cascade failed'; end if;
+  if (select plan_revision from domain_approaches)<>7 then raise exception 'Object cascade did not version the approach'; end if;
+  if has_function_privilege('authenticated',(select p.oid from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='alcon_approach_internal' and p.proname='version_after_contribution_delete'),'EXECUTE') then raise exception 'Internal trigger exposed'; end if;
+end $$;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000004',false);
 do $$ begin
   if (select count(*) from domain_approaches)+(select count(*) from approach_assessments)+(select count(*) from approach_reviews)<>0 then raise exception 'Outsider data leak'; end if;
 end $$;
 reset role;
+begin;
+set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000001';
+insert into objects values('30000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001');
+insert into approach_contributions(approach_id,condition_id,object_id,role,rationale) values('50000000-0000-0000-0000-000000000001','60000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','primary','Cascade fixture');
+delete from domains where id='10000000-0000-0000-0000-000000000001';
+do $$ begin
+  if (select count(*) from domain_approaches)+(select count(*) from approach_conditions)+(select count(*) from approach_reviews)<>0 then raise exception 'Domain cascade failed'; end if;
+end $$;
+rollback;
 select 'Domain approach persistence and permissions passed' as result;
