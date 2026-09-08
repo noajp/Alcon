@@ -260,6 +260,33 @@ check-inは、必要なstatus変更、短い更新文、任意の次の一手を
 
 データは `custom_columns`（定義）・`custom_column_placements`（配置）・`custom_column_values`（Elementの値）に分ける。保存済みのSpace・個人・Domainスコープのデータは保持するが、一覧の作成導線はObjectスコープに統一する。
 
+### コードの置き場 — 盤面と仕組み
+
+概念モデルはディレクトリにそのまま現れる。`web/src/` 直下は、組織活動そのものを映す面（**ActivitySpace**）と、その面を成立させる仕組み（**Function**）の二つに分かれる。Activity Space が組織活動の文脈である以上、分類・概念・画面はその下に入り、どこにも属さない道具立てだけが Function に残る。
+
+```
+web/src/
+├── ActivitySpace/        盤面そのもの — 三分類 ＋ Home
+│   ├── home/             Now / Inbox / My Elements / My Calendar / Profile
+│   ├── strategy/         initiative / phase / timeline
+│   ├── execution/        domain / object / element
+│   └── sustainment/      workload / notebook / table / team / calendar / operations（CRM・SCM）
+├── Function/             盤面を成立させる仕組み。特定の概念に属さない
+│   ├── widget/           WidgetFrame と widgets/ + registry.tsx + defaults.ts
+│   ├── property/         Object ごとの列定義と値
+│   ├── copilot/          Copilot パネルと Edge Function 呼び出し
+│   ├── settings/
+│   ├── space/            Activity Space の切替とオンボーディング
+│   ├── sync/             差分ストリームと正規化キャッシュ
+│   └── shared/           概念をまたぐ UI とロジック
+├── shell/                外殻 — ModeRail / AppSidebar / TabBar / CommandPalette
+├── app/                  Next.js App Router
+├── hooks/                Supabase の CRUD
+├── lib/ providers/ auth/ types/ ui/ shared/
+```
+
+Execution が Domain → Object → Element の順に並ぶのは、上位ほど文脈が広く、下位ほど行動が具体になるため。Sustainment の各道具は ModeRail の Apps ランチャーに1対1で対応する。
+
 ## UI デザイン原則
 
 ### レイアウト哲学
