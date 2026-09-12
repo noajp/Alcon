@@ -7,6 +7,7 @@ import type { AlconObjectWithChildren, Phase, ObjectMilestone } from '@/types/da
 import { updateElement } from '@/hooks/useSupabase';
 import { ChevronRight, ChevronDown, CalendarDays, ZoomIn, ZoomOut } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
+import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
 import { getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
@@ -608,15 +609,12 @@ export function GanttView({
                       className="w-full flex items-center gap-1.5 px-2.5 h-8 text-left bg-muted/40 hover:bg-muted/60 border-b border-border/60 transition-colors group"
                       title={isCollapsed ? 'Expand' : 'Collapse'}
                     >
-                      <span className="w-3.5 h-3.5 flex items-center justify-center text-muted-foreground/70 group-hover:text-foreground transition-colors">
-                        {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-                      </span>
                       <span className="w-3.5 h-3.5 flex items-center justify-center text-muted-foreground shrink-0">
                         {icon ?? <ObjectIcon size={12} />}
                       </span>
                       <span className="text-[12px] font-medium text-foreground truncate flex-1">{name}</span>
-                      <span className="text-[10px] font-medium text-muted-foreground tabular-nums shrink-0 px-1.5 py-px rounded-full bg-card/80 border border-border/40">
-                        {sectionElements.length}
+                      <span className="w-3.5 h-3.5 flex items-center justify-center text-muted-foreground/70 group-hover:text-foreground transition-colors">
+                        {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                       </span>
                     </button>
                   )}
@@ -634,10 +632,9 @@ export function GanttView({
                         }`}
                         style={{ height: ROW_H }}
                       >
-                        <div
-                          className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: statusColor(element.status) }}
-                        />
+                        <span className="shrink-0 flex items-center" style={{ color: statusColor(element.status) }}>
+                          <ElementIcon size={12} />
+                        </span>
                         <span className={`text-xs truncate flex-1 ${isDone ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                           {element.title}
                         </span>

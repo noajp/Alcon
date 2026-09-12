@@ -9,11 +9,9 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
 import { useNotifications } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, FileText, Bot, Settings, Users, X, Check, Search, Smile, Image as ImageIcon } from 'lucide-react';
+import { Plus, ChevronRight, FileText, Bot, Settings, Users, X, Search } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain } from '@/hooks/useSupabase';
-import { supabase } from '@/lib/supabase';
-import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import {
   DndContext,
   DragOverlay,
@@ -35,7 +33,6 @@ import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { useDomains, reorderDomains } from '@/hooks/useSupabase';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/ActivitySpace/execution/domain/domainsStore';
-import { DOMAIN_COLOR_SWATCHES } from '@/ActivitySpace/execution/domain/domainColorPalette';
 import { SpaceSwitcher } from '@/Function/space/SpaceSwitcher';
 
 import { NavNoteIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
@@ -86,12 +83,6 @@ const HOME_ITEMS = [navItem('home'), navItem('inbox'), navItem('calendar'), navI
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
-const DOMAIN_ICON_EMOJI_PICKS = [
-  '🏢', '🏥', '🏗️', '🚀', '⭐', '💡', '🎯', '🔥',
-  '💎', '🌍', '🌸', '🎨', '📦', '🛠️', '📊', '🧩',
-  '🤖', '🧪', '📚', '🎵', '🍀', '🌊', '⚡', '🏆',
-];
-const DOMAIN_ICON_BUCKET = 'avatars';
 
 function isEmojiIcon(s: string) {
   return /^\p{Emoji}/u.test(s) && s.length <= 4;
@@ -823,7 +814,7 @@ function DomainSettingsModal({
               active={tab === 'general'}
               icon={<Settings size={15} />}
               title="General"
-              description="Name, icon, and privacy"
+              description="Name and privacy"
               onClick={() => setTab('general')}
             />
             <SettingsTabButton
@@ -896,43 +887,27 @@ function DomainGeneralSettings({
   domain: Domain;
   onUpdated: (domain: Domain) => void;
 }) {
-  const { user } = useAuthContext();
   const [name, setName] = useState(domain.name);
   const [identifier, setIdentifier] = useState(domain.identifier ?? '');
   const [privacy, setPrivacy] = useState<DomainPrivacy>(domain.privacy ?? 'workspace');
-  const [color, setColor] = useState(domain.color ?? '');
-  const [icon, setIcon] = useState(domain.icon ?? '');
-  const [iconOpen, setIconOpen] = useState(false);
-  const [iconSaving, setIconSaving] = useState(false);
-  const iconSavePending = useRef(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Keyed on domain.id, not the domain object itself: saveIcon below persists
-  // instantly (unlike the batched name/identifier/privacy/color, which wait
-  // for "Save changes") and reports the fresh row up through onUpdated, which
-  // hands a new `domain` object back down as this same prop. Resyncing on
-  // every object identity change — rather than only when the Domain being
-  // edited actually changes — would silently discard any unsaved edits to
-  // the batched fields the moment the user touched the icon picker.
+  // Keyed on domain.id, not the domain object itself: onUpdated hands a new
+  // `domain` object back down as this same prop after every save, and
+  // resyncing on object identity would discard edits still in the fields.
   const [seededFor, setSeededFor] = useState(domain.id);
   if (seededFor !== domain.id) {
     setSeededFor(domain.id);
     setName(domain.name);
     setIdentifier(domain.identifier ?? '');
     setPrivacy(domain.privacy ?? 'workspace');
-    setColor(domain.color ?? '');
-    setIcon(domain.icon ?? '');
   }
 
   const canSave =
     name.trim() !== domain.name ||
     identifier.trim() !== (domain.identifier ?? '') ||
-    privacy !== (domain.privacy ?? 'workspace') ||
-    color !== (domain.color ?? '');
+    privacy !== (domain.privacy ?? 'workspace');
 
   const handleSave = async () => {
     if (!canSave || saving) return;
@@ -943,7 +918,6 @@ function DomainGeneralSettings({
         name: name.trim() || domain.name,
         identifier: identifier.trim() || null,
         privacy,
-        color: color || null,
       });
       onUpdated(updated);
     } catch (e) {
@@ -953,175 +927,22 @@ function DomainGeneralSettings({
     }
   };
 
-  const saveIcon = async (source: string | (() => Promise<string>)) => {
-    // Cover upload and persistence with one synchronous lock across renders.
-    if (iconSavePending.current || source === icon) return;
-    iconSavePending.current = true;
-    const previous = icon;
-    setIconOpen(false);
-    setUploadError(null);
-    setIconSaving(true);
-    try {
-      const value = typeof source === 'string' ? source : await source();
-      setIcon(value);
-      const updated = await updateDomain(domain.id, { icon: value || null });
-      onUpdated(updated);
-    } catch (e) {
-      setIcon(previous);
-      setUploadError(e instanceof Error ? e.message : 'Failed to update icon');
-    } finally {
-      iconSavePending.current = false;
-      setIconSaving(false);
-    }
-  };
-
-  const handleEmojiSelect = (emoji: string) => {
-    void saveIcon(emoji);
-  };
-
-  const handleIconReset = () => {
-    void saveIcon('');
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-    await saveIcon(async () => {
-      setUploading(true);
-      try {
-        const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
-        const path = `${user.id}/domain-${domain.id}-${Date.now()}.${ext}`;
-        const { error: uploadErr } = await supabase.storage
-          .from(DOMAIN_ICON_BUCKET)
-          .upload(path, file, { upsert: true, contentType: file.type });
-        if (uploadErr) throw uploadErr;
-        const { data: pub } = supabase.storage.from(DOMAIN_ICON_BUCKET).getPublicUrl(path);
-        return `${pub.publicUrl}?t=${Date.now()}`;
-      } finally {
-        setUploading(false);
-      }
-    });
-    if (fileRef.current) fileRef.current.value = '';
-  };
-
-  const iconPreview = icon && !isEmojiIcon(icon) ? (
-    // eslint-disable-next-line @next/next/no-img-element -- uploaded file; see DomainIcon above
-    <img src={icon} alt="" className="h-full w-full object-cover" />
-  ) : (
-    <span
-      className={`flex h-full w-full items-center justify-center ${color ? 'text-white' : 'text-foreground'}`}
-      style={color ? { backgroundColor: color } : undefined}
-    >
-      {icon ? <span className="text-[18px] leading-none">{icon}</span> : <DomainIcon size={16} />}
-    </span>
-  );
-
   return (
     <div className="max-w-xl">
       <div className="mb-5">
         <h3 className="text-[15px] font-semibold text-foreground">General</h3>
         <p className="mt-1 text-[12px] text-muted-foreground">
-          Configure this Domain&apos;s name, icon, color, identifier, and access mode.
+          Configure this Domain&apos;s name, identifier, and access mode.
         </p>
       </div>
 
       <div className="space-y-5">
         <div>
-          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Icon</label>
-          <div className="flex items-center gap-3">
-            <Popover open={iconOpen} onOpenChange={setIconOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="h-11 w-11 overflow-hidden rounded-lg border border-border transition-colors hover:bg-muted/60"
-                  disabled={iconSaving}
-                  aria-busy={iconSaving}
-                  title={iconSaving ? 'Saving icon…' : 'Change icon'}
-                >
-                  {iconPreview}
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-64 p-2">
-                <div className="mb-2 flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
-                    disabled={iconSaving}
-                    className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground disabled:opacity-50"
-                  >
-                    <ImageIcon size={13} /> {uploading ? 'Uploading…' : 'Upload image'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleIconReset}
-                    disabled={iconSaving}
-                    className="rounded-md px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-                  >
-                    Reset
-                  </button>
-                </div>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} disabled={iconSaving} />
-                <div className="border-t border-border/60 pt-2">
-                  <div className="mb-1.5 flex items-center gap-1 px-1">
-                    <Smile size={12} className="text-muted-foreground" />
-                    <span className="text-[11px] text-muted-foreground">Emoji</span>
-                  </div>
-                  <div className="grid grid-cols-8 gap-0.5">
-                    {DOMAIN_ICON_EMOJI_PICKS.map((e) => (
-                      <button
-                        key={e}
-                        type="button"
-                        onClick={() => handleEmojiSelect(e)}
-                        disabled={iconSaving}
-                        className="flex h-7 w-7 items-center justify-center rounded text-[16px] transition-colors hover:bg-muted/40"
-                      >
-                        {e}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-            {uploadError && <span className="text-[11px] text-destructive">{uploadError}</span>}
-          </div>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Color</label>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setColor('')}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
-                color === '' ? 'border-foreground bg-muted' : 'border-border hover:bg-muted/60'
-              }`}
-              title="No color"
-            >
-              <DomainIcon size={16} />
-            </button>
-            {DOMAIN_COLOR_SWATCHES.map((swatch) => (
-              <button
-                key={swatch}
-                type="button"
-                onClick={() => setColor(swatch)}
-                className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-transform hover:scale-105 ${
-                  color === swatch ? 'border-foreground' : 'border-border/60'
-                }`}
-                style={{ backgroundColor: swatch }}
-                title={swatch}
-              >
-                {color === swatch && <Check size={14} className="text-white" />}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
           <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:bg-[var(--accent-subtle)]"
+            className="w-full rounded-md bg-muted/40 px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:bg-[var(--accent-subtle)]"
           />
         </div>
 
@@ -1131,7 +952,7 @@ function DomainGeneralSettings({
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
             placeholder="e.g. ALCON"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:bg-[var(--accent-subtle)]"
+            className="w-full rounded-md bg-muted/40 px-3 py-2 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:bg-[var(--accent-subtle)]"
           />
         </div>
 
@@ -1146,10 +967,10 @@ function DomainGeneralSettings({
                 key={value}
                 type="button"
                 onClick={() => setPrivacy(value)}
-                className={`min-w-0 truncate rounded-md border px-2 py-2 text-[12px] font-semibold transition-colors sm:px-3 ${
+                className={`min-w-0 truncate rounded-md px-2 py-2 text-[12px] font-semibold transition-colors sm:px-3 ${
                   privacy === value
-                    ? 'border-foreground bg-foreground text-background'
-                    : 'border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                    ? 'bg-foreground text-background'
+                    : 'bg-muted/40 text-muted-foreground hover:bg-muted/70 hover:text-foreground'
                 }`}
               >
                 {label}
