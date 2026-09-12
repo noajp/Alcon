@@ -21,6 +21,12 @@ import { CardAgentControl } from '../agent';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { ActivitySignal } from '../ActivitySignal';
 
+// A card title reads at most three lines — beyond that it ellipsises, and the
+// inline rename box grows to the same three lines before it scrolls. Both
+// numbers are the `leading-5` line box, so the box never jumps on click.
+const TITLE_MAX_LINES = 3;
+const TITLE_LINE_HEIGHT = 20;
+
 type ElementStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled';
 
 const COLUMNS: { status: ElementStatus; label: string }[] = [
@@ -57,6 +63,15 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(element.title);
   useEffect(() => { setTitleDraft(element.title); }, [element.title]);
+  // The rename box is a textarea sized to its own content: a fixed rows={1}
+  // collapsed a wrapped title to a single line the moment it was clicked.
+  const titleRef = React.useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    const el = titleRef.current;
+    if (!editingTitle || !el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, TITLE_MAX_LINES * TITLE_LINE_HEIGHT)}px`;
+  }, [editingTitle, titleDraft]);
 
   const saveTitle = async () => {
     setEditingTitle(false);
@@ -124,6 +139,7 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
         {editingTitle ? (
           <textarea
             autoFocus
+            ref={titleRef}
             rows={1}
             value={titleDraft}
             onChange={(e) => setTitleDraft(e.target.value)}
@@ -134,11 +150,11 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
             }}
             onPointerDown={stop}
             onClick={stop}
-            className="w-full text-[13px] font-medium text-foreground leading-5 bg-transparent border-none resize-none"
+            className="w-full text-[13px] font-medium text-foreground leading-5 bg-transparent border-none resize-none overflow-y-auto"
           />
         ) : (
           <p
-            className="text-[13px] font-medium text-foreground leading-5 -mx-1 px-1 rounded cursor-text hover:bg-muted/30 transition-colors"
+            className="text-[13px] font-medium text-foreground leading-5 -mx-1 px-1 rounded cursor-text hover:bg-muted/30 transition-colors line-clamp-3 break-words"
             title="Click to rename"
             onPointerDown={stop}
             onClick={(e) => { stop(e); setEditingTitle(true); }}
