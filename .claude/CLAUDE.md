@@ -1,6 +1,6 @@
 # Alcon — 世界最高の組織活動支援ツールを目指す
 
-Next.js 16 + Supabase + Tailwind CSS + recharts。企業・軍事作戦・病院を問わず、あらゆる組織活動を業界非依存の少数概念で扱う。原則は **「意図で委ね、成果と根拠で確かめる」** —— 人間が目的・成功条件・制約・権限を示し、AI は意図を理解して権限内で手段を選び、権限を超える判断や前提の崩壊が生じたら人間に判断を戻す。
+Next.js 16 + Supabase + Tailwind CSS + recharts。企業・軍事作戦・病院など、さまざまな組織の活動を少数の共通概念で扱う。原則は **「意図で委ね、成果と根拠で確かめる」**。人間が目的・成功条件・制約・権限を示し、AI はその意図に沿って権限内で手段を選ぶ。権限を超える判断が必要になったり、前提が成り立たなくなったりした場合は、人間に判断を求める。
 
 思想・UI レイアウト・データモデル・境界と権限の詳細は [PRODUCT.md](./PRODUCT.md)（製品判断をするときに読む）。
 
@@ -8,27 +8,27 @@ Next.js 16 + Supabase + Tailwind CSS + recharts。企業・軍事作戦・病院
 
 | 分類 | 何を扱うか | 単位 |
 |---|---|---|
-| **Strategy** | 何を達成し、どう勝つか | Initiative（束ねると戦略）/ Phase（時間箱）/ Timeline |
+| **Strategy** | 何を達成し、どう勝つか | Initiative（複数で戦略を構成）/ Phase（活動を期間で区切る単位）/ Timeline |
 | **Execution** | 実際に行動する | Domain（活動の場）→ Object（成果物）→ Element（行動の最小単位） |
 | **Sustainment** | 仕事道具 | Workload / CRM / SCM / Notebook / Table / Team / Calendar |
 
-Initiative は目的・前提・意思決定・成功条件を持ち、担当や進捗は持たない。担当・期限・進捗・依存は Execution 側。ほかに個人の横断サーフェス **Home** と、Object ごとに定義して Element に値を持たせる **Property**。Worker は `human | ai_agent`。
+Initiative は目的・前提・意思決定・成功条件を持ち、担当や進捗は持たない。担当・期限・進捗・依存は Execution 側で扱う。ほかに分類を横断して使う個人向けの画面 **Home** と、Object ごとに定義して Element に値を持たせる **Property** がある。Worker は `human | ai_agent`。
 
-**Strategy と Execution は分離するが遮断しない。** 混ぜて一覧化すると「意図」と「行動」の区別が崩れる。Initiative は配下 Object と実行上のリスク・負荷を、Object は貢献先 Initiative と意図を常に見せる —— この一クリックの往復可能性が Alcon の核。
+**Strategy と Execution は分けて表示し、相互に参照できるようにする。** 「意図」と「行動」を区別しつつ、Initiative には配下の Object と実行上のリスク・負荷を、Object には貢献先の Initiative と意図を常に表示する。目的と実行状況を一クリックで行き来できることを重視する。
 
 ## AI 駆動ループ
 
-**バックログの単一情報源は盤面**（Supabase の `elements`）。外部の TODO リストを作らない。**状態をセッションの記憶に置かない** —— どのセッションが落ちても、盤面から拾えば続きが回る。
+**バックログは盤面（Supabase の `elements`）で一元管理する。** 外部の TODO リストを作らず、セッションが終了しても盤面を読めば作業を再開できる状態を保つ。
 
 セッションを始めたら、まず盤面を見る。
 
 | 盤面の状態 | 規約 |
 |---|---|
 | 着手できる Element がある | [friction](./skills/friction/SKILL.md) — 実装 → PR → レビューゲート → マージ → 書き戻し |
-| 空いている | [exercise](./skills/exercise/SKILL.md) — **仕事を探さない。**架空の作戦を運用して摩擦を採る |
+| 空いている | [exercise](./skills/exercise/SKILL.md) — 新たな仕事を探さず、架空の作戦を運用し、使いにくい点を記録する |
 | PR をレビューする | [code-review](./skills/code-review/SKILL.md) |
 
-ユーザーの判断が要るもの（課金 / 不可逆 / 割れた設計判断 / 停滞）は Object「Decisions — 判断」に Element として起票し、ユーザーにアサインして、止まらずに次へ行く。市場投入に直接効く仕事は Initiative「Friction GTM — 市場投入」の Ends から採り、Object「Go-to-Market」に置く。
+課金、不可逆な操作、結論が出ない設計判断、作業の停滞など、ユーザーの判断が必要な事項は Object「Decisions — 判断」に Element として起票する。ユーザーにアサインし、判断待ちの間はほかの作業を進める。市場投入に関わる仕事は Initiative「Friction GTM — 市場投入」の Ends をもとに、Object「Go-to-Market」に登録する。
 
 ## コマンド
 
@@ -42,16 +42,16 @@ cd web && npm run sync       # ブランチ・worktree の同期と掃除
 npx vercel --prod            # 本番デプロイ
 ```
 
-テストは `web/tests/`（Vitest / node）。対象は壊れると痛い純粋ロジックだけ —— jsonb の正規化、リストのソート、design-lint の規則とラチェット。UI のレンダリングテストは持たない。
+テストは `web/tests/`（Vitest / node）。対象は、不具合の影響が大きい純粋ロジックに絞る。jsonb の正規化、リストのソート、design-lint の規則とラチェットなど。UI のレンダリングテストは持たない。
 
 **キー**：⌘K で CommandPalette（グローバル検索＋ナビ）。ウィジェットは長押し 450ms で arrange モード（Esc / Done で抜ける）。
 
 ## ビジュアル原則
 
-ミニマルで静かな UI。装飾よりも情報密度。メイン領域は角丸の IslandCard で浮かせる。
+ミニマルで静かな UI。装飾よりも情報密度を重視する。メイン領域は角丸の IslandCard で背景から区別する。
 
 - **色をハードコードしない** — デザイントークンは `shared/designTokens.ts`
-- **入力フィールドに枠・リング・アウトライン禁止** — globals.css が自動リングを一切出さないので、フォーカスの可視化は部品側の義務（背景トーンの変化で示す）。`focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで書かない
+- **入力フィールドに枠・リング・アウトライン禁止** — globals.css はフォーカスリングを表示しないため、各コンポーネントで背景色を変えてフォーカスを示す。`focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで書かない
 - **`uppercase` を使わない** — ラベルは書いた通り（先頭大文字）で表示する
 - **「Task」と呼ばない** — 必ず「Element」
 - **ウィジェットの枠を自作しない** — `WIDGET_REGISTRY` に登録し、枠は `WidgetFrame`、ヘッダは `useWidgetMeta` / `WidgetHeaderAction`
@@ -68,18 +68,18 @@ root 直下は `supabase/`（migrations と functions）、`ops/`（自走ルー
 ## 実装ルール
 
 1. 変更後は必ず `npx tsc --noEmit` と `npm test`
-2. 新規ファイルは、盤面の面なら `ActivitySpace/<分類>/<概念>/`、それを支える仕組みなら `Function/<concept>/`。横断 UI は `Function/shared/`、外殻は `shell/`
+2. 新規ファイルは、盤面の画面なら `ActivitySpace/<分類>/<概念>/`、それを支える仕組みなら `Function/<concept>/`。横断 UI は `Function/shared/`、外殻は `shell/`
 3. **新 view**：`viewRegistry.ts`（label/icon の単一情報源）→ `MainContent` 分岐 → `railApps.ts` の `MODE_META`。新モードを App にするなら `RailMode` / `APP_GROUPS` も
-4. **新 Widget**：本体を `Function/widget/widgets/` に、定義を `registry.tsx` に1つ（`accepts` / `zones` / `load()` の動的 import）、既定配置は `defaults.ts`。既存ウィジェットを別 Subject に開放するのは `accepts` に1語足すだけ
-5. **図の軸を焼き込まない** — 集計軸は `Function/shared/dimensions.ts` の `Dimension` から選ばせ `WidgetInstance.params` に持たせる。軸違いで2つ目のウィジェットを作らない
-6. **フレームワークは永続データの見せ方にする** — OKR / Gap は `intents` の measure の読み替え、任意分類の分析は Table、散文は Note。業界固有のデータや分析結果をコンポーネントや配置パラメータへ直書きしない
+4. **新 Widget**：本体を `Function/widget/widgets/` に、定義を `registry.tsx` に1つ（`accepts` / `zones` / `load()` の動的 import）、既定配置は `defaults.ts`。既存ウィジェットを別の Subject でも使う場合は、`accepts` に対象を追加する
+5. **グラフの集計軸を固定しない** — 集計軸は `Function/shared/dimensions.ts` の `Dimension` から選択できるようにし、`WidgetInstance.params` に保存する。軸の違いだけで別のウィジェットを作らない
+6. **フレームワークは永続データの見せ方にする** — OKR / Gap は `intents` の measure の読み替え、任意の分類による分析には Table を使い、文章は Note に保存する。業界固有のデータや分析結果をコンポーネントや配置パラメータへ直書きしない
 7. **Object のネスト禁止**。Element の multi-homing は `object_id` + `element_objects` の二重書き
-8. Phase の `end_date` は**含む**。日付を扱う処理は `Function/shared/phaseWindow.ts` を通す
+8. Phase の期間には **`end_date` 当日を含める**。日付を扱う処理は `Function/shared/phaseWindow.ts` を通す
 9. Note エディタは独自 `AppleNoteEditor`（HTML + `htmlSanitizer`）。BlockNote は使わない
 
 ## Supabase
 
-- Project ID: `rkugtcqztkkacvoylupw`。RLS 有効で可視性は RLS が強制。CRUD は `hooks/` に集約
+- Project ID: `rkugtcqztkkacvoylupw`。閲覧範囲は RLS で制御する。CRUD は `hooks/` に集約
 - AI は Edge Functions 経由（`alcon-copilot` / `run-agent` / `summarize-note` 等）
 - **`supabase/` は root にのみ存在する**（migrations・functions とも）。`web/supabase/` は作らない
 - **既存テーブルに触る migration は `to_regclass` ガード必須** —— 基底スキーマは migrations フォルダの外にあり、PR の preview branch は空 DB に replay する（書式は [friction/references/db.md](./skills/friction/references/db.md)）
@@ -88,9 +88,9 @@ root 直下は `supabase/`（migrations と functions）、`ops/`（自走ルー
 
 root の `vercel.json` は本番デプロイ設定そのもの、root の `package.json` はフレームワーク検出用。`web/next.config.ts` の `turbopack.root` 固定も外さない（root で `npm install` すると lockfile が復活し、Next が workspace root を誤認して dev の `globals.css` が stale になる）。
 
-## 改訂の作法 — 差分注釈ではなくモデル更新
+## 文書の改訂方針
 
-知識・方針・用語の修正を依頼されたら、**思考（モデル）自体を上書き**する。新しい理解が最初からそうだったかのように書き直し、残骸を残さない。旧概念を「禁止」「廃止」「旧称」に降格させて残さない。「X→Y に変更」「以前は X」をファイルに書かない —— 変更点は会話で述べ、ファイルには最終状態だけを残す。言及された一箇所だけでなく意図が波及する全箇所（用語・例・図・命名表）を直し、仕上げに旧概念を grep して 0 件を確認する。例外はユーザーが履歴の保持を明示したときだけ。
+知識・方針・用語を修正するときは、意図を踏まえて関連する説明全体を更新する。文書には現在の考え方を記し、古い説明を残さない。不要になった概念は「禁止」「廃止」「旧称」として残さず、削除する。変更点は会話で説明し、文書には「X→Y に変更」「以前は X」のような履歴を書かない。用語・例・図・命名表など、関連する箇所を一貫して更新し、旧概念の表記が残っていないことを検索で確認する。例外はユーザーが履歴の保持を明示したときだけ。
 
 ## 完了したら
 

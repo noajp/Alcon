@@ -1,29 +1,29 @@
 # Alcon
 
-**世界最高の組織活動支援ツールを目指す。** 企業・軍事作戦・病院など業界を問わず、あらゆる組織活動を業界非依存の少数概念で扱う。
+**世界最高の組織活動支援ツールを目指す。** 企業・軍事作戦・病院など、さまざまな組織の活動を少数の共通概念で扱う。
 
 ## 三分類
 
-全体の体系はクラウゼヴィッツ『戦争論』の 戦略・戦闘・兵站 に着想を得ている。
+全体の体系はクラウゼヴィッツ『戦争論』の戦略・戦闘・兵站に着想を得ている。
 
 | 分類 | 戦争論 | 何を扱うか | 単位 |
 |---|---|---|---|
-| **Strategy** | 戦略 | 何を達成し、どう勝つか | Initiative。複数の Initiative が束ねられて戦略となる |
+| **Strategy** | 戦略 | 何を達成し、どう勝つか | Initiative。複数の Initiative で戦略を構成する |
 | **Execution** | 戦闘 | 実際に行動する | Domain（活動の場）→ Object（成果物の束）→ Element（行動の最小単位） |
 | **Sustainment** | 兵站 | 仕事道具 | Workload / Notebook / Table / Team / Calendar |
 
-Execution の三層はアーレント『人間の条件』の 活動・仕事・労働 に着想を得ている。
+Execution の三層はアーレント『人間の条件』の活動・仕事・労働に着想を得ている。
 
-設計思想の全体は [.claude/PRODUCT.md](.claude/PRODUCT.md)、開発の規約は [.claude/CLAUDE.md](.claude/CLAUDE.md)、判断の履歴は [docs/adr/](docs/adr/README.md)。
+設計思想は [.claude/PRODUCT.md](.claude/PRODUCT.md)、開発の規約は [.claude/CLAUDE.md](.claude/CLAUDE.md)、判断の履歴は [docs/adr/](docs/adr/README.md)。
 
 ## 構成
 
 - `web/` — Next.js 16 + Supabase + Tailwind CSS のアプリ本体
 - `supabase/` — migrations と Edge Functions
-- `ops/` — 自走開発ループの配管（[ops/README.md](ops/README.md)）
+- `ops/` — 自走開発ループを支える運用スクリプト（[ops/README.md](ops/README.md)）
 - `docs/` — ADR とリスク登録簿
 
-## Commands
+## コマンド
 
 ```bash
 cd web && npm run dev        # 開発サーバー (port 3000)
