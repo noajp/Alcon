@@ -50,9 +50,18 @@ export function renderWithMentions(text: string): React.ReactNode {
   );
 }
 
-/** The author's face: their real photo when the Worker record has one, and a
- *  colour-coded initial when it doesn't. Both threads resolve the Worker
- *  themselves (humans by user_id, agents by worker id) and hand the URL in. */
+// Local copies of the providers' official icons keep historical comments
+// independent of external image availability. Sources: github.com/openai.png;
+// assets.claude.com/95a868946ac8a31e5ff832e2899f294aa368b836.png.
+const AI_COMMENT_LOGOS = new Map([
+  ['claude', '/ai-logos/claude.png'],
+  ['chatgpt', '/ai-logos/chatgpt.png'],
+  ['codex', '/ai-logos/chatgpt.png'],
+]);
+
+/** Prefer the Worker's configured photo. Historical AI comments often have
+ *  no author_id, so recognized provider names get a logo as a visual fallback.
+ *  This never resolves identity or permissions, and never applies to humans. */
 export function CommentAvatar({
   name,
   kind,
@@ -64,10 +73,12 @@ export function CommentAvatar({
   isMine: boolean;
   avatarUrl?: string | null;
 }) {
-  if (avatarUrl) {
+  const logo = kind === 'ai_agent' ? AI_COMMENT_LOGOS.get(name?.trim().toLowerCase() ?? '') : undefined;
+  const imageUrl = avatarUrl || logo;
+  if (imageUrl) {
     return (
       <WorkerAvatar
-        worker={{ name: name ?? '', avatar_url: avatarUrl }}
+        worker={{ name: name ?? '', avatar_url: imageUrl }}
         size={28}
         className="flex-shrink-0"
       />
