@@ -25,14 +25,14 @@ export function SettingsSidebarPanel() {
 
   return (
     <div className="pt-1">
-      <div className="px-1 pb-2">
+      <div className="pb-2">
         <div className="relative">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/70" />
+          <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/70" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search settings…"
-            className="w-full pl-8 pr-2 py-1.5 text-[13px] bg-muted/40 rounded-md placeholder:text-muted-foreground/60 border-none"
+            className="w-full h-8 pl-[35px] pr-2.5 text-[12px] bg-muted/40 rounded-md placeholder:text-muted-foreground/60 border-none"
           />
         </div>
       </div>
