@@ -4,7 +4,7 @@ import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/ActivitySpace/exe
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
-import { supabase } from '@/lib/supabase';
+import { supabase, getCurrentUserId } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { Domain, DomainInsert, DomainUpdate } from '@/types/database';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
@@ -66,6 +66,22 @@ export async function deleteDomain(id: string): Promise<void> {
   const { data, error } = await supabase.from('domains').delete().eq('id', id).select('id');
   if (error) throw error;
   if (!data?.length) throw new Error('Only an owner of this Domain can delete it.');
+  notifyDomainsChanged();
+}
+
+// Give up one's own seat in a Domain. RLS lets a member delete their own
+// domain_members row; a refused delete matches no rows, so ask for the ids.
+export async function leaveDomain(domainId: string): Promise<void> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('Not signed in.');
+  const { data, error } = await supabase
+    .from('domain_members')
+    .delete()
+    .eq('domain_id', domainId)
+    .eq('user_id', userId)
+    .select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('You are not a member of this Domain.');
   notifyDomainsChanged();
 }
 

@@ -11,7 +11,7 @@ import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
 import { useNotifications } from '@/hooks/useSupabase';
 import { Plus, ChevronRight, FileText, Bot, Settings, Users, X, Search } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { updateDomain, deleteDomain } from '@/hooks/useSupabase';
+import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';
 import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
 import {
@@ -346,7 +346,7 @@ export function AppSidebar({
   // Same reason as the order mirror above: the open dialog picks up the row
   // it is editing as it is rendered, not a frame later.
   if (settingsDomain) {
-    const fresh = domains.find((d) => d.id === settingsDomain.id);
+    const fresh = [...domains, ...guestDomains].find((d) => d.id === settingsDomain.id);
     if (fresh && fresh !== settingsDomain) setSettingsDomain(fresh);
   }
 
@@ -578,6 +578,7 @@ export function AppSidebar({
               return next;
             })}
             onSelect={view => { setActiveDomainId(d.id); onNavigate({ objectId: null }); onViewChange(view); }}
+            onSettings={() => setSettingsDomain(d)}
           />)}
 
           </>
@@ -776,6 +777,8 @@ function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
   );
 }
 
+type DomainRole = 'owner' | 'admin' | 'member';
+
 function DomainSettingsModal({
   domain,
   onClose,
@@ -785,9 +788,28 @@ function DomainSettingsModal({
   domain: Domain;
   onClose: () => void;
   onUpdated: (domain: Domain) => void;
+  /** The Domain is gone for this viewer — deleted, or they left it. */
   onDeleted: () => void;
 }) {
   const [tab, setTab] = useState<'general' | 'members' | 'agent'>('general');
+  // The viewer's own seat, read once for every tab. It answers the same
+  // question RLS answers on write: owner/admin may change the Domain, only
+  // an owner may delete it, and anyone else is a guest who can only leave.
+  const { user } = useAuthContext();
+  const [role, setRole] = useState<DomainRole | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) return;
+    void supabase
+      .from('domain_members')
+      .select('role')
+      .eq('domain_id', domain.id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setRole((data?.role as DomainRole | undefined) ?? null); });
+    return () => { cancelled = true; };
+  }, [domain.id, user]);
+  const canEdit = role === 'owner' || role === 'admin';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 sm:p-6">
@@ -822,7 +844,7 @@ function DomainSettingsModal({
               active={tab === 'general'}
               icon={<Settings size={15} />}
               title="General"
-              description="Name and privacy"
+              description={canEdit ? 'Name and privacy' : 'Name and membership'}
               onClick={() => setTab('general')}
             />
             <SettingsTabButton
@@ -842,9 +864,9 @@ function DomainSettingsModal({
           </aside>
           <main className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6">
             {tab === 'general' ? (
-              <DomainGeneralSettings domain={domain} onUpdated={onUpdated} onDeleted={onDeleted} />
+              <DomainGeneralSettings domain={domain} role={role} onUpdated={onUpdated} onDeleted={onDeleted} />
             ) : tab === 'agent' ? (
-              <DomainAgentSettings key={domain.id} domain={domain} />
+              <DomainAgentSettings key={domain.id} domain={domain} canEdit={canEdit} />
             ) : (
               <TeamSettings domainId={domain.id} />
             )}
@@ -890,14 +912,17 @@ function SettingsTabButton({
 
 function DomainGeneralSettings({
   domain,
+  role,
   onUpdated,
   onDeleted,
 }: {
   domain: Domain;
+  role: DomainRole | null;
   onUpdated: (domain: Domain) => void;
   onDeleted: () => void;
 }) {
-  const { user } = useAuthContext();
+  const isOwner = role === 'owner';
+  const canEdit = isOwner || role === 'admin';
   const [name, setName] = useState(domain.name);
   const [identifier, setIdentifier] = useState(domain.identifier ?? '');
   const [privacy, setPrivacy] = useState<DomainPrivacy>(domain.privacy ?? 'workspace');
@@ -920,35 +945,24 @@ function DomainGeneralSettings({
     identifier.trim() !== (domain.identifier ?? '') ||
     privacy !== (domain.privacy ?? 'workspace');
 
-  // Delete is offered to owners only — the same gate RLS applies — so a
-  // member never sees a button that the database would refuse.
-  const [isOwner, setIsOwner] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    if (!user) return;
-    void supabase
-      .from('domain_members')
-      .select('role')
-      .eq('domain_id', domain.id)
-      .eq('user_id', user.id)
-      .maybeSingle()
-      .then(({ data }) => { if (!cancelled) setIsOwner(data?.role === 'owner'); });
-    return () => { cancelled = true; };
-  }, [domain.id, user]);
+  // Delete is offered to owners only, Leave to everyone else with a seat —
+  // the same gates RLS applies, so nobody sees a button the database would
+  // refuse.
+  const [confirming, setConfirming] = useState<'delete' | 'leave' | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const handleDelete = async () => {
-    if (deleting) return;
-    setDeleting(true);
+  const runConfirmed = async () => {
+    if (busy || !confirming) return;
+    setBusy(true);
     setError(null);
     try {
-      await deleteDomain(domain.id);
+      if (confirming === 'delete') await deleteDomain(domain.id);
+      else await leaveDomain(domain.id);
       onDeleted();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to delete Domain');
-      setDeleting(false);
-      setConfirmingDelete(false);
+      setError(e instanceof Error ? e.message : `Failed to ${confirming} Domain`);
+      setBusy(false);
+      setConfirming(null);
     }
   };
 
@@ -975,11 +989,13 @@ function DomainGeneralSettings({
       <div className="mb-5">
         <h3 className="text-[15px] font-semibold text-foreground">General</h3>
         <p className="mt-1 text-[12px] text-muted-foreground">
-          Configure this Domain&apos;s name, identifier, and access mode.
+          {canEdit
+            ? 'Configure this Domain\u2019s name, identifier, and access mode.'
+            : 'You were invited to this Domain. Only its owner or admin can change these settings.'}
         </p>
       </div>
 
-      <div className="space-y-5">
+      <fieldset disabled={!canEdit} className="space-y-5">
         <div>
           <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Name</label>
           <input
@@ -1028,44 +1044,73 @@ function DomainGeneralSettings({
           </div>
         )}
 
-        <div className="flex justify-end border-t border-border pt-4">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!canSave || saving}
-            className="rounded-md bg-foreground px-3 py-1.5 text-[12px] font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-40"
-          >
-            {saving ? 'Saving...' : 'Save changes'}
-          </button>
-        </div>
-
-        {isOwner && (
-          <div className="flex items-center justify-between gap-4 pt-2">
-            <div className="min-w-0">
-              <div className="text-[12px] font-semibold text-foreground">Delete Domain</div>
-              <p className="mt-0.5 text-[12px] text-muted-foreground">
-                Permanently delete this Domain for every member.
-              </p>
-            </div>
+        {canEdit && (
+          <div className="flex justify-end border-t border-border pt-4">
             <button
               type="button"
-              onClick={() => setConfirmingDelete(true)}
-              disabled={deleting}
-              className="shrink-0 rounded-md bg-destructive/10 px-3 py-1.5 text-[12px] font-semibold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
+              onClick={handleSave}
+              disabled={!canSave || saving}
+              className="rounded-md bg-foreground px-3 py-1.5 text-[12px] font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-40"
             >
-              Delete
+              {saving ? 'Saving...' : 'Save changes'}
             </button>
           </div>
         )}
-      </div>
+      </fieldset>
+
+      {/* Outside the fieldset: a guest's one available action must stay enabled. */}
+      {isOwner ? (
+        <div className="mt-5 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-[12px] font-semibold text-foreground">Delete Domain</div>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">
+              Permanently delete this Domain for every member.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setConfirming('delete')}
+            disabled={busy}
+            className="shrink-0 rounded-md bg-destructive/10 px-3 py-1.5 text-[12px] font-semibold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
+          >
+            Delete
+          </button>
+        </div>
+      ) : role ? (
+        <div className="mt-5 flex items-center justify-between gap-4 border-t border-border pt-4">
+          <div className="min-w-0">
+            <div className="text-[12px] font-semibold text-foreground">Leave Domain</div>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">
+              Remove yourself. The Domain and your past work stay as they are.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setConfirming('leave')}
+            disabled={busy}
+            className="shrink-0 rounded-md bg-destructive/10 px-3 py-1.5 text-[12px] font-semibold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
+          >
+            Leave
+          </button>
+        </div>
+      ) : null}
 
       <ConfirmDialog
-        open={confirmingDelete}
+        open={confirming === 'delete'}
         title={`Delete "${domain.name}"?`}
         description="Its members, Phases, and templates are deleted. Objects and Tables stay but are no longer in any Domain. This can't be undone."
-        busy={deleting}
-        onConfirm={() => { void handleDelete(); }}
-        onCancel={() => setConfirmingDelete(false)}
+        busy={busy}
+        onConfirm={() => { void runConfirmed(); }}
+        onCancel={() => setConfirming(null)}
+      />
+      <ConfirmDialog
+        open={confirming === 'leave'}
+        title={`Leave "${domain.name}"?`}
+        description="You lose access to this Domain until someone invites you again."
+        confirmLabel="Leave"
+        busy={busy}
+        onConfirm={() => { void runConfirmed(); }}
+        onCancel={() => setConfirming(null)}
       />
     </div>
   );

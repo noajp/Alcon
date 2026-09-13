@@ -137,6 +137,7 @@ export {
   addDomainObjectType,
   createDomain,
   deleteDomain,
+  leaveDomain,
   fetchLabelUsageByDomain,
   mergeDomainLabelColors,
   removeDomainElementType,

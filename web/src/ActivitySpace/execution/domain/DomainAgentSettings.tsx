@@ -26,9 +26,13 @@ type PingState =
 export function DomainAgentSettings({
   domain,
   onSaved,
+  canEdit = true,
 }: {
   domain: Domain;
   onSaved?: () => void;
+  /** False for a plain member: `domains` UPDATE is owner/admin-only, so the
+   *  form shows the settings but every control is disabled. */
+  canEdit?: boolean;
 }) {
   const initial: DomainAIConfig = domain.ai_config ?? {};
   const [enabled, setEnabled] = useState(initial.enabled !== false);
@@ -72,7 +76,7 @@ export function DomainAgentSettings({
   };
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card p-4 space-y-4">
+    <fieldset disabled={!canEdit} className="rounded-xl border border-border/60 bg-card p-4 space-y-4 disabled:opacity-70">
       {/* Header */}
       <div className="flex items-start gap-3">
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -216,6 +220,6 @@ export function DomainAgentSettings({
           </span>
         )}
       </div>
-    </div>
+    </fieldset>
   );
 }
