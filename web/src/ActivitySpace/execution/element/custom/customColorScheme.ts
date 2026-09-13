@@ -20,6 +20,6 @@ export const TYPE_META: Record<FlagType, { label: string; color: string; bg: str
 };
 
 // The draw-tool's overlay/stroke color — a user-facing swatch picker, same
-// shape as ActivitySpace/execution/domain/domainColorPalette.ts.
+// shape as Function/shared/labelColor.ts.
 export const OVERLAY_COLOR_SWATCHES = ['#f8fafc', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#a855f7'];
 export const DEFAULT_OVERLAY_COLOR = OVERLAY_COLOR_SWATCHES[0];
