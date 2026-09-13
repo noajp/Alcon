@@ -61,8 +61,11 @@ export async function reorderDomains(updates: { id: string; order_index: number 
 }
 
 export async function deleteDomain(id: string): Promise<void> {
-  const { error } = await supabase.from('domains').delete().eq('id', id);
+  // RLS lets only owners delete, and a refused delete is not an error — it
+  // just matches no rows. Ask for the deleted ids so a refusal is visible.
+  const { data, error } = await supabase.from('domains').delete().eq('id', id).select('id');
   if (error) throw error;
+  if (!data?.length) throw new Error('Only an owner of this Domain can delete it.');
   notifyDomainsChanged();
 }
 

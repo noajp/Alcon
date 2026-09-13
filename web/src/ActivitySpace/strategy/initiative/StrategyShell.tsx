@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, Plus, Search, X } from 'lucide-react';
+import { ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { isCancelKey, isCommitEnter, isSubmitChord, useCancelOnEscape, useEscapeLayer } from '@/Function/shared/keyboard';
 import {
@@ -14,6 +14,7 @@ import {
   setStrategyObjects,
   updateObject,
   updateStrategy,
+  deleteStrategy,
   useDomains,
   useObjects,
   useStrategies,
@@ -581,6 +582,28 @@ function StrategyDetailView({
     }
   };
 
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const handleDelete = async () => {
+    if (!canEdit || deleting) return;
+    const ok = window.confirm(
+      `Delete "${strategy.name}"? Its Intents, comments, and nesting links are deleted. ` +
+      `Linked Objects stay. This can't be undone.`,
+    );
+    if (!ok) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteStrategy(strategy.id);
+      onSaved();
+      onBack();
+    } catch (e) {
+      console.error('Failed to delete Initiative:', e);
+      setDeleteError(e instanceof Error ? e.message : 'Could not delete the Initiative');
+      setDeleting(false);
+    }
+  };
+
   const saveName = async () => {
     if (nameCancel.consumeCancel()) return;
     const trimmed = name.trim() || strategy.name;
@@ -692,11 +715,31 @@ function StrategyDetailView({
             Read-only
           </span>
         )}
-        {saveError && (
-          <span role="status" className="ml-auto text-[11px] text-muted-foreground truncate">
-            {saveError} — change reverted
-          </span>
-        )}
+        <div className="ml-auto flex min-w-0 items-center gap-2">
+          {(deleteError || saveError) && (
+            <span role="status" className="text-[11px] text-muted-foreground truncate">
+              {deleteError ?? `${saveError} — change reverted`}
+            </span>
+          )}
+          {canEdit && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Initiative actions"
+                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
+                >
+                  <MoreHorizontal size={14} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleDelete} disabled={deleting} className="text-destructive">
+                  <Trash2 size={13} /> Delete Initiative
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto">

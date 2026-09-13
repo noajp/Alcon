@@ -237,8 +237,16 @@ export async function updateStrategy(id: string, updates: StrategyUpdate): Promi
 }
 
 export async function deleteStrategy(id: string): Promise<void> {
-  const { error } = await supabase.from('strategies').delete().eq('id', id);
-  if (error) throw error;
+  // RLS lets only the creator delete, and a refused delete matches no rows
+  // rather than erroring — ask for the ids so the refusal is visible.
+  const { data, error } = await supabase.from('strategies').delete().eq('id', id).select('id');
+  if (error) {
+    // domain_approaches.strategy_id is ON DELETE RESTRICT.
+    if (error.code === '23503') throw new Error('A Domain approach still points at this Initiative — remove it first.');
+    throw error;
+  }
+  if (!data?.length) throw new Error("Only the Initiative's owner can delete it.");
+  invalidateStrategies();
 }
 
 export async function setStrategyObjects(strategyId: string, objectIds: string[]): Promise<void> {

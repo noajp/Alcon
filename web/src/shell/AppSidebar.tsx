@@ -11,7 +11,8 @@ import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
 import { useNotifications } from '@/hooks/useSupabase';
 import { Plus, ChevronRight, FileText, Bot, Settings, Users, X, Search } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { updateDomain } from '@/hooks/useSupabase';
+import { updateDomain, deleteDomain } from '@/hooks/useSupabase';
+import { supabase } from '@/lib/supabase';
 import {
   DndContext,
   DragOverlay,
@@ -669,6 +670,10 @@ export function AppSidebar({
             setSettingsDomain(domain);
             void refetchDomains();
           }}
+          onDeleted={() => {
+            setSettingsDomain(null);
+            void refetchDomains();
+          }}
         />
       )}
 
@@ -774,10 +779,12 @@ function DomainSettingsModal({
   domain,
   onClose,
   onUpdated,
+  onDeleted,
 }: {
   domain: Domain;
   onClose: () => void;
   onUpdated: (domain: Domain) => void;
+  onDeleted: () => void;
 }) {
   const [tab, setTab] = useState<'general' | 'members' | 'agent'>('general');
 
@@ -834,7 +841,7 @@ function DomainSettingsModal({
           </aside>
           <main className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6">
             {tab === 'general' ? (
-              <DomainGeneralSettings domain={domain} onUpdated={onUpdated} />
+              <DomainGeneralSettings domain={domain} onUpdated={onUpdated} onDeleted={onDeleted} />
             ) : tab === 'agent' ? (
               <DomainAgentSettings key={domain.id} domain={domain} />
             ) : (
@@ -883,10 +890,13 @@ function SettingsTabButton({
 function DomainGeneralSettings({
   domain,
   onUpdated,
+  onDeleted,
 }: {
   domain: Domain;
   onUpdated: (domain: Domain) => void;
+  onDeleted: () => void;
 }) {
+  const { user } = useAuthContext();
   const [name, setName] = useState(domain.name);
   const [identifier, setIdentifier] = useState(domain.identifier ?? '');
   const [privacy, setPrivacy] = useState<DomainPrivacy>(domain.privacy ?? 'workspace');
@@ -908,6 +918,41 @@ function DomainGeneralSettings({
     name.trim() !== domain.name ||
     identifier.trim() !== (domain.identifier ?? '') ||
     privacy !== (domain.privacy ?? 'workspace');
+
+  // Delete is offered to owners only — the same gate RLS applies — so a
+  // member never sees a button that the database would refuse.
+  const [isOwner, setIsOwner] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) return;
+    void supabase
+      .from('domain_members')
+      .select('role')
+      .eq('domain_id', domain.id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setIsOwner(data?.role === 'owner'); });
+    return () => { cancelled = true; };
+  }, [domain.id, user]);
+
+  const handleDelete = async () => {
+    if (deleting) return;
+    const ok = window.confirm(
+      `Delete "${domain.name}"? Its members, Phases, and templates are deleted. ` +
+      `Objects and Tables stay but are no longer in any Domain. This can't be undone.`,
+    );
+    if (!ok) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteDomain(domain.id);
+      onDeleted();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete Domain');
+      setDeleting(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!canSave || saving) return;
@@ -995,6 +1040,25 @@ function DomainGeneralSettings({
             {saving ? 'Saving...' : 'Save changes'}
           </button>
         </div>
+
+        {isOwner && (
+          <div className="flex items-center justify-between gap-4 pt-2">
+            <div className="min-w-0">
+              <div className="text-[12px] font-semibold text-foreground">Delete Domain</div>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">
+                Permanently delete this Domain for every member.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="shrink-0 rounded-md bg-destructive/10 px-3 py-1.5 text-[12px] font-semibold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
