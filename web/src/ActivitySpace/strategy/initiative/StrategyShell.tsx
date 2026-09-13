@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { isCancelKey, isCommitEnter, isSubmitChord, useCancelOnEscape, useEscapeLayer } from '@/Function/shared/keyboard';
+import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
 import {
   addDomainObjectType,
   addStrategyChild,
@@ -582,15 +583,11 @@ function StrategyDetailView({
     }
   };
 
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const handleDelete = async () => {
     if (!canEdit || deleting) return;
-    const ok = window.confirm(
-      `Delete "${strategy.name}"? Its Intents, comments, and nesting links are deleted. ` +
-      `Linked Objects stay. This can't be undone.`,
-    );
-    if (!ok) return;
     setDeleting(true);
     setDeleteError(null);
     try {
@@ -601,6 +598,7 @@ function StrategyDetailView({
       console.error('Failed to delete Initiative:', e);
       setDeleteError(e instanceof Error ? e.message : 'Could not delete the Initiative');
       setDeleting(false);
+      setConfirmingDelete(false);
     }
   };
 
@@ -690,6 +688,14 @@ function StrategyDetailView({
 
   return (
     <>
+    <ConfirmDialog
+      open={confirmingDelete}
+      title={`Delete "${strategy.name}"?`}
+      description="Its Intents, comments, and nesting links are deleted. Linked Objects stay. This can't be undone."
+      busy={deleting}
+      onConfirm={() => { void handleDelete(); }}
+      onCancel={() => setConfirmingDelete(false)}
+    />
     <div ref={rootRef} className="flex-1 flex flex-col overflow-hidden bg-card h-full">
       <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <button
@@ -733,7 +739,7 @@ function StrategyDetailView({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleDelete} disabled={deleting} className="text-destructive">
+                <DropdownMenuItem onClick={() => setConfirmingDelete(true)} disabled={deleting} className="text-destructive">
                   <Trash2 size={13} /> Delete Initiative
                 </DropdownMenuItem>
               </DropdownMenuContent>

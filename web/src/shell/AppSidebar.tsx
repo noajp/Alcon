@@ -13,6 +13,7 @@ import { Plus, ChevronRight, FileText, Bot, Settings, Users, X, Search } from 'l
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain, deleteDomain } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';
+import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
 import {
   DndContext,
   DragOverlay,
@@ -922,6 +923,7 @@ function DomainGeneralSettings({
   // Delete is offered to owners only — the same gate RLS applies — so a
   // member never sees a button that the database would refuse.
   const [isOwner, setIsOwner] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -938,11 +940,6 @@ function DomainGeneralSettings({
 
   const handleDelete = async () => {
     if (deleting) return;
-    const ok = window.confirm(
-      `Delete "${domain.name}"? Its members, Phases, and templates are deleted. ` +
-      `Objects and Tables stay but are no longer in any Domain. This can't be undone.`,
-    );
-    if (!ok) return;
     setDeleting(true);
     setError(null);
     try {
@@ -951,6 +948,7 @@ function DomainGeneralSettings({
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete Domain');
       setDeleting(false);
+      setConfirmingDelete(false);
     }
   };
 
@@ -1051,15 +1049,24 @@ function DomainGeneralSettings({
             </div>
             <button
               type="button"
-              onClick={handleDelete}
+              onClick={() => setConfirmingDelete(true)}
               disabled={deleting}
               className="shrink-0 rounded-md bg-destructive/10 px-3 py-1.5 text-[12px] font-semibold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
             >
-              {deleting ? 'Deleting...' : 'Delete'}
+              Delete
             </button>
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title={`Delete "${domain.name}"?`}
+        description="Its members, Phases, and templates are deleted. Objects and Tables stay but are no longer in any Domain. This can't be undone."
+        busy={deleting}
+        onConfirm={() => { void handleDelete(); }}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }
