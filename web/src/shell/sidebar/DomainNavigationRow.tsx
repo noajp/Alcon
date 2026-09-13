@@ -4,6 +4,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { VIEW_REGISTRY } from '@/shell/viewRegistry';
+import { CONTROL } from '@/shared/designTokens';
 
 export function DomainNavigationRow({ name, mark, active, expanded, activeView, onOpen, onToggle, onSelect, onSettings, dragProps }: {
   name: string; mark: ReactNode; active: boolean; expanded: boolean; activeView: string;
@@ -18,7 +19,9 @@ export function DomainNavigationRow({ name, mark, active, expanded, activeView, 
       <Button variant="ghost" size="icon-sm" onClick={onToggle} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${name}`} aria-expanded={expanded}>
         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
       </Button>
-      {onSettings && <Button variant="ghost" size="icon-xs" onClick={onSettings} aria-label={`${name} settings`} className="mr-1"><MoreHorizontal size={12} /></Button>}
+      {onSettings
+        ? <Button variant="ghost" size="icon-xs" onClick={onSettings} aria-label={`${name} settings`} className="mr-1"><MoreHorizontal size={12} /></Button>
+        : <span aria-hidden className={`mr-1 shrink-0 ${CONTROL.square.xs}`} />}
     </div>
     {expanded && <div className="mt-0.5 pl-7">
       {(['objects', 'domain-elements'] as const).map(id => {

@@ -41,6 +41,10 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   // Global view (no domainId) has no single Domain to check ownership
   // against, so Connect stays unavailable there rather than guessing.
   const isOwner = domainId ? myRole === 'owner' : false;
+  // Inviting, adding, deactivating and removing Workers are owner actions in
+  // a Domain. The global view has no Domain to be owner of, so it keeps the
+  // controls (it is the Workspace-wide roster).
+  const canManage = domainId ? isOwner : true;
 
   const reload = async () => {
     setLoading(true);
@@ -117,7 +121,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
             Workers (human or AI) that can be assigned to Elements.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        {canManage && <div className="flex items-center gap-2">
           {domainId && (
             <button
               onClick={() => setShowInvite(true)}
@@ -134,7 +138,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
             <Plus size={12} />
             Add member
           </button>
-        </div>
+        </div>}
       </div>
 
       {error && (
@@ -153,8 +157,8 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
             <WorkerRow
               key={w.id}
               worker={w}
-              onDelete={() => handleDelete(w.id)}
-              onToggleStatus={() => handleStatusToggle(w)}
+              onDelete={canManage ? () => handleDelete(w.id) : undefined}
+              onToggleStatus={canManage ? () => handleStatusToggle(w) : undefined}
               onConnect={isOwner ? () => setConnecting(w) : undefined}
             />
           ))
@@ -169,8 +173,8 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
             <WorkerRow
               key={w.id}
               worker={w}
-              onDelete={() => handleDelete(w.id)}
-              onToggleStatus={() => handleStatusToggle(w)}
+              onDelete={canManage ? () => handleDelete(w.id) : undefined}
+              onToggleStatus={canManage ? () => handleStatusToggle(w) : undefined}
             />
           ))
         )}
@@ -219,8 +223,9 @@ function WorkerRow({
   onConnect,
 }: {
   worker: Worker;
-  onDelete: () => void;
-  onToggleStatus: () => void;
+  /** Both omitted for a non-owner viewing a Domain's team. */
+  onDelete?: () => void;
+  onToggleStatus?: () => void;
   /** Omitted for AI agents — isUnreachableWorker is never true for them, so
    *  the button below never renders regardless, but the row itself is human-
    *  only about "no account". */
@@ -258,20 +263,20 @@ function WorkerRow({
           Connect
         </button>
       )}
-      <button
+      {onToggleStatus && <button
         onClick={onToggleStatus}
         className="px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
         title={worker.status === 'active' ? 'Deactivate' : 'Reactivate'}
       >
         {worker.status === 'active' ? 'Deactivate' : 'Activate'}
-      </button>
-      <button
+      </button>}
+      {onDelete && <button
         onClick={onDelete}
         className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded transition-colors"
         title="Remove"
       >
         <Trash2 size={13} />
-      </button>
+      </button>}
     </div>
   );
 }

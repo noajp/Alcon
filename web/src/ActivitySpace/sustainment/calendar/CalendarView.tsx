@@ -794,9 +794,7 @@ function TimeGridView({
           return (
             <div
               key={i}
-              className={`${colWidthClass} px-2 py-2 text-center border-l border-border/40 ${
-                isTodayCol ? 'bg-[var(--accent-subtle)]' : ''
-              }`}
+              className={`${colWidthClass} px-2 py-2 text-center border-l border-border/40`}
             >
               <div className="text-[10px] text-muted-foreground">
                 {WEEKDAYS[d.getDay()]}
@@ -821,13 +819,10 @@ function TimeGridView({
           all-day
         </div>
         {perDay.map((bucket, i) => {
-          const isTodayCol = todayColIdx === i;
           return (
             <div
               key={i}
-              className={`${colWidthClass} border-l border-border/40 px-1 py-1 space-y-0.5 min-h-[28px] ${
-                isTodayCol ? 'bg-[var(--accent-subtle)]' : ''
-              }`}
+              className={`${colWidthClass} border-l border-border/40 px-1 py-1 space-y-0.5 min-h-[28px]`}
             >
               {bucket.allDay.map(el => {
                 const cs = getCardStyle(el);
@@ -887,9 +882,7 @@ function TimeGridView({
             return (
               <div
                 key={colIdx}
-                className={`${colWidthClass} relative border-l border-border/40 ${
-                  isTodayCol ? 'bg-[var(--accent-subtle)]' : ''
-                }`}
+                className={`${colWidthClass} relative border-l border-border/40`}
               >
                 {/* Hour grid lines */}
                 {hours.map(h => (

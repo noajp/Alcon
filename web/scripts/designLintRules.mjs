@@ -26,8 +26,6 @@ export const COLOR_ALLOWLIST = [
   'src/Function/settings/AppearanceSettings.tsx',
   // Theme-preview swatch data feeding SettingsView.tsx's theme picker.
   'src/Function/settings/appearanceOptions.ts',
-  // Domain "Color" swatch grid — same shape as labelColor.ts.
-  'src/ActivitySpace/execution/domain/domainColorPalette.ts',
   // Random pastel for a freshly-typed Select/Status option.
   'src/Function/property/optionColorPalette.ts',
   // Calendar's event-color picker — same shape as labelColor.ts.
