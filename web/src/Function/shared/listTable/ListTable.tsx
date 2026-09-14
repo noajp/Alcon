@@ -450,10 +450,7 @@ export function ListTable({
 
   return (
     <DndContext id={dndId} sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
-    {/* The Object list's columns all fit (Name shrinks; see colgroup), so it
-        locks horizontal scroll entirely — the Element list can still grow
-        wide with custom Properties and keeps the scroller. */}
-    <div className="overflow-x-auto h-full">
+    <div data-list-scroller className="overflow-x-auto h-full [overflow-anchor:none]">
       <table
         // `min-w-full` so the table fills the wrap (rows + section bands span
         // the full width). The trailing column is given width:100% so it — and
@@ -468,21 +465,11 @@ export function ListTable({
         className="group/list min-w-full table-fixed bg-card border-separate border-spacing-0 text-[13px]"
         data-has-selection={hasSelection ? '' : undefined}
       >
-        {/* Authoritative column widths. `<col>` wins over per-cell widths
-            in table-fixed mode, so resize/reorder rewrites here and the
-            browser never redistributes extra space across data columns —
-            only the unsized Name column absorbs leftover. We also pin
-            minWidth so cols 0/1 don't shrink when the table needs to
-            overflow horizontally past the wrap width. */}
+        {/* Fixed tracks retain their saved widths; the trailing percentage
+            track absorbs only the remaining space. */}
         <colgroup>
           <col style={{ width: 28, minWidth: 28 }} />
           <col style={{ width: 28, minWidth: 28 }} />
-          {/* Name flexes (auto) to absorb leftover width so the data columns
-              and the add-column button pack flush to the right (Linear look),
-              with a generous 550px floor on the Element list. The Object list
-              only ever carries 5 narrow data columns, so pin Name AT (not a
-              floor under) 550 and let it shrink instead of forcing the row
-              past the panel width into a horizontal scrollbar. */}
           <col style={{ width: cols.widthFor(NAME_COL_KEY), minWidth: cols.widthFor(NAME_COL_KEY) }} />
           {visibleColumns.map((c) => {
             const w = cols.widthFor(c.id);
@@ -491,7 +478,7 @@ export function ListTable({
             // an empty gap and force horizontal scroll in narrow panels.
             return <col key={c.id} className="table-column" style={{ width: w, minWidth: w }} />;
           })}
-          {hasTrailingCol && <col className="table-column" style={{ width: 80, minWidth: 80 }} />}
+          {hasTrailingCol && <col className="table-column" style={{ width: '100%', minWidth: 80 }} />}
         </colgroup>
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
@@ -535,15 +522,14 @@ export function ListTable({
               ))}
             </SortableContext>
             {hasTrailingCol && (
-              // Fixed-width trailing cell at the right edge that holds the
-              // add-column "+", lining it up under the header's right actions.
+              // Keep column controls at the right edge of the flexible spacer.
               <th className="table-cell w-8 px-1 py-2.5 bg-card text-center border-b border-border/60">
                 {/* Trailing "+": lists that can create a Property (a scope is
                     wired) open the add-property picker directly, anchored to
                     the button. Lists that can't (cross-Object: Domain Elements,
                     My Elements) fall back to the column show/hide menu so the
                     "+" is still present everywhere. */}
-                <div className="flex items-center justify-center gap-1">
+                <div className="flex items-center justify-end gap-1">
                 <ColumnMenu allColumns={cols.allColumns} isVisible={cols.isVisible} onToggle={cols.toggleVisible} />
                 {onAddColumn && (
                   <button

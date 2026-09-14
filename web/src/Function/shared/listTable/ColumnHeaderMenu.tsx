@@ -137,7 +137,7 @@ export function ResizeHandle({
   width: number;
   onResize: (w: number) => void;
 }) {
-  const startRef = useRef<{ x: number; w: number } | null>(null);
+  const startRef = useRef<{ x: number; w: number; left: number; header: HTMLTableCellElement | null } | null>(null);
   return (
     <div
       role="separator"
@@ -153,19 +153,27 @@ export function ResizeHandle({
         }
       }}
       onPointerCancel={() => { startRef.current = null; }}
+      onLostPointerCapture={() => { startRef.current = null; }}
       // Wide transparent grab area for an easy target; the visible feedback
       // is a thin 1px gray line on the right edge (group-hover), so it reads
       // as a slim divider rather than a fat blue bar.
-      className="group/resize absolute top-0 right-0 h-full w-2 -mr-1 cursor-col-resize"
+      className="group/resize absolute top-0 right-0 z-10 h-full w-2 touch-none cursor-col-resize"
       onPointerDown={(e) => {
-        startRef.current = { x: e.clientX, w: width };
+        const header = e.currentTarget.closest('th');
+        const rect = header?.getBoundingClientRect();
+        // Use rendered geometry so stretched tracks do not snap. The left
+        // edge delta accounts for scroll only when the track actually moves;
+        // frozen Name headers must not inherit the scroller's movement.
+        startRef.current = { x: e.clientX, w: rect?.width ?? width, left: rect?.left ?? 0, header };
         e.currentTarget.setPointerCapture(e.pointerId);
         e.preventDefault();
         e.stopPropagation();
       }}
       onPointerMove={(e) => {
         if (!startRef.current) return;
-        const next = startRef.current.w + (e.clientX - startRef.current.x);
+        const start = startRef.current;
+        const left = start.header?.getBoundingClientRect().left ?? start.left;
+        const next = start.w + (e.clientX - start.x) + (start.left - left);
         // Raw width — setWidth applies the right per-column min/max clamp
         // (the Name column has a higher floor than the data columns).
         onResize(next);
@@ -177,7 +185,7 @@ export function ResizeHandle({
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      <span className="absolute top-0 right-1 h-full w-px bg-muted-foreground/40 opacity-0 group-hover/resize:opacity-100 transition-opacity" />
+      <span className="absolute top-0 right-0 h-full w-px bg-muted-foreground/40 opacity-0 group-hover/resize:opacity-100 transition-opacity" />
     </div>
   );
 }
