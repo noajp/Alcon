@@ -150,6 +150,8 @@ function TablesEmptyState({ onCreate }: { onCreate: () => void }) {
 
 // ─── Detail (columns + rows) ──────────────────────────────────────────────
 const PAGE_SIZE_OPTIONS = [30, 50, 100] as const;
+// Schema-based widths stay stable across editing, saving and pagination.
+const COLUMN_WIDTH: Record<DataTableColumnType, number> = { text: 160, number: 88, date: 128, select: 104, checkbox: 64 };
 const ROW_HEIGHT_PX = 36; // every body cell renders at this exact height — keeps the grid even
 
 function TableDetailView({ table, source }: { table: DataTable; source: TableSource }) {
@@ -185,13 +187,14 @@ function TableDetailView({ table, source }: { table: DataTable; source: TableSou
           on scroll. With separate borders + a solid header bg, the header
           completely hides anything scrolling under it.
         */}
-        <table className="w-full border-separate border-spacing-0 text-[12px]">
+        <table className="w-full table-fixed border-separate border-spacing-0 text-[12px]" style={{ minWidth: columns.reduce((width, column) => width + COLUMN_WIDTH[column.type], 0) }}>
+          <colgroup>{columns.map(column => <col key={column.id} style={{ width: COLUMN_WIDTH[column.type] }} />)}</colgroup>
           <thead className="sticky top-0 z-20">
             <tr className="text-[11px] text-muted-foreground/70">
               {columns.map((c) => (
                 <th
                   key={c.id}
-                  className="px-3 text-left font-medium border-b border-r border-border/60 bg-card first:border-l"
+                  className="truncate px-3 text-left font-medium border-b border-r border-border/60 bg-card first:border-l"
                   style={{ height: ROW_HEIGHT_PX, borderTopWidth: 1, borderTopColor: 'var(--border)' }}
                   title={c.type}
                 >
@@ -365,9 +368,9 @@ function EditableCell({ column, value, disabled, onSave }: {
               editingRef.current = false; setEditing(false);
             }
           }}
-          className="w-full h-8 bg-muted/40 px-2 text-xs text-foreground" />
+          className="min-w-0 w-full h-8 bg-muted/40 px-2 text-xs text-foreground" />
       ) : (
-        <Button variant="ghost" size="sm" align="start" className="w-full font-normal"
+        <Button variant="ghost" size="sm" align="start" className="min-w-0 w-full font-normal"
           aria-label={`Edit ${column.name}: ${formatCell(displayed) || 'Empty'}`}
           disabled={disabled || !!pending} onClick={begin}>
           <span className="truncate">{formatCell(displayed) || <span className="text-muted-foreground">—</span>}</span>
