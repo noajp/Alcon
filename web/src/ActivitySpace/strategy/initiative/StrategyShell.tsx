@@ -122,7 +122,7 @@ export function StrategyShell({
         <NavStrategyIcon size={12} />
         <span className="text-[12px] font-semibold text-foreground">Initiatives</span>
         <div className="flex-1" />
-        <Button variant="primary" size="icon-xs"
+        <Button variant="ghost" size="icon-xs" className="text-muted-foreground"
           type="button"
           onClick={() => setNewOpen(true)}
           title="Add Initiative"
