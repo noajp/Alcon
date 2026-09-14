@@ -1,5 +1,7 @@
 'use client';
 
+import { appDialog } from '@/Function/shared/appDialogStore';
+
 import { useState } from 'react';
 import { Check, Plus, Trash2, Settings, Users, ChevronRight, LogOut, ArrowLeft } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
@@ -54,10 +56,10 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
       .select('id', { count: 'exact', head: true })
       .eq('activity_space_id', active.id);
     if ((count ?? 0) > 0) {
-      window.alert(`"${active.name}" still has Domains. Move or delete them before deleting the Space.`);
+      await appDialog.alert(`"${active.name}" still has Domains. Move or delete them before deleting the Space.`);
       return;
     }
-    if (!window.confirm(`Delete Space "${active.name}"? This can't be undone.`)) return;
+    if (!await appDialog.confirm(`Delete Space "${active.name}"? This can't be undone.`)) return;
     try {
       await deleteActivitySpace(active.id);
       window.location.reload();

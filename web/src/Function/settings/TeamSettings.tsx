@@ -1,5 +1,7 @@
 'use client';
 
+import { appDialog } from '@/Function/shared/appDialogStore';
+
 import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Plus, Trash2, UserPlus, X } from 'lucide-react';
 import { isCommitEnter, useEscapeLayer } from '@/Function/shared/keyboard';
@@ -75,7 +77,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   }, [domainId, user?.id]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Remove this team member? Their assignments will be cleared.')) return;
+    if (!await appDialog.confirm('Remove this team member? Their assignments will be cleared.')) return;
     try {
       await deleteWorker(id);
       setWorkers((prev) => prev.filter((w) => w.id !== id));

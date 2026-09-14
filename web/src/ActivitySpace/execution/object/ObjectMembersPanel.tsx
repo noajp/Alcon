@@ -1,5 +1,7 @@
 'use client';
 
+import { appDialog } from '@/Function/shared/appDialogStore';
+
 import { useCallback, useEffect, useState } from 'react';
 import { Plus, UserMinus, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -142,7 +144,7 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
   };
 
   const handleRemove = async (memberId: string) => {
-    if (!confirm('Remove this member from the Object?')) return;
+    if (!await appDialog.confirm('Remove this member from the Object?')) return;
     try {
       await supabase.from('object_members').delete().eq('id', memberId);
       await refresh();

@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/providers/ThemeProvider";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import "./globals.css";
+import { AppDialogHost } from "@/Function/shared/AppDialogHost";
 
 // Primary sans-serif - Inter for clean UI typography
 // Inter as a variable font (no discrete weights) so the 510 / 590 UI weights
@@ -66,6 +67,7 @@ export default function RootLayout({
           <QueryProvider>
             <AuthProvider>
               {children}
+              <AppDialogHost />
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>

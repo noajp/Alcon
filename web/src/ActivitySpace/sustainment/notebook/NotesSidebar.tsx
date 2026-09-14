@@ -1,5 +1,7 @@
 'use client';
 
+import { appDialog } from '@/Function/shared/appDialogStore';
+
 import { useMemo, useState } from 'react';
 import {
   FolderClosed,
@@ -62,8 +64,8 @@ export function NotesSidebar({
               selected={selectedFolderId === f.id}
               onSelect={() => onSelectFolder(f.id)}
               onRenameNode={onRenameNode}
-              onDelete={onDeleteNode ? () => {
-                if (confirm(`"${f.name}" を削除しますか?\n中のファイルも削除されます。`)) {
+              onDelete={onDeleteNode ? async () => {
+                if (await appDialog.confirm(`"${f.name}" を削除しますか?\n中のファイルも削除されます。`)) {
                   onDeleteNode(f.id);
                 }
               } : undefined}

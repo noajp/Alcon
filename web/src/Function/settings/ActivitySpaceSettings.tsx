@@ -1,5 +1,7 @@
 'use client';
 
+import { appDialog } from '@/Function/shared/appDialogStore';
+
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Smile, Image as ImageIcon, UserPlus, Trash2 } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
@@ -89,7 +91,7 @@ export function ActivitySpaceSettings() {
 
   const handleRemoveMember = async (member: SpaceMember) => {
     if (!active) return;
-    if (!window.confirm(`Remove ${member.display_name || 'this member'} from "${active.name}"?`)) return;
+    if (!await appDialog.confirm(`Remove ${member.display_name || 'this member'} from "${active.name}"?`)) return;
     try {
       const { error } = await supabase
         .from('activity_space_members')
@@ -164,10 +166,10 @@ export function ActivitySpaceSettings() {
       .select('id', { count: 'exact', head: true })
       .eq('activity_space_id', active.id);
     if ((count ?? 0) > 0) {
-      window.alert(`"${active.name}" still has Domains. Move or delete them before deleting the Space.`);
+      await appDialog.alert(`"${active.name}" still has Domains. Move or delete them before deleting the Space.`);
       return;
     }
-    if (!window.confirm(`Delete "${active.name}"? This can't be undone.`)) return;
+    if (!await appDialog.confirm(`Delete "${active.name}"? This can't be undone.`)) return;
     try {
       await deleteActivitySpace(active.id);
       window.location.reload();

@@ -1,5 +1,7 @@
 'use client';
 
+import { appDialog } from '@/Function/shared/appDialogStore';
+
 import { useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -122,7 +124,7 @@ export function ElementActionsMenu({
   };
 
   const del = async () => {
-    if (!window.confirm(`Delete "${element.title}"? This can't be undone.`)) return;
+    if (!await appDialog.confirm(`Delete "${element.title}"? This can't be undone.`)) return;
     try {
       await deleteElement(element.id);
       onDeleted?.();

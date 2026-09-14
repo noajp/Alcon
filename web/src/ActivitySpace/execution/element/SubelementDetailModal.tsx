@@ -1,5 +1,7 @@
 'use client';
 
+import { appDialog } from '@/Function/shared/appDialogStore';
+
 // SubelementDetailModal — used in two modes:
 //   - create:  subelement === null → blank title input, "Create" submit
 //   - detail:  subelement provided  → editable title, completion toggle,
@@ -102,7 +104,7 @@ export function SubelementDetailModal({
 
   const handleDelete = async () => {
     if (isCreate || !subelement) return;
-    if (!confirm('このサブエレメントを削除します。よろしいですか?')) return;
+    if (!await appDialog.confirm('このサブエレメントを削除します。よろしいですか?')) return;
     setBusy(true);
     setError(null);
     try {
