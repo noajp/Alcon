@@ -57,7 +57,7 @@ export function MilestonesWidget({ elements }: Props) {
                     <div className="flex items-center gap-2 flex-wrap">
                       <Diamond
                         size={14}
-                        className={`shrink-0 ${isUrgent ? 'text-red-500' : 'text-muted-foreground'}`}
+                        className={`shrink-0 ${isUrgent ? 'text-[var(--status-danger)]' : 'text-muted-foreground'}`}
                       />
                       <span className="text-[14px] font-medium text-foreground truncate">
                         {m.title}
@@ -70,7 +70,7 @@ export function MilestonesWidget({ elements }: Props) {
                       <span
                         className={`text-[12px] ${
                           isOverdue
-                            ? 'text-red-500 font-medium'
+                            ? 'text-[var(--status-danger)] font-medium'
                             : isDone
                               ? 'text-emerald-600'
                               : 'text-muted-foreground'

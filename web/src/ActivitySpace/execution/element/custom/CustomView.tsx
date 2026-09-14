@@ -74,7 +74,7 @@ const PRIORITY_META: Record<FlagPriority, { label: string; className: string }> 
   low: { label: 'Low', className: 'text-zinc-400' },
   normal: { label: 'Normal', className: 'text-zinc-100' },
   high: { label: 'High', className: 'text-amber-300' },
-  critical: { label: 'Critical', className: 'text-red-300' },
+  critical: { label: 'Critical', className: 'text-[var(--status-danger)]' },
 };
 
 const TOOL_META: Array<{ id: Tool; label: string; icon: React.ReactNode }> = [
@@ -623,7 +623,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
               <button
                 type="button"
                 onClick={() => deleteFlag(menuFlag.id)}
-                className="h-8 w-full rounded-md text-[12px] text-red-300 hover:bg-red-500/10 inline-flex items-center justify-center gap-1"
+                className="h-8 w-full rounded-md text-[12px] text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10 inline-flex items-center justify-center gap-1"
               >
                 <Trash2 size={13} />
                 Delete flag

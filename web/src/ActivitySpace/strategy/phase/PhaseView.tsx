@@ -490,7 +490,7 @@ function PhaseDetailView({
           onClick={() => void handleDelete()}
           title="Delete Phase"
           aria-label="Delete Phase"
-          className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-red-500 hover:bg-muted rounded-md transition-colors"
+          className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-[var(--status-danger)] hover:bg-muted rounded-md transition-colors"
         >
           <X size={13} />
         </button>
@@ -989,14 +989,13 @@ function PhaseCreateDialog({
           >
             Cancel
           </button>
-          <button
+          <Button variant="primary"
             type="button"
             onClick={() => void handleSave()}
             disabled={!canSave || saving}
-            className="px-3 py-1.5 rounded-md text-[12px] font-medium bg-foreground text-background hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? 'Saving…' : 'Create'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -15,13 +15,13 @@ export interface NotificationKindMeta {
 // NotificationKind, so adding a kind here is the only place both surfaces
 // need updating.
 export const NOTIFICATION_KIND_META: Record<NotificationKind, NotificationKindMeta> = {
-  mention:            { icon: AtSign,        color: 'text-blue-400',    label: 'Mention' },
+  mention:            { icon: AtSign,        color: 'text-[var(--accent-default)]',    label: 'Mention' },
   assigned:           { icon: UserPlus,      color: 'text-emerald-400', label: 'Assigned' },
   comment:            { icon: MessageIcon,   color: 'text-foreground/80', label: 'Comment' },
   status_change:      { icon: RefreshCw,     color: 'text-amber-400',   label: 'Status' },
   approval_requested: { icon: ShieldCheck,   color: 'text-purple-400',  label: 'Approval requested' },
   approval_decided:   { icon: ShieldCheck,   color: 'text-purple-400',  label: 'Approval decision' },
-  due_soon:           { icon: Calendar,      color: 'text-red-400',     label: 'Due soon' },
+  due_soon:           { icon: Calendar,      color: 'text-[var(--status-danger)]',     label: 'Due soon' },
   review_due:         { icon: CalendarClock,  color: 'text-amber-400',   label: 'Review due' },
 };
 

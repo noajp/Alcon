@@ -686,11 +686,11 @@ export function GanttView({
                   >
                     {zoom === 'day' ? (
                       <>
-                        <span className={`text-[9px] mb-0.5 ${unit.isToday ? 'text-red-500 font-semibold' : 'text-muted-foreground/70'}`}>
+                        <span className={`text-[9px] mb-0.5 ${unit.isToday ? 'text-[var(--status-danger)] font-semibold' : 'text-muted-foreground/70'}`}>
                           {unit.sub}
                         </span>
                         {unit.isToday ? (
-                          <span className="w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[11px] font-semibold flex items-center justify-center">
+                          <span className="w-[18px] h-[18px] rounded-full bg-[var(--status-danger)] text-white text-[11px] font-semibold flex items-center justify-center">
                             {unit.label}
                           </span>
                         ) : (
@@ -800,7 +800,7 @@ export function GanttView({
                         className="absolute z-20 pointer-events-none"
                         style={{ left: leftPos, top: 4, transform: 'translateX(-50%)' }}
                       >
-                        <span className="inline-block text-[10px] font-semibold text-white bg-red-500 px-1.5 py-0.5 rounded-full shadow-sm whitespace-nowrap">
+                        <span className="inline-block text-[10px] font-semibold text-white bg-[var(--status-danger)] px-1.5 py-0.5 rounded-full shadow-sm whitespace-nowrap">
                           Today · {todayStr}
                         </span>
                       </div>
@@ -894,7 +894,7 @@ export function GanttView({
                     <div
                       className={`absolute h-6 rounded-md cursor-pointer group ring-1 ring-inset ring-white/10 transition-shadow overflow-hidden ${
                         selectedElement === element.id ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' : ''
-                      } ${isBlocked ? 'ring-2 ring-red-500/40' : ''} ${isDraggingThis ? 'opacity-80 shadow-lg' : 'hover:shadow-md'}`}
+                      } ${isBlocked ? 'ring-2 ring-[var(--status-danger)]/40' : ''} ${isDraggingThis ? 'opacity-80 shadow-lg' : 'hover:shadow-md'}`}
                       style={{
                         left: barPos.left,
                         width: barWidth,

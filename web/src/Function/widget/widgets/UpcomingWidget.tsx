@@ -16,7 +16,7 @@ function ElementRow({ el, accentColor }: { el: ElementWithDetails; accentColor: 
         <div className="flex items-center gap-2 mt-0.5">
           {statusMeta && <span className={`text-[11px] ${statusMeta.textColor}`}>{statusMeta.label}</span>}
           {el.due_date && (
-            <span className={`text-[11px] ${overdue ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
+            <span className={`text-[11px] ${overdue ? 'text-[var(--status-danger)] font-medium' : 'text-muted-foreground'}`}>
               {overdue ? `${overdueDays}d overdue` : formatElementDate(el.due_date)}
             </span>
           )}

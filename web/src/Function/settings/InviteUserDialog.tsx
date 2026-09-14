@@ -156,7 +156,7 @@ export function InviteUserDialog({
               className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
             />
           </div>
-          {error && <p className="mt-2 text-[12px] text-red-500">{error}</p>}
+          {error && <p className="mt-2 text-[12px] text-[var(--status-danger)]">{error}</p>}
         </div>
 
         <div className="max-h-[320px] overflow-y-auto divide-y divide-border/40 mt-3">

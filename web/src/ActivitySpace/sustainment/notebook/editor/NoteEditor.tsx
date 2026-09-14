@@ -1552,7 +1552,7 @@ function TblMenuItem({ label, onSelect, danger }: { label: string; onSelect: () 
       onClick={onSelect}
       className={[
         'w-full text-left px-2.5 py-1 text-[12px] rounded transition-colors',
-        danger ? 'text-red-500 hover:bg-red-500/10' : 'text-foreground/80 hover:bg-accent hover:text-foreground',
+        danger ? 'text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10' : 'text-foreground/80 hover:bg-accent hover:text-foreground',
       ].join(' ')}
     >
       {label}

@@ -467,7 +467,7 @@ export function ElementCell({
       <button
         type="button"
         disabled={!canUpdate}
-        className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? (isOverdue ? 'text-red-600' : '') : CELL_TRIGGER_EMPTY}`}
+        className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? (isOverdue ? 'text-[var(--status-danger)]' : '') : CELL_TRIGGER_EMPTY}`}
       >
         <CalendarIcon size={11} className="opacity-60" />
         <CellText>{display}</CellText>

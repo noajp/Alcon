@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/ui/button';
+
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import type { ElementPriority } from '@/types/database';
@@ -365,7 +367,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
                 <span className="text-sm font-medium">{col.label}</span>
                 <span className="text-xs text-muted-foreground">{colItems.length}</span>
               </div>
-              <button
+              <Button variant="primary" size="icon-xs"
                 type="button"
                 onClick={async () => {
                   try {
@@ -379,12 +381,11 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
                     console.error('Failed to create element', err);
                   }
                 }}
-                className="flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent text-muted-foreground"
                 title={`Add Element to ${col.label}`}
                 aria-label={`Add Element to ${col.label}`}
               >
                 <Plus className="h-3.5 w-3.5" />
-              </button>
+              </Button>
             </div>
 
             {/* Cards */}

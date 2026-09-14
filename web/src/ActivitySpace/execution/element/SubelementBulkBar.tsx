@@ -79,7 +79,7 @@ export function SubelementBulkBar({
             type="button"
             onClick={wrap(onDelete)}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] text-[var(--status-danger)] hover:text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10 transition-colors disabled:opacity-40"
             title="Delete"
           >
             <Trash2 size={12} />

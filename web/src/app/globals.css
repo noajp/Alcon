@@ -42,7 +42,7 @@
   --element-status-backlog:     color-mix(in oklab, var(--muted-foreground) 60%, transparent);
   --element-status-todo:        color-mix(in oklab, var(--muted-foreground) 70%, transparent);
   --element-status-in-progress: #816ee6;
-  --element-status-review:      #3d80b0;
+  --element-status-review:      var(--accent-default);
   --element-status-done:        #279066;
   --element-status-blocked:     #eab308;
   --element-status-cancelled:   color-mix(in oklab, var(--muted-foreground) 40%, transparent);
@@ -596,7 +596,7 @@ button, a, input, select, textarea {
 }
 
 :root {
-  --rail-active: #2b5c80; /* accent used by Send buttons and similar primary actions */
+  --rail-active: var(--accent-default); /* accent used by Send buttons and similar primary actions */
 }
 
 /* ============================================

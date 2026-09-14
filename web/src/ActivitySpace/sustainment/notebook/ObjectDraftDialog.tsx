@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/ui/button';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from './objectDraft';
@@ -289,11 +291,10 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
           <div className="text-[11px] text-destructive min-w-0 flex-1 break-words">
             {submitError}
           </div>
-          <button
+          <Button variant="primary"
             type="button"
             onClick={submit}
             disabled={phase !== 'ready' || !name.trim() || submitting}
-            className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 bg-foreground text-background rounded-md disabled:opacity-30 disabled:cursor-not-allowed"
           >
             {submitting && <Spinner />}
             {submitting
@@ -301,7 +302,7 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
               : includedCount > 0
               ? `Create Object + ${includedCount} Element${includedCount === 1 ? '' : 's'}`
               : 'Create Object'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -76,7 +76,7 @@ export function AccountSettings() {
           <button
             onClick={handleSignOut}
             disabled={signingOut}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 rounded-md text-[12px] font-medium hover:bg-red-50 dark:hover:bg-red-950/20 disabled:opacity-40 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-[var(--status-danger)] dark:border-[var(--status-danger)] text-[var(--status-danger)] dark:text-[var(--status-danger)] rounded-md text-[12px] font-medium hover:bg-[var(--status-danger-subtle)] dark:hover:bg-[var(--status-danger)]/20 disabled:opacity-40 transition-colors"
           >
             <LogOut size={12} />
             {signingOut ? 'Signing out…' : 'Sign out'}
@@ -84,7 +84,7 @@ export function AccountSettings() {
         </SettingsRow>
       </SettingsSection>
 
-      {error && <p className="text-[12px] text-red-500 mt-2">{error}</p>}
+      {error && <p className="text-[12px] text-[var(--status-danger)] mt-2">{error}</p>}
     </div>
   );
 }

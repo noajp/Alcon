@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/ui/button';
+
 import { useEffect, useRef, useState } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import {
@@ -311,14 +313,13 @@ export function QuickAddObjectPopup({
             <Sparkles size={11} />
             <span className="truncate">{hint}</span>
           </div>
-          <button
+          <Button variant="primary" size="md"
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <ArrowUp size={13} />
             Create
-          </button>
+          </Button>
         </div>
       </div>
     </div>

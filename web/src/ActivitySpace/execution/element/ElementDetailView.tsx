@@ -106,6 +106,8 @@ const parseYMD = (s?: string | null): Date | undefined => {
 };
 
 interface ElementDetailViewProps {
+  /** A notification reader stacks supplementary properties below the activity. */
+  layout?: 'full' | 'reader';
   element: ElementWithDetails;
   objectName?: string;
   objectPath?: { id: string; name: string }[];
@@ -170,9 +172,9 @@ const statusOptions = [
   { status: 'backlog', label: STATUS.backlog.label, icon: Circle, color: 'text-muted-foreground' },
   { status: 'todo', label: STATUS.todo.label, icon: Circle, color: 'text-muted-foreground' },
   { status: 'in_progress', label: STATUS.in_progress.label, icon: Clock, color: 'text-amber-400' },
-  { status: 'review', label: STATUS.review.label, icon: Send, color: 'text-blue-400' },
+  { status: 'review', label: STATUS.review.label, icon: Send, color: 'text-[var(--accent-default)]' },
   { status: 'done', label: STATUS.done.label, icon: CheckCircle2, color: 'text-indigo-400' },
-  { status: 'blocked', label: STATUS.blocked.label, icon: XCircle, color: 'text-red-400' },
+  { status: 'blocked', label: STATUS.blocked.label, icon: XCircle, color: 'text-[var(--status-danger)]' },
   { status: 'cancelled', label: STATUS.cancelled.label, icon: Ban, color: 'text-muted-foreground' },
 ];
 
@@ -211,6 +213,7 @@ function timeAgo(date: Date): string {
 function ElementDetailBody({
   element,
   objectName: _objectName,
+  layout = 'full',
   objectPath,
   domainName,
   onBack,
@@ -260,6 +263,23 @@ function ElementDetailBody({
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   }, [description]);
+
+  // Readers can resize independently of the viewport (sidebar or split pane).
+  useEffect(() => {
+    const fields = [titleRef.current, descriptionRef.current].filter((el): el is HTMLTextAreaElement => !!el);
+    const widths = new WeakMap<Element, number>();
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        if (widths.get(entry.target) === entry.contentRect.width) continue;
+        widths.set(entry.target, entry.contentRect.width);
+        const field = entry.target as HTMLTextAreaElement;
+        field.style.height = 'auto';
+        field.style.height = `${field.scrollHeight}px`;
+      }
+    });
+    fields.forEach(field => observer.observe(field));
+    return () => observer.disconnect();
+  }, []);
 
   // Esc goes back to the list this Element was opened from — one level.
   // Anything open above the page (a picker, the Subelement modal, a field
@@ -665,7 +685,7 @@ function ElementDetailBody({
 
       {/* Scrollable body — Linear-style two-column layout */}
       <div className="flex-1 overflow-auto">
-        <div className="max-w-7xl mx-auto px-8 py-8 flex gap-8">
+        <div className={layout === 'reader' ? "mx-auto w-full max-w-4xl px-5 py-7 flex flex-col gap-8" : "max-w-7xl mx-auto px-8 py-8 flex gap-8"}>
           <div className="flex-1 min-w-0 space-y-5">
 
           {/* Title & description */}
@@ -702,6 +722,17 @@ function ElementDetailBody({
                 placeholder="Element title"
               />
             </div>
+            {layout === 'reader' && <div className="mb-5 flex flex-wrap items-center gap-2">
+              <StatusPicker element={element} onChanged={handleStatusChange} trigger={
+                <Button variant="secondary"><ElementProgressMark status={element.status} progress={getElementProgress(element, customColumns)} size={14} />{currentStatus.label}</Button>
+              } />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild><Button variant="secondary"><PriorityMark priority={element.priority} />{currentPriority.label}</Button></DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {priorityOptions.map(opt => <DropdownMenuItem key={opt.priority} onClick={() => handlePriorityChange(opt.priority)} className="gap-2"><PriorityMark priority={opt.priority} />{opt.label}</DropdownMenuItem>)}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>}
             <textarea
               ref={descriptionRef}
               value={description}
@@ -904,8 +935,12 @@ function ElementDetailBody({
               onOpenElement={onOpenElement} onChanged={onRefresh} />
           </section>
 
-          {/* Comments — single section now. Activity moved to the right
-              rail as its own island card. */}
+          {layout === 'reader' && <section className="space-y-3 border-t border-border pt-5" aria-label="Activity">
+            <h2 className="text-[13px] font-semibold">Activity</h2>
+            <ActivityFeed entries={activityLog} compact />
+          </section>}
+
+          {/* The reader keeps changes next to their discussion. */}
           <div>
             <div className="h-px bg-border mb-3" />
             <div className="mb-3 text-[13px] font-semibold text-foreground/95">
@@ -952,7 +987,7 @@ function ElementDetailBody({
               own card with a small chevron header; rows hover-highlight
               and open inline pickers. The bg is intentionally grey-ish
               (zinc-100 / zinc-900/40) so the cards lift off the page. */}
-          <aside className="w-80 shrink-0 hidden lg:block space-y-3">
+          <aside className={layout === 'reader' ? "w-full space-y-3" : "w-80 shrink-0 hidden lg:block space-y-3"}>
             {/* What this Element is standing on — the decisions and
                 assumptions the Initiative bound to it. Above Properties for the
                 same reason Initiative intent sits above them on an Object: why
@@ -1245,9 +1280,9 @@ function ElementDetailBody({
             {/* Activity — moved off the main column. Lives in the rail
                 as its own island so the body stays focused on title /
                 description / sub-elements / comments. */}
-            <RailCard title={`Activity${activityLog.length ? ` · ${activityLog.length}` : ''}`} padded>
+            {layout !== 'reader' && <RailCard title={`Activity${activityLog.length ? ` · ${activityLog.length}` : ''}`} padded>
               <ActivityFeed entries={activityLog} compact />
-            </RailCard>
+            </RailCard>}
             {/* The standalone "Objects" island was folded into the top of the
                 Properties island (membership reads as the first property). */}
           </aside>

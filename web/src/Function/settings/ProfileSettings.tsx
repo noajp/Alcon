@@ -326,7 +326,7 @@ export function ProfileSettings() {
       </SettingsSection>
 
       <div className="flex items-center justify-end gap-3">
-        {error && <span className="text-[12px] text-red-500">{error}</span>}
+        {error && <span className="text-[12px] text-[var(--status-danger)]">{error}</span>}
         {savedAt && !dirty && !error && (
           <span className="text-[12px] text-muted-foreground">Saved.</span>
         )}

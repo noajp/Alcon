@@ -72,7 +72,7 @@ export function RecentActivityWidget({ elements }: Props) {
           a.kind === 'completed'
             ? 'text-emerald-500'
             : a.kind === 'created'
-              ? 'text-blue-500'
+              ? 'text-[var(--accent-default)]'
               : 'text-muted-foreground';
 
         return (

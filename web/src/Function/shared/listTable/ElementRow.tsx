@@ -136,7 +136,7 @@ export const ElementRow = memo(function ElementRow({
       onMouseLeave={cancelElementDetailPrefetch}
       className={`group cursor-pointer select-none leading-[1.4] [&>td]:transition-colors ${ROW_ROUND_BASE} ${isSelected ? selectionSquareClass(selPrev, selNext) : ''} ${DROP_LINE_CLASS} ${dropEdge ? DROP_LINE_SQUARE : ''} ${
         isSelected
-          ? `[&>td:not(.sticky):not(:last-child)]:bg-blue-500/15 dark:[&>td:not(.sticky):not(:last-child)]:bg-blue-400/20 [&:hover>td:not(.sticky):not(:last-child)]:bg-blue-500/20 dark:[&:hover>td:not(.sticky):not(:last-child)]:bg-blue-400/25 ${STICKY_TINT_SELECTED}`
+          ? `[&>td:not(.sticky):not(:last-child)]:bg-[var(--accent-default)]/15 dark:[&>td:not(.sticky):not(:last-child)]:bg-[var(--accent-default)]/20 [&:hover>td:not(.sticky):not(:last-child)]:bg-[var(--accent-default)]/20 dark:[&:hover>td:not(.sticky):not(:last-child)]:bg-[var(--accent-default)]/25 ${STICKY_TINT_SELECTED}`
           : `[&:hover>td:not(.sticky):not(:last-child)]:bg-foreground/[0.06] ${STICKY_TINT_HOVER}`
       }`}
       onClick={(e) => {
@@ -401,7 +401,7 @@ export const ElementRow = memo(function ElementRow({
         )}
         <ContextMenuSeparator />
         <ContextMenuItem
-          className="gap-2 text-red-600 focus:text-red-600"
+          className="gap-2 text-[var(--status-danger)] focus:text-[var(--status-danger)]"
           onPointerEnter={() => setOpenSub(null)}
           onClick={() => { void deleteElement(el.id); }}
         >
