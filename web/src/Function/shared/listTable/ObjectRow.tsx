@@ -70,8 +70,8 @@ export const ObjectRow = memo(function ObjectRow({
       className={`group cursor-pointer select-none leading-[1.4] [&>td]:transition-colors ${hasTrailingCol ? ROW_ROUND_BASE : ROW_ROUND_TO_LAST} ${isSelected ? (hasTrailingCol ? selectionSquareClass(selPrev, selNext) : selectionSquareClassToLast(selPrev, selNext)) : ''} ${DROP_LINE_CLASS} ${dropEdge ? DROP_LINE_SQUARE : ''} ${
         isSelected
           ? (hasTrailingCol
-              ? '[&>td:not(:first-child):not(:last-child)]:bg-blue-500/15 dark:[&>td:not(:first-child):not(:last-child)]:bg-blue-400/20 [&:hover>td:not(:first-child):not(:last-child)]:bg-blue-500/20 dark:[&:hover>td:not(:first-child):not(:last-child)]:bg-blue-400/25'
-              : '[&>td:not(:first-child)]:bg-blue-500/15 dark:[&>td:not(:first-child)]:bg-blue-400/20 [&:hover>td:not(:first-child)]:bg-blue-500/20 dark:[&:hover>td:not(:first-child)]:bg-blue-400/25')
+              ? '[&>td:not(:first-child):not(:last-child)]:bg-[var(--accent-default)]/15 dark:[&>td:not(:first-child):not(:last-child)]:bg-[var(--accent-default)]/20 [&:hover>td:not(:first-child):not(:last-child)]:bg-[var(--accent-default)]/20 dark:[&:hover>td:not(:first-child):not(:last-child)]:bg-[var(--accent-default)]/25'
+              : '[&>td:not(:first-child)]:bg-[var(--accent-default)]/15 dark:[&>td:not(:first-child)]:bg-[var(--accent-default)]/20 [&:hover>td:not(:first-child)]:bg-[var(--accent-default)]/20 dark:[&:hover>td:not(:first-child)]:bg-[var(--accent-default)]/25')
           : ''
       }`}
       onClick={(e) => {

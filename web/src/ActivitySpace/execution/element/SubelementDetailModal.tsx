@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/ui/button';
+
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 // SubelementDetailModal — used in two modes:
@@ -184,7 +186,7 @@ export function SubelementDetailModal({
           />
         </div>
 
-        {error && <div className="px-1 pt-2 text-[12px] text-red-500">{error}</div>}
+        {error && <div className="px-1 pt-2 text-[12px] text-[var(--status-danger)]">{error}</div>}
 
         {/* Footer — delete (detail only) + submit */}
         <div className="flex items-center justify-between gap-2 px-1 pt-3">
@@ -193,20 +195,19 @@ export function SubelementDetailModal({
               <button
                 onClick={handleDelete}
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] text-muted-foreground hover:text-red-600 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] text-muted-foreground hover:text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10 transition-colors disabled:opacity-40"
               >
                 <Trash2 size={12} /> Delete
               </button>
             )}
           </div>
-          <button
+          <Button variant="primary"
             onClick={handleSubmit}
             disabled={!title.trim() || busy}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <ArrowUp size={13} />
             {isCreate ? 'Create' : 'Save'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

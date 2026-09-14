@@ -197,7 +197,7 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
                     <button
                       type="button"
                       onClick={() => handleRemove(m.id)}
-                      className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded transition-colors"
+                      className="p-1.5 text-muted-foreground hover:text-[var(--status-danger)] hover:bg-[var(--status-danger-subtle)] dark:hover:bg-[var(--status-danger)]/20 rounded transition-colors"
                       title="Remove member"
                       aria-label="Remove member"
                     >

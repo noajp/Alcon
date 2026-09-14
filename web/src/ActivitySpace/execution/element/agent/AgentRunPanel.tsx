@@ -29,7 +29,7 @@ interface AgentRunPanelProps {
 
 const STATUS_META: Record<AgentRunStatus, { label: string; tone: string; dot: string }> = {
   queued:          { label: 'キュー待ち',   tone: 'text-muted-foreground', dot: 'bg-muted-foreground' },
-  running:         { label: '実行中',       tone: 'text-blue-500',         dot: 'bg-blue-500' },
+  running:         { label: '実行中',       tone: 'text-[var(--accent-default)]',         dot: 'bg-[var(--accent-default)]' },
   awaiting_review: { label: 'レビュー待ち', tone: 'text-amber-500',        dot: 'bg-amber-500' },
   completed:       { label: '完了',         tone: 'text-emerald-500',      dot: 'bg-emerald-500' },
   failed:          { label: '失敗',         tone: 'text-rose-500',         dot: 'bg-rose-500' },
@@ -55,7 +55,7 @@ const STEP_ICON: Record<AgentRunStepType, StepGlyph> = {
 const STEP_TONE: Record<AgentRunStepType, string> = {
   plan: 'text-foreground',
   thought: 'text-muted-foreground',
-  action: 'text-blue-500',
+  action: 'text-[var(--accent-default)]',
   subelement: 'text-emerald-500',
   comment: 'text-purple-400',
   status: 'text-amber-500',
@@ -146,7 +146,7 @@ export function AgentRunPanel({
             {isActive && (
               <div className="relative flex items-start gap-2">
                 <span className="absolute -left-4 top-0 w-5 h-5 rounded-full bg-card border border-border flex items-center justify-center">
-                  <Loader2 size={10} className="text-blue-500 animate-spin" />
+                  <Loader2 size={10} className="text-[var(--accent-default)] animate-spin" />
                 </span>
                 <div className="flex-1 min-w-0 pl-4">
                   <p className="text-[11.5px] text-muted-foreground leading-snug">作業中…</p>

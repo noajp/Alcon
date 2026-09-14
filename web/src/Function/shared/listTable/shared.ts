@@ -116,10 +116,9 @@ export function selectionSquareClassToLast(selPrev?: boolean, selNext?: boolean)
 // background-IMAGE (a flat gradient) layered over the opaque bg-card, which
 // composites to the exact same colour the non-sticky cells show.
 // Selection tints match the non-sticky band below.
-// non-sticky `bg-blue-500/15` band.
+// non-sticky `bg-[var(--accent-default)]/15` band.
 export const STICKY_TINT_SELECTED =
-  // design-lint-ignore — preserve existing sticky selection tint during mechanical extraction.
-  '[&>td.sticky:not(:first-child)]:bg-[linear-gradient(rgb(59_130_246/0.15),rgb(59_130_246/0.15))] dark:[&>td.sticky:not(:first-child)]:bg-[linear-gradient(rgb(96_165_250/0.2),rgb(96_165_250/0.2))] [&:hover>td.sticky:not(:first-child)]:bg-[linear-gradient(rgb(59_130_246/0.2),rgb(59_130_246/0.2))] dark:[&:hover>td.sticky:not(:first-child)]:bg-[linear-gradient(rgb(96_165_250/0.25),rgb(96_165_250/0.25))]';
+  '[&>td.sticky:not(:first-child)]:bg-[linear-gradient(color-mix(in_oklab,var(--accent-default)_15%,transparent),color-mix(in_oklab,var(--accent-default)_15%,transparent))] dark:[&>td.sticky:not(:first-child)]:bg-[linear-gradient(color-mix(in_oklab,var(--accent-default)_20%,transparent),color-mix(in_oklab,var(--accent-default)_20%,transparent))] [&:hover>td.sticky:not(:first-child)]:bg-[linear-gradient(color-mix(in_oklab,var(--accent-default)_20%,transparent),color-mix(in_oklab,var(--accent-default)_20%,transparent))] dark:[&:hover>td.sticky:not(:first-child)]:bg-[linear-gradient(color-mix(in_oklab,var(--accent-default)_25%,transparent),color-mix(in_oklab,var(--accent-default)_25%,transparent))]';
 
 export const STICKY_TINT_HOVER =
   '[&:hover>td.sticky:not(:first-child)]:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))]';

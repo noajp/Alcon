@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/ui/button';
+
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
@@ -120,15 +122,14 @@ export function StrategyShell({
         <NavStrategyIcon size={12} />
         <span className="text-[12px] font-semibold text-foreground">Initiatives</span>
         <div className="flex-1" />
-        <button
+        <Button variant="primary" size="icon-xs"
           type="button"
           onClick={() => setNewOpen(true)}
           title="Add Initiative"
           aria-label="Add Initiative"
-          className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
         >
           <Plus size={14} />
-        </button>
+        </Button>
       </div>
 
       <div className="flex-1 overflow-hidden">
@@ -167,14 +168,13 @@ function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
         Create a Initiative to group Objects across Domains. Each Initiative gets its own timeline and resource view.
       </p>
       {onCreate && (
-        <button
+        <Button variant="primary" size="md"
           type="button"
           onClick={onCreate}
-          className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-foreground text-background text-[12px] font-medium hover:opacity-90"
         >
           <Plus size={12} />
           New Initiative
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -1261,14 +1261,13 @@ function StrategyCreateDialog({
           >
             Cancel
           </button>
-          <button
+          <Button variant="primary" size="md"
             type="button"
             onClick={handleSave}
             disabled={!canSave || saving}
-            className="px-3 py-1.5 rounded-md text-[12px] font-medium bg-foreground text-background hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? 'Saving…' : 'Create'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

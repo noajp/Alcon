@@ -18,7 +18,7 @@ export function ObjectProgressWidget({ explorerData }: { explorerData: ExplorerD
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-sm font-medium text-foreground truncate">{obj.name}</span>
                 <div className="flex items-center gap-2 shrink-0 ml-2">
-                  {overdue > 0 && <span className="text-[10px] text-red-500 font-medium">{overdue} overdue</span>}
+                  {overdue > 0 && <span className="text-[10px] text-[var(--status-danger)] font-medium">{overdue} overdue</span>}
                   <span className="text-xs text-muted-foreground tabular-nums">{done}/{total}</span>
                 </div>
               </div>

@@ -22,8 +22,8 @@ interface Props {
 const stateMeta: Record<ApprovalState, { label: string; icon: React.ComponentType<{ size?: number; className?: string }>; color: string }> = {
   pending:            { label: 'Pending',           icon: Clock,       color: 'text-amber-400' },
   approved:           { label: 'Approved',          icon: Check,       color: 'text-emerald-400' },
-  changes_requested:  { label: 'Changes requested', icon: AlertCircle, color: 'text-blue-400' },
-  rejected:           { label: 'Rejected',          icon: X,           color: 'text-red-400' },
+  changes_requested:  { label: 'Changes requested', icon: AlertCircle, color: 'text-[var(--accent-default)]' },
+  rejected:           { label: 'Rejected',          icon: X,           color: 'text-[var(--status-danger)]' },
 };
 
 function formatRelative(iso: string): string {
@@ -163,14 +163,14 @@ export function ElementApprovalMenu({ element, onRefresh }: Props) {
               <button
                 onClick={() => decide('changes_requested')}
                 disabled={busy}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] text-left text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] text-left text-[var(--accent-default)] hover:bg-[var(--accent-default)]/10 transition-colors disabled:opacity-50"
               >
                 <AlertCircle size={13} /> Request changes
               </button>
               <button
                 onClick={() => decide('rejected')}
                 disabled={busy}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] text-left text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] text-left text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10 transition-colors disabled:opacity-50"
               >
                 <X size={13} /> Reject
               </button>

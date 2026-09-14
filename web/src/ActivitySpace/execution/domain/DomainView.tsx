@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/ui/button';
+
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
@@ -298,26 +300,24 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
   const headerActions = selectedObject ? (
     <div className="ml-auto flex items-center gap-2">
       {!isEmptyObjectElements && (
-        <button
+        <Button variant="primary" size="icon-xs"
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent('alcon:quick-add-element'))}
-          className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-          title="Add Element"
+          title="Add Element" aria-label="Add Element"
         >
           <Plus size={14} />
-        </button>
+        </Button>
       )}
     </div>
   ) : !isEmptyDomain ? (
     <div className="ml-auto flex items-center gap-2">
-      <button
+      <Button variant="primary" size="icon-xs"
         type="button"
         onClick={() => openCreate('object')}
-        className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-        title="Add Object"
+        title="Add Object" aria-label="Add Object"
       >
         <Plus size={14} />
-      </button>
+      </Button>
     </div>
   ) : null;
 

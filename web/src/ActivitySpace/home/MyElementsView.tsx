@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/ui/button';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
@@ -382,13 +384,12 @@ function MyElementsEmptyState({ onAdd }: { onAdd: () => void }) {
       <p className="text-[12px] text-muted-foreground/60 text-center max-w-xs mb-6">
         You&apos;ll also see Elements from shared Domains where you&apos;re assigned.
       </p>
-      <button
+      <Button variant="primary" size="md"
         onClick={onAdd}
-        className="flex items-center gap-2 px-4 py-2 rounded-full bg-foreground text-background text-[13px] font-semibold hover:bg-foreground/90 transition-colors"
       >
         <Plus size={14} />
         Create Element
-      </button>
+      </Button>
     </div>
   );
 }

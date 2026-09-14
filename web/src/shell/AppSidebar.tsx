@@ -1,6 +1,6 @@
 'use client';
 
-import { ButtonAppearanceProvider } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { StrategyNavigation } from './sidebar/StrategyNavigation';
@@ -472,16 +472,15 @@ export function AppSidebar({
                 <Search size={15} />
               </button>
             )}
-            <button
+            <Button variant="primary" size="icon-xs"
               ref={createBtnRef}
               type="button"
               onClick={openCreateMenu}
               title={t('Create new')}
               aria-label={t('Create new')}
-              className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
             >
               <Plus size={16} />
-            </button>
+            </Button>
           </div>
 
           {/* ── Home mode ── Inbox / Calendar / My Elements */}
@@ -506,7 +505,7 @@ export function AppSidebar({
                   <Icon size={16} />
                   <span className="flex-1 text-left">{t(item.label)}</span>
                   {showBadge && (
-                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
+                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--status-danger)] text-white text-[10px] font-semibold flex items-center justify-center">
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
@@ -1044,7 +1043,7 @@ function DomainGeneralSettings({
         </div>
 
         {error && (
-          <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-400">
+          <div className="rounded-md border border-[var(--status-danger)]/30 bg-[var(--status-danger)]/10 px-3 py-2 text-[12px] text-[var(--status-danger)]">
             {error}
           </div>
         )}

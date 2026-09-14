@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/ui/button';
+
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -693,15 +695,14 @@ function ElementsHierarchyHeader({
       </button>
       <div className="flex-1" />
       {onAdd && (
-        <button
+        <Button variant="primary" size="icon-xs"
           type="button"
           onClick={onAdd}
-          className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
           title="Add Element"
           aria-label="Add Element"
         >
           <Plus size={14} />
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -728,13 +729,12 @@ function ElementsDomainEmptyState({ onAdd }: { onAdd: () => void }) {
       <p className="text-[12px] text-muted-foreground/60 text-left max-w-xs mb-6">
         Domain-direct Elements live at the top level. Open an Object to add Elements there.
       </p>
-      <button
+      <Button variant="primary" size="md"
         onClick={onAdd}
-        className="flex items-center gap-2 px-4 py-2 rounded-full bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 transition-colors"
       >
         <Plus size={14} />
         Create Element
-      </button>
+      </Button>
     </div>
   );
 }

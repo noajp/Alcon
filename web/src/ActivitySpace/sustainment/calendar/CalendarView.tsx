@@ -443,7 +443,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                     const isHighPriority =
                       element.priority === 'high' || element.priority === 'urgent';
                     const priorityDotColor =
-                      element.priority === 'urgent' ? 'bg-red-500' : 'bg-orange-400';
+                      element.priority === 'urgent' ? 'bg-[var(--status-danger)]' : 'bg-orange-400';
 
                     return (
                       <button
@@ -471,7 +471,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                           group/chip w-full text-left rounded-md px-2 py-1
                           transition-colors hover:brightness-95
                           ${cardStyle.className}
-                          ${overdue ? 'ring-1 ring-red-400/60' : ''}
+                          ${overdue ? 'ring-1 ring-[var(--status-danger)]/60' : ''}
                           ${isDone ? 'opacity-70' : ''}
                           ${dragging?.id === element.id ? 'opacity-40' : ''}
                           ${element.element ? 'cursor-grab active:cursor-grabbing' : ''}
@@ -840,7 +840,7 @@ function TimeGridView({
                       onElementContextMenu(el);
                     }}
                     className={`w-full text-left rounded-md px-2 py-0.5 transition-colors hover:brightness-95 ${cs.className} ${
-                      overdue ? 'ring-1 ring-red-400/60' : ''
+                      overdue ? 'ring-1 ring-[var(--status-danger)]/60' : ''
                     } ${isDone ? 'opacity-70' : ''}`}
                     style={cs.style}
                     title={el.title}
@@ -908,8 +908,8 @@ function TimeGridView({
                     style={{ top: nowLineTop }}
                   >
                     <div className="relative">
-                      <div className="absolute -left-1 -top-[4px] w-2 h-2 rounded-full bg-red-500" />
-                      <div className="h-px bg-red-500" />
+                      <div className="absolute -left-1 -top-[4px] w-2 h-2 rounded-full bg-[var(--status-danger)]" />
+                      <div className="h-px bg-[var(--status-danger)]" />
                     </div>
                   </div>
                 )}
@@ -941,7 +941,7 @@ function TimeGridView({
                         onElementContextMenu(el);
                       }}
                       className={`absolute z-10 text-left rounded-md px-1.5 py-1 overflow-hidden transition-colors hover:brightness-95 ${cs.className} ${
-                        overdue ? 'ring-1 ring-red-400/60' : ''
+                        overdue ? 'ring-1 ring-[var(--status-danger)]/60' : ''
                       } ${isDone ? 'opacity-70' : ''}`}
                       style={{ top, height, left: `calc(${lane / columns * 100}% + 4px)`, width: `calc(${100 / columns}% - 8px)`, ...cs.style }}
                       title={`${el.title}\n${timeLabel}`}

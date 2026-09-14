@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/ui/button';
+
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
@@ -155,13 +157,12 @@ function ObjectsEmptyState() {
       <p className="text-[12px] text-muted-foreground/60 text-left max-w-xs mb-6">
         Objects live directly under a Domain (no nesting) and can be shared across multiple Domains.
       </p>
-      <button
+      <Button variant="primary" size="md"
         onClick={() => openCreate('object')}
-        className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--rail-active)] text-white text-[13px] font-medium hover:brightness-110 transition"
       >
         <Plus size={14} />
         Create Object
-      </button>
+      </Button>
     </div>
   );
 }

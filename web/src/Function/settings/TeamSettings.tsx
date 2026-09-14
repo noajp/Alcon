@@ -144,7 +144,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
       </div>
 
       {error && (
-        <div className="mb-3 p-3 rounded-md border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20 text-[12px] text-red-600 dark:text-red-400">
+        <div className="mb-3 p-3 rounded-md border border-[var(--status-danger)] dark:border-[var(--status-danger)] bg-[var(--status-danger-subtle)] dark:bg-[var(--status-danger)]/20 text-[12px] text-[var(--status-danger)] dark:text-[var(--status-danger)]">
           {error}
         </div>
       )}
@@ -274,7 +274,7 @@ function WorkerRow({
       </button>}
       {onDelete && <button
         onClick={onDelete}
-        className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded transition-colors"
+        className="p-1.5 text-muted-foreground hover:text-[var(--status-danger)] hover:bg-[var(--status-danger-subtle)] dark:hover:bg-[var(--status-danger)]/20 rounded transition-colors"
         title="Remove"
       >
         <Trash2 size={13} />
@@ -421,7 +421,7 @@ function AddMemberDialog({
           )}
 
           {error && (
-            <p className="text-[12px] text-red-500">{error}</p>
+            <p className="text-[12px] text-[var(--status-danger)]">{error}</p>
           )}
         </div>
 

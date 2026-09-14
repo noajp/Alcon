@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/ui/button';
+
 import { useState } from 'react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { LanguageSelect } from '@/Function/i18n/LanguageSelect';
@@ -115,15 +117,14 @@ export function AuthPage() {
             </div>
 
             {error && (
-              <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg">
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              <div className="p-3 bg-[var(--status-danger-subtle)] dark:bg-[var(--status-danger)]/20 border border-[var(--status-danger)] dark:border-[var(--status-danger)] rounded-lg">
+                <p className="text-sm text-[var(--status-danger)] dark:text-[var(--status-danger)]">{error}</p>
               </div>
             )}
 
-            <button
+            <Button variant="primary"
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-foreground text-background rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -133,7 +134,7 @@ export function AuthPage() {
               ) : (
                 t(mode === 'signin' ? 'Sign in' : 'Create account')
               )}
-            </button>
+            </Button>
           </form>
 
           <div className="mt-6 text-center">

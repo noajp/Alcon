@@ -122,7 +122,7 @@ export function FilesPane({
                 <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
                 <ContextMenuContent className="min-w-[160px]">
                   <ContextMenuItem
-                    className="gap-2 text-red-600 focus:text-red-600"
+                    className="gap-2 text-[var(--status-danger)] focus:text-[var(--status-danger)]"
                     onClick={() => onDeleteFile(file.id)}
                   >
                     <Trash2 className="size-3.5" /> Delete

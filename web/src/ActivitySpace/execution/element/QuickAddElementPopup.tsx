@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/ui/button';
+
 import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
@@ -606,14 +608,13 @@ export function QuickAddElementPopup({
             <span className="text-[11px] text-muted-foreground/60 hidden sm:inline">
               ⌘/Ctrl+Enter to create and close
             </span>
-            <button
+            <Button variant="primary" size="md"
               onClick={() => handleSubmit(false)}
               disabled={!canSubmit}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ArrowUp size={13} />
               {titles.length > 1 ? `Create ${titles.length}` : 'Create'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

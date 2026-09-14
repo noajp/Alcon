@@ -67,7 +67,7 @@ export function SubelementRow({
       }}
       className={`group flex items-center gap-2 min-h-[1.625rem] px-2 py-1 rounded-lg cursor-pointer select-none leading-[1.4] transition-colors ${
         isSelected
-          ? 'bg-blue-500/15 dark:bg-blue-400/20 hover:bg-blue-500/20 dark:hover:bg-blue-400/25'
+          ? 'bg-[var(--accent-default)]/15 dark:bg-[var(--accent-default)]/20 hover:bg-[var(--accent-default)]/20 dark:hover:bg-[var(--accent-default)]/25'
           : 'hover:bg-foreground/[0.06]'
       }`}
     >

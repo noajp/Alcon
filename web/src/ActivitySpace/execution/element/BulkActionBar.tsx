@@ -75,7 +75,7 @@ function BarButton({
           aria-label={label}
           className={`flex items-center justify-center size-8 rounded-full transition-colors disabled:opacity-40 ${
             danger
-              ? 'text-red-500 hover:text-red-400 hover:bg-red-500/10'
+              ? 'text-[var(--status-danger)] hover:text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10'
               : active
               ? 'bg-muted/60 text-foreground'
               : 'text-foreground/80 hover:text-foreground hover:bg-muted/40'
@@ -372,7 +372,7 @@ export function BulkActionBar({
                 type="button"
                 onClick={runDelete}
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] rounded-md bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] rounded-md bg-[var(--status-danger)] text-white hover:bg-[var(--status-danger)] transition-colors disabled:opacity-50"
               >
                 <Trash2 size={12} /> Delete
               </button>

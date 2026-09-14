@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/ui/button';
+
 import { Plus } from 'lucide-react';
 import type { ElementWithDetails, CustomColumnWithValues } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
@@ -159,13 +161,12 @@ function ElementsEmptyState({ onAdd }: { onAdd: () => void }) {
       <p className="text-[12px] text-muted-foreground/60 text-center max-w-xs mb-6">
         You can also add sections, set priorities, assignees, and due dates.
       </p>
-      <button
+      <Button variant="primary" size="md"
         onClick={onAdd}
-        className="flex items-center gap-2 px-4 py-2 rounded-full bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 transition-colors"
       >
         <Plus size={14} />
         Create Element
-      </button>
+      </Button>
     </div>
   );
 }

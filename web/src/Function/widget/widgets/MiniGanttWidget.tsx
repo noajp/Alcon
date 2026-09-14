@@ -54,7 +54,7 @@ export function MiniGanttWidget({ elements }: { elements: ElementWithDetails[] }
       {todayPct >= 0 && todayPct <= 100 && (
         <div className="relative h-0">
           <div className="absolute" style={{ left: `calc(8rem + 12px + (100% - 8rem - 12px) * ${todayPct / 100})`, top: '-100%', height: '100%' }}>
-            <div className="w-px h-full bg-red-500/50" />
+            <div className="w-px h-full bg-[var(--status-danger)]/50" />
           </div>
         </div>
       )}

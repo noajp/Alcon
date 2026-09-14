@@ -137,14 +137,13 @@ function TablesEmptyState({ onCreate }: { onCreate: () => void }) {
       <p className="text-[13px] text-muted-foreground text-center max-w-xs mb-6">
         Create a Table to store and query rows of your own — customers, inquiries, anything.
       </p>
-      <button
+      <Button variant="primary"
         type="button"
         onClick={onCreate}
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 transition-colors"
       >
         <Plus size={14} />
         Create Table
-      </button>
+      </Button>
     </div>
   );
 }
@@ -788,14 +787,13 @@ function NewTableDialog({
           >
             Cancel
           </button>
-          <button
+          <Button variant="primary"
             type="button"
             disabled={!name.trim() || saving}
             onClick={() => void save()}
-            className="px-3 py-1.5 text-[12px] font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-colors disabled:opacity-50"
           >
             {saving ? 'Creating…' : 'Create'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
