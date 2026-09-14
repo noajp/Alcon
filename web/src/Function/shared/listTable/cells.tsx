@@ -346,7 +346,7 @@ function DateRangeCellPopover({
 // Label chip — a coloured Tag mark + label text in a soft pill, shown left of
 // the Type column. The mark colour comes from the Domain colour catalogue
 // (picked colour, else an auto colour derived from the name).
-function LabelChip({ label }: { label: string }) {
+export function LabelChip({ label }: { label: string }) {
   useLabelColors(); // re-render when a colour is picked / the catalogue loads
   return (
     <span

@@ -43,10 +43,10 @@
      freezing one gray. The hues are theme-invariant, like --status-*. */
   --element-status-backlog:     color-mix(in oklab, var(--muted-foreground) 60%, transparent);
   --element-status-todo:        color-mix(in oklab, var(--muted-foreground) 70%, transparent);
-  --element-status-in-progress: #816ee6;
-  --element-status-review:      var(--accent-default);
-  --element-status-done:        #279066;
-  --element-status-blocked:     #eab308;
+  --element-status-in-progress: var(--accent-default);
+  --element-status-review:      #8578b8;
+  --element-status-done:        #23734f;
+  --element-status-blocked:     #c29a4c;
   --element-status-cancelled:   color-mix(in oklab, var(--muted-foreground) 40%, transparent);
 
   /* Badge grounds — subtle pair for every hue above (§1.3: badge ground is

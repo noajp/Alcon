@@ -187,26 +187,16 @@ export function ResizeHandle({
 // built-in/custom columns are visible. Lists that CAN add a Property use a
 // direct "+" instead (see the header cell above).
 export function ColumnMenu({
-  allColumns, isVisible, onToggle, canAddProperty = true,
+  allColumns, isVisible, onToggle,
 }: {
   allColumns: DataColumn[];
   isVisible: (id: ColumnId) => boolean;
   onToggle: (id: ColumnId) => void;
-  /** False on the cross-Object lists. A Property belongs to one Object, and
-   *  these lists gather Elements from many (some from none at all), so there
-   *  is no Object a new one could belong to. Saying that is the difference
-   *  between a rule and a missing button. */
-  canAddProperty?: boolean;
 }) {
   return <Popover>
     <PopoverTrigger asChild><Button type="button" variant="ghost" size="icon-sm" aria-label="Configure fields" title="Configure fields"><Settings2 size={14} /></Button></PopoverTrigger>
     <MenuShell align="end" width="wide">
       <FieldVisibility columns={allColumns} isVisible={isVisible} onToggle={onToggle} />
-      {!canAddProperty && (
-        <p className="px-2 pt-2 pb-1 text-xs text-muted-foreground border-t border-border/40 mt-2">
-          A Property belongs to one Object. To add one, open that Object&apos;s Elements.
-        </p>
-      )}
     </MenuShell>
   </Popover>;
 }

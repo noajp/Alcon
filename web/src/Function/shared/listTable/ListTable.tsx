@@ -544,7 +544,7 @@ export function ListTable({
                     My Elements) fall back to the column show/hide menu so the
                     "+" is still present everywhere. */}
                 <div className="flex items-center justify-center gap-1">
-                <ColumnMenu allColumns={cols.allColumns} isVisible={cols.isVisible} onToggle={cols.toggleVisible} canAddProperty={!!onAddColumn} />
+                <ColumnMenu allColumns={cols.allColumns} isVisible={cols.isVisible} onToggle={cols.toggleVisible} />
                 {onAddColumn && (
                   <button
                     type="button"
