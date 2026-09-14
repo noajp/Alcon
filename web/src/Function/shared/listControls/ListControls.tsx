@@ -8,7 +8,7 @@ import {
   Plus,
 
   X,
-  Search,
+  Search, CircleDashed, Flag, Tag, UserRound, Box, CalendarDays, Shapes, ListFilter as GroupIcon, ArrowDownWideNarrow, RotateCcw, Play,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuItem,
@@ -76,6 +76,9 @@ import {
   type ListGroupBy,
   type ListOrderBy,
 } from './types';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
+import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { FieldVisibility } from '@/Function/property/FieldVisibility';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { useListColumns, type ColumnId } from '@/ActivitySpace/execution/object/useListColumns';
@@ -226,7 +229,7 @@ export function ListControls({
           >
             <FilterBarsIcon size={CONTROL.icon.sm} />
             {filterActive && (
-              <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-orange-500" />
+              <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-primary" />
             )}
           </Button>
         </PopoverTrigger>
@@ -304,6 +307,7 @@ function FilterPanel({
             type="text"
             value={query}
             placeholder="Search title…"
+            aria-label="Search title"
             onChange={(e) => setQuery(e.target.value)}
             onBlur={() => setFilter({ query })}
             onKeyDown={(e) => { if (e.key === 'Enter') setFilter({ query }); }}
@@ -322,13 +326,13 @@ function FilterPanel({
         </div>
       </div>
 
-      <Submenu label="Status" count={filter.status?.length ?? 0}>
+      <Submenu icon={<CircleDashed size={15} />} label="Status" count={filter.status?.length ?? 0}>
         {STATUS_OPTIONS.map((s) => {
           const checked = (filter.status ?? []).includes(s);
           return (
             <MenuCheckRow
               key={s}
-              label={labelForStatus(s)}
+              icon={<ElementProgressMark status={s} size={15} />} label={labelForStatus(s)}
               checked={checked}
               onClick={() => {
                 const next = new Set(filter.status ?? []);
@@ -340,13 +344,13 @@ function FilterPanel({
         })}
       </Submenu>
 
-      <Submenu label="Priority" count={filter.priority?.length ?? 0}>
+      <Submenu icon={<Flag size={15} />} label="Priority" count={filter.priority?.length ?? 0}>
         {PRIORITY_OPTIONS.map((p) => {
           const checked = (filter.priority ?? []).includes(p);
           return (
             <MenuCheckRow
               key={p}
-              label={labelForPriority(p)}
+              icon={<PriorityMark priority={p} />} label={labelForPriority(p)}
               checked={checked}
               onClick={() => {
                 const next = new Set(filter.priority ?? []);
@@ -359,7 +363,7 @@ function FilterPanel({
       </Submenu>
 
       {typeOptions && typeOptions.length > 0 && (
-        <Submenu label="Type" count={filter.types?.length ?? 0}>
+        <Submenu icon={<Shapes size={15} />} label="Type" count={filter.types?.length ?? 0}>
           {typeOptions.map((t) => {
             const checked = (filter.types ?? []).includes(t);
             return (
@@ -379,7 +383,7 @@ function FilterPanel({
       )}
 
       {labelOptions && labelOptions.length > 0 && (
-        <Submenu label="Labels" count={filter.labels?.length ?? 0}>
+        <Submenu icon={<Tag size={15} />} label="Labels" count={filter.labels?.length ?? 0}>
           {labelOptions.map((l) => {
             const checked = (filter.labels ?? []).includes(l);
             return (
@@ -399,7 +403,7 @@ function FilterPanel({
       )}
 
       {workerOptions && workerOptions.length > 0 && (
-        <Submenu label="Assignee" count={filter.assigneeWorkerIds?.length ?? 0}>
+        <Submenu icon={<UserRound size={15} />} label="Assignee" count={filter.assigneeWorkerIds?.length ?? 0}>
           {workerOptions.map((w) => {
             const checked = (filter.assigneeWorkerIds ?? []).includes(w.id);
             return (
@@ -419,7 +423,7 @@ function FilterPanel({
       )}
 
       {objectOptions && objectOptions.length > 0 && (
-        <Submenu label="Object" count={filter.objectIds?.length ?? 0}>
+        <Submenu icon={<Box size={15} />} label="Object" count={filter.objectIds?.length ?? 0}>
           {objectOptions.map((o) => {
             const checked = (filter.objectIds ?? []).includes(o.id);
             return (
@@ -439,19 +443,21 @@ function FilterPanel({
       )}
 
       <div className={MENU_SEPARATOR} />
-      <MenuSectionLabel>Due date</MenuSectionLabel>
+      <Submenu icon={<CalendarDays size={15} />} label="Due date" count={filter.dueFrom || filter.dueTo ? 1 : 0}>
       <DueDateFilter
         value={{ from: filter.dueFrom ?? null, to: filter.dueTo ?? null }}
         onChange={(next) => setFilter({ dueFrom: next.from, dueTo: next.to })}
       />
+      </Submenu>
 
       <button
         type="button"
         onClick={() => setFilter({ readyOnly: !filter.readyOnly })}
+        aria-pressed={Boolean(filter.readyOnly)}
         className={`${MENU_ROW} justify-between`}
         title="Hide Elements still waiting on an unfinished dependency"
       >
-        <span>Ready to start</span>
+        <Play size={15} className="text-muted-foreground" /><span className="flex-1">Ready to start</span>
         {filter.readyOnly && <Check size={12} className="text-foreground" />}
       </button>
 
@@ -459,9 +465,10 @@ function FilterPanel({
         <button
           type="button"
           onClick={() => setFilter({ ownerOnly: !filter.ownerOnly })}
+          aria-pressed={Boolean(filter.ownerOnly)}
           className={`${MENU_ROW} justify-between`}
         >
-          <span>Owned by me only</span>
+          <UserRound size={15} className="text-muted-foreground" /><span className="flex-1">Owned by me only</span>
           {filter.ownerOnly && <Check size={12} className="text-foreground" />}
         </button>
       )}
@@ -507,6 +514,7 @@ function DisplayPanel({
   propertiesCustom?: CustomColumnWithValues[];
   onAddColumn?: () => void;
 }) {
+  const { t } = useI18n();
   // If the current grouping isn't an offered option (e.g. 'object' inside a
   // single-Object view where it's hidden), display it as 'No grouping' so the
   // select never shows a dangling value. The underlying list already renders
@@ -516,15 +524,15 @@ function DisplayPanel({
     <div>
       {/* Grouping + Ordering as Linear-style labelled dropdowns. */}
       <LabeledSelect
-        label="Grouping"
+        icon={<GroupIcon size={15} />} label="Grouping"
         value={groupByValue}
-        options={groupOptions}
+        options={groupOptions.map(option => ({ ...option, label: t(option.label) }))}
         onSelect={(id) => setDisplay({ groupBy: id })}
       />
       <LabeledSelect
-        label="Ordering"
+        icon={<ArrowDownWideNarrow size={15} />} label="Ordering"
         value={display.orderBy}
-        options={ORDER_OPTIONS}
+        options={ORDER_OPTIONS.map(option => ({ ...option, label: t(option.label) }))}
         onSelect={(id) => setDisplay({ orderBy: id })}
       />
 
@@ -569,9 +577,9 @@ function DisplayPanel({
           <button
             type="button"
             onClick={onReset}
-            className={`${MENU_ROW} justify-center text-muted-foreground hover:text-foreground`}
+            className={`${MENU_ROW} text-muted-foreground hover:text-foreground`}
           >
-            Reset to defaults
+            <RotateCcw size={14} />Reset to defaults
           </button>
         </>
       )}
@@ -581,26 +589,25 @@ function DisplayPanel({
 
 // A label + dropdown-select row (Linear's Display menu pattern).
 function LabeledSelect<T extends string>({
-  label, value, options, onSelect,
+  label, value, options, onSelect, icon,
 }: {
   label: string;
+  icon?: React.ReactNode;
   value: T;
   options: { id: T; label: string }[];
   onSelect: (id: T) => void;
 }) {
+  const { t } = useI18n();
   const current = options.find((o) => o.id === value);
   return (
     <div className={`${MENU_ROW} justify-between hover:bg-transparent`}>
-      <span className="text-[13px] text-foreground">{label}</span>
+      <span className="flex items-center gap-2 text-muted-foreground">{icon}{t(label)}</span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[12.5px] text-foreground hover:bg-muted/60 transition-colors"
-          >
-            <span>{current?.label ?? value}</span>
-            <ChevronDown size={13} className="text-muted-foreground" />
-          </button>
+          <Button type="button" variant="ghost" shape="tab" size="sm" aria-label={t(label)} className="w-32 justify-between">
+            <span className="truncate">{current?.label ?? value}</span>
+            <ChevronDown size={12} className="shrink-0 text-muted-foreground" />
+          </Button>
         </DropdownMenuTrigger>
         <MenuShell as="dropdown" align="end">
           {options.map((o) => (
@@ -635,7 +642,7 @@ function PropertiesSection({
   return (
     <>
       <div className={MENU_SEPARATOR} />
-      <FieldVisibility columns={cols.allColumns} isVisible={cols.isVisible} onToggle={cols.toggleVisible} />
+      <FieldVisibility compact columns={cols.allColumns} isVisible={cols.isVisible} onToggle={cols.toggleVisible} />
       {onAddColumn && <Button type="button" variant="ghost" size="sm" onClick={onAddColumn}><Plus size={14} />Add field</Button>}
     </>
   );
@@ -643,55 +650,34 @@ function PropertiesSection({
 
 // -- Tiny primitives ------------------------------------------------------
 
-function Submenu({
-  label,
-  count,
-  children,
-}: {
-  label: string;
-  count: number;
-  children: React.ReactNode;
+function Submenu({ label, count, children, icon }: {
+  label: string; count: number; children: React.ReactNode; icon: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={`${MENU_ROW} justify-between`}
-      >
-        <span className="flex items-center gap-2">
-          {label}
-          {count > 0 && (
-            <span className="text-[11px] text-muted-foreground">{count}</span>
-          )}
-        </span>
-        <ChevronRight size={12} className={`text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
+  const { t } = useI18n();
+  return <Popover open={open} onOpenChange={setOpen}>
+    <PopoverTrigger asChild>
+      <button type="button" className={`${MENU_ROW} justify-between`}
+        onKeyDown={(event) => { if (event.key === 'ArrowRight') { event.preventDefault(); setOpen(true); } }}>
+        <span className="flex items-center gap-2.5"><span className="text-muted-foreground">{icon}</span>{t(label)}</span>
+        <span className="flex items-center gap-2">{count > 0 && <span className="text-xs text-muted-foreground">{count}</span>}<ChevronRight size={12} className="text-muted-foreground" /></span>
       </button>
-      {open && <div className="pb-1">{children}</div>}
-    </div>
-  );
+    </PopoverTrigger>
+    <MenuShell side="right" align="start" onKeyDown={(event) => { if (event.key === 'ArrowLeft') { event.preventDefault(); setOpen(false); } }}>
+      <MenuSectionLabel>{t(label)}</MenuSectionLabel>
+      {children}
+    </MenuShell>
+  </Popover>;
 }
 
-function MenuCheckRow({
-  label,
-  checked,
-  onClick,
-}: {
-  label: string;
-  checked: boolean;
-  onClick: () => void;
+function MenuCheckRow({ label, checked, onClick, icon }: {
+  label: string; checked: boolean; onClick: () => void; icon?: React.ReactNode;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`${MENU_ROW} justify-between pl-7`}
-    >
-      <span className="truncate">{label}</span>
-      {checked && <Check size={11} className="text-foreground" />}
-    </button>
-  );
+  return <button type="button" onClick={onClick} aria-pressed={checked} className={MENU_ROW}>
+    {icon && <span className="flex size-4 shrink-0 items-center justify-center">{icon}</span>}
+    <span className="flex-1 truncate">{label}</span>
+    {checked && <Check size={12} className="text-foreground" />}
+  </button>;
 }
 
 // Stable empty default for the optional Sort-menu custom columns array, so
@@ -710,6 +696,7 @@ function SortMenu({
   storageKey: string;
   customColumns: CustomColumnWithValues[];
 }) {
+  const { t } = useI18n();
   const cols = useListColumns(storageKey, customColumns, { entity: storageKey === 'domain' ? 'object' : 'element' });
   const [open, setOpen] = useState(false);
   const active = cols.sort;
@@ -722,8 +709,8 @@ function SortMenu({
   // their values legible while sorting by them.
   const sortCandidates = useMemo<{ id: ColumnId; label: string }[]>(() => {
     const customVisible = cols.visibleColumns.filter((c) => c.kind === 'custom');
-    return [...SORTABLE_ELEMENT_FIELDS, ...customVisible.map((c) => ({ id: c.id, label: c.label }))];
-  }, [cols.visibleColumns]);
+    return [...SORTABLE_ELEMENT_FIELDS.map(field => ({ ...field, label: t(field.label) })), ...customVisible.map((c) => ({ id: c.id, label: c.label }))];
+  }, [cols.visibleColumns, t]);
   const activeLabel = active
     ? sortCandidates.find((c) => c.id === active.id)?.label ?? null
     : null;
@@ -750,93 +737,15 @@ function SortMenu({
           {activeLabel ? <span className="truncate max-w-[120px]">{activeLabel}</span> : null}
         </Button>
       </PopoverTrigger>
-      <MenuShell align="end">
-        <div>
-          <MenuSectionLabel>Sort by</MenuSectionLabel>
-          {sortCandidates.length === 0 && (
-            <div className="px-2 pb-2 text-[12px] text-muted-foreground/70">
-              No columns to sort by.
-            </div>
-          )}
-          {sortCandidates.map((col) => {
-            const isActive = active?.id === col.id;
-            const dir = isActive ? active!.direction : null;
-            return (
-              <div
-                key={col.id}
-                className={`${MENU_ROW} gap-1 hover:bg-transparent ${
-                  isActive ? 'text-foreground' : 'text-foreground/90'
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => cols.cycleSort(col.id)}
-                  className="flex-1 min-w-0 text-left truncate hover:text-foreground transition-colors"
-                  title={
-                    dir === 'asc'  ? `Sorting by ${col.label} — ascending. Click for descending.` :
-                    dir === 'desc' ? `Sorting by ${col.label} — descending. Click to clear.` :
-                    `Sort by ${col.label}`
-                  }
-                >
-                  {col.label}
-                </button>
-                <DirButton
-                  active={dir === 'asc'}
-                  onClick={() => cols.setSort(dir === 'asc' ? null : { id: col.id, direction: 'asc' })}
-                  Icon={ArrowUp}
-                  label={`Sort ${col.label} ascending`}
-                />
-                <DirButton
-                  active={dir === 'desc'}
-                  onClick={() => cols.setSort(dir === 'desc' ? null : { id: col.id, direction: 'desc' })}
-                  Icon={ArrowDown}
-                  label={`Sort ${col.label} descending`}
-                />
-              </div>
-            );
-          })}
-          {active && (
-            <>
-              <div className={MENU_SEPARATOR} />
-              <button
-                type="button"
-                onClick={() => cols.setSort(null)}
-                className={`${MENU_ROW} justify-center text-muted-foreground hover:text-foreground`}
-              >
-                Clear sort
-              </button>
-            </>
-          )}
-        </div>
+      <MenuShell align="end" width="wide">
+        <LabeledSelect label="Sort by" icon={<ArrowUpDown size={15} />}
+          value={active?.id ?? 'manual'} options={[{ id: 'manual', label: t('Manual') }, ...sortCandidates]}
+          onSelect={(id) => cols.setSort(id === 'manual' ? null : { id, direction: active?.direction ?? 'asc' })} />
+        {active && <LabeledSelect label="Direction" icon={<ActiveIcon size={15} />}
+          value={active.direction} options={[{ id: 'asc', label: t('Ascending') }, { id: 'desc', label: t('Descending') }]}
+          onSelect={(direction) => cols.setSort({ id: active.id, direction })} />}
       </MenuShell>
     </Popover>
-  );
-}
-
-function DirButton({
-  active, onClick, Icon, label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  Icon: typeof ArrowUp;
-  label: string;
-}) {
-  // The row-inner step (24px). It used to be a 20px box with `rounded` (4px)
-  // sitting inside menu rows whose every other corner is 6px — the mismatch is
-  // small enough to read as sloppiness rather than as a decision.
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      onClick={onClick}
-      aria-label={label}
-      aria-pressed={active}
-      title={label}
-      className={active ? 'bg-[var(--surface-strong)] text-[var(--text-primary)]' : ''}
-    >
-      <Icon size={CONTROL.icon.xs} />
-    </Button>
   );
 }
 

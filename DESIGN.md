@@ -68,7 +68,7 @@ Chat・Property・Widgetの面には既存の薄い枠と面色を使う。AIへ
 
 Object・Elementのクイック作成は `QUICK_CREATE` を共有する。最大幅760px、内側16pxで見出し・タイトル・説明・Property列の左端を揃える。タイトルは18px太字、説明は入力に応じて伸びるコンパクトな高さ。作成ボタンは共通28px高の文字だけとし、常設のキー操作説明を置かない。
 
-表示項目の設定（Default fields / Custom fields）は枠なしのメニュー行とし、FieldVisibilityで共通のnavigationスタイルを使う。オン・オフはスイッチで、ホバーは背景で示す。
+表示項目の設定（Default fields / Custom fields）は枠なしのメニュー行とし、FieldVisibilityで共通のnavigationスタイルを使う。列ヘッダから開く場合はスイッチ、Displayパネルではコンパクトな選択チップで切り替え、ホバーは背景で示す。
 
 認証フォームの主要操作は共通Buttonの `size="lg"`（44px高・text-sm）で入力欄と同じ幅にする。
 
