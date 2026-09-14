@@ -61,6 +61,7 @@ const buttonVariants = cva(
         xs: [CONTROL.height.xs, CONTROL.padX.xs, CONTROL.gap.xs, CONTROL.text.xs].join(" "),
         sm: [CONTROL.height.sm, CONTROL.padX.sm, CONTROL.gap.sm, CONTROL.text.sm].join(" "),
         md: [CONTROL.height.md, CONTROL.padX.md, CONTROL.gap.md, CONTROL.text.md].join(" "),
+        lg: [CONTROL.height.lg, CONTROL.padX.lg, CONTROL.gap.lg, CONTROL.text.lg].join(" "),
         "icon-xs": [CONTROL.square.xs, "p-0 justify-center"].join(" "),
         "icon-sm": [CONTROL.square.sm, "p-0 justify-center"].join(" "),
         "icon-md": [CONTROL.square.md, "p-0 justify-center"].join(" "),

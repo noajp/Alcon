@@ -62,8 +62,8 @@ function renderButton(props: React.ComponentProps<typeof Button> = {}) {
 // -------------------------------------------------------------------- tokens
 
 describe('CONTROL is the one place the numbers live', () => {
-  it('offers exactly three steps, and the same three for every axis', () => {
-    const steps = ['xs', 'sm', 'md'];
+  it('offers the same four steps for every axis', () => {
+    const steps = ['xs', 'sm', 'md', 'lg'];
     for (const axis of ['height', 'square', 'padX', 'gap', 'text', 'icon'] as const) {
       expect(Object.keys(CONTROL[axis])).toEqual(steps);
     }

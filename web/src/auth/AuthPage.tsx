@@ -122,7 +122,7 @@ export function AuthPage() {
               </div>
             )}
 
-            <Button variant="primary"
+            <Button variant="primary" size="lg" className="w-full"
               type="submit"
               disabled={loading}
             >

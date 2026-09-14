@@ -80,19 +80,19 @@ export const FONT = {
 // Control geometry and fine outlines — see /DESIGN.md.
 export const CONTROL = {
   /** Height of a control with a label. */
-  height: { xs: 'h-6', sm: 'h-7', md: 'h-8' },
+  height: { xs: 'h-6', sm: 'h-7', md: 'h-8', lg: 'h-11' },
   /** Icon-only controls are the square of the same step. */
-  square: { xs: 'size-6', sm: 'size-7', md: 'size-8' },
+  square: { xs: 'size-6', sm: 'size-7', md: 'size-8', lg: 'size-11' },
   /** Horizontal padding. Vertical padding is never used — height is declared. */
-  padX: { xs: 'px-2', sm: 'px-2.5', md: 'px-3' },
+  padX: { xs: 'px-2', sm: 'px-2.5', md: 'px-3', lg: 'px-4' },
   /** Gap between icon and label. */
-  gap: { xs: 'gap-1.5', sm: 'gap-1.5', md: 'gap-2' },
+  gap: { xs: 'gap-1.5', sm: 'gap-1.5', md: 'gap-2', lg: 'gap-2' },
   /** Label type. 12px = FONT.sm, 13px = FONT.base. */
-  text: { xs: 'text-[12px]', sm: 'text-[12px]', md: 'text-[13px]' },
+  text: { xs: 'text-[12px]', sm: 'text-[12px]', md: 'text-[13px]', lg: 'text-sm' },
   /** Center visible label metrics, rather than a font's asymmetric leading. */
   label: '[text-box-trim:trim-both] [text-box-edge:cap_alphabetic]',
   /** lucide `size` prop for an icon inside a control of this step. */
-  icon: { xs: 14, sm: 14, md: 16 },
+  icon: { xs: 14, sm: 14, md: 16, lg: 18 },
   /** One radius for every step. */
   radius: 'rounded-md',
   actionRadius: 'rounded-[var(--control-action-radius)]',
