@@ -28,19 +28,22 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
     },
     onViewChange,
   };
-  return <div className="min-w-0 flex-1 overflow-y-auto bg-card">
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
+  return <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-4">
+      <DomainIcon size={12} />
+      <h1 className="truncate text-xs font-semibold">{domain.name}</h1>
+    </header>
+    <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-6">
       {query.isError && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm"><p>Unable to refresh this Domain. Showing the last loaded data; drafts are retained.</p><Button variant="ghost" onClick={() => void query.refetch()}>Retry</Button></div>}
-      <header className="space-y-3">
+      <section className="space-y-3" aria-label="Domain details">
         <div className="flex items-center gap-2 text-xs text-muted-foreground"><DomainIcon size={16} />Domain<span>·</span><span>{domain.privacy === 'private' ? 'Private' : 'Space'}</span>{domain.identifier && <span>{domain.identifier}</span>}</div>
-        <h1 className="break-words text-2xl font-semibold">{domain.name}</h1>
         <p className="max-w-3xl whitespace-pre-wrap break-words text-sm text-muted-foreground">{domain.description || 'No description yet.'}</p>
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <Button variant="secondary" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('objects'); }}>{explorer.objects.length} Objects</Button>
           <Button variant="ghost" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('domain-elements'); }}>{elements.length} Elements</Button>
           <span>{initiatives.length} Initiatives linked through Objects</span>
         </div>
-      </header>
+      </section>
       <WidgetSurface key={domain.id} board={board} host={host} zones={['main']}>
         <WidgetZone zone="main" columns={1} />
       </WidgetSurface>

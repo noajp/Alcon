@@ -258,6 +258,7 @@ export function AppSidebar({
   onCreateNew,
   onSearch,
 }: AppSidebarProps) {
+  const { openCreate } = useWorkspaceActions();
   const { t } = useI18n();
   const { user } = useAuthContext();
   const { unreadCount } = useNotifications(user?.id ?? null);
@@ -312,6 +313,7 @@ export function AppSidebar({
   // "+ Create new" trigger — anchors the menu off its own button rect (no
   // ModeRail to dispatch this from anymore, so it's a direct click handler).
   const openCreateMenu = () => {
+    if (activeView === 'tables') { openCreate('table'); return; }
     const rect = createBtnRef.current?.getBoundingClientRect();
     if (rect) {
       setCreateMenuPos({ top: rect.bottom + 4, left: rect.left });
@@ -476,8 +478,8 @@ export function AppSidebar({
               ref={createBtnRef}
               type="button"
               onClick={openCreateMenu}
-              title={t('Create new')}
-              aria-label={t('Create new')}
+              title={t(activeView === 'tables' ? 'Add Table' : 'Create new')}
+              aria-label={t(activeView === 'tables' ? 'Add Table' : 'Create new')}
             >
               <Plus size={16} />
             </Button>

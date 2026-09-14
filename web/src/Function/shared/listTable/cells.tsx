@@ -179,7 +179,7 @@ export function TypeCell({
                     className={`px-2 py-1 text-[12px] rounded-full border transition-colors ${
                       isCurrent
                         ? 'bg-muted text-foreground border-border'
-                        : 'bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground'
+                        : 'bg-transparent text-muted-foreground border-[var(--border-strong)] hover:border-[var(--border-strong)] hover:text-foreground'
                     }`}
                   >
                     {name}
@@ -200,7 +200,7 @@ export function TypeCell({
                   className={`px-2 py-1 text-[12px] rounded-full border transition-colors ${
                     on
                       ? 'bg-muted text-foreground border-border'
-                      : 'bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground'
+                      : 'bg-transparent text-muted-foreground border-[var(--border-strong)] hover:border-[var(--border-strong)] hover:text-foreground'
                   }`}
                 >
                   {t}
