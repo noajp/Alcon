@@ -102,6 +102,8 @@ export type WidgetParams = Record<string, unknown>;
  * the subject knowing anything about configuration.
  */
 export interface WidgetProps {
+  /** Stable placement identity for persisted generated apps. */
+  instanceId?: string;
   host: WidgetHost;
   params: WidgetParams;
   setParams: (params: WidgetParams | ((current: WidgetParams) => WidgetParams)) => void;

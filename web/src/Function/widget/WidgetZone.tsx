@@ -148,6 +148,7 @@ function SortableWidget({
           <Body
             key={`${host.subject.kind}:${host.subject.id ?? 'me'}:${String(params.tableId ?? '')}`}
             host={host}
+            instanceId={instance.id}
             params={params}
             setParams={(next) => board.setParams(instance.id, next)}
           />

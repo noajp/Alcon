@@ -24,6 +24,12 @@ const DEFAULT_FLOW: Dimension[] = ['assignee', 'object', 'campaign'];
 // =============================================================
 
 export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
+  'generated-app': {
+    type: 'generated-app', label: 'AI app',
+    description: 'Create a persistent calculator, checklist or mini app with AI',
+    group: 'core', accepts: ['object'], zones: ['main'], defaultSize: 'full',
+    load: async () => (await import('./widgets/GeneratedAppWidget')).GeneratedAppWidget,
+  },
   'approach-references': {
     type: 'approach-references', label: 'Domain approaches', group: 'core',
     accepts: ['initiative', 'object'], zones: ['main', 'rail'], singleton: true, defaultSize: 'full',
