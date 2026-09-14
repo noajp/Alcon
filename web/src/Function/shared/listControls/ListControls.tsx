@@ -117,12 +117,11 @@ interface ListControlsProps {
    *  the Domain Elements view passes "By parent" since 'none' there
    *  preserves the natural Domain → Object header structure. */
   groupNoneLabel?: string;
-  /** When set, renders a Sort button to the left of Filter that lists this
-   *  view's data columns. Stays in lock-step with the column header's
+  /** Connects Display Ordering to this view's data columns. Stays in lock-step with the column header's
    *  arrow via the shared useListColumns store. Same key the list passes
    *  to ListTable's `colStorageKey`. */
   sortColumnsStorageKey?: string;
-  /** Custom (Property) columns the list view exposes — needed so the Sort menu
+  /** Custom (Property) columns the list view exposes — needed so the Ordering menu
    *  surfaces them alongside built-ins. */
   sortColumnsCustom?: CustomColumnWithValues[];
   /** Open the Add-Property modal from the Display panel's Properties "+"
@@ -146,9 +145,9 @@ const ORDER_OPTIONS: { id: ListOrderBy; label: string }[] = [
 // Sort axes are independent of which columns the user has chosen to display
 // (Type / Due date / Assignee are the only real "columns"; Priority, Status,
 // Title, and Created live inline on every row already). This fixed catalogue
-// is the Sort menu's candidate list; `cc:`-prefixed custom Properties are
+// is the Ordering menu's candidate list; `cc:`-prefixed custom Properties are
 // appended alongside it for whichever ones the user currently shows as
-// columns (see SortMenu below).
+// columns (see OrderingControl below).
 const SORTABLE_ELEMENT_FIELDS: { id: ColumnId; label: string }[] = [
   { id: 'title',     label: 'Title' },
   { id: 'type',      label: 'Type' },
@@ -156,6 +155,7 @@ const SORTABLE_ELEMENT_FIELDS: { id: ColumnId; label: string }[] = [
   { id: 'priority',  label: 'Priority' },
   { id: 'due_date',  label: 'Due date' },
   { id: 'created_at', label: 'Created' },
+  { id: 'updated_at', label: 'Updated' },
   { id: 'assignee',  label: 'Assignee' },
 ];
 
@@ -207,14 +207,6 @@ export function ListControls({
 
   return (
     <div className="flex items-center gap-1.5">
-      {/* Sort — only rendered when the host wires up a column storage key */}
-      {sortColumnsStorageKey && (
-        <SortMenu
-          storageKey={sortColumnsStorageKey}
-          customColumns={sortColumnsCustom ?? EMPTY_CUSTOM}
-        />
-      )}
-
       {/* Filter */}
       <Popover open={filterOpen} onOpenChange={setFilterOpen}>
         <PopoverTrigger asChild>
@@ -515,6 +507,7 @@ function DisplayPanel({
   onAddColumn?: () => void;
 }) {
   const { t } = useI18n();
+  const orderingColumns = useListColumns(propertiesStorageKey, propertiesCustom ?? EMPTY_CUSTOM, { entity: propertiesStorageKey === 'domain' ? 'object' : 'element' });
   // If the current grouping isn't an offered option (e.g. 'object' inside a
   // single-Object view where it's hidden), display it as 'No grouping' so the
   // select never shows a dangling value. The underlying list already renders
@@ -529,12 +522,10 @@ function DisplayPanel({
         options={groupOptions.map(option => ({ ...option, label: t(option.label) }))}
         onSelect={(id) => setDisplay({ groupBy: id })}
       />
-      <LabeledSelect
-        icon={<ArrowDownWideNarrow size={15} />} label="Ordering"
-        value={display.orderBy}
-        options={ORDER_OPTIONS.map(option => ({ ...option, label: t(option.label) }))}
-        onSelect={(id) => setDisplay({ orderBy: id })}
-      />
+      {propertiesStorageKey ? <OrderingControl storageKey={propertiesStorageKey} customColumns={propertiesCustom ?? EMPTY_CUSTOM} display={display} setDisplay={setDisplay} /> :
+        <LabeledSelect icon={<ArrowDownWideNarrow size={15} />} label="Ordering" value={display.orderBy}
+          options={ORDER_OPTIONS.map(option => ({ ...option, label: t(option.label) }))} onSelect={(id) => setDisplay({ orderBy: id })} />}
+
 
       {/* Properties — which data columns show. Driven by the same shared
           column store the list header uses, so toggles here and in the
@@ -576,7 +567,7 @@ function DisplayPanel({
           <div className={MENU_SEPARATOR} />
           <button
             type="button"
-            onClick={onReset}
+            onClick={() => { orderingColumns.setSort(null); onReset(); }}
             className={`${MENU_ROW} text-muted-foreground hover:text-foreground`}
           >
             <RotateCcw size={14} />Reset to defaults
@@ -681,72 +672,45 @@ function MenuCheckRow({ label, checked, onClick, icon }: {
 }
 
 // Stable empty default for the optional Sort-menu custom columns array, so
-// SortMenu's parent doesn't re-render every tick when no Properties are passed.
+// OrderingControl receives a stable empty list when no Properties are passed.
 const EMPTY_CUSTOM: CustomColumnWithValues[] = [];
 
-// -- Sort menu ------------------------------------------------------------
-// Mirrors the column header's sort arrow but driven from the toolbar.
-// Reads / writes the same shared store (keyed by storageKey) so picking a
-// sort here updates the matching column's arrow instantly, and vice versa.
-
-function SortMenu({
-  storageKey,
-  customColumns,
-}: {
+// Ordering uses the same column store as the table header. Legacy display
+// ordering remains visible until the user changes it; a new choice clears
+// that fallback so there is only one active ordering source.
+const ORDER_COLUMN: Record<ListOrderBy, string | null> = {
+  manual: null, priority: 'priority', due: 'due_date', created: 'created_at', updated: 'updated_at', title: 'title',
+};
+function OrderingControl({ storageKey, customColumns, display, setDisplay }: {
   storageKey: string;
   customColumns: CustomColumnWithValues[];
+  display: ListDisplay;
+  setDisplay: (patch: Partial<ListDisplay>) => void;
 }) {
   const { t } = useI18n();
   const cols = useListColumns(storageKey, customColumns, { entity: storageKey === 'domain' ? 'object' : 'element' });
-  const [open, setOpen] = useState(false);
-  const active = cols.sort;
-  const ActiveIcon = active
-    ? (active.direction === 'asc' ? ArrowUp : ArrowDown)
-    : ArrowUpDown;
-  // Sort candidates = the fixed field catalogue (independent of which
-  // columns are on-screen) plus whichever custom Properties the user
-  // currently shows as columns — those still need a visible column to make
-  // their values legible while sorting by them.
-  const sortCandidates = useMemo<{ id: ColumnId; label: string }[]>(() => {
-    const customVisible = cols.visibleColumns.filter((c) => c.kind === 'custom');
-    return [...SORTABLE_ELEMENT_FIELDS.map(field => ({ ...field, label: t(field.label) })), ...customVisible.map((c) => ({ id: c.id, label: c.label }))];
-  }, [cols.visibleColumns, t]);
-  const activeLabel = active
-    ? sortCandidates.find((c) => c.id === active.id)?.label ?? null
-    : null;
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        {/* The trigger states the current sort in words. It used to be a bare
-            26px arrow whose only account of itself was a `title` attribute
-            reading "Sorted by column (asc)" — which does not even name the
-            column, so the sort order was unknowable without opening the menu
-            (DESIGN.md §5.11.5). Unsorted, it stays an icon-only square of the
-            same step, so the toolbar does not jump when a sort is cleared. */}
-        <Button
-          type="button"
-          variant="ghost"
-          size={active ? 'sm' : 'icon-sm'}
-          align="start"
-          aria-pressed={Boolean(active)}
-          className={active ? 'bg-[var(--surface-strong)] text-[var(--text-primary)]' : ''}
-          title={activeLabel ? `Sorted by ${activeLabel}, ${active!.direction === 'asc' ? 'ascending' : 'descending'}` : 'Sort'}
-          aria-label={activeLabel ? `Sorted by ${activeLabel}` : 'Sort'}
-        >
-          <ActiveIcon size={CONTROL.icon.sm} />
-          {activeLabel ? <span className="truncate max-w-[120px]">{activeLabel}</span> : null}
-        </Button>
-      </PopoverTrigger>
-      <MenuShell align="end" width="wide">
-        <LabeledSelect label="Sort by" icon={<ArrowUpDown size={15} />}
-          value={active?.id ?? 'manual'} options={[{ id: 'manual', label: t('Manual') }, ...sortCandidates]}
-          onSelect={(id) => cols.setSort(id === 'manual' ? null : { id, direction: active?.direction ?? 'asc' })} />
-        {active && <LabeledSelect label="Direction" icon={<ActiveIcon size={15} />}
-          value={active.direction} options={[{ id: 'asc', label: t('Ascending') }, { id: 'desc', label: t('Descending') }]}
-          onSelect={(direction) => cols.setSort({ id: active.id, direction })} />}
-      </MenuShell>
-    </Popover>
-  );
+  const legacyId = ORDER_COLUMN[display.orderBy];
+  const legacyDirection = display.orderBy === 'priority' ? (display.orderDir === 'asc' ? 'desc' : 'asc') : display.orderDir;
+  const active = cols.sort ?? (legacyId ? { id: legacyId, direction: legacyDirection } : null);
+  const candidates = [
+    ...SORTABLE_ELEMENT_FIELDS.map(field => ({ ...field, label: t(field.label) })),
+    ...cols.visibleColumns.filter(c => c.kind === 'custom').map(c => ({ id: c.id, label: c.label })),
+  ];
+  // Header sorting may name another visible built-in (e.g. Object progress).
+  const activeColumn = cols.allColumns.find(c => c.id === active?.id);
+  if (activeColumn && !candidates.some(c => c.id === activeColumn.id)) candidates.push({ id: activeColumn.id, label: activeColumn.label });
+  const choose = (id: string, direction: 'asc' | 'desc') => {
+    cols.setSort(id === 'manual' ? null : { id, direction });
+    setDisplay({ orderBy: 'manual', orderDir: direction });
+  };
+  return <>
+    <LabeledSelect label="Ordering" icon={<ArrowUpDown size={15} />}
+      value={active?.id ?? 'manual'} options={[{ id: 'manual', label: t('Manual') }, ...candidates]}
+      onSelect={(id) => choose(id, active?.direction ?? 'asc')} />
+    {active && <LabeledSelect label="Direction" icon={active.direction === 'asc' ? <ArrowUp size={15} /> : <ArrowDown size={15} />}
+      value={active.direction} options={[{ id: 'asc', label: t('Ascending') }, { id: 'desc', label: t('Descending') }]}
+      onSelect={(direction) => choose(active.id, direction)} />}
+  </>;
 }
 
 // Re-export for convenience.

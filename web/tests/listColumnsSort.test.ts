@@ -186,3 +186,13 @@ describe('sortElements — nulls sort last in both directions', () => {
     expect(idsOf(sortElements(allNull, desc('type'), []))).toEqual(['x', 'y', 'z']);
   });
 });
+
+// Ordering previously read updated_at outside the column sorter. The unified
+// control must keep that option functional in both directions, with nulls last.
+describe('Updated ordering', () => {
+  it('orders timestamps in both directions without promoting empty dates', () => {
+    const rows = [row({ id: 'empty', updated_at: null }), row({ id: 'new', updated_at: '2026-09-15T00:00:00Z' }), row({ id: 'old', updated_at: '2026-09-01T00:00:00Z' })];
+    expect(idsOf(sortElements(rows, asc('updated_at'), []))).toEqual(['old', 'new', 'empty']);
+    expect(idsOf(sortElements(rows, desc('updated_at'), []))).toEqual(['new', 'old', 'empty']);
+  });
+});

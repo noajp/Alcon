@@ -18,8 +18,8 @@ export function FieldVisibility({ columns, isVisible, onToggle, compact = false 
   if (compact) return <div className="px-2 py-2">
     <MenuSectionLabel className="px-0 pb-2">{t('Display properties')}</MenuSectionLabel>
     <div className="flex flex-wrap gap-1.5">
-      {columns.map((c) => <Button key={c.id} type="button" size="sm" variant={isVisible(c.id) ? 'secondary' : 'ghost'} className={isVisible(c.id) ? 'bg-[var(--surface-strong)]' : 'text-muted-foreground'}
-        aria-pressed={isVisible(c.id)} disabled={!c.toggleable} onClick={() => onToggle(c.id)}>{c.label}</Button>)}
+      {columns.map((c) => <Button key={c.id} type="button" size="sm" variant={isVisible(c.id) ? 'secondary' : 'ghost'} className={`max-w-full ${isVisible(c.id) ? 'bg-[var(--surface-strong)]' : 'text-muted-foreground'}`}
+        aria-pressed={isVisible(c.id)} disabled={!c.toggleable} onClick={() => onToggle(c.id)} title={c.label}><span className="truncate">{c.label}</span></Button>)}
     </div>
   </div>;
   return <ButtonAppearanceProvider appearance="navigation"><div className="space-y-2">
