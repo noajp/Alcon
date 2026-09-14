@@ -9,6 +9,11 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { CONTROL } from "@/shared/designTokens"
 
+const ButtonAppearance = React.createContext<'control' | 'navigation'>('control');
+export function ButtonAppearanceProvider({ children, appearance }: { children: React.ReactNode; appearance: 'control' | 'navigation' }) {
+  return <ButtonAppearance.Provider value={appearance}>{children}</ButtonAppearance.Provider>;
+}
+
 const buttonVariants = cva(
   [
     "inline-flex items-center whitespace-nowrap shrink-0 select-none",
@@ -91,6 +96,8 @@ function Button({
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
   }) {
+  const appearance = React.useContext(ButtonAppearance);
+  const resolvedAlign = size?.startsWith('icon-') ? 'center' : align;
   const Comp = asChild ? Slot : "button"
 
   return (
@@ -99,7 +106,9 @@ function Button({
       data-variant={variant}
       data-size={size}
       data-shape={shape}
-      className={cn(buttonVariants({ variant, size, align, shape, multiline, className }))}
+      className={cn(buttonVariants({ variant, size, align: resolvedAlign, shape, multiline, className }),
+        appearance === 'navigation' && 'rounded-[var(--control-tab-radius)] border-transparent hover:border-transparent aria-pressed:border-transparent aria-selected:border-transparent'
+      )}
       {...props}
     />
   )

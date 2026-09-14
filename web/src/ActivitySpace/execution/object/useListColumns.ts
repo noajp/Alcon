@@ -57,8 +57,6 @@ const NAME_MAX_WIDTH = 1200;
 // non-toggleable) on both. Elements carry an Assignee; Objects carry a Lead
 // (objects.lead_id), a computed Progress bar, and an Elements count instead.
 const ELEMENT_BUILTIN_COLUMNS: DataColumn[] = [
-  { id: 'status', label: 'Status', kind: 'builtin', toggleable: true, defaultWidth: 128 },
-  { id: 'priority', label: 'Priority', kind: 'builtin', toggleable: true, defaultWidth: 110 },
   { id: 'labels', label: 'Tags', kind: 'builtin', toggleable: true, defaultWidth: 160 },
   { id: 'objects', label: 'Objects', kind: 'builtin', toggleable: true, defaultWidth: 160 },
   { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: true, defaultWidth: DEFAULT_COLUMN_WIDTH },

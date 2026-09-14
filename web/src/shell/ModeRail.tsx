@@ -13,7 +13,7 @@ import {
   type RailMode,
 } from '@/shell/railApps';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { MenuShell, MenuSectionLabel } from '@/Function/shared/menu';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
@@ -131,8 +131,8 @@ export function ModeRail({
   };
 
   return (
-    <Popover open={launcherOpen} onOpenChange={setLauncherOpen}>
-    <div className="flex w-[46px] shrink-0 flex-col items-center gap-1 border-r border-border bg-background py-2">
+    <ButtonAppearanceProvider appearance="navigation"><Popover open={launcherOpen} onOpenChange={setLauncherOpen}>
+    <div className="flex w-[46px] shrink-0 flex-col items-center gap-1 bg-background py-2">
       {CORE_MODES.map((mode) => (
         <RailButton
           key={mode}
@@ -182,7 +182,7 @@ export function ModeRail({
         <ProfileRailButton active={activeView === 'profile'} onClick={() => onViewChange('profile')} />
       </div>
 
-      <MenuShell width="wide" side="right" align="start" sideOffset={8} aria-label={t('Sustainment apps')}>
+      <MenuShell className="border-transparent" width="wide" side="right" align="start" sideOffset={8} aria-label={t('Sustainment apps')}>
             {APP_GROUPS.map((group) => (
               <div key={group.title} className="mb-2 last:mb-0">
                 <MenuSectionLabel>{t(group.title)}</MenuSectionLabel>
@@ -228,6 +228,6 @@ export function ModeRail({
             ))}
       </MenuShell>
     </div>
-    </Popover>
+    </Popover></ButtonAppearanceProvider>
   );
 }
