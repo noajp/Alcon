@@ -145,15 +145,16 @@ describe('the feed survives a kind it has never heard of', () => {
 });
 
 describe('the feed is reachable without a mouse', () => {
-  it('gives every row and row action a real button', () => {
+  it('gives rows and selected notification actions real buttons', async () => {
     feed = [notification()];
     render(<InboxView />);
 
     const row = screen.getByRole('button', { name: /commented on Wire the Inbox/ });
     expect(row.tagName).toBe('BUTTON');
-    // The row's own actions are separately focusable, not hover-only affordances
-    // hidden behind a pointer.
-    expect(screen.getByRole('button', { name: 'Mark as read' }).tagName).toBe('BUTTON');
+    // Actions stay labelled in the reader instead of covering row text.
+    fireEvent.click(row);
+    await vi.waitFor(() => expect(screen.getByTestId('element-detail')).toBeTruthy());
+    expect(screen.getByRole('button', { name: 'Mark as unread' }).tagName).toBe('BUTTON');
     expect(screen.getByRole('button', { name: 'Archive' }).tagName).toBe('BUTTON');
   });
 

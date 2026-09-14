@@ -83,7 +83,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
 
   return <InboxLayout
     notifications={visible.slice(0, renderLimit)} unreadCount={unreadCount} loading={loading}
-    unreadOnly={unreadOnly} selectedId={selected?.id ?? null} hasMore={visible.length > renderLimit}
+    unreadOnly={unreadOnly} selectedNotification={notifications.find(n => n.id === selected?.id) ?? selected} hasMore={visible.length > renderLimit}
     onSelect={select} onBack={() => setSelected(null)}
     onFilter={() => { setUnreadOnly(v => !v); setRenderLimit(RENDER_PAGE_SIZE); }}
     onMarkAllRead={markAllRead} onToggleRead={toggleRead} onArchive={archive}
