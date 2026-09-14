@@ -43,7 +43,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
       if (!cancelled) setLoaded({ elementId, element: null });
     });
     return () => { cancelled = true; };
-  }, [elementId, revision]);
+  }, [elementId, revision, selectionRevision]);
 
   const detail = elementId && loaded?.elementId === elementId ? loaded : null;
   // Keep the notification being read in the unread view until the user leaves it.
