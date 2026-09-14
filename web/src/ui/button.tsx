@@ -16,7 +16,7 @@ export function ButtonAppearanceProvider({ children, appearance }: { children: R
 
 const buttonVariants = cva(
   [
-    "inline-flex items-center whitespace-nowrap shrink-0 select-none",
+    "inline-flex items-center whitespace-nowrap shrink-0 select-none leading-none",
     CONTROL.border,
     "hover:border-[var(--border-strong)]",
     "font-medium",
@@ -65,7 +65,7 @@ const buttonVariants = cva(
         "icon-sm": [CONTROL.square.sm, "p-0 justify-center"].join(" "),
         "icon-md": [CONTROL.square.md, "p-0 justify-center"].join(" "),
       },
-      multiline: { true: "h-auto min-h-7 max-w-full whitespace-normal py-1.5 text-left justify-start", false: "" },
+      multiline: { true: "leading-snug h-auto min-h-7 max-w-full whitespace-normal py-1.5 text-left justify-start", false: "" },
       align: {
         /** Execute CTA — "press this and something happens". */
         center: "justify-center",
@@ -83,6 +83,23 @@ const buttonVariants = cva(
   }
 )
 
+// Text gets its own block so flex aligns the glyph metrics. Keep adjacent
+// text/count nodes together: wrapping each one would introduce extra flex gaps.
+function buttonLabels(children: React.ReactNode): React.ReactNode[] {
+  const result: React.ReactNode[] = [];
+  let text = '';
+  const flush = () => {
+    if (text.trim()) result.push(<span key={`label-${result.length}`} className={CONTROL.label}>{text}</span>);
+    text = '';
+  };
+  React.Children.toArray(children).forEach(child => {
+    if (typeof child === 'string' || typeof child === 'number') text += child;
+    else { flush(); result.push(child); }
+  });
+  flush();
+  return result;
+}
+
 function Button({
   className,
   variant = "secondary",
@@ -91,6 +108,7 @@ function Button({
   shape = "action",
   multiline = false,
   asChild = false,
+  children,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
@@ -110,7 +128,9 @@ function Button({
         appearance === 'navigation' && 'rounded-[var(--control-tab-radius)] border-transparent hover:border-transparent aria-pressed:border-transparent aria-selected:border-transparent'
       )}
       {...props}
-    />
+    >
+      {asChild ? children : buttonLabels(children)}
+    </Comp>
   )
 }
 
