@@ -5,27 +5,30 @@
 
 /* =============================================
    Alcon Design System
-   Accent: Blue (#1f6feb) — a true blue between cyan and navy, single accent
-   Danger: Matte red (#ce4a3b) — muted and slightly light, not fire-engine
+   Accent: Matte blue (#426fac) — muted, single accent
+   Danger: Matte red (#c45147) — muted, warm red
    Surfaces: neutral dark-first ramp
    Typography: Inter Variable, 13px base
    ============================================= */
 
 :root {
+  --control-action-radius: 9999px;
+  --control-tab-radius: 6px;
+  --control-field-radius: 6px;
   /* ---- Accent (Blue — single accent) ---- */
-  --accent-default: #1f6feb;
-  --accent-hover:   #5793f0;
-  --accent-subtle:  rgba(31, 111, 235, 0.15);
+  --accent-default: #426fac;
+  --accent-hover:   #365d94;
+  --accent-subtle:  rgba(66, 111, 172, 0.15);
 
   /* ---- Status (semantic only) ---- */
   --status-success:        #27a644;
   --status-success-subtle: rgba(39, 166, 68, 0.15);
   --status-warning:        #f59e0b;
   --status-warning-subtle: rgba(245, 158, 11, 0.15);
-  --status-danger:         #ce4a3b;
-  --status-danger-subtle:  rgba(206, 74, 59, 0.15);
-  --status-info:           #1f6feb;
-  --status-info-subtle:    rgba(31, 111, 235, 0.15);
+  --status-danger:         #c45147;
+  --status-danger-subtle:  rgba(196, 81, 71, 0.15);
+  --status-info:           var(--accent-default);
+  --status-info-subtle:    var(--accent-subtle);
 
   /* ---- Element status ramp ----
      The hue an Element status is drawn in: the mark in every list row, the
@@ -502,7 +505,7 @@ button, a, input, select, textarea {
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   height: 32px; padding: 0 12px; font-size: 14px; font-weight: 510;
-  border-radius: var(--radius-sm); cursor: pointer; border: none;
+  border-radius: var(--control-action-radius); cursor: pointer; border: 1px solid var(--border-default);
   font-family: inherit; transition: background var(--motion-fast), opacity var(--motion-fast);
 }
 .btn:active { transform: scale(0.98); transition-duration: 80ms; }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, FileText, Flag } from 'lucide-react';
+import { Button } from '@/ui/button';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
 
 interface TabBarProps {
@@ -99,22 +100,18 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
 
   return (
     <div className="flex items-center gap-1.5 px-4 py-2 bg-transparent">
-      {/* Tabs — pill / chip buttons */}
+      {/* Tabs — outlined rectangles */}
       <div className="flex items-center gap-1.5 overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           const TabIcon = OBJECT_TAB_META[tab.tab_type].Icon;
           return (
-            <button
+            <Button
               key={tab.id}
-              className={`
-                flex items-center gap-1.5 px-3 py-1 cursor-pointer select-none rounded-md
-                transition-colors flex-shrink-0 border
-                ${isActive
-                  ? 'bg-muted text-foreground border-border'
-                  : 'text-muted-foreground border-border/50 hover:text-foreground hover:bg-muted/40 hover:border-border'
-                }
-              `}
+              type="button"
+              shape="tab"
+              variant={isActive ? 'secondary' : 'ghost'}
+              aria-pressed={isActive}
               onClick={() => onTabSelect(tab.id)}
               onContextMenu={(e) => handleContextMenu(e, tab)}
             >
@@ -124,20 +121,21 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
               <span className="text-xs font-semibold">
                 {tab.title}
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>
 
       {/* Add Tab Button */}
       <div className="relative flex items-center flex-shrink-0">
-        <button
+        <Button
           type="button"
+          size="icon-sm"
+          aria-label="Add tab"
           onClick={() => setShowCreateMenu(!showCreateMenu)}
-          className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-colors"
         >
           <Plus size={14} />
-        </button>
+        </Button>
 
         {showCreateMenu && (
           <>

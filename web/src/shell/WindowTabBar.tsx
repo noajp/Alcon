@@ -1,5 +1,7 @@
 'use client';
+import { Button } from '@/ui/button';
 
+import { CONTROL } from '@/shared/designTokens';
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { Plus, X, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
@@ -33,12 +35,12 @@ function findObjectName(objects: AlconObjectWithChildren[] | undefined, id: stri
   return objects?.find((o) => o.id === id)?.name ?? null;
 }
 
-function getTabLabel(tab: AppTab, explorerData?: ExplorerData): string {
+function getObjectTabLabel(tab: AppTab, explorerData?: ExplorerData): string | null {
   if (tab.activeView === 'objects' && tab.navigation.objectId) {
     const name = findObjectName(explorerData?.objects, tab.navigation.objectId);
     if (name) return name;
   }
-  return viewLabel(tab.activeView);
+  return null;
 }
 
 function getTabIcon(tab: AppTab): React.ReactNode {
@@ -67,7 +69,8 @@ export function WindowTabBar({
       <div className="flex items-center gap-1.5 overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
-          const label = t(getTabLabel(tab, explorerData));
+          // User-authored Object names are content, never translation keys.
+          const label = getObjectTabLabel(tab, explorerData) ?? t(viewLabel(tab.activeView));
           return (
             <div
               key={tab.id}
@@ -82,17 +85,10 @@ export function WindowTabBar({
               }}
               className={`
                 group flex items-center gap-1.5 pl-3 pr-2 py-1 cursor-pointer select-none
-                rounded-md transition-colors flex-shrink-0 min-w-[200px] max-w-[280px]
-                border
+                ${CONTROL.tabRadius} ${CONTROL.border} transition-colors flex-shrink-0 min-w-[200px] max-w-[280px]
                 ${isActive
-                  // Match the MainIsland wrapper exactly so the active tab
-                  // reads as the same surface (`bg-white dark:bg-card` +
-                  // `border-border/60` — a thin line, a touch stronger than the
-                  // ModeRail's so the island + tabs read clearly). Previously a
-                  // punchier `border-foreground/30` outline left the active chip
-                  // looking distinct rather than the top of the island below.
-                  ? 'bg-white dark:bg-card text-foreground border-border/60'
-                  : 'bg-transparent text-muted-foreground border-border hover:text-foreground hover:bg-muted/30 hover:border-foreground/20'
+                  ? 'bg-white dark:bg-card text-foreground border-[var(--border-strong)]'
+                  : 'bg-transparent text-foreground hover:bg-muted/30 hover:border-[var(--border-strong)]'
                 }
               `}
             >
@@ -103,52 +99,52 @@ export function WindowTabBar({
                 {label}
               </span>
               {tabs.length > 1 && (
-                <button
+                <Button size="icon-sm" variant="ghost"
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onClose(tab.id); }}
                   aria-label={t('Close tab')}
-                  className="opacity-0 group-hover:opacity-100 w-4 h-4 flex items-center justify-center rounded-full hover:bg-accent text-muted-foreground hover:text-foreground transition-opacity shrink-0"
+                  className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 w-4 h-4 flex items-center justify-center rounded-full hover:bg-accent text-muted-foreground hover:text-foreground transition-opacity shrink-0"
                 >
                   <X size={11} />
-                </button>
+                </Button>
               )}
             </div>
           );
         })}
       </div>
-      <button
+      <Button size="icon-sm" variant="ghost"
         type="button"
         onClick={onCreate}
         aria-label={t('New tab')}
         className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-colors flex-shrink-0"
       >
         <Plus size={14} />
-      </button>
+      </Button>
       <div className="flex-1" />
       {onToggleSidebar && (
-        <button
+        <Button size="icon-sm" variant="ghost"
           type="button"
           onClick={onToggleSidebar}
           aria-label={t(sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar')}
           title={t(sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar')}
-          className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-md transition-colors flex-shrink-0"
+          className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors flex-shrink-0"
         >
           {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-        </button>
+        </Button>
       )}
       {/* Right-panel toggle → opens the AI pane. State lives in the page so
           this button + ⌘L + the panel's own close button all flip the same
           boolean. Closed shows ">" (open it); open shows "<" (collapse). */}
       {onToggleCopilot && (
-        <button
+        <Button size="icon-sm" variant="ghost"
           type="button"
           onClick={onToggleCopilot}
           aria-label={t(copilotOpen ? 'Hide AI' : 'Show AI')}
           title={`AI ( ⌘L )${copilotOpen ? ' — hide' : ''}`}
-          className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-md transition-colors flex-shrink-0"
+          className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors flex-shrink-0"
         >
           {copilotOpen ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
-        </button>
+        </Button>
       )}
     </div>
   );

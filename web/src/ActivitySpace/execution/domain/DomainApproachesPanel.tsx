@@ -64,7 +64,7 @@ export function DomainApproachesPanel({ data, objects, host, onSave }: {
           <span className="text-muted-foreground">{ROLE_LABELS[row.role]} · {row.sequence_note || row.rationale}</span>
         </div>)}</div>)}
       </section>}
-      <div className="flex flex-wrap gap-1" aria-label="Approaches">{data.approaches.map(a => <Button key={a.id} variant={current?.id === a.id ? 'secondary' : 'ghost'} aria-pressed={current?.id === a.id} onClick={() => setSelected(a.id)}>{a.title}{approachReview(a, data.reviews)?.action === 'stop' ? ' · Stopped' : ''}</Button>)}</div>
+      <div className="flex flex-wrap gap-1" aria-label="Approaches">{data.approaches.map(a => <Button shape="tab" key={a.id} variant={current?.id === a.id ? 'secondary' : 'ghost'} aria-pressed={current?.id === a.id} onClick={() => setSelected(a.id)}>{a.title}{approachReview(a, data.reviews)?.action === 'stop' ? ' · Stopped' : ''}</Button>)}</div>
       {current && renderApproachDetail(current)}
     </>}
     {!data.canEdit && <p className="text-xs text-muted-foreground">Domain owners and admins can edit approaches and record judgments.</p>}

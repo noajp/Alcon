@@ -17,10 +17,9 @@ let cachedLocale: Locale | null = null;
 function readLocale(): Locale {
   if (typeof window === 'undefined') return DEFAULT_LOCALE;
   if (cachedLocale) return cachedLocale;
-  cachedLocale = resolveLocale(
-    window.localStorage.getItem(LOCALE_STORAGE_KEY),
-    window.navigator.languages,
-  );
+  let saved: string | null = null;
+  try { saved = window.localStorage.getItem(LOCALE_STORAGE_KEY); } catch { /* storage may be disabled */ }
+  cachedLocale = resolveLocale(saved, window.navigator.languages ?? [window.navigator.language]);
   return cachedLocale;
 }
 

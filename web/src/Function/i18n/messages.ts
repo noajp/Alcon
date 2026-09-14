@@ -125,36 +125,91 @@ Object.assign(ja, {
 });
 
 Object.assign(ko, {
+  'A new note': '새 노트', 'Add Notebook': '노트북 추가', 'Add Table': '테이블 추가',
   'Adjust the size of text across the app': '앱 전체의 글자 크기를 조절합니다', 'Collapse': '접기',
-  'Convert text emoticons into emojis': '텍스트 이모티콘을 이모지로 변환', 'Dark': '다크', 'Expand': '펼치기', 'Full name': '전체 이름',
+  'Change the cursor to a pointer over interactive elements': '상호작용 요소에 포인터 커서를 표시합니다',
+  'Convert text emoticons into emojis': '텍스트 이모티콘을 이모지로 변환', 'Customize sidebar item visibility, ordering, and badge style': '사이드바 표시, 순서, 배지 스타일을 설정합니다',
+  'Dark': '다크', 'Discover Domains and Objects': 'Domains과 Objects 탐색', 'Drag to resize': '드래그하여 크기 조절', 'Enter': 'Enter', 'Expand': '펼치기', 'Full name': '전체 이름',
+  'Hide AI': 'AI 숨기기', 'Hide sidebar': '사이드바 숨기기', 'Large': '큼', 'Larger': '더 큼',
   'How names are shown across the interface': '인터페이스에서 이름을 표시하는 방식', 'Labels': '라벨', 'Light': '라이트',
-  'Monday': '월요일', 'Navigation': '탐색', 'Note': '노트', 'Notes': '노트', 'Saturday': '토요일',
+  'Match the system or pick a colour theme': '시스템에 맞추거나 색상 테마를 선택합니다',
+  'Monday': '월요일', 'Navigation': '탐색', 'Note': '노트', 'Notes': '노트', 'Object': 'Object', 'Remove {label} from the rail': '레일에서 {label} 제거', 'Saturday': '토요일',
+  'Search elements, objects, notes. Press ⌘K to open.': 'Elements, Objects, 노트를 검색합니다. ⌘K로 엽니다.',
   'Search elements, objects, notes…': 'Elements, Objects, 노트 검색…', 'Searching…': '검색 중…',
-  'Select which view to open when launching Alcon': 'Alcon 시작 시 열 뷰를 선택합니다', 'Short name': '짧은 이름',
-  'SLAs': 'SLA', 'Statuses': '상태', 'Sunday': '일요일', 'Templates': '템플릿', 'Try Again': '다시 시도', 'Updates': '업데이트',
+  'Select which view to open when launching Alcon': 'Alcon 시작 시 열 뷰를 선택합니다', 'Send comment on…': '댓글 제출 키', 'Short name': '짧은 이름',
+  'Show AI': 'AI 표시', 'Show sidebar': '사이드바 표시', 'SLAs': 'SLA', 'Small': '작음', 'Smaller': '더 작음', 'Statuses': '상태', 'Sunday': '일요일', 'Templates': '템플릿', 'Top-level container': '최상위 컨테이너', 'Try Again': '다시 시도', 'Updates': '업데이트',
   'Used for date pickers': '날짜 선택기에 사용', 'Username': '사용자 이름', 'Which key press submits a comment': '댓글을 제출할 키',
 });
 
 Object.assign(fr, {
+  'A new note': 'Une nouvelle note', 'Add Notebook': 'Ajouter un carnet', 'Add Table': 'Ajouter un tableau',
   'Adjust the size of text across the app': 'Ajuster la taille du texte dans toute l’application', 'Collapse': 'Réduire',
-  'Convert text emoticons into emojis': 'Convertir les émoticônes en emojis', 'Dark': 'Sombre', 'Expand': 'Développer', 'Full name': 'Nom complet',
+  'Change the cursor to a pointer over interactive elements': 'Afficher un pointeur sur les éléments interactifs', 'Convert text emoticons into emojis': 'Convertir les émoticônes en emojis',
+  'Customize sidebar item visibility, ordering, and badge style': 'Personnaliser la visibilité, l’ordre et les badges de la barre latérale',
+  'Dark': 'Sombre', 'Discover Domains and Objects': 'Découvrir les Domains et Objects', 'Drag to resize': 'Faire glisser pour redimensionner', 'Enter': 'Entrée', 'Expand': 'Développer', 'Full name': 'Nom complet',
+  'Hide AI': 'Masquer l’IA', 'Hide sidebar': 'Masquer la barre latérale', 'Large': 'Grand', 'Larger': 'Très grand',
   'How names are shown across the interface': 'Mode d’affichage des noms dans l’interface', 'Labels': 'Étiquettes', 'Light': 'Clair',
-  'Monday': 'Lundi', 'Navigation': 'Navigation', 'Note': 'Note', 'Notes': 'Notes', 'Saturday': 'Samedi',
+  'Match the system or pick a colour theme': 'Suivre le système ou choisir un thème de couleur',
+  'Monday': 'Lundi', 'Navigation': 'Navigation', 'Note': 'Note', 'Notes': 'Notes', 'Object': 'Object', 'Remove {label} from the rail': 'Retirer {label} de la barre', 'Saturday': 'Samedi',
+  'Search elements, objects, notes. Press ⌘K to open.': 'Recherchez des Elements, Objects et notes. Appuyez sur ⌘K pour ouvrir.',
   'Search elements, objects, notes…': 'Rechercher des Elements, Objects et notes…', 'Searching…': 'Recherche…',
-  'Select which view to open when launching Alcon': 'Choisir la vue ouverte au lancement d’Alcon', 'Short name': 'Prénom',
-  'SLAs': 'SLA', 'Statuses': 'Statuts', 'Sunday': 'Dimanche', 'Templates': 'Modèles', 'Try Again': 'Réessayer', 'Updates': 'Mises à jour',
+  'Select which view to open when launching Alcon': 'Choisir la vue ouverte au lancement d’Alcon', 'Send comment on…': 'Envoyer le commentaire avec…', 'Short name': 'Prénom',
+  'Show AI': 'Afficher l’IA', 'Show sidebar': 'Afficher la barre latérale', 'SLAs': 'SLA', 'Small': 'Petit', 'Smaller': 'Très petit', 'Statuses': 'Statuts', 'Sunday': 'Dimanche', 'Templates': 'Modèles', 'Top-level container': 'Conteneur principal', 'Try Again': 'Réessayer', 'Updates': 'Mises à jour',
   'Used for date pickers': 'Utilisé dans les sélecteurs de date', 'Username': "Nom d’utilisateur", 'Which key press submits a comment': 'Touche utilisée pour envoyer un commentaire',
 });
 
 Object.assign(es, {
+  'A new note': 'Una nota nueva', 'Add Notebook': 'Añadir cuaderno', 'Add Table': 'Añadir tabla',
   'Adjust the size of text across the app': 'Ajusta el tamaño del texto en toda la aplicación', 'Collapse': 'Contraer',
-  'Convert text emoticons into emojis': 'Convertir emoticonos de texto en emojis', 'Dark': 'Oscuro', 'Expand': 'Expandir', 'Full name': 'Nombre completo',
+  'Change the cursor to a pointer over interactive elements': 'Mostrar un puntero sobre los elementos interactivos', 'Convert text emoticons into emojis': 'Convertir emoticonos de texto en emojis',
+  'Customize sidebar item visibility, ordering, and badge style': 'Personaliza la visibilidad, el orden y las insignias de la barra lateral',
+  'Dark': 'Oscuro', 'Discover Domains and Objects': 'Descubrir Domains y Objects', 'Drag to resize': 'Arrastra para cambiar el tamaño', 'Enter': 'Intro', 'Expand': 'Expandir', 'Full name': 'Nombre completo',
+  'Hide AI': 'Ocultar IA', 'Hide sidebar': 'Ocultar barra lateral', 'Large': 'Grande', 'Larger': 'Más grande',
   'How names are shown across the interface': 'Cómo se muestran los nombres en la interfaz', 'Labels': 'Etiquetas', 'Light': 'Claro',
-  'Monday': 'Lunes', 'Navigation': 'Navegación', 'Note': 'Nota', 'Notes': 'Notas', 'Saturday': 'Sábado',
+  'Match the system or pick a colour theme': 'Usa el tema del sistema o elige un tema de color',
+  'Monday': 'Lunes', 'Navigation': 'Navegación', 'Note': 'Nota', 'Notes': 'Notas', 'Object': 'Object', 'Remove {label} from the rail': 'Quitar {label} de la barra', 'Saturday': 'Sábado',
+  'Search elements, objects, notes. Press ⌘K to open.': 'Busca Elements, Objects y notas. Pulsa ⌘K para abrir.',
   'Search elements, objects, notes…': 'Buscar Elements, Objects y notas…', 'Searching…': 'Buscando…',
-  'Select which view to open when launching Alcon': 'Selecciona la vista que se abrirá al iniciar Alcon', 'Short name': 'Nombre corto',
-  'SLAs': 'SLA', 'Statuses': 'Estados', 'Sunday': 'Domingo', 'Templates': 'Plantillas', 'Try Again': 'Reintentar', 'Updates': 'Actualizaciones',
+  'Select which view to open when launching Alcon': 'Selecciona la vista que se abrirá al iniciar Alcon', 'Send comment on…': 'Enviar comentario con…', 'Short name': 'Nombre corto',
+  'Show AI': 'Mostrar IA', 'Show sidebar': 'Mostrar barra lateral', 'SLAs': 'SLA', 'Small': 'Pequeño', 'Smaller': 'Más pequeño', 'Statuses': 'Estados', 'Sunday': 'Domingo', 'Templates': 'Plantillas', 'Top-level container': 'Contenedor principal', 'Try Again': 'Reintentar', 'Updates': 'Actualizaciones',
   'Used for date pickers': 'Se usa en los selectores de fecha', 'Username': 'Nombre de usuario', 'Which key press submits a comment': 'Tecla que envía un comentario',
 });
 
-export const MESSAGES: Record<Exclude<Locale, 'en'>, TranslationMap> = { ja, ko, fr, es };
+const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
+  ja: {
+    'Carbon': 'カーボン', "Couldn't save": '保存できませんでした', 'Domain Elements': 'Domain の Elements', 'Graphite': 'グラファイト',
+    'Ivory': 'アイボリー', 'Mid-level structural unit': '中間レベルの構造単位', 'Midnight': 'ミッドナイト', 'Mist': 'ミスト',
+    'New Element': '新しい Element', 'New Initiative': '新しい Initiative', 'New Object': '新しい Object',
+    'No notebooks yet — click + to add one.': 'ノートブックはまだありません。+ で追加できます。',
+    'No tables yet — click + to add one.': 'テーブルはまだありません。+ で追加できます。',
+    'Open Calendar': 'カレンダーを開く', 'Open Inbox': '受信トレイを開く', 'Open Notebook': 'ノートブックを開く', 'Open Table': 'テーブルを開く', 'Open Team': 'チームを開く', 'Open Workload': 'ワークロードを開く',
+    'Go to Now': '現在へ移動', 'Snow': 'スノー', 'Something went wrong': '問題が発生しました', 'Strings like :) will be converted to 🙂': ':) などの文字を 🙂 に変換します', 'Sustainment apps': 'Sustainment アプリ',
+  },
+  ko: {
+    'Carbon': '카본', "Couldn't save": '저장할 수 없습니다', 'Domain Elements': 'Domain Elements', 'Graphite': '그래파이트', 'Ivory': '아이보리',
+    'Mid-level structural unit': '중간 수준 구조 단위', 'Midnight': '미드나잇', 'Mist': '미스트', 'New Element': '새 Element', 'New Initiative': '새 Initiative', 'New Object': '새 Object',
+    'No notebooks yet — click + to add one.': '노트북이 없습니다. +를 눌러 추가하세요.', 'No tables yet — click + to add one.': '테이블이 없습니다. +를 눌러 추가하세요.',
+    'Open Calendar': '캘린더 열기', 'Open Inbox': '받은편지함 열기', 'Open Notebook': '노트북 열기', 'Open Table': '테이블 열기', 'Open Team': '팀 열기', 'Open Workload': '워크로드 열기',
+    'Go to Now': '지금으로 이동', 'Snow': '스노우', 'Something went wrong': '문제가 발생했습니다', 'Strings like :) will be converted to 🙂': ':)와 같은 문자열을 🙂로 변환합니다', 'Sustainment apps': 'Sustainment 앱',
+  },
+  fr: {
+    'Carbon': 'Carbone', "Couldn't save": 'Enregistrement impossible', 'Domain Elements': 'Elements du Domain', 'Graphite': 'Graphite', 'Ivory': 'Ivoire',
+    'Mid-level structural unit': 'Unité structurelle intermédiaire', 'Midnight': 'Minuit', 'Mist': 'Brume', 'New Element': 'Nouvel Element', 'New Initiative': 'Nouvelle Initiative', 'New Object': 'Nouvel Object',
+    'No notebooks yet — click + to add one.': 'Aucun carnet. Cliquez sur + pour en ajouter un.', 'No tables yet — click + to add one.': 'Aucun tableau. Cliquez sur + pour en ajouter un.',
+    'Open Calendar': 'Ouvrir le calendrier', 'Open Inbox': 'Ouvrir la boîte de réception', 'Open Notebook': 'Ouvrir le carnet', 'Open Table': 'Ouvrir le tableau', 'Open Team': 'Ouvrir l’équipe', 'Open Workload': 'Ouvrir la charge de travail',
+    'Go to Now': 'Aller à Maintenant', 'Snow': 'Neige', 'Something went wrong': 'Un problème est survenu', 'Strings like :) will be converted to 🙂': 'Les chaînes comme :) seront converties en 🙂', 'Sustainment apps': 'Applications Sustainment',
+  },
+  es: {
+    'Carbon': 'Carbono', "Couldn't save": 'No se pudo guardar', 'Domain Elements': 'Elements del Domain', 'Graphite': 'Grafito', 'Ivory': 'Marfil',
+    'Mid-level structural unit': 'Unidad estructural intermedia', 'Midnight': 'Medianoche', 'Mist': 'Niebla', 'New Element': 'Nuevo Element', 'New Initiative': 'Nueva Initiative', 'New Object': 'Nuevo Object',
+    'No notebooks yet — click + to add one.': 'Todavía no hay cuadernos. Pulsa + para añadir uno.', 'No tables yet — click + to add one.': 'Todavía no hay tablas. Pulsa + para añadir una.',
+    'Open Calendar': 'Abrir calendario', 'Open Inbox': 'Abrir bandeja de entrada', 'Open Notebook': 'Abrir cuaderno', 'Open Table': 'Abrir tabla', 'Open Team': 'Abrir equipo', 'Open Workload': 'Abrir carga de trabajo',
+    'Go to Now': 'Ir a Ahora', 'Snow': 'Nieve', 'Something went wrong': 'Algo salió mal', 'Strings like :) will be converted to 🙂': 'Las cadenas como :) se convertirán en 🙂', 'Sustainment apps': 'Aplicaciones Sustainment',
+  },
+};
+
+const MESSAGES_PLACEHOLDER: Record<Exclude<Locale, 'en'>, TranslationMap> = { ja, ko, fr, es };
+for (const locale of Object.keys(commonMessages) as Array<Exclude<Locale, 'en'>>) {
+  Object.assign(MESSAGES_PLACEHOLDER[locale], commonMessages[locale]);
+}
+export const MESSAGES = MESSAGES_PLACEHOLDER;

@@ -35,8 +35,8 @@ export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDo
         <Button variant="ghost" size="icon-sm" aria-label="Settings" onClick={onOpenSettings}><Settings size={16} /></Button>
       </header>
       <div className="flex gap-2 px-6 pb-3" aria-label="Profile sections">
-        <Button variant={tab === 'elements' ? 'secondary' : 'ghost'} aria-pressed={tab === 'elements'} onClick={() => setTab('elements')}><ElementIcon size={16} />My Elements</Button>
-        <Button variant={tab === 'ai' ? 'secondary' : 'ghost'} aria-pressed={tab === 'ai'} onClick={() => setTab('ai')}><Sparkles size={16} />AI</Button>
+        <Button shape="tab" variant={tab === 'elements' ? 'secondary' : 'ghost'} aria-pressed={tab === 'elements'} onClick={() => setTab('elements')}><ElementIcon size={16} />My Elements</Button>
+        <Button shape="tab" variant={tab === 'ai' ? 'secondary' : 'ghost'} aria-pressed={tab === 'ai'} onClick={() => setTab('ai')}><Sparkles size={16} />AI</Button>
       </div>
       <div className={tab === 'elements' ? 'flex-1 min-h-0 overflow-hidden' : 'hidden'}>
         <MyElementsView embedded onNavigate={onNavigate} onViewChange={onViewChange} />

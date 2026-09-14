@@ -2,6 +2,7 @@
 
 import { Check, ChevronDown, Languages } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { Button } from '@/ui/button';
 import { LOCALE_NAMES, SUPPORTED_LOCALES } from './locales';
 import { useI18n } from './I18nProvider';
 
@@ -10,15 +11,17 @@ export function LanguageSelect({ compact = false }: { compact?: boolean }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="md"
           aria-label={t('Language')}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-muted/40 px-2.5 text-[12px] font-medium text-foreground transition-colors hover:bg-muted/70"
+          className="gap-1.5 px-2.5"
         >
           <Languages size={14} />
           {!compact && <span>{LOCALE_NAMES[locale]}</span>}
           <ChevronDown size={12} className="opacity-60" />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[150px]">
         {SUPPORTED_LOCALES.map((option) => (
