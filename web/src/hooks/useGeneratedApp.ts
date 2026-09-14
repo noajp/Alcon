@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { readGeneratedAppContext } from './generatedAppContext';
 import { supabase } from '@/lib/supabase';
 import { parseAppSource, parseAppState, type AppSource, type AppState } from '@/Function/widget/generated/model';
 
@@ -67,10 +68,15 @@ export function useGeneratedApp(objectId: string, instanceId: string) {
     app: query.data?.app ?? null, state: query.data?.state ?? {}, loading: !authReady || (!!owner && (query.isPending || query.isFetching)),
     error: query.error?.message ?? (authReady && !owner ? 'Sign in to save your app.' : null), saving: pending > 0,
     reload: query.refetch,
+    readContext: async () => {
+      if (!owner) throw new Error('Sign in before reading Object data.');
+      return readGeneratedAppContext(objectId, owner);
+    },
+    useTemplate: (source: AppSource) => serial(() => update({ draft_app: parseAppSource(source) })),
     savePrompt: (prompt: string) => serial(() => update({ prompt })),
     generate: (prompt: string) => serial(async () => {
       const app = await update({ prompt });
-      const { data, error } = await supabase.functions.invoke('generate-widget-app', { body: { appId: app.id, prompt } });
+      const { data, error } = await supabase.functions.invoke('generate-widget-app', { body: { appId: app.id, prompt, runtimeVersion: 2 } });
       if (error) {
         let message = error.message;
         if ('context' in error && error.context instanceof Response) { try { message = (await error.context.json()).error ?? message; } catch { /* Keep transport error. */ } }
