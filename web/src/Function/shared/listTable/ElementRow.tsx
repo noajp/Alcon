@@ -212,8 +212,7 @@ export const ElementRow = memo(function ElementRow({
           <DisplayIdChip id={rowId} size="xs" fit="column" />
           {/* Status — between the id and the title, so Priority · id · Status
               read as one leading cluster: how urgent, which row, how far
-              along. The Status column can still be shown; this mark is the
-              one a person gets without configuring anything. */}
+              along. Status and Priority live here rather than in duplicate columns. */}
           <span className="shrink-0" onClick={(e) => e.stopPropagation()}>
             {canUpdate ? (
               <StatusPicker

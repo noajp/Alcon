@@ -16,7 +16,7 @@
 // 'type' is always-on (non-toggleable); the rest are default-visible but
 // hideable from the column menu. My Elements layers its cross-Object 'objects'
 // column on top of this (see MyElementsView).
-export const ELEMENT_DEFAULT_VISIBLE: string[] = ['status', 'due_date', 'assignee', 'labels'];
+export const ELEMENT_DEFAULT_VISIBLE: string[] = ['due_date', 'assignee', 'labels'];
 
 // ── Object row ───────────────────────────────────────────────────────────────
 // Type leads (leftmost) to match the Element lists. 'lead' is the Object's

@@ -1,5 +1,6 @@
 'use client';
 
+import { ButtonAppearanceProvider } from '@/ui/button';
 
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { StrategyNavigation } from './sidebar/StrategyNavigation';
@@ -439,12 +440,12 @@ export function AppSidebar({
         }}
         className={`app-sidebar h-full flex flex-col flex-shrink-0 overflow-hidden ${
           collapsed
-            ? 'absolute inset-y-0 left-0 z-50 bg-background border-r border-border shadow-xl'
+            ? 'absolute inset-y-0 left-0 z-50 bg-background shadow-xl'
             : 'relative'
         } ${resizing ? '' : 'transition-transform duration-200 ease-out'}`}
       >
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto pb-3 pl-1 pr-2">
+        <ButtonAppearanceProvider appearance="navigation"><nav className="flex-1 overflow-y-auto pb-3 pl-1 pr-2">
 
           {activeView === 'settings' ? (
             <SettingsSidebarPanel />
@@ -611,7 +612,7 @@ export function AppSidebar({
             queue={operationsQueue(navigation, railMode)} onSelect={queue => onNavigate(operationsQueueRoute(railMode, queue))} />}
           </>
           )}
-        </nav>
+        </nav></ButtonAppearanceProvider>
 
         {!collapsed && (
           <div
