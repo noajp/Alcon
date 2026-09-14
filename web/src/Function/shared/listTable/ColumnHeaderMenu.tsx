@@ -137,7 +137,7 @@ export function ResizeHandle({
   width: number;
   onResize: (w: number) => void;
 }) {
-  const startRef = useRef<{ x: number; w: number; scrollLeft: number; scroller: HTMLElement | null } | null>(null);
+  const startRef = useRef<{ x: number; w: number; left: number; header: HTMLTableCellElement | null } | null>(null);
   return (
     <div
       role="separator"
@@ -159,11 +159,12 @@ export function ResizeHandle({
       // as a slim divider rather than a fat blue bar.
       className="group/resize absolute top-0 right-0 z-10 h-full w-2 touch-none cursor-col-resize"
       onPointerDown={(e) => {
-        const scroller = e.currentTarget.closest<HTMLElement>('[data-list-scroller]');
-        // Begin from the rendered track, not a saved width that the table
-        // may have stretched. Include scroll movement in the drag distance.
-        const renderedWidth = e.currentTarget.closest('th')?.getBoundingClientRect().width ?? width;
-        startRef.current = { x: e.clientX, w: renderedWidth, scrollLeft: scroller?.scrollLeft ?? 0, scroller };
+        const header = e.currentTarget.closest('th');
+        const rect = header?.getBoundingClientRect();
+        // Use rendered geometry so stretched tracks do not snap. The left
+        // edge delta accounts for scroll only when the track actually moves;
+        // frozen Name headers must not inherit the scroller's movement.
+        startRef.current = { x: e.clientX, w: rect?.width ?? width, left: rect?.left ?? 0, header };
         e.currentTarget.setPointerCapture(e.pointerId);
         e.preventDefault();
         e.stopPropagation();
@@ -171,7 +172,8 @@ export function ResizeHandle({
       onPointerMove={(e) => {
         if (!startRef.current) return;
         const start = startRef.current;
-        const next = start.w + (e.clientX - start.x) + ((start.scroller?.scrollLeft ?? 0) - start.scrollLeft);
+        const left = start.header?.getBoundingClientRect().left ?? start.left;
+        const next = start.w + (e.clientX - start.x) + (start.left - left);
         // Raw width — setWidth applies the right per-column min/max clamp
         // (the Name column has a higher floor than the data columns).
         onResize(next);
