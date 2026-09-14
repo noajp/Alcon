@@ -1,5 +1,7 @@
 'use client';
 
+import { appDialog } from '@/Function/shared/appDialogStore';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -130,10 +132,10 @@ export function MemberSettings() {
       const question = isSelf
         ? "Change your own role to Member? You'll lose owner access — invites, removals, role changes, and deleting this Space — immediately."
         : `Change ${target} from Owner to Member?`;
-      if (!window.confirm(question)) return;
+      if (!await appDialog.confirm(question)) return;
     } else if (nextRole === 'owner') {
       const target = profileFor(member.user_id)?.display_name || 'this member';
-      if (!window.confirm(`Make ${target} an Owner? They'll be able to invite, remove, and change the role of any Space member, and delete this Space.`)) return;
+      if (!await appDialog.confirm(`Make ${target} an Owner? They'll be able to invite, remove, and change the role of any Space member, and delete this Space.`)) return;
     }
 
     setRowErrors((prev) => {

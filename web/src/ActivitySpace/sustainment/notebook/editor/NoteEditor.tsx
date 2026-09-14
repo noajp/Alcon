@@ -1,5 +1,7 @@
 'use client';
 
+import { appDialog } from '@/Function/shared/appDialogStore';
+
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { createPortal } from 'react-dom';
@@ -812,7 +814,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     });
   }, [onBulletContextMenu]);
 
-  const insertLink = useCallback(() => {
+  const insertLink = useCallback(async () => {
     // Restore the editor selection first — the header toolbar button stole
     // focus, and createLink needs the original (non-collapsed) selection to
     // know which text to wrap.
@@ -823,12 +825,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       exec('unlink');
       return;
     }
-    const url = window.prompt('リンク先 URL', 'https://');
+    const editor = ref.current;
+    const originalBody = editor?.innerHTML;
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
+    const url = await appDialog.prompt('リンク先 URL', 'https://');
     if (!url) return;
     if (!/^(https?:\/\/|mailto:)/i.test(url)) {
-      window.alert('http(s):// または mailto: で始まる URL を入力してください');
+      await appDialog.alert('http(s):// または mailto: で始まる URL を入力してください');
       return;
     }
+    if (!editor || ref.current !== editor || editor.innerHTML !== originalBody || !range || !editor.contains(range.commonAncestorContainer)) return;
+    savedRangeRef.current = range;
+    editor.focus();
+    selection?.removeAllRanges(); selection?.addRange(range);
     exec('createLink', url);
   }, [exec, restoreSelection]);
 

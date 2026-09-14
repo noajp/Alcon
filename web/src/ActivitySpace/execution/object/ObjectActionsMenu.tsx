@@ -1,5 +1,7 @@
 'use client';
 
+import { appDialog } from '@/Function/shared/appDialogStore';
+
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
@@ -92,7 +94,7 @@ export function ObjectActionsMenu({
   };
 
   const del = async () => {
-    if (!window.confirm(
+    if (!await appDialog.confirm(
       `Delete "${object.name}"? Its Elements that live only here are deleted too. This can't be undone.`,
     )) return;
     try {

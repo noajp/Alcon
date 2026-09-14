@@ -1,5 +1,7 @@
 'use client';
 
+import { appDialog } from '@/Function/shared/appDialogStore';
+
 import { statusLabel } from '@/shared/designTokens';
 import { useEffect, useMemo, useState } from 'react';
 import { MoreHorizontal, Plus } from 'lucide-react';
@@ -82,7 +84,7 @@ function DomainTemplates({ domain }: { domain: Domain }) {
   };
 
   const handleDelete = async (t: ElementTemplate) => {
-    if (!window.confirm(`Delete the "${t.name}" template? This cannot be undone.`)) return;
+    if (!await appDialog.confirm(`Delete the "${t.name}" template? This cannot be undone.`)) return;
     setBusy(t.id, true);
     setRowError(null);
     try {
