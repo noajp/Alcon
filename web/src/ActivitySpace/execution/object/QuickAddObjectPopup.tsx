@@ -1,15 +1,14 @@
 'use client';
 
+import { QUICK_CREATE } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 
 import { useEffect, useRef, useState } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import {
-  ArrowUp,
   CalendarIcon,
   Check,
   ChevronDown,
-  Sparkles,
   User as UserIcon,
   X,
 } from 'lucide-react';
@@ -61,7 +60,7 @@ interface QuickAddObjectPopupProps {
 export function QuickAddObjectPopup({
   open,
   contextLabel,
-  hint = 'Create an Object to group Elements (and stay queryable across Domains).',
+  hint,
   onClose,
   onSubmit,
   workers = [],
@@ -115,7 +114,7 @@ export function QuickAddObjectPopup({
   useEffect(() => {
     const ta = descRef.current; if (!ta) return;
     ta.style.height = 'auto';
-    ta.style.height = `${Math.min(Math.max(ta.scrollHeight, 84), 240)}px`;
+    ta.style.height = `${Math.min(Math.max(ta.scrollHeight, QUICK_CREATE.descriptionMinHeight), 240)}px`;
   }, [description]);
 
   const trimmedName = name.trim();
@@ -155,13 +154,13 @@ export function QuickAddObjectPopup({
   return (
     <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4 pointer-events-none">
       <div
-        className="pointer-events-auto w-full max-w-[640px] rounded-2xl bg-popover/95 backdrop-blur-md border border-border/60 p-4"
+        className={QUICK_CREATE.panel}
         role="dialog"
         aria-label="Quick add Object"
       >
         {/* Header */}
-        <div className="flex items-center gap-2 px-1 mb-2">
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted/40 text-[12px] text-muted-foreground">
+        <div className={QUICK_CREATE.header}>
+          <span className={QUICK_CREATE.context}>
             <BoxIcon size={12} />
             <span className="truncate max-w-[200px]">{contextLabel ?? 'New Object'}</span>
           </span>
@@ -186,24 +185,25 @@ export function QuickAddObjectPopup({
               handleSubmit();
             }
           }}
-          placeholder="Object name… (Enter to create)"
+          placeholder="Object name…"
+          aria-label="Object name"
           rows={1}
-          className="w-full bg-transparent px-2 py-1 text-[15px] font-medium text-foreground placeholder:text-muted-foreground/60 resize-none"
+          className={QUICK_CREATE.title}
         />
 
-        {/* Description — starts 3 lines tall so users have room to write
-            without clicking into it first. */}
+        {/* Description — compact at rest, grows with the content. */}
         <textarea
           ref={descRef}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Add description…"
-          rows={3}
-          className="w-full bg-transparent px-2 py-1 text-[13px] text-foreground/85 placeholder:text-muted-foreground/50 resize-none"
+          aria-label="Description"
+          rows={2}
+          className={QUICK_CREATE.description}
         />
 
         {/* Pill row — Type / Lead / Due date / Domain */}
-        <div className="flex flex-wrap items-center gap-1.5 px-1 pt-2">
+        <div className={QUICK_CREATE.properties}>
           {/* Type — only when the Domain has a type catalog.
               Iconless on purpose: Type is structural, not a label/tag, so the
               previous lucide Tag icon misread as "this is a Label". */}
@@ -305,19 +305,11 @@ export function QuickAddObjectPopup({
           )}
         </div>
 
-        {error && <p role="alert" className="px-2 pt-2 text-xs text-destructive">{error}</p>}
+        {error && <p role="alert" className="pt-2 text-xs text-destructive">{error}</p>}
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-2 px-1 pt-3">
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/80 min-w-0 truncate">
-            <Sparkles size={11} />
-            <span className="truncate">{hint}</span>
-          </div>
-          <Button variant="primary" size="md"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-          >
-            <ArrowUp size={13} />
+        <div className={QUICK_CREATE.footer}>
+          {hint && <span className="mr-auto min-w-0 text-[11px] text-muted-foreground">{hint}</span>}
+          <Button variant="primary" onClick={handleSubmit} disabled={!canSubmit}>
             Create
           </Button>
         </div>

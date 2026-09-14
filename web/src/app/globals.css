@@ -445,6 +445,11 @@ input, textarea, [contenteditable], [contenteditable] * {
   font-weight: 400;
 }
 
+/* Creation titles retain the shared bold heading weight while editing. */
+textarea.quick-create-title {
+  font-weight: var(--font-weight-bold);
+}
+
 /* ---- Scrollbar ---- */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
