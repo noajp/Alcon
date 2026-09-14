@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { ArrowRight, Check, FlaskConical, RefreshCw } from 'lucide-react';
+import { ArrowRight, RefreshCw } from 'lucide-react';
 import { Button } from '@/ui/button';
+import { ChoiceCard } from '@/ui/choice-card';
 import { formatElementDate, parseDateOnly } from '@/Function/shared/dateUtils';
 import type { AlconObject } from '@/types/database';
 import { compareDecisionLab, type DecisionLabInput, type DecisionLabComparison, type DecisionLabScenario } from './decisionLabModel';
@@ -105,7 +106,7 @@ export function DecisionLab({ input, objects, refreshing, canRecord = true, onRe
   </div>;
 
   return (
-    <div className="space-y-4">
+    <div className="@container/decision space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="space-y-1">
           <p className="text-sm font-medium">Protect a commitment. See what it costs.</p>
@@ -118,7 +119,7 @@ export function DecisionLab({ input, objects, refreshing, canRecord = true, onRe
 
       <fieldset disabled={saving} className="min-w-0 space-y-3">
         <legend className="sr-only">Choose an Element and a planning assumption</legend>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 @min-[560px]/decision:grid-cols-2">
           <div className="min-w-0 space-y-1">
             <label htmlFor="decision-lab-search" className="text-xs text-muted-foreground">Explore an Element</label>
             <input id="decision-lab-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find an Element…" className="h-8 w-full rounded-md border-0 bg-muted/40 px-2 text-sm placeholder:text-muted-foreground focus:bg-muted/60" />
@@ -137,21 +138,23 @@ export function DecisionLab({ input, objects, refreshing, canRecord = true, onRe
           </div>
         </div>
 
-        <div className="grid gap-2 md:grid-cols-3" aria-label="Compare plans">
+        <div className="grid gap-2 @min-[640px]/decision:grid-cols-3" aria-label="Compare plans">
           {(Object.keys(PLAN_LABEL) as Plan[]).map((option) => {
             const read = comparisons[option];
             const targetResult = read.scenario.byId[target.id];
             const cost = read.changes.filter((change) => change.elementId !== target.id && change.change === 'worsened').length;
-            return <Button key={option} variant="ghost" size="sm" align="start" aria-pressed={plan === option}
+            return <ChoiceCard key={option} selected={plan === option} label={PLAN_LABEL[option]}
               disabled={option === 'reassign' && !replacementId}
-              onClick={() => { setPlan(option); resetResult(); }}
-              className={`h-auto min-w-0 items-start whitespace-normal p-3 active:bg-muted ${plan === option ? 'bg-[var(--accent-subtle)] text-foreground' : 'bg-muted/30'}`}>
-              <span className="min-w-0 space-y-1 text-left">
-                <span className="flex items-center gap-2 text-sm font-medium">{plan === option ? <Check className="size-4" /> : <FlaskConical className="size-4" />}{PLAN_LABEL[option]}</span>
-                <span className="block text-xs text-muted-foreground">Finish {dateLabel(targetResult?.finish ?? null)}</span>
-                <span className={`block text-xs ${cost ? 'text-[var(--status-warning)]' : 'text-muted-foreground'}`}>{cost} other Elements finish later</span>
+              onClick={() => { setPlan(option); resetResult(); }}>
+              <span className="flex items-baseline justify-between gap-2 text-xs">
+                <span className="text-muted-foreground">Finish</span>
+                <span className={`text-right tabular-nums ${targetResult?.finish ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>{dateLabel(targetResult?.finish ?? null)}</span>
               </span>
-            </Button>;
+              <span className="mt-2 flex items-baseline justify-between gap-2 text-xs">
+                <span className="text-muted-foreground">Other Elements finishing later</span>
+                <span className={`tabular-nums ${cost ? 'font-medium text-[var(--status-warning)]' : 'text-muted-foreground'}`}>{cost}</span>
+              </span>
+            </ChoiceCard>;
           })}
         </div>
 

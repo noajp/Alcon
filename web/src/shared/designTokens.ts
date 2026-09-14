@@ -2,7 +2,7 @@
  * Alcon Design Tokens
  *
  * Accent: Matte blue (#426fac) — muted, single accent
- * Danger: Matte red (#c45147) — muted, warm red
+ * Danger: Matte red (#d05249) — muted, warm red
  * Surfaces: neutral light / dark ramp
  * Typography: Inter Variable, 13px base
  *

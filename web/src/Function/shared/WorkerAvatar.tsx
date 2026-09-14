@@ -92,9 +92,8 @@ interface WorkerAvatarStackProps {
   max?: number;
   size?: number;
   className?: string;
-  /** Extra class on each item — typically the overlap separator border
-   *  (`border-card`, `border-background`, etc.). The stack drops the
-   *  single-avatar ring so the border is the only outline. */
+  /** Extra class on each item. The overlap separator is an outside ring
+   *  so the visible image diameter stays identical to a single avatar. */
   itemClassName?: string;
 }
 
@@ -121,9 +120,9 @@ export function WorkerAvatarStack({
           <WorkerAvatar
             worker={w}
             size={size}
-            // Strip the single-avatar ring; the overlap border carries the
-            // outline so we don't double up.
-            className={cn('ring-0 border border-card', itemClassName)}
+            // Paint the separator outside the avatar so stacked images and
+            // initials keep the same visible diameter as a single avatar.
+            className={cn(isUnreachableWorker(w) ? 'ring-0' : 'ring-1 ring-card', itemClassName)}
           />
         </span>
       ))}

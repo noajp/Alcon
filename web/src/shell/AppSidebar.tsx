@@ -472,7 +472,7 @@ export function AppSidebar({
                 <Search size={15} />
               </button>
             )}
-            <Button variant="primary" size="icon-xs"
+            <Button variant="ghost" size="icon-xs" className="text-muted-foreground"
               ref={createBtnRef}
               type="button"
               onClick={openCreateMenu}

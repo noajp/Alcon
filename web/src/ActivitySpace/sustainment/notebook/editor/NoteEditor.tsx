@@ -951,11 +951,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
           pointer-events: none;
         }
-        .note-editor ::selection,
-        .note-editor::selection {
-          background: var(--accent-default);
-          color: var(--primary-foreground);
-        }
         .note-editor h1 {
           font-size: 1.75rem;
           font-weight: 700;

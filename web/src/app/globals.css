@@ -6,7 +6,7 @@
 /* =============================================
    Alcon Design System
    Accent: Matte blue (#426fac) — muted, single accent
-   Danger: Matte red (#c45147) — muted, warm red
+   Danger: Matte red (#d05249) — muted, warm red
    Surfaces: neutral dark-first ramp
    Typography: Inter Variable, 13px base
    ============================================= */
@@ -19,14 +19,16 @@
   --accent-default: #426fac;
   --accent-hover:   #365d94;
   --accent-subtle:  rgba(66, 111, 172, 0.15);
+  --selection-background: var(--accent-default);
+  --selection-foreground: var(--primary-foreground);
 
   /* ---- Status (semantic only) ---- */
   --status-success:        #27a644;
   --status-success-subtle: rgba(39, 166, 68, 0.15);
   --status-warning:        #f59e0b;
   --status-warning-subtle: rgba(245, 158, 11, 0.15);
-  --status-danger:         #c45147;
-  --status-danger-subtle:  rgba(196, 81, 71, 0.15);
+  --status-danger:         #d05249;
+  --status-danger-subtle:  rgba(208, 82, 73, 0.15);
   --status-info:           var(--accent-default);
   --status-info-subtle:    var(--accent-subtle);
 
@@ -458,7 +460,7 @@ input, textarea, [contenteditable], [contenteditable] * {
 *:focus, *:focus-visible { outline: none; }
 
 /* ---- Selection ---- */
-::selection { background: var(--accent-subtle); color: var(--text-primary); }
+::selection { background: var(--selection-background); color: var(--selection-foreground); }
 
 /* ---- Transitions ---- */
 button, a, input, select, textarea {
