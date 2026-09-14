@@ -12,7 +12,7 @@ import {
   User as UserIcon,
   X,
 } from 'lucide-react';
-import { ObjectIcon as BoxIcon } from '@/Function/shared/conceptIcons';
+import { ObjectIcon as BoxIcon, DomainIcon } from '@/Function/shared/conceptIcons';
 import { DatePopover } from '@/Function/shared/date';
 import {
   DropdownMenu,
@@ -279,7 +279,7 @@ export function QuickAddObjectPopup({
             <DropdownMenu {...menuProps('domain')}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!domainPick)}>
-                  <BoxIcon size={12} className="text-muted-foreground" />
+                  <DomainIcon size={12} className="text-muted-foreground" />
                   <span>{domainPick?.name ?? 'Domain'}{domainIds.length > 1 ? ` +${domainIds.length - 1}` : ''}</span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
@@ -296,7 +296,7 @@ export function QuickAddObjectPopup({
                       : [...ids, d.id])}
                     className="gap-2 text-[12px]"
                   >
-                    <BoxIcon size={12} className="text-muted-foreground" />
+                    <DomainIcon size={12} className="text-muted-foreground" />
                     <span className="flex-1 truncate">{d.name}</span>
                   </DropdownMenuCheckboxItem>
                 ))}

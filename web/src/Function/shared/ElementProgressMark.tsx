@@ -55,10 +55,10 @@ export function getElementProgress(
 // mark.
 //   backlog     → dashed ring
 //   todo / null → solid ring
-//   in_progress → faint track ring + foreground arc filled to progress% + dot
-//   review      → ring + paper-plane glyph
+//   in_progress → faint track ring + foreground arc filled to progress%
+//   review      → ring + review lines
 //   done        → filled disc + white check
-//   blocked     → ring + exclamation
+//   blocked     → ring + horizontal bar
 //   cancelled   → ring + ×
 // Glyphs are authored on a 48-unit grid (ring r=15, centre 24). A `<g>`
 // transform scales that grid so the ring fills the box at the SAME diameter the
@@ -114,25 +114,15 @@ export function ElementProgressMark({
               transform="rotate(-90 24 24)"
             />
           )}
-          <circle cx="24" cy="24" r="5" fill="currentColor" />
         </>
       );
       break;
     case 'review':
-      // Ring + the same filled paper-plane silhouette as the shared send control’s
-      // SendIcon (authored on a 0–24 grid, recentred and scaled into the ring).
       inner = (
-        <>
-          <circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" strokeWidth={sw(1.7)} />
-          <g transform="translate(24 24) scale(0.9) translate(-12.35 -12)">
-            <path
-              d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z"
-              fill="currentColor"
-            />
-            {/* faint centre fold */}
-            <path d="M6 12h15" stroke="var(--progress-mark-shadow)" strokeWidth="2.2" strokeLinecap="round" />
-          </g>
-        </>
+        <g fill="none" stroke="currentColor" strokeWidth={sw(1.7)} strokeLinecap="round">
+          <circle cx="24" cy="24" r="15" />
+          <path d="M18 21h12 M18 27h8" />
+        </g>
       );
       break;
     case 'done':
@@ -154,8 +144,7 @@ export function ElementProgressMark({
       inner = (
         <g fill="none" stroke="currentColor" strokeWidth={sw(1.7)} strokeLinecap="round" strokeLinejoin="round">
           <circle cx="24" cy="24" r="15" />
-          <path d="M24 16 L24 25.5" strokeWidth={sw(2)} />
-          <circle cx="24" cy="30.4" r="1.7" fill="currentColor" stroke="none" />
+          <path d="M18 24h12" />
         </g>
       );
       break;

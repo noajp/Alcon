@@ -23,7 +23,7 @@ import { ActivitySignal } from '@/ActivitySpace/execution/element/ActivitySignal
 import { StatusPicker } from '@/ActivitySpace/execution/element/StatusPicker';
 import { type DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
 import { STATUS_OPTIONS, type ElementUpdate, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, selectionSquareClass, STICKY_TINT_SELECTED, STICKY_TINT_HOVER } from './shared';
-import { ElementCell } from './cells';
+import { ElementCell, LabelChip } from './cells';
 
 // Memoised element row. All props are reference-stable across the common
 // re-render trigger (an element field edit changes only that element's `el`
@@ -183,7 +183,7 @@ export const ElementRow = memo(function ElementRow({
       {/* Priority — the row opens on it, ahead of the id. Urgency is what a
           person scans a list for, so it sits at the leading edge where the
           eye already lands, not in an optional column off to the right. */}
-      <td className="sticky left-7 z-10 bg-card w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
+      <td className="sticky left-7 z-10 bg-card w-7 pl-1 pr-1.5 py-2" onClick={(e) => e.stopPropagation()}>
         {canUpdate ? (
           <PriorityPicker
             value={el.priority ?? null}
@@ -192,14 +192,14 @@ export const ElementRow = memo(function ElementRow({
               <button
                 type="button"
                 title={el.priority ? `Priority: ${el.priority}` : 'Set priority'}
-                className="flex w-full items-center justify-center rounded-md py-0.5 transition-colors hover:bg-muted/40"
+                className="flex w-full items-center justify-end rounded-md py-0.5 transition-colors hover:bg-muted/40"
               >
                 <PriorityMark priority={el.priority ?? null} />
               </button>
             }
           />
         ) : (
-          <span className="flex items-center justify-center">
+          <span className="flex items-center justify-end">
             <PriorityMark priority={el.priority ?? null} />
           </span>
         )}
@@ -209,7 +209,7 @@ export const ElementRow = memo(function ElementRow({
             show from this cell's own width, not the viewport's — the Name
             column is user-resizable and shares the row with the sidebar. */}
         <div className="@container flex items-center gap-2 min-w-0 min-h-[1.625rem]">
-          <DisplayIdChip id={rowId} size="xs" fit="column" />
+          <DisplayIdChip id={rowId} size="xs" fit="row" />
           {/* Status — between the id and the title, so Priority · id · Status
               read as one leading cluster: how urgent, which row, how far
               along. Status and Priority live here rather than in duplicate columns. */}
@@ -222,19 +222,22 @@ export const ElementRow = memo(function ElementRow({
                   <button
                     type="button"
                     title={`Status: ${(el.status ?? 'todo').replaceAll('_', ' ')}`}
-                    className="flex items-center justify-center rounded-md p-0.5 transition-colors hover:bg-muted/40"
+                    className="flex size-4 items-center justify-center rounded-md transition-colors hover:bg-muted/40"
                   >
-                    <ElementProgressMark status={el.status} progress={getElementProgress(el, allCustomColumns)} size={14} />
+                    <ElementProgressMark status={el.status} progress={getElementProgress(el, allCustomColumns)} size={16} />
                   </button>
                 }
               />
             ) : (
-              <ElementProgressMark status={el.status} progress={getElementProgress(el, allCustomColumns)} size={14} />
+              <ElementProgressMark status={el.status} progress={getElementProgress(el, allCustomColumns)} size={16} />
             )}
           </span>
-          <span className="text-[13px] font-medium truncate flex-1 min-w-0 text-foreground">
-            {el.title}
-          </span>
+          <div className="flex flex-1 min-w-0 items-center gap-2">
+            <span className="text-[13px] font-medium truncate flex-1 min-w-0 text-foreground">{el.title}</span>
+            {!!el.labels?.length && <span className="flex max-w-[40%] shrink-0 items-center gap-1 overflow-hidden" title={el.labels.join(', ')}>
+              {el.labels.map(label => <LabelChip key={label} label={label} />)}
+            </span>}
+          </div>
           {lease && (
             // Who holds this right now. Only a live lease is shown — a lapsed
             // one is nobody, and painting a dead session's token here is how

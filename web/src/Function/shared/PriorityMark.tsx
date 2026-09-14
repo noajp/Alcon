@@ -13,7 +13,7 @@ const PRIORITY_LEVEL: Record<string, number> = { low: PRIORITY.low.weight, mediu
 // set or cleared (the text ↔ icon swap used to shift the row). Shared between
 // the list cell and the Element-detail Properties row so the two surfaces stay
 // visually in sync.
-const BOX = 'inline-flex items-center justify-center w-[15px] h-3.5 shrink-0';
+const BOX = 'inline-flex items-center justify-center w-4 h-4 shrink-0';
 
 export function PriorityMark({ priority }: { priority: string | null }) {
   if (priority === 'urgent') {
@@ -28,7 +28,11 @@ export function PriorityMark({ priority }: { priority: string | null }) {
   const level = priority ? (PRIORITY_LEVEL[priority] ?? 0) : 0;
 
   if (level === 0) {
-    return <span className={cn(BOX, 'text-[11px] leading-none text-muted-foreground')}>---</span>;
+    return <span className={cn(BOX, 'text-muted-foreground')} aria-hidden="true">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M2 8h2 M7 8h2 M12 8h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    </span>;
   }
 
   return (
