@@ -468,6 +468,7 @@ export type ElementLike = {
   status?: string | null;
   title?: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
   /** Comment rollup, attached by the surface (withCommentActivity). Sorting by
    *  Activity reads it; a surface that never fetched it sorts every row null. */
   activity?: ElementCommentActivity;
@@ -500,6 +501,7 @@ function keyOf(el: ElementLike, sort: ColumnSort, customColumns: CustomColumnWit
   if (sort.id === 'type') return el.type ?? null;
   if (sort.id === 'due_date') return el.due_date ?? null;
   if (sort.id === 'created_at') return el.created_at ?? null;
+  if (sort.id === 'updated_at') return el.updated_at ?? null;
   // Recency, not volume: "what moved lately" is the question the column is
   // there to answer, and an old thread with forty comments is not the answer.
   // ISO timestamps compare lexicographically, so no parsing is needed.

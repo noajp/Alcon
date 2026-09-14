@@ -3,6 +3,9 @@ import type { Locale } from './locales';
 type TranslationMap = Record<string, string>;
 
 const ja: TranslationMap = {
+  'Grouping': 'グループ化', 'Ordering': '並び順', 'Sort by': '並べ替え項目',
+  'Direction': '方向', 'Ascending': '昇順', 'Descending': '降順', 'Manual': '手動',
+  'Display properties': '表示項目',
   'Account': 'アカウント', 'Activity space': 'アクティビティスペース', 'Administration': '管理',
   'AI agent': 'AI エージェント', 'Already have an account? ': 'すでにアカウントをお持ちですか？ ',
   'App sidebar': 'アプリサイドバー', 'At least 6 characters': '6文字以上', 'Back to sign in': 'サインインに戻る',
@@ -33,6 +36,14 @@ const ja: TranslationMap = {
 };
 
 const ko: TranslationMap = {
+  'Grouping': '그룹화',
+  'Ordering': '정렬 순서',
+  'Sort by': '정렬 기준',
+  'Direction': '방향',
+  'Ascending': '오름차순',
+  'Descending': '내림차순',
+  'Manual': '수동',
+  'Display properties': '표시 속성',
   'Account': '계정', 'Activity space': '활동 공간', 'Administration': '관리', 'AI agent': 'AI 에이전트',
   'Already have an account? ': '이미 계정이 있나요? ', 'App sidebar': '앱 사이드바', 'At least 6 characters': '6자 이상',
   'Back to sign in': '로그인으로 돌아가기', 'Calendar': '캘린더', 'Cancel': '취소', 'Check your email': '이메일을 확인하세요',
@@ -57,6 +68,14 @@ const ko: TranslationMap = {
 };
 
 const fr: TranslationMap = {
+  'Grouping': 'Regroupement',
+  'Ordering': 'Ordre',
+  'Sort by': 'Trier par',
+  'Direction': 'Sens',
+  'Ascending': 'Croissant',
+  'Descending': 'Décroissant',
+  'Manual': 'Manuel',
+  'Display properties': 'Propriétés affichées',
   'Account': 'Compte', 'Activity space': "Espace d'activité", 'Administration': 'Administration', 'AI agent': 'Agent IA',
   'Already have an account? ': 'Vous avez déjà un compte ? ', 'App sidebar': "Barre latérale de l’app", 'At least 6 characters': 'Au moins 6 caractères',
   'Back to sign in': 'Retour à la connexion', 'Calendar': 'Calendrier', 'Cancel': 'Annuler', 'Check your email': 'Consultez votre messagerie',
@@ -81,6 +100,14 @@ const fr: TranslationMap = {
 };
 
 const es: TranslationMap = {
+  'Grouping': 'Agrupación',
+  'Ordering': 'Orden',
+  'Sort by': 'Ordenar por',
+  'Direction': 'Dirección',
+  'Ascending': 'Ascendente',
+  'Descending': 'Descendente',
+  'Manual': 'Manual',
+  'Display properties': 'Propiedades visibles',
   'Account': 'Cuenta', 'Activity space': 'Espacio de actividad', 'Administration': 'Administración', 'AI agent': 'Agente de IA',
   'Already have an account? ': '¿Ya tienes una cuenta? ', 'App sidebar': 'Barra lateral', 'At least 6 characters': 'Al menos 6 caracteres',
   'Back to sign in': 'Volver a iniciar sesión', 'Calendar': 'Calendario', 'Cancel': 'Cancelar', 'Check your email': 'Revisa tu correo',

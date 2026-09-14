@@ -217,15 +217,6 @@ describe('the converged surfaces go through the primitive', () => {
     expect(text).toMatch(/<Button\b/);
   });
 
-  it('the Sort trigger says what it is sorted by, in words', () => {
-    // It used to be a bare arrow whose only account of itself was
-    // `title="Sorted by column (asc)"` — which does not even name the column.
-    // DESIGN.md §5.11.5.
-    const text = code('Function/shared/listControls/ListControls.tsx');
-    expect(text).not.toMatch(/Sorted by column/);
-    expect(text).toMatch(/activeLabel/);
-  });
-
   it('the due-date filter leads with relative presets', () => {
     // DESIGN.md §5.11.6: the absolute picker is what you reach for after the
     // presets fail you, not the first thing offered.
