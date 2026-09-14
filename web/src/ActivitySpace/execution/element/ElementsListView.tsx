@@ -548,6 +548,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
       <TabBar
         tabs={tabs}
         activeTabId={activeTabId}
+        onTabReorder={ids => setVisibleTabs(ids.map(id => tabs.find(t => t.id === id)!.tab_type))}
         onTabSelect={(id) => {
           const t = tabs.find((x) => x.id === id);
           if (t) setViewMode(t.tab_type);

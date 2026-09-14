@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
+import { SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, FileText, Flag } from 'lucide-react';
 import { Button } from '@/ui/button';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
@@ -8,6 +11,7 @@ import type { ObjectTab, ObjectTabType } from '@/types/database';
 interface TabBarProps {
   tabs: ObjectTab[];
   activeTabId: string | null;
+  onTabReorder?: (ids: string[]) => void;
   onTabSelect: (tabId: string) => void;
   onTabClose: (tabId: string) => void;
   onTabCreate: (type: ObjectTabType, title: string) => void;
@@ -54,7 +58,8 @@ interface ContextMenu {
   y: number;
 }
 
-export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate, rightSlot, createOptions }: TabBarProps) {
+export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate, rightSlot, createOptions, onTabReorder }: TabBarProps) {
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
   const visibleCreateOptions = (createOptions
     ? CREATE_TAB_ORDER.filter((t) => createOptions.includes(t))
     : CREATE_TAB_ORDER);
@@ -101,30 +106,19 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
   return (
     <div className="flex items-center gap-1.5 px-4 py-2 bg-transparent">
       {/* Tabs — outlined rectangles */}
-      <div className="flex items-center gap-1.5 overflow-x-auto">
-        {tabs.map((tab) => {
-          const isActive = tab.id === activeTabId;
-          const TabIcon = OBJECT_TAB_META[tab.tab_type].Icon;
-          return (
-            <Button
-              key={tab.id}
-              type="button"
-              shape="tab"
-              variant={isActive ? 'secondary' : 'ghost'}
-              aria-pressed={isActive}
-              onClick={() => onTabSelect(tab.id)}
-              onContextMenu={(e) => handleContextMenu(e, tab)}
-            >
-              <span className={isActive ? 'text-foreground' : 'text-muted-foreground'}>
-                <TabIcon size={14} />
-              </span>
-              <span className="text-xs font-semibold">
-                {tab.title}
-              </span>
-            </Button>
-          );
-        })}
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={({ active, over }) => {
+        if (!onTabReorder || !over || active.id === over.id) return;
+        const from = tabs.findIndex(t => t.id === active.id);
+        const to = tabs.findIndex(t => t.id === over.id);
+        if (from >= 0 && to >= 0) onTabReorder(arrayMove(tabs.map(t => t.id), from, to));
+      }}>
+        <SortableContext items={tabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
+          <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
+            {tabs.map(tab => <SortableViewTab key={tab.id} tab={tab} active={tab.id === activeTabId}
+              sortable={!!onTabReorder} onSelect={() => onTabSelect(tab.id)} onContextMenu={e => handleContextMenu(e, tab)} />)}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Add Tab Button */}
       <div className="relative flex items-center flex-shrink-0">
@@ -196,4 +190,19 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
       )}
     </div>
   );
+}
+
+function SortableViewTab({ tab, active, sortable, onSelect, onContextMenu }: {
+  tab: ObjectTab; active: boolean; sortable: boolean; onSelect: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id, disabled: !sortable });
+  const Icon = OBJECT_TAB_META[tab.tab_type].Icon;
+  return <Button ref={setNodeRef} type="button" shape="tab" variant={active ? 'secondary' : 'ghost'}
+    {...attributes} {...listeners} aria-pressed={active} onClick={onSelect} onContextMenu={onContextMenu}
+    style={{ transform: CSS.Transform.toString(transform), transition }}
+    className={sortable ? `touch-none ${isDragging ? 'relative z-10 opacity-70' : ''}` : undefined}>
+    <span className={active ? 'text-foreground' : 'text-muted-foreground'}><Icon size={14}/></span>
+    <span className="text-xs font-semibold">{tab.title}</span>
+  </Button>;
 }

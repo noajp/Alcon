@@ -71,3 +71,5 @@ Object・Elementのクイック作成は `QUICK_CREATE` を共有する。最大
 表示項目の設定（Default fields / Custom fields）は枠なしのメニュー行とし、FieldVisibilityで共通のnavigationスタイルを使う。オン・オフはスイッチで、ホバーは背景で示す。
 
 認証フォームの主要操作は共通Buttonの `size="lg"`（44px高・text-sm）で入力欄と同じ幅にする。
+
+ModeRailの右側には共通色の薄い区切り線を置く。人物名・コメント著者の横に装飾のAIバッジを付けない。Privacyの選択肢は薄枠の長方形ボタンを使う。表示タブはドラッグ、またはSpaceでつかんで左右キーで並べ替え、同じ画面の順序を保持する。

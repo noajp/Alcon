@@ -348,6 +348,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
         <TabBar
           tabs={tabs}
           activeTabId={activeTabId}
+          onTabReorder={ids => setVisibleTabTypes(() => ids.map(id => tabs.find(t => t.id === id)!.tab_type))}
           onTabSelect={(id) => {
             const t = tabs.find(x => x.id === id);
             if (t) setActiveTypeOnly(t.tab_type);

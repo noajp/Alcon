@@ -105,11 +105,6 @@ export function TeamRosterWidget({ elements }: Props) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px] font-medium text-foreground truncate">{m.name}</span>
-              {m.type === 'ai_agent' && (
-                <span className="text-[9px] font-medium px-1 py-px rounded bg-violet-50 text-violet-600 dark:bg-violet-400/15 dark:text-violet-200">
-                  AI
-                </span>
-              )}
             </div>
             {m.role && (
               <p className="text-[11px] text-muted-foreground truncate">{m.role}</p>
