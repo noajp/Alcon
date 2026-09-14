@@ -18,6 +18,8 @@ import { LabelSettings } from './LabelSettings';
 import { ElementTemplateSettings } from './ElementTemplateSettings';
 import { useActiveSettingsSection, SETTINGS_ITEM_TITLES } from './settingsNav';
 import { useUserPreferences, type UserPreferences } from './useUserPreferences';
+import { LanguageSelect } from '@/Function/i18n/LanguageSelect';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // =============================================================
 // SettingsView — content pane only. The settings NAV lives in
@@ -36,6 +38,7 @@ import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 
 export function SettingsView() {
   const active = useActiveSettingsSection();
+  const { t } = useI18n();
 
   return (
     <div className="h-full overflow-y-auto bg-card">
@@ -43,25 +46,25 @@ export function SettingsView() {
         {active === 'preferences' ? (
           <PreferencesPanel />
         ) : active === 'profile' ? (
-          <PanelShell title="Profile"><ProfileSettings /></PanelShell>
+          <PanelShell title={t('Profile')}><ProfileSettings /></PanelShell>
         ) : active === 'security' ? (
-          <PanelShell title="Security & access"><AccountSettings /></PanelShell>
+          <PanelShell title={t('Security & access')}><AccountSettings /></PanelShell>
         ) : active === 'workspace' ? (
-          <PanelShell title="Activity space"><ActivitySpaceSettings /></PanelShell>
+          <PanelShell title={t('Activity space')}><ActivitySpaceSettings /></PanelShell>
         ) : active === 'domain' ? (
-          <PanelShell title="Domain"><TeamSettings /></PanelShell>
+          <PanelShell title={t('Domain')}><TeamSettings /></PanelShell>
         ) : active === 'members' ? (
-          <PanelShell title="Member"><MemberSettings /></PanelShell>
+          <PanelShell title={t('Member')}><MemberSettings /></PanelShell>
         ) : active === 'notifications' ? (
-          <PanelShell title="Notifications"><NotificationSettings /></PanelShell>
+          <PanelShell title={t('Notifications')}><NotificationSettings /></PanelShell>
         ) : active === 'el-slas' ? (
-          <PanelShell title="SLAs"><SlaSettings /></PanelShell>
+          <PanelShell title={t('SLAs')}><SlaSettings /></PanelShell>
         ) : active === 'el-labels' ? (
-          <PanelShell title="Labels"><LabelSettings /></PanelShell>
+          <PanelShell title={t('Labels')}><LabelSettings /></PanelShell>
         ) : active === 'el-templates' ? (
-          <PanelShell title="Templates"><ElementTemplateSettings /></PanelShell>
+          <PanelShell title={t('Templates')}><ElementTemplateSettings /></PanelShell>
         ) : (
-          <ComingSoon title={SETTINGS_ITEM_TITLES[active] ?? 'Settings'} />
+          <ComingSoon title={t(SETTINGS_ITEM_TITLES[active] ?? 'Settings')} />
         )}
       </div>
     </div>
@@ -75,6 +78,7 @@ export function SettingsView() {
 // still local-only placeholders.
 // =============================================================
 function PreferencesPanel() {
+  const { t } = useI18n();
   const { preferences, error, savePreference } = useUserPreferences();
   const [pointerCursors, setPointerCursors] = useState(false);
 
@@ -106,74 +110,77 @@ function PreferencesPanel() {
 
   return (
     <div className="space-y-10">
-      <h1 className="text-[26px] font-semibold tracking-tight text-foreground">Preferences</h1>
+      <h1 className="text-[26px] font-semibold tracking-tight text-foreground">{t('Preferences')}</h1>
 
       {error && (
         <div className="text-[12px] text-destructive px-1 -mt-6">
-          Couldn&apos;t save: {error}
+          {t("Couldn't save")}: {error}
         </div>
       )}
 
-      <Group title="General">
+      <Group title={t('General')}>
+        <Row label={t('Language')} desc={t('Choose the language used across Alcon')}>
+          <LanguageSelect />
+        </Row>
         <SelectRow
-          label="Default home view"
-          desc="Select which view to open when launching Alcon"
+          label={t('Default home view')}
+          desc={t('Select which view to open when launching Alcon')}
           value={preferences.home_view}
           options={['Now', 'My Elements', 'Inbox', 'Calendar']}
           onChange={(v) => savePreference('home_view', v as UserPreferences['home_view'])}
         />
         <SelectRow
-          label="Display names"
-          desc="How names are shown across the interface"
+          label={t('Display names')}
+          desc={t('How names are shown across the interface')}
           value={preferences.display_names}
           options={['Full name', 'Short name', 'Username']}
           onChange={(v) => savePreference('display_names', v as UserPreferences['display_names'])}
         />
         <SelectRow
-          label="First day of the week"
-          desc="Used for date pickers"
+          label={t('First day of the week')}
+          desc={t('Used for date pickers')}
           value={preferences.first_day_of_week}
           options={['Monday', 'Sunday', 'Saturday']}
           onChange={(v) => savePreference('first_day_of_week', v as UserPreferences['first_day_of_week'])}
         />
         <ToggleRow
-          label="Convert text emoticons into emojis"
-          desc="Strings like :) will be converted to 🙂"
+          label={t('Convert text emoticons into emojis')}
+          desc={t('Strings like :) will be converted to 🙂')}
           value={preferences.convert_emoticons}
           onChange={(v) => savePreference('convert_emoticons', v)}
         />
         <SelectRow
-          label="Send comment on…"
-          desc="Which key press submits a comment"
+          label={t('Send comment on…')}
+          desc={t('Which key press submits a comment')}
           value={preferences.send_comment_shortcut}
           options={['⌘+Enter', 'Enter']}
           onChange={(v) => savePreference('send_comment_shortcut', v as UserPreferences['send_comment_shortcut'])}
         />
       </Group>
 
-      <Group title="Interface and theme">
+      <Group title={t('Interface and theme')}>
         <SelectRow
-          label="Theme"
-          desc="Match the system or pick a colour theme"
+          label={t('Theme')}
+          desc={t('Match the system or pick a colour theme')}
           value={themeLabel}
           options={THEME_OPTIONS.map((o) => o.label)}
           onChange={setThemeByLabel}
         />
-        <Row label="App sidebar" desc="Customize sidebar item visibility, ordering, and badge style">
+        <Row label={t('App sidebar')} desc={t('Customize sidebar item visibility, ordering, and badge style')}>
           <button type="button" className="text-[13px] text-muted-foreground hover:text-foreground transition-colors">
-            Customize
+            {t('Customize')}
           </button>
         </Row>
         <SelectRow
-          label="Font size"
-          desc="Adjust the size of text across the app"
+          label={t('Font size')}
+          desc={t('Adjust the size of text across the app')}
           value={fontLabel}
           options={FONT_SIZES.map((f) => f.label)}
           onChange={setFontByLabel}
         />
         <ToggleRow
-          label="Use pointer cursors"
-          desc="Change the cursor to a pointer over interactive elements"
+          label={t('Use pointer cursors')}
+          desc={t('Change the cursor to a pointer over interactive elements')}
           value={pointerCursors}
           onChange={setPointerCursors}
         />
@@ -225,6 +232,7 @@ function SelectRow({
   label: string; desc?: string; value: string; options: string[];
   onChange: (v: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <Row label={label} desc={desc}>
       <DropdownMenu>
@@ -233,14 +241,14 @@ function SelectRow({
             type="button"
             className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium border border-border/60 bg-muted/40 text-foreground hover:bg-muted/70 transition-colors"
           >
-            {value}
+            {t(value)}
             <ChevronDown size={12} className="opacity-60" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-[160px]">
           {options.map((opt) => (
             <DropdownMenuItem key={opt} onSelect={() => onChange(opt)} className="gap-2 text-[12px]">
-              <span className="flex-1">{opt}</span>
+              <span className="flex-1">{t(opt)}</span>
               {value === opt && <Check size={12} />}
             </DropdownMenuItem>
           ))}
