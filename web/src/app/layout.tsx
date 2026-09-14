@@ -56,7 +56,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var s=['en','ja','ko','fr','es'];var v=localStorage.getItem('alcon:locale');var l=(v||navigator.languages.find(function(x){return s.includes(x.toLowerCase().split(/[-_]/)[0])})||'en').toLowerCase().split(/[-_]/)[0];document.documentElement.lang=s.includes(l)?l:'en'}catch(e){}",
+              "try{var s=['en','ja','ko','fr','es'];var n=function(x){var l=(x||'').toLowerCase().split(/[-_]/)[0];return s.includes(l)?l:null};var l=n(localStorage.getItem('alcon:locale'));if(!l){var a=navigator.languages||[navigator.language];for(var i=0;i<a.length&&!l;i++)l=n(a[i])}document.documentElement.lang=l||'en'}catch(e){}",
           }}
         />
         {/* Apply the Font size (text scale --fs) before first paint. Default is
