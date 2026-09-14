@@ -44,7 +44,7 @@ npx vercel --prod            # 本番デプロイ
 
 テストは `web/tests/`（Vitest / node）。対象は、不具合の影響が大きい純粋ロジックに絞る。jsonb の正規化、リストのソート、design-lint の規則とラチェットなど。UI のレンダリングテストは持たない。
 
-**キー**：⌘K で CommandPalette（グローバル検索＋ナビ）。ウィジェットは長押し 450ms で arrange モード（Esc / Done で抜ける）。
+**キー**：⌘K で CommandPalette（グローバル検索＋ナビ）。ウィジェットは長押し 450ms で arrange モード（Esc / ウィジェット外のクリックで抜ける）。
 
 ## ビジュアル原則
 

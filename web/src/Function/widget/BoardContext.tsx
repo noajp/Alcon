@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, useEffect, useRef } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { createPortal } from 'react-dom';
 import {
@@ -64,6 +64,7 @@ export function WidgetSurface({
   className?: string;
 }) {
   const [arranging, setArrangingState] = useState(false);
+  const surfaceRef = useRef<HTMLDivElement>(null);
   const setArranging = useCallback((next: boolean) => setArrangingState(next), []);
   const actionSlot = useWidgetActionSlot();
 
@@ -72,6 +73,17 @@ export function WidgetSurface({
   // picker is reachable from the chrome while arranging) owns the key, and
   // arrange mode is what the next Esc closes.
   useEscapeLayer(arranging, () => setArrangingState(false));
+
+  useEffect(() => {
+    if (!arranging) return;
+    const dismiss = (event: PointerEvent) => {
+      const widget = event.target instanceof Element ? event.target.closest('[data-widget]') : null;
+      if (widget && surfaceRef.current?.contains(widget)) return;
+      setArrangingState(false);
+    };
+    document.addEventListener('pointerdown', dismiss, true);
+    return () => document.removeEventListener('pointerdown', dismiss, true);
+  }, [arranging]);
 
   const value = useMemo(
     () => ({ board, host, arranging, setArranging }),
@@ -141,24 +153,12 @@ export function WidgetSurface({
       {/* Text selection is suppressed while arranging: a press-and-drag that
           started as a long press would otherwise paint a selection across the
           widget it is dragging. */}
-      <div className={`${className} ${arranging ? 'select-none' : ''}`}>
+      <div ref={surfaceRef} className={`${className} ${arranging ? 'select-none' : ''}`}>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           {children}
         </DndContext>
       </div>
 
-      {/* Done. Fixed rather than in a toolbar, because the toolbar is what
-          this interaction exists to delete — the mode is entered on the
-          object itself, so its only persistent chrome is the way out. */}
-      {arranging && (
-        <div className="fixed inset-x-0 bottom-6 z-40 flex justify-center pointer-events-none">
-          <div className="pointer-events-auto animate-fade-in">
-            <Button variant="secondary" size="md" onClick={() => setArrangingState(false)}>
-              Done
-            </Button>
-          </div>
-        </div>
-      )}
     </BoardContext.Provider>
   );
 }

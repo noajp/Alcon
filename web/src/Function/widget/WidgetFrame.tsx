@@ -245,7 +245,6 @@ export function WidgetFrame({
             <RailCard title={title} padded={padded} action={headerNode}>
               {body}
             </RailCard>
-            {arranging && <RemoveBadge title={title} onRemove={onRemove} />}
           </div>
         )}
 
@@ -267,7 +266,6 @@ export function WidgetFrame({
               </div>
               <div className={padded ? 'px-4 py-3' : ''}>{body}</div>
             </div>
-            {arranging && <RemoveBadge title={title} onRemove={onRemove} />}
           </section>
         )}
 
@@ -278,11 +276,10 @@ export function WidgetFrame({
               <div className="flex-1 min-w-0">{body}</div>
               {headerNode}
             </div>
-            {arranging && <RemoveBadge title={title} onRemove={onRemove} />}
           </div>
         )}
       </div>
-
+      {arranging && <RemoveBadge title={title} onRemove={onRemove} />}
     </div>
   );
 }
