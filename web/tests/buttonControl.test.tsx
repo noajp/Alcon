@@ -141,7 +141,7 @@ describe('Button renders the CONTROL geometry', () => {
         .forEach((c) => radii.add(c));
       cleanup();
     }
-    expect([...radii]).toEqual([CONTROL.radius]);
+    expect([...radii]).toEqual([CONTROL.actionRadius]);
   });
 
   it('offers four tiers and no fifth', () => {

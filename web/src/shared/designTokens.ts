@@ -1,8 +1,8 @@
 /**
  * Alcon Design Tokens
  *
- * Accent: Blue (#1f6feb) — a true blue between cyan and navy, single accent
- * Danger: Matte red (#ce4a3b) — muted and slightly light, not fire-engine
+ * Accent: Matte blue (#426fac) — muted, single accent
+ * Danger: Matte red (#c45147) — muted, warm red
  * Surfaces: neutral light / dark ramp
  * Typography: Inter Variable, 13px base
  *
@@ -77,36 +77,7 @@ export const FONT = {
 } as const;
 
 // ============================================
-// Control geometry — buttons, toolbar triggers, date fields
-//
-// Three height steps and nothing else. Measured before this block existed:
-// the 550 hand-written `<button>`s in `src/` declared 18 distinct heights
-// (h-6 46 / h-7 43 / h-5 24 / h-8 20 / h-4 17 / h-[24px] 10 / h-9 7 /
-// h-[26px] 5 / h-[22px] 4 / h-10 3 / h-[18px] 3 / h-11 2 / h-[2.625rem] 2 /
-// h-full / h-[16px] / h-[3.25rem] / h-3.5 / h-14), 9 radii (rounded-md 181 /
-// rounded 117 / rounded-full 41 / rounded-lg 23 / rounded-sm 6 /
-// rounded-[5px] 4 / rounded-[2px] 2 / rounded-2xl 1 / rounded-[3px] 1) and
-// 10 type sizes. Only 191 of the 550 declared a height at all — the rest let
-// padding decide, which is why rows of controls never line up.
-//
-// The three steps are 24 / 28 / 32px. That is not a preference: it is where
-// the existing distribution already clusters (h-6 / h-7 / h-8 are the three
-// most common values, 109 of the 191) *and* it is GitHub Primer's
-// xsmall / small / medium control scale. See
-// `.claude/skills/design/references/buttons-and-controls.md` §1.2, §3.1.
-//
-// Radius is one value for all three steps. shadcn and Primer both hold radius
-// constant across sizes; a smaller button with a smaller radius is precisely
-// what makes a row of controls look hand-assembled (DESIGN.md §3.2).
-// `rounded-md` resolves to `calc(0.5rem - 2px)` = 6px here — the same 6px
-// MenuShell puts on every menu surface, so a trigger and the surface it opens
-// share a corner.
-//
-// No transition class lives here. `globals.css` already gives every `button`
-// and `a` `transition: background/color/border-color/opacity var(--motion-fast)`.
-// The 273 `transition-colors` in the codebase restate it; the 5
-// `transition-all` make it worse by animating width and height too.
-// ============================================
+// Control geometry and fine outlines — see /DESIGN.md.
 export const CONTROL = {
   /** Height of a control with a label. */
   height: { xs: 'h-6', sm: 'h-7', md: 'h-8' },
@@ -122,6 +93,13 @@ export const CONTROL = {
   icon: { xs: 14, sm: 14, md: 16 },
   /** One radius for every step. */
   radius: 'rounded-md',
+  actionRadius: 'rounded-[var(--control-action-radius)]',
+  tabRadius: 'rounded-[var(--control-tab-radius)]',
+  border: 'border border-[var(--border-default)]',
+} as const;
+
+export const FIELD = {
+  base: `${CONTROL.border} rounded-[var(--control-field-radius)] placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 focus:bg-[var(--accent-subtle)]`,
 } as const;
 
 export type ControlSize = keyof typeof CONTROL.height;

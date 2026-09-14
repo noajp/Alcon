@@ -1,4 +1,5 @@
 'use client';
+import { Button } from '@/ui/button';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Calendar, Check, User as UserIcon, X } from 'lucide-react';
@@ -340,20 +341,20 @@ function SingleDatePickerRow({
           weekStartsOn={weekStartsOn}
         />
         <div className="flex items-center justify-between border-t border-border px-3 py-2">
-          <button
+          <Button
             type="button"
+            size="xs"
             onClick={() => onChange(null)}
-            className="text-[12px] text-muted-foreground hover:text-foreground"
           >
             Clear
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            size="xs"
             onClick={() => onChange(toYMD(new Date()))}
-            className="text-[12px] text-primary hover:underline"
           >
             Today
-          </button>
+          </Button>
         </div>
       </PopoverContent>
     </Popover>

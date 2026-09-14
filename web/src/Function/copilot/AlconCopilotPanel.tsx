@@ -1,4 +1,5 @@
 'use client';
+import { Button } from '@/ui/button';
 
 import { useEffect, useRef, useState } from 'react';
 import { X, ChevronRight, Loader2, Wrench, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -146,14 +147,14 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
             <span className="text-[13px] font-semibold text-foreground">AI</span>
             <div className="flex-1" />
             {messages.length > 0 && (
-              <button
+              <Button size="sm"
                 type="button"
                 onClick={reset}
                 title="会話をクリア"
                 className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
               >
                 Clear
-              </button>
+              </Button>
             )}
             {/* Close lives on the WindowTabBar's PanelRight toggle (and ⌘L);
                 a header X would just duplicate that affordance. */}
@@ -197,25 +198,25 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
                 style={{ fontWeight: 400 }}
               />
               {streaming ? (
-                <button
+                <Button size="icon-sm"
                   type="button"
                   onClick={cancel}
                   title="停止"
                   aria-label="Stop"
-                  className="inline-flex items-center justify-center h-7 px-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors shrink-0"
+                  variant="ghost"
                 >
                   <X size={14} />
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button size="icon-sm"
                   type="submit"
                   disabled={!input.trim()}
                   title="送信 (Enter)"
                   aria-label="Send"
-                  className="inline-flex items-center justify-center h-7 px-2.5 rounded-lg bg-[var(--rail-active)] text-white border border-white/20 shadow-[var(--shadow-button)] hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
+                  variant="primary"
                 >
                   <SendIcon size={16} />
-                </button>
+                </Button>
               )}
             </form>
           </div>

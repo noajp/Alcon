@@ -41,8 +41,8 @@ export function NowView({ items, scope, onScopeChange, readAt, refreshing, error
         </header>
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-3">
           <div className="flex items-center gap-1" role="group" aria-label="Work scope">
-            <Button variant={scope === 'mine' ? 'secondary' : 'ghost'} aria-pressed={scope === 'mine'} onClick={() => onScopeChange('mine')}>My work</Button>
-            <Button variant={scope === 'team' ? 'secondary' : 'ghost'} aria-pressed={scope === 'team'} onClick={() => onScopeChange('team')}>Team</Button>
+            <Button shape="tab" variant={scope === 'mine' ? 'secondary' : 'ghost'} aria-pressed={scope === 'mine'} onClick={() => onScopeChange('mine')}>My work</Button>
+            <Button shape="tab" variant={scope === 'team' ? 'secondary' : 'ghost'} aria-pressed={scope === 'team'} onClick={() => onScopeChange('team')}>Team</Button>
             <span className="ml-2 text-[12px] tabular-nums text-muted-foreground">{active} active</span>
           </div>
           <div className="flex items-center gap-2 text-[12px] text-muted-foreground">

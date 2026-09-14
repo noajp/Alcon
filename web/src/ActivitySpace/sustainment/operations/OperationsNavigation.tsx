@@ -25,7 +25,7 @@ export function OperationsNavigation({ kind, queue, onSelect, sidebar = false, c
     {sidebar && <p className="px-2 py-1 text-xs font-medium text-muted-foreground">{kind === 'crm' ? 'CRM' : 'SCM'}</p>}
     {OPERATIONS_QUEUES.map(id => {
       const Icon = ICONS[id];
-      return <Button key={id} variant={queue === id ? 'secondary' : 'ghost'} align="start" className={sidebar ? 'w-full' : undefined}
+      return <Button shape="tab" key={id} variant={queue === id ? 'secondary' : 'ghost'} align="start" className={sidebar ? 'w-full' : undefined}
         aria-pressed={queue === id} onClick={() => onSelect(id)}>
         {sidebar && <Icon size={14} />}{operationsQueueLabel(kind, id)}
         {counts?.[id] !== undefined && <span className="text-xs tabular-nums text-muted-foreground">{counts[id]}</span>}

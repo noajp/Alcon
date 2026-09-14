@@ -1055,6 +1055,7 @@ function AvailabilityMenu({
               key={k.id}
               type="button"
               size="xs"
+              shape="tab"
               variant={kind === k.id ? 'secondary' : 'ghost'}
               aria-pressed={kind === k.id}
               onClick={() => setKind(k.id)}
