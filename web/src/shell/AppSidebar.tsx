@@ -1026,18 +1026,17 @@ function DomainGeneralSettings({
               ['workspace', 'Workspace'],
               ['private', 'Private'],
             ] as [DomainPrivacy, string][]).map(([value, label]) => (
-              <button
+              <Button
                 key={value}
                 type="button"
+                shape="tab"
+                variant={privacy === value ? 'secondary' : 'ghost'}
+                aria-pressed={privacy === value}
                 onClick={() => setPrivacy(value)}
-                className={`min-w-0 truncate rounded-md px-2 py-2 text-[12px] font-semibold transition-colors sm:px-3 ${
-                  privacy === value
-                    ? 'bg-foreground text-background'
-                    : 'bg-muted/40 text-muted-foreground hover:bg-muted/70 hover:text-foreground'
-                }`}
+                className="min-w-0 w-full truncate"
               >
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>

@@ -369,10 +369,12 @@ export async function deleteObjectTab(tabId: string): Promise<void> {
 // Reorder tabs
 export async function reorderObjectTabs(objectId: string, tabIds: string[]): Promise<void> {
   for (let i = 0; i < tabIds.length; i++) {
-    await supabase
+    const { error } = await supabase
       .from('object_tabs')
       .update({ order_index: i })
-      .eq('id', tabIds[i]);
+      .eq('id', tabIds[i])
+      .eq('object_id', objectId);
+    if (error) throw error;
   }
 }
 

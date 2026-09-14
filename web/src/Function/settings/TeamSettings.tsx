@@ -240,11 +240,6 @@ function WorkerRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-[13px] font-medium text-foreground truncate">{worker.name}</span>
-          {isAi && (
-            <span className="text-[9px] font-medium px-1 py-px rounded bg-violet-50 text-violet-600">
-              AI
-            </span>
-          )}
           {worker.status === 'inactive' && (
             <span className="text-[9px] font-medium px-1 py-px rounded bg-muted text-muted-foreground">
               Inactive

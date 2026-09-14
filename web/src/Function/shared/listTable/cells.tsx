@@ -783,7 +783,7 @@ export function LeadCell({
         {!empty && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onObjectUpdate(obj.id, { lead_id: null })} className="text-muted-foreground">
+            <DropdownMenuItem onClick={() => onObjectUpdate(obj.id, { lead_id: null })} className="h-6 py-0 text-muted-foreground">
               Clear
             </DropdownMenuItem>
           </>

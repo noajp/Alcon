@@ -1,5 +1,6 @@
 'use client';
 
+import { appDialog } from '@/Function/shared/appDialogStore';
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 
@@ -9,7 +10,7 @@ import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hook
 import {
   createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, addElementAssignee,
   fetchAllWorkers,
-  useObjectTabs, useDomains, useElementTemplates, usePhases, useObjectMilestones, createObjectTab, deleteObjectTab,
+  useObjectTabs, reorderObjectTabs, useDomains, useElementTemplates, usePhases, useObjectMilestones, createObjectTab, deleteObjectTab,
   deleteObject, addDomainElementType, removeDomainElementType,
 } from '@/hooks/useSupabase';
 import type { ObjectTabType } from '@/types/database';
@@ -151,6 +152,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
 
   // Tabs state
   const { tabs, loading: tabsLoading, refetch: refetchTabs } = useObjectTabs(object.id);
+  const [reorderingTabs, setReorderingTabs] = useState(false);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
   // Track which objects we've already initialized default tabs for (ref to survive re-renders)
@@ -460,6 +462,15 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
             <TabBar
               tabs={tabs}
               activeTabId={activeTabId}
+              onTabReorder={reorderingTabs ? undefined : ids => {
+                setReorderingTabs(true);
+                void reorderObjectTabs(object.id, ids).catch(error => {
+                  void appDialog.alert(error instanceof Error ? error.message : 'Could not reorder tabs');
+                }).finally(async () => {
+                  try { await refetchTabs(); }
+                  finally { setReorderingTabs(false); }
+                });
+              }}
               onTabSelect={setActiveTabId}
               onTabClose={handleTabClose}
               onTabCreate={handleTabCreate}

@@ -126,7 +126,6 @@ export function CommentBubble({
       <div className={`flex flex-col max-w-[78%] min-w-0 ${isMine ? 'items-end' : 'items-start'}`}>
         <div className={`flex items-center gap-1.5 mb-0.5 text-[10px] text-muted-foreground ${isMine ? 'flex-row-reverse' : ''}`}>
           <span className="font-medium text-foreground/85">{comment.author_name || 'Unknown'}</span>
-          {isAi && <span className="text-[9px] px-1 bg-purple-500/15 text-purple-300 rounded">AI</span>}
           {meta}
           <span>{formatCommentAge(comment.created_at)}</span>
           {menu}
