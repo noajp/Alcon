@@ -116,21 +116,21 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
 
   return (
     <div>
-      <div className="flex items-end justify-between mb-4">
-        <div>
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+        <div className="min-w-[180px] flex-1">
           <h2 className="text-[15px] font-semibold text-foreground">Team</h2>
           <p className="text-[12px] text-muted-foreground mt-0.5">
             Workers (human or AI) that can be assigned to Elements.
           </p>
         </div>
-        {canManage && <div className="flex items-center gap-2">
+        {canManage && <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
           {domainId && (
             <button
               onClick={() => setShowInvite(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 border border-border text-foreground rounded-md text-[12px] font-medium hover:bg-muted/40 transition-colors"
             >
               <UserPlus size={12} />
-              Invite user
+              Invite
             </button>
           )}
           <button
@@ -138,7 +138,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
             className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background rounded-md text-[12px] font-medium hover:opacity-90 transition-opacity"
           >
             <Plus size={12} />
-            Add member
+            Add
           </button>
         </div>}
       </div>
