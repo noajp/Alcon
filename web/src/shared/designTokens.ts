@@ -187,3 +187,15 @@ export const CARD_HOVER =
 
 export const CARD_DRAG =
   'ring-2 ring-[var(--accent-default)] border-[var(--accent-default)]';
+
+/** Shared geometry for Object and Element quick creation. */
+export const QUICK_CREATE = {
+  panel: 'pointer-events-auto w-full max-w-[760px] max-h-[calc(100dvh-48px)] overflow-y-auto rounded-2xl bg-popover/95 backdrop-blur-md border border-border p-4',
+  header: 'flex items-center gap-2 mb-2',
+  context: 'inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground',
+  title: 'quick-create-title block w-full bg-transparent px-0 py-1 text-lg text-foreground placeholder:text-muted-foreground/60 resize-none',
+  description: 'block w-full bg-transparent px-0 py-1 text-[13px] text-foreground/85 placeholder:text-muted-foreground/50 resize-none',
+  properties: 'flex flex-wrap items-center gap-1.5 pt-2',
+  footer: 'flex items-center justify-end gap-3 pt-3',
+  descriptionMinHeight: 56,
+} as const;

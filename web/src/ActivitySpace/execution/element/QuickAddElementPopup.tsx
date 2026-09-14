@@ -1,16 +1,15 @@
 'use client';
 
+import { QUICK_CREATE } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 
 import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import {
-  ArrowUp,
   Check,
   ChevronDown,
   LayoutTemplate,
-  Sparkles,
   Tag as TagIcon,
   User as UserIcon,
   X,
@@ -78,7 +77,7 @@ interface QuickAddElementPopupProps {
   open: boolean;
   /** Context label shown next to the title — e.g. an Object name. */
   contextLabel?: string;
-  /** Hint shown under the textarea. Default: paste-multiple hint. */
+  /** Hint shown under the textarea. Optional contextual guidance. */
   hint?: string;
   onClose: () => void;
   /** Receives one NewElementInput per non-empty line of the textarea. Shared
@@ -135,7 +134,7 @@ const STATUS_OPTIONS: { value: ElementStatus; label: string }[] = STATUS_ORDER.m
 export function QuickAddElementPopup({
   open,
   contextLabel,
-  hint = 'Tip: paste multiple lines to create several Elements at once',
+  hint,
   onClose,
   onSubmit,
   types = [],
@@ -225,7 +224,7 @@ export function QuickAddElementPopup({
     const ta = descRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
-    ta.style.height = `${Math.min(Math.max(ta.scrollHeight, 84), 240)}px`;
+    ta.style.height = `${Math.min(Math.max(ta.scrollHeight, QUICK_CREATE.descriptionMinHeight), 240)}px`;
   }, [description]);
 
   const titles = useMemo(
@@ -313,13 +312,13 @@ export function QuickAddElementPopup({
   return (
     <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4 pointer-events-none">
       <div
-        className="pointer-events-auto w-full max-w-[640px] rounded-2xl bg-popover/95 backdrop-blur-md border border-border/60 p-4"
+        className={QUICK_CREATE.panel}
         role="dialog"
         aria-label="Quick add Element"
       >
         {/* Header — context chip + close */}
-        <div className="flex items-center gap-2 px-1 mb-2">
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted/40 text-[12px] text-muted-foreground">
+        <div className={QUICK_CREATE.header}>
+          <span className={QUICK_CREATE.context}>
             <ElementIcon size={12} />
             <span className="truncate max-w-[200px]">{contextLabel ?? 'New Element'}</span>
           </span>
@@ -353,24 +352,25 @@ export function QuickAddElementPopup({
               handleSubmit(e.metaKey || e.ctrlKey);
             }
           }}
-          placeholder="Element title… (Enter to create, Shift+Enter for newline)"
+          placeholder="Element title…"
+          aria-label="Element title"
           rows={1}
-          className="w-full bg-transparent px-2 py-1 text-[15px] font-medium text-foreground placeholder:text-muted-foreground/60 resize-none"
+          className={QUICK_CREATE.title}
         />
 
-        {/* Description — starts 3 lines tall so users have room to write
-            without clicking into it first. */}
+        {/* Description — compact at rest, grows with the content. */}
         <textarea
           ref={descRef}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Add description…"
-          rows={3}
-          className="w-full bg-transparent px-2 py-1 text-[13px] text-foreground/85 placeholder:text-muted-foreground/50 resize-none"
+          aria-label="Description"
+          rows={2}
+          className={QUICK_CREATE.description}
         />
 
         {/* Pill row — Template / Type / Status / Priority / Assignee / Save to / Labels */}
-        <div className="flex flex-wrap items-center gap-1.5 px-1 pt-2">
+        <div className={QUICK_CREATE.properties}>
           {/* Template — a saved shape (Settings > Elements > Templates).
               Picking one resets every pill it defines to match; the pill
               itself only ever shows the last-picked name, since applying a
@@ -594,28 +594,11 @@ export function QuickAddElementPopup({
           )}
         </div>
 
-        {/* Footer — hint + submit */}
-        <div className="flex items-center justify-between gap-2 px-1 pt-3">
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/80 min-w-0 truncate">
-            <Sparkles size={11} />
-            <span className="truncate">{hint}</span>
-          </div>
-          {/* The shortcut sits with the button it fires, not in the placeholder
-              — the title field already spends its hint on Shift+Enter. */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Both bindings are live, so the hint names both rather than
-                showing a ⌘ to people who do not have one. */}
-            <span className="text-[11px] text-muted-foreground/60 hidden sm:inline">
-              ⌘/Ctrl+Enter to create and close
-            </span>
-            <Button variant="primary" size="md"
-              onClick={() => handleSubmit(false)}
-              disabled={!canSubmit}
-            >
-              <ArrowUp size={13} />
-              {titles.length > 1 ? `Create ${titles.length}` : 'Create'}
-            </Button>
-          </div>
+        <div className={QUICK_CREATE.footer}>
+          {hint && <span className="mr-auto min-w-0 text-[11px] text-muted-foreground">{hint}</span>}
+          <Button variant="primary" onClick={() => handleSubmit(false)} disabled={!canSubmit}>
+            {titles.length > 1 ? `Create ${titles.length}` : 'Create'}
+          </Button>
         </div>
       </div>
     </div>
