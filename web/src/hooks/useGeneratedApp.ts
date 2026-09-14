@@ -76,7 +76,7 @@ export function useGeneratedApp(objectId: string, instanceId: string) {
     savePrompt: (prompt: string) => serial(() => update({ prompt })),
     generate: (prompt: string) => serial(async () => {
       const app = await update({ prompt });
-      const { data, error } = await supabase.functions.invoke('generate-widget-app', { body: { appId: app.id, prompt } });
+      const { data, error } = await supabase.functions.invoke('generate-widget-app', { body: { appId: app.id, prompt, runtimeVersion: 2 } });
       if (error) {
         let message = error.message;
         if ('context' in error && error.context instanceof Response) { try { message = (await error.context.json()).error ?? message; } catch { /* Keep transport error. */ } }

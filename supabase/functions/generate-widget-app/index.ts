@@ -22,6 +22,7 @@ Deno.serve(async req => {
     const text = await req.text();
     if (text.length > 140000) return reply({ error: 'Request too large.' }, 413);
     const input = JSON.parse(text);
+    if (input.runtimeVersion !== 2) return reply({ error: 'Reload Alcon before generating an app with the current runtime.' }, 409);
     if (typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > 8000 || typeof input.appId !== 'string') return reply({ error: 'An app and request are required.' }, 400);
     const { data: app, error } = await client.from('widget_apps').select('object_id,current_app,draft_app').eq('id', input.appId).single();
     if (error || !app) return reply({ error: 'App not found or access denied.' }, 404);
