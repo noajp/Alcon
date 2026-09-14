@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { LanguageSelect } from '@/Function/i18n/LanguageSelect';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export function AuthPage() {
+  const { t } = useI18n();
   const { signIn, signUp } = useAuthContext();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
@@ -26,7 +29,7 @@ export function AuthPage() {
         await signIn(email, password);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      setError(err instanceof Error ? err.message : t('Something went wrong'));
     } finally {
       setLoading(false);
     }
@@ -34,7 +37,8 @@ export function AuthPage() {
 
   if (signUpSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--content-bg)]">
+      <div className="relative min-h-screen flex items-center justify-center bg-[var(--content-bg)]">
+        <div className="absolute right-4 top-4"><LanguageSelect /></div>
         <div className="w-full max-w-sm">
           <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-8 text-center">
             <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
@@ -42,15 +46,15 @@ export function AuthPage() {
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-foreground mb-2">Check your email</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-2">{t('Check your email')}</h2>
             <p className="text-sm text-muted-foreground mb-6">
-              We sent a confirmation link to <strong className="text-foreground">{email}</strong>
+              {t('We sent a confirmation link to {email}', { email })}
             </p>
             <button
               onClick={() => { setSignUpSuccess(false); setMode('signin'); }}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              Back to sign in
+              {t('Back to sign in')}
             </button>
           </div>
         </div>
@@ -59,33 +63,34 @@ export function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--content-bg)]">
+    <div className="relative min-h-screen flex items-center justify-center bg-[var(--content-bg)]">
+      <div className="absolute right-4 top-4"><LanguageSelect /></div>
       <div className="w-full max-w-sm">
         {/* Card */}
         <div className="bg-card rounded-lg border border-border/40 shadow-[var(--shadow-island)] p-8">
           <h1 className="text-lg font-semibold text-foreground mb-1">
-            {mode === 'signin' ? 'Welcome back' : 'Create an account'}
+            {t(mode === 'signin' ? 'Welcome back' : 'Create an account')}
           </h1>
           <p className="text-sm text-muted-foreground mb-6">
-            {mode === 'signin' ? 'Sign in to your Activity Space' : 'Get started with Alcon'}
+            {t(mode === 'signin' ? 'Sign in to your Activity Space' : 'Get started with Alcon')}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Name</label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">{t('Name')}</label>
                 <input
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your name"
+                  placeholder={t('Your name')}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
                 />
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">{t('Email')}</label>
               <input
                 type="email"
                 value={email}
@@ -97,12 +102,12 @@ export function AuthPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Password</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">{t('Password')}</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 6 characters"
+                placeholder={t('At least 6 characters')}
                 required
                 minLength={6}
                 className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
@@ -123,23 +128,23 @@ export function AuthPage() {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <div className="w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
-                  {mode === 'signin' ? 'Signing in...' : 'Creating account...'}
+                  {t(mode === 'signin' ? 'Signing in...' : 'Creating account...')}
                 </span>
               ) : (
-                mode === 'signin' ? 'Sign in' : 'Create account'
+                t(mode === 'signin' ? 'Sign in' : 'Create account')
               )}
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <span className="text-sm text-muted-foreground">
-              {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
+              {t(mode === 'signin' ? "Don't have an account? " : 'Already have an account? ')}
             </span>
             <button
               onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(null); }}
               className="text-sm font-medium text-foreground hover:underline"
             >
-              {mode === 'signin' ? 'Sign up' : 'Sign in'}
+              {t(mode === 'signin' ? 'Sign up' : 'Sign in')}
             </button>
           </div>
         </div>

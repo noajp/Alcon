@@ -48,6 +48,7 @@ import { TeamSettings } from '@/Function/settings/TeamSettings';
 import { OperationsNavigation } from '@/ActivitySpace/sustainment/operations/OperationsNavigation';
 import { operationsQueue, operationsQueueRoute } from '@/ActivitySpace/sustainment/operations/operationsQueues';
 import type { NavigationState } from '@/types/navigation';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export type { NavigationState };
 
@@ -113,6 +114,7 @@ function NotebookSidebar({
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
 }) {
+  const { t } = useI18n();
   const { nodes, createNode, deleteNode } = useNotes();
   const folders = useMemo(
     () => nodes.filter((n) => n.type === 'folder').sort((a, b) => a.name.localeCompare(b.name)),
@@ -132,13 +134,13 @@ function NotebookSidebar({
   return (
     <div className="mt-1">
       <div className="flex items-center gap-1 px-2 h-6 mt-3">
-        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">Notebook</span>
+        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Notebook')}</span>
         <div className="flex-1" />
         <button
           type="button"
           onClick={addNotebook}
-          title="Add Notebook"
-          aria-label="Add Notebook"
+          title={t('Add Notebook')}
+          aria-label={t('Add Notebook')}
           className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
         >
           <Plus size={14} />
@@ -166,7 +168,7 @@ function NotebookSidebar({
         })}
         {folders.length === 0 && (
           <div className="px-2.5 py-6 text-[11px] text-muted-foreground/60 leading-relaxed">
-            No notebooks yet — click + to add one.
+            {t('No notebooks yet — click + to add one.')}
           </div>
         )}
       </div>
@@ -187,6 +189,7 @@ function TableSidebar({
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
 }) {
+  const { t } = useI18n();
   const { openCreate } = useWorkspaceActions();
   const { data: tables, refetch } = useDataTables();
   // The New Table dialog lives in TableView; when it creates a table it
@@ -200,13 +203,13 @@ function TableSidebar({
   return (
     <div className="mt-1">
       <div className="flex items-center gap-1 px-2 h-6 mt-3">
-        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">Table</span>
+        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Table')}</span>
         <div className="flex-1" />
         <button
           type="button"
           onClick={() => openCreate('table')}
-          title="Add Table"
-          aria-label="Add Table"
+          title={t('Add Table')}
+          aria-label={t('Add Table')}
           className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
         >
           <Plus size={14} />
@@ -235,7 +238,7 @@ function TableSidebar({
         })}
         {tables.length === 0 && (
           <div className="px-2.5 py-6 text-[11px] text-muted-foreground/60 leading-relaxed">
-            No tables yet — click + to add one.
+            {t('No tables yet — click + to add one.')}
           </div>
         )}
       </div>
@@ -254,6 +257,7 @@ export function AppSidebar({
   onCreateNew,
   onSearch,
 }: AppSidebarProps) {
+  const { t } = useI18n();
   const { user } = useAuthContext();
   const { unreadCount } = useNotifications(user?.id ?? null);
   const { guestDomains, refetch: refetchMemberDomains } = useDomains();
@@ -460,8 +464,8 @@ export function AppSidebar({
               <button
                 type="button"
                 onClick={onSearch}
-                title="Discover Domains and Objects"
-                aria-label="Discover"
+                title={t('Discover Domains and Objects')}
+                aria-label={t('Discover')}
                 className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
               >
                 <Search size={15} />
@@ -471,8 +475,8 @@ export function AppSidebar({
               ref={createBtnRef}
               type="button"
               onClick={openCreateMenu}
-              title="Create new"
-              aria-label="Create new"
+              title={t('Create new')}
+              aria-label={t('Create new')}
               className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
             >
               <Plus size={16} />
@@ -482,7 +486,7 @@ export function AppSidebar({
           {/* ── Home mode ── Inbox / Calendar / My Elements */}
           {railMode === 'home' && (
           <>
-          <SidebarModeLabel label="Home" />
+          <SidebarModeLabel label={t('Home')} />
           <div className="mb-1 mt-1">
             {HOME_ITEMS.map((item) => {
               const Icon = item.icon;
@@ -499,7 +503,7 @@ export function AppSidebar({
                   }`}
                 >
                   <Icon size={16} />
-                  <span className="flex-1 text-left">{item.label}</span>
+                  <span className="flex-1 text-left">{t(item.label)}</span>
                   {showBadge && (
                     <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
                       {unreadCount > 9 ? '9+' : unreadCount}
@@ -518,7 +522,7 @@ export function AppSidebar({
               down, reachable from any Initiative's member Objects. */}
           {railMode === 'strategy' && (
           <>
-          <SidebarModeLabel label="Strategy" />
+          <SidebarModeLabel label={t('Strategy')} />
           <StrategyNavigation activeView={activeView} onSelect={(id) => {
             if (id === 'strategy') onNavigate({ strategyId: null });
             onViewChange(id);
@@ -530,7 +534,7 @@ export function AppSidebar({
               each Domain opening onto its Objects and Elements. */}
           {railMode === 'execution' && (
           <>
-          <SidebarModeLabel label="Execution" />
+          <SidebarModeLabel label={t('Execution')} />
           <div className="mt-1" />
 
           {/* All domains — the name opens the overview; the chevron expands the tree.
@@ -604,9 +608,9 @@ export function AppSidebar({
           )}
           {/* ── Workload / Team modes ── each a single full surface in the
               main pane, so the sidebar just names the mode. */}
-          {railMode === 'workload' && <SidebarModeLabel label="Workload" />}
-          {railMode === 'calendar' && <SidebarModeLabel label="Calendar" />}
-          {railMode === 'team' && <SidebarModeLabel label="Team" />}
+          {railMode === 'workload' && <SidebarModeLabel label={t('Workload')} />}
+          {railMode === 'calendar' && <SidebarModeLabel label={t('Calendar')} />}
+          {railMode === 'team' && <SidebarModeLabel label={t('Team')} />}
           {(railMode === 'crm' || railMode === 'scm') && <OperationsNavigation sidebar kind={railMode}
             queue={operationsQueue(navigation, railMode)} onSelect={queue => onNavigate(operationsQueueRoute(railMode, queue))} />}
           </>
@@ -617,7 +621,7 @@ export function AppSidebar({
           <div
             onPointerDown={startResize}
             className="absolute top-0 right-0 h-full w-1 cursor-col-resize hover:bg-border/40 active:bg-border/60"
-            title="Drag to resize"
+            title={t('Drag to resize')}
           />
         )}
       </div>
@@ -642,20 +646,20 @@ export function AppSidebar({
               <>
                 <CreateMenuItem
                   icon={<DomainIcon size={16} />}
-                  label="Domain"
-                  desc="Top-level container"
+                  label={t('Domain')}
+                  desc={t('Top-level container')}
                   onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
                 />
                 <CreateMenuItem
                   icon={<ObjectIcon size={14} />}
-                  label="Object"
-                  desc="Mid-level structural unit"
+                  label={t('Object')}
+                  desc={t('Mid-level structural unit')}
                   onClick={() => { setCreateMenuOpen(false); onCreateNew?.('object'); }}
                 />
                 <CreateMenuItem
                   icon={<FileText size={14} />}
-                  label="Note"
-                  desc="A new note"
+                  label={t('Note')}
+                  desc={t('A new note')}
                   onClick={() => { setCreateMenuOpen(false); onCreateNew?.('note'); }}
                 />
               </>
