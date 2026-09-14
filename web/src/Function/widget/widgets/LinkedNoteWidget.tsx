@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/ui/button';
 import { useState } from 'react';
 import { FileText, Plus } from 'lucide-react';
 import { updateObject } from '@/hooks/useSupabase';
@@ -44,15 +45,15 @@ export function LinkedNoteWidget({ host }: { host: WidgetHost }) {
 
   return (
     <div className="relative">
-      <button
+      <Button
         type="button"
         onClick={() => setPickerOpen(true)}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-md border border-dashed border-border/60 text-[12px] text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+        className="w-full" align="start"
       >
         <FileText size={13} />
         <span className="flex-1 text-left">Link a Note</span>
         <Plus size={13} />
-      </button>
+      </Button>
       <NotePicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}

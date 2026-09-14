@@ -41,7 +41,7 @@ export function CalendarScopePicker({ domains, objects, selection, onChange }: P
       <MenuShell width="wide" align="end">
         <div className="flex gap-1 p-1" aria-label="Calendar scope lists">
           {([{ id: 'mine', label: 'My Elements' }, { id: 'domains', label: 'Domains' }, { id: 'objects', label: 'Objects' }] as const).map(item => (
-            <Button key={item.id} size="xs" variant={tab === item.id ? 'secondary' : 'ghost'} aria-pressed={tab === item.id} onClick={() => { setTab(item.id); setSearch(''); }}>{item.label}</Button>
+            <Button shape="tab" key={item.id} size="xs" variant={tab === item.id ? 'secondary' : 'ghost'} aria-pressed={tab === item.id} onClick={() => { setTab(item.id); setSearch(''); }}>{item.label}</Button>
           ))}
         </div>
         <Command>

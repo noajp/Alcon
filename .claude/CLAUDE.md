@@ -50,8 +50,10 @@ npx vercel --prod            # 本番デプロイ
 
 ミニマルで静かな UI。装飾よりも情報密度を重視する。メイン領域は角丸の IslandCard で背景から区別する。
 
+**ボタン・タブ・枠線の規約は [DESIGN.md](../DESIGN.md)。UIを変更するときに読む。** 操作ボタンは薄枠の端子型、タブは同じ薄枠の角丸長方形。
+
 - **色をハードコードしない** — デザイントークンは `shared/designTokens.ts`
-- **入力フィールドに枠・リング・アウトライン禁止** — globals.css はフォーカスリングを表示しないため、各コンポーネントで背景色を変えてフォーカスを示す。`focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで書かない
+- **独立した入力欄は共通の薄枠。リング・アウトライン禁止** — globals.css はフォーカスリングを表示しないため、各コンポーネントで背景色を変えてフォーカスを示す。`focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで書かない
 - **`uppercase` を使わない** — ラベルは書いた通り（先頭大文字）で表示する
 - **「Task」と呼ばない** — 必ず「Element」
 - **ウィジェットの枠を自作しない** — `WIDGET_REGISTRY` に登録し、枠は `WidgetFrame`、ヘッダは `useWidgetMeta` / `WidgetHeaderAction`

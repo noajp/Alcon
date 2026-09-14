@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Sparkles, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { Button } from '@/ui/button';
+import { TextComposer } from '@/ui/text-composer';
 import { useGeneratedApp } from '@/hooks/useGeneratedApp';
 import { WidgetHeaderAction, useWidgetMeta } from '../WidgetFrame';
 import { summaryApp } from '../generated/summaryApp';
@@ -44,7 +45,7 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
   if (store.loading) return <p className="text-sm text-muted-foreground">Loading your app…</p>;
   return <div className="space-y-3">
     <WidgetHeaderAction>
-      {app?.current_app && <Button variant="ghost" size="sm" disabled={locked} onClick={() => setEditing(v => !v)}><Sparkles size={13} />{showEditor ? 'Close editor' : 'Edit with AI'}</Button>}
+      {app?.current_app && <Button variant="ghost" size="sm" disabled={locked} onClick={() => setEditing(v => !v)}>{showEditor ? 'Close editor' : 'Edit with AI'}</Button>}
     </WidgetHeaderAction>
     {showEditor && <div className="space-y-3">
       {!app?.current_app && !app?.draft_app && <div className="space-y-1">
@@ -52,16 +53,15 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
         <p className="text-xs text-muted-foreground">Create a summary of this Object’s Strategy and Execution, a calculator, checklist or form. The app and its saved inputs stay here when you return. Private to you.</p>
       </div>}
       <form className="space-y-2" onSubmit={e => { e.preventDefault(); void run(() => store.generate(prompt)); }}>
-        <textarea aria-label="Describe your app" placeholder="例：人数・単価・割引率で見積もりを計算して、採用案を保存したい" rows={3} maxLength={8000} value={prompt} disabled={locked} onChange={e => setPrompt(e.target.value)} className="w-full resize-y rounded-md border-0 bg-muted/30 p-3 text-sm placeholder:text-muted-foreground focus:bg-muted/60" />
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" size="sm" disabled={locked || !prompt.trim()}><Sparkles size={14} />{busy ? 'Working…' : source ? 'Generate revision' : 'Generate app'}</Button>
-          {app?.previous_app && <Button type="button" variant="ghost" size="sm" disabled={locked} onClick={() => void run(async () => { await store.restore(); setEpoch(n => n + 1); })}><RotateCcw size={13} />Previous version</Button>}
-          <span className="text-xs text-muted-foreground">Uses AI when you generate</span>
-        </div>
+        <TextComposer aria-label="Describe your app" placeholder="Example: Calculate an estimate from headcount, unit price and discount, then save the chosen plan." rows={3} maxLength={8000} value={prompt} disabled={locked} onChange={e => setPrompt(e.target.value)}
+          hint="Uses AI when you generate"
+          action={<Button type="submit" variant="primary" size="sm" disabled={locked || !prompt.trim()}>{busy ? 'Working…' : source ? 'Generate revision' : 'Generate app'}</Button>}
+          secondaryAction={app?.previous_app && <Button type="button" variant="ghost" size="sm" disabled={locked} onClick={() => void run(async () => { await store.restore(); setEpoch(n => n + 1); })}><RotateCcw size={13} />Previous version</Button>}
+        />
       </form>
-      {!source && <Button variant="secondary" size="sm" disabled={locked} onClick={() => void run(() => store.useTemplate(summaryApp))}>案件サマリーで始める</Button>}
+      {!source && <Button variant="secondary" size="sm" disabled={locked} onClick={() => void run(() => store.useTemplate(summaryApp))}>Start with a project summary</Button>}
       {!source && <div className="flex flex-wrap gap-1">
-        {['このObjectのElementsと関連Initiativeから案件サマリーを作って', '見積もり計算と案の保存', '納品前のチェックリスト', '議題と決定事項の記録フォーム'].map(example => <Button key={example} variant="ghost" size="sm" disabled={locked} onClick={() => setPrompt(example)}>{example}</Button>)}
+        {['Summarize this Object’s Elements and related Initiatives', 'Calculate estimates and save plans', 'Create a delivery checklist', 'Track agendas and decisions'].map(example => <Button key={example} variant="ghost" size="sm" multiline disabled={locked} onClick={() => setPrompt(example)}>{example}</Button>)}
       </div>}
     </div>}
     {app?.draft_app && <div className="flex flex-wrap items-center gap-2">
@@ -69,7 +69,7 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
       <Button size="sm" disabled={locked || !ready || store.saving} onClick={() => void run(async () => { await store.adopt(); setEditing(false); setPrompt(''); latestPrompt.current = ''; setEpoch(n => n + 1); })}>Use this app</Button>
       <Button variant="ghost" size="sm" disabled={locked} onClick={() => void run(() => store.discard())}>Discard preview</Button>
     </div>}
-    {source?.usesObjectData && <p className="text-xs text-muted-foreground">Object data connected · このObjectのElements・関連Initiatives・Intentを、あなたの閲覧権限で取得します。取得時点の情報です。</p>}
+    {source?.usesObjectData && <p className="text-xs text-muted-foreground">Object data connected · Reads this Object’s Elements, related Initiatives and Intents with your access permissions. Data reflects the time it was fetched.</p>}
     {source && <AppRuntime key={`${epoch}:${app?.draft_app ? 'draft' : 'live'}:${JSON.stringify(source)}`} source={source} state={store.state} objectId={host.subject.id ?? ''} objectName={host.object?.name ?? ''} preview={!!app?.draft_app} readOnly={!!host.readOnly || !!store.error} onSave={async value => { try { await store.saveState(value); } catch (e) { setError(e instanceof Error ? e.message : 'Could not save app data.'); throw e; } }} onReadContext={source.usesObjectData ? store.readContext : undefined} onReady={setReady} />}
     {(error || store.error) && <div role="alert" className="space-y-1 text-sm text-destructive"><p>{error ?? store.error}</p><Button variant="ghost" size="sm" disabled={busy || store.saving} onClick={() => void run(async () => { const result = await store.reload(); if (result.error) throw result.error; setEpoch(n => n + 1); })}>Reload saved app</Button></div>}
     {host.readOnly && <p className="text-xs text-muted-foreground">Reconnect to edit or save this app.</p>}

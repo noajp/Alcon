@@ -1,4 +1,5 @@
 'use client';
+import { Button } from '@/ui/button';
 
 import { useState } from 'react';
 import { Check, Plus } from 'lucide-react';
@@ -173,14 +174,9 @@ export function AddPropertyButton({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label="Add property"
-          title="Add property"
-          className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
-        >
+        <Button type="button" size="icon-xs" variant="ghost" aria-label="Add property" title="Add property">
           <Plus size={13} strokeWidth={2.5} />
-        </button>
+        </Button>
       </PopoverTrigger>
       <MenuShell align="end">
         <AddPropertyMenu scope={scope} onAdd={onAdd} onClose={() => setOpen(false)} />

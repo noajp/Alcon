@@ -30,7 +30,11 @@ document.addEventListener('submit',event=>event.preventDefault());
 document.addEventListener('click',event=>{if(event.target.closest?.('a'))event.preventDefault();},true);
 let started=false;
 window.addEventListener('message',event=>{
- if(event.source!==parent||event.data?.channel!==channel||event.data?.type!=='start'||started)return;
+ if(event.source!==parent||event.data?.channel!==channel||!['start','theme'].includes(event.data?.type))return;
+ for(const [key,value] of Object.entries(event.data.theme||{})){
+  if(/^--[a-zA-Z0-9_-]+$/.test(key)&&typeof value==='string')document.documentElement.style.setProperty(key,value);
+ }
+ if(event.data.type!=='start'||started)return;
  started=true;
  (async()=>{try{\n${app.js}\n;send('ready');}catch(error){send('error',{message:String(error?.message||error)});}})();
 });
@@ -38,5 +42,13 @@ send('boot');`;
   // Sandboxed opaque origin, no credentials, external resources or child frames.
   // The host authorizes scoped Object reads; iframe code never receives credentials.
   const variables = Object.entries(theme).map(([key, value]) => `${key}:${value.replace(/[<>;{}]/g, '')}`).join(';');
-  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{${variables}}*{box-sizing:border-box}body{margin:0;padding:16px;font:14px system-ui;color:var(--foreground);background:var(--background)}input,button,select,textarea{font:inherit}button{cursor:pointer}input,textarea,select{max-width:100%}:focus-visible{outline:none;background:var(--muted)}${app.css.replace(/</g, '\\3c ')}</style></head><body>${app.html}<script>${bootstrap.replace(/<\/script/gi, '<\\/script')}</script></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{${variables}}*{box-sizing:border-box}body{margin:0;padding:16px;font:14px system-ui;color:var(--foreground);background:var(--background)}input,button,select,textarea{font:inherit}button{cursor:pointer;color:inherit}input,textarea,select{max-width:100%}:focus-visible{outline:none;background:var(--muted)}${app.css.replace(/</g, '\\3c ')}
+/* Host control geometry applies to saved apps as well as new generations. */
+button,[role=tab]{box-sizing:border-box!important;border:1px solid var(--border)!important;border-radius:var(--control-action-radius,9999px)!important;min-height:28px;padding:4px 10px;line-height:1.4;font-size:12px;font-weight:500}
+[role=tab]{border-radius:var(--control-tab-radius,6px)!important}
+button:hover,[role=tab]:hover{border-color:var(--border-strong,var(--border))!important}
+[role=tab][aria-selected=true]{background:var(--muted);border-color:var(--border-strong,var(--border))!important;font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,[role=tab]:focus-visible{background:var(--muted);border-color:var(--border-strong,var(--border))!important}
+</style></head><body>${app.html}<script>${bootstrap.replace(/<\/script/gi, '<\\/script')}</script></body></html>`;
 }

@@ -82,8 +82,8 @@ function DependencyEditor({ elementId, spaceId, onOpenElement, onChanged }: Elem
       <PopoverTrigger asChild><Button variant="ghost" size="xs" disabled={pending}><Plus className="size-3" />Add dependency</Button></PopoverTrigger>
       <MenuShell align="start">
         <div className="flex gap-1 p-1">
-          <Button size="xs" variant={relation === 'incoming' ? 'secondary' : 'ghost'} aria-pressed={relation === 'incoming'} onClick={() => setRelation('incoming')}>Waits for</Button>
-          <Button size="xs" variant={relation === 'outgoing' ? 'secondary' : 'ghost'} aria-pressed={relation === 'outgoing'} onClick={() => setRelation('outgoing')}>Unblocks</Button>
+          <Button shape="tab" size="xs" variant={relation === 'incoming' ? 'secondary' : 'ghost'} aria-pressed={relation === 'incoming'} onClick={() => setRelation('incoming')}>Waits for</Button>
+          <Button shape="tab" size="xs" variant={relation === 'outgoing' ? 'secondary' : 'ghost'} aria-pressed={relation === 'outgoing'} onClick={() => setRelation('outgoing')}>Unblocks</Button>
         </div>
         <Command shouldFilter={false}>
           <CommandInput placeholder="Find an Element…" value={search} onValueChange={setSearch} className="focus:bg-muted/40" />

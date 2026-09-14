@@ -1,44 +1,6 @@
 "use client"
 
-// THE button. Four hierarchies, three sizes, one radius — and the geometry
-// comes from `CONTROL` in `shared/designTokens.ts`, not from numbers typed
-// here, so the tokens and the primitive cannot drift apart.
-//
-// HOUSE OVERRIDE — do not restore the shadcn defaults. What was replaced and
-// why (measured on `src/` before this rewrite; see
-// `.claude/skills/design/references/buttons-and-controls.md`):
-//
-//   six variants → four. shadcn ships `default / secondary / outline / ghost /
-//     destructive / link`. `outline` is gone: a bordered tier duplicates
-//     `secondary` and adds a second way to draw the same emphasis (DESIGN.md
-//     §5.2). `link` is gone: a link is an `<a>`. The four that remain are
-//     Primer's, and Primer's rule comes with them — one `primary` per screen,
-//     never two in a group.
-//
-//   seven sizes → three + three squares. `h-9 / h-8 / h-10 / size-9 / size-8 /
-//     size-10` became 24 / 28 / 32px, matching the three heights the codebase
-//     already clusters on. An icon-only button is the square of its step, so
-//     `Sort ▾` and the icon button beside it are the same height.
-//
-//   `transition-all` → nothing. `globals.css` already transitions background,
-//     color, border-color and opacity on every `button` at `--motion-fast`.
-//     shadcn's `transition-all` additionally animated width and height, so a
-//     button whose label changed grew visibly.
-//
-//   `focus-visible:ring-[3px]` + `focus-visible:border-ring` → a 2px ring and
-//     no border change. The border recolour was invisible on the three
-//     borderless variants. The ring stays a *ring* (box-shadow) rather than an
-//     `outline`: `globals.css` sets `*:focus-visible { outline: none }`
-//     unlayered, which beats any `@layer utilities` outline utility. Pressable
-//     parts must show focus themselves (DESIGN.md §5.8) — buttons are on the
-//     whitelist, inputs are not.
-//
-//   `justify-center` always → an `align` variant. Primer distinguishes a
-//     dropdown trigger (label left, so the `▾` sits at the far edge and the
-//     label starts where a label starts) from an execute CTA (centred). The
-//     two are different objects and should not look identical.
-//
-// If you re-run the shadcn generator, re-apply this file by hand.
+// Shared action and tab control. Geometry and borders follow /DESIGN.md.
 
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
@@ -50,7 +12,8 @@ import { CONTROL } from "@/shared/designTokens"
 const buttonVariants = cva(
   [
     "inline-flex items-center whitespace-nowrap shrink-0 select-none",
-    CONTROL.radius,
+    CONTROL.border,
+    "hover:border-[var(--border-strong)]",
     "font-medium",
     "disabled:pointer-events-none disabled:opacity-50",
     "[&_svg]:pointer-events-none [&_svg]:shrink-0",
@@ -59,11 +22,12 @@ const buttonVariants = cva(
   ].join(" "),
   {
     variants: {
+      shape: { action: CONTROL.actionRadius, tab: [CONTROL.tabRadius, "aria-pressed:border-[var(--border-strong)] aria-selected:border-[var(--border-strong)]"].join(" ") },
       variant: {
-        /** Accent ground. One per screen; never two inside one button group. */
+        /** Accent ground. One primary action per button group. */
         primary:
           "bg-[var(--accent-default)] text-white hover:bg-[var(--accent-hover)]",
-        /** Sits beside a primary. A filled step, not a border. */
+        /** Neutral filled action, with the same fine border as every control. */
         secondary:
           "bg-[var(--surface-strong)] text-[var(--text-primary)] hover:bg-[var(--surface-overlay)]",
         /**
@@ -73,7 +37,7 @@ const buttonVariants = cva(
          * `hover:bg-accent` paints nothing.
          */
         ghost:
-          "bg-transparent text-[var(--text-secondary)] hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)]",
+          "bg-transparent text-[var(--text-primary)] hover:bg-[var(--surface-strong)]",
         /**
          * Destructive. Tinted at rest, solid red on hover (Primer).
          *
@@ -96,6 +60,7 @@ const buttonVariants = cva(
         "icon-sm": [CONTROL.square.sm, "p-0 justify-center"].join(" "),
         "icon-md": [CONTROL.square.md, "p-0 justify-center"].join(" "),
       },
+      multiline: { true: "h-auto min-h-7 max-w-full whitespace-normal py-1.5 text-left justify-start", false: "" },
       align: {
         /** Execute CTA — "press this and something happens". */
         center: "justify-center",
@@ -104,6 +69,8 @@ const buttonVariants = cva(
       },
     },
     defaultVariants: {
+      shape: "action",
+      multiline: false,
       variant: "secondary",
       size: "sm",
       align: "center",
@@ -116,6 +83,8 @@ function Button({
   variant = "secondary",
   size = "sm",
   align = "center",
+  shape = "action",
+  multiline = false,
   asChild = false,
   ...props
 }: React.ComponentProps<"button"> &
@@ -129,7 +98,8 @@ function Button({
       data-slot="button"
       data-variant={variant}
       data-size={size}
-      className={cn(buttonVariants({ variant, size, align, className }))}
+      data-shape={shape}
+      className={cn(buttonVariants({ variant, size, align, shape, multiline, className }))}
       {...props}
     />
   )
