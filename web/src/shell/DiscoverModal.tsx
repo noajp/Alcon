@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { ObjectIcon } from '@/shell/icons';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { notifyDomainsChanged } from '@/ActivitySpace/execution/domain/domainsStore';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // "Things I haven't joined yet." Opens from the 🔍 in the ModeStrip and
 // lists Domains / Objects whose member tables don't yet have a row for the
@@ -35,6 +36,7 @@ interface DiscoverModalProps {
 }
 
 export function DiscoverModal({ open, onOpenChange }: DiscoverModalProps) {
+  const { t } = useI18n();
   const { user } = useAuthContext();
   const [tab, setTab] = useState<'domains' | 'objects'>('domains');
   const [domains, setDomains] = useState<DiscoverableDomain[]>([]);
@@ -139,7 +141,7 @@ export function DiscoverModal({ open, onOpenChange }: DiscoverModalProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md p-0 overflow-hidden">
         <DialogHeader className="px-4 py-3 border-b border-border">
-          <DialogTitle className="text-sm font-semibold">Discover</DialogTitle>
+          <DialogTitle className="text-sm font-semibold">{t('Discover')}</DialogTitle>
         </DialogHeader>
 
         <div className="flex border-b border-border">
@@ -152,7 +154,7 @@ export function DiscoverModal({ open, onOpenChange }: DiscoverModalProps) {
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Domains ({domains.length})
+            {t('Domains')} ({domains.length})
           </button>
           <button
             type="button"
@@ -163,13 +165,13 @@ export function DiscoverModal({ open, onOpenChange }: DiscoverModalProps) {
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Objects ({objects.length})
+            {t('Objects')} ({objects.length})
           </button>
         </div>
 
         <div className="max-h-[420px] overflow-y-auto divide-y divide-border/40">
           {loading ? (
-            <div className="p-6 text-center text-xs text-muted-foreground">Loading…</div>
+            <div className="p-6 text-center text-xs text-muted-foreground">{t('Loading…')}</div>
           ) : tab === 'domains' ? (
             domains.length === 0 ? (
               <div className="p-6 text-center text-xs text-muted-foreground">

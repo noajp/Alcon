@@ -17,6 +17,7 @@ import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { MenuShell, MenuSectionLabel } from '@/Function/shared/menu';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export type { RailMode };
 
@@ -77,6 +78,7 @@ function ProfileRailButton({
   active: boolean;
   onClick: () => void;
 }) {
+  const { t } = useI18n();
   const { user, profile } = useAuthContext();
   const name = profile?.display_name || user?.email?.split('@')[0] || null;
   const avatarUrl = profile?.avatar_url;
@@ -88,8 +90,8 @@ function ProfileRailButton({
     <button
       type="button"
       onClick={onClick}
-      title="Profile"
-      aria-label="Profile"
+      title={t('Profile')}
+      aria-label={t('Profile')}
       aria-pressed={active}
       className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
         active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/50'
@@ -110,6 +112,7 @@ export function ModeRail({
    *  tab's view — see the rationale on page.tsx's handleOpenSettings. */
   onOpenSettings: () => void;
 }) {
+  const { t } = useI18n();
   const activeMode = railModeOf(activeView);
   const [apps, setApp] = useRailApps();
   const [launcherOpen, setLauncherOpen] = useState(false);
@@ -133,7 +136,7 @@ export function ModeRail({
       {CORE_MODES.map((mode) => (
         <RailButton
           key={mode}
-          label={MODE_META[mode].label}
+          label={t(MODE_META[mode].label)}
           icon={MODE_META[mode].icon}
           active={mode === activeMode}
           onClick={() => open(mode)}
@@ -147,7 +150,7 @@ export function ModeRail({
       {railApps.map((mode) => (
         <RailButton
           key={mode}
-          label={MODE_META[mode].label}
+          label={t(MODE_META[mode].label)}
           icon={MODE_META[mode].icon}
           active={mode === activeMode}
           onClick={() => open(mode)}
@@ -158,8 +161,8 @@ export function ModeRail({
       <Button
         variant="ghost"
         size="icon-md"
-        title="Sustainment"
-        aria-label="Sustainment"
+        title={t('Sustainment')}
+        aria-label={t('Sustainment')}
         aria-expanded={launcherOpen}
         className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
           launcherOpen
@@ -179,10 +182,10 @@ export function ModeRail({
         <ProfileRailButton active={activeView === 'profile'} onClick={() => onViewChange('profile')} />
       </div>
 
-      <MenuShell className="border-transparent" width="wide" side="right" align="start" sideOffset={8} aria-label="Sustainment apps">
+      <MenuShell className="border-transparent" width="wide" side="right" align="start" sideOffset={8} aria-label={t('Sustainment apps')}>
             {APP_GROUPS.map((group) => (
               <div key={group.title} className="mb-2 last:mb-0">
-                <MenuSectionLabel>{group.title}</MenuSectionLabel>
+                <MenuSectionLabel>{t(group.title)}</MenuSectionLabel>
                 <div className="grid grid-cols-3 gap-1">
                   {group.apps.map((mode) => {
                     const { label, icon: Icon } = MODE_META[mode];
@@ -203,15 +206,15 @@ export function ModeRail({
                           className="h-20 w-full flex-col gap-2"
                         >
                           <Icon size={20} />
-                          <span className="text-[11px] font-semibold">{label}</span>
+                          <span className="text-[11px] font-semibold">{t(label)}</span>
                         </Button>
                         {added && (
                           <Button
                             variant="ghost"
                             size="icon-xs"
                             onClick={() => setApp(mode, false)}
-                            title={`Remove ${label} from the rail`}
-                            aria-label={`Remove ${label} from the rail`}
+                            title={t('Remove {label} from the rail', { label: t(label) })}
+                            aria-label={t('Remove {label} from the rail', { label: t(label) })}
                             className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-md text-foreground transition-colors hover:bg-sidebar-accent"
                           >
                             <Check size={12} />

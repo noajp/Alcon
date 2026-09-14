@@ -7,11 +7,13 @@ import {
   useActiveSettingsSection,
   setActiveSettingsSection,
 } from './settingsNav';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // The Settings navigation rendered INSIDE the AppSidebar (it replaces the
 // Activity Space tree while Settings mode is active). Selecting an item just
 // updates the shared store; SettingsView reacts and swaps its content panel.
 export function SettingsSidebarPanel() {
+  const { t } = useI18n();
   const active = useActiveSettingsSection();
   const [query, setQuery] = useState('');
 
@@ -19,9 +21,9 @@ export function SettingsSidebarPanel() {
     const q = query.trim().toLowerCase();
     if (!q) return SETTINGS_NAV;
     return SETTINGS_NAV
-      .map((s) => ({ ...s, items: s.items.filter((i) => i.label.toLowerCase().includes(q)) }))
+      .map((s) => ({ ...s, items: s.items.filter((i) => t(i.label).toLowerCase().includes(q)) }))
       .filter((s) => s.items.length > 0);
-  }, [query]);
+  }, [query, t]);
 
   return (
     <div className="pt-1">
@@ -31,7 +33,7 @@ export function SettingsSidebarPanel() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search settings…"
+            placeholder={t('Search settings…')}
             className="w-full h-8 pl-[35px] pr-2.5 text-[12px] bg-muted/40 rounded-md placeholder:text-muted-foreground/60 border-none"
           />
         </div>
@@ -40,7 +42,7 @@ export function SettingsSidebarPanel() {
       {filtered.map((section) => (
         <div key={section.title} className="mb-3">
           <div className="px-2.5 mb-1 text-[11px] font-bold tracking-wide text-muted-foreground/60">
-            {section.title}
+            {t(section.title)}
           </div>
           <div className="space-y-0.5">
             {section.items.map((item) => {
@@ -58,7 +60,7 @@ export function SettingsSidebarPanel() {
                   }`}
                 >
                   <Icon size={15} className="shrink-0" />
-                  <span className="truncate">{item.label}</span>
+                  <span className="truncate">{t(item.label)}</span>
                 </button>
               );
             })}

@@ -9,6 +9,7 @@ import { ObjectIcon } from '@/shell/icons';
 import { viewLabel, viewIcon } from '@/shell/viewRegistry';
 import type { NavigationState } from '@/types/navigation';
 import type { AlconObjectWithChildren, ExplorerData } from '@/hooks/useSupabase';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export interface AppTab {
   id: string;
@@ -34,12 +35,12 @@ function findObjectName(objects: AlconObjectWithChildren[] | undefined, id: stri
   return objects?.find((o) => o.id === id)?.name ?? null;
 }
 
-function getTabLabel(tab: AppTab, explorerData?: ExplorerData): string {
+function getObjectTabLabel(tab: AppTab, explorerData?: ExplorerData): string | null {
   if (tab.activeView === 'objects' && tab.navigation.objectId) {
     const name = findObjectName(explorerData?.objects, tab.navigation.objectId);
     if (name) return name;
   }
-  return viewLabel(tab.activeView);
+  return null;
 }
 
 function getTabIcon(tab: AppTab): React.ReactNode {
@@ -61,13 +62,15 @@ export function WindowTabBar({
   copilotOpen,
   onToggleCopilot,
 }: WindowTabBarProps) {
+  const { t } = useI18n();
   const explorerData = useExplorerData();
   return (
     <div className="flex items-center gap-1.5 pl-0 pr-2 py-1.5 flex-shrink-0">
       <div className="flex items-center gap-1.5 overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
-          const label = getTabLabel(tab, explorerData);
+          // User-authored Object names are content, never translation keys.
+          const label = getObjectTabLabel(tab, explorerData) ?? t(viewLabel(tab.activeView));
           return (
             <div
               key={tab.id}
@@ -99,7 +102,7 @@ export function WindowTabBar({
                 <Button size="icon-sm" variant="ghost"
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onClose(tab.id); }}
-                  aria-label="Close tab"
+                  aria-label={t('Close tab')}
                   className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 w-4 h-4 flex items-center justify-center rounded-full hover:bg-accent text-muted-foreground hover:text-foreground transition-opacity shrink-0"
                 >
                   <X size={11} />
@@ -112,7 +115,7 @@ export function WindowTabBar({
       <Button size="icon-sm" variant="ghost"
         type="button"
         onClick={onCreate}
-        aria-label="New tab"
+        aria-label={t('New tab')}
         className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-colors flex-shrink-0"
       >
         <Plus size={14} />
@@ -122,8 +125,8 @@ export function WindowTabBar({
         <Button size="icon-sm" variant="ghost"
           type="button"
           onClick={onToggleSidebar}
-          aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
-          title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+          aria-label={t(sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar')}
+          title={t(sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar')}
           className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors flex-shrink-0"
         >
           {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
@@ -136,7 +139,7 @@ export function WindowTabBar({
         <Button size="icon-sm" variant="ghost"
           type="button"
           onClick={onToggleCopilot}
-          aria-label={copilotOpen ? 'Hide AI' : 'Show AI'}
+          aria-label={t(copilotOpen ? 'Hide AI' : 'Show AI')}
           title={`AI ( ⌘L )${copilotOpen ? ' — hide' : ''}`}
           className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors flex-shrink-0"
         >

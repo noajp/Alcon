@@ -23,6 +23,7 @@ import type { NavigationState } from '@/types/navigation';
 import type { ViewId } from '@/shell/viewRegistry';
 import { CREATE_ELEMENT_EVENT } from '@/shell/QuickAddElementLauncher';
 import { filterCreateCommands, type CreateCommandId } from '@/shell/paletteCreateCommands';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface CommandPaletteProps {
   onNavigate: (nav: Partial<NavigationState>) => void;
@@ -64,6 +65,7 @@ function createCommandIcon(id: CreateCommandId): React.ComponentType<{ size?: nu
 }
 
 export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: CommandPaletteProps) {
+  const { t } = useI18n();
   const { openCreate } = useWorkspaceActions();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -142,32 +144,32 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
-      title="Search"
-      description="Search elements, objects, notes. Press ⌘K to open."
+      title={t('Search')}
+      description={t('Search elements, objects, notes. Press ⌘K to open.')}
     >
       <CommandInput
-        placeholder="Search elements, objects, notes…"
+        placeholder={t('Search elements, objects, notes…')}
         value={query}
         onValueChange={setQuery}
       />
       <CommandList>
         <CommandEmpty>
-          {searching ? 'Searching…' : query ? 'No results.' : 'Type to search.'}
+          {t(searching ? 'Searching…' : query ? 'No results.' : 'Type to search.')}
         </CommandEmpty>
 
         {visibleCreateCommands.length > 0 && (
           <>
-            <CommandGroup heading="Create">
+            <CommandGroup heading={t('Create')}>
               {visibleCreateCommands.map(c => {
                 const Icon = createCommandIcon(c.id);
                 return (
                   <CommandItem
                     key={c.id}
-                    value={`${c.id} ${c.label} ${query}`}
+                    value={`${c.id} ${c.label} ${t(c.label)} ${query}`}
                     onSelect={() => handleCreateCommand(c.id)}
                   >
                     <Icon />
-                    <span className="flex-1">{c.label}</span>
+                    <span className="flex-1">{t(c.label)}</span>
                     {c.id === 'create-element' && <CommandShortcut>C</CommandShortcut>}
                   </CommandItem>
                 );
@@ -178,7 +180,7 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
         )}
 
         {grouped.element.length > 0 && (
-          <CommandGroup heading="Elements">
+          <CommandGroup heading={t('Elements')}>
             {grouped.element.map(r => {
               const Icon = kindIcon(r.kind);
               return (
@@ -213,7 +215,7 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
         {grouped.object.length > 0 && (
           <>
             <CommandSeparator />
-            <CommandGroup heading="Objects">
+            <CommandGroup heading={t('Objects')}>
               {grouped.object.map(r => {
                 const Icon = kindIcon(r.kind);
                 return (
@@ -239,7 +241,7 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
         {grouped.note.length > 0 && (
           <>
             <CommandSeparator />
-            <CommandGroup heading="Notes">
+            <CommandGroup heading={t('Notes')}>
               {grouped.note.map(r => {
                 const Icon = kindIcon(r.kind);
                 return (
@@ -258,15 +260,15 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
         )}
 
         <CommandSeparator />
-        <CommandGroup heading="Navigation">
+        <CommandGroup heading={t('Navigation')}>
           {NAV_COMMANDS.map(c => (
             <CommandItem
               key={c.id}
-              value={`nav-${c.label}`}
+              value={`nav-${c.label}-${t(c.label)}`}
               onSelect={() => handleNav(c.view)}
             >
               <c.icon />
-              <span>{c.label}</span>
+              <span>{t(c.label)}</span>
             </CommandItem>
           ))}
         </CommandGroup>

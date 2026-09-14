@@ -5,6 +5,7 @@ import { AuthProvider } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import "./globals.css";
 import { AppDialogHost } from "@/Function/shared/AppDialogHost";
+import { I18nProvider } from "@/Function/i18n/I18nProvider";
 
 // Primary sans-serif - Inter for clean UI typography
 // Inter as a variable font (no discrete weights) so the 510 / 590 UI weights
@@ -22,8 +23,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Alcon — 組織活動支援",
-  description: "Strategy・Execution・Sustainmentで、人間とAIによる組織活動を支援する。",
+  title: "Alcon",
+  description: "Organizational activity support for people and AI.",
 };
 
 // Mobile rendering: without this, mobile Safari lays the page out at ~980px and
@@ -50,6 +51,14 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Set the document language before paint. The provider uses the same
+            resolution order and translates visible copy after hydration. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var s=['en','ja','ko','fr','es'];var n=function(x){var l=(x||'').trim().toLowerCase().split(/[-_]/)[0];return s.includes(l)?l:null};var v=null;try{v=localStorage.getItem('alcon:locale')}catch(e){}var l=n(v);if(!l){var a=navigator.languages||[navigator.language];for(var i=0;i<a.length&&!l;i++)l=n(a[i])}document.documentElement.lang=l||'en'}catch(e){}",
+          }}
+        />
         {/* Apply the Font size (text scale --fs) before first paint. Default is
             the slightly-large baseline (1.075) when nothing is saved. Keep the
             map in sync with FONT_SIZES in Function/settings/appearanceOptions. */}
@@ -63,14 +72,16 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
       >
-        <ThemeProvider>
-          <QueryProvider>
-            <AuthProvider>
-              {children}
-              <AppDialogHost />
-            </AuthProvider>
-          </QueryProvider>
-        </ThemeProvider>
+        <I18nProvider>
+          <ThemeProvider>
+            <QueryProvider>
+              <AuthProvider>
+                {children}
+                <AppDialogHost />
+              </AuthProvider>
+            </QueryProvider>
+          </ThemeProvider>
+        </I18nProvider>
       </body>
     </html>
   );

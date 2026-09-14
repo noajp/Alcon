@@ -26,6 +26,7 @@ import { getCachedHomeViewId } from '@/Function/settings/preferencesStore';
 import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -95,6 +96,7 @@ function makeNewTab(activeView = 'home'): AppTab {
 const SIDEBAR_AUTO_COLLAPSE_WIDTH = 1024;
 
 function AppContent() {
+  const { t } = useI18n();
   const { user } = useAuthContext();
   // Every server-confirmed change reaches the caches through this one channel.
   useWorkspaceDeltaStream(user?.id ?? null);
@@ -183,11 +185,11 @@ function AppContent() {
   if (spaces.length === 0) {
     return (
       <OnboardingCreate
-        title="Create your Space"
-        subtitle="A shared place for your team. Bring in one existing project to get started."
-        label="Name"
+        title={t('Create your Space')}
+        subtitle={t('A shared place for your team. Bring in one existing project to get started.')}
+        label={t('Name')}
         placeholder="Acme Inc."
-        cta="Create Space"
+        cta={t('Create Space')}
         onCreate={handleCreateSpace}
       />
     );
@@ -197,10 +199,10 @@ function AppContent() {
     return (
       <div className="h-dvh flex items-center justify-center bg-background">
         <div className="text-center p-6 rounded-lg bg-card border border-border max-w-sm">
-          <div className="text-destructive text-sm font-medium mb-2">Connection Error</div>
+          <div className="text-destructive text-sm font-medium mb-2">{t('Connection Error')}</div>
           <div className="text-muted-foreground text-xs mb-4">{domainsError.message}</div>
           <button onClick={() => refetchDomains()} className="px-3 py-1.5 bg-muted hover:bg-accent text-foreground rounded text-xs transition-colors">
-            Try Again
+            {t('Try Again')}
           </button>
         </div>
       </div>
@@ -233,6 +235,7 @@ function WorkspaceContent({
   refetchDomains: () => void | Promise<void>;
   onActiveDomainChange: (id: string) => void;
 }) {
+  const { t } = useI18n();
   // Browser-style window tabs — each tab carries its own activity + navigation
   // and renders its own MainContent in parallel so internal state (Domain
   // tab selection, expand state, scroll position, etc.) survives switches.
@@ -451,10 +454,10 @@ function WorkspaceContent({
     return (
       <div className="h-dvh flex items-center justify-center bg-background">
         <div className="text-center p-6 rounded-lg bg-card border border-border max-w-sm">
-          <div className="text-destructive text-sm font-medium mb-2">Connection Error</div>
+          <div className="text-destructive text-sm font-medium mb-2">{t('Connection Error')}</div>
           <div className="text-muted-foreground text-xs mb-4">{error.message}</div>
           <button onClick={() => refetch()} className="px-3 py-1.5 bg-muted hover:bg-accent text-foreground rounded text-xs transition-colors">
-            Try Again
+            {t('Try Again')}
           </button>
         </div>
       </div>
