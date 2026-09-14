@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
 import { SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { constrainTabDrag } from './tabDrag';
 import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, FileText, Flag } from 'lucide-react';
 import { Button } from '@/ui/button';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
@@ -106,16 +107,18 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
   return (
     <div className="flex items-center gap-1.5 px-4 py-2 bg-transparent">
       {/* Tabs — outlined rectangles */}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={({ active, over }) => {
+      <DndContext sensors={sensors} modifiers={[constrainTabDrag]} collisionDetection={closestCenter} onDragEnd={({ active, over }) => {
         if (!onTabReorder || !over || active.id === over.id) return;
         const from = tabs.findIndex(t => t.id === active.id);
         const to = tabs.findIndex(t => t.id === over.id);
         if (from >= 0 && to >= 0) onTabReorder(arrayMove(tabs.map(t => t.id), from, to));
       }}>
         <SortableContext items={tabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
-          <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
+          <div className="min-w-0 overflow-x-auto">
+            <div className="flex w-max items-center gap-1.5">
             {tabs.map(tab => <SortableViewTab key={tab.id} tab={tab} active={tab.id === activeTabId}
               sortable={!!onTabReorder} onSelect={() => onTabSelect(tab.id)} onContextMenu={e => handleContextMenu(e, tab)} />)}
+            </div>
           </div>
         </SortableContext>
       </DndContext>
