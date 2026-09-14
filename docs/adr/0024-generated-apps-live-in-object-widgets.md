@@ -1,5 +1,7 @@
 # 0024 — Generated apps live in Object widgets
 
+> 読み取り能力の境界は [0025](0025-generated-apps-read-scoped-object-context.md) で拡張。
+
 ## 背景
 
 Object Overview内で必要な小さなアプリをAIで作成し、再訪してもアプリと入力を保持する。配置ごとのコードと業務入力を同じJSONに入れると、画面の改訂が入力を消す。
