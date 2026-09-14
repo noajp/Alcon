@@ -89,6 +89,8 @@ export const CONTROL = {
   gap: { xs: 'gap-1.5', sm: 'gap-1.5', md: 'gap-2' },
   /** Label type. 12px = FONT.sm, 13px = FONT.base. */
   text: { xs: 'text-[12px]', sm: 'text-[12px]', md: 'text-[13px]' },
+  /** Center visible label metrics, rather than a font's asymmetric leading. */
+  label: '[text-box-trim:trim-both] [text-box-edge:cap_alphabetic]',
   /** lucide `size` prop for an icon inside a control of this step. */
   icon: { xs: 14, sm: 14, md: 16 },
   /** One radius for every step. */

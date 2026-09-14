@@ -5,7 +5,7 @@ import { Archive, ArrowLeft, Check, CheckCheck, Inbox, ListFilter, MoreHorizonta
 import type { Notification } from '@/hooks/useSupabase';
 import { notificationKindMeta } from '@/Function/shared/notificationKinds';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/ui/dropdown-menu';
 
 interface InboxLayoutProps {
@@ -44,6 +44,7 @@ export function InboxLayout(props: InboxLayoutProps) {
   const selectedId = selectedNotification?.id ?? null;
   return (
     <div className="@container/inbox flex h-full min-h-0 min-w-0 overflow-hidden bg-card">
+      <ButtonAppearanceProvider appearance="navigation">
       <section aria-label={t('Notifications')} className={`flex min-h-0 w-full shrink-0 flex-col @min-[760px]/inbox:w-[330px] @min-[760px]/inbox:border-r border-border ${selectedId ? 'hidden @min-[760px]/inbox:flex' : ''}`}>
         <header className="flex h-[50px] shrink-0 items-center gap-2 border-b border-border px-4">
           <h1 className="text-[13px] font-medium text-foreground">{t('Inbox')}</h1>
@@ -89,6 +90,7 @@ export function InboxLayout(props: InboxLayoutProps) {
           {props.hasMore && <div className="flex justify-center py-3"><Button variant="ghost" onClick={props.onShowMore}>{t('Show more')}</Button></div>}
         </div>
       </section>
+      </ButtonAppearanceProvider>
       <section aria-label={t('Notification detail')} className={`min-h-0 min-w-0 flex-1 flex-col ${selectedId ? 'flex' : 'hidden @min-[760px]/inbox:flex'}`}>
         {selectedId ? <>
           <header className="flex min-h-[50px] shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
