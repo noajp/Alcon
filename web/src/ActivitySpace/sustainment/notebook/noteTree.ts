@@ -26,16 +26,21 @@ export function filesInFolder(nodes: NoteNode[], parentId: string | null): NoteN
 }
 
 /** Resolve the active section for a folder. An explicit, still-valid pick
- *  wins; otherwise the first tab. `null` = the folder's direct files (only
- *  meaningful while the folder has no sections). */
+ *  wins; otherwise the section holding the open file (so a page reached
+ *  from outside the notebook — the Profile's My Notes, a notification —
+ *  opens where it lives); otherwise the first tab. `null` = the folder's
+ *  direct files (only meaningful while the folder has no sections). */
 export function resolveSectionSelection(
   nodes: NoteNode[],
   folderId: string | null,
   pickedSectionId: string | null,
+  selectedFileId: string | null = null,
 ): string | null {
   const sections = sectionsInFolder(nodes, folderId);
   if (sections.length === 0) return null;
   if (pickedSectionId && sections.some((s) => s.id === pickedSectionId)) return pickedSectionId;
+  const file = selectedFileId ? nodes.find((n) => n.id === selectedFileId) : undefined;
+  if (file && sections.some((s) => s.id === file.parentId)) return file.parentId!;
   return sections[0].id;
 }
 

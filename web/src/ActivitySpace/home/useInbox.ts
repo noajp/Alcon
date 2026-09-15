@@ -42,7 +42,7 @@ export function selectInboxNotification(id: string | null) {
   emit({ ...selection, selectedId: id, revision: selection.revision + 1 });
 }
 
-export function useInboxSelection(): InboxSelection {
+function useInboxSelection(): InboxSelection {
   return useSyncExternalStore(subscribe, getSelection, getSelection);
 }
 
@@ -60,10 +60,13 @@ export function useInbox({ onNavigate, onViewChange }: InboxNavigation = {}) {
   const { selectedId, unreadOnly, revision } = useInboxSelection();
   const selected = notifications.find(n => n.id === selectedId) ?? null;
 
-  const select = useCallback((n: Notification) => {
+  /** Opens a notification. Returns true when it opened in the Inbox reader,
+   *  false when it navigated to the surface it is about instead. */
+  const select = useCallback((n: Notification): boolean => {
     // Element notifications open in the reader; the rest jump to the surface
     // they are about.
-    if (n.element_id || !(n.strategy_id || n.object_id || n.brief_id)) selectInboxNotification(n.id);
+    let opened = false;
+    if (n.element_id || !(n.strategy_id || n.object_id || n.brief_id)) { selectInboxNotification(n.id); opened = true; }
     else if (n.strategy_id) {
       onViewChange?.('strategy');
       onNavigate?.({ strategyId: n.strategy_id });
@@ -75,6 +78,7 @@ export function useInbox({ onNavigate, onViewChange }: InboxNavigation = {}) {
       setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
       void markNotificationRead(n.id, true).catch(error => { console.error(error); reload(); });
     }
+    return opened;
   }, [onNavigate, onViewChange, reload, setNotifications]);
 
   const archive = useCallback(async (n: Notification) => {

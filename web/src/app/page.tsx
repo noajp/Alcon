@@ -318,8 +318,8 @@ function WorkspaceContent({
   // When collapsed, the sidebar can still be peeked as a floating overlay
   // (via the WindowTabBar reveal button) instead of pinning it back into flow.
   const [sidebarOverlay, setSidebarOverlay] = useState(false);
-  // The personal pages (Now / My Elements / Profile) are reached from the
-  // avatar and have nothing to list, so they take the whole width.
+  // Profile (reached from the avatar; Now / My Elements / My Notes / AI are
+  // its tabs) has nothing to list, so it takes the whole width.
   const personalMode = railModeOf(activeTab.activeView) === 'personal';
   const sidebarHidden = sidebarCollapsed || personalMode;
   const [discoverOpen, setDiscoverOpen] = useState(false);
@@ -455,11 +455,14 @@ function WorkspaceContent({
     setSidebarOverlay(false);
   };
 
-  if (loading && activeTab.activeView !== 'home') {
+  // Views that read nothing from the Domain list paint without waiting for
+  // it — and without being blocked when it fails.
+  const standsAlone = ['home', 'inbox', 'profile', 'my-elements'].includes(activeTab.activeView);
+  if (loading && !standsAlone) {
     return <AppShellSkeleton />;
   }
 
-  if (error && activeTab.activeView !== 'home') {
+  if (error && !standsAlone) {
     return (
       <div className="h-dvh flex items-center justify-center bg-background">
         <div className="text-center p-6 rounded-lg bg-card border border-border max-w-sm">

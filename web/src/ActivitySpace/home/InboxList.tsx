@@ -14,9 +14,9 @@ import { useInbox } from './useInbox';
 interface InboxListProps {
   onNavigate?: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
-  /** A notification was opened in the reader. The shell uses this to close
-   *  the sidebar drawer on narrow windows, as picking any other sidebar
-   *  entry does. */
+  /** A notification was opened in the Inbox reader (not routed elsewhere).
+   *  The shell uses this to close the sidebar drawer on narrow windows, as
+   *  picking any other sidebar entry does. */
   onOpen?: () => void;
 }
 
@@ -60,7 +60,7 @@ export function InboxList({ onNavigate, onViewChange, onOpen }: InboxListProps) 
         : rows.length === 0 ? <p className="px-2 py-8 text-center text-[12px] text-muted-foreground">{t(inbox.unreadOnly ? "You're all caught up!" : 'No notifications yet.')}</p>
         : <ul className="mt-1 space-y-0.5">
           {rows.map(n => <InboxRow key={n.id} notification={n} selected={inbox.selectedId === n.id} locale={locale}
-            onSelect={n => { inbox.select(n); onOpen?.(); }} onToggleRead={inbox.toggleRead} onArchive={inbox.archive} />)}
+            onSelect={n => { if (inbox.select(n)) onOpen?.(); }} onToggleRead={inbox.toggleRead} onArchive={inbox.archive} />)}
         </ul>}
       {visible.length > renderLimit && <div className="flex justify-center py-2"><Button variant="ghost" size="xs" onClick={() => setRenderLimit(limit => limit + RENDER_PAGE_SIZE)}>{t('Show more')}</Button></div>}
     </section>

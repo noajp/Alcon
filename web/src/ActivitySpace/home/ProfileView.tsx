@@ -72,18 +72,21 @@ export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDo
           </div>
           {profile?.bio && <p className="mt-3 max-w-2xl whitespace-pre-wrap text-[14px] leading-6 text-foreground/90">{profile.bio}</p>}
         </div>
-        <div className="mt-4 flex gap-1 border-b border-border px-6" aria-label={t('Profile sections')}>
+        <nav className="mt-4 flex gap-1 border-b border-border px-6" aria-label={t('Profile sections')}>
           {tabs.map(({ id, label, icon: Icon }) => (
             <Button key={id} shape="tab" variant={tab === id ? 'secondary' : 'ghost'} aria-pressed={tab === id} onClick={() => setTab(id)} className="mb-1.5">
               <Icon size={16} />{t(label)}
             </Button>
           ))}
-        </div>
+        </nav>
       </header>
       <div className={tab === 'now' ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'hidden'}>
         <NowScreen spaceId={spaceId} onNavigate={onNavigate} onViewChange={onViewChange} />
       </div>
-      <div className={tab === 'elements' ? 'min-h-0 flex-1 overflow-hidden' : 'hidden'}>
+      {/* MyElementsView lays itself out as a flex child (header + scrolling
+          list), so its wrapper has to be a bounded flex column or the list
+          is clipped instead of scrolling. */}
+      <div className={tab === 'elements' ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'hidden'}>
         <MyElementsView embedded onNavigate={onNavigate} onViewChange={onViewChange} />
       </div>
       <div className={tab === 'notes' ? 'min-h-0 flex-1 overflow-y-auto px-6 py-4' : 'hidden'}>
