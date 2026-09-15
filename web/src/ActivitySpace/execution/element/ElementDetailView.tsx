@@ -890,7 +890,7 @@ function ElementDetailBody({
                   className="p-1 -m-1 text-muted-foreground hover:text-foreground transition-colors"
                   title="New sub-element"
                 >
-                  <Plus size={13} />
+                  <Plus size={13} strokeWidth={2.5} />
                 </button>
               </div>
             )}
@@ -915,7 +915,7 @@ function ElementDetailBody({
                   onClick={() => setSubModal({ mode: 'create' })}
                   className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground py-1 transition-colors"
                 >
-                  <Plus size={13} /> Add sub-element
+                  <Plus size={13} strokeWidth={2.5} /> Add sub-element
                 </button>
               )}
             </div>
