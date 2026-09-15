@@ -18,6 +18,8 @@ interface Profile {
   id: string;
   display_name: string | null;
   avatar_url: string | null;
+  /** Short self-introduction on the Profile page. */
+  bio: string | null;
 }
 
 export function useAuth() {
@@ -128,7 +130,7 @@ export function useAuth() {
   };
 
   // Update profile
-  const updateProfile = async (updates: Partial<Pick<Profile, 'display_name' | 'avatar_url'>>) => {
+  const updateProfile = async (updates: Partial<Pick<Profile, 'display_name' | 'avatar_url' | 'bio'>>) => {
     if (!state.user) throw new Error('Not authenticated');
     const { error } = await supabase
       .from('profiles')

@@ -22,6 +22,9 @@ interface CalendarViewProps {
   onObjectClick?: (object: AlconObject) => void;
   onElementClick?: (element: ElementWithDetails) => void;
   onRefresh?: () => void;
+  /** The day the grid is on, when a parent (the Calendar sidebar) owns it. */
+  date?: Date;
+  onDateChange?: (date: Date) => void;
 }
 
 type CalendarMode = 'day' | 'week' | 'month';
@@ -99,13 +102,19 @@ function formatTimeShort(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-export function CalendarView({ elements: sourceElements, objects, onObjectClick, onElementClick: openElement, onRefresh }: CalendarViewProps) {
+export function CalendarView({ elements: sourceElements, objects, onObjectClick, onElementClick: openElement, onRefresh, date, onDateChange }: CalendarViewProps) {
   const elements = useMemo(() => calendarEntries(sourceElements, objects), [sourceElements, objects]);
   const onElementClick = (entry: CalendarEntry) => {
     if (entry.object) onObjectClick?.(entry.object);
     else openElement?.(entry.element);
   };
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [ownDate, setOwnDate] = useState(new Date());
+  const currentDate = date ?? ownDate;
+  const setCurrentDate = (next: Date | ((prev: Date) => Date)) => {
+    const value = typeof next === 'function' ? next(currentDate) : next;
+    setOwnDate(value);
+    onDateChange?.(value);
+  };
   const [selectedElement, setSelectedElement] = useState<CalendarEntry | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [mode, setMode] = useState<CalendarMode>('week');
@@ -180,16 +189,6 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
     () => elements.filter(e => e.element && !e.due_date && !e.start_date),
     [elements]
   );
-
-  const hasEventsInCurrentMonth = useMemo(() => {
-    const y = currentDate.getFullYear();
-    const m = currentDate.getMonth();
-    return elements.some(e => {
-      const start = e.start_date ?? e.due_date;
-      const end = e.due_date ?? e.start_date;
-      return Boolean(start && end && start <= fmtDateOnly(new Date(y, m + 1, 0)) && end >= fmtDateOnly(new Date(y, m, 1)));
-    });
-  }, [elements, currentDate]);
 
   const goToPrevious = () => {
     setCurrentDate(prev => {
@@ -376,15 +375,6 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
           ))}
         </div>
 
-        {/* Empty state overlay */}
-        {!hasEventsInCurrentMonth && (
-          <div className="pointer-events-none absolute inset-0 top-9 flex items-center justify-center z-[5]">
-            <div className="text-xs text-muted-foreground/70 bg-card/60 px-3 py-1.5 rounded-md">
-              No events this month — click a day to schedule an Element
-            </div>
-          </div>
-        )}
-
         {/* Calendar days */}
         <div className="grid grid-cols-7">
           {calendarData.map((day, index) => {
@@ -420,7 +410,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                 {/* Date number */}
                 <div className="flex justify-start mb-1">
                   {day.isToday ? (
-                    <span className="bg-[var(--accent-default)] text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-semibold">
+                    <span className="bg-[var(--accent-default)] text-primary-foreground w-6 h-6 pt-0.5 rounded-full flex items-center justify-center text-[12px] font-semibold leading-none tabular-nums">
                       {day.date.getDate()}
                     </span>
                   ) : (
@@ -801,7 +791,7 @@ function TimeGridView({
               </div>
               <div className="mt-0.5 inline-flex items-center justify-center">
                 {isTodayCol ? (
-                  <span className="bg-[var(--accent-default)] text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-semibold">
+                  <span className="bg-[var(--accent-default)] text-primary-foreground w-6 h-6 pt-0.5 rounded-full flex items-center justify-center text-[12px] font-semibold leading-none tabular-nums">
                     {d.getDate()}
                   </span>
                 ) : (

@@ -65,9 +65,9 @@ const HOME_VIEW_TO_VIEW_ID: Record<HomeView, string> = {
 };
 
 export function getCachedHomeViewId(): string {
-  if (typeof window === 'undefined') return 'home';
+  if (typeof window === 'undefined') return 'inbox';
   const v = localStorage.getItem(HOME_VIEW_KEY) as HomeView | null;
-  return HOME_VIEW_TO_VIEW_ID[v as HomeView] ?? 'home';
+  return HOME_VIEW_TO_VIEW_ID[v as HomeView] ?? 'inbox';
 }
 
 export function setCachedHomeView(v: HomeView) {

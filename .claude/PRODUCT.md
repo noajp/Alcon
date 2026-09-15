@@ -151,7 +151,7 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
-ModeRail の固定セレクタ Home / Strategy / Execution は、この構造に対応する。Sustainment の各道具は Apps ランチャーから各自がレールに追加する。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / Calendar / CRM / SCM）の2グループで表示し、概念上はどちらも Sustainment に属する。
+ModeRail の固定セレクタは Inbox / Calendar / Strategy / Execution。Strategy と Execution がこの構造に対応し、Inbox と Calendar は毎日の入口として常設する。レール最下部のアバターは Profile を開き、Now / My Elements / My Notes / AI は Profile のタブとして並ぶ。Sustainment のその他の道具は Apps ランチャーから各自がレールに追加する。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / CRM / SCM）の2グループで表示し、概念上はどちらも Sustainment に属する。
 
 ### Strategy と Execution の分離
 
@@ -214,7 +214,7 @@ Object は Element をまとめる単位で、Object 同士はネストしない
 | **Notebook** | 思考・記録のドキュメント（議事録 / メモ） | 独自 HTML エディタ（`AppleNoteEditor` + `htmlSanitizer`）。**Folder → File の 2 階層**ツリー（`notes` + `note_contents.html`） |
 | **Table** | 任意の表 | `tables` + `table_columns` / `table_rows` / `table_cells`。所有者限定の RLS |
 | **Team** | Worker の所属・担当・通常稼働時間を管理 | `workers`（human \| ai_agent）。`element_assignees` で Element にアサイン |
-| **Calendar** | Domain を横断して Element の予定を調整 | Apps から組織の予定を開く。Home は自分の予定を初期表示。同じ日 / 週 / 月ビューと保存先を使う |
+| **Calendar** | Domain を横断して Element の予定を調整 | レールの Calendar から開く。初期表示は自分の予定で、ヘッダの範囲選択で Domain / Object の予定へ広げる。サイドバーに今日の日付・ミニ月・表示する人の選択を置き、同じ日 / 週 / 月ビューと保存先を使う |
 
 Team の名簿は Space メンバー、閲覧できる Domain のゲスト、実行に参加する Worker をまとめる。ゲストの取得はメンバー設定と同じ境界 RPC を使う。受信可能な変更イベントは名簿へ反映し、所属テーブルの RLS によりイベントを受信できない変更は、画面へのフォーカス復帰または Refresh で最新の名簿を取得する。
 
@@ -230,13 +230,13 @@ Object Detail 内の Workers / Resource / Calendar / Gantt タブは、同じ道
 
 ### Home — 分類を横断する個人向け画面
 
-分類をまたいで、自分が行う仕事と返答が必要な事項を確認する画面。Now を最初に開く画面とし、ユーザーが指定した初期ビューの設定は保持する。
+分類をまたいで、自分が行う仕事と返答が必要な事項を確認する画面。最初に開く画面の既定は Inbox とし、ユーザーが指定した初期ビューの設定は保持する。Profile はアバターから開き、サイドバーを出さずに全幅で表示する。ヘッダ（カバー・アバター・名前と Worker ID・自己紹介・プロフィール編集）の下に仕切り線を引き、その上に Now / My Elements / My Notes / AI のタブを置く。自己紹介は Settings > Profile で編集する。
 
 | 機能 | 役割 |
 |------|------|
 | **Now** | 担当・状態・記録済みの依存・開始日等から、着手する仕事の候補と待機中の仕事を理由付きで示す。必要な更新をその場で行う |
-| **Inbox** | 通知フィード |
-| **Calendar** | 自分の Element の期日 |
+| **Inbox** | 通知フィード。サイドバーに通知の一覧、メイン領域に開いた通知の本文（Element の詳細）を全幅で表示する |
+| **Calendar** | 自分の Element の期日。サイドバーのミニ月で日を移動し、担当者ごとに表示を切り替える |
 | **My Elements** | 自分が所有・アサインされた Element を横断表示 |
 
 Nowの「前提が完了」は記録された依存の範囲の判断であり、現実の着手可能性や余力の保証ではない。見えない前提は不明として扱い、承認決定者を推測しない。更新がないことを停滞・怠慢と解釈しない。
@@ -293,8 +293,8 @@ Execution が Domain → Object → Element の順に並ぶのは、上位ほど
 
 ### レイアウト哲学
 - **常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス** の 3 列構成
-- **ModeRail**（46px）は分類セレクタ：固定の Home / Strategy / Execution ＋ Apps ランチャーから追加した App。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / Calendar / CRM / SCM）の 2 グループで、すべて Sustainment の道具
-- **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋ Create。本体は現在のモードに応じて切替（Home＝Now・Inbox・Calendar・My Elements / Strategy＝Initiatives の下に Phase・Timeline / Execution＝Domain ツリー / App 各種＝モード名ラベルのみ）
+- **ModeRail**（46px）は分類セレクタ：固定の Inbox / Calendar / Strategy / Execution ＋ Apps ランチャーから追加した App ＋ 最下部のアバター（Profile）。Inbox のアイコンには未読数のバッジを出す。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / CRM / SCM）の 2 グループで、すべて Sustainment の道具
+- **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋ Create。本体は現在のモードに応じて切替（Inbox＝通知の一覧 / Calendar＝今日・ミニ月・表示する人 / Strategy＝Initiatives の下に Phase・Timeline / Execution＝Domain ツリー / App 各種＝モード名ラベルのみ）。アバターから開く Profile ではサイドバーを出さない
 - view→モードの対応は `shell/railApps.ts` の `MODE_META.views` / `railModeOf`、view id→ラベル / アイコンは `shell/viewRegistry.ts` が単一情報源
 
 Domain の概要は、その Domain の Objects と実行状況、Object を介して関連する Initiatives を示す。Initiative 側には現在 Space と招待された Guest の関連 Domains を示し、相互に移動できる。関係は両端が可視の Object 所属から導出し、multi-homing を含む。Domain 集計は所属 Object の Element を重複なく数える。Phase / Timeline のナビゲーション上の配置は、Phase の Domain スコープを変えない。

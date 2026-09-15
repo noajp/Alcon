@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { CalendarView } from '@/ActivitySpace/sustainment/calendar/CalendarView';
 import { CalendarScopePicker, type CalendarSelection } from '@/ActivitySpace/sustainment/calendar/CalendarScopePicker';
-import { selectCalendarScope } from '@/ActivitySpace/sustainment/calendar/schedule';
+import { filterByWorkers, selectCalendarScope } from '@/ActivitySpace/sustainment/calendar/schedule';
+import { setCalendarDay, setCalendarWorkerIds, useCalendarDay, useHiddenCalendarWorkers } from '@/ActivitySpace/sustainment/calendar/calendarStore';
+import { parseDateOnly, toDateOnlyString } from '@/Function/shared/dateUtils';
 import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
 import { NavCalendarIcon } from '@/shell/sidebar/NavIcons';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
@@ -49,7 +51,16 @@ function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: My
   })) });
   const mine = useQuery({ queryKey: ['my-elements', userId], queryFn: () => fetchMyElements(userId!), enabled: !!userId && selection.mine });
   const scoped = selectCalendarScope(explorers.flatMap(query => query.data ? [query.data] : []), selection.objectIds);
-  const elements = selection.mine ? mine.data?.elements ?? [] : scoped.elements;
+  const hiddenWorkers = useHiddenCalendarWorkers();
+  const scopedElements = useMemo(() => selection.mine ? mine.data?.elements ?? [] : scoped.elements, [selection.mine, mine.data, scoped.elements]);
+  const elements = filterByWorkers(scopedElements, hiddenWorkers);
+  // Tell the sidebar who is on this calendar, hidden or not, so its People
+  // list is the assignees in scope rather than every Worker in the Space.
+  useEffect(() => {
+    setCalendarWorkerIds([...new Set(scopedElements.flatMap(element => (element.assignees ?? []).map(assignee => assignee.worker_id)))].sort());
+  }, [scopedElements]);
+  const day = useCalendarDay();
+  const date = useMemo(() => parseDateOnly(day) ?? new Date(), [day]);
   const loading = domainQuery.loading || (selection.mine ? mine.isPending : explorers.some(query => query.isPending));
   const error = domainQuery.error || (selection.mine ? mine.error : explorers.find(query => query.error)?.error);
   const fetchMine = useCallback(async () => {
@@ -72,7 +83,7 @@ function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: My
           const domainId = domainIds.find(id => explorers[domainIds.indexOf(id)]?.data?.objects.some(item => item.id === object.id));
           onNavigate?.({ objectId: object.id, objectDomainId: domainId ?? null });
           onViewChange?.('objects');
-        }} elements={elements} onRefresh={fetchMine} onElementClick={(el) => openElement(el.id)} />
+        }} elements={elements} date={date} onDateChange={next => setCalendarDay(toDateOnlyString(next))} onRefresh={fetchMine} onElementClick={(el) => openElement(el.id)} />
       </div>
       </div>}
     </ElementDrilldown>

@@ -1,7 +1,7 @@
 'use client';
 
 import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
@@ -16,10 +16,9 @@ import { cn } from '@/lib/utils';
 // exposes a 0–100 number field that writes directly to elements.progress;
 // reaching 100% flips the element to Done.
 
-const ROWS: Array<{ status: ElementStatus; label: string; previewProgress?: number }> = STATUS_ORDER.map((status) => ({
+const ROWS: Array<{ status: ElementStatus; label: string }> = STATUS_ORDER.map((status) => ({
   status,
   label: STATUS[status].label,
-  ...(status === 'in_progress' ? { previewProgress: 50 } : {}),
 }));
 
 interface StatusPickerProps {
@@ -54,6 +53,12 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
   // progress pass `progressOverride`; otherwise defer to getElementProgress
   // (done→100, then element.progress, then subelement ratio).
   const triggerProgress = progressOverride ?? getElementProgress(element);
+  // The In Progress row's mark follows the % being typed, so the pie is a
+  // live preview of what committing will show.
+  const draftProgress = (() => {
+    const parsed = parseInt(progressDraft, 10);
+    return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : triggerProgress;
+  })();
 
   const applyStatus = async (newStatus: ElementStatus) => {
     // Picking In Progress while progress is already 100% is effectively
@@ -66,6 +71,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
     else if (resolved === 'backlog' || resolved === 'todo') updates.progress = null;
     try {
       await updateElement(element.id, updates);
+      lastCommitted.current = null;
       setOpen(false);
       onChanged?.(resolved);
     } catch (e) {
@@ -73,10 +79,17 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
     }
   };
 
+  // Enter commits and leaves the field focused, so the blur that follows a
+  // later dismissal would commit the same value again — a second write and,
+  // through onChanged, a second round of assignee notifications. The last
+  // committed value short-circuits that.
+  const lastCommitted = useRef<{ progress: number; status: ElementStatus | null } | null>(null);
   const commitProgress = async (raw: string) => {
     const parsed = parseInt(raw, 10);
     if (!Number.isFinite(parsed)) return;
     const clamped = Math.max(0, Math.min(100, parsed));
+    // What the field shows is what was saved, never the raw keystrokes.
+    setProgressDraft(String(clamped));
     try {
       const updates: { progress: number; status?: ElementStatus } = { progress: clamped };
       // 100% snaps to Done; anything else lands in In Progress — including a
@@ -87,12 +100,18 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
       else if (element.status !== 'in_progress' && element.status !== 'review') {
         updates.status = 'in_progress';
       }
+      const next = { progress: clamped, status: updates.status ?? element.status ?? null };
+      if (lastCommitted.current && lastCommitted.current.progress === next.progress && lastCommitted.current.status === next.status) return;
+      lastCommitted.current = next;
       await updateElement(element.id, updates);
       // Fire onChanged even on a progress-only update so callers (e.g. the
       // Element-detail view) refresh their trigger mark instead of showing
       // a stale percentage.
       onChanged?.(updates.status ?? element.status ?? 'todo');
     } catch (e) {
+      // A failed write must not count as committed, or retrying the same
+      // value would be swallowed by the guard above.
+      lastCommitted.current = null;
       console.error('Failed to update progress', e);
     }
   };
@@ -151,7 +170,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
               <span className="flex items-center justify-center w-[18px] h-[18px] shrink-0">
                 <ElementProgressMark
                   status={row.status}
-                  progress={row.previewProgress ?? 0}
+                  progress={row.status === 'in_progress' ? draftProgress : 0}
                   size={17}
                 />
               </span>
@@ -176,10 +195,12 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                     onBlur={(e) => commitProgress(e.target.value)}
                     onKeyDown={(e) => {
                       e.stopPropagation();
+                      // Enter commits and keeps the menu open: the mark
+                      // and the trigger update in place, and the person
+                      // can keep adjusting or pick another status.
                       if (e.key === 'Enter') {
                         e.preventDefault();
                         commitProgress((e.target as HTMLInputElement).value);
-                        setOpen(false);
                       }
                     }}
                     className="w-8 text-[11.5px] tabular-nums bg-transparent text-right focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"

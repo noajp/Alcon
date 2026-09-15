@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calendarEntries, occursOn, selectCalendarScope, layoutTimedEntries } from '../src/ActivitySpace/sustainment/calendar/schedule';
+import { calendarEntries, occursOn, selectCalendarScope, layoutTimedEntries, filterByWorkers, miniMonthDays, monthOf, shiftMonth } from '../src/ActivitySpace/sustainment/calendar/schedule';
 import type { AlconObjectWithChildren, ElementWithDetails } from '../src/types/database';
 
 const element = (id: string) => ({ id, title: id, start_date: '2026-09-06', due_date: '2026-09-08' } as ElementWithDetails);
@@ -77,5 +77,40 @@ describe('time grid', () => {
       { ...element('c'), due_date: '2026-09-06', start_time: '11:00', due_time: '12:00' },
     ]);
     expect(layoutTimedEntries(entries, '2026-09-06').map(({ lane, columns }) => [lane, columns])).toEqual([[0, 2], [1, 2], [0, 1]]);
+  });
+});
+
+describe('calendar people filter', () => {
+  const assigned = (id: string, workers: string[]) => ({ id, assignees: workers.map(worker_id => ({ worker_id })) });
+  const rows: { id: string; assignees?: { worker_id: string }[] }[] = [assigned('solo', ['a']), assigned('shared', ['a', 'b']), assigned('nobody', []), { id: 'unset' }];
+  it('keeps everything when nobody is hidden', () => {
+    expect(filterByWorkers(rows, [])).toBe(rows);
+  });
+  it('drops Elements whose every assignee is hidden and keeps unassigned ones', () => {
+    expect(filterByWorkers(rows, ['a']).map(r => r.id)).toEqual(['shared', 'nobody', 'unset']);
+    expect(filterByWorkers(rows, ['a', 'b']).map(r => r.id)).toEqual(['nobody', 'unset']);
+  });
+});
+
+describe('mini month', () => {
+  it('moves by whole months across a year boundary', () => {
+    expect(shiftMonth('2026-12', 1)).toBe('2027-01');
+    expect(shiftMonth('2026-01', -1)).toBe('2025-12');
+    expect(monthOf('2026-09-15')).toBe('2026-09');
+  });
+  it('always fills six weeks from the preferred first weekday', () => {
+    // September 2026 starts on a Tuesday.
+    const sundayFirst = miniMonthDays('2026-09', 0);
+    expect(sundayFirst).toHaveLength(42);
+    expect(sundayFirst[0]).toBe('2026-08-30');
+    expect(sundayFirst[41]).toBe('2026-10-10');
+    const mondayFirst = miniMonthDays('2026-09', 1);
+    expect(mondayFirst[0]).toBe('2026-08-31');
+    expect(mondayFirst.indexOf('2026-09-01')).toBe(1);
+  });
+  it('starts a month that begins on the first weekday with no leading days', () => {
+    // November 2026 starts on a Sunday.
+    expect(miniMonthDays('2026-11', 0)[0]).toBe('2026-11-01');
+    expect(miniMonthDays('2026-11', 1)[0]).toBe('2026-10-26');
   });
 });

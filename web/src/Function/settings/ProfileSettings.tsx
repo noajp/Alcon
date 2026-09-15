@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Textarea } from '@/ui/textarea';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
@@ -176,6 +177,7 @@ export function ProfileSettings() {
   const { user, profile, updateProfile } = useAuthContext();
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? '');
+  const [bio, setBio] = useState(profile?.bio ?? '');
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -236,11 +238,13 @@ export function ProfileSettings() {
   useEffect(() => {
     setDisplayName(profile?.display_name ?? '');
     setAvatarUrl(profile?.avatar_url ?? '');
-  }, [profile?.display_name, profile?.avatar_url]);
+    setBio(profile?.bio ?? '');
+  }, [profile?.display_name, profile?.avatar_url, profile?.bio]);
 
   const dirty =
     displayName !== (profile?.display_name ?? '') ||
-    avatarUrl !== (profile?.avatar_url ?? '');
+    avatarUrl !== (profile?.avatar_url ?? '') ||
+    bio !== (profile?.bio ?? '');
 
   const handleSave = async () => {
     if (!dirty || saving) return;
@@ -250,6 +254,7 @@ export function ProfileSettings() {
       await updateProfile({
         display_name: displayName.trim() || null,
         avatar_url: avatarUrl.trim() || null,
+        bio: bio.trim() || null,
       });
       setSavedAt(Date.now());
     } catch (e) {
@@ -321,6 +326,15 @@ export function ProfileSettings() {
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder="Your name"
             className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
+          />
+        </SettingsField>
+        <SettingsField label="Bio" hint="A short introduction shown on your Profile page.">
+          <Textarea
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            placeholder="What you work on, what you care about…"
+            rows={3}
+            maxLength={280}
           />
         </SettingsField>
       </SettingsSection>

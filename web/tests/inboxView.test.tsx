@@ -11,6 +11,7 @@
 //     the entire feed was unreachable without a mouse.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useSyncExternalStore } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Notification } from '@/types/database';
 
@@ -49,20 +50,26 @@ vi.mock('@/hooks/useSupabase', () => ({
   markAllNotificationsRead: vi.fn().mockResolvedValue(undefined),
   archiveNotification: vi.fn().mockResolvedValue(undefined),
   fetchElementWithDetails: (...a: unknown[]) => fetchElementWithDetails(...a),
-  // Stands in for the shared store: the view owns the list after mount and
-  // drives it through the setter, exactly as the real hook does.
+  // Stands in for the shared store: the sidebar list and the reader both
+  // read one feed and drive it through the setter, exactly as the real hook does.
   useNotifications: () => {
-    const { useState } = require('react');
-    const [notifications, setNotifications] = useState(feed);
+    const notifications: Notification[] = useSyncExternalStore(subscribeFeed, () => feed, () => feed);
     return {
       notifications,
       unreadCount: notifications.filter((n: Notification) => !n.is_read).length,
       loading: false,
       reload: () => {},
-      setNotifications,
+      setNotifications: setFeed,
     };
   },
 }));
+
+const feedListeners = new Set<() => void>();
+function subscribeFeed(listener: () => void) { feedListeners.add(listener); return () => { feedListeners.delete(listener); }; }
+function setFeed(update: Notification[] | ((prev: Notification[]) => Notification[])) {
+  feed = typeof update === 'function' ? update(feed) : update;
+  feedListeners.forEach(fn => fn());
+}
 
 // The detail view itself is not what is being tested — which Element it is
 // opened on, and at which comment, is.
@@ -77,10 +84,19 @@ vi.mock('@/providers/AuthProvider', () => ({
   useAuthContext: () => ({ user: { id: USER_ID }, profile: { display_name: 'Me' } }),
 }));
 
-const { InboxView } = await import('@/ActivitySpace/home/InboxView');
+const { InboxView: Reader } = await import('@/ActivitySpace/home/InboxView');
+const { InboxList } = await import('@/ActivitySpace/home/InboxList');
+const { selectInboxNotification } = await import('@/ActivitySpace/home/useInbox');
+
+// The Inbox is two panes — the list in the AppSidebar, the reader in the main
+// pane — joined by a shared selection. Tests mount both, as the shell does.
+function InboxView(props: { onViewChange?: (view: string) => void; onNavigate?: (nav: object) => void }) {
+  return <><InboxList {...props} /><Reader {...props} /></>;
+}
 
 beforeEach(() => {
   feed = [notification()];
+  selectInboxNotification(null);
   markNotificationRead.mockClear();
   detailProps.mockClear();
   fetchElementWithDetails.mockReset();
@@ -175,5 +191,26 @@ describe('the feed is reachable without a mouse', () => {
       row.focus();
       expect(document.activeElement).toBe(row);
     }
+  });
+});
+
+describe('the sidebar list tells the shell only when the reader opened', () => {
+  it('reports an Element notification as opened, and a routed one as not', () => {
+    feed = [
+      notification({ id: 'el', title: 'Claude commented on Wire the Inbox' }),
+      notification({ id: 'st', element_id: null, comment_id: null, strategy_id: 's-1', title: 'Ana commented on Q3' }),
+    ];
+    const onOpen = vi.fn();
+    const onViewChange = vi.fn();
+    render(<InboxList onOpen={onOpen} onViewChange={onViewChange} onNavigate={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /commented on Q3/ }));
+    // Routed to the Initiative: the shell must not be told to stay on the Inbox.
+    expect(onViewChange).toHaveBeenCalledWith('strategy');
+    expect(onOpen).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /commented on Wire the Inbox/ }));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onViewChange).toHaveBeenCalledTimes(1);
   });
 });

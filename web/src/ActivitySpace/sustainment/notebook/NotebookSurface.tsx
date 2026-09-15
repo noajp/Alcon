@@ -73,7 +73,16 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
     setPickedSectionId(undefined);
     setSectionsOpen(false);
   }
-  const resolvedSectionId = resolveSectionSelection(nodes, resolvedFolderId, pickedSectionId ?? null);
+  // A file opened from outside (Profile's My Notes, a notification) may sit
+  // in a Section other than the one picked here; the file wins over a stale
+  // pick, so the tab follows the page instead of hiding it.
+  const [sectionFileId, setSectionFileId] = useState(selectedFileId);
+  if (sectionFileId !== selectedFileId) {
+    setSectionFileId(selectedFileId);
+    const file = selectedFileId ? nodes.find((n) => n.id === selectedFileId) : undefined;
+    if (file && pickedSectionId !== undefined && file.parentId !== pickedSectionId) setPickedSectionId(undefined);
+  }
+  const resolvedSectionId = resolveSectionSelection(nodes, resolvedFolderId, pickedSectionId ?? null, selectedFileId);
   const activeSectionName = folderSections.find((s) => s.id === resolvedSectionId)?.name ?? null;
   // Where the file list (and new files) hang: the active Section, or the
   // folder itself while it has no Sections yet.
@@ -324,7 +333,13 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
                 sections={folderSections}
                 activeSectionId={resolvedSectionId}
                 onClose={() => setSectionsOpen(false)}
-                onSelect={(id) => setPickedSectionId(id)}
+                // Picking a tab also drops the open page, so `noteId` never
+                // points at a file in a Section that is no longer shown —
+                // a stale id would otherwise defeat the file-follows reset
+                // above. The folder is pinned in the same step: when it was
+                // only derived from that page, dropping the page alone would
+                // send the pane back to the notebook grid.
+                onSelect={(id) => { setPickedSectionId(id); onNavigate({ noteFolderId: resolvedFolderId, noteId: null }); }}
                 onAdd={handleAddSection}
               />
             )}

@@ -54,6 +54,7 @@ function rowToNode(r: NoteRow): NoteNode {
     icon: r.icon ?? undefined,
     parentId: r.parent_id,
     linkedObjectId: r.linked_object_id ?? null,
+    createdBy: r.created_by,
   };
 }
 

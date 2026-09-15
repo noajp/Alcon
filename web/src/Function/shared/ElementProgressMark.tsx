@@ -55,8 +55,10 @@ export function getElementProgress(
 // mark.
 //   backlog     → dashed ring
 //   todo / null → solid ring
-//   in_progress → faint track ring + foreground arc filled to progress%
-//   review      → ring + review lines
+//   in_progress → solid ring + inner disc, a pie filled to progress%
+//                 (half when no progress is known yet, so it never reads
+//                 as an empty To Do ring)
+//   review      → filled disc + white review lines
 //   done        → filled disc + white check
 //   blocked     → ring + horizontal bar
 //   cancelled   → ring + ×
@@ -92,8 +94,6 @@ export function ElementProgressMark({
   // Stroke px → authored-grid units (pre-divided by the scale so the rendered
   // stroke stays a constant px regardless of `size`).
   const sw = (px: number) => +(px / s).toFixed(3);
-  const C = 2 * Math.PI * 15;        // ring circumference (authored units)
-  const dash = (C * pct) / 100;
 
   let inner: ReactNode;
   switch (key) {
@@ -102,27 +102,35 @@ export function ElementProgressMark({
         <circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" strokeWidth={sw(1.7)} strokeLinecap="round" strokeDasharray="2.4 6.4" />
       );
       break;
-    case 'in_progress':
+    case 'in_progress': {
+      // The inner disc is a pie: its rim (r=9) is drawn as a wide stroke of
+      // r=4.5 so a dash of the circumference fills a wedge from 12 o'clock.
+      const share = pct > 0 ? pct : 50;
+      const innerC = 2 * Math.PI * 4.5;
       inner = (
         <>
-          <circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" strokeWidth={sw(1.7)} opacity="0.3" />
-          {pct > 0 && (
+          <circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" strokeWidth={sw(1.7)} />
+          {share >= 100 ? (
+            <circle cx="24" cy="24" r="9" fill="currentColor" />
+          ) : (
             <circle
-              cx="24" cy="24" r="15" fill="none" stroke="currentColor"
-              strokeWidth={sw(1.7)} strokeLinecap="round"
-              strokeDasharray={`${dash.toFixed(2)} ${C.toFixed(2)}`}
+              cx="24" cy="24" r="4.5" fill="none" stroke="currentColor" strokeWidth="9"
+              strokeDasharray={`${((innerC * share) / 100).toFixed(3)} ${innerC.toFixed(3)}`}
               transform="rotate(-90 24 24)"
             />
           )}
         </>
       );
       break;
+    }
     case 'review':
+      // Filled disc + white review lines — the same silhouette as Done, with
+      // the lines knocked out where Done has its check.
       inner = (
-        <g fill="none" stroke="currentColor" strokeWidth={sw(1.7)} strokeLinecap="round">
-          <circle cx="24" cy="24" r="15" />
-          <path d="M18 21h12 M18 27h8" />
-        </g>
+        <>
+          <circle cx="24" cy="24" r="15" fill="currentColor" stroke="currentColor" strokeWidth={sw(1.7)} />
+          <path d="M17 20h14 M17 28h9" fill="none" stroke="var(--primary-foreground)" strokeWidth={sw(1.6)} strokeLinecap="round" />
+        </>
       );
       break;
     case 'done':

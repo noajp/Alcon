@@ -365,7 +365,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
           onClick={() => { setExpanded(true); setManuallyExpanded(true); }}
           className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground py-1 transition-colors"
         >
-          <Plus size={13} /> Set direction
+          <Plus size={13} strokeWidth={2.5} /> Set direction
         </button>
       </div>
     );

@@ -9,7 +9,6 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
-import { useNotifications } from '@/hooks/useSupabase';
 import { Plus, ChevronRight, FileText, Bot, Settings, Users, X, Search } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
@@ -40,13 +39,14 @@ import { SpaceSwitcher } from '@/Function/space/SpaceSwitcher';
 
 import { NavNoteIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
 import { useDataTables } from '@/hooks/useSupabase';
-import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
 import { railModeOf } from '@/shell/ModeRail';
 import { seedNotebook } from '@/ActivitySpace/sustainment/notebook/notebookActions';
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { useNotes } from '@/hooks/useNotesDb';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
 import { OperationsNavigation } from '@/ActivitySpace/sustainment/operations/OperationsNavigation';
+import { InboxList } from '@/ActivitySpace/home/InboxList';
+import { CalendarSidebar } from '@/ActivitySpace/sustainment/calendar/CalendarSidebar';
 import { operationsQueue, operationsQueueRoute } from '@/ActivitySpace/sustainment/operations/operationsQueues';
 import type { NavigationState } from '@/types/navigation';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -69,15 +69,9 @@ interface AppSidebarProps {
   onSearch?: () => void;
 }
 
-// Sidebar nav items derive their label + icon from the shared view registry
-// so there is one source of truth for activity-view metadata. Each id below
-// is guaranteed to have an icon in the registry. The ModeRail picks a top-level
-// mode; the sidebar then renders only that mode's surfaces.
-const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIEW_REGISTRY[id].label });
+// The ModeRail picks a top-level mode; the sidebar renders only that mode's
+// surfaces.
 
-// Home — the user-scoped surfaces. Inbox is the notifications feed; Calendar
-// and My Elements show the signed-in user's Elements.
-const HOME_ITEMS = [navItem('home'), navItem('inbox'), navItem('calendar'), navItem('my-elements'), navItem('profile')];
 // Strategy — what we're trying to achieve and how we intend to win. Initiative
 // (view id 'strategy', display label "Initiatives") is the unit, and Initiatives
 // bundle into a strategy; Phase stages the effort; Timeline sequences the set.
@@ -260,8 +254,6 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { openCreate } = useWorkspaceActions();
   const { t } = useI18n();
-  const { user } = useAuthContext();
-  const { unreadCount } = useNotifications(user?.id ?? null);
   const { guestDomains, refetch: refetchMemberDomains } = useDomains();
   const { data: visibleDomains, refetch: refetchVisibleDomains } = useSustainmentDomains();
   const domains = useMemo(() => [...visibleDomains].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)), [visibleDomains]);
@@ -485,38 +477,6 @@ export function AppSidebar({
             </Button>
           </div>
 
-          {/* ── Home mode ── Inbox / Calendar / My Elements */}
-          {railMode === 'home' && (
-          <>
-          <SidebarModeLabel label={t('Home')} />
-          <div className="mb-1 mt-1">
-            {HOME_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeView === item.id;
-              const showBadge = item.id === 'inbox' && unreadCount > 0;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onViewChange(item.id)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                    isActive
-                      ? 'bg-sidebar-accent text-foreground'
-                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                  }`}
-                >
-                  <Icon size={16} />
-                  <span className="flex-1 text-left">{t(item.label)}</span>
-                  {showBadge && (
-                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--status-danger)] text-white text-[10px] font-semibold flex items-center justify-center">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          </>
-          )}
 
           {/* ── Strategy mode ── The Initiative portfolio plus the
               surfaces that carry its reasoning and sequencing. Deliberately
@@ -611,7 +571,10 @@ export function AppSidebar({
           {/* ── Workload / Team modes ── each a single full surface in the
               main pane, so the sidebar just names the mode. */}
           {railMode === 'workload' && <SidebarModeLabel label={t('Workload')} />}
-          {railMode === 'calendar' && <SidebarModeLabel label={t('Calendar')} />}
+          {/* ── Inbox ── the notification list; the main pane reads the open one. */}
+          {railMode === 'inbox' && <InboxList onNavigate={onNavigate} onViewChange={onViewChange} onOpen={() => onViewChange('inbox')} />}
+          {/* ── Calendar ── today, a mini month that moves the grid, and who is shown. */}
+          {railMode === 'calendar' && <><SidebarModeLabel label={t('Calendar')} /><CalendarSidebar /></>}
           {railMode === 'team' && <SidebarModeLabel label={t('Team')} />}
           {(railMode === 'crm' || railMode === 'scm') && <OperationsNavigation sidebar kind={railMode}
             queue={operationsQueue(navigation, railMode)} onSelect={queue => onNavigate(operationsQueueRoute(railMode, queue))} />}
