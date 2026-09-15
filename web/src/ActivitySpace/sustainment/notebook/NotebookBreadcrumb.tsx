@@ -4,9 +4,9 @@ import { ChevronRight, Plus } from 'lucide-react';
 
 // Breadcrumb strip along the top of the Notebook surface — the open
 // Notebook's name (click to go back to the notebook browser) plus a "+" to
-// add a page (file) to the active Section. Section switching lives in the
-// FilesPane's hamburger drawer, and new Notebooks are created from the
-// notebook browser's "+", not here.
+// add a page (file) to the active Section. Sections are listed in the
+// FilesPane, and new Notebooks are created from the notebook browser's "+",
+// not here.
 export function NotebookBreadcrumb({
   folderName,
   onBack,

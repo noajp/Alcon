@@ -9,7 +9,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, FileText, Bot, Settings, Users, X, Search } from 'lucide-react';
+import { Plus, ChevronRight, Bot, Settings, Users, X, Search } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';
@@ -40,6 +40,10 @@ import { SpaceSwitcher } from '@/Function/space/SpaceSwitcher';
 import { NavNoteIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
 import { useDataTables } from '@/hooks/useSupabase';
 import { railModeOf } from '@/shell/ModeRail';
+import type { RailMode } from '@/shell/railApps';
+import { CREATE_ELEMENT_EVENT, type CreateElementDetail } from '@/shell/QuickAddElementLauncher';
+import { CREATE_INITIATIVE_EVENT } from '@/ActivitySpace/strategy/initiative/StrategyShell';
+import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarStore';
 import { seedNotebook } from '@/ActivitySpace/sustainment/notebook/notebookActions';
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { useNotes } from '@/hooks/useNotesDb';
@@ -110,36 +114,17 @@ function NotebookSidebar({
   onViewChange: (view: string) => void;
 }) {
   const { t } = useI18n();
-  const { nodes, createNode, deleteNode } = useNotes();
+  const { nodes } = useNotes();
   const folders = useMemo(
     () => nodes.filter((n) => n.type === 'folder').sort((a, b) => a.name.localeCompare(b.name)),
     [nodes],
   );
 
-  const addNotebook = async () => {
-    try {
-      const { folder, page } = await seedNotebook(createNode, deleteNode);
-      onViewChange('note');
-      onNavigate({ noteFolderId: folder.id, noteId: page.id });
-    } catch (e) {
-      console.error('Failed to create notebook', e);
-    }
-  };
-
+  // New notebooks come from the "+" at the top of the sidebar.
   return (
     <div className="mt-1">
       <div className="flex items-center gap-1 px-2 h-6 mt-3">
         <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Notebook')}</span>
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={addNotebook}
-          title={t('Add Notebook')}
-          aria-label={t('Add Notebook')}
-          className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
-        >
-          <Plus size={14} />
-        </button>
       </div>
       <div className="mt-1 flex flex-col">
         {folders.map((f) => {
@@ -185,7 +170,6 @@ function TableSidebar({
   onViewChange: (view: string) => void;
 }) {
   const { t } = useI18n();
-  const { openCreate } = useWorkspaceActions();
   const { data: tables, refetch } = useDataTables();
   // The New Table dialog lives in TableView; when it creates a table it
   // dispatches this so our separate list instance refreshes.
@@ -199,16 +183,6 @@ function TableSidebar({
     <div className="mt-1">
       <div className="flex items-center gap-1 px-2 h-6 mt-3">
         <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Table')}</span>
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={() => openCreate('table')}
-          title={t('Add Table')}
-          aria-label={t('Add Table')}
-          className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
-        >
-          <Plus size={14} />
-        </button>
       </div>
       <div className="mt-1 flex flex-col">
         {tables.map((t) => {
@@ -302,10 +276,33 @@ export function AppSidebar({
     window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
   }, [width]);
 
-  // "+ Create new" trigger — anchors the menu off its own button rect (no
-  // ModeRail to dispatch this from anymore, so it's a direct click handler).
+  // The "+" at the top of the sidebar creates whatever the current mode is
+  // about: a Notebook, a Table, an Initiative, a scheduled Element, or (in
+  // Execution) a Domain or Object from a small menu. Modes with nothing to
+  // create show no "+".
+  const { createNode: createNoteNode, deleteNode: deleteNoteNode } = useNotes();
+  const calendarDay = useCalendarDay();
+  const createLabel = ({
+    notebook: 'Add Notebook', tables: 'Add Table', strategy: 'New Initiative',
+    calendar: 'Add schedule', execution: 'Create new',
+  } as Partial<Record<RailMode, string>>)[railMode ?? 'execution'];
   const openCreateMenu = () => {
-    if (activeView === 'tables') { openCreate('table'); return; }
+    if (railMode === 'tables') { openCreate('table'); return; }
+    if (railMode === 'notebook') {
+      void seedNotebook(createNoteNode, deleteNoteNode)
+        .then(({ folder, page }) => { onViewChange('note'); onNavigate({ noteFolderId: folder.id, noteId: page.id }); })
+        .catch((e) => console.error('Failed to create notebook', e));
+      return;
+    }
+    if (railMode === 'strategy') {
+      onViewChange('strategy');
+      window.dispatchEvent(new CustomEvent(CREATE_INITIATIVE_EVENT));
+      return;
+    }
+    if (railMode === 'calendar') {
+      window.dispatchEvent(new CustomEvent<CreateElementDetail>(CREATE_ELEMENT_EVENT, { detail: { dueDate: calendarDay } }));
+      return;
+    }
     const rect = createBtnRef.current?.getBoundingClientRect();
     if (rect) {
       setCreateMenuPos({ top: rect.bottom + 4, left: rect.left });
@@ -466,15 +463,17 @@ export function AppSidebar({
                 <Search size={15} />
               </button>
             )}
-            <Button variant="ghost" size="icon-xs" className="text-muted-foreground"
-              ref={createBtnRef}
-              type="button"
-              onClick={openCreateMenu}
-              title={t(activeView === 'tables' ? 'Add Table' : 'Create new')}
-              aria-label={t(activeView === 'tables' ? 'Add Table' : 'Create new')}
-            >
-              <Plus size={16} />
-            </Button>
+            {createLabel && (
+              <Button variant="ghost" size="icon-xs" className="text-muted-foreground"
+                ref={createBtnRef}
+                type="button"
+                onClick={openCreateMenu}
+                title={t(createLabel)}
+                aria-label={t(createLabel)}
+              >
+                <Plus size={16} />
+              </Button>
+            )}
           </div>
 
 
@@ -602,33 +601,18 @@ export function AppSidebar({
             className="fixed w-52 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden"
             style={{ top: createMenuPos.top, left: createMenuPos.left }}
           >
-            {activeView === 'note' ? (
-              <CreateNoteMenuItems
-                onClose={() => setCreateMenuOpen(false)}
-                onNavigate={onNavigate}
-              />
-            ) : (
-              <>
-                <CreateMenuItem
-                  icon={<DomainIcon size={16} />}
-                  label={t('Domain')}
-                  desc={t('Top-level container')}
-                  onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
-                />
-                <CreateMenuItem
-                  icon={<ObjectIcon size={14} />}
-                  label={t('Object')}
-                  desc={t('Mid-level structural unit')}
-                  onClick={() => { setCreateMenuOpen(false); onCreateNew?.('object'); }}
-                />
-                <CreateMenuItem
-                  icon={<FileText size={14} />}
-                  label={t('Note')}
-                  desc={t('A new note')}
-                  onClick={() => { setCreateMenuOpen(false); onCreateNew?.('note'); }}
-                />
-              </>
-            )}
+            <CreateMenuItem
+              icon={<DomainIcon size={16} />}
+              label={t('Domain')}
+              desc={t('Top-level container')}
+              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
+            />
+            <CreateMenuItem
+              icon={<ObjectIcon size={14} />}
+              label={t('Object')}
+              desc={t('Mid-level structural unit')}
+              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('object'); }}
+            />
           </div>
         </>
       )}
@@ -1081,57 +1065,6 @@ function DomainGeneralSettings({
         onCancel={() => setConfirming(null)}
       />
     </div>
-  );
-}
-
-// Two menu items for the bottom "+ Create new" popover when in Notebook mode.
-// Pulls `useNotes()` here (same shared hook). "New Notebook" seeds a full
-// notebook (Folder → Section → page) via seedNotebook — identical to the
-// Notebook sidebar's "+"; "New Note" drops a loose page (ensureNoteHome files
-// it under a Section).
-function CreateNoteMenuItems({
-  onClose,
-  onNavigate,
-}: {
-  onClose: () => void;
-  onNavigate: (nav: Partial<NavigationState>) => void;
-}) {
-  const { createNode, deleteNode } = useNotes();
-  const createNote = async () => {
-    try {
-      const node = await createNode('file', 'Untitled', null);
-      onNavigate({ noteId: node.id });
-    } catch (e) {
-      console.error('Failed to create note', e);
-    } finally {
-      onClose();
-    }
-  };
-  const createNotebook = async () => {
-    try {
-      const { folder, page } = await seedNotebook(createNode, deleteNode);
-      onNavigate({ noteFolderId: folder.id, noteId: page.id });
-    } catch (e) {
-      console.error('Failed to create notebook', e);
-    } finally {
-      onClose();
-    }
-  };
-  return (
-    <>
-      <CreateMenuItem
-        icon={<NavNoteIcon size={14} />}
-        label="New Notebook"
-        desc="A section + page, ready to write"
-        onClick={createNotebook}
-      />
-      <CreateMenuItem
-        icon={<FileText size={14} />}
-        label="New Note"
-        desc="A single page"
-        onClick={createNote}
-      />
-    </>
   );
 }
 

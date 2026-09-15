@@ -2,6 +2,8 @@
 
 import { Button } from '@/ui/button';
 
+export const CREATE_INITIATIVE_EVENT = 'alcon:create-initiative';
+
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
@@ -89,6 +91,13 @@ export function StrategyShell({
   const { data: strategies, loading, refetch: refetchStrategies } = useStrategies();
 
   const [newOpen, setNewOpen] = useState(false);
+  // The sidebar's "+" (Strategy mode) raises the New Initiative dialog from
+  // outside this tree — same window-event convention as alcon:create-element.
+  useEffect(() => {
+    const open = () => setNewOpen(true);
+    window.addEventListener(CREATE_INITIATIVE_EVENT, open);
+    return () => window.removeEventListener(CREATE_INITIATIVE_EVENT, open);
+  }, []);
   // Falls back to local state when unmounted from navigation (e.g. a bare
   // <StrategyShell /> with no controlling caller) so the surface still works.
   const [localOpenId, setLocalOpenId] = useState<string | null>(null);
