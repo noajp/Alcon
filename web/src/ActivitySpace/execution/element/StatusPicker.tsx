@@ -16,10 +16,9 @@ import { cn } from '@/lib/utils';
 // exposes a 0–100 number field that writes directly to elements.progress;
 // reaching 100% flips the element to Done.
 
-const ROWS: Array<{ status: ElementStatus; label: string; previewProgress?: number }> = STATUS_ORDER.map((status) => ({
+const ROWS: Array<{ status: ElementStatus; label: string }> = STATUS_ORDER.map((status) => ({
   status,
   label: STATUS[status].label,
-  ...(status === 'in_progress' ? { previewProgress: 50 } : {}),
 }));
 
 interface StatusPickerProps {
@@ -54,6 +53,12 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
   // progress pass `progressOverride`; otherwise defer to getElementProgress
   // (done→100, then element.progress, then subelement ratio).
   const triggerProgress = progressOverride ?? getElementProgress(element);
+  // The In Progress row's mark follows the % being typed, so the pie is a
+  // live preview of what committing will show.
+  const draftProgress = (() => {
+    const parsed = parseInt(progressDraft, 10);
+    return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : element.progress ?? 0;
+  })();
 
   const applyStatus = async (newStatus: ElementStatus) => {
     // Picking In Progress while progress is already 100% is effectively
@@ -151,7 +156,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
               <span className="flex items-center justify-center w-[18px] h-[18px] shrink-0">
                 <ElementProgressMark
                   status={row.status}
-                  progress={row.previewProgress ?? 0}
+                  progress={row.status === 'in_progress' ? draftProgress : 0}
                   size={17}
                 />
               </span>
@@ -176,10 +181,12 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                     onBlur={(e) => commitProgress(e.target.value)}
                     onKeyDown={(e) => {
                       e.stopPropagation();
+                      // Enter commits and keeps the menu open: the mark
+                      // and the trigger update in place, and the person
+                      // can keep adjusting or pick another status.
                       if (e.key === 'Enter') {
                         e.preventDefault();
                         commitProgress((e.target as HTMLInputElement).value);
-                        setOpen(false);
                       }
                     }}
                     className="w-8 text-[11.5px] tabular-nums bg-transparent text-right focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
