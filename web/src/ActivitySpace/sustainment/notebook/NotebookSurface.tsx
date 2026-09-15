@@ -333,7 +333,10 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
                 sections={folderSections}
                 activeSectionId={resolvedSectionId}
                 onClose={() => setSectionsOpen(false)}
-                onSelect={(id) => setPickedSectionId(id)}
+                // Picking a tab also drops the open page, so `noteId` never
+                // points at a file in a Section that is no longer shown —
+                // a stale id would otherwise defeat the file-follows reset above.
+                onSelect={(id) => { setPickedSectionId(id); setSelectedFileId(null); }}
                 onAdd={handleAddSection}
               />
             )}

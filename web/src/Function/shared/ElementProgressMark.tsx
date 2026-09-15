@@ -129,7 +129,7 @@ export function ElementProgressMark({
       inner = (
         <>
           <circle cx="24" cy="24" r="15" fill="currentColor" stroke="currentColor" strokeWidth={sw(1.7)} />
-          <path d="M17 21h14 M17 27h9" fill="none" stroke="var(--primary-foreground)" strokeWidth={sw(1.6)} strokeLinecap="round" />
+          <path d="M17 20h14 M17 28h9" fill="none" stroke="var(--primary-foreground)" strokeWidth={sw(1.6)} strokeLinecap="round" />
         </>
       );
       break;

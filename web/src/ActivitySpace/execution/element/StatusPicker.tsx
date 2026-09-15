@@ -1,7 +1,7 @@
 'use client';
 
 import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
@@ -57,7 +57,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
   // live preview of what committing will show.
   const draftProgress = (() => {
     const parsed = parseInt(progressDraft, 10);
-    return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : element.progress ?? 0;
+    return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : triggerProgress;
   })();
 
   const applyStatus = async (newStatus: ElementStatus) => {
@@ -71,6 +71,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
     else if (resolved === 'backlog' || resolved === 'todo') updates.progress = null;
     try {
       await updateElement(element.id, updates);
+      lastCommitted.current = null;
       setOpen(false);
       onChanged?.(resolved);
     } catch (e) {
@@ -78,10 +79,17 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
     }
   };
 
+  // Enter commits and leaves the field focused, so the blur that follows a
+  // later dismissal would commit the same value again — a second write and,
+  // through onChanged, a second round of assignee notifications. The last
+  // committed value short-circuits that.
+  const lastCommitted = useRef<{ progress: number; status: ElementStatus | null } | null>(null);
   const commitProgress = async (raw: string) => {
     const parsed = parseInt(raw, 10);
     if (!Number.isFinite(parsed)) return;
     const clamped = Math.max(0, Math.min(100, parsed));
+    // What the field shows is what was saved, never the raw keystrokes.
+    setProgressDraft(String(clamped));
     try {
       const updates: { progress: number; status?: ElementStatus } = { progress: clamped };
       // 100% snaps to Done; anything else lands in In Progress — including a
@@ -92,6 +100,9 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
       else if (element.status !== 'in_progress' && element.status !== 'review') {
         updates.status = 'in_progress';
       }
+      const next = { progress: clamped, status: updates.status ?? element.status ?? null };
+      if (lastCommitted.current && lastCommitted.current.progress === next.progress && lastCommitted.current.status === next.status) return;
+      lastCommitted.current = next;
       await updateElement(element.id, updates);
       // Fire onChanged even on a progress-only update so callers (e.g. the
       // Element-detail view) refresh their trigger mark instead of showing
