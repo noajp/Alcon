@@ -42,7 +42,6 @@ import { useDataTables } from '@/hooks/useSupabase';
 import { railModeOf } from '@/shell/ModeRail';
 import type { RailMode } from '@/shell/railApps';
 import { CREATE_ELEMENT_EVENT, type CreateElementDetail } from '@/shell/QuickAddElementLauncher';
-import { CREATE_INITIATIVE_EVENT } from '@/ActivitySpace/strategy/initiative/StrategyShell';
 import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarStore';
 import { seedNotebook } from '@/ActivitySpace/sustainment/notebook/notebookActions';
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
@@ -295,8 +294,10 @@ export function AppSidebar({
       return;
     }
     if (railMode === 'strategy') {
+      // Land on the portfolio root (an open Initiative's detail has no
+      // create dialog) and let this tab's surface open it once mounted.
+      onNavigate({ strategyId: null, strategyCreate: true });
       onViewChange('strategy');
-      window.dispatchEvent(new CustomEvent(CREATE_INITIATIVE_EVENT));
       return;
     }
     if (railMode === 'calendar') {

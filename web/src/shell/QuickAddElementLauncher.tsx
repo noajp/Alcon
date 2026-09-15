@@ -12,6 +12,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { getQueryClient } from '@/lib/queryClient';
 
 // Last Object an Element was quick-added to — pressing C on a screen with no
 // Object context (Home, Notes, …) targets this Object again.
@@ -185,6 +186,11 @@ export function QuickAddElementLauncher({
     // Remember the landing Object so the next context-less C targets it too.
     const first = inputs[0];
     if (first && !first.personal && first.objectId) writeLastObjectId(first.objectId);
+    // The Calendar and My Elements read react-query caches, not the Domain
+    // refetch below — drop them so a just-added Element shows at once.
+    const qc = getQueryClient();
+    void qc.invalidateQueries({ queryKey: ['my-elements'] });
+    void qc.invalidateQueries({ queryKey: ['explorer'] });
     await onRefresh?.();
   };
 

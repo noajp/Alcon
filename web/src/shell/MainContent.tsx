@@ -86,6 +86,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             <div className="flex-1 overflow-hidden bg-card">
               <StrategyShell
                 activeStrategyId={navigation.strategyId ?? null}
+                createRequested={!!navigation.strategyCreate}
+                onCreateHandled={() => onNavigate({ strategyCreate: null })}
                 onSelectStrategy={(id) => onNavigate({ strategyId: id })}
                 onOpenDomain={(domainId) => {
                   setActiveDomainId(domainId);

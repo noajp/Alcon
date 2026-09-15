@@ -2,8 +2,6 @@
 
 import { Button } from '@/ui/button';
 
-export const CREATE_INITIATIVE_EVENT = 'alcon:create-initiative';
-
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
@@ -76,6 +74,8 @@ export function StrategyShell({
   onSelectStrategy,
   onOpenObject,
   onOpenDomain,
+  createRequested,
+  onCreateHandled,
 }: {
   /** Which Initiative the detail page shows; null = the portfolio root list.
    *  Controlled by the caller (navigation.strategyId) so other surfaces can
@@ -87,17 +87,19 @@ export function StrategyShell({
    *  the active Domain context before navigating. */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
   onOpenDomain?: (domainId: string) => void;
+  /** The sidebar's "+" asked for a new Initiative (navigation.strategyCreate).
+   *  The dialog opens on the portfolio root and `onCreateHandled` clears it. */
+  createRequested?: boolean;
+  onCreateHandled?: () => void;
 } = {}) {
   const { data: strategies, loading, refetch: refetchStrategies } = useStrategies();
 
-  const [newOpen, setNewOpen] = useState(false);
-  // The sidebar's "+" (Strategy mode) raises the New Initiative dialog from
-  // outside this tree — same window-event convention as alcon:create-element.
-  useEffect(() => {
-    const open = () => setNewOpen(true);
-    window.addEventListener(CREATE_INITIATIVE_EVENT, open);
-    return () => window.removeEventListener(CREATE_INITIATIVE_EVENT, open);
-  }, []);
+  const [localNewOpen, setLocalNewOpen] = useState(false);
+  const newOpen = localNewOpen || !!createRequested;
+  const setNewOpen = (open: boolean) => {
+    setLocalNewOpen(open);
+    if (!open && createRequested) onCreateHandled?.();
+  };
   // Falls back to local state when unmounted from navigation (e.g. a bare
   // <StrategyShell /> with no controlling caller) so the surface still works.
   const [localOpenId, setLocalOpenId] = useState<string | null>(null);

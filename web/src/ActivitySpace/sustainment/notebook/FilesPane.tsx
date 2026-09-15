@@ -61,6 +61,9 @@ export function FilesPane({
   onDeleteSection,
 }: FilesPaneProps) {
   const [renaming, setRenaming] = useState<string | null>(null);
+  // Radix hands focus back to the trigger as the menu closes; renaming after
+  // that, with the menu's own auto-focus off, lets the field keep it.
+  const startRename = (id: string) => { window.setTimeout(() => setRenaming(id), 0); };
   // Stable alpha sort per group — matches the sidebar's sibling sort so a
   // freshly created page lands where the user expects on the next render.
   const sorted = useMemo(() => {
@@ -98,8 +101,8 @@ export function FilesPane({
     return (
       <ContextMenu key={file.id}>
         <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
-        <ContextMenuContent className="min-w-[170px]">
-          {onRenameNode && <ContextMenuItem onSelect={() => setRenaming(file.id)}><Pencil /> Rename</ContextMenuItem>}
+        <ContextMenuContent className="min-w-[170px]" onCloseAutoFocus={(e) => e.preventDefault()}>
+          {onRenameNode && <ContextMenuItem onSelect={() => startRename(file.id)}><Pencil /> Rename</ContextMenuItem>}
           {onDeleteFile && (
             <>
               {onRenameNode && <ContextMenuSeparator />}
@@ -149,9 +152,9 @@ export function FilesPane({
     return (
       <ContextMenu>
         <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
-        <ContextMenuContent className="min-w-[170px]">
+        <ContextMenuContent className="min-w-[170px]" onCloseAutoFocus={(e) => e.preventDefault()}>
           {onAddFile && <ContextMenuItem onSelect={() => onAddFile(section.id)}><FilePlus /> New page</ContextMenuItem>}
-          {onRenameNode && <ContextMenuItem onSelect={() => setRenaming(section.id)}><Pencil /> Rename</ContextMenuItem>}
+          {onRenameNode && <ContextMenuItem onSelect={() => startRename(section.id)}><Pencil /> Rename</ContextMenuItem>}
           {onDeleteSection && (
             <>
               {(onAddFile || onRenameNode) && <ContextMenuSeparator />}
@@ -171,17 +174,6 @@ export function FilesPane({
           editor's toolbar header so the two panes share one header band. */}
       <div className="flex items-center gap-2 h-[50px] px-3 border-b border-border/30">
         <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-foreground">{folderName ?? ''}</span>
-        {onAddSection && (
-          <button
-            type="button"
-            onClick={onAddSection}
-            title="New section"
-            aria-label="New section"
-            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-          >
-            <Plus size={14} strokeWidth={2.5} />
-          </button>
-        )}
       </div>
 
       <div className="flex-1 overflow-y-auto pb-2">

@@ -225,6 +225,14 @@ let notesCache: NoteNode[] | null = null;
 // boot fired the same `notes` select three times. Concurrent callers share
 // one in-flight request.
 let notesInflight: Promise<NoteNode[]> | null = null;
+// Every mounted instance sees the same list: a create in the sidebar's "+"
+// has to show up in the notebook list and the open notebook at once, and
+// there is no realtime channel on `notes` to do that for us.
+const notesListeners = new Set<(list: NoteNode[]) => void>();
+function publishNotes(list: NoteNode[]) {
+  notesCache = list;
+  notesListeners.forEach((fn) => fn(list));
+}
 
 export function useNotes() {
   const [nodes, setNodes] = useState<NoteNode[]>(() => notesCache ?? []);
@@ -248,11 +256,15 @@ export function useNotes() {
     return notesInflight;
   }, []);
 
+  useEffect(() => {
+    notesListeners.add(setNodes);
+    return () => { notesListeners.delete(setNodes); };
+  }, []);
+
   const reload = useCallback(async () => {
     try {
       const list = await fetchAll();
-      notesCache = list;
-      setNodes(list);
+      publishNotes(list);
       setError(null);
     } catch (err) {
       setError(err as Error);
@@ -265,15 +277,12 @@ export function useNotes() {
     reload();
   }, [reload]);
 
-  // Keeps notesCache in lockstep with every optimistic update below, so a
-  // sidebar remount right after a create/rename/delete/move still sees it
-  // instead of momentarily reverting to the last *fetched* snapshot.
+  // Every optimistic update below goes through the shared list, so each
+  // mounted instance — and a sidebar remount right after a
+  // create/rename/delete/move — sees it, instead of reverting to the last
+  // *fetched* snapshot.
   const updateNodes = useCallback((updater: (prev: NoteNode[]) => NoteNode[]) => {
-    setNodes((prev) => {
-      const next = updater(prev);
-      notesCache = next;
-      return next;
-    });
+    publishNotes(updater(notesCache ?? []));
   }, []);
 
   // --- mutations ---
