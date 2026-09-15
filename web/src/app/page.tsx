@@ -84,7 +84,7 @@ function AppShellSkeleton() {
   );
 }
 
-function makeNewTab(activeView = 'home'): AppTab {
+function makeNewTab(activeView = 'inbox'): AppTab {
   return {
     id: `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     activeView,
@@ -247,7 +247,7 @@ function WorkspaceContent({
   const initialTabRef = useRef<AppTab | null>(null);
   // Settings > Preferences > "Default home view" — only the very first tab
   // of a session honors it; the "+" new-tab action always opens fresh at
-  // Now (see handleCreateTab below).
+  // the Inbox (see handleCreateTab below).
   if (initialTabRef.current === null) initialTabRef.current = makeNewTab(getCachedHomeViewId());
   const [tabs, setTabs] = useState<AppTab[]>(() => [initialTabRef.current!]);
   const [activeTabId, setActiveTabId] = useState<string>(() => initialTabRef.current!.id);
@@ -276,7 +276,7 @@ function WorkspaceContent({
   const setActiveNavigation = (nav: Partial<NavigationState>) => updateTabNavigation(activeTab.id, nav);
 
   const handleCreateTab = () => {
-    // A fresh tab opens the daily coordination surface.
+    // A fresh tab opens the Inbox, the first entry on the rail.
     const tab = makeNewTab();
     setTabs(prev => [...prev, tab]);
     setActiveTabId(tab.id);

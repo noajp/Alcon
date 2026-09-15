@@ -190,16 +190,6 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
     [elements]
   );
 
-  const hasEventsInCurrentMonth = useMemo(() => {
-    const y = currentDate.getFullYear();
-    const m = currentDate.getMonth();
-    return elements.some(e => {
-      const start = e.start_date ?? e.due_date;
-      const end = e.due_date ?? e.start_date;
-      return Boolean(start && end && start <= fmtDateOnly(new Date(y, m + 1, 0)) && end >= fmtDateOnly(new Date(y, m, 1)));
-    });
-  }, [elements, currentDate]);
-
   const goToPrevious = () => {
     setCurrentDate(prev => {
       if (mode === 'month') {
@@ -384,15 +374,6 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
             </div>
           ))}
         </div>
-
-        {/* Empty state overlay */}
-        {!hasEventsInCurrentMonth && (
-          <div className="pointer-events-none absolute inset-0 top-9 flex items-center justify-center z-[5]">
-            <div className="text-xs text-muted-foreground/70 bg-card/60 px-3 py-1.5 rounded-md">
-              No events this month — click a day to schedule an Element
-            </div>
-          </div>
-        )}
 
         {/* Calendar days */}
         <div className="grid grid-cols-7">

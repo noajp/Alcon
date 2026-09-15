@@ -151,7 +151,7 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
-ModeRail の固定セレクタは Inbox / Calendar / Strategy / Execution。Strategy と Execution がこの構造に対応し、Inbox と Calendar は毎日の入口として常設する。個人の画面（Now / My Elements / Profile）はレール最下部のアバターから開く。Sustainment のその他の道具は Apps ランチャーから各自がレールに追加する。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / CRM / SCM）の2グループで表示し、概念上はどちらも Sustainment に属する。
+ModeRail の固定セレクタは Inbox / Calendar / Strategy / Execution。Strategy と Execution がこの構造に対応し、Inbox と Calendar は毎日の入口として常設する。レール最下部のアバターは Profile を開き、Now / My Elements / My Notes / AI は Profile のタブとして並ぶ。Sustainment のその他の道具は Apps ランチャーから各自がレールに追加する。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / CRM / SCM）の2グループで表示し、概念上はどちらも Sustainment に属する。
 
 ### Strategy と Execution の分離
 
@@ -230,7 +230,7 @@ Object Detail 内の Workers / Resource / Calendar / Gantt タブは、同じ道
 
 ### Home — 分類を横断する個人向け画面
 
-分類をまたいで、自分が行う仕事と返答が必要な事項を確認する画面。最初に開く画面の既定は Inbox とし、ユーザーが指定した初期ビューの設定は保持する。Now / My Elements / Profile はアバターから開き、サイドバーを出さずに全幅で表示する。
+分類をまたいで、自分が行う仕事と返答が必要な事項を確認する画面。最初に開く画面の既定は Inbox とし、ユーザーが指定した初期ビューの設定は保持する。Profile はアバターから開き、サイドバーを出さずに全幅で表示する。ヘッダ（カバー・アバター・名前と Worker ID・自己紹介・プロフィール編集）の下に仕切り線を引き、その上に Now / My Elements / My Notes / AI のタブを置く。自己紹介は Settings > Profile で編集する。
 
 | 機能 | 役割 |
 |------|------|
@@ -293,8 +293,8 @@ Execution が Domain → Object → Element の順に並ぶのは、上位ほど
 
 ### レイアウト哲学
 - **常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス** の 3 列構成
-- **ModeRail**（46px）は分類セレクタ：固定の Inbox / Calendar / Strategy / Execution ＋ Apps ランチャーから追加した App ＋ 最下部のアバター（Now・My Elements・Profile）。Inbox のアイコンには未読数のバッジを出す。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / CRM / SCM）の 2 グループで、すべて Sustainment の道具
-- **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋ Create。本体は現在のモードに応じて切替（Inbox＝通知の一覧 / Calendar＝今日・ミニ月・表示する人 / Strategy＝Initiatives の下に Phase・Timeline / Execution＝Domain ツリー / App 各種＝モード名ラベルのみ）。アバターから開く個人の画面ではサイドバーを出さない
+- **ModeRail**（46px）は分類セレクタ：固定の Inbox / Calendar / Strategy / Execution ＋ Apps ランチャーから追加した App ＋ 最下部のアバター（Profile）。Inbox のアイコンには未読数のバッジを出す。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / CRM / SCM）の 2 グループで、すべて Sustainment の道具
+- **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋ Create。本体は現在のモードに応じて切替（Inbox＝通知の一覧 / Calendar＝今日・ミニ月・表示する人 / Strategy＝Initiatives の下に Phase・Timeline / Execution＝Domain ツリー / App 各種＝モード名ラベルのみ）。アバターから開く Profile ではサイドバーを出さない
 - view→モードの対応は `shell/railApps.ts` の `MODE_META.views` / `railModeOf`、view id→ラベル / アイコンは `shell/viewRegistry.ts` が単一情報源
 
 Domain の概要は、その Domain の Objects と実行状況、Object を介して関連する Initiatives を示す。Initiative 側には現在 Space と招待された Guest の関連 Domains を示し、相互に移動できる。関係は両端が可視の Object 所属から導出し、multi-homing を含む。Domain 集計は所属 Object の Element を重複なく数える。Phase / Timeline のナビゲーション上の配置は、Phase の Domain スコープを変えない。

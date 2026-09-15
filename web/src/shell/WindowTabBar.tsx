@@ -116,7 +116,7 @@ export function WindowTabBar({
         type="button"
         onClick={onCreate}
         aria-label={t('New tab')}
-        className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-colors flex-shrink-0"
+        className="flex items-center justify-center w-6 h-6 border-transparent hover:border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-colors flex-shrink-0"
       >
         <Plus size={14} />
       </Button>

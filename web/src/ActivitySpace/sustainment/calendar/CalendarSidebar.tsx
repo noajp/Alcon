@@ -54,16 +54,17 @@ export function CalendarSidebar() {
         <Button size="icon-xs" variant="ghost" aria-label={t('Previous month')} onClick={() => setBrowsed({ month: shiftMonth(month, -1), forDay: day })}><ChevronLeft size={14} /></Button>
         <Button size="icon-xs" variant="ghost" aria-label={t('Next month')} onClick={() => setBrowsed({ month: shiftMonth(month, 1), forDay: day })}><ChevronRight size={14} /></Button>
       </div>
-      <div role="grid" aria-label={monthDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' })} className="mt-1 grid grid-cols-7 gap-y-0.5 px-1">
+      <div aria-label={monthDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' })} className="mt-1 grid grid-cols-7 gap-y-0.5 px-1">
         {weekdayLabels.map((label, i) => (
-          <span key={i} role="columnheader" className="text-center text-[10px] font-medium text-muted-foreground/70">{label}</span>
+          <span key={i} aria-hidden="true" className="text-center text-[10px] font-medium text-muted-foreground/70">{label}</span>
         ))}
         {days.map(value => {
           const inMonth = monthOf(value) === month;
           const isToday = value === today;
           const selected = value === day;
           return (
-            <button key={value} type="button" role="gridcell" aria-selected={selected} aria-current={isToday ? 'date' : undefined}
+            <button key={value} type="button" aria-pressed={selected} aria-current={isToday ? 'date' : undefined}
+              aria-label={parseDateOnly(value)!.toLocaleDateString(locale, { month: 'long', day: 'numeric' })}
               onClick={() => setCalendarDay(value)}
               className={`mx-auto flex h-6 w-6 items-center justify-center rounded-full pt-0.5 text-[11px] leading-none tabular-nums transition-colors ${
                 isToday ? 'bg-[var(--accent-default)] font-semibold text-primary-foreground'
@@ -79,7 +80,7 @@ export function CalendarSidebar() {
 
       <div className="mt-4 flex h-6 items-center gap-1 px-2">
         <h2 className="flex-1 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('People')}</h2>
-        {hidden.length > 0 && <Button size="xs" variant="ghost" onClick={showAllCalendarWorkers}>{t('Show all')}</Button>}
+        {people.some(worker => hidden.includes(worker.id)) && <Button size="xs" variant="ghost" onClick={showAllCalendarWorkers}>{t('Show all')}</Button>}
       </div>
       {people.length === 0 && <p className="px-2 py-1 text-[12px] text-muted-foreground">{t('No one is scheduled here.')}</p>}
       <ul className="mt-1 space-y-0.5">

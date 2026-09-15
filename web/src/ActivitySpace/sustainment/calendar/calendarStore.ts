@@ -7,7 +7,8 @@ import { toDateOnlyString } from '@/Function/shared/dateUtils';
 // a parent below the shell, so the day being looked at and the Workers being
 // hidden live here. Same shape as railApps: a module store read through
 // `useSyncExternalStore`, with the hidden-people choice kept in localStorage
-// so it survives a reload. The day does not — every open starts on today.
+// so it survives a reload. The day lives for the page: leaving the Calendar
+// and coming back lands on the day that was open, a reload on today.
 
 const HIDDEN_KEY = 'alcon:calendar-hidden-workers';
 const CHANGE_EVENT = 'alcon:calendar-change';

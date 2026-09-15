@@ -7,12 +7,17 @@ import { notificationKindMeta } from '@/Function/shared/notificationKinds';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Button } from '@/ui/button';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/ui/dropdown-menu';
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } from '@/ui/context-menu';
 import type { NavigationState } from '@/types/navigation';
 import { useInbox } from './useInbox';
 
 interface InboxListProps {
   onNavigate?: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
+  /** A notification was opened in the reader. The shell uses this to close
+   *  the sidebar drawer on narrow windows, as picking any other sidebar
+   *  entry does. */
+  onOpen?: () => void;
 }
 
 // Bound mounted rows, while counts and filtering still use the whole Inbox.
@@ -32,7 +37,7 @@ function relativeTime(iso: string, locale: string) {
 
 /** The Inbox's sidebar: every notification as a preview row. Picking one
  *  opens it in the main pane, which stays free for the whole message. */
-export function InboxList({ onNavigate, onViewChange }: InboxListProps) {
+export function InboxList({ onNavigate, onViewChange, onOpen }: InboxListProps) {
   const { t, locale } = useI18n();
   const inbox = useInbox({ onNavigate, onViewChange });
   const [renderLimit, setRenderLimit] = useState(RENDER_PAGE_SIZE);
@@ -55,7 +60,7 @@ export function InboxList({ onNavigate, onViewChange }: InboxListProps) {
         : rows.length === 0 ? <p className="px-2 py-8 text-center text-[12px] text-muted-foreground">{t(inbox.unreadOnly ? "You're all caught up!" : 'No notifications yet.')}</p>
         : <ul className="mt-1 space-y-0.5">
           {rows.map(n => <InboxRow key={n.id} notification={n} selected={inbox.selectedId === n.id} locale={locale}
-            onSelect={inbox.select} onToggleRead={inbox.toggleRead} onArchive={inbox.archive} />)}
+            onSelect={n => { inbox.select(n); onOpen?.(); }} onToggleRead={inbox.toggleRead} onArchive={inbox.archive} />)}
         </ul>}
       {visible.length > renderLimit && <div className="flex justify-center py-2"><Button variant="ghost" size="xs" onClick={() => setRenderLimit(limit => limit + RENDER_PAGE_SIZE)}>{t('Show more')}</Button></div>}
     </section>
@@ -73,7 +78,11 @@ function InboxRow({ notification: n, selected, locale, onSelect, onToggleRead, o
   const { t } = useI18n();
   const meta = notificationKindMeta(n.kind);
   const Icon = meta.icon;
+  // The same two actions sit behind the row's "⋯" and a right-click, so the
+  // menu is reachable with either hand.
   return (
+    <ContextMenu>
+    <ContextMenuTrigger asChild>
     <li className={`group/row flex items-start gap-0.5 rounded-lg pr-1 transition-colors ${selected ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50'}`}>
       <button type="button" onClick={() => onSelect(n)} aria-current={selected ? 'true' : undefined}
         className="flex min-w-0 flex-1 items-start gap-2 rounded-lg py-2 pl-2 text-left focus-visible:bg-sidebar-accent">
@@ -100,5 +109,11 @@ function InboxRow({ notification: n, selected, locale, onSelect, onToggleRead, o
         </DropdownMenuContent>
       </DropdownMenu>
     </li>
+    </ContextMenuTrigger>
+    <ContextMenuContent>
+      <ContextMenuItem onSelect={() => void onToggleRead(n)}><Check />{t(n.is_read ? 'Mark as unread' : 'Mark as read')}</ContextMenuItem>
+      <ContextMenuItem onSelect={() => void onArchive(n)}><Archive />{t('Archive')}</ContextMenuItem>
+    </ContextMenuContent>
+    </ContextMenu>
   );
 }

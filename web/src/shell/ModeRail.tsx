@@ -75,6 +75,8 @@ function RailButton({
 }
 
 // The personal surface keeps My Elements and AI behind the signed-in avatar.
+// The avatar opens the Profile page, which carries the personal surfaces
+// (My Elements, Notes, …) as its own tabs.
 function ProfileRailButton({
   active,
   onClick,
@@ -94,7 +96,7 @@ function ProfileRailButton({
     <button
       type="button"
       onClick={onClick}
-      title={t('Profile')}
+      title={name ?? t('Profile')}
       aria-label={t('Profile')}
       aria-pressed={active}
       className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${

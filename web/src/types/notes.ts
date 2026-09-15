@@ -14,6 +14,8 @@ export interface NoteNode {
    *  Element conversion pre-selects the linked Object (and its
    *  Domain) instead of falling back to the Individual Domain. */
   linkedObjectId?: string | null;
+  /** auth user id of the creator — the Profile page lists a person's own notes. */
+  createdBy?: string;
 }
 
 export interface Brief {
