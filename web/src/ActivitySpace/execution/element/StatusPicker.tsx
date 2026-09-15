@@ -109,6 +109,9 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
       // a stale percentage.
       onChanged?.(updates.status ?? element.status ?? 'todo');
     } catch (e) {
+      // A failed write must not count as committed, or retrying the same
+      // value would be swallowed by the guard above.
+      lastCommitted.current = null;
       console.error('Failed to update progress', e);
     }
   };

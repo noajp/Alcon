@@ -335,8 +335,11 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
                 onClose={() => setSectionsOpen(false)}
                 // Picking a tab also drops the open page, so `noteId` never
                 // points at a file in a Section that is no longer shown —
-                // a stale id would otherwise defeat the file-follows reset above.
-                onSelect={(id) => { setPickedSectionId(id); setSelectedFileId(null); }}
+                // a stale id would otherwise defeat the file-follows reset
+                // above. The folder is pinned in the same step: when it was
+                // only derived from that page, dropping the page alone would
+                // send the pane back to the notebook grid.
+                onSelect={(id) => { setPickedSectionId(id); onNavigate({ noteFolderId: resolvedFolderId, noteId: null }); }}
                 onAdd={handleAddSection}
               />
             )}
