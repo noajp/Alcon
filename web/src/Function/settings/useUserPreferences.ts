@@ -18,7 +18,7 @@ export interface UserPreferences {
 }
 
 const DEFAULTS: UserPreferences = {
-  home_view: 'Now',
+  home_view: 'Inbox',
   display_names: 'Full name',
   first_day_of_week: 'Monday',
   convert_emoticons: true,

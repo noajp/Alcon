@@ -12,6 +12,7 @@ import {
   useRailApps,
   type RailMode,
 } from '@/shell/railApps';
+import { useNotifications } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
@@ -36,7 +37,7 @@ export type { RailMode };
 // highlight follows `activeView`, following either link swaps modes on its
 // own. One click each way.
 //
-// Below those three sits the launcher: the apps a person has added, then the
+// Below the fixed entries sits the launcher: the apps a person has added, then the
 // Sustainment launcher that adds them.
 
 export { railModeOf } from '@/shell/railApps';
@@ -46,7 +47,9 @@ function RailButton({
   icon: Icon,
   active,
   onClick,
+  unreadCount = 0,
 }: {
+  unreadCount?: number;
   label: string;
   icon: React.ComponentType<{ size?: number }>;
   active: boolean;
@@ -59,13 +62,14 @@ function RailButton({
       title={label}
       aria-label={label}
       aria-pressed={active}
-      className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+      className={`relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
         active
           ? 'bg-sidebar-accent text-foreground'
           : 'text-muted-foreground/70 hover:bg-sidebar-accent/50 hover:text-foreground'
       }`}
     >
       <Icon size={18} />
+      {unreadCount > 0 && <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--status-danger)] px-1 text-[9px] font-semibold text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}
     </button>
   );
 }
@@ -114,6 +118,8 @@ export function ModeRail({
 }) {
   const { t } = useI18n();
   const activeMode = railModeOf(activeView);
+  const { user } = useAuthContext();
+  const { unreadCount } = useNotifications(user?.id ?? null);
   const [apps, setApp] = useRailApps();
   const [launcherOpen, setLauncherOpen] = useState(false);
 
@@ -136,6 +142,7 @@ export function ModeRail({
       {CORE_MODES.map((mode) => (
         <RailButton
           key={mode}
+          unreadCount={mode === 'inbox' ? unreadCount : 0}
           label={t(MODE_META[mode].label)}
           icon={MODE_META[mode].icon}
           active={mode === activeMode}
@@ -179,7 +186,7 @@ export function ModeRail({
           rail. */}
       <div className="mt-auto flex flex-col items-center gap-1">
         <div className="my-1 h-px w-5 bg-border" />
-        <ProfileRailButton active={activeView === 'profile'} onClick={() => onViewChange('profile')} />
+        <ProfileRailButton active={activeMode === 'personal'} onClick={() => onViewChange('profile')} />
       </div>
 
       <MenuShell className="border-transparent" width="wide" side="right" align="start" sideOffset={8} aria-label={t('Sustainment apps')}>

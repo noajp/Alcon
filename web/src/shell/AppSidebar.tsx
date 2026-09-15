@@ -9,7 +9,6 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
-import { useNotifications } from '@/hooks/useSupabase';
 import { Plus, ChevronRight, FileText, Bot, Settings, Users, X, Search } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
@@ -47,6 +46,8 @@ import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { useNotes } from '@/hooks/useNotesDb';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
 import { OperationsNavigation } from '@/ActivitySpace/sustainment/operations/OperationsNavigation';
+import { InboxList } from '@/ActivitySpace/home/InboxList';
+import { CalendarSidebar } from '@/ActivitySpace/sustainment/calendar/CalendarSidebar';
 import { operationsQueue, operationsQueueRoute } from '@/ActivitySpace/sustainment/operations/operationsQueues';
 import type { NavigationState } from '@/types/navigation';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -75,9 +76,8 @@ interface AppSidebarProps {
 // mode; the sidebar then renders only that mode's surfaces.
 const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIEW_REGISTRY[id].label });
 
-// Home — the user-scoped surfaces. Inbox is the notifications feed; Calendar
-// and My Elements show the signed-in user's Elements.
-const HOME_ITEMS = [navItem('home'), navItem('inbox'), navItem('calendar'), navItem('my-elements'), navItem('profile')];
+// Personal pages are reached through the profile avatar.
+const PERSONAL_ITEMS = [navItem('home'), navItem('my-elements'), navItem('profile')];
 // Strategy — what we're trying to achieve and how we intend to win. Initiative
 // (view id 'strategy', display label "Initiatives") is the unit, and Initiatives
 // bundle into a strategy; Phase stages the effort; Timeline sequences the set.
@@ -260,8 +260,6 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { openCreate } = useWorkspaceActions();
   const { t } = useI18n();
-  const { user } = useAuthContext();
-  const { unreadCount } = useNotifications(user?.id ?? null);
   const { guestDomains, refetch: refetchMemberDomains } = useDomains();
   const { data: visibleDomains, refetch: refetchVisibleDomains } = useSustainmentDomains();
   const domains = useMemo(() => [...visibleDomains].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)), [visibleDomains]);
@@ -485,15 +483,14 @@ export function AppSidebar({
             </Button>
           </div>
 
-          {/* ── Home mode ── Inbox / Calendar / My Elements */}
-          {railMode === 'home' && (
+          {/* Personal pages */}
+          {railMode === 'personal' && (
           <>
-          <SidebarModeLabel label={t('Home')} />
+          <SidebarModeLabel label={t('Profile')} />
           <div className="mb-1 mt-1">
-            {HOME_ITEMS.map((item) => {
+            {PERSONAL_ITEMS.map((item) => {
               const Icon = item.icon;
               const isActive = activeView === item.id;
-              const showBadge = item.id === 'inbox' && unreadCount > 0;
               return (
                 <button
                   key={item.id}
@@ -506,11 +503,7 @@ export function AppSidebar({
                 >
                   <Icon size={16} />
                   <span className="flex-1 text-left">{t(item.label)}</span>
-                  {showBadge && (
-                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--status-danger)] text-white text-[10px] font-semibold flex items-center justify-center">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
+
                 </button>
               );
             })}
@@ -611,7 +604,10 @@ export function AppSidebar({
           {/* ── Workload / Team modes ── each a single full surface in the
               main pane, so the sidebar just names the mode. */}
           {railMode === 'workload' && <SidebarModeLabel label={t('Workload')} />}
-          {railMode === 'calendar' && <SidebarModeLabel label={t('Calendar')} />}
+          {/* ── Inbox ── the notification list; the main pane reads the open one. */}
+          {railMode === 'inbox' && <InboxList onNavigate={onNavigate} onViewChange={onViewChange} />}
+          {/* ── Calendar ── today, a mini month that moves the grid, and who is shown. */}
+          {railMode === 'calendar' && <><SidebarModeLabel label={t('Calendar')} /><CalendarSidebar /></>}
           {railMode === 'team' && <SidebarModeLabel label={t('Team')} />}
           {(railMode === 'crm' || railMode === 'scm') && <OperationsNavigation sidebar kind={railMode}
             queue={operationsQueue(navigation, railMode)} onSelect={queue => onNavigate(operationsQueueRoute(railMode, queue))} />}

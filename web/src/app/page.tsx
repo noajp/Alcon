@@ -5,7 +5,8 @@ import { ExplorerDataProvider } from '@/Function/shared/ExplorerDataContext';
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { WorkspaceActionsProvider } from '@/shell/WorkspaceActionsContext';
 import { AppSidebar } from '@/shell/AppSidebar';
-import { ModeRail } from '@/shell/ModeRail';
+import { ModeRail, railModeOf } from '@/shell/ModeRail';
+import { useUserPreferences } from '@/Function/settings/useUserPreferences';
 import { DiscoverModal } from '@/shell/DiscoverModal';
 import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
@@ -96,6 +97,10 @@ function makeNewTab(activeView = 'home'): AppTab {
 const SIDEBAR_AUTO_COLLAPSE_WIDTH = 1024;
 
 function AppContent() {
+  // Settings > Preferences are cached per browser so the first tab can open
+  // on the saved home view before any fetch; reading them here, at launch,
+  // is what keeps that cache in step with the account across devices.
+  useUserPreferences();
   const { t } = useI18n();
   const { user } = useAuthContext();
   // Every server-confirmed change reaches the caches through this one channel.
@@ -313,6 +318,10 @@ function WorkspaceContent({
   // When collapsed, the sidebar can still be peeked as a floating overlay
   // (via the WindowTabBar reveal button) instead of pinning it back into flow.
   const [sidebarOverlay, setSidebarOverlay] = useState(false);
+  // The personal pages (Now / My Elements / Profile) are reached from the
+  // avatar and have nothing to list, so they take the whole width.
+  const personalMode = railModeOf(activeTab.activeView) === 'personal';
+  const sidebarHidden = sidebarCollapsed || personalMode;
   const [discoverOpen, setDiscoverOpen] = useState(false);
   // Alcon Copilot pane — open state shared by the WindowTabBar PanelRight
   // toggle, ⌘L, and the panel's own close button. localStorage round-trips
@@ -482,7 +491,7 @@ function WorkspaceContent({
           onViewChange={handleSidebarViewChange}
           onOpenSettings={handleOpenSettings}
         />
-        <AppSidebar
+        {!personalMode && <AppSidebar
           navigation={activeTab.navigation}
           onNavigate={handleSidebarNavigate}
           activeView={activeTab.activeView}
@@ -494,9 +503,9 @@ function WorkspaceContent({
           overlay={sidebarCollapsed && sidebarOverlay}
           onCreateNew={handleSidebarCreateNew}
           onSearch={() => setDiscoverOpen(true)}
-        />
+        />}
 
-        {sidebarCollapsed && sidebarOverlay && (
+        {!personalMode && sidebarCollapsed && sidebarOverlay && (
           <div
             className="absolute inset-0 z-40 bg-black/45"
             onClick={() => setSidebarOverlay(false)}
@@ -504,15 +513,15 @@ function WorkspaceContent({
           />
         )}
 
-        <div className={`flex-1 flex flex-col overflow-hidden pr-1.5 pb-1.5 ${sidebarCollapsed ? 'pl-1.5' : 'pl-0'}`}>
+        <div className={`flex-1 flex flex-col overflow-hidden pr-1.5 pb-1.5 ${sidebarHidden ? 'pl-1.5' : 'pl-0'}`}>
         <WindowTabBar
           tabs={tabs}
           activeTabId={activeTab.id}
           onSelect={setActiveTabId}
           onClose={handleCloseTab}
           onCreate={handleCreateTab}
-          sidebarCollapsed={sidebarCollapsed}
-          onToggleSidebar={handleSidebarToggle}
+          sidebarCollapsed={sidebarHidden}
+          onToggleSidebar={personalMode ? undefined : handleSidebarToggle}
           copilotOpen={copilotOpen}
           onToggleCopilot={() => handleCopilotOpenChange(!copilotOpen)}
         />

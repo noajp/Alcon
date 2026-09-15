@@ -240,3 +240,19 @@ for (const locale of Object.keys(commonMessages) as Array<Exclude<Locale, 'en'>>
   Object.assign(MESSAGES_PLACEHOLDER[locale], commonMessages[locale]);
 }
 export const MESSAGES = MESSAGES_PLACEHOLDER;
+
+Object.assign(ja, {
+  'Today': '今日', 'People': 'メンバー', 'Previous month': '前の月', 'Next month': '次の月', 'Show all': 'すべて表示', 'No one is scheduled here.': 'この予定表に担当者はいません。',
+});
+
+Object.assign(ko, {
+  'Today': '오늘', 'People': '사람', 'Previous month': '이전 달', 'Next month': '다음 달', 'Show all': '모두 표시', 'No one is scheduled here.': '이 캘린더에 배정된 사람이 없습니다.',
+});
+
+Object.assign(fr, {
+  'Today': "Aujourd'hui", 'People': 'Personnes', 'Previous month': 'Mois précédent', 'Next month': 'Mois suivant', 'Show all': 'Tout afficher', 'No one is scheduled here.': 'Personne n’est planifié ici.',
+});
+
+Object.assign(es, {
+  'Today': 'Hoy', 'People': 'Personas', 'Previous month': 'Mes anterior', 'Next month': 'Mes siguiente', 'Show all': 'Mostrar todo', 'No one is scheduled here.': 'Nadie está programado aquí.',
+});

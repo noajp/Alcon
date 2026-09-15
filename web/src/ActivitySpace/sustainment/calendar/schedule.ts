@@ -1,5 +1,6 @@
 import type { AlconObject, ElementWithDetails } from '@/types/database';
 import type { ExplorerData } from '@/Function/sync/explorerPatch';
+import { shiftDateOnly } from '@/Function/shared/dateUtils';
 
 export type CalendarEntry = Pick<ElementWithDetails,
   'id' | 'title' | 'start_date' | 'due_date' | 'start_time' | 'due_time' | 'color' | 'status' | 'priority' | 'estimated_hours'
@@ -72,4 +73,32 @@ export function layoutTimedEntries(entries: CalendarEntry[], day: string) {
   }
   finish();
   return items;
+}
+
+/** Elements the Calendar keeps once some Workers are hidden. An Element with
+ *  no assignee belongs to nobody in particular and always stays; one shared
+ *  by a hidden and a shown Worker stays for the shown one. */
+export function filterByWorkers<T extends { assignees?: { worker_id: string }[] }>(elements: T[], hiddenWorkerIds: string[]): T[] {
+  if (hiddenWorkerIds.length === 0) return elements;
+  const hidden = new Set(hiddenWorkerIds);
+  return elements.filter(element => !element.assignees?.length || element.assignees.some(assignee => !hidden.has(assignee.worker_id)));
+}
+
+/** `yyyy-MM` of a `yyyy-MM-dd` day. */
+export const monthOf = (day: string): string => day.slice(0, 7);
+
+/** The same `yyyy-MM`, moved by whole months. */
+export function shiftMonth(month: string, months: number): string {
+  const [y, m] = month.split('-').map(Number);
+  const moved = new Date(Date.UTC(y, m - 1 + months, 1));
+  return `${moved.getUTCFullYear()}-${`${moved.getUTCMonth() + 1}`.padStart(2, '0')}`;
+}
+
+/** The six rows of days a mini month shows for `yyyy-MM`, starting on the
+ *  preferred weekday, so every grid is the same height. */
+export function miniMonthDays(month: string, weekStartsOn: number): string[] {
+  const first = `${month}-01`;
+  const [y, m] = month.split('-').map(Number);
+  const offset = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() - weekStartsOn + 7) % 7;
+  return Array.from({ length: 42 }, (_, i) => shiftDateOnly(first, i - offset));
 }

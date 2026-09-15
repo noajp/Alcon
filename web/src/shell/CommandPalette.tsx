@@ -39,6 +39,7 @@ interface CommandPaletteProps {
 const NAV_COMMANDS = [
   { id: 'home',         label: 'Go to Now',         icon: Home,     view: 'home' },
   { id: 'my-elements',  label: 'My Elements',        icon: ListTodo, view: 'my-elements' },
+  { id: 'calendar', label: 'Open Calendar', icon: MODE_META.calendar.icon, view: 'calendar' },
   { id: 'inbox',        label: 'Open Inbox',         icon: Inbox,    view: 'inbox' },
   { id: 'domain-elements',      label: 'Domain Elements',    icon: ListTodo, view: 'domain-elements' },
   { id: 'objects',     label: 'Objects',            icon: ObjectIcon, view: 'objects' },

@@ -1,103 +1,64 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import {
-  useNotifications, markNotificationRead, markAllNotificationsRead,
-  archiveNotification, fetchElementWithDetails,
-  type ElementWithDetails, type Notification,
-} from '@/hooks/useSupabase';
+import { Archive, Check, Inbox } from 'lucide-react';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
-import { useAuthContext } from '@/providers/AuthProvider';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Button } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';
-import { InboxLayout } from './InboxLayout';
+import { selectInboxNotification, useInbox, useNotificationElement } from './useInbox';
 
 interface InboxViewProps {
   onNavigate?: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
 }
 
-// Bound mounted rows, while counts and filtering still use the whole Inbox.
-const RENDER_PAGE_SIZE = 100;
-
+/** The Inbox's main pane: the open notification at full width. The list
+ *  that picks it lives in the AppSidebar (`InboxList`). */
 export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
-  const { user } = useAuthContext();
-  const { t } = useI18n();
-  const { notifications, unreadCount, loading, reload, setNotifications } = useNotifications(user?.id ?? null);
-  const [unreadOnly, setUnreadOnly] = useState(false);
-  const [renderLimit, setRenderLimit] = useState(RENDER_PAGE_SIZE);
-  const [selected, setSelected] = useState<Notification | null>(null);
-  const [revision, setRevision] = useState(0);
-  const [selectionRevision, setSelectionRevision] = useState(0);
-  const [loaded, setLoaded] = useState<{ elementId: string; element: ElementWithDetails | null } | null>(null);
+  const { t, locale } = useI18n();
+  const { selected, revision, toggleRead, archive } = useInbox({ onNavigate, onViewChange });
   const elementId = selected?.element_id;
+  const { detail, refresh } = useNotificationElement(elementId, revision);
 
-  useEffect(() => {
-    if (!elementId) return;
-    let cancelled = false;
-    void fetchElementWithDetails(elementId).then(element => {
-      if (!cancelled) setLoaded({ elementId, element });
-    }).catch(error => {
-      console.error('Failed to open notification Element:', error);
-      if (!cancelled) setLoaded({ elementId, element: null });
-    });
-    return () => { cancelled = true; };
-  }, [elementId, revision, selectionRevision]);
+  if (!selected) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-5 bg-card text-muted-foreground">
+        <Inbox size={88} strokeWidth={0.8} className="opacity-60" aria-hidden="true" />
+        <p className="text-[13px]">{t('No notification selected')}</p>
+      </div>
+    );
+  }
 
-  const detail = elementId && loaded?.elementId === elementId ? loaded : null;
-  // Keep the notification being read in the unread view until the user leaves it.
-  const visible = unreadOnly ? notifications.filter(n => !n.is_read || n.id === selected?.id) : notifications;
-
-  const select = (n: Notification) => {
-    // Following a notification starts a fresh reader navigation trail.
-    setSelectionRevision(v => v + 1);
-    if (n.element_id || !(n.strategy_id || n.object_id || n.brief_id)) setSelected(n);
-    else if (n.strategy_id) {
-      onViewChange?.('strategy');
-      onNavigate?.({ strategyId: n.strategy_id });
-    } else if (n.object_id) {
-      onViewChange?.('objects');
-      onNavigate?.({ objectId: n.object_id });
-    } else if (n.brief_id) onViewChange?.('note');
-    if (!n.is_read) {
-      setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
-      void markNotificationRead(n.id, true).catch(error => { console.error(error); reload(); });
-    }
-  };
-
-  const archive = async (n: Notification) => {
-    setNotifications(prev => prev.filter(x => x.id !== n.id));
-    if (selected?.id === n.id) setSelected(null);
-    try { await archiveNotification(n.id); } catch (error) { console.error(error); reload(); }
-  };
-  const toggleRead = async (n: Notification) => {
-    setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: !n.is_read } : x));
-    try { await markNotificationRead(n.id, !n.is_read); } catch (error) { console.error(error); reload(); }
-  };
-  const markAllRead = async () => {
-    if (!user) return;
-    setNotifications(prev => prev.map(x => ({ ...x, is_read: true })));
-    try { await markAllNotificationsRead(user.id); } catch (error) { console.error(error); reload(); }
-  };
-
-  return <InboxLayout
-    notifications={visible.slice(0, renderLimit)} unreadCount={unreadCount} loading={loading}
-    unreadOnly={unreadOnly} selectedNotification={notifications.find(n => n.id === selected?.id) ?? selected} hasMore={visible.length > renderLimit}
-    onSelect={select} onBack={() => setSelected(null)}
-    onFilter={() => { setUnreadOnly(v => !v); setRenderLimit(RENDER_PAGE_SIZE); }}
-    onMarkAllRead={markAllRead} onToggleRead={toggleRead} onArchive={archive}
-    onShowMore={() => setRenderLimit(limit => limit + RENDER_PAGE_SIZE)}
-    detail={elementId ? detail?.element ? <ElementDetailView
-      key={`${elementId}:${selectionRevision}`} element={detail.element} layout="reader"
-      domainName={null} objectPath={detail.element.objects ?? []} focusCommentId={selected?.comment_id}
-      onBack={() => setSelected(null)} onNavigateRoot={() => setSelected(null)}
-      onRefresh={() => setRevision(v => v + 1)}
-      onNavigateObject={objectId => { onViewChange?.('objects'); onNavigate?.({ objectId }); }}
-    /> : <div className="flex flex-1 flex-col items-center justify-center gap-3 text-[13px] text-muted-foreground" role="status">
-      <p>{t(detail ? 'This Element is no longer available.' : 'Opening…')}</p>
-      {detail && <Button variant="ghost" onClick={() => setRevision(v => v + 1)}>{t('Retry')}</Button>}
-      <Button variant="ghost" onClick={() => setSelected(null)}>{t('Back to Inbox')}</Button>
-    </div> : <article className="overflow-auto p-8"><h2 className="text-xl font-semibold">{selected?.title}</h2><p className="mt-4 whitespace-pre-wrap text-[14px] text-muted-foreground">{selected?.body}</p></article>}
-  />;
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-card">
+      <header className="flex min-h-[50px] shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-2">
+        <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
+          {selected.actor_name && <span className="font-medium text-foreground">{selected.actor_name}</span>}
+          {selected.actor_name && ' · '}
+          <time dateTime={selected.created_at}>{new Date(selected.created_at).toLocaleString(locale)}</time>
+        </span>
+        <Button variant="secondary" onClick={() => void toggleRead(selected)}><Check size={14} />{t(selected.is_read ? 'Mark as unread' : 'Mark as read')}</Button>
+        <Button variant="secondary" onClick={() => void archive(selected)}><Archive size={14} />{t('Archive')}</Button>
+      </header>
+      {elementId ? detail?.element ? (
+        <ElementDetailView
+          key={`${elementId}:${revision}`} element={detail.element} layout="reader"
+          domainName={null} objectPath={detail.element.objects ?? []} focusCommentId={selected.comment_id}
+          onBack={() => selectInboxNotification(null)} onNavigateRoot={() => selectInboxNotification(null)}
+          onRefresh={refresh}
+          onNavigateObject={objectId => { onViewChange?.('objects'); onNavigate?.({ objectId }); }}
+        />
+      ) : (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-[13px] text-muted-foreground" role="status">
+          <p>{t(detail ? 'This Element is no longer available.' : 'Opening…')}</p>
+          {detail && <Button variant="ghost" onClick={refresh}>{t('Retry')}</Button>}
+        </div>
+      ) : (
+        <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">
+          <h1 className="text-2xl font-semibold">{selected.title}</h1>
+          <p className="mt-6 whitespace-pre-wrap text-[15px] leading-7 text-foreground/90">{selected.body}</p>
+        </article>
+      )}
+    </div>
+  );
 }
