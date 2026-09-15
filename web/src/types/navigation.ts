@@ -20,6 +20,11 @@ export interface NavigationState {
    *  id). null = the portfolio root list. Lets other surfaces (e.g. an
    *  Object's Properties rail) deep-link straight into a Strategy. */
   strategyId?: string | null;
+  /** The sidebar's "+" in Strategy mode asked for a new Initiative. The
+   *  portfolio root opens its create dialog and clears this. Carried in
+   *  navigation so the request lands in this tab's surface once it is
+   *  mounted, not in whichever listener happened to exist. */
+  strategyCreate?: boolean | null;
   /** What the Home main island is showing, when on the Home view. A pinned
    *  item's content renders in place (no layer/view switch) instead of the
    *  welcome. null = the welcome landing. */

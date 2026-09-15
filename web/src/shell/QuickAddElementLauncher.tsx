@@ -12,6 +12,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { getQueryClient } from '@/lib/queryClient';
 
 // Last Object an Element was quick-added to — pressing C on a screen with no
 // Object context (Home, Notes, …) targets this Object again.
@@ -22,6 +23,9 @@ const LAST_OBJECT_KEY = 'alcon.quickAddElement.lastObjectId';
 // an external caller (⌘K's Create group) raise this popup without a prop or
 // a real keypress.
 export const CREATE_ELEMENT_EVENT = 'alcon:create-element';
+/** Optional detail on CREATE_ELEMENT_EVENT — the Calendar's "+" presets the
+ *  day the grid is on. */
+export interface CreateElementDetail { dueDate?: string | null }
 
 function readLastObjectId(): string | null {
   try { return localStorage.getItem(LAST_OBJECT_KEY); } catch { return null; }
@@ -72,6 +76,8 @@ export function QuickAddElementLauncher({
   // Save target resolved at press time (context Object → last-used Object →
   // none) so the popup's reset-on-open lands on the right "Save to" value.
   const [defaultObjectId, setDefaultObjectId] = useState<string | null>(null);
+  // Due date handed in by the opener (the Calendar's "+"); null for a plain C.
+  const [presetDueDate, setPresetDueDate] = useState<string | null>(null);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const { data: domains } = useDomains();
 
@@ -83,7 +89,8 @@ export function QuickAddElementLauncher({
   // Resolves the save target (context Object → last-used Object → none) and
   // raises the popup. Shared by the physical `C` key and the programmatic
   // CREATE_ELEMENT_EVENT below.
-  const openQuickAdd = useCallback(() => {
+  const openQuickAdd = useCallback((detail?: CreateElementDetail) => {
+    setPresetDueDate(detail?.dueDate ?? null);
     const last = readLastObjectId();
     setDefaultObjectId(
       contextObjectId && objectIds.has(contextObjectId)
@@ -113,8 +120,9 @@ export function QuickAddElementLauncher({
   // typing/overlay guards above since it isn't a real keystroke; the caller
   // (CommandPalette) has already closed itself before dispatching.
   useEffect(() => {
-    window.addEventListener(CREATE_ELEMENT_EVENT, openQuickAdd);
-    return () => window.removeEventListener(CREATE_ELEMENT_EVENT, openQuickAdd);
+    const handler = (e: Event) => openQuickAdd((e as CustomEvent<CreateElementDetail>).detail ?? undefined);
+    window.addEventListener(CREATE_ELEMENT_EVENT, handler);
+    return () => window.removeEventListener(CREATE_ELEMENT_EVENT, handler);
   }, [openQuickAdd]);
 
   // Fetch the active Domain's workers when the popup opens (lazy — keeps the
@@ -166,6 +174,7 @@ export function QuickAddElementLauncher({
           type: input.type ?? null,
           status: input.status ?? undefined,
           priority: input.priority ?? undefined,
+          due_date: presetDueDate ?? undefined,
         });
         for (const wid of input.assigneeWorkerIds ?? []) {
           try {
@@ -177,6 +186,11 @@ export function QuickAddElementLauncher({
     // Remember the landing Object so the next context-less C targets it too.
     const first = inputs[0];
     if (first && !first.personal && first.objectId) writeLastObjectId(first.objectId);
+    // The Calendar and My Elements read react-query caches, not the Domain
+    // refetch below — drop them so a just-added Element shows at once.
+    const qc = getQueryClient();
+    void qc.invalidateQueries({ queryKey: ['my-elements'] });
+    void qc.invalidateQueries({ queryKey: ['explorer'] });
     await onRefresh?.();
   };
 
@@ -184,6 +198,7 @@ export function QuickAddElementLauncher({
     <QuickAddElementPopup
       open={open}
       contextLabel={contextLabel}
+      hint={presetDueDate ? `Due ${presetDueDate}` : undefined}
       onClose={() => setOpen(false)}
       onSubmit={handleSubmit}
       types={elementTypes}

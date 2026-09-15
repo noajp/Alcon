@@ -1,136 +1,214 @@
 'use client';
 
-import { useMemo } from 'react';
-import { FileText, Menu, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { FileText, FilePlus, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { NoteNode } from './types';
+import { RenameInput } from './RenameInput';
 import {
   ContextMenu,
   ContextMenuTrigger,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
 } from '@/ui/context-menu';
 
 interface FilesPaneProps {
   /** Header context — the selected Folder's name. Falls back to a placeholder
    *  when no folder is selected so the column isn't blank. */
   folderName: string | null;
-  files: NoteNode[];
+  /** The Folder's Sections, in display order. */
+  sections: NoteNode[];
+  /** Pages of each Section (keyed by Section id) plus, under the folder id
+   *  itself, the pages that sit directly in the Folder. */
+  filesByParent: Record<string, NoteNode[]>;
+  folderId: string | null;
+  activeSectionId: string | null;
   selectedFileId: string | null;
+  onSelectSection: (id: string) => void;
   onSelectFile: (id: string) => void;
-  /** Create a new page — the empty-state prompt calls this (the header "+"
-   *  moved to the breadcrumb). Hidden when omitted (read-only states). */
-  onAddFile?: () => void;
+  /** Create a new page under a Section (or the Folder). Hidden when omitted
+   *  (read-only states). */
+  onAddFile?: (parentId: string) => void;
+  onAddSection?: () => void;
+  onRenameNode?: (id: string, name: string) => void;
   onDeleteFile?: (id: string) => void;
-  /** Active Section's name — shown in the header beside the hamburger. */
-  activeSectionName?: string | null;
-  /** Hamburger → opens the Section drawer (owned by MainContent so it can
-   *  cover the breadcrumb above this pane). Omitted while no folder is open. */
-  onOpenSections?: () => void;
+  onDeleteSection?: (id: string) => void;
 }
 
 /**
- * Middle pane of the Note layout. Lives between the Folder sidebar (left) and
- * the PageView editor (right). Shows the page titles for the active Section;
- * the header hamburger opens the full-column Section drawer (OneNote-style).
+ * Middle pane of the Note layout, between the Folder sidebar (left) and the
+ * PageView editor (right). Every Section of the open Folder is listed, always
+ * visible, with its pages beneath it — nothing hides behind a drawer. Rows
+ * carry their actions on a right-click (Rename / Delete / New page) and the
+ * list ends in "New section", so adding one is one click away.
  *
  * Title-only vertical list — no preview, no timestamp — to keep this column
  * narrow and the editor as wide as possible.
  */
 export function FilesPane({
   folderName,
-  files,
+  sections,
+  filesByParent,
+  folderId,
+  activeSectionId,
   selectedFileId,
+  onSelectSection,
   onSelectFile,
   onAddFile,
+  onAddSection,
+  onRenameNode,
   onDeleteFile,
-  activeSectionName,
-  onOpenSections,
+  onDeleteSection,
 }: FilesPaneProps) {
-  // Stable alpha sort — matches the sidebar's sibling sort so a freshly
-  // created file lands where the user expects on the next render.
-  const sortedFiles = useMemo(
-    () => [...files].sort((a, b) => a.name.localeCompare(b.name)),
-    [files],
-  );
+  const [renaming, setRenaming] = useState<string | null>(null);
+  // Radix hands focus back to the trigger as the menu closes; renaming after
+  // that, with the menu's own auto-focus off, lets the field keep it.
+  const startRename = (id: string) => { window.setTimeout(() => setRenaming(id), 0); };
+  // Stable alpha sort per group — matches the sidebar's sibling sort so a
+  // freshly created page lands where the user expects on the next render.
+  const sorted = useMemo(() => {
+    const out: Record<string, NoteNode[]> = {};
+    for (const [parent, files] of Object.entries(filesByParent)) out[parent] = [...files].sort((a, b) => a.name.localeCompare(b.name));
+    return out;
+  }, [filesByParent]);
+  const looseFiles = folderId ? sorted[folderId] ?? [] : [];
+
+  const fileRow = (file: NoteNode) => {
+    const selected = file.id === selectedFileId;
+    const row = (
+      <div
+        className={[
+          'group flex w-full items-center gap-2 pl-7 pr-3 py-1.5 text-[12px] font-semibold transition-colors min-w-0',
+          selected ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+        ].join(' ')}
+      >
+        <FileText size={14} className="shrink-0" />
+        {renaming === file.id ? (
+          <RenameInput
+            initial={file.name}
+            onCommit={(v) => { if (v && v !== file.name) onRenameNode?.(file.id, v); setRenaming(null); }}
+            onCancel={() => setRenaming(null)}
+            className="min-w-0 flex-1 bg-transparent text-[12px] font-semibold text-foreground"
+          />
+        ) : (
+          <button type="button" onClick={() => onSelectFile(file.id)} className="min-w-0 flex-1 truncate text-left" title={file.name}>
+            {file.name || 'Untitled'}
+          </button>
+        )}
+      </div>
+    );
+    if (!onRenameNode && !onDeleteFile) return <div key={file.id}>{row}</div>;
+    return (
+      <ContextMenu key={file.id}>
+        <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+        <ContextMenuContent className="min-w-[170px]" onCloseAutoFocus={(e) => e.preventDefault()}>
+          {onRenameNode && <ContextMenuItem onSelect={() => startRename(file.id)}><Pencil /> Rename</ContextMenuItem>}
+          {onDeleteFile && (
+            <>
+              {onRenameNode && <ContextMenuSeparator />}
+              <ContextMenuItem variant="destructive" onSelect={() => onDeleteFile(file.id)}><Trash2 /> Delete page</ContextMenuItem>
+            </>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
+    );
+  };
+
+  const sectionRow = (section: NoteNode) => {
+    const active = section.id === activeSectionId;
+    const row = (
+      <div
+        className={[
+          'group flex w-full items-center gap-2 px-3 py-1.5 text-[12px] font-semibold transition-colors min-w-0',
+          active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+        ].join(' ')}
+      >
+        <span className={`h-4 w-[3px] shrink-0 rounded-full ${active ? 'bg-[var(--accent-default)]' : 'bg-[var(--text-tertiary)]'}`} />
+        {renaming === section.id ? (
+          <RenameInput
+            initial={section.name}
+            onCommit={(v) => { if (v && v !== section.name) onRenameNode?.(section.id, v); setRenaming(null); }}
+            onCancel={() => setRenaming(null)}
+            className="min-w-0 flex-1 bg-transparent text-[12px] font-semibold text-foreground"
+          />
+        ) : (
+          <button type="button" onClick={() => onSelectSection(section.id)} className="min-w-0 flex-1 truncate text-left" title={section.name}>
+            {section.name}
+          </button>
+        )}
+        {onAddFile && (
+          <button
+            type="button"
+            onClick={() => onAddFile(section.id)}
+            title="New page"
+            aria-label={`New page in ${section.name}`}
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+          >
+            <Plus size={13} strokeWidth={2.5} />
+          </button>
+        )}
+      </div>
+    );
+    return (
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+        <ContextMenuContent className="min-w-[170px]" onCloseAutoFocus={(e) => e.preventDefault()}>
+          {onAddFile && <ContextMenuItem onSelect={() => onAddFile(section.id)}><FilePlus /> New page</ContextMenuItem>}
+          {onRenameNode && <ContextMenuItem onSelect={() => startRename(section.id)}><Pencil /> Rename</ContextMenuItem>}
+          {onDeleteSection && (
+            <>
+              {(onAddFile || onRenameNode) && <ContextMenuSeparator />}
+              <ContextMenuItem variant="destructive" onSelect={() => onDeleteSection(section.id)}><Trash2 /> Delete section</ContextMenuItem>
+            </>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
+    );
+  };
+
+  const empty = sections.length === 0 && looseFiles.length === 0;
 
   return (
     <aside className="w-full sm:w-60 shrink-0 flex flex-col border-r border-border/40 bg-card/30">
-      {/* Header — hamburger (opens Section drawer) + active Section name.
-          h-[50px] + bottom divider lines this header up with the editor's
-          toolbar header so the two panes share one header band. */}
-      {/* gap-2 + px-3 + a w-6 leading slot match the file rows below so the
-          Section name and file names line up on the same left edge. */}
+      {/* Header — h-[50px] + bottom divider lines this header up with the
+          editor's toolbar header so the two panes share one header band. */}
       <div className="flex items-center gap-2 h-[50px] px-3 border-b border-border/30">
-        {onOpenSections && (
-          <button
-            type="button"
-            onClick={onOpenSections}
-            title="Sections"
-            aria-label="Open Sections"
-            className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors shrink-0"
-          >
-            <Menu size={16} />
-          </button>
-        )}
-        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-foreground">
-          {activeSectionName ?? ''}
-        </span>
+        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-foreground">{folderName ?? ''}</span>
       </div>
 
-      {/* Body — page list. */}
       <div className="flex-1 overflow-y-auto pb-2">
-        {sortedFiles.length === 0 ? (
-          folderName && onAddFile ? (
-            // The header "+" moved to the breadcrumb, so the empty prompt
-            // itself creates the first page.
-            <button
-              type="button"
-              onClick={onAddFile}
-              className="w-full px-3 py-6 text-[11px] text-muted-foreground/60 hover:text-foreground text-center leading-relaxed transition-colors"
-            >
-              No pages yet — click to create
-            </button>
-          ) : (
-            <div className="px-3 py-6 text-[11px] text-muted-foreground/60 text-center leading-relaxed">
-              {folderName ? 'No pages yet' : 'Select a folder to see its pages'}
-            </div>
-          )
-        ) : (
-          sortedFiles.map((file) => {
-            const selected = file.id === selectedFileId;
-            const row = (
+        {empty && !folderName && (
+          <div className="px-3 py-6 text-center text-[11px] leading-relaxed text-muted-foreground/60">Select a folder to see its pages</div>
+        )}
+        {sections.map((section) => (
+          <div key={section.id} className="pt-1">
+            {sectionRow(section)}
+            {(sorted[section.id] ?? []).map(fileRow)}
+            {(sorted[section.id] ?? []).length === 0 && onAddFile && (
               <button
                 type="button"
-                onClick={() => onSelectFile(file.id)}
-                className={[
-                  'group w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] font-semibold transition-colors min-w-0',
-                  selected
-                    ? 'bg-accent text-foreground'
-                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-                ].join(' ')}
-                title={file.name}
+                onClick={() => onAddFile(section.id)}
+                className="w-full py-1.5 pl-7 pr-3 text-left text-[11px] text-muted-foreground/60 transition-colors hover:text-foreground"
               >
-                <span className="w-6 flex items-center justify-center shrink-0 text-muted-foreground">
-                  <FileText size={16} />
-                </span>
-                <span className="truncate flex-1">{file.name || 'Untitled'}</span>
+                No pages yet — click to create
               </button>
-            );
-            if (!onDeleteFile) return <div key={file.id}>{row}</div>;
-            return (
-              <ContextMenu key={file.id}>
-                <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
-                <ContextMenuContent className="min-w-[160px]">
-                  <ContextMenuItem
-                    className="gap-2 text-[var(--status-danger)] focus:text-[var(--status-danger)]"
-                    onClick={() => onDeleteFile(file.id)}
-                  >
-                    <Trash2 className="size-3.5" /> Delete
-                  </ContextMenuItem>
-                </ContextMenuContent>
-              </ContextMenu>
-            );
-          })
+            )}
+          </div>
+        ))}
+        {looseFiles.length > 0 && (
+          <div className="pt-1">
+            {sections.length > 0 && <div className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground/60">Pages</div>}
+            {looseFiles.map(fileRow)}
+          </div>
+        )}
+        {folderName && onAddSection && (
+          <button
+            type="button"
+            onClick={onAddSection}
+            className="mt-1 flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+          >
+            <Plus size={14} strokeWidth={2.5} className="shrink-0" /> New section
+          </button>
         )}
       </div>
     </aside>
