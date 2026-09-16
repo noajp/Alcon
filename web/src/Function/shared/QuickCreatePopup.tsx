@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { QUICK_CREATE } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
-import { useEscapeLayer } from '@/Function/shared/keyboard';
+import { isCommitEnter, isSubmitChord, useEscapeLayer } from '@/Function/shared/keyboard';
 
 export interface QuickCreateInput {
   name: string;
@@ -139,7 +139,9 @@ export function QuickCreatePopup({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+            // The name is the one single-line field: Enter creates (IME-safe
+            // via the shared helper), Shift+Enter still wraps a long name.
+            if (isCommitEnter(e) || isSubmitChord(e)) {
               e.preventDefault();
               void handleSubmit();
             }
@@ -157,7 +159,7 @@ export function QuickCreatePopup({
             onChange={(e) => setDesc(e.target.value)}
             onKeyDown={(e) => {
               // Multi-line: Enter is a newline, ⌘/Ctrl+Enter creates.
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              if (isSubmitChord(e)) {
                 e.preventDefault();
                 void handleSubmit();
               }

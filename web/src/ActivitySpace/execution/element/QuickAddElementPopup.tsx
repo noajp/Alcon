@@ -1,6 +1,7 @@
 'use client';
 
 import { QUICK_CREATE } from '@/shared/designTokens';
+import { quickCreatePillClass as pillClass } from '@/Function/shared/QuickCreatePopup';
 import { Button } from '@/ui/button';
 
 import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
@@ -606,17 +607,6 @@ export function QuickAddElementPopup({
 }
 
 // Tailwind for pill triggers — semibold + brighter text, soft-fill at rest.
-// Mirrors the Properties panel chips so the popup reads as the same family.
-// Fills are kept a notch brighter than the popover bg so the pills read as
-// tappable controls rather than fading into the panel.
-function pillClass(active: boolean): string {
-  return [
-    'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[12px] font-semibold transition-colors border shadow-sm',
-    active
-      ? 'bg-muted border-border text-foreground hover:bg-muted/90'
-      : 'bg-muted/70 border-border/60 text-foreground/90 hover:bg-muted/90 hover:text-foreground',
-  ].join(' ');
-}
 
 function toggleSet<T>(setter: React.Dispatch<React.SetStateAction<Set<T>>>, value: T) {
   setter((prev) => {

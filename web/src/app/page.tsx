@@ -594,8 +594,9 @@ function WorkspaceContent({
         onRefresh={refetch}
       />
 
-      {/* Quick-add Object popup — Linear-style, replaces the full-page Create
-          Object form for the common case. */}
+      {/* Quick-create cards — one shape for every "+": the Notebook card and
+          the Object card here (Linear-style, no full-page form); Initiative
+          and Table cards live in their surfaces. */}
       <QuickAddNotebookPopup
         open={notebookPopupOpen}
         onClose={() => setNotebookPopupOpen(false)}
