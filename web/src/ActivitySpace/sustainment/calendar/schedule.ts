@@ -12,10 +12,21 @@ export type CalendarEntry = Pick<ElementWithDetails,
  *  an Element with a range used to skip the first day it covers. */
 const dayOf = (value: string) => value.slice(0, 10);
 
-export function occursOn(entry: { start_date: string | null; due_date: string | null }, date: string): boolean {
+/** The days an entry covers, as `yyyy-MM-dd` bounds. A pair with the start
+ *  after the due is not a span at all — it stays off the grid, the same way
+ *  an undated entry does, rather than being silently read backwards. */
+function spanOf(entry: { start_date: string | null; due_date: string | null }): { s: string; e: string } | null {
   const start = entry.start_date ?? entry.due_date;
   const end = entry.due_date ?? entry.start_date;
-  return Boolean(start && end && dayOf(start) <= dayOf(date) && dayOf(date) <= dayOf(end));
+  if (!start || !end) return null;
+  const s = dayOf(start);
+  const e = dayOf(end);
+  return s <= e ? { s, e } : null;
+}
+
+export function occursOn(entry: { start_date: string | null; due_date: string | null }, date: string): boolean {
+  const span = spanOf(entry);
+  return Boolean(span && span.s <= dayOf(date) && dayOf(date) <= span.e);
 }
 
 export function calendarEntries(elements: ElementWithDetails[], objects: AlconObject[] = []): CalendarEntry[] {
@@ -101,4 +112,45 @@ export function miniMonthDays(month: string, weekStartsOn: number): string[] {
   const [y, m] = month.split('-').map(Number);
   const offset = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() - weekStartsOn + 7) % 7;
   return Array.from({ length: 42 }, (_, i) => shiftDateOnly(first, i - offset));
+}
+
+/** One Element (or Object) drawn across a week row of the month grid: the
+ *  columns it covers in that week, clipped to the week, and the lane it was
+ *  stacked into so bands never overlap. `continuesBefore` / `continuesAfter`
+ *  say the span runs on past this week's edge. */
+export interface WeekSpan {
+  entry: CalendarEntry;
+  startCol: number;
+  endCol: number;
+  lane: number;
+  continuesBefore: boolean;
+  continuesAfter: boolean;
+}
+
+/** Lay the entries that touch a week (seven `yyyy-MM-dd` days) out as bands.
+ *  Earlier starts take the upper lanes; among the same start the longer band
+ *  goes first, so a long span keeps one lane across the weeks it crosses as
+ *  often as the shorter ones around it allow. */
+export function layoutWeekSpans(entries: CalendarEntry[], week: string[]): WeekSpan[] {
+  const first = week[0];
+  const last = week[week.length - 1];
+  const spans = entries.flatMap(entry => {
+    const span = spanOf(entry);
+    if (!span) return [];
+    const { s, e } = span;
+    if (e < first || s > last) return [];
+    const startCol = s < first ? 0 : week.indexOf(s);
+    const endCol = e > last ? week.length - 1 : week.indexOf(e);
+    if (startCol < 0 || endCol < 0) return [];
+    return [{ entry, startCol, endCol, lane: 0, continuesBefore: s < first, continuesAfter: e > last }];
+  });
+  spans.sort((a, b) => a.startCol - b.startCol || (b.endCol - b.startCol) - (a.endCol - a.startCol) || a.entry.title.localeCompare(b.entry.title));
+  const laneEnds: number[] = [];
+  for (const span of spans) {
+    let lane = laneEnds.findIndex(end => end < span.startCol);
+    if (lane < 0) lane = laneEnds.length;
+    laneEnds[lane] = span.endCol;
+    span.lane = lane;
+  }
+  return spans;
 }

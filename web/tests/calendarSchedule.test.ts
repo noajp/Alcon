@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calendarEntries, occursOn, selectCalendarScope, layoutTimedEntries, filterByWorkers, miniMonthDays, monthOf, shiftMonth } from '../src/ActivitySpace/sustainment/calendar/schedule';
+import { calendarEntries, occursOn, selectCalendarScope, layoutTimedEntries, filterByWorkers, miniMonthDays, monthOf, shiftMonth, layoutWeekSpans } from '../src/ActivitySpace/sustainment/calendar/schedule';
 import type { AlconObjectWithChildren, ElementWithDetails } from '../src/types/database';
 
 const element = (id: string) => ({ id, title: id, start_date: '2026-09-06', due_date: '2026-09-08' } as ElementWithDetails);
@@ -112,5 +112,32 @@ describe('mini month', () => {
     // November 2026 starts on a Sunday.
     expect(miniMonthDays('2026-11', 0)[0]).toBe('2026-11-01');
     expect(miniMonthDays('2026-11', 1)[0]).toBe('2026-10-26');
+  });
+});
+
+describe('month bands', () => {
+  const week = ['2026-09-13', '2026-09-14', '2026-09-15', '2026-09-16', '2026-09-17', '2026-09-18', '2026-09-19'];
+  const entry = (id: string, start: string | null, due: string | null) => ({ id, title: id, start_date: start, due_date: due } as ElementWithDetails);
+  const spans = (rows: ElementWithDetails[]) => layoutWeekSpans(calendarEntries(rows), week);
+  it('clips a span to the week and says which edges it runs past', () => {
+    const [s] = spans([entry('trip', '2026-09-10', '2026-09-22')]);
+    expect([s.startCol, s.endCol, s.continuesBefore, s.continuesAfter]).toEqual([0, 6, true, true]);
+  });
+  it('places single days and ranges, and leaves out what is not in the week', () => {
+    const out = spans([entry('a', null, '2026-09-15'), entry('b', '2026-09-18', '2026-09-19'), entry('gone', '2026-09-01', '2026-09-05'), entry('unset', null, null)]);
+    expect(out.map(s => [s.entry.id, s.startCol, s.endCol])).toEqual([['a', 2, 2], ['b', 5, 6]]);
+  });
+  it('stacks overlapping bands into lanes and reuses a lane once it is free', () => {
+    const out = spans([entry('long', '2026-09-13', '2026-09-16'), entry('short', '2026-09-14', '2026-09-14'), entry('later', '2026-09-17', '2026-09-18')]);
+    const lanes = Object.fromEntries(out.map(s => [s.entry.id, s.lane]));
+    expect(lanes).toEqual({ long: 0, short: 1, later: 0 });
+  });
+  it('gives the earlier start the upper lane, then the longer band', () => {
+    const out = spans([entry('b', '2026-09-14', '2026-09-15'), entry('a', '2026-09-14', '2026-09-19'), entry('c', '2026-09-13', '2026-09-13')]);
+    expect(out.map(s => s.entry.id)).toEqual(['c', 'a', 'b']);
+    expect(out.map(s => s.lane)).toEqual([0, 0, 1]);
+  });
+  it('leaves a range whose start is after its due off the grid, as occursOn does', () => {
+    expect(spans([entry('odd', '2026-09-16', '2026-09-14')])).toEqual([]);
   });
 });
