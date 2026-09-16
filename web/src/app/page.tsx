@@ -476,7 +476,6 @@ function WorkspaceContent({
         <ModeRail
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
-          onOpenSettings={handleOpenSettings}
           sidebarCollapsed={sidebarHidden}
           onToggleSidebar={personalMode ? undefined : handleSidebarToggle}
           copilotOpen={copilotOpen}

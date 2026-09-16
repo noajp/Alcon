@@ -20,7 +20,7 @@ import {
 
 // Single source of truth for the top-level *activity views* (the thing
 // `AppTab.activeView` holds and `MainContent` switches on). Every surface that
-// needs a view's label or icon — the tab bar, the sidebar's mode sections, the
+// needs a view's label or icon — the sidebar's mode sections, the
 // command palette — reads it from here, so the two can never drift apart.
 //
 // NOTE: this is a different axis from `ObjectTabType` (the tabs *inside* an

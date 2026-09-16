@@ -20,15 +20,15 @@ function ObjectLabel() {
 }
 
 it('updates mounted labels when the workspace query snapshot changes', () => {
-  const tabBar = <ObjectLabel />;
-  const view = render(<ExplorerDataProvider value={snapshot('First Domain Object')}>{tabBar}</ExplorerDataProvider>);
+  const label = <ObjectLabel />;
+  const view = render(<ExplorerDataProvider value={snapshot('First Domain Object')}>{label}</ExplorerDataProvider>);
   expect(screen.getByText('First Domain Object')).toBeTruthy();
 
-  view.rerender(<ExplorerDataProvider value={snapshot('Updated Domain Object')}>{tabBar}</ExplorerDataProvider>);
+  view.rerender(<ExplorerDataProvider value={snapshot('Updated Domain Object')}>{label}</ExplorerDataProvider>);
   expect(screen.getByText('Updated Domain Object')).toBeTruthy();
   expect(screen.queryByText('First Domain Object')).toBeNull();
 
-  view.rerender(<ExplorerDataProvider value={EMPTY_EXPLORER_DATA}>{tabBar}</ExplorerDataProvider>);
+  view.rerender(<ExplorerDataProvider value={EMPTY_EXPLORER_DATA}>{label}</ExplorerDataProvider>);
   expect(screen.queryByText('Updated Domain Object')).toBeNull();
 });
 

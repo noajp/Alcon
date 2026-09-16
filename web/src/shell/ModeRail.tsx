@@ -117,8 +117,6 @@ export function ModeRail({
 }: {
   activeView: string;
   onViewChange: (view: string) => void;
-  /** Settings opens in place — see page.tsx's handleOpenSettings. */
-  onOpenSettings: () => void;
   /** The page-level toggles live at the foot of the rail: the sidebar
    *  (omitted while it has nothing to show, on Profile) and the AI pane. */
   sidebarCollapsed: boolean;
@@ -206,7 +204,7 @@ export function ModeRail({
         {/* The AI pane: state lives in the page so this button, ⌘L and the
             pane's own close all flip the same boolean. */}
         <RailButton
-          label={t(copilotOpen ? 'Hide AI' : 'Show AI')}
+          label={`${t(copilotOpen ? 'Hide AI' : 'Show AI')} (⌘L)`}
           icon={copilotOpen ? PanelRightOpen : PanelRightClose}
           active={copilotOpen}
           onClick={onToggleCopilot}

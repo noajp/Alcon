@@ -125,7 +125,7 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
     <>
       {/* Open / close is driven by the rail's PanelRight button
           (and ⌘L), so the panel itself renders nothing in the closed state.
-          Mouse re-entry: the user clicks the same toggle in the tab bar. */}
+          Mouse re-entry: the user clicks the same toggle on the rail. */}
       {open && (
         <aside
           style={{ width }}

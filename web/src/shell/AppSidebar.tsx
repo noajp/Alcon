@@ -381,9 +381,8 @@ export function AppSidebar({
         } ${resizing ? '' : 'transition-transform duration-200 ease-out'}`}
       >
         {/* Header — fixed; only the navigation under it scrolls. The same
-            height as the main island's header (50px) and the same offset
-            from the top edge, so the Space name and the island's title sit
-            on one line. */}
+            height as the main island's header (50px), so the Space name and
+            the island's title sit on one line. */}
         <ButtonAppearanceProvider appearance="navigation">
         <div className="mt-1.5 flex h-[50px] shrink-0 items-center pl-1 pr-2">
           {activeView === 'settings' ? (
