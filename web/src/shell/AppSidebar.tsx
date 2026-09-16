@@ -44,9 +44,7 @@ import { railModeOf } from '@/shell/ModeRail';
 import type { RailMode } from '@/shell/railApps';
 import { CREATE_ELEMENT_EVENT, type CreateElementDetail } from '@/shell/QuickAddElementLauncher';
 import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarStore';
-import { seedNotebook } from '@/ActivitySpace/sustainment/notebook/notebookActions';
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
-import { useNotes } from '@/hooks/useNotesDb';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
 import { OperationsNavigation } from '@/ActivitySpace/sustainment/operations/OperationsNavigation';
 import { InboxList } from '@/ActivitySpace/home/InboxList';
@@ -225,7 +223,6 @@ export function AppSidebar({
   // about: a Notebook, a Table, an Initiative, a scheduled Element, or (in
   // Execution) a Domain or Object from a small menu. Modes with nothing to
   // create show no "+".
-  const { createNode: createNoteNode, deleteNode: deleteNoteNode } = useNotes();
   const calendarDay = useCalendarDay();
   const createLabel = ({
     notebook: 'Add Notebook', tables: 'Add Table', strategy: 'New Initiative',
@@ -233,12 +230,7 @@ export function AppSidebar({
   } as Partial<Record<RailMode, string>>)[railMode ?? 'execution'];
   const openCreateMenu = () => {
     if (railMode === 'tables') { openCreate('table'); return; }
-    if (railMode === 'notebook') {
-      void seedNotebook(createNoteNode, deleteNoteNode)
-        .then(({ folder, page }) => { onViewChange('note'); onNavigate({ noteFolderId: folder.id, noteSectionId: null, noteId: page.id }); })
-        .catch((e) => console.error('Failed to create notebook', e));
-      return;
-    }
+    if (railMode === 'notebook') { openCreate('notebook'); return; }
     if (railMode === 'strategy') {
       // Land on the portfolio root (an open Initiative's detail has no
       // create dialog) and let this tab's surface open it once mounted.

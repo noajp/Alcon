@@ -15,8 +15,9 @@ type DeleteNode = (id: string) => Promise<void>;
 export async function seedNotebook(
   createNode: CreateNode,
   deleteNode: DeleteNode,
+  name = 'New Notebook',
 ): Promise<{ folder: NoteNode; page: NoteNode }> {
-  const folder = await createNode('folder', 'New Notebook', null);
+  const folder = await createNode('folder', name, null);
   try {
     const section = await createNode('section', 'New Section', folder.id);
     const page = await createNode('file', 'Untitled', section.id);

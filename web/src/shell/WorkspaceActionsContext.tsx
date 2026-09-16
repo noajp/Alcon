@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode } from 'react';
 
-type CreateKind = 'object' | 'table';
+type CreateKind = 'object' | 'table' | 'notebook';
 interface WorkspaceActions {
   openCreate: (kind: CreateKind) => void;
   subscribeTableCreate: (open: () => void) => () => void;
@@ -12,8 +12,9 @@ const WorkspaceActionsContext = createContext<WorkspaceActions | null>(null);
 
 /** Creation requests are scoped to this workspace. Data invalidation remains
  * in the existing stores; this context only routes UI actions to their owner. */
-export function WorkspaceActionsProvider({ onOpenCreateObject, children }: {
+export function WorkspaceActionsProvider({ onOpenCreateObject, onOpenCreateNotebook, children }: {
   onOpenCreateObject: () => void;
+  onOpenCreateNotebook?: () => void;
   children: ReactNode;
 }) {
   const tableOpeners = useRef(new Set<() => void>());
@@ -23,8 +24,9 @@ export function WorkspaceActionsProvider({ onOpenCreateObject, children }: {
   }, []);
   const openCreate = useCallback((kind: CreateKind) => {
     if (kind === 'object') onOpenCreateObject();
+    else if (kind === 'notebook') onOpenCreateNotebook?.();
     else tableOpeners.current.forEach(open => open());
-  }, [onOpenCreateObject]);
+  }, [onOpenCreateObject, onOpenCreateNotebook]);
   const value = useMemo(() => ({ openCreate, subscribeTableCreate }), [openCreate, subscribeTableCreate]);
   return <WorkspaceActionsContext.Provider value={value}>{children}</WorkspaceActionsContext.Provider>;
 }
