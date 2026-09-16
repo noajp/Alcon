@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 //
 // Unlike domainsStore's list, a preference's *own* getCached* read has no
 // natural refetch point of its own — nothing calls it again once a component
-// has mounted. `WindowTabBar` keeps every open tab's `MainContent` mounted in
+// has mounted. The shell keeps every kept view's `MainContent` mounted in
 // parallel, so a Settings edit in one tab previously never reached a value
 // already read into an already-mounted sibling instance until that instance
 // itself reloaded (ELE_QLT-025). `usePreference` below is what call sites

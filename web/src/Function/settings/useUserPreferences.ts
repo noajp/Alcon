@@ -90,7 +90,7 @@ export function useUserPreferences() {
 
   // Optimistic update with rollback, one column at a time — never a
   // whole-row snapshot. That snapshot approach let two saves in flight (or
-  // two mounted instances, since WindowTabBar keeps every tab's Settings
+  // two mounted instances, since the shell keeps every kept view's Settings
   // panel mounted) each overwrite the other's already-persisted column with
   // a stale copy of it. A single-column upsert can't clobber a field it
   // never mentions, in the DB or in the cache.

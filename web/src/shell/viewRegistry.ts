@@ -83,11 +83,5 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
 
 /** Display label for an activity view id. Falls back to 'Tab' for unknown
  *  ids so unknown navigation state never renders blank. */
-export function viewLabel(id: string): string {
-  return VIEW_REGISTRY[id as ViewId]?.label ?? 'Tab';
-}
 
 /** Nav icon for an activity view id, or undefined when it has none. */
-export function viewIcon(id: string): React.ComponentType<{ size?: number }> | undefined {
-  return VIEW_REGISTRY[id as ViewId]?.icon;
-}

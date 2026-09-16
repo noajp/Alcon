@@ -4,7 +4,6 @@ import { memo } from 'react';
 import { afterEach, expect, it } from 'vitest';
 import { ExplorerDataProvider, useExplorerData } from '@/Function/shared/ExplorerDataContext';
 import { EMPTY_EXPLORER_DATA, type ExplorerData } from '@/Function/sync/explorerPatch';
-import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
 
 afterEach(cleanup);
 
@@ -15,9 +14,13 @@ function snapshot(name: string): ExplorerData {
   };
 }
 
-it('updates mounted tab labels when the workspace query snapshot changes', () => {
-  const tabs: AppTab[] = [{ id: 'tab-1', activeView: 'objects', navigation: { objectId: 'object-1' } }];
-  const tabBar = <WindowTabBar tabs={tabs} activeTabId="tab-1" onSelect={() => {}} onClose={() => {}} onCreate={() => {}} />;
+function ObjectLabel() {
+  const data = useExplorerData();
+  return <span>{data?.objects.find((o) => o.id === 'object-1')?.name ?? ''}</span>;
+}
+
+it('updates mounted labels when the workspace query snapshot changes', () => {
+  const tabBar = <ObjectLabel />;
   const view = render(<ExplorerDataProvider value={snapshot('First Domain Object')}>{tabBar}</ExplorerDataProvider>);
   expect(screen.getByText('First Domain Object')).toBeTruthy();
 
