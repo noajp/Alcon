@@ -29,7 +29,7 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
     onViewChange,
   };
   return <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-4">
+    <header className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
       <DomainIcon size={12} />
       <h1 className="truncate text-xs font-semibold">{domain.name}</h1>
     </header>

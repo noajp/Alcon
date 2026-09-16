@@ -186,7 +186,7 @@ function TeamContent({ roster, onOpenWorkload, onOpenElement, onManageTeam }: Te
 export function TeamView(props: TeamViewProps = {}) {
   const roster = useTeamRoster();
   return <div className="flex flex-col h-full bg-card">
-    <div className="h-12 flex items-center gap-2 px-4 border-b border-[var(--border-subtle)] shrink-0">
+    <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
       <NavTeamsIcon size={12} /><span className={`${FONT.sm} font-semibold text-foreground`}>Team</span>
     </div>
     <div className="flex-1 overflow-auto"><TeamContent key={roster.contextKey} roster={roster} {...props} /></div>

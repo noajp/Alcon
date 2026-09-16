@@ -61,7 +61,7 @@ function TableSurface({ activeTableId, onSelectTable }: TableViewProps) {
 
   return (
     <div className="flex flex-col h-full bg-card">
-      <div className="h-12 flex items-center gap-2 px-4 border-b border-[var(--border-subtle)] shrink-0">
+      <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <NavTableIcon size={12} />
         <span className="text-xs font-semibold text-foreground truncate">{activeTable?.name ?? 'Table'}</span>
         <div className="flex-1" />
