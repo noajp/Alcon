@@ -249,7 +249,7 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
                   <CommandItem
                     key={`note-${r.id}`}
                     value={`note-${r.title}`}
-                    onSelect={() => handleNav('note', { noteId: r.id })}
+                    onSelect={() => handleNav('note', { noteId: r.id, noteSectionId: null })}
                   >
                     <Icon />
                     <span className="truncate">{r.title}</span>

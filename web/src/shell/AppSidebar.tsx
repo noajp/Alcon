@@ -4,6 +4,7 @@ import { Button, ButtonAppearanceProvider } from '@/ui/button';
 
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { StrategyNavigation } from './sidebar/StrategyNavigation';
+import { NotebookTree } from './sidebar/NotebookTree';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
@@ -37,7 +38,7 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/ActivitySpace/execution/domain/domainsStore';
 import { SpaceSwitcher } from '@/Function/space/SpaceSwitcher';
 
-import { NavNoteIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
+import { NavTableIcon } from '@/shell/sidebar/NavIcons';
 import { useDataTables } from '@/hooks/useSupabase';
 import { railModeOf } from '@/shell/ModeRail';
 import type { RailMode } from '@/shell/railApps';
@@ -99,61 +100,6 @@ function SidebarModeLabel({ label }: { label: string }) {
   );
 }
 
-// Notebook mode's sidebar — the list of notebooks (root Folders). Picking one
-// opens it in the main pane (Section drawer + file list + editor); the "+"
-// seeds a fresh notebook (Folder → Section → page) and opens it. The main
-// pane shows just a placeholder until a notebook is chosen here.
-function NotebookSidebar({
-  activeFolderId,
-  onNavigate,
-  onViewChange,
-}: {
-  activeFolderId: string | null;
-  onNavigate: (nav: Partial<NavigationState>) => void;
-  onViewChange: (view: string) => void;
-}) {
-  const { t } = useI18n();
-  const { nodes } = useNotes();
-  const folders = useMemo(
-    () => nodes.filter((n) => n.type === 'folder').sort((a, b) => a.name.localeCompare(b.name)),
-    [nodes],
-  );
-
-  // New notebooks come from the "+" at the top of the sidebar.
-  return (
-    <div className="mt-1">
-      <div className="flex items-center gap-1 px-2 h-6 mt-3">
-        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Notebook')}</span>
-      </div>
-      <div className="mt-1 flex flex-col">
-        {folders.map((f) => {
-          const active = f.id === activeFolderId;
-          return (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => { onViewChange('note'); onNavigate({ noteFolderId: f.id, noteId: null }); }}
-              title={f.name}
-              className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                active
-                  ? 'bg-sidebar-accent text-foreground'
-                  : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-              }`}
-            >
-              <NavNoteIcon size={16} />
-              <span className="min-w-0 flex-1 text-left truncate">{f.name}</span>
-            </button>
-          );
-        })}
-        {folders.length === 0 && (
-          <div className="px-2.5 py-6 text-[11px] text-muted-foreground/60 leading-relaxed">
-            {t('No notebooks yet — click + to add one.')}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // Table mode's sidebar — the list of the user's Tables. Picking one opens it
 // in the main pane (columns + rows); the "+" fires an event the TableView
@@ -289,7 +235,7 @@ export function AppSidebar({
     if (railMode === 'tables') { openCreate('table'); return; }
     if (railMode === 'notebook') {
       void seedNotebook(createNoteNode, deleteNoteNode)
-        .then(({ folder, page }) => { onViewChange('note'); onNavigate({ noteFolderId: folder.id, noteId: page.id }); })
+        .then(({ folder, page }) => { onViewChange('note'); onNavigate({ noteFolderId: folder.id, noteSectionId: null, noteId: page.id }); })
         .catch((e) => console.error('Failed to create notebook', e));
       return;
     }
@@ -553,8 +499,9 @@ export function AppSidebar({
           {/* ── Notebook mode ── the notebook list lives here; the main pane
               opens the chosen notebook. */}
           {railMode === 'notebook' && (
-            <NotebookSidebar
+            <NotebookTree
               activeFolderId={navigation.noteFolderId ?? null}
+              activeSectionId={navigation.noteSectionId ?? null}
               onNavigate={onNavigate}
               onViewChange={onViewChange}
             />

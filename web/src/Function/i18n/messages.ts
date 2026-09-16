@@ -242,17 +242,17 @@ for (const locale of Object.keys(commonMessages) as Array<Exclude<Locale, 'en'>>
 export const MESSAGES = MESSAGES_PLACEHOLDER;
 
 Object.assign(ja, {
-  'Today': '今日', 'People': 'メンバー', 'Previous month': '前の月', 'Next month': '次の月', 'Show all': 'すべて表示', 'Edit profile': 'プロフィールを編集', 'New Initiative': '新しい Initiative', 'Add schedule': '予定を追加', 'My Notes': 'マイノート', 'No notes yet.': 'ノートはまだありません。', 'No one is scheduled here.': 'この予定表に担当者はいません。',
+  'Today': '今日', 'People': 'メンバー', 'Previous month': '前の月', 'Next month': '次の月', 'Show all': 'すべて表示', 'Edit profile': 'プロフィールを編集', 'New Initiative': '新しい Initiative', 'Add schedule': '予定を追加', 'New section': '新しいセクション', 'New page': '新しいページ', 'Rename': '名前を変更', 'Delete notebook': 'ノートブックを削除', 'Delete section': 'セクションを削除', 'My Notes': 'マイノート', 'No notes yet.': 'ノートはまだありません。', 'No one is scheduled here.': 'この予定表に担当者はいません。',
 });
 
 Object.assign(ko, {
-  'Today': '오늘', 'People': '사람', 'Previous month': '이전 달', 'Next month': '다음 달', 'Show all': '모두 표시', 'Edit profile': '프로필 편집', 'New Initiative': '새 Initiative', 'Add schedule': '일정 추가', 'My Notes': '내 노트', 'No notes yet.': '아직 노트가 없습니다.', 'No one is scheduled here.': '이 캘린더에 배정된 사람이 없습니다.',
+  'Today': '오늘', 'People': '사람', 'Previous month': '이전 달', 'Next month': '다음 달', 'Show all': '모두 표시', 'Edit profile': '프로필 편집', 'New Initiative': '새 Initiative', 'Add schedule': '일정 추가', 'New section': '새 섹션', 'New page': '새 페이지', 'Rename': '이름 바꾸기', 'Delete notebook': '노트북 삭제', 'Delete section': '섹션 삭제', 'My Notes': '내 노트', 'No notes yet.': '아직 노트가 없습니다.', 'No one is scheduled here.': '이 캘린더에 배정된 사람이 없습니다.',
 });
 
 Object.assign(fr, {
-  'Today': "Aujourd'hui", 'People': 'Personnes', 'Previous month': 'Mois précédent', 'Next month': 'Mois suivant', 'Show all': 'Tout afficher', 'Edit profile': 'Modifier le profil', 'New Initiative': 'Nouvelle Initiative', 'Add schedule': 'Ajouter au calendrier', 'My Notes': 'Mes notes', 'No notes yet.': 'Aucune note pour l’instant.', 'No one is scheduled here.': 'Personne n’est planifié ici.',
+  'Today': "Aujourd'hui", 'People': 'Personnes', 'Previous month': 'Mois précédent', 'Next month': 'Mois suivant', 'Show all': 'Tout afficher', 'Edit profile': 'Modifier le profil', 'New Initiative': 'Nouvelle Initiative', 'Add schedule': 'Ajouter au calendrier', 'New section': 'Nouvelle section', 'New page': 'Nouvelle page', 'Rename': 'Renommer', 'Delete notebook': 'Supprimer le carnet', 'Delete section': 'Supprimer la section', 'My Notes': 'Mes notes', 'No notes yet.': 'Aucune note pour l’instant.', 'No one is scheduled here.': 'Personne n’est planifié ici.',
 });
 
 Object.assign(es, {
-  'Today': 'Hoy', 'People': 'Personas', 'Previous month': 'Mes anterior', 'Next month': 'Mes siguiente', 'Show all': 'Mostrar todo', 'Edit profile': 'Editar perfil', 'New Initiative': 'Nueva Initiative', 'Add schedule': 'Añadir al calendario', 'My Notes': 'Mis notas', 'No notes yet.': 'Aún no hay notas.', 'No one is scheduled here.': 'Nadie está programado aquí.',
+  'Today': 'Hoy', 'People': 'Personas', 'Previous month': 'Mes anterior', 'Next month': 'Mes siguiente', 'Show all': 'Mostrar todo', 'Edit profile': 'Editar perfil', 'New Initiative': 'Nueva Initiative', 'Add schedule': 'Añadir al calendario', 'New section': 'Nueva sección', 'New page': 'Nueva página', 'Rename': 'Renombrar', 'Delete notebook': 'Eliminar cuaderno', 'Delete section': 'Eliminar sección', 'My Notes': 'Mis notas', 'No notes yet.': 'Aún no hay notas.', 'No one is scheduled here.': 'Nadie está programado aquí.',
 });
