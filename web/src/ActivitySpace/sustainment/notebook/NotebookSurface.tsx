@@ -27,7 +27,7 @@ import {
 } from '@/ActivitySpace/sustainment/notebook';
 import { summarizeNoteContent } from '@/ActivitySpace/sustainment/notebook/aiSummary';
 import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from '@/ActivitySpace/sustainment/notebook/objectDraft';
-import type { Brief, NoteNode } from '@/types/notes';
+import type { Brief } from '@/types/notes';
 
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 interface NotebookSurfaceProps {
@@ -61,24 +61,13 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
     () => sectionsInFolder(nodes, resolvedFolderId),
     [nodes, resolvedFolderId],
   );
-  // The user's tab pick for the CURRENT folder. `undefined` = no pick yet
-  // (auto-resolve to the first Section).
-  const [pickedSectionId, setPickedSectionId] = useState<string | undefined>(undefined);
-  const [sectionFolderId, setSectionFolderId] = useState(resolvedFolderId);
-  if (sectionFolderId !== resolvedFolderId) {
-    setSectionFolderId(resolvedFolderId);
-    setPickedSectionId(undefined);
-  }
-  // A file opened from outside (Profile's My Notes, a notification) may sit
-  // in a Section other than the one picked here; the file wins over a stale
-  // pick, so the tab follows the page instead of hiding it.
-  const [sectionFileId, setSectionFileId] = useState(selectedFileId);
-  if (sectionFileId !== selectedFileId) {
-    setSectionFileId(selectedFileId);
-    const file = selectedFileId ? nodes.find((n) => n.id === selectedFileId) : undefined;
-    if (file && pickedSectionId !== undefined && file.parentId !== pickedSectionId) setPickedSectionId(undefined);
-  }
-  const resolvedSectionId = resolveSectionSelection(nodes, resolvedFolderId, pickedSectionId ?? null, selectedFileId);
+  // The Section comes from the sidebar's tree (navigation.noteSectionId).
+  // A page opened from outside the notebook (Profile's My Notes, a
+  // notification, ⌘K) arrives with only its id, and the page wins over any
+  // earlier pick so the list shows where it actually lives.
+  const openFile = selectedFileId ? nodes.find((n) => n.id === selectedFileId) : undefined;
+  const fileSectionId = openFile && folderSections.some((s) => s.id === openFile.parentId) ? openFile.parentId! : null;
+  const resolvedSectionId = resolveSectionSelection(nodes, resolvedFolderId, fileSectionId ?? navigation.noteSectionId ?? null, selectedFileId);
   // Where the file list (and new files) hang: the active Section, or the
   // folder itself while it has no Sections yet.
   const filesParentId = resolvedSectionId ?? resolvedFolderId;
@@ -86,13 +75,7 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
     () => filesInFolder(nodes, filesParentId),
     [nodes, filesParentId],
   );
-  // Every Section's pages plus the Folder's own, for the always-visible list.
-  const filesByParent = useMemo(() => {
-    const out: Record<string, NoteNode[]> = {};
-    for (const section of folderSections) out[section.id] = filesInFolder(nodes, section.id);
-    if (resolvedFolderId) out[resolvedFolderId] = filesInFolder(nodes, resolvedFolderId);
-    return out;
-  }, [nodes, folderSections, resolvedFolderId]);
+  const activeSectionName = folderSections.find((s) => s.id === resolvedSectionId)?.name ?? null;
   const resolvedFileId = (selectedFileId && folderFiles.some((f) => f.id === selectedFileId))
     ? selectedFileId
     : (folderFiles[0]?.id ?? null);
@@ -101,13 +84,13 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
   // PageView header).
   const [filesPaneOpen, setFilesPaneOpen] = useState(true);
 
-  // Create a new File under a Section (a row's "+" / right-click), or under
-  // the active Section / the Folder while sectionless (the breadcrumb "+"),
-  // then select it.
-  const handleAddFile = async (parentId: string | null = filesParentId) => {
-    if (!parentId) return;
+  // Create a new File under the active Section (or the Folder while
+  // sectionless), then select it — the breadcrumb "+" and the pane's
+  // "New page" row.
+  const handleAddFile = async () => {
+    if (!filesParentId) return;
     try {
-      const node = await createNode('file', 'Untitled', parentId);
+      const node = await createNode('file', 'Untitled', filesParentId);
       setSelectedFileId(node.id);
     } catch (e) { console.error('Failed to create note file', e); }
   };
@@ -121,33 +104,6 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
       await deleteNode(id);
       if (selectedFileId === id) setSelectedFileId(null);
     } catch (e) { console.error('Failed to delete note file', e); }
-  };
-  const handleDeleteSection = async (id: string) => {
-    const section = nodes.find((n) => n.id === id);
-    const pages = filesInFolder(nodes, id).length;
-    const what = pages > 0 ? ` and its ${pages} page${pages === 1 ? '' : 's'}` : '';
-    if (!await appDialog.confirm(`Delete the section "${section?.name ?? ''}"${what}? This cannot be undone.`)) return;
-    try {
-      await deleteNode(id);
-      if (pickedSectionId === id) setPickedSectionId(undefined);
-      const open = selectedFileId ? nodes.find((n) => n.id === selectedFileId) : undefined;
-      if (open?.parentId === id) onNavigate({ noteFolderId: resolvedFolderId, noteId: null });
-    } catch (e) { console.error('Failed to delete note section', e); }
-  };
-  const handleAddSection = async () => {
-    if (!resolvedFolderId) return;
-    let section: { id: string } | undefined;
-    try {
-      section = await createNode('section', 'New Section', resolvedFolderId);
-      // Seed a default page so the new Section opens straight into the editor.
-      const page = await createNode('file', 'Untitled', section.id);
-      setPickedSectionId(section.id);
-      setSelectedFileId(page.id);
-    } catch (e) {
-      console.error('Failed to create note section', e);
-      // Don't leave a page-less Section behind if the page insert failed.
-      if (section) { try { await deleteNode(section.id); } catch { /* best-effort */ } }
-    }
   };
   // Note → Obj化 session cache. Key is the note's id; entry is only reused
   // when the note body's hash matches, so editing the note re-triggers AI.
@@ -251,12 +207,12 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
             </div>
             ) : (
             <div className="relative flex-1 flex flex-col overflow-hidden bg-card">
-            {/* Breadcrumb — the open Notebook's name + "New page". Sections
-                are listed, always visible, in the FilesPane. */}
+            {/* Breadcrumb — the open Notebook's name + "New page". Books and
+                Sections are the sidebar's tree; this pane lists pages. */}
             {resolvedFolderId && (
               <NotebookBreadcrumb
                 folderName={folderDisplayName(nodes, resolvedFolderId)}
-                onBack={() => onNavigate({ noteFolderId: null, noteId: null })}
+                onBack={() => onNavigate({ noteFolderId: null, noteSectionId: null, noteId: null })}
                 onAddFile={() => void handleAddFile()}
               />
             )}
@@ -266,18 +222,9 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
                   pane on the right. */}
               {filesPaneOpen && (
                 <FilesPane
-                  folderName={folderDisplayName(nodes, resolvedFolderId)}
-                  sections={folderSections}
-                  filesByParent={filesByParent}
-                  folderId={resolvedFolderId}
-                  activeSectionId={resolvedSectionId}
+                  title={activeSectionName ?? folderDisplayName(nodes, resolvedFolderId)}
+                  files={folderFiles}
                   selectedFileId={resolvedFileId}
-                  // Picking a Section also drops the open page, so `noteId`
-                  // never points at a file in a Section that is no longer
-                  // shown. The folder is pinned in the same step: when it was
-                  // only derived from that page, dropping the page alone would
-                  // send the pane back to the notebook grid.
-                  onSelectSection={(id) => { setPickedSectionId(id); onNavigate({ noteFolderId: resolvedFolderId, noteId: null }); }}
                   onSelectFile={(id) => {
                     setSelectedFileId(id);
                     // Phones can't fit the list + editor side by side, so the
@@ -287,11 +234,9 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
                       setFilesPaneOpen(false);
                     }
                   }}
-                  onAddFile={(parentId) => void handleAddFile(parentId)}
-                  onAddSection={handleAddSection}
+                  onAddFile={() => void handleAddFile()}
                   onRenameNode={(id, name) => void handleRenameNode(id, name)}
                   onDeleteFile={(id) => void handleDeleteFile(id)}
-                  onDeleteSection={(id) => void handleDeleteSection(id)}
                 />
               )}
               {/* When the list is open on a phone it owns the whole row; hide

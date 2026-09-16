@@ -13,6 +13,9 @@ export interface NavigationState {
   noteId?: string | null;
   /** Note Folder currently focused in the middle pane (a root folder id). */
   noteFolderId?: string | null;
+  /** Section picked in the sidebar's notebook tree. null = derived from the
+   *  open page, else the Folder's first Section. */
+  noteSectionId?: string | null;
   /** Table currently open in the Table surface (a `tables` row id). The list
    *  lives in the sidebar; this is which one the main pane shows. */
   tableId?: string | null;

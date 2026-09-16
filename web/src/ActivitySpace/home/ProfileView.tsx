@@ -45,7 +45,7 @@ export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDo
     let node = byId.get(id);
     while (node?.parentId && byId.has(node.parentId)) node = byId.get(node.parentId);
     onViewChange?.('note');
-    onNavigate({ noteFolderId: node?.id ?? null, noteId: id });
+    onNavigate({ noteFolderId: node?.id ?? null, noteSectionId: null, noteId: id });
   };
 
   const tabs: { id: ProfileTab; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
