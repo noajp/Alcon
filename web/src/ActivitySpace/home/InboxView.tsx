@@ -20,18 +20,26 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
   const elementId = selected?.element_id;
   const { detail, refresh } = useNotificationElement(elementId, revision);
 
+  // Every island opens with the same 50px header, so the title line sits
+  // level with the sidebar's Space row whichever view is showing.
   if (!selected) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-5 bg-card text-muted-foreground">
-        <Inbox size={88} strokeWidth={0.8} className="opacity-60" aria-hidden="true" />
-        <p className="text-[13px]">{t('No notification selected')}</p>
+      <div className="flex h-full min-h-0 flex-col bg-card">
+        <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
+          <Inbox size={12} aria-hidden="true" />
+          <span className="text-[12px] font-semibold text-foreground">{t('Inbox')}</span>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-5 text-muted-foreground">
+          <Inbox size={88} strokeWidth={0.8} className="opacity-60" aria-hidden="true" />
+          <p className="text-[13px]">{t('No notification selected')}</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-card">
-      <header className="flex min-h-[50px] shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-2">
+      <header className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
           {selected.actor_name && <span className="font-medium text-foreground">{selected.actor_name}</span>}
           {selected.actor_name && ' · '}

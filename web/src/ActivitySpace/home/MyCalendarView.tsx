@@ -70,7 +70,7 @@ function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: My
   return (
     <ElementDrilldown label="Calendar" onNavigate={onNavigate} onViewChange={onViewChange}>
       {openElement => <div className="flex min-h-0 flex-1 flex-col bg-card">
-      <div className="h-12 flex items-center gap-2 px-4 border-b border-[var(--border-subtle)] bg-card flex-shrink-0">
+      <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <NavCalendarIcon size={12} />
         <span className="text-[12px] font-semibold text-foreground">Calendar</span>
         <div className="flex-1" />
