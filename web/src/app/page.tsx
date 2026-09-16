@@ -18,6 +18,9 @@ import { mergeNavigation, navigationAfterDomainChange } from '@/shell/navigation
 import type { NavigationState } from '@/types/navigation';
 import { useDomains, useObjects, createObject, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
 import { QuickAddObjectPopup } from '@/ActivitySpace/execution/object/QuickAddObjectPopup';
+import { QuickAddNotebookPopup } from '@/ActivitySpace/sustainment/notebook/QuickAddNotebookPopup';
+import { seedNotebook } from '@/ActivitySpace/sustainment/notebook/notebookActions';
+import { useNotes } from '@/hooks/useNotesDb';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/ActivitySpace/execution/domain/domainsStore';
@@ -349,6 +352,11 @@ function WorkspaceContent({
   }, []);
 
   const openObjectPopup = useCallback(() => setObjectPopupOpen(true), []);
+  // The sidebar's "+" in Notebook mode — the same quick-create card,
+  // asking for the notebook's name.
+  const [notebookPopupOpen, setNotebookPopupOpen] = useState(false);
+  const openNotebookPopup = useCallback(() => setNotebookPopupOpen(true), []);
+  const { createNode: createNoteNode, deleteNode: deleteNoteNode } = useNotes();
 
   // Fetch the active Domain's workers when the popup opens (lazy — keeps the
   // first paint cheap and re-runs when the Domain changes).
@@ -478,7 +486,7 @@ function WorkspaceContent({
 
   return (
     <ExplorerDataProvider value={explorerData}>
-    <WorkspaceActionsProvider onOpenCreateObject={openObjectPopup}>
+    <WorkspaceActionsProvider onOpenCreateObject={openObjectPopup} onOpenCreateNotebook={openNotebookPopup}>
     <div
       className="h-dvh flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground"
       style={{
@@ -586,8 +594,18 @@ function WorkspaceContent({
         onRefresh={refetch}
       />
 
-      {/* Quick-add Object popup — Linear-style, replaces the full-page Create
-          Object form for the common case. */}
+      {/* Quick-create cards — one shape for every "+": the Notebook card and
+          the Object card here (Linear-style, no full-page form); Initiative
+          and Table cards live in their surfaces. */}
+      <QuickAddNotebookPopup
+        open={notebookPopupOpen}
+        onClose={() => setNotebookPopupOpen(false)}
+        onSubmit={async (name) => {
+          const { folder, page } = await seedNotebook(createNoteNode, deleteNoteNode, name);
+          setActiveView('note');
+          setActiveNavigation({ noteFolderId: folder.id, noteSectionId: null, noteId: page.id });
+        }}
+      />
       <QuickAddObjectPopup
         open={objectPopupOpen}
         onClose={() => setObjectPopupOpen(false)}

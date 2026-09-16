@@ -3,8 +3,12 @@
 import { Button } from '@/ui/button';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
+import { QuickCreatePopup, quickCreatePillClass } from '@/Function/shared/QuickCreatePopup';
+import { Popover, PopoverTrigger } from '@/ui/popover';
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/ui/command';
+import { MenuShell } from '@/Function/shared/menu';
 import { isCancelKey, isCommitEnter, isSubmitChord, useCancelOnEscape, useEscapeLayer } from '@/Function/shared/keyboard';
 import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
 import {
@@ -1136,26 +1140,10 @@ function StrategyCreateDialog({
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
-  const [saving, setSaving] = useState(false);
-  // Mirrors `saving` synchronously: two Enters in the same tick would both
-  // read the stale `saving === false` and create twice.
-  const savingRef = useRef(false);
-
-  const nameRef = useRef<HTMLTextAreaElement | null>(null);
-  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
-  useAutoGrowTextarea(nameRef, name);
-  useAutoGrowTextarea(descriptionRef, description);
-
-  // Esc closes the dialog — from any field in it, since the overlay means
-  // nothing outside can have focus.
-  useEscapeLayer(true, onClose);
-
   const grouped = useObjectPicker(query);
-
+  const selectedCount = selectedIds.size;
   const toggleObject = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -1165,122 +1153,48 @@ function StrategyCreateDialog({
     });
   };
 
-  const canSave = name.trim().length > 0;
-
-  async function handleSave() {
-    if (!canSave || savingRef.current) return;
-    savingRef.current = true;
-    setSaving(true);
-    try {
-      const created = await createStrategy(
-        { name: name.trim(), description: description.trim() || null },
-        Array.from(selectedIds),
-      );
-      onCreated(created.id);
-    } catch (e) {
-      console.error('create Initiative failed:', e);
-    } finally {
-      savingRef.current = false;
-      setSaving(false);
-    }
-  }
-
+  // The same quick-create card Objects and Elements use: name, description
+  // and one pill for the Objects the Initiative bundles. Objects can be
+  // chosen or left for later — the detail page has the same picker.
   return (
-    <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-6" onClick={onClose}>
-      <div
-        className="bg-card border border-border rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="h-10 flex items-center px-4 border-b border-border/60 flex-shrink-0">
-          <span className="text-[13px] font-semibold text-foreground">New Initiative</span>
-          <div className="flex-1" />
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
-            aria-label="Close"
-          >
-            <X size={14} />
+    <QuickCreatePopup
+      open
+      icon={<NavStrategyIcon size={12} />}
+      contextLabel="New Initiative"
+      ariaLabel="Quick add Initiative"
+      namePlaceholder="Initiative name…"
+      onClose={onClose}
+      onSubmit={async ({ name, description }) => {
+        const created = await createStrategy({ name, description }, Array.from(selectedIds));
+        onCreated(created.id);
+      }}
+    >
+      <Popover>
+        <PopoverTrigger asChild>
+          <button type="button" className={quickCreatePillClass(selectedCount > 0)} aria-label="Objects">
+            <ObjectIcon size={12} />
+            <span>{selectedCount > 0 ? `${selectedCount} Object${selectedCount === 1 ? '' : 's'}` : 'Objects'}</span>
+            <ChevronDown size={10} className="opacity-60" />
           </button>
-        </div>
-
-        <div className="p-4 space-y-3 overflow-auto flex-1">
-          <div>
-            <span className="w-9 h-9 -ml-2 rounded-lg bg-muted/40 flex items-center justify-center text-foreground/70 mb-3">
-              <NavStrategyIcon size={18} />
-            </span>
-            <textarea
-              ref={nameRef}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => {
-                // The name is the dialog's one single-line field: Enter
-                // creates. Shift+Enter still wraps, for the rare long name.
-                if (isCommitEnter(e) || isSubmitChord(e)) {
-                  e.preventDefault();
-                  void handleSave();
-                }
-              }}
-              rows={1}
-              placeholder="Initiative name"
-              className="w-full text-2xl font-semibold text-foreground bg-transparent border-none resize-none leading-tight overflow-hidden tracking-normal"
-              autoFocus
-            />
-          </div>
-          <section>
-            <textarea
-              ref={descriptionRef}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              onKeyDown={(e) => {
-                // Multi-line: Enter is a newline, Cmd/Ctrl+Enter creates.
-                if (isSubmitChord(e)) {
-                  e.preventDefault();
-                  void handleSave();
-                }
-              }}
-              rows={1}
-              placeholder="Add description..."
-              className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
-            />
-          </section>
-
-          <div>
-            <label className="block text-[11px] text-muted-foreground mb-1">
-              Objects <span className="text-muted-foreground/60">({selectedIds.size} selected)</span>
-            </label>
-            <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-1">
-              <Search size={12} className="text-muted-foreground" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search Objects across Domains…"
-                className="flex-1 bg-transparent text-[13px] outline-none"
-              />
-            </div>
-            <div className="border border-border/40 rounded-md max-h-72 overflow-auto">
-              <ObjectPickerList grouped={grouped} selectedIds={selectedIds} onToggle={toggleObject} />
-            </div>
-          </div>
-        </div>
-
-        <div className="h-12 flex items-center justify-end gap-2 px-4 border-t border-border/60 flex-shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1.5 rounded-md text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/30"
-          >
-            Cancel
-          </button>
-          <Button variant="primary" size="md"
-            type="button"
-            onClick={handleSave}
-            disabled={!canSave || saving}
-          >
-            {saving ? 'Saving…' : 'Create'}
-          </Button>
-        </div>
-      </div>
-    </div>
+        </PopoverTrigger>
+        <MenuShell width="wide" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput value={query} onValueChange={setQuery} placeholder="Search Objects across Domains…" />
+            <CommandList>
+              <CommandEmpty>No Objects match.</CommandEmpty>
+              {grouped.map(([did, { domainName, objects }]) => (
+                <CommandGroup key={did} heading={domainName}>
+                  {objects.map((o) => (
+                    <CommandItem key={o.id} value={`${o.name} ${o.id}`} onSelect={() => toggleObject(o.id)}>
+                      <ObjectIcon size={12} /><span className="flex-1 truncate">{o.name}</span>{selectedIds.has(o.id) && <Check size={12} />}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ))}
+            </CommandList>
+          </Command>
+        </MenuShell>
+      </Popover>
+    </QuickCreatePopup>
   );
 }

@@ -13,6 +13,7 @@ import {
 import { useTableData } from './useTableData';
 import type { Json } from '@/types/database';
 import { Button } from '@/ui/button';
+import { QuickCreatePopup } from '@/Function/shared/QuickCreatePopup';
 import { MENU_WIDTH } from '@/Function/shared/menu';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
@@ -699,6 +700,7 @@ function EmptySchemaState({ source }: { source: TableSource }) {
 }
 
 // ─── New Table dialog ─────────────────────────────────────────────────────
+// The same quick-create card Objects and Elements use.
 function NewTableDialog({
   onClose,
   onSaved,
@@ -706,100 +708,30 @@ function NewTableDialog({
   onClose: () => void;
   onSaved: (id: string) => void;
 }) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEscapeLayer(true, onClose);
-
-  const save = async () => {
-    if (!name.trim()) return;
-    setSaving(true);
-    setErr(null);
-    try {
-      const created = await createDataTable({
-        name: name.trim(),
-        description: description.trim() || null,
-      });
-      // Seed a default "Name" text column so the detail view has a schema
-      // to render against without the user having to add one first.
-      try {
-        await addDataTableColumn(created.id, 'Name', 'text', 0);
-      } catch (e) {
-        // Non-fatal: the table exists, the column add failed (RLS, etc.).
-        // EmptySchemaState handles the no-columns case.
-        console.warn('Default column add failed', e);
-      }
-      onSaved(created.id);
-    } catch (e) {
-      setErr((e as Error).message || 'Failed to create table');
-      setSaving(false);
-    }
-  };
-
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
-      onClick={onClose}
-    >
-      <div
-        className="w-[420px] rounded-lg bg-background shadow-xl border border-border/60"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="px-5 py-3 border-b border-border/60">
-          <div className="text-[13px] font-semibold text-foreground">New Table</div>
-        </div>
-        <div className="px-5 py-4 space-y-3">
-          <div className="space-y-1">
-            <div className="text-[11px] font-medium text-muted-foreground">Name</div>
-            <input
-              autoFocus
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Customers"
-              className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60 border-none"
-              onKeyDown={(e) => {
-                if (isCommitEnter(e) && !saving && name.trim()) {
-                  e.preventDefault();
-                  void save();
-                }
-              }}
-            />
-          </div>
-          <div className="space-y-1">
-            <div className="text-[11px] font-medium text-muted-foreground">
-              Description <span className="opacity-60">(optional)</span>
-            </div>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What does this table store?"
-              rows={2}
-              className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60 resize-none border-none"
-            />
-          </div>
-          {err && <div className="text-[12px] text-rose-400">{err}</div>}
-        </div>
-        <div className="px-5 py-3 border-t border-border/60 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors"
-          >
-            Cancel
-          </button>
-          <Button variant="primary"
-            type="button"
-            disabled={!name.trim() || saving}
-            onClick={() => void save()}
-          >
-            {saving ? 'Creating…' : 'Create'}
-          </Button>
-        </div>
-      </div>
-    </div>
+    <QuickCreatePopup
+      open
+      icon={<NavTableIcon size={12} />}
+      contextLabel="New Table"
+      ariaLabel="Quick add Table"
+      namePlaceholder="Table name…"
+      descriptionPlaceholder="What does this table store?"
+      hint="Starts with a Name column"
+      onClose={onClose}
+      onSubmit={async ({ name, description }) => {
+        const created = await createDataTable({ name, description });
+        // Seed a default "Name" text column so the detail view has a schema
+        // to render against without the user having to add one first.
+        try {
+          await addDataTableColumn(created.id, 'Name', 'text', 0);
+        } catch (e) {
+          // Non-fatal: the table exists, the column add failed (RLS, etc.).
+          // EmptySchemaState handles the no-columns case.
+          console.warn('Default column add failed', e);
+        }
+        onSaved(created.id);
+      }}
+    />
   );
 }
 
