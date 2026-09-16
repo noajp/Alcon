@@ -352,7 +352,7 @@ function Header({
   setSelectedDomainIds: (fn: (prev: string[]) => string[]) => void;
 }) {
   return (
-    <div className="min-h-10 flex flex-wrap items-center gap-2 px-4 py-1 border-b border-[var(--border-subtle)] flex-shrink-0">
+    <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0 overflow-hidden">
       <span className="text-[12px] font-semibold text-foreground">{title}</span>
       <span className="text-[11px] text-muted-foreground">
         {loading ? 'Loading…' : `${stats.humans} humans · ${stats.agents} agents`}

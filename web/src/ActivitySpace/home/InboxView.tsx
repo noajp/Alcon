@@ -25,10 +25,10 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
   if (!selected) {
     return (
       <div className="flex h-full min-h-0 flex-col bg-card">
-        <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
+        <header className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
           <Inbox size={12} aria-hidden="true" />
           <span className="text-[12px] font-semibold text-foreground">{t('Inbox')}</span>
-        </div>
+        </header>
         <div className="flex flex-1 flex-col items-center justify-center gap-5 text-muted-foreground">
           <Inbox size={88} strokeWidth={0.8} className="opacity-60" aria-hidden="true" />
           <p className="text-[13px]">{t('No notification selected')}</p>
@@ -39,7 +39,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-card">
-      <header className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
+      <header className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0 overflow-hidden">
         <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
           {selected.actor_name && <span className="font-medium text-foreground">{selected.actor_name}</span>}
           {selected.actor_name && ' · '}
