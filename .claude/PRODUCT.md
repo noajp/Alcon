@@ -214,7 +214,7 @@ Object は Element をまとめる単位で、Object 同士はネストしない
 | **Notebook** | 思考・記録のドキュメント（議事録 / メモ） | 独自 HTML エディタ（`AppleNoteEditor` + `htmlSanitizer`）。**Folder → File の 2 階層**ツリー（`notes` + `note_contents.html`） |
 | **Table** | 任意の表 | `tables` + `table_columns` / `table_rows` / `table_cells`。所有者限定の RLS |
 | **Team** | Worker の所属・担当・通常稼働時間を管理 | `workers`（human \| ai_agent）。`element_assignees` で Element にアサイン |
-| **Calendar** | Domain を横断して Element の予定を調整 | レールの Calendar から開く。初期表示は自分の予定で、ヘッダの範囲選択で Domain / Object の予定へ広げる。サイドバーに今日の日付・ミニ月・表示する人の選択を置き、同じ日 / 週 / 月ビューと保存先を使う。月表示では期間を持つ Element を開始日から終了日まで続く帯で描き、週をまたぐ帯は行ごとに切って同じ段に揃える。日のセルへの予定登録はホバーで出る「＋」か右クリックから行い、素のクリックでは何も開かない |
+| **Calendar** | Domain を横断して Element の予定を調整 | レールの Calendar から開く。初期表示は自分の予定で、ヘッダの範囲選択で Domain / Object の予定へ広げる。サイドバーに今日の日付・ミニ月・表示する人の選択を置き、同じ日 / 週 / 月ビューと保存先を使う。月表示と週/日表示の終日行では、期間を持つ Element を開始日から終了日まで続く帯で描き、表示範囲をまたぐ帯は行ごとに切って同じ段に揃える（左端は直線）。日のセルへの予定登録はホバーで出る「＋」か右クリックから行い、素のクリックでは何も開かない |
 
 Team の名簿は Space メンバー、閲覧できる Domain のゲスト、実行に参加する Worker をまとめる。ゲストの取得はメンバー設定と同じ境界 RPC を使う。受信可能な変更イベントは名簿へ反映し、所属テーブルの RLS によりイベントを受信できない変更は、画面へのフォーカス復帰または Refresh で最新の名簿を取得する。
 
