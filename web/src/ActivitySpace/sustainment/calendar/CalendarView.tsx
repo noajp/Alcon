@@ -797,15 +797,14 @@ function TimeGridView({
     return arr;
   }, []);
 
-  // Bucket elements per day → { allDay: [], timed: [] }
+  // Bucket timed elements per day (all-day ones are laid out as bands above
+  // the hour grid, see the all-day row)
   const perDay = useMemo(() => {
     return days.map(day => {
-      const allDay: CalendarEntry[] = [];
       const timed: CalendarEntry[] = [];
       elements.forEach(el => {
         if (!occursOn(el, fmtDateOnly(day))) return;
         if (el.start_time || el.due_time) timed.push(el);
-        else allDay.push(el);
       });
       // Sort timed by start
       timed.sort((a, b) => {
@@ -813,7 +812,7 @@ function TimeGridView({
         const bm = parseTimeToMinutes(b.start_time ?? b.due_time) ?? 0;
         return am - bm;
       });
-      return { allDay, timed };
+      return { timed };
     });
   }, [days, elements]);
 
@@ -855,24 +854,33 @@ function TimeGridView({
         })}
       </div>
 
-      {/* All-day band */}
-      <div className="flex border-b border-border/60 bg-card">
-        <div className="w-14 flex-shrink-0 px-2 py-1.5 text-[10px] text-muted-foreground text-right">
-          all-day
-        </div>
-        {perDay.map((bucket, i) => {
-          return (
-            <div
-              key={i}
-              className={`${colWidthClass} border-l border-border/40 px-1 py-1 space-y-0.5 min-h-[28px]`}
-            >
-              {bucket.allDay.map(el => {
+      {/* All-day row — the same bands as the month grid: an Element that
+          runs over several of the shown days is one band from its first to
+          its last, clipped to the range with a square edge where it
+          continues, stacked into lanes so bands never overlap. */}
+      {(() => {
+        const dayKeys = days.map(d => fmtDateOnly(d));
+        const spans = layoutWeekSpans(elements.filter(el => !el.start_time && !el.due_time), dayKeys);
+        const lanes = spans.reduce((max, span) => Math.max(max, span.lane + 1), 0);
+        const height = Math.max(28, 4 + lanes * MONTH_LANE_HEIGHT + 4);
+        return (
+          <div className="flex border-b border-border/60 bg-card">
+            <div className="w-14 flex-shrink-0 px-2 py-1.5 text-[10px] text-muted-foreground text-right">
+              all-day
+            </div>
+            <div className="relative flex flex-1 min-w-0" style={{ height }}>
+              {days.map((_, i) => (
+                <div key={i} className={`${colWidthClass} border-l border-border/40`} />
+              ))}
+              {spans.map(span => {
+                const el = span.entry;
                 const cs = getCardStyle(el);
                 const overdue = isOverdue(el);
                 const isDone = el.status === 'done';
+                const width = span.endCol - span.startCol + 1;
                 return (
                   <button
-                    key={el.id}
+                    key={`${el.id}:${span.startCol}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       onElementClick(el);
@@ -881,26 +889,35 @@ function TimeGridView({
                       e.preventDefault();
                       onElementContextMenu(el);
                     }}
-                    className={`w-full text-left rounded-md px-2 py-0.5 transition-colors hover:brightness-95 ${cs.className} ${
-                      overdue ? 'ring-1 ring-[var(--status-danger)]/60' : ''
-                    } ${isDone ? 'opacity-70' : ''}`}
-                    style={cs.style}
+                    className={`absolute text-left px-2 transition-colors hover:brightness-95 rounded-l-none ${
+                      span.continuesAfter ? 'rounded-r-none' : 'rounded-r-md'
+                    } ${cs.className} ${overdue ? 'ring-1 ring-[var(--status-danger)]/60' : ''} ${isDone ? 'opacity-70' : ''}`}
+                    style={{
+                      ...cs.style,
+                      ...(span.continuesBefore ? { borderLeft: 'none' } : {}),
+                      top: 4 + span.lane * MONTH_LANE_HEIGHT,
+                      height: MONTH_LANE_HEIGHT - 2,
+                      left: `calc(${(span.startCol / days.length) * 100}% + ${span.continuesBefore ? 0 : 4}px)`,
+                      width: `calc(${(width / days.length) * 100}% - ${(span.continuesBefore ? 0 : 4) + (span.continuesAfter ? 0 : 4)}px)`,
+                    }}
                     title={el.title}
                   >
-                    <span
-                      className={`text-[11px] font-medium leading-tight truncate block ${
-                        isDone ? 'line-through' : ''
-                      }`}
-                    >
-                      {el.title}
-                    </span>
+                    <div className="flex h-full items-center min-w-0">
+                      <span
+                        className={`text-[11px] font-medium leading-tight truncate flex-1 ${
+                          isDone ? 'line-through' : ''
+                        }`}
+                      >
+                        {el.title}
+                      </span>
+                    </div>
                   </button>
                 );
               })}
             </div>
-          );
-        })}
-      </div>
+          </div>
+        );
+      })()}
 
       {/* Scrollable hour grid */}
       <div ref={scrollRef} className="flex-1 overflow-auto relative">
