@@ -13,7 +13,7 @@ const MAX_WIDTH = 640;
 const DEFAULT_WIDTH = 340;
 
 export interface AlconCopilotPanelProps {
-  /** Open state is owned by the page so the status bar's PanelRight
+  /** Open state is owned by the page so the rail's PanelRight
    *  toggle and the ⌘L shortcut both flip the same boolean — sharing via a
    *  CustomEvent is fragile under React 18 StrictMode (the listener gets
    *  re-attached and a single click flips state twice). */
@@ -23,7 +23,7 @@ export interface AlconCopilotPanelProps {
 
 /**
  * Right-edge floating Copilot pane. Open state lives in the parent (toggled
- * with Cmd/Ctrl+L globally, by the status bar's PanelRight button, or by
+ * with Cmd/Ctrl+L globally, by the rail's PanelRight button, or by
  * the panel's own close button). Width is user-resizable from a left-side
  * drag handle and persisted via localStorage. Phase 1 ships read-only tools;
  * the deliverable-creating Code / Terminal tabs are stubbed at the bottom
@@ -123,7 +123,7 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
 
   return (
     <>
-      {/* Open / close is driven by the status bar's PanelRight button
+      {/* Open / close is driven by the rail's PanelRight button
           (and ⌘L), so the panel itself renders nothing in the closed state.
           Mouse re-entry: the user clicks the same toggle in the tab bar. */}
       {open && (
@@ -156,7 +156,7 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
                 Clear
               </Button>
             )}
-            {/* Close lives on the status bar's PanelRight toggle (and ⌘L);
+            {/* Close lives on the rail's PanelRight toggle (and ⌘L);
                 a header X would just duplicate that affordance. */}
           </div>
 

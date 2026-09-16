@@ -380,25 +380,18 @@ export function AppSidebar({
             : 'relative'
         } ${resizing ? '' : 'transition-transform duration-200 ease-out'}`}
       >
-        {/* Navigation */}
-        <ButtonAppearanceProvider appearance="navigation"><nav className="flex-1 overflow-y-auto pb-3 pl-1 pr-2">
-
+        {/* Header — fixed; only the navigation under it scrolls. The same
+            height as the main island's header (50px) and the same offset
+            from the top edge, so the Space name and the island's title sit
+            on one line. */}
+        <ButtonAppearanceProvider appearance="navigation">
+        <div className="mt-1.5 flex h-[50px] shrink-0 items-center pl-1 pr-2">
           {activeView === 'settings' ? (
-            <>
-              <div className="flex items-center pt-3 pb-1.5">
-                <Button variant="ghost" size="sm" align="start" onClick={onCloseSettings} className="text-muted-foreground">
-                  <ArrowLeft size={14} />{t('Back')}
-                </Button>
-              </div>
-              <SettingsSidebarPanel />
-            </>
+            <Button variant="ghost" size="sm" align="start" onClick={onCloseSettings} className="text-muted-foreground">
+              <ArrowLeft size={14} />{t('Back')}
+            </Button>
           ) : (
-          <>
-          {/* Top row: the active Space + quick actions (search + create-new).
-              The ModeRail to the left picks which mode's surfaces show below.
-              Sits a little down from the top edge — there is no tab strip
-              above it any more. */}
-          <div className="flex items-center gap-1 pt-3 pb-1.5">
+            <div className="flex w-full items-center gap-1">
             <div className="min-w-0 flex-1">
               <SpaceSwitcher onSettings={onOpenSettings} />
             </div>
@@ -425,6 +418,14 @@ export function AppSidebar({
               </Button>
             )}
           </div>
+          )}
+        </div>
+        <nav className="flex-1 overflow-y-auto pb-3 pl-1 pr-2">
+
+          {activeView === 'settings' ? (
+            <SettingsSidebarPanel />
+          ) : (
+          <>
 
 
           {/* ── Strategy mode ── The Initiative portfolio plus the

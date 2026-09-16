@@ -281,7 +281,7 @@ web/src/
 │   ├── space/            Activity Space の切替とオンボーディング
 │   ├── sync/             差分ストリームと正規化キャッシュ
 │   └── shared/           概念をまたぐ UI とロジック
-├── shell/                外殻 — ModeRail / AppSidebar / StatusBar / CommandPalette
+├── shell/                外殻 — ModeRail / AppSidebar / CommandPalette
 ├── app/                  Next.js App Router
 ├── hooks/                Supabase の CRUD
 ├── lib/ providers/ auth/ types/ ui/ shared/
@@ -292,7 +292,7 @@ Execution が Domain → Object → Element の順に並ぶのは、上位ほど
 ## UI デザイン原則
 
 ### レイアウト哲学
-- **常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス** の 3 列構成。ブラウザのタブがあるので画面内にタブ列は置かず、最下部に VS Code 風の **StatusBar**（サイドバーの表示切替・AI ペインの開閉）を置く。Settings は同じ画面で開き、サイドバー上部の「Back」で元の画面へ戻る
+- **常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス** の 3 列構成。ブラウザのタブがあるので画面内にタブ列は置かない。サイドバーの表示切替と AI ペインの開閉は ModeRail の最下部（アバターの上）に置く。サイドバー最上部の Space 行は固定ヘッダーで、メイン領域のヘッダーと同じ高さ・位置に揃え、その下だけがスクロールする。Settings は同じ画面で開き、その固定ヘッダーの「Back」で元の画面へ戻る
 - **ModeRail**（46px）は分類セレクタ：固定の Inbox / Calendar / Strategy / Execution ＋ Apps ランチャーから追加した App ＋ 最下部のアバター（Profile）。Inbox のアイコンには未読数のバッジを出す。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / CRM / SCM）の 2 グループで、すべて Sustainment の道具
 - **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋「＋」。「＋」はモードごとに対象が変わる（Notebook＝ノートブック / Table＝テーブル / Strategy＝Initiative / Calendar＝表示中の日を期日にした Element / Execution＝Domain・Object のメニュー）。どれも Object / Element と同じクイック作成カード（画面下の角丸カードに名前・説明・プロパティのピル・Create）で作る。作るものが無いモードでは出さない。見出し横に別の「＋」を置かない。本体は現在のモードに応じて切替（Inbox＝通知の一覧 / Calendar＝今日・ミニ月・表示する人 / Strategy＝Initiatives の下に Phase・Timeline / Execution＝Domain ツリー / Notebook＝ノートブック一覧 / App 各種＝モード名ラベルのみ）。アバターから開く Profile ではサイドバーを出さない
 - **Notebook** はサイドバーに Book（ノートブック）と配下の Section をツリーで並べ、メイン領域の左列は選んだ Section のページ一覧だけを示す。Book / Section の右クリックで New section / New page / Rename / Delete（削除は確認を経る）、ページは右クリックで Rename / Delete、一覧末尾の「New page」で追加する。新しい Book はサイドバー上部の「＋」

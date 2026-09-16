@@ -14,7 +14,6 @@ import { CommandPalette } from '@/shell/CommandPalette';
 import { QuickAddElementLauncher } from '@/shell/QuickAddElementLauncher';
 import { AlconCopilotPanel } from '@/Function/copilot';
 import type { AppTab } from '@/shell/appTab';
-import { StatusBar } from '@/shell/StatusBar';
 import { mergeNavigation, navigationAfterDomainChange } from '@/shell/navigationState';
 import type { NavigationState } from '@/types/navigation';
 import { useDomains, useObjects, createObject, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
@@ -296,14 +295,14 @@ function WorkspaceContent({
     () => typeof window !== 'undefined' && window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH,
   );
   // When collapsed, the sidebar can still be peeked as a floating overlay
-  // (via the status bar's reveal button) instead of pinning it back into flow.
+  // (via the rail's reveal button) instead of pinning it back into flow.
   const [sidebarOverlay, setSidebarOverlay] = useState(false);
   // Profile (reached from the avatar; Now / My Elements / My Notes / AI are
   // its tabs) has nothing to list, so it takes the whole width.
   const personalMode = railModeOf(activeTab.activeView) === 'personal';
   const sidebarHidden = sidebarCollapsed || personalMode;
   const [discoverOpen, setDiscoverOpen] = useState(false);
-  // Alcon Copilot pane — open state shared by the status bar's PanelRight
+  // Alcon Copilot pane — open state shared by the rail's PanelRight
   // toggle, ⌘L, and the panel's own close button. localStorage round-trips
   // it across reloads.
   const [copilotOpen, setCopilotOpen] = useState(false);
@@ -403,7 +402,7 @@ function WorkspaceContent({
     setCreateType(null);
   };
 
-  // PanelLeft button on the status bar. The right behaviour
+  // PanelLeft button at the foot of the rail. The right behaviour
   // depends on whether the window is wide enough to show the sidebar AND the
   // island side-by-side:
   // - Visible → hide it (island goes full-width).
@@ -478,6 +477,10 @@ function WorkspaceContent({
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
           onOpenSettings={handleOpenSettings}
+          sidebarCollapsed={sidebarHidden}
+          onToggleSidebar={personalMode ? undefined : handleSidebarToggle}
+          copilotOpen={copilotOpen}
+          onToggleCopilot={() => handleCopilotOpenChange(!copilotOpen)}
         />
         {!personalMode && <AppSidebar
           navigation={activeTab.navigation}
@@ -547,12 +550,6 @@ function WorkspaceContent({
         </div>
         </div>
       </div>
-      <StatusBar
-        sidebarCollapsed={sidebarHidden}
-        onToggleSidebar={personalMode ? undefined : handleSidebarToggle}
-        copilotOpen={copilotOpen}
-        onToggleCopilot={() => handleCopilotOpenChange(!copilotOpen)}
-      />
 
       {/* Global ⌘K command palette */}
       <CommandPalette onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} />

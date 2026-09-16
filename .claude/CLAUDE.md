@@ -63,7 +63,7 @@ UI を変更したら `npm run design-lint`（変更ファイル限定のラチ�
 
 ## ディレクトリ
 
-`web/src/` の下に、`shell/`（外殻 — ModeRail / AppSidebar / StatusBar / CommandPalette / MainContent / viewRegistry）、`ActivitySpace/`（盤面の面 — `home/` `strategy/` `execution/` `sustainment/`）、`Function/`（盤面を成立させる仕組み — `widget/` `property/` `copilot/` `settings/` `space/` `sync/` `shared/`）、`hooks/`（Supabase の CRUD は全部ここ）、`shared/designTokens.ts`、`lib/` `providers/` `auth/` `types/` `ui/`。`app/` は layout / page / globals.css だけ。
+`web/src/` の下に、`shell/`（外殻 — ModeRail / AppSidebar / CommandPalette / MainContent / viewRegistry）、`ActivitySpace/`（盤面の面 — `home/` `strategy/` `execution/` `sustainment/`）、`Function/`（盤面を成立させる仕組み — `widget/` `property/` `copilot/` `settings/` `space/` `sync/` `shared/`）、`hooks/`（Supabase の CRUD は全部ここ）、`shared/designTokens.ts`、`lib/` `providers/` `auth/` `types/` `ui/`。`app/` は layout / page / globals.css だけ。
 
 root 直下は `supabase/`（migrations と functions）、`ops/`（自走ループの配管）、`docs/`（adr / friction-risk-register.md）、`website/`（LP）。
 

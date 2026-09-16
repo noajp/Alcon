@@ -81,7 +81,3 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   account:       { label: 'Account' },
 };
 
-/** Display label for an activity view id. Falls back to 'Tab' for unknown
- *  ids so unknown navigation state never renders blank. */
-
-/** Nav icon for an activity view id, or undefined when it has none. */
