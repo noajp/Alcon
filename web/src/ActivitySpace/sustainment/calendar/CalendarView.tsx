@@ -902,13 +902,15 @@ function TimeGridView({
                     }}
                     title={el.title}
                   >
-                    <span
-                      className={`flex h-full items-center text-[11px] font-medium leading-tight truncate ${
-                        isDone ? 'line-through' : ''
-                      }`}
-                    >
-                      {el.title}
-                    </span>
+                    <div className="flex h-full items-center min-w-0">
+                      <span
+                        className={`text-[11px] font-medium leading-tight truncate flex-1 ${
+                          isDone ? 'line-through' : ''
+                        }`}
+                      >
+                        {el.title}
+                      </span>
+                    </div>
                   </button>
                 );
               })}
