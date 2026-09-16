@@ -10,7 +10,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, Bot, Settings, Users, X, Search } from 'lucide-react';
+import { ArrowLeft, Plus, ChevronRight, Bot, Settings, Users, X, Search } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';
@@ -60,9 +60,10 @@ interface AppSidebarProps {
   onNavigate: (nav: Partial<NavigationState>) => void;
   activeView: string;
   onViewChange: (view: string) => void;
-  /** Settings opens in its own tab rather than overwriting the active
-   *  tab's view — see the rationale on page.tsx's handleOpenSettings. */
+  /** Settings opens in place; Back returns to the view it came from — see
+   *  page.tsx's handleOpenSettings / handleCloseSettings. */
   onOpenSettings: () => void;
+  onCloseSettings: () => void;
   onRefresh?: () => void;
   width: number;
   collapsed: boolean;
@@ -164,6 +165,7 @@ export function AppSidebar({
   activeView,
   onViewChange,
   onOpenSettings,
+  onCloseSettings,
   collapsed,
   overlay,
   onCreateNew,
@@ -378,16 +380,17 @@ export function AppSidebar({
             : 'relative'
         } ${resizing ? '' : 'transition-transform duration-200 ease-out'}`}
       >
-        {/* Navigation */}
-        <ButtonAppearanceProvider appearance="navigation"><nav className="flex-1 overflow-y-auto pb-3 pl-1 pr-2">
-
+        {/* Header — fixed; only the navigation under it scrolls. The same
+            height as the main island's header (50px), so the Space name and
+            the island's title sit on one line. */}
+        <ButtonAppearanceProvider appearance="navigation">
+        <div className="mt-1.5 flex h-[50px] shrink-0 items-center pl-1 pr-2">
           {activeView === 'settings' ? (
-            <SettingsSidebarPanel />
+            <Button variant="ghost" size="sm" align="start" onClick={onCloseSettings} className="text-muted-foreground">
+              <ArrowLeft size={14} />{t('Back')}
+            </Button>
           ) : (
-          <>
-          {/* Top row: the active Space + quick actions (search + create-new).
-              The ModeRail to the left picks which mode's surfaces show below. */}
-          <div className="flex items-center gap-1 py-1.5">
+            <div className="flex w-full items-center gap-1">
             <div className="min-w-0 flex-1">
               <SpaceSwitcher onSettings={onOpenSettings} />
             </div>
@@ -414,6 +417,14 @@ export function AppSidebar({
               </Button>
             )}
           </div>
+          )}
+        </div>
+        <nav className="flex-1 overflow-y-auto pb-3 pl-1 pr-2">
+
+          {activeView === 'settings' ? (
+            <SettingsSidebarPanel />
+          ) : (
+          <>
 
 
           {/* ── Strategy mode ── The Initiative portfolio plus the

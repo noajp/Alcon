@@ -20,7 +20,7 @@ import {
 
 // Single source of truth for the top-level *activity views* (the thing
 // `AppTab.activeView` holds and `MainContent` switches on). Every surface that
-// needs a view's label or icon — the tab bar, the sidebar's mode sections, the
+// needs a view's label or icon — the sidebar's mode sections, the
 // command palette — reads it from here, so the two can never drift apart.
 //
 // NOTE: this is a different axis from `ObjectTabType` (the tabs *inside* an
@@ -81,13 +81,3 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   account:       { label: 'Account' },
 };
 
-/** Display label for an activity view id. Falls back to 'Tab' for unknown
- *  ids so unknown navigation state never renders blank. */
-export function viewLabel(id: string): string {
-  return VIEW_REGISTRY[id as ViewId]?.label ?? 'Tab';
-}
-
-/** Nav icon for an activity view id, or undefined when it has none. */
-export function viewIcon(id: string): React.ComponentType<{ size?: number }> | undefined {
-  return VIEW_REGISTRY[id as ViewId]?.icon;
-}

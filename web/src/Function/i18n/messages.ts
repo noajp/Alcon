@@ -9,8 +9,7 @@ const ja: TranslationMap = {
   'Account': 'アカウント', 'Activity space': 'アクティビティスペース', 'Administration': '管理',
   'AI agent': 'AI エージェント', 'Already have an account? ': 'すでにアカウントをお持ちですか？ ',
   'App sidebar': 'アプリサイドバー', 'At least 6 characters': '6文字以上', 'Back to sign in': 'サインインに戻る',
-  'Calendar': 'カレンダー', 'Cancel': 'キャンセル', 'Check your email': 'メールを確認してください',
-  'Close tab': 'タブを閉じる', 'Connected accounts': '連携アカウント', 'Connection Error': '接続エラー',
+  'Calendar': 'カレンダー', 'Cancel': 'キャンセル', 'Check your email': 'メールを確認してください', 'Connected accounts': '連携アカウント', 'Connection Error': '接続エラー',
   'Create': '作成', 'Create account': 'アカウントを作成', 'Create an account': 'アカウントを作成',
   'Create Domain': 'Domain を作成', 'Create new': '新規作成', 'Create Space': 'スペースを作成',
   'Create your Space': 'スペースを作成', 'Creating account...': 'アカウントを作成中...', 'Customize': 'カスタマイズ',
@@ -20,8 +19,7 @@ const ja: TranslationMap = {
   'Elements': 'Elements', 'Execution': 'Execution', 'First day of the week': '週の開始曜日', 'Font size': 'フォントサイズ',
   'General': '一般', 'Get started with Alcon': 'Alcon を始めましょう', 'Home': 'ホーム', 'Inbox': '受信トレイ',
   'Initiatives': 'Initiatives', 'Interface and theme': 'インターフェースとテーマ', 'Language': '言語',
-  'Loading…': '読み込み中…', 'Member': 'メンバー', 'My Elements': '自分の Elements', 'Name': '名前',
-  'New tab': '新しいタブ', 'No results.': '結果はありません。', 'Notebook': 'ノートブック',
+  'Loading…': '読み込み中…', 'Member': 'メンバー', 'My Elements': '自分の Elements', 'Name': '名前', 'No results.': '結果はありません。', 'Notebook': 'ノートブック',
   'Notifications': '通知', 'Now': '現在', 'Objects': 'Objects', 'Password': 'パスワード', 'Personal': '個人',
   'Phase': 'Phase', 'Preferences': '設定', 'Profile': 'プロフィール', 'Search': '検索', 'Search settings…': '設定を検索…',
   'Security & access': 'セキュリティとアクセス', 'Settings': '設定', 'Sign in': 'サインイン',
@@ -46,8 +44,7 @@ const ko: TranslationMap = {
   'Display properties': '표시 속성',
   'Account': '계정', 'Activity space': '활동 공간', 'Administration': '관리', 'AI agent': 'AI 에이전트',
   'Already have an account? ': '이미 계정이 있나요? ', 'App sidebar': '앱 사이드바', 'At least 6 characters': '6자 이상',
-  'Back to sign in': '로그인으로 돌아가기', 'Calendar': '캘린더', 'Cancel': '취소', 'Check your email': '이메일을 확인하세요',
-  'Close tab': '탭 닫기', 'Connected accounts': '연결된 계정', 'Connection Error': '연결 오류', 'Create': '만들기',
+  'Back to sign in': '로그인으로 돌아가기', 'Calendar': '캘린더', 'Cancel': '취소', 'Check your email': '이메일을 확인하세요', 'Connected accounts': '연결된 계정', 'Connection Error': '연결 오류', 'Create': '만들기',
   'Create account': '계정 만들기', 'Create an account': '계정 만들기', 'Create Domain': 'Domain 만들기', 'Create new': '새로 만들기',
   'Create Space': '공간 만들기', 'Create your Space': '공간을 만드세요', 'Creating account...': '계정 만드는 중...',
   'Customize': '사용자 설정', 'Default': '기본', 'Default home view': '기본 홈 뷰', 'Discover': '탐색', 'Display names': '이름 표시',
@@ -55,7 +52,7 @@ const ko: TranslationMap = {
   'Email': '이메일', 'Elements': 'Elements', 'Execution': 'Execution', 'First day of the week': '주 시작일', 'Font size': '글자 크기',
   'General': '일반', 'Get started with Alcon': 'Alcon 시작하기', 'Home': '홈', 'Inbox': '받은편지함', 'Initiatives': 'Initiatives',
   'Interface and theme': '인터페이스 및 테마', 'Language': '언어', 'Loading…': '로딩 중…', 'Member': '멤버',
-  'My Elements': '내 Elements', 'Name': '이름', 'New tab': '새 탭', 'No results.': '결과가 없습니다.', 'Notebook': '노트북',
+  'My Elements': '내 Elements', 'Name': '이름', 'No results.': '결과가 없습니다.', 'Notebook': '노트북',
   'Notifications': '알림', 'Now': '지금', 'Objects': 'Objects', 'Password': '비밀번호', 'Personal': '개인', 'Phase': 'Phase',
   'Preferences': '환경설정', 'Profile': '프로필', 'Search': '검색', 'Search settings…': '설정 검색…', 'Security & access': '보안 및 액세스',
   'Settings': '설정', 'Sign in': '로그인', 'Sign in to your Activity Space': '활동 공간에 로그인', 'Signing in...': '로그인 중...',
@@ -79,7 +76,7 @@ const fr: TranslationMap = {
   'Account': 'Compte', 'Activity space': "Espace d'activité", 'Administration': 'Administration', 'AI agent': 'Agent IA',
   'Already have an account? ': 'Vous avez déjà un compte ? ', 'App sidebar': "Barre latérale de l’app", 'At least 6 characters': 'Au moins 6 caractères',
   'Back to sign in': 'Retour à la connexion', 'Calendar': 'Calendrier', 'Cancel': 'Annuler', 'Check your email': 'Consultez votre messagerie',
-  'Close tab': "Fermer l’onglet", 'Connected accounts': 'Comptes connectés', 'Connection Error': 'Erreur de connexion', 'Create': 'Créer',
+  'Connected accounts': 'Comptes connectés', 'Connection Error': 'Erreur de connexion', 'Create': 'Créer',
   'Create account': 'Créer le compte', 'Create an account': 'Créer un compte', 'Create Domain': 'Créer un Domain', 'Create new': 'Créer',
   'Create Space': "Créer l’espace", 'Create your Space': 'Créez votre espace', 'Creating account...': 'Création du compte...', 'Customize': 'Personnaliser',
   'Default': 'Par défaut', 'Default home view': "Vue d’accueil par défaut", 'Discover': 'Découvrir', 'Display names': 'Affichage des noms',
@@ -87,7 +84,7 @@ const fr: TranslationMap = {
   'Email': 'E-mail', 'Elements': 'Elements', 'Execution': 'Execution', 'First day of the week': 'Premier jour de la semaine', 'Font size': 'Taille du texte',
   'General': 'Général', 'Get started with Alcon': 'Commencez avec Alcon', 'Home': 'Accueil', 'Inbox': 'Boîte de réception', 'Initiatives': 'Initiatives',
   'Interface and theme': 'Interface et thème', 'Language': 'Langue', 'Loading…': 'Chargement…', 'Member': 'Membre', 'My Elements': 'Mes Elements',
-  'Name': 'Nom', 'New tab': 'Nouvel onglet', 'No results.': 'Aucun résultat.', 'Notebook': 'Carnet', 'Notifications': 'Notifications', 'Now': 'Maintenant',
+  'Name': 'Nom', 'No results.': 'Aucun résultat.', 'Notebook': 'Carnet', 'Notifications': 'Notifications', 'Now': 'Maintenant',
   'Objects': 'Objects', 'Password': 'Mot de passe', 'Personal': 'Personnel', 'Phase': 'Phase', 'Preferences': 'Préférences', 'Profile': 'Profil',
   'Search': 'Rechercher', 'Search settings…': 'Rechercher dans les paramètres…', 'Security & access': 'Sécurité et accès', 'Settings': 'Paramètres',
   'Sign in': 'Se connecter', 'Sign in to your Activity Space': "Connectez-vous à votre espace d’activité", 'Signing in...': 'Connexion...',
@@ -110,8 +107,7 @@ const es: TranslationMap = {
   'Display properties': 'Propiedades visibles',
   'Account': 'Cuenta', 'Activity space': 'Espacio de actividad', 'Administration': 'Administración', 'AI agent': 'Agente de IA',
   'Already have an account? ': '¿Ya tienes una cuenta? ', 'App sidebar': 'Barra lateral', 'At least 6 characters': 'Al menos 6 caracteres',
-  'Back to sign in': 'Volver a iniciar sesión', 'Calendar': 'Calendario', 'Cancel': 'Cancelar', 'Check your email': 'Revisa tu correo',
-  'Close tab': 'Cerrar pestaña', 'Connected accounts': 'Cuentas conectadas', 'Connection Error': 'Error de conexión', 'Create': 'Crear',
+  'Back to sign in': 'Volver a iniciar sesión', 'Calendar': 'Calendario', 'Cancel': 'Cancelar', 'Check your email': 'Revisa tu correo', 'Connected accounts': 'Cuentas conectadas', 'Connection Error': 'Error de conexión', 'Create': 'Crear',
   'Create account': 'Crear cuenta', 'Create an account': 'Crear una cuenta', 'Create Domain': 'Crear Domain', 'Create new': 'Crear',
   'Create Space': 'Crear espacio', 'Create your Space': 'Crea tu espacio', 'Creating account...': 'Creando cuenta...', 'Customize': 'Personalizar',
   'Default': 'Predeterminado', 'Default home view': 'Vista de inicio predeterminada', 'Discover': 'Descubrir', 'Display names': 'Visualización de nombres',
@@ -119,7 +115,7 @@ const es: TranslationMap = {
   'Email': 'Correo electrónico', 'Elements': 'Elements', 'Execution': 'Execution', 'First day of the week': 'Primer día de la semana', 'Font size': 'Tamaño del texto',
   'General': 'General', 'Get started with Alcon': 'Empieza a usar Alcon', 'Home': 'Inicio', 'Inbox': 'Bandeja de entrada', 'Initiatives': 'Initiatives',
   'Interface and theme': 'Interfaz y tema', 'Language': 'Idioma', 'Loading…': 'Cargando…', 'Member': 'Miembro', 'My Elements': 'Mis Elements',
-  'Name': 'Nombre', 'New tab': 'Nueva pestaña', 'No results.': 'No hay resultados.', 'Notebook': 'Cuaderno', 'Notifications': 'Notificaciones', 'Now': 'Ahora',
+  'Name': 'Nombre', 'No results.': 'No hay resultados.', 'Notebook': 'Cuaderno', 'Notifications': 'Notificaciones', 'Now': 'Ahora',
   'Objects': 'Objects', 'Password': 'Contraseña', 'Personal': 'Personal', 'Phase': 'Phase', 'Preferences': 'Preferencias', 'Profile': 'Perfil',
   'Search': 'Buscar', 'Search settings…': 'Buscar en ajustes…', 'Security & access': 'Seguridad y acceso', 'Settings': 'Ajustes',
   'Sign in': 'Iniciar sesión', 'Sign in to your Activity Space': 'Inicia sesión en tu espacio de actividad', 'Signing in...': 'Iniciando sesión...',
@@ -242,17 +238,17 @@ for (const locale of Object.keys(commonMessages) as Array<Exclude<Locale, 'en'>>
 export const MESSAGES = MESSAGES_PLACEHOLDER;
 
 Object.assign(ja, {
-  'Today': '今日', 'People': 'メンバー', 'Previous month': '前の月', 'Next month': '次の月', 'Show all': 'すべて表示', 'Edit profile': 'プロフィールを編集', 'New Initiative': '新しい Initiative', 'Add schedule': '予定を追加', 'New section': '新しいセクション', 'New page': '新しいページ', 'Rename': '名前を変更', 'Delete notebook': 'ノートブックを削除', 'Delete section': 'セクションを削除', 'Delete page': 'ページを削除', 'Untitled': '無題', 'Select a notebook to see its pages': 'ノートブックを選ぶとページが表示されます', 'My Notes': 'マイノート', 'No notes yet.': 'ノートはまだありません。', 'No one is scheduled here.': 'この予定表に担当者はいません。',
+  'Today': '今日', 'People': 'メンバー', 'Previous month': '前の月', 'Next month': '次の月', 'Show all': 'すべて表示', 'Edit profile': 'プロフィールを編集', 'New Initiative': '新しい Initiative', 'Add schedule': '予定を追加', 'New section': '新しいセクション', 'New page': '新しいページ', 'Rename': '名前を変更', 'Delete notebook': 'ノートブックを削除', 'Delete section': 'セクションを削除', 'Delete page': 'ページを削除', 'Untitled': '無題', 'Back': '戻る', 'Select a notebook to see its pages': 'ノートブックを選ぶとページが表示されます', 'My Notes': 'マイノート', 'No notes yet.': 'ノートはまだありません。', 'No one is scheduled here.': 'この予定表に担当者はいません。',
 });
 
 Object.assign(ko, {
-  'Today': '오늘', 'People': '사람', 'Previous month': '이전 달', 'Next month': '다음 달', 'Show all': '모두 표시', 'Edit profile': '프로필 편집', 'New Initiative': '새 Initiative', 'Add schedule': '일정 추가', 'New section': '새 섹션', 'New page': '새 페이지', 'Rename': '이름 바꾸기', 'Delete notebook': '노트북 삭제', 'Delete section': '섹션 삭제', 'Delete page': '페이지 삭제', 'Untitled': '제목 없음', 'Select a notebook to see its pages': '노트북을 선택하면 페이지가 표시됩니다', 'My Notes': '내 노트', 'No notes yet.': '아직 노트가 없습니다.', 'No one is scheduled here.': '이 캘린더에 배정된 사람이 없습니다.',
+  'Today': '오늘', 'People': '사람', 'Previous month': '이전 달', 'Next month': '다음 달', 'Show all': '모두 표시', 'Edit profile': '프로필 편집', 'New Initiative': '새 Initiative', 'Add schedule': '일정 추가', 'New section': '새 섹션', 'New page': '새 페이지', 'Rename': '이름 바꾸기', 'Delete notebook': '노트북 삭제', 'Delete section': '섹션 삭제', 'Delete page': '페이지 삭제', 'Untitled': '제목 없음', 'Back': '뒤로', 'Select a notebook to see its pages': '노트북을 선택하면 페이지가 표시됩니다', 'My Notes': '내 노트', 'No notes yet.': '아직 노트가 없습니다.', 'No one is scheduled here.': '이 캘린더에 배정된 사람이 없습니다.',
 });
 
 Object.assign(fr, {
-  'Today': "Aujourd'hui", 'People': 'Personnes', 'Previous month': 'Mois précédent', 'Next month': 'Mois suivant', 'Show all': 'Tout afficher', 'Edit profile': 'Modifier le profil', 'New Initiative': 'Nouvelle Initiative', 'Add schedule': 'Ajouter au calendrier', 'New section': 'Nouvelle section', 'New page': 'Nouvelle page', 'Rename': 'Renommer', 'Delete notebook': 'Supprimer le carnet', 'Delete section': 'Supprimer la section', 'Delete page': 'Supprimer la page', 'Untitled': 'Sans titre', 'Select a notebook to see its pages': 'Choisissez un carnet pour voir ses pages', 'My Notes': 'Mes notes', 'No notes yet.': 'Aucune note pour l’instant.', 'No one is scheduled here.': 'Personne n’est planifié ici.',
+  'Today': "Aujourd'hui", 'People': 'Personnes', 'Previous month': 'Mois précédent', 'Next month': 'Mois suivant', 'Show all': 'Tout afficher', 'Edit profile': 'Modifier le profil', 'New Initiative': 'Nouvelle Initiative', 'Add schedule': 'Ajouter au calendrier', 'New section': 'Nouvelle section', 'New page': 'Nouvelle page', 'Rename': 'Renommer', 'Delete notebook': 'Supprimer le carnet', 'Delete section': 'Supprimer la section', 'Delete page': 'Supprimer la page', 'Untitled': 'Sans titre', 'Back': 'Retour', 'Select a notebook to see its pages': 'Choisissez un carnet pour voir ses pages', 'My Notes': 'Mes notes', 'No notes yet.': 'Aucune note pour l’instant.', 'No one is scheduled here.': 'Personne n’est planifié ici.',
 });
 
 Object.assign(es, {
-  'Today': 'Hoy', 'People': 'Personas', 'Previous month': 'Mes anterior', 'Next month': 'Mes siguiente', 'Show all': 'Mostrar todo', 'Edit profile': 'Editar perfil', 'New Initiative': 'Nueva Initiative', 'Add schedule': 'Añadir al calendario', 'New section': 'Nueva sección', 'New page': 'Nueva página', 'Rename': 'Renombrar', 'Delete notebook': 'Eliminar cuaderno', 'Delete section': 'Eliminar sección', 'Delete page': 'Eliminar página', 'Untitled': 'Sin título', 'Select a notebook to see its pages': 'Elige un cuaderno para ver sus páginas', 'My Notes': 'Mis notas', 'No notes yet.': 'Aún no hay notas.', 'No one is scheduled here.': 'Nadie está programado aquí.',
+  'Today': 'Hoy', 'People': 'Personas', 'Previous month': 'Mes anterior', 'Next month': 'Mes siguiente', 'Show all': 'Mostrar todo', 'Edit profile': 'Editar perfil', 'New Initiative': 'Nueva Initiative', 'Add schedule': 'Añadir al calendario', 'New section': 'Nueva sección', 'New page': 'Nueva página', 'Rename': 'Renombrar', 'Delete notebook': 'Eliminar cuaderno', 'Delete section': 'Eliminar sección', 'Delete page': 'Eliminar página', 'Untitled': 'Sin título', 'Back': 'Atrás', 'Select a notebook to see its pages': 'Elige un cuaderno para ver sus páginas', 'My Notes': 'Mis notas', 'No notes yet.': 'Aún no hay notas.', 'No one is scheduled here.': 'Nadie está programado aquí.',
 });

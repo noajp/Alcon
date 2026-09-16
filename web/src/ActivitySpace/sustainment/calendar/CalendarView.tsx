@@ -132,7 +132,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
   useEscapeLayer(showColorPicker, () => setShowColorPicker(false));
   // Settings > Preferences > "First day of the week" — this is the Calendar
   // view itself, so a change while it's already open (or open in another
-  // tab, via WindowTabBar's parallel mounting) has to move the grid without
+  // kept view, via the shell's parallel mounting) has to move the grid without
   // a reload (ELE_QLT-025).
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
 

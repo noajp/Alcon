@@ -13,7 +13,7 @@ import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateVi
 import { CommandPalette } from '@/shell/CommandPalette';
 import { QuickAddElementLauncher } from '@/shell/QuickAddElementLauncher';
 import { AlconCopilotPanel } from '@/Function/copilot';
-import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
+import type { AppTab } from '@/shell/appTab';
 import { mergeNavigation, navigationAfterDomainChange } from '@/shell/navigationState';
 import type { NavigationState } from '@/types/navigation';
 import { useDomains, useObjects, createObject, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
@@ -244,16 +244,15 @@ function WorkspaceContent({
   onActiveDomainChange: (id: string) => void;
 }) {
   const { t } = useI18n();
-  // Browser-style window tabs — each tab carries its own activity + navigation
-  // and renders its own MainContent in parallel so internal state (Domain
-  // tab selection, expand state, scroll position, etc.) survives switches.
+  // The shell's view + navigation. Kept as a list of tabs so a surface's
+  // internal state (Domain tab selection, expand state, scroll position …)
+  // survives while another view is shown; the page shows one at a time and
+  // has no tab strip — this is a browser tab already.
   const initialTabRef = useRef<AppTab | null>(null);
-  // Settings > Preferences > "Default home view" — only the very first tab
-  // of a session honors it; the "+" new-tab action always opens fresh at
-  // the Inbox (see handleCreateTab below).
+  // Settings > Preferences > "Default home view" — honoured at launch.
   if (initialTabRef.current === null) initialTabRef.current = makeNewTab(getCachedHomeViewId());
   const [tabs, setTabs] = useState<AppTab[]>(() => [initialTabRef.current!]);
-  const [activeTabId, setActiveTabId] = useState<string>(() => initialTabRef.current!.id);
+  const [activeTabId] = useState<string>(() => initialTabRef.current!.id);
 
   const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0];
 
@@ -278,55 +277,32 @@ function WorkspaceContent({
   const setActiveView = (view: string) => updateTab(activeTab.id, { activeView: view });
   const setActiveNavigation = (nav: Partial<NavigationState>) => updateTabNavigation(activeTab.id, nav);
 
-  const handleCreateTab = () => {
-    // A fresh tab opens the Inbox, the first entry on the rail.
-    const tab = makeNewTab();
-    setTabs(prev => [...prev, tab]);
-    setActiveTabId(tab.id);
-  };
-  // Settings always opens in its own tab rather than overwriting whatever
-  // the active tab was showing — the one navigation target a viewer needs a
-  // way back FROM, not just a way to switch away from. Overwriting in place
-  // left no way back when it was the only open tab (WindowTabBar only shows
-  // a close button once there are 2+ tabs) and no way back even with
-  // several tabs open, since the tab that used to be "My Elements" was just
-  // gone. Reuses an already-open Settings tab instead of stacking a new one
-  // every time the entry point is used again.
+  // Settings opens in place and remembers where it came from, so the
+  // sidebar's Back returns to that view — the one navigation target a
+  // viewer needs a way back FROM, not just a way to switch away from.
+  const [settingsReturnView, setSettingsReturnView] = useState<string | null>(null);
   const handleOpenSettings = () => {
-    const existing = tabs.find(t => t.activeView === 'settings');
-    if (existing) {
-      setActiveTabId(existing.id);
-      return;
-    }
-    const tab = makeNewTab('settings');
-    setTabs(prev => [...prev, tab]);
-    setActiveTabId(tab.id);
+    if (activeTab.activeView === 'settings') return;
+    setSettingsReturnView(activeTab.activeView);
+    setActiveView('settings');
   };
-  const handleCloseTab = (tabId: string) => {
-    setTabs(prev => {
-      if (prev.length <= 1) return prev;
-      const idx = prev.findIndex(t => t.id === tabId);
-      const next = prev.filter(t => t.id !== tabId);
-      if (tabId === activeTabId) {
-        const fallback = next[Math.max(0, idx - 1)] ?? next[0];
-        setActiveTabId(fallback.id);
-      }
-      return next;
-    });
+  const handleCloseSettings = () => {
+    setActiveView(settingsReturnView && settingsReturnView !== 'settings' ? settingsReturnView : 'inbox');
+    setSettingsReturnView(null);
   };
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH,
   );
   // When collapsed, the sidebar can still be peeked as a floating overlay
-  // (via the WindowTabBar reveal button) instead of pinning it back into flow.
+  // (via the rail's reveal button) instead of pinning it back into flow.
   const [sidebarOverlay, setSidebarOverlay] = useState(false);
   // Profile (reached from the avatar; Now / My Elements / My Notes / AI are
   // its tabs) has nothing to list, so it takes the whole width.
   const personalMode = railModeOf(activeTab.activeView) === 'personal';
   const sidebarHidden = sidebarCollapsed || personalMode;
   const [discoverOpen, setDiscoverOpen] = useState(false);
-  // Alcon Copilot pane — open state shared by the WindowTabBar PanelRight
+  // Alcon Copilot pane — open state shared by the rail's PanelRight
   // toggle, ⌘L, and the panel's own close button. localStorage round-trips
   // it across reloads.
   const [copilotOpen, setCopilotOpen] = useState(false);
@@ -426,7 +402,7 @@ function WorkspaceContent({
     setCreateType(null);
   };
 
-  // PanelLeft button at the WindowTabBar's right edge. The right behaviour
+  // PanelLeft button at the foot of the rail. The right behaviour
   // depends on whether the window is wide enough to show the sidebar AND the
   // island side-by-side:
   // - Visible → hide it (island goes full-width).
@@ -500,7 +476,10 @@ function WorkspaceContent({
         <ModeRail
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
-          onOpenSettings={handleOpenSettings}
+          sidebarCollapsed={sidebarHidden}
+          onToggleSidebar={personalMode ? undefined : handleSidebarToggle}
+          copilotOpen={copilotOpen}
+          onToggleCopilot={() => handleCopilotOpenChange(!copilotOpen)}
         />
         {!personalMode && <AppSidebar
           navigation={activeTab.navigation}
@@ -508,6 +487,7 @@ function WorkspaceContent({
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
           onOpenSettings={handleOpenSettings}
+          onCloseSettings={handleCloseSettings}
           onRefresh={refetch}
           width={260}
           collapsed={sidebarCollapsed}
@@ -524,18 +504,7 @@ function WorkspaceContent({
           />
         )}
 
-        <div className={`flex-1 flex flex-col overflow-hidden pr-1.5 pb-1.5 ${sidebarHidden ? 'pl-1.5' : 'pl-0'}`}>
-        <WindowTabBar
-          tabs={tabs}
-          activeTabId={activeTab.id}
-          onSelect={setActiveTabId}
-          onClose={handleCloseTab}
-          onCreate={handleCreateTab}
-          sidebarCollapsed={sidebarHidden}
-          onToggleSidebar={personalMode ? undefined : handleSidebarToggle}
-          copilotOpen={copilotOpen}
-          onToggleCopilot={() => handleCopilotOpenChange(!copilotOpen)}
-        />
+        <div className={`flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5 pb-1.5 ${sidebarHidden ? 'pl-1.5' : 'pl-0'}`}>
         {/* MainContent + Copilot live side-by-side as two islands. When the
             Copilot is open it claims its own width on the right; otherwise
             MainContent fills the row. */}
@@ -548,9 +517,9 @@ function WorkspaceContent({
                 onCreated={handleCreated}
               />
             ) : (
-              // Render every tab's content tree; only the active one is visible.
-              // Hidden tabs stay mounted so their internal state (Domain tab,
-              // expand state, scroll, edit drafts, etc.) survives a tab swap.
+              // Render every kept view's tree; only the active one is visible.
+              // The others stay mounted so their internal state (Domain tab,
+              // expand state, scroll, edit drafts, etc.) survives a swap.
               tabs.map((tab) => {
                 const isActive = tab.id === activeTab.id;
                 return (
