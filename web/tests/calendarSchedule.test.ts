@@ -137,8 +137,7 @@ describe('month bands', () => {
     expect(out.map(s => s.entry.id)).toEqual(['c', 'a', 'b']);
     expect(out.map(s => s.lane)).toEqual([0, 0, 1]);
   });
-  it('treats a range whose start is after its due as the same span reversed', () => {
-    const [s] = spans([entry('odd', '2026-09-16', '2026-09-14')]);
-    expect([s.startCol, s.endCol]).toEqual([1, 3]);
+  it('leaves a range whose start is after its due off the grid, as occursOn does', () => {
+    expect(spans([entry('odd', '2026-09-16', '2026-09-14')])).toEqual([]);
   });
 });

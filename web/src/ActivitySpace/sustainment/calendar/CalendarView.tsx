@@ -583,16 +583,20 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                     }}
                     className={`
                       group/chip absolute text-left px-2 transition-colors hover:brightness-95
-                      ${span.continuesBefore ? 'rounded-l-none' : 'rounded-l-md'}
-                      ${span.continuesAfter ? 'rounded-r-none' : 'rounded-r-md'}
+                      rounded-l-none ${span.continuesAfter ? 'rounded-r-none' : 'rounded-r-md'}
                       ${cardStyle.className}
                       ${overdue ? 'ring-1 ring-[var(--status-danger)]/60' : ''}
                       ${isDone ? 'opacity-70' : ''}
                       ${dragging?.id === element.id ? 'opacity-40' : ''}
                       ${element.element ? 'cursor-grab active:cursor-grabbing' : ''}
                     `}
+                    // The left edge is a straight line: the status / colour
+                    // mark is a vertical rule, not a curve, and a band that
+                    // continues from the previous week has no mark at all so
+                    // it reads as the middle of something.
                     style={{
                       ...cardStyle.style,
+                      ...(span.continuesBefore ? { borderLeft: 'none' } : {}),
                       top: MONTH_LANE_TOP + span.lane * MONTH_LANE_HEIGHT,
                       height: MONTH_LANE_HEIGHT - 2,
                       left: `calc(${(span.startCol / 7) * 100}% + ${span.continuesBefore ? 0 : 6}px)`,

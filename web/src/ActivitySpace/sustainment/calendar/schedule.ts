@@ -12,10 +12,21 @@ export type CalendarEntry = Pick<ElementWithDetails,
  *  an Element with a range used to skip the first day it covers. */
 const dayOf = (value: string) => value.slice(0, 10);
 
-export function occursOn(entry: { start_date: string | null; due_date: string | null }, date: string): boolean {
+/** The days an entry covers, as `yyyy-MM-dd` bounds. A pair with the start
+ *  after the due is not a span at all — it stays off the grid, the same way
+ *  an undated entry does, rather than being silently read backwards. */
+function spanOf(entry: { start_date: string | null; due_date: string | null }): { s: string; e: string } | null {
   const start = entry.start_date ?? entry.due_date;
   const end = entry.due_date ?? entry.start_date;
-  return Boolean(start && end && dayOf(start) <= dayOf(date) && dayOf(date) <= dayOf(end));
+  if (!start || !end) return null;
+  const s = dayOf(start);
+  const e = dayOf(end);
+  return s <= e ? { s, e } : null;
+}
+
+export function occursOn(entry: { start_date: string | null; due_date: string | null }, date: string): boolean {
+  const span = spanOf(entry);
+  return Boolean(span && span.s <= dayOf(date) && dayOf(date) <= span.e);
 }
 
 export function calendarEntries(elements: ElementWithDetails[], objects: AlconObject[] = []): CalendarEntry[] {
@@ -124,11 +135,9 @@ export function layoutWeekSpans(entries: CalendarEntry[], week: string[]): WeekS
   const first = week[0];
   const last = week[week.length - 1];
   const spans = entries.flatMap(entry => {
-    const start = entry.start_date ?? entry.due_date;
-    const end = entry.due_date ?? entry.start_date;
-    if (!start || !end) return [];
-    const s = dayOf(start) <= dayOf(end) ? dayOf(start) : dayOf(end);
-    const e = dayOf(start) <= dayOf(end) ? dayOf(end) : dayOf(start);
+    const span = spanOf(entry);
+    if (!span) return [];
+    const { s, e } = span;
     if (e < first || s > last) return [];
     const startCol = s < first ? 0 : week.indexOf(s);
     const endCol = e > last ? week.length - 1 : week.indexOf(e);
