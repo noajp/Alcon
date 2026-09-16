@@ -10,7 +10,7 @@ import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import type { ElementWithDetails, AlconObject } from '@/types/database';
-import { calendarEntries, occursOn, layoutTimedEntries, type CalendarEntry } from './schedule';
+import { calendarEntries, occursOn, layoutTimedEntries, layoutWeekSpans, type CalendarEntry } from './schedule';
 import { COLOR_PALETTE } from './calendarColorPalette';
 import { updateElement } from '@/hooks/useSupabase';
 import { STATUS, statusColor, statusLabel, type StatusKey } from '@/shared/designTokens';
@@ -48,6 +48,12 @@ function pastelFromHex(hex: string): { backgroundColor: string; color: string; d
     dotColor: hex,
   };
 }
+
+// Month grid: bands are stacked in lanes under the date row; a day showing
+// more than this many collapses the rest into "+N more".
+const MONTH_MAX_LANES = 3;
+const MONTH_LANE_HEIGHT = 22;   // px per lane
+const MONTH_LANE_TOP = 34;      // px from the row's top to the first lane (date row + gap)
 
 // Time grid constants
 const GRID_START_HOUR = 0;
@@ -172,6 +178,9 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
 
     return days;
   }, [currentDate, weekStartsOn]);
+
+  // The month grid as rows of seven, each laid out on its own.
+  const weekRows = useMemo(() => Array.from({ length: calendarData.length / 7 }, (_, w) => calendarData.slice(w * 7, w * 7 + 7)), [calendarData]);
 
   // Group elements by date
   const elementsByDate = useMemo(() => {
@@ -375,205 +384,244 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
           ))}
         </div>
 
-        {/* Calendar days */}
-        <div className="grid grid-cols-7">
-          {calendarData.map((day, index) => {
-            const dateKey = day.date.toDateString();
-            const dayElements = elementsByDate[dateKey] || [];
-            const isWeekend = day.date.getDay() === 0 || day.date.getDay() === 6;
-
-            return (
-              <div
-                key={index}
-                onClick={(e) => setDayPicker({ date: day.date, x: e.clientX, y: e.clientY })}
-                onDragOver={(e) => { if (dragging) e.preventDefault(); }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (!dragging) return;
-                  const entry = elements.find((el) => el.id === dragging.id);
-                  const from = dragging.from;
-                  setDragging(null);
-                  if (entry) void moveTo(entry, from, fmtDateOnly(day.date));
-                }}
-                className={`
-                  group min-h-28 border-b border-r border-[var(--border-subtle)] p-2
-                  transition-colors duration-150 cursor-pointer flex flex-col
-                  ${
-                    !day.isCurrentMonth
-                      ? 'bg-muted/20'
-                      : isWeekend
-                      ? 'bg-muted/10 hover:bg-muted/30'
-                      : 'hover:bg-muted/30'
-                  }
-                `}
-              >
-                {/* Date number */}
-                <div className="flex justify-start mb-1">
-                  {day.isToday ? (
-                    <span className="bg-[var(--accent-default)] text-primary-foreground w-6 h-6 pt-0.5 rounded-full flex items-center justify-center text-[12px] font-semibold leading-none tabular-nums">
-                      {day.date.getDate()}
-                    </span>
-                  ) : (
-                    <span
-                      className={`text-[12px] font-medium px-1 ${
-                        day.isCurrentMonth ? 'text-foreground' : 'text-muted-foreground/40'
-                      }`}
-                    >
-                      {day.date.getDate()}
-                    </span>
-                  )}
-                </div>
-
-                {/* Elements */}
-                <div className="space-y-0.5 flex-1 overflow-hidden">
-                  {dayElements.slice(0, 3).map(element => {
-                    const cardStyle = getCardStyle(element);
-                    const overdue = isOverdue(element);
-                    const isDone = element.status === 'done';
-                    const isHighPriority =
-                      element.priority === 'high' || element.priority === 'urgent';
-                    const priorityDotColor =
-                      element.priority === 'urgent' ? 'bg-[var(--status-danger)]' : 'bg-orange-400';
-
-                    return (
-                      <button
-                        key={element.id}
-                        draggable={Boolean(element.element)}
-                        onDragStart={(e) => {
-                          e.stopPropagation();
-                          e.dataTransfer.effectAllowed = 'move';
-                          // Firefox refuses to start a drag without payload.
-                          e.dataTransfer.setData('text/plain', element.id);
-                          setDragging({ id: element.id, from: fmtDateOnly(day.date) });
-                        }}
-                        onDragEnd={() => setDragging(null)}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedElement(element);
-                          onElementClick?.(element);
-                        }}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          setSelectedElement(element);
-                          setShowColorPicker(Boolean(element.element));
-                        }}
-                        className={`
-                          group/chip w-full text-left rounded-md px-2 py-1
-                          transition-colors hover:brightness-95
-                          ${cardStyle.className}
-                          ${overdue ? 'ring-1 ring-[var(--status-danger)]/60' : ''}
-                          ${isDone ? 'opacity-70' : ''}
-                          ${dragging?.id === element.id ? 'opacity-40' : ''}
-                          ${element.element ? 'cursor-grab active:cursor-grabbing' : ''}
-                        `}
-                        style={cardStyle.style}
-                        title={`${element.title}${overdue ? ' (Overdue)' : ''}\nRight-click to change color`}
-                      >
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          {element.object && <ObjectIcon size={12} />}
-                          <span
-                            className={`text-[11px] font-medium leading-tight truncate flex-1 ${
-                              isDone ? 'line-through' : ''
-                            }`}
-                          >
-                            {element.title}
-                          </span>
-                          {isHighPriority && (
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${priorityDotColor}`}
-                              title={element.priority || ''}
-                            />
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                  {dayElements.length > 3 && (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded-md hover:bg-muted transition-colors duration-150 cursor-pointer font-medium"
+        {/* Calendar weeks — each week is one row: seven day cells carry the
+            date, the hover "+" / right-click scheduler and the drop target,
+            and over them the Elements are drawn as bands from their first
+            day to their last (clipped to the week), so a span reads as one
+            thing rather than a chip repeated in every cell. */}
+        {weekRows.map((week, w) => {
+          const days = week.map(day => fmtDateOnly(day.date));
+          const spans = layoutWeekSpans(elements, days);
+          const visibleSpans = spans.filter(span => span.lane < MONTH_MAX_LANES);
+          const hiddenByCol = week.map((_, col) => spans.filter(span => span.lane >= MONTH_MAX_LANES && span.startCol <= col && col <= span.endCol).length);
+          // Which day a pointer is over inside this row — bands cover the
+          // cells, so their drags and drops resolve the day from the x.
+          const dayAt = (row: HTMLElement, clientX: number) => {
+            const rect = row.getBoundingClientRect();
+            const col = Math.min(6, Math.max(0, Math.floor(((clientX - rect.left) / rect.width) * 7)));
+            return days[col];
+          };
+          const dropOn = (e: React.DragEvent<HTMLElement>, day: string) => {
+            e.preventDefault();
+            if (!dragging) return;
+            const entry = elements.find((el) => el.id === dragging.id);
+            const from = dragging.from;
+            setDragging(null);
+            if (entry) void moveTo(entry, from, day);
+          };
+          return (
+            <div key={w} className="relative grid grid-cols-7">
+              {week.map((day, col) => {
+                const dateKey = day.date.toDateString();
+                const dayElements = elementsByDate[dateKey] || [];
+                const isWeekend = day.date.getDay() === 0 || day.date.getDay() === 6;
+                const hidden = hiddenByCol[col];
+                const openPicker = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); setDayPicker({ date: day.date, x: e.clientX, y: e.clientY }); };
+                return (
+                  <div
+                    key={col}
+                    onContextMenu={openPicker}
+                    onDragOver={(e) => { if (dragging) e.preventDefault(); }}
+                    onDrop={(e) => dropOn(e, days[col])}
+                    className={`
+                      group min-h-28 border-b border-r border-[var(--border-subtle)] p-2
+                      transition-colors duration-150 flex flex-col
+                      ${
+                        !day.isCurrentMonth
+                          ? 'bg-muted/20'
+                          : isWeekend
+                          ? 'bg-muted/10 hover:bg-muted/30'
+                          : 'hover:bg-muted/30'
+                      }
+                    `}
+                  >
+                    {/* Date number + the scheduler "+" (hover / right-click) */}
+                    <div className="mb-1 flex h-6 items-center justify-between">
+                      {day.isToday ? (
+                        <span className="bg-[var(--accent-default)] text-primary-foreground w-6 h-6 pt-0.5 rounded-full flex items-center justify-center text-[12px] font-semibold leading-none tabular-nums">
+                          {day.date.getDate()}
+                        </span>
+                      ) : (
+                        <span
+                          className={`text-[12px] font-medium px-1 ${
+                            day.isCurrentMonth ? 'text-foreground' : 'text-muted-foreground/40'
+                          }`}
                         >
-                          +{dayElements.length - 3} more
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-72 p-3" align="start">
-                        <div className="mb-2.5 pb-2 border-b border-border/60">
-                          <div className="text-sm font-semibold tracking-tight">
-                            {day.date.toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                            })}{' '}
-                            <span className="text-muted-foreground font-normal">
-                              ({day.date.toLocaleDateString('en-US', { weekday: 'short' })})
-                            </span>
+                          {day.date.getDate()}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={openPicker}
+                        title="Schedule an Element on this day"
+                        aria-label={`Schedule an Element on ${day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                        className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted/40 hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+                      >
+                        <CalendarPlus size={13} />
+                      </button>
+                    </div>
+                    {/* Room for the bands drawn over this row */}
+                    <div style={{ height: MONTH_MAX_LANES * MONTH_LANE_HEIGHT }} aria-hidden="true" />
+                    {hidden > 0 && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            onClick={(e) => e.stopPropagation()}
+                            className="self-start text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded-md hover:bg-muted transition-colors duration-150 cursor-pointer font-medium"
+                          >
+                            +{hidden} more
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-72 p-3" align="start">
+                          <div className="mb-2.5 pb-2 border-b border-border/60">
+                            <div className="text-sm font-semibold tracking-tight">
+                              {day.date.toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })}{' '}
+                              <span className="text-muted-foreground font-normal">
+                                ({day.date.toLocaleDateString('en-US', { weekday: 'short' })})
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-muted-foreground mt-0.5">
+                              {dayElements.length} {dayElements.length === 1 ? 'item' : 'items'}
+                            </div>
                           </div>
-                          <div className="text-[11px] text-muted-foreground mt-0.5">
-                            {dayElements.length} {dayElements.length === 1 ? 'item' : 'items'}
+                          <div className="space-y-0.5 max-h-[280px] overflow-y-auto -mx-1 px-1">
+                            {dayElements.map(element => {
+                              const statusKey = element.status || 'todo';
+                              const dotColor = element.color || statusColor(statusKey);
+                              return (
+                                <button
+                                  key={element.id}
+                                  // The overflow list is where a crowded day
+                                  // keeps its Elements, which is exactly the day
+                                  // somebody wants to move one off.
+                                  draggable={Boolean(element.element)}
+                                  onDragStart={(e) => {
+                                    e.stopPropagation();
+                                    e.dataTransfer.effectAllowed = 'move';
+                                    e.dataTransfer.setData('text/plain', element.id);
+                                    setDragging({ id: element.id, from: fmtDateOnly(day.date) });
+                                  }}
+                                  onDragEnd={() => setDragging(null)}
+                                  onClick={() => {
+                                    setSelectedElement(element);
+                                    onElementClick?.(element);
+                                  }}
+                                  onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    setSelectedElement(element);
+                                    setShowColorPicker(Boolean(element.element));
+                                  }}
+                                  className="w-full text-left px-2 py-1.5 text-xs rounded-md hover:bg-muted transition-colors duration-150"
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span
+                                      className="w-2 h-2 rounded-full flex-shrink-0"
+                                      style={{ backgroundColor: dotColor }}
+                                    />
+                                    <span
+                                      className={`truncate flex-1 ${
+                                        element.status === 'done' ? 'line-through opacity-60' : ''
+                                      }`}
+                                    >
+                                      {element.title}
+                                    </span>
+                                    <span
+                                      className="text-[10px] text-muted-foreground flex-shrink-0"
+                                      style={{ color: statusColor(statusKey) }}
+                                    >
+                                      {statusLabel(statusKey)}
+                                    </span>
+                                  </div>
+                                </button>
+                              );
+                            })}
                           </div>
-                        </div>
-                        <div className="space-y-0.5 max-h-[280px] overflow-y-auto -mx-1 px-1">
-                          {dayElements.map(element => {
-                            const statusKey = element.status || 'todo';
-                            const dotColor = element.color || statusColor(statusKey);
-                            return (
-                              <button
-                                key={element.id}
-                                // The overflow list is where a crowded day
-                                // keeps its Elements, which is exactly the day
-                                // somebody wants to move one off.
-                                draggable={Boolean(element.element)}
-                                onDragStart={(e) => {
-                                  e.stopPropagation();
-                                  e.dataTransfer.effectAllowed = 'move';
-                                  e.dataTransfer.setData('text/plain', element.id);
-                                  setDragging({ id: element.id, from: fmtDateOnly(day.date) });
-                                }}
-                                onDragEnd={() => setDragging(null)}
-                                onClick={() => {
-                                  setSelectedElement(element);
-                                  onElementClick?.(element);
-                                }}
-                                onContextMenu={(e) => {
-                                  e.preventDefault();
-                                  setSelectedElement(element);
-                                  setShowColorPicker(Boolean(element.element));
-                                }}
-                                className="w-full text-left px-2 py-1.5 text-xs rounded-md hover:bg-muted transition-colors duration-150"
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span
-                                    className="w-2 h-2 rounded-full flex-shrink-0"
-                                    style={{ backgroundColor: dotColor }}
-                                  />
-                                  <span
-                                    className={`truncate flex-1 ${
-                                      element.status === 'done' ? 'line-through opacity-60' : ''
-                                    }`}
-                                  >
-                                    {element.title}
-                                  </span>
-                                  <span
-                                    className="text-[10px] text-muted-foreground flex-shrink-0"
-                                    style={{ color: statusColor(statusKey) }}
-                                  >
-                                    {statusLabel(statusKey)}
-                                  </span>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Bands — one per Element per week, spanning its days */}
+              {visibleSpans.map(span => {
+                const element = span.entry;
+                const cardStyle = getCardStyle(element);
+                const overdue = isOverdue(element);
+                const isDone = element.status === 'done';
+                const isHighPriority = element.priority === 'high' || element.priority === 'urgent';
+                const priorityDotColor = element.priority === 'urgent' ? 'bg-[var(--status-danger)]' : 'bg-orange-400';
+                const width = span.endCol - span.startCol + 1;
+                return (
+                  <button
+                    key={`${element.id}:${span.startCol}`}
+                    draggable={Boolean(element.element)}
+                    onDragStart={(e) => {
+                      e.stopPropagation();
+                      e.dataTransfer.effectAllowed = 'move';
+                      // Firefox refuses to start a drag without payload.
+                      e.dataTransfer.setData('text/plain', element.id);
+                      setDragging({ id: element.id, from: dayAt(e.currentTarget.parentElement as HTMLElement, e.clientX) });
+                    }}
+                    onDragEnd={() => setDragging(null)}
+                    onDragOver={(e) => { if (dragging) e.preventDefault(); }}
+                    onDrop={(e) => dropOn(e, dayAt(e.currentTarget.parentElement as HTMLElement, e.clientX))}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedElement(element);
+                      onElementClick?.(element);
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSelectedElement(element);
+                      setShowColorPicker(Boolean(element.element));
+                    }}
+                    className={`
+                      group/chip absolute text-left px-2 transition-colors hover:brightness-95
+                      ${span.continuesBefore ? 'rounded-l-none' : 'rounded-l-md'}
+                      ${span.continuesAfter ? 'rounded-r-none' : 'rounded-r-md'}
+                      ${cardStyle.className}
+                      ${overdue ? 'ring-1 ring-[var(--status-danger)]/60' : ''}
+                      ${isDone ? 'opacity-70' : ''}
+                      ${dragging?.id === element.id ? 'opacity-40' : ''}
+                      ${element.element ? 'cursor-grab active:cursor-grabbing' : ''}
+                    `}
+                    style={{
+                      ...cardStyle.style,
+                      top: MONTH_LANE_TOP + span.lane * MONTH_LANE_HEIGHT,
+                      height: MONTH_LANE_HEIGHT - 2,
+                      left: `calc(${(span.startCol / 7) * 100}% + ${span.continuesBefore ? 0 : 6}px)`,
+                      width: `calc(${(width / 7) * 100}% - ${(span.continuesBefore ? 0 : 6) + (span.continuesAfter ? 0 : 6)}px)`,
+                    }}
+                    title={`${element.title}${overdue ? ' (Overdue)' : ''}\nRight-click to change color`}
+                  >
+                    <div className="flex h-full items-center gap-1.5 min-w-0">
+                      {element.object && <ObjectIcon size={12} />}
+                      <span
+                        className={`text-[11px] font-medium leading-tight truncate flex-1 ${
+                          isDone ? 'line-through' : ''
+                        }`}
+                      >
+                        {element.title}
+                      </span>
+                      {isHighPriority && (
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${priorityDotColor}`}
+                          title={element.priority || ''}
+                        />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-x-auto flex">
