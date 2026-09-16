@@ -502,6 +502,7 @@ export function AppSidebar({
             <NotebookTree
               activeFolderId={navigation.noteFolderId ?? null}
               activeSectionId={navigation.noteSectionId ?? null}
+              activeFileId={navigation.noteId ?? null}
               onNavigate={onNavigate}
               onViewChange={onViewChange}
             />

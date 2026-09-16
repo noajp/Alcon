@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { FileText, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { NoteNode } from './types';
 import { RenameInput } from './RenameInput';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -44,6 +45,7 @@ export function FilesPane({
   onRenameNode,
   onDeleteFile,
 }: FilesPaneProps) {
+  const { t } = useI18n();
   const [renaming, setRenaming] = useState<string | null>(null);
   // Radix hands focus back to the trigger as the menu closes; renaming after
   // that, with the menu's own auto-focus off, lets the field keep it.
@@ -65,7 +67,7 @@ export function FilesPane({
 
       <div className="flex-1 overflow-y-auto pb-2">
         {!title && (
-          <div className="px-3 py-6 text-center text-[11px] leading-relaxed text-muted-foreground/60">Select a notebook to see its pages</div>
+          <div className="px-3 py-6 text-center text-[11px] leading-relaxed text-muted-foreground/60">{t('Select a notebook to see its pages')}</div>
         )}
         {sortedFiles.map((file) => {
           const selected = file.id === selectedFileId;
@@ -86,7 +88,7 @@ export function FilesPane({
                 />
               ) : (
                 <button type="button" onClick={() => onSelectFile(file.id)} className="min-w-0 flex-1 truncate text-left" title={file.name}>
-                  {file.name || 'Untitled'}
+                  {file.name || t('Untitled')}
                 </button>
               )}
             </div>
@@ -96,11 +98,11 @@ export function FilesPane({
             <ContextMenu key={file.id}>
               <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
               <ContextMenuContent className="min-w-[170px]" onCloseAutoFocus={(e) => e.preventDefault()}>
-                {onRenameNode && <ContextMenuItem onSelect={() => startRename(file.id)}><Pencil /> Rename</ContextMenuItem>}
+                {onRenameNode && <ContextMenuItem onSelect={() => startRename(file.id)}><Pencil /> {t('Rename')}</ContextMenuItem>}
                 {onDeleteFile && (
                   <>
                     {onRenameNode && <ContextMenuSeparator />}
-                    <ContextMenuItem variant="destructive" onSelect={() => onDeleteFile(file.id)}><Trash2 /> Delete page</ContextMenuItem>
+                    <ContextMenuItem variant="destructive" onSelect={() => onDeleteFile(file.id)}><Trash2 /> {t('Delete page')}</ContextMenuItem>
                   </>
                 )}
               </ContextMenuContent>
@@ -113,7 +115,7 @@ export function FilesPane({
             onClick={onAddFile}
             className="mt-1 flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
           >
-            <Plus size={14} strokeWidth={2.5} className="shrink-0" /> New page
+            <Plus size={14} strokeWidth={2.5} className="shrink-0" /> {t('New page')}
           </button>
         )}
       </div>

@@ -1,13 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronRight, FilePlus, FolderPlus, Pencil, Trash2 } from 'lucide-react';
+import { FilePlus, FolderPlus, Pencil, Trash2 } from 'lucide-react';
 import { NavNoteIcon } from '@/shell/sidebar/NavIcons';
 import { useNotes } from '@/hooks/useNotesDb';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { RenameInput } from '@/ActivitySpace/sustainment/notebook/RenameInput';
-import { sectionsInFolder, filesInFolder } from '@/ActivitySpace/sustainment/notebook/noteTree';
+import { sectionsInFolder, filesInFolder, resolveSectionSelection } from '@/ActivitySpace/sustainment/notebook/noteTree';
 import type { NoteNode } from '@/types/notes';
 import {
   ContextMenu,
@@ -18,20 +18,24 @@ import {
 } from '@/ui/context-menu';
 import type { NavigationState } from '@/types/navigation';
 
-// Notebook mode's sidebar — the Books (root Folders) with their Sections as
-// a tree, the way Obsidian lists vaults and folders. Picking a Book or a
-// Section decides what the main pane's page list shows; the pages themselves
-// live there, not here. Books and Sections carry their actions on a
+// Notebook mode's sidebar — the Books (root Folders) with their Sections
+// always listed beneath, the way Obsidian lists a vault. Picking a Book or
+// a Section decides what the main pane's page list shows; the pages
+// themselves live there, not here. The row that is highlighted is the
+// Section the pane actually shows — resolved the same way the pane does —
+// so the two never disagree. Books and Sections carry their actions on a
 // right-click (New section / New page / Rename / Delete); new Books come
 // from the "+" at the top of the sidebar.
 export function NotebookTree({
   activeFolderId,
   activeSectionId,
+  activeFileId,
   onNavigate,
   onViewChange,
 }: {
   activeFolderId: string | null;
   activeSectionId: string | null;
+  activeFileId: string | null;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
 }) {
@@ -41,9 +45,13 @@ export function NotebookTree({
     () => nodes.filter((n) => n.type === 'folder').sort((a, b) => a.name.localeCompare(b.name)),
     [nodes],
   );
-  // Books start open; a chevron folds one away.
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [renaming, setRenaming] = useState<string | null>(null);
+  // The Section the pane shows for the active Book: the open page's, else
+  // the pick, else the first (see NotebookSurface).
+  const openFile = activeFileId ? nodes.find((n) => n.id === activeFileId) : undefined;
+  const shownSectionId = activeFolderId
+    ? resolveSectionSelection(nodes, activeFolderId, (openFile && openFile.parentId !== activeFolderId ? openFile.parentId : null) ?? activeSectionId, activeFileId)
+    : null;
   // Radix hands focus back to the trigger as the menu closes; renaming after
   // that, with the menu's own auto-focus off, lets the field keep it.
   const startRename = (id: string) => { window.setTimeout(() => setRenaming(id), 0); };
@@ -97,7 +105,8 @@ export function NotebookTree({
     if (!await appDialog.confirm(`Delete the section "${section.name}"${what}? This cannot be undone.`)) return;
     try {
       await deleteNode(section.id);
-      if (activeSectionId === section.id) onNavigate({ noteFolderId: folderId, noteSectionId: null, noteId: null });
+      // The pick and the open page both go if they were inside it.
+      if (activeSectionId === section.id || openFile?.parentId === section.id) onNavigate({ noteFolderId: folderId, noteSectionId: null, noteId: null });
     } catch (e) { console.error('Failed to delete note section', e); }
   };
 
@@ -122,27 +131,21 @@ export function NotebookTree({
       <div className="mt-1 flex flex-col">
         {folders.map((folder) => {
           const sections = sectionsInFolder(nodes, folder.id);
-          const open = !collapsed.has(folder.id);
-          const bookActive = folder.id === activeFolderId && !activeSectionId;
+          // The Book itself is the row to highlight only while nothing below
+          // it is shown (a Book without Sections).
+          const bookActive = folder.id === activeFolderId && !shownSectionId;
           return (
             <div key={folder.id}>
               <ContextMenu>
                 <ContextMenuTrigger asChild>
                   <div
-                    className={`group flex h-8 w-full items-center gap-1 rounded-md pl-1 pr-2 text-[12px] font-semibold transition-colors duration-100 ${
+                    className={`group flex h-8 w-full items-center gap-2 rounded-md px-2 text-[12px] font-semibold transition-colors duration-100 ${
                       bookActive ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                     }`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setCollapsed((prev) => { const next = new Set(prev); if (next.has(folder.id)) next.delete(folder.id); else next.add(folder.id); return next; })}
-                      aria-label={open ? t('Collapse') : t('Expand')}
-                      aria-expanded={open}
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-transform hover:text-foreground ${open ? 'rotate-90' : ''} ${sections.length === 0 ? 'invisible' : ''}`}
-                    >
-                      <ChevronRight size={13} />
-                    </button>
-                    <NavNoteIcon size={16} />
+                    {/* The icon slot is the same width on Book and Section
+                        rows (w-4), so both names start on one edge. */}
+                    <span className="flex w-4 shrink-0 items-center justify-center"><NavNoteIcon size={16} /></span>
                     {nameOrInput(folder, () => openBook(folder.id), 'text-[12px] font-semibold')}
                   </div>
                 </ContextMenuTrigger>
@@ -153,17 +156,19 @@ export function NotebookTree({
                   <ContextMenuItem variant="destructive" onSelect={() => void deleteBook(folder)}><Trash2 /> {t('Delete notebook')}</ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
-              {open && sections.map((section) => {
-                const active = section.id === activeSectionId;
+              {sections.map((section) => {
+                const active = folder.id === activeFolderId && section.id === shownSectionId;
                 return (
                   <ContextMenu key={section.id}>
                     <ContextMenuTrigger asChild>
                       <div
-                        className={`group flex h-7 w-full items-center gap-2 rounded-md pl-7 pr-2 text-[12px] font-semibold transition-colors duration-100 ${
+                        className={`group flex h-7 w-full items-center gap-2 rounded-md px-2 text-[12px] font-semibold transition-colors duration-100 ${
                           active ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                         }`}
                       >
-                        <span className={`h-3.5 w-[3px] shrink-0 rounded-full ${active ? 'bg-[var(--accent-default)]' : 'bg-[var(--text-tertiary)]'}`} />
+                        <span className="flex w-4 shrink-0 items-center justify-center">
+                          <span className={`h-3.5 w-[3px] rounded-full ${active ? 'bg-[var(--accent-default)]' : 'bg-[var(--text-tertiary)]'}`} />
+                        </span>
                         {nameOrInput(section, () => openSection(folder.id, section.id), 'text-[12px] font-semibold')}
                       </div>
                     </ContextMenuTrigger>
