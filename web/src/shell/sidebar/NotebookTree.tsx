@@ -135,7 +135,9 @@ export function NotebookTree({
           // it is shown (a Book without Sections).
           const bookActive = folder.id === activeFolderId && !shownSectionId;
           return (
-            <div key={folder.id}>
+            // Books sit apart from each other; the Sections under one sit
+            // close, so the tree reads as groups, like the Domain tree.
+            <div key={folder.id} className="mt-2.5 first:mt-0">
               <ContextMenu>
                 <ContextMenuTrigger asChild>
                   <div
@@ -162,14 +164,14 @@ export function NotebookTree({
                   <ContextMenu key={section.id}>
                     <ContextMenuTrigger asChild>
                       <div
-                        className={`group flex h-7 w-full items-center gap-2 rounded-md px-2 text-[12px] font-semibold transition-colors duration-100 ${
+                        className={`group flex h-6 w-full items-center gap-2 rounded-md px-2 text-[12px] font-medium transition-colors duration-100 ${
                           active ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                         }`}
                       >
                         <span className="flex w-4 shrink-0 items-center justify-center">
                           <span className={`h-3.5 w-[3px] rounded-full ${active ? 'bg-[var(--accent-default)]' : 'bg-[var(--text-tertiary)]'}`} />
                         </span>
-                        {nameOrInput(section, () => openSection(folder.id, section.id), 'text-[12px] font-semibold')}
+                        {nameOrInput(section, () => openSection(folder.id, section.id), 'text-[12px] font-medium')}
                       </div>
                     </ContextMenuTrigger>
                     <ContextMenuContent className="min-w-[180px]" onCloseAutoFocus={(e) => e.preventDefault()}>
