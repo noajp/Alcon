@@ -5,6 +5,7 @@ import { Button } from '@/ui/button';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
+import { EmptyState } from '@/Function/shared/EmptyState';
 import { QuickCreatePopup, quickCreatePillClass } from '@/Function/shared/QuickCreatePopup';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/ui/command';
@@ -175,23 +176,16 @@ export function StrategyShell({
 // =============================================================
 // Empty / create prompt
 // =============================================================
-function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
+function EmptyPrompt({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="h-full flex flex-col items-center justify-center text-center px-6 gap-3">
-      <NavStrategyIcon size={28} className="text-muted-foreground/50" />
-      <p className="text-[13px] text-muted-foreground max-w-md">
-        Create a Initiative to group Objects across Domains. Each Initiative gets its own timeline and resource view.
-      </p>
-      {onCreate && (
-        <Button variant="primary" size="md"
-          type="button"
-          onClick={onCreate}
-        >
-          <Plus size={12} />
-          New Initiative
-        </Button>
-      )}
-    </div>
+    <EmptyState
+      icon={NavStrategyIcon}
+      title="Add Initiatives"
+      description="An Initiative groups Objects across Domains around one outcome — what to achieve and how to win."
+      hint="Each Initiative gets its own timeline and resource view."
+      cta="Create Initiative"
+      onCta={onCreate}
+    />
   );
 }
 
