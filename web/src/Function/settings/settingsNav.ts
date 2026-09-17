@@ -14,9 +14,9 @@ import {
 // Space tree while in Settings mode), and SettingsView renders the matching
 // content panel — both read/write the store so they stay in sync.
 //
-// Sections follow the concept model: Personal, then the Activity Space
-// itself, then one section per classification (Strategy / Execution /
-// Sustainment) listing its concepts. A concept with several settings
+// Sections follow the concept model: the Activity Space itself, then one
+// section per classification (Strategy / Execution / Sustainment) listing
+// its concepts, and the person's own settings last. A concept with several settings
 // surfaces (Objects, Elements) is one page with tabs, not a nav subtree.
 
 export interface SettingsNavTab {
@@ -35,16 +35,6 @@ export interface SettingsNavSection {
 }
 
 export const SETTINGS_NAV: SettingsNavSection[] = [
-  {
-    title: 'Personal',
-    items: [
-      { id: 'preferences', label: 'Preferences', icon: SlidersHorizontal },
-      { id: 'profile', label: 'Profile', icon: User },
-      { id: 'notifications', label: 'Notifications', icon: Bell },
-      { id: 'security', label: 'Security & access', icon: KeyRound },
-      { id: 'connected', label: 'Connected accounts', icon: Plug },
-    ],
-  },
   {
     title: 'Activity settings',
     items: [
@@ -93,6 +83,16 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
       { id: 'workload', label: 'Workload', icon: NavWorkloadIcon },
     ],
   },
+  {
+    title: 'Personal',
+    items: [
+      { id: 'preferences', label: 'Preferences', icon: SlidersHorizontal },
+      { id: 'profile', label: 'Profile', icon: User },
+      { id: 'notifications', label: 'Notifications', icon: Bell },
+      { id: 'security', label: 'Security & access', icon: KeyRound },
+      { id: 'connected', label: 'Connected accounts', icon: Plug },
+    ],
+  },
 ];
 
 export const SETTINGS_ITEMS: Record<string, SettingsNavItem> = Object.fromEntries(
@@ -104,7 +104,8 @@ export const SETTINGS_ITEM_TITLES: Record<string, string> = Object.fromEntries(
 );
 
 // ── External store for the active page (and its tab, when it has tabs) ──
-const DEFAULT_SECTION = 'preferences';
+// Settings opens on the first page of the nav.
+const DEFAULT_SECTION = SETTINGS_NAV[0].items[0].id;
 interface ActiveSettings { section: string; tab: string | null }
 let active: ActiveSettings = { section: DEFAULT_SECTION, tab: null };
 const DEFAULT_ACTIVE: ActiveSettings = active;
