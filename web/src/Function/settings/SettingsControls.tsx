@@ -42,29 +42,38 @@ export function SelectRow({
   label: string; desc?: string; value: string; options: string[];
   onChange: (v: string) => void;
 }) {
-  const { t } = useI18n();
   return (
     <Row label={label} desc={desc}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium border border-border/60 bg-muted/40 text-foreground hover:bg-muted/70 transition-colors"
-          >
-            {t(value)}
-            <ChevronDown size={12} className="opacity-60" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-[160px]">
-          {options.map((opt) => (
-            <DropdownMenuItem key={opt} onSelect={() => onChange(opt)} className="gap-2 text-[12px]">
-              <span className="flex-1">{t(opt)}</span>
-              {value === opt && <Check size={12} />}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <SelectControl value={value} options={options} onChange={onChange} />
     </Row>
+  );
+}
+
+/** The select of a settings row on its own, for rows laid out by SettingsRow. */
+export function SelectControl({
+  value, options, onChange,
+}: { value: string; options: string[]; onChange: (v: string) => void }) {
+  const { t } = useI18n();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium border border-border/60 bg-muted/40 text-foreground hover:bg-muted/70 transition-colors"
+        >
+          {t(value)}
+          <ChevronDown size={12} className="opacity-60" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[160px]">
+        {options.map((opt) => (
+          <DropdownMenuItem key={opt} onSelect={() => onChange(opt)} className="gap-2 text-[12px]">
+            <span className="flex-1">{t(opt)}</span>
+            {value === opt && <Check size={12} />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

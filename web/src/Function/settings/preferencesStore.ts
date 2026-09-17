@@ -179,7 +179,7 @@ export const TIMELINE_MONTHS_AHEAD_RANGE = { min: 3, max: 36, fallback: 10 } as 
 function readInt(key: string, range: { min: number; max: number; fallback: number }): number {
   if (typeof window === 'undefined') return range.fallback;
   const raw = localStorage.getItem(key);
-  const n = raw === null ? NaN : Number(raw);
+  const n = raw === null || raw === '' ? NaN : Number(raw);
   return Number.isInteger(n) && n >= range.min && n <= range.max ? n : range.fallback;
 }
 function readBool(key: string, fallback: boolean): boolean {

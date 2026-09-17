@@ -144,6 +144,9 @@ export function PhaseView({
   onOpenInitiative?: (strategyId: string) => void;
 }) {
   const { data: phases, loading, refetch } = usePhases(activeDomainId);
+  // The create dialog seeds its dates from the Domain's defaults and the
+  // last Phase, once, on open — so it waits for both to be loaded.
+  const { loading: domainsLoading } = useDomains();
   const [openPhaseId, setOpenPhaseId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
 
@@ -205,7 +208,7 @@ export function PhaseView({
         )}
       </div>
 
-      {newOpen && activeDomainId && (
+      {newOpen && activeDomainId && !loading && !domainsLoading && (
         <PhaseCreateDialog
           domainId={activeDomainId}
           onClose={() => setNewOpen(false)}

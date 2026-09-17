@@ -7,7 +7,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { PHASE_DEFAULTS_MAX } from '@/ActivitySpace/strategy/phase/phaseDefaults';
 import { SlaSettings } from './SlaSettings';
 import { SettingsSection, SettingsRow } from './SettingsSection';
-import { Group, SelectRow, ToggleRow } from './SettingsControls';
+import { Group, SelectRow, SelectControl, ToggleRow } from './SettingsControls';
 import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 import { TIMELINE_MONTHS_BACK_RANGE, TIMELINE_MONTHS_AHEAD_RANGE } from './preferencesStore';
 
@@ -79,9 +79,11 @@ export function PhaseDefaultsSettings() {
               <DaysInput key={`len:${current.length_days ?? ''}`} value={current.length_days} max={PHASE_DEFAULTS_MAX.length_days}
                 unit={t('days')} disabled={pending.has(domain.id)} onCommit={(v) => save(domain, { length_days: v })} />
             </SettingsRow>
-            <SelectRow label={t('Start')} desc={t('Where a new Phase begins')}
-              value={START_LABEL[current.start ?? 'today']} options={START_OPTIONS.map((o) => START_LABEL[o])}
-              onChange={(label) => save(domain, { start: START_OPTIONS.find((o) => START_LABEL[o] === label) ?? 'today' })} />
+            <SettingsRow label={t('Start')} hint={t('Where a new Phase begins')}>
+              <SelectControl value={START_LABEL[current.start === 'after_last' ? 'after_last' : 'today']}
+                options={START_OPTIONS.map((o) => START_LABEL[o])}
+                onChange={(label) => save(domain, { start: START_OPTIONS.find((o) => START_LABEL[o] === label) ?? 'today' })} />
+            </SettingsRow>
             {errors[domain.id] && <div className="px-4 py-2 text-[11px] text-destructive">{errors[domain.id]}</div>}
           </SettingsSection>
         );

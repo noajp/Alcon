@@ -117,7 +117,7 @@ export function TimelineView({
   }, [anchorOffset, monthsBack]);
 
   const months = useMemo(() => {
-    const arr: { label: string; x: number; w: number }[] = [];
+    const arr: { label: string; x: number; w: number; date: Date }[] = [];
     let x = 0;
     for (let i = 0; i < visibleMonths; i++) {
       const d = new Date(windowStart.getFullYear(), windowStart.getMonth() + i, 1);
@@ -128,11 +128,25 @@ export function TimelineView({
       const label = (i === 0 || d.getMonth() === 0)
         ? d.toLocaleDateString(locale, { month: 'short', year: 'numeric' })
         : d.toLocaleDateString(locale, { month: 'short' });
-      arr.push({ label, x, w });
+      arr.push({ label, x, w, date: d });
       x += w;
     }
     return arr;
   }, [windowStart, visibleMonths, dayW, locale]);
+
+  // The axis: one cell per month, or — at quarter scale, where a month is
+  // too narrow for a year-tagged label — one cell per quarter.
+  const axisCells = useMemo(() => {
+    if (scale !== 'quarter') return months;
+    const cells: { label: string; x: number; w: number }[] = [];
+    for (const m of months) {
+      const last = cells[cells.length - 1];
+      const key = quarterLabel(m.date);
+      if (last && last.label === key) last.w += m.w;
+      else cells.push({ label: key, x: m.x, w: m.w });
+    }
+    return cells;
+  }, [months, scale]);
 
   const totalW = useMemo(() => months.reduce((s, m) => s + m.w, 0), [months]);
   const windowEnd = useMemo(
@@ -272,10 +286,10 @@ export function TimelineView({
               style={{ paddingLeft: LEFT_COL_W }}
             >
               <div className="relative" style={{ width: totalW, height: MONTH_HEADER_H }}>
-                {months.map((m, i) => (
+                {axisCells.map((m, i) => (
                   <div
                     key={i}
-                    className="absolute top-0 bottom-0 flex items-center px-2 text-[11px] text-muted-foreground font-medium border-l border-border/30 first:border-l-0"
+                    className="absolute top-0 bottom-0 flex items-center overflow-hidden whitespace-nowrap px-2 text-[11px] text-muted-foreground font-medium border-l border-border/30 first:border-l-0"
                     style={{ left: m.x, width: m.w }}
                   >
                     {m.label}

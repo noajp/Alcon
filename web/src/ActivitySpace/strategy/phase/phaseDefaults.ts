@@ -1,10 +1,12 @@
 import type { DomainPhaseDefaults } from '@/types/database';
+import { shiftDateOnly, toDateOnlyString } from '@/Function/shared/dateUtils';
 
 // How Settings > Strategy > Phase seeds a new Phase's dates. Pure, so the
 // rule is testable: `length_days` spans the Phase with its end_date
-// inclusive (a 14-day Phase starting on the 1st ends on the 14th); `start`
-// is today or the day after the Domain's last dated Phase. Without
-// length_days nothing is seeded and the dialog starts empty, as before.
+// inclusive — the same reading of end_date as Function/shared/phaseWindow.ts
+// (a 14-day Phase starting on the 1st ends on the 14th); `start` is today or
+// the day after the Domain's last dated Phase. Without length_days nothing
+// is seeded and the dialog starts empty, as before.
 
 export const PHASE_DEFAULTS_MAX = { length_days: 3650 } as const;
 
@@ -18,9 +20,9 @@ export function seedPhaseDates(
     return { start: '', end: '' };
   }
   const start = defaults?.start === 'after_last' && lastPhaseEnd && lastPhaseEnd >= today
-    ? addDays(lastPhaseEnd, 1)
+    ? shiftDateOnly(lastPhaseEnd, 1)
     : today;
-  return { start, end: addDays(start, length - 1) };
+  return { start, end: shiftDateOnly(start, length - 1) };
 }
 
 /** The latest end_date among the Domain's Phases, or null when none is dated. */
@@ -30,11 +32,7 @@ export function lastPhaseEndOf(phases: { end_date: string | null }[]): string | 
   return last;
 }
 
+/** Today as a local date-only key ('YYYY-MM-DD'). */
 export function todayKey(now = new Date()): string {
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
-
-function addDays(key: string, days: number): string {
-  const [y, m, d] = key.split('-').map(Number);
-  return todayKey(new Date(y, m - 1, d + days));
+  return toDateOnlyString(now);
 }
