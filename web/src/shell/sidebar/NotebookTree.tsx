@@ -126,7 +126,7 @@ export function NotebookTree({
   return (
     <div className="mt-1">
       <div className="flex items-center gap-1 px-2 h-6 mt-3">
-        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Notebook')}</span>
+        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">Notebook</span>
       </div>
       <div className="mt-1 flex flex-col">
         {folders.map((folder) => {

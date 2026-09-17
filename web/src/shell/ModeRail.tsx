@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { NavSustainmentModeIcon } from '@/shell/sidebar/NavIcons';
 import {
   APP_GROUPS,
@@ -83,7 +83,6 @@ function ProfileRailButton({
   active: boolean;
   onClick: () => void;
 }) {
-  const { t } = useI18n();
   const { user, profile } = useAuthContext();
   const name = profile?.display_name || user?.email?.split('@')[0] || null;
   const avatarUrl = profile?.avatar_url;
@@ -95,8 +94,8 @@ function ProfileRailButton({
     <button
       type="button"
       onClick={onClick}
-      title={name ?? t('Profile')}
-      aria-label={t('Profile')}
+      title={name ?? 'Profile'}
+      aria-label="Profile"
       aria-pressed={active}
       className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
         active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/50'
@@ -110,19 +109,9 @@ function ProfileRailButton({
 export function ModeRail({
   activeView,
   onViewChange,
-  sidebarCollapsed,
-  onToggleSidebar,
-  copilotOpen,
-  onToggleCopilot,
 }: {
   activeView: string;
   onViewChange: (view: string) => void;
-  /** The page-level toggles live at the foot of the rail: the sidebar
-   *  (omitted while it has nothing to show, on Profile) and the AI pane. */
-  sidebarCollapsed: boolean;
-  onToggleSidebar?: () => void;
-  copilotOpen: boolean;
-  onToggleCopilot: () => void;
 }) {
   const { t } = useI18n();
   const activeMode = railModeOf(activeView);
@@ -151,7 +140,7 @@ export function ModeRail({
         <RailButton
           key={mode}
           unreadCount={mode === 'inbox' ? unreadCount : 0}
-          label={t(MODE_META[mode].label)}
+          label={MODE_META[mode].label}
           icon={MODE_META[mode].icon}
           active={mode === activeMode}
           onClick={() => open(mode)}
@@ -165,7 +154,7 @@ export function ModeRail({
       {railApps.map((mode) => (
         <RailButton
           key={mode}
-          label={t(MODE_META[mode].label)}
+          label={MODE_META[mode].label}
           icon={MODE_META[mode].icon}
           active={mode === activeMode}
           onClick={() => open(mode)}
@@ -176,8 +165,8 @@ export function ModeRail({
       <Button
         variant="ghost"
         size="icon-md"
-        title={t('Sustainment')}
-        aria-label={t('Sustainment')}
+        title="Sustainment"
+        aria-label="Sustainment"
         aria-expanded={launcherOpen}
         className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
           launcherOpen
@@ -193,22 +182,6 @@ export function ModeRail({
           sit above — the one personal entry point on an otherwise all-work
           rail. */}
       <div className="mt-auto flex flex-col items-center gap-1">
-        {onToggleSidebar && (
-          <RailButton
-            label={t(sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar')}
-            icon={sidebarCollapsed ? PanelLeftOpen : PanelLeftClose}
-            active={false}
-            onClick={onToggleSidebar}
-          />
-        )}
-        {/* The AI pane: state lives in the page so this button, ⌘L and the
-            pane's own close all flip the same boolean. */}
-        <RailButton
-          label={`${t(copilotOpen ? 'Hide AI' : 'Show AI')} (⌘L)`}
-          icon={copilotOpen ? PanelRightOpen : PanelRightClose}
-          active={copilotOpen}
-          onClick={onToggleCopilot}
-        />
         <div className="my-1 h-px w-5 bg-border" />
         <ProfileRailButton active={activeMode === 'personal'} onClick={() => onViewChange('profile')} />
       </div>
@@ -237,15 +210,15 @@ export function ModeRail({
                           className="h-20 w-full flex-col gap-2"
                         >
                           <Icon size={20} />
-                          <span className="text-[11px] font-semibold">{t(label)}</span>
+                          <span className="text-[11px] font-semibold">{label}</span>
                         </Button>
                         {added && (
                           <Button
                             variant="ghost"
                             size="icon-xs"
                             onClick={() => setApp(mode, false)}
-                            title={t('Remove {label} from the rail', { label: t(label) })}
-                            aria-label={t('Remove {label} from the rail', { label: t(label) })}
+                            title={t('Remove {label} from the rail', { label })}
+                            aria-label={t('Remove {label} from the rail', { label })}
                             className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-md text-foreground transition-colors hover:bg-sidebar-accent"
                           >
                             <Check size={12} />

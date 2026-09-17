@@ -30,7 +30,9 @@ import { getCachedHomeViewId } from '@/Function/settings/preferencesStore';
 import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -295,14 +297,14 @@ function WorkspaceContent({
     () => typeof window !== 'undefined' && window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH,
   );
   // When collapsed, the sidebar can still be peeked as a floating overlay
-  // (via the rail's reveal button) instead of pinning it back into flow.
+  // (via the strip's reveal button) instead of pinning it back into flow.
   const [sidebarOverlay, setSidebarOverlay] = useState(false);
   // Profile (reached from the avatar; Now / My Elements / My Notes / AI are
   // its tabs) has nothing to list, so it takes the whole width.
   const personalMode = railModeOf(activeTab.activeView) === 'personal';
   const sidebarHidden = sidebarCollapsed || personalMode;
   const [discoverOpen, setDiscoverOpen] = useState(false);
-  // Alcon Copilot pane — open state shared by the rail's PanelRight
+  // Alcon Copilot pane — open state shared by the strip's PanelRight
   // toggle, ⌘L, and the panel's own close button. localStorage round-trips
   // it across reloads.
   const [copilotOpen, setCopilotOpen] = useState(false);
@@ -402,7 +404,7 @@ function WorkspaceContent({
     setCreateType(null);
   };
 
-  // PanelLeft button at the foot of the rail. The right behaviour
+  // PanelLeft button in the strip under the islands. The right behaviour
   // depends on whether the window is wide enough to show the sidebar AND the
   // island side-by-side:
   // - Visible → hide it (island goes full-width).
@@ -476,10 +478,6 @@ function WorkspaceContent({
         <ModeRail
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
-          sidebarCollapsed={sidebarHidden}
-          onToggleSidebar={personalMode ? undefined : handleSidebarToggle}
-          copilotOpen={copilotOpen}
-          onToggleCopilot={() => handleCopilotOpenChange(!copilotOpen)}
         />
         {!personalMode && <AppSidebar
           navigation={activeTab.navigation}
@@ -547,6 +545,24 @@ function WorkspaceContent({
           </div>
           <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} />
         </div>
+        {/* The strip under the islands: the page-level toggles sit at its
+            right end — the sidebar (omitted while it has nothing to show, on
+            Profile) and the AI pane. ⌘L and the pane's own close flip the
+            same boolean. */}
+        <ButtonAppearanceProvider appearance="navigation">
+        <div className="flex h-9 shrink-0 items-center justify-end gap-0.5 pt-1">
+          {!personalMode && (
+            <Button size="icon-xs" variant="ghost" onClick={handleSidebarToggle} className="text-muted-foreground"
+              aria-pressed={sidebarHidden} title={t(sidebarHidden ? 'Show sidebar' : 'Hide sidebar')} aria-label={t(sidebarHidden ? 'Show sidebar' : 'Hide sidebar')}>
+              {sidebarHidden ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+            </Button>
+          )}
+          <Button size="icon-xs" variant="ghost" onClick={() => handleCopilotOpenChange(!copilotOpen)} className={copilotOpen ? 'text-foreground' : 'text-muted-foreground'}
+            aria-pressed={copilotOpen} title={`${t(copilotOpen ? 'Hide AI' : 'Show AI')} (⌘L)`} aria-label={t(copilotOpen ? 'Hide AI' : 'Show AI')}>
+            {copilotOpen ? <PanelRightOpen size={15} /> : <PanelRightClose size={15} />}
+          </Button>
+        </div>
+        </ButtonAppearanceProvider>
         </div>
       </div>
 
