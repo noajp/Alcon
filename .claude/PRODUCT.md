@@ -182,6 +182,8 @@ ModeRail の固定セレクタは Inbox / Calendar / Strategy / Execution。Stra
 | **Phase** | 活動を期間で区切り、力の配分を決める単位 | `phases`（Domain スコープ）。Object / Element は高々 1 つの Phase に所属 |
 | **Timeline** | Initiative の期間・シーケンスを月スケール Gantt で俯瞰 | 行を展開すると参加 Object のバーが同じ軸に並ぶ |
 
+Strategy の設定は、サイドバーの Initiatives 行の「…」（モーダル）と Settings > Strategy の両方から同じパネルで開く。**Initiative** は判定閾値（Due soon / Stalled / Idle）で、Domain ごとの `risk_thresholds` を編集する（Elements > SLAs と同じ値）。**Phase** は Domain ごとの作成既定値（既定の長さ、開始日を「今日」か「最後の Phase の翌日」にする）で、新規 Phase ダイアログの日付に効く。**Timeline** は個人の表示設定（月 / 四半期スケール、前後の月数、今日の線、進捗の塗り）で `user_preferences` に持つ。
+
 Initiative を開くと、意図・状況・前提・決定・指標・リスクの各ウィジェットと、参加 Object の一覧が並ぶ。そこから Object 詳細を一クリックで開ける。
 
 **Decision Lab** は、重要な Element への集中・着手延期・担当変更を試し、条件付きの完了日と他の仕事への影響を現状と比較するウィジェット。同じ Space で閲覧できる仕事の工数・担当・依存関係・不在を使い、履歴の蓄積を待たずに試算する。未見積や解けない依存は未算定として示す。採択理由・前提・比較結果は Initiative の Decision に保存し、対象 Element に結び付ける。試算は実際の予定を変えず、Element の編集へ戻って判断を実行に反映する。完了日の試算と成功条件の達成は区別する。

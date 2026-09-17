@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { NavStrategyIcon, NavPhaseIcon, NavTimelineIcon } from '@/shell/sidebar/NavIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { SettingsModal } from './SettingsModal';
-import { SettingsComingSoon } from './SettingsSection';
+import { InitiativeJudgementSettings, PhaseDefaultsSettings, TimelineDisplaySettings } from './StrategySettingsPanels';
 
 type StrategyTab = 'initiative' | 'phase' | 'timeline';
 
@@ -29,7 +29,7 @@ export function StrategySettingsModal({ onClose }: { onClose: () => void }) {
       onSelect={(id) => setTab(id as StrategyTab)}
     >
       <h3 className="mb-4 text-[15px] font-semibold text-foreground">{titles[tab]}</h3>
-      <SettingsComingSoon title={titles[tab]} />
+      {tab === 'initiative' ? <InitiativeJudgementSettings /> : tab === 'phase' ? <PhaseDefaultsSettings /> : <TimelineDisplaySettings />}
     </SettingsModal>
   );
 }

@@ -26,10 +26,12 @@ import {
   usePhases,
   type Phase,
   type PhaseReschedule,
+  useDomains,
 } from '@/hooks/useSupabase';
 import { formatElementDate } from '@/Function/shared/dateUtils';
 import type { PhaseStatus } from '@/types/database';
 import { PhaseCloseDialog } from './PhaseCloseDialog';
+import { seedPhaseDates, lastPhaseEndOf, todayKey } from './phaseDefaults';
 import {
   PHASE_STANDING_LABEL,
   PHASE_STATUS_LABEL,
@@ -142,6 +144,9 @@ export function PhaseView({
   onOpenInitiative?: (strategyId: string) => void;
 }) {
   const { data: phases, loading, refetch } = usePhases(activeDomainId);
+  // The create dialog seeds its dates from the Domain's defaults and the
+  // last Phase, once, on open — so it waits for both to be loaded.
+  const { loading: domainsLoading } = useDomains();
   const [openPhaseId, setOpenPhaseId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
 
@@ -203,7 +208,7 @@ export function PhaseView({
         )}
       </div>
 
-      {newOpen && activeDomainId && (
+      {newOpen && activeDomainId && !loading && !domainsLoading && (
         <PhaseCreateDialog
           domainId={activeDomainId}
           onClose={() => setNewOpen(false)}
@@ -914,8 +919,14 @@ function PhaseCreateDialog({
   onCreated: (id: string) => void;
 }) {
   const [name, setName] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  // Dates start from the Domain's Phase defaults (Settings > Strategy >
+  // Phase) — seeded once on open; the fields stay editable.
+  const { data: domains } = useDomains();
+  const { data: phases } = usePhases(domainId);
+  const [seed] = useState(() => seedPhaseDates(
+    domains.find((d) => d.id === domainId)?.phase_defaults, lastPhaseEndOf(phases), todayKey()));
+  const [startDate, setStartDate] = useState(seed.start);
+  const [endDate, setEndDate] = useState(seed.end);
   const [saving, setSaving] = useState(false);
 
   // Esc closes the dialog from any of its fields, not only the name.

@@ -6,7 +6,9 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import {
   setCachedHomeView, setCachedSendCommentShortcut, setCachedFirstDayOfWeek,
   setCachedDisplayNames, setCachedConvertEmoticons,
-  type HomeView, type SendCommentShortcut, type FirstDayOfWeek, type DisplayNames,
+  setCachedTimelineScale, setCachedTimelineMonthsBack, setCachedTimelineMonthsAhead,
+  setCachedTimelineTodayMarker, setCachedTimelineProgressFill,
+  type HomeView, type SendCommentShortcut, type FirstDayOfWeek, type DisplayNames, type TimelineScale,
 } from './preferencesStore';
 
 export interface UserPreferences {
@@ -15,6 +17,12 @@ export interface UserPreferences {
   first_day_of_week: FirstDayOfWeek;
   convert_emoticons: boolean;
   send_comment_shortcut: SendCommentShortcut;
+  // Settings > Strategy > Timeline — how the Timeline is drawn.
+  timeline_scale: TimelineScale;
+  timeline_months_back: number;
+  timeline_months_ahead: number;
+  timeline_today_marker: boolean;
+  timeline_progress_fill: boolean;
 }
 
 const DEFAULTS: UserPreferences = {
@@ -23,6 +31,11 @@ const DEFAULTS: UserPreferences = {
   first_day_of_week: 'Monday',
   convert_emoticons: true,
   send_comment_shortcut: '⌘+Enter',
+  timeline_scale: 'month',
+  timeline_months_back: 2,
+  timeline_months_ahead: 10,
+  timeline_today_marker: true,
+  timeline_progress_fill: true,
 };
 
 // One cache setter per column, so a save/rollback can mirror only the field
@@ -34,6 +47,11 @@ const CACHE_SETTERS: { [K in keyof UserPreferences]: (v: UserPreferences[K]) => 
   first_day_of_week: setCachedFirstDayOfWeek,
   convert_emoticons: setCachedConvertEmoticons,
   send_comment_shortcut: setCachedSendCommentShortcut,
+  timeline_scale: setCachedTimelineScale,
+  timeline_months_back: setCachedTimelineMonthsBack,
+  timeline_months_ahead: setCachedTimelineMonthsAhead,
+  timeline_today_marker: setCachedTimelineTodayMarker,
+  timeline_progress_fill: setCachedTimelineProgressFill,
 };
 
 function mirrorFieldToCache<K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) {
@@ -59,7 +77,7 @@ export function useUserPreferences() {
       setLoading(true);
       const { data, error: fetchError } = await supabase
         .from('user_preferences')
-        .select('home_view, display_names, first_day_of_week, convert_emoticons, send_comment_shortcut')
+        .select('home_view, display_names, first_day_of_week, convert_emoticons, send_comment_shortcut, timeline_scale, timeline_months_back, timeline_months_ahead, timeline_today_marker, timeline_progress_fill')
         .eq('user_id', user.id)
         .maybeSingle();
       if (cancelled) return;
