@@ -19,7 +19,9 @@ export function EmptyState({ icon: Icon, title, description, hint, cta, onCta }:
   onCta: () => void;
 }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center py-20 px-8 select-none">
+    // flex-1 for a flex-column host, h-full for a plain block host (the
+    // Initiative and Phase panes) — either way the column fills the pane.
+    <div className="flex-1 h-full flex flex-col items-center justify-center py-20 px-8 select-none">
       <div className="w-full max-w-sm">
         <div className="grid w-fit grid-cols-2 gap-3 mb-6">
           {[0.18, 0.35, 0.55, 1].map((opacity, i) => (
