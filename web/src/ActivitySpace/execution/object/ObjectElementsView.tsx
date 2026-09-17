@@ -1,8 +1,6 @@
 'use client';
 
-import { Button } from '@/ui/button';
 
-import { Plus } from 'lucide-react';
 import type { ElementWithDetails, CustomColumnWithValues } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
@@ -10,6 +8,7 @@ import type { ListControlsState } from '@/Function/shared/listControls';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
 import { ListTable, type ListSection } from '@/ActivitySpace/execution/object/ListTable';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
+import { EmptyState } from '@/Function/shared/EmptyState';
 
 // ObjectElementsView — the body of an Object detail's "Elements" tab.
 // Extracted from ObjectDetailView so the Element surfaces read as one
@@ -142,31 +141,13 @@ export function ObjectElementsView({
 
 function ElementsEmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center flex-1 py-20 px-6 select-none">
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        {[0.18, 0.35, 0.55, 1].map((opacity, i) => (
-          <div
-            key={i}
-            className="w-14 h-14 rounded-xl border-2 border-muted-foreground flex items-center justify-center"
-            style={{ opacity, borderStyle: i === 0 ? 'dashed' : 'solid' }}
-          >
-            <NavMyTasksIcon size={22} />
-          </div>
-        ))}
-      </div>
-      <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Elements to this Object</h2>
-      <p className="text-[13px] text-muted-foreground text-center max-w-xs mb-2">
-        Elements are the smallest unit you track — anything actionable or worth recording.
-      </p>
-      <p className="text-[12px] text-muted-foreground/60 text-center max-w-xs mb-6">
-        You can also add sections, set priorities, assignees, and due dates.
-      </p>
-      <Button variant="primary" size="md"
-        onClick={onAdd}
-      >
-        <Plus size={14} />
-        Create Element
-      </Button>
-    </div>
+    <EmptyState
+      icon={NavMyTasksIcon}
+      title="Add Elements to this Object"
+      description="Elements are the smallest unit you track — anything actionable or worth recording."
+      hint="You can also add sections, set priorities, assignees, and due dates."
+      cta="Create Element"
+      onCta={onAdd}
+    />
   );
 }
