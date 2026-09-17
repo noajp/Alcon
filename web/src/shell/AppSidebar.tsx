@@ -126,7 +126,7 @@ function TableSidebar({
   return (
     <div className="mt-1">
       <div className="flex items-center gap-1 px-2 h-6 mt-3">
-        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">Table</span>
+        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Table')}</span>
       </div>
       <div className="mt-1 flex flex-col">
         {tables.map((t) => {
@@ -433,7 +433,7 @@ export function AppSidebar({
               down, reachable from any Initiative's member Objects. */}
           {railMode === 'strategy' && (
           <>
-          <SidebarModeLabel label="Strategy" />
+          <SidebarModeLabel label={t('Strategy')} />
           <StrategyNavigation activeView={activeView} onSelect={(id) => {
             if (id === 'strategy') onNavigate({ strategyId: null });
             onViewChange(id);
@@ -445,7 +445,7 @@ export function AppSidebar({
               each Domain opening onto its Objects and Elements. */}
           {railMode === 'execution' && (
           <>
-          <SidebarModeLabel label="Execution" />
+          <SidebarModeLabel label={t('Execution')} />
           <div className="mt-1" />
 
           {/* All domains — the name opens the overview; the chevron expands the tree.
@@ -521,12 +521,12 @@ export function AppSidebar({
           )}
           {/* ── Workload / Team modes ── each a single full surface in the
               main pane, so the sidebar just names the mode. */}
-          {railMode === 'workload' && <SidebarModeLabel label="Workload" />}
+          {railMode === 'workload' && <SidebarModeLabel label={t('Workload')} />}
           {/* ── Inbox ── the notification list; the main pane reads the open one. */}
           {railMode === 'inbox' && <InboxList onNavigate={onNavigate} onViewChange={onViewChange} onOpen={() => onViewChange('inbox')} />}
           {/* ── Calendar ── today, a mini month that moves the grid, and who is shown. */}
-          {railMode === 'calendar' && <><SidebarModeLabel label="Calendar" /><CalendarSidebar /></>}
-          {railMode === 'team' && <SidebarModeLabel label="Team" />}
+          {railMode === 'calendar' && <><SidebarModeLabel label={t('Calendar')} /><CalendarSidebar /></>}
+          {railMode === 'team' && <SidebarModeLabel label={t('Team')} />}
           {(railMode === 'crm' || railMode === 'scm') && <OperationsNavigation sidebar kind={railMode}
             queue={operationsQueue(navigation, railMode)} onSelect={queue => onNavigate(operationsQueueRoute(railMode, queue))} />}
           </>

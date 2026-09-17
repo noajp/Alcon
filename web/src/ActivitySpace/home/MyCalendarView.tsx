@@ -16,6 +16,7 @@ import { fetchMyElements } from '@/ActivitySpace/home/myElementsData';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { Button } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface MyCalendarViewProps {
   initialScope?: 'mine' | 'space';
@@ -31,6 +32,7 @@ export function MyCalendarView(props: MyCalendarViewProps) {
 }
 
 function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: MyCalendarViewProps) {
+  const { t } = useI18n();
   const { user } = useAuthContext();
   const spaceId = useActiveSpaceId();
   const userId = user?.id ?? null;
@@ -72,7 +74,7 @@ function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: My
       {openElement => <div className="flex min-h-0 flex-1 flex-col bg-card">
       <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <NavCalendarIcon size={12} />
-        <span className="text-[12px] font-semibold text-foreground">Calendar</span>
+        <span className="text-[12px] font-semibold text-foreground">{t('Calendar')}</span>
         <div className="flex-1" />
         <CalendarScopePicker domains={domains} objects={scoped.availableObjects} selection={{ ...selection, domainIds }} onChange={setSelection} />
       </div>

@@ -550,16 +550,16 @@ function WorkspaceContent({
             Profile) and the AI pane. ⌘L and the pane's own close flip the
             same boolean. */}
         <ButtonAppearanceProvider appearance="navigation">
-        <div className="flex h-9 shrink-0 items-center justify-end gap-0.5 pt-1">
+        <div className="flex h-7 shrink-0 items-center justify-end pt-0.5">
           {!personalMode && (
             <Button size="icon-xs" variant="ghost" onClick={handleSidebarToggle} className="text-muted-foreground"
-              aria-pressed={sidebarHidden} title={t(sidebarHidden ? 'Show sidebar' : 'Hide sidebar')} aria-label={t(sidebarHidden ? 'Show sidebar' : 'Hide sidebar')}>
-              {sidebarHidden ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+              title={t(sidebarHidden ? 'Show sidebar' : 'Hide sidebar')} aria-label={t(sidebarHidden ? 'Show sidebar' : 'Hide sidebar')}>
+              {sidebarHidden ? <PanelLeftOpen size={12} /> : <PanelLeftClose size={12} />}
             </Button>
           )}
           <Button size="icon-xs" variant="ghost" onClick={() => handleCopilotOpenChange(!copilotOpen)} className={copilotOpen ? 'text-foreground' : 'text-muted-foreground'}
             aria-pressed={copilotOpen} title={`${t(copilotOpen ? 'Hide AI' : 'Show AI')} (⌘L)`} aria-label={t(copilotOpen ? 'Hide AI' : 'Show AI')}>
-            {copilotOpen ? <PanelRightOpen size={15} /> : <PanelRightClose size={15} />}
+            {copilotOpen ? <PanelRightOpen size={12} /> : <PanelRightClose size={12} />}
           </Button>
         </div>
         </ButtonAppearanceProvider>

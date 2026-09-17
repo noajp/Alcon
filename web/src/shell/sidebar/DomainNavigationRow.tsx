@@ -29,7 +29,7 @@ export function DomainNavigationRow({ name, mark, active, expanded, activeView, 
       {(['objects', 'domain-elements'] as const).map(id => {
         const { icon: Icon, label } = VIEW_REGISTRY[id];
         return <Button key={id} variant="ghost" size="md" align="start" onClick={() => onSelect(id)} aria-current={active && activeView === id ? 'page' : undefined}
-          className={`w-full gap-2.5 text-xs font-semibold ${active && activeView === id ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{Icon && <Icon size={16} />}{label}</Button>;
+          className={`w-full gap-2.5 text-xs font-semibold ${active && activeView === id ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{Icon && <Icon size={16} />}{t(label)}</Button>;
       })}
     </div>}
   </div>;

@@ -13,6 +13,7 @@ import { FONT, STATUS } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 import type { Worker } from '@/types/database';
 import { displayIdOf } from '@/ActivitySpace/execution/element/displayId';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface TeamViewProps {
   onOpenWorkload?: (workerId?: string) => void;
@@ -143,6 +144,7 @@ function WorkerRow({ entry, onSave, onOpenWorkload, onOpenElement }: {
 }
 
 function TeamContent({ roster, onOpenWorkload, onOpenElement, onManageTeam }: TeamViewProps & { roster: ReturnType<typeof useTeamRoster> }) {
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const query = search.trim().toLocaleLowerCase();
   const filtered = roster.entries.filter(({ worker, domainNames, membership }) => [worker.name, worker.role, worker.email, worker.type, membership, ...domainNames]
@@ -155,7 +157,7 @@ function TeamContent({ roster, onOpenWorkload, onOpenElement, onManageTeam }: Te
   return <div className="max-w-5xl mx-auto px-4 sm:px-8 py-6 space-y-6">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h1 className={`${FONT.xl} text-foreground`}>Team</h1>
+        <h1 className={`${FONT.xl} text-foreground`}>{t('Team')}</h1>
         <p className={`${FONT.sm} text-muted-foreground mt-1`}>Members and Workers supporting this Space. Capacity applies across their work.</p>
       </div>
       <div className="flex items-center gap-2">
@@ -184,10 +186,11 @@ function TeamContent({ roster, onOpenWorkload, onOpenElement, onManageTeam }: Te
 }
 
 export function TeamView(props: TeamViewProps = {}) {
+  const { t } = useI18n();
   const roster = useTeamRoster();
   return <div className="flex flex-col h-full bg-card">
     <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
-      <NavTeamsIcon size={12} /><span className={`${FONT.sm} font-semibold text-foreground`}>Team</span>
+      <NavTeamsIcon size={12} /><span className={`${FONT.sm} font-semibold text-foreground`}>{t('Team')}</span>
     </div>
     <div className="flex-1 overflow-auto"><TeamContent key={roster.contextKey} roster={roster} {...props} /></div>
   </div>;

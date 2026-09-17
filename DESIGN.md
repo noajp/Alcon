@@ -50,7 +50,9 @@ Object・Domain・Element・Initiative等の新規作成ボタンは、入口と
 
 主要操作のアクセントは彩度を抑えたマットブルー（`--accent-default`）。破壊的操作には彩度を抑えたマットレッド（`--status-danger`）を使う。AI機能の操作に装飾のSparklesアイコンを付けず、ラベルで用途を伝える。
 
-製品の固定UIラベル・入力例・候補ボタンは `Function/i18n` の辞書を通し、選択された言語で一貫して表示する。未翻訳の文言は英語へフォールバックする。ただし製品の概念名（Strategy / Execution / Sustainment、Initiatives / Phase / Timeline、Domain / Objects / Elements、Inbox / Calendar / Notebook / Table / Team / Workload / CRM / SCM、Profile）は ModeRail・サイドバーのナビでは言語設定に関わらず英語表記のまま出す。ナビは固有名詞として一貫させ、翻訳しない。
+製品の固定UIラベル・入力例・候補ボタンは `Function/i18n` の辞書を通し、選択された言語で一貫して表示する。未翻訳の文言は英語へフォールバックする。ユーザーが入力した内容や生成を依頼したアプリの言語は保持する。画面に英語リテラルを直接書かず、必ず `t()` を通す。
+
+製品の概念名（Strategy / Execution / Sustainment、Initiatives / Phase / Timeline、Domain / Objects / Elements、Inbox / Calendar / Notebook / Table / Team / Workload / CRM / SCM、Profile）は固有名詞として扱い、どの言語でも英語表記のまま出す。これはコードで固定するのではなく、各言語の辞書でその語を自分自身に写して実現する（`'Timeline': 'Timeline'`）。概念名を含む文も同じ（`'Open Calendar': 'Calendar を開く'`）。日付・曜日は `toLocaleDateString(locale)` で設定言語に従う。
 
 サイドバーのナビ項目は、選択中だけ `text-foreground`（背景 `bg-sidebar-accent`）で、非選択は `text-muted-foreground`（hover で `text-foreground`）。ユーザーが入力した内容や生成を依頼したアプリの言語は保持する。
 
