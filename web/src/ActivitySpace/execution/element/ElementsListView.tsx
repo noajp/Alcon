@@ -15,6 +15,7 @@ import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
 import { pushUndo } from '@/ActivitySpace/execution/element/bulkUndo';
 import { ObjectIcon } from '@/shell/icons';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
+import { EmptyState } from '@/Function/shared/EmptyState';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
@@ -711,31 +712,13 @@ function ElementsHierarchyHeader({
 
 function ElementsDomainEmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center py-20 px-6 select-none">
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        {[0.18, 0.35, 0.55, 1].map((opacity, i) => (
-          <div
-            key={i}
-            className="w-14 h-14 rounded-xl border-2 border-muted-foreground flex items-center justify-center"
-            style={{ opacity, borderStyle: i === 0 ? 'dashed' : 'solid' }}
-          >
-            <NavMyTasksIcon size={22} />
-          </div>
-        ))}
-      </div>
-      <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Elements to this Domain</h2>
-      <p className="text-[13px] text-muted-foreground text-left max-w-xs mb-2">
-        Elements are the smallest unit you track — anything actionable or worth recording.
-      </p>
-      <p className="text-[12px] text-muted-foreground/60 text-left max-w-xs mb-6">
-        Domain-direct Elements live at the top level. Open an Object to add Elements there.
-      </p>
-      <Button variant="primary" size="md"
-        onClick={onAdd}
-      >
-        <Plus size={14} />
-        Create Element
-      </Button>
-    </div>
+    <EmptyState
+      icon={NavMyTasksIcon}
+      title="Add Elements to this Domain"
+      description="Elements are the smallest unit you track — anything actionable or worth recording."
+      hint="Domain-direct Elements live at the top level. Open an Object to add Elements there."
+      cta="Create Element"
+      onCta={onAdd}
+    />
   );
 }

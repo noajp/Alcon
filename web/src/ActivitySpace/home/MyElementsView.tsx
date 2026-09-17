@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@/ui/button';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -26,6 +25,7 @@ import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
 import type { ColumnId, DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
 import { ELEMENT_DEFAULT_VISIBLE } from '@/Function/shared/listConfig';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
+import { EmptyState } from '@/Function/shared/EmptyState';
 import type { NavigationState } from '@/types/navigation';
 import { pushUndo } from '@/ActivitySpace/execution/element/bulkUndo';
 import {
@@ -365,31 +365,13 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
 
 function MyElementsEmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center py-20 px-6 select-none">
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        {[0.18, 0.35, 0.55, 1].map((opacity, i) => (
-          <div
-            key={i}
-            className="w-14 h-14 rounded-xl border-2 border-muted-foreground flex items-center justify-center"
-            style={{ opacity, borderStyle: i === 0 ? 'dashed' : 'solid' }}
-          >
-            <NavMyTasksIcon size={22} />
-          </div>
-        ))}
-      </div>
-      <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Your personal Elements</h2>
-      <p className="text-[13px] text-muted-foreground text-center max-w-xs mb-2">
-        Anything that&apos;s yours alone — quick captures, personal todos, ideas — lives here.
-      </p>
-      <p className="text-[12px] text-muted-foreground/60 text-center max-w-xs mb-6">
-        You&apos;ll also see Elements from shared Domains where you&apos;re assigned.
-      </p>
-      <Button variant="primary" size="md"
-        onClick={onAdd}
-      >
-        <Plus size={14} />
-        Create Element
-      </Button>
-    </div>
+    <EmptyState
+      icon={NavMyTasksIcon}
+      title="Your personal Elements"
+      description={<>Anything that&apos;s yours alone — quick captures, personal todos, ideas — lives here.</>}
+      hint={<>You&apos;ll also see Elements from shared Domains where you&apos;re assigned.</>}
+      cta="Create Element"
+      onCta={onAdd}
+    />
   );
 }

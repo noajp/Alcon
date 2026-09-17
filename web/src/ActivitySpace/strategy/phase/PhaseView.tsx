@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, X } from 'lucide-react';
 import { isCommitEnter, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NavPhaseIcon } from '@/shell/sidebar/NavIcons';
+import { EmptyState } from '@/Function/shared/EmptyState';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
@@ -217,24 +218,16 @@ export function PhaseView({
   );
 }
 
-function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
+function EmptyPrompt({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="h-full flex flex-col items-center justify-center text-center px-6 gap-3">
-      <span className="text-muted-foreground/50"><NavPhaseIcon size={28} /></span>
-      <p className="text-[13px] text-muted-foreground max-w-md">
-        Create a Phase to time-box a stage of work — 要件定義, design, build. Assign Objects and Elements to it and track what each period covers.
-      </p>
-      {onCreate && (
-        <button
-          type="button"
-          onClick={onCreate}
-          className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-foreground text-background text-[12px] font-medium hover:opacity-90"
-        >
-          <Plus size={12} />
-          New Phase
-        </button>
-      )}
-    </div>
+    <EmptyState
+      icon={NavPhaseIcon}
+      title="Add Phases"
+      description="A Phase time-boxes a stage of work — requirements, design, build."
+      hint="Assign Objects and Elements to it and track what each period covers."
+      cta="Create Phase"
+      onCta={onCreate}
+    />
   );
 }
 

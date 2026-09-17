@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@/ui/button';
 
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
@@ -14,7 +13,7 @@ import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore
 import { hydrateLabelColors } from '@/Function/shared/labelColor';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { NavObjectsIcon } from '@/shell/sidebar/NavIcons';
-import { Plus } from 'lucide-react';
+import { EmptyState } from '@/Function/shared/EmptyState';
 import { ListTable, type ListSection } from '@/ActivitySpace/execution/object/ListTable';
 
 // Objects are a flat list within the Domain.
@@ -138,31 +137,13 @@ export function ObjListView({
 function ObjectsEmptyState() {
   const { openCreate } = useWorkspaceActions();
   return (
-    <div className="flex-1 flex flex-col items-center justify-center py-20 px-6 select-none">
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        {[0.18, 0.35, 0.55, 1].map((opacity, i) => (
-          <div
-            key={i}
-            className="w-14 h-14 rounded-xl border-2 border-muted-foreground flex items-center justify-center"
-            style={{ opacity, borderStyle: i === 0 ? 'dashed' : 'solid' }}
-          >
-            <NavObjectsIcon size={22} />
-          </div>
-        ))}
-      </div>
-      <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Objects to this Domain</h2>
-      <p className="text-[13px] text-muted-foreground text-left max-w-xs mb-2">
-        Objects are mid-level structural units — projects, departments, or any container you want to organise.
-      </p>
-      <p className="text-[12px] text-muted-foreground/60 text-left max-w-xs mb-6">
-        Objects live directly under a Domain (no nesting) and can be shared across multiple Domains.
-      </p>
-      <Button variant="primary" size="md"
-        onClick={() => openCreate('object')}
-      >
-        <Plus size={14} />
-        Create Object
-      </Button>
-    </div>
+    <EmptyState
+      icon={NavObjectsIcon}
+      title="Add Objects to this Domain"
+      description="Objects are mid-level structural units — projects, departments, or any container you want to organise."
+      hint="Objects live directly under a Domain (no nesting) and can be shared across multiple Domains."
+      cta="Create Object"
+      onCta={() => openCreate('object')}
+    />
   );
 }
