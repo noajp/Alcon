@@ -13,6 +13,11 @@ import {
 import { ObjectIcon } from '@/shell/icons';
 import { NavStrategyIcon, NavTimelineIcon } from '@/shell/sidebar/NavIcons';
 import { completionOf } from '@/Function/shared/completion';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import {
+  usePreference, getCachedTimelineScale, getCachedTimelineMonthsBack, getCachedTimelineMonthsAhead,
+  getCachedTimelineTodayMarker, getCachedTimelineProgressFill, type TimelineScale,
+} from '@/Function/settings/preferencesStore';
 
 // =============================================================
 // Timeline — Linear-Roadmap-style portfolio timeline for the
@@ -29,9 +34,11 @@ import { completionOf } from '@/Function/shared/completion';
 // =============================================================
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const DAY_W = 4;               // month-scale: ~120px per month
-const VISIBLE_MONTHS = 12;
-const PAST_MONTHS = 2;         // window starts 2 months back
+// Pixels per day by scale (Settings > Strategy > Timeline): month ≈ 120px
+// per month, quarter ≈ 60px. The window (months back / ahead) is a
+// preference too; both are read live, so a change in Settings redraws an
+// open Timeline.
+const DAY_W_BY_SCALE: Record<TimelineScale, number> = { month: 4, quarter: 2 };
 const LEFT_COL_W = 260;
 const MONTH_HEADER_H = 28;
 const GROUP_ROW_H = 32;
@@ -95,41 +102,50 @@ export function TimelineView({
   }, [rootStrategies, scopeKey]);
 
   // ── Month window ───────────────────────────────────────────
+  const { locale } = useI18n();
+  const scale = usePreference(getCachedTimelineScale);
+  const monthsBack = usePreference(getCachedTimelineMonthsBack);
+  const monthsAhead = usePreference(getCachedTimelineMonthsAhead);
+  const showToday = usePreference(getCachedTimelineTodayMarker);
+  const progressFill = usePreference(getCachedTimelineProgressFill);
+  const dayW = DAY_W_BY_SCALE[scale];
+  const visibleMonths = monthsBack + monthsAhead;
   const [anchorOffset, setAnchorOffset] = useState(0); // in months
   const windowStart = useMemo(() => {
     const t = new Date();
-    return new Date(t.getFullYear(), t.getMonth() - PAST_MONTHS + anchorOffset, 1);
-  }, [anchorOffset]);
+    return new Date(t.getFullYear(), t.getMonth() - monthsBack + anchorOffset, 1);
+  }, [anchorOffset, monthsBack]);
 
   const months = useMemo(() => {
     const arr: { label: string; x: number; w: number }[] = [];
     let x = 0;
-    for (let i = 0; i < VISIBLE_MONTHS; i++) {
+    for (let i = 0; i < visibleMonths; i++) {
       const d = new Date(windowStart.getFullYear(), windowStart.getMonth() + i, 1);
       const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-      const w = daysInMonth * DAY_W;
+      const w = daysInMonth * dayW;
       // Year tag on the first visible month and on every January so long
       // scrolls stay oriented.
       const label = (i === 0 || d.getMonth() === 0)
-        ? d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-        : d.toLocaleDateString('en-US', { month: 'short' });
+        ? d.toLocaleDateString(locale, { month: 'short', year: 'numeric' })
+        : d.toLocaleDateString(locale, { month: 'short' });
       arr.push({ label, x, w });
       x += w;
     }
     return arr;
-  }, [windowStart]);
+  }, [windowStart, visibleMonths, dayW, locale]);
 
   const totalW = useMemo(() => months.reduce((s, m) => s + m.w, 0), [months]);
   const windowEnd = useMemo(
-    () => new Date(windowStart.getFullYear(), windowStart.getMonth() + VISIBLE_MONTHS, 0),
-    [windowStart],
+    () => new Date(windowStart.getFullYear(), windowStart.getMonth() + visibleMonths, 0),
+    [windowStart, visibleMonths],
   );
 
   const todayX = useMemo(() => {
+    if (!showToday) return null;
     const t = stripTime(new Date());
     if (t < windowStart || t > windowEnd) return null;
-    return daysBetween(windowStart, t) * DAY_W + DAY_W / 2;
-  }, [windowStart, windowEnd]);
+    return daysBetween(windowStart, t) * dayW + dayW / 2;
+  }, [windowStart, windowEnd, dayW, showToday]);
 
   // ── Rows: span + progress per Initiative, grouped by quarter ─
   type InitiativeRow = {
@@ -307,6 +323,8 @@ export function TimelineView({
                       todayX={todayX}
                       windowStart={windowStart}
                       windowEnd={windowEnd}
+                      dayW={dayW}
+                      progressFill={progressFill}
                       isOpen={expanded.has(row.strategy.id)}
                       onToggle={() => setExpanded((prev) => toggleIn(prev, row.strategy.id))}
                       onOpen={() => onSelectStrategy?.(row.strategy.id)}
@@ -321,6 +339,7 @@ export function TimelineView({
                         todayX={todayX}
                         windowStart={windowStart}
                         windowEnd={windowEnd}
+                        dayW={dayW}
                         onOpen={() => onOpenObject?.(obj.id, obj.domain_id)}
                       />
                     ))}
@@ -356,6 +375,8 @@ function InitiativeTimelineRow({
   todayX,
   windowStart,
   windowEnd,
+  dayW,
+  progressFill,
   isOpen,
   onToggle,
   onOpen,
@@ -371,12 +392,14 @@ function InitiativeTimelineRow({
   todayX: number | null;
   windowStart: Date;
   windowEnd: Date;
+  dayW: number;
+  progressFill: boolean;
   isOpen: boolean;
   onToggle: () => void;
   onOpen: () => void;
 }) {
   const { strategy, range, progress } = row;
-  const bar = range ? rangeToBar(range, windowStart, windowEnd) : null;
+  const bar = range ? rangeToBar(range, windowStart, windowEnd, dayW) : null;
   const color = strategy.color ?? 'var(--accent-default)';
 
   return (
@@ -422,10 +445,12 @@ function InitiativeTimelineRow({
               height: INITIATIVE_BAR_H,
             }}
           >
-            <div
-              className="absolute inset-y-0 left-0"
-              style={{ width: `${progress}%`, background: color, opacity: 0.35 }}
-            />
+            {progressFill && (
+              <div
+                className="absolute inset-y-0 left-0"
+                style={{ width: `${progress}%`, background: color, opacity: 0.35 }}
+              />
+            )}
             <span
               className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-foreground/90 truncate pr-2"
               style={{ maxWidth: Math.max(bar.width - 12, 0) }}
@@ -450,6 +475,7 @@ function ObjectTimelineRow({
   todayX,
   windowStart,
   windowEnd,
+  dayW,
   onOpen,
 }: {
   obj: AlconObject;
@@ -459,9 +485,10 @@ function ObjectTimelineRow({
   todayX: number | null;
   windowStart: Date;
   windowEnd: Date;
+  dayW: number;
   onOpen: () => void;
 }) {
-  const bar = range ? rangeToBar(range, windowStart, windowEnd) : null;
+  const bar = range ? rangeToBar(range, windowStart, windowEnd, dayW) : null;
   const color = obj.color ?? 'var(--accent-default)';
 
   return (
@@ -612,11 +639,12 @@ function rangeToBar(
   range: DateRange,
   windowStart: Date,
   windowEnd: Date,
+  dayW: number,
 ): { left: number; width: number } | null {
   if (range.end < windowStart || range.start > windowEnd) return null;
   const start = range.start < windowStart ? windowStart : range.start;
   const end = range.end > windowEnd ? windowEnd : range.end;
-  const left = daysBetween(windowStart, start) * DAY_W;
-  const width = (daysBetween(start, end) + 1) * DAY_W;
+  const left = daysBetween(windowStart, start) * dayW;
+  const width = (daysBetween(start, end) + 1) * dayW;
   return { left, width };
 }

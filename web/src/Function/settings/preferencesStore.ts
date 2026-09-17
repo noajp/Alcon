@@ -50,6 +50,7 @@ export type HomeView = 'Now' | 'My Elements' | 'Inbox' | 'Calendar';
 export type SendCommentShortcut = '⌘+Enter' | 'Enter';
 export type FirstDayOfWeek = 'Monday' | 'Sunday' | 'Saturday';
 export type DisplayNames = 'Full name' | 'Short name' | 'Username';
+export type TimelineScale = 'month' | 'quarter';
 
 const HOME_VIEW_KEY = 'alcon:pref:home-view';
 const SEND_SHORTCUT_KEY = 'alcon:pref:send-comment-shortcut';
@@ -164,3 +165,43 @@ const EMOTICON_MAP: [RegExp, string][] = [
 export function convertEmoticons(text: string): string {
   return EMOTICON_MAP.reduce((acc, [pattern, replacement]) => acc.replace(pattern, replacement), text);
 }
+
+// ── Timeline display (Settings > Strategy > Timeline) ─────────────────
+const TIMELINE_SCALE_KEY = 'alcon:pref:timeline-scale';
+const TIMELINE_BACK_KEY = 'alcon:pref:timeline-months-back';
+const TIMELINE_AHEAD_KEY = 'alcon:pref:timeline-months-ahead';
+const TIMELINE_TODAY_KEY = 'alcon:pref:timeline-today-marker';
+const TIMELINE_FILL_KEY = 'alcon:pref:timeline-progress-fill';
+
+export const TIMELINE_MONTHS_BACK_RANGE = { min: 0, max: 12, fallback: 2 } as const;
+export const TIMELINE_MONTHS_AHEAD_RANGE = { min: 3, max: 36, fallback: 10 } as const;
+
+function readInt(key: string, range: { min: number; max: number; fallback: number }): number {
+  if (typeof window === 'undefined') return range.fallback;
+  const raw = localStorage.getItem(key);
+  const n = raw === null ? NaN : Number(raw);
+  return Number.isInteger(n) && n >= range.min && n <= range.max ? n : range.fallback;
+}
+function readBool(key: string, fallback: boolean): boolean {
+  if (typeof window === 'undefined') return fallback;
+  const v = localStorage.getItem(key);
+  return v === null ? fallback : v === '1';
+}
+function write(key: string, v: string) {
+  try { localStorage.setItem(key, v); } catch { /* ignore */ }
+  notifyPreferencesChanged();
+}
+
+export function getCachedTimelineScale(): TimelineScale {
+  if (typeof window === 'undefined') return 'month';
+  return localStorage.getItem(TIMELINE_SCALE_KEY) === 'quarter' ? 'quarter' : 'month';
+}
+export function setCachedTimelineScale(v: TimelineScale) { write(TIMELINE_SCALE_KEY, v); }
+export function getCachedTimelineMonthsBack(): number { return readInt(TIMELINE_BACK_KEY, TIMELINE_MONTHS_BACK_RANGE); }
+export function setCachedTimelineMonthsBack(v: number) { write(TIMELINE_BACK_KEY, String(v)); }
+export function getCachedTimelineMonthsAhead(): number { return readInt(TIMELINE_AHEAD_KEY, TIMELINE_MONTHS_AHEAD_RANGE); }
+export function setCachedTimelineMonthsAhead(v: number) { write(TIMELINE_AHEAD_KEY, String(v)); }
+export function getCachedTimelineTodayMarker(): boolean { return readBool(TIMELINE_TODAY_KEY, true); }
+export function setCachedTimelineTodayMarker(v: boolean) { write(TIMELINE_TODAY_KEY, v ? '1' : '0'); }
+export function getCachedTimelineProgressFill(): boolean { return readBool(TIMELINE_FILL_KEY, true); }
+export function setCachedTimelineProgressFill(v: boolean) { write(TIMELINE_FILL_KEY, v ? '1' : '0'); }

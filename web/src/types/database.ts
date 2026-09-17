@@ -31,6 +31,13 @@ export interface DomainAIConfig {
 // domains.risk_thresholds (jsonb). Every key optional; absent = the default
 // in ActivitySpace/strategy/initiative/initiativeRiskModel.ts. Edited from Settings >
 // Elements > SLAs.
+/** Settings > Strategy > Phase: how a new Phase's dates are seeded. Every
+ *  key optional; absent = the create dialog starts with empty dates. */
+export interface DomainPhaseDefaults {
+  length_days?: number            // a new Phase spans this many days (end_date inclusive)
+  start?: 'today' | 'after_last'  // where it starts: today, or the day after the Domain's last Phase
+}
+
 export interface DomainRiskThresholds {
   due_soon_days?: number   // days ahead that count as "due soon" (default 3)
   stall_minutes?: number   // minutes of silence before in_progress work is stalled (default 25)
@@ -60,6 +67,7 @@ export interface Domain {
   object_types: string[]        // Object (Project層) の型カタログ (Project / Initiative ...) — element_types とは別レイヤー
   label_colors: Record<string, string>  // Label 名 → パレットキー (e.g. {"Bug":"red"})。色は Domain 共通
   risk_thresholds: DomainRiskThresholds // Settings > Elements > SLAs。未設定は {}（DB 既定）
+  phase_defaults: DomainPhaseDefaults   // Settings > Strategy > Phase。未設定は {}（DB 既定）
 }
 
 export interface DomainInsert {
@@ -78,6 +86,7 @@ export interface DomainInsert {
   object_types?: string[]
   label_colors?: Record<string, string>
   risk_thresholds?: DomainRiskThresholds
+  phase_defaults?: DomainPhaseDefaults
 }
 
 export interface DomainUpdate {
@@ -94,6 +103,7 @@ export interface DomainUpdate {
   object_types?: string[]
   label_colors?: Record<string, string>
   risk_thresholds?: DomainRiskThresholds
+  phase_defaults?: DomainPhaseDefaults
 }
 
 // A saved Element shape (Settings > Elements > Templates, el_QLT-029),
