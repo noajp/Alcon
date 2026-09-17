@@ -6,7 +6,7 @@ const ja: TranslationMap = {
   'Grouping': 'グループ化', 'Ordering': '並び順', 'Sort by': '並べ替え項目',
   'Direction': '方向', 'Ascending': '昇順', 'Descending': '降順', 'Manual': '手動',
   'Display properties': '表示項目',
-  'Account': 'アカウント', 'Activity space': 'アクティビティスペース', 'Administration': '管理',
+  'Account': 'アカウント', 'Activity space': 'アクティビティスペース',
   'AI agent': 'AI エージェント', 'Already have an account? ': 'すでにアカウントをお持ちですか？ ',
   'App sidebar': 'アプリサイドバー', 'At least 6 characters': '6文字以上', 'Back to sign in': 'サインインに戻る',
   'Calendar': 'Calendar', 'Cancel': 'キャンセル', 'Check your email': 'メールを確認してください', 'Connected accounts': '連携アカウント', 'Connection Error': '接続エラー',
@@ -42,7 +42,7 @@ const ko: TranslationMap = {
   'Descending': '내림차순',
   'Manual': '수동',
   'Display properties': '표시 속성',
-  'Account': '계정', 'Activity space': '활동 공간', 'Administration': '관리', 'AI agent': 'AI 에이전트',
+  'Account': '계정', 'Activity space': '활동 공간', 'AI agent': 'AI 에이전트',
   'Already have an account? ': '이미 계정이 있나요? ', 'App sidebar': '앱 사이드바', 'At least 6 characters': '6자 이상',
   'Back to sign in': '로그인으로 돌아가기', 'Calendar': 'Calendar', 'Cancel': '취소', 'Check your email': '이메일을 확인하세요', 'Connected accounts': '연결된 계정', 'Connection Error': '연결 오류', 'Create': '만들기',
   'Create account': '계정 만들기', 'Create an account': '계정 만들기', 'Create Domain': 'Domain 만들기', 'Create new': '새로 만들기',
@@ -73,7 +73,7 @@ const fr: TranslationMap = {
   'Descending': 'Décroissant',
   'Manual': 'Manuel',
   'Display properties': 'Propriétés affichées',
-  'Account': 'Compte', 'Activity space': "Espace d'activité", 'Administration': 'Administration', 'AI agent': 'Agent IA',
+  'Account': 'Compte', 'Activity space': "Espace d'activité", 'AI agent': 'Agent IA',
   'Already have an account? ': 'Vous avez déjà un compte ? ', 'App sidebar': "Barre latérale de l’app", 'At least 6 characters': 'Au moins 6 caractères',
   'Back to sign in': 'Retour à la connexion', 'Calendar': 'Calendar', 'Cancel': 'Annuler', 'Check your email': 'Consultez votre messagerie',
   'Connected accounts': 'Comptes connectés', 'Connection Error': 'Erreur de connexion', 'Create': 'Créer',
@@ -105,7 +105,7 @@ const es: TranslationMap = {
   'Descending': 'Descendente',
   'Manual': 'Manual',
   'Display properties': 'Propiedades visibles',
-  'Account': 'Cuenta', 'Activity space': 'Espacio de actividad', 'Administration': 'Administración', 'AI agent': 'Agente de IA',
+  'Account': 'Cuenta', 'Activity space': 'Espacio de actividad', 'AI agent': 'Agente de IA',
   'Already have an account? ': '¿Ya tienes una cuenta? ', 'App sidebar': 'Barra lateral', 'At least 6 characters': 'Al menos 6 caracteres',
   'Back to sign in': 'Volver a iniciar sesión', 'Calendar': 'Calendar', 'Cancel': 'Cancelar', 'Check your email': 'Revisa tu correo', 'Connected accounts': 'Cuentas conectadas', 'Connection Error': 'Error de conexión', 'Create': 'Crear',
   'Create account': 'Crear cuenta', 'Create an account': 'Crear una cuenta', 'Create Domain': 'Crear Domain', 'Create new': 'Crear',
@@ -200,6 +200,7 @@ Object.assign(es, {
 
 const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
   ja: {
+    'Activity settings': 'Activity 設定', 'Strategy settings': 'Strategy 設定', 'Execution settings': 'Execution 設定', 'Sustainment settings': 'Sustainment 設定', 'Initiative': 'Initiative', '{title} settings are coming soon.': '{title} の設定は準備中です。',
     'Day': '日', 'Week': '週', 'Month': '月', 'Choose scope': '範囲を選択', 'Choose calendar scope': 'Calendar の範囲を選択', 'Calendar scope lists': 'Calendar の範囲一覧', 'Find a calendar…': 'カレンダーを検索…', 'No matches.': '該当なし。',
     'Carbon': 'カーボン', "Couldn't save": '保存できませんでした', 'Domain Elements': 'Domain の Elements', 'Graphite': 'グラファイト',
     'Ivory': 'アイボリー', 'Mid-level structural unit': '中間レベルの構造単位', 'Midnight': 'ミッドナイト', 'Mist': 'ミスト',
@@ -210,6 +211,7 @@ const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
     'Go to Now': '現在へ移動', 'Snow': 'スノー', 'Something went wrong': '問題が発生しました', 'Strings like :) will be converted to 🙂': ':) などの文字を 🙂 に変換します', 'Sustainment apps': 'Sustainment アプリ',
   },
   ko: {
+    'Activity settings': 'Activity 설정', 'Strategy settings': 'Strategy 설정', 'Execution settings': 'Execution 설정', 'Sustainment settings': 'Sustainment 설정', 'Initiative': 'Initiative', '{title} settings are coming soon.': '{title} 설정은 준비 중입니다.',
     'Day': '일', 'Week': '주', 'Month': '월', 'Choose scope': '범위 선택', 'Choose calendar scope': 'Calendar 범위 선택', 'Calendar scope lists': 'Calendar 범위 목록', 'Find a calendar…': '캘린더 검색…', 'No matches.': '일치하는 항목이 없습니다.',
     'Carbon': '카본', "Couldn't save": '저장할 수 없습니다', 'Domain Elements': 'Domain Elements', 'Graphite': '그래파이트', 'Ivory': '아이보리',
     'Mid-level structural unit': '중간 수준 구조 단위', 'Midnight': '미드나잇', 'Mist': '미스트', 'New Element': '새 Element', 'New Initiative': '새 Initiative', 'New Object': '새 Object',
@@ -218,6 +220,7 @@ const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
     'Go to Now': '지금으로 이동', 'Snow': '스노우', 'Something went wrong': '문제가 발생했습니다', 'Strings like :) will be converted to 🙂': ':)와 같은 문자열을 🙂로 변환합니다', 'Sustainment apps': 'Sustainment 앱',
   },
   fr: {
+    'Activity settings': 'Paramètres Activity', 'Strategy settings': 'Paramètres Strategy', 'Execution settings': 'Paramètres Execution', 'Sustainment settings': 'Paramètres Sustainment', 'Initiative': 'Initiative', '{title} settings are coming soon.': 'Les paramètres {title} arrivent bientôt.',
     'Day': 'Jour', 'Week': 'Semaine', 'Month': 'Mois', 'Choose scope': 'Choisir la portée', 'Choose calendar scope': 'Choisir la portée du Calendar', 'Calendar scope lists': 'Listes de portée du Calendar', 'Find a calendar…': 'Rechercher un calendrier…', 'No matches.': 'Aucun résultat.',
     'Carbon': 'Carbone', "Couldn't save": 'Enregistrement impossible', 'Domain Elements': 'Elements du Domain', 'Graphite': 'Graphite', 'Ivory': 'Ivoire',
     'Mid-level structural unit': 'Unité structurelle intermédiaire', 'Midnight': 'Minuit', 'Mist': 'Brume', 'New Element': 'Nouvel Element', 'New Initiative': 'Nouvelle Initiative', 'New Object': 'Nouvel Object',
@@ -226,6 +229,7 @@ const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
     'Go to Now': 'Aller à Maintenant', 'Snow': 'Neige', 'Something went wrong': 'Un problème est survenu', 'Strings like :) will be converted to 🙂': 'Les chaînes comme :) seront converties en 🙂', 'Sustainment apps': 'Applications Sustainment',
   },
   es: {
+    'Activity settings': 'Ajustes de Activity', 'Strategy settings': 'Ajustes de Strategy', 'Execution settings': 'Ajustes de Execution', 'Sustainment settings': 'Ajustes de Sustainment', 'Initiative': 'Initiative', '{title} settings are coming soon.': 'Los ajustes de {title} llegarán pronto.',
     'Day': 'Día', 'Week': 'Semana', 'Month': 'Mes', 'Choose scope': 'Elegir alcance', 'Choose calendar scope': 'Elegir el alcance del Calendar', 'Calendar scope lists': 'Listas de alcance del Calendar', 'Find a calendar…': 'Buscar un calendario…', 'No matches.': 'Sin coincidencias.',
     'Carbon': 'Carbono', "Couldn't save": 'No se pudo guardar', 'Domain Elements': 'Elements del Domain', 'Graphite': 'Grafito', 'Ivory': 'Marfil',
     'Mid-level structural unit': 'Unidad estructural intermedia', 'Midnight': 'Medianoche', 'Mist': 'Niebla', 'New Element': 'Nuevo Element', 'New Initiative': 'Nueva Initiative', 'New Object': 'Nuevo Object',
