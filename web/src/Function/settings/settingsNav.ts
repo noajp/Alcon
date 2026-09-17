@@ -104,10 +104,10 @@ export const SETTINGS_ITEM_TITLES: Record<string, string> = Object.fromEntries(
 );
 
 // ── External store for the active page (and its tab, when it has tabs) ──
-// Settings opens on the first page of the nav.
-const DEFAULT_SECTION = SETTINGS_NAV[0].items[0].id;
+// Settings opens on the first page of the nav (on its first tab, if any).
+const FIRST_PAGE = SETTINGS_NAV[0].items[0];
 interface ActiveSettings { section: string; tab: string | null }
-let active: ActiveSettings = { section: DEFAULT_SECTION, tab: null };
+let active: ActiveSettings = { section: FIRST_PAGE.id, tab: FIRST_PAGE.tabs?.[0].id ?? null };
 const DEFAULT_ACTIVE: ActiveSettings = active;
 const listeners = new Set<() => void>();
 

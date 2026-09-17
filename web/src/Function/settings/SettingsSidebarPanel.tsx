@@ -8,10 +8,10 @@ import {
   setActiveSettingsSection,
   type SettingsNavItem,
 } from './settingsNav';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /** A page listed in the nav — opened on `tab` when the search matched one of its tabs. */
 interface NavHit { item: SettingsNavItem; tab?: string }
-import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // The Settings navigation rendered INSIDE the AppSidebar (it replaces the
 // Activity Space tree while Settings mode is active). Selecting an item just
@@ -75,6 +75,11 @@ export function SettingsSidebarPanel() {
                 >
                   <Icon size={15} className="shrink-0" />
                   <span className="truncate">{t(item.label)}</span>
+                  {tab && (
+                    <span className="ml-auto shrink-0 text-[11px] font-medium text-muted-foreground/70">
+                      {t(item.tabs!.find((x) => x.id === tab)!.label)}
+                    </span>
+                  )}
                 </button>
               );
             })}
