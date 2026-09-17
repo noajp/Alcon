@@ -1,26 +1,29 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, MoreHorizontal, Plus, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/ui/button';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem } from '@/ui/dropdown-menu';
-import { MenuShell, MENU_ROW } from '@/Function/shared/menu';
 import { VIEW_REGISTRY } from '@/shell/viewRegistry';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // The Strategy mode's navigation: the Initiatives row with Phase and
 // Timeline nested under it — the same row anatomy as a Domain in Execution
-// (name, a chevron that folds the children, a "…" menu).
-export function StrategyNavigation({ activeView, onSelect, onCreate, onOpenSettings }: {
+// (name, a chevron that folds the children, a "…" that opens its settings).
+export function StrategyNavigation({ activeView, onSelect, onOpenSettings }: {
   activeView: string;
   onSelect: (view: string) => void;
-  /** Opens the New Initiative dialog (what the sidebar's "+" does in this mode). */
-  onCreate: () => void;
-  /** Opens Settings on the Strategy pages. */
+  /** Opens the Strategy settings modal. */
   onOpenSettings: () => void;
 }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(true);
+  // A child becoming current (⌘K, a link) unfolds the row so the current
+  // page is never hidden — the same as a Domain unfolding for its Object.
+  const [seenView, setSeenView] = useState(activeView);
+  if (activeView !== seenView) {
+    setSeenView(activeView);
+    if (activeView === 'phase' || activeView === 'timeline') setExpanded(true);
+  }
   const rootActive = activeView === 'strategy';
   const { icon: RootIcon, label: rootLabel } = VIEW_REGISTRY.strategy;
   return <nav aria-label={t('Initiatives')} className="mb-1 mt-1">
@@ -34,15 +37,7 @@ export function StrategyNavigation({ activeView, onSelect, onCreate, onOpenSetti
         aria-label={`${t(expanded ? 'Collapse' : 'Expand')} ${t(rootLabel)}`} aria-expanded={expanded}>
         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
       </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon-xs" aria-label={t('Strategy settings')} className="mr-1"><MoreHorizontal size={12} /></Button>
-        </DropdownMenuTrigger>
-        <MenuShell as="dropdown" align="start" width="standard">
-          <DropdownMenuItem className={MENU_ROW} onSelect={onCreate}><Plus size={14} />{t('New Initiative')}</DropdownMenuItem>
-          <DropdownMenuItem className={MENU_ROW} onSelect={onOpenSettings}><SlidersHorizontal size={14} />{t('Strategy settings')}</DropdownMenuItem>
-        </MenuShell>
-      </DropdownMenu>
+      <Button variant="ghost" size="icon-xs" onClick={onOpenSettings} aria-label={t('Strategy settings')} className="mr-1"><MoreHorizontal size={12} /></Button>
     </div>
     {expanded && <div className="mt-0.5 pl-7">
       {(['phase', 'timeline'] as const).map((id) => {

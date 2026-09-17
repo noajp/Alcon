@@ -21,6 +21,7 @@ import { useActiveSettingsSection, useActiveSettingsTab, setActiveSettingsSectio
 import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 import { LanguageSelect } from '@/Function/i18n/LanguageSelect';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { SettingsComingSoon } from './SettingsSection';
 
 // =============================================================
 // SettingsView — content pane only. The settings NAV lives in
@@ -65,7 +66,7 @@ export function SettingsView() {
             {tab === 'templates' ? <ElementTemplateSettings /> : tab === 'slas' ? <SlaSettings /> : <LabelSettings />}
           </TabbedPanel>
         ) : active === 'objects' ? (
-          <TabbedPanel id="objects" tab={tab}><ComingSoonBody title={t(SETTINGS_ITEMS.objects.tabs!.find((x) => x.id === tab)?.label ?? 'Objects')} /></TabbedPanel>
+          <TabbedPanel id="objects" tab={tab}><SettingsComingSoon title={t(SETTINGS_ITEMS.objects.tabs!.find((x) => x.id === tab)?.label ?? 'Objects')} /></TabbedPanel>
         ) : (
           <ComingSoon title={t(SETTINGS_ITEM_TITLES[active] ?? 'Settings')} />
         )}
@@ -308,18 +309,8 @@ function ComingSoon({ title }: { title: string }) {
   return (
     <div className="space-y-6">
       <h1 className="text-[26px] font-semibold tracking-tight text-foreground">{title}</h1>
-      <ComingSoonBody title={title} />
+      <SettingsComingSoon title={title} />
     </div>
   );
 }
 
-function ComingSoonBody({ title }: { title: string }) {
-  const { t } = useI18n();
-  return (
-    <div className="rounded-lg border border-dashed border-border bg-[var(--surface-rail)]/30 px-6 py-12 text-center">
-      <div className="text-[13px] text-muted-foreground">
-        {t('{title} settings are coming soon.', { title })}
-      </div>
-    </div>
-  );
-}

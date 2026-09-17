@@ -200,6 +200,7 @@ Object.assign(es, {
 
 const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
   ja: {
+    'Domain settings': 'Domain 設定', 'Members': 'メンバー', 'Name and privacy': '名前と公開範囲', 'Name and membership': '名前とメンバーシップ', 'Manage team members': 'メンバーを管理', 'How Initiatives are judged': 'Initiative の評価のしかた', 'How Phases divide time': 'Phase による期間の区切り方', 'How the Timeline is drawn': 'Timeline の描き方', 'Close': '閉じる',
     'Activity settings': 'Activity 設定', 'Strategy settings': 'Strategy 設定', 'Execution settings': 'Execution 設定', 'Sustainment settings': 'Sustainment 設定', 'Initiative': 'Initiative', '{title} settings are coming soon.': '{title} の設定は準備中です。',
     'Day': '日', 'Week': '週', 'Month': '月', 'Choose scope': '範囲を選択', 'Choose calendar scope': 'Calendar の範囲を選択', 'Calendar scope lists': 'Calendar の範囲一覧', 'Find a calendar…': 'カレンダーを検索…', 'No matches.': '該当なし。',
     'Carbon': 'カーボン', "Couldn't save": '保存できませんでした', 'Domain Elements': 'Domain の Elements', 'Graphite': 'グラファイト',
@@ -211,6 +212,7 @@ const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
     'Go to Now': '現在へ移動', 'Snow': 'スノー', 'Something went wrong': '問題が発生しました', 'Strings like :) will be converted to 🙂': ':) などの文字を 🙂 に変換します', 'Sustainment apps': 'Sustainment アプリ',
   },
   ko: {
+    'Domain settings': 'Domain 설정', 'Members': '멤버', 'Name and privacy': '이름과 공개 범위', 'Name and membership': '이름과 멤버십', 'Manage team members': '멤버 관리', 'How Initiatives are judged': 'Initiative 평가 방식', 'How Phases divide time': 'Phase로 기간을 나누는 방식', 'How the Timeline is drawn': 'Timeline 표시 방식', 'Close': '닫기',
     'Activity settings': 'Activity 설정', 'Strategy settings': 'Strategy 설정', 'Execution settings': 'Execution 설정', 'Sustainment settings': 'Sustainment 설정', 'Initiative': 'Initiative', '{title} settings are coming soon.': '{title} 설정은 준비 중입니다.',
     'Day': '일', 'Week': '주', 'Month': '월', 'Choose scope': '범위 선택', 'Choose calendar scope': 'Calendar 범위 선택', 'Calendar scope lists': 'Calendar 범위 목록', 'Find a calendar…': '캘린더 검색…', 'No matches.': '일치하는 항목이 없습니다.',
     'Carbon': '카본', "Couldn't save": '저장할 수 없습니다', 'Domain Elements': 'Domain Elements', 'Graphite': '그래파이트', 'Ivory': '아이보리',
@@ -220,6 +222,7 @@ const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
     'Go to Now': '지금으로 이동', 'Snow': '스노우', 'Something went wrong': '문제가 발생했습니다', 'Strings like :) will be converted to 🙂': ':)와 같은 문자열을 🙂로 변환합니다', 'Sustainment apps': 'Sustainment 앱',
   },
   fr: {
+    'Domain settings': 'Paramètres du Domain', 'Members': 'Membres', 'Name and privacy': 'Nom et confidentialité', 'Name and membership': 'Nom et adhésion', 'Manage team members': 'Gérer les membres', 'How Initiatives are judged': 'Comment les Initiatives sont évaluées', 'How Phases divide time': 'Comment les Phases découpent le temps', 'How the Timeline is drawn': 'Comment la Timeline est tracée', 'Close': 'Fermer',
     'Activity settings': 'Paramètres Activity', 'Strategy settings': 'Paramètres Strategy', 'Execution settings': 'Paramètres Execution', 'Sustainment settings': 'Paramètres Sustainment', 'Initiative': 'Initiative', '{title} settings are coming soon.': 'Les paramètres {title} arrivent bientôt.',
     'Day': 'Jour', 'Week': 'Semaine', 'Month': 'Mois', 'Choose scope': 'Choisir la portée', 'Choose calendar scope': 'Choisir la portée du Calendar', 'Calendar scope lists': 'Listes de portée du Calendar', 'Find a calendar…': 'Rechercher un calendrier…', 'No matches.': 'Aucun résultat.',
     'Carbon': 'Carbone', "Couldn't save": 'Enregistrement impossible', 'Domain Elements': 'Elements du Domain', 'Graphite': 'Graphite', 'Ivory': 'Ivoire',
@@ -229,6 +232,7 @@ const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
     'Go to Now': 'Aller à Maintenant', 'Snow': 'Neige', 'Something went wrong': 'Un problème est survenu', 'Strings like :) will be converted to 🙂': 'Les chaînes comme :) seront converties en 🙂', 'Sustainment apps': 'Applications Sustainment',
   },
   es: {
+    'Domain settings': 'Ajustes del Domain', 'Members': 'Miembros', 'Name and privacy': 'Nombre y privacidad', 'Name and membership': 'Nombre y pertenencia', 'Manage team members': 'Gestionar miembros', 'How Initiatives are judged': 'Cómo se evalúan las Initiatives', 'How Phases divide time': 'Cómo las Phases dividen el tiempo', 'How the Timeline is drawn': 'Cómo se dibuja la Timeline', 'Close': 'Cerrar',
     'Activity settings': 'Ajustes de Activity', 'Strategy settings': 'Ajustes de Strategy', 'Execution settings': 'Ajustes de Execution', 'Sustainment settings': 'Ajustes de Sustainment', 'Initiative': 'Initiative', '{title} settings are coming soon.': 'Los ajustes de {title} llegarán pronto.',
     'Day': 'Día', 'Week': 'Semana', 'Month': 'Mes', 'Choose scope': 'Elegir alcance', 'Choose calendar scope': 'Elegir el alcance del Calendar', 'Calendar scope lists': 'Listas de alcance del Calendar', 'Find a calendar…': 'Buscar un calendario…', 'No matches.': 'Sin coincidencias.',
     'Carbon': 'Carbono', "Couldn't save": 'No se pudo guardar', 'Domain Elements': 'Elements del Domain', 'Graphite': 'Grafito', 'Ivory': 'Marfil',

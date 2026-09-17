@@ -4,14 +4,15 @@ import { Button, ButtonAppearanceProvider } from '@/ui/button';
 
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { StrategyNavigation } from './sidebar/StrategyNavigation';
-import { setActiveSettingsSection } from '@/Function/settings/settingsNav';
+import { SettingsModal } from '@/Function/settings/SettingsModal';
+import { StrategySettingsModal } from '@/Function/settings/StrategySettingsModal';
 import { NotebookTree } from './sidebar/NotebookTree';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
-import { ArrowLeft, Plus, ChevronRight, Bot, Settings, Users, X, Search } from 'lucide-react';
+import { ArrowLeft, Plus, Bot, Settings, Users, Search } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';
@@ -203,6 +204,7 @@ export function AppSidebar({
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
+  const [strategySettingsOpen, setStrategySettingsOpen] = useState(false);
   const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const railMode = railModeOf(activeView);
@@ -438,7 +440,7 @@ export function AppSidebar({
           <StrategyNavigation activeView={activeView} onSelect={(id) => {
             if (id === 'strategy') onNavigate({ strategyId: null });
             onViewChange(id);
-          }} onCreate={openCreateMenu} onOpenSettings={() => { setActiveSettingsSection('initiative'); onOpenSettings(); }} />
+          }} onOpenSettings={() => setStrategySettingsOpen(true)} />
           </>
           )}
 
@@ -570,6 +572,7 @@ export function AppSidebar({
         </>
       )}
 
+      {strategySettingsOpen && <StrategySettingsModal onClose={() => setStrategySettingsOpen(false)} />}
       {settingsDomain && (
         <DomainSettingsModal
           domain={settingsDomain}
@@ -697,6 +700,7 @@ function DomainSettingsModal({
   /** The Domain is gone for this viewer — deleted, or they left it. */
   onDeleted: () => void;
 }) {
+  const { t } = useI18n();
   const [tab, setTab] = useState<'general' | 'members' | 'agent'>('general');
   // The viewer's own seat, read once for every tab. It answers the same
   // question RLS answers on write: owner/admin may change the Domain, only
@@ -718,101 +722,27 @@ function DomainSettingsModal({
   const canEdit = role === 'owner' || role === 'admin';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 sm:p-6">
-      <div className="flex flex-col w-full max-w-3xl max-h-[90vh] sm:max-h-[86vh] overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
-        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <DomainMark domain={domain} size={38} />
-            <div className="min-w-0">
-              <h2 className="truncate text-[15px] font-semibold text-foreground">
-                {domain.name}
-              </h2>
-              <p className="text-[12px] text-muted-foreground">Domain settings</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            aria-label="Close"
-          >
-            <X size={15} />
-          </button>
-        </div>
-
-        {/* Fixed height (not min-height) on the desktop two-column layout —
-            General and Members carry very different amounts of content, and
-            a min-height let the whole modal resize under the viewer's cursor
-            when switching tabs. Each pane scrolls its own overflow instead. */}
-        <div className="flex min-h-0 flex-col sm:flex-row sm:h-[480px] overflow-hidden">
-          <aside className="w-full sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-border p-3 flex flex-wrap sm:block gap-2">
-            <SettingsTabButton
-              active={tab === 'general'}
-              icon={<Settings size={15} />}
-              title="General"
-              description={canEdit ? 'Name and privacy' : 'Name and membership'}
-              onClick={() => setTab('general')}
-            />
-            <SettingsTabButton
-              active={tab === 'members'}
-              icon={<Users size={15} />}
-              title="Members"
-              description="Manage team members"
-              onClick={() => setTab('members')}
-            />
-            <SettingsTabButton
-              active={tab === 'agent'}
-              icon={<Bot size={15} />}
-              title="AI agent"
-              description="Execution settings"
-              onClick={() => setTab('agent')}
-            />
-          </aside>
-          <main className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6">
-            {tab === 'general' ? (
-              <DomainGeneralSettings domain={domain} role={role} onUpdated={onUpdated} onDeleted={onDeleted} />
-            ) : tab === 'agent' ? (
-              <DomainAgentSettings key={domain.id} domain={domain} canEdit={canEdit} />
-            ) : (
-              <TeamSettings domainId={domain.id} />
-            )}
-          </main>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SettingsTabButton({
-  active,
-  icon,
-  title,
-  description,
-  onClick,
-}: {
-  active: boolean;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
-        active ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-      }`}
+    <SettingsModal
+      mark={<DomainMark domain={domain} size={24} />}
+      title={domain.name}
+      subtitle={t('Domain settings')}
+      onClose={onClose}
+      sections={[
+        { id: 'general', icon: <Settings size={15} />, title: t('General'), description: t(canEdit ? 'Name and privacy' : 'Name and membership') },
+        { id: 'members', icon: <Users size={15} />, title: t('Members'), description: t('Manage team members') },
+        { id: 'agent', icon: <Bot size={15} />, title: t('AI agent'), description: t('Execution settings') },
+      ]}
+      active={tab}
+      onSelect={(id) => setTab(id as 'general' | 'members' | 'agent')}
     >
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/80 text-muted-foreground">
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[13px] font-semibold">{title}</span>
-        <span className="block truncate text-[11px] text-muted-foreground">{description}</span>
-      </span>
-      <ChevronRight size={13} className="shrink-0 text-muted-foreground/70" />
-    </button>
+      {tab === 'general' ? (
+        <DomainGeneralSettings domain={domain} role={role} onUpdated={onUpdated} onDeleted={onDeleted} />
+      ) : tab === 'agent' ? (
+        <DomainAgentSettings key={domain.id} domain={domain} canEdit={canEdit} />
+      ) : (
+        <TeamSettings domainId={domain.id} />
+      )}
+    </SettingsModal>
   );
 }
 
