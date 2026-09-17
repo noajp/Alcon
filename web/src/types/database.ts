@@ -163,6 +163,7 @@ export interface ActivitySpace {
   identifier: string | null  // optional short slug
   color: string | null
   logo: string | null
+  vision: string | null      // Strategy > Vision — what the Space aims for
   order_index: number | null
   created_by: string | null
   created_at: string | null
@@ -184,6 +185,7 @@ export interface ActivitySpaceUpdate {
   color?: string | null
   logo?: string | null
   order_index?: number | null
+  vision?: string | null
 }
 
 export interface ActivitySpaceMember {
@@ -1253,9 +1255,35 @@ export interface Strategy {
   scope: StrategyScope
   color: string | null
   icon: string | null
+  portfolio_id: string | null  // Strategy > Portfolio the Initiative belongs to (at most one)
   created_by: string | null
   created_at: string
   updated_at: string
+}
+
+// Strategy > Portfolio — a named bundle of Initiatives within an Activity
+// Space. An Initiative belongs to at most one Portfolio (strategies.portfolio_id).
+export interface Portfolio {
+  id: string
+  activity_space_id: string
+  name: string
+  description: string | null
+  order_index: number
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+export interface PortfolioInsert {
+  id?: string
+  activity_space_id: string
+  name: string
+  description?: string | null
+  order_index?: number
+}
+export interface PortfolioUpdate {
+  name?: string
+  description?: string | null
+  order_index?: number
 }
 
 export interface StrategyInsert {
@@ -1266,6 +1294,7 @@ export interface StrategyInsert {
   scope?: StrategyScope
   color?: string | null
   icon?: string | null
+  portfolio_id?: string | null
   created_by?: string | null
 }
 
@@ -1276,6 +1305,7 @@ export interface StrategyUpdate {
   scope?: StrategyScope
   color?: string | null
   icon?: string | null
+  portfolio_id?: string | null
   updated_at?: string
 }
 
@@ -1848,6 +1878,11 @@ export interface Database {
         Row: Strategy
         Insert: StrategyInsert
         Update: StrategyUpdate
+      }
+      portfolios: {
+        Row: Portfolio
+        Insert: PortfolioInsert
+        Update: PortfolioUpdate
       }
       strategy_objects: {
         Row: StrategyObject

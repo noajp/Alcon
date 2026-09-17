@@ -77,9 +77,10 @@ interface AppSidebarProps {
 // The ModeRail picks a top-level mode; the sidebar renders only that mode's
 // surfaces.
 
-// Strategy — what we're trying to achieve and how we intend to win. Initiative
-// (view id 'strategy', display label "Initiatives") is the unit, and Initiatives
-// bundle into a strategy; Phase stages the effort; Timeline sequences the set.
+// Strategy — what we're trying to achieve and how we intend to win. Vision
+// (view id 'vision') is what the Space aims for; a Portfolio ('portfolio')
+// bundles Initiatives; Initiative ('strategy') is the unit. Phase and
+// Timeline are reached from an Initiative or a Domain, not from here.
 // Execution — the fighting: the Domain tree, whose rows carry the D/O/E
 // surfaces below.
 
@@ -229,7 +230,7 @@ export function AppSidebar({
   // Execution) a Domain or Object from a small menu. Modes with nothing to
   // create show no "+".
   const calendarDay = useCalendarDay();
-  const createLabel = ({
+  const createLabel = activeView === 'portfolio' ? 'New Portfolio' : ({
     notebook: 'Add Notebook', tables: 'Add Table', strategy: 'New Initiative',
     calendar: 'Add schedule', execution: 'Create new',
   } as Partial<Record<RailMode, string>>)[railMode ?? 'execution'];
@@ -237,7 +238,8 @@ export function AppSidebar({
     if (railMode === 'tables') { openCreate('table'); return; }
     if (railMode === 'notebook') { openCreate('notebook'); return; }
     if (railMode === 'strategy') {
-      // Land on the portfolio root (an open Initiative's detail has no
+      if (activeView === 'portfolio') { onNavigate({ portfolioCreate: true }); return; }
+      // Land on the Initiative list (an open Initiative's detail has no
       // create dialog) and let this tab's surface open it once mounted.
       onNavigate({ strategyId: null, strategyCreate: true });
       onViewChange('strategy');
