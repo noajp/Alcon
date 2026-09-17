@@ -28,7 +28,7 @@ describe('i18n locale resolution', () => {
   });
 
   it('keeps product concept names in English in every locale', () => {
-    const concepts = ['Strategy', 'Execution', 'Sustainment', 'Initiatives', 'Phase', 'Timeline', 'Domain', 'Objects', 'Elements',
+    const concepts = ['Strategy', 'Execution', 'Sustainment', 'Initiative', 'Initiatives', 'Phase', 'Timeline', 'Domain', 'Objects', 'Elements',
       'Inbox', 'Calendar', 'Notebook', 'Table', 'Team', 'Workload', 'Profile'];
     for (const locale of Object.keys(MESSAGES) as Array<keyof typeof MESSAGES>) {
       for (const name of concepts) expect(MESSAGES[locale][name], `${locale}:${name}`).toBe(name);

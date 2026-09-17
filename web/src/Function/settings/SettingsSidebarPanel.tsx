@@ -6,7 +6,11 @@ import {
   SETTINGS_NAV,
   useActiveSettingsSection,
   setActiveSettingsSection,
+  type SettingsNavItem,
 } from './settingsNav';
+
+/** A page listed in the nav — opened on `tab` when the search matched one of its tabs. */
+interface NavHit { item: SettingsNavItem; tab?: string }
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // The Settings navigation rendered INSIDE the AppSidebar (it replaces the
@@ -17,11 +21,21 @@ export function SettingsSidebarPanel() {
   const active = useActiveSettingsSection();
   const [query, setQuery] = useState('');
 
-  const filtered = useMemo(() => {
+  // Search matches a page by its own label or by one of its tabs, so
+  // "Labels" still finds Objects and Elements; picking such a hit opens
+  // the page on that tab.
+  const filtered = useMemo((): { title: string; items: NavHit[] }[] => {
     const q = query.trim().toLowerCase();
-    if (!q) return SETTINGS_NAV;
+    if (!q) return SETTINGS_NAV.map((s) => ({ title: s.title, items: s.items.map((item) => ({ item })) }));
     return SETTINGS_NAV
-      .map((s) => ({ ...s, items: s.items.filter((i) => t(i.label).toLowerCase().includes(q)) }))
+      .map((s) => ({
+        title: s.title,
+        items: s.items.flatMap((item): NavHit[] => {
+          if (t(item.label).toLowerCase().includes(q)) return [{ item }];
+          const tab = item.tabs?.find((x) => t(x.label).toLowerCase().includes(q));
+          return tab ? [{ item, tab: tab.id }] : [];
+        }),
+      }))
       .filter((s) => s.items.length > 0);
   }, [query, t]);
 
@@ -45,14 +59,14 @@ export function SettingsSidebarPanel() {
             {t(section.title)}
           </div>
           <div className="space-y-0.5">
-            {section.items.map((item) => {
+            {section.items.map(({ item, tab }) => {
               const Icon = item.icon;
               const isActive = active === item.id;
               return (
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setActiveSettingsSection(item.id)}
+                  onClick={() => setActiveSettingsSection(item.id, tab)}
                   className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
                     isActive
                       ? 'bg-sidebar-accent text-foreground'

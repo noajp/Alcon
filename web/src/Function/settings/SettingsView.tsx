@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { Check, ChevronDown } from 'lucide-react';
+import { Button } from '@/ui/button';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from '@/ui/dropdown-menu';
@@ -16,7 +17,7 @@ import { NotificationSettings } from './NotificationSettings';
 import { SlaSettings } from './SlaSettings';
 import { LabelSettings } from './LabelSettings';
 import { ElementTemplateSettings } from './ElementTemplateSettings';
-import { useActiveSettingsSection, SETTINGS_ITEM_TITLES } from './settingsNav';
+import { useActiveSettingsSection, useActiveSettingsTab, setActiveSettingsSection, SETTINGS_ITEMS, SETTINGS_ITEM_TITLES } from './settingsNav';
 import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 import { LanguageSelect } from '@/Function/i18n/LanguageSelect';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -31,13 +32,15 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 // Projects → Objects, Team(s) → Domain(s).
 //
 // Panels with real implementations (Profile / Security / Domain / Activity
-// space / Member / Notifications / Labels / SLAs / Templates / Preferences)
-// reuse or hold their
-// own backing-store wiring; the rest fall through to ComingSoon.
+// space / Member / Notifications / Preferences, and the Elements tabs
+// Labels / Templates / SLAs) hold their own backing-store wiring; the rest
+// fall through to ComingSoon. Objects and Elements are one page each with
+// tabs — see settingsNav.
 // =============================================================
 
 export function SettingsView() {
   const active = useActiveSettingsSection();
+  const tab = useActiveSettingsTab();
   const { t } = useI18n();
 
   return (
@@ -57,12 +60,12 @@ export function SettingsView() {
           <PanelShell title={t('Member')}><MemberSettings /></PanelShell>
         ) : active === 'notifications' ? (
           <PanelShell title={t('Notifications')}><NotificationSettings /></PanelShell>
-        ) : active === 'el-slas' ? (
-          <PanelShell title={t('SLAs')}><SlaSettings /></PanelShell>
-        ) : active === 'el-labels' ? (
-          <PanelShell title={t('Labels')}><LabelSettings /></PanelShell>
-        ) : active === 'el-templates' ? (
-          <PanelShell title={t('Templates')}><ElementTemplateSettings /></PanelShell>
+        ) : active === 'elements' ? (
+          <TabbedPanel id="elements" tab={tab}>
+            {tab === 'templates' ? <ElementTemplateSettings /> : tab === 'slas' ? <SlaSettings /> : <LabelSettings />}
+          </TabbedPanel>
+        ) : active === 'objects' ? (
+          <TabbedPanel id="objects" tab={tab}><ComingSoonBody title={t(SETTINGS_ITEMS.objects.tabs!.find((x) => x.id === tab)?.label ?? 'Objects')} /></TabbedPanel>
         ) : (
           <ComingSoon title={t(SETTINGS_ITEM_TITLES[active] ?? 'Settings')} />
         )}
@@ -282,14 +285,40 @@ function ToggleRow({
   );
 }
 
+// A page whose settings live under tabs (Objects, Elements). The tab strip
+// is the same tab control as everywhere else; the active tab is shared
+// with the sidebar's search through the settingsNav store.
+function TabbedPanel({ id, tab, children }: { id: string; tab: string | null; children: React.ReactNode }) {
+  const { t } = useI18n();
+  const item = SETTINGS_ITEMS[id];
+  return (
+    <PanelShell title={t(item.label)}>
+      <div className="flex gap-1" role="tablist" aria-label={t(item.label)}>
+        {item.tabs?.map((x) => (
+          <Button key={x.id} shape="tab" size="xs" variant={tab === x.id ? 'secondary' : 'ghost'} role="tab"
+            aria-selected={tab === x.id} onClick={() => setActiveSettingsSection(id, x.id)}>{t(x.label)}</Button>
+        ))}
+      </div>
+      {children}
+    </PanelShell>
+  );
+}
+
 function ComingSoon({ title }: { title: string }) {
   return (
     <div className="space-y-6">
       <h1 className="text-[26px] font-semibold tracking-tight text-foreground">{title}</h1>
-      <div className="rounded-lg border border-dashed border-border bg-[var(--surface-rail)]/30 px-6 py-12 text-center">
-        <div className="text-[13px] text-muted-foreground">
-          {title} settings are coming soon.
-        </div>
+      <ComingSoonBody title={title} />
+    </div>
+  );
+}
+
+function ComingSoonBody({ title }: { title: string }) {
+  const { t } = useI18n();
+  return (
+    <div className="rounded-lg border border-dashed border-border bg-[var(--surface-rail)]/30 px-6 py-12 text-center">
+      <div className="text-[13px] text-muted-foreground">
+        {t('{title} settings are coming soon.', { title })}
       </div>
     </div>
   );
