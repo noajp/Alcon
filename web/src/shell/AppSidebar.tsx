@@ -229,7 +229,7 @@ export function AppSidebar({
   // Execution) a Domain or Object from a small menu. Modes with nothing to
   // create show no "+".
   const calendarDay = useCalendarDay();
-  const createLabel = ({
+  const createLabel = activeView === 'portfolio' ? 'New Portfolio' : ({
     notebook: 'Add Notebook', tables: 'Add Table', strategy: 'New Initiative',
     calendar: 'Add schedule', execution: 'Create new',
   } as Partial<Record<RailMode, string>>)[railMode ?? 'execution'];
@@ -237,7 +237,8 @@ export function AppSidebar({
     if (railMode === 'tables') { openCreate('table'); return; }
     if (railMode === 'notebook') { openCreate('notebook'); return; }
     if (railMode === 'strategy') {
-      // Land on the portfolio root (an open Initiative's detail has no
+      if (activeView === 'portfolio') { onNavigate({ portfolioCreate: true }); return; }
+      // Land on the Initiative list (an open Initiative's detail has no
       // create dialog) and let this tab's surface open it once mounted.
       onNavigate({ strategyId: null, strategyCreate: true });
       onViewChange('strategy');

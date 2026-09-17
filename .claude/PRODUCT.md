@@ -125,7 +125,7 @@ AIによる変更も、バージョンと適用範囲を持つ業務設定とし
 
 | 分類 | 戦争論 | 何を扱うか | 単位 |
 |---|---|---|---|
-| **Strategy** | 戦略 | 何を達成し、どう勝つか | Initiative。複数の Initiative で戦略を構成する |
+| **Strategy** | 戦略 | 何を達成し、どう勝つか | Vision（Space が目指す姿）→ Portfolio（Initiative の束）→ Initiative。複数の Initiative で戦略を構成する |
 | **Execution** | 戦闘 | 実際に行動する | Domain（活動の場）→ Object（成果物の束）→ Element（最小単位） |
 | **Sustainment** | 兵站 | 仕事道具 | Workload / CRM / SCM / Notebook / Table / Team / Calendar |
 
@@ -136,7 +136,7 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ```
 ╔═══════════════════════ Activity Space ═══════════════════════╗
 ║ ┌──────────────────────────────────────────────────────────┐ ║
-║ │  Strategy（戦略）— Initiative / Phase / Timeline            │ ║
+║ │  Strategy（戦略）— Vision / Portfolio / Initiative         │ ║
 ║ │  何を達成し、どう勝つか。Initiative を束ねると戦略になる          │ ║
 ║ ├──────────────────────────────────────────────────────────┤ ║
 ║ │  Execution（戦闘）— Domain → Object → Element             │ ║
@@ -159,7 +159,7 @@ ModeRail の固定セレクタは Inbox / Calendar / Strategy / Execution。Stra
 
 | Strategy | Execution |
 |----------|-----------|
-| Initiative → Phase → Timeline | Domain → Object → Element |
+| Vision → Portfolio → Initiative | Domain → Object → Element |
 | 目的、方針、前提、意思決定、成功条件 | 担当、期限、進捗、依存関係、成果物 |
 | 「何を、なぜ、どう勝つか」 | 「何を今やるか、どこで詰まっているか」 |
 
@@ -170,19 +170,21 @@ ModeRail の固定セレクタは Inbox / Calendar / Strategy / Execution。Stra
 
 レールのハイライトは `activeView` に追従するため、どちらのリンクを辿ってもモードは自動で切り替わる。この往復によって方針の確認や変更が実際に容易になるかを検証する。日常の実行に毎回Initiativeの設定や閲覧を要求しない。
 
-### Strategy（戦略）：Initiative / Phase / Timeline
+### Strategy（戦略）：Vision / Portfolio / Initiative
 
 何を達成し、どう勝つかを扱う分類。目的・方針・前提・意思決定・成功条件がここに置かれ、担当・進捗は持たない。
 
-**Initiative が Strategy の単位であり、複数の Initiative で戦略を構成する。** Initiative は Initiative を内包でき（`strategy_children`）、ポートフォリオのルートには最上位の Initiative だけが並ぶ。入れ子の Initiative は親の "Initiatives" セクションにだけ現れる。
+**Vision が Strategy の頂点、Portfolio が Initiative の束、Initiative が Strategy の単位であり、複数の Initiative で戦略を構成する。** Vision は Space ごとに 1 つの文章（`activity_spaces.vision`）で、Space のオーナーが書き、メンバーは読む。Portfolio は Space 内の名前付きの束（`portfolios`）で、Initiative は高々 1 つの Portfolio に入る（`strategies.portfolio_id`）。 Initiative は Initiative を内包でき（`strategy_children`）、ポートフォリオのルートには最上位の Initiative だけが並ぶ。入れ子の Initiative は親の "Initiatives" セクションにだけ現れる。
 
 | 機能 | 役割 | 実装 |
 |------|------|------|
+| **Vision** | Space が目指す姿と、そこに着いたと分かる条件を 1 つの文章で持つ | `activity_spaces.vision`。view id は `vision`。編集は Space オーナー |
+| **Portfolio** | Vision の一部分に向かう Initiative を束ね、Strategy を少数の賭けとして読めるようにする | `portfolios`（Space スコープ、メンバーが作成・編集）+ `strategies.portfolio_id`。view id は `portfolio` |
 | **Initiative** | Object を目的単位で束ね、意図・前提・決定・成功条件を保持する | `strategies` + `strategy_objects` junction（Object 集合の唯一の置き場、[ADR 0017](../docs/adr/0017-campaign-objects-live-in-the-junction.md)）+ `strategy_children`（Initiative の入れ子）+ `intents`（decision / assumption / measure）。view id は `strategy` |
-| **Phase** | 活動を期間で区切り、力の配分を決める単位 | `phases`（Domain スコープ）。Object / Element は高々 1 つの Phase に所属 |
-| **Timeline** | Initiative の期間・シーケンスを月スケール Gantt で俯瞰 | 行を展開すると参加 Object のバーが同じ軸に並ぶ |
+| **Phase** | 活動を期間で区切り、力の配分を決める単位 | `phases`（Domain スコープ）。Object / Element は高々 1 つの Phase に所属。ナビには出さず、Initiative や Domain から到達する |
+| **Timeline** | Initiative の期間・シーケンスを月スケール Gantt で俯瞰 | 行を展開すると参加 Object のバーが同じ軸に並ぶ。ナビには出さない |
 
-Strategy の設定は、サイドバーの Initiatives 行の「…」（モーダル）と Settings > Strategy の両方から同じパネルで開く。**Initiative** は判定閾値（Due soon / Stalled / Idle）で、Domain ごとの `risk_thresholds` を編集する（Elements > SLAs と同じ値）。**Phase** は Domain ごとの作成既定値（既定の長さ、開始日を「今日」か「最後の Phase の翌日」にする）で、新規 Phase ダイアログの日付に効く。**Timeline** は個人の表示設定（月 / 四半期スケール、前後の月数、今日の線、進捗の塗り）で `user_preferences` に持つ。
+Strategy の設定は、サイドバーの Vision 行の「…」（モーダル）と Settings > Strategy の両方から同じパネルで開く。**Initiative** は判定閾値（Due soon / Stalled / Idle）で、Domain ごとの `risk_thresholds` を編集する（Elements > SLAs と同じ値）。**Phase** は Domain ごとの作成既定値（既定の長さ、開始日を「今日」か「最後の Phase の翌日」にする）で、新規 Phase ダイアログの日付に効く。**Timeline** は個人の表示設定（月 / 四半期スケール、前後の月数、今日の線、進捗の塗り）で `user_preferences` に持つ。
 
 Initiative を開くと、意図・状況・前提・決定・指標・リスクの各ウィジェットと、参加 Object の一覧が並ぶ。そこから Object 詳細を一クリックで開ける。
 
@@ -296,7 +298,7 @@ Execution が Domain → Object → Element の順に並ぶのは、上位ほど
 ### レイアウト哲学
 - **常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス** の 3 列構成。ブラウザのタブがあるので画面内にタブ列は置かない。サイドバーの表示切替と AI ペインの開閉は、アイランドの下の帯の右端に置く。サイドバー最上部の Space 行は固定ヘッダーで、メイン領域のヘッダーと同じ高さ・位置に揃え、その下だけがスクロールする。Settings は同じ画面で開き、その固定ヘッダーの「Back」で元の画面へ戻る
 - **ModeRail**（46px）は分類セレクタ：固定の Inbox / Calendar / Strategy / Execution ＋ Apps ランチャーから追加した App ＋ 最下部のアバター（Profile）。Inbox のアイコンには未読数のバッジを出す。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / CRM / SCM）の 2 グループで、すべて Sustainment の道具
-- **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋「＋」。「＋」はモードごとに対象が変わる（Notebook＝ノートブック / Table＝テーブル / Strategy＝Initiative / Calendar＝表示中の日を期日にした Element / Execution＝Domain・Object のメニュー）。どれも Object / Element と同じクイック作成カード（画面下の角丸カードに名前・説明・プロパティのピル・Create）で作る。作るものが無いモードでは出さない。見出し横に別の「＋」を置かない。本体は現在のモードに応じて切替（Inbox＝通知の一覧 / Calendar＝今日・ミニ月・表示する人 / Strategy＝Initiatives の下に Phase・Timeline / Execution＝Domain ツリー / Notebook＝ノートブック一覧 / App 各種＝モード名ラベルのみ）。アバターから開く Profile ではサイドバーを出さない
+- **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋「＋」。「＋」はモードごとに対象が変わる（Notebook＝ノートブック / Table＝テーブル / Strategy＝Initiative（Portfolio ページでは Portfolio）/ Calendar＝表示中の日を期日にした Element / Execution＝Domain・Object のメニュー）。どれも Object / Element と同じクイック作成カード（画面下の角丸カードに名前・説明・プロパティのピル・Create）で作る。作るものが無いモードでは出さない。見出し横に別の「＋」を置かない。本体は現在のモードに応じて切替（Inbox＝通知の一覧 / Calendar＝今日・ミニ月・表示する人 / Strategy＝Vision の下に Portfolio・Initiative / Execution＝Domain ツリー / Notebook＝ノートブック一覧 / App 各種＝モード名ラベルのみ）。アバターから開く Profile ではサイドバーを出さない
 - **Notebook** はサイドバーに Book（ノートブック）と配下の Section をツリーで並べ、メイン領域の左列は選んだ Section のページ一覧だけを示す。Book / Section の右クリックで New section / New page / Rename / Delete（削除は確認を経る）、ページは右クリックで Rename / Delete、一覧末尾の「New page」で追加する。新しい Book はサイドバー上部の「＋」
 - view→モードの対応は `shell/railApps.ts` の `MODE_META.views` / `railModeOf`、view id→ラベル / アイコンは `shell/viewRegistry.ts` が単一情報源
 
@@ -355,7 +357,7 @@ Claude API を Supabase Edge Functions 経由で利用：
 - `analyze-change`：変更分析
 - `validate-task`：Element 検証
 
-## 拡張構想（Vision）
+## 拡張構想
 
 拡張は、実顧客の反復業務で現在の道具では解けない負担が確認でき、導入と日常操作を複雑にする費用を上回る場合に選ぶ。Sustainmentでは、Workload・CRM・SCMを起点に、Object単位の道具を横断して使うことや、予算・会計・契約・購買・勤怠・設備まで扱うことが候補になる。概念上分類できることだけを開発理由にしない。
 

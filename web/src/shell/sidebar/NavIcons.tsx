@@ -3,7 +3,7 @@
 import {
   House, Table2, Settings, Inbox, Calendar,
   LayoutDashboard, Notebook, BarChart3,
-  ChartArea, ChartGantt, Users, Share2, Search, Workflow, Compass, Milestone,
+  ChartArea, ChartGantt, Users, Share2, Search, Workflow, Compass, Milestone, Telescope, Briefcase,
 } from 'lucide-react';
 import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon, ScmIcon } from '@/Function/shared/conceptIcons';
 
@@ -58,7 +58,10 @@ export const NavSustainmentModeIcon = ({ size = 20 }: { size?: number }) => (
     <path d="M12 12C9 8 7.8 6.5 5.5 6.5a5.5 5.5 0 0 0 0 11C7.8 17.5 9 16 12 12s4.2-5.5 6.5-5.5a5.5 5.5 0 0 1 0 11C16.2 17.5 15 16 12 12Z" transform="translate(1.5 1.5) scale(.875)" />
   </svg>
 );
-// Strategy's nested sub-view.
+// Strategy's units: the Vision above, its Portfolios of Initiatives below.
+export const NavVisionIcon = ({ size = 20 }: { size?: number }) => <Telescope size={size} strokeWidth={2} />;
+export const NavPortfolioIcon = ({ size = 20 }: { size?: number }) => <Briefcase size={size} strokeWidth={2} />;
+// Phase — a Domain's period, reachable from an Initiative rather than the nav.
 export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} className="scale-110" />;
 
 export const NavCrmIcon = CrmIcon;

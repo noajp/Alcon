@@ -33,7 +33,9 @@ export interface ModeMeta {
 export const MODE_META: Record<RailMode, ModeMeta> = {
   personal:  { label: 'Profile',   icon: NavPersonalIcon, defaultView: 'profile', views: ['home', 'my-elements', 'profile'] },
   inbox:     { label: 'Inbox',     icon: NavInboxIcon, defaultView: 'inbox', views: ['inbox'] },
-  strategy:  { label: 'Strategy',  icon: NavStrategyModeIcon, defaultView: 'strategy', views: ['strategy', 'phase', 'timeline'] },
+  // Vision opens first (the row at the top of the mode); Phase and Timeline
+  // stay routable but are not in the nav.
+  strategy:  { label: 'Strategy',  icon: NavStrategyModeIcon, defaultView: 'vision', views: ['vision', 'portfolio', 'strategy', 'phase', 'timeline'] },
   execution: { label: 'Execution', icon: NavExecutionModeIcon, defaultView: 'objects', views: ['objects', 'domain-elements', 'domains', 'domain-overview'] },
   workload:  { label: 'Workload',  icon: NavWorkloadIcon, defaultView: 'workload', views: ['workload'] },
   notebook:  { label: 'Notebook',  icon: NavNoteIcon, defaultView: 'note', views: ['note'] },
