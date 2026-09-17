@@ -33,7 +33,10 @@ export const NavStrategyIcon = ({ size = 20, className }: { size?: number; class
   <Compass size={size} strokeWidth={2} className={className} />
 );
 export const NavWorkloadIcon = ({ size = 20 }: { size?: number }) => <ChartArea size={size} strokeWidth={2} />;
-export const NavTimelineIcon = ({ size = 20 }: { size?: number }) => <ChartGantt size={size} strokeWidth={2} />;
+// Milestone and ChartGantt ink only 18 of Lucide's 24 units where Compass,
+// Layers and Box ink 20, so next to them they read a size smaller. Scaling
+// the glyph inside its box keeps the row layout and evens the optical size.
+export const NavTimelineIcon = ({ size = 20 }: { size?: number }) => <ChartGantt size={size} strokeWidth={2} className="scale-110" />;
 export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => <Users size={size} strokeWidth={2} />;
 export const NavGraphIcon = ({ size = 20 }: { size?: number }) => <Share2 size={size} strokeWidth={2} />;
 export const NavSearchIcon = ({ size = 20 }: { size?: number }) => <Search size={size} strokeWidth={2} />;
@@ -56,7 +59,7 @@ export const NavSustainmentModeIcon = ({ size = 20 }: { size?: number }) => (
   </svg>
 );
 // Strategy's nested sub-view.
-export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} />;
+export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} className="scale-110" />;
 
 export const NavCrmIcon = CrmIcon;
 export const NavScmIcon = ScmIcon;
