@@ -1,8 +1,10 @@
 'use client';
 
 import type React from 'react';
+import { useId } from 'react';
 import { ChevronRight, X } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { useEscapeLayer } from '@/Function/shared/keyboard';
 
 // The settings modal used by a Domain row's "…" and the Initiatives row's
 // "…": a 50px header (the same height as an island header), a left column
@@ -26,14 +28,17 @@ export function SettingsModal({ mark, title, subtitle, onClose, sections, active
   children: React.ReactNode;
 }) {
   const { t } = useI18n();
+  const titleId = useId();
+  useEscapeLayer(true, onClose);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 sm:p-6">
-      <div className="flex flex-col w-full max-w-3xl max-h-[90vh] sm:max-h-[86vh] overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-labelledby={titleId}
+        className="flex flex-col w-full max-w-3xl max-h-[90vh] sm:max-h-[86vh] overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
         <div className="flex h-[50px] shrink-0 items-center justify-between border-b border-border/60 pl-4 pr-3">
           <div className="flex min-w-0 items-center gap-2.5">
             {mark}
             <div className="flex min-w-0 items-baseline gap-2">
-              <h2 className="truncate text-[13px] font-semibold text-foreground">{title}</h2>
+              <h2 id={titleId} className="truncate text-[13px] font-semibold text-foreground">{title}</h2>
               <p className="truncate text-[12px] text-muted-foreground">{subtitle}</p>
             </div>
           </div>
