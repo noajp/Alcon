@@ -43,8 +43,8 @@ export function VisionView() {
         <span className="text-[12px] font-semibold text-foreground">{t('Vision')}</span>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {loading || !space ? null : (
-          <VisionEditor key={`${space.id}:${space.vision ?? ''}`} spaceId={space.id} spaceName={space.name}
+        {loading || !space || role.isPending ? null : (
+          <VisionEditor key={space.id} spaceId={space.id} spaceName={space.name}
             initial={space.vision ?? ''} canEdit={isOwner} onSaved={() => void refetch()} />
         )}
       </div>
@@ -57,6 +57,14 @@ function VisionEditor({ spaceId, spaceName, initial, canEdit, onSaved }: {
 }) {
   const { t } = useI18n();
   const [text, setText] = useState(initial);
+  // A refetch (another owner, another tab) brings a new `initial`; adopt it
+  // unless the field holds an unsaved edit — the "adjust state from a prop"
+  // pattern, during render, so nothing paints twice.
+  const [seenInitial, setSeenInitial] = useState(initial);
+  if (initial !== seenInitial) {
+    setSeenInitial(initial);
+    if (text === seenInitial) setText(initial);
+  }
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement | null>(null);
@@ -71,7 +79,7 @@ function VisionEditor({ spaceId, spaceName, initial, canEdit, onSaved }: {
 
   const save = async () => {
     const next = text.trim();
-    if (next === initial.trim()) return;
+    if (next === seenInitial.trim()) return;
     setState('saving');
     try {
       await updateActivitySpace(spaceId, { vision: next || null });
@@ -93,8 +101,9 @@ function VisionEditor({ spaceId, spaceName, initial, canEdit, onSaved }: {
           onChange={(e) => { setText(e.target.value); setState('idle'); }}
           onBlur={() => void save()}
           placeholder={t('Write the Vision — the future this Space works toward, and how it will know it got there.')}
+          aria-label={t('Vision')}
           rows={3}
-          className="mt-4 w-full resize-none bg-transparent text-[20px] leading-8 text-foreground placeholder:text-muted-foreground/50 outline-none"
+          className="mt-3 -mx-2 w-[calc(100%+1rem)] resize-none rounded-md bg-transparent px-2 py-1 text-[20px] leading-8 text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors focus:bg-muted/30"
         />
       ) : initial ? (
         <p className="mt-4 whitespace-pre-wrap text-[20px] leading-8 text-foreground">{initial}</p>

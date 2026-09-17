@@ -13,11 +13,11 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 import { RenameInput } from '@/ActivitySpace/sustainment/notebook/RenameInput';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { useStrategies } from '@/hooks/useSupabase';
+import { useStrategies, useDomains, useObjects } from '@/hooks/useSupabase';
 import { NavPortfolioIcon, NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import type { Portfolio, StrategyWithObjects } from '@/types/database';
-import { createPortfolio, deletePortfolio, setStrategyPortfolio, updatePortfolio, usePortfolios } from './data';
-import { groupByPortfolio } from './portfolioGroups';
+import { createPortfolio, deletePortfolio, PortfolioMoveRefused, setStrategyPortfolio, updatePortfolio, usePortfolios } from './data';
+import { groupByPortfolio, initiativesInSpace } from './portfolioGroups';
 
 // Strategy > Portfolio — the Space's Initiatives bundled into named
 // Portfolios. Each Portfolio row folds open on its Initiatives; the picker
@@ -31,7 +31,15 @@ export function PortfolioView({ createRequested, onCreateHandled, onSelectStrate
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
   const { data: portfolios, loading: portfoliosLoading, refetch } = usePortfolios(spaceId);
-  const { data: strategies, loading: strategiesLoading } = useStrategies();
+  const { data: allStrategies, loading: strategiesLoading } = useStrategies();
+  // An Initiative reaches a Space through its Objects' Domains — the page
+  // lists the ones with an Object in this Space (or none yet).
+  const { data: domains } = useDomains();
+  const { data: explorer } = useObjects();
+  const strategies = useMemo(() => {
+    const objectDomain = new Map<string, string | null>(explorer.objects.map((o) => [o.id, o.domain_id]));
+    return initiativesInSpace(allStrategies, objectDomain, new Set(domains.map((d) => d.id)));
+  }, [allStrategies, explorer.objects, domains]);
   const [localNewOpen, setLocalNewOpen] = useState(false);
   const newOpen = localNewOpen || createRequested;
   const closeNew = () => { setLocalNewOpen(false); if (createRequested) onCreateHandled(); };
@@ -113,7 +121,9 @@ function PortfolioRow({ portfolio, initiatives, candidates, onSelectStrategy }: 
     setPickerOpen(false);
     setError(null);
     try { await setStrategyPortfolio(strategyId, portfolioId); }
-    catch (e) { setError(e instanceof Error ? e.message : t("Couldn't save")); }
+    catch (e) {
+      setError(e instanceof PortfolioMoveRefused ? t("Only the Initiative's owner can move it.") : e instanceof Error ? e.message : t("Couldn't save"));
+    }
   };
   const remove = async () => {
     if (!await appDialog.confirm(t('Delete the Portfolio "{name}"? Its Initiatives stay, outside any Portfolio.', { name: portfolio.name }))) return;

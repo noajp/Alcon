@@ -59,6 +59,7 @@ import {
   DropdownMenuTrigger,
 } from '@/ui/dropdown-menu';
 import { completionOf } from '@/Function/shared/completion';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /** A Initiative page has a band and one column of readings; no side rail. */
 const INITIATIVE_ZONES: Zone[] = ['band', 'main'];
@@ -66,8 +67,8 @@ const INITIATIVE_ZONES: Zone[] = ['band', 'main'];
 // =============================================================
 // StrategyShell — the Strategy layer's "Initiative" app (code keeps the
 // `strategy`/`strategies` naming — table, hooks, view id — display text says
-// "Initiative" throughout): an Asana-portfolio-style surface. The root is the
-// portfolio list — only TOP-LEVEL Initiatives (no parent in strategy_children)
+// "Initiative" throughout): a list-and-detail surface. The root is the
+// Initiative list — only TOP-LEVEL Initiatives (no parent in strategy_children)
 // show there; a Initiative nested inside another only appears in its parent's
 // "Initiatives" section. Selecting a row pushes into that Initiative's detail
 // page (title, description, nested Initiatives, Object scope — no Properties
@@ -82,7 +83,7 @@ export function StrategyShell({
   createRequested,
   onCreateHandled,
 }: {
-  /** Which Initiative the detail page shows; null = the portfolio root list.
+  /** Which Initiative the detail page shows; null = the root Initiative list.
    *  Controlled by the caller (navigation.strategyId) so other surfaces can
    *  deep-link straight into a Initiative. */
   activeStrategyId?: string | null;
@@ -93,7 +94,7 @@ export function StrategyShell({
   onOpenObject?: (objectId: string, domainId: string | null) => void;
   onOpenDomain?: (domainId: string) => void;
   /** The sidebar's "+" asked for a new Initiative (navigation.strategyCreate).
-   *  The dialog opens on the portfolio root and `onCreateHandled` clears it. */
+   *  The dialog opens on the root list and `onCreateHandled` clears it. */
   createRequested?: boolean;
   onCreateHandled?: () => void;
 } = {}) {
@@ -114,7 +115,7 @@ export function StrategyShell({
     () => strategies.find((s) => s.id === openStrategyId) ?? null,
     [strategies, openStrategyId],
   );
-  // Root portfolio only lists top-level Initiatives — nested ones surface
+  // The root list only shows top-level Initiatives — nested ones surface
   // inside their parent's "Initiatives" section instead.
   const rootStrategies = useMemo(() => strategies.filter((s) => s.parentIds.length === 0), [strategies]);
 
@@ -190,10 +191,10 @@ function EmptyPrompt({ onCreate }: { onCreate: () => void }) {
 }
 
 // =============================================================
-// Portfolio Initiative list — the entire root view. Selecting a row pushes
+// Root Initiative list — the entire root view. Selecting a row pushes
 // into that Initiative's detail page.
 // =============================================================
-// What a person scans a portfolio for, and nothing more: how far along, how
+// What a person scans the list for, and nothing more: how far along, how
 // recently anything moved, and whether something is on fire. Counts come from
 // the same predicates the Initiative page uses (initiativeRiskModel), so the
 // row never disagrees with the page it opens. Quiet register throughout — a
@@ -404,6 +405,7 @@ function StrategyDetailView({
   onOpenObject?: (objectId: string, domainId: string | null) => void;
   onOpenDomain?: (domainId: string) => void;
 }) {
+  const { t } = useI18n();
   const [name, setName] = useState(strategy.name);
   const [description, setDescription] = useState(strategy.description ?? '');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(strategy.objectIds));
@@ -414,7 +416,7 @@ function StrategyDetailView({
   const [newObjectName, setNewObjectName] = useState('');
   const [newObjectDomainId, setNewObjectDomainId] = useState<string | null>(null);
   const [creatingObject, setCreatingObject] = useState(false);
-  // Nested Strategies (Asana sub-portfolios) — "+" offers picking an
+  // Nested Initiatives — "+" offers picking an
   // existing top-level-or-unrelated Strategy or creating a fresh one, both
   // immediately nested via strategy_children.
   const [childPickerOpen, setChildPickerOpen] = useState(false);
@@ -422,7 +424,7 @@ function StrategyDetailView({
   const [newChildOpen, setNewChildOpen] = useState(false);
   const [linkingChildId, setLinkingChildId] = useState<string | null>(null);
 
-  // Esc leaves the page for the portfolio list — one level back. Anything
+  // Esc leaves the page for the root list — one level back. Anything
   // opened on top of the page (a picker's field, the create dialog) takes the
   // key first and the page gets the next one.
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -861,7 +863,7 @@ function StrategyDetailView({
 
             {childStrategies.length === 0 && childPickerOpen === false && (
               <div className="text-[12px] text-muted-foreground/50 py-1">
-                No nested Initiatives yet — group related Initiatives here, portfolio-style.
+                {t('No nested Initiatives yet — group related Initiatives here.')}
               </div>
             )}
 

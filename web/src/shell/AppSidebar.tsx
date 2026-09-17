@@ -77,9 +77,10 @@ interface AppSidebarProps {
 // The ModeRail picks a top-level mode; the sidebar renders only that mode's
 // surfaces.
 
-// Strategy — what we're trying to achieve and how we intend to win. Initiative
-// (view id 'strategy', display label "Initiatives") is the unit, and Initiatives
-// bundle into a strategy; Phase stages the effort; Timeline sequences the set.
+// Strategy — what we're trying to achieve and how we intend to win. Vision
+// (view id 'vision') is what the Space aims for; a Portfolio ('portfolio')
+// bundles Initiatives; Initiative ('strategy') is the unit. Phase and
+// Timeline are reached from an Initiative or a Domain, not from here.
 // Execution — the fighting: the Domain tree, whose rows carry the D/O/E
 // surfaces below.
 

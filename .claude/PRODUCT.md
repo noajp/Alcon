@@ -174,7 +174,7 @@ ModeRail の固定セレクタは Inbox / Calendar / Strategy / Execution。Stra
 
 何を達成し、どう勝つかを扱う分類。目的・方針・前提・意思決定・成功条件がここに置かれ、担当・進捗は持たない。
 
-**Vision が Strategy の頂点、Portfolio が Initiative の束、Initiative が Strategy の単位であり、複数の Initiative で戦略を構成する。** Vision は Space ごとに 1 つの文章（`activity_spaces.vision`）で、Space のオーナーが書き、メンバーは読む。Portfolio は Space 内の名前付きの束（`portfolios`）で、Initiative は高々 1 つの Portfolio に入る（`strategies.portfolio_id`）。 Initiative は Initiative を内包でき（`strategy_children`）、ポートフォリオのルートには最上位の Initiative だけが並ぶ。入れ子の Initiative は親の "Initiatives" セクションにだけ現れる。
+**Vision が Strategy の頂点、Portfolio が Initiative の束、Initiative が Strategy の単位であり、複数の Initiative で戦略を構成する。** Vision は Space ごとに 1 つの文章（`activity_spaces.vision`）で、Space のオーナーが書き、メンバーは読む。Portfolio は Space 内の名前付きの束（`portfolios`）で、Initiative は高々 1 つの Portfolio に入る（`strategies.portfolio_id`）。 Initiative 自体は Space に属さず、Object の Domain を介して Space に届く（[ADR](../supabase/migrations/20260902140000_strategy_boundary_visibility.sql) の境界可視性）。そのため Portfolio ページには、この Space の Domain に Object を持つ Initiative と、まだ Object を持たない Initiative を出す。Portfolio を削除すると、中の Initiative はどの Portfolio にも入らない状態に戻る（`on delete set null`）。Initiative を Portfolio に入れる操作は Initiative 側の書き込みなので、その作成者だけができる。 Initiative は Initiative を内包でき（`strategy_children`）、Initiative 一覧には最上位の Initiative だけが並ぶ。入れ子の Initiative は親の "Initiatives" セクションにだけ現れる。
 
 | 機能 | 役割 | 実装 |
 |------|------|------|

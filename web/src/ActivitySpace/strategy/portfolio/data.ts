@@ -5,7 +5,6 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
 import type { Portfolio, PortfolioInsert, PortfolioUpdate } from '@/types/database';
-import { updateStrategy } from '@/ActivitySpace/strategy/initiative/strategyData';
 
 // Portfolios of the active Space. RLS scopes rows to Space members; writes
 // are member-level too (a Portfolio is shared grouping, not ownership).
@@ -68,8 +67,23 @@ export async function deletePortfolio(id: string): Promise<void> {
   void getQueryClient().invalidateQueries({ queryKey: ['strategies'] });
 }
 
-/** Moves an Initiative into a Portfolio (or out of every Portfolio with null). */
+/** Thrown when the move touched no row — the Initiative's own rule
+ *  (creator-only update) refused it. */
+export class PortfolioMoveRefused extends Error {
+  constructor() { super('portfolio move refused'); this.name = 'PortfolioMoveRefused'; }
+}
+
+/** Moves an Initiative into a Portfolio (or out of every Portfolio with null).
+ *  The write is on the Initiative, so only its creator can; a refused move
+ *  updates nothing and is reported as PortfolioMoveRefused rather than as a
+ *  raw "no rows" error. */
 export async function setStrategyPortfolio(strategyId: string, portfolioId: string | null): Promise<void> {
-  await updateStrategy(strategyId, { portfolio_id: portfolioId });
+  const { data, error } = await supabase
+    .from('strategies')
+    .update({ portfolio_id: portfolioId, updated_at: new Date().toISOString() })
+    .eq('id', strategyId)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) throw new PortfolioMoveRefused();
   void getQueryClient().invalidateQueries({ queryKey: ['strategies'] });
 }
