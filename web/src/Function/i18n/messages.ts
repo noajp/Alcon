@@ -200,7 +200,7 @@ Object.assign(es, {
 
 const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
   ja: {
-    'Day': '日', 'Week': '週', 'Month': '月', 'Choose scope': '範囲を選択', 'Choose calendar scope': 'カレンダーの範囲を選択', 'Calendar scope lists': 'Calendar の範囲一覧', 'Find a calendar…': 'カレンダーを検索…', 'No matches.': '該当なし。',
+    'Day': '日', 'Week': '週', 'Month': '月', 'Choose scope': '範囲を選択', 'Choose calendar scope': 'Calendar の範囲を選択', 'Calendar scope lists': 'Calendar の範囲一覧', 'Find a calendar…': 'カレンダーを検索…', 'No matches.': '該当なし。',
     'Carbon': 'カーボン', "Couldn't save": '保存できませんでした', 'Domain Elements': 'Domain の Elements', 'Graphite': 'グラファイト',
     'Ivory': 'アイボリー', 'Mid-level structural unit': '中間レベルの構造単位', 'Midnight': 'ミッドナイト', 'Mist': 'ミスト',
     'New Element': '新しい Element', 'New Initiative': '新しい Initiative', 'New Object': '新しい Object',

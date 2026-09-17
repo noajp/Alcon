@@ -54,7 +54,7 @@ Object・Domain・Element・Initiative等の新規作成ボタンは、入口と
 
 製品の概念名（Strategy / Execution / Sustainment、Initiatives / Phase / Timeline、Domain / Objects / Elements、Inbox / Calendar / Notebook / Table / Team / Workload / CRM / SCM、Profile）は固有名詞として扱い、どの言語でも英語表記のまま出す。これはコードで固定するのではなく、各言語の辞書でその語を自分自身に写して実現する（`'Timeline': 'Timeline'`）。概念名を含む文も同じ（`'Open Calendar': 'Calendar を開く'`）。日付・曜日は `toLocaleDateString(locale)` で設定言語に従う。
 
-サイドバーのナビ項目は、選択中だけ `text-foreground`（背景 `bg-sidebar-accent`）で、非選択は `text-muted-foreground`（hover で `text-foreground`）。ユーザーが入力した内容や生成を依頼したアプリの言語は保持する。
+サイドバーのナビ項目は、選択中だけ `text-foreground`（背景 `bg-sidebar-accent`）で、非選択は `text-muted-foreground`（hover で `text-foreground`）。
 
 ## 入力と面
 
