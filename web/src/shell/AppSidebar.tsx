@@ -4,6 +4,7 @@ import { Button, ButtonAppearanceProvider } from '@/ui/button';
 
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { StrategyNavigation } from './sidebar/StrategyNavigation';
+import { setActiveSettingsSection } from '@/Function/settings/settingsNav';
 import { NotebookTree } from './sidebar/NotebookTree';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
@@ -437,7 +438,7 @@ export function AppSidebar({
           <StrategyNavigation activeView={activeView} onSelect={(id) => {
             if (id === 'strategy') onNavigate({ strategyId: null });
             onViewChange(id);
-          }} />
+          }} onCreate={openCreateMenu} onOpenSettings={() => { setActiveSettingsSection('initiative'); onOpenSettings(); }} />
           </>
           )}
 
