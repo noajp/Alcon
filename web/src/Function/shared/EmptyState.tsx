@@ -5,8 +5,9 @@ import { Plus } from 'lucide-react';
 import { Button } from '@/ui/button';
 
 // The one "nothing here yet" surface for a list — Objects, Elements,
-// Initiatives, Phases. Left-aligned like the list it stands in for, with
-// every part a fixed size: the icon grid, two text rows with a two-line
+// Initiatives, Phases. One fixed-width column sits in the middle of the
+// pane and everything inside it is left-aligned, with every part a fixed
+// size: the icon grid, two text rows with a two-line
 // floor, and a CTA with a minimum width, so the copy's length never moves
 // the grid or the button between two views that sit side by side.
 export function EmptyState({ icon: Icon, title, description, hint, cta, onCta }: {
@@ -18,8 +19,8 @@ export function EmptyState({ icon: Icon, title, description, hint, cta, onCta }:
   onCta: () => void;
 }) {
   return (
-    <div className="flex-1 flex flex-col justify-center py-20 px-8 select-none">
-      <div className="max-w-sm">
+    <div className="flex-1 flex flex-col items-center justify-center py-20 px-8 select-none">
+      <div className="w-full max-w-sm">
         <div className="grid w-fit grid-cols-2 gap-3 mb-6">
           {[0.18, 0.35, 0.55, 1].map((opacity, i) => (
             <div
