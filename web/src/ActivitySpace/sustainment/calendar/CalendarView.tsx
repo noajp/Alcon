@@ -15,6 +15,7 @@ import { COLOR_PALETTE } from './calendarColorPalette';
 import { updateElement } from '@/hooks/useSupabase';
 import { STATUS, statusColor, statusLabel, type StatusKey } from '@/shared/designTokens';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface CalendarViewProps {
   elements: ElementWithDetails[];
@@ -37,8 +38,11 @@ function statusCardClasses(status?: string | null): string {
   return `${meta.bg} text-foreground`;
 }
 
-// Day names
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+// Day names follow the interface language (Settings > Language); `day` is
+// getDay()'s Sun-first index.
+function weekdayLabel(locale: string, day: number): string {
+  return new Date(2023, 0, 1 + day).toLocaleDateString(locale, { weekday: 'short' });
+}
 
 // Convert hex to soft pastel inline style (bg + text)
 function pastelFromHex(hex: string): { backgroundColor: string; color: string; dotColor: string } {
@@ -74,11 +78,11 @@ function getWeekDays(date: Date, weekStartsOn: number): Date[] {
   });
 }
 
-// WEEKDAYS rotated to start from Settings > Preferences > "First day of the
+// Day names rotated to start from Settings > Preferences > "First day of the
 // week" — used only for the month-grid header row. Everywhere else looks up
-// a specific date's label via WEEKDAYS[d.getDay()], which stays Sun-first.
-function orderedWeekdayLabels(weekStartsOn: number): string[] {
-  return Array.from({ length: 7 }, (_, i) => WEEKDAYS[(weekStartsOn + i) % 7]);
+// a specific date's label via weekdayLabel(locale, d.getDay()).
+function orderedWeekdayLabels(locale: string, weekStartsOn: number): string[] {
+  return Array.from({ length: 7 }, (_, i) => weekdayLabel(locale, (weekStartsOn + i) % 7));
 }
 
 function parseTimeToMinutes(timeStr: string | null | undefined): number | null {
@@ -96,10 +100,8 @@ function isSameDay(a: Date, b: Date): boolean {
   );
 }
 
-function formatHourLabel(hour: number): string {
-  const period = hour >= 12 ? 'PM' : 'AM';
-  const h12 = hour % 12 === 0 ? 12 : hour % 12;
-  return `${h12} ${period}`;
+function formatHourLabel(locale: string, hour: number): string {
+  return new Date(2023, 0, 1, hour).toLocaleTimeString(locale, { hour: 'numeric' });
 }
 
 function formatTimeShort(minutes: number): string {
@@ -109,6 +111,7 @@ function formatTimeShort(minutes: number): string {
 }
 
 export function CalendarView({ elements: sourceElements, objects, onObjectClick, onElementClick: openElement, onRefresh, date, onDateChange }: CalendarViewProps) {
+  const { t, locale } = useI18n();
   const elements = useMemo(() => calendarEntries(sourceElements, objects), [sourceElements, objects]);
   const onElementClick = (entry: CalendarEntry) => {
     if (entry.object) onObjectClick?.(entry.object);
@@ -318,29 +321,21 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
 
   const headerTitle = useMemo(() => {
     if (mode === 'month') {
-      return currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      return currentDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
     }
     if (mode === 'day') {
-      return currentDate.toLocaleDateString('en-US', {
+      return currentDate.toLocaleDateString(locale, {
         weekday: 'long',
         month: 'short',
         day: 'numeric',
         year: 'numeric',
       });
     }
-    // week
-    const start = weekDays[0];
-    const end = weekDays[6];
-    const sameMonth = start.getMonth() === end.getMonth();
-    const startStr = start.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
-    const endStr = sameMonth
-      ? end.toLocaleDateString('en-US', { day: 'numeric' })
-      : end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    return `${startStr} – ${endStr}, ${end.getFullYear()}`;
-  }, [mode, currentDate, weekDays]);
+    // week — formatRange collapses the shared parts the way each language
+    // does it ("Sep 13 – 19, 2026" / "2026年9月13日～19日").
+    return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short', day: 'numeric' })
+      .formatRange(weekDays[0], weekDays[6]);
+  }, [mode, currentDate, weekDays, locale]);
 
   return (
     <div className="flex flex-col h-full bg-card">
@@ -353,17 +348,17 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[var(--border-subtle)] bg-card">
-        <Button size="sm" variant="secondary" onClick={goToToday}>Today</Button>
+        <Button size="sm" variant="secondary" onClick={goToToday}>{t('Today')}</Button>
         <Button size="icon-sm" variant="ghost" onClick={goToPrevious} aria-label="Previous period"><ChevronLeft size={16} /></Button>
         <Button size="icon-sm" variant="ghost" onClick={goToNext} aria-label="Next period"><ChevronRight size={16} /></Button>
         <h2 className="text-base font-semibold flex-1 min-w-0">{headerTitle}</h2>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild><Button size="sm" variant="secondary">{{ day: 'Day', week: 'Week', month: 'Month' }[mode]}<ChevronDown size={12} /></Button></DropdownMenuTrigger>
+          <DropdownMenuTrigger asChild><Button size="sm" variant="secondary">{t({ day: 'Day', week: 'Week', month: 'Month' }[mode])}<ChevronDown size={12} /></Button></DropdownMenuTrigger>
           <MenuShell as="dropdown" align="end">
             <DropdownMenuRadioGroup value={mode} onValueChange={value => setMode(value as CalendarMode)}>
-              <DropdownMenuRadioItem value="day">Day</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="week">Week</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="month">Month</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="day">{t('Day')}</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="week">{t('Week')}</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="month">{t('Month')}</DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
           </MenuShell>
         </DropdownMenu>
@@ -374,7 +369,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
       <div className="flex-1 overflow-auto relative">
         {/* Weekday headers */}
         <div className="grid grid-cols-7 border-b border-border/60 bg-card/95 backdrop-blur sticky top-0 z-10">
-          {orderedWeekdayLabels(weekStartsOn).map((day, i) => (
+          {orderedWeekdayLabels(locale, weekStartsOn).map((day, i) => (
             <div
               key={`${day}-${i}`}
               className="px-2 py-2 text-center text-[11px] font-medium text-muted-foreground"
@@ -454,7 +449,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                         type="button"
                         onClick={openPicker}
                         title="Schedule an Element on this day"
-                        aria-label={`Schedule an Element on ${day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                        aria-label={`Schedule an Element on ${day.date.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}`}
                         className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted/40 hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
                       >
                         <CalendarPlus size={13} />
@@ -475,13 +470,13 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                         <PopoverContent className="w-72 p-3" align="start">
                           <div className="mb-2.5 pb-2 border-b border-border/60">
                             <div className="text-sm font-semibold tracking-tight">
-                              {day.date.toLocaleDateString('en-US', {
+                              {day.date.toLocaleDateString(locale, {
                                 month: 'short',
                                 day: 'numeric',
                                 year: 'numeric',
                               })}{' '}
                               <span className="text-muted-foreground font-normal">
-                                ({day.date.toLocaleDateString('en-US', { weekday: 'short' })})
+                                ({day.date.toLocaleDateString(locale, { weekday: 'short' })})
                               </span>
                             </div>
                             <div className="text-[11px] text-muted-foreground mt-0.5">
@@ -663,7 +658,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
             <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-border/60">
               <span className="text-[12px] font-semibold">
                 Schedule on{' '}
-                {dayPicker.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {dayPicker.date.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
               </span>
               <button
                 onClick={() => setDayPicker(null)}
@@ -771,6 +766,7 @@ function TimeGridView({
   onElementClick,
   onElementContextMenu,
 }: TimeGridViewProps) {
+  const { locale } = useI18n();
   const [now, setNow] = useState(new Date());
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -838,7 +834,7 @@ function TimeGridView({
               className={`${colWidthClass} px-2 py-2 text-center border-l border-border/40`}
             >
               <div className="text-[10px] text-muted-foreground">
-                {WEEKDAYS[d.getDay()]}
+                {weekdayLabel(locale, d.getDay())}
               </div>
               <div className="mt-0.5 inline-flex items-center justify-center">
                 {isTodayCol ? (
@@ -930,7 +926,7 @@ function TimeGridView({
                 className="absolute left-0 right-0 px-1 text-right text-[10px] text-muted-foreground"
                 style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT - 6, height: HOUR_HEIGHT }}
               >
-                {formatHourLabel(h)}
+                {formatHourLabel(locale, h)}
               </div>
             ))}
           </div>

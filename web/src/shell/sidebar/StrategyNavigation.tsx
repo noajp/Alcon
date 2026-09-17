@@ -11,7 +11,7 @@ export function StrategyNavigation({ activeView, onSelect }: { activeView: strin
       const { icon: Icon, label } = VIEW_REGISTRY[id];
       return <div key={id} className={id === 'strategy' ? '' : 'ml-4 pl-2'}>
         <Button variant="ghost" size="md" align="start" aria-current={activeView === id ? 'page' : undefined}
-          className={`w-full gap-2.5 text-xs font-semibold ${activeView === id ? 'bg-sidebar-accent text-foreground' : ''}`}
+          className={`w-full gap-2.5 text-xs font-semibold ${activeView === id ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           onClick={() => onSelect(id)}>{Icon && <Icon size={16} />}{t(label)}</Button>
       </div>;
     })}

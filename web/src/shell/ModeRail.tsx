@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { NavSustainmentModeIcon } from '@/shell/sidebar/NavIcons';
 import {
   APP_GROUPS,
@@ -110,19 +110,9 @@ function ProfileRailButton({
 export function ModeRail({
   activeView,
   onViewChange,
-  sidebarCollapsed,
-  onToggleSidebar,
-  copilotOpen,
-  onToggleCopilot,
 }: {
   activeView: string;
   onViewChange: (view: string) => void;
-  /** The page-level toggles live at the foot of the rail: the sidebar
-   *  (omitted while it has nothing to show, on Profile) and the AI pane. */
-  sidebarCollapsed: boolean;
-  onToggleSidebar?: () => void;
-  copilotOpen: boolean;
-  onToggleCopilot: () => void;
 }) {
   const { t } = useI18n();
   const activeMode = railModeOf(activeView);
@@ -193,22 +183,6 @@ export function ModeRail({
           sit above — the one personal entry point on an otherwise all-work
           rail. */}
       <div className="mt-auto flex flex-col items-center gap-1">
-        {onToggleSidebar && (
-          <RailButton
-            label={t(sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar')}
-            icon={sidebarCollapsed ? PanelLeftOpen : PanelLeftClose}
-            active={false}
-            onClick={onToggleSidebar}
-          />
-        )}
-        {/* The AI pane: state lives in the page so this button, ⌘L and the
-            pane's own close all flip the same boolean. */}
-        <RailButton
-          label={`${t(copilotOpen ? 'Hide AI' : 'Show AI')} (⌘L)`}
-          icon={copilotOpen ? PanelRightOpen : PanelRightClose}
-          active={copilotOpen}
-          onClick={onToggleCopilot}
-        />
         <div className="my-1 h-px w-5 bg-border" />
         <ProfileRailButton active={activeMode === 'personal'} onClick={() => onViewChange('profile')} />
       </div>
