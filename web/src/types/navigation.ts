@@ -30,6 +30,8 @@ export interface NavigationState {
   strategyCreate?: boolean | null;
   /** The sidebar's "+" on the Portfolio page asked for a new Portfolio. */
   portfolioCreate?: boolean | null;
+  /** Portfolio open on the Portfolio page; null = the tree. */
+  portfolioId?: string | null;
   /** What the Home main island is showing, when on the Home view. A pinned
    *  item's content renders in place (no layer/view switch) instead of the
    *  welcome. null = the welcome landing. */

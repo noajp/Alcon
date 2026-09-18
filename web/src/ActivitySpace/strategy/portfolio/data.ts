@@ -60,6 +60,16 @@ export async function updatePortfolio(id: string, updates: PortfolioUpdate): Pro
   return data as Portfolio;
 }
 
+/** Nests a Portfolio under another (null = top level). The caller keeps a
+ *  Portfolio out of its own subtree — see subtreeIds. */
+export async function movePortfolio(id: string, parentId: string | null): Promise<void> {
+  const { error } = await supabase.from('portfolios').update({ parent_id: parentId }).eq('id', id);
+  if (error) throw error;
+  void invalidatePortfolios();
+}
+
+/** Deleting a Portfolio deletes the Portfolios nested in it (cascade); the
+ *  Initiatives in any of them stay, outside every Portfolio. */
 export async function deletePortfolio(id: string): Promise<void> {
   const { error } = await supabase.from('portfolios').delete().eq('id', id);
   if (error) throw error;

@@ -1,35 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { groupByPortfolio, initiativesInSpace } from '../src/ActivitySpace/strategy/portfolio/portfolioGroups';
+import {
+  buildPortfolioTree, flattenTree, groupByPortfolio, initiativesInSpace, portfolioPath, rollupPortfolio, subtreeIds,
+} from '../src/ActivitySpace/strategy/portfolio/portfolioGroups';
 import type { Portfolio } from '../src/types/database';
 
-const p = (id: string, order = 0): Portfolio => ({
-  id, activity_space_id: 'sp', name: id, description: null, order_index: order,
-  created_by: 'u', created_at: '2026-09-18T00:00:00Z', updated_at: '2026-09-18T00:00:00Z',
+const p = (id: string, parent_id: string | null = null, order = 0): Portfolio => ({
+  id, activity_space_id: 'sp', parent_id, name: id, description: null, order_index: order,
+  created_by: 'u', created_at: `2026-09-18T00:00:0${order}Z`, updated_at: '2026-09-18T00:00:00Z',
 });
 const s = (id: string, portfolio_id: string | null, parentIds: string[] = [], objectIds: string[] = []) => ({ id, name: id, portfolio_id, parentIds, objectIds });
 
 describe('groupByPortfolio', () => {
-  it('puts each root Initiative under its Portfolio and the rest last', () => {
-    const { groups, unassigned } = groupByPortfolio([p('A'), p('B')], [s('i1', 'A'), s('i2', 'B'), s('i3', null), s('i4', 'A')]);
-    expect(groups.map((g) => [g.portfolio.id, g.initiatives.map((i) => i.id)])).toEqual([['A', ['i1', 'i4']], ['B', ['i2']]]);
+  it('keys root Initiatives by Portfolio and lists the rest as unassigned', () => {
+    const { byPortfolio, unassigned } = groupByPortfolio([p('A'), p('B')], [s('i1', 'A'), s('i2', 'B'), s('i3', null), s('i4', 'A')]);
+    expect(byPortfolio.get('A')!.map((i) => i.id)).toEqual(['i1', 'i4']);
+    expect(byPortfolio.get('B')!.map((i) => i.id)).toEqual(['i2']);
     expect(unassigned.map((i) => i.id)).toEqual(['i3']);
   });
-
   it('treats a Portfolio id that no longer exists as unassigned', () => {
-    const { groups, unassigned } = groupByPortfolio([p('A')], [s('i1', 'gone')]);
-    expect(groups[0].initiatives).toEqual([]);
+    const { byPortfolio, unassigned } = groupByPortfolio([p('A')], [s('i1', 'gone')]);
+    expect(byPortfolio.get('A')).toEqual([]);
     expect(unassigned.map((i) => i.id)).toEqual(['i1']);
   });
-
   it('leaves nested Initiatives to their parent', () => {
-    const { groups, unassigned } = groupByPortfolio([p('A')], [s('root', 'A'), s('child', 'A', ['root']), s('orphanChild', null, ['x'])]);
-    expect(groups[0].initiatives.map((i) => i.id)).toEqual(['root']);
+    const { byPortfolio, unassigned } = groupByPortfolio([p('A')], [s('root', 'A'), s('child', 'A', ['root']), s('orphanChild', null, ['x'])]);
+    expect(byPortfolio.get('A')!.map((i) => i.id)).toEqual(['root']);
     expect(unassigned).toEqual([]);
-  });
-
-  it('keeps the Portfolio order given', () => {
-    const { groups } = groupByPortfolio([p('B', 1), p('A', 0)], []);
-    expect(groups.map((g) => g.portfolio.id)).toEqual(['B', 'A']);
   });
 });
 
@@ -40,5 +36,45 @@ describe('initiativesInSpace', () => {
       [s('here', null, [], ['o1']), s('elsewhere', null, [], ['o2']), s('fresh', null, [], []), s('mixed', null, [], ['o2', 'o1']), s('undomained', null, [], ['o3'])],
       objectDomain, new Set(['d1']));
     expect(kept.map((i) => i.id)).toEqual(['here', 'fresh', 'mixed']);
+  });
+});
+
+describe('buildPortfolioTree', () => {
+  const list = [p('B', null, 1), p('A', null, 0), p('A1', 'A', 0), p('A2', 'A', 1), p('A1x', 'A1', 0), p('lost', 'nope', 2)];
+  it('nests by parent_id in sibling order and lifts orphans to the top level', () => {
+    const tree = buildPortfolioTree(list);
+    expect(tree.map((n) => n.portfolio.id)).toEqual(['A', 'B', 'lost']);
+    expect(tree[0].children.map((n) => [n.portfolio.id, n.depth])).toEqual([['A1', 1], ['A2', 1]]);
+    expect(tree[0].children[0].children[0].portfolio.id).toBe('A1x');
+    expect(tree[0].children[0].children[0].depth).toBe(2);
+  });
+  it('flattens depth first and skips folded subtrees', () => {
+    const tree = buildPortfolioTree(list);
+    expect(flattenTree(tree, () => true).map((n) => n.portfolio.id)).toEqual(['A', 'A1', 'A1x', 'A2', 'B', 'lost']);
+    expect(flattenTree(tree, (id) => id !== 'A1').map((n) => n.portfolio.id)).toEqual(['A', 'A1', 'A2', 'B', 'lost']);
+  });
+  it('knows a subtree and a path', () => {
+    const tree = buildPortfolioTree(list);
+    expect([...subtreeIds(tree[0])].sort()).toEqual(['A', 'A1', 'A1x', 'A2']);
+    expect(portfolioPath(list, 'A1x').map((x) => x.id)).toEqual(['A', 'A1', 'A1x']);
+    expect(portfolioPath(list, 'lost').map((x) => x.id)).toEqual(['lost']);
+  });
+});
+
+describe('rollupPortfolio', () => {
+  it('adds up the Portfolio and everything nested, averaging measured progress', () => {
+    const tree = buildPortfolioTree([p('A'), p('A1', 'A')]);
+    const byPortfolio = new Map([['A', [s('i1', 'A')]], ['A1', [s('i2', 'A1'), s('i3', 'A1')]]]);
+    const health = new Map([
+      ['i1', { progressPct: 50, risk: { overdue: 1, stalled: 0, blocked: 0 } }],
+      ['i2', { progressPct: 100, risk: { overdue: 0, stalled: 2, blocked: 0 } }],
+      ['i3', { progressPct: null, risk: { overdue: 0, stalled: 0, blocked: 0 } }],
+    ]);
+    expect(rollupPortfolio(tree[0], byPortfolio, health)).toEqual({ initiatives: 3, progressPct: 75, alerts: 3, pending: 0 });
+    expect(rollupPortfolio(tree[0].children[0], byPortfolio, health)).toEqual({ initiatives: 2, progressPct: 100, alerts: 2, pending: 0 });
+  });
+  it('counts Initiatives whose health has not arrived', () => {
+    const tree = buildPortfolioTree([p('A')]);
+    expect(rollupPortfolio(tree[0], new Map([['A', [s('i1', 'A')]]]), new Map())).toEqual({ initiatives: 1, progressPct: null, alerts: 0, pending: 1 });
   });
 });

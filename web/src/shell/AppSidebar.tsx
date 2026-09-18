@@ -441,6 +441,7 @@ export function AppSidebar({
           <SidebarModeLabel label={t('Strategy')} />
           <StrategyNavigation activeView={activeView} onSelect={(id) => {
             if (id === 'strategy') onNavigate({ strategyId: null });
+            if (id === 'portfolio') onNavigate({ portfolioId: null });
             onViewChange(id);
           }} onOpenSettings={() => setStrategySettingsOpen(true)} />
           </>
