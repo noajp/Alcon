@@ -57,3 +57,4 @@
 | [0023](0023-domain-approaches-preserve-the-basis-of-judgment.md) | Domain の構想と判断根拠を保存する |
 | [0024](0024-generated-apps-live-in-object-widgets.md) | Objectのウィジェット内で生成アプリと入力を分けて保存する |
 | [0025](0025-generated-apps-read-scoped-object-context.md) | 生成アプリに配置先Objectの実データ読み取り契約を提供する |
+| [0026](0026-external-ai-reaches-the-board-through-mcp-with-the-callers-rls.md) | 外部 AI は MCP（Edge Function）から本人の RLS で盤面を読み書きする |
