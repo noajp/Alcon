@@ -459,6 +459,11 @@ function ElementDetailBody({
   const sentRef = useRef({ id: element.id, title: element.title, description: element.description || '' });
   const draftRef = useRef({ title, description });
   useEffect(() => { draftRef.current = { title, description }; }, [title, description]);
+  // What a close-time save needs after the view is gone: who to credit on
+  // the Activity rail and whom to tell the list changed (a dialog's owner
+  // reads its own query, not the explorer cache updateElement patches).
+  const closeRef = useRef({ author, onRefresh });
+  useEffect(() => { closeRef.current = { author, onRefresh }; }, [author, onRefresh]);
   useEffect(() => {
     sentRef.current = { id: element.id, title: element.title, description: element.description || '' };
   }, [element.id, element.title, element.description]);
@@ -468,7 +473,15 @@ function ElementDetailBody({
     const patch: { title?: string; description?: string | null } = {};
     if (draft.title.trim() && draft.title.trim() !== sent.title) patch.title = draft.title.trim();
     if (draft.description !== sent.description) patch.description = draft.description || null;
-    if (Object.keys(patch).length) void updateElement(sent.id, patch).catch((e) => console.error('Failed to save on close', e));
+    if (!Object.keys(patch).length) return;
+    const { author: by, onRefresh: refresh } = closeRef.current;
+    void updateElement(sent.id, patch)
+      .then(async () => {
+        if (patch.title !== undefined) await logActivity(sent.id, 'renamed', `Renamed to “${patch.title}”`, by);
+        if (patch.description !== undefined) await logActivity(sent.id, 'description', patch.description ? 'Updated description' : 'Cleared description', by);
+        refresh?.();
+      })
+      .catch((e) => console.error('Failed to save on close', e));
   }, []);
 
   // Handlers
