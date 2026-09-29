@@ -36,7 +36,8 @@ export type WidgetSize = 'half' | 'full';
 
 /**
  * The chrome a widget wears. Not a free choice — it follows from the zone
- * (see ZONE_VARIANT), because a rail island and a main-column section are
+ * (see ZONE_VARIANT), because an unboxed rail section and a boxed
+ * main-column section are
  * two established looks in this app and mixing them per widget is how a
  * surface starts looking assembled rather than designed.
  */

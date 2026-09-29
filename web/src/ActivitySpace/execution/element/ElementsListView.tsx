@@ -697,7 +697,7 @@ function ElementsHierarchyHeader({
       </button>
       <div className="flex-1" />
       {onAdd && (
-        <Button variant="primary" size="icon-xs"
+        <Button variant="ghost" size="icon-xs"
           type="button"
           onClick={onAdd}
           title="Add Element"

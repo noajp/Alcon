@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus } from 'lucide-react';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
 import { normalizeDirection, type AcceptanceLine, type ElementDirection } from '@/types/database';
@@ -338,20 +339,17 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   // session, even if the user clears everything back out.
   if (!expanded) {
     return (
-      <div className="px-1">
-        <button
-          onClick={() => { setExpanded(true); setManuallyExpanded(true); }}
-          className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground py-1 transition-colors"
-        >
-          <Plus size={13} strokeWidth={2.5} /> Set direction
-        </button>
-      </div>
+      <ButtonAppearanceProvider appearance="inline">
+        <Button variant="ghost" size="sm" onClick={() => { setExpanded(true); setManuallyExpanded(true); }}>
+          <Plus size={13} strokeWidth={2.5} />Set direction
+        </Button>
+      </ButtonAppearanceProvider>
     );
   }
 
   return (
-    <div className="space-y-2 px-1">
-      <div className="flex items-center gap-2 text-[12px] font-semibold text-muted-foreground">
+    <div className="w-full space-y-2">
+      <div className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
         <span>Direction</span>
       </div>
 

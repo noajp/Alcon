@@ -21,7 +21,7 @@ import { MenuShell } from '@/Function/shared/menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
-import { CustomColumnCell, CellText, CELL_TRIGGER_BASE, CELL_TRIGGER_EMPTY, CELL_POPOVER_RADIUS } from '@/Function/property/CustomColumnCell';
+import { CustomColumnCell, CellText, EmptyCellMark, CELL_TRIGGER_BASE, CELL_TRIGGER_EMPTY, CELL_POPOVER_RADIUS } from '@/Function/property/CustomColumnCell';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { PriorityPicker } from '@/Function/shared/PriorityPicker';
 import { StatusPicker } from '@/ActivitySpace/execution/element/StatusPicker';
@@ -113,7 +113,7 @@ export function TypeCell({
     <button
       type="button"
       disabled={!canEdit}
-      className={`${CELL_TRIGGER_BASE} ${current ? '' : 'text-amber-600 dark:text-amber-400'}`}
+      className={`${CELL_TRIGGER_BASE} ${current ? '' : CELL_TRIGGER_EMPTY}`}
     >
       <CellText>{current ?? 'Set type'}</CellText>
     </button>
@@ -433,7 +433,7 @@ export function ElementCell({
     return (
       <td className="table-cell px-1.5 py-1 max-w-0 overflow-hidden">
         {empty ? (
-          <span className={`${CELL_TRIGGER_BASE} ${CELL_TRIGGER_EMPTY}`}>Empty</span>
+          <span className={`${CELL_TRIGGER_BASE} ${CELL_TRIGGER_EMPTY}`}><EmptyCellMark /></span>
         ) : (
           <span className="inline-flex items-center gap-1 max-w-full overflow-hidden">
             {homes.slice(0, 2).map((o) => (
@@ -462,15 +462,14 @@ export function ElementCell({
     // The "Due date" column shows the DUE date only — not the start→due range.
     // (start_date is still editable via the popover for the Gantt, just not
     // rendered as a range here.)
-    const display = dateString ? formatDateShort(dateString) : 'Empty';
+    const display = dateString ? formatDateShort(dateString) : null;
     const trigger = (
       <button
         type="button"
         disabled={!canUpdate}
         className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? (isOverdue ? 'text-[var(--status-danger)]' : '') : CELL_TRIGGER_EMPTY}`}
       >
-        <CalendarIcon size={11} className="opacity-60" />
-        <CellText>{display}</CellText>
+        {display ? <><CalendarIcon size={11} className="opacity-60" /><CellText>{display}</CellText></> : <EmptyCellMark />}
       </button>
     );
     return (
@@ -521,7 +520,7 @@ function AssigneeCell({
 
   const display = (
     <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
-      {empty ? 'Empty' : all.length === 1 ? (
+      {empty ? <EmptyCellMark /> : all.length === 1 ? (
         <>
           <WorkerAvatar worker={all[0].worker ?? null} size={16} />
           <CellText>{all[0].worker?.name ?? 'Unknown'}</CellText>
@@ -698,7 +697,7 @@ export function DueDateCell({
 }) {
   const dateString = obj.due_date ? obj.due_date.slice(0, 10) : null;
   const selected = parseDateOnly(dateString);
-  const display = dateString ? formatDateShort(dateString) : 'Empty';
+  const display = dateString ? formatDateShort(dateString) : null;
   const canEdit = !!onObjectUpdate;
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
   const trigger = (
@@ -707,8 +706,7 @@ export function DueDateCell({
       disabled={!canEdit}
       className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? '' : CELL_TRIGGER_EMPTY}`}
     >
-      <CalendarIcon size={11} className="opacity-60" />
-      <CellText>{display}</CellText>
+      {display ? <><CalendarIcon size={11} className="opacity-60" /><CellText>{display}</CellText></> : <EmptyCellMark />}
     </button>
   );
   if (!canEdit) return trigger;
@@ -748,7 +746,7 @@ export function LeadCell({
   const lead = obj.lead_id ? workers.find((w) => w.id === obj.lead_id) ?? null : null;
   const display = (
     <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
-      {empty ? 'Empty' : (
+      {empty ? <EmptyCellMark /> : (
         <>
           <WorkerAvatar worker={lead} size={16} />
           <CellText>{lead?.name ?? 'Unknown'}</CellText>

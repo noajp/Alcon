@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import {
   CommentAvatar,
-  CommentBubble,
+  CommentEntry,
   CommentComposer,
   CommentMenu,
   CommentMenuItem,
@@ -154,7 +154,7 @@ export function StrategyCommentsPanel({
   return (
     <div className="space-y-3">
       {comments.length > 0 && (
-        <ul className="space-y-2.5">
+        <ul className="space-y-5">
           {comments.map((c) => {
             const isAi = c.author_kind === 'ai_agent';
             const isMine = !!user?.id && c.author_id === user.id && c.author_kind === 'human';
@@ -163,9 +163,8 @@ export function StrategyCommentsPanel({
               : undefined;
             return (
               <li key={c.id}>
-                <CommentBubble
+                <CommentEntry
                   comment={c}
-                  isMine={isMine}
                   avatar={
                     <CommentAvatar
                       name={c.author_name ?? authorWorker?.name ?? null}
@@ -175,7 +174,7 @@ export function StrategyCommentsPanel({
                     />
                   }
                   menu={isMine || canModerate ? (
-                    <CommentMenu align={isMine ? 'end' : 'start'}>
+                    <CommentMenu align="end">
                       {(close) => (
                         <CommentMenuItem
                           icon={<Trash2 size={12} />}

@@ -234,7 +234,7 @@ export const ElementRow = memo(function ElementRow({
           </span>
           <div className="flex flex-1 min-w-0 items-center gap-2">
             <span className="text-[13px] font-medium truncate flex-1 min-w-0 text-foreground">{el.title}</span>
-            {!!el.labels?.length && <span className="flex max-w-[40%] shrink-0 items-center gap-1 overflow-hidden" title={el.labels.join(', ')}>
+            {!!el.labels?.length && <span className="hidden @[26rem]:flex max-w-[35%] shrink-0 items-center gap-1 overflow-hidden" title={el.labels.join(', ')}>
               {el.labels.map(label => <LabelChip key={label} label={label} />)}
             </span>}
           </div>

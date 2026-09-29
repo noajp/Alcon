@@ -13,7 +13,8 @@ import type { FrameVariant } from './types';
 // board into arrange mode.
 //
 // The frame was not invented here. `RailCard` — the collapsible island the
-// Properties rail is already made of — IS the widget frame; the island
+// Properties rail is already made of — IS the widget frame (an unboxed
+// heading and its rows, see RailCard); the island
 // variant renders it verbatim, so a widget and a hand-placed rail card are
 // the same object to the eye. The `section` variant is the other look this
 // app already had (heading + hairline-bordered body, as Milestones and Child
@@ -249,18 +250,17 @@ export function WidgetFrame({
         )}
 
         {variant === 'section' && (
-          // The frame closes over the title, the way the rail island always
-          // has: one box per widget, with its name inside it. A heading
-          // floating above an unrelated box reads as two things, which is
-          // wrong the moment the box can be picked up and moved.
+          // The frame closes over the title: one box per widget, with its
+          // name inside it. A heading floating above an unrelated box reads
+          // as two things, which is wrong the moment the box can be picked up
+          // and moved. (Rail widgets are unboxed instead — see RailCard.)
           <section className="relative">
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-              {/* The header is chrome, not content, and `--surface-muted` at
-                  low alpha is what this app already says that with. The
-                  hairline under it is `--border-subtle` — a divider inside one
-                  surface — so a full-bleed body (a table) does not start
-                  flush against the band. */}
-              <div className="flex items-center justify-between h-9 px-4 bg-muted/40 border-b border-[var(--border-subtle)]">
+              {/* The title row is a plain heading inside the box — no tinted
+                  band. The hairline under it is `--border-subtle` (a divider
+                  inside one surface) so a full-bleed body (a table) does not
+                  start flush against the title. */}
+              <div className="flex items-center justify-between h-10 px-4 border-b border-[var(--border-subtle)]">
                 <h2 className="min-w-0 truncate text-[13px] font-medium text-foreground/90">{title}</h2>
                 {headerNode}
               </div>

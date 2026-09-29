@@ -7,7 +7,10 @@
  * and the Object overview's "Properties" island stay visually identical
  * (and so a tweak in one place doesn't drift the other). Layout:
  *
- *   [ name (w-24, semibold, muted) ][ icon ][ label (truncates) ]
+ *   [ name (w-24, 12px muted) ][ icon ][ label (13px, truncates) ]
+ *
+ * A set value is foreground and an unset one is muted, so the rail can be
+ * read for what is filled in without reading the words.
  *
  * Used as a wrapper inside <RailCard>'s body, where each row is either
  * a plain display row or a `<button>` that opens an inline picker — the
@@ -31,12 +34,12 @@ export function RailRow({
 }) {
   return (
     <div
-      className={`flex items-center gap-2 px-2 ${dense ? 'py-1.5' : 'py-2'} rounded-md hover:bg-muted/40 transition-colors text-[11px] font-normal leading-5 ${
-        placeholder ? 'text-muted-foreground' : 'text-foreground/90'
+      className={`flex items-center gap-2 px-2 ${dense ? 'h-8' : 'min-h-8 py-1.5'} rounded-md hover:bg-muted/50 transition-colors text-[13px] font-normal leading-5 ${
+        placeholder ? 'text-muted-foreground' : 'text-foreground'
       }`}
     >
       {name && (
-        <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground">
+        <span className="shrink-0 w-24 text-left text-[12px] text-muted-foreground">
           {name}
         </span>
       )}

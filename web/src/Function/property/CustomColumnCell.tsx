@@ -59,6 +59,21 @@ export function CellText({ children, className = '' }: { children: React.ReactNo
   return <span className={`min-w-0 truncate ${className}`}>{children}</span>;
 }
 
+/**
+ * What an unset cell shows: a faint dash, with "Empty" for screen readers.
+ * The word "Empty" repeated down a column is noise that outweighs the values
+ * around it; the dash keeps the column's rhythm, and the cell's hover ground
+ * still shows where to click.
+ */
+export function EmptyCellMark() {
+  return (
+    <>
+      <span aria-hidden className="opacity-60">–</span>
+      <span className="sr-only">Empty</span>
+    </>
+  );
+}
+
 const TRIGGER_BASE = CELL_TRIGGER_BASE;
 const TRIGGER_EMPTY = CELL_TRIGGER_EMPTY;
 
@@ -133,8 +148,7 @@ function CustomColumnCellBody({
             type="button"
             className={`${TRIGGER_BASE} gap-1 ${dateString ? '' : TRIGGER_EMPTY}`}
           >
-            <CalendarIcon size={11} className="opacity-60" />
-            {dateString ? formatDate(dateString) : 'Empty'}
+            {dateString ? <><CalendarIcon size={11} className="opacity-60" />{formatDate(dateString)}</> : <EmptyCellMark />}
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0 rounded-xl" align="start">
@@ -159,7 +173,7 @@ function CustomColumnCellBody({
         {selected.length ? selected.map((v) => {
           const option = options.find((o) => o.value === v);
           return <span key={v} className="inline-flex items-center gap-1 min-w-0"><span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: option?.color ?? 'var(--text-secondary)' }} /><CellText>{option ? optionLabel(option) : v}</CellText></span>;
-        }) : 'Empty'}
+        }) : <EmptyCellMark />}
       </button></DropdownMenuTrigger>
       <MenuShell as="dropdown" align="start">
         {options.filter((opt) => !opt.archived).map((opt) => <DropdownMenuItem key={opt.value} onSelect={(e) => {
@@ -224,7 +238,7 @@ function PersonCell({
           className={`${TRIGGER_BASE} gap-1.5 ${current ? '' : TRIGGER_EMPTY}`}
         >
           {current ? <WorkerAvatar worker={current} size={16} /> : null}
-          <CellText>{current ? current.name : 'Empty'}</CellText>
+          <CellText>{current ? current.name : <EmptyCellMark />}</CellText>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-56 p-1 rounded-xl">
@@ -298,7 +312,7 @@ function TextCell({
           type="button"
           className={`${TRIGGER_BASE} ${display ? '' : TRIGGER_EMPTY}`}
         >
-          <CellText>{display || 'Empty'}</CellText>
+          <CellText>{display || <EmptyCellMark />}</CellText>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-2 rounded-xl">
@@ -393,7 +407,7 @@ function NumberCell({
       }}
       className={`${TRIGGER_BASE} ${display ? '' : TRIGGER_EMPTY}`}
     >
-      <CellText>{display || 'Empty'}</CellText>
+      <CellText>{display || <EmptyCellMark />}</CellText>
     </button>,
   );
 }
