@@ -430,7 +430,6 @@ function StrategyDetailView({
   const rootRef = useRef<HTMLDivElement | null>(null);
   useEscapeLayer(true, onBack, rootRef);
 
-
   // Re-sync local edit state when switching to a different Strategy.
   // The database answers "may this user write?" with owner-only RLS; the UI
   // has to give the same answer before the write, or a non-owner sees an
@@ -610,7 +609,9 @@ function StrategyDetailView({
   };
 
   const saveName = async () => {
-    const trimmed = name.trim() || strategy.name;
+    // An emptied name is not saved; show the saved one again.
+    if (!name.trim()) { setName(strategy.name); return; }
+    const trimmed = name.trim();
     if (trimmed === strategy.name) return;
     if (!canEdit) { setName(strategy.name); return; }
     try {

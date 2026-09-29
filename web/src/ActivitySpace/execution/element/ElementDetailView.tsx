@@ -283,12 +283,11 @@ function ElementDetailBody({
 
   // Esc goes back to the list this Element was opened from — one level.
   // Anything open above the page (a picker, the Subelement modal, a field
-  // cancelling its own edit) takes the key first; the page gets the next one.
+  // ending its own edit) takes the key first; the page gets the next one.
   // The root ref keeps an Escape typed into a field elsewhere (the sidebar's
   // rename, say) from counting as this page's.
   const rootRef = useRef<HTMLDivElement | null>(null);
   useEscapeLayer(true, onBack, rootRef);
-
 
   // Reactions on this Element — cached per Element, refreshed on toggle.
   const { reactions, refresh: refreshReactions } = useElementReactions(element.id);
@@ -452,9 +451,33 @@ function ElementDetailBody({
     }
   }, [element.id, reloadCustomColumns]);
 
+  // What the title / description fields hold versus what was last sent, so
+  // an edit still pending when the view goes away is saved rather than lost.
+  // A detail opened inside a dialog closes on Escape at the document's
+  // capture phase, before the field's own Escape runs, and a field removed
+  // while focused gets no blur — so blur alone cannot be the only save.
+  const sentRef = useRef({ id: element.id, title: element.title, description: element.description || '' });
+  const draftRef = useRef({ title, description });
+  useEffect(() => { draftRef.current = { title, description }; }, [title, description]);
+  useEffect(() => {
+    sentRef.current = { id: element.id, title: element.title, description: element.description || '' };
+  }, [element.id, element.title, element.description]);
+  useEffect(() => () => {
+    const sent = sentRef.current;
+    const draft = draftRef.current;
+    const patch: { title?: string; description?: string | null } = {};
+    if (draft.title.trim() && draft.title.trim() !== sent.title) patch.title = draft.title.trim();
+    if (draft.description !== sent.description) patch.description = draft.description || null;
+    if (Object.keys(patch).length) void updateElement(sent.id, patch).catch((e) => console.error('Failed to save on close', e));
+  }, []);
+
   // Handlers
   const handleTitleSave = async () => {
-    if (title.trim() && title !== element.title) {
+    // An emptied title is not saved; show the saved one again rather than
+    // leaving the field blank until the next navigation.
+    if (!title.trim()) { setTitle(element.title); return; }
+    if (title !== element.title) {
+      sentRef.current = { ...sentRef.current, title: title.trim() };
       try {
         await updateElement(element.id, { title: title.trim() });
         log('renamed', `Renamed to “${title.trim()}”`);
@@ -465,6 +488,7 @@ function ElementDetailBody({
 
   const handleDescriptionSave = async () => {
     if (description !== (element.description || '')) {
+      sentRef.current = { ...sentRef.current, description };
       try {
         await updateElement(element.id, { description: description || null });
         log('description', description ? 'Updated description' : 'Cleared description');

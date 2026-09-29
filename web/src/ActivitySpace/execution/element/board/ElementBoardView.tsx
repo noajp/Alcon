@@ -22,7 +22,7 @@ import { formatElementDate, toDateOnlyString } from '@/Function/shared/dateUtils
 import { CardAgentControl } from '../agent';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { ActivitySignal } from '../ActivitySignal';
-import { isCancelKey, isCommitEnter } from '@/Function/shared/keyboard';
+import { isCancelKey, isCommitEnter, isSubmitChord } from '@/Function/shared/keyboard';
 
 // A card title reads at most three lines — beyond that it ellipsises, and the
 // inline rename box grows to the same three lines before it scrolls. Both
@@ -79,7 +79,8 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
   const saveTitle = async () => {
     setEditingTitle(false);
     const next = titleDraft.trim();
-    if (next && next !== element.title) {
+    if (!next) { setTitleDraft(element.title); return; }
+    if (next !== element.title) {
       try { await updateElement(element.id, { title: next }); onRefresh?.(); }
       catch (e) { console.error('Failed to rename element', e); }
     }
@@ -150,7 +151,7 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
             onKeyDown={(e) => {
               // Enter (not an IME conversion) and Escape both end the rename
               // and save, like the detail page's title.
-              if (isCommitEnter(e) || isCancelKey(e)) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).blur(); }
+              if (isCommitEnter(e) || isSubmitChord(e) || isCancelKey(e)) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).blur(); }
             }}
             onPointerDown={stop}
             onClick={stop}

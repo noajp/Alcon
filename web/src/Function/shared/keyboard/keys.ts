@@ -43,7 +43,9 @@ export function isSubmitChord(e: KeyLike): boolean {
     && !e.repeat && !composing(e);
 }
 
-/** Escape as cancel. An Escape that ends an IME composition is the IME's. */
+/** Escape: leave the current field or layer. What leaving means is the
+ *  caller's — an autosaved field saves, a dialog or an add-new input
+ *  discards. An Escape that ends an IME composition is the IME's. */
 export function isCancelKey(e: KeyLike): boolean {
   return e.key === 'Escape' && !composing(e);
 }
