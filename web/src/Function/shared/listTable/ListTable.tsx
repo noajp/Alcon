@@ -16,6 +16,7 @@ import { getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { useListColumns, sortElements, NAME_COL_KEY, type ColumnId, type DataColumn, type ColumnEntity } from '@/ActivitySpace/execution/object/useListColumns';
 import { EMPTY_CUSTOM_COLUMNS, EMPTY_ELEMENT_TYPES, EMPTY_WORKERS, EMPTY_ELEMENT_IDS, type ElementUpdate, type ListSection, HEADER_DRAG_PREFIX, OBJECT_DRAG_PREFIX, ROW_ROUND_BASE, STICKY_TINT_HOVER } from './shared';
 import { ElementRow } from './ElementRow';
+import { useUniformIdWidth } from './useUniformIdWidth';
 import { ObjectRow } from './ObjectRow';
 import { ColumnHeader, ResizeHandle, ColumnMenu } from './ColumnHeaderMenu';
 
@@ -191,6 +192,11 @@ export function ListTable({
 }: ListTableProps) {
   const dndId = useId();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // The id column takes the width of the widest id drawn, so the status mark
+  // and title start at one x down the whole list (9rem cap = the chip's
+  // own max-w-36).
+  const tableRef = useRef<HTMLTableElement | null>(null);
+  useUniformIdWidth(tableRef, 144, useMemo(() => [sections, collapsed], [sections, collapsed]));
   const toggle = (id: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -452,6 +458,7 @@ export function ListTable({
     <DndContext id={dndId} sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
     <div data-list-scroller className="overflow-x-auto h-full [overflow-anchor:none]">
       <table
+        ref={tableRef}
         // `min-w-full` so the table fills the wrap (rows + section bands span
         // the full width). The trailing column is given width:100% so it — and
         // only it — soaks up the surplus on wide screens, keeping Name and the
