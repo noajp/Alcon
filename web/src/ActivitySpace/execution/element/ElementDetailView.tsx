@@ -85,7 +85,7 @@ import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
 import { Smile, FileText } from 'lucide-react';
-import { isCancelKey, isCommitEnter, isSubmitChord, useCancelOnEscape, useEscapeLayer } from '@/Function/shared/keyboard';
+import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NotePicker } from '@/ActivitySpace/sustainment/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/sustainment/notebook/LinkedNoteEmbed';
 import { logActivity, useElementActivityLog, invalidateElementActivity, mergeActivity, type ActivityKind } from './elementActivity';
@@ -289,10 +289,6 @@ function ElementDetailBody({
   const rootRef = useRef<HTMLDivElement | null>(null);
   useEscapeLayer(true, onBack, rootRef);
 
-  // Escape in the title / description is a cancel: put the saved value back
-  // and make the blur that follows skip its save — see useCancelOnEscape.
-  const titleCancel = useCancelOnEscape();
-  const descriptionCancel = useCancelOnEscape();
 
   // Reactions on this Element — cached per Element, refreshed on toggle.
   const { reactions, refresh: refreshReactions } = useElementReactions(element.id);
@@ -458,7 +454,6 @@ function ElementDetailBody({
 
   // Handlers
   const handleTitleSave = async () => {
-    if (titleCancel.consumeCancel()) return;
     if (title.trim() && title !== element.title) {
       try {
         await updateElement(element.id, { title: title.trim() });
@@ -469,7 +464,6 @@ function ElementDetailBody({
   };
 
   const handleDescriptionSave = async () => {
-    if (descriptionCancel.consumeCancel()) return;
     if (description !== (element.description || '')) {
       try {
         await updateElement(element.id, { description: description || null });
@@ -692,10 +686,12 @@ function ElementDetailBody({
           <div>
             <div className="flex items-start gap-2 mb-6">
               {/* Auto-grow textarea so long titles wrap to multiple
-                  lines instead of being clipped. Enter saves (via blur);
-                  Shift+Enter inserts a newline within the title; Escape
-                  restores the saved title and is consumed here, so the
-                  page's own Escape (back to the list) is the next press.
+                  lines instead of being clipped. Enter and Escape both
+                  save (via blur) — the title autosaves, so Escape ends the
+                  edit rather than discarding it (Cmd+Z undoes while
+                  typing); Shift+Enter inserts a newline. Escape is
+                  consumed here, so the page's own Escape (back to the
+                  list) is the next press.
                   NOTE: the global base resets typed content (input /
                   textarea / contenteditable) to font-weight 400, which
                   beats a `font-semibold` utility — so the heading's
@@ -707,13 +703,8 @@ function ElementDetailBody({
                 onChange={(e) => setTitle(e.target.value)}
                 onBlur={handleTitleSave}
                 onKeyDown={(e) => {
-                  if (isCommitEnter(e) || isSubmitChord(e)) {
+                  if (isCommitEnter(e) || isSubmitChord(e) || isCancelKey(e)) {
                     e.preventDefault();
-                    e.currentTarget.blur();
-                  } else if (isCancelKey(e)) {
-                    e.preventDefault();
-                    titleCancel.cancel();
-                    setTitle(element.title);
                     e.currentTarget.blur();
                   }
                 }}
@@ -739,14 +730,10 @@ function ElementDetailBody({
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleDescriptionSave}
               onKeyDown={(e) => {
-                // Multi-line: Enter is a newline, Cmd/Ctrl+Enter saves.
-                if (isSubmitChord(e)) {
+                // Multi-line: Enter is a newline; Cmd/Ctrl+Enter and
+                // Escape end the edit and save.
+                if (isSubmitChord(e) || isCancelKey(e)) {
                   e.preventDefault();
-                  e.currentTarget.blur();
-                } else if (isCancelKey(e)) {
-                  e.preventDefault();
-                  descriptionCancel.cancel();
-                  setDescription(element.description || '');
                   e.currentTarget.blur();
                 }
               }}
