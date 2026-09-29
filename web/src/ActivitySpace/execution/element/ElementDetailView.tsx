@@ -85,7 +85,7 @@ import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
 import { Smile, FileText } from 'lucide-react';
-import { isCancelKey, isCommitEnter, isSubmitChord, useCancelOnEscape, useEscapeLayer } from '@/Function/shared/keyboard';
+import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NotePicker } from '@/ActivitySpace/sustainment/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/sustainment/notebook/LinkedNoteEmbed';
 import { logActivity, useElementActivityLog, invalidateElementActivity, mergeActivity, type ActivityKind } from './elementActivity';
@@ -283,16 +283,11 @@ function ElementDetailBody({
 
   // Esc goes back to the list this Element was opened from — one level.
   // Anything open above the page (a picker, the Subelement modal, a field
-  // cancelling its own edit) takes the key first; the page gets the next one.
+  // ending its own edit) takes the key first; the page gets the next one.
   // The root ref keeps an Escape typed into a field elsewhere (the sidebar's
   // rename, say) from counting as this page's.
   const rootRef = useRef<HTMLDivElement | null>(null);
   useEscapeLayer(true, onBack, rootRef);
-
-  // Escape in the title / description is a cancel: put the saved value back
-  // and make the blur that follows skip its save — see useCancelOnEscape.
-  const titleCancel = useCancelOnEscape();
-  const descriptionCancel = useCancelOnEscape();
 
   // Reactions on this Element — cached per Element, refreshed on toggle.
   const { reactions, refresh: refreshReactions } = useElementReactions(element.id);
@@ -456,10 +451,49 @@ function ElementDetailBody({
     }
   }, [element.id, reloadCustomColumns]);
 
+  // What the title / description fields hold versus what was last sent, so
+  // an edit still pending when the view goes away is saved rather than lost.
+  // A detail opened inside a dialog closes on Escape at the document's
+  // capture phase, before the field's own Escape runs, and a field removed
+  // while focused gets no blur — so blur alone cannot be the only save.
+  const sentRef = useRef({ id: element.id, title: element.title, description: element.description || '' });
+  const draftRef = useRef({ title, description });
+  useEffect(() => { draftRef.current = { title, description }; }, [title, description]);
+  // What a close-time save needs after the view is gone: who to credit on
+  // the Activity rail and whom to tell the list changed (a dialog's owner
+  // reads its own query, not the explorer cache updateElement patches).
+  const closeRef = useRef({ author, onRefresh });
+  useEffect(() => { closeRef.current = { author, onRefresh }; }, [author, onRefresh]);
+  useEffect(() => {
+    sentRef.current = { id: element.id, title: element.title, description: element.description || '' };
+  }, [element.id, element.title, element.description]);
+  useEffect(() => () => {
+    const sent = sentRef.current;
+    const draft = draftRef.current;
+    const patch: { title?: string; description?: string | null } = {};
+    if (draft.title.trim() && draft.title.trim() !== sent.title) patch.title = draft.title.trim();
+    if (draft.description !== sent.description) patch.description = draft.description || null;
+    if (!Object.keys(patch).length) return;
+    const { author: by, onRefresh: refresh } = closeRef.current;
+    void updateElement(sent.id, patch)
+      .then(() => {
+        // The list first: the save landed, whatever happens to the rail.
+        refresh?.();
+        const record = (kind: ActivityKind, detail: string) =>
+          void logActivity(sent.id, kind, detail, by).catch((e) => console.error('Failed to record activity:', e));
+        if (patch.title !== undefined) record('renamed', `Renamed to “${patch.title}”`);
+        if (patch.description !== undefined) record('description', patch.description ? 'Updated description' : 'Cleared description');
+      })
+      .catch((e) => console.error('Failed to save on close', e));
+  }, []);
+
   // Handlers
   const handleTitleSave = async () => {
-    if (titleCancel.consumeCancel()) return;
-    if (title.trim() && title !== element.title) {
+    // An emptied title is not saved; show the saved one again rather than
+    // leaving the field blank until the next navigation.
+    if (!title.trim()) { setTitle(element.title); return; }
+    if (title !== element.title) {
+      sentRef.current = { ...sentRef.current, title: title.trim() };
       try {
         await updateElement(element.id, { title: title.trim() });
         log('renamed', `Renamed to “${title.trim()}”`);
@@ -469,8 +503,8 @@ function ElementDetailBody({
   };
 
   const handleDescriptionSave = async () => {
-    if (descriptionCancel.consumeCancel()) return;
     if (description !== (element.description || '')) {
+      sentRef.current = { ...sentRef.current, description };
       try {
         await updateElement(element.id, { description: description || null });
         log('description', description ? 'Updated description' : 'Cleared description');
@@ -692,10 +726,12 @@ function ElementDetailBody({
           <div>
             <div className="flex items-start gap-2 mb-6">
               {/* Auto-grow textarea so long titles wrap to multiple
-                  lines instead of being clipped. Enter saves (via blur);
-                  Shift+Enter inserts a newline within the title; Escape
-                  restores the saved title and is consumed here, so the
-                  page's own Escape (back to the list) is the next press.
+                  lines instead of being clipped. Enter and Escape both
+                  save (via blur) — the title autosaves, so Escape ends the
+                  edit rather than discarding it (Cmd+Z undoes while
+                  typing); Shift+Enter inserts a newline. Escape is
+                  consumed here, so the page's own Escape (back to the
+                  list) is the next press.
                   NOTE: the global base resets typed content (input /
                   textarea / contenteditable) to font-weight 400, which
                   beats a `font-semibold` utility — so the heading's
@@ -707,13 +743,8 @@ function ElementDetailBody({
                 onChange={(e) => setTitle(e.target.value)}
                 onBlur={handleTitleSave}
                 onKeyDown={(e) => {
-                  if (isCommitEnter(e) || isSubmitChord(e)) {
+                  if (isCommitEnter(e) || isSubmitChord(e) || isCancelKey(e)) {
                     e.preventDefault();
-                    e.currentTarget.blur();
-                  } else if (isCancelKey(e)) {
-                    e.preventDefault();
-                    titleCancel.cancel();
-                    setTitle(element.title);
                     e.currentTarget.blur();
                   }
                 }}
@@ -739,14 +770,10 @@ function ElementDetailBody({
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleDescriptionSave}
               onKeyDown={(e) => {
-                // Multi-line: Enter is a newline, Cmd/Ctrl+Enter saves.
-                if (isSubmitChord(e)) {
+                // Multi-line: Enter is a newline; Cmd/Ctrl+Enter and
+                // Escape end the edit and save.
+                if (isSubmitChord(e) || isCancelKey(e)) {
                   e.preventDefault();
-                  e.currentTarget.blur();
-                } else if (isCancelKey(e)) {
-                  e.preventDefault();
-                  descriptionCancel.cancel();
-                  setDescription(element.description || '');
                   e.currentTarget.blur();
                 }
               }}

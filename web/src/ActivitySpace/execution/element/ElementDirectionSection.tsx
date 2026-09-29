@@ -6,6 +6,7 @@ import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
 import { normalizeDirection, type AcceptanceLine, type ElementDirection } from '@/types/database';
 import { mergeAcceptance, sameAcceptance } from './directionMerge';
+import { isCancelKey, isCommitEnter } from '@/Function/shared/keyboard';
 
 // Direction — "how this Element should be driven" as a first-class block:
 // approach (prose), acceptance criteria (declarative statements — NOT a
@@ -217,22 +218,13 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     }
   });
 
-  // Escape-to-cancel snapshots — taken on focus, restored on Escape, for
-  // every field. Without this Escape fell through to blur, which saves
-  // whatever is currently typed — the opposite of "cancel".
-  //
-  // Restoring via setState (e.g. setApproach(snapshot)) is not enough on its
-  // own: blur() fires its handler synchronously, before React has applied
-  // that setState, so the handler's closure still sees the just-typed value
-  // and persists it — the DB ends up with the text Escape was supposed to
-  // discard. The *CancelRef values carry the authoritative value straight
-  // into the blur handler instead of relying on state having caught up.
+  // Focus snapshots: what each field held when it was entered, so a field
+  // left exactly as it was found writes nothing. Every field autosaves on
+  // blur, and Escape ends the edit the same way (it saves, it does not
+  // discard — the page's title works the same).
   const approachSnapshotRef = useRef(approach);
-  const approachCancelRef = useRef<string | null>(null);
   const nextSnapshotRef = useRef(next);
-  const nextCancelRef = useRef<string | null>(null);
   const rowSnapshotsRef = useRef(new Map<string, string>());
-  const rowCancelRef = useRef<{ key: string; text: string } | null>(null);
 
   const saveAcceptance = useCallback((nextRows: AcceptanceRow[], opts?: { immediate?: boolean }) => {
     // What this tab changed, applied to the list the server holds now — so a
@@ -251,9 +243,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   }, [persist, currentBase]);
 
   const handleApproachBlur = () => {
-    const cancelled = approachCancelRef.current;
-    approachCancelRef.current = null;
-    const value = cancelled !== null ? cancelled : approach;
+    const value = approach;
     // Focused and left without typing: there is nothing of this tab's to
     // save, and writing the value it loaded would overwrite whatever someone
     // else put there in the meantime.
@@ -262,9 +252,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   };
 
   const handleNextBlur = () => {
-    const cancelled = nextCancelRef.current;
-    nextCancelRef.current = null;
-    const value = cancelled !== null ? cancelled : next;
+    const value = next;
     if (value === nextSnapshotRef.current) return;
     persist({ next: value.trim() || null }, 'Updated next step', { immediate: true });
   };
@@ -291,7 +279,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
 
   const handleRowKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
     const row = rows[index];
-    if (e.key === 'Enter') {
+    if (isCommitEnter(e)) {
       e.preventDefault();
       handleRowEnter(index);
     } else if (e.key === 'Backspace' && row.text === '') {
@@ -303,14 +291,10 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
       setRows(nextRows);
       if (prevRow) focusKeyRef.current = prevRow.key;
       saveAcceptance(nextRows);
-    } else if (e.key === 'Escape') {
-      // Consumed here: the cancel is this row's one level, not the page's.
+    } else if (isCancelKey(e)) {
+      // Ends the edit and saves (via blur). Consumed here, so the page's own
+      // Escape waits for the next press.
       e.preventDefault();
-      const snapshot = rowSnapshotsRef.current.get(row.key);
-      if (snapshot !== undefined) {
-        rowCancelRef.current = { key: row.key, text: snapshot };
-        setRowText(index, snapshot);
-      }
       e.currentTarget.blur();
     }
   };
@@ -323,13 +307,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     const row = rows[index];
     const snapshot = rowSnapshotsRef.current.get(row.key);
     rowSnapshotsRef.current.delete(row.key);
-    const cancel = rowCancelRef.current;
-    rowCancelRef.current = null;
-    // Escape fired setRowText(snapshot) right before this handler, but blur()
-    // runs synchronously — React hasn't applied that update yet, so `row`
-    // here can still be the just-typed text. Use the cancelled value
-    // directly rather than trusting `row.text` caught up in time.
-    const text = cancel && cancel.key === row.key ? cancel.text : row.text;
+    const text = row.text;
     // Left exactly as it was found. Writing the list back would send this
     // tab's copy over a criterion somebody else added since — the same reason
     // a bare blur on approach or next now says nothing. An untouched row that
@@ -389,10 +367,8 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
           onFocus={() => { approachSnapshotRef.current = approach; }}
           onBlur={handleApproachBlur}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') {
+            if (isCancelKey(e)) {
               e.preventDefault();
-              approachCancelRef.current = approachSnapshotRef.current;
-              setApproach(approachSnapshotRef.current);
               e.currentTarget.blur();
             }
           }}
@@ -441,12 +417,8 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
           onFocus={() => { nextSnapshotRef.current = next; }}
           onBlur={handleNextBlur}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.currentTarget.blur();
-            } else if (e.key === 'Escape') {
+            if (isCommitEnter(e) || isCancelKey(e)) {
               e.preventDefault();
-              nextCancelRef.current = nextSnapshotRef.current;
-              setNext(nextSnapshotRef.current);
               e.currentTarget.blur();
             }
           }}

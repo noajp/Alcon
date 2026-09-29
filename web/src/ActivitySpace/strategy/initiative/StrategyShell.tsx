@@ -10,7 +10,7 @@ import { QuickCreatePopup, quickCreatePillClass } from '@/Function/shared/QuickC
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/ui/command';
 import { MenuShell } from '@/Function/shared/menu';
-import { isCancelKey, isCommitEnter, isSubmitChord, useCancelOnEscape, useEscapeLayer } from '@/Function/shared/keyboard';
+import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/Function/shared/keyboard';
 import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
 import {
   addDomainObjectType,
@@ -430,11 +430,6 @@ function StrategyDetailView({
   const rootRef = useRef<HTMLDivElement | null>(null);
   useEscapeLayer(true, onBack, rootRef);
 
-  // Escape in the name / description is a cancel: put the saved value back
-  // and make the blur that follows skip its save — see useCancelOnEscape.
-  const nameCancel = useCancelOnEscape();
-  const descriptionCancel = useCancelOnEscape();
-
   // Re-sync local edit state when switching to a different Strategy.
   // The database answers "may this user write?" with owner-only RLS; the UI
   // has to give the same answer before the write, or a non-owner sees an
@@ -614,8 +609,9 @@ function StrategyDetailView({
   };
 
   const saveName = async () => {
-    if (nameCancel.consumeCancel()) return;
-    const trimmed = name.trim() || strategy.name;
+    // An emptied name is not saved; show the saved one again.
+    if (!name.trim()) { setName(strategy.name); return; }
+    const trimmed = name.trim();
     if (trimmed === strategy.name) return;
     if (!canEdit) { setName(strategy.name); return; }
     try {
@@ -630,7 +626,6 @@ function StrategyDetailView({
   };
 
   const saveDescription = async () => {
-    if (descriptionCancel.consumeCancel()) return;
     const trimmed = description.trim() || null;
     if (trimmed === (strategy.description ?? null)) return;
     if (!canEdit) { setDescription(strategy.description ?? ''); return; }
@@ -778,16 +773,12 @@ function StrategyDetailView({
               onBlur={saveName}
               onKeyDown={(e) => {
                 // A name is one line: Enter commits (via blur), Shift+Enter
-                // is the only way to a newline. Escape restores the saved
-                // name and is consumed here, so the page's own Escape (back
-                // to the list) waits for the next press.
-                if (isCommitEnter(e) || isSubmitChord(e)) {
+                // is the only way to a newline. The name autosaves, so
+                // Escape ends the edit and saves too; it is consumed here,
+                // so the page's own Escape (back to the list) waits for the
+                // next press.
+                if (isCommitEnter(e) || isSubmitChord(e) || isCancelKey(e)) {
                   e.preventDefault();
-                  e.currentTarget.blur();
-                } else if (isCancelKey(e)) {
-                  e.preventDefault();
-                  nameCancel.cancel();
-                  setName(strategy.name);
                   e.currentTarget.blur();
                 }
               }}
@@ -805,14 +796,10 @@ function StrategyDetailView({
             onChange={(e) => setDescription(e.target.value)}
             onBlur={saveDescription}
             onKeyDown={(e) => {
-              // Multi-line: Enter is a newline, Cmd/Ctrl+Enter commits.
-              if (isSubmitChord(e)) {
+              // Multi-line: Enter is a newline; Cmd/Ctrl+Enter and Escape
+              // end the edit and save.
+              if (isSubmitChord(e) || isCancelKey(e)) {
                 e.preventDefault();
-                e.currentTarget.blur();
-              } else if (isCancelKey(e)) {
-                e.preventDefault();
-                descriptionCancel.cancel();
-                setDescription(strategy.description ?? '');
                 e.currentTarget.blur();
               }
             }}
