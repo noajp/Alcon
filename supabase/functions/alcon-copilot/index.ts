@@ -104,18 +104,17 @@ const TOOLS: ToolDef[] = [
 // Each returns either { ok: true, data } or { ok: false, error }.
 // ──────────────────────────────────────────────────────────────────────────
 
-const COPILOT: BoardActor = { agent: "Alcon Copilot", userId: null };
-
 async function runTool(
   supabase: SupabaseClient,
   name: string,
   input: Record<string, unknown>,
+  actor: BoardActor,
 ): Promise<ToolResult> {
   try {
     if (name === "campaignMeasure") return await runMeasureTool(supabase, input);
     if (name === "analyzeOperations") return await runOperationsTool(supabase, input);
     if (name === "tableData" || name === "widgetBoard") return await runWidgetTool(supabase, name, input);
-    return await runBoardTool(supabase, name, input, COPILOT);
+    return await runBoardTool(supabase, name, input, actor);
   } catch (e) {
     return { ok: false, error: errorMessage(e) };
   }
@@ -173,6 +172,9 @@ Deno.serve(async (req: Request) => {
     global: { headers: { Authorization: authHeader } },
   });
   const client = new Anthropic({ apiKey: anthropicKey });
+  // Comments the Copilot writes stay traceable to the person who asked.
+  const { data: { user } } = await supabase.auth.getUser();
+  const actor: BoardActor = { agent: "Alcon Copilot", userId: user?.id ?? null };
 
   const ctx = body.context ?? {};
   const contextHint = [
@@ -269,7 +271,7 @@ Deno.serve(async (req: Request) => {
           const toolResults: AnthropicContentBlock[] = [];
           for (const block of turnContent) {
             if (block.type !== "tool_use") continue;
-            const result = await runTool(supabase, block.name!, (block.input ?? {}) as Record<string, unknown>);
+            const result = await runTool(supabase, block.name!, (block.input ?? {}) as Record<string, unknown>, actor);
             send("tool_result", {
               name: block.name,
               ok: result.ok,

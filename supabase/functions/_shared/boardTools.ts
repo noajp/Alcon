@@ -452,6 +452,18 @@ export async function resolveElementId(supabase: SupabaseClient, idArg: string):
   return null;
 }
 
+/**
+ * The visible Element a Subelement belongs to, or null. subelements RLS is
+ * wider than elements' (any signed-in user), so a Subelement id alone must
+ * not reach a write: its parent has to pass resolveElementId first.
+ */
+async function visibleSubelementParent(supabase: SupabaseClient, subelementId: string): Promise<string | null> {
+  if (!UUID_RE.test(subelementId)) return null;
+  const { data } = await supabase.from("subelements").select("element_id").eq("id", subelementId).maybeSingle();
+  if (!data?.element_id) return null;
+  return await resolveElementId(supabase, data.element_id as string);
+}
+
 // "done" → progress 100; "todo" / "backlog" → null. Mirrors the client's
 // updateElement normalization so the mark stays in sync.
 export function normalizeStatusPatch(patch: Record<string, unknown>): Record<string, unknown> {
@@ -802,6 +814,7 @@ export async function runBoardTool(
       case "toggleSubelementComplete": {
         const id = String(input.id ?? "");
         if (!id) return { ok: false, error: "id is required" };
+        if (!(await visibleSubelementParent(supabase, id))) return { ok: false, error: "Subelement not found" };
         let nextValue: boolean;
         if (input.isCompleted !== undefined) {
           nextValue = !!input.isCompleted;
@@ -822,6 +835,7 @@ export async function runBoardTool(
       case "updateSubelement": {
         const id = String(input.id ?? "");
         if (!id) return { ok: false, error: "id is required" };
+        if (!(await visibleSubelementParent(supabase, id))) return { ok: false, error: "Subelement not found" };
         const patch: Record<string, unknown> = {};
         if (input.title !== undefined) patch.title = String(input.title);
         if (input.is_completed !== undefined) patch.is_completed = !!input.is_completed;
@@ -837,6 +851,7 @@ export async function runBoardTool(
       case "deleteSubelement": {
         const id = String(input.id ?? "");
         if (!id) return { ok: false, error: "id is required" };
+        if (!(await visibleSubelementParent(supabase, id))) return { ok: false, error: "Subelement not found" };
         const { error } = await supabase.from("subelements").delete().eq("id", id);
         if (error) throw error;
         return { ok: true, data: { id, deleted: true }, meta: { rows: 1 } };

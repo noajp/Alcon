@@ -91,6 +91,13 @@ describe('MCP protocol', () => {
     expect((unknown.body as { error: { code: number } }).error.code).toBe(RPC.METHOD_NOT_FOUND);
   });
 
+  it('acknowledges a client response with 202 and checks the protocol header', async () => {
+    expect(await handleBody(JSON.stringify({ jsonrpc: '2.0', id: 9, result: {} }), host())).toEqual({ status: 202 });
+    expect(protocol.acceptsProtocolHeader(null)).toBe(true);
+    expect(protocol.acceptsProtocolHeader('2025-06-18')).toBe(true);
+    expect(protocol.acceptsProtocolHeader('1.0')).toBe(false);
+  });
+
   it('answers each request in a batch and skips its notifications', async () => {
     const res = await handleBody(JSON.stringify([
       { jsonrpc: '2.0', id: 1, method: 'ping' },
@@ -124,9 +131,9 @@ describe('MCP tool surface', () => {
     expect(names.some((n: string) => /delete|bulk|move|unlink|Object$/.test(n))).toBe(false);
   });
 
-  it('marks reads read-only and nothing destructive', () => {
+  it('marks reads read-only and overwrites destructive', () => {
     for (const tool of mcpTools()) {
-      expect(tool.annotations.destructiveHint).toBe(false);
+      expect(tool.annotations.destructiveHint).toBe(['updateElement', 'setElementLabels'].includes(tool.name));
       expect(tool.annotations.readOnlyHint).toBe(MCP_READ_TOOLS.includes(tool.name));
       expect(tool.inputSchema.type).toBe('object');
     }
@@ -183,6 +190,14 @@ describe('board tools', () => {
     const { db, writes } = fakeDb({ elements: [] });
     const res = await runBoardTool(db, 'addElementComment', { elementId: OTHER, body: 'x' }, { agent: 'AI (MCP)', userId: 'user-1' });
     expect(res).toEqual({ ok: false, error: 'Element not found' });
+    expect(writes).toEqual([]);
+  });
+
+  it('does not toggle a subelement whose Element the caller cannot see', async () => {
+    const SUB = 'aaaaaaaa-aaaa-aaaa-aaaa-000000000001';
+    const { db, writes } = fakeDb({ elements: [], subelements: [{ id: SUB, element_id: OTHER, title: 'hidden', is_completed: false }] });
+    const res = await runBoardTool(db, 'toggleSubelementComplete', { id: SUB, isCompleted: true }, { agent: 'AI (MCP)', userId: 'user-1' });
+    expect(res).toEqual({ ok: false, error: 'Subelement not found' });
     expect(writes).toEqual([]);
   });
 

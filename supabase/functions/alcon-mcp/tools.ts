@@ -35,6 +35,9 @@ const STRATEGY_NAMES = new Set(STRATEGY_TOOLS.map((t) => t.name));
 const READ = new Set<string>(MCP_READ_TOOLS);
 // Writes that land the same state when repeated.
 const IDEMPOTENT = new Set(["updateElement", "addElementAssignee", "setElementLabels"]);
+// Writes that overwrite what was there (a title, a description, the whole
+// label set) — a client should confirm these the way it confirms a delete.
+const OVERWRITES = new Set(["updateElement", "setElementLabels"]);
 
 function toMcp(def: ToolDef): McpTool {
   const readOnly = READ.has(def.name);
@@ -44,7 +47,7 @@ function toMcp(def: ToolDef): McpTool {
     inputSchema: def.input_schema,
     annotations: {
       readOnlyHint: readOnly,
-      destructiveHint: false,
+      destructiveHint: OVERWRITES.has(def.name),
       idempotentHint: readOnly || IDEMPOTENT.has(def.name),
       openWorldHint: false,
     },

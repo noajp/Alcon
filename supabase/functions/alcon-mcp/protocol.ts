@@ -51,6 +51,14 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
 }
 
+/**
+ * Pure. The MCP-Protocol-Version header after initialize: absent is allowed
+ * (older clients), an unsupported value is refused with 400.
+ */
+export function acceptsProtocolHeader(header: string | null): boolean {
+  return header === null || (SUPPORTED_PROTOCOL_VERSIONS as readonly string[]).includes(header);
+}
+
 export function negotiateVersion(requested: unknown): string {
   return (SUPPORTED_PROTOCOL_VERSIONS as readonly string[]).includes(String(requested))
     ? String(requested)
@@ -58,10 +66,13 @@ export function negotiateVersion(requested: unknown): string {
 }
 
 /**
- * One JSON-RPC message → its response, or null for a notification (no id),
- * which the transport acknowledges with 202 and no body.
+ * One JSON-RPC message → its response, or null for a notification (no id)
+ * or a client response, which the transport acknowledges with 202 and no body.
  */
 export async function handleMessage(msg: unknown, host: ToolHost): Promise<JsonRpcResponse | null> {
+  // A client's response (to a request this server never sends) is
+  // acknowledged like a notification.
+  if (isObject(msg) && msg.jsonrpc === "2.0" && msg.method === undefined && ("result" in msg || "error" in msg)) return null;
   if (!isObject(msg) || msg.jsonrpc !== "2.0" || typeof msg.method !== "string") {
     const id = isObject(msg) && (typeof msg.id === "string" || typeof msg.id === "number") ? msg.id : null;
     return fail(id, RPC.INVALID_REQUEST, "Invalid JSON-RPC request");

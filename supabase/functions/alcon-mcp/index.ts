@@ -18,7 +18,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { clientLabel, handleBody } from "./protocol.ts";
+import { acceptsProtocolHeader, clientLabel, handleBody } from "./protocol.ts";
 import { mcpHost } from "./tools.ts";
 
 const corsHeaders = {
@@ -45,6 +45,10 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") {
     return new Response(null, { status: 405, headers: { ...corsHeaders, allow: "POST, OPTIONS" } });
+  }
+
+  if (!acceptsProtocolHeader(req.headers.get("mcp-protocol-version"))) {
+    return json(400, { error: "unsupported MCP-Protocol-Version" });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
