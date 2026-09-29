@@ -1,0 +1,69 @@
+// alcon-mcp — Alcon as an MCP server.
+//
+// External AI clients (Claude Code, Claude, ChatGPT, …) connect over MCP
+// Streamable HTTP and read / write the board as the person who connected
+// them. Every call runs with that person's Supabase JWT, so RLS decides what
+// the AI can see and change — the same boundary the app draws — and the
+// service role is never used. Writes are recorded on the Element's Activity
+// under the client's name (see protocol.ts clientLabel).
+//
+// Transport: stateless. POST one JSON-RPC message → JSON response; a
+// notification → 202. GET (server-initiated stream) and DELETE (session end)
+// answer 405 because there is no session.
+//
+// Auth: Authorization: Bearer <Supabase access token>. verify_jwt=false on
+// this function so a missing / expired token gets an MCP-shaped 401 with
+// WWW-Authenticate instead of the gateway's; the token is verified here with
+// auth.getUser before any tool runs.
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { clientLabel, handleBody } from "./protocol.ts";
+import { mcpHost } from "./tools.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, content-type, mcp-protocol-version, mcp-session-id",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Expose-Headers": "www-authenticate",
+};
+
+function json(status: number, body: unknown, extra: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "content-type": "application/json", ...extra },
+  });
+}
+
+function unauthorized(detail: string): Response {
+  return json(401, { error: "unauthorized", error_description: detail }, {
+    "www-authenticate": `Bearer realm="alcon", error="invalid_token", error_description="${detail}"`,
+  });
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") {
+    return new Response(null, { status: 405, headers: { ...corsHeaders, allow: "POST, OPTIONS" } });
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !anonKey) return json(500, { error: "server env not configured" });
+
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  if (!token) return unauthorized("missing bearer token");
+
+  // Per-request client with the caller's JWT → RLS sees auth.uid().
+  const supabase = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !user) return unauthorized("token is invalid or expired");
+
+  const actor = { agent: clientLabel(new URL(req.url), req.headers.get("user-agent")), userId: user.id };
+  const { status, body } = await handleBody(await req.text(), mcpHost(supabase, actor));
+  return body === undefined ? new Response(null, { status, headers: corsHeaders }) : json(status, body);
+});
