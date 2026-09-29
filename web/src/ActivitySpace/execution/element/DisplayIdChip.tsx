@@ -38,14 +38,12 @@ export function DisplayIdChip({
    *  - `row`: cap relative to the row. A viewport breakpoint can't see how
    *    wide the row is — list and detail columns move with the sidebar and
    *    the right rail, so a wide window still hands a row a narrow box.
-   *  - `column`: reserve a floor so what follows the id (the status mark,
-   *    the title) starts at the same x down a long column, capped so one
-   *    outlier can't run away. 5rem clears every object prefix in the
-   *    database at 13px once the entity prefix is off the front (worst case
-   *    `P1—こ-999`, ~75px), 4.5rem the common three-letter ones at 12px (~62px); the
-   *    9rem ceiling is far enough out that nothing real reaches it, and a
-   *    longer prefix widens its own row rather than the column. Plain rem
-   *    because a column wants one width, not one per row.
+   *  - `column`: one width down a whole list, so what follows the id (the
+   *    status mark, the title) starts at the same x on every row. The list
+   *    measures its widest drawn id and hands that width to every chip as
+   *    `--list-id-w` (useUniformIdWidth); outside such a list the chip falls
+   *    back to a 4.5rem (12px) / 5rem (13px) floor. Capped at 9rem so one
+   *    runaway id can't push every title off screen.
    *  - `full`: never truncate. For surfaces with no hover to fall back on,
    *    like the drag preview, where a clipped id can't be recovered. */
   fit?: 'row' | 'column' | 'full';
@@ -53,13 +51,14 @@ export function DisplayIdChip({
   if (!id) return null;
   const FIT = {
     row: 'max-w-[min(10rem,35%)] truncate',
-    column: `${size === 'xs' ? 'min-w-[4.5rem]' : 'min-w-20'} max-w-36 truncate text-left`,
+    column: `${size === 'xs' ? 'min-w-[var(--list-id-w,4.5rem)]' : 'min-w-[var(--list-id-w,5rem)]'} max-w-36 truncate text-left`,
     full: '',
   }[fit];
   return (
     <span
       dir="rtl"
       title={id}
+      data-list-id={fit === 'column' ? '' : undefined}
       className={`shrink-0 tabular-nums text-muted-foreground/60 ${
         size === 'xs' ? 'text-xs' : 'text-[13px]'
       } ${FIT}`}
