@@ -14,11 +14,11 @@ import type { CommentAuthorKind } from '@/types/database';
 // Alcon has two threads — one on an Element, one on a Initiative — and they are
 // the same object with two homes, so they render through the same parts. What
 // differs between them (reactions, pinning, who may delete) is passed in as
-// slots rather than forked: a second hand-rolled bubble is where the two
+// slots rather than forked: a second hand-rolled entry is where the two
 // quietly stop looking alike.
 // =============================================================
 
-/** The subset of a comment row a bubble actually renders — both
+/** The subset of a comment row an entry actually renders — both
  *  ElementComment and StrategyComment satisfy it. */
 export interface CommentEntryData {
   author_name: string | null;

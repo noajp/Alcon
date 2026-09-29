@@ -168,9 +168,8 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
             {/* Due date — click to pick / change. Unset, it appears only while
-                the card is hovered: a column of "Date · Priority" placeholders
-                is chrome on every card. Unset fields stay editable from the
-                Element detail by keyboard. */}
+                the card is hovered or has keyboard focus inside it: a column
+                of "Date · Priority" placeholders is chrome on every card. */}
             <Popover>
               <PopoverTrigger asChild>
                 <button
@@ -179,7 +178,7 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
                   onClick={stop}
                   className={cn(
                     'items-center gap-1 -mx-1 px-1 rounded hover:bg-muted/40 hover:text-foreground transition-colors',
-                    dueDate ? 'flex' : 'hidden opacity-60 group-hover/card:flex data-[state=open]:flex',
+                    dueDate ? 'flex' : 'hidden opacity-60 group-hover/card:flex group-focus-within/card:flex data-[state=open]:flex',
                   )}
                 >
                   <Calendar className="h-3 w-3" />
@@ -205,7 +204,7 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
                   onClick={stop}
                   className={cn(
                     'items-center gap-1 -mx-1 px-1 rounded hover:bg-muted/40 hover:text-foreground transition-colors',
-                    priority ? 'inline-flex' : 'hidden opacity-60 group-hover/card:inline-flex data-[state=open]:inline-flex',
+                    priority ? 'inline-flex' : 'hidden opacity-60 group-hover/card:inline-flex group-focus-within/card:inline-flex data-[state=open]:inline-flex',
                   )}
                 >
                   {priority ? (

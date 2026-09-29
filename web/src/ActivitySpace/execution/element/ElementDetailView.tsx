@@ -760,7 +760,8 @@ function ElementDetailBody({
             />
           </div>
 
-          {/* Action row — reactions / Note link (icon-only). Sits flush
+          {/* Action row — reactions, Note link, approval and Share an update,
+              all borderless inline verbs. Sits flush
               with the title/description block (no extra horizontal
               padding) and wraps so reaction chips line up next to the
               affordances. */}
