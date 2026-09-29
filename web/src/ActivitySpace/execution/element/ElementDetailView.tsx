@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUserId } from '@/providers/authContext';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { ElementDependencies } from './ElementDependencies';
 import { CheckInDialog } from '../../home/now/CheckInDialog';
 import { STATUS, PRIORITY } from '@/shared/designTokens';
@@ -65,6 +65,8 @@ import {
   useBoard,
   WidgetSurface,
   WidgetZone,
+  WidgetActionSlotProvider,
+  WidgetActionSlotTarget,
   ELEMENT_DETAIL_BOARD,
   type WidgetHost,
   type Zone,
@@ -654,6 +656,7 @@ function ElementDetailBody({
   );
 
   return (
+    <WidgetActionSlotProvider>
     <div ref={rootRef} className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Breadcrumb — data hierarchy only: Domain > Object > Element. */}
       <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
@@ -679,18 +682,19 @@ function ElementDetailBody({
           <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack} />
         </div>
         <div className="flex-1" />
-        {/* Start/Run lives in the right-rail AgentRunPanel only — no
-            duplicate header CTA. */}
+        {/* The rail's "Add widget" is page chrome, not content: it portals
+            here, beside the breadcrumb, instead of heading the rail. */}
+        <WidgetActionSlotTarget className="flex items-center gap-1" />
       </div>
 
       {/* Scrollable body — Linear-style two-column layout */}
       <div className="flex-1 overflow-auto">
         <div className={layout === 'reader' ? "mx-auto w-full max-w-4xl px-5 py-7 flex flex-col gap-8" : "max-w-7xl mx-auto px-8 py-8 flex gap-8"}>
-          <div className="flex-1 min-w-0 space-y-5">
+          <div className="flex-1 min-w-0 flex flex-col gap-6">
 
           {/* Title & description */}
           <div>
-            <div className="flex items-start gap-2 mb-6">
+            <div className="flex items-start gap-2 mb-2">
               {/* Auto-grow textarea so long titles wrap to multiple
                   lines instead of being clipped. Enter saves (via blur);
                   Shift+Enter inserts a newline within the title; Escape
@@ -760,7 +764,8 @@ function ElementDetailBody({
               with the title/description block (no extra horizontal
               padding) and wraps so reaction chips line up next to the
               affordances. */}
-          <div className="flex items-center gap-1 flex-wrap">
+          <ButtonAppearanceProvider appearance="inline">
+          <div className="-mt-3 -ml-1.5 flex items-center gap-0.5 flex-wrap">
             {/* Smile button → quick-emoji popover that toggles a
                 reaction on this Element. */}
             <div className="relative">
@@ -822,9 +827,7 @@ function ElementDetailBody({
                 and record a decision (Approve / Request changes / Reject).
                 Moved here from the right rail's "Approval" island. */}
             <ElementApprovalMenu element={element} onRefresh={onRefresh} />
-            <Button size="sm" onClick={() => setCheckInOpen(true)}>Share an update</Button>
-            {checkInOpen && <CheckInDialog element={element} onClose={() => setCheckInOpen(false)}
-              onSaved={() => { setCheckInOpen(false); onRefresh?.(); }} />}
+            <Button variant="ghost" size="sm" onClick={() => setCheckInOpen(true)}>Share an update</Button>
 
             {/* Existing reactions as toggleable chips, aggregated by
                 emoji so two thumbs-ups read as 👍 ×2 with my own
@@ -853,6 +856,9 @@ function ElementDetailBody({
               ));
             })()}
           </div>
+          </ButtonAppearanceProvider>
+          {checkInOpen && <CheckInDialog element={element} onClose={() => setCheckInOpen(false)}
+            onSaved={() => { setCheckInOpen(false); onRefresh?.(); }} />}
 
           {/* Linked Note — embedded inline once chosen. */}
           {element.note_id && (
@@ -866,6 +872,11 @@ function ElementDetailBody({
               between the linked Note and the Sub-elements so the read order
               is intent → its breakdown → discussion. Keyed by element.id so
               switching Elements resets the editing state. */}
+          {/* Direction, sub-elements and dependencies share one wrapping row:
+              an empty one is a single quiet "+" verb that sits beside the
+              others (Linear's "+ Add sub-issues"); a filled one takes the full
+              width with its own small heading. */}
+          <div className="-ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
           <ElementDirectionSection
             key={`direction-${element.id}`}
             element={element}
@@ -879,9 +890,9 @@ function ElementDetailBody({
               the only entry point is a small "+" at the right end of the
               header. Empty state still shows a labelled "Add sub-element"
               link so the affordance is obvious. */}
-          <div className="space-y-1.5 px-1">
+          <div className={totalSubs > 0 ? 'w-full space-y-1.5' : ''}>
             {totalSubs > 0 && (
-              <div className="flex items-center gap-2 text-[12px] font-semibold text-muted-foreground">
+              <div className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
                 <span>Sub-elements</span>
                 <span className="tabular-nums">{completedSubs}/{totalSubs}</span>
                 <div className="flex-1" />
@@ -911,12 +922,11 @@ function ElementDetailBody({
                 />
               ))}
               {totalSubs === 0 && (
-                <button
-                  onClick={() => setSubModal({ mode: 'create' })}
-                  className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground py-1 transition-colors"
-                >
-                  <Plus size={13} strokeWidth={2.5} /> Add sub-element
-                </button>
+                <ButtonAppearanceProvider appearance="inline">
+                  <Button variant="ghost" size="sm" onClick={() => setSubModal({ mode: 'create' })}>
+                    <Plus size={13} strokeWidth={2.5} />Add sub-element
+                  </Button>
+                </ButtonAppearanceProvider>
               )}
             </div>
           </div>
@@ -929,11 +939,33 @@ function ElementDetailBody({
             onClear={subSelection.clearSelection}
           />
 
-          <section className="space-y-2 px-1" aria-label="Dependencies">
-            <h2 className="text-[13px] font-semibold">Dependencies</h2>
-            <ElementDependencies elementId={element.id} spaceId={coordinationSpaceId ?? null}
-              onOpenElement={onOpenElement} onChanged={onRefresh} />
-          </section>
+          <ElementDependencies elementId={element.id} spaceId={coordinationSpaceId ?? null}
+            onOpenElement={onOpenElement} onChanged={onRefresh} />
+          </div>
+
+          {/* Linked Elements */}
+          {(edges.incoming.length > 0 || edges.outgoing.length > 0) && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Link2 size={12} className="text-muted-foreground" />
+                <span className="text-[12px] font-medium text-muted-foreground">Linked elements</span>
+              </div>
+              <div className="space-y-1">
+                {edges.outgoing.map(edge => (
+                  <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1">
+                    <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')}</span>
+                    <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
+                  </div>
+                ))}
+                {edges.incoming.map(edge => (
+                  <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1">
+                    <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
+                    <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')} this</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {layout === 'reader' && <section className="space-y-3 border-t border-border pt-5" aria-label="Activity">
             <h2 className="text-[13px] font-semibold">Activity</h2>
@@ -941,11 +973,8 @@ function ElementDetailBody({
           </section>}
 
           {/* The reader keeps changes next to their discussion. */}
-          <div>
-            <div className="h-px bg-border mb-3" />
-            <div className="mb-3 text-[13px] font-semibold text-foreground/95">
-              Comments
-            </div>
+          <div className={layout === 'reader' ? '' : 'mt-4 border-t border-border pt-8'}>
+            <h2 className="mb-5 text-[15px] font-medium text-foreground">Comments</h2>
             <ElementCommentsPanel
               key={`comments-${element.id}-${agent.run?.finished_at ?? 'live'}`}
               elementId={element.id}
@@ -955,39 +984,14 @@ function ElementDetailBody({
             />
           </div>
 
-          {/* Linked Elements */}
-          {(edges.incoming.length > 0 || edges.outgoing.length > 0) && (
-            <div className="rounded-xl bg-muted/30 p-3">
-              <div className="flex items-center gap-1.5 px-1 pb-2">
-                <Link2 size={11} className="text-muted-foreground" />
-                <span className="text-[12px] font-semibold text-muted-foreground">Linked elements</span>
-              </div>
-              <div className="space-y-1">
-                {edges.outgoing.map(edge => (
-                  <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1.5 px-2 bg-muted/30 rounded-md">
-                    <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')}</span>
-                    <span className="font-semibold">{edge.related_element?.title || 'Unknown'}</span>
-                  </div>
-                ))}
-                {edges.incoming.map(edge => (
-                  <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1.5 px-2 bg-muted/30 rounded-md">
-                    <span className="font-semibold">{edge.related_element?.title || 'Unknown'}</span>
-                    <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')} this</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Bottom spacer */}
           <div className="h-8" />
           </div>
 
-          {/* Right rail — Linear-style floating cards. Each section is its
-              own card with a small chevron header; rows hover-highlight
-              and open inline pickers. The bg is intentionally grey-ish
-              (zinc-100 / zinc-900/40) so the cards lift off the page. */}
-          <aside className={layout === 'reader' ? "w-full space-y-3" : "w-80 shrink-0 hidden lg:block space-y-3"}>
+          {/* Right rail — unboxed sections (RailCard): a small heading and its
+              rows, separated by space. Rows hover-highlight and open inline
+              pickers. */}
+          <aside className={layout === 'reader' ? "w-full space-y-6" : "w-72 shrink-0 hidden lg:block space-y-6"}>
             {/* What this Element is standing on — the decisions and
                 assumptions the Initiative bound to it. Above Properties for the
                 same reason Initiative intent sits above them on an Object: why
@@ -1139,19 +1143,6 @@ function ElementDetailBody({
                 </PopoverContent>
               </Popover>
 
-              {/* Inset hairline under Date — soft section break before the
-                  Custom Property block. mx-2 keeps it off the card edges so it
-                  reads as a divider, not a full rule. */}
-              <div className="mx-2 mt-4 mb-2 h-px bg-border/50" />
-
-              {/* Custom Property section — the add-property "+" relocated here
-                  from the card header, with a label so the affordance is
-                  explicit rather than a bare "+" in the corner. */}
-              <div className="flex items-center justify-between px-2 py-1">
-                <span className="text-[12px] font-semibold text-muted-foreground">Custom fields</span>
-
-              </div>
-
               {/* Assignees */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1234,10 +1225,15 @@ function ElementDetailBody({
                 />
               </label>
 
-              {/* Custom Properties (object-scoped) — editable value + inline add. */}
+              {/* Custom Properties (object-scoped). Assignee, Lease and Estimate
+                  are built-in fields and sit with the others above; this
+                  heading only appears when the Object defines fields of its own. */}
+              {customColumns.length > 0 && (
+                <div className="px-2 pt-4 pb-1 text-[12px] font-medium text-muted-foreground">Custom fields</div>
+              )}
               {customColumns.map((col) => (
-                <div key={col.id} className="flex items-center gap-2 px-2 py-2">
-                  <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground">{col.name}</span>
+                <div key={col.id} className="flex items-center gap-2 px-2 min-h-8">
+                  <span className="shrink-0 w-24 text-left text-[12px] text-muted-foreground">{col.name}</span>
                   <div className="flex-1 min-w-0">
                     <CustomColumnCell
                       column={col}
@@ -1261,7 +1257,7 @@ function ElementDetailBody({
               }
             >
               {(element.labels?.length ?? 0) === 0 ? (
-                <div className="px-2 py-1.5 text-[11px] text-muted-foreground/60">No label yet…</div>
+                <div className="px-2 h-8 flex items-center text-[13px] text-muted-foreground">No labels</div>
               ) : (
                 <div className="px-2 py-1.5">
                   <LabelEditor labels={element.labels ?? []} />
@@ -1306,15 +1302,9 @@ function ElementDetailBody({
         />
       )}
     </div>
+    </WidgetActionSlotProvider>
   );
 }
-
-// ============================================
-// Right-rail card — Linear-style floating block.
-// ============================================
-// RailCard moved to @/Function/shared/RailCard (shared with the Object overview).
-
-// RailRow moved to @/Function/shared/RailRow (shared with the Object overview).
 
 // ============================================
 // Type picker — the Element's required `type`.

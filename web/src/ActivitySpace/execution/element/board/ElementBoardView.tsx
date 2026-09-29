@@ -135,7 +135,7 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
         if (!(e.target instanceof Node) || !e.currentTarget.contains(e.target)) return;
         onOpen?.(element);
       }}
-      className="rounded-xl border border-border bg-card hover:shadow-sm transition-shadow cursor-grab active:cursor-grabbing"
+      className="group/card rounded-xl border border-border bg-card hover:border-[var(--border-strong)] transition-colors cursor-grab active:cursor-grabbing"
     >
       <div className="p-4">
         {editingTitle ? (
@@ -165,9 +165,12 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
           </p>
         )}
 
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
-            {/* Due date — click to pick / change. Shown even when empty. */}
+            {/* Due date — click to pick / change. Unset, it appears only while
+                the card is hovered: a column of "Date · Priority" placeholders
+                is chrome on every card. Unset fields stay editable from the
+                Element detail by keyboard. */}
             <Popover>
               <PopoverTrigger asChild>
                 <button
@@ -175,8 +178,8 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
                   onPointerDown={stop}
                   onClick={stop}
                   className={cn(
-                    'flex items-center gap-1 -mx-1 px-1 rounded hover:bg-muted/40 hover:text-foreground transition-colors',
-                    !dueDate && 'opacity-60',
+                    'items-center gap-1 -mx-1 px-1 rounded hover:bg-muted/40 hover:text-foreground transition-colors',
+                    dueDate ? 'flex' : 'hidden opacity-60 group-hover/card:flex data-[state=open]:flex',
                   )}
                 >
                   <Calendar className="h-3 w-3" />
@@ -201,8 +204,8 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
                   onPointerDown={stop}
                   onClick={stop}
                   className={cn(
-                    'inline-flex items-center gap-1 -mx-1 px-1 rounded hover:bg-muted/40 hover:text-foreground transition-colors',
-                    !priority && 'opacity-60',
+                    'items-center gap-1 -mx-1 px-1 rounded hover:bg-muted/40 hover:text-foreground transition-colors',
+                    priority ? 'inline-flex' : 'hidden opacity-60 group-hover/card:inline-flex data-[state=open]:inline-flex',
                   )}
                 >
                   {priority ? (
@@ -367,7 +370,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
                 <span className="text-sm font-medium">{col.label}</span>
                 <span className="text-xs text-muted-foreground">{colItems.length}</span>
               </div>
-              <Button variant="primary" size="icon-xs"
+              <Button variant="ghost" size="icon-xs"
                 type="button"
                 onClick={async () => {
                   try {

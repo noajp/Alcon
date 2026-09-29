@@ -91,19 +91,18 @@ export function ColumnHeader({
             }`}
           />
         </button>
-        {/* Overflow menu — opens on hover (or focus) to expose Hide for
-            toggleable columns. Kept opacity-0 so it doesn't draw chrome
-            on every header at rest. */}
+        {/* Overflow menu — Edit / Move / Hide for toggleable columns.
+            Transparent at rest and shown on header hover, keyboard focus or
+            while open, so a row of headers is a row of words rather than a
+            row of chevrons. Transparent (not display:none) keeps it
+            reachable by Tab. */}
         {onHide && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
                 aria-label={`${column.label} options`}
-                // hidden (not opacity-0) so it doesn't reserve layout space —
-                // otherwise tight columns truncate their label to make room
-                // for an invisible button.
-                className="shrink-0 w-5 h-4 inline-flex items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                className="shrink-0 w-5 h-4 inline-flex items-center justify-center rounded text-muted-foreground opacity-0 group-hover/col:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 hover:bg-muted hover:text-foreground transition-[opacity,color,background-color]"
                 onPointerDown={(e) => e.stopPropagation()}
               >
                 <ChevronDown size={12} />

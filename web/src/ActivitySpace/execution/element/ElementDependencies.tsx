@@ -5,7 +5,7 @@ import { ArrowRight, Plus, X } from 'lucide-react';
 import { useNowWork } from '@/hooks/useNowWork';
 import { setElementDependency } from '@/hooks/coordinationData';
 import { useCurrentUserId } from '@/providers/authContext';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
 import { MenuShell } from '@/Function/shared/menu';
@@ -51,12 +51,17 @@ function DependencyEditor({ elementId, spaceId, onOpenElement, onChanged }: Elem
     } finally { setPending(false); }
   }
 
-  if (loading) return <p className={`${FONT.sm} text-muted-foreground`}>Loading dependencies…</p>;
-  if (error) return <div className="flex items-center gap-2"><p role="alert" className={`${FONT.sm} text-muted-foreground`}>{error.message}</p>
+  // Nothing to say until it has loaded — a "Loading…" line would flash in and
+  // out of a section that is usually empty.
+  if (loading) return null;
+  if (error) return <div className="w-full flex items-center gap-2"><p role="alert" className={`${FONT.sm} text-muted-foreground`}>{error.message}</p>
     {spaceId && <Button size="xs" variant="ghost" onClick={() => { void refetch().catch(() => {}); }}>Retry</Button>}</div>;
-  if (!elements.has(elementId)) return <p className={`${FONT.sm} text-muted-foreground`}>Space dependencies are available for Elements in this Space’s Objects.</p>;
+  if (!elements.has(elementId)) return <p className={`${FONT.sm} w-full text-muted-foreground`}>Space dependencies are available for Elements in this Space’s Objects.</p>;
 
-  return <div className="space-y-2">
+  // Empty reads as one quiet affordance, like "Add sub-element" — a heading
+  // and a "No dependencies recorded." line over nothing is chrome, not content.
+  return <section className={edges.length ? 'w-full space-y-2' : ''} aria-label="Dependencies">
+    {edges.length > 0 && <h2 className="text-[12px] font-medium text-muted-foreground">Dependencies</h2>}
     {(['incoming', 'outgoing'] as const).map((direction) => {
       const matching = edges.filter((edge) => direction === 'incoming' ? edge.to_element === elementId : edge.from_element === elementId);
       if (!matching.length) return null;
@@ -77,9 +82,10 @@ function DependencyEditor({ elementId, spaceId, onOpenElement, onChanged }: Elem
         })}
       </div>;
     })}
-    {!edges.length && <p className={`${FONT.sm} text-muted-foreground`}>No dependencies recorded.</p>}
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild><Button variant="ghost" size="xs" disabled={pending}><Plus className="size-3" />Add dependency</Button></PopoverTrigger>
+      <ButtonAppearanceProvider appearance="inline">
+        <PopoverTrigger asChild><Button variant="ghost" size="sm" disabled={pending}><Plus size={13} strokeWidth={2.5} />Add dependency</Button></PopoverTrigger>
+      </ButtonAppearanceProvider>
       <MenuShell align="start">
         <div className="flex gap-1 p-1">
           <Button shape="tab" size="xs" variant={relation === 'incoming' ? 'secondary' : 'ghost'} aria-pressed={relation === 'incoming'} onClick={() => setRelation('incoming')}>Waits for</Button>
@@ -101,5 +107,5 @@ function DependencyEditor({ elementId, spaceId, onOpenElement, onChanged }: Elem
       </MenuShell>
     </Popover>
     {!open && saveError && <p role="alert" className={`${FONT.sm} text-[var(--status-danger)]`}>{saveError}</p>}
-  </div>;
+  </section>;
 }

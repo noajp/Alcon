@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pin, Trash2 } from 'lucide-react';
-import { CommentAvatar, CommentBubble, CommentComposer, CommentMenu, CommentMenuItem, CommentMenuSeparator } from '@/Function/shared/CommentThread';
+import { CommentAvatar, CommentComposer, CommentEntry, CommentMenu, CommentMenuItem, CommentMenuSeparator } from '@/Function/shared/CommentThread';
 import {
   useElementComments,
   createElementComment,
@@ -239,7 +239,7 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
       ) : sorted.length === 0 ? (
         null
       ) : (
-        <ul className="space-y-2.5">
+        <ul className="space-y-5">
           {sorted.map(c => {
             const myReactions = (reactions[c.id] || []).filter(r => r.user_id === user?.id).map(r => r.emoji);
             const counts: Record<string, number> = {};
@@ -265,9 +265,8 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
                     : 'transition-colors duration-500'
                 }
               >
-                <CommentBubble
+                <CommentEntry
                   comment={c}
-                  isMine={isMine}
                   avatar={
                     <CommentAvatar
                       name={c.author_name ?? authorWorker?.name ?? null}
@@ -278,7 +277,7 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
                   }
                   meta={c.is_pinned ? <Pin size={9} className="text-amber-400" /> : null}
                   footer={Object.keys(counts).length > 0 ? (
-                    <div className={`flex flex-wrap gap-1 mt-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                    <div className="flex flex-wrap gap-1 mt-1.5">
                       {Object.entries(counts).map(([emoji, n]) => {
                         const mine = myReactions.includes(emoji);
                         return (
@@ -299,7 +298,7 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
                     </div>
                   ) : null}
                   menu={
-                    <CommentMenu align={isMine ? 'end' : 'start'}>
+                    <CommentMenu align="end">
                       {(close) => (
                         <>
                           <div className="flex items-center gap-0.5 px-1 py-0.5">

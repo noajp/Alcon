@@ -5,6 +5,7 @@ import { Diamond } from 'lucide-react';
 import { formatElementDate, daysUntil } from '@/Function/shared/dateUtils';
 import { STATUS } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
+import { useWidgetEmpty } from '../WidgetFrame';
 
 interface Props {
   elements: ElementWithDetails[];
@@ -21,13 +22,11 @@ export function MilestonesWidget({ elements }: Props) {
       .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime());
   }, [elements]);
 
-  if (milestones.length === 0) {
-    return (
-      <div className="py-6 text-center text-sm text-muted-foreground">
-        No high-priority items with dates yet
-      </div>
-    );
-  }
+  // Derived, not entered: with no dated high-priority Elements there is
+  // nothing to show, so the frame hides the widget (it reappears in arrange
+  // mode, where it can still be removed) instead of boxing an apology.
+  useWidgetEmpty(milestones.length === 0);
+  if (milestones.length === 0) return null;
 
   // Group by month
   const grouped = milestones.reduce<Record<string, ElementWithDetails[]>>((acc, el) => {

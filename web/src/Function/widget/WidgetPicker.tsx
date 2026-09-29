@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Plus, LayoutGrid } from 'lucide-react';
 import { Popover, PopoverTrigger } from '@/ui/popover';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR } from '@/Function/shared/menu';
 import { WIDGET_REGISTRY } from './registry';
 import type { SubjectKind, WidgetDefinition, WidgetGroup, Zone } from './types';
@@ -85,12 +85,16 @@ export function WidgetPicker({
         if (!next) setQuery('');
       }}
     >
-      <PopoverTrigger asChild>
-        <Button disabled={disabled} variant="ghost" size="sm">
-          <Plus size={14} />
-          Add widget
-        </Button>
-      </PopoverTrigger>
+      {/* Page chrome, not a document action: a muted, unbordered verb like
+          the header's other controls. */}
+      <ButtonAppearanceProvider appearance="inline">
+        <PopoverTrigger asChild>
+          <Button disabled={disabled} variant="ghost" size="sm">
+            <Plus size={14} />
+            Add widget
+          </Button>
+        </PopoverTrigger>
+      </ButtonAppearanceProvider>
       <MenuShell align="end" width="standard">
         {/* Verb-phrase placeholder, no ring, no border — DESIGN.md §5.3/§5.9. */}
         <input

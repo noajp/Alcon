@@ -300,7 +300,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
   const headerActions = selectedObject ? (
     <div className="ml-auto flex items-center gap-2">
       {!isEmptyObjectElements && (
-        <Button variant="primary" size="icon-xs"
+        <Button variant="ghost" size="icon-xs"
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent('alcon:quick-add-element'))}
           title="Add Element" aria-label="Add Element"
@@ -311,7 +311,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
     </div>
   ) : !isEmptyDomain ? (
     <div className="ml-auto flex items-center gap-2">
-      <Button variant="primary" size="icon-xs"
+      <Button variant="ghost" size="icon-xs"
         type="button"
         onClick={() => openCreate('object')}
         title="Add Object" aria-label="Add Object"

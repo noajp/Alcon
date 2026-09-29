@@ -208,7 +208,7 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
         label={
           <span className="flex items-center gap-2 w-full">
             <SegmentedProgress value={stats.progress} className="flex-1" />
-            <span className="text-[11px] tabular-nums text-foreground/80 shrink-0">
+            <span className="text-[12px] tabular-nums text-muted-foreground shrink-0">
               {stats.progress}%
             </span>
           </span>
@@ -222,7 +222,7 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
           <span className="tabular-nums">
             {stats.done}/{stats.total} done
             {stats.inProgress > 0 && (
-              <span className="ml-1.5 text-[var(--status-warning)]">· {stats.inProgress} in progress</span>
+              <span className="ml-1.5 text-muted-foreground">· <span className="text-[var(--element-status-in-progress)]">{stats.inProgress} in progress</span></span>
             )}
             {stats.overdue > 0 && (
               <span className="ml-1.5 text-[var(--status-danger)]">· {stats.overdue} overdue</span>
@@ -232,8 +232,8 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
       />
 
       {customCols.map((col) => (
-        <div key={col.id} className="flex items-center gap-2 px-2 py-2">
-          <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground">{col.name}</span>
+        <div key={col.id} className="flex items-center gap-2 px-2 min-h-8">
+          <span className="shrink-0 w-24 text-left text-[12px] text-muted-foreground">{col.name}</span>
           <div className="flex-1 min-w-0">
             <CustomColumnCell
               column={col}
