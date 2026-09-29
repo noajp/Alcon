@@ -476,10 +476,13 @@ function ElementDetailBody({
     if (!Object.keys(patch).length) return;
     const { author: by, onRefresh: refresh } = closeRef.current;
     void updateElement(sent.id, patch)
-      .then(async () => {
-        if (patch.title !== undefined) await logActivity(sent.id, 'renamed', `Renamed to “${patch.title}”`, by);
-        if (patch.description !== undefined) await logActivity(sent.id, 'description', patch.description ? 'Updated description' : 'Cleared description', by);
+      .then(() => {
+        // The list first: the save landed, whatever happens to the rail.
         refresh?.();
+        const record = (kind: ActivityKind, detail: string) =>
+          void logActivity(sent.id, kind, detail, by).catch((e) => console.error('Failed to record activity:', e));
+        if (patch.title !== undefined) record('renamed', `Renamed to “${patch.title}”`);
+        if (patch.description !== undefined) record('description', patch.description ? 'Updated description' : 'Cleared description');
       })
       .catch((e) => console.error('Failed to save on close', e));
   }, []);
