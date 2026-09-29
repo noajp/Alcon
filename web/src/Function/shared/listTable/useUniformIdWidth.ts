@@ -14,10 +14,10 @@ import { useLayoutEffect, type RefObject } from 'react';
 // max-width, so one runaway id cannot push every title off screen.
 
 /** The CSS variable the id chips read their min-width from. */
-export const LIST_ID_WIDTH_VAR = '--list-id-w';
+const LIST_ID_WIDTH_VAR = '--list-id-w';
 
 /** Marks a chip whose text width takes part in the measurement. */
-export const LIST_ID_ATTR = 'data-list-id';
+const LIST_ID_ATTR = 'data-list-id';
 
 /**
  * Pure. The width every id chip should reserve: the widest measured id,
