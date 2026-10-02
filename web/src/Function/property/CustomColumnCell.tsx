@@ -7,7 +7,7 @@ import type { CustomColumnOptions } from '@/types/database';
 import { MenuShell } from '@/Function/shared/menu';
 import { CalendarIcon, Check } from 'lucide-react';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
-import { useWorkerById, useWorkers } from '@/hooks/useSupabase';
+import { useAssignableWorkers, useWorkerById, useWorkers } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
@@ -99,6 +99,7 @@ export function CustomColumnCell(props: CustomColumnCellProps) {
 
 function CustomColumnCellBody({
   column,
+  elementId,
   value,
   onChange,
   displayMode = 'table',
@@ -188,7 +189,10 @@ function CustomColumnCellBody({
 
   // ── Person (Assignee) ────────────────────────────────────────────────
   if (column.column_type === 'person') {
-    return <PersonCell value={value} onChange={onChange} renderWithLabel={renderWithLabel} columnLabel={column.name} />;
+    // A Domain column tags Objects (`elementId` is then the Object's id); every
+    // other column holds an Element value.
+    return <PersonCell value={value} onChange={onChange} renderWithLabel={renderWithLabel} columnLabel={column.name}
+      elementId={column.domain_id ? null : elementId} />;
   }
 
   // ── Progress ─────────────────────────────────────────────────────────
@@ -211,27 +215,34 @@ function CustomColumnCellBody({
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Person picker: offers the active Space's assignable Workers, lets user
-// pick by name. Stores the worker_id as the cell value. The current value
-// resolves by id, so a Worker outside the list still shows its name.
+// Person picker: offers the Workers the database accepts here — on an
+// Element, exactly its assignable Workers (worker_assignable, read when the
+// picker opens, as the board's assignee menu does); on an Object, the active
+// Space's. Stores the worker_id as the cell value. The current value resolves
+// by id, so a Worker outside the list still shows its name.
 // ─────────────────────────────────────────────────────────────────────
 function PersonCell({
   value,
   onChange,
   renderWithLabel,
   columnLabel,
+  elementId,
 }: {
   value: Json;
   onChange: (v: Json) => void;
   renderWithLabel: (c: React.ReactNode) => React.ReactNode;
   columnLabel: string;
+  elementId: string | null;
 }) {
-  const { data: workers } = useWorkers();
+  const [open, setOpen] = useState(false);
+  const { data: spaceWorkers } = useWorkers();
+  const { data: elementWorkers, loading } = useAssignableWorkers({ elementId }, !!elementId && open);
+  const workers = elementId ? elementWorkers : spaceWorkers;
   const currentId = typeof value === 'string' ? value : '';
-  const current = useWorkerById(currentId || null, workers);
+  const current = useWorkerById(currentId || null, spaceWorkers);
 
   return renderWithLabel(
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -244,7 +255,7 @@ function PersonCell({
       </PopoverTrigger>
       <PopoverContent align="start" className="w-56 p-1 rounded-xl">
         <div className="max-h-64 overflow-auto">
-          {workers.length === 0 && (
+          {workers.length === 0 && !(elementId && loading) && (
             <div className="px-2 py-1.5 text-[12px] text-muted-foreground">
               No workers yet
             </div>

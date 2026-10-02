@@ -1,5 +1,7 @@
 'use client';
 
+import { translate } from '@/Function/i18n/I18nProvider';
+import { appDialog } from '@/Function/shared/appDialogStore';
 import { invalidateCustomColumnLists, invalidateElementDetail } from '@/Function/sync/explorerCache';
 import { selectIn } from '@/hooks/chunkedIn';
 import { supabase } from '@/lib/supabase';
@@ -16,7 +18,34 @@ import type {
 
 // ============================================
 // Custom Columns CRUD
+//
+// The database decides who may read and write Properties: a value follows the
+// visibility of its Element / Object and takes only a column that belongs
+// there, a definition is visible inside its own scope, and a Person value
+// names only a Worker inside the boundary (42501, hint
+// alcon:person_outside_boundary). A refused UPDATE comes back as "no rows"
+// (PGRST116 from .single()), a refused INSERT as 42501.
 // ============================================
+
+const PERSON_OUTSIDE_BOUNDARY = 'alcon:person_outside_boundary';
+
+/** True when the database refused the write, so a retry cannot succeed. */
+export function isPropertyWriteRefused(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  return code === '42501' || code === 'PGRST116';
+}
+
+/** Tell the person a Property value did not save. The cell has already
+ *  dropped its optimistic value and shows what the database holds. */
+export function noticePropertyValueFailed(error: unknown): void {
+  console.error('Property value was not saved:', error);
+  const hint = (error as { hint?: string } | null)?.hint;
+  void appDialog.alert(translate(hint === PERSON_OUTSIDE_BOUNDARY
+    ? 'This Worker cannot be set here: they are outside this Space or cannot see it.'
+    : isPropertyWriteRefused(error)
+    ? 'You cannot change this value. It belongs to an Element, Object or field outside your access.'
+    : 'The value could not be saved. Try again.'));
+}
 
 // Fetch all custom columns for an object
 export async function fetchCustomColumns(objectId: string): Promise<CustomColumn[]> {
@@ -245,14 +274,17 @@ export async function updateCustomColumn(id: string, updates: CustomColumnUpdate
   return data as CustomColumn;
 }
 
-// Delete a custom column
+// Delete a custom column. RLS turns a refused DELETE into "no rows", so say
+// so instead of reporting success.
 export async function deleteCustomColumn(id: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('custom_columns')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
   if (error) throw error;
+  if (!data?.length) throw Object.assign(new Error('The field was not deleted.'), { code: '42501' });
 }
 
 // Set a custom column value for an element. Uses partial-unique-index
