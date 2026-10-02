@@ -4,6 +4,9 @@ type TranslationMap = Record<string, string>;
 
 const ja: TranslationMap = {
   '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '{n} 人の担当者は追加しませんでした（inactive か、この Element を見られない人です）。',
+  'This Worker cannot be assigned to this Element: they are inactive, outside its Space, or cannot see it.': 'この Worker はこの Element に割り当てられません（inactive、別の Space、またはこの Element を見られない人です）。',
+  'The assignees could not be changed. Try again.': '担当者を変更できませんでした。もう一度お試しください。',
+  'You cannot change this Worker. Ask an owner of its Space or Domain.': 'この Worker は変更できません。Space か Domain のオーナーに依頼してください。',
   'Grouping': 'グループ化', 'Ordering': '並び順', 'Sort by': '並べ替え項目',
   'Direction': '方向', 'Ascending': '昇順', 'Descending': '降順', 'Manual': '手動',
   'Display properties': '表示項目',
@@ -51,6 +54,9 @@ const ja: TranslationMap = {
 
 const ko: TranslationMap = {
   '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '담당자 {n}명은 추가하지 않았습니다(비활성이거나 이 Element를 볼 수 없는 사람입니다).',
+  'This Worker cannot be assigned to this Element: they are inactive, outside its Space, or cannot see it.': '이 Worker는 이 Element에 할당할 수 없습니다(비활성, 다른 Space, 또는 이 Element를 볼 수 없는 사람입니다).',
+  'The assignees could not be changed. Try again.': '담당자를 변경하지 못했습니다. 다시 시도하세요.',
+  'You cannot change this Worker. Ask an owner of its Space or Domain.': '이 Worker는 변경할 수 없습니다. Space나 Domain 소유자에게 요청하세요.',
   'Grouping': '그룹화',
   'Ordering': '정렬 순서',
   'Sort by': '정렬 기준',
@@ -118,6 +124,9 @@ const ko: TranslationMap = {
 
 const fr: TranslationMap = {
   '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '{n} responsable(s) non ajouté(s) : inactif(s) ou sans accès à cet Element.',
+  'This Worker cannot be assigned to this Element: they are inactive, outside its Space, or cannot see it.': 'Ce Worker ne peut pas être assigné à cet Element : inactif, hors de son Space ou sans accès.',
+  'The assignees could not be changed. Try again.': 'Impossible de modifier les responsables. Réessayez.',
+  'You cannot change this Worker. Ask an owner of its Space or Domain.': 'Vous ne pouvez pas modifier ce Worker. Demandez à un propriétaire de son Space ou Domain.',
   'Grouping': 'Regroupement',
   'Ordering': 'Ordre',
   'Sort by': 'Trier par',
@@ -186,6 +195,9 @@ const fr: TranslationMap = {
 
 const es: TranslationMap = {
   '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '{n} responsable(s) no se añadieron: están inactivos o no pueden ver este Element.',
+  'This Worker cannot be assigned to this Element: they are inactive, outside its Space, or cannot see it.': 'Este Worker no se puede asignar a este Element: está inactivo, fuera de su Space o no puede verlo.',
+  'The assignees could not be changed. Try again.': 'No se pudieron cambiar los responsables. Inténtalo de nuevo.',
+  'You cannot change this Worker. Ask an owner of its Space or Domain.': 'No puedes cambiar este Worker. Pide ayuda a un propietario de su Space o Domain.',
   'Grouping': 'Agrupación',
   'Ordering': 'Orden',
   'Sort by': 'Ordenar por',

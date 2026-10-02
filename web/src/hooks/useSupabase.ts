@@ -123,6 +123,7 @@ export {
 export {
   assignWorkersToElement,
   noticeSkippedAssignees,
+  noticeAssignmentFailed,
   createWorker,
   deleteWorker,
   fetchAllWorkers,

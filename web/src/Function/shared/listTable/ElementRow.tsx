@@ -5,7 +5,7 @@ import { Grip, Lock, Check, Trash2, Fingerprint } from 'lucide-react';
 import { BUILTIN_COLUMN_ICONS } from '@/Function/property/columnTypes';
 import type { CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { scheduleElementDetailPrefetch, cancelElementDetailPrefetch } from '@/ActivitySpace/execution/element/elementDetailQueries';
-import { deleteElement, addElementAssignee, removeElementAssignee, fetchAssignableWorkers } from '@/hooks/useSupabase';
+import { deleteElement, addElementAssignee, removeElementAssignee, fetchAssignableWorkers, noticeAssignmentFailed } from '@/hooks/useSupabase';
 import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { describeBlocker, type DependencyBlocker } from '@/ActivitySpace/execution/element/dependencyReadiness';
 import { displayIdOf } from '@/ActivitySpace/execution/element/displayId';
@@ -475,7 +475,7 @@ function AssigneeContextSub({
       if (existing) await removeElementAssignee(existing.id);
       else await addElementAssignee({ element_id: el.id, worker_id: workerId, role: 'assignee', worker: workers.find((w) => w.id === workerId) });
       await onRefresh();
-    } catch (e) { console.error('Failed to toggle assignee', e); }
+    } catch (e) { noticeAssignmentFailed(e); }
   };
   return (
     <ContextMenuSub open={open} onOpenChange={onOpenChange}>

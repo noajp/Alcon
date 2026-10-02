@@ -9,10 +9,11 @@ import { useEscapeLayer } from '@/Function/shared/keyboard';
 
 // Search `profiles` by display_name and add the picked user as a member —
 // either to a Domain (`domain_members`) or to an ActivitySpace
-// (`activity_space_members`), per `target`. If they don't yet have a worker
-// row, we create one too so they immediately appear in TeamSettings + the
-// assignee picker. Email-based invites for users who don't have an account
-// yet are deferred to a later phase.
+// (`activity_space_members`), per `target`. Joining gives them their human
+// Worker (a database trigger), so they appear in TeamSettings and the
+// assignee picker without this dialog writing any Worker row. Email-based
+// invites for users who don't have an account yet are deferred to a later
+// phase.
 
 interface ProfileRow {
   id: string;

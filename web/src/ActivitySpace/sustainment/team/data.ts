@@ -199,9 +199,32 @@ export function noticeSkippedAssignees(count: number): void {
     '{n} assignee(s) were not added: they are inactive or cannot see this Element.', { n: count }));
 }
 
+/** Tell the person an assignee change did not save. The database refuses
+ *  (42501) a Worker that worker_assignable does not accept; anything else is a
+ *  plain failure. The optimistic chip has already been rolled back. */
+export function noticeAssignmentFailed(error: unknown): void {
+  console.error('Assignee change failed:', error);
+  const code = (error as { code?: string } | null)?.code;
+  void appDialog.alert(translate(code === '42501'
+    ? 'This Worker cannot be assigned to this Element: they are inactive, outside its Space, or cannot see it.'
+    : 'The assignees could not be changed. Try again.'));
+}
+
 // ============================================
 // Worker CRUD
+//
+// The database decides who may change a Worker (workers RLS): your own
+// Worker; an unlinked Worker of a Space you belong to; an Object's Worker on
+// an Object you can see; and, as an owner of a person's Space or Domain, only
+// that person's capacity and status. A Worker's type never changes and a
+// person's Worker never leaves their account. Removing is only for unlinked
+// Workers, by an owner of their Space — a person's Worker stays so the work
+// they did keeps their name. RLS turns a
+// refused UPDATE / DELETE into "no rows", so both writers below say so instead
+// of reporting success.
 // ============================================
+
+const WORKER_REFUSED = 'You cannot change this Worker. Ask an owner of its Space or Domain.';
 
 export async function createWorker(worker: {
   name: string;
@@ -248,20 +271,23 @@ export async function updateWorker(
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
+  if (!data) throw new Error(translate(WORKER_REFUSED));
   invalidateWorkersCache();
   return data;
 }
 
 export async function deleteWorker(id: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('workers')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
   if (error) throw error;
+  if (!data?.length) throw new Error(translate(WORKER_REFUSED));
   invalidateWorkersCache();
 }
 
