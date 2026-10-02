@@ -259,10 +259,12 @@ begin
   -- With an Element: exactly the Workers worker_assignable accepts. Without
   -- one: the Workers the caller may list, in the given Space (a Domain's
   -- own Space when a Domain is given), narrowed to people who can see that
-  -- Domain.
+  -- Domain. Inactive Workers are left out (the caller's own stays) unless
+  -- p_include_inactive — the roster screen, where they are reactivated.
   execute $f$
     create or replace function public.list_assignable_workers(
-      p_space_id uuid default null, p_domain_id uuid default null, p_element_id uuid default null)
+      p_space_id uuid default null, p_domain_id uuid default null, p_element_id uuid default null,
+      p_include_inactive boolean default false)
     returns setof public.workers language plpgsql stable security definer set search_path = public as $b$
     declare
       v_space uuid := p_space_id;
@@ -286,6 +288,7 @@ begin
            and (v_space is null or alcon_internal.worker_in_space(w.id, v_space))
            and (p_domain_id is null or w.user_id is null
                 or alcon_internal.user_can_see_domain_as(p_domain_id, w.user_id))
+           and (p_include_inactive or w.status is distinct from 'inactive' or w.user_id = auth.uid())
          order by w.type, w.name;
     end;
     $b$
@@ -293,8 +296,8 @@ begin
 
   execute 'revoke all on function public.worker_assignable(uuid, uuid) from public, anon';
   execute 'grant execute on function public.worker_assignable(uuid, uuid) to authenticated';
-  execute 'revoke all on function public.list_assignable_workers(uuid, uuid, uuid) from public, anon';
-  execute 'grant execute on function public.list_assignable_workers(uuid, uuid, uuid) to authenticated';
+  execute 'revoke all on function public.list_assignable_workers(uuid, uuid, uuid, boolean) from public, anon';
+  execute 'grant execute on function public.list_assignable_workers(uuid, uuid, uuid, boolean) to authenticated';
 
   -- ── Backfill: unlinked Workers whose work sits in exactly one Space ─────
   execute $f$
@@ -362,10 +365,13 @@ begin
     returns trigger language plpgsql security definer set search_path = public as $b$
     begin
       if new.user_id is null then return new; end if;
-      insert into public.workers (user_id, type, name, email, avatar_url, status)
+      -- No email: workers is readable more widely than the account it names,
+      -- so the sign-in address never lands here (the person adds what they
+      -- want shown from their own profile).
+      insert into public.workers (user_id, type, name, avatar_url, status)
       select new.user_id, 'human',
-             coalesce(nullif(btrim(p.display_name), ''), u.email, 'Member'),
-             u.email, p.avatar_url, 'active'
+             coalesce(nullif(btrim(p.display_name), ''), 'Member'),
+             p.avatar_url, 'active'
         from auth.users u
         left join public.profiles p on p.id = u.id
        where u.id = new.user_id

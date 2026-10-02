@@ -8,7 +8,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import {
-  createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, assignWorkersToElement,
+  createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, assignWorkersToElement, noticeSkippedAssignees,
   fetchAllWorkers,
   useObjectTabs, reorderObjectTabs, useDomains, useElementTemplates, usePhases, useObjectMilestones, createObjectTab, deleteObjectTab,
   deleteObject, addDomainElementType, removeDomainElementType,
@@ -621,6 +621,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         defaultAssigneeWorkerIds={quickAddDefaults.assigneeWorkerIds}
         defaultLabels={quickAddDefaults.labels}
         onSubmit={async (inputs: NewElementInput[]) => {
+          let skippedAssignees = 0;
           for (const input of inputs) {
             try {
               const created = await createElement({
@@ -633,9 +634,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
                 priority: input.priority ?? undefined,
                 estimated_hours: input.estimatedHours ?? null,
               });
-              await assignWorkersToElement(created.id, input.assigneeWorkerIds ?? []);
+              skippedAssignees += (await assignWorkersToElement(created.id, input.assigneeWorkerIds ?? [])).skipped.length;
             } catch (e) { console.error('Failed to create Element', e); }
           }
+          noticeSkippedAssignees(skippedAssignees);
           await onRefresh?.();
         }}
       />

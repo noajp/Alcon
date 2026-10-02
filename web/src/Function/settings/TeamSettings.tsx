@@ -58,7 +58,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
       // The Workers of the active Space (a Domain's own Space when scoped to
       // one) — the same list the assignee pickers offer.
       const [{ data: workersData, error: workersErr }, memberRowsResult, domainResult] = await Promise.all([
-        supabase.rpc('list_assignable_workers', { p_space_id: activeSpaceId, p_domain_id: domainId ?? null }),
+        supabase.rpc('list_assignable_workers', { p_space_id: activeSpaceId, p_domain_id: domainId ?? null, p_include_inactive: true }),
         domainId
           ? supabase.from('domain_members').select('user_id, role').eq('domain_id', domainId)
           : Promise.resolve({ data: null, error: null } as const),

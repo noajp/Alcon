@@ -5,7 +5,8 @@ import { Button } from '@/ui/button';
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import type { ElementPriority } from '@/types/database';
-import { updateElement, createElement, useWorkers, addElementAssignee, removeElementAssignee, useElementCommentActivity, withCommentActivity } from '@/hooks/useSupabase';
+import { updateElement, createElement, useAssignableWorkers, addElementAssignee, removeElementAssignee, useElementCommentActivity, withCommentActivity } from '@/hooks/useSupabase';
+import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { Skeleton } from '@/ui/skeleton';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
@@ -44,14 +45,21 @@ const COLUMNS: { status: ElementStatus; label: string }[] = [
 
 interface ElementCardProps {
   element: ElementWithDetails;
-  workers: Worker[];
   onRefresh?: () => void;
   /** A plain click on the card (not a drag, not one of its inline controls)
    *  opens the Element — the same gesture every other list surface has. */
   onOpen?: (element: ElementWithDetails) => void;
 }
 
-function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) {
+function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
+  // Who can be assigned to THIS Element, read when the assignee menu opens;
+  // the people already on it stay listed so they can be removed.
+  const [assigneeMenuOpen, setAssigneeMenuOpen] = useState(false);
+  const { data: candidates } = useAssignableWorkers({ elementId: element.id }, assigneeMenuOpen);
+  const workers = useMemo(
+    () => withCurrentWorkers(candidates, (element.assignees ?? []).map((a) => a.worker as Worker | null | undefined)),
+    [candidates, element.assignees],
+  );
   const draggingRef = React.useRef(false);
   const startPosRef = React.useRef<{ x: number; y: number } | null>(null);
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
@@ -247,7 +255,7 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
             <ActivitySignal activity={element.activity} showRelative={false} className="mr-1" />
             <CardAgentControl elementId={element.id} onFinished={onRefresh} />
             {/* Assignee — click to assign / change. */}
-            <DropdownMenu>
+            <DropdownMenu open={assigneeMenuOpen} onOpenChange={setAssigneeMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
@@ -300,10 +308,6 @@ interface ElementBoardViewProps {
 export function ElementBoardView({ elements, loading = false, onRefresh, objectId, onElementClick }: ElementBoardViewProps) {
   const [items, setItems] = useState<ElementWithDetails[]>(elements);
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  // Fetched once for the whole board (NOT per card) and handed to each card's
-  // assignee picker.
-  const { data: workers } = useWorkers();
-
   // One aggregated fetch for the whole board, hung on the Elements the same
   // way the list does it, so a card and a row cannot disagree about what
   // "active" means.
@@ -407,7 +411,6 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
                 >
                   <ElementCard
                     element={el}
-                    workers={workers}
                     onRefresh={onRefresh}
                     onOpen={onElementClick}
                   />

@@ -122,6 +122,7 @@ export {
 
 export {
   assignWorkersToElement,
+  noticeSkippedAssignees,
   createWorker,
   deleteWorker,
   fetchAllWorkers,
@@ -135,6 +136,7 @@ export {
   useWorkerById,
   useWorkerCommitments,
   useWorkers,
+  useWorkersByIds,
 } from '@/ActivitySpace/sustainment/team/data';
 
 export {

@@ -3,6 +3,7 @@ import type { Locale } from './locales';
 type TranslationMap = Record<string, string>;
 
 const ja: TranslationMap = {
+  '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '{n} 人の担当者は追加しませんでした（inactive か、この Element を見られない人です）。',
   'Grouping': 'グループ化', 'Ordering': '並び順', 'Sort by': '並べ替え項目',
   'Direction': '方向', 'Ascending': '昇順', 'Descending': '降順', 'Manual': '手動',
   'Display properties': '表示項目',
@@ -49,6 +50,7 @@ const ja: TranslationMap = {
 };
 
 const ko: TranslationMap = {
+  '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '담당자 {n}명은 추가하지 않았습니다(비활성이거나 이 Element를 볼 수 없는 사람입니다).',
   'Grouping': '그룹화',
   'Ordering': '정렬 순서',
   'Sort by': '정렬 기준',
@@ -115,6 +117,7 @@ const ko: TranslationMap = {
 };
 
 const fr: TranslationMap = {
+  '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '{n} responsable(s) non ajouté(s) : inactif(s) ou sans accès à cet Element.',
   'Grouping': 'Regroupement',
   'Ordering': 'Ordre',
   'Sort by': 'Trier par',
@@ -182,6 +185,7 @@ const fr: TranslationMap = {
 };
 
 const es: TranslationMap = {
+  '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '{n} responsable(s) no se añadieron: están inactivos o no pueden ver este Element.',
   'Grouping': 'Agrupación',
   'Ordering': 'Orden',
   'Sort by': 'Ordenar por',

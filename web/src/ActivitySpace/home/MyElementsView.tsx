@@ -8,6 +8,7 @@ import { fetchMyElements, type MyElementsData } from '@/ActivitySpace/home/myEle
 import { useAuthContext } from '@/providers/AuthProvider';
 import {
   assignWorkersToElement,
+  noticeSkippedAssignees,
   createElement,
   updateElement,
   deleteElement,
@@ -237,6 +238,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
 
   const handleQuickAddSubmit = useCallback(async (inputs: NewElementInput[]) => {
     if (!userId) return;
+    let skippedAssignees = 0;
     for (const input of inputs) {
       try {
         // Personal Element: no object, owner = me. Honor the popup's shared
@@ -256,11 +258,12 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
         const assigneeIds = input.assigneeWorkerIds && input.assigneeWorkerIds.length > 0
           ? input.assigneeWorkerIds
           : (myWorkers[0] ? [myWorkers[0].id] : []);
-        await assignWorkersToElement(created.id, assigneeIds);
+        skippedAssignees += (await assignWorkersToElement(created.id, assigneeIds)).skipped.length;
       } catch (e) {
         console.error('Failed to create personal Element', e);
       }
     }
+    noticeSkippedAssignees(skippedAssignees);
     await fetchMine();
     await onRefresh?.();
   }, [userId, myWorkers, fetchMine, onRefresh]);

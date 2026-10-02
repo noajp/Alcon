@@ -23,7 +23,7 @@ import { GanttView } from '@/ActivitySpace/execution/element/gantt';
 import { CalendarView } from '@/ActivitySpace/sustainment/calendar/CalendarView';
 import { CustomView } from '@/ActivitySpace/execution/element/custom';
 import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
-import { assignWorkersToElement, useAssignableWorkers } from '@/hooks/useSupabase';
+import { assignWorkersToElement, noticeSkippedAssignees, useAssignableWorkers } from '@/hooks/useSupabase';
 import { partitionAssignable } from '@/Function/shared/assignableWorkers';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { type ListSection } from '@/ActivitySpace/execution/object/ListTable';
@@ -469,6 +469,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
     // total failure comes back as a rejection instead of a quiet resolve.
     let createdAny = false;
     let lastError: unknown = null;
+    let skippedAssignees = 0;
 
     for (const input of inputs) {
       try {
@@ -486,12 +487,13 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
           estimated_hours: input.estimatedHours ?? null,
         });
         createdAny = true;
-        await assignWorkersToElement(created.id, input.assigneeWorkerIds ?? []);
+        skippedAssignees += (await assignWorkersToElement(created.id, input.assigneeWorkerIds ?? [])).skipped.length;
       } catch (e) {
         lastError = e;
         console.error('Failed to create Element', e);
       }
     }
+    noticeSkippedAssignees(skippedAssignees);
     await onRefresh?.();
     if (!createdAny && inputs.length > 0) {
       throw lastError ?? new Error('No Elements were created');

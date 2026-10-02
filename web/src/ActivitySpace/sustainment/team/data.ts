@@ -1,5 +1,7 @@
 'use client';
 
+import { appDialog } from '@/Function/shared/appDialogStore';
+import { translate } from '@/Function/i18n/I18nProvider';
 import { addElementAssignee } from '@/ActivitySpace/execution/element/data';
 import { partitionAssignable } from '@/Function/shared/assignableWorkers';
 import type { LoadElement } from '@/Function/shared/assignmentLoad';
@@ -119,6 +121,23 @@ export function useWorkerById(
   return fromList ?? query.data?.[0] ?? null;
 }
 
+async function loadWorkersByIds(ids: readonly string[]): Promise<Worker[]> {
+  return selectIn<Worker>(ids, (chunk) => supabase.from('workers').select('*').in('id', chunk));
+}
+
+/** The Workers behind stored ids (bindings, calendar picks), read by id so a
+ *  name renders even when it is not a candidate in the active Space. */
+export function useWorkersByIds(ids: readonly string[]): Worker[] {
+  const sorted = useMemo(() => [...new Set(ids)].sort(), [ids]);
+  const query = useQuery({
+    queryKey: [...WORKERS_QUERY_PREFIX, 'byIds', sorted.join(',')],
+    queryFn: () => loadWorkersByIds(sorted),
+    enabled: sorted.length > 0,
+    staleTime: 60_000,
+  });
+  return query.data ?? EMPTY_WORKERS;
+}
+
 async function loadSelfWorkers(userId: string): Promise<Worker[]> {
   const { data, error } = await supabase
     .from('workers').select('*')
@@ -170,10 +189,14 @@ export async function assignWorkersToElement(
       skipped.push(wid);
     }
   }
-  if (skipped.length > 0) {
-    console.warn(`Skipped ${skipped.length} assignee(s) that cannot be assigned to this Element:`, skipped);
-  }
   return { assigned, skipped };
+}
+
+/** Tell the person, once per batch, that some chosen assignees were left off. */
+export function noticeSkippedAssignees(count: number): void {
+  if (count <= 0) return;
+  void appDialog.alert(translate(
+    '{n} assignee(s) were not added: they are inactive or cannot see this Element.', { n: count }));
 }
 
 // ============================================

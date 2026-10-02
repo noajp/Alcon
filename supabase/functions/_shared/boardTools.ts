@@ -937,7 +937,12 @@ export async function runBoardTool(
         const { data: assignable, error: aErr } = await supabase
           .rpc("worker_assignable", { p_worker: workerId, p_element: elementId });
         if (aErr) throw aErr;
-        if (assignable !== true) return { ok: false, error: "Worker is outside this Element's Space" };
+        if (assignable !== true) {
+          return {
+            ok: false,
+            error: "This Worker can't be assigned to this Element: it is in another Space, inactive, or the person can't see this Element. listWorkers with elementId returns who can be.",
+          };
+        }
         const { error } = await supabase
           .from("element_assignees").insert({ element_id: elementId, worker_id: workerId });
         if (error) throw error;
