@@ -26,6 +26,7 @@ import { AuthPage } from '@/auth/AuthPage';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/ActivitySpace/execution/domain/domainsStore';
 import { useActiveSpaceId, setActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { OnboardingCreate } from '@/Function/space/OnboardingCreate';
+import { MyInvitations } from '@/Function/membership/MyInvitations';
 import { getCachedHomeViewId } from '@/Function/settings/preferencesStore';
 import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
@@ -201,7 +202,10 @@ function AppContent() {
         placeholder="Acme Inc."
         cta={t('Create Space')}
         onCreate={handleCreateSpace}
-      />
+      >
+        {/* Invited to someone else's Space? Accepting is how you join it. */}
+        <MyInvitations className="mt-8 divide-y divide-border/40 rounded-lg border border-border bg-card" onAccepted={() => void refetchSpaces()} />
+      </OnboardingCreate>
     );
   }
 

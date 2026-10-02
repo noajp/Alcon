@@ -3,6 +3,8 @@
 import { Archive, Check, Inbox } from 'lucide-react';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { InvitationCard } from '@/Function/membership/InvitationCard';
+import { useInvitation } from '@/Function/membership/invitations';
 import { Button } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';
 import { selectInboxNotification, useInbox, useNotificationElement } from './useInbox';
@@ -61,6 +63,8 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
           <p>{t(detail ? 'This Element is no longer available.' : 'Opening…')}</p>
           {detail && <Button variant="ghost" onClick={refresh}>{t('Retry')}</Button>}
         </div>
+      ) : selected.kind === 'invite' ? (
+        <InvitationNotice key={selected.id} invitationId={selected.invitation_id ?? null} title={selected.title} />
       ) : (
         <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">
           <h1 className="text-2xl font-semibold">{selected.title}</h1>
@@ -68,5 +72,26 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
         </article>
       )}
     </div>
+  );
+}
+
+/** An invitation in the reader: Accept / Decline while it is pending, how it
+ *  was resolved afterwards, and a plain notice once it no longer exists. */
+function InvitationNotice({ invitationId, title }: { invitationId: string | null; title: string }) {
+  const { t } = useI18n();
+  const { invitation, loading } = useInvitation(invitationId);
+  return (
+    <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">
+      {invitation ? (
+        <InvitationCard invitation={invitation} />
+      ) : (
+        <>
+          <h1 className="text-2xl font-semibold">{title}</h1>
+          <p className="mt-6 text-[13px] text-muted-foreground" role="status">
+            {t(loading ? 'Opening…' : 'This invitation no longer exists.')}
+          </p>
+        </>
+      )}
+    </article>
   );
 }

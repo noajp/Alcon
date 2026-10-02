@@ -13,7 +13,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSyncExternalStore } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { Notification } from '@/types/database';
+import type { MembershipInvitation, Notification } from '@/types/database';
 
 const USER_ID = 'user-1';
 
@@ -78,6 +78,18 @@ vi.mock('@/ActivitySpace/execution/element/ElementDetailView', () => ({
     detailProps(props);
     return <div data-testid="element-detail">{(props.element as { title: string }).title}</div>;
   },
+}));
+
+// The invitation an 'invite' notification points at, as the reader loads it.
+let invitationRow: MembershipInvitation | null = null;
+const respondToInvite = vi.fn();
+vi.mock('@/Function/membership/invitations', () => ({
+  useInvitation: () => ({ invitation: invitationRow, loading: false }),
+  respondToInvite: (...a: unknown[]) => respondToInvite(...a),
+  invitationScope: (i: MembershipInvitation) => i.activity_space_id
+    ? { scope: 'space', scopeId: i.activity_space_id }
+    : i.domain_id ? { scope: 'domain', scopeId: i.domain_id } : { scope: 'object', scopeId: i.object_id },
+  SCOPE_LABEL: { space: 'Space', domain: 'Domain', object: 'Object' },
 }));
 
 vi.mock('@/providers/AuthProvider', () => ({
@@ -212,5 +224,77 @@ describe('the sidebar list tells the shell only when the reader opened', () => {
     fireEvent.click(screen.getByRole('button', { name: /commented on Wire the Inbox/ }));
     expect(onOpen).toHaveBeenCalledTimes(1);
     expect(onViewChange).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('an invitation is answered in the reader, and only there does it become a membership', () => {
+  function invitation(over: Partial<MembershipInvitation> = {}): MembershipInvitation {
+    return {
+      id: 'inv-1', activity_space_id: 'sp-1', domain_id: null, object_id: null,
+      invitee_id: USER_ID, invited_by: 'user-2', role: 'member',
+      scope_name: 'Acme', inviter_name: 'Ana', status: 'pending',
+      created_at: new Date().toISOString(), responded_at: null,
+      ...over,
+    };
+  }
+  const invite = () => notification({
+    id: 'n-inv', kind: 'invite', element_id: null, comment_id: null, invitation_id: 'inv-1',
+    title: 'Ana invited you to Space Acme', body: 'You join when you accept.',
+  });
+
+  beforeEach(() => {
+    respondToInvite.mockReset();
+    feed = [invite()];
+  });
+
+  it('offers Accept as the one primary action and Decline beside it while pending', async () => {
+    invitationRow = invitation();
+    respondToInvite.mockResolvedValue('accepted');
+    render(<InboxView />);
+    fireEvent.click(screen.getByRole('button', { name: /invited you to Space Acme/ }));
+
+    const accept = await screen.findByRole('button', { name: 'Accept' });
+    const decline = screen.getByRole('button', { name: 'Decline' });
+    expect(accept.getAttribute('data-variant')).toBe('primary');
+    expect(decline.getAttribute('data-variant')).toBe('secondary');
+    expect(screen.getByText('Ana invited you to Space Acme', { selector: 'p' })).toBeTruthy();
+    // An invitation is not an Element: nothing is fetched for it.
+    expect(fetchElementWithDetails).not.toHaveBeenCalled();
+
+    fireEvent.click(accept);
+    await vi.waitFor(() => expect(screen.getByText('You joined Space Acme.')).toBeTruthy());
+    expect(respondToInvite).toHaveBeenCalledWith('inv-1', true);
+    expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull();
+  });
+
+  it('says how it was resolved instead of offering the choice again', async () => {
+    invitationRow = invitation({ status: 'declined', responded_at: new Date().toISOString() });
+    render(<InboxView />);
+    fireEvent.click(screen.getByRole('button', { name: /invited you to Space Acme/ }));
+
+    expect(await screen.findByText('You declined this invitation.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Decline' })).toBeNull();
+  });
+
+  it('says so when the invitation is gone', async () => {
+    invitationRow = null;
+    render(<InboxView />);
+    fireEvent.click(screen.getByRole('button', { name: /invited you to Space Acme/ }));
+
+    expect(await screen.findByText('This invitation no longer exists.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull();
+  });
+
+  it('keeps the choice open when answering fails', async () => {
+    invitationRow = invitation();
+    respondToInvite.mockRejectedValue(new Error('This invitation no longer exists.'));
+    render(<InboxView />);
+    fireEvent.click(screen.getByRole('button', { name: /invited you to Space Acme/ }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Decline' }));
+    await vi.waitFor(() => expect(screen.getByText('This invitation no longer exists.')).toBeTruthy());
+    expect(respondToInvite).toHaveBeenCalledWith('inv-1', false);
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeTruthy();
   });
 });

@@ -11,6 +11,8 @@ import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { Button } from '@/ui/button';
 import { SettingsSection } from './SettingsSection';
+import { useScopeInvitations } from '@/Function/membership/invitations';
+import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
 
 // Cross-boundary read of the current ActivitySpace: every Space member (role
 // editable here) plus every Guest across the Space's Domains (a domain_member
@@ -47,6 +49,8 @@ export function MemberSettings() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  // Invited to the Space but not yet accepted: listed, never a member.
+  const { invitees, refetch: refetchInvitees } = useScopeInvitations('space', active?.id);
 
   const reload = useCallback(async () => {
     if (!active) return;
@@ -246,6 +250,7 @@ export function MemberSettings() {
             );
           })
         )}
+        <PendingInviteRows invitees={invitees} canCancel={(i) => isOwner || i.invitedBy === user?.id} onChanged={() => void refetchInvitees()} />
       </SettingsSection>
 
       <div className="mb-2 mt-8">

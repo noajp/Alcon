@@ -201,9 +201,10 @@ export interface ActivitySpaceMember {
 // Visibility cascades: a Space member sees 'workspace' Domains; a
 // domain_member who is NOT a Space member is a Guest (sees only that
 // Domain). object_members are typically a subset of domain_members,
-// but also allow Object-only guests.
+// but also allow Object-only guests. A row is an active membership: an
+// invitation becomes one only when the invitee accepts it.
 // =====================================================
-export type MemberRole = 'owner' | 'member'
+export type MemberRole = 'owner' | 'admin' | 'member'
 
 export interface DomainMember {
   id: string
@@ -233,6 +234,28 @@ export interface ObjectMemberInsert {
   object_id: string
   user_id: string
   role?: MemberRole
+}
+
+// An invitation to a Space, Domain or Object (exactly one is set). It grants
+// nothing until the invitee accepts it through respond_to_invite; written
+// only by the invite_member / respond_to_invite / cancel_invite RPCs.
+export type InvitationScope = 'space' | 'domain' | 'object'
+export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'canceled'
+
+export interface MembershipInvitation {
+  id: string
+  activity_space_id: string | null
+  domain_id: string | null
+  object_id: string | null
+  invitee_id: string
+  invited_by: string | null
+  role: 'member'
+  /** The Space / Domain / Object name when the invitation was sent. */
+  scope_name: string
+  inviter_name: string | null
+  status: InvitationStatus
+  created_at: string
+  responded_at: string | null
 }
 
 // object_domains junction: Object multi-homes across Domains
@@ -1099,6 +1122,7 @@ export type NotificationKind =
   | 'approval_decided'
   | 'due_soon'
   | 'review_due'
+  | 'invite'
 
 export interface Notification {
   id: string
@@ -1116,6 +1140,8 @@ export interface Notification {
   strategy_comment_id: string | null
   object_id: string | null
   brief_id: string | null
+  /** The membership invitation an 'invite' notification is about. */
+  invitation_id?: string | null
   title: string
   body: string | null
   is_read: boolean
@@ -1888,6 +1914,11 @@ export interface Database {
         Row: Domain
         Insert: DomainInsert
         Update: DomainUpdate
+      }
+      membership_invitations: {
+        Row: MembershipInvitation
+        Insert: never
+        Update: never
       }
       object_domains: {
         Row: ObjectDomain

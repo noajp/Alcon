@@ -7,6 +7,8 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { SettingsSection, SettingsField } from './SettingsSection';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { MyInvitations } from '@/Function/membership/MyInvitations';
 
 function initialsFor(name: string | null | undefined, fallback: string): string {
   const source = (name && name.trim()) || fallback;
@@ -169,6 +171,18 @@ function DomainMembershipsSection() {
           </div>
         ))
       )}
+    </SettingsSection>
+  );
+}
+
+// ── Invitations ──────────────────────────────────────────────────────────
+// Spaces, Domains and Objects someone invited you to. You become a member
+// only when you accept (ADR 0029); the same invitation is in your Inbox.
+function InvitationsSection() {
+  const { t } = useI18n();
+  return (
+    <SettingsSection title={t('Invitations')} description={t('You join a Space, Domain or Object only when you accept its invitation.')}>
+      <MyInvitations emptyText={t('No pending invitations.')} />
     </SettingsSection>
   );
 }
@@ -351,6 +365,10 @@ export function ProfileSettings() {
         >
           {saving ? 'Saving…' : 'Save changes'}
         </button>
+      </div>
+
+      <div className="mt-10">
+        <InvitationsSection />
       </div>
 
       <div className="mt-10">
