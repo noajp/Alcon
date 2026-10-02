@@ -10,7 +10,8 @@
 --                    person; run-agent and the friction board write with the
 --                    service role, which RLS does not touch
 --   update           the Element is visible; the author may edit their own
---                    comment, anyone else may only pin or unpin it (trigger)
+--                    comment, anyone else may only pin or unpin it (trigger);
+--                    a reply's parent is a comment on the same Element
 --   delete           the author only
 -- element_reactions  visible through the Element or the comment it is on;
 --                    each person adds and removes only their own
@@ -69,6 +70,24 @@ begin
   execute 'drop trigger if exists trg_element_comments_guard_update on public.element_comments';
   execute 'create trigger trg_element_comments_guard_update before update on public.element_comments
     for each row execute function public.element_comments_guard_update()';
+
+  -- A reply stays in its Element's thread: parent_id names a comment on
+  -- the same Element (the FK alone would accept any comment id).
+  execute $f$create or replace function public.element_comments_parent_same_element()
+  returns trigger language plpgsql set search_path = public as $g$
+  begin
+    if new.parent_id is not null and not exists (
+      select 1 from public.element_comments c where c.id = new.parent_id and c.element_id = new.element_id
+    ) then
+      raise exception 'a reply must answer a comment on the same Element' using errcode = '23514';
+    end if;
+    return new;
+  end
+  $g$
+  $f$;
+  execute 'drop trigger if exists trg_element_comments_parent_same_element on public.element_comments';
+  execute 'create trigger trg_element_comments_parent_same_element before insert or update of parent_id, element_id
+    on public.element_comments for each row execute function public.element_comments_parent_same_element()';
 
   if to_regclass('public.element_reactions') is not null then
     execute 'drop policy if exists element_reactions_rw on public.element_reactions';
