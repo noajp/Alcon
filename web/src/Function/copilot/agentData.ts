@@ -19,11 +19,17 @@ export function isAgentRunActive(run: AgentRun | null | undefined): boolean {
   return !!run && AGENT_RUN_ACTIVE_STATUSES.includes(run.status);
 }
 
+// The run's columns a browser may read: everything but the transcript and
+// the continuation token, which stay with the Edge Function (they can hold
+// data read with the starter's permissions).
+const AGENT_RUN_COLUMNS =
+  'id, element_id, domain_id, worker_id, status, model, triggered_from, triggered_by, summary, result, error, step_count, started_at, finished_at, created_at, mode, prompt, reply_to, input_tokens, output_tokens, cost_usd, activity_space_id, continuation_count';
+
 // Latest run for an Element (any status), or null if it's never been run.
 export async function fetchLatestAgentRun(elementId: string): Promise<AgentRun | null> {
   const { data, error } = await supabase
     .from('agent_runs')
-    .select('*')
+    .select(AGENT_RUN_COLUMNS)
     .eq('element_id', elementId)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -54,7 +60,7 @@ export async function startAgentRun(opts: {
 }): Promise<AgentRun> {
   const { data: existing } = await supabase
     .from('agent_runs')
-    .select('*')
+    .select(AGENT_RUN_COLUMNS)
     .eq('element_id', opts.elementId)
     .in('status', AGENT_RUN_ACTIVE_STATUSES)
     .order('created_at', { ascending: false })
@@ -72,7 +78,7 @@ export async function startAgentRun(opts: {
       triggered_by: userId ?? null,
       status: 'queued',
     })
-    .select()
+    .select(AGENT_RUN_COLUMNS)
     .single();
   if (error) throw error;
   const run = data as AgentRun;
@@ -162,7 +168,7 @@ export function useAgentRun(
     const tick = async () => {
       try {
         const [{ data: freshRun }, freshSteps] = await Promise.all([
-          supabase.from('agent_runs').select('*').eq('id', runId).maybeSingle(),
+          supabase.from('agent_runs').select(AGENT_RUN_COLUMNS).eq('id', runId).maybeSingle(),
           fetchAgentRunSteps(runId),
         ]);
         if (cancelled) return;
