@@ -108,6 +108,11 @@ function Workpad({ steps }: { steps: AgentRunStep[] }) {
 function ApprovalCard({ agent }: { agent: Agent }) {
   const { t } = useI18n();
   const [note, setNote] = useState('');
+  // The note belongs to one request: a new request starts empty, but a
+  // decision that fails and comes back keeps what was typed.
+  const pendingId = agent.pending?.id ?? null;
+  const [noteFor, setNoteFor] = useState(pendingId);
+  if (pendingId && pendingId !== noteFor) { setNoteFor(pendingId); setNote(''); }
   const [openRow, setOpenRow] = useState<string | null>(null);
   const rows = useMemo(() => (agent.pending ? approvalRows(agent.pending) : []), [agent.pending]);
   if (!agent.pending) return null;
@@ -274,7 +279,7 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
           <div className="px-1">
             <Workpad steps={agent.steps} />
           </div>
-          <ApprovalCard key={agent.pending?.id ?? 'none'} agent={agent} />
+          <ApprovalCard agent={agent} />
         </div>
       )}
 

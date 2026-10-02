@@ -9,10 +9,6 @@
 
 export interface AiWorkerRef { id: string; name: string }
 
-function escape(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 /** Pure. The part of a comment that speaks for itself: no quoted lines, no code. */
 function ownWords(text: string): string {
   return text
@@ -23,23 +19,31 @@ function ownWords(text: string): string {
     .join('\n');
 }
 
+const AFTER_NAME = /^($|[\s、。,.!?！？:：)）])/;
+
 /**
  * Which agent a comment addresses, or null. `@AI` addresses the default
- * agent (workerId null). Quoted lines and code don't count, and a mention of
- * a person comes off first — "@Ai Tanaka" is a person, not the agent.
+ * agent (workerId null). Quoted lines and code don't count. At each "@" the
+ * longest matching name wins, person or agent — so "@Ai Tanaka" is a person
+ * and "@Claude Code" is the agent even when someone is called Claude. A
+ * person with exactly an agent's name wins the tie.
  */
 export function agentMention(text: string, aiWorkers: AiWorkerRef[], humanNames: string[] = []): { workerId: string | null } | null {
-  let own = ownWords(text);
-  for (const name of [...humanNames].sort((a, b) => b.length - a.length)) {
-    if (name.trim()) own = own.replace(new RegExp(`@${escape(name)}`, 'gi'), ' ');
+  const own = ownWords(text);
+  // Longest first; on a tie the person wins — starting a paid run must be meant.
+  const names = [
+    ...aiWorkers.filter((w) => w.name.trim()).map((w) => ({ name: w.name.toLowerCase(), workerId: w.id as string | null })),
+    ...humanNames.filter((n) => n.trim()).map((n) => ({ name: n.toLowerCase(), workerId: undefined as string | null | undefined })),
+    { name: 'ai', workerId: null as string | null },
+  ].sort((x, y) => y.name.length - x.name.length || Number(x.workerId !== undefined) - Number(y.workerId !== undefined));
+  const lower = own.toLowerCase();
+  for (let at = lower.indexOf('@'); at >= 0; at = lower.indexOf('@', at + 1)) {
+    // Not part of a word or an address (mail@ai.example).
+    if (at > 0 && /[\w@.]/.test(lower[at - 1])) continue;
+    const rest = lower.slice(at + 1);
+    const hit = names.find((n) => rest.startsWith(n.name) && AFTER_NAME.test(rest.slice(n.name.length)));
+    if (hit && hit.workerId !== undefined) return { workerId: hit.workerId };
   }
-  text = own;
-  // Longest names first, so "@Claude Code" wins over "@Claude".
-  for (const w of [...aiWorkers].sort((a, b) => b.name.length - a.name.length)) {
-    if (!w.name.trim()) continue;
-    if (new RegExp(`(^|\\s)@${escape(w.name)}(?=$|[\\s、。,.!?！？:：])`, 'i').test(text)) return { workerId: w.id };
-  }
-  if (/(^|\s)@ai(?=$|[\s、。,.!?！？:：])/i.test(text)) return { workerId: null };
   return null;
 }
 

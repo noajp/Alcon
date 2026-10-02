@@ -81,6 +81,9 @@ describe('comments and agents', () => {
     expect(agentMention('`@AI` と書くと動きます', ai)).toBeNull();
     expect(agentMention('```\n@AI\n```', ai)).toBeNull();
     expect(agentMention('@Ai Tanaka と @AI で確認', ai, ['Ai Tanaka'])).toEqual({ workerId: null });
+    expect(agentMention('@Claude Code 直して', ai, ['Claude'])).toEqual({ workerId: 'w2' });
+    expect(agentMention('@Claude 見て', ai, ['Claude'])).toBeNull();
+    expect(agentMention('お願い、@AI で', ai)).toEqual({ workerId: null });
   });
 
   it('folds long stretches of agent comments, keeping the last and any focused one', () => {
