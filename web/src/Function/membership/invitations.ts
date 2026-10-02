@@ -16,7 +16,7 @@ import type { InvitationScope, InvitationStatus, MembershipInvitation } from '@/
 // the scope), respond_to_invite (only the invitee), cancel_invite (the
 // inviter or a manager). Pending invitations never feed pickers or Workers.
 
-export const INVITATIONS_QUERY_KEY = ['membership-invitations'] as const;
+const INVITATIONS_QUERY_KEY = ['membership-invitations'] as const;
 
 export interface InvitationScopeRef {
   scope: InvitationScope;
@@ -38,7 +38,7 @@ function scopeColumn(scope: InvitationScope): 'activity_space_id' | 'domain_id' 
 }
 
 /** The RPCs' refusals, in the viewer's language. */
-export function invitationErrorMessage(error: unknown): string {
+function invitationErrorMessage(error: unknown): string {
   const e = error as { code?: string; message?: string } | null;
   const message = e?.message ?? '';
   if (e?.code === '42501') return translate('Only people who manage this can invite to it or cancel an invitation.');
