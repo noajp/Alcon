@@ -330,12 +330,15 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
                             label={c.is_pinned ? 'Unpin' : 'Pin'}
                             onClick={() => { onTogglePin(c); close(); }}
                           />
-                          <CommentMenuItem
-                            icon={<Trash2 size={12} />}
-                            label="Delete"
-                            onClick={() => { onDelete(c.id); close(); }}
-                            destructive
-                          />
+                          {/* Only a comment's author may delete it (RLS). */}
+                          {!!user?.id && c.author_id === user.id && (
+                            <CommentMenuItem
+                              icon={<Trash2 size={12} />}
+                              label="Delete"
+                              onClick={() => { onDelete(c.id); close(); }}
+                              destructive
+                            />
+                          )}
                         </>
                       )}
                     </CommentMenu>

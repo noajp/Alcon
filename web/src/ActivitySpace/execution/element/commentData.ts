@@ -43,8 +43,11 @@ export async function updateElementComment(id: string, updates: ElementCommentUp
 }
 
 export async function deleteElementComment(id: string): Promise<void> {
-  const { error } = await supabase.from('element_comments').delete().eq('id', id);
+  // RLS lets only the author delete; anyone else's delete matches no row and
+  // returns no error — report it so the caller can put the comment back.
+  const { data, error } = await supabase.from('element_comments').delete().eq('id', id).select('id');
   if (error) throw error;
+  if (!data?.length) throw new Error('This comment can only be deleted by its author.');
 }
 
 // ============================================
