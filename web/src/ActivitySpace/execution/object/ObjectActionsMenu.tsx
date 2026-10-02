@@ -79,7 +79,11 @@ export function ObjectActionsMenu({
       await setObjectDomains(object.id, [domainId, ...memberIds.filter((id) => id !== domainId)]);
       await onRefresh?.();
       await reload();
-    } catch (e) { console.error('Move Object failed', e); }
+    } catch (e) {
+      // Moving needs an owner/admin of both Domains; say why it was refused.
+      console.error('Move Object failed', e);
+      if (e instanceof Error && e.message) await appDialog.alert(e.message);
+    }
   };
 
   const toggleMultiHome = async (domainId: string, isMember: boolean) => {
@@ -90,7 +94,10 @@ export function ObjectActionsMenu({
       await setObjectDomains(object.id, ordered(next, primaryId));
       await onRefresh?.();
       await reload();
-    } catch (e) { console.error('Multi-home Object failed', e); }
+    } catch (e) {
+      console.error('Multi-home Object failed', e);
+      if (e instanceof Error && e.message) await appDialog.alert(e.message);
+    }
   };
 
   const del = async () => {

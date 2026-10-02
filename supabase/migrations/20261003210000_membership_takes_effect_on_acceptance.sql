@@ -32,7 +32,9 @@
 --   - No membership row can change person or scope (trigger), and a Domain or
 --     Object keeps at least one owner, like a Space. An owner/admin of an
 --     Object's Domain sees and removes its members without joining; removing
---     the last owner hands the ownership to them.
+--     the last owner hands the ownership to them. Moving an Object to another
+--     Domain needs an owner/admin of both Domains (of the Object itself when
+--     it has none), so no member can make themselves its Domain manager.
 --   - domain_members / object_members roles are owner / admin / member.
 --   - invite_member notifies the invitee with kind 'invite' and refuses to
 --     invite again for 7 days after they declined; joining by any path
@@ -210,6 +212,41 @@ begin
   execute 'drop trigger if exists objects_creator_fixed on public.objects';
   execute 'create trigger objects_creator_fixed before update on public.objects
     for each row execute function alcon_internal.creator_is_fixed(''user_id'', ''Object'')';
+
+  -- An Object's primary Domain decides who manages it (user_manages_scope_as
+  -- reads objects.domain_id, never object_domains), so moving an Object is
+  -- for people who manage both ends: an owner/admin of the Domain it leaves —
+  -- or of the Object itself when it has no Domain — and of the Domain it
+  -- joins. Otherwise any Object member could move it into a Domain of their
+  -- own and become its manager.
+  execute $f$
+    create or replace function alcon_internal.objects_domain_move_guard()
+    returns trigger language plpgsql security definer set search_path = ''
+    as $b$
+    begin
+      if auth.uid() is null or new.domain_id is not distinct from old.domain_id then
+        return new;
+      end if;
+      if old.domain_id is not null then
+        if not alcon_internal.user_manages_scope_as(auth.uid(), 'domain', old.domain_id) then
+          raise exception 'Only owners or admins of both Domains can move this Object' using errcode = '42501';
+        end if;
+      elsif not exists (select 1 from public.object_members
+                         where object_id = old.id and user_id = auth.uid() and role in ('owner', 'admin')) then
+        raise exception 'Only owners or admins of both Domains can move this Object' using errcode = '42501';
+      end if;
+      if new.domain_id is not null
+         and not alcon_internal.user_manages_scope_as(auth.uid(), 'domain', new.domain_id) then
+        raise exception 'Only owners or admins of both Domains can move this Object' using errcode = '42501';
+      end if;
+      return new;
+    end
+    $b$
+  $f$;
+  execute 'revoke all on function alcon_internal.objects_domain_move_guard() from public, anon, authenticated';
+  execute 'drop trigger if exists objects_domain_move_guard on public.objects';
+  execute 'create trigger objects_domain_move_guard before update of domain_id on public.objects
+    for each row execute function alcon_internal.objects_domain_move_guard()';
 
   -- Whoever creates a Space, Domain or Object is its first owner, written in
   -- the same statement — the browser never writes an owner row.

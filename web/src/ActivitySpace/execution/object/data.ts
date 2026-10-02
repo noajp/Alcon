@@ -2,6 +2,7 @@
 
 import { suggestObjectPrefix } from '@/ActivitySpace/execution/object/objectPrefix';
 import { applyOptimisticExplorerPatch } from '@/Function/sync/explorerCache';
+import { translate } from '@/Function/i18n/I18nProvider';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
 import type { AlconObject, ObjectTab, ObjectTabInsert, ObjectTabUpdate } from '@/types/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -186,10 +187,14 @@ export async function fetchObjectDomainIds(objectId: string): Promise<string[]> 
 export async function setObjectDomains(objectId: string, domainIds: string[]): Promise<void> {
   const unique = Array.from(new Set(domainIds.filter(Boolean)));
   const primary = unique[0] ?? null;
-  await supabase
+  // Changing the primary Domain is for owners/admins of both Domains
+  // (objects_domain_move_guard); stop before touching the junction if refused.
+  const { error: moveError } = await supabase
     .from('objects')
     .update({ domain_id: primary, updated_at: new Date().toISOString() })
     .eq('id', objectId);
+  if (moveError?.code === '42501') throw new Error(translate('Only owners or admins of both Domains can move this Object.'));
+  if (moveError) throw moveError;
   await supabase.from('object_domains').delete().eq('object_id', objectId);
   if (unique.length > 0) {
     await supabase.from('object_domains').insert(
