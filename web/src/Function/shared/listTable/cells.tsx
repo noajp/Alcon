@@ -7,7 +7,7 @@ import { useCallback, useState, type ReactElement, type ReactNode } from 'react'
 import type { DateRange } from 'react-day-picker';
 import { CalendarIcon, Menu, Plus, Check, Tag, X } from 'lucide-react';
 import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
-import { addElementAssignee, removeElementAssignee, fetchAssignableWorkers, useWorkerById } from '@/hooks/useSupabase';
+import { addElementAssignee, removeElementAssignee, fetchAssignableWorkers, useWorkerById, noticeAssignmentFailed } from '@/hooks/useSupabase';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
@@ -548,13 +548,13 @@ function AssigneeCell({
       await addElementAssignee({ element_id: el.id, worker_id: workerId, role: 'assignee', worker: workers.find((w) => w.id === workerId) });
       setOpen(false);
       await onRefresh();
-    } catch (e) { console.error('Failed to add assignee', e); }
+    } catch (e) { noticeAssignmentFailed(e); }
   };
   const handleRemove = async (assigneeId: string) => {
     try {
       await removeElementAssignee(assigneeId);
       await onRefresh();
-    } catch (e) { console.error('Failed to remove assignee', e); }
+    } catch (e) { noticeAssignmentFailed(e); }
   };
 
   return (

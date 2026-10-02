@@ -35,6 +35,7 @@ import {
   fetchAssignableWorkers,
   addElementAssignee,
   removeElementAssignee,
+  noticeAssignmentFailed,
   setCustomColumnValue,
   notifyMany,
   useAgentRun,
@@ -616,7 +617,7 @@ function ElementDetailBody({
       }
       setShowAssigneeDropdown(false);
       onRefresh?.();
-    } catch (e) { console.error(e); }
+    } catch (e) { noticeAssignmentFailed(e); }
   };
 
   const handleRemoveAssignee = async (assigneeId: string) => {
@@ -625,7 +626,7 @@ function ElementDetailBody({
       await removeElementAssignee(assigneeId);
       if (removed?.worker?.name) log('unassigned', `Unassigned ${removed.worker.name}`);
       onRefresh?.();
-    } catch (e) { console.error(e); }
+    } catch (e) { noticeAssignmentFailed(e); }
   };
 
   // Note linking — pin one Note to this Element. The picker offers

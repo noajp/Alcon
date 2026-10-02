@@ -30,6 +30,10 @@ import type { Worker } from '@/types/database';
 // specific message rather than a raw constraint name, not resolved
 // automatically (merging two Worker histories is its own decision, not a
 // side effect of a connect action).
+//
+// The database also requires (workers RLS, ADR 0028) that the caller owns
+// the Worker's Space or Domain and that the picked account belongs to a
+// Space or Domain the caller owns; anything else comes back as 42501.
 
 interface ProfileRow {
   id: string;
@@ -89,7 +93,9 @@ export function ConnectWorkerAccountDialog({
       setError(
         code === '23505'
           ? `${profile.display_name || 'That account'} is already connected to a different Worker.`
-          : e instanceof Error
+          : code === '42501'
+            ? 'You can connect this Worker only as an owner of its Space or Domain, and only to someone in a Space or Domain you own.'
+            : e instanceof Error
             ? e.message
             : 'Failed to connect',
       );

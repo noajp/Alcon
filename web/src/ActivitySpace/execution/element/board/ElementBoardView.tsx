@@ -5,7 +5,7 @@ import { Button } from '@/ui/button';
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import type { ElementPriority } from '@/types/database';
-import { updateElement, createElement, useAssignableWorkers, addElementAssignee, removeElementAssignee, useElementCommentActivity, withCommentActivity } from '@/hooks/useSupabase';
+import { updateElement, createElement, useAssignableWorkers, addElementAssignee, removeElementAssignee, noticeAssignmentFailed, useElementCommentActivity, withCommentActivity } from '@/hooks/useSupabase';
 import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { Skeleton } from '@/ui/skeleton';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
@@ -107,13 +107,13 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
     try {
       await addElementAssignee({ element_id: element.id, worker_id: w.id, role: 'assignee', worker: w });
       onRefresh?.();
-    } catch (e) { console.error('Failed to update assignee', e); }
+    } catch (e) { noticeAssignmentFailed(e); }
   };
   const removeAssignee = async (assigneeId: string) => {
     try {
       await removeElementAssignee(assigneeId);
       onRefresh?.();
-    } catch (e) { console.error('Failed to update assignee', e); }
+    } catch (e) { noticeAssignmentFailed(e); }
   };
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 

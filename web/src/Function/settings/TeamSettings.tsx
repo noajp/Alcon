@@ -31,26 +31,32 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   const [workerSpaceId, setWorkerSpaceId] = useState<string | null>(null);
   const [memberUserIds, setMemberUserIds] = useState<Set<string>>(new Set());
   const [myRole, setMyRole] = useState<'owner' | 'member' | null>(null);
+  const [isSpaceOwner, setIsSpaceOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [connecting, setConnecting] = useState<Worker | null>(null);
 
-  // Connecting a Worker to an account redirects that Worker's assignments
-  // and notifications to whoever the admin picks — the same blast radius as
-  // "Make owner"/"Make member" in MemberSettings.tsx and ActivitySpaceSettings.tsx,
-  // both of which gate on the viewer's own role instead of trusting RLS
-  // alone. `workers`' own RLS ("Authenticated full access") permits the
-  // UPDATE from any signed-in user regardless of Domain membership, so this
-  // page — not the database — is what has to say no to a plain member.
-  // Global view (no domainId) has no single Domain to check ownership
-  // against, so Connect stays unavailable there rather than guessing.
+  // The database decides who may change a Worker (workers RLS, ADR 0028);
+  // these flags only hide controls it would refuse. Connecting a Worker to an
+  // account redirects its assignments and notifications, so it is for an
+  // owner of the Worker's Space or Domain, and only to someone in that scope.
+  // The global view has no single Domain, so Connect is offered there only
+  // to an owner of the Space.
   const isOwner = domainId ? myRole === 'owner' : false;
-  // Inviting, adding, deactivating and removing Workers are owner actions in
-  // a Domain. The global view has no Domain to be owner of, so it keeps the
-  // controls (it is the Workspace-wide roster).
+  const canConnect = isOwner || isSpaceOwner;
+  // Inviting and adding Workers are owner actions in a Domain. The global
+  // view is the Space-wide roster, where any member may add an unlinked one.
   const canManage = domainId ? isOwner : true;
+  // Your own Worker and the Space's unlinked Workers are yours to (de)activate
+  // as a member; someone else's Worker needs an owner of their Space or Domain.
+  const canToggle = (w: Worker) => canManage && (w.user_id === null || w.user_id === user?.id || canConnect);
+  // Only an unlinked Worker is removed, by an owner of its Space. A person's
+  // Worker stays so the work they did keeps their name; they leave by losing
+  // their membership, and are deactivated here.
+  const canRemove = (w: Worker) => isSpaceOwner && w.user_id === null && w.object_id === null
+    && w.activity_space_id !== null && w.activity_space_id === workerSpaceId;
 
   const reload = async () => {
     setLoading(true);
@@ -69,10 +75,15 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
       if (workersErr) throw workersErr;
       if (memberRowsResult.error) throw memberRowsResult.error;
       const memberRows = (memberRowsResult.data ?? []) as { user_id: string; role: 'owner' | 'member' }[];
+      const spaceId = (domainResult.data as { activity_space_id: string | null } | null)?.activity_space_id ?? activeSpaceId;
+      const { data: spaceRole, error: spaceRoleErr } = spaceId && user?.id
+        ? await supabase.from('activity_space_members').select('role')
+          .eq('activity_space_id', spaceId).eq('user_id', user.id).maybeSingle()
+        : { data: null, error: null };
+      if (spaceRoleErr) throw spaceRoleErr;
       setWorkers((workersData ?? []) as Worker[]);
-      setWorkerSpaceId(
-        (domainResult.data as { activity_space_id: string | null } | null)?.activity_space_id ?? activeSpaceId,
-      );
+      setWorkerSpaceId(spaceId);
+      setIsSpaceOwner((spaceRole as { role: string } | null)?.role === 'owner');
       setMemberUserIds(new Set(memberRows.map((r) => r.user_id)));
       setMyRole(memberRows.find((r) => r.user_id === user?.id)?.role ?? null);
       setError(null);
@@ -171,9 +182,9 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
             <WorkerRow
               key={w.id}
               worker={w}
-              onDelete={canManage ? () => handleDelete(w.id) : undefined}
-              onToggleStatus={canManage ? () => handleStatusToggle(w) : undefined}
-              onConnect={isOwner ? () => setConnecting(w) : undefined}
+              onDelete={canRemove(w) ? () => handleDelete(w.id) : undefined}
+              onToggleStatus={canToggle(w) ? () => handleStatusToggle(w) : undefined}
+              onConnect={canConnect ? () => setConnecting(w) : undefined}
             />
           ))
         )}
@@ -187,8 +198,8 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
             <WorkerRow
               key={w.id}
               worker={w}
-              onDelete={canManage ? () => handleDelete(w.id) : undefined}
-              onToggleStatus={canManage ? () => handleStatusToggle(w) : undefined}
+              onDelete={canRemove(w) ? () => handleDelete(w.id) : undefined}
+              onToggleStatus={canToggle(w) ? () => handleStatusToggle(w) : undefined}
             />
           ))
         )}
@@ -238,7 +249,7 @@ function WorkerRow({
   onConnect,
 }: {
   worker: Worker;
-  /** Both omitted for a non-owner viewing a Domain's team. */
+  /** Omitted when the viewer may not remove / (de)activate this Worker. */
   onDelete?: () => void;
   onToggleStatus?: () => void;
   /** Omitted for AI agents — isUnreachableWorker is never true for them, so
