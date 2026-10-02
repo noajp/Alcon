@@ -16,6 +16,8 @@
 
 ## Claude Code から接続する
 
+接続コマンドとエンドポイントは、アプリの Settings › Integrations の「Alcon へ接続する」にも出ている（コピーボタン付き）。
+
 アクセストークンは、ログイン中の Alcon で DevTools を開き、`localStorage` にある `sb-rkugtcqztkkacvoylupw-auth-token` の `access_token` から取り出す。有効期限は 1 時間。claude.ai や ChatGPT のコネクタで使えるように、OAuth での接続を ELE_PLT-004 で追加する。
 
 ```bash
@@ -31,3 +33,7 @@ env -u SUPABASE_ACCESS_TOKEN supabase functions deploy alcon-mcp --project-ref r
 ```
 
 `--no-verify-jwt` を付けるのは、トークンがない場合や期限切れの場合に、関数自身が MCP の形式に沿った 401（`WWW-Authenticate` 付き）を返すため。トークンの検証は関数の中で行う。`_shared/boardTools.ts` を変更したら、`alcon-copilot` も再デプロイする。
+
+## 逆向き：Alcon のエージェントが外部サービスを使う
+
+この文書は外部の AI が Alcon を操作する入口を扱う。Alcon のエージェント（run-agent）が Linear・Asana・任意の MCP / API を道具として使う接続は、Settings › Integrations の「外部サービスをつなぐ」で Space の owner が設定する。資格情報は Vault に置かれ、外部への書き込みは既定で毎回承認を待つ。設計は [ADR 0027](adr/0027-agents-act-on-elements-with-the-callers-rls-and-stop-for-approval.md)。
