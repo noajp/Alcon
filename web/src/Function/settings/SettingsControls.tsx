@@ -78,16 +78,18 @@ export function SelectControl({
 }
 
 export function ToggleRow({
-  label, desc, value, onChange,
-}: { label: string; desc?: string; value: boolean; onChange: (v: boolean) => void }) {
+  label, desc, value, onChange, disabled = false,
+}: { label: string; desc?: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <Row label={label} desc={desc}>
       <button
         type="button"
         role="switch"
         aria-checked={value}
+        aria-label={label}
+        disabled={disabled}
         onClick={() => onChange(!value)}
-        className={`relative inline-flex h-[18px] w-8 items-center rounded-full transition-colors ${
+        className={`relative inline-flex h-[18px] w-8 items-center rounded-full transition-colors disabled:opacity-50 disabled:pointer-events-none ${
           value ? 'bg-primary' : 'bg-muted-foreground/30'
         }`}
       >
