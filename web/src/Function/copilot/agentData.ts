@@ -22,7 +22,7 @@ export function isAgentRunActive(run: AgentRun | null | undefined): boolean {
 // The run's columns a browser may read: everything but the transcript and
 // the continuation token, which stay with the Edge Function (they can hold
 // data read with the starter's permissions).
-export const AGENT_RUN_COLUMNS =
+const AGENT_RUN_COLUMNS =
   'id, element_id, domain_id, worker_id, status, model, triggered_from, triggered_by, summary, result, error, step_count, started_at, finished_at, created_at, mode, prompt, reply_to, input_tokens, output_tokens, cost_usd, activity_space_id, continuation_count';
 
 // Latest run for an Element (any status), or null if it's never been run.
