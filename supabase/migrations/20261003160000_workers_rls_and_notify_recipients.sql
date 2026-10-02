@@ -16,6 +16,11 @@
 --                            their Space or Domain only capacity and status.
 --                            Connect links a human Object Worker, by an owner.
 --                    DELETE  an unlinked Worker, by an owner of its Space.
+-- Object Workers     a Worker with an object_id belongs to its Object even when
+--                    connected to an account: worker_in_space and
+--                    user_can_list_worker read the Object first, so a persona
+--                    made in one Object never shows up in the person's other
+--                    Spaces (get_now_work follows).
 -- element_assignees  read / remove on visible Elements; add only what
 --                    worker_assignable accepts.
 -- agent_runs         a run names only an assignable Worker.
@@ -27,6 +32,10 @@
 --
 -- Guarded for preview replay (the base schema lives outside this folder).
 do $$
+declare
+  v_def text;
+  v_old text;
+  v_new text;
 begin
   if to_regclass('public.workers') is null
      or to_regclass('public.element_assignees') is null
@@ -58,13 +67,78 @@ begin
      or to_regprocedure('alcon_internal.object_in_space(uuid, uuid)') is null
      or to_regprocedure('alcon_internal.object_home_space(uuid)') is null
      or to_regprocedure('alcon_internal.element_home_space(uuid)') is null
-     or to_regprocedure('alcon_internal.worker_in_space(uuid, uuid)') is null then
+     or to_regprocedure('alcon_internal.worker_in_space(uuid, uuid)') is null
+     or to_regprocedure('public.get_now_work(uuid)') is null then
     raise notice 'workers_rls_and_notify_recipients skipped: base schema not present';
     return;
   end if;
 
   -- Policies run as the caller and read alcon_internal helpers.
   execute 'grant usage on schema alcon_internal to authenticated';
+
+  -- ── An Object's Worker belongs to its Object ────────────────────────────
+  -- object_id decides first, then user_id, then activity_space_id. A Worker
+  -- with both an Object and an account is that Object's persona of the
+  -- person: it is in the Object's Space and listed by whoever can see the
+  -- Object. Reading the person's memberships instead would let anyone who
+  -- adds someone to their own Space, then connects a made-up Object Worker
+  -- to them, place that persona in the person's other organisations.
+  -- worker_assignable still requires the linked person to see the Element.
+  execute $f$
+    create or replace function alcon_internal.worker_in_space(p_worker uuid, p_space uuid)
+    returns boolean language sql stable security definer set search_path = public as $b$
+      select exists (
+        select 1 from public.workers w
+        where w.id = p_worker and p_space is not null and (
+          (w.object_id is not null and alcon_internal.object_in_space(w.object_id, p_space))
+          or (w.object_id is null and w.user_id is not null and (
+             exists (select 1 from public.activity_space_members m
+                      where m.activity_space_id = p_space and m.user_id = w.user_id)
+             or exists (select 1 from public.domain_members dm join public.domains d on d.id = dm.domain_id
+                         where dm.user_id = w.user_id and d.activity_space_id = p_space)
+             or exists (select 1 from public.object_members om
+                         where om.user_id = w.user_id and alcon_internal.object_in_space(om.object_id, p_space))))
+          or (w.user_id is null and w.object_id is null and w.activity_space_id = p_space)));
+    $b$
+  $f$;
+
+  execute $f$
+    create or replace function alcon_internal.user_can_list_worker(p_worker uuid)
+    returns boolean language sql stable security definer set search_path = public as $b$
+      select auth.uid() is not null and exists (
+        select 1 from public.workers w
+        where w.id = p_worker and (
+          w.user_id = auth.uid()
+          or (w.object_id is not null and public.user_can_see_object(w.object_id))
+          or (w.object_id is null and w.user_id is not null and (
+               exists (select 1 from public.activity_space_members mine
+                         join public.activity_space_members theirs
+                           on theirs.activity_space_id = mine.activity_space_id
+                        where mine.user_id = auth.uid() and theirs.user_id = w.user_id)
+               or exists (select 1 from public.domain_members dm
+                           where dm.user_id = w.user_id and public.user_can_see_domain(dm.domain_id))
+               or exists (select 1 from public.object_members om
+                           where om.user_id = w.user_id and public.user_can_see_object(om.object_id))))
+          or (w.user_id is null and w.object_id is null and w.activity_space_id is not null
+              and public.is_activity_space_member(w.activity_space_id))));
+    $b$
+  $f$;
+  execute 'revoke all on function alcon_internal.worker_in_space(uuid, uuid) from public, anon, authenticated';
+  execute 'revoke all on function alcon_internal.user_can_list_worker(uuid) from public, anon';
+  execute 'grant execute on function alcon_internal.user_can_list_worker(uuid) to authenticated';
+
+  -- get_now_work lists the Space's members' Workers; an Object persona of a
+  -- member is not one of them (it comes in through its Object, when that
+  -- Object is in scope).
+  v_def := pg_get_functiondef('public.get_now_work(uuid)'::regprocedure);
+  v_old := 'and exists(select 1 from public.activity_space_members member where member.activity_space_id=p_space_id and member.user_id=w.user_id))';
+  v_new := 'and w.object_id is null and exists(select 1 from public.activity_space_members member where member.activity_space_id=p_space_id and member.user_id=w.user_id))';
+  if position(v_new in v_def) = 0 then
+    if (length(v_def) - length(replace(v_def, v_old, ''))) <> length(v_old) then
+      raise exception 'get_now_work: the member branch is not where this migration expects it';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
 
   -- ── Display: who the caller may see ─────────────────────────────────────
   -- Everything beyond the row's own columns; the policy checks those inline
@@ -92,11 +166,11 @@ begin
   $f$;
 
   -- ── Management: who may change a Worker ─────────────────────────────────
-  -- Owner of the Worker's scope, from its columns: an owner of a Space the
-  -- Worker belongs to (user → any membership in that Space, object → the
-  -- Object is in it, neither → activity_space_id), or an owner of a Domain it
-  -- belongs to (user → Domain member, object → filed under the Domain,
-  -- neither → a Domain of its Space).
+  -- Owner of the Worker's scope, from its columns, in worker_in_space's
+  -- order: an owner of a Space the Worker belongs to (object → the Object is
+  -- in it, else user → any membership in that Space, else activity_space_id),
+  -- or an owner of a Domain it belongs to (object → filed under the Domain,
+  -- else user → Domain member, else a Domain of its Space).
   execute $f$
     create or replace function alcon_internal.user_owns_worker_fields(p_user uuid, p_object uuid, p_space uuid)
     returns boolean language sql stable security definer set search_path = public as $b$
@@ -104,7 +178,7 @@ begin
         exists (
           select 1 from public.activity_space_members m
            where m.user_id = auth.uid() and m.role = 'owner' and (
-             (p_user is not null and (
+             (p_user is not null and p_object is null and (
                 alcon_internal.is_activity_space_member_as(m.activity_space_id, p_user)
                 or exists (select 1 from public.domain_members dm join public.domains d on d.id = dm.domain_id
                             where dm.user_id = p_user and d.activity_space_id = m.activity_space_id)
@@ -116,7 +190,7 @@ begin
         or exists (
           select 1 from public.domain_members mine join public.domains d on d.id = mine.domain_id
            where mine.user_id = auth.uid() and mine.role = 'owner' and (
-             (p_user is not null and alcon_internal.user_is_domain_member_as(d.id, p_user))
+             (p_user is not null and p_object is null and alcon_internal.user_is_domain_member_as(d.id, p_user))
              or (p_object is not null and (
                   exists (select 1 from public.objects o where o.id = p_object and o.domain_id = d.id)
                   or exists (select 1 from public.object_domains od

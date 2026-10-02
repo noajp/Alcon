@@ -8,7 +8,7 @@ Worker には 3 種類ある。アカウントに結び付いた人（`user_id`�
 
 ## 選択肢
 
-- Worker の Space の持ち方：Worker ごとに `activity_space_id` を必須にする／所属（`user_id` → メンバーシップ、`object_id` → Object の Space）で決め、どちらもない Worker だけ列で決める／Space × Worker の junction を作る
+- Worker の Space の持ち方：Worker ごとに `activity_space_id` を必須にする／所属（`object_id` → Object の Space、`user_id` → メンバーシップ）で決め、どちらもない Worker だけ列で決める／Space × Worker の junction を作る
 - 名前の見え方：割り当てられる Worker の名前だけを見せる／割り当てと表示を分け、見える Element や Object にすでに付いている Worker の名前も見せる
 - 強制の場所：クライアントのピッカーで絞る／DB の RPC で判定し、ピッカーとボードツールが同じ RPC を読む
 - Worker の変更権限：ログインしていれば誰でも／Worker の種類ごとに、その Worker の範囲にいる人だけ
@@ -16,7 +16,7 @@ Worker には 3 種類ある。アカウントに結び付いた人（`user_id`�
 
 ## 決定
 
-- **Worker の Space は所属で決める。** `user_id` があれば、その人の Space メンバー・Domain メンバー・Object メンバーの所属。なければ `object_id` の Object の Space。どちらもない Worker だけ `workers.activity_space_id`（`on delete set null`）で決める。CHECK 制約は置かない。
+- **Worker の Space は所属で決める。** `object_id` があれば、その Object の Space。アカウントに接続された Object の Worker も同じで、その Object の中の、その人の顔（ペルソナ）として扱う。`object_id` がなく `user_id` があれば、その人の Space メンバー・Domain メンバー・Object メンバーの所属。どちらもない Worker だけ `workers.activity_space_id`（`on delete set null`）で決める。一覧できるかどうか（`user_can_list_worker`）も同じ順で、Object の Worker はその Object を見られる人が一覧できる。CHECK 制約は置かない。
 - **割り当ては境界に従う。** `worker_assignable(worker, element)` が真になるのは次のすべてを満たすとき：呼び出した人が Element を見られる。その Worker を一覧できる。Worker が inactive でない（自分自身を割り当てる場合は inactive でもよい）。Element の Space（主 Object の Domain の Space）があれば Worker がその Space に属する。人の Worker なら、その人自身も Element を見られる。担当者の候補は `list_assignable_workers(space, domain, element)` で取り、アプリのピッカー、テンプレート、MCP / Copilot のボードツール、エージェントの Worker 選択がすべてこれを通る。
 - **名前は Element に付いてくる。** 割り当てられない Worker でも、見える Element や Object にすでに付いていれば名前を表示する。Assignee は `element.assignees`、Lead や Person 型の Property は id で引いて表示する。
 - **Space ごとに AI を置く。** 各 Space に ai_agent の Worker「Claude」を 1 つ置き、新しい Space には作成時のトリガで作る。エージェントは、Element に割り当てられる AI Worker のプロファイルだけを読み、それ以外は既定のエージェントとして動く。
@@ -25,11 +25,11 @@ Worker には 3 種類ある。アカウントに結び付いた人（`user_id`�
 - **Worker を変えられる人は Worker の種類で決まる。** 本人。所属のない Worker ならその Space のメンバー。Object の Worker ならその Object を見られる人。他人の Worker なら、その人が属する Space か Domain のオーナー（`user_can_manage_worker`）。UPDATE は変更前と変更後の両方でこの条件を満たす必要があり、変えられる列はトリガが決める。
   - Worker の種類（human / ai_agent）と識別子は誰も変えられない。
   - 人の Worker（`user_id` あり）は、アカウントから外すことも別のアカウントへ付け替えることも、Space や Object へ移すこともできない。名前・アバター・役割・メールなどを変えられるのは本人だけで、オーナーが変えられるのは通常稼働時間（`capacity_hours_per_day`）と状態（active / inactive）だけ。
-  - アカウントへの接続（Team 設定の Connect）は、アカウントのない human の Object Worker だけを、その Object の Space か Domain のオーナーが、その Space にいる人へ結ぶ。Space の名簿にある所属のない Worker は接続しない。どのアカウントにも自分の human Worker がすでにあり、1 アカウント 1 つの制約に必ずかかるため。
+  - アカウントへの接続（Team 設定の Connect）は、アカウントのない human の Object Worker だけを、その Object の Space か Domain のオーナーが、その Space にいる人へ結ぶ。Space の名簿にある所属のない Worker は接続しない。どのアカウントにも自分の human Worker がすでにあり、1 アカウント 1 つの制約に必ずかかるため。接続した Worker もその Object の Worker のままで、その人の他の Space のピッカーや名簿には出ない。
   - Worker を別の Space・Object へ移せるのは、移動先の Space のメンバーか Object を見られる人だけ。
   - 新しく作れるのは、自分の human Worker、自分が属する Space の所属のない Worker、見える Object の Worker。
   - 削除できるのは所属のない Worker だけで、その Space のオーナーが行う。人の Worker はアカウントから外せないので、削除の対象にならない。人がチームを離れるときはメンバーシップを外し、Worker を inactive にする。
-- **残るリスク：同意のない所属。** Space を作った人は、相手の同意なく任意のアカウントを Space のメンバーに加えられる。その Space のオーナーは、加えた人の Worker の通常稼働時間と状態を変えられる。Worker は 1 人に 1 つなので、inactive にすると他の Space のピッカーからもその人が消える（本人と、本来の Space のオーナーは戻せる）。名前・種類・AI の指示・アカウントの結び付き・削除には届かない。所属の承認（招待を受けた本人が承諾する）を持つまで、この範囲のリスクは残す。
+- **残るリスク：同意のない所属。** Space を作った人は、相手の同意なく任意のアカウントを Space のメンバーに加えられる。その Space のオーナーは、加えた人の Worker の通常稼働時間と状態を変えられる。Worker は 1 人に 1 つなので、inactive にすると他の Space のピッカーからもその人が消える（本人と、本来の Space のオーナーは戻せる）。名前・種類・AI の指示・アカウントの結び付き・削除には届かない。同じ方法で自分の Object の Worker をその人のアカウントに接続することもできるが、その Worker は攻撃者の Object の中にしか現れず、その人の他の組織のピッカー・名簿・割り当てには入らない（その人自身の一覧には自分の Worker として見える）。所属の承認（招待を受けた本人が承諾する）を持つまで、この範囲のリスクは残す。
 - **通知は Element を見られる人にだけ届く。** 状態変更・コメント・メンション・期日の通知は、宛先ごとに `user_can_see_element_as` で絞る。境界より前に別の Space の人へ付いた担当は残っていても、その人に Element の通知は届かない。
 - 既存の、所属を持たない Worker は、割り当てと Lead がすべて 1 つの Space にあるときだけ、その Space に寄せる。複数の Space にまたがる、またはどこにも付いていない Worker は NULL のままにする。どの Space のピッカーにも出なくなるが、すでに付いている Element では名前が見える。
 
