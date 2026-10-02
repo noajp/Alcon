@@ -181,11 +181,10 @@ export {
 
 export {
   archiveNotification,
-  createNotification,
   fetchNotifications,
   markAllNotificationsRead,
   markNotificationRead,
-  notifyMany,
+  notifyAboutElement,
   useNotifications,
 } from '@/ActivitySpace/execution/element/notificationData';
 
