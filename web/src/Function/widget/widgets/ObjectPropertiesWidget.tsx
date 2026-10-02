@@ -6,6 +6,7 @@ import { Calendar, Check, User as UserIcon, X } from 'lucide-react';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import {
   fetchDomainCustomColumnsWithValues,
+  noticePropertyValueFailed,
   setCustomColumnObjectValue,
   updateObject,
   useDomains,
@@ -128,7 +129,7 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
       await setCustomColumnObjectValue(columnId, objectId, value);
       setReloadToken((n) => n + 1);
     } catch (e) {
-      console.error('Failed to save property', e);
+      noticePropertyValueFailed(e);
     }
   }, [objectId]);
 

@@ -37,6 +37,7 @@ import {
   removeElementAssignee,
   noticeAssignmentFailed,
   setCustomColumnValue,
+  noticePropertyValueFailed,
   notifyAboutElement,
   useAgentRun,
   useDomains,
@@ -465,7 +466,7 @@ function ElementDetailBody({
       await setCustomColumnValue(columnId, element.id, value);
       reloadCustomColumns();
     } catch (e) {
-      console.error('Failed to save property', e);
+      noticePropertyValueFailed(e);
     }
   }, [element.id, reloadCustomColumns]);
 

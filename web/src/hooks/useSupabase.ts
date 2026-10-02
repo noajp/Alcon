@@ -114,6 +114,8 @@ export {
   fetchCustomColumnsWithValues,
   fetchDomainCustomColumnsWithValues,
   fetchElementCustomColumnsWithValues,
+  isPropertyWriteRefused,
+  noticePropertyValueFailed,
   reorderCustomColumns,
   setCustomColumnObjectValue,
   setCustomColumnValue,
