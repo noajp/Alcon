@@ -5,11 +5,12 @@
 // Request (POST JSON, Authorization: Bearer <the person's Supabase JWT>):
 //   { integrationId }
 // Response:
-//   { last_test: { ok, at, detail, tools?, tool_count?, status? } }
-//     mcp   initialize + tools/list; tool_count and up to 20 tools
-//           ({ name, readOnly }).
-//     http  GET on the base URL. Any response below 500 other than 401 / 403
-//           counts as reachable; status is the HTTP status.
+//   { last_test: { ok, at, code, detail, tools?, tool_count?, status? } }
+//     mcp   initialize + tools/list → connected; tool_count and up to 20
+//           tools ({ name, readOnly }).
+//     http  a preset with a credential check (VERIFY) → connected or
+//           auth_failed. Any other API: GET on the base URL; a response
+//           below 500 other than 401 / 403 is only "reachable".
 //
 // Who may test: a Space owner. The integration must be visible to the caller
 // (RLS: Space member) and the caller must hold the owner role in that Space —
@@ -37,6 +38,9 @@ function json(payload: unknown, status = 200): Response {
 interface LastTest {
   ok: boolean;
   at: string;
+  /** What happened, for the client to word in the viewer's language. */
+  code: "connected" | "reachable" | "auth_failed" | "http_error" | "unreachable" | "blocked" | "oauth_required" | "error";
+  /** A technical note for errors (already scrubbed of the secret); empty otherwise. */
   detail: string;
   tools?: { name: string; readOnly: boolean }[];
   tool_count?: number;
@@ -49,32 +53,49 @@ function scrub(message: string, secret: string | null): string {
   return secret && secret.length >= 4 ? text.split(secret).join("•••") : text;
 }
 
-async function runTest(row: IntegrationRow, secret: string | null): Promise<LastTest> {
+/**
+ * How a preset's credential is checked: a request that only succeeds with a
+ * valid credential. Without one (a custom API) the test can only say the
+ * service answered — "reachable", never "connected".
+ */
+const VERIFY: Record<string, { path: string; okWhen: (status: number, body: string) => boolean }> = {
+  asana: { path: "users/me", okWhen: (status) => status >= 200 && status < 300 },
+  // Slack answers 200 even for a bad token; the body's "ok" says which.
+  slack: { path: "auth.test", okWhen: (status, body) => status === 200 && /"ok"\s*:\s*true/.test(body) },
+};
+
+async function runTest(row: IntegrationRow & { preset: string | null }, secret: string | null): Promise<LastTest> {
   const at = new Date().toISOString();
-  if (!isSafeEndpoint(row.endpoint)) {
-    return { ok: false, at, detail: "接続先は https の公開ホストに限られます。" };
-  }
+  if (!isSafeEndpoint(row.endpoint)) return { ok: false, at, code: "blocked", detail: "" };
+  if (row.auth_type === "oauth") return { ok: false, at, code: "oauth_required", detail: "" };
   try {
     if (row.kind === "mcp") {
       const session = new McpSession(row, secret);
       await session.initialize();
       const tools = await session.listTools();
       return {
-        ok: true,
-        at,
-        detail: `${tools.length} 個のツールを取得しました。`,
+        ok: true, at, code: "connected", detail: "",
         tool_count: tools.length,
         tools: tools.slice(0, MAX_LISTED_TOOLS).map((t) => ({ name: t.name, readOnly: t.readOnly })),
       };
     }
-    const res = await callHttp(row, secret, { method: "GET", path: "" });
+    const verify = row.preset ? VERIFY[row.preset] : undefined;
+    const res = await callHttp(row, secret, { method: "GET", path: verify?.path ?? "" });
     const status = Number(res.text.match(/^HTTP (\d{3})/)?.[1] ?? 0);
-    if (status === 401 || status === 403) return { ok: false, at, status, detail: `認証に失敗しました（HTTP ${status}）。` };
-    if (!status || status >= 500) return { ok: false, at, status, detail: `接続先がエラーを返しました（HTTP ${status || "?"}）。` };
-    return { ok: true, at, status, detail: `接続できました（HTTP ${status}）。` };
+    const body = res.text.replace(/^HTTP \d{3}\n/, "");
+    if (status === 401 || status === 403) return { ok: false, at, code: "auth_failed", status, detail: "" };
+    if (verify) {
+      if (verify.okWhen(status, body)) return { ok: true, at, code: "connected", status, detail: "" };
+      const reason = body.match(/"error"\s*:\s*"([^"]{1,60})"/)?.[1] ?? "";
+      return { ok: false, at, code: status >= 500 || !status ? "http_error" : "auth_failed", status, detail: scrub(reason, secret) };
+    }
+    if (!status || status >= 500) return { ok: false, at, code: "http_error", status, detail: "" };
+    return { ok: true, at, code: "reachable", status, detail: "" };
   } catch (e) {
-    const message = e instanceof Error ? (e.name === "AbortError" ? "応答がありませんでした（タイムアウト）。" : e.message) : String(e);
-    return { ok: false, at, detail: scrub(message, secret) };
+    const timeout = e instanceof Error && e.name === "AbortError";
+    const message = e instanceof Error ? e.message : String(e);
+    if (/認証に失敗/.test(message)) return { ok: false, at, code: "auth_failed", detail: "" };
+    return { ok: false, at, code: timeout ? "unreachable" : "error", detail: timeout ? "" : scrub(message, secret) };
   }
 }
 
@@ -105,7 +126,7 @@ Deno.serve(async (req: Request) => {
   // Visible to the caller (RLS: Space member)…
   const { data: visible, error: readErr } = await userDb
     .from("integrations")
-    .select("id, activity_space_id, kind, name, description, endpoint, auth_type, auth_header, delegation")
+    .select("id, activity_space_id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation")
     .eq("id", integrationId)
     .maybeSingle();
   if (readErr) return json({ error: "could not read the integration" }, 500);
@@ -118,14 +139,14 @@ Deno.serve(async (req: Request) => {
     .eq("activity_space_id", visible.activity_space_id)
     .eq("user_id", user.id)
     .maybeSingle();
-  if (membership?.role !== "owner") return json({ error: "Space のオーナーだけが接続テストを実行できます。" }, 403);
+  if (membership?.role !== "owner") return json({ error: "only Space owners can test connections", code: "not_owner" }, 403);
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const { data: secretData, error: secretErr } = await admin.rpc("get_integration_secret", { p_integration_id: integrationId });
   if (secretErr) return json({ error: "could not read the credential" }, 500);
   const secret = typeof secretData === "string" && secretData.length > 0 ? secretData : null;
 
-  const row = visible as IntegrationRow & { activity_space_id: string };
+  const row = visible as IntegrationRow & { activity_space_id: string; preset: string | null };
   const lastTest = await runTest(row, secret);
 
   const { error: writeErr } = await admin.from("integrations").update({ last_test: lastTest }).eq("id", integrationId);

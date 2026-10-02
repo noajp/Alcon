@@ -26,8 +26,11 @@ import { IntegrationDetailDialog, IntegrationIcon, SourceChip } from './Integrat
 // Members see everything read-only; only owners can connect or change.
 
 const DOCS_URL = 'https://github.com/noajp/Alcon/blob/main/docs/mcp.md';
-const ALCON_MCP_URL = 'https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/alcon-mcp';
-const AUTH_STORAGE_KEY = 'sb-rkugtcqztkkacvoylupw-auth-token';
+// Derived from the project this build talks to, so preview and local builds
+// show their own addresses.
+const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/\/+$/, '');
+const ALCON_MCP_URL = `${SUPABASE_URL}/functions/v1/alcon-mcp`;
+const AUTH_STORAGE_KEY = `sb-${SUPABASE_URL.replace(/^https?:\/\//, '').split('.')[0]}-auth-token`;
 
 export function IntegrationsSettings({ tab }: { tab: string | null }) {
   return tab === 'alcon' ? <AlconConnectPanel /> : <ExternalServicesPanel />;
@@ -302,7 +305,7 @@ function AlconConnectPanel() {
       </section>
 
       <p className="rounded-lg border border-border/60 bg-[var(--surface-rail)]/40 px-4 py-3 text-[12px] text-muted-foreground">
-        {t('Coming next: OAuth for claude.ai and ChatGPT connectors (ELE_PLT-004) and personal access tokens (ELE_PLT-005).')}
+        {t('Coming next: OAuth for claude.ai and ChatGPT connectors, and personal access tokens.')}
       </p>
     </div>
   );

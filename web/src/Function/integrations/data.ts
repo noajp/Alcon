@@ -142,8 +142,7 @@ export function useIntegrationActions(spaceId: string | null) {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      // Clear the Vault entry first; deleting the row would orphan it.
-      await setIntegrationSecret(id, '');
+      // Deleting the row also deletes its Vault entry (a database trigger).
       const { data, error } = await supabase.from('integrations').delete().eq('id', id).select('id');
       if (error) throw error;
       if (!data || data.length === 0) throw new Error('Only Space owners can change integrations.');

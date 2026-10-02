@@ -14,8 +14,7 @@ import { ToggleRow } from '@/Function/settings/SettingsControls';
 import type { Integration } from '@/types/database';
 import {
   KIND_LABELS, SOURCE_LABELS, buildIntegrationRow, readLastTest,
-  type IntegrationAuthType, type IntegrationDelegation, type IntegrationPreset, type IntegrationSource,
-} from './catalog';
+  type IntegrationAuthType, type IntegrationDelegation, type IntegrationPreset, type IntegrationSource, testOutcomeLabel } from './catalog';
 import { useIntegrationActions } from './data';
 
 // One integration: connect a preset (or a custom MCP / API), or manage an
@@ -127,6 +126,11 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
     const built = buildIntegrationRow(preset, spaceId, draft());
     if (!built.ok) { setError(t(built.error)); return; }
     const { name: n, endpoint: ep, auth_type, auth_header } = built.row;
+    // A credential belongs to its destination: changing where or how it is
+    // sent drops it (a database rule), so say so before it happens.
+    const rebinds = ep !== integration.endpoint || auth_type !== integration.auth_type || (auth_header ?? null) !== (integration.auth_header ?? null);
+    if (rebinds && integration.secret_id
+      && !await appDialog.confirm(t('Changing the address or how the credential is sent deletes the stored credential. Enter it again afterwards. Continue?'))) return;
     try {
       await actions.update.mutateAsync({ id: integration.id, patch: { name: n, endpoint: ep, auth_type, auth_header } });
     } catch (e) { setError(t(errorText(e))); }
@@ -297,7 +301,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
                 {lastTest ? (
                   <div className="space-y-1.5 text-[12px]">
                     <div className={cn('font-medium', lastTest.ok ? 'text-[var(--status-success)]' : 'text-[var(--status-danger)]')}>
-                      {lastTest.ok ? t('Connected') : t('Failed')}
+                      {t(testOutcomeLabel(lastTest.code))}{lastTest.status ? ` (HTTP ${lastTest.status})` : ''}
                       {lastTest.at && <span className="ml-2 font-normal text-muted-foreground">{new Date(lastTest.at).toLocaleString(locale)}</span>}
                     </div>
                     {lastTest.detail && <p className="text-muted-foreground">{lastTest.detail}</p>}

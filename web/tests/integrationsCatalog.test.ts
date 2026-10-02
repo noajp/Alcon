@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_FILTER, INTEGRATION_PRESETS, buildIntegrationRow, filterPresets, installedPresetIds,
-  isSafeEndpoint, presetById, readLastTest, type IntegrationDraft,
+  isSafeEndpoint, presetById, readLastTest, testOutcomeLabel, type IntegrationDraft,
 } from '@/Function/integrations/catalog';
 
 const server = await import(new URL('../../supabase/functions/_shared/integrationClient.ts', import.meta.url).pathname);
@@ -58,7 +58,7 @@ describe('installedPresetIds', () => {
 
 describe('isSafeEndpoint', () => {
   const cases = [
-    'https://mcp.linear.app/mcp', 'https://api.example.com/v1', 'http://api.example.com',
+    'https://mcp.linear.app/mcp', 'https://api.example.com/v1', 'http://api.example.com', 'https://localhost./x', 'https://198.18.0.1/', 'https://[2606:4700::1111]/',
     'https://localhost/x', 'https://foo.localhost', 'https://printer.local', 'https://svc.internal',
     'https://intranet', 'https://user:pw@example.com', 'https://10.0.0.1', 'https://127.0.0.1',
     'https://169.254.169.254/latest', 'https://172.16.0.1', 'https://172.32.0.1', 'https://192.168.1.1',
@@ -74,6 +74,7 @@ describe('isSafeEndpoint', () => {
     expect(isSafeEndpoint('https://api.example.com/v1')).toBe(true);
     expect(isSafeEndpoint('http://api.example.com')).toBe(false);
     expect(isSafeEndpoint('https://192.168.1.1')).toBe(false);
+    for (const bad of ['https://localhost./x', 'https://198.18.0.1/', 'https://[2606:4700::1111]/']) expect(isSafeEndpoint(bad)).toBe(false);
   });
 });
 
@@ -123,11 +124,18 @@ describe('readLastTest', () => {
 
   it('reads an MCP result with tools', () => {
     expect(readLastTest({ ok: true, at: '2026-10-03T00:00:00Z', detail: '2', tool_count: 25, tools: [{ name: 'a', readOnly: true }, { name: 'b' }, { nope: 1 }] })).toEqual({
-      ok: true, at: '2026-10-03T00:00:00Z', detail: '2', toolCount: 25, tools: [{ name: 'a', readOnly: true }, { name: 'b', readOnly: false }], status: null,
+      ok: true, code: 'connected', at: '2026-10-03T00:00:00Z', detail: '2', toolCount: 25, tools: [{ name: 'a', readOnly: true }, { name: 'b', readOnly: false }], status: null,
     });
   });
 
   it('reads an HTTP result', () => {
-    expect(readLastTest({ ok: false, detail: 'auth', status: 401 })).toEqual({ ok: false, at: null, detail: 'auth', toolCount: null, tools: [], status: 401 });
+    expect(readLastTest({ ok: false, detail: 'auth', status: 401 })).toEqual({ ok: false, code: 'error', at: null, detail: 'auth', toolCount: null, tools: [], status: 401 });
+    expect(readLastTest({ ok: false, code: 'auth_failed', detail: '', status: 401 })?.code).toBe('auth_failed');
+  });
+
+  it('words every outcome, and only a verified one as connected', () => {
+    expect(testOutcomeLabel('connected')).toBe('Connected');
+    expect(testOutcomeLabel('reachable')).toMatch(/not checked/);
+    for (const c of ['auth_failed', 'http_error', 'unreachable', 'blocked', 'oauth_required', 'whatever']) expect(testOutcomeLabel(c)).not.toBe('Connected');
   });
 });

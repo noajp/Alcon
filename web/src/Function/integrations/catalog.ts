@@ -137,17 +137,17 @@ export function isSafeEndpoint(raw: string): boolean {
   try { u = new URL(raw); } catch { return false; }
   if (u.protocol !== 'https:') return false;
   if (u.username || u.password) return false;
-  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  // A trailing dot names the same host ("localhost." is localhost).
+  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
   if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) return false;
   if (!host.includes('.') && !host.includes(':')) return false;
   const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (v4) {
     const [a, b] = [Number(v4[1]), Number(v4[2])];
-    if (a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224) return false;
+    if (a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || (a === 198 && (b === 18 || b === 19)) || a >= 224) return false;
   }
-  if (host.includes(':')) {
-    if (host === '::1' || host === '::' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80') || host.startsWith('::ffff:')) return false;
-  }
+  // IPv6 literals are refused outright, as on the server.
+  if (host.includes(':')) return false;
   return true;
 }
 
@@ -226,6 +226,8 @@ export function buildIntegrationRow(preset: IntegrationPreset, spaceId: string, 
 export interface IntegrationTestTool { name: string; readOnly: boolean }
 
 export interface IntegrationTestResult {
+  /** connected | reachable | auth_failed | http_error | unreachable | blocked | oauth_required | error */
+  code: string;
   ok: boolean;
   at: string | null;
   detail: string;
@@ -250,10 +252,25 @@ export function readLastTest(raw: unknown): IntegrationTestResult | null {
     : [];
   return {
     ok: r.ok,
+    code: typeof r.code === 'string' ? r.code : (r.ok ? 'connected' : 'error'),
     at: typeof r.at === 'string' ? r.at : null,
     detail: typeof r.detail === 'string' ? r.detail : '',
     toolCount: typeof r.tool_count === 'number' ? r.tool_count : (Array.isArray(r.tools) ? tools.length : null),
     tools,
     status: typeof r.status === 'number' ? r.status : null,
   };
+}
+
+/** Pure. The words for a connection test's outcome (a t() key). */
+export function testOutcomeLabel(code: string): string {
+  switch (code) {
+    case 'connected': return 'Connected';
+    case 'reachable': return 'Reachable — the credential was not checked';
+    case 'auth_failed': return 'Authentication failed';
+    case 'http_error': return 'The service returned an error';
+    case 'unreachable': return 'No response from the service';
+    case 'blocked': return 'Only https addresses on public hosts can be used.';
+    case 'oauth_required': return 'This service needs OAuth, which is not set up yet';
+    default: return 'Failed';
+  }
 }
