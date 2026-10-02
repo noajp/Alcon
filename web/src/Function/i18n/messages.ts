@@ -785,3 +785,9 @@ Object.assign(es, {
   'A Space needs at least one owner. Make someone else an owner first.': 'Un Space necesita al menos un propietario. Primero haz propietaria a otra persona.',
   'The member could not be removed. Try again.': 'No se pudo quitar al miembro. Inténtalo de nuevo.',
 });
+
+// A Domain is created inside a Space the creator belongs to (ADR 0029).
+Object.assign(ja, { 'You can create a Domain only in a Space you belong to.': 'Domain は、自分が参加している Space の中にだけ作れます。' });
+Object.assign(ko, { 'You can create a Domain only in a Space you belong to.': 'Domain은 내가 참여한 Space 안에서만 만들 수 있습니다.' });
+Object.assign(fr, { 'You can create a Domain only in a Space you belong to.': 'Vous ne pouvez créer un Domain que dans un Space dont vous êtes membre.' });
+Object.assign(es, { 'You can create a Domain only in a Space you belong to.': 'Solo puedes crear un Domain en un Space del que formas parte.' });

@@ -1,6 +1,7 @@
 'use client';
 
 import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/ActivitySpace/execution/domain/domainsStore';
+import { translate } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { membershipErrorMessage } from '@/Function/membership/membershipErrors';
 import { selectIn } from '@/hooks/chunkedIn';
@@ -22,6 +23,9 @@ export async function createDomain(domain: DomainInsert & { user_id: string }): 
     .insert(domain)
     .select()
     .single();
+  // A Domain is created only inside a Space the caller belongs to (RLS);
+  // a stale active Space is the usual way to hit that.
+  if (error?.code === '42501') throw new Error(translate('You can create a Domain only in a Space you belong to.'));
   if (error) throw error;
 
   // The database enrols the creator as the Domain's owner in the same insert
