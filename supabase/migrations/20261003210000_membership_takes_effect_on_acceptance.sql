@@ -30,7 +30,9 @@
 --     objects.user_id) are stamped on insert and fixed afterwards, so no one
 --     can make themselves the "creator" of something that already exists.
 --   - No membership row can change person or scope (trigger), and a Domain or
---     Object keeps at least one owner, like a Space.
+--     Object keeps at least one owner, like a Space. An owner/admin of an
+--     Object's Domain sees and removes its members without joining; removing
+--     the last owner hands the ownership to them.
 --   - domain_members / object_members roles are owner / admin / member.
 --   - invite_member notifies the invitee with kind 'invite' and refuses to
 --     invite again for 7 days after they declined; joining by any path
@@ -402,6 +404,10 @@ begin
 
   -- ── A Domain or Object keeps at least one owner, like a Space ───────────
   -- Deleting the scope itself, or the person's account, cascades through.
+  -- An owner or admin of an Object's Domain who removes its last owner (e.g.
+  -- someone who left the Domain) takes the ownership over in the same
+  -- statement, so the Object is never left without an owner and the people
+  -- who manage it can always revoke access.
   execute $f$
     create or replace function alcon_internal.guard_last_scope_owner()
     returns trigger language plpgsql security definer set search_path = ''
@@ -422,20 +428,35 @@ begin
       execute format('select count(*) from public.%I where %I = $1 and role = ''owner'' and user_id <> $2',
                      tg_table_name, tg_argv[0])
         into v_others using v_scope, old.user_id;
-      if v_others = 0 then
-        raise exception 'A % must keep at least one owner', tg_argv[2] using errcode = '23514';
+      if v_others > 0 then
+        return coalesce(new, old);
       end if;
-      return coalesce(new, old);
+      if tg_op = 'DELETE' and tg_table_name = 'object_members'
+         and auth.uid() is not null and old.user_id <> auth.uid()
+         and alcon_internal.user_manages_scope_as(auth.uid(), 'object', v_scope) then
+        insert into public.object_members (object_id, user_id, role)
+        values (v_scope, auth.uid(), 'owner')
+        on conflict (object_id, user_id) do update set role = 'owner';
+        return old;
+      end if;
+      raise exception '% must keep at least one owner', tg_argv[2] using errcode = '23514';
     end
     $b$
   $f$;
   execute 'revoke all on function alcon_internal.guard_last_scope_owner() from public, anon, authenticated';
   execute 'drop trigger if exists domain_members_guard_last_owner on public.domain_members';
   execute 'create trigger domain_members_guard_last_owner before delete or update on public.domain_members
-    for each row execute function alcon_internal.guard_last_scope_owner(''domain_id'', ''domains'', ''Domain'')';
+    for each row execute function alcon_internal.guard_last_scope_owner(''domain_id'', ''domains'', ''A Domain'')';
   execute 'drop trigger if exists object_members_guard_last_owner on public.object_members';
   execute 'create trigger object_members_guard_last_owner before delete or update on public.object_members
-    for each row execute function alcon_internal.guard_last_scope_owner(''object_id'', ''objects'', ''Object'')';
+    for each row execute function alcon_internal.guard_last_scope_owner(''object_id'', ''objects'', ''An Object'')';
+
+  -- The owners and admins of an Object's Domain see and remove its members
+  -- without joining it first (om delete already lets them delete).
+  execute 'drop policy if exists "om select domain managers" on public.object_members';
+  execute 'create policy "om select domain managers" on public.object_members
+    for select to authenticated
+    using (alcon_internal.user_manages_scope_as(auth.uid(), ''object'', object_id))';
 
   if not exists (select 1 from pg_constraint
                   where conrelid = 'public.domain_members'::regclass and conname = 'domain_members_role_check') then

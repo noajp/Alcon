@@ -9,6 +9,7 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { inviteMember, useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
+import { membershipErrorMessage } from '@/Function/membership/membershipErrors';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { Button } from '@/ui/button';
@@ -165,12 +166,13 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
 
   const handleRemove = async (memberId: string) => {
     if (!await appDialog.confirm('Remove this member from the Object?')) return;
-    try {
-      await supabase.from('object_members').delete().eq('id', memberId);
-      await refresh();
-    } catch (e) {
-      console.error('Failed to remove object member', e);
-    }
+    setInviteError(null);
+    // A refused delete matches no rows; the last owner is refused outright
+    // unless a manager of the Domain removes them (they then take it over).
+    const { data, error } = await supabase.from('object_members').delete().eq('id', memberId).select('id');
+    if (error) setInviteError(membershipErrorMessage(error, t('The member could not be removed. Try again.')));
+    else if (!data?.length) setInviteError(t('The member could not be removed. Try again.'));
+    await refresh();
   };
 
   return (

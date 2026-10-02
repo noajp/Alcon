@@ -692,6 +692,10 @@ Object.assign(ja, {
   'Invitations': '招待', 'You join a Space, Domain or Object only when you accept its invitation.': 'Space・Domain・Object には、招待を承諾したときだけ参加します。',
   'No pending invitations.': '保留中の招待はありません。',
   'This person declined an invitation here in the last 7 days. You can invite them again after that.': 'この人は 7 日以内にここへの招待を辞退しています。その後なら再び招待できます。',
+  'An Object needs at least one owner. Make someone else an owner first.': 'Object には少なくとも 1 人のオーナーが必要です。先に別の人をオーナーにしてください。',
+  'A Domain needs at least one owner. Make someone else an owner first.': 'Domain には少なくとも 1 人のオーナーが必要です。先に別の人をオーナーにしてください。',
+  'A Space needs at least one owner. Make someone else an owner first.': 'Space には少なくとも 1 人のオーナーが必要です。先に別の人をオーナーにしてください。',
+  'The member could not be removed. Try again.': 'メンバーを外せませんでした。もう一度お試しください。',
 });
 
 Object.assign(ko, {
@@ -716,6 +720,10 @@ Object.assign(ko, {
   'Invitations': '초대', 'You join a Space, Domain or Object only when you accept its invitation.': 'Space, Domain, Object에는 초대를 수락할 때만 참여합니다.',
   'No pending invitations.': '대기 중인 초대가 없습니다.',
   'This person declined an invitation here in the last 7 days. You can invite them again after that.': '이 사람은 최근 7일 안에 이곳의 초대를 거절했습니다. 그 이후에 다시 초대할 수 있습니다.',
+  'An Object needs at least one owner. Make someone else an owner first.': 'Object에는 소유자가 최소 1명 필요합니다. 먼저 다른 사람을 소유자로 지정하세요.',
+  'A Domain needs at least one owner. Make someone else an owner first.': 'Domain에는 소유자가 최소 1명 필요합니다. 먼저 다른 사람을 소유자로 지정하세요.',
+  'A Space needs at least one owner. Make someone else an owner first.': 'Space에는 소유자가 최소 1명 필요합니다. 먼저 다른 사람을 소유자로 지정하세요.',
+  'The member could not be removed. Try again.': '멤버를 제외하지 못했습니다. 다시 시도하세요.',
 });
 
 Object.assign(fr, {
@@ -740,6 +748,10 @@ Object.assign(fr, {
   'Invitations': 'Invitations', 'You join a Space, Domain or Object only when you accept its invitation.': "Vous rejoignez un Space, un Domain ou un Object uniquement en acceptant son invitation.",
   'No pending invitations.': 'Aucune invitation en attente.',
   'This person declined an invitation here in the last 7 days. You can invite them again after that.': 'Cette personne a refusé une invitation ici au cours des 7 derniers jours. Vous pourrez la réinviter ensuite.',
+  'An Object needs at least one owner. Make someone else an owner first.': "Un Object doit avoir au moins un propriétaire. Désignez d'abord quelqu'un d'autre comme propriétaire.",
+  'A Domain needs at least one owner. Make someone else an owner first.': "Un Domain doit avoir au moins un propriétaire. Désignez d'abord quelqu'un d'autre comme propriétaire.",
+  'A Space needs at least one owner. Make someone else an owner first.': "Un Space doit avoir au moins un propriétaire. Désignez d'abord quelqu'un d'autre comme propriétaire.",
+  'The member could not be removed. Try again.': "Le membre n'a pas pu être retiré. Réessayez.",
 });
 
 Object.assign(es, {
@@ -764,4 +776,8 @@ Object.assign(es, {
   'Invitations': 'Invitaciones', 'You join a Space, Domain or Object only when you accept its invitation.': 'Te unes a un Space, Domain u Object solo al aceptar su invitación.',
   'No pending invitations.': 'No hay invitaciones pendientes.',
   'This person declined an invitation here in the last 7 days. You can invite them again after that.': 'Esta persona rechazó una invitación aquí en los últimos 7 días. Podrás invitarla de nuevo después.',
+  'An Object needs at least one owner. Make someone else an owner first.': 'Un Object necesita al menos un propietario. Primero haz propietaria a otra persona.',
+  'A Domain needs at least one owner. Make someone else an owner first.': 'Un Domain necesita al menos un propietario. Primero haz propietaria a otra persona.',
+  'A Space needs at least one owner. Make someone else an owner first.': 'Un Space necesita al menos un propietario. Primero haz propietaria a otra persona.',
+  'The member could not be removed. Try again.': 'No se pudo quitar al miembro. Inténtalo de nuevo.',
 });

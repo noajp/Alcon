@@ -2,6 +2,7 @@
 
 import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/ActivitySpace/execution/domain/domainsStore';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { membershipErrorMessage } from '@/Function/membership/membershipErrors';
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase, getCurrentUserId } from '@/lib/supabase';
@@ -74,7 +75,9 @@ export async function leaveDomain(domainId: string): Promise<void> {
     .eq('domain_id', domainId)
     .eq('user_id', userId)
     .select('id');
-  if (error) throw error;
+  // The last owner cannot leave (guard_last_scope_owner); say so in the
+  // viewer's language rather than the database's.
+  if (error) throw new Error(membershipErrorMessage(error, 'Failed to leave Domain'));
   if (!data?.length) throw new Error('You are not a member of this Domain.');
   notifyDomainsChanged();
 }

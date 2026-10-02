@@ -22,7 +22,7 @@ Space・Domain・Object の所属（`activity_space_members` / `domain_members` 
   - `cancel_invite(id)`：招いた人か、その対象を管理する人が取り消せる。通知も消える。
 - **招待を読めるのは**、招かれた人、招いた人、その対象のメンバー（一覧に「Invited」と出すため）、Object の Domain を管理する人。
 - **作った人の owner の行はサーバーが書く。** Space・Domain・Object を作ると、同じ INSERT の中でトリガが作った人（`auth.uid()`）を owner として登録する。作った人を表す列（`activity_spaces.created_by` / `domains.user_id` / `objects.user_id`）は作成時に呼び出した人になり、その後はログイン中の誰も変えられない。
-- **ブラウザが書ける所属の行は、見えている Domain・Object に member として自分が加わる行だけ（Discover）。** 他人の行も、owner の行も、Space の行も書けない。所属の行は人と対象を変えられず、変えられるのは役割だけ。`domain_members` / `object_members` の役割は owner / admin / member で、Domain と Object は Space と同じく最後の owner を外せない（対象そのものやアカウントの削除は別）。
+- **ブラウザが書ける所属の行は、見えている Domain・Object に member として自分が加わる行だけ（Discover）。** 他人の行も、owner の行も、Space の行も書けない。所属の行は人と対象を変えられず、変えられるのは役割だけ。`domain_members` / `object_members` の役割は owner / admin / member で、Domain と Object は Space と同じく最後の owner を外せない（対象そのものやアカウントの削除は別）。例外は、Object の Domain の owner・admin がその Object の最後の owner を外すときで、その人が同じ操作の中で owner を引き継ぐ。Domain の owner・admin は、Object に参加しなくてもそのメンバーを見て外せる。
 - **どの経路で参加しても、同じ対象への保留中の招待は承諾済みになる。** 保留中の招待の相手がすでにメンバーである状態は作らない。
 - **招待は Inbox と Profile に届く。** Inbox では Accept / Decline を出し、答えた後はその結果を示す。Space をまだ持たない人の初回画面にも保留中の招待を並べ、Space を作らずに招待へ参加できるようにする。メンバー一覧は保留中の招待を「Invited」として淡く示し、管理する人には「Cancel invite」を出す。保留中の招待はピッカー・Worker・所属の判定のどれにも入らない。
 
@@ -38,7 +38,7 @@ Space・Domain・Object の所属（`activity_space_members` / `domain_members` 
 
 辞退から 7 日は同じ人を同じ対象に招けないようにしたのは、辞退の直後に招き直すと通知を繰り返し送れてしまうから。取り消した招待は相手が断ったわけではないので、待たずに招き直せる。
 
-最後の owner を外せないようにしたのは、owner のいない Domain・Object を誰も管理できなくなるから。Space にはすでに同じ制約がある。
+最後の owner を外せないようにしたのは、owner のいない Domain・Object を誰も管理できなくなるから。Space にはすでに同じ制約がある。ただし Object を作った人が Space や Domain から外れても、その Object の唯一の owner として中身を見続け、削除もできてしまう。Object を管理するのはその Domain の owner・admin なので、その人たちが最後の owner を外したときは引き継ぎにした。外すことを拒めば外れた人のアクセスが残り、引き継がずに外せば owner のいない Object が残る。
 
 招いた人の権限を承諾の時点で確かめ直すのは、外されたオーナーの古い招待が、外された後に所属を作らないようにするため。
 

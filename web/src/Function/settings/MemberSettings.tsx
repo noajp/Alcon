@@ -13,6 +13,7 @@ import { Button } from '@/ui/button';
 import { SettingsSection } from './SettingsSection';
 import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
+import { membershipErrorMessage } from '@/Function/membership/membershipErrors';
 
 // Cross-boundary read of the current ActivitySpace: every Space member (role
 // editable here) plus every Guest across the Space's Domains (a domain_member
@@ -174,7 +175,7 @@ export function MemberSettings() {
       setMembers((list) => list.map((m) => (m.user_id === member.user_id ? { ...m, role: prevRole } : m)));
       setRowErrors((prev) => ({
         ...prev,
-        [member.user_id]: e instanceof Error ? e.message : 'Failed to update role',
+        [member.user_id]: membershipErrorMessage(e, 'Failed to update role'),
       }));
     } finally {
       setPendingUserId(null);
