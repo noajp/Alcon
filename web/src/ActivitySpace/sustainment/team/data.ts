@@ -341,12 +341,16 @@ async function createWorkerAvailability(
 }
 
 async function deleteWorkerAvailability(id: string): Promise<void> {
-  const { error } = await supabase
+  // Only someone who manages the Worker may remove a span (RLS); a refused
+  // delete matches no row and returns no error, so report it.
+  const { data, error } = await supabase
     .from('worker_availability')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
   if (error) throw error;
+  if (!data?.length) throw new Error('Only someone who manages this Worker can change their availability.');
 }
 
 /** Shared empty map, so an empty roster returns the same object every render. */
