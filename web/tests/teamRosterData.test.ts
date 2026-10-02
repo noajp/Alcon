@@ -47,7 +47,7 @@ import { buildTeamRoster } from '@/ActivitySpace/sustainment/team/teamRoster';
 
 const RPC = 'get_space_guest_domain_members';
 const worker = (id: string, userId: string) => ({
-  id, name: id, user_id: userId, object_id: null, type: 'human', display_id: null,
+  id, name: id, user_id: userId, object_id: null, activity_space_id: null, type: 'human', display_id: null,
   seq_number: null, role: null, email: null, avatar_url: null, ai_model: null,
   ai_config: null, status: 'active', capacity_hours_per_day: null, created_at: null, updated_at: null,
 } satisfies Worker);

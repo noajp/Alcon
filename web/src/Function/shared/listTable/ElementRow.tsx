@@ -5,13 +5,13 @@ import { Grip, Lock, Check, Trash2, Fingerprint } from 'lucide-react';
 import { BUILTIN_COLUMN_ICONS } from '@/Function/property/columnTypes';
 import type { CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { scheduleElementDetailPrefetch, cancelElementDetailPrefetch } from '@/ActivitySpace/execution/element/elementDetailQueries';
-import { deleteElement, addElementAssignee, removeElementAssignee, fetchAllWorkers } from '@/hooks/useSupabase';
+import { deleteElement, addElementAssignee, removeElementAssignee, fetchAssignableWorkers } from '@/hooks/useSupabase';
+import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { describeBlocker, type DependencyBlocker } from '@/ActivitySpace/execution/element/dependencyReadiness';
 import { displayIdOf } from '@/ActivitySpace/execution/element/displayId';
 import { DisplayIdChip } from '@/ActivitySpace/execution/element/DisplayIdChip';
 import { liveLease, holderLabel, formatRemaining } from '@/ActivitySpace/execution/element/lease';
 import { useNow } from '@/Function/shared/useNow';
-import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
 import { useSortable } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
@@ -457,13 +457,18 @@ function AssigneeContextSub({
   onOpenChange: (open: boolean) => void;
   onTriggerEnter: () => void;
 }) {
-  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [candidates, setCandidates] = useState<Worker[]>([]);
   const load = () => {
-    if (workers.length === 0) {
-      fetchAllWorkers(getActiveDomainId()).then(setWorkers).catch((e) => console.error('Failed to load workers', e));
+    if (candidates.length === 0) {
+      fetchAssignableWorkers({ elementId: el.id }).then(setCandidates).catch((e) => console.error('Failed to load workers', e));
     }
   };
   const assignees = el.assignees ?? [];
+  // Who is already on it stays listed (and removable) even when outside the
+  // Workers this Element can be assigned to.
+  const workers = candidates.length === 0
+    ? candidates
+    : withCurrentWorkers(candidates, assignees.map((a) => a.worker ?? null));
   const toggle = async (workerId: string) => {
     const existing = assignees.find((a) => a.worker_id === workerId);
     try {

@@ -121,13 +121,18 @@ export {
 } from '@/Function/property/data';
 
 export {
+  assignWorkersToElement,
   createWorker,
   deleteWorker,
   fetchAllWorkers,
+  fetchAssignableWorkers,
   fetchWorkerAvailability,
   invalidateWorkersCache,
   updateWorker,
+  useAssignableWorkers,
+  useSelfWorker,
   useWorkerAvailability,
+  useWorkerById,
   useWorkerCommitments,
   useWorkers,
 } from '@/ActivitySpace/sustainment/team/data';

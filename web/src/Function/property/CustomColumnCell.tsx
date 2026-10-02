@@ -7,7 +7,7 @@ import type { CustomColumnOptions } from '@/types/database';
 import { MenuShell } from '@/Function/shared/menu';
 import { CalendarIcon, Check } from 'lucide-react';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
-import { useWorkers } from '@/hooks/useSupabase';
+import { useWorkerById, useWorkers } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
@@ -211,8 +211,9 @@ function CustomColumnCellBody({
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Person picker: fetches workers once, lets user pick by name. Stores
-// the worker_id as the cell value.
+// Person picker: offers the active Space's assignable Workers, lets user
+// pick by name. Stores the worker_id as the cell value. The current value
+// resolves by id, so a Worker outside the list still shows its name.
 // ─────────────────────────────────────────────────────────────────────
 function PersonCell({
   value,
@@ -227,7 +228,7 @@ function PersonCell({
 }) {
   const { data: workers } = useWorkers();
   const currentId = typeof value === 'string' ? value : '';
-  const current = workers.find((w) => w.id === currentId) || null;
+  const current = useWorkerById(currentId || null, workers);
 
   return renderWithLabel(
     <Popover>

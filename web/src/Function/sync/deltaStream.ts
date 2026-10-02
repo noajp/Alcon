@@ -177,6 +177,10 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
   if (['domains', 'domain_members', 'activity_space_members'].includes(d.table)) {
     invalidateSoon(qc, ['sustainment-domains']);
   }
+  // Who can be assigned follows memberships (list_assignable_workers).
+  if (['domain_members', 'object_members', 'activity_space_members', 'object_domains'].includes(d.table)) {
+    invalidateSoon(qc, ['workers']);
+  }
   if (['elements', 'element_assignees', 'element_objects'].includes(d.table)) {
     invalidateSoon(qc, ['worker-commitments']);
     invalidateSoon(qc, ['element-detail']);

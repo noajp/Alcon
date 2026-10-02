@@ -4,7 +4,7 @@ import type { Worker } from '@/types/database';
 
 function worker(id: string, overrides: Partial<Worker> = {}): Worker {
   return {
-    id, name: id, object_id: null, user_id: null, type: 'human', display_id: null,
+    id, name: id, object_id: null, user_id: null, activity_space_id: null, type: 'human', display_id: null,
     seq_number: null, role: null, email: null, avatar_url: null, ai_model: null,
     ai_config: null, status: 'active', capacity_hours_per_day: null, created_at: null,
     updated_at: null, ...overrides,

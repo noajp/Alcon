@@ -7,6 +7,7 @@ import { Plus, Trash2, UserPlus, X } from 'lucide-react';
 import { isCommitEnter, useEscapeLayer } from '@/Function/shared/keyboard';
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { createWorker, deleteWorker, updateWorker } from '@/hooks/useSupabase';
 import type { Worker } from '@/types/database';
 import { ReachHint, WorkerAvatar } from '@/Function/shared/WorkerAvatar';
@@ -24,7 +25,10 @@ interface TeamSettingsProps {
 
 export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   const { user } = useAuthContext();
+  const activeSpaceId = useActiveSpaceId();
   const [workers, setWorkers] = useState<Worker[]>([]);
+  // The Space a Worker added here belongs to: the Domain's, else the active one.
+  const [workerSpaceId, setWorkerSpaceId] = useState<string | null>(null);
   const [memberUserIds, setMemberUserIds] = useState<Set<string>>(new Set());
   const [myRole, setMyRole] = useState<'owner' | 'member' | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,16 +55,24 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   const reload = async () => {
     setLoading(true);
     try {
-      const [{ data: workersData, error: workersErr }, memberRowsResult] = await Promise.all([
-        supabase.from('workers').select('*').order('type').order('name'),
+      // The Workers of the active Space (a Domain's own Space when scoped to
+      // one) — the same list the assignee pickers offer.
+      const [{ data: workersData, error: workersErr }, memberRowsResult, domainResult] = await Promise.all([
+        supabase.rpc('list_assignable_workers', { p_space_id: activeSpaceId, p_domain_id: domainId ?? null }),
         domainId
           ? supabase.from('domain_members').select('user_id, role').eq('domain_id', domainId)
+          : Promise.resolve({ data: null, error: null } as const),
+        domainId
+          ? supabase.from('domains').select('activity_space_id').eq('id', domainId).maybeSingle()
           : Promise.resolve({ data: null, error: null } as const),
       ]);
       if (workersErr) throw workersErr;
       if (memberRowsResult.error) throw memberRowsResult.error;
       const memberRows = (memberRowsResult.data ?? []) as { user_id: string; role: 'owner' | 'member' }[];
       setWorkers((workersData ?? []) as Worker[]);
+      setWorkerSpaceId(
+        (domainResult.data as { activity_space_id: string | null } | null)?.activity_space_id ?? activeSpaceId,
+      );
       setMemberUserIds(new Set(memberRows.map((r) => r.user_id)));
       setMyRole(memberRows.find((r) => r.user_id === user?.id)?.role ?? null);
       setError(null);
@@ -74,7 +86,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   useEffect(() => {
     void reload();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [domainId, user?.id]);
+  }, [domainId, user?.id, activeSpaceId]);
 
   const handleDelete = async (id: string) => {
     if (!await appDialog.confirm('Remove this team member? Their assignments will be cleared.')) return;
@@ -184,6 +196,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
 
       {showAdd && (
         <AddMemberDialog
+          spaceId={workerSpaceId}
           onClose={() => setShowAdd(false)}
           onCreated={(w) => {
             setWorkers((prev) => [...prev, w]);
@@ -279,9 +292,12 @@ function WorkerRow({
 }
 
 function AddMemberDialog({
+  spaceId,
   onClose,
   onCreated,
 }: {
+  /** The Space the new Worker belongs to. */
+  spaceId: string | null;
   onClose: () => void;
   onCreated: (worker: Worker) => void;
 }) {
@@ -303,6 +319,7 @@ function AddMemberDialog({
       const created = await createWorker({
         name: name.trim(),
         type,
+        activity_space_id: spaceId,
         role: role.trim() || null,
         email: type === 'human' ? email.trim() || null : null,
         ai_model: type === 'ai_agent' ? aiModel.trim() || null : null,

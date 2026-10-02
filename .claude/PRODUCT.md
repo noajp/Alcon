@@ -333,7 +333,7 @@ Workers / Resource / Calendar / Gantt は Sustainment の道具を Object 単位
 - **CRM / SCM は Table の見せ方** — 業務入力は共通の Table スキーマ、列 ID の対応と試算条件は `widget_boards`。計算結果は入力から導出する
 - **active な Domain は localStorage 永続** — どの Domain を開いているかはクライアント側で切替
 - **Notebook は 2 階層** — `notes`（Folder→File ツリー、Folder はルート）+ `note_contents.html`
-- **Worker = human | ai_agent** — 同一テーブルで人的リソースと AI エージェントを管理
+- **Worker = human | ai_agent** — 同一テーブルで人的リソースと AI エージェントを管理。Space は `user_id`（メンバーシップ）→ `object_id`（Object の Space）→ `activity_space_id` の順に決まり、列はどちらも持たない Worker のためだけにある
 
 ## 境界と権限（Boundary & Permissions）
 
@@ -344,6 +344,7 @@ Workers / Resource / Calendar / Gantt は Sustainment の道具を Object 単位
 - **Domain 可視性 `domains.privacy`** — `workspace`＝同じ Space のメンバー全員が閲覧可。`private`＝`domain_members` のみ。
 - **可視性カスケード** — Domain 可視 ⇔ domain_member、または（`workspace` かつ Space メンバー）。Object 可視 ⇔ object_member、または所属 Domain が可視。Element 可視 ⇔ 所有者、または所属 Object が可視。
 - **サーバーで強制** — 上記は SECURITY DEFINER ヘルパー（`user_can_see_domain` / `user_can_see_object` / `user_can_see_element`）として RLS に組み込む。クライアント表示任せにしない。横断取得 RPC `get_explorer_data` も同じ可視性で Object/Element を返す。
+- **Worker は Space に属する** — 人の Worker は Space・Domain・Object のメンバーシップで、Object の Worker はその Object で、どちらもない Worker（AI・アカウントのない人）は `workers.activity_space_id` で Space が決まる。割り当てられるのは Element と同じ Space の Worker で、人ならその人自身も Element を見られること（`worker_assignable` / `list_assignable_workers`。ピッカー・テンプレート・ボードツール・エージェントの Worker 選択が通る）。すでに付いている担当者・Lead の名前は、割り当ての範囲外でも見える Element・Object の上で表示する。各 Space に AI Worker「Claude」を置き、メンバーになると自分の human Worker が DB で用意される。判断は [ADR 0028](../docs/adr/0028-workers-belong-to-a-space.md)。
 - **招待 UI** — Space 招待は ActivitySpace 設定（owner のみ）、Domain 招待（Guest 化）は Domain の Team 設定から。
 - **Table と CRM / SCM** — Table の RLS は `created_by = auth.uid()` による所有者限定。`domain_id` を付けても Space メンバー全員に共有されない。CRM / SCM は active Space の Domain に属する Table と、Domain 未指定の個人 Table を選択できる。配置はユーザー・Space 別に保存する。
 

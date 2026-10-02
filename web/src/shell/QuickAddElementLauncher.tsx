@@ -5,7 +5,7 @@ import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { QuickAddElementPopup, type NewElementInput } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
 import {
-  addElementAssignee,
+  assignWorkersToElement,
   createElement,
   fetchAllWorkers,
   useDomains,
@@ -176,11 +176,7 @@ export function QuickAddElementLauncher({
           priority: input.priority ?? undefined,
           due_date: presetDueDate ?? undefined,
         });
-        for (const wid of input.assigneeWorkerIds ?? []) {
-          try {
-            await addElementAssignee({ element_id: created.id, worker_id: wid, role: 'assignee' });
-          } catch (e) { console.warn('Could not assign Element:', e); }
-        }
+        await assignWorkersToElement(created.id, input.assigneeWorkerIds ?? []);
       } catch (e) { console.error('Failed to create Element', e); }
     }
     // Remember the landing Object so the next context-less C targets it too.

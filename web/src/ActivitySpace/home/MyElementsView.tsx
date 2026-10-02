@@ -7,12 +7,14 @@ import { Plus } from 'lucide-react';
 import { fetchMyElements, type MyElementsData } from '@/ActivitySpace/home/myElementsData';
 import { useAuthContext } from '@/providers/AuthProvider';
 import {
-  addElementAssignee,
+  assignWorkersToElement,
   createElement,
   updateElement,
   deleteElement,
   useDomains,
+  useWorkers,
 } from '@/hooks/useSupabase';
+import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
 import type {
@@ -141,6 +143,10 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
     }
     return Array.from(map.values());
   }, [myWorkers, elements]);
+  // QuickAdd's Assignee pill: yourself, then the Workers assignable in the
+  // active Space.
+  const { data: spaceWorkers } = useWorkers();
+  const popupWorkers = useMemo(() => withCurrentWorkers(myWorkers, spaceWorkers), [myWorkers, spaceWorkers]);
 
   const handleElementUpdate = useCallback(async (
     elementId: string,
@@ -250,13 +256,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
         const assigneeIds = input.assigneeWorkerIds && input.assigneeWorkerIds.length > 0
           ? input.assigneeWorkerIds
           : (myWorkers[0] ? [myWorkers[0].id] : []);
-        for (const wid of assigneeIds) {
-          try {
-            await addElementAssignee({ element_id: created.id, worker_id: wid, role: 'assignee' });
-          } catch (assignErr) {
-            console.warn('Could not assign personal Element:', assignErr);
-          }
-        }
+        await assignWorkersToElement(created.id, assigneeIds);
       } catch (e) {
         console.error('Failed to create personal Element', e);
       }
@@ -345,7 +345,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
         types={elementTypes}
-        workers={workerOptions.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
+        workers={popupWorkers.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
         availableLabels={labelOptions}
       />
 
