@@ -6,8 +6,8 @@
 //   { integrationId }
 // Response:
 //   { last_test: { ok, at, code, detail, tools?, tool_count?, status? } }
-//     mcp   initialize + tools/list → connected; tool_count and up to 20
-//           tools ({ name, readOnly }).
+//     mcp   initialize + tools/list → connected for a preset, reachable for
+//           a custom server; tool_count and up to 20 tools ({ name, readOnly }).
 //     http  a preset with a credential check (VERIFY) → connected or
 //           auth_failed. Any other API: GET on the base URL; a response
 //           below 500 other than 401 / 403 is only "reachable".
@@ -73,8 +73,10 @@ async function runTest(row: IntegrationRow & { preset: string | null }, secret: 
       const session = new McpSession(row, secret);
       await session.initialize();
       const tools = await session.listTools();
+      // A preset's server refuses tools/list without a valid credential; a
+      // custom server may answer anyone, so it is only "reachable".
       return {
-        ok: true, at, code: "connected", detail: "",
+        ok: true, at, code: row.preset ? "connected" : "reachable", detail: "",
         tool_count: tools.length,
         tools: tools.slice(0, MAX_LISTED_TOOLS).map((t) => ({ name: t.name, readOnly: t.readOnly })),
       };

@@ -12,7 +12,7 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import type { Integration } from '@/types/database';
 import {
   CATEGORY_LABELS, EMPTY_FILTER, INTEGRATION_PRESETS, KIND_LABELS, SOURCE_LABELS,
-  filterPresets, installedPresetIds, presetById, readLastTest,
+  filterPresets, installedPresetIds, presetById, readLastTest, testOutcomeLabel,
   type CatalogFilter, type IntegrationPreset,
 } from './catalog';
 import { useIntegrations, useIsSpaceOwner } from './data';
@@ -267,10 +267,18 @@ function TestStatus({ integration }: { integration: Integration }) {
   const { t } = useI18n();
   const last = readLastTest(integration.last_test);
   if (!last) return <span className="shrink-0 text-[11px] text-muted-foreground">{t('Not tested')}</span>;
+  // Only a checked credential is "Connected"; a custom API that merely
+  // answered is "Reachable", in a neutral tone.
+  const tone = last.code === 'connected' ? 'success' : last.ok ? 'neutral' : 'danger';
   return (
-    <span className={cn('inline-flex shrink-0 items-center gap-1.5 text-[11px]', last.ok ? 'text-[var(--status-success)]' : 'text-[var(--status-danger)]')}>
-      <span aria-hidden="true" className={cn('size-1.5 rounded-full', last.ok ? 'bg-[var(--status-success)]' : 'bg-[var(--status-danger)]')} />
-      {last.ok ? t('Connected') : t('Error')}
+    <span
+      title={t(testOutcomeLabel(last.code))}
+      className={cn('inline-flex shrink-0 items-center gap-1.5 text-[11px]',
+        tone === 'success' ? 'text-[var(--status-success)]' : tone === 'danger' ? 'text-[var(--status-danger)]' : 'text-muted-foreground')}
+    >
+      <span aria-hidden="true" className={cn('size-1.5 rounded-full',
+        tone === 'success' ? 'bg-[var(--status-success)]' : tone === 'danger' ? 'bg-[var(--status-danger)]' : 'bg-muted-foreground')} />
+      {tone === 'success' ? t('Connected') : tone === 'neutral' ? t('Reachable') : t('Error')}
     </span>
   );
 }

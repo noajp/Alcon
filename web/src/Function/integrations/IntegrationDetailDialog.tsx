@@ -13,8 +13,9 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ToggleRow } from '@/Function/settings/SettingsControls';
 import type { Integration } from '@/types/database';
 import {
-  KIND_LABELS, SOURCE_LABELS, buildIntegrationRow, readLastTest,
-  type IntegrationAuthType, type IntegrationDelegation, type IntegrationPreset, type IntegrationSource, testOutcomeLabel } from './catalog';
+  KIND_LABELS, SOURCE_LABELS, buildIntegrationRow, readLastTest, testOutcomeLabel,
+  type IntegrationAuthType, type IntegrationDelegation, type IntegrationPreset, type IntegrationSource,
+} from './catalog';
 import { useIntegrationActions } from './data';
 
 // One integration: connect a preset (or a custom MCP / API), or manage an
