@@ -236,7 +236,11 @@ begin
       if not public.user_can_see_element(p_element) then return false; end if;
       if not alcon_internal.user_can_list_worker(p_worker) then return false; end if;
       select * into w from public.workers where id = p_worker;
-      if not found or w.status is not distinct from 'inactive' then return false; end if;
+      -- An inactive Worker takes no new work, except that a person may
+      -- always assign themselves.
+      if not found or (w.status is not distinct from 'inactive' and w.user_id is distinct from auth.uid()) then
+        return false;
+      end if;
       s := alcon_internal.element_home_space(p_element);
       if s is not null then
         if not alcon_internal.worker_in_space(p_worker, s) then return false; end if;

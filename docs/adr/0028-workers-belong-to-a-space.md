@@ -16,7 +16,7 @@ Worker には 3 種類ある。アカウントに結び付いた人（`user_id`�
 ## 決定
 
 - **Worker の Space は所属で決める。** `user_id` があれば、その人の Space メンバー・Domain メンバー・Object メンバーの所属。なければ `object_id` の Object の Space。どちらもない Worker だけ `workers.activity_space_id`（`on delete set null`）で決める。CHECK 制約は置かない。
-- **割り当ては境界に従う。** `worker_assignable(worker, element)` が真になるのは次のすべてを満たすとき：呼び出した人が Element を見られる。その Worker を一覧できる。Worker が inactive でない。Element の Space（主 Object の Domain の Space）があれば Worker がその Space に属する。人の Worker なら、その人自身も Element を見られる。担当者の候補は `list_assignable_workers(space, domain, element)` で取り、アプリのピッカー、テンプレート、MCP / Copilot のボードツール、エージェントの Worker 選択がすべてこれを通る。
+- **割り当ては境界に従う。** `worker_assignable(worker, element)` が真になるのは次のすべてを満たすとき：呼び出した人が Element を見られる。その Worker を一覧できる。Worker が inactive でない（自分自身を割り当てる場合は inactive でもよい）。Element の Space（主 Object の Domain の Space）があれば Worker がその Space に属する。人の Worker なら、その人自身も Element を見られる。担当者の候補は `list_assignable_workers(space, domain, element)` で取り、アプリのピッカー、テンプレート、MCP / Copilot のボードツール、エージェントの Worker 選択がすべてこれを通る。
 - **名前は Element に付いてくる。** 割り当てられない Worker でも、見える Element や Object にすでに付いていれば名前を表示する。Assignee は `element.assignees`、Lead や Person 型の Property は id で引いて表示する。
 - **Space ごとに AI を置く。** 各 Space に ai_agent の Worker「Claude」を 1 つ置き、新しい Space には作成時のトリガで作る。エージェントは、Element に割り当てられる AI Worker のプロファイルだけを読み、それ以外は既定のエージェントとして動く。
 - **メンバーになると自分の Worker ができる。** Space・Domain・Object のメンバーになったとき、DB のトリガがその人の human Worker を用意する。アプリが他人の Worker 行を作ることはない。
