@@ -20,13 +20,21 @@
 -- row in public.membership_invitations, written only by invite_member, and
 -- becomes a membership only through respond_to_invite by the invitee.
 --
---   - Browsers insert membership rows only for themselves: the creator of a
---     Space / Domain / Object as its first member, or a person joining as
---     'member' a Domain or Object they can already see (Discover).
---   - No membership row can change person or scope (trigger).
+--   - The creator's owner membership is written by the server: an AFTER
+--     INSERT trigger on activity_spaces / domains / objects enrols auth.uid()
+--     as owner. Browsers write no owner rows and no rows for other people;
+--     the only browser INSERT left is joining, as 'member', a Domain or
+--     Object they can already see (Discover). activity_space_members has no
+--     browser INSERT at all.
+--   - The creator columns (activity_spaces.created_by, domains.user_id,
+--     objects.user_id) are stamped on insert and fixed afterwards, so no one
+--     can make themselves the "creator" of something that already exists.
+--   - No membership row can change person or scope (trigger), and a Domain or
+--     Object keeps at least one owner, like a Space.
 --   - domain_members / object_members roles are owner / admin / member.
---   - invite_member notifies the invitee with kind 'invite'; joining by any
---     path settles that person's pending invitation to the same scope.
+--   - invite_member notifies the invitee with kind 'invite' and refuses to
+--     invite again for 7 days after they declined; joining by any path
+--     settles that person's pending invitation to the same scope.
 --
 -- Every existing membership row was written by its own member (creators), so
 -- no data changes: existing rows are the accepted state.
@@ -107,24 +115,6 @@ begin
   ]::text[]))';
 
   -- ── Helpers ─────────────────────────────────────────────────────────────
-  -- Whether a scope already has a member: the creator's self-join is only the
-  -- first row. SECURITY DEFINER so it counts rows the caller cannot read.
-  execute $f$
-    create or replace function alcon_internal.space_has_members(p_space uuid)
-    returns boolean language sql stable security definer set search_path = ''
-    as $b$ select exists (select 1 from public.activity_space_members where activity_space_id = p_space) $b$
-  $f$;
-  execute $f$
-    create or replace function alcon_internal.domain_has_members(p_domain uuid)
-    returns boolean language sql stable security definer set search_path = ''
-    as $b$ select exists (select 1 from public.domain_members where domain_id = p_domain) $b$
-  $f$;
-  execute $f$
-    create or replace function alcon_internal.object_has_members(p_object uuid)
-    returns boolean language sql stable security definer set search_path = ''
-    as $b$ select exists (select 1 from public.object_members where object_id = p_object) $b$
-  $f$;
-
   -- Who may invite to (and cancel invitations of) a scope, for a given
   -- person: a Space owner; a Domain owner or admin; an owner or admin of the
   -- Object's Domain.
@@ -165,14 +155,8 @@ begin
     $b$
   $f$;
 
-  execute 'revoke all on function alcon_internal.space_has_members(uuid) from public, anon';
-  execute 'revoke all on function alcon_internal.domain_has_members(uuid) from public, anon';
-  execute 'revoke all on function alcon_internal.object_has_members(uuid) from public, anon';
   execute 'revoke all on function alcon_internal.user_manages_scope_as(uuid, text, uuid) from public, anon';
   execute 'revoke all on function alcon_internal.user_can_see_invitation(uuid, uuid, uuid, uuid, uuid) from public, anon';
-  execute 'grant execute on function alcon_internal.space_has_members(uuid) to authenticated';
-  execute 'grant execute on function alcon_internal.domain_has_members(uuid) to authenticated';
-  execute 'grant execute on function alcon_internal.object_has_members(uuid) to authenticated';
   execute 'grant execute on function alcon_internal.user_manages_scope_as(uuid, text, uuid) to authenticated';
   execute 'grant execute on function alcon_internal.user_can_see_invitation(uuid, uuid, uuid, uuid, uuid) to authenticated';
   execute 'grant usage on schema alcon_internal to authenticated';
@@ -182,17 +166,86 @@ begin
     for select to authenticated
     using (alcon_internal.user_can_see_invitation(activity_space_id, domain_id, object_id, invitee_id, invited_by))';
 
-  -- ── Membership rows: only yourself, only as described ───────────────────
+  -- ── Creators are enrolled by the server ─────────────────────────────────
+  -- The creator columns are the caller on insert and never change afterwards
+  -- from a signed-in session (auth.uid() is set). Server jobs and the service
+  -- role (auth.uid() null) are left alone.
+  execute $f$
+    create or replace function alcon_internal.objects_stamp_creator()
+    returns trigger language plpgsql set search_path = ''
+    as $b$
+    begin
+      if auth.uid() is not null then
+        new.user_id := auth.uid();
+      end if;
+      return new;
+    end
+    $b$
+  $f$;
+  execute 'drop trigger if exists objects_stamp_creator on public.objects';
+  execute 'create trigger objects_stamp_creator before insert on public.objects
+    for each row execute function alcon_internal.objects_stamp_creator()';
+
+  execute $f$
+    create or replace function alcon_internal.creator_is_fixed()
+    returns trigger language plpgsql set search_path = ''
+    as $b$
+    begin
+      if auth.uid() is not null
+         and (to_jsonb(new) ->> tg_argv[0]) is distinct from (to_jsonb(old) ->> tg_argv[0]) then
+        raise exception 'The creator of a % cannot be changed', tg_argv[1] using errcode = '42501';
+      end if;
+      return new;
+    end
+    $b$
+  $f$;
+  execute 'drop trigger if exists activity_spaces_creator_fixed on public.activity_spaces';
+  execute 'create trigger activity_spaces_creator_fixed before update on public.activity_spaces
+    for each row execute function alcon_internal.creator_is_fixed(''created_by'', ''Space'')';
+  execute 'drop trigger if exists domains_creator_fixed on public.domains';
+  execute 'create trigger domains_creator_fixed before update on public.domains
+    for each row execute function alcon_internal.creator_is_fixed(''user_id'', ''Domain'')';
+  execute 'drop trigger if exists objects_creator_fixed on public.objects';
+  execute 'create trigger objects_creator_fixed before update on public.objects
+    for each row execute function alcon_internal.creator_is_fixed(''user_id'', ''Object'')';
+
+  -- Whoever creates a Space, Domain or Object is its first owner, written in
+  -- the same statement — the browser never writes an owner row.
+  execute $f$
+    create or replace function alcon_internal.enrol_creator_as_owner()
+    returns trigger language plpgsql security definer set search_path = ''
+    as $b$
+    begin
+      if auth.uid() is null then
+        return new;
+      end if;
+      if tg_table_name = 'activity_spaces' then
+        insert into public.activity_space_members (activity_space_id, user_id, role)
+        values (new.id, auth.uid(), 'owner') on conflict do nothing;
+      elsif tg_table_name = 'domains' then
+        insert into public.domain_members (domain_id, user_id, role)
+        values (new.id, auth.uid(), 'owner') on conflict do nothing;
+      else
+        insert into public.object_members (object_id, user_id, role)
+        values (new.id, auth.uid(), 'owner') on conflict do nothing;
+      end if;
+      return new;
+    end
+    $b$
+  $f$;
+  execute 'revoke all on function alcon_internal.enrol_creator_as_owner() from public, anon, authenticated';
+  execute 'drop trigger if exists activity_spaces_enrol_creator on public.activity_spaces';
+  execute 'create trigger activity_spaces_enrol_creator after insert on public.activity_spaces
+    for each row execute function alcon_internal.enrol_creator_as_owner()';
+  execute 'drop trigger if exists domains_enrol_creator on public.domains';
+  execute 'create trigger domains_enrol_creator after insert on public.domains
+    for each row execute function alcon_internal.enrol_creator_as_owner()';
+  execute 'drop trigger if exists objects_enrol_creator on public.objects';
+  execute 'create trigger objects_enrol_creator after insert on public.objects
+    for each row execute function alcon_internal.enrol_creator_as_owner()';
+
+  -- ── Membership rows from browsers: joining a visible scope as member ────
   execute 'drop policy if exists activity_space_members_insert on public.activity_space_members';
-  execute 'create policy activity_space_members_insert on public.activity_space_members
-    for insert to authenticated
-    with check (
-      user_id = auth.uid()
-      and role = ''owner''
-      and exists (select 1 from public.activity_spaces s
-                   where s.id = activity_space_members.activity_space_id and s.created_by = auth.uid())
-      and not alcon_internal.space_has_members(activity_space_members.activity_space_id)
-    )';
 
   execute 'drop policy if exists "dm insert self or owner" on public.domain_members';
   execute 'drop policy if exists "dm insert self" on public.domain_members';
@@ -200,12 +253,8 @@ begin
     for insert to authenticated
     with check (
       user_id = auth.uid()
-      and (
-        (exists (select 1 from public.domains d
-                  where d.id = domain_members.domain_id and d.user_id = auth.uid())
-         and not alcon_internal.domain_has_members(domain_members.domain_id))
-        or (role = ''member'' and public.user_can_see_domain(domain_members.domain_id))
-      )
+      and role = ''member''
+      and public.user_can_see_domain(domain_members.domain_id)
     )';
 
   execute 'drop policy if exists "om insert self or domain-owner" on public.object_members';
@@ -214,13 +263,68 @@ begin
     for insert to authenticated
     with check (
       user_id = auth.uid()
-      and (
-        (exists (select 1 from public.objects o
-                  where o.id = object_members.object_id and o.user_id = auth.uid())
-         and not alcon_internal.object_has_members(object_members.object_id))
-        or (role = ''member'' and public.user_can_see_object(object_members.object_id))
-      )
+      and role = ''member''
+      and public.user_can_see_object(object_members.object_id)
     )';
+
+  -- import_existing_work wrote the creator's owner rows itself; the trigger
+  -- does that now, and the browser policy no longer admits an owner row.
+  if to_regprocedure('public.import_existing_work(uuid, uuid, uuid, uuid, text, jsonb)') is not null then
+    declare
+      v_def text := pg_get_functiondef('public.import_existing_work(uuid, uuid, uuid, uuid, text, jsonb)'::regprocedure);
+      v_new text;
+    begin
+      v_new := replace(v_def,
+        'insert into public.domain_members(domain_id,user_id,role) values(v_domain,v_user,''owner'');',
+        '-- The creator''s owner row is written by domains_enrol_creator.');
+      v_new := replace(v_new,
+        'insert into public.object_members(object_id,user_id,role) values(v_object,v_user,''owner'');',
+        '-- The creator''s owner row is written by objects_enrol_creator.');
+      if v_new = v_def and position('domain_members(domain_id,user_id,role)' in v_def) > 0 then
+        raise exception 'import_existing_work: owner inserts not found to remove';
+      end if;
+      if v_new <> v_def then
+        execute v_new;
+      end if;
+    end;
+  end if;
+
+  -- ── A Domain or Object keeps at least one owner, like a Space ───────────
+  -- Deleting the scope itself, or the person's account, cascades through.
+  execute $f$
+    create or replace function alcon_internal.guard_last_scope_owner()
+    returns trigger language plpgsql security definer set search_path = ''
+    as $b$
+    declare
+      v_scope uuid := (to_jsonb(old) ->> tg_argv[0])::uuid;
+      v_exists boolean;
+      v_others integer;
+    begin
+      if old.role <> 'owner' or (tg_op = 'UPDATE' and new.role = 'owner') then
+        return coalesce(new, old);
+      end if;
+      execute format('select exists (select 1 from public.%I where id = $1)', tg_argv[1]) into v_exists using v_scope;
+      if not v_exists or not exists (select 1 from auth.users where id = old.user_id) then
+        return coalesce(new, old);
+      end if;
+      execute format('select 1 from public.%I where id = $1 for update', tg_argv[1]) using v_scope;
+      execute format('select count(*) from public.%I where %I = $1 and role = ''owner'' and user_id <> $2',
+                     tg_table_name, tg_argv[0])
+        into v_others using v_scope, old.user_id;
+      if v_others = 0 then
+        raise exception 'A % must keep at least one owner', tg_argv[2] using errcode = '23514';
+      end if;
+      return coalesce(new, old);
+    end
+    $b$
+  $f$;
+  execute 'revoke all on function alcon_internal.guard_last_scope_owner() from public, anon, authenticated';
+  execute 'drop trigger if exists domain_members_guard_last_owner on public.domain_members';
+  execute 'create trigger domain_members_guard_last_owner before delete or update on public.domain_members
+    for each row execute function alcon_internal.guard_last_scope_owner(''domain_id'', ''domains'', ''Domain'')';
+  execute 'drop trigger if exists object_members_guard_last_owner on public.object_members';
+  execute 'create trigger object_members_guard_last_owner before delete or update on public.object_members
+    for each row execute function alcon_internal.guard_last_scope_owner(''object_id'', ''objects'', ''Object'')';
 
   if not exists (select 1 from pg_constraint
                   where conrelid = 'public.domain_members'::regclass and conname = 'domain_members_role_check') then
@@ -351,6 +455,12 @@ begin
                   where status = 'pending' and invitee_id = p_user
                     and coalesce(activity_space_id, domain_id, object_id) = p_scope_id) then
         raise exception 'This person already has a pending invitation' using errcode = '23505';
+      end if;
+      if exists (select 1 from public.membership_invitations
+                  where status = 'declined' and invitee_id = p_user
+                    and coalesce(activity_space_id, domain_id, object_id) = p_scope_id
+                    and responded_at > now() - interval '7 days') then
+        raise exception 'This person declined an invitation here in the last 7 days' using errcode = '22023';
       end if;
 
       select nullif(btrim(p.display_name), '') into v_inviter_name from public.profiles p where p.id = v_actor;

@@ -11,7 +11,7 @@ import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { Button } from '@/ui/button';
 import { SettingsSection } from './SettingsSection';
-import { useScopeInvitations } from '@/Function/membership/invitations';
+import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
 
 // Cross-boundary read of the current ActivitySpace: every Space member (role
@@ -88,6 +88,7 @@ export function MemberSettings() {
   useEffect(() => {
     void reload();
   }, [reload]);
+  useWhenInvitationsSettle(invitees, () => void reload());
 
   const myRole = members.find((m) => m.user_id === user?.id)?.role ?? null;
   const isOwner = myRole === 'owner';

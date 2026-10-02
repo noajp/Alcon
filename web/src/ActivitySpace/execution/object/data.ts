@@ -118,16 +118,8 @@ export async function createObject(obj: {
     );
   }
 
-  // Auto-enrol the creator as an object_member with 'owner' role — same
-  // pattern as createDomain, scoped one level finer.
-  if (creatorId) {
-    await supabase.from('object_members').insert({
-      object_id: data.id,
-      user_id: creatorId,
-      role: 'owner',
-    });
-  }
-
+  // The database enrols the creator as the Object's owner in the same insert
+  // (objects_enrol_creator) — the browser writes no owner rows.
   return data;
 }
 

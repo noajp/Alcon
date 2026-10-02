@@ -691,6 +691,7 @@ Object.assign(ja, {
   'Every Domain member is already in this Object or invited to it.': 'Domain のメンバーは全員、この Object のメンバーか招待中です。',
   'Invitations': '招待', 'You join a Space, Domain or Object only when you accept its invitation.': 'Space・Domain・Object には、招待を承諾したときだけ参加します。',
   'No pending invitations.': '保留中の招待はありません。',
+  'This person declined an invitation here in the last 7 days. You can invite them again after that.': 'この人は 7 日以内にここへの招待を辞退しています。その後なら再び招待できます。',
 });
 
 Object.assign(ko, {
@@ -714,6 +715,7 @@ Object.assign(ko, {
   'Every Domain member is already in this Object or invited to it.': 'Domain의 모든 멤버가 이미 이 Object의 멤버이거나 초대되었습니다.',
   'Invitations': '초대', 'You join a Space, Domain or Object only when you accept its invitation.': 'Space, Domain, Object에는 초대를 수락할 때만 참여합니다.',
   'No pending invitations.': '대기 중인 초대가 없습니다.',
+  'This person declined an invitation here in the last 7 days. You can invite them again after that.': '이 사람은 최근 7일 안에 이곳의 초대를 거절했습니다. 그 이후에 다시 초대할 수 있습니다.',
 });
 
 Object.assign(fr, {
@@ -737,6 +739,7 @@ Object.assign(fr, {
   'Every Domain member is already in this Object or invited to it.': "Tous les membres du Domain sont déjà dans cet Object ou y sont invités.",
   'Invitations': 'Invitations', 'You join a Space, Domain or Object only when you accept its invitation.': "Vous rejoignez un Space, un Domain ou un Object uniquement en acceptant son invitation.",
   'No pending invitations.': 'Aucune invitation en attente.',
+  'This person declined an invitation here in the last 7 days. You can invite them again after that.': 'Cette personne a refusé une invitation ici au cours des 7 derniers jours. Vous pourrez la réinviter ensuite.',
 });
 
 Object.assign(es, {
@@ -760,4 +763,5 @@ Object.assign(es, {
   'Every Domain member is already in this Object or invited to it.': 'Todos los miembros del Domain ya están en este Object o invitados.',
   'Invitations': 'Invitaciones', 'You join a Space, Domain or Object only when you accept its invitation.': 'Te unes a un Space, Domain u Object solo al aceptar su invitación.',
   'No pending invitations.': 'No hay invitaciones pendientes.',
+  'This person declined an invitation here in the last 7 days. You can invite them again after that.': 'Esta persona rechazó una invitación aquí en los últimos 7 días. Podrás invitarla de nuevo después.',
 });

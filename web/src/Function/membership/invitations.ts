@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { SPACE_IDS_QUERY_KEY } from '@/ActivitySpace/execution/domain/data';
 import { notifyDomainsChanged } from '@/ActivitySpace/execution/domain/domainsStore';
@@ -48,6 +49,7 @@ function invitationErrorMessage(error: unknown): string {
       : 'This person is already a member.');
   }
   if (e?.code === 'P0002') return translate('This invitation no longer exists.');
+  if (/declined/i.test(message)) return translate('This person declined an invitation here in the last 7 days. You can invite them again after that.');
   if (/yourself/i.test(message)) return translate('You cannot invite yourself.');
   return translate('The invitation could not be sent. Try again.');
 }
@@ -169,4 +171,19 @@ export function useScopeInvitations(scope: InvitationScope, scopeId: string | nu
     },
   });
   return { invitees: query.data ?? EMPTY_INVITEES, refetch: query.refetch };
+}
+
+/** Re-read a member list when one of its pending invitations is answered or
+ *  canceled — the same realtime change that clears the "Invited" row, so an
+ *  accepted invitee appears as a member without reopening the list. */
+export function useWhenInvitationsSettle(invitees: PendingInvitee[], onSettled: () => void) {
+  const previous = useRef<ReadonlySet<string> | null>(null);
+  const callback = useRef(onSettled);
+  useEffect(() => { callback.current = onSettled; });
+  useEffect(() => {
+    const ids = new Set(invitees.map((i) => i.invitationId));
+    const before = previous.current;
+    previous.current = ids;
+    if (before && [...before].some((id) => !ids.has(id))) callback.current();
+  }, [invitees]);
 }

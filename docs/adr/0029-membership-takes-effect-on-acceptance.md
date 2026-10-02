@@ -17,11 +17,12 @@ Space・Domain・Object の所属（`activity_space_members` / `domain_members` 
 
 - **招待は `membership_invitations` に置く。** 所属の表は「参加している人」だけを表す。行は Space・Domain・Object のどれか 1 つを指し、招かれた人・招いた人・招いた時点の名前（`scope_name` / `inviter_name`）・状態（pending / accepted / declined / canceled）を持つ。同じ人への同じ対象の保留中の招待は 1 つだけ。
 - **書き込みは RPC だけが行う。** ブラウザに INSERT / UPDATE / DELETE の権限はない。
-  - `invite_member(scope, id, user)`：その対象を管理する人（Space のオーナー、Domain のオーナー・admin、Object の Domain のオーナー・admin）だけが呼べる。自分自身、すでにメンバーの人、保留中の招待がある人は招けない。招かれた人に `kind = 'invite'` の通知を送る。送り手は `auth.uid()`、文面はサーバーで作る。
+  - `invite_member(scope, id, user)`：その対象を管理する人（Space のオーナー、Domain のオーナー・admin、Object の Domain のオーナー・admin）だけが呼べる。自分自身、すでにメンバーの人、保留中の招待がある人、7 日以内に同じ対象への招待を辞退した人は招けない。招かれた人に `kind = 'invite'` の通知を送る。送り手は `auth.uid()`、文面はサーバーで作る。
   - `respond_to_invite(id, accept)`：招かれた本人だけが、保留中の間に呼べる。承諾すると役割 member で所属の行を作り、既存のトリガがその人の Worker を用意する。招いた人がもうその対象を管理していなければ、招待は取り消し扱いになる。
   - `cancel_invite(id)`：招いた人か、その対象を管理する人が取り消せる。通知も消える。
 - **招待を読めるのは**、招かれた人、招いた人、その対象のメンバー（一覧に「Invited」と出すため）、Object の Domain を管理する人。
-- **ブラウザが書ける所属の行は自分の分だけ。** 作った人が最初のメンバーになる（Space・Domain・Object に、まだ誰もいないとき）か、すでに見えている Domain・Object に member として加わる（Discover）。他人の行も、owner としての自己参加も書けない。所属の行は人と対象を変えられず、変えられるのは役割だけ。`domain_members` / `object_members` の役割は owner / admin / member。
+- **作った人の owner の行はサーバーが書く。** Space・Domain・Object を作ると、同じ INSERT の中でトリガが作った人（`auth.uid()`）を owner として登録する。作った人を表す列（`activity_spaces.created_by` / `domains.user_id` / `objects.user_id`）は作成時に呼び出した人になり、その後はログイン中の誰も変えられない。
+- **ブラウザが書ける所属の行は、見えている Domain・Object に member として自分が加わる行だけ（Discover）。** 他人の行も、owner の行も、Space の行も書けない。所属の行は人と対象を変えられず、変えられるのは役割だけ。`domain_members` / `object_members` の役割は owner / admin / member で、Domain と Object は Space と同じく最後の owner を外せない（対象そのものやアカウントの削除は別）。
 - **どの経路で参加しても、同じ対象への保留中の招待は承諾済みになる。** 保留中の招待の相手がすでにメンバーである状態は作らない。
 - **招待は Inbox と Profile に届く。** Inbox では Accept / Decline を出し、答えた後はその結果を示す。Space をまだ持たない人の初回画面にも保留中の招待を並べ、Space を作らずに招待へ参加できるようにする。メンバー一覧は保留中の招待を「Invited」として淡く示し、管理する人には「Cancel invite」を出す。保留中の招待はピッカー・Worker・所属の判定のどれにも入らない。
 
@@ -33,7 +34,11 @@ Space・Domain・Object の所属（`activity_space_members` / `domain_members` 
 
 承諾で所属の行を作るのは RPC の中だけにした。招待の状態をトリガで所属に変えると、状態を書ける経路がそのまま所属を作る経路になる。
 
-作った人の自己参加を「まだ誰もいないとき」に限ったのは、`domains.user_id` / `objects.user_id` / `activity_spaces.created_by` が作った人の証拠として十分でないから。Domain の admin は `domains.user_id` を書き換えられ、Object のメンバーは `objects.user_id` を書き換えられる。最初のメンバーに限れば、作成の直後にしか通らない。
+作った人の登録をブラウザに残すと、「作った人」を示す列が証拠になる。ところが Object のメンバーは `objects.user_id` を、Domain の admin は `domains.user_id` を書き換えられたので、「まだ誰もいないとき」に限っても、Discover で加わる → 列を自分に書き換える → 抜けて 0 人にする → 作った人として owner で戻る、という順で他人の Object の owner になれた。登録を作成と同じ INSERT のトリガに移せば、ブラウザが owner の行を書く経路そのものがなくなる。列を作成後に固定するのは、他の判定（`user_can_see_domain` の作成者の分岐など）でも作った人を偽れないようにするため。
+
+辞退から 7 日は同じ人を同じ対象に招けないようにしたのは、辞退の直後に招き直すと通知を繰り返し送れてしまうから。取り消した招待は相手が断ったわけではないので、待たずに招き直せる。
+
+最後の owner を外せないようにしたのは、owner のいない Domain・Object を誰も管理できなくなるから。Space にはすでに同じ制約がある。
 
 招いた人の権限を承諾の時点で確かめ直すのは、外されたオーナーの古い招待が、外された後に所属を作らないようにするため。
 

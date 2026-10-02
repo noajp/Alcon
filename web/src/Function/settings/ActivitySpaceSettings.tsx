@@ -12,7 +12,7 @@ import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { SettingsSection, SettingsRow } from './SettingsSection';
 import { InviteUserDialog } from './InviteUserDialog';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
-import { useScopeInvitations } from '@/Function/membership/invitations';
+import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
 
 interface SpaceMember {
@@ -88,6 +88,7 @@ export function ActivitySpaceSettings() {
   useEffect(() => {
     void reloadMembers();
   }, [reloadMembers]);
+  useWhenInvitationsSettle(invitees, () => void reloadMembers());
 
   const myRole = members.find((m) => m.user_id === user?.id)?.role ?? null;
   const isOwner = myRole === 'owner';

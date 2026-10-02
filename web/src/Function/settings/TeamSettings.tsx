@@ -15,7 +15,7 @@ import { isUnreachableWorker } from '@/Function/shared/workerReach';
 import { SettingsSection } from './SettingsSection';
 import { InviteUserDialog } from './InviteUserDialog';
 import { ConnectWorkerAccountDialog } from './ConnectWorkerAccountDialog';
-import { useScopeInvitations } from '@/Function/membership/invitations';
+import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
 
 interface TeamSettingsProps {
@@ -104,6 +104,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
     void reload();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [domainId, user?.id, activeSpaceId]);
+  useWhenInvitationsSettle(invitees, () => void reload());
 
   const handleDelete = async (id: string) => {
     if (!await appDialog.confirm('Remove this team member? Their assignments will be cleared.')) return;

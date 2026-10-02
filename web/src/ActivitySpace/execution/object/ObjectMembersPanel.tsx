@@ -7,7 +7,7 @@ import { UserMinus, UserPlus, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { inviteMember, useScopeInvitations } from '@/Function/membership/invitations';
+import { inviteMember, useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
@@ -147,6 +147,7 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  useWhenInvitationsSettle(invitees, () => void refresh());
 
   const handleInvite = async (userId: string) => {
     setInvitingId(userId);
