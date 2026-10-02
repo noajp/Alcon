@@ -32,10 +32,6 @@
 --
 -- Guarded for preview replay (the base schema lives outside this folder).
 do $$
-declare
-  v_def text;
-  v_old text;
-  v_new text;
 begin
   if to_regclass('public.workers') is null
      or to_regclass('public.element_assignees') is null
@@ -67,8 +63,7 @@ begin
      or to_regprocedure('alcon_internal.object_in_space(uuid, uuid)') is null
      or to_regprocedure('alcon_internal.object_home_space(uuid)') is null
      or to_regprocedure('alcon_internal.element_home_space(uuid)') is null
-     or to_regprocedure('alcon_internal.worker_in_space(uuid, uuid)') is null
-     or to_regprocedure('public.get_now_work(uuid)') is null then
+     or to_regprocedure('alcon_internal.worker_in_space(uuid, uuid)') is null then
     raise notice 'workers_rls_and_notify_recipients skipped: base schema not present';
     return;
   end if;
@@ -129,15 +124,91 @@ begin
 
   -- get_now_work lists the Space's members' Workers; an Object persona of a
   -- member is not one of them (it comes in through its Object, when that
-  -- Object is in scope).
-  v_def := pg_get_functiondef('public.get_now_work(uuid)'::regprocedure);
-  v_old := 'and exists(select 1 from public.activity_space_members member where member.activity_space_id=p_space_id and member.user_id=w.user_id))';
-  v_new := 'and w.object_id is null and exists(select 1 from public.activity_space_members member where member.activity_space_id=p_space_id and member.user_id=w.user_id))';
-  if position(v_new in v_def) = 0 then
-    if (length(v_def) - length(replace(v_def, v_old, ''))) <> length(v_old) then
-      raise exception 'get_now_work: the member branch is not where this migration expects it';
-    end if;
-    execute replace(v_def, v_old, v_new);
+  -- Object is in scope). Same signature, security, search_path and grants as
+  -- 20260906155350_coordination_core.sql; only the member branch changes.
+  if to_regprocedure('public.get_now_work(uuid)') is not null
+     and to_regclass('public.element_objects') is not null
+     and to_regclass('public.element_edges') is not null
+     and to_regclass('public.subelements') is not null then
+    execute $g$
+create or replace function public.get_now_work(p_space_id uuid)
+returns jsonb language plpgsql stable security definer set search_path = '' as $fn$
+declare
+  v_objects uuid[];
+  v_elements uuid[];
+  v_result jsonb;
+begin
+  if auth.uid() is null then raise exception using errcode='42501', message='Sign in to read Space work.'; end if;
+  if p_space_id is null then raise exception using errcode='22023', message='Select a Space.'; end if;
+  -- Explicit Object membership also admits a guest; Space membership is not
+  -- required when canonical visibility grants a narrower view of this Space.
+  select coalesce(array_agg(o.id), '{}') into v_objects from public.objects o
+  where public.user_can_see_object(o.id)
+    and (exists (select 1 from public.domains d where d.id=o.domain_id and d.activity_space_id=p_space_id)
+      or exists (select 1 from public.object_domains od join public.domains d on d.id=od.domain_id
+        where od.object_id=o.id and d.activity_space_id=p_space_id));
+  select coalesce(array_agg(e.id), '{}') into v_elements from public.elements e
+  where public.user_can_see_element(e.id)
+    and (e.object_id=any(v_objects) or exists (
+      select 1 from public.element_objects eo where eo.element_id=e.id and eo.object_id=any(v_objects)));
+  if cardinality(v_objects)>10000 or cardinality(v_elements)>20000 then
+    raise exception using errcode='54000', message='This Space exceeds the Now read limit. Open an Object to continue.';
+  end if;
+  with scoped_workers as materialized (
+    select w.* from public.workers w where exists (
+      select 1 from public.element_assignees ea where ea.worker_id=w.id and ea.element_id=any(v_elements))
+      or w.object_id=any(v_objects)
+      or (exists(select 1 from public.activity_space_members mine where mine.activity_space_id=p_space_id and mine.user_id=auth.uid())
+        and w.object_id is null
+        and exists(select 1 from public.activity_space_members member where member.activity_space_id=p_space_id and member.user_id=w.user_id))
+  ), worker_rows as materialized (
+    select w.id, to_jsonb(w) || jsonb_build_object('ai_config',null,'email',null,
+      'object_id',case when w.object_id=any(v_objects) then w.object_id else null end) as item
+    from scoped_workers w
+  ), element_rows as (
+    select e.id, to_jsonb(e) || jsonb_build_object(
+      'object_id',case when e.object_id=any(v_objects) then e.object_id else null end,
+      'objectIds', h.ids, 'isMultiHomed',jsonb_array_length(h.ids)>1,
+      'objects', h.objects,
+      'assignees', coalesce((select jsonb_agg(to_jsonb(ea) || jsonb_build_object('worker',w.item) order by ea.id)
+        from public.element_assignees ea left join worker_rows w on w.id=ea.worker_id where ea.element_id=e.id), '[]'::jsonb),
+      'subelements',coalesce((select jsonb_agg(to_jsonb(s) order by s.order_index,s.id)
+        from public.subelements s where s.element_id=e.id), '[]'::jsonb)
+    ) as item
+    from public.elements e cross join lateral (
+      select coalesce(jsonb_agg(o.id order by o.id),'[]'::jsonb) as ids,
+        coalesce(jsonb_agg(jsonb_build_object('id',o.id,'name',o.name) order by o.id),'[]'::jsonb) as objects
+      from public.objects o where o.id=any(v_objects) and (o.id=e.object_id or exists (
+        select 1 from public.element_objects eo where eo.element_id=e.id and eo.object_id=o.id))
+    ) h where e.id=any(v_elements)
+  ), edge_rows as (
+    select ed.id, case when ed.from_element=any(v_elements) and ed.to_element=any(v_elements)
+      then to_jsonb(ed) else jsonb_build_object('id',ed.id,'from_element',ed.from_element,
+        'to_element',ed.to_element,'edge_type','depends_on','attributes','{}'::jsonb,'created_at',null,'created_by',null) end as item
+    from public.element_edges ed where ed.edge_type='depends_on'
+      and (ed.from_element=any(v_elements) or ed.to_element=any(v_elements))
+  )
+  select jsonb_build_object(
+    'elements',coalesce((select jsonb_agg(item order by id) from element_rows),'[]'::jsonb),
+    'workers',coalesce((select jsonb_agg(item order by id) from worker_rows),'[]'::jsonb),
+    'objects',coalesce((select jsonb_agg(jsonb_build_object('id',o.id,'name',o.name,'domain_id',
+      case when exists(select 1 from public.domains d where d.id=o.domain_id and d.activity_space_id=p_space_id
+        and public.user_can_see_domain(d.id)) then o.domain_id else null end) order by o.id)
+      from public.objects o where o.id=any(v_objects)),'[]'::jsonb),
+    'edges',coalesce((select jsonb_agg(item order by id) from edge_rows),'[]'::jsonb),
+    'readAt',statement_timestamp()
+  ) into v_result;
+  -- A single scalar JSON result cannot be silently truncated by PostgREST's
+  -- row cap. Never turn resource protection into partial, falsely-ready data.
+  if octet_length(v_result::text)>25000000 then
+    raise exception using errcode='54000', message='This Space exceeds the Now response limit. Open an Object to continue.';
+  end if;
+  return v_result;
+end;
+$fn$
+    $g$;
+    execute 'revoke all on function public.get_now_work(uuid) from public, anon';
+    execute 'grant execute on function public.get_now_work(uuid) to authenticated, service_role';
   end if;
 
   -- ── Display: who the caller may see ─────────────────────────────────────
