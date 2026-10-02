@@ -56,7 +56,7 @@ const USER_MONTHLY_BUDGET_USD = 20;
 /** No single run may spend more than this, whatever the budget left. */
 const MAX_RUN_COST_USD = 5;
 /** A run that has written no step for this long is stuck; its starter may resume it. */
-const STALE_MS = 5 * 60_000;
+const STALE_MS = 10 * 60_000;
 const SESSION_PAUSE = "セッションの期限が切れたため一時停止しました。Element を開くと続きから再開します。";
 
 function json(payload: unknown, status = 200): Response {
@@ -438,6 +438,23 @@ async function execute(a: ExecArgs): Promise<void> {
       await admin.from("agent_runs").update({ status: "paused", error: `続きを開始できませんでした: ${errorMessage(e)}`, continuation_token: null }).eq("id", run.id).eq("status", "running");
     });
   };
+
+  // A run resumed while a proposal is still unanswered (a stale decision, a
+  // slice cut off before it stopped) goes back to waiting for it — sending
+  // the transcript on with an unanswered tool_use would fail every time.
+  if (pending && !pending.approved && !a.body.decision) {
+    const { data: open } = await admin.from("agent_actions").select("id").eq("run_id", run.id).eq("status", "pending").maybeSingle();
+    if (!open) {
+      const display = pending.calls.map((c) => ({ id: c.id, integration: c.name.split(INTEGRATION_SEPARATOR)[0], operation: c.name.split(INTEGRATION_SEPARATOR).slice(1).join(INTEGRATION_SEPARATOR) || c.name }));
+      await admin.from("agent_actions").insert({
+        run_id: run.id, element_id: run.element_id, tool_use_id: pending.calls[0].id, tool: pending.calls.length === 1 ? pending.calls[0].name : "batch",
+        input: { calls: pending.calls, display }, input_hash: await sha256(canonicalCalls(pending.calls)), summary: approvalSummary(display),
+      });
+    }
+    await admin.from("agent_runs").update({ status: "awaiting_approval" }).eq("id", run.id).eq("status", "running");
+    await addStep(admin, run.id, "approval", "承認待ちに戻しました");
+    return;
+  }
 
   // ── A decision answers the paused turn first ────────────────────────────
   if (a.body.decision && pending) {

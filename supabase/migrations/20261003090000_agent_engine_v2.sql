@@ -416,3 +416,22 @@ begin
     for each row execute function public.integrations_drop_secret();
 end
 $$;
+
+-- The transcript holds raw tool results the agent read with its starter's
+-- permissions; a viewer who can see the Element but not everything the
+-- starter can see must not read it. Neither the transcript nor the one-time
+-- continuation token is selectable from the browser (the Edge Function
+-- reads them with the service role); every other column stays readable.
+do $$
+begin
+  if to_regclass('public.agent_runs') is null then
+    raise notice 'agent_runs column grants skipped: agent_runs not present';
+    return;
+  end if;
+  revoke select on public.agent_runs from authenticated;
+  grant select (id, element_id, domain_id, worker_id, status, model, triggered_from, triggered_by, summary, result, error,
+                step_count, started_at, finished_at, created_at, mode, prompt, reply_to, input_tokens, output_tokens, cost_usd,
+                activity_space_id, continuation_count)
+    on public.agent_runs to authenticated;
+end
+$$;
