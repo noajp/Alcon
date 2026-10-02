@@ -2,15 +2,19 @@
 -- half; phase 1 added the helpers and RPCs every caller now reads).
 --
 -- workers            SELECT  yourself; anyone you may list (user_can_list_worker);
---                            and any Worker already attached to something you
---                            can see — an assignee of a visible Element, the
---                            lead of a visible Object, a Person value on a
---                            visible Element — so past work keeps its names.
---                    INSERT  your own Worker; an unlinked Worker in a Space you
---                            belong to; an Object's Worker on a visible Object.
+--                            an assignee of a visible Element; the lead of a
+--                            visible Object or a Person value on a visible
+--                            Element when the Worker belongs to that Space —
+--                            so past work keeps its names.
+--                    INSERT  your own human Worker; an unlinked Worker in a
+--                            Space you belong to; an Object's Worker on a
+--                            visible Object.
 --                    UPDATE  user_can_manage_worker, before and after the
---                            change. A trigger keeps the account link and the
---                            Space with owners and members.
+--                            change; a trigger limits the columns. A person's
+--                            Worker is never unlinked, re-linked or retyped;
+--                            only the person edits its profile, an owner of
+--                            their Space or Domain only capacity and status.
+--                            Connect links a human Object Worker, by an owner.
 --                    DELETE  an unlinked Worker, by an owner of its Space.
 -- element_assignees  read / remove on visible Elements; add only what
 --                    worker_assignable accepts.
@@ -51,7 +55,10 @@ begin
      or to_regprocedure('alcon_internal.user_can_see_element_as(uuid, uuid)') is null
      or to_regprocedure('alcon_internal.is_activity_space_member_as(uuid, uuid)') is null
      or to_regprocedure('alcon_internal.user_is_domain_member_as(uuid, uuid)') is null
-     or to_regprocedure('alcon_internal.object_in_space(uuid, uuid)') is null then
+     or to_regprocedure('alcon_internal.object_in_space(uuid, uuid)') is null
+     or to_regprocedure('alcon_internal.object_home_space(uuid)') is null
+     or to_regprocedure('alcon_internal.element_home_space(uuid)') is null
+     or to_regprocedure('alcon_internal.worker_in_space(uuid, uuid)') is null then
     raise notice 'workers_rls_and_notify_recipients skipped: base schema not present';
     return;
   end if;
@@ -61,7 +68,11 @@ begin
 
   -- ── Display: who the caller may see ─────────────────────────────────────
   -- Everything beyond the row's own columns; the policy checks those inline
-  -- so INSERT … RETURNING sees the row it is writing.
+  -- so INSERT … RETURNING sees the row it is writing. An assignment can only
+  -- be written through worker_assignable, so it is trusted as it stands. An
+  -- Object's lead and a Person value are plain columns anyone with the row can
+  -- set, so they reveal a Worker only when it belongs to that Space — a lead
+  -- pointed at another organisation's Worker shows nothing.
   execute $f$
     create or replace function alcon_internal.user_can_see_worker(p_worker uuid)
     returns boolean language sql stable security definer set search_path = public as $b$
@@ -70,11 +81,13 @@ begin
         or exists (select 1 from public.element_assignees ea
                     where ea.worker_id = p_worker and public.user_can_see_element(ea.element_id))
         or exists (select 1 from public.objects o
-                    where o.lead_id = p_worker and public.user_can_see_object(o.id))
+                    where o.lead_id = p_worker and public.user_can_see_object(o.id)
+                      and alcon_internal.worker_in_space(p_worker, alcon_internal.object_home_space(o.id)))
         or exists (select 1 from public.custom_column_values v
                      join public.custom_columns c on c.id = v.column_id
                     where c.column_type = 'person' and v.value = to_jsonb(p_worker::text)
-                      and v.element_id is not null and public.user_can_see_element(v.element_id)));
+                      and v.element_id is not null and public.user_can_see_element(v.element_id)
+                      and alcon_internal.worker_in_space(p_worker, alcon_internal.element_home_space(v.element_id))));
     $b$
   $f$;
 
@@ -135,19 +148,62 @@ begin
     $b$
   $f$;
 
-  -- The account link moves only with an owner of the Worker's current scope
-  -- (TeamSettings "Connect"); a Worker moves only into a Space or an Object
-  -- the caller is in. Service-role and database-internal writes (no
-  -- auth.uid()) pass.
+  -- Which columns may move, by whom. Service-role and database-internal
+  -- writes (no auth.uid()) pass.
+  --   Everyone   type and identity never change.
+  --   A person's Worker (user_id set) is never unlinked, re-linked or moved to
+  --              a Space or Object: its Space comes from memberships, and an
+  --              unlinked one could then be deleted with its assignments.
+  --              Only the person edits the rest; an owner of their Space or
+  --              Domain (user_can_manage_worker) changes capacity and status.
+  --   Connect    links a human Object Worker to someone in that Object's
+  --              Space, by an owner of the Object's Space or Domain. A Space's
+  --              unlinked roster Worker is never linked: every account already
+  --              has its own human Worker.
+  --   Moving     an unlinked Worker only into a Space you belong to, an Object
+  --              Worker only into an Object you can see.
   execute $f$
     create or replace function alcon_internal.workers_guard_update()
     returns trigger language plpgsql security definer set search_path = public as $b$
+    declare
+      v_uid uuid := auth.uid();
+      v_space uuid;
     begin
-      if auth.uid() is null then return new; end if;
-      if new.user_id is distinct from old.user_id
-         and not alcon_internal.user_owns_worker_fields(old.user_id, old.object_id, old.activity_space_id) then
-        raise exception 'Only an owner of this Worker''s Space or Domain can change which account it belongs to'
-          using errcode = '42501';
+      if v_uid is null then return new; end if;
+      if new.id is distinct from old.id or new.type is distinct from old.type
+         or new.seq_number is distinct from old.seq_number or new.display_id is distinct from old.display_id
+         or new.created_at is distinct from old.created_at then
+        raise exception 'A Worker''s type and identity cannot change' using errcode = '42501';
+      end if;
+
+      if old.user_id is not null then
+        if new.user_id is distinct from old.user_id or new.object_id is distinct from old.object_id
+           or new.activity_space_id is distinct from old.activity_space_id then
+          raise exception 'A person''s Worker stays linked to them' using errcode = '42501';
+        end if;
+        if old.user_id <> v_uid
+           and (to_jsonb(new) - 'capacity_hours_per_day' - 'status' - 'updated_at')
+               is distinct from (to_jsonb(old) - 'capacity_hours_per_day' - 'status' - 'updated_at') then
+          raise exception 'Only this person can change their Worker; an owner may change its capacity and status'
+            using errcode = '42501';
+        end if;
+        return new;
+      end if;
+
+      if new.user_id is not null then
+        v_space := alcon_internal.object_home_space(old.object_id);
+        if old.object_id is null or old.type is distinct from 'human'
+           or new.object_id is distinct from old.object_id
+           or not alcon_internal.user_owns_worker_fields(null, old.object_id, old.activity_space_id)
+           or v_space is null
+           or not (alcon_internal.is_activity_space_member_as(v_space, new.user_id)
+                   or exists (select 1 from public.domain_members dm join public.domains d on d.id = dm.domain_id
+                               where dm.user_id = new.user_id and d.activity_space_id = v_space)
+                   or exists (select 1 from public.object_members om
+                               where om.user_id = new.user_id and alcon_internal.object_in_space(om.object_id, v_space))) then
+          raise exception 'Only an owner of the Object''s Space or Domain can connect its human Worker, to someone in that Space'
+            using errcode = '42501';
+        end if;
       end if;
       if new.activity_space_id is distinct from old.activity_space_id and new.activity_space_id is not null
          and not public.is_activity_space_member(new.activity_space_id) then
@@ -191,7 +247,7 @@ begin
   execute 'drop policy if exists workers_delete on public.workers';
   execute $p$
     create policy workers_select on public.workers for select to authenticated using (
-      user_id = auth.uid()
+      user_id = (select auth.uid())
       or (user_id is null and object_id is null and activity_space_id is not null
           and public.is_activity_space_member(activity_space_id))
       or (user_id is null and object_id is not null and public.user_can_see_object(object_id))
@@ -199,17 +255,20 @@ begin
   $p$;
   execute $p$
     create policy workers_insert on public.workers for insert to authenticated with check (
-      (user_id = auth.uid() and object_id is null)
+      (user_id = (select auth.uid()) and object_id is null and type = 'human')
       or (user_id is null and object_id is null and public.is_activity_space_member(activity_space_id))
       or (user_id is null and object_id is not null and public.user_can_see_object(object_id)))
   $p$;
   -- USING reads the stored row; WITH CHECK reads the new columns (a helper
-  -- that looks the Worker up by id would still see the old row there).
+  -- that looks the Worker up by id would still see the old row there). Which
+  -- columns may change is the trigger's.
   execute $p$
     create policy workers_update on public.workers for update to authenticated
       using (alcon_internal.user_can_manage_worker(id))
       with check (alcon_internal.user_can_manage_worker_fields(user_id, object_id, activity_space_id))
   $p$;
+  -- A person's Worker is never unlinked from the app (trigger above), so it
+  -- never becomes deletable here.
   execute $p$
     create policy workers_delete on public.workers for delete to authenticated using (
       user_id is null and object_id is null and public.is_activity_space_owner(activity_space_id))

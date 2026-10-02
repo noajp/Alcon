@@ -21,8 +21,15 @@ Worker には 3 種類ある。アカウントに結び付いた人（`user_id`�
 - **名前は Element に付いてくる。** 割り当てられない Worker でも、見える Element や Object にすでに付いていれば名前を表示する。Assignee は `element.assignees`、Lead や Person 型の Property は id で引いて表示する。
 - **Space ごとに AI を置く。** 各 Space に ai_agent の Worker「Claude」を 1 つ置き、新しい Space には作成時のトリガで作る。エージェントは、Element に割り当てられる AI Worker のプロファイルだけを読み、それ以外は既定のエージェントとして動く。
 - **メンバーになると自分の Worker ができる。** Space・Domain・Object のメンバーになったとき、DB のトリガがその人の human Worker を用意する。アプリが他人の Worker 行を作ることはない。
-- **RLS で強制する。** `workers` を読めるのは、自分の Worker、一覧できる Worker（`user_can_list_worker`）、見える Element・Object にすでに付いている Worker（担当者・Lead・Person 型の値）。`element_assignees` は見える Element の行だけを読み・消せ、追加と変更は `worker_assignable` が通すものだけ。`agent_runs` を作るときに指定できる Worker も `worker_assignable` が通すものだけ。取り込み（`import_existing_work`）も担当者を同じ関数で確かめる。
-- **Worker を変えられる人は Worker の種類で決まる。** 本人。所属のない Worker ならその Space のメンバー。Object の Worker ならその Object を見られる人。他人の Worker なら、その人が属する Space か Domain のオーナー（`user_can_manage_worker`）。UPDATE は変更前と変更後の両方でこの条件を満たす必要がある。アカウントの付け替え（Team 設定の Connect）は Worker の現在の範囲のオーナーだけができ、付け先もそのオーナーが持つ Space・Domain にいる人に限る。Worker を別の Space・Object へ移せるのは、移動先の Space のメンバーか Object を見られる人だけ（トリガで検査）。新しく作れるのは、自分の Worker、自分が属する Space の所属のない Worker、見える Object の Worker。削除できるのは所属のない Worker だけで、その Space のオーナーが行う。人の Worker は消さず、メンバーシップを外して inactive にする。
+- **RLS で強制する。** `workers` を読めるのは、自分の Worker、一覧できる Worker（`user_can_list_worker`）、見える Element にすでに付いている担当者、そして見える Object の Lead と見える Element の Person 型の値のうち、その Object・Element と同じ Space に属する Worker。Lead と Person 値は誰でも書ける列なので、別の組織の Worker を指しても名前は見えない。`element_assignees` は見える Element の行だけを読み・消せ、追加と変更は `worker_assignable` が通すものだけ。`agent_runs` を作るときに指定できる Worker も `worker_assignable` が通すものだけ。取り込み（`import_existing_work`）も担当者を同じ関数で確かめる。
+- **Worker を変えられる人は Worker の種類で決まる。** 本人。所属のない Worker ならその Space のメンバー。Object の Worker ならその Object を見られる人。他人の Worker なら、その人が属する Space か Domain のオーナー（`user_can_manage_worker`）。UPDATE は変更前と変更後の両方でこの条件を満たす必要があり、変えられる列はトリガが決める。
+  - Worker の種類（human / ai_agent）と識別子は誰も変えられない。
+  - 人の Worker（`user_id` あり）は、アカウントから外すことも別のアカウントへ付け替えることも、Space や Object へ移すこともできない。名前・アバター・役割・メールなどを変えられるのは本人だけで、オーナーが変えられるのは通常稼働時間（`capacity_hours_per_day`）と状態（active / inactive）だけ。
+  - アカウントへの接続（Team 設定の Connect）は、アカウントのない human の Object Worker だけを、その Object の Space か Domain のオーナーが、その Space にいる人へ結ぶ。Space の名簿にある所属のない Worker は接続しない。どのアカウントにも自分の human Worker がすでにあり、1 アカウント 1 つの制約に必ずかかるため。
+  - Worker を別の Space・Object へ移せるのは、移動先の Space のメンバーか Object を見られる人だけ。
+  - 新しく作れるのは、自分の human Worker、自分が属する Space の所属のない Worker、見える Object の Worker。
+  - 削除できるのは所属のない Worker だけで、その Space のオーナーが行う。人の Worker はアカウントから外せないので、削除の対象にならない。人がチームを離れるときはメンバーシップを外し、Worker を inactive にする。
+- **残るリスク：同意のない所属。** Space を作った人は、相手の同意なく任意のアカウントを Space のメンバーに加えられる。その Space のオーナーは、加えた人の Worker の通常稼働時間と状態を変えられる。Worker は 1 人に 1 つなので、inactive にすると他の Space のピッカーからもその人が消える（本人と、本来の Space のオーナーは戻せる）。名前・種類・AI の指示・アカウントの結び付き・削除には届かない。所属の承認（招待を受けた本人が承諾する）を持つまで、この範囲のリスクは残す。
 - **通知は Element を見られる人にだけ届く。** 状態変更・コメント・メンション・期日の通知は、宛先ごとに `user_can_see_element_as` で絞る。境界より前に別の Space の人へ付いた担当は残っていても、その人に Element の通知は届かない。
 - 既存の、所属を持たない Worker は、割り当てと Lead がすべて 1 つの Space にあるときだけ、その Space に寄せる。複数の Space にまたがる、またはどこにも付いていない Worker は NULL のままにする。どの Space のピッカーにも出なくなるが、すでに付いている Element では名前が見える。
 
@@ -36,6 +43,8 @@ Worker には 3 種類ある。アカウントに結び付いた人（`user_id`�
 
 表示の規則を割り当ての規則と分けて SELECT ポリシーにしたのは、名前の解決・Team の名簿・Workload が `workers` を直接読むから。割り当てられる範囲だけを見せると、過去の担当者・Lead が空欄になる。
 
+人の Worker の変更をオーナーには稼働時間と状態だけに絞るのは、オーナーであることの根拠になる所属を、相手の同意なしに作れるから。名前や種類、AI の指示、アカウントの結び付きまで任せると、他の組織の人の Worker を AI に変えて指示を仕込んだり、アカウントから外して担当ごと削除したりできてしまう。
+
 UPDATE の WITH CHECK は Worker を id で引き直さず、新しい行の列（`user_id` / `object_id` / `activity_space_id`）で判定する。WITH CHECK の中で id から表を読むと変更前の行が返り、付け替え先を検査できないため。SELECT ポリシーも同じ理由で、所属のない Worker と Object の Worker は行の列で判定し、INSERT … RETURNING が自分の書いた行を読めるようにしている。
 
 通知の宛先を割り当てから絞るだけにすると、境界より前の担当や、見えなくなった Object の担当者・コメント参加者に Element の題名と本文が届く。宛先ごとに可視性を確かめれば、古い割り当てを消さずに漏れを止められる。
@@ -47,4 +56,5 @@ UPDATE の WITH CHECK は Worker を id で引き直さず、新しい行の列�
 - inactive の Worker も割り当てたい場面（過去の作業の付け直しなど）が出たら、inactive を割り当ての条件から外し、ピッカーの表示だけで区別する
 - Domain に招かれただけの人（Guest）を、その Domain 以外の同じ Space の Element に割り当てたいという要望が出たら、`worker_in_space` を Space 単位ではなく Domain 単位に狭めるか広げるかを決め直す（今は、Space 内のどの Domain のメンバーでも Space に属するとみなし、最後に「その人が Element を見られるか」で絞っている）
 - Space ごとの AI が 1 つでは足りず、役割の違う複数の AI を置くようになったら、AI の作成をトリガではなく Space の設定から行う
-- Domain のオーナーにも所属のない Worker の削除を任せたい、あるいは Space の外の人へ Worker を付け替えたいという要望が出たら、DELETE と付け替えの条件を Worker の範囲のオーナー（`user_owns_worker_fields`）に揃えるか、招待を先に求めるかを決め直す
+- 所属の承認（招待を受けた本人の承諾）を持ったら、オーナーが人の Worker の稼働時間と状態を変えられる条件を、承認済みの所属に限る
+- Domain のオーナーにも所属のない Worker の削除を任せたい、あるいは Space の名簿の Worker をアカウントへ統合したいという要望が出たら、DELETE の条件と、2 つの Worker の履歴をまとめる手順を決め直す

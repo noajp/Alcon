@@ -31,9 +31,11 @@ import type { Worker } from '@/types/database';
 // automatically (merging two Worker histories is its own decision, not a
 // side effect of a connect action).
 //
-// The database also requires (workers RLS, ADR 0028) that the caller owns
-// the Worker's Space or Domain and that the picked account belongs to a
-// Space or Domain the caller owns; anything else comes back as 42501.
+// The database also requires (workers RLS, ADR 0028) that the Worker is a
+// human Object Worker, that the caller owns the Object's Space or Domain, and
+// that the picked account belongs to that Space; anything else comes back as
+// 42501. A Space's unlinked roster Worker is never offered: the account's own
+// human Worker already exists, so the index above would always refuse it.
 
 interface ProfileRow {
   id: string;
@@ -94,7 +96,7 @@ export function ConnectWorkerAccountDialog({
         code === '23505'
           ? `${profile.display_name || 'That account'} is already connected to a different Worker.`
           : code === '42501'
-            ? 'You can connect this Worker only as an owner of its Space or Domain, and only to someone in a Space or Domain you own.'
+            ? 'You can connect this Worker only as an owner of its Object\'s Space or Domain, and only to someone in that Space.'
             : e instanceof Error
             ? e.message
             : 'Failed to connect',

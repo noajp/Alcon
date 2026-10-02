@@ -215,9 +215,11 @@ export function noticeAssignmentFailed(error: unknown): void {
 //
 // The database decides who may change a Worker (workers RLS): your own
 // Worker; an unlinked Worker of a Space you belong to; an Object's Worker on
-// an Object you can see; someone else's Worker as an owner of their Space or
-// Domain. Removing is only for unlinked Workers, by an owner of their Space —
-// a person's Worker stays so the work they did keeps their name. RLS turns a
+// an Object you can see; and, as an owner of a person's Space or Domain, only
+// that person's capacity and status. A Worker's type never changes and a
+// person's Worker never leaves their account. Removing is only for unlinked
+// Workers, by an owner of their Space — a person's Worker stays so the work
+// they did keeps their name. RLS turns a
 // refused UPDATE / DELETE into "no rows", so both writers below say so instead
 // of reporting success.
 // ============================================

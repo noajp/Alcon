@@ -389,6 +389,10 @@ function ElementDetailBody({
       .find((w) => w?.type === 'ai_agent' && aiWorkers.some((ai) => ai.id === w.id))?.id ?? null,
     [element.assignees, aiWorkers],
   );
+  // Run again keeps the previous run's AI only while this Element can still be
+  // handed to it (agent_runs refuses any other); otherwise the assigned AI.
+  const rerunWorkerId = (previous: string | null | undefined) =>
+    previous && aiWorkers.some((ai) => ai.id === previous) ? previous : assignedAiWorkerId;
   // When a run finishes it moves the Element to "review" and posts its
   // deliverable as a comment — refresh the parent so the status updates.
   // (The comments panel re-reads its thread as the run moves on: refreshKey.)
@@ -908,7 +912,7 @@ function ElementDetailBody({
           </ButtonAppearanceProvider>
           <AgentRunPanel
             agent={agent}
-            onRunAgain={() => void agent.start({ workerId: agent.run?.worker_id ?? assignedAiWorkerId, triggeredFrom: 'detail', domainId })}
+            onRunAgain={() => void agent.start({ workerId: rerunWorkerId(agent.run?.worker_id), triggeredFrom: 'detail', domainId })}
           />
           {checkInOpen && <CheckInDialog element={element} onClose={() => setCheckInOpen(false)}
             onSaved={() => { setCheckInOpen(false); onRefresh?.(); }} />}

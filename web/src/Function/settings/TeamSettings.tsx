@@ -39,19 +39,21 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   const [connecting, setConnecting] = useState<Worker | null>(null);
 
   // The database decides who may change a Worker (workers RLS, ADR 0028);
-  // these flags only hide controls it would refuse. Connecting a Worker to an
-  // account redirects its assignments and notifications, so it is for an
-  // owner of the Worker's Space or Domain, and only to someone in that scope.
-  // The global view has no single Domain, so Connect is offered there only
-  // to an owner of the Space.
+  // these flags only hide controls it would refuse. An owner of a person's
+  // Space or Domain may change only their capacity and status.
   const isOwner = domainId ? myRole === 'owner' : false;
-  const canConnect = isOwner || isSpaceOwner;
+  const isAnyOwner = isOwner || isSpaceOwner;
+  // Connecting redirects a Worker's assignments and notifications to an
+  // account. Only a human Object Worker can be connected, by an owner, to
+  // someone in its Space: every account already has its own human Worker, so
+  // a Space's unlinked roster Worker could never take one.
+  const canConnect = (w: Worker) => isAnyOwner && w.type === 'human' && w.user_id === null && w.object_id !== null;
   // Inviting and adding Workers are owner actions in a Domain. The global
   // view is the Space-wide roster, where any member may add an unlinked one.
   const canManage = domainId ? isOwner : true;
   // Your own Worker and the Space's unlinked Workers are yours to (de)activate
   // as a member; someone else's Worker needs an owner of their Space or Domain.
-  const canToggle = (w: Worker) => canManage && (w.user_id === null || w.user_id === user?.id || canConnect);
+  const canToggle = (w: Worker) => canManage && (w.user_id === null || w.user_id === user?.id || isAnyOwner);
   // Only an unlinked Worker is removed, by an owner of its Space. A person's
   // Worker stays so the work they did keeps their name; they leave by losing
   // their membership, and are deactivated here.
@@ -184,7 +186,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
               worker={w}
               onDelete={canRemove(w) ? () => handleDelete(w.id) : undefined}
               onToggleStatus={canToggle(w) ? () => handleStatusToggle(w) : undefined}
-              onConnect={canConnect ? () => setConnecting(w) : undefined}
+              onConnect={canConnect(w) ? () => setConnecting(w) : undefined}
             />
           ))
         )}
