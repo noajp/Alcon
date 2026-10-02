@@ -217,6 +217,7 @@ export {
   pingAgentRuntime,
   startAgentRun,
   useAgentRun,
+  type AgentStartOutcome,
 } from '@/Function/copilot/agentData';
 
 export {

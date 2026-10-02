@@ -1159,15 +1159,22 @@ export interface ElementApprovalInsert {
 // Agent Runs — AI-driven Element execution (Symphony-style)
 // =====================================================
 
-// An agent run executes a single Element autonomously and stops at "review"
-// for a human to approve. agent_run_steps is the live "Workpad".
+// An agent run carries out a single Element's task on behalf of the person
+// who started it (ADR 0027): it stops for that person's approval before
+// external writes, and ends with a report on the Element. agent_run_steps is
+// the live "Workpad"; agent_actions are the approvals; agent_artifacts are
+// deliverables everyone on the Element can read.
 export type AgentRunStatus =
   | 'queued'
   | 'running'
+  | 'awaiting_approval'
+  | 'paused'
   | 'awaiting_review'
   | 'completed'
   | 'failed'
   | 'cancelled'
+
+export type AgentRunMode = 'execute' | 'reply'
 
 export type AgentRunStepType =
   | 'plan'
@@ -1178,6 +1185,8 @@ export type AgentRunStepType =
   | 'status'
   | 'result'
   | 'error'
+  | 'approval'
+  | 'artifact'
 
 export interface AgentRun {
   id: string
@@ -1195,6 +1204,14 @@ export interface AgentRun {
   started_at: string | null
   finished_at: string | null
   created_at: string
+  mode: AgentRunMode
+  prompt: string | null
+  reply_to: string | null
+  input_tokens: number
+  output_tokens: number
+  cost_usd: number | string
+  activity_space_id: string | null
+  continuation_count: number
 }
 
 export interface AgentRunInsert {
@@ -1206,6 +1223,9 @@ export interface AgentRunInsert {
   model?: string | null
   triggered_from?: string | null
   triggered_by?: string | null
+  mode?: AgentRunMode
+  prompt?: string | null
+  reply_to?: string | null
 }
 
 export interface AgentRunUpdate {
@@ -1252,6 +1272,39 @@ export interface Integration {
 
 export type IntegrationUpdate = Partial<Pick<Integration,
   'name' | 'description' | 'endpoint' | 'auth_type' | 'auth_header' | 'delegation' | 'enabled'>>
+
+export type AgentActionStatus = 'pending' | 'approved' | 'rejected' | 'executed' | 'failed'
+
+/** One proposal waiting for (or decided by) a person — an external write, or a batch of them. */
+export interface AgentAction {
+  id: string
+  run_id: string
+  element_id: string
+  tool: string
+  input: { calls?: { id: string; name: string; input: Record<string, unknown> }[] }
+  input_hash: string
+  summary: string
+  integration_id: string | null
+  status: AgentActionStatus
+  decided_by: string | null
+  decided_at: string | null
+  decision_note: string | null
+  result: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface AgentArtifact {
+  id: string
+  element_id: string
+  run_id: string | null
+  title: string
+  content: string
+  format: 'markdown' | 'text' | 'csv' | 'json' | 'html'
+  created_by: string | null
+  author_name: string | null
+  created_at: string
+  updated_at: string
+}
 
 // =====================================================
 // Strategy — cross-Domain Object groupings (Linear Initiative-style)

@@ -25,6 +25,8 @@ import { Calendar as DateCalendar } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
 import type { DateRange } from 'react-day-picker';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
+import { isAgentRunOpen } from '@/Function/copilot/agentData';
+import { AgentRunPanel, DelegateToAiButton } from './agent';
 import {
   updateElement,
   fetchElementWithDetails,
@@ -377,9 +379,14 @@ function ElementDetailBody({
   // AI agent execution — Symphony-style autonomous run for this Element.
   // (The quick-start button was removed; the run still surfaces in comments.)
   const agent = useAgentRun(element.id);
+  const aiWorkers = useMemo(() => allWorkers.filter((w) => w.type === 'ai_agent'), [allWorkers]);
+  const assignedAiWorkerId = useMemo(
+    () => (element.assignees || []).map((a) => a.worker).find((w) => w?.type === 'ai_agent')?.id ?? null,
+    [element.assignees],
+  );
   // When a run finishes it moves the Element to "review" and posts its
   // deliverable as a comment — refresh the parent so the status updates.
-  // (The comments panel is remounted via a finished_at-based key below.)
+  // (The comments panel re-reads its thread as the run moves on: refreshKey.)
   const agentWasActive = useRef(false);
   // Multi-select for the sub-element checklist — same hook the Elements list
   // uses. `hasSubSelectionRef` lets a plain row click replace the selection
@@ -848,8 +855,17 @@ function ElementDetailBody({
               </div>
             )}
 
-            {/* (Agent quick-start button removed — the run still surfaces in
-                the comments thread; start it from elsewhere.) */}
+            {/* Hand the Element to an agent — it works the task with your
+                permissions and stops for your approval before external
+                writes (ADR 0027). */}
+            <DelegateToAiButton
+              aiWorkers={aiWorkers}
+              defaultWorkerId={assignedAiWorkerId}
+              disabled={isAgentRunOpen(agent.run)}
+              starting={agent.starting}
+              error={agent.error}
+              onStart={({ workerId, prompt }) => agent.start({ workerId, prompt, triggeredFrom: 'detail', domainId })}
+            />
 
             {/* Approval — one button that opens a menu to enable the workflow
                 and record a decision (Approve / Request changes / Reject).
@@ -885,6 +901,10 @@ function ElementDetailBody({
             })()}
           </div>
           </ButtonAppearanceProvider>
+          <AgentRunPanel
+            agent={agent}
+            onRunAgain={() => void agent.start({ workerId: agent.run?.worker_id ?? assignedAiWorkerId, triggeredFrom: 'detail', domainId })}
+          />
           {checkInOpen && <CheckInDialog element={element} onClose={() => setCheckInOpen(false)}
             onSaved={() => { setCheckInOpen(false); onRefresh?.(); }} />}
 
@@ -1004,11 +1024,14 @@ function ElementDetailBody({
           <div className={layout === 'reader' ? '' : 'mt-4 border-t border-border pt-8'}>
             <h2 className="mb-5 text-[15px] font-medium text-foreground">Comments</h2>
             <ElementCommentsPanel
-              key={`comments-${element.id}-${agent.run?.finished_at ?? 'live'}`}
+              key={`comments-${element.id}`}
+              refreshKey={agent.run ? `${agent.run.id}:${agent.run.status}:${agent.run.step_count}` : null}
               elementId={element.id}
               elementTitle={element.title}
               workers={allWorkers}
               focusCommentId={focusCommentId}
+              onAskAgent={({ prompt, commentId, workerId }) =>
+                agent.start({ mode: 'reply', prompt, replyTo: commentId, workerId: workerId ?? assignedAiWorkerId, triggeredFrom: 'comment', domainId })}
             />
           </div>
 

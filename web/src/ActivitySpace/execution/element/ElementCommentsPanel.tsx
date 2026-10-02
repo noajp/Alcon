@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pin, Trash2 } from 'lucide-react';
+import { ChevronRight, Pin, Trash2 } from 'lucide-react';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { agentMention, foldAgentRuns, plainFirstLine } from './agent/commentAgent';
 import { CommentAvatar, CommentComposer, CommentEntry, CommentMenu, CommentMenuItem, CommentMenuSeparator } from '@/Function/shared/CommentThread';
 import {
   useElementComments,
@@ -12,6 +14,7 @@ import {
   toggleReaction,
   notifyMany,
   type ElementComment,
+  type AgentStartOutcome,
   type ElementReaction,
   type Worker,
 } from '@/hooks/useSupabase';
@@ -27,13 +30,26 @@ interface ElementCommentsPanelProps {
    *  into view and mark it, so the thread opens at the line that was
    *  announced rather than at the bottom of a hundred agent reports. */
   focusCommentId?: string | null;
+  /** A comment addressed to an agent ("@AI", "@<AI Worker>") becomes its
+   *  next instruction; the agent answers under that comment. */
+  onAskAgent?: (ask: { prompt: string; commentId: string; workerId: string | null }) => Promise<AgentStartOutcome>;
+  /** Changes when the agent's run moves on; the thread re-reads its comments. */
+  refreshKey?: string | null;
 }
 
 const QUICK_EMOJI = ['👍', '🎉', '❤️', '👀', '🚀', '✅'];
 
-export function ElementCommentsPanel({ elementId, elementTitle, workers, onCountChange, focusCommentId }: ElementCommentsPanelProps) {
+export function ElementCommentsPanel({ elementId, elementTitle, workers, onCountChange, focusCommentId, onAskAgent, refreshKey }: ElementCommentsPanelProps) {
+  const { t } = useI18n();
+  const aiWorkers = useMemo(() => workers.filter((w) => w.type === 'ai_agent').map((w) => ({ id: w.id, name: w.name })), [workers]);
+  const humanNames = useMemo(() => workers.filter((w) => w.type === 'human').map((w) => w.name), [workers]);
+  const [askOutcome, setAskOutcome] = useState<AgentStartOutcome | null>(null);
+  const [openFolds, setOpenFolds] = useState<Set<string>>(new Set());
   const { user, profile } = useAuthContext();
   const { comments, loading, reload, setComments } = useElementComments(elementId);
+  // The agent posts as it works: re-read when its run moves on, without
+  // remounting (a half-written comment and open folds stay as they are).
+  useEffect(() => { if (refreshKey) void reload(); }, [refreshKey, reload]);
   const [reactions, setReactions] = useState<Record<string, ElementReaction[]>>({});
   const [draft, setDraft] = useState('');
   // Read once — this is a localStorage hit, and `draft` changes on every
@@ -143,6 +159,10 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
       setComments(prev => (prev.some(c => c.id === created.id) ? prev : [...prev, created]));
       setDraft('');
 
+      const ask = onAskAgent ? agentMention(content, aiWorkers, humanNames) : null;
+      setAskOutcome(null);
+      if (ask && onAskAgent) void onAskAgent({ prompt: content, commentId: created.id, workerId: ask.workerId }).then(setAskOutcome);
+
       if (mentions.length > 0) {
         await notifyMany(mentions, {
           actor_id: user?.id ?? null,
@@ -231,16 +251,7 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
     return () => clearTimeout(t);
   }, [focusCommentId]);
 
-  return (
-    <div className="space-y-3">
-      {/* Comment list — chat bubble style (own → right, others → left). */}
-      {loading ? (
-        <div className="text-center py-4 text-muted-foreground text-[12px]">Loading…</div>
-      ) : sorted.length === 0 ? (
-        null
-      ) : (
-        <ul className="space-y-5">
-          {sorted.map(c => {
+  const renderComment = (c: ElementComment) => {
             const myReactions = (reactions[c.id] || []).filter(r => r.user_id === user?.id).map(r => r.emoji);
             const counts: Record<string, number> = {};
             for (const r of (reactions[c.id] || [])) counts[r.emoji] = (counts[r.emoji] || 0) + 1;
@@ -332,10 +343,46 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
                 />
               </li>
             );
+};
+
+  return (
+    <div className="space-y-3">
+      {/* Comment list — chat bubble style (own → right, others → left). */}
+      {loading ? (
+        <div className="text-center py-4 text-muted-foreground text-[12px]">Loading…</div>
+      ) : sorted.length === 0 ? (
+        null
+      ) : (
+        <ul className="space-y-5">
+          {foldAgentRuns(sorted, 4, focusCommentId).map(seg => {
+            if (seg.kind === 'one') return renderComment(seg.comment);
+            const open = openFolds.has(seg.key);
+            return (
+              <li key={`fold-${seg.key}`}>
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setOpenFolds(prev => { const next = new Set(prev); if (next.has(seg.key)) next.delete(seg.key); else next.add(seg.key); return next; })}
+                  className="mb-3 flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left text-[12px] text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                >
+                  <ChevronRight size={13} className={`shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+                  <span className="shrink-0">{t('AI conversation · {n} messages', { n: seg.hidden.length + 1 })}</span>
+                  <span className="truncate">{t('Latest: {s}', { s: plainFirstLine(seg.last.content) })}</span>
+                </button>
+                <ul className="space-y-5">
+                  {open && seg.hidden.map(c => renderComment(c))}
+                  {renderComment(seg.last)}
+                </ul>
+              </li>
+            );
           })}
         </ul>
       )}
 
+      {askOutcome === 'busy' && (
+        <p className="text-[12px] text-muted-foreground">{t('The agent is already working on this Element. Stop it or wait for it to finish, then ask again.')}</p>
+      )}
+      {askOutcome === 'failed' && <p className="text-[12px] text-[var(--status-danger)]">{t('The agent could not start. See the agent panel above.')}</p>}
       <CommentComposer
         value={draft}
         onChange={handleDraftChange}

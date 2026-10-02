@@ -624,7 +624,23 @@ async function execute(a: ExecArgs): Promise<void> {
 
 async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: FinishPayload, status?: "paused") {
   const { admin, userDb, user } = a;
-  // Close the run first: a run stopped meanwhile stays stopped, and says nothing.
+  // A run stopped meanwhile stays stopped, and says nothing.
+  const { data: live } = await admin.from("agent_runs").select("status").eq("id", run.id).maybeSingle();
+  if (live?.status !== "running") return;
+
+  // In execute mode the Element moves on first — done work waits for a
+  // person's review, blocked work says so — so that when the run reads as
+  // finished, the Element already shows where it went. A reply leaves the
+  // status alone.
+  if (run.mode !== "reply" && status !== "paused") {
+    const { data: el } = await userDb.from("elements").select("status").eq("id", run.element_id).maybeSingle();
+    const next = finish.outcome === "completed" ? "review" : finish.outcome === "blocked" ? "blocked" : null;
+    if (el && next && !["done", "cancelled"].includes(el.status ?? "") && el.status !== next) {
+      await runBoardTool(userDb, "updateElement", { id: run.element_id, status: next }, { agent: `${agentName}（AI）`, userId: user.id });
+      await addStep(admin, run.id, "status", next === "review" ? "Element をレビュー待ちに移動" : "Element をブロック中に移動");
+    }
+  }
+
   const runStatus = status ?? (finish.outcome === "completed" && run.mode !== "reply" ? "awaiting_review" : "completed");
   const { data: closed } = await admin.from("agent_runs").update({
     status: runStatus, summary: finish.summary, result: finish.message, finished_at: status ? null : new Date().toISOString(),
@@ -632,7 +648,9 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
   }).eq("id", run.id).eq("status", "running").select("id").maybeSingle();
   if (!closed) return;
 
-  const label = finish.outcome === "completed" ? "完了報告" : finish.outcome === "partial" ? "途中報告" : "対応が必要です";
+  const label = finish.outcome === "blocked" ? "対応が必要です"
+    : run.mode === "reply" ? "返信"
+    : finish.outcome === "completed" ? "完了報告" : "途中報告";
   const content = `**${label}** — ${finish.summary}\n\n${finish.message || finish.summary}`;
   // A reply hangs under the comment that asked — only if it is this Element's.
   let parentId: string | null = null;
@@ -645,17 +663,6 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
     content, ...(parentId ? { parent_id: parentId } : {}),
   });
   await addStep(admin, run.id, "result", finish.summary, finish.message);
-
-  // In execute mode the Element moves on: done work waits for a person's
-  // review, blocked work says so. A reply leaves the status alone.
-  if (run.mode !== "reply" && status !== "paused") {
-    const { data: el } = await userDb.from("elements").select("status").eq("id", run.element_id).maybeSingle();
-    const next = finish.outcome === "completed" ? "review" : finish.outcome === "blocked" ? "blocked" : null;
-    if (el && next && !["done", "cancelled"].includes(el.status ?? "") && el.status !== next) {
-      await runBoardTool(userDb, "updateElement", { id: run.element_id, status: next }, { agent: `${agentName}（AI）`, userId: user.id });
-      await addStep(admin, run.id, "status", next === "review" ? "Element をレビュー待ちに移動" : "Element をブロック中に移動");
-    }
-  }
 
   if (run.triggered_by) {
     await admin.from("notifications").insert({
