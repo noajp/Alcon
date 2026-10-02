@@ -39,21 +39,14 @@ export async function createActivitySpace(
   input: ActivitySpaceInsert & { user_id: string },
 ): Promise<ActivitySpace> {
   const { user_id, ...fields } = input;
+  // The database enrols the creator as the Space's owner in the same insert
+  // (activity_spaces_enrol_creator); the browser writes no membership rows.
   const { data, error } = await supabase
     .from('activity_spaces')
-    .insert(fields)
+    .insert({ ...fields, created_by: user_id })
     .select()
     .single();
   if (error) throw error;
-
-  // Enrol the creator as 'owner' so the membership-scoped RLS + roster work
-  // (mirrors createDomain's domain_members enrolment).
-  await supabase.from('activity_space_members').insert({
-    activity_space_id: data.id,
-    user_id,
-    role: 'owner',
-  });
-
   return data as ActivitySpace;
 }
 

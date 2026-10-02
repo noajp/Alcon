@@ -3,17 +3,17 @@
 import { useEffect, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { invalidateWorkersCache } from '@/hooks/useSupabase';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { inviteMember } from '@/Function/membership/invitations';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 
-// Search `profiles` by display_name and add the picked user as a member —
-// either to a Domain (`domain_members`) or to an ActivitySpace
-// (`activity_space_members`), per `target`. Joining gives them their human
-// Worker (a database trigger), so they appear in TeamSettings and the
-// assignee picker without this dialog writing any Worker row. Email-based
-// invites for users who don't have an account yet are deferred to a later
-// phase.
+// Search `profiles` by display_name and invite the picked user to a Domain
+// (Guest path) or an ActivitySpace (full member), per `target`. The invitation
+// grants nothing until they accept it from their Inbox (ADR 0029); accepting
+// makes them a member, and the database then gives them their human Worker.
+// Email-based invites for users who don't have an account yet are deferred to
+// a later phase.
 
 interface ProfileRow {
   id: string;
@@ -21,7 +21,7 @@ interface ProfileRow {
   avatar_url: string | null;
 }
 
-/** Where the invited user is added — a Domain (Guest path) or a Space (full member). */
+/** Where the invited user would join — a Domain (Guest path) or a Space (full member). */
 export type InviteTarget =
   | { kind: 'domain'; domainId: string }
   | { kind: 'space'; spaceId: string };
@@ -30,6 +30,8 @@ interface InviteUserDialogProps {
   target: InviteTarget;
   /** User IDs already a member of the target — used to grey out / exclude them. */
   existingMemberIds: Set<string>;
+  /** User IDs with a pending invitation to the target. */
+  pendingInviteeIds?: Set<string>;
   onClose: () => void;
   onInvited: () => void;
 }
@@ -37,9 +39,11 @@ interface InviteUserDialogProps {
 export function InviteUserDialog({
   target,
   existingMemberIds,
+  pendingInviteeIds,
   onClose,
   onInvited,
 }: InviteUserDialogProps) {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ProfileRow[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -75,27 +79,14 @@ export function InviteUserDialog({
     setBusyId(profile.id);
     setError(null);
     try {
-      // 1. Add to the target membership table.
-      const { error: memberErr } = target.kind === 'space'
-        ? await supabase.from('activity_space_members').insert({
-            activity_space_id: target.spaceId,
-            user_id: profile.id,
-            role: 'member',
-          })
-        : await supabase.from('domain_members').insert({
-            domain_id: target.domainId,
-            user_id: profile.id,
-            role: 'member',
-          });
-      if (memberErr) throw memberErr;
-
-      // 2. Joining gives them their human Worker (a database trigger on the
-      // membership tables), so the pickers only need to re-read.
-      invalidateWorkersCache();
-
+      await inviteMember(
+        target.kind,
+        target.kind === 'space' ? target.spaceId : target.domainId,
+        profile.id,
+      );
       onInvited();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to invite');
+      setError(e instanceof Error ? e.message : t('The invitation could not be sent. Try again.'));
     } finally {
       setBusyId(null);
     }
@@ -112,19 +103,22 @@ export function InviteUserDialog({
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-[14px] font-semibold text-foreground">
-            {target.kind === 'space' ? 'Invite to Space' : 'Invite to Domain'}
+            {t(target.kind === 'space' ? 'Invite to Space' : 'Invite to Domain')}
           </h3>
           <button
             type="button"
             onClick={onClose}
             className="p-1 text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
-            aria-label="Close"
+            aria-label={t('Close')}
           >
             <X size={14} />
           </button>
         </div>
 
         <div className="px-5 pt-4">
+          <p className="mb-3 text-[12px] text-muted-foreground">
+            {t('They join when they accept the invitation in their Inbox.')}
+          </p>
           <div className="relative">
             <Search
               size={14}
@@ -135,7 +129,7 @@ export function InviteUserDialog({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
-              placeholder="Search by display name…"
+              placeholder={t('Search by display name…')}
               className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
             />
           </div>
@@ -144,20 +138,21 @@ export function InviteUserDialog({
 
         <div className="max-h-[320px] overflow-y-auto divide-y divide-border/40 mt-3">
           {loading ? (
-            <div className="px-5 py-8 text-center text-xs text-muted-foreground">Searching…</div>
+            <div className="px-5 py-8 text-center text-xs text-muted-foreground">{t('Searching…')}</div>
           ) : results.length === 0 ? (
             <div className="px-5 py-8 text-center text-xs text-muted-foreground">
-              {query.trim() ? 'No users matched.' : 'Start typing to search users.'}
+              {t(query.trim() ? 'No users matched.' : 'Start typing to search users.')}
             </div>
           ) : (
             results.map((p) => {
-              const already = existingMemberIds.has(p.id);
+              const isMember = existingMemberIds.has(p.id);
+              const isInvited = !isMember && !!pendingInviteeIds?.has(p.id);
               const isBusy = busyId === p.id;
               return (
                 <button
                   key={p.id}
                   type="button"
-                  disabled={already || isBusy}
+                  disabled={isMember || isInvited || isBusy}
                   onClick={() => handleInvite(p)}
                   className="w-full flex items-center gap-3 px-5 py-2.5 hover:bg-muted/30 disabled:opacity-50 disabled:cursor-not-allowed text-left transition-colors"
                 >
@@ -168,15 +163,15 @@ export function InviteUserDialog({
                   />
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium text-foreground truncate">
-                      {p.display_name || 'Unnamed'}
+                      {p.display_name || t('Unnamed')}
                     </div>
-                    {already && (
-                      <div className="text-[11px] text-muted-foreground">Already a member</div>
+                    {isMember && (
+                      <div className="text-[11px] text-muted-foreground">{t('Already a member')}</div>
                     )}
                   </div>
-                  {!already && (
+                  {!isMember && (
                     <span className="text-[12px] text-muted-foreground">
-                      {isBusy ? 'Inviting…' : 'Invite'}
+                      {t(isInvited ? 'Invited' : isBusy ? 'Inviting…' : 'Invite')}
                     </span>
                   )}
                 </button>

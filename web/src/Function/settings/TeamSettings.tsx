@@ -15,6 +15,8 @@ import { isUnreachableWorker } from '@/Function/shared/workerReach';
 import { SettingsSection } from './SettingsSection';
 import { InviteUserDialog } from './InviteUserDialog';
 import { ConnectWorkerAccountDialog } from './ConnectWorkerAccountDialog';
+import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
+import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
 
 interface TeamSettingsProps {
   /** Optional Domain scope — when provided, the Humans list is filtered to
@@ -37,6 +39,8 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   const [showAdd, setShowAdd] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [connecting, setConnecting] = useState<Worker | null>(null);
+  // Invited to this Domain but not yet accepted: listed, not a Worker here.
+  const { invitees, refetch: refetchInvitees } = useScopeInvitations('domain', domainId);
 
   // The database decides who may change a Worker (workers RLS, ADR 0028);
   // these flags only hide controls it would refuse. An owner of a person's
@@ -100,6 +104,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
     void reload();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [domainId, user?.id, activeSpaceId]);
+  useWhenInvitationsSettle(invitees, () => void reload());
 
   const handleDelete = async (id: string) => {
     if (!await appDialog.confirm('Remove this team member? Their assignments will be cleared.')) return;
@@ -190,6 +195,9 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
             />
           ))
         )}
+        {domainId && (
+          <PendingInviteRows invitees={invitees} canCancel={(i) => isOwner || i.invitedBy === user?.id} onChanged={() => void refetchInvitees()} />
+        )}
       </SettingsSection>
 
       <SettingsSection title={`AI agents (${agents.length})`}>
@@ -222,10 +230,11 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
         <InviteUserDialog
           target={{ kind: 'domain', domainId }}
           existingMemberIds={memberUserIds}
+          pendingInviteeIds={new Set(invitees.map((i) => i.userId))}
           onClose={() => setShowInvite(false)}
           onInvited={() => {
             setShowInvite(false);
-            void reload();
+            void refetchInvitees();
           }}
         />
       )}

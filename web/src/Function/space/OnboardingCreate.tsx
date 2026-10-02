@@ -16,6 +16,7 @@ export function OnboardingCreate({
   placeholder,
   cta,
   onCreate,
+  children,
 }: {
   title: string;
   subtitle: string;
@@ -23,6 +24,8 @@ export function OnboardingCreate({
   placeholder: string;
   cta: string;
   onCreate: (name: string) => Promise<void>;
+  /** Shown under the form — e.g. invitations to join an existing Space. */
+  children?: React.ReactNode;
 }) {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -65,6 +68,7 @@ export function OnboardingCreate({
         >
           {busy ? 'Creating…' : cta}
         </button>
+        {children}
       </div>
     </div>
   );
