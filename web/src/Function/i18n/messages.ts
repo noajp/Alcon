@@ -695,6 +695,8 @@ Object.assign(ja, {
   'An Object needs at least one owner. Delete the Object instead, or ask an owner of its Domain to take it over.': 'Object には少なくとも 1 人のオーナーが必要です。Object を削除するか、その Domain のオーナーに引き継ぎを依頼してください。',
   'A Domain needs at least one owner. Delete the Domain instead if no one else should own it.': 'Domain には少なくとも 1 人のオーナーが必要です。ほかに持つ人がいなければ、Domain を削除してください。',
   'Only owners or admins of both Domains can move this Object.': 'この Object を移動できるのは、移動元と移動先の両方の Domain のオーナーか admin だけです。',
+  'Only owners or admins of both this Object and the Domain can file it there.': 'この Object をその Domain に入れられるのは、Object とその Domain の両方のオーナーか admin だけです。',
+  'Only owners or admins of this Object or of the Domain can take it out of there.': 'この Object をその Domain から外せるのは、Object かその Domain のオーナーか admin だけです。',
   'A Space needs at least one owner. Make someone else an owner first.': 'Space には少なくとも 1 人のオーナーが必要です。先に別の人をオーナーにしてください。',
   'The member could not be removed. Try again.': 'メンバーを外せませんでした。もう一度お試しください。',
 });
@@ -724,6 +726,8 @@ Object.assign(ko, {
   'An Object needs at least one owner. Delete the Object instead, or ask an owner of its Domain to take it over.': 'Object에는 소유자가 최소 1명 필요합니다. Object를 삭제하거나 해당 Domain의 소유자에게 인계를 요청하세요.',
   'A Domain needs at least one owner. Delete the Domain instead if no one else should own it.': 'Domain에는 소유자가 최소 1명 필요합니다. 다른 소유자가 없어야 한다면 Domain을 삭제하세요.',
   'Only owners or admins of both Domains can move this Object.': '이 Object는 원래 Domain과 옮길 Domain 모두의 소유자나 admin만 옮길 수 있습니다.',
+  'Only owners or admins of both this Object and the Domain can file it there.': '이 Object를 그 Domain에 넣을 수 있는 사람은 Object와 그 Domain 모두의 소유자나 admin뿐입니다.',
+  'Only owners or admins of this Object or of the Domain can take it out of there.': '이 Object를 그 Domain에서 뺄 수 있는 사람은 Object나 그 Domain의 소유자나 admin뿐입니다.',
   'A Space needs at least one owner. Make someone else an owner first.': 'Space에는 소유자가 최소 1명 필요합니다. 먼저 다른 사람을 소유자로 지정하세요.',
   'The member could not be removed. Try again.': '멤버를 제외하지 못했습니다. 다시 시도하세요.',
 });
@@ -753,6 +757,8 @@ Object.assign(fr, {
   'An Object needs at least one owner. Delete the Object instead, or ask an owner of its Domain to take it over.': "Un Object doit avoir au moins un propriétaire. Supprimez plutôt l'Object, ou demandez à un propriétaire de son Domain de le reprendre.",
   'A Domain needs at least one owner. Delete the Domain instead if no one else should own it.': "Un Domain doit avoir au moins un propriétaire. Supprimez plutôt le Domain si personne d'autre ne doit le posséder.",
   'Only owners or admins of both Domains can move this Object.': 'Seuls les propriétaires ou admins des deux Domains peuvent déplacer cet Object.',
+  'Only owners or admins of both this Object and the Domain can file it there.': 'Seuls les propriétaires ou admins de cet Object et de ce Domain peuvent l’y classer.',
+  'Only owners or admins of this Object or of the Domain can take it out of there.': 'Seuls les propriétaires ou admins de cet Object ou de ce Domain peuvent l’en retirer.',
   'A Space needs at least one owner. Make someone else an owner first.': "Un Space doit avoir au moins un propriétaire. Désignez d'abord quelqu'un d'autre comme propriétaire.",
   'The member could not be removed. Try again.': "Le membre n'a pas pu être retiré. Réessayez.",
 });
@@ -782,6 +788,8 @@ Object.assign(es, {
   'An Object needs at least one owner. Delete the Object instead, or ask an owner of its Domain to take it over.': 'Un Object necesita al menos un propietario. Elimina el Object o pide a un propietario de su Domain que lo asuma.',
   'A Domain needs at least one owner. Delete the Domain instead if no one else should own it.': 'Un Domain necesita al menos un propietario. Si nadie más debe tenerlo, elimina el Domain.',
   'Only owners or admins of both Domains can move this Object.': 'Solo los propietarios o admins de ambos Domains pueden mover este Object.',
+  'Only owners or admins of both this Object and the Domain can file it there.': 'Solo los propietarios o admins de este Object y de ese Domain pueden archivarlo allí.',
+  'Only owners or admins of this Object or of the Domain can take it out of there.': 'Solo los propietarios o admins de este Object o de ese Domain pueden sacarlo de allí.',
   'A Space needs at least one owner. Make someone else an owner first.': 'Un Space necesita al menos un propietario. Primero haz propietaria a otra persona.',
   'The member could not be removed. Try again.': 'No se pudo quitar al miembro. Inténtalo de nuevo.',
 });

@@ -70,7 +70,10 @@ export function ObjectActionsMenu({
         domain_ids: memberIds.length > 0 ? memberIds : undefined,
       });
       await onRefresh?.();
-    } catch (e) { console.error('Duplicate Object failed', e); }
+    } catch (e) {
+      console.error('Duplicate Object failed', e);
+      if (e instanceof Error && e.message) await appDialog.alert(e.message);
+    }
   };
 
   const move = async (domainId: string) => {
