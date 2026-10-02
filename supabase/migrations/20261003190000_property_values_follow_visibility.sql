@@ -5,9 +5,12 @@
 -- non-personal definition and placement, across Spaces — including deleting
 -- another Space's column, which cascades to its values.
 --
--- custom_columns            a definition has exactly one scope:
+-- custom_columns            a definition has exactly one scope, fixed once
+--                           made (a trigger refuses moving it from a browser):
 --   object_id               visible to and changed by whoever sees the Object
---   domain_id               … whoever sees the Domain
+--   domain_id               changed by whoever sees the Domain; also readable
+--                           by anyone who sees an Object filed under it (an
+--                           Object-only invitee reading its Object's fields)
 --   activity_space_id       changed by Space members; also readable by anyone
 --                           who sees an Object the column is placed on (a
 --                           Domain guest reading a library field's values)
@@ -29,13 +32,17 @@
 --                           Object value takes a column of a Domain the Object
 --                           is filed under. The WITH CHECK reads the new row,
 --                           so a value cannot be moved onto a hidden target.
+--                           Reads test membership in the caller's visible sets,
+--                           computed once per query, not helpers per row.
 -- Person values             a trigger checks every Worker a person value
 --                           names (a string, or an array of strings): on an
 --                           Element, worker_assignable(worker, element); on an
 --                           Object, a Worker the caller may list that belongs
---                           to the Object's Space. Checked when the value, its
---                           column or its target changes; existing values stay.
--- Service role              RLS does not apply; the trigger skips calls with
+--                           to the Object's Space — or, for an Object in no
+--                           Space, whose linked person (if any) can see the
+--                           Object. Checked when the value, its column or its
+--                           target changes; existing values stay.
+-- Service role              RLS does not apply; the triggers skip calls with
 --                           no auth.uid().
 --
 -- Guarded for preview replay (the base schema lives outside this folder).
@@ -48,6 +55,10 @@ begin
      or to_regclass('public.element_objects') is null
      or to_regclass('public.objects') is null
      or to_regclass('public.object_domains') is null
+     or to_regclass('public.object_members') is null
+     or to_regclass('public.domains') is null
+     or to_regclass('public.domain_members') is null
+     or to_regclass('public.activity_space_members') is null
      or to_regclass('public.workers') is null
      or to_regprocedure('public.user_can_see_element(uuid)') is null
      or to_regprocedure('public.user_can_see_object(uuid)') is null
@@ -57,12 +68,56 @@ begin
      or to_regprocedure('alcon_internal.object_in_space(uuid, uuid)') is null
      or to_regprocedure('alcon_internal.object_home_space(uuid)') is null
      or to_regprocedure('alcon_internal.worker_in_space(uuid, uuid)') is null
-     or to_regprocedure('alcon_internal.user_can_list_worker(uuid)') is null then
+     or to_regprocedure('alcon_internal.user_can_list_worker(uuid)') is null
+     or to_regprocedure('alcon_internal.user_can_see_object_as(uuid, uuid)') is null then
     raise notice 'property_values_follow_visibility skipped: base schema not present';
     return;
   end if;
 
   execute 'grant usage on schema alcon_internal to authenticated';
+
+  -- ── The caller's visible sets ───────────────────────────────────────────
+  -- Set forms of user_can_see_domain / _object / _element (same branches),
+  -- so a policy reads "id in (visible set)" — one hashed set per query —
+  -- instead of running the helper chain for every row.
+  execute $f$
+    create or replace function alcon_internal.visible_domain_ids()
+    returns setof uuid language sql stable security definer set search_path = public as $b$
+      select d.id from public.domains d where d.user_id = auth.uid()
+      union
+      select dm.domain_id from public.domain_members dm where dm.user_id = auth.uid()
+      union
+      select d.id from public.domains d
+        join public.activity_space_members m on m.activity_space_id = d.activity_space_id
+       where d.privacy = 'workspace' and m.user_id = auth.uid();
+    $b$
+  $f$;
+
+  execute $f$
+    create or replace function alcon_internal.visible_object_ids()
+    returns setof uuid language sql stable security definer set search_path = public as $b$
+      with vd as (select alcon_internal.visible_domain_ids() as id)
+      select om.object_id from public.object_members om where om.user_id = auth.uid()
+      union
+      select o.id from public.objects o where o.domain_id in (select id from vd)
+      union
+      select od.object_id from public.object_domains od where od.domain_id in (select id from vd);
+    $b$
+  $f$;
+
+  execute $f$
+    create or replace function alcon_internal.visible_element_ids()
+    returns setof uuid language sql stable security definer set search_path = public as $b$
+      with vo as (select alcon_internal.visible_object_ids() as id)
+      select e.id from public.elements e
+       where e.owner_id = auth.uid()
+          or e.object_id in (select id from vo)
+          or (e.object_id is null and e.owner_id is null
+              and not exists (select 1 from public.element_objects eo where eo.element_id = e.id))
+      union
+      select eo.element_id from public.element_objects eo where eo.object_id in (select id from vo);
+    $b$
+  $f$;
 
   -- ── Definitions ─────────────────────────────────────────────────────────
   -- From the row's own columns, so INSERT … RETURNING reads the row it wrote.
@@ -72,7 +127,12 @@ begin
     returns boolean language sql stable security definer set search_path = public as $b$
       select auth.uid() is not null and (
         (p_object is not null and public.user_can_see_object(p_object))
-        or (p_domain is not null and public.user_can_see_domain(p_domain))
+        or (p_domain is not null and (
+              public.user_can_see_domain(p_domain)
+              or exists (select 1 from public.objects o
+                          where o.domain_id = p_domain and public.user_can_see_object(o.id))
+              or exists (select 1 from public.object_domains od
+                          where od.domain_id = p_domain and public.user_can_see_object(od.object_id))))
         or (p_space is not null and (
               public.is_activity_space_member(p_space)
               or exists (select 1 from public.custom_column_placements pl
@@ -100,6 +160,29 @@ begin
       select coalesce((
         select alcon_internal.custom_column_readable(c.id, c.object_id, c.domain_id, c.activity_space_id, c.owner_user_id)
           from public.custom_columns c where c.id = p_column), false);
+    $b$
+  $f$;
+
+  -- Set form of custom_column_readable over every column.
+  execute $f$
+    create or replace function alcon_internal.readable_column_ids()
+    returns setof uuid language sql stable security definer set search_path = public as $b$
+      with vo as (select alcon_internal.visible_object_ids() as id),
+           vd as (select alcon_internal.visible_domain_ids() as id
+                  union select o.domain_id from public.objects o
+                         where o.domain_id is not null and o.id in (select id from vo)
+                  union select od.domain_id from public.object_domains od
+                         where od.object_id in (select id from vo))
+      select c.id from public.custom_columns c
+       where auth.uid() is not null and (
+             c.object_id in (select id from vo)
+          or c.domain_id in (select id from vd)
+          or c.activity_space_id in (select m.activity_space_id from public.activity_space_members m
+                                      where m.user_id = auth.uid())
+          or c.owner_user_id = auth.uid()
+          or (c.activity_space_id is not null and c.id in (
+                select pl.column_id from public.custom_column_placements pl
+                 where pl.object_id in (select id from vo))));
     $b$
   $f$;
 
@@ -158,6 +241,14 @@ begin
     $b$
   $f$;
 
+  execute 'revoke all on function alcon_internal.visible_domain_ids() from public, anon';
+  execute 'grant execute on function alcon_internal.visible_domain_ids() to authenticated';
+  execute 'revoke all on function alcon_internal.visible_object_ids() from public, anon';
+  execute 'grant execute on function alcon_internal.visible_object_ids() to authenticated';
+  execute 'revoke all on function alcon_internal.visible_element_ids() from public, anon';
+  execute 'grant execute on function alcon_internal.visible_element_ids() to authenticated';
+  execute 'revoke all on function alcon_internal.readable_column_ids() from public, anon';
+  execute 'grant execute on function alcon_internal.readable_column_ids() to authenticated';
   execute 'revoke all on function alcon_internal.custom_column_readable(uuid, uuid, uuid, uuid, uuid) from public, anon';
   execute 'grant execute on function alcon_internal.custom_column_readable(uuid, uuid, uuid, uuid, uuid) to authenticated';
   execute 'revoke all on function alcon_internal.custom_column_manageable(uuid, uuid, uuid, uuid) from public, anon';
@@ -191,6 +282,29 @@ begin
     for delete to authenticated
     using (alcon_internal.custom_column_manageable(object_id, domain_id, activity_space_id, owner_user_id))$p$;
 
+  -- A column's scope is fixed once made: moving it would carry its values and
+  -- placements into another scope. No app flow moves a column.
+  execute $f$
+    create or replace function alcon_internal.custom_columns_guard_scope()
+    returns trigger language plpgsql set search_path = public as $g$
+    begin
+      if auth.uid() is null then return new; end if;  -- service role
+      if new.object_id is distinct from old.object_id
+         or new.domain_id is distinct from old.domain_id
+         or new.activity_space_id is distinct from old.activity_space_id
+         or new.owner_user_id is distinct from old.owner_user_id then
+        raise exception 'a Property''s scope cannot be changed' using errcode = '42501';
+      end if;
+      return new;
+    end
+    $g$
+  $f$;
+  execute 'revoke all on function alcon_internal.custom_columns_guard_scope() from public, anon, authenticated';
+  execute 'drop trigger if exists trg_custom_columns_guard_scope on public.custom_columns';
+  execute 'create trigger trg_custom_columns_guard_scope
+    before update of object_id, domain_id, activity_space_id, owner_user_id on public.custom_columns
+    for each row execute function alcon_internal.custom_columns_guard_scope()';
+
   -- ── custom_column_placements ────────────────────────────────────────────
   execute 'drop policy if exists "Property placements access" on public.custom_column_placements';
   execute 'drop policy if exists custom_column_placements_select on public.custom_column_placements';
@@ -215,6 +329,8 @@ begin
            or (object_id is not null and public.user_can_see_object(object_id)))$p$;
 
   -- ── custom_column_values ────────────────────────────────────────────────
+  -- USING reads the visible sets (a list fetch reads many rows); WITH CHECK
+  -- tests the one row being written with the scalar helpers.
   execute 'drop policy if exists "Authenticated full access" on public.custom_column_values';
   execute 'drop policy if exists custom_column_values_select on public.custom_column_values';
   execute 'drop policy if exists custom_column_values_insert on public.custom_column_values';
@@ -222,9 +338,9 @@ begin
   execute 'drop policy if exists custom_column_values_delete on public.custom_column_values';
   execute $p$create policy custom_column_values_select on public.custom_column_values
     for select to authenticated
-    using (((element_id is not null and public.user_can_see_element(element_id))
-            or (element_id is null and object_id is not null and public.user_can_see_object(object_id)))
-           and alcon_internal.user_can_see_custom_column(column_id))$p$;
+    using (column_id in (select alcon_internal.readable_column_ids())
+           and ((element_id is not null and element_id in (select alcon_internal.visible_element_ids()))
+                or (element_id is null and object_id in (select alcon_internal.visible_object_ids()))))$p$;
   execute $p$create policy custom_column_values_insert on public.custom_column_values
     for insert to authenticated
     with check (((element_id is not null and public.user_can_see_element(element_id))
@@ -233,18 +349,18 @@ begin
                 and alcon_internal.custom_column_fits(column_id, element_id, object_id))$p$;
   execute $p$create policy custom_column_values_update on public.custom_column_values
     for update to authenticated
-    using (((element_id is not null and public.user_can_see_element(element_id))
-            or (element_id is null and object_id is not null and public.user_can_see_object(object_id)))
-           and alcon_internal.user_can_see_custom_column(column_id))
+    using (column_id in (select alcon_internal.readable_column_ids())
+           and ((element_id is not null and element_id in (select alcon_internal.visible_element_ids()))
+                or (element_id is null and object_id in (select alcon_internal.visible_object_ids()))))
     with check (((element_id is not null and public.user_can_see_element(element_id))
                  or (element_id is null and object_id is not null and public.user_can_see_object(object_id)))
                 and alcon_internal.user_can_see_custom_column(column_id)
                 and alcon_internal.custom_column_fits(column_id, element_id, object_id))$p$;
   execute $p$create policy custom_column_values_delete on public.custom_column_values
     for delete to authenticated
-    using (((element_id is not null and public.user_can_see_element(element_id))
-            or (element_id is null and object_id is not null and public.user_can_see_object(object_id)))
-           and alcon_internal.user_can_see_custom_column(column_id))$p$;
+    using (column_id in (select alcon_internal.readable_column_ids())
+           and ((element_id is not null and element_id in (select alcon_internal.visible_element_ids()))
+                or (element_id is null and object_id in (select alcon_internal.visible_object_ids()))))$p$;
 
   -- ── Person values name Workers inside the boundary ──────────────────────
   -- A Person value is a plain column anyone with the row can set; the workers
@@ -258,6 +374,8 @@ begin
       v_ids text[];
       v_id text;
       v_worker uuid;
+      v_space uuid;
+      v_person uuid;
       v_ok boolean;
     begin
       if auth.uid() is null then return new; end if;  -- service role
@@ -280,6 +398,9 @@ begin
       else
         raise exception 'a Person value is a Worker id or a list of Worker ids' using errcode = '22023';
       end if;
+      if new.element_id is null then
+        v_space := alcon_internal.object_home_space(new.object_id);
+      end if;
       foreach v_id in array v_ids loop
         v_worker := null;
         if v_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
@@ -289,9 +410,15 @@ begin
           v_ok := false;
         elsif new.element_id is not null then
           v_ok := public.worker_assignable(v_worker, new.element_id);
-        else
+        elsif v_space is not null then
           v_ok := alcon_internal.user_can_list_worker(v_worker)
-                  and alcon_internal.worker_in_space(v_worker, alcon_internal.object_home_space(new.object_id));
+                  and alcon_internal.worker_in_space(v_worker, v_space);
+        else
+          -- An Object in no Space: a Worker the caller may list, whose
+          -- person (if linked) can see the Object.
+          select w.user_id into v_person from public.workers w where w.id = v_worker;
+          v_ok := alcon_internal.user_can_list_worker(v_worker)
+                  and (v_person is null or alcon_internal.user_can_see_object_as(new.object_id, v_person));
         end if;
         if not coalesce(v_ok, false) then
           raise exception 'this Worker cannot be set here: they are outside its Space or cannot see it'
