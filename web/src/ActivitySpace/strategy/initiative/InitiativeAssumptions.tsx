@@ -9,6 +9,7 @@ import {
   removeIntentBinding,
   useWorkerAvailability,
   useWorkers,
+  useWorkersByIds,
 } from '@/hooks/useSupabase';
 import type { IntentBinding, Worker } from '@/types/database';
 import { Button } from '@/ui/button';
@@ -107,11 +108,6 @@ export function InitiativeAssumptions({
     [scope.elements],
   );
 
-  // The whole roster, not the Initiative's slice of it: a Worker is not owned by
-  // a Initiative, and the person an assumption rests on is often the one with no
-  // Object of their own.
-  const { data: roster } = useWorkers();
-  const byWorker = useMemo(() => new Map(roster.map((w) => [w.id, w])), [roster]);
 
   // Written and fetched bindings both appear once the refetch lands, so the two
   // lists are merged by id rather than concatenated — a chip drawn twice for
@@ -132,6 +128,16 @@ export function InitiativeAssumptions({
     [bindings],
   );
   const { byWorker: availability } = useWorkerAvailability(boundWorkerIds);
+  // The whole roster, not the Initiative's slice of it: a Worker is not owned by
+  // a Initiative, and the person an assumption rests on is often the one with no
+  // Object of their own. A bound Worker outside the active Space's roster is
+  // read by id so it still shows by name.
+  const { data: roster } = useWorkers();
+  const boundWorkers = useWorkersByIds(boundWorkerIds);
+  const byWorker = useMemo(
+    () => new Map([...boundWorkers, ...roster].map((w) => [w.id, w])),
+    [roster, boundWorkers],
+  );
 
   const assumptions = useMemo(() => {
     const rows = (data?.subs ?? [])

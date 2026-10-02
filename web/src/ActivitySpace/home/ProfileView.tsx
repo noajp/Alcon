@@ -10,7 +10,7 @@ import { NavHomeIcon } from '@/shell/sidebar/NavIcons';
 import { MyElementsView } from '@/ActivitySpace/home/MyElementsView';
 import { NowScreen } from '@/ActivitySpace/home/now/NowScreen';
 import { ProfileAI } from '@/Function/copilot/ProfileAI';
-import { useWorkers } from '@/ActivitySpace/sustainment/team/data';
+import { useSelfWorker } from '@/ActivitySpace/sustainment/team/data';
 import { useNotes } from '@/hooks/useNotesDb';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -35,8 +35,8 @@ export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDo
   const [tab, setTab] = useState<ProfileTab>('elements');
   const name = profile?.display_name || user?.email?.split('@')[0] || 'You';
   // The person's Worker id (wrk_015) is the handle other surfaces show.
-  const { data: workers } = useWorkers();
-  const handle = workers.find(worker => worker.user_id === user?.id)?.display_id ?? user?.email?.split('@')[0] ?? null;
+  const selfWorker = useSelfWorker(user?.id);
+  const handle = selfWorker?.display_id ?? user?.email?.split('@')[0] ?? null;
   const { nodes: notes, loading: notesLoading } = useNotes();
   const myNotes = useMemo(() => notes.filter(node => node.type === 'file' && node.createdBy === user?.id), [notes, user?.id]);
   const openNote = (id: string) => {

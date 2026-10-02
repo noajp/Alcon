@@ -7,9 +7,8 @@ import { useCallback, useState, type ReactElement, type ReactNode } from 'react'
 import type { DateRange } from 'react-day-picker';
 import { CalendarIcon, Menu, Plus, Check, Tag, X } from 'lucide-react';
 import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
-import { addElementAssignee, removeElementAssignee, fetchAllWorkers } from '@/hooks/useSupabase';
+import { addElementAssignee, removeElementAssignee, fetchAssignableWorkers, useWorkerById } from '@/hooks/useSupabase';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
-import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
 import { ReachHint, WorkerAvatar, WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
@@ -505,7 +504,8 @@ export function ElementCell({
 // Reads the current set from el.assignees; add/remove write element_assignees
 // directly, then onRefresh reloads the row so the chips reflect the new set.
 // Read-only (plain chips, no dropdown) when canUpdate is false or onRefresh
-// isn't wired. Workers are fetched lazily on first open.
+// isn't wired. The Workers assignable to this Element are fetched lazily on
+// first open.
 function AssigneeCell({
   el, canUpdate, onRefresh,
 }: {
@@ -540,7 +540,7 @@ function AssigneeCell({
   const handleOpen = (next: boolean) => {
     setOpen(next);
     if (next && workers.length === 0) {
-      fetchAllWorkers(getActiveDomainId()).then(setWorkers).catch((e) => console.error('Failed to load workers', e));
+      fetchAssignableWorkers({ elementId: el.id }).then(setWorkers).catch((e) => console.error('Failed to load workers', e));
     }
   };
   const handleAdd = async (workerId: string) => {
@@ -732,8 +732,9 @@ export function DueDateCell({
 }
 
 // Lead cell — single-select Worker picker for objects.lead_id. Resolves the
-// current lead from the passed worker list (for display) and offers a dropdown
-// of all workers (+ Clear) to set it. Read-only chip when onObjectUpdate isn't
+// current lead by id (from the passed list, else read on its own, so a lead
+// outside the list still shows by name) and offers a dropdown of the passed
+// workers (+ Clear) to set it. Read-only chip when onObjectUpdate isn't
 // wired. Exported for the same cross-surface reuse as DueDateCell above.
 export function LeadCell({
   obj, workers, onObjectUpdate,
@@ -743,7 +744,7 @@ export function LeadCell({
   onObjectUpdate?: (objectId: string, updates: { lead_id?: string | null }) => void | Promise<void>;
 }) {
   const empty = !obj.lead_id;
-  const lead = obj.lead_id ? workers.find((w) => w.id === obj.lead_id) ?? null : null;
+  const lead = useWorkerById(obj.lead_id ?? null, workers);
   const display = (
     <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
       {empty ? <EmptyCellMark /> : (

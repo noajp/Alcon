@@ -32,7 +32,7 @@ import {
   fetchElementWithDetails,
   updateSubelement,
   deleteSubelement,
-  fetchAllWorkers,
+  fetchAssignableWorkers,
   addElementAssignee,
   removeElementAssignee,
   setCustomColumnValue,
@@ -310,7 +310,8 @@ function ElementDetailBody({
   const edges = { incoming: allEdges.incoming.filter(edge => edge.edge_type !== 'depends_on'),
     outgoing: allEdges.outgoing.filter(edge => edge.edge_type !== 'depends_on') };
 
-  // Workers for assignee management
+  // Workers assignable to this Element (its Space's people and AI). Already
+  // assigned Workers keep their names through element.assignees.
   const [allWorkers, setAllWorkers] = useState<Worker[]>([]);
   const [, setShowAssigneeDropdown] = useState(false);
 
@@ -380,9 +381,12 @@ function ElementDetailBody({
   // (The quick-start button was removed; the run still surfaces in comments.)
   const agent = useAgentRun(element.id);
   const aiWorkers = useMemo(() => allWorkers.filter((w) => w.type === 'ai_agent'), [allWorkers]);
+  // Preselect the assigned AI only when it is one this Element can be handed to.
   const assignedAiWorkerId = useMemo(
-    () => (element.assignees || []).map((a) => a.worker).find((w) => w?.type === 'ai_agent')?.id ?? null,
-    [element.assignees],
+    () => (element.assignees || [])
+      .map((a) => a.worker)
+      .find((w) => w?.type === 'ai_agent' && aiWorkers.some((ai) => ai.id === w.id))?.id ?? null,
+    [element.assignees, aiWorkers],
   );
   // When a run finishes it moves the Element to "review" and posts its
   // deliverable as a comment — refresh the parent so the status updates.
@@ -450,7 +454,7 @@ function ElementDetailBody({
     setEstimatedHours(element.estimated_hours?.toString() || '');
   }, [element.id, element.title, element.description, element.estimated_hours]);
 
-  useEffect(() => { fetchAllWorkers(domainId).then(setAllWorkers).catch(console.error); }, [domainId]);
+  useEffect(() => { fetchAssignableWorkers({ elementId: element.id }).then(setAllWorkers).catch(console.error); }, [element.id]);
   const handleCustomChange = useCallback(async (columnId: string, value: Json) => {
     try {
       await setCustomColumnValue(columnId, element.id, value);

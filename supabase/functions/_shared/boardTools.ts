@@ -116,11 +116,13 @@ export const BOARD_TOOLS: ToolDef[] = [
   },
   {
     name: "listWorkers",
-    description: "Worker (担当者) の一覧。assignee 追加・削除の時にこの id を渡す。",
+    description: "担当にできる Worker の一覧。assignee 追加・削除の時にこの id を渡す。担当にできるのは Element と同じ Space の人と AI だけ。elementId を渡すと、その Element に実際に割り当てられる Worker だけを返す。引数なしなら、自分が属する Space 全体の Worker。",
     input_schema: {
       type: "object",
       properties: {
-        domainId: { type: "string", description: "Domain で絞る場合のみ" },
+        elementId: { type: "string", description: "この Element に割り当てられる Worker だけ（uuid または display_id）" },
+        objectId: { type: "string", description: "この Object の Domain を見られる人に絞る" },
+        domainId: { type: "string", description: "この Domain を見られる人に絞る" },
       },
       additionalProperties: false,
     },
@@ -662,18 +664,32 @@ export async function runBoardTool(
       }
 
       case "listWorkers": {
-        let q = supabase.from("workers").select("id, name, type, role, user_id").order("name");
-        if (input.domainId) {
-          // domain_members holds user_id; map → workers via workers.user_id.
-          const { data: members } = await supabase
-            .from("domain_members").select("user_id").eq("domain_id", input.domainId as string);
-          const userIds = (members ?? []).map((m: { user_id: string }) => m.user_id);
-          if (userIds.length === 0) return { ok: true, data: [], meta: { rows: 0 } };
-          q = q.in("user_id", userIds);
+        // Who can be assigned follows the Space boundary; the database decides
+        // (list_assignable_workers). No arguments: every Space the caller is in.
+        let elementId: string | null = null;
+        if (input.elementId) {
+          elementId = await resolveElementId(supabase, String(input.elementId));
+          if (!elementId) return { ok: false, error: "Element not found" };
         }
-        const { data, error } = await q;
+        let domainId = input.domainId ? String(input.domainId) : null;
+        if (!elementId && !domainId && input.objectId) {
+          const { data: obj } = await supabase
+            .from("objects").select("domain_id").eq("id", String(input.objectId)).maybeSingle();
+          if (!obj) return { ok: false, error: "Object not found" };
+          domainId = (obj as { domain_id: string | null }).domain_id;
+          if (!domainId) {
+            const { data: od } = await supabase
+              .from("object_domains").select("domain_id").eq("object_id", String(input.objectId))
+              .order("is_primary", { ascending: false }).limit(1).maybeSingle();
+            domainId = (od as { domain_id: string } | null)?.domain_id ?? null;
+          }
+        }
+        const { data, error } = await supabase
+          .rpc("list_assignable_workers", { p_space_id: null, p_domain_id: domainId, p_element_id: elementId })
+          .select("id, name, type, role, user_id");
         if (error) throw error;
-        return { ok: true, data, meta: { rows: data?.length ?? 0 } };
+        const rows = Array.isArray(data) ? data : data ? [data] : [];
+        return { ok: true, data: rows, meta: { rows: rows.length } };
       }
 
       // ── Write: Element ────────────────────────────────────────────────
@@ -700,13 +716,24 @@ export async function runBoardTool(
         await audit(supabase, actor, data.id, `Created “${title}”`);
         // initial assignees — a refused assignment is reported, not dropped:
         // the Element exists either way, and the caller should know who is on it.
+        // A Worker outside the Element's Space is skipped and named here.
         let assigneeError: string | undefined;
         if (Array.isArray(input.assigneeWorkerIds) && input.assigneeWorkerIds.length > 0) {
-          const rows = (input.assigneeWorkerIds as string[]).map((wid) => ({
-            element_id: data.id, worker_id: wid,
-          }));
-          const { error: aErr } = await supabase.from("element_assignees").insert(rows);
-          if (aErr) assigneeError = aErr.message;
+          const requested = [...new Set((input.assigneeWorkerIds as unknown[]).map(String).filter(Boolean))];
+          const allowed: string[] = [];
+          const refused: string[] = [];
+          for (const wid of requested) {
+            const { data: ok } = await supabase.rpc("worker_assignable", { p_worker: wid, p_element: data.id });
+            (ok === true ? allowed : refused).push(wid);
+          }
+          const problems: string[] = [];
+          if (refused.length > 0) problems.push(`Worker is outside this Element's Space: ${refused.join(", ")}`);
+          if (allowed.length > 0) {
+            const { error: aErr } = await supabase.from("element_assignees")
+              .insert(allowed.map((wid) => ({ element_id: data.id, worker_id: wid })));
+            if (aErr) problems.push(aErr.message);
+          }
+          if (problems.length > 0) assigneeError = problems.join("; ");
         }
         return { ok: true, data: assigneeError ? { ...data, assigneeError } : data, meta: { rows: 1 } };
       }
@@ -907,6 +934,15 @@ export async function runBoardTool(
           .from("element_assignees").select("element_id")
           .eq("element_id", elementId).eq("worker_id", workerId).maybeSingle();
         if (existing) return { ok: true, data: { elementId, workerId, already: true }, meta: { rows: 0 } };
+        const { data: assignable, error: aErr } = await supabase
+          .rpc("worker_assignable", { p_worker: workerId, p_element: elementId });
+        if (aErr) throw aErr;
+        if (assignable !== true) {
+          return {
+            ok: false,
+            error: "This Worker can't be assigned to this Element: it is in another Space, inactive, or the person can't see this Element. listWorkers with elementId returns who can be.",
+          };
+        }
         const { error } = await supabase
           .from("element_assignees").insert({ element_id: elementId, worker_id: workerId });
         if (error) throw error;

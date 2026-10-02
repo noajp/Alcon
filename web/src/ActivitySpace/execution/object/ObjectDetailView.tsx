@@ -8,7 +8,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import {
-  createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, addElementAssignee,
+  createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, assignWorkersToElement, noticeSkippedAssignees,
   fetchAllWorkers,
   useObjectTabs, reorderObjectTabs, useDomains, useElementTemplates, usePhases, useObjectMilestones, createObjectTab, deleteObjectTab,
   deleteObject, addDomainElementType, removeDomainElementType,
@@ -36,6 +36,7 @@ import { ObjectElementsView } from '@/ActivitySpace/execution/object/ObjectEleme
 import type { ListSection } from '@/ActivitySpace/execution/object/ListTable';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { sectionGroupValues, type ListControlsState, type SectionGroup } from '@/Function/shared/listControls';
+import { partitionAssignable } from '@/Function/shared/assignableWorkers';
 
 export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls, onViewChange }: {
   object: AlconObjectWithChildren;
@@ -87,6 +88,16 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
   const { templates: elementTemplates } = useElementTemplates(object.domain_id ?? null);
   const { data: domainPhases } = usePhases(object.domain_id ?? null);
   const { data: objectMilestones } = useObjectMilestones([object.id]);
+  // Workers for the QuickAdd popup's Assignee pill — the ones assignable in
+  // this Space. Fetched once per Domain.
+  const [popupWorkers, setPopupWorkers] = useState<Worker[]>([]);
+  useEffect(() => {
+    fetchAllWorkers(object.domain_id ?? null)
+      .then(setPopupWorkers)
+      .catch((e) => console.error('Failed to load workers for QuickAdd', e));
+  }, [object.domain_id]);
+
+  // A template keeps only the assignees that are on that list.
   const quickAddTemplates = useMemo<QuickAddTemplate[]>(
     () => elementTemplates.map((t) => ({
       id: t.id,
@@ -95,20 +106,12 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
       status: t.status,
       priority: t.priority,
       labels: t.labels,
-      assigneeWorkerIds: t.assignee_worker_ids,
+      assigneeWorkerIds: partitionAssignable(t.assignee_worker_ids, popupWorkers).assignable,
       description: t.description,
       estimatedHours: t.estimated_hours,
     })),
-    [elementTemplates],
+    [elementTemplates, popupWorkers],
   );
-
-  // Workers for the QuickAdd popup's Assignee pill. Fetched once per Domain.
-  const [popupWorkers, setPopupWorkers] = useState<Worker[]>([]);
-  useEffect(() => {
-    fetchAllWorkers(object.domain_id ?? null)
-      .then(setPopupWorkers)
-      .catch((e) => console.error('Failed to load workers for QuickAdd', e));
-  }, [object.domain_id]);
 
   // Labels already used on this Object's Elements — surface them as
   // selectable suggestions in the QuickAdd popup's Labels pill.
@@ -618,6 +621,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         defaultAssigneeWorkerIds={quickAddDefaults.assigneeWorkerIds}
         defaultLabels={quickAddDefaults.labels}
         onSubmit={async (inputs: NewElementInput[]) => {
+          let skippedAssignees = 0;
           for (const input of inputs) {
             try {
               const created = await createElement({
@@ -630,13 +634,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
                 priority: input.priority ?? undefined,
                 estimated_hours: input.estimatedHours ?? null,
               });
-              for (const wid of input.assigneeWorkerIds ?? []) {
-                try {
-                  await addElementAssignee({ element_id: created.id, worker_id: wid, role: 'assignee' });
-                } catch (e) { console.warn('Could not assign Element:', e); }
-              }
+              skippedAssignees += (await assignWorkersToElement(created.id, input.assigneeWorkerIds ?? [])).skipped.length;
             } catch (e) { console.error('Failed to create Element', e); }
           }
+          noticeSkippedAssignees(skippedAssignees);
           await onRefresh?.();
         }}
       />

@@ -228,14 +228,22 @@ async function execute(a: ExecArgs): Promise<void> {
   let instructions: string | null = null;
   let model: AgentModel = DEFAULT_AGENT_MODEL;
   let maxTotalTurns = DEFAULT_MAX_TOTAL_TURNS;
-  let workerId = run.worker_id;
+  // An AI Worker's profile (its instructions above all) loads only when that
+  // Worker is assignable to this Element for the person running it — the
+  // Space boundary. Anything else runs as the default agent.
+  const assignable = async (id: string) => {
+    const { data } = await userDb.rpc("worker_assignable", { p_worker: id, p_element: run.element_id });
+    return data === true;
+  };
+  let workerId = run.worker_id && (await assignable(run.worker_id)) ? run.worker_id : null;
   if (!workerId) {
     // The AI Worker assigned to the Element, if any, is the one who works it.
     const { data: assigned } = await userDb.from("element_assignees").select("worker:workers(id, type)").eq("element_id", run.element_id);
     const workers = ((assigned ?? []) as unknown as { worker: { id: string; type: string } | { id: string; type: string }[] | null }[])
       .flatMap((r) => (Array.isArray(r.worker) ? r.worker : r.worker ? [r.worker] : []));
-    const ai = workers.find((w) => w.type === "ai_agent");
-    workerId = ai?.id ?? null;
+    for (const w of workers) {
+      if (w.type === "ai_agent" && await assignable(w.id)) { workerId = w.id; break; }
+    }
   }
   if (workerId) {
     const { data: w } = await userDb.from("workers").select("name, ai_config, ai_model").eq("id", workerId).maybeSingle();

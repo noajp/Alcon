@@ -10,6 +10,7 @@ import {
   updateObject,
   useDomains,
   useStrategies,
+  useWorkerById,
   useWorkers,
 } from '@/hooks/useSupabase';
 import type { Domain, Json, Worker } from '@/types/database';
@@ -91,8 +92,8 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
     domains.find((d) => d.id === object?.domain_id) ?? null;
   const objectTypes: string[] = primaryDomain?.object_types ?? [];
 
-  const leadWorker: Worker | null =
-    (object?.lead_id ? allWorkers.find((w) => w.id === object.lead_id) : null) ?? null;
+  // Resolved by id: a lead from outside the picker's list still shows by name.
+  const leadWorker: Worker | null = useWorkerById(object?.lead_id ?? null, allWorkers);
 
   // Custom Properties (domain-scoped) for this Object — the same columns the
   // Object list shows, surfaced here as editable property rows. Fetched in an

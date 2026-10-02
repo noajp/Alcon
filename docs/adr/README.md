@@ -59,3 +59,4 @@
 | [0025](0025-generated-apps-read-scoped-object-context.md) | 生成アプリに配置先Objectの実データ読み取り契約を提供する |
 | [0026](0026-external-ai-reaches-the-board-through-mcp-with-the-callers-rls.md) | 外部 AI は MCP（Edge Function）から本人の RLS で盤面を読み書きする |
 | [0027](0027-agents-act-on-elements-with-the-callers-rls-and-stop-for-approval.md) | エージェントは本人の RLS で Element を代行し、外部への書き込みは承認を通す |
+| [0028](0028-workers-belong-to-a-space.md) | Worker は Space に属する — 名前は Element に付いてきて、割り当ては境界に従う |

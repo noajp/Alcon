@@ -515,6 +515,9 @@ export interface Worker {
   id: string
   object_id: string | null
   user_id: string | null
+  /** The Space an unlinked Worker (no user_id, no object_id) belongs to.
+   *  A person's Space follows their memberships, an Object's Worker its Object. */
+  activity_space_id: string | null
   type: 'human' | 'ai_agent' | 'robot'
   name: string
   display_id: string | null       // e.g. "wrk_001"
@@ -577,6 +580,7 @@ export interface WorkerAvailabilityUpdate {
 export interface WorkerInsert {
   id?: string
   object_id?: string | null
+  activity_space_id?: string | null
   type: 'human' | 'ai_agent' | 'robot'
   name: string
   role?: string | null
@@ -592,6 +596,7 @@ export interface WorkerInsert {
 export interface WorkerUpdate {
   id?: string
   object_id?: string | null
+  activity_space_id?: string | null
   type?: 'human' | 'ai_agent' | 'robot'
   name?: string
   role?: string | null

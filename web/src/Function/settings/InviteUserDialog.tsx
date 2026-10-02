@@ -88,26 +88,8 @@ export function InviteUserDialog({
           });
       if (memberErr) throw memberErr;
 
-      // 2. Ensure they have a human Worker row so assignee pickers /
-      // TeamSettings include them. ensureSelfWorker runs only on the
-      // invitee's own login, so we have to mirror its behaviour here for
-      // someone else.
-      const { data: existingWorker } = await supabase
-        .from('workers')
-        .select('id')
-        .eq('user_id', profile.id)
-        .eq('type', 'human')
-        .limit(1)
-        .maybeSingle();
-      if (!existingWorker) {
-        await supabase.from('workers').insert({
-          user_id: profile.id,
-          type: 'human',
-          name: profile.display_name || 'Member',
-          avatar_url: profile.avatar_url ?? null,
-          status: 'active',
-        });
-      }
+      // 2. Joining gives them their human Worker (a database trigger on the
+      // membership tables), so the pickers only need to re-read.
       invalidateWorkersCache();
 
       onInvited();

@@ -23,6 +23,12 @@ function readLocale(): Locale {
   return cachedLocale;
 }
 
+/** The viewer's language outside React (data-layer notices); `t` inside it. */
+export function translate(message: string, values?: Record<string, string | number>): string {
+  const locale = readLocale();
+  return interpolate(locale === 'en' ? message : (MESSAGES[locale][message] ?? message), values);
+}
+
 function subscribe(listener: () => void): () => void {
   const handleStorage = (event: StorageEvent) => {
     if (event.key !== null && event.key !== LOCALE_STORAGE_KEY) return;
