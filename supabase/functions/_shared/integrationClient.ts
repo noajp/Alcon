@@ -38,19 +38,20 @@ export function isSafeEndpoint(raw: string): boolean {
   try { u = new URL(raw); } catch { return false; }
   if (u.protocol !== "https:") return false;
   if (u.username || u.password) return false;
-  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  // A trailing dot names the same host ("localhost." is localhost).
+  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.+$/, "");
   if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
   if (!host.includes(".") && !host.includes(":")) return false;
   // IPv4 literals in private, loopback, link-local, CGNAT and metadata ranges.
   const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (v4) {
     const [a, b] = [Number(v4[1]), Number(v4[2])];
-    if (a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224) return false;
+    if (a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || (a === 198 && (b === 18 || b === 19)) || a >= 224) return false;
   }
-  // IPv6 literals: loopback, unique-local, link-local, mapped.
-  if (host.includes(":")) {
-    if (host === "::1" || host === "::" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80") || host.startsWith("::ffff:")) return false;
-  }
+  // IPv6 literals are refused outright: loopback, unique/site/link-local,
+  // IPv4-mapped / -compatible / NAT64 forms all spell private targets, and
+  // no real integration endpoint is an IPv6 literal.
+  if (host.includes(":")) return false;
   return true;
 }
 
@@ -79,6 +80,27 @@ export function authHeaders(row: IntegrationRow, secret: string | null): Record<
 
 function truncate(s: string): string {
   return s.length > MAX_RESULT_CHARS ? `${s.slice(0, MAX_RESULT_CHARS)}\n…(${s.length - MAX_RESULT_CHARS} chars truncated)` : s;
+}
+
+const MAX_BODY_BYTES = 2_000_000;
+
+/** Read at most MAX_BODY_BYTES of a response body as text. */
+export async function readCapped(res: Response, limit = MAX_BODY_BYTES): Promise<string> {
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) { chunks.push(value.slice(0, value.byteLength - (size - limit))); await reader.cancel().catch(() => {}); break; }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(chunks.reduce((n, c) => n + c.byteLength, 0));
+  let off = 0;
+  for (const c of chunks) { all.set(c, off); off += c.byteLength; }
+  return new TextDecoder().decode(all);
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
@@ -135,7 +157,7 @@ export class McpSession {
     const sid = res.headers.get("mcp-session-id");
     if (sid) this.sessionId = sid;
     if (notify) return null;
-    const text = await res.text();
+    const text = await readCapped(res);
     if (res.status === 401 || res.status === 403) throw new Error(`${this.row.name}: 認証に失敗しました（${res.status}）`);
     if (!res.ok) throw new Error(`${this.row.name}: HTTP ${res.status} ${text.slice(0, 200)}`);
     const msg = parseRpcBody(res.headers.get("content-type") ?? "", text, id);
@@ -216,6 +238,6 @@ export async function callHttp(row: IntegrationRow, secret: string | null, input
     body = typeof input.body === "string" ? input.body : JSON.stringify(input.body);
   }
   const res = await fetchWithTimeout(url, { method, headers, body });
-  const text = method === "HEAD" ? "" : await res.text();
+  const text = method === "HEAD" ? "" : await readCapped(res);
   return { text: truncate(`HTTP ${res.status}\n${text}`), isError: !res.ok };
 }

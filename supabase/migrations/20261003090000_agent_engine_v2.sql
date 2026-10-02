@@ -287,3 +287,132 @@ begin
   grant execute on function public.get_integration_secret(uuid) to service_role;
 end
 $$;
+
+-- Review hardening (PR #460).
+--   continuation_token  a slice's continuation is claimed with a one-time
+--                       token, so a run never executes twice in parallel
+--   element_space()     only for definer contexts (it maps any Element to
+--                       its Space)
+--   agent_runs guard    a browser may only cancel an open run
+--   integrations        secret_id and last_test are not writable from the
+--                       browser — only set_integration_secret and the
+--                       service role write them — and the Vault functions
+--                       check the secret's name belongs to that integration
+--   agent_artifacts     created_by is the caller, not what the row says
+do $$
+begin
+  if to_regclass('public.agent_runs') is null then
+    raise notice 'agent_engine_v2 hardening skipped: agent_runs not present';
+    return;
+  end if;
+  alter table public.agent_runs add column if not exists continuation_token text;
+
+  if to_regprocedure('public.element_space(uuid)') is not null then
+    revoke all on function public.element_space(uuid) from public;
+    revoke all on function public.element_space(uuid) from anon;
+    revoke all on function public.element_space(uuid) from authenticated;
+  end if;
+
+  create or replace function public.agent_runs_guard_client()
+  returns trigger language plpgsql set search_path = public as $f$
+  begin
+    if coalesce(auth.role(), '') <> 'authenticated' then
+      return new;
+    end if;
+    if tg_op = 'INSERT' and new.status <> 'queued' then
+      raise exception 'a run starts queued' using errcode = '42501';
+    end if;
+    if tg_op = 'UPDATE' and (old.status not in ('queued', 'running', 'awaiting_approval', 'paused') or new.status <> 'cancelled') then
+      raise exception 'a run can only be cancelled from the app, while it is open' using errcode = '42501';
+    end if;
+    return new;
+  end
+  $f$;
+
+  if to_regclass('public.integrations') is not null then
+    revoke insert, update on public.integrations from authenticated;
+    grant insert (activity_space_id, preset, kind, name, description, icon, endpoint, auth_type, auth_header, delegation, enabled)
+      on public.integrations to authenticated;
+    grant update (name, description, icon, endpoint, auth_type, auth_header, delegation, enabled, updated_at)
+      on public.integrations to authenticated;
+  end if;
+
+  if to_regclass('public.agent_artifacts') is not null then
+    create or replace function public.agent_artifacts_stamp_author()
+    returns trigger language plpgsql set search_path = public as $f$
+    begin
+      if coalesce(auth.role(), '') = 'authenticated' then
+        if tg_op = 'INSERT' then new.created_by := auth.uid(); else new.created_by := old.created_by; end if;
+      end if;
+      return new;
+    end
+    $f$;
+    drop trigger if exists trg_agent_artifacts_stamp_author on public.agent_artifacts;
+    create trigger trg_agent_artifacts_stamp_author before insert or update on public.agent_artifacts
+      for each row execute function public.agent_artifacts_stamp_author();
+  end if;
+end
+$$;
+
+do $$
+begin
+  if to_regclass('public.integrations') is null
+     or not exists (select 1 from pg_namespace where nspname = 'vault') then
+    raise notice 'integration secret hardening skipped';
+    return;
+  end if;
+
+  create or replace function public.set_integration_secret(p_integration_id uuid, p_secret text)
+  returns void language plpgsql security definer set search_path = public, vault as $f$
+  declare
+    v_space uuid;
+    v_secret_id uuid;
+    v_name text := 'integration:' || p_integration_id::text;
+  begin
+    select activity_space_id into v_space from public.integrations where id = p_integration_id;
+    if v_space is null or not public.is_activity_space_owner(v_space) then
+      raise exception 'not allowed' using errcode = '42501';
+    end if;
+    -- The secret is found by its name, never by a secret_id a row claims.
+    select id into v_secret_id from vault.secrets where name = v_name;
+    if p_secret is null or length(p_secret) = 0 then
+      if v_secret_id is not null then delete from vault.secrets where id = v_secret_id; end if;
+      update public.integrations set secret_id = null, updated_at = now() where id = p_integration_id;
+      return;
+    end if;
+    if v_secret_id is null then
+      v_secret_id := vault.create_secret(p_secret, v_name, 'Alcon integration credential');
+    else
+      perform vault.update_secret(v_secret_id, p_secret);
+    end if;
+    update public.integrations set secret_id = v_secret_id, updated_at = now() where id = p_integration_id;
+  end
+  $f$;
+  revoke all on function public.set_integration_secret(uuid, text) from public;
+  revoke all on function public.set_integration_secret(uuid, text) from anon;
+  grant execute on function public.set_integration_secret(uuid, text) to authenticated;
+
+  create or replace function public.get_integration_secret(p_integration_id uuid)
+  returns text language sql stable security definer set search_path = public, vault as $f$
+    select ds.decrypted_secret
+    from vault.decrypted_secrets ds
+    where ds.name = 'integration:' || p_integration_id::text
+  $f$;
+  revoke all on function public.get_integration_secret(uuid) from public;
+  revoke all on function public.get_integration_secret(uuid) from authenticated;
+  revoke all on function public.get_integration_secret(uuid) from anon;
+  grant execute on function public.get_integration_secret(uuid) to service_role;
+
+  -- A disconnected integration takes its credential with it.
+  create or replace function public.integrations_drop_secret()
+  returns trigger language plpgsql security definer set search_path = public, vault as $f$
+  begin
+    delete from vault.secrets where name = 'integration:' || old.id::text;
+    return old;
+  end
+  $f$;
+  drop trigger if exists trg_integrations_drop_secret on public.integrations;
+  create trigger trg_integrations_drop_secret after delete on public.integrations
+    for each row execute function public.integrations_drop_secret();
+end
+$$;

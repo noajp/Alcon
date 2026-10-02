@@ -45,6 +45,8 @@ export interface LoopDeps {
   onUsage(usage: ModelUsage): Promise<void>;
   budgetExceeded(): boolean;
   cancelled(): Promise<boolean>;
+  /** After every completed turn (its tool results appended): persist progress. */
+  afterTurn?(): Promise<void>;
 }
 
 export interface LoopLimits {
@@ -158,10 +160,12 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
       results.push({ type: "tool_result", tool_use_id: finishCall.id, content: r.content, ...(r.is_error ? { is_error: true } : {}) });
       state.messages.push({ role: "user", content: orderResults(calls, results) });
       if (r.finish) return { kind: "finished", finish: r.finish };
+      await deps.afterTurn?.();
       continue;
     }
 
     state.messages.push({ role: "user", content: orderResults(calls, results) });
+    await deps.afterTurn?.();
   }
 }
 

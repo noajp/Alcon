@@ -145,6 +145,14 @@ describe('agent tools', () => {
     expect(tools.baseKindOf('linear_ab12__create_issue')).toBeNull();
   });
 
+  it('summarises a batch of writes in one line', () => {
+    expect(tools.approvalSummary([
+      { integration: 'Echo Test', operation: 'POST /notify' },
+      { integration: 'Echo Test', operation: 'POST /notify' },
+      { integration: 'Linear', operation: 'create_issue' },
+    ])).toBe('Echo Test · POST /notify × 2、Linear · create_issue');
+  });
+
   it('keeps integration tool prefixes stable and valid', () => {
     expect(tools.integrationPrefix('Linear', '4f3a2b1c-0000-0000-0000-000000000000')).toBe('linear_4f3a');
     expect(tools.integrationPrefix('Google ドライブ', 'abcd')).toBe('google_abcd');
@@ -158,6 +166,19 @@ describe('integration client guards', () => {
     for (const bad of ['http://example.com', 'https://localhost:3000', 'https://127.0.0.1', 'https://10.0.0.5', 'https://192.168.1.2', 'https://169.254.169.254/latest', 'https://[::1]/', 'https://user:pw@example.com', 'https://intranet', 'https://db.internal']) {
       expect(client.isSafeEndpoint(bad)).toBe(false);
     }
+  });
+
+  it('refuses trailing-dot, IPv6 and benchmark-range hosts too', () => {
+    for (const bad of ['https://localhost./x', 'https://metadata.google.internal./x', 'https://[::127.0.0.1]/', 'https://[64:ff9b::a00:1]/', 'https://[fec0::1]/', 'https://198.18.0.1/']) {
+      expect(client.isSafeEndpoint(bad)).toBe(false);
+    }
+    expect(client.isSafeEndpoint('https://app.asana.com/api/1.0')).toBe(true);
+  });
+
+  it('reads at most the cap of a response body', async () => {
+    const big = new Response('x'.repeat(5000));
+    expect((await client.readCapped(big, 1000)).length).toBe(1000);
+    expect(await client.readCapped(new Response('ok'), 1000)).toBe('ok');
   });
 
   it('keeps an http_request under its base URL', () => {
@@ -188,6 +209,7 @@ describe('pricing and prompts', () => {
     expect(pricing.costOf('claude-sonnet-5-5', { input_tokens: 1_000_000 })).toBe(2);
     expect(pricing.costOf('claude-sonnet-5-5', { output_tokens: 100_000 })).toBe(1);
     expect(pricing.costOf('claude-haiku-4-5', { cache_creation_input_tokens: 1_000_000, cache_read_input_tokens: 1_000_000 })).toBe(1.35);
+    expect(pricing.costOf('claude-opus-5-5', { cache_read_input_tokens: 1_000_000 })).toBe(0.2);
     expect(pricing.isAgentModel('claude-opus-5-5')).toBe(true);
     expect(pricing.isAgentModel('gpt-5')).toBe(false);
   });

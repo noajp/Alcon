@@ -105,3 +105,13 @@ export function integrationPrefix(name: string, id: string): string {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 16);
   return `${base || "x"}_${id.replace(/-/g, "").slice(0, 4)}`;
 }
+
+/** Pure. "Echo Test · POST /notify × 3、Linear · create_issue" — one line for a batch of writes. */
+export function approvalSummary(display: { integration: string; operation: string }[]): string {
+  const groups = new Map<string, number>();
+  for (const d of display) {
+    const key = `${d.integration} · ${d.operation || "書き込み"}`;
+    groups.set(key, (groups.get(key) ?? 0) + 1);
+  }
+  return [...groups.entries()].map(([k, n]) => (n > 1 ? `${k} × ${n}` : k)).join("、");
+}
