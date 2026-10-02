@@ -249,10 +249,10 @@ export type ElementNotifyKind = 'assigned' | 'status_change' | 'approval_decided
  *
  * Browsers cannot write notifications directly. The `notify_about_element`
  * RPC checks that the caller really did it (the assignment row, their status
- * change, their approval decision — each within ten minutes), picks the
- * recipients from the Element, drops anyone who cannot see it, and writes the
- * text itself. Pass `workerId` for 'assigned'. A failed notification never
- * undoes the action, so errors are logged, not thrown.
+ * change, their approval decision — each within ten minutes and still matching
+ * the Element), picks the recipients from the Element, drops anyone who cannot
+ * see it, and writes the text itself. Pass `workerId` for 'assigned'. A failed
+ * notification never undoes the action, so errors are logged, not thrown.
  */
 export async function notifyAboutElement(
   elementId: string,
