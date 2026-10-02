@@ -301,7 +301,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
                 )}
                 {lastTest ? (
                   <div className="space-y-1.5 text-[12px]">
-                    <div className={cn('font-medium', lastTest.ok ? 'text-[var(--status-success)]' : 'text-[var(--status-danger)]')}>
+                    <div className={cn('font-medium', lastTest.code === 'connected' ? 'text-[var(--status-success)]' : lastTest.ok ? 'text-muted-foreground' : 'text-[var(--status-danger)]')}>
                       {t(testOutcomeLabel(lastTest.code))}{lastTest.status ? ` (HTTP ${lastTest.status})` : ''}
                       {lastTest.at && <span className="ml-2 font-normal text-muted-foreground">{new Date(lastTest.at).toLocaleString(locale)}</span>}
                     </div>
