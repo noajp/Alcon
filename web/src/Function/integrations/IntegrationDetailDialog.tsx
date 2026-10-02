@@ -1,0 +1,365 @@
+'use client';
+
+import { useState, type ReactNode } from 'react';
+import { ChevronDown, Check } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/ui/dialog';
+import { Button } from '@/ui/button';
+import { Input } from '@/ui/input';
+import { ChoiceCard } from '@/ui/choice-card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import { appDialog } from '@/Function/shared/appDialogStore';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { ToggleRow } from '@/Function/settings/SettingsControls';
+import type { Integration } from '@/types/database';
+import {
+  KIND_LABELS, SOURCE_LABELS, buildIntegrationRow, readLastTest, testOutcomeLabel,
+  type IntegrationAuthType, type IntegrationDelegation, type IntegrationPreset, type IntegrationSource,
+} from './catalog';
+import { useIntegrationActions } from './data';
+
+// One integration: connect a preset (or a custom MCP / API), or manage an
+// existing connection — credential, delegation, on/off, connection test,
+// disconnect. The credential is write-only: it is sent to Vault and the
+// dialog only ever knows whether one is set (`secret_id`).
+//
+// For an existing connection, delegation and on/off apply at once
+// (optimistically, rolled back on failure); custom name / endpoint / auth are
+// saved with 「保存」. Members see the same dialog read-only.
+
+const CUSTOM_AUTH_LABELS: Record<'none' | 'bearer' | 'header', string> = {
+  none: 'None',
+  bearer: 'Bearer token',
+  header: 'Custom header',
+};
+
+export function IntegrationIcon({ name, icon, size }: { name: string; icon: string | null; size: number }) {
+  const style = { width: size, height: size };
+  if (icon) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={icon} alt="" style={style} className="shrink-0 rounded-lg object-contain" />;
+  }
+  return (
+    <span aria-hidden="true" style={style}
+      className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[var(--surface-strong)] font-semibold text-[var(--text-secondary)]">
+      <span style={{ fontSize: Math.round(size * 0.42) }}>{name.trim().charAt(0) || '?'}</span>
+    </span>
+  );
+}
+
+export function SourceChip({ source }: { source: IntegrationSource }) {
+  const { t } = useI18n();
+  return (
+    <span className="inline-flex h-5 shrink-0 items-center rounded-[var(--control-tab-radius)] border border-[var(--border-default)] px-1.5 text-[11px] font-medium text-[var(--text-secondary)]">
+      {t(SOURCE_LABELS[source])}
+    </span>
+  );
+}
+
+function errorText(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string') return (e as { message: string }).message;
+  return String(e);
+}
+
+export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit, onClose, onCreated }: {
+  spaceId: string;
+  preset: IntegrationPreset;
+  integration: Integration | null;
+  canEdit: boolean;
+  onClose: () => void;
+  onCreated: (created: Integration) => void;
+}) {
+  const { t, locale } = useI18n();
+  const actions = useIntegrationActions(spaceId);
+  const isNew = !integration;
+
+  const [name, setName] = useState(integration?.name ?? '');
+  const [endpoint, setEndpoint] = useState(integration?.endpoint ?? preset.endpoint ?? '');
+  const [auth, setAuth] = useState<IntegrationAuthType>(integration?.auth_type ?? preset.auth);
+  const [authHeader, setAuthHeader] = useState(integration?.auth_header ?? '');
+  const [secretInput, setSecretInput] = useState('');
+  const [editingSecret, setEditingSecret] = useState(false);
+  const [newDelegation, setNewDelegation] = useState<IntegrationDelegation>('approve_each');
+  const [newEnabled, setNewEnabled] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const delegation = integration?.delegation ?? newDelegation;
+  const enabled = integration?.enabled ?? newEnabled;
+  const needsSecret = auth === 'bearer' || auth === 'header';
+  const hasSecret = !!integration?.secret_id;
+  const lastTest = readLastTest(integration?.last_test);
+  const unavailable = preset.unavailableReason;
+  const readOnly = !canEdit || !!unavailable;
+  const customDirty = !!integration && preset.custom && (
+    name.trim() !== integration.name || endpoint.trim() !== integration.endpoint
+    || auth !== integration.auth_type || (auth === 'header' && authHeader.trim() !== (integration.auth_header ?? ''))
+  );
+  const busy = actions.create.isPending || actions.update.isPending || actions.remove.isPending || actions.secret.isPending;
+
+  const draft = () => ({ name, endpoint, auth, authHeader, delegation, enabled });
+
+  const connect = async () => {
+    setError(null);
+    const built = buildIntegrationRow(preset, spaceId, draft());
+    if (!built.ok) { setError(t(built.error)); return; }
+    if (needsSecret && !secretInput.trim()) { setError(t('Enter the {label}.', { label: t(preset.credentialLabel) })); return; }
+    try {
+      const created = await actions.create.mutateAsync({ row: built.row, secret: needsSecret ? secretInput.trim() : '' });
+      setSecretInput('');
+      onCreated(created);
+    } catch (e) { setError(t(errorText(e))); }
+  };
+
+  const setLive = (patch: { delegation?: IntegrationDelegation; enabled?: boolean }) => {
+    if (!integration) {
+      if (patch.delegation) setNewDelegation(patch.delegation);
+      if (patch.enabled !== undefined) setNewEnabled(patch.enabled);
+      return;
+    }
+    setError(null);
+    actions.update.mutate({ id: integration.id, patch }, { onError: (e) => setError(t(errorText(e))) });
+  };
+
+  const saveCustom = async () => {
+    if (!integration) return;
+    setError(null);
+    const built = buildIntegrationRow(preset, spaceId, draft());
+    if (!built.ok) { setError(t(built.error)); return; }
+    const { name: n, endpoint: ep, auth_type, auth_header } = built.row;
+    // A credential belongs to its destination: changing where or how it is
+    // sent drops it (a database rule), so say so before it happens.
+    const rebinds = ep !== integration.endpoint || auth_type !== integration.auth_type || (auth_header ?? null) !== (integration.auth_header ?? null);
+    if (rebinds && integration.secret_id
+      && !await appDialog.confirm(t('Changing the address or how the credential is sent deletes the stored credential. Enter it again afterwards. Continue?'))) return;
+    try {
+      await actions.update.mutateAsync({ id: integration.id, patch: { name: n, endpoint: ep, auth_type, auth_header } });
+    } catch (e) { setError(t(errorText(e))); }
+  };
+
+  const saveSecret = async () => {
+    if (!integration || !secretInput.trim()) return;
+    setError(null);
+    try {
+      await actions.secret.mutateAsync({ id: integration.id, value: secretInput.trim() });
+      setSecretInput('');
+      setEditingSecret(false);
+    } catch (e) { setError(t(errorText(e))); }
+  };
+
+  const clearSecret = async () => {
+    if (!integration) return;
+    if (!await appDialog.confirm(t('Delete the stored credential for {name}? Agents can no longer use this connection until a new one is set.', { name: integration.name }))) return;
+    setError(null);
+    try { await actions.secret.mutateAsync({ id: integration.id, value: '' }); } catch (e) { setError(t(errorText(e))); }
+  };
+
+  const runTest = () => {
+    if (!integration) return;
+    setError(null);
+    actions.test.mutate(integration.id, { onError: (e) => setError(t(errorText(e))) });
+  };
+
+  const disconnect = async () => {
+    if (!integration) return;
+    if (!await appDialog.confirm(t('Disconnect {name}? Its credential is deleted and agents can no longer use it.', { name: integration.name }))) return;
+    setError(null);
+    try {
+      await actions.remove.mutateAsync(integration.id);
+      onClose();
+    } catch (e) { setError(t(errorText(e))); }
+  };
+
+  return (
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent className="max-h-[calc(100dvh-48px)] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <IntegrationIcon name={integration?.name ?? preset.name} icon={integration?.icon ?? preset.icon} size={36} />
+            <div className="min-w-0">
+              <DialogTitle className="truncate">{integration?.name ?? t(preset.name)}</DialogTitle>
+              <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <SourceChip source={preset.source} />
+                <span>{KIND_LABELS[preset.kind]}</span>
+                <span aria-hidden="true">·</span>
+                <span>{t('Built by {name}', { name: t(preset.builtBy) })}</span>
+              </div>
+            </div>
+          </div>
+          <DialogDescription className="pt-2 text-[12px]">{t(preset.description)}</DialogDescription>
+        </DialogHeader>
+
+        {unavailable && (
+          <p className="rounded-lg border border-border/60 bg-[var(--status-warning-subtle)] px-3 py-2 text-[12px] text-foreground">{t(unavailable)}</p>
+        )}
+        {!canEdit && !unavailable && (
+          <p className="text-[12px] text-muted-foreground">{t('Only Space owners can connect or change integrations. You can see what is connected.')}</p>
+        )}
+
+        <div className="space-y-4">
+          {preset.custom && (
+            <Field label={t('Name')}>
+              <Input value={name} onChange={(e) => setName(e.target.value)} disabled={readOnly} placeholder={preset.kind === 'mcp' ? t('My MCP server') : t('My API')} className="h-8 text-[13px] md:text-[13px]" />
+            </Field>
+          )}
+
+          <Field label={preset.kind === 'mcp' ? t('Endpoint') : t('Base URL')}>
+            {preset.custom ? (
+              <Input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} disabled={readOnly} inputMode="url"
+                placeholder="https://" className="h-8 font-mono text-[12px] md:text-[12px]" />
+            ) : (
+              <code className="block truncate font-mono text-[12px] text-foreground">{preset.endpoint}</code>
+            )}
+          </Field>
+
+          {preset.custom && (
+            <Field label={t('Authentication')}>
+              <div className="flex flex-wrap items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" align="start" disabled={readOnly}>
+                      <span>{t(CUSTOM_AUTH_LABELS[auth === 'oauth' ? 'bearer' : auth])}</span>
+                      <ChevronDown size={12} aria-hidden="true" className="opacity-60" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[160px]">
+                    {(Object.keys(CUSTOM_AUTH_LABELS) as (keyof typeof CUSTOM_AUTH_LABELS)[]).map((k) => (
+                      <DropdownMenuItem key={k} onSelect={() => setAuth(k)} className="gap-2 text-[12px]">
+                        <span className="flex-1">{t(CUSTOM_AUTH_LABELS[k])}</span>
+                        {auth === k && <Check size={12} />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {auth === 'header' && (
+                  <Input value={authHeader} onChange={(e) => setAuthHeader(e.target.value)} disabled={readOnly} aria-label={t('Header name')}
+                    placeholder="X-API-Key" className="h-7 w-44 font-mono text-[12px] md:text-[12px]" />
+                )}
+              </div>
+            </Field>
+          )}
+
+          {needsSecret && (
+            <Field label={preset.custom ? t('Credential') : t(preset.credentialLabel)}>
+              {integration && hasSecret && !editingSecret ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-[13px] text-foreground">{t('Set')}</span>
+                  {canEdit && (
+                    <>
+                      <Button variant="ghost" size="xs" onClick={() => setEditingSecret(true)} disabled={busy}>{t('Update')}</Button>
+                      <Button variant="danger" size="xs" onClick={clearSecret} disabled={busy}>{t('Delete')}</Button>
+                    </>
+                  )}
+                </div>
+              ) : canEdit && !unavailable ? (
+                <div className="flex items-center gap-2">
+                  <Input type="password" autoComplete="off" value={secretInput} onChange={(e) => setSecretInput(e.target.value)}
+                    placeholder={integration && !hasSecret ? t('Not set') : ''} aria-label={t(preset.credentialLabel)} className="h-8 text-[13px] md:text-[13px]" />
+                  {integration && (
+                    <>
+                      <Button variant="secondary" size="sm" onClick={saveSecret} disabled={busy || !secretInput.trim()}>{t('Save')}</Button>
+                      {editingSecret && <Button variant="ghost" size="sm" onClick={() => { setEditingSecret(false); setSecretInput(''); }}>{t('Cancel')}</Button>}
+                    </>
+                  )}
+                </div>
+              ) : (
+                <span className="text-[13px] text-muted-foreground">{hasSecret ? t('Set') : t('Not set')}</span>
+              )}
+            </Field>
+          )}
+
+          <Field label={t('Delegation')}>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <ChoiceCard selected={delegation === 'approve_each'} label={t('Approve each time (recommended)')}
+                disabled={readOnly} onClick={() => setLive({ delegation: 'approve_each' })}>
+                <span className="text-[12px] text-muted-foreground">{t('Agents read freely and wait for your approval before writing to this service.')}</span>
+              </ChoiceCard>
+              <ChoiceCard selected={delegation === 'full_delegation'} label={t('Full delegation (no approval)')}
+                disabled={readOnly} onClick={() => setLive({ delegation: 'full_delegation' })}>
+                <span className="text-[12px] text-muted-foreground">{t('Agents write to this service without asking.')}</span>
+              </ChoiceCard>
+            </div>
+            {delegation === 'full_delegation' && (
+              <p className="mt-2 text-[12px] text-[var(--status-warning)]">
+                {t('With full delegation, agents send, update and delete in this service without asking. Use it only for services you trust.')}
+              </p>
+            )}
+          </Field>
+
+          <div className="-my-1">
+            <ToggleRow label={t('Enabled')} desc={t('When off, agents do not see this connection.')} value={enabled}
+              disabled={readOnly} onChange={(v) => setLive({ enabled: v })} />
+          </div>
+
+          {integration && (
+            <Field label={t('Connection test')}>
+              <div className="space-y-2">
+                {canEdit && (
+                  <Button variant="secondary" size="sm" onClick={runTest} disabled={actions.test.isPending}>
+                    {actions.test.isPending ? t('Testing…') : t('Test connection')}
+                  </Button>
+                )}
+                {lastTest ? (
+                  <div className="space-y-1.5 text-[12px]">
+                    <div className={cn('font-medium', lastTest.code === 'connected' ? 'text-[var(--status-success)]' : lastTest.ok ? 'text-muted-foreground' : 'text-[var(--status-danger)]')}>
+                      {t(testOutcomeLabel(lastTest.code))}{lastTest.status ? ` (HTTP ${lastTest.status})` : ''}
+                      {lastTest.at && <span className="ml-2 font-normal text-muted-foreground">{new Date(lastTest.at).toLocaleString(locale)}</span>}
+                    </div>
+                    {lastTest.detail && <p className="text-muted-foreground">{lastTest.detail}</p>}
+                    {lastTest.tools.length > 0 && (
+                      <ul className="flex flex-wrap gap-1">
+                        {lastTest.tools.map((tool) => (
+                          <li key={tool.name} className="inline-flex h-5 items-center gap-1 rounded-[var(--control-tab-radius)] border border-[var(--border-default)] px-1.5 font-mono text-[11px] text-foreground">
+                            {tool.name}
+                            <span className="font-sans text-muted-foreground">{tool.readOnly ? t('read') : t('write')}</span>
+                          </li>
+                        ))}
+                        {lastTest.toolCount != null && lastTest.toolCount > lastTest.tools.length && (
+                          <li className="text-[11px] text-muted-foreground">{t('+{count} more', { count: lastTest.toolCount - lastTest.tools.length })}</li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-[12px] text-muted-foreground">{t('Not tested yet.')}</p>
+                )}
+              </div>
+            </Field>
+          )}
+        </div>
+
+        {error && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>}
+
+        {canEdit && !unavailable && (
+          <DialogFooter className="items-center sm:justify-between">
+            {integration ? (
+              <Button variant="danger" size="sm" onClick={disconnect} disabled={busy}>{t('Disconnect')}</Button>
+            ) : <span />}
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={onClose}>{isNew ? t('Cancel') : t('Close')}</Button>
+              {isNew ? (
+                <Button variant="primary" size="sm" onClick={connect} disabled={busy}>{actions.create.isPending ? t('Connecting…') : t('Connect')}</Button>
+              ) : customDirty ? (
+                <Button variant="primary" size="sm" onClick={saveCustom} disabled={busy}>{t('Save')}</Button>
+              ) : null}
+            </div>
+          </DialogFooter>
+        )}
+        {unavailable && isNew && (
+          <DialogFooter>
+            <Button variant="primary" size="sm" disabled>{t('Connect')}</Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <div className="mb-1.5 text-[12px] font-medium text-muted-foreground">{label}</div>
+      {children}
+    </div>
+  );
+}

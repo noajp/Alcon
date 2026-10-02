@@ -1226,6 +1226,33 @@ export interface AgentRunStep {
   created_at: string
 }
 
+// An external service a Space connects for its agents (ADR 0027). Members
+// read; owners write. The credential lives in Vault: secret_id only says one
+// is set, and the browser writes it through set_integration_secret and never
+// reads it back. last_test is written by the integration-test Edge Function.
+export interface Integration {
+  id: string
+  activity_space_id: string
+  preset: string | null
+  kind: 'mcp' | 'http'
+  name: string
+  description: string | null
+  icon: string | null
+  endpoint: string
+  auth_type: 'none' | 'bearer' | 'header' | 'oauth'
+  auth_header: string | null
+  secret_id: string | null
+  delegation: 'approve_each' | 'full_delegation'
+  enabled: boolean
+  last_test: Json | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type IntegrationUpdate = Partial<Pick<Integration,
+  'name' | 'description' | 'endpoint' | 'auth_type' | 'auth_header' | 'delegation' | 'enabled'>>
+
 // =====================================================
 // Strategy — cross-Domain Object groupings (Linear Initiative-style)
 //
@@ -1984,6 +2011,11 @@ export interface Database {
       agent_run_steps: {
         Row: AgentRunStep
         Insert: Omit<AgentRunStep, 'id' | 'created_at'>
+      }
+      integrations: {
+        Row: Integration
+        Insert: Omit<Integration, 'id' | 'secret_id' | 'last_test' | 'created_by' | 'created_at' | 'updated_at'>
+        Update: IntegrationUpdate
       }
     }
   }
