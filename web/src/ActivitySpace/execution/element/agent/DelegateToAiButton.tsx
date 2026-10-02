@@ -7,7 +7,7 @@ import { TextComposer } from '@/ui/text-composer';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import type { Worker } from '@/hooks/useSupabase';
+import type { AgentStartOutcome, Worker } from '@/hooks/useSupabase';
 
 // The inline verb that hands an Element to an agent: an optional note and,
 // when the Space has more than one AI Worker, which one. The AI Worker
@@ -18,28 +18,35 @@ export function DelegateToAiButton({
   defaultWorkerId,
   disabled,
   starting,
+  error,
   onStart,
 }: {
   aiWorkers: Worker[];
   defaultWorkerId: string | null;
   disabled?: boolean;
   starting?: boolean;
-  onStart: (opts: { workerId: string | null; prompt: string }) => Promise<void> | void;
+  /** Why the last start failed, shown in the popover. */
+  error?: string | null;
+  /** Unless the run started, the popover stays open with the note kept for another try. */
+  onStart: (opts: { workerId: string | null; prompt: string }) => Promise<AgentStartOutcome>;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
+  const [outcome, setOutcome] = useState<AgentStartOutcome | null>(null);
   const [workerId, setWorkerId] = useState<string | null>(defaultWorkerId ?? aiWorkers[0]?.id ?? null);
   const chosen = aiWorkers.find((w) => w.id === workerId) ?? null;
 
   const run = async () => {
-    await onStart({ workerId, prompt });
+    const result = await onStart({ workerId, prompt });
+    setOutcome(result);
+    if (result !== 'started') return;
     setPrompt('');
     setOpen(false);
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setOutcome(null); }}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" disabled={disabled}>
           <Bot size={13} />{t('Delegate to AI')}
@@ -75,6 +82,10 @@ export function DelegateToAiButton({
             </Button>
           }
         />
+        {outcome === 'busy' && (
+          <p className="mt-2 text-[12px] text-muted-foreground">{t('The agent is already working on this Element. Stop it or wait for it to finish, then ask again.')}</p>
+        )}
+        {outcome === 'failed' && error && <p className="mt-2 text-[12px] text-[var(--status-danger)]">{error}</p>}
       </PopoverContent>
     </Popover>
   );

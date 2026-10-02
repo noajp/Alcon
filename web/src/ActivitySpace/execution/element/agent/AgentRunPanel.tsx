@@ -6,7 +6,7 @@ import {
   Loader2, MessageSquare, Pause, ShieldCheck, Wrench, CircleDot,
 } from 'lucide-react';
 import { Button } from '@/ui/button';
-import { Textarea } from '@/ui/textarea';
+import { TextComposer } from '@/ui/text-composer';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
@@ -67,6 +67,7 @@ function StepRow({ step }: { step: AgentRunStep }) {
       <button
         type="button"
         disabled={!hasDetail}
+        aria-expanded={hasDetail ? open : undefined}
         onClick={() => setOpen((o) => !o)}
         className={cn('flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-1 text-left text-[12px]', hasDetail && 'hover:bg-muted/40')}
       >
@@ -94,7 +95,7 @@ function Workpad({ steps }: { steps: AgentRunStep[] }) {
   return (
     <div className="mt-1">
       {steps.length > VISIBLE_STEPS && (
-        <button type="button" onClick={() => setAll((a) => !a)} className="mb-0.5 flex items-center gap-1 px-1 text-[12px] text-muted-foreground hover:text-foreground">
+        <button type="button" aria-expanded={all} onClick={() => setAll((a) => !a)} className="mb-0.5 flex items-center gap-1 px-1 text-[12px] text-muted-foreground hover:text-foreground">
           <ChevronDown size={12} className={cn('transition-transform', !all && '-rotate-90')} />
           {all ? t('Show fewer steps') : t('Show all {n} steps', { n: steps.length })}
         </button>
@@ -111,6 +112,7 @@ function ApprovalCard({ agent }: { agent: Agent }) {
   const rows = useMemo(() => (agent.pending ? approvalRows(agent.pending) : []), [agent.pending]);
   if (!agent.pending) return null;
   const shared = sharedColumns(rows);
+  const omitted = rows.reduce((n, r) => n + r.more, 0);
   return (
     <div className="mt-2 rounded-lg border border-border bg-card">
       <div className="flex items-start gap-2 px-3 pt-3">
@@ -145,10 +147,11 @@ function ApprovalCard({ agent }: { agent: Agent }) {
                       {r.fields.length ? r.fields.map(([k, v]) => (
                         <div key={k} className="flex gap-2"><span className="shrink-0 text-muted-foreground">{k}</span><span className="min-w-0 break-words text-foreground">{v}</span></div>
                       )) : <span className="text-muted-foreground">—</span>}
+                      {r.more > 0 && <div className="text-muted-foreground">{t('+{n} more fields in the raw input', { n: r.more })}</div>}
                     </td>
                   )}
                 <td className="border-b border-border/60 py-1.5 align-top">
-                  <button type="button" aria-label={t('Raw input')} onClick={() => setOpenRow((o) => (o === r.id ? null : r.id))} className="rounded p-0.5 text-muted-foreground hover:bg-muted/50 hover:text-foreground">
+                  <button type="button" aria-label={t('Raw input')} aria-expanded={openRow === r.id} onClick={() => setOpenRow((o) => (o === r.id ? null : r.id))} className="rounded p-0.5 text-muted-foreground hover:bg-muted/50 hover:text-foreground">
                     <ChevronRight size={13} className={cn('transition-transform', openRow === r.id && 'rotate-90')} />
                   </button>
                 </td>
@@ -156,23 +159,30 @@ function ApprovalCard({ agent }: { agent: Agent }) {
             ))}
           </tbody>
         </table>
+        {shared && omitted > 0 && (
+          <div className="mt-1 text-[12px] text-muted-foreground">{t('+{n} more fields in the raw input', { n: omitted })}</div>
+        )}
       </div>
 
       <div className="px-3 pb-3 pt-2">
-        <Textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder={t('Note to the agent (optional)')}
-          rows={2}
-          className="text-[13px]"
-        />
-        <div className="mt-2 flex items-center justify-end gap-2">
-          <Button variant="secondary" disabled={agent.deciding} onClick={() => void agent.decide(false, note)}>{t('Reject')}</Button>
-          <Button variant="primary" disabled={agent.deciding} onClick={() => void agent.decide(true, note)}>
-            {agent.deciding ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-            {t('Approve and run')}
-          </Button>
-        </div>
+        {agent.isMine ? (
+          <TextComposer
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={t('Note to the agent (optional)')}
+            rows={2}
+            className="text-[13px]"
+            secondaryAction={<Button variant="secondary" size="sm" disabled={agent.deciding} onClick={() => void agent.decide(false, note)}>{t('Reject')}</Button>}
+            action={
+              <Button variant="primary" size="sm" disabled={agent.deciding} onClick={() => void agent.decide(true, note)}>
+                {agent.deciding ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                {t('Approve and run')}
+              </Button>
+            }
+          />
+        ) : (
+          <p className="text-[12px] text-muted-foreground">{t('Waiting for the person who started this run to approve.')}</p>
+        )}
       </div>
     </div>
   );
@@ -204,7 +214,7 @@ function ArtifactItem({ artifact }: { artifact: AgentArtifact }) {
   return (
     <li className="rounded-lg border border-border">
       <div className="flex items-center gap-2 px-2.5 py-1.5">
-        <button type="button" onClick={() => setOpen((o) => !o)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
           <ChevronRight size={13} className={cn('shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} />
           <FileText size={13} className="shrink-0 text-muted-foreground" />
           <span className="truncate text-[13px] text-foreground">{artifact.title}</span>
@@ -228,7 +238,7 @@ function ArtifactItem({ artifact }: { artifact: AgentArtifact }) {
 export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain: () => void }) {
   const { t } = useI18n();
   const run = agent.run;
-  if (!run && !agent.artifacts.length) return null;
+  if (!run && !agent.artifacts.length && !agent.error) return null;
   const status = run ? STATUS[run.status] ?? STATUS.completed : null;
   const finished = run && ['awaiting_review', 'completed', 'failed', 'cancelled'].includes(run.status);
   const cost = run ? Number(run.cost_usd || 0) : 0;
@@ -240,9 +250,10 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
 
   return (
     <section className="space-y-2">
+      {agent.error && <p className="px-3 text-[12px] text-[var(--status-danger)]">{agent.error}</p>}
       {run && status && (
         <div>
-          <div className="flex min-h-9 items-center gap-2.5 rounded-full border border-border px-3 py-1.5">
+          <div role="status" aria-live="polite" className="flex min-h-9 items-center gap-2.5 rounded-full border border-border px-3 py-1.5">
             <StatusGlyph status={run.status} />
             <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{line}</span>
             {cost > 0 && <span className="shrink-0 font-mono text-[11px] text-muted-foreground">${cost.toFixed(2)}</span>}
@@ -250,19 +261,20 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
             {agent.isActive || run.status === 'awaiting_approval' ? (
               <Button variant="ghost" size="xs" onClick={() => void agent.cancel()}>{t('Stop')}</Button>
             ) : run.status === 'paused' ? (
-              <Button variant="secondary" size="xs" onClick={() => void agent.resume()}>{t('Resume')}</Button>
+              agent.isMine ? <Button variant="secondary" size="xs" onClick={() => void agent.resume()}>{t('Resume')}</Button> : null
             ) : finished ? (
-              <Button variant="ghost" size="xs" disabled={agent.starting} onClick={onRunAgain}>{t('Run again')}</Button>
+              <Button variant="ghost" size="xs" disabled={agent.starting} onClick={onRunAgain}>
+                {run.mode === 'reply' ? t('Run the task') : t('Run again')}
+              </Button>
             ) : null}
           </div>
           {(run.status === 'failed' || run.status === 'paused') && run.error && (
             <p className="mt-1 px-3 text-[12px] text-muted-foreground">{run.error}</p>
           )}
-          {agent.error && <p className="mt-1 px-3 text-[12px] text-[var(--status-danger)]">{agent.error}</p>}
           <div className="px-1">
             <Workpad steps={agent.steps} />
           </div>
-          <ApprovalCard agent={agent} />
+          <ApprovalCard key={agent.pending?.id ?? 'none'} agent={agent} />
         </div>
       )}
 

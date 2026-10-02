@@ -10,34 +10,43 @@ export interface ApprovalRow {
   operation: string;
   /** The fields worth reading, flattened to text: [label, value]. */
   fields: [string, string][];
+  /** How many fields the table leaves out; the raw input has them. */
+  more: number;
   raw: Record<string, unknown>;
 }
 
-const SKIP = new Set(['method', 'path']);
 const MAX_VALUE = 160;
+const MAX_FIELDS = 6;
 
 function show(v: unknown): string {
   if (v === null || v === undefined) return '—';
   if (typeof v === 'string') return v.length > MAX_VALUE ? `${v.slice(0, MAX_VALUE)}…` : v;
   if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-  if (Array.isArray(v)) return v.length <= 3 && v.every((x) => typeof x !== 'object') ? v.join(', ') : `${v.length} 件`;
+  if (Array.isArray(v) && v.length <= 3 && v.every((x) => typeof x !== 'object')) return v.join(', ');
   const s = JSON.stringify(v);
   return s.length > MAX_VALUE ? `${s.slice(0, MAX_VALUE)}…` : s;
 }
 
-/** Pure. The readable fields of one call's input: its body for HTTP calls, its arguments otherwise. */
-export function readableFields(input: Record<string, unknown>): [string, string][] {
-  const source = input.body && typeof input.body === 'object' && !Array.isArray(input.body)
-    ? (input.body as Record<string, unknown>)
-    : input;
-  const out: [string, string][] = [];
-  for (const [k, v] of Object.entries(source)) {
-    if (source === input && SKIP.has(k)) continue;
-    out.push([k, show(v)]);
-    if (out.length >= 6) break;
+/**
+ * Pure. The readable fields of one call's input — for an HTTP call its query
+ * and body, otherwise its arguments — and how many were left out.
+ */
+export function readableFields(input: Record<string, unknown>): { fields: [string, string][]; more: number } {
+  const isHttp = typeof input.method === 'string';
+  const all: [string, string][] = [];
+  if (isHttp) {
+    if (input.query && typeof input.query === 'object') {
+      for (const [k, v] of Object.entries(input.query as Record<string, unknown>)) all.push([`?${k}`, show(v)]);
+    }
+    if (input.body && typeof input.body === 'object' && !Array.isArray(input.body)) {
+      for (const [k, v] of Object.entries(input.body as Record<string, unknown>)) all.push([k, show(v)]);
+    } else if (input.body !== undefined && input.body !== null) {
+      all.push(['body', show(input.body)]);
+    }
+  } else {
+    for (const [k, v] of Object.entries(input)) all.push([k, show(v)]);
   }
-  if (source !== input && typeof input.body === 'string') out.push(['body', show(input.body)]);
-  return out;
+  return { fields: all.slice(0, MAX_FIELDS), more: Math.max(0, all.length - MAX_FIELDS) };
 }
 
 /** Pure. The approval card's rows for a pending action. */
@@ -52,7 +61,7 @@ export function approvalRows(action: Pick<AgentAction, 'input'>): ApprovalRow[] 
       id: c.id,
       integration: d?.integration ?? c.name.split('__')[0],
       operation: d?.operation || httpOp || c.name.split('__').slice(1).join('__') || c.name,
-      fields: readableFields(input),
+      ...readableFields(input),
       raw: input,
     };
   });

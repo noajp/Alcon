@@ -44,9 +44,17 @@ describe('approval card rows', () => {
   });
 
   it('reads MCP arguments directly and shortens long values', () => {
-    const fields = readableFields({ title: 'x'.repeat(300), teamId: 't1', labels: ['a', 'b'] });
+    const { fields } = readableFields({ title: 'x'.repeat(300), teamId: 't1', labels: ['a', 'b'], path: '/docs/a' });
     expect(fields[0][1].endsWith('…')).toBe(true);
     expect(fields).toContainEqual(['labels', 'a, b']);
+    expect(fields).toContainEqual(['path', '/docs/a']);
+  });
+
+  it('shows an HTTP call\'s query and says how many fields it left out', () => {
+    const r = readableFields({ method: 'POST', path: '/x', query: { force: true }, body: { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7 } });
+    expect(r.fields[0]).toEqual(['?force', 'true']);
+    expect(r.fields).toHaveLength(6);
+    expect(r.more).toBe(2);
   });
 
   it('falls back to the tool name when no label was stored', () => {
@@ -67,6 +75,14 @@ describe('comments and agents', () => {
     expect(agentMention('普通のコメント', ai)).toBeNull();
   });
 
+  it('ignores people named like the agent, quoted lines and code', () => {
+    expect(agentMention('@Ai Tanaka 確認お願いします', ai, ['Ai Tanaka'])).toBeNull();
+    expect(agentMention('> @AI 税込にして\n了解です', ai)).toBeNull();
+    expect(agentMention('`@AI` と書くと動きます', ai)).toBeNull();
+    expect(agentMention('```\n@AI\n```', ai)).toBeNull();
+    expect(agentMention('@Ai Tanaka と @AI で確認', ai, ['Ai Tanaka'])).toEqual({ workerId: null });
+  });
+
   it('folds long stretches of agent comments, keeping the last and any focused one', () => {
     const c = (id: string, kind: string) => ({ id, author_kind: kind });
     const list = [c('h1', 'human'), c('a1', 'ai_agent'), c('a2', 'ai_agent'), c('a3', 'ai_agent'), c('a4', 'ai_agent'), c('h2', 'human'), c('a5', 'ai_agent')];
@@ -76,6 +92,12 @@ describe('comments and agents', () => {
     expect(fold.hidden.map((x) => x.id)).toEqual(['a1', 'a2', 'a3']);
     expect(fold.last.id).toBe('a4');
     expect(foldAgentRuns(list, 4, 'a2').map((s) => s.kind)).toEqual(['one', 'one', 'one', 'one', 'one', 'one', 'one']);
+  });
+
+  it('never folds a pinned comment away', () => {
+    const c = (id: string, pinned = false) => ({ id, author_kind: 'ai_agent', is_pinned: pinned });
+    const segs = foldAgentRuns([c('p1', true), c('a1'), c('a2'), c('a3')], 4);
+    expect(segs.map((s) => s.kind)).toEqual(['one', 'one', 'one', 'one']);
   });
 
   it('summarises a comment without markdown marks', () => {

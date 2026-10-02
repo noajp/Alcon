@@ -386,7 +386,7 @@ function ElementDetailBody({
   );
   // When a run finishes it moves the Element to "review" and posts its
   // deliverable as a comment — refresh the parent so the status updates.
-  // (The comments panel is remounted via a finished_at-based key below.)
+  // (The comments panel re-reads its thread as the run moves on: refreshKey.)
   const agentWasActive = useRef(false);
   // Multi-select for the sub-element checklist — same hook the Elements list
   // uses. `hasSubSelectionRef` lets a plain row click replace the selection
@@ -863,6 +863,7 @@ function ElementDetailBody({
               defaultWorkerId={assignedAiWorkerId}
               disabled={isAgentRunOpen(agent.run)}
               starting={agent.starting}
+              error={agent.error}
               onStart={({ workerId, prompt }) => agent.start({ workerId, prompt, triggeredFrom: 'detail', domainId })}
             />
 
@@ -1023,13 +1024,14 @@ function ElementDetailBody({
           <div className={layout === 'reader' ? '' : 'mt-4 border-t border-border pt-8'}>
             <h2 className="mb-5 text-[15px] font-medium text-foreground">Comments</h2>
             <ElementCommentsPanel
-              key={`comments-${element.id}-${agent.run?.finished_at ?? 'live'}`}
+              key={`comments-${element.id}`}
+              refreshKey={agent.run ? `${agent.run.id}:${agent.run.status}:${agent.run.step_count}` : null}
               elementId={element.id}
               elementTitle={element.title}
               workers={allWorkers}
               focusCommentId={focusCommentId}
               onAskAgent={({ prompt, commentId, workerId }) =>
-                void agent.start({ mode: 'reply', prompt, replyTo: commentId, workerId: workerId ?? assignedAiWorkerId, triggeredFrom: 'comment', domainId })}
+                agent.start({ mode: 'reply', prompt, replyTo: commentId, workerId: workerId ?? assignedAiWorkerId, triggeredFrom: 'comment', domainId })}
             />
           </div>
 

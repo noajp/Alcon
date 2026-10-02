@@ -25,10 +25,17 @@ export function isAgentRunOpen(run: AgentRun | null | undefined): boolean {
   return !!run && AGENT_RUN_OPEN_STATUSES.includes(run.status);
 }
 
+// run-agent's SESSION_PAUSE, word for word: the one pause that resumes on
+// its own when the run's person opens the Element.
+const SESSION_PAUSE = 'セッションの期限が切れたため一時停止しました。Element を開くと続きから再開します。';
+
 /** Pure. The paused runs that resume on their own when their person opens them. */
 function resumesOnOpen(run: AgentRun | null | undefined): boolean {
-  return !!run && run.status === 'paused' && /セッション/.test(run.error ?? '');
+  return !!run && run.status === 'paused' && run.error === SESSION_PAUSE;
 }
+
+/** A queued run the engine never picked up (its hand-off failed) is handed over again after this long. */
+const STUCK_QUEUED_MS = 30_000;
 
 // The run's columns a browser may read: everything but the transcript and
 // the continuation token, which stay with the Edge Function (they can hold
@@ -97,8 +104,9 @@ async function invokeEngine(body: Record<string, unknown>): Promise<void> {
 }
 
 // Start a run for an Element: create the queued row, then hand it to the
-// engine. One open run per Element — an open one is returned instead.
-export async function startAgentRun(opts: {
+// engine. One open run per Element — an open one is returned instead, with
+// `existing: true`, so the caller can say so rather than drop the request.
+interface StartOptions {
   elementId: string;
   domainId?: string | null;
   triggeredFrom?: 'board' | 'detail' | 'comment';
@@ -106,7 +114,10 @@ export async function startAgentRun(opts: {
   mode?: AgentRunMode;
   prompt?: string | null;
   replyTo?: string | null;
-}): Promise<AgentRun> {
+}
+
+export async function startAgentRun(opts: StartOptions, retried = false): Promise<{ run: AgentRun; existing: boolean }> {
+  const userId = await getCurrentUserId();
   const { data: existing } = await supabase
     .from('agent_runs')
     .select(AGENT_RUN_COLUMNS)
@@ -114,9 +125,17 @@ export async function startAgentRun(opts: {
     .in('status', AGENT_RUN_OPEN_STATUSES)
     .order('created_at', { ascending: false })
     .limit(1);
-  if (existing && existing.length > 0) return existing[0] as AgentRun;
+  if (existing && existing.length > 0) {
+    const open = existing[0] as AgentRun;
+    // A queued run whose hand-off was lost would block the Element for good:
+    // its person hands it over again (the engine's claim makes this safe).
+    if (open.status === 'queued' && open.triggered_by === userId
+        && Date.now() - new Date(open.created_at).getTime() > STUCK_QUEUED_MS) {
+      try { await invokeEngine({ runId: open.id }); } catch { /* already claimed */ }
+    }
+    return { run: open, existing: true };
+  }
 
-  const userId = await getCurrentUserId();
   const { data, error } = await supabase
     .from('agent_runs')
     .insert({
@@ -132,12 +151,23 @@ export async function startAgentRun(opts: {
     })
     .select(AGENT_RUN_COLUMNS)
     .single();
+  // Another start won the race (one open run per Element): return its run.
+  if (error?.code === '23505' && !retried) return startAgentRun(opts, true);
   if (error) throw error;
   const run = data as unknown as AgentRun;
-  // The engine answers 202 at once and works in the background.
-  await invokeEngine({ runId: run.id });
-  return run;
+  // The engine answers 202 at once and works in the background. If the
+  // hand-off fails, the queued row is closed so it doesn't hold the Element.
+  try {
+    await invokeEngine({ runId: run.id });
+  } catch (e) {
+    await cancelAgentRun(run.id).catch(() => undefined);
+    throw e;
+  }
+  return { run, existing: false };
 }
+
+/** What became of a request to start a run. */
+export type AgentStartOutcome = 'started' | 'busy' | 'failed';
 
 export async function cancelAgentRun(runId: string): Promise<void> {
   const { error } = await supabase
@@ -197,7 +227,15 @@ export function useAgentRun(
   const [starting, setStarting] = useState(false);
   const [deciding, setDeciding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [me, setMe] = useState<string | null>(null);
   const resumedRef = useRef<string | null>(null);
+  const startingRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getCurrentUserId().then((id) => { if (!cancelled) setMe(id ?? null); });
+    return () => { cancelled = true; };
+  }, []);
 
   const load = useCallback(async (id: string | null) => {
     const latest = id ? await fetchLatestAgentRun(id) : null;
@@ -281,36 +319,50 @@ export function useAgentRun(
       mode?: AgentRunMode;
       prompt?: string | null;
       replyTo?: string | null;
-    }) => {
-      if (!elementId || starting) return;
+    }): Promise<AgentStartOutcome> => {
+      if (!elementId) return 'failed';
+      if (startingRef.current) return 'busy';
+      startingRef.current = true;
       setStarting(true);
       setError(null);
       try {
-        const newRun = await startAgentRun({ elementId, ...startOpts });
+        const { run: newRun, existing } = await startAgentRun({ elementId, ...startOpts });
+        if (existing) {
+          // The Element's open run stays as it is — its approval card included.
+          const r = await load(elementId);
+          setRun(r.latest);
+          setSteps(r.latestSteps);
+          setPending(r.latestPending);
+          return 'busy';
+        }
         setRun(newRun);
         setPending(null);
-        if (newRun.status === 'queued' || newRun.status === 'running') setSteps([]);
-        else setSteps(await fetchAgentRunSteps(newRun.id));
+        setSteps([]);
+        return 'started';
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
+        return 'failed';
       } finally {
+        startingRef.current = false;
         setStarting(false);
       }
     },
-    [elementId, starting],
+    [elementId, load],
   );
 
   const cancel = useCallback(async () => {
     if (!run) return;
-    const before = run;
+    const before = { run, pending };
     setRun({ ...run, status: 'cancelled' });
+    setPending(null);
     try {
       await cancelAgentRun(run.id);
     } catch (e) {
-      setRun(before);
+      setRun(before.run);
+      setPending(before.pending);
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [run]);
+  }, [run, pending]);
 
   const resume = useCallback(async () => {
     if (!run) return;
@@ -344,5 +396,7 @@ export function useAgentRun(
   }, [run, pending, deciding]);
 
   const isActive = isAgentRunActive(run);
-  return { run, steps, pending, artifacts, loading, starting, deciding, error, isActive, start, cancel, resume, decide };
+  /** Only the run's starter may approve, reject or resume it (ADR 0027); others watch and may stop it. */
+  const isMine = !!run && !!me && run.triggered_by === me;
+  return { run, steps, pending, artifacts, loading, starting, deciding, error, isActive, isMine, start, cancel, resume, decide };
 }

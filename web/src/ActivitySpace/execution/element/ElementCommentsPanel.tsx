@@ -14,6 +14,7 @@ import {
   toggleReaction,
   notifyMany,
   type ElementComment,
+  type AgentStartOutcome,
   type ElementReaction,
   type Worker,
 } from '@/hooks/useSupabase';
@@ -31,17 +32,24 @@ interface ElementCommentsPanelProps {
   focusCommentId?: string | null;
   /** A comment addressed to an agent ("@AI", "@<AI Worker>") becomes its
    *  next instruction; the agent answers under that comment. */
-  onAskAgent?: (ask: { prompt: string; commentId: string; workerId: string | null }) => void;
+  onAskAgent?: (ask: { prompt: string; commentId: string; workerId: string | null }) => Promise<AgentStartOutcome>;
+  /** Changes when the agent's run moves on; the thread re-reads its comments. */
+  refreshKey?: string | null;
 }
 
 const QUICK_EMOJI = ['👍', '🎉', '❤️', '👀', '🚀', '✅'];
 
-export function ElementCommentsPanel({ elementId, elementTitle, workers, onCountChange, focusCommentId, onAskAgent }: ElementCommentsPanelProps) {
+export function ElementCommentsPanel({ elementId, elementTitle, workers, onCountChange, focusCommentId, onAskAgent, refreshKey }: ElementCommentsPanelProps) {
   const { t } = useI18n();
   const aiWorkers = useMemo(() => workers.filter((w) => w.type === 'ai_agent').map((w) => ({ id: w.id, name: w.name })), [workers]);
+  const humanNames = useMemo(() => workers.filter((w) => w.type === 'human').map((w) => w.name), [workers]);
+  const [askOutcome, setAskOutcome] = useState<AgentStartOutcome | null>(null);
   const [openFolds, setOpenFolds] = useState<Set<string>>(new Set());
   const { user, profile } = useAuthContext();
   const { comments, loading, reload, setComments } = useElementComments(elementId);
+  // The agent posts as it works: re-read when its run moves on, without
+  // remounting (a half-written comment and open folds stay as they are).
+  useEffect(() => { if (refreshKey) void reload(); }, [refreshKey, reload]);
   const [reactions, setReactions] = useState<Record<string, ElementReaction[]>>({});
   const [draft, setDraft] = useState('');
   // Read once — this is a localStorage hit, and `draft` changes on every
@@ -151,8 +159,9 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
       setComments(prev => (prev.some(c => c.id === created.id) ? prev : [...prev, created]));
       setDraft('');
 
-      const ask = onAskAgent ? agentMention(content, aiWorkers) : null;
-      if (ask) onAskAgent?.({ prompt: content, commentId: created.id, workerId: ask.workerId });
+      const ask = onAskAgent ? agentMention(content, aiWorkers, humanNames) : null;
+      setAskOutcome(null);
+      if (ask && onAskAgent) void onAskAgent({ prompt: content, commentId: created.id, workerId: ask.workerId }).then(setAskOutcome);
 
       if (mentions.length > 0) {
         await notifyMany(mentions, {
@@ -370,6 +379,10 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
         </ul>
       )}
 
+      {askOutcome === 'busy' && (
+        <p className="text-[12px] text-muted-foreground">{t('The agent is already working on this Element. Stop it or wait for it to finish, then ask again.')}</p>
+      )}
+      {askOutcome === 'failed' && <p className="text-[12px] text-[var(--status-danger)]">{t('The agent could not start. See the agent panel above.')}</p>}
       <CommentComposer
         value={draft}
         onChange={handleDraftChange}
