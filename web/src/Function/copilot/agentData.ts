@@ -26,7 +26,7 @@ export function isAgentRunOpen(run: AgentRun | null | undefined): boolean {
 }
 
 /** Pure. The paused runs that resume on their own when their person opens them. */
-export function resumesOnOpen(run: AgentRun | null | undefined): boolean {
+function resumesOnOpen(run: AgentRun | null | undefined): boolean {
   return !!run && run.status === 'paused' && /セッション/.test(run.error ?? '');
 }
 
@@ -59,7 +59,7 @@ export async function fetchAgentRunSteps(runId: string): Promise<AgentRunStep[]>
   return (data || []) as AgentRunStep[];
 }
 
-export async function fetchPendingAgentAction(runId: string): Promise<AgentAction | null> {
+async function fetchPendingAgentAction(runId: string): Promise<AgentAction | null> {
   const { data, error } = await supabase
     .from('agent_actions')
     .select('*')
@@ -72,7 +72,7 @@ export async function fetchPendingAgentAction(runId: string): Promise<AgentActio
   return (data as AgentAction) ?? null;
 }
 
-export async function fetchAgentArtifacts(elementId: string): Promise<AgentArtifact[]> {
+async function fetchAgentArtifacts(elementId: string): Promise<AgentArtifact[]> {
   const { data, error } = await supabase
     .from('agent_artifacts')
     .select('*')
@@ -148,12 +148,12 @@ export async function cancelAgentRun(runId: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function resumeAgentRun(runId: string): Promise<void> {
+async function resumeAgentRun(runId: string): Promise<void> {
   await invokeEngine({ runId, resume: true });
 }
 
 /** Approve or reject a pending action — bound to the input that was shown. */
-export async function decideAgentAction(opts: {
+async function decideAgentAction(opts: {
   runId: string;
   action: AgentAction;
   approve: boolean;
