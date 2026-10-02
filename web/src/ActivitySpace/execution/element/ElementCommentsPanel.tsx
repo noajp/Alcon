@@ -12,7 +12,6 @@ import {
   updateElementComment,
   fetchCommentReactions,
   toggleReaction,
-  notifyMany,
   type ElementComment,
   type AgentStartOutcome,
   type ElementReaction,
@@ -23,7 +22,6 @@ import { getCachedSendCommentShortcut, getCachedDisplayNames, getCachedConvertEm
 
 interface ElementCommentsPanelProps {
   elementId: string;
-  elementTitle: string;
   workers: Worker[];           // for @mentions autocomplete
   onCountChange?: (n: number) => void;
   /** Arrived here from a notification about one particular comment: bring it
@@ -39,7 +37,7 @@ interface ElementCommentsPanelProps {
 
 const QUICK_EMOJI = ['👍', '🎉', '❤️', '👀', '🚀', '✅'];
 
-export function ElementCommentsPanel({ elementId, elementTitle, workers, onCountChange, focusCommentId, onAskAgent, refreshKey }: ElementCommentsPanelProps) {
+export function ElementCommentsPanel({ elementId, workers, onCountChange, focusCommentId, onAskAgent, refreshKey }: ElementCommentsPanelProps) {
   const { t } = useI18n();
   const aiWorkers = useMemo(() => workers.filter((w) => w.type === 'ai_agent').map((w) => ({ id: w.id, name: w.name })), [workers]);
   const humanNames = useMemo(() => workers.filter((w) => w.type === 'human').map((w) => w.name), [workers]);
@@ -163,17 +161,8 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
       setAskOutcome(null);
       if (ask && onAskAgent) void onAskAgent({ prompt: content, commentId: created.id, workerId: ask.workerId }).then(setAskOutcome);
 
-      if (mentions.length > 0) {
-        await notifyMany(mentions, {
-          actor_id: user?.id ?? null,
-          actor_name: authorName,
-          kind: 'mention',
-          element_id: elementId,
-          comment_id: created.id,
-          title: `${authorName} mentioned you`,
-          body: `In "${elementTitle}": ${content.slice(0, 140)}`,
-        });
-      }
+      // Mentioned people are notified by the element_comments trigger
+      // (notify_element_comment) from the `mentions` written above.
     } catch (e) {
       console.error(e);
     } finally {

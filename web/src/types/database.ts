@@ -1123,21 +1123,6 @@ export interface Notification {
   created_at: string
 }
 
-export interface NotificationInsert {
-  recipient_id: string
-  actor_id?: string | null
-  actor_name?: string | null
-  kind: NotificationKind
-  element_id?: string | null
-  comment_id?: string | null
-  strategy_id?: string | null
-  strategy_comment_id?: string | null
-  object_id?: string | null
-  brief_id?: string | null
-  title: string
-  body?: string | null
-}
-
 // =====================================================
 // Approvals
 // =====================================================

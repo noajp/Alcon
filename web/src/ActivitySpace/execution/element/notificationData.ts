@@ -1,7 +1,7 @@
 'use client';
 
 import { supabase } from '@/lib/supabase';
-import type { Notification, NotificationInsert } from '@/types/database';
+import type { Notification } from '@/types/database';
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 
 
@@ -24,22 +24,6 @@ export async function fetchNotifications(opts: {
   const { data, error } = await q;
   if (error) throw error;
   return (data || []) as Notification[];
-}
-
-export async function createNotification(input: NotificationInsert): Promise<Notification | null> {
-  // maybeSingle, not single: a muted kind (notification_preferences) makes
-  // the BEFORE INSERT trigger skip the row, so zero rows back is an
-  // intended outcome here, not a failure to log.
-  const { data, error } = await supabase
-    .from('notifications')
-    .insert(input)
-    .select('*')
-    .maybeSingle();
-  if (error) {
-    console.error('createNotification failed:', error);
-    return null;
-  }
-  return data as Notification | null;
 }
 
 export async function markNotificationRead(id: string, isRead = true): Promise<void> {
@@ -256,13 +240,29 @@ export function useNotifications(recipientId: string | null) {
   };
 }
 
-export async function notifyMany(
-  recipients: string[],
-  payload: Omit<NotificationInsert, 'recipient_id'>
+/** Kinds the app announces itself. Comments, mentions, done / blocked and due
+ *  dates are notified by the database when the row is written. */
+export type ElementNotifyKind = 'assigned' | 'status_change' | 'approval_decided';
+
+/**
+ * Tell the people on an Element about something the caller just did there.
+ *
+ * Browsers cannot write notifications directly. The `notify_about_element`
+ * RPC checks that the caller really did it (the assignment row, their status
+ * change, their approval decision — each within ten minutes), picks the
+ * recipients from the Element, drops anyone who cannot see it, and writes the
+ * text itself. Pass `workerId` for 'assigned'. A failed notification never
+ * undoes the action, so errors are logged, not thrown.
+ */
+export async function notifyAboutElement(
+  elementId: string,
+  kind: ElementNotifyKind,
+  workerId?: string,
 ): Promise<void> {
-  const unique = Array.from(new Set(recipients.filter(Boolean)));
-  if (unique.length === 0) return;
-  const rows = unique.map(rid => ({ ...payload, recipient_id: rid }));
-  const { error } = await supabase.from('notifications').insert(rows);
-  if (error) console.error('notifyMany failed:', error);
+  const { error } = await supabase.rpc('notify_about_element', {
+    p_element_id: elementId,
+    p_kind: kind,
+    p_worker_id: workerId ?? null,
+  });
+  if (error) console.error('notifyAboutElement failed:', error);
 }

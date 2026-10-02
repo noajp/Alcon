@@ -37,7 +37,7 @@ import {
   removeElementAssignee,
   noticeAssignmentFailed,
   setCustomColumnValue,
-  notifyMany,
+  notifyAboutElement,
   useAgentRun,
   useDomains,
   addDomainElementType,
@@ -545,20 +545,10 @@ function ElementDetailBody({
       // The status row is written by the element_activity trigger — from here,
       // from an agent, or from SQL alike — so ask the rail to look again.
       void invalidateElementActivity(element.id);
-      const assigneeUserIds = (element.assignees || [])
-        .map(a => a.worker?.user_id)
-        .filter((u): u is string => !!u && u !== user?.id);
-      if (assigneeUserIds.length > 0) {
-        const actorName = profile?.display_name || user?.email?.split('@')[0] || 'Someone';
-        await notifyMany(assigneeUserIds, {
-          actor_id: user?.id ?? null,
-          actor_name: actorName,
-          kind: 'status_change',
-          element_id: element.id,
-          title: `${actorName} changed status to ${newStatus.replace('_', ' ')}`,
-          body: element.title,
-        });
-      }
+      // StatusPicker also reports progress-only edits; only a real change is
+      // news. The RPC tells the assignees, bound to the status row just
+      // written (done / blocked come from the notify_element_status trigger).
+      if (newStatus !== element.status) await notifyAboutElement(element.id, 'status_change');
       onRefresh?.();
     } catch (e) { console.error(e); }
   };
@@ -609,15 +599,7 @@ function ElementDetailBody({
       await addElementAssignee({ element_id: element.id, worker_id: workerId, role: 'assignee', worker });
       if (worker) log('assigned', `Assigned ${worker.name}`);
       if (worker?.user_id && worker.user_id !== user?.id) {
-        const actorName = profile?.display_name || user?.email?.split('@')[0] || 'Someone';
-        await notifyMany([worker.user_id], {
-          actor_id: user?.id ?? null,
-          actor_name: actorName,
-          kind: 'assigned',
-          element_id: element.id,
-          title: `${actorName} assigned you to "${element.title}"`,
-          body: null,
-        });
+        await notifyAboutElement(element.id, 'assigned', workerId);
       }
       setShowAssigneeDropdown(false);
       onRefresh?.();
@@ -1036,7 +1018,6 @@ function ElementDetailBody({
               key={`comments-${element.id}`}
               refreshKey={agent.run ? `${agent.run.id}:${agent.run.status}:${agent.run.step_count}` : null}
               elementId={element.id}
-              elementTitle={element.title}
               workers={allWorkers}
               focusCommentId={focusCommentId}
               onAskAgent={({ prompt, commentId, workerId }) =>

@@ -6,7 +6,7 @@ import {
   fetchElementApprovals,
   decideApproval,
   setElementIsApproval,
-  notifyMany,
+  notifyAboutElement,
   type ElementApproval,
   type ApprovalState,
   type ElementWithDetails,
@@ -77,19 +77,8 @@ export function ElementApprovalMenu({ element, onRefresh }: Props) {
         note: note.trim() || null,
       });
 
-      const assigneeUserIds = (element.assignees || [])
-        .map(a => a.worker?.user_id)
-        .filter((u): u is string => !!u);
-      if (assigneeUserIds.length > 0) {
-        await notifyMany(assigneeUserIds, {
-          actor_id: user?.id ?? null,
-          actor_name: approverName,
-          kind: 'approval_decided',
-          element_id: element.id,
-          title: `${approverName} ${stateMeta[state].label.toLowerCase()} "${element.title}"`,
-          body: note.trim() || null,
-        });
-      }
+      // The RPC tells the assignees, using the decision row written above.
+      await notifyAboutElement(element.id, 'approval_decided');
 
       setNote('');
       const fresh = await fetchElementApprovals(element.id);
