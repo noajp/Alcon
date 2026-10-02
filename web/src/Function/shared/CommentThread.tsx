@@ -7,6 +7,7 @@ import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell, MENU_SEPARATOR } from '@/Function/shared/menu/MenuShell';
 import type { CommentAuthorKind } from '@/types/database';
+import { MarkdownLite } from './MarkdownLite';
 
 // =============================================================
 // The parts every comment thread is made of.
@@ -129,9 +130,15 @@ export function CommentEntry({
         <span className="text-[12px] text-muted-foreground shrink-0">{formatCommentAge(comment.created_at)}</span>
         {menu && <span className="ml-auto shrink-0">{menu}</span>}
       </div>
-      <div className="pl-7 text-[13px] leading-[1.6] text-foreground/90 whitespace-pre-wrap break-words">
-        {renderWithMentions(comment.content)}
-      </div>
+      {comment.author_kind === 'ai_agent' ? (
+        // Agents write reports in Markdown — headings, tables, lists — so
+        // they read as a document rather than raw marks.
+        <div className="pl-7 break-words"><MarkdownLite text={comment.content} className="text-foreground/90" /></div>
+      ) : (
+        <div className="pl-7 text-[13px] leading-[1.6] text-foreground/90 whitespace-pre-wrap break-words">
+          {renderWithMentions(comment.content)}
+        </div>
+      )}
       {footer && <div className="pl-7">{footer}</div>}
     </div>
   );
