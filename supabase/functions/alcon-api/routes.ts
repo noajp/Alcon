@@ -134,7 +134,7 @@ export function queryArgs(params: URLSearchParams, schema: Schema): { ok: true; 
     const values = params.getAll(key);
     if (values.length > 1) return err(422, "invalid_request", `"${key}" is given more than once`);
     const raw = values[0];
-    const type = schema.properties?.[key]?.type;
+    const type = schema.properties && Object.hasOwn(schema.properties, key) ? schema.properties[key].type : undefined;
     if (type === "number") {
       const n = Number(raw);
       if (raw.trim() === "" || !Number.isFinite(n)) return err(422, "invalid_request", `"${key}" must be a number`);
@@ -159,15 +159,18 @@ function typeOk(value: unknown, type: string | undefined, items?: { type?: strin
   }
 }
 
+/** Fields a write may clear with null. Any other null is refused. */
+export const NULLABLE_FIELDS: ReadonlySet<string> = new Set(["due_date", "estimated_hours", "description"]);
+
 /**
  * Pure. The arguments checked against the tool's input schema: no unknown
  * field, every required one present, each value of its type and in its enum.
- * An optional field may be null (updateElement clears due_date with null).
+ * Only NULLABLE_FIELDS may be null (updateElement clears due_date with null).
  */
 export function validateArgs(args: Record<string, unknown>, schema: Schema): ApiError | null {
   const props = schema.properties ?? {};
   for (const key of Object.keys(args)) {
-    if (!(key in props) && schema.additionalProperties === false) {
+    if (!Object.hasOwn(props, key) && schema.additionalProperties === false) {
       return { status: 422, code: "invalid_request", message: `Unknown field "${key}"` };
     }
   }
@@ -177,10 +180,11 @@ export function validateArgs(args: Record<string, unknown>, schema: Schema): Api
     }
   }
   for (const [key, value] of Object.entries(args)) {
-    const prop = props[key];
+    const prop = Object.hasOwn(props, key) ? props[key] : undefined;
     if (!prop || value === undefined) continue;
     if (value === null) {
       if ((schema.required ?? []).includes(key)) return { status: 422, code: "invalid_request", message: `"${key}" is required` };
+      if (!NULLABLE_FIELDS.has(key)) return { status: 422, code: "invalid_request", message: `"${key}" cannot be null` };
       continue;
     }
     if (!typeOk(value, prop.type, prop.items)) {
@@ -316,11 +320,17 @@ function routeParameters(route: Route, schema: Schema): unknown[] {
   return params;
 }
 
-function bodySchema(route: Route, schema: Schema): Record<string, unknown> {
-  const properties = { ...(schema.properties ?? {}) };
-  if (route.idArg) delete properties[route.idArg];
+function bodySchema(route: Route, schema: Schema): { schema: Record<string, unknown>; required: string[] } {
+  const properties: Record<string, unknown> = {};
+  for (const [name, prop] of Object.entries(schema.properties ?? {})) {
+    if (name === route.idArg) continue;
+    properties[name] = NULLABLE_FIELDS.has(name) && prop.type ? { ...prop, type: [prop.type, "null"] } : prop;
+  }
   const required = (schema.required ?? []).filter((k) => k !== route.idArg);
-  return { type: "object", properties, ...(required.length ? { required } : {}), additionalProperties: false };
+  return {
+    schema: { type: "object", properties, ...(required.length ? { required } : {}), additionalProperties: false },
+    required,
+  };
 }
 
 /** Pure. The OpenAPI 3.1 description of every route, built from the route table and the tools' schemas. */
@@ -329,21 +339,25 @@ export function openApiDocument(serverUrl: string): Record<string, unknown> {
   for (const route of ROUTES) {
     const def = toolDef(route.tool);
     const schema = def.input_schema as Schema;
+    const error = { $ref: "#/components/responses/Error" };
     const errors = {
-      "401": { $ref: "#/components/responses/Error" },
-      "404": { $ref: "#/components/responses/Error" },
-      "422": { $ref: "#/components/responses/Error" },
-      ...(isReadTool(route.tool) ? {} : { "403": { $ref: "#/components/responses/Error" } }),
+      ...(isReadTool(route.tool) ? {} : { "400": error, "403": error }),
+      "401": error,
+      "404": error,
+      "405": error,
+      "422": error,
+      "500": error,
     };
+    const body = route.method === "GET" ? null : bodySchema(route, schema);
     paths[route.path] ??= {};
     paths[route.path][route.method.toLowerCase()] = {
       operationId: route.tool,
       summary: route.summary,
       description: def.description,
       parameters: routeParameters(route, schema),
-      ...(route.method === "GET"
-        ? {}
-        : { requestBody: { required: true, content: { "application/json": { schema: bodySchema(route, schema) } } } }),
+      ...(body
+        ? { requestBody: { required: body.required.length > 0, content: { "application/json": { schema: body.schema } } } }
+        : {}),
       responses: {
         [route.creates ? "201" : "200"]: { $ref: "#/components/responses/Data" },
         ...errors,

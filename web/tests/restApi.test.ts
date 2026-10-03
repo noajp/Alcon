@@ -201,3 +201,40 @@ describe('openApiDocument', () => {
     expect(comment.required).toEqual(['body']);
   });
 });
+
+describe('review hardening', () => {
+  it('refuses inherited property names as unknown fields', () => {
+    expect(plan('POST', '/elements', { body: { objectId: UUID, title: 'x', constructor: 'y' } }))
+      .toMatchObject({ ok: false, error: { status: 422, message: 'Unknown field "constructor"' } });
+    expect(plan('GET', '/elements', { query: 'toString=1' })).toMatchObject({ ok: false, error: { status: 422 } });
+  });
+
+  it('lets only clearable fields be null', () => {
+    expect(plan('PATCH', `/elements/${UUID}`, { body: { status: null } }))
+      .toMatchObject({ ok: false, error: { status: 422, message: '"status" cannot be null' } });
+    expect(plan('PATCH', '/subelements/' + UUID, { body: { isCompleted: null } }))
+      .toMatchObject({ ok: false, error: { status: 422 } });
+    expect(plan('PATCH', `/elements/${UUID}`, { body: { due_date: null, estimated_hours: null, description: null } }))
+      .toMatchObject({ ok: true });
+  });
+
+  it('describes clearable fields as nullable and an all-optional body as optional', () => {
+    const doc = openApiDocument('https://example.test') as {
+      paths: Record<string, Record<string, { requestBody?: { required: boolean; content: Record<string, { schema: { properties: Record<string, { type: unknown }> } }> } }>>;
+    };
+    const patch = doc.paths['/elements/{id}'].patch.requestBody!;
+    expect(patch.required).toBe(false);
+    expect(patch.content['application/json'].schema.properties.due_date.type).toEqual(['string', 'null']);
+    expect(doc.paths['/subelements/{id}'].patch.requestBody!.required).toBe(false);
+    expect(doc.paths['/elements'].post.requestBody!.required).toBe(true);
+  });
+});
+
+describe('findByText filter value', () => {
+  it('keeps commas, parentheses and quotes inside the value', async () => {
+    const board = await import(new URL('../../supabase/functions/_shared/boardTools.ts', import.meta.url).pathname);
+    expect(board.quoteFilterValue('%a,b%')).toBe('"%a,b%"');
+    expect(board.quoteFilterValue('%x),id.not.is.null,(y%')).toBe('"%x),id.not.is.null,(y%"');
+    expect(board.quoteFilterValue('%say "hi" \\%%')).toBe('"%say \\"hi\\" \\\\%%"');
+  });
+});

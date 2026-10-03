@@ -29,19 +29,19 @@
 | POST | `/elements/{id}/subelements` | Subelement を足す（201） | `title`（必須） |
 | PATCH | `/subelements/{id}` | Subelement を完了・再開する | `isCompleted`（省略で反転） |
 
-`{id}` は Element なら UUID か display_id（`ELE_PLT-006` など）、Initiative と Subelement は UUID。GET の入力はクエリ文字列、それ以外は JSON の本文で渡す。ステータスは `backlog / todo / in_progress / review / done / blocked / cancelled`、優先度は `urgent / high / medium / low`、日付は `YYYY-MM-DD`。
+`{id}` は Element なら UUID か display_id（`ELE_PLT-006` など）、Initiative と Subelement は UUID。GET の入力はクエリ文字列、それ以外は JSON の本文で渡す。`null` を渡せるのは `due_date`・`estimated_hours`・`description`（消す）だけ。ステータスは `backlog / todo / in_progress / review / done / blocked / cancelled`、優先度は `urgent / high / medium / low`、日付は `YYYY-MM-DD`。
 
 削除、一括変更、Object 間の移動、Object の編集はできない（MCP と同じ）。見える範囲と書ける範囲は、アプリでの本人の権限（RLS）と同じ。担当にできるのは Element と同じ Space の Worker だけ。読み取りのみのトークンは GET だけが通る。
 
 ## 応答
 
-成功すると `{ "data": …, "meta": { "rows": … } }`（`meta` は一覧のときだけ）。失敗すると次のステータスと `{ "error": { "code", "message" } }` を返す。
+成功すると `{ "data": …, "meta": { "rows": … } }` を返す（`meta` はツールが返したときだけ付く）。失敗すると次のステータスと `{ "error": { "code", "message" } }` を返す。
 
 | ステータス | code | いつ |
 |---|---|---|
 | 400 | `bad_request` | 本文が JSON のオブジェクトでない |
 | 401 | `unauthorized` | トークンがない、無効、期限切れ、取り消し済み |
-| 403 | `forbidden` | 読み取りのみのトークンで書き込んだ。見えている行への書き込みを権限が拒んだ |
+| 403 | `forbidden` | 読み取りのみのトークンで書き込んだ。書き込みを権限（RLS）が拒んだ。見えない Object・存在しない Object への Element の作成もここに入る |
 | 404 | `not_found` | 経路がない。対象がない、または本人に見えない |
 | 405 | `method_not_allowed` | そのパスにないメソッド（`Allow` ヘッダーに使えるもの） |
 | 422 | `invalid_request` / `rejected` | 未知のフィールド、必須の欠落、型・選択肢の不一致。盤面が受け付けなかった |
