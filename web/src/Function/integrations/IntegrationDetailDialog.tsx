@@ -191,16 +191,21 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
 
   const disconnect = async () => {
     if (!integration) return;
-    if (!await appDialog.confirm(t('Disconnect {name}? Its credential is deleted and agents can no longer use it.', { name: integration.name }))) return;
+    const question = oauthConnected
+      ? t("Disconnect {name}? Alcon's access is revoked at Google. If the same Google account is connected in another Space, that connection stops working too.", { name: integration.name })
+      : t('Disconnect {name}? Its credential is deleted and agents can no longer use it.', { name: integration.name });
+    if (!await appDialog.confirm(question)) return;
     setError(null);
     try {
       if (oauthConnected) {
         // Revoke the grant at Google first; deleting the row alone would only
-        // forget the tokens. If Google can't be reached, still disconnect and
+        // forget the tokens. If Google can't confirm it, still disconnect and
         // say where to remove the access by hand.
+        let revoked = false;
         try {
-          await actions.revoke.mutateAsync(integration.id);
-        } catch {
+          revoked = (await actions.revoke.mutateAsync(integration.id)).revoked;
+        } catch { /* reported below */ }
+        if (!revoked) {
           await appDialog.alert(t('Alcon could not revoke its access at Google. Remove it from your Google Account under Security › Third-party access.'));
         }
       }
@@ -300,6 +305,9 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
                   {oauthAccount && (
                     <p className="text-[12px] text-muted-foreground">{t('Files are created as {account}.', { account: oauthAccount })}</p>
                   )}
+                  <p className="text-[12px] text-muted-foreground">
+                    {t('Access belongs to the Google account: if it is connected in another Space too, agents there see the files Alcon created here, and disconnecting either one disconnects both.')}
+                  </p>
                 </div>
               ) : integration ? (
                 <div className="flex flex-wrap items-center gap-2">
@@ -311,9 +319,10 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
                   )}
                 </div>
               ) : (
-                <p className="text-[12px] text-muted-foreground">
-                  {t('Connect opens Google sign-in. Alcon asks only for access to files it creates or that you choose.')}
-                </p>
+                <div className="space-y-1.5 text-[12px] text-muted-foreground">
+                  <p>{t('Connect opens Google sign-in. Alcon asks only for access to files it creates or that you choose.')}</p>
+                  <p>{t('Access belongs to the Google account: if it is connected in another Space too, agents there see the files Alcon created here, and disconnecting either one disconnects both.')}</p>
+                </div>
               )}
             </Field>
           )}

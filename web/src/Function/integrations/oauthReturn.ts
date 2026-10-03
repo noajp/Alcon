@@ -3,43 +3,77 @@
 import { useSyncExternalStore } from 'react';
 
 // Coming back from Google sign-in (ADR 0035). integration-oauth redirects to
-// `/?integration_oauth=ok|error&integration=<id>`; the page reads that once,
-// opens Settings › Integrations, removes the parameters from the address and
-// leaves the result here for the Integrations screen to show.
+//   /?integration_oauth=finish&handle=<one-time handle>&integration=<id>
+//   /?integration_oauth=error&integration=<id>
+// The page reads that once, removes it from the address, opens Settings ›
+// Integrations and, for `finish`, confirms the sign-in with POST /finish
+// under the signed-in person's JWT — nothing is stored until then, and only
+// for the person who started it. The outcome is left here for the
+// Integrations screen to show.
 
-export interface OAuthReturn {
-  ok: boolean;
+export type OAuthReturn =
+  | { kind: 'finish'; handle: string; integrationId: string | null }
+  | { kind: 'error'; integrationId: string | null };
+
+export interface OAuthOutcome {
+  status: 'pending' | 'ok' | 'error';
   integrationId: string | null;
+  /** The server's reason when finishing failed (an English source string for t()). */
+  message: string | null;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const HANDLE = /^[A-Za-z0-9_-]{43,128}$/;
 
 /** Pure. The sign-in result in a query string, or null when there is none. */
 export function readOAuthReturn(search: string): OAuthReturn | null {
   const params = new URLSearchParams(search);
   const result = params.get('integration_oauth');
-  if (result !== 'ok' && result !== 'error') return null;
   const id = params.get('integration');
-  return { ok: result === 'ok', integrationId: id && UUID.test(id) ? id : null };
+  const integrationId = id && UUID.test(id) ? id : null;
+  if (result === 'error') return { kind: 'error', integrationId };
+  if (result !== 'finish') return null;
+  const handle = params.get('handle') ?? '';
+  return HANDLE.test(handle) ? { kind: 'finish', handle, integrationId } : { kind: 'error', integrationId };
 }
 
 /** Pure. The URL without the sign-in parameters (path, other params and hash kept). */
 export function stripOAuthReturn(href: string): string {
   const u = new URL(href);
-  u.searchParams.delete('integration_oauth');
-  u.searchParams.delete('integration');
+  for (const key of ['integration_oauth', 'integration', 'handle']) u.searchParams.delete(key);
   return `${u.pathname}${u.search}${u.hash}`;
 }
 
-let current: OAuthReturn | null = null;
+let current: OAuthOutcome | null = null;
 const listeners = new Set<() => void>();
+const finishing = new Set<string>();
 
-export function setOAuthReturn(next: OAuthReturn | null) {
+export function setOAuthOutcome(next: OAuthOutcome | null) {
   current = next;
   listeners.forEach((l) => l());
 }
 
-export function useOAuthReturn(): OAuthReturn | null {
+/**
+ * Records the return and, for `finish`, confirms it once with `finish`
+ * (a handle is used at most once even if this is called again).
+ */
+export async function completeOAuthReturn(ret: OAuthReturn, finish: (handle: string) => Promise<string | null>): Promise<void> {
+  if (ret.kind === 'error') {
+    setOAuthOutcome({ status: 'error', integrationId: ret.integrationId, message: null });
+    return;
+  }
+  if (finishing.has(ret.handle)) return;
+  finishing.add(ret.handle);
+  setOAuthOutcome({ status: 'pending', integrationId: ret.integrationId, message: null });
+  try {
+    const id = await finish(ret.handle);
+    setOAuthOutcome({ status: 'ok', integrationId: id ?? ret.integrationId, message: null });
+  } catch (e) {
+    setOAuthOutcome({ status: 'error', integrationId: ret.integrationId, message: e instanceof Error ? e.message : null });
+  }
+}
+
+export function useOAuthOutcome(): OAuthOutcome | null {
   return useSyncExternalStore(
     (cb) => { listeners.add(cb); return () => { listeners.delete(cb); }; },
     () => current,

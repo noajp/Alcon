@@ -1159,6 +1159,12 @@ Object.assign(ja, {
   'Google sign-in did not finish, so nothing was connected. Try again.': 'Google のサインインが完了しなかったため、接続されていません。もう一度お試しください。',
   'Dismiss': '閉じる',
   'Google sign-in could not be started.': 'Google のサインインを開始できませんでした。',
+  "Disconnect {name}? Alcon's access is revoked at Google. If the same Google account is connected in another Space, that connection stops working too.": '{name} を切断しますか？Google 側で Alcon のアクセスが取り消されます。同じ Google アカウントを別の Space でもつないでいる場合、そちらの接続も使えなくなります。',
+  'Access belongs to the Google account: if it is connected in another Space too, agents there see the files Alcon created here, and disconnecting either one disconnects both.': 'アクセス権は Google アカウントに付きます。同じアカウントを別の Space でもつなぐと、そちらのエージェントもここで Alcon が作ったファイルを見られ、どちらかで切断すると両方とも切断されます。',
+  'Finishing Google sign-in…': 'Google のサインインを完了しています…',
+  'This Google sign-in was started by someone else, so it was discarded.': 'この Google サインインは別の人が開始したものなので、破棄しました。',
+  'This Google sign-in has expired. Connect again.': 'この Google サインインは期限切れです。もう一度接続してください。',
+  'This Google sign-in has already been used or has expired.': 'この Google サインインは使用済みか、期限切れです。',
 });
 
 Object.assign(ko, {
@@ -1178,6 +1184,12 @@ Object.assign(ko, {
   'Google sign-in did not finish, so nothing was connected. Try again.': 'Google 로그인이 완료되지 않아 아무것도 연결되지 않았습니다. 다시 시도하세요.',
   'Dismiss': '닫기',
   'Google sign-in could not be started.': 'Google 로그인을 시작할 수 없습니다.',
+  "Disconnect {name}? Alcon's access is revoked at Google. If the same Google account is connected in another Space, that connection stops working too.": '{name} 연결을 해제할까요? Google에서 Alcon의 접근 권한이 취소됩니다. 같은 Google 계정을 다른 Space에도 연결했다면 그 연결도 작동하지 않게 됩니다.',
+  'Access belongs to the Google account: if it is connected in another Space too, agents there see the files Alcon created here, and disconnecting either one disconnects both.': '접근 권한은 Google 계정에 속합니다. 같은 계정을 다른 Space에도 연결하면 그쪽 에이전트도 여기서 Alcon이 만든 파일을 볼 수 있고, 어느 한쪽에서 연결을 해제하면 둘 다 해제됩니다.',
+  'Finishing Google sign-in…': 'Google 로그인을 마무리하는 중…',
+  'This Google sign-in was started by someone else, so it was discarded.': '이 Google 로그인은 다른 사람이 시작한 것이라 폐기했습니다.',
+  'This Google sign-in has expired. Connect again.': '이 Google 로그인은 만료되었습니다. 다시 연결하세요.',
+  'This Google sign-in has already been used or has expired.': '이 Google 로그인은 이미 사용되었거나 만료되었습니다.',
 });
 
 Object.assign(fr, {
@@ -1197,6 +1209,12 @@ Object.assign(fr, {
   'Google sign-in did not finish, so nothing was connected. Try again.': 'La connexion Google n’a pas abouti : rien n’a été connecté. Réessayez.',
   'Dismiss': 'Fermer',
   'Google sign-in could not be started.': 'Impossible de lancer la connexion Google.',
+  "Disconnect {name}? Alcon's access is revoked at Google. If the same Google account is connected in another Space, that connection stops working too.": 'Déconnecter {name} ? L’accès d’Alcon est révoqué chez Google. Si le même compte Google est connecté dans un autre Space, cette connexion cesse aussi de fonctionner.',
+  'Access belongs to the Google account: if it is connected in another Space too, agents there see the files Alcon created here, and disconnecting either one disconnects both.': 'L’accès appartient au compte Google : s’il est aussi connecté dans un autre Space, les agents de ce Space voient les fichiers qu’Alcon a créés ici, et déconnecter l’un déconnecte les deux.',
+  'Finishing Google sign-in…': 'Finalisation de la connexion Google…',
+  'This Google sign-in was started by someone else, so it was discarded.': 'Cette connexion Google a été lancée par quelqu’un d’autre : elle a été abandonnée.',
+  'This Google sign-in has expired. Connect again.': 'Cette connexion Google a expiré. Connectez-vous de nouveau.',
+  'This Google sign-in has already been used or has expired.': 'Cette connexion Google a déjà été utilisée ou a expiré.',
 });
 
 Object.assign(es, {
@@ -1216,4 +1234,10 @@ Object.assign(es, {
   'Google sign-in did not finish, so nothing was connected. Try again.': 'El inicio de sesión con Google no terminó, así que no se conectó nada. Inténtalo de nuevo.',
   'Dismiss': 'Cerrar',
   'Google sign-in could not be started.': 'No se pudo iniciar el inicio de sesión con Google.',
+  "Disconnect {name}? Alcon's access is revoked at Google. If the same Google account is connected in another Space, that connection stops working too.": '¿Desconectar {name}? El acceso de Alcon se revoca en Google. Si la misma cuenta de Google está conectada en otro Space, esa conexión también deja de funcionar.',
+  'Access belongs to the Google account: if it is connected in another Space too, agents there see the files Alcon created here, and disconnecting either one disconnects both.': 'El acceso pertenece a la cuenta de Google: si también está conectada en otro Space, los agentes de ese Space ven los archivos que Alcon creó aquí, y desconectar uno desconecta ambos.',
+  'Finishing Google sign-in…': 'Terminando el inicio de sesión con Google…',
+  'This Google sign-in was started by someone else, so it was discarded.': 'Este inicio de sesión con Google lo inició otra persona, así que se descartó.',
+  'This Google sign-in has expired. Connect again.': 'Este inicio de sesión con Google caducó. Vuelve a conectar.',
+  'This Google sign-in has already been used or has expired.': 'Este inicio de sesión con Google ya se usó o caducó.',
 });

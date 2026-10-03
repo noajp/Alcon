@@ -29,7 +29,8 @@ import { OnboardingCreate } from '@/Function/space/OnboardingCreate';
 import { MyInvitations } from '@/Function/membership/MyInvitations';
 import { getCachedHomeViewId } from '@/Function/settings/preferencesStore';
 import { setActiveSettingsSection } from '@/Function/settings/settingsNav';
-import { readOAuthReturn, setOAuthReturn, stripOAuthReturn } from '@/Function/integrations/oauthReturn';
+import { completeOAuthReturn, readOAuthReturn, stripOAuthReturn } from '@/Function/integrations/oauthReturn';
+import { finishIntegrationOAuth } from '@/Function/integrations/data';
 import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
@@ -294,17 +295,18 @@ function WorkspaceContent({
     setSettingsReturnView(activeTab.activeView);
     setActiveView('settings');
   };
-  // Back from Google sign-in (integration-oauth): open Settings ›
-  // Integrations, hand it the result and drop the parameters from the URL.
+  // Back from Google sign-in (integration-oauth): drop the parameters from
+  // the URL, confirm the sign-in as this person (POST /finish — nothing is
+  // stored before that) and open Settings › Integrations to show the outcome.
   useEffect(() => {
     const result = readOAuthReturn(window.location.search);
     if (!result) return;
-    setOAuthReturn(result);
+    window.history.replaceState(window.history.state, '', stripOAuthReturn(window.location.href));
+    void completeOAuthReturn(result, finishIntegrationOAuth);
     setActiveSettingsSection('integrations', 'external');
     const launchView = initialTabRef.current?.activeView ?? 'inbox';
     if (launchView !== 'settings') setSettingsReturnView(launchView);
     setTabs(prev => prev.map(t => (t.id === activeTabId ? { ...t, activeView: 'settings' } : t)));
-    window.history.replaceState(window.history.state, '', stripOAuthReturn(window.location.href));
   }, [activeTabId]);
   const handleCloseSettings = () => {
     setActiveView(settingsReturnView && settingsReturnView !== 'settings' ? settingsReturnView : 'inbox');

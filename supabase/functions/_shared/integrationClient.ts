@@ -14,7 +14,7 @@
 // link-local hosts, and an http_request path can never leave its base URL.
 
 import {
-  GOOGLE_TOKEN_URL, isGoogleDriveRow, needsRefresh, parseOAuthSecret, secretFromTokenResponse,
+  GOOGLE_TOKEN_URL, isGoogleDriveRow, needsRefresh, parseOAuthSecret, secretFromTokenResponse, sha256Hex,
 } from "./googleOAuth.ts";
 
 export interface IntegrationRow {
@@ -284,7 +284,7 @@ export async function callHttp(row: IntegrationRow, secret: string | null, input
 
 /** The part of a service-role Supabase client resolveCredential uses. */
 export interface CredentialStore {
-  rpc(fn: string, args: Record<string, unknown>): PromiseLike<{ error: { message: string } | null }>;
+  rpc(fn: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string } | null }>;
   from(table: string): {
     update(values: Record<string, unknown>): { eq(column: string, value: string): PromiseLike<{ error: { message: string } | null }> };
   };
@@ -312,7 +312,9 @@ function envGet(key: string): string | undefined {
  *   none / bearer / header   the raw value as stored.
  *   oauth (google-drive)     the access token, refreshed through Google when
  *                            it expires within two minutes; the new token set
- *                            is saved with store_integration_oauth_token.
+ *                            is saved with store_integration_oauth_token,
+ *                            only if the stored refresh token is still the
+ *                            one refreshed (otherwise the result is null).
  *                            When Google refuses the refresh token
  *                            (invalid_grant) the row's last_test becomes
  *                            oauth_expired and the result is null.
@@ -358,7 +360,12 @@ export async function resolveCredential(
   }
   const next = secretFromTokenResponse(body, now, secret);
   if (!next) throw new Error("Google token refresh returned no access token");
-  const { error } = await admin.rpc("store_integration_oauth_token", { p_integration_id: row.id, p_secret: JSON.stringify(next) });
+  // Written only over the token set this refresh started from: a reconnect
+  // (perhaps with another account) or a revoke in the meantime wins, and this
+  // run gets no token rather than one for a connection that has changed.
+  const { data: written, error } = await admin.rpc("store_integration_oauth_token", {
+    p_integration_id: row.id, p_secret: JSON.stringify(next), p_expected_refresh_hash: await sha256Hex(secret.refresh_token),
+  });
   if (error) throw new Error("could not save the refreshed token");
-  return next.access_token;
+  return written === false ? null : next.access_token;
 }

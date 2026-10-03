@@ -102,10 +102,21 @@ export async function startIntegrationOAuth(integrationId: string): Promise<stri
   return url;
 }
 
-/** Revokes an OAuth integration's grant at the provider and clears its stored tokens. */
-export async function revokeIntegrationOAuth(integrationId: string): Promise<void> {
-  const { error } = await supabase.functions.invoke('integration-oauth/revoke', { body: { integrationId } });
+/** Confirms a finished Google sign-in (the one-time handle from the return
+ *  URL) as the signed-in person; returns the connected integration's id. */
+export async function finishIntegrationOAuth(handle: string): Promise<string | null> {
+  const { data, error } = await supabase.functions.invoke('integration-oauth/finish', { body: { handle } });
   if (error) throw await functionError(error);
+  const id = (data as { integrationId?: unknown } | null)?.integrationId;
+  return typeof id === 'string' ? id : null;
+}
+
+/** Revokes an OAuth integration's grant at the provider and clears its stored
+ *  tokens. `revoked` is false when the provider could not confirm it. */
+export async function revokeIntegrationOAuth(integrationId: string): Promise<{ revoked: boolean }> {
+  const { data, error } = await supabase.functions.invoke('integration-oauth/revoke', { body: { integrationId } });
+  if (error) throw await functionError(error);
+  return { revoked: (data as { revoked?: unknown } | null)?.revoked === true };
 }
 
 /** Whether Google sign-in is configured on the server: true / false, null while

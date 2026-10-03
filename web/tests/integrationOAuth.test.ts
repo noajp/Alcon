@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { presetById } from '@/Function/integrations/catalog';
-import { readOAuthReturn, stripOAuthReturn } from '@/Function/integrations/oauthReturn';
+import { completeOAuthReturn, readOAuthReturn, stripOAuthReturn } from '@/Function/integrations/oauthReturn';
 
 // Google Drive over OAuth (ADR 0035): the pure parts of integration-oauth,
 // the token refresh in resolveCredential, and the Drive request builders.
@@ -38,7 +38,6 @@ describe('authorize URL and PKCE', () => {
       scope: 'https://www.googleapis.com/auth/drive.file',
       access_type: 'offline',
       prompt: 'consent',
-      include_granted_scopes: 'true',
       state: 'state-abc',
       code_challenge: 'challenge-xyz',
       code_challenge_method: 'S256',
@@ -87,24 +86,82 @@ describe('cookie and return URL', () => {
     expect(oauth.readCookie(null, 'ioauth')).toBeNull();
   });
 
-  it('returns only to a bare https app origin', () => {
-    expect(oauth.appReturnUrl('https://alcon.example.com', true, INTEGRATION))
-      .toBe(`https://alcon.example.com/?integration_oauth=ok&integration=${INTEGRATION}`);
-    expect(oauth.appReturnUrl('https://alcon.example.com/', false, 'not-a-uuid')).toBe('https://alcon.example.com/?integration_oauth=error');
-    expect(oauth.appReturnUrl('http://localhost:3000', true, null)).toBe('http://localhost:3000/?integration_oauth=ok');
-    expect(oauth.appReturnUrl('http://alcon.example.com', true, null)).toBeNull();
-    expect(oauth.appReturnUrl('https://alcon.example.com/next?x=1', true, null)).toBeNull();
-    expect(oauth.appReturnUrl('', true, null)).toBeNull();
-    expect(oauth.appReturnUrl(undefined, true, null)).toBeNull();
+  const HANDLE = 'h'.repeat(20) + '_-' + 'K'.repeat(21);
+
+  it('returns only to a bare https app origin, with the completion handle on finish', () => {
+    expect(oauth.appReturnUrl('https://alcon.example.com', 'finish', INTEGRATION, HANDLE))
+      .toBe(`https://alcon.example.com/?integration_oauth=finish&integration=${INTEGRATION}&handle=${HANDLE}`);
+    expect(oauth.appReturnUrl('https://alcon.example.com/', 'error', 'not-a-uuid')).toBe('https://alcon.example.com/?integration_oauth=error');
+    expect(oauth.appReturnUrl('http://localhost:3000', 'error', null)).toBe('http://localhost:3000/?integration_oauth=error');
+    // finish without a well-formed handle is not a return URL at all.
+    expect(oauth.appReturnUrl('https://alcon.example.com', 'finish', INTEGRATION)).toBeNull();
+    expect(oauth.appReturnUrl('https://alcon.example.com', 'finish', INTEGRATION, 'short')).toBeNull();
+    expect(oauth.appReturnUrl('http://alcon.example.com', 'error', null)).toBeNull();
+    expect(oauth.appReturnUrl('https://alcon.example.com/next?x=1', 'error', null)).toBeNull();
+    expect(oauth.appReturnUrl('', 'error', null)).toBeNull();
+    expect(oauth.appReturnUrl(undefined, 'finish', null, HANDLE)).toBeNull();
+    expect(oauth.appOrigin('https://alcon.example.com/')).toBe('https://alcon.example.com');
+    expect(oauth.appOrigin('https://user:pw@alcon.example.com')).toBeNull();
   });
 
   it('reads and strips the result on the app side', () => {
-    expect(readOAuthReturn(`?integration_oauth=ok&integration=${INTEGRATION}`)).toEqual({ ok: true, integrationId: INTEGRATION });
-    expect(readOAuthReturn('?integration_oauth=error&integration=x')).toEqual({ ok: false, integrationId: null });
-    expect(readOAuthReturn('?integration_oauth=maybe')).toBeNull();
+    expect(readOAuthReturn(`?integration_oauth=finish&integration=${INTEGRATION}&handle=${HANDLE}`)).toEqual({ kind: 'finish', handle: HANDLE, integrationId: INTEGRATION });
+    expect(readOAuthReturn('?integration_oauth=finish&handle=bad')).toEqual({ kind: 'error', integrationId: null });
+    expect(readOAuthReturn('?integration_oauth=error&integration=x')).toEqual({ kind: 'error', integrationId: null });
+    expect(readOAuthReturn('?integration_oauth=ok')).toBeNull();
     expect(readOAuthReturn('')).toBeNull();
-    expect(stripOAuthReturn(`https://app.example.com/?a=1&integration_oauth=ok&integration=${INTEGRATION}#h`)).toBe('/?a=1#h');
-    expect(stripOAuthReturn('https://app.example.com/?integration_oauth=ok')).toBe('/');
+    expect(stripOAuthReturn(`https://app.example.com/?a=1&integration_oauth=finish&integration=${INTEGRATION}&handle=${HANDLE}#h`)).toBe('/?a=1#h');
+    expect(stripOAuthReturn('https://app.example.com/?integration_oauth=error')).toBe('/');
+  });
+
+  it('confirms a finish once and records the outcome', async () => {
+    const calls: string[] = [];
+    const finish = async (h: string) => { calls.push(h); return INTEGRATION; };
+    const ret = { kind: 'finish' as const, handle: HANDLE, integrationId: null };
+    await Promise.all([completeOAuthReturn(ret, finish), completeOAuthReturn(ret, finish)]);
+    expect(calls).toEqual([HANDLE]);
+    const failing = async () => { throw new Error('This Google sign-in was started by someone else, so it was discarded.'); };
+    const outcomes: unknown[] = [];
+    await completeOAuthReturn({ kind: 'finish', handle: HANDLE.replace('h', 'j'), integrationId: INTEGRATION }, async (h) => {
+      outcomes.push(h);
+      return failing();
+    });
+    expect(outcomes).toHaveLength(1);
+  });
+});
+
+describe('finishing a sign-in', () => {
+  const NOW = 1_800_000_000_000;
+  const LATER = new Date(NOW + 60_000).toISOString();
+  const EARLIER = new Date(NOW - 1).toISOString();
+  const STARTER = '60b10d95-f1d7-40dc-9d59-0836f4ae333c';
+  const OTHER = '11111111-2222-4333-8444-555555555555';
+
+  it('stores only for the person who started it, before it expires', () => {
+    expect(oauth.finishDecision({ flowUserId: STARTER, callerId: STARTER, expiresAt: LATER, nowMs: NOW })).toBe('ok');
+    expect(oauth.finishDecision({ flowUserId: STARTER, callerId: OTHER, expiresAt: LATER, nowMs: NOW })).toBe('wrong_user');
+    expect(oauth.finishDecision({ flowUserId: STARTER, callerId: STARTER, expiresAt: EARLIER, nowMs: NOW })).toBe('expired');
+    expect(oauth.finishDecision({ flowUserId: STARTER, callerId: OTHER, expiresAt: EARLIER, nowMs: NOW })).toBe('wrong_user');
+    expect(oauth.finishDecision({ flowUserId: STARTER, callerId: null, expiresAt: LATER, nowMs: NOW })).toBe('wrong_user');
+    expect(oauth.finishDecision({ flowUserId: null, callerId: null, expiresAt: LATER, nowMs: NOW })).toBe('wrong_user');
+    expect(oauth.finishDecision({ flowUserId: STARTER, callerId: STARTER, expiresAt: null, nowMs: NOW })).toBe('expired');
+  });
+
+  it('treats a missing, unreadable or past deadline as expired', () => {
+    expect(oauth.isExpired(new Date(NOW).toISOString(), NOW)).toBe(true);
+    expect(oauth.isExpired(new Date(NOW + 1).toISOString(), NOW)).toBe(false);
+    expect(oauth.isExpired('not a date', NOW)).toBe(true);
+    expect(oauth.isExpired(undefined, NOW)).toBe(true);
+    expect(oauth.COMPLETION_TTL_MS).toBe(10 * 60_000);
+  });
+
+  it('keeps only the hash of the handle, and the hash is stable', async () => {
+    const handle = oauth.randomToken();
+    const hash = await oauth.sha256Hex(handle);
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(await oauth.sha256Hex(handle)).toBe(hash);
+    expect(hash).not.toContain(handle);
+    expect(await oauth.sha256Hex(oauth.randomToken())).not.toBe(hash);
   });
 });
 
@@ -149,10 +206,10 @@ describe('stored secret', () => {
 });
 
 describe('resolveCredential', () => {
-  function fakeAdmin() {
+  function fakeAdmin(written = true) {
     const calls: { rpc: [string, Record<string, unknown>][]; updates: [Record<string, unknown>, string][] } = { rpc: [], updates: [] };
     const admin = {
-      rpc: async (fn: string, args: Record<string, unknown>) => { calls.rpc.push([fn, args]); return { error: null }; },
+      rpc: async (fn: string, args: Record<string, unknown>) => { calls.rpc.push([fn, args]); return { data: written, error: null }; },
       from: () => ({
         update: (values: Record<string, unknown>) => ({
           eq: async (_c: string, id: string) => { calls.updates.push([values, id]); return { error: null }; },
@@ -198,6 +255,15 @@ describe('resolveCredential', () => {
     expect(calls.rpc).toHaveLength(1);
     expect(calls.rpc[0][0]).toBe('store_integration_oauth_token');
     expect(JSON.parse(String(calls.rpc[0][1].p_secret))).toEqual({ ...SECRET, access_token: 'ya29.new', expires_at: now + 3_600_000 });
+    // The write is conditional on the refresh token it started from.
+    expect(calls.rpc[0][1].p_expected_refresh_hash).toBe(await oauth.sha256Hex('1//refresh'));
+  });
+
+  it('gives no token when the connection changed while refreshing', async () => {
+    const { admin, calls } = fakeAdmin(false);
+    const fetchImpl = async () => new Response(JSON.stringify({ access_token: 'ya29.late', expires_in: 3600 }), { status: 200 });
+    expect(await client.resolveCredential(admin, DRIVE_ROW, JSON.stringify(SECRET), { now: SECRET.expires_at, client: CLIENT, fetchImpl })).toBeNull();
+    expect(calls.rpc).toHaveLength(1);
   });
 
   it('marks the connection expired when Google refuses the refresh token', async () => {

@@ -71,7 +71,7 @@ export function buildAuthorizeUrl(p: { clientId: string; redirectUri: string; st
   u.searchParams.set("scope", DRIVE_FILE_SCOPE);
   u.searchParams.set("access_type", "offline");
   u.searchParams.set("prompt", "consent");
-  u.searchParams.set("include_granted_scopes", "true");
+  // No include_granted_scopes: the grant stays drive.file alone.
   u.searchParams.set("state", p.state);
   u.searchParams.set("code_challenge", p.codeChallenge);
   u.searchParams.set("code_challenge_method", "S256");
@@ -138,20 +138,60 @@ export function readCookie(header: string | null | undefined, name: string): str
   return null;
 }
 
-/**
- * The URL to send the browser back to: the fixed app origin with the result.
- * Null when APP_ORIGIN is missing or is not a bare https origin (http only
- * for localhost).
- */
-export function appReturnUrl(appOrigin: string | null | undefined, ok: boolean, integrationId: string | null): string | null {
-  if (!appOrigin) return null;
+/** The app origin from APP_ORIGIN: a bare https origin (http only for localhost), or null. */
+export function appOrigin(raw: string | null | undefined): string | null {
+  if (!raw) return null;
   let u: URL;
-  try { u = new URL(appOrigin); } catch { return null; }
+  try { u = new URL(raw); } catch { return null; }
   const local = u.hostname === "localhost" || u.hostname === "127.0.0.1";
   if (u.protocol !== "https:" && !(u.protocol === "http:" && local)) return null;
   if (u.username || u.password || (u.pathname !== "/" && u.pathname !== "") || u.search || u.hash) return null;
-  const out = new URL("/", u.origin);
-  out.searchParams.set("integration_oauth", ok ? "ok" : "error");
+  return u.origin;
+}
+
+/**
+ * The URL to send the browser back to: the fixed app origin with the result.
+ *   finish   Google answered; the app confirms with POST /finish {handle}
+ *            under the signed-in person's JWT, and only then is anything
+ *            stored.
+ *   error    the sign-in did not complete.
+ * Null when APP_ORIGIN is missing or is not a bare origin.
+ */
+export function appReturnUrl(
+  rawOrigin: string | null | undefined,
+  result: "finish" | "error",
+  integrationId: string | null,
+  handle?: string,
+): string | null {
+  const origin = appOrigin(rawOrigin);
+  if (!origin) return null;
+  const out = new URL("/", origin);
+  out.searchParams.set("integration_oauth", result);
   if (integrationId && /^[0-9a-f-]{36}$/i.test(integrationId)) out.searchParams.set("integration", integrationId);
+  if (result === "finish") {
+    if (!handle || !/^[A-Za-z0-9_-]{43,128}$/.test(handle)) return null;
+    out.searchParams.set("handle", handle);
+  }
   return out.toString();
+}
+
+export const COMPLETION_TTL_MS = 10 * 60_000;
+
+/** True when an ISO timestamp is missing, unreadable or not after now. */
+export function isExpired(expiresAt: string | null | undefined, nowMs: number): boolean {
+  if (!expiresAt) return true;
+  const t = new Date(expiresAt).getTime();
+  return !Number.isFinite(t) || t <= nowMs;
+}
+
+/**
+ * Whether a completed Google sign-in may be stored for the caller of
+ * /finish: only for the person who started it, before it expires. Ownership
+ * of the Space is checked separately, against the database.
+ */
+export function finishDecision(p: { flowUserId: string | null | undefined; callerId: string | null | undefined; expiresAt: string | null | undefined; nowMs: number }):
+  "ok" | "expired" | "wrong_user" {
+  if (!p.callerId || !p.flowUserId || p.callerId !== p.flowUserId) return "wrong_user";
+  if (isExpired(p.expiresAt, p.nowMs)) return "expired";
+  return "ok";
 }
