@@ -1129,6 +1129,28 @@ Object.assign(es, {
   "Allow writes": "Permitir escritura",
 });
 
+// integration-oauth server messages shown in the Google sign-in outcome (ADR 0035).
+Object.assign(ja, {
+  "Only Space owners can connect integrations.": "Space のオーナーだけが連携をつなげます。",
+  "The Google sign-in could not be finished. Connect again.": "Google のサインインを完了できませんでした。もう一度つないでください。",
+  "The connection could not be saved. Connect again.": "接続を保存できませんでした。もう一度つないでください。",
+});
+Object.assign(ko, {
+  "Only Space owners can connect integrations.": "Space 소유자만 연동을 연결할 수 있습니다.",
+  "The Google sign-in could not be finished. Connect again.": "Google 로그인을 완료하지 못했습니다. 다시 연결하세요.",
+  "The connection could not be saved. Connect again.": "연결을 저장하지 못했습니다. 다시 연결하세요.",
+});
+Object.assign(fr, {
+  "Only Space owners can connect integrations.": "Seuls les propriétaires du Space peuvent connecter des intégrations.",
+  "The Google sign-in could not be finished. Connect again.": "La connexion Google n’a pas pu être finalisée. Reconnectez-vous.",
+  "The connection could not be saved. Connect again.": "La connexion n’a pas pu être enregistrée. Reconnectez-vous.",
+});
+Object.assign(es, {
+  "Only Space owners can connect integrations.": "Solo los propietarios del Space pueden conectar integraciones.",
+  "The Google sign-in could not be finished. Connect again.": "No se pudo completar el inicio de sesión de Google. Vuelve a conectar.",
+  "The connection could not be saved. Connect again.": "No se pudo guardar la conexión. Vuelve a conectar.",
+});
+
 // The CRM App (Sustainment).
 Object.assign(ja, CRM_TRANSLATIONS.ja);
 Object.assign(ko, CRM_TRANSLATIONS.ko);

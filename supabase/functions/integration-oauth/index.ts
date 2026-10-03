@@ -110,7 +110,7 @@ async function ownedIntegration(req: Request, env: Env, integrationId: string): 
   const { data: membership } = await who.userDb
     .from("activity_space_members").select("role")
     .eq("activity_space_id", visible.activity_space_id).eq("user_id", who.userId).maybeSingle();
-  if (membership?.role !== "owner") return json({ error: "only Space owners can connect integrations", code: "not_owner" }, 403);
+  if (membership?.role !== "owner") return json({ error: "Only Space owners can connect integrations.", code: "not_owner" }, 403);
   return { userId: who.userId, row: visible as Row };
 }
 
@@ -162,6 +162,13 @@ async function postForm(url: string, params: Record<string, string>): Promise<{ 
 }
 
 /** Revokes a token (and so the grant) at Google. True when Google confirmed it. */
+/** Sign-ins past both deadlines go, their held tokens with them (by trigger). Run on every step that touches sign-ins. */
+async function sweepExpired(admin: SupabaseClient): Promise<void> {
+  const nowIso = new Date().toISOString();
+  await admin.from("integration_oauth_states").delete().lt("expires_at", nowIso).is("completion_hash", null);
+  await admin.from("integration_oauth_states").delete().lt("completion_expires_at", nowIso);
+}
+
 async function revokeAtGoogle(token: string): Promise<boolean> {
   const res = await postForm(GOOGLE_REVOKE_URL, { token }).catch(() => null);
   return res?.status === 200;
@@ -221,10 +228,7 @@ Deno.serve(async (req: Request) => {
     if (owned instanceof Response) return owned;
     if (!isGoogleDriveRow(owned.row)) return json({ error: "this integration does not sign in with Google", code: "not_oauth" }, 400);
 
-    // Sign-ins past both deadlines go (their held tokens with them, by trigger).
-    const nowIso = new Date().toISOString();
-    await admin.from("integration_oauth_states").delete().lt("expires_at", nowIso).is("completion_hash", null);
-    await admin.from("integration_oauth_states").delete().lt("completion_expires_at", nowIso);
+    await sweepExpired(admin);
     const ticket = randomToken();
     const now = Date.now();
     const { error } = await admin.from("integration_oauth_states").insert({
@@ -268,6 +272,7 @@ Deno.serve(async (req: Request) => {
     if (req.method !== "GET") return json({ error: "method not allowed" }, 405);
     const state = url.searchParams.get("state") ?? "";
     if (!state || state.length > 100) return backToApp("error", null);
+    await sweepExpired(admin);
     // Claim the state: a second callback with it finds nothing.
     const { data: flow } = await admin.from("integration_oauth_states")
       .update({ state_hash: null })
@@ -319,9 +324,10 @@ Deno.serve(async (req: Request) => {
     if (!/^[A-Za-z0-9_-]{43,128}$/.test(handle)) return json({ error: "handle is required" }, 400);
     const who = await caller(req, env);
     if (who instanceof Response) return who;
+    await sweepExpired(admin);
 
     const { data: taken, error: takeErr } = await admin.rpc("take_integration_oauth_pending", { p_completion_hash: await sha256Hex(handle) });
-    if (takeErr) return json({ error: "could not finish the sign-in" }, 500);
+    if (takeErr) return json({ error: "The Google sign-in could not be finished. Connect again." }, 500);
     const pending = (Array.isArray(taken) ? taken[0] : taken) as
       { flow_integration_id: string; flow_user_id: string; token_set: string | null; account: string | null; flow_expires_at: string } | undefined;
     if (!pending) return json({ error: "This Google sign-in has already been used or has expired.", code: "not_found" }, 404);
@@ -332,15 +338,15 @@ Deno.serve(async (req: Request) => {
     // already has in their own Spaces. The held tokens are gone once taken,
     // so nobody holds a usable token for this sign-in.
     const discard = async (status: number, error: string, code: string) => json({ error, code, integrationId }, status);
-    if (!secret) return json({ error: "could not finish the sign-in", integrationId }, 500);
+    if (!secret) return json({ error: "The Google sign-in could not be finished. Connect again.", integrationId }, 500);
 
     const decision = finishDecision({ flowUserId: pending.flow_user_id, callerId: who.userId, expiresAt: pending.flow_expires_at, nowMs: Date.now() });
     if (decision === "wrong_user") return await discard(403, "This Google sign-in was started by someone else, so it was discarded.", "wrong_user");
     if (decision === "expired") return await discard(410, "This Google sign-in has expired. Connect again.", "expired");
-    if (!await stillOwned(admin, integrationId, who.userId)) return await discard(403, "only Space owners can connect integrations", "not_owner");
+    if (!await stillOwned(admin, integrationId, who.userId)) return await discard(403, "Only Space owners can connect integrations.", "not_owner");
 
     const { error: storeErr } = await admin.rpc("store_integration_oauth_token", { p_integration_id: integrationId, p_secret: JSON.stringify(secret) });
-    if (storeErr) return await discard(500, "could not save the connection", "error");
+    if (storeErr) return await discard(500, "The connection could not be saved. Connect again.", "error");
     await admin.from("integrations").update({
       external_account: pending.account,
       last_test: { ok: true, at: new Date().toISOString(), code: "connected", detail: "" },
