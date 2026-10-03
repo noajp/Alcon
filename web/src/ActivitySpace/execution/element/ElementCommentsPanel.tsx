@@ -154,7 +154,8 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
 
   // While the @ list shows, ↑ / ↓ move, Enter or Tab picks, Esc closes.
   const onComposerKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!mentionListOpen || e.nativeEvent.isComposing) return;
+    // keyCode 229: Safari reports an IME commit as not composing.
+    if (!mentionListOpen || e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       const step = e.key === 'ArrowDown' ? 1 : -1;
@@ -172,7 +173,9 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
     const ids = new Set<string>();
     for (const w of workers) {
       if (!w.user_id) continue;
-      const re = new RegExp(`@${w.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+      // A name ends at whitespace, punctuation or the end of the text — not \b,
+      // which only knows ASCII word characters and misses Japanese names.
+      const re = new RegExp(`@${w.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[\\s、。,.!?！？:：)）])`);
       if (re.test(text)) ids.add(w.user_id);
     }
     return Array.from(ids);
@@ -196,6 +199,8 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
       // The delta stream may have landed the row already.
       setComments(prev => (prev.some(c => c.id === created.id) ? prev : [...prev, created]));
       setDraft('');
+      setMentionOpen(false);
+      setMentionQuery('');
 
       const ask = onAskAgent ? agentMention(content, aiWorkers, humanNames) : null;
       setAskOutcome(null);
