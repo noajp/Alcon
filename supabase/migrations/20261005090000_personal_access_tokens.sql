@@ -1,4 +1,4 @@
--- Personal access tokens (ELE_PLT-005, ADR 0031).
+-- Personal access tokens (ELE_PLT-005, ADR 0032).
 --
 -- External AI clients and scripts reach Alcon as the person who issued the
 -- token. The token never authorises anything by itself: alcon-mcp resolves it

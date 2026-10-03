@@ -61,7 +61,7 @@ export function isSafeEndpoint(raw: string): boolean {
  * serves alcon-mcp (REST API, any Edge Function). Case, a trailing dot and a
  * port do not change the answer. An agent already has the board tools under
  * its starter's RLS; reaching Alcon again through a stored credential would
- * act outside that run (ADR 0031).
+ * act outside that run (ADR 0032).
  */
 export function pointsAtAlcon(endpoint: string, supabaseUrl: string | null | undefined): boolean {
   if (!supabaseUrl) return false;

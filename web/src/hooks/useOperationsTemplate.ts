@@ -6,7 +6,7 @@ import { useDomains } from '@/ActivitySpace/execution/domain/data';
 import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { addDataTableColumns, createDataTable, deleteDataTable, DATA_TABLES_QUERY_KEY, useDataTables } from '@/ActivitySpace/sustainment/table/data';
-import { OPERATIONS_FIELDS, type OperationsKind } from '@/ActivitySpace/sustainment/operations/operationsModel';
+import { OPERATIONS_FIELDS } from '@/ActivitySpace/sustainment/operations/operationsModel';
 
 /** Domain-scoped tables stay in their Space; unscoped personal tables are portable. */
 export function useOperationsTables() {
@@ -30,7 +30,7 @@ export function useOperationsTemplate() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function create(kind: OperationsKind, name: string) {
+  async function create(name: string) {
     if (lock.current) throw new Error('A table is already being created.');
     if (!name.trim()) throw new Error('Enter a table name.');
     lock.current = true;
@@ -41,7 +41,7 @@ export function useOperationsTemplate() {
       const domain = domains.find(item => item.id === getActiveDomainId() && item.activity_space_id === getActiveSpaceId());
       const table = await createDataTable({ name: name.trim(), domain_id: domain?.id ?? null });
       tableId = table.id;
-      const fields = OPERATIONS_FIELDS[kind];
+      const fields = OPERATIONS_FIELDS;
       const columns = await addDataTableColumns(table.id, fields.map(field => ({ name: field.label, type: field.type })));
       const mapping: Record<string, string> = {};
       // INSERT RETURNING does not promise order; match the explicit persisted order.

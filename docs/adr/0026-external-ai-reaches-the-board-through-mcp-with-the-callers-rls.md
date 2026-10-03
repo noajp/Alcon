@@ -1,6 +1,6 @@
 # 0026 — External AI reaches the board through MCP with the caller's RLS
 
-> 置き換え: [0031](0031-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)（認証の判断だけ。MCP の入口と公開範囲はこの ADR のまま）
+> 置き換え: [0032](0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)（認証の判断だけ。MCP の入口と公開範囲はこの ADR のまま）
 
 ## 背景
 

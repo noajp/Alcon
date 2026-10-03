@@ -1,6 +1,6 @@
 # Alcon MCP サーバー
 
-外部の AI（Claude Code、Claude、ChatGPT など）やスクリプトから、接続した本人の権限で盤面を読み書きする入口。設計の判断は [ADR 0026](adr/0026-external-ai-reaches-the-board-through-mcp-with-the-callers-rls.md)、認証は [ADR 0031](adr/0031-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)。
+外部の AI（Claude Code、Claude、ChatGPT など）やスクリプトから、接続した本人の権限で盤面を読み書きする入口。設計の判断は [ADR 0026](adr/0026-external-ai-reaches-the-board-through-mcp-with-the-callers-rls.md)、認証は [ADR 0032](adr/0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)。
 
 - エンドポイント: `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/alcon-mcp`
 - 方式: Streamable HTTP（状態を持たない。POST で JSON-RPC を 1 件送り、JSON で応答を受け取る）

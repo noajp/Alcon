@@ -12,7 +12,7 @@ import type { PersonalAccessToken, PersonalAccessTokenAccess } from '@/types/dat
 import { CopyField } from './CopyField';
 import { claudeMcpAddCommand, usePersonalAccessTokenActions, usePersonalAccessTokens, type TokenExpiryDays } from './patData';
 
-// The signed-in person's personal access tokens (ADR 0031): list them with
+// The signed-in person's personal access tokens (ADR 0032): list them with
 // what they can do, when they expire and when they were last used; revoke
 // one (it stops working at once); generate one. A new token is shown once —
 // the database keeps only its hash.

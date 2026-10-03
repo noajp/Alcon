@@ -1,4 +1,4 @@
-# 0031 — External callers authenticate with a PAT or OAuth; the function mints a short-lived user JWT
+# 0032 — External callers authenticate with a PAT or OAuth; the function mints a short-lived user JWT
 
 ## 背景
 

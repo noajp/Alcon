@@ -1,4 +1,6 @@
 import type { Locale } from './locales';
+import { CRM_TRANSLATIONS } from '@/ActivitySpace/sustainment/crm/crmMessages';
+import { SCM_MESSAGES } from './scmMessages';
 
 type TranslationMap = Record<string, string>;
 
@@ -879,7 +881,7 @@ Object.assign(es, {
   'Permanently delete this Domain for every member. Move or delete its Objects first.': 'Elimina este Domain de forma permanente para todos los miembros. Primero mueve o elimina sus Objects.',
 });
 
-// Settings › Integrations › Connect to Alcon — personal access tokens (ADR 0031).
+// Settings › Integrations › Connect to Alcon — personal access tokens (ADR 0032).
 Object.assign(ja, {
   "Generate a token, then run this command with it in place of <token>:": "<token> をトークンに置き換えて、次のコマンドを実行します。",
   "Any MCP client or script that can send an Authorization header connects the same way.": "Authorization ヘッダーを送れる MCP クライアントやスクリプトなら、同じ方法で接続できます。",
@@ -1036,3 +1038,15 @@ Object.assign(es, {
   "Generating…": "Generando…",
   "Generate": "Generar",
 });
+
+// The CRM App (Sustainment).
+Object.assign(ja, CRM_TRANSLATIONS.ja);
+Object.assign(ko, CRM_TRANSLATIONS.ko);
+Object.assign(fr, CRM_TRANSLATIONS.fr);
+Object.assign(es, CRM_TRANSLATIONS.es);
+
+// The SCM App (Sustainment).
+Object.assign(ja, SCM_MESSAGES.ja);
+Object.assign(ko, SCM_MESSAGES.ko);
+Object.assign(fr, SCM_MESSAGES.fr);
+Object.assign(es, SCM_MESSAGES.es);

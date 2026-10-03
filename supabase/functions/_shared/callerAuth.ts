@@ -1,4 +1,4 @@
-// Who is calling, and with what client (ADR 0031).
+// Who is calling, and with what client (ADR 0032).
 //
 //   alc_pat_…   a personal access token. Hashed and resolved with the service
 //               role (resolve_personal_access_token — that lookup and nothing

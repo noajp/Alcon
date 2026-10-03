@@ -1,4 +1,4 @@
-// Delegated auth (ADR 0031): an external caller that holds a personal access
+// Delegated auth (ADR 0032): an external caller that holds a personal access
 // token (or, with ELE_PLT-004, an OAuth grant) is turned into a short-lived
 // JWT for the person it stands for. The database never trusts the token
 // itself; it sees an ordinary `authenticated` JWT whose `sub` is the person,

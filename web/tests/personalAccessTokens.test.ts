@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-// Personal access tokens (ADR 0031): the pure parts of the edge auth path.
+// Personal access tokens (ADR 0032): the pure parts of the edge auth path.
 const auth = await import(new URL('../../supabase/functions/_shared/delegatedAuth.ts', import.meta.url).pathname);
 const protocol = await import(new URL('../../supabase/functions/alcon-mcp/protocol.ts', import.meta.url).pathname);
 const { mcpTools, mcpHost, MCP_READ_TOOLS, MCP_WRITE_TOOLS } = await import(new URL('../../supabase/functions/alcon-mcp/tools.ts', import.meta.url).pathname);

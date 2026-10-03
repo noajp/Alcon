@@ -7,7 +7,7 @@ import { ALCON_MCP_URL, claudeMcpAddCommand } from './patData';
 
 // Settings › Integrations › Connect to Alcon: point an MCP client or a script
 // at Alcon. The client acts as the signed-in person through a personal access
-// token (ADR 0031) and sees and changes only what that person can.
+// token (ADR 0032) and sees and changes only what that person can.
 
 export function AlconConnectPanel() {
   const { t } = useI18n();

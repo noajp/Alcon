@@ -1293,7 +1293,7 @@ export type IntegrationUpdate = Partial<Pick<Integration,
 
 export type PersonalAccessTokenAccess = 'read' | 'read_write'
 
-// A personal access token (ADR 0031): lets an external client act as its
+// A personal access token (ADR 0032): lets an external client act as its
 // owner through alcon-mcp, under the owner's RLS. Only the owner reads their
 // rows, and never the hash; the plaintext exists once, in the result of
 // create_personal_access_token. Issue and revoke go through RPCs.

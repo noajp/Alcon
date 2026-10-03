@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { IssuedPersonalAccessToken, PersonalAccessToken, PersonalAccessTokenAccess } from '@/types/database';
 
-// The signed-in person's personal access tokens (ADR 0031): list, issue,
+// The signed-in person's personal access tokens (ADR 0032): list, issue,
 // revoke. RLS shows each person only their own rows, and the hash is not
 // selectable at all. Issue and revoke are RPCs; the database refuses both
 // when the caller is itself a delegated client.

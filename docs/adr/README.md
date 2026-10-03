@@ -62,4 +62,5 @@
 | [0028](0028-workers-belong-to-a-space.md) | Worker は Space に属する — 名前は Element に付いてきて、割り当ては境界に従う |
 | [0029](0029-membership-takes-effect-on-acceptance.md) | 所属は招かれた本人の承諾で成立する — 招待は別の表に置き、RPC だけが書く |
 | [0030](0030-unused-objects-are-archived-and-domains-with-objects-stay.md) | 使わなくなった Object はアーカイブし、Object が残る Domain は削除しない |
-| [0031](0031-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md) | 外部の呼び出しは PAT か OAuth で認証し、関数が本人の短命な JWT を発行する |
+| [0031](0031-scm-owns-its-ledger-and-acts-within-a-policy.md) | SCM は専用の台帳を持ち、人が示した方針の範囲で AI が発注する |
+| [0032](0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md) | 外部の呼び出しは PAT か OAuth で認証し、関数が本人の短命な JWT を発行する |

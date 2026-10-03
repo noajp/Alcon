@@ -11,7 +11,7 @@
 // notification → 202. GET (server-initiated stream) and DELETE (session end)
 // answer 405 because there is no session.
 //
-// Auth (ADR 0031): Authorization: Bearer <personal access token> (alc_pat_…)
+// Auth (ADR 0032): Authorization: Bearer <personal access token> (alc_pat_…)
 // or <Supabase session JWT>. A token is exchanged for a five-minute JWT for
 // its owner (_shared/callerAuth.ts), so RLS applies either way; a read-only
 // token is offered the read tools alone. verify_jwt=false on this function so
