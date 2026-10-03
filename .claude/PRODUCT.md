@@ -340,7 +340,7 @@ Workers / Resource / Calendar / Gantt は Sustainment の道具を Object 単位
 組織の信頼境界は **ActivitySpace**。Strategy / Execution / Sustainment / Home / Property は、選択中の ActivitySpace を組織活動の文脈として使う（詳細は前述の [Activity Space — 組織活動の文脈と信頼境界](#activity-space--組織活動の文脈と信頼境界)）。組織データは Linear 型の二層メンバーシップでアクセスを管理し、個人の道具は所有者の権限で管理する。
 
 - **二層の所属** — Space メンバー（`activity_space_members`：owner/member）＝組織の正規メンバー。Domain メンバー（`domain_members`：owner/admin/member）＝その Domain だけに招かれて承諾した人。Object メンバー（`object_members`）はさらに細かい Object 限定の同席者（通常 domain_members の部分集合、Object 限定ゲストも可）。
-- **Guest** — `domain_members` だが Space 非メンバーの人。招かれた Domain しか見えず、組織の他 Domain 構造は一切露出しない。他組織の人を招いても相手の Space は混ざらない（Domain は `activity_space_id` で1つの Space に属したまま、相手には「Shared with me」として現れる）。
+- **Guest** — `domain_members` だが Space 非メンバーの人。招かれた Domain しか見えず、組織の他 Domain 構造は一切露出しない。他組織の人を招いても相手の Space は混ざらない（Domain は `activity_space_id` で1つの Space に属したまま、相手には「Shared with me」として現れる）。Domain を作れるのは自分が参加している Space の中だけで、Domain を別の Space へ移せるのは移動元と移動先の両方の Space のオーナーだけ。
 - **Domain 可視性 `domains.privacy`** — `workspace`＝同じ Space のメンバー全員が閲覧可。`private`＝`domain_members` のみ。
 - **可視性カスケード** — Domain 可視 ⇔ domain_member、または（`workspace` かつ Space メンバー）。Object 可視 ⇔ object_member、または所属 Domain が可視。Element 可視 ⇔ 所有者、または所属 Object が可視。
 - **サーバーで強制** — 上記は SECURITY DEFINER ヘルパー（`user_can_see_domain` / `user_can_see_object` / `user_can_see_element`）として RLS に組み込む。クライアント表示任せにしない。横断取得 RPC `get_explorer_data` も同じ可視性で Object/Element を返す。

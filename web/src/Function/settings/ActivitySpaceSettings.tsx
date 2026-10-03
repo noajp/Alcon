@@ -179,6 +179,7 @@ export function ActivitySpaceSettings() {
       window.location.reload();
     } catch (e) {
       console.error('Delete failed', e);
+      if (e instanceof Error && e.message) await appDialog.alert(e.message);
     }
   };
 

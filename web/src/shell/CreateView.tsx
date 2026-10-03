@@ -37,6 +37,7 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
   const [identifier, setIdentifier] = useState('');
   const [privacy, setPrivacy] = useState<DomainPrivacy>('workspace');
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const creatingRef = useRef(false);
 
   const handleNameChange = (v: string) => {
@@ -50,6 +51,7 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
     if (!name.trim() || creatingRef.current) return;
     creatingRef.current = true;
     setCreating(true);
+    setError(null);
     try {
       const domain = await createDomain({
         name: name.trim(),
@@ -63,6 +65,7 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
       onCreated({ type: 'domain', id: domain.id });
     } catch (err) {
       console.error('Failed to create domain:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create Domain');
     } finally {
       creatingRef.current = false;
       setCreating(false);
@@ -130,6 +133,8 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
             </div>
           </Field>
         </div>
+
+        {error && <p className="mt-6 text-[12px] text-destructive">{error}</p>}
 
         <div className="flex items-center justify-end gap-2 mt-10 pt-6 border-t border-border">
           <Button variant="secondary" size="md" onClick={onCancel} disabled={creating}>Cancel</Button>
