@@ -1,4 +1,4 @@
--- OAuth integrations (ADR 0034): a Space owner connects Google Drive with
+-- OAuth integrations (ADR 0035): a Space owner connects Google Drive with
 -- Google sign-in, and the integration-oauth Edge Function stores the tokens.
 --
 --   integrations.external_account   the account the tokens belong to (the

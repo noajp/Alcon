@@ -24,7 +24,7 @@
 - **どのトークンで書いたかを残す。** Activity とコメントの名義は「Claude Code (MCP · token: laptop)」の形にする。トークン名は名前に使える文字だけに絞り、40 文字までにする。
 - **エージェントは連携で Alcon 自身に入らない。** `run-agent` は、接続先がこのプロジェクトのホスト（`SUPABASE_URL` のホスト、`<ref>.supabase.co`、alcon-mcp も配信する旧来の `<ref>.functions.supabase.co`。大文字小文字・末尾のドット・ポートは問わない）である連携を使わない。エージェントは開始した人の RLS で盤面のツールをすでに持っている。`set_integration_secret` は、値のどこかに `alc_pat_` を含むもの（`Bearer alc_pat_…` や前に空白のあるものを含む）を拒み、PAT を連携の資格情報として預けられないようにする。
 - **PAT はパスワードの変更やセッションの失効では取り消されない。** GitHub の PAT と同じく、トークンは本人が取り消すか期限が切れるまで有効。発行ダイアログで「使わなくなったトークンは取り消す。パスワードを変えても取り消されない」と示す。アカウントの BAN と削除は、照会の時点で拒む。
-- **OAuth（ELE_PLT-004）は同じ入口に足す。** `authenticateCaller` のセッションの分岐の前に、`client_id` を持つ JWT の分岐を置く。許可が生きていることを確かめたら、`mintUserJwt({ via: 'oauth', clientId })` で同じ形の JWT にする。
+- **OAuth も同じ入口を通る。** `authenticateCaller` はセッションの分岐の前で `client_id` を持つ JWT を受け、同意が生きていることを確かめてから `mintUserJwt({ via: 'oauth', clientId })` で同じ形の JWT にする（ADR 0034）。
 
 ## 根拠
 

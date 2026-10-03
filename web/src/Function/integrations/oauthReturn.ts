@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 
-// Coming back from Google sign-in (ADR 0034). integration-oauth redirects to
+// Coming back from Google sign-in (ADR 0035). integration-oauth redirects to
 // `/?integration_oauth=ok|error&integration=<id>`; the page reads that once,
 // opens Settings › Integrations, removes the parameters from the address and
 // leaves the result here for the Integrations screen to show.

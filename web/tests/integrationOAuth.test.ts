@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { presetById } from '@/Function/integrations/catalog';
 import { readOAuthReturn, stripOAuthReturn } from '@/Function/integrations/oauthReturn';
 
-// Google Drive over OAuth (ADR 0034): the pure parts of integration-oauth,
+// Google Drive over OAuth (ADR 0035): the pure parts of integration-oauth,
 // the token refresh in resolveCredential, and the Drive request builders.
 const oauth = await import(new URL('../../supabase/functions/_shared/googleOAuth.ts', import.meta.url).pathname);
 const drive = await import(new URL('../../supabase/functions/_shared/googleDrive.ts', import.meta.url).pathname);

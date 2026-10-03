@@ -1,4 +1,4 @@
-# 0034 — OAuth integrations sign in through an Edge Function and keep their tokens in Vault
+# 0035 — OAuth integrations sign in through an Edge Function and keep their tokens in Vault
 
 ## 背景
 

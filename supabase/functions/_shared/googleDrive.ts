@@ -1,4 +1,4 @@
-// Google Drive tools for agents (ADR 0034). A google-drive integration gives
+// Google Drive tools for agents (ADR 0035). A google-drive integration gives
 // the agent these typed tools instead of the generic http_request:
 //
 //   drive_search          read   list files matching a query

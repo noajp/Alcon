@@ -288,10 +288,14 @@ export function toResponse(result: ToolResult, successStatus: 200 | 201): { stat
 
 /**
  * Pure. The name a write is recorded under: "API", with the caller's own
- * name (X-Alcon-Client) in front when it gave one, and the personal access
- * token's name — "n8n (API · token: ops)", "API · token: ops".
+ * name (X-Alcon-Client) in front when it gave one, and how it signed in —
+ * "n8n (API · token: ops)", "API · token: ops", "Claude (API · OAuth)".
  */
-export function apiActorLabel(client: string | null, token: string | null): string {
+export function apiActorLabel(client: string | null, token: string | null, oauthClient: string | null = null): string {
+  if (oauthClient !== null) {
+    const name = sanitizeName(client) || sanitizeName(oauthClient);
+    return name ? `${name} (API · OAuth)` : "API · OAuth";
+  }
   const name = sanitizeName(client);
   const tokenName = token === null ? null : sanitizeName(token);
   const door = tokenName === null ? "API" : tokenName ? `API · token: ${tokenName}` : "API · token";

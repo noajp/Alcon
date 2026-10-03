@@ -1,4 +1,4 @@
-// Google OAuth for integrations (ADR 0034) — the pure parts: the authorize
+// Google OAuth for integrations (ADR 0035) — the pure parts: the authorize
 // URL, PKCE, the stored secret's shape, when to refresh, the nonce cookie and
 // the return URL. No network, no Deno globals, so web/tests imports it.
 //

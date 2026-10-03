@@ -171,17 +171,24 @@ export function clientName(url: URL, userAgent: string | null): string {
   return known ? known[1] : "AI";
 }
 
-/** How the caller authenticated, when it adds to the record: a personal access token's name. */
+/** How the caller authenticated, when it adds to the record: a personal access token's name, or the OAuth client's. */
 export interface ClientVia {
   token?: string | null;
+  oauthClient?: string | null;
 }
 
 /**
  * Pure. The name an MCP write is recorded under: the client's name suffixed
- * "(MCP)" so the Activity rail says which door the change came through, and,
- * for a personal access token, which token — "Claude Code (MCP · token: laptop)".
+ * "(MCP)" so the Activity rail says which door the change came through, and
+ * how it signed in — "Claude Code (MCP · token: laptop)" for a personal
+ * access token, "Claude (MCP · OAuth)" for an OAuth client, named as it
+ * registered itself.
  */
 export function clientLabel(url: URL, userAgent: string | null, via?: ClientVia | null): string {
+  if (via && typeof via.oauthClient === "string") {
+    const name = sanitizeName(via.oauthClient) || clientName(url, userAgent);
+    return `${name} (MCP · OAuth)`;
+  }
   const name = clientName(url, userAgent);
   if (via && typeof via.token === "string") {
     const token = sanitizeName(via.token);

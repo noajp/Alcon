@@ -1,5 +1,5 @@
 // integration-oauth — a Space owner connects Google Drive by signing in with
-// Google (ADR 0034). Deployed with --no-verify-jwt: /go and /callback are
+// Google (ADR 0035). Deployed with --no-verify-jwt: /go and /callback are
 // browser navigations without a Supabase JWT; /start and /revoke check the
 // caller's JWT themselves.
 //
