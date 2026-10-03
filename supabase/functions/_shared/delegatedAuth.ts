@@ -1,5 +1,5 @@
-// Delegated auth (ADR 0032): an external caller that holds a personal access
-// token (or, with ELE_PLT-004, an OAuth grant) is turned into a short-lived
+// Delegated auth (ADR 0032, 0034): an external caller that holds a personal
+// access token or an OAuth grant is turned into a short-lived
 // JWT for the person it stands for. The database never trusts the token
 // itself; it sees an ordinary `authenticated` JWT whose `sub` is the person,
 // so RLS — which reads only auth.uid() — draws the same boundary as in the
@@ -27,7 +27,7 @@ export interface DelegatedSubject {
   via: DelegatedVia;
   /** personal_access_tokens.id, for via 'pat'. */
   patId?: string;
-  /** The OAuth client the grant was issued to, for via 'oauth' (ELE_PLT-004). */
+  /** The OAuth client the grant was issued to, for via 'oauth'. */
   clientId?: string;
 }
 

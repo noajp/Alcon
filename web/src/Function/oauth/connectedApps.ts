@@ -38,24 +38,30 @@ export function mergeConnectedApps(
     .sort((a, b) => b.grantedAt.localeCompare(a.grantedAt));
 }
 
+const UNSAFE_SCHEMES = new Set(['javascript:', 'data:', 'vbscript:', 'file:', 'blob:']);
+
 /**
- * Pure. Where to send the browser after a consent decision: only an absolute
- * http(s) URL. Anything else (javascript:, data:, relative) is refused.
+ * Pure. Where to send the browser after a consent decision: an absolute URL —
+ * https, http (a local client), or a desktop app's own scheme (cursor://…),
+ * which Supabase has already matched against the client's registered
+ * redirect URIs. Script-bearing and local-file schemes, and anything
+ * relative, are refused.
  */
 export function safeRedirectUrl(raw: unknown): string | null {
   if (typeof raw !== 'string' || raw.trim() === '') return null;
   try {
     const url = new URL(raw);
-    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
+    return UNSAFE_SCHEMES.has(url.protocol) ? null : url.toString();
   } catch {
     return null;
   }
 }
 
-/** Pure. The host a client returns to, for the consent screen; the full URI when it has no host. */
+/** Pure. The host a client returns to, for the consent screen; the full URI for an app scheme (cursor://…). */
 export function redirectHost(raw: string): string {
   try {
-    return new URL(raw).host || raw;
+    const url = new URL(raw);
+    return (url.protocol === 'https:' || url.protocol === 'http:') && url.host ? url.host : raw;
   } catch {
     return raw;
   }

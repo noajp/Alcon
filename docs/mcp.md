@@ -1,10 +1,10 @@
 # Alcon MCP サーバー
 
-外部の AI（Claude Code、Claude、ChatGPT など）やスクリプトから、接続した本人の権限で盤面を読み書きする入口。設計の判断は [ADR 0026](adr/0026-external-ai-reaches-the-board-through-mcp-with-the-callers-rls.md)、認証は [ADR 0032](adr/0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)。
+外部の AI（Claude Code、Claude、ChatGPT など）やスクリプトから、接続した本人の権限で盤面を読み書きする入口。設計の判断は [ADR 0026](adr/0026-external-ai-reaches-the-board-through-mcp-with-the-callers-rls.md)、認証は [ADR 0032](adr/0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md) と [ADR 0034](adr/0034-mcp-clients-sign-in-through-supabase-oauth-and-their-tokens-only-work-through-alcon.md)。
 
 - エンドポイント: `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/alcon-mcp`
 - 方式: Streamable HTTP（状態を持たない。POST で JSON-RPC を 1 件送り、JSON で応答を受け取る）
-- 認証: `Authorization: Bearer <個人用アクセストークン>`（`alc_pat_…`）
+- 認証: claude.ai・ChatGPT などのコネクタは OAuth でサインイン、Claude Code やスクリプトは `Authorization: Bearer <個人用アクセストークン>`（`alc_pat_…`）
 
 ## できること
 
@@ -27,7 +27,19 @@
 - 有効なトークンは 1 人 20 個まで
 - パスワードを変更しても、トークンは取り消されない。使わなくなったトークンは取り消す
 
-Supabase のセッションの JWT（1 時間で切れる）も受け付けるが、検証用の代替手段にとどめる。claude.ai や ChatGPT のコネクタで使う OAuth は ELE_PLT-004 で追加する。
+Supabase のセッションの JWT（1 時間で切れる）も受け付けるが、検証用の代替手段にとどめる。
+
+## claude.ai・ChatGPT から接続する（OAuth）
+
+コネクタの設定にエンドポイントの URL を貼るだけでよい。トークンは要らない。
+
+1. claude.ai の Settings › Connectors › Add custom connector（ChatGPT は Developer mode のコネクタ）に、エンドポイントの URL を入れる
+2. Alcon のサインイン画面が開く。サインインすると同意画面（`/oauth/consent`）に、クライアント名・戻り先・できること・できないことが出る
+3. 「読み取りと書き込み」か「読み取りのみ」を選んで承認する
+
+接続したアプリは、Settings › Integrations の「接続中のアプリ」に並ぶ。権限を替えたり、切断したりでき、切断すると次の呼び出しから 401 になる。OAuth で発行されたトークンは、Alcon の MCP（と REST API）を通したときだけ使え、PostgREST などに直接持ち込んでも何もできない。書き込みは「Claude (MCP · OAuth)」の形で記録される。
+
+仕組み：401 の `WWW-Authenticate` が `resource_metadata` で `…/alcon-mcp/.well-known/oauth-protected-resource` を指し、そこに認可サーバー（Supabase Auth の OAuth サーバー、`https://<ref>.supabase.co/auth/v1`）が書いてある。クライアントの登録・PKCE・トークンの発行と更新は Supabase が行う。
 
 ## Claude Code から接続する
 
@@ -45,9 +57,9 @@ claude mcp add --transport http alcon "https://rkugtcqztkkacvoylupw.supabase.co/
 env -u SUPABASE_ACCESS_TOKEN supabase functions deploy alcon-mcp --project-ref rkugtcqztkkacvoylupw --no-verify-jwt --use-api
 ```
 
-`--no-verify-jwt` を付けるのは、トークンがない場合や、期限切れ・取り消し済みの場合に、関数自身が MCP の形式に沿った 401（`WWW-Authenticate` 付き）を返すため。トークンの検証は関数の中で行う。`_shared/externalTools.ts` を変更したら `alcon-api` も、`_shared/boardTools.ts` を変更したら `alcon-api` と `alcon-copilot` も再デプロイする。
+`--no-verify-jwt` を付けるのは、トークンがない場合や、期限切れ・取り消し済みの場合に、関数自身が MCP の形式に沿った 401（保護リソースのメタデータを指す `WWW-Authenticate` 付き）を返し、メタデータをトークンなしで配るため。トークンの検証は関数の中で行う。`_shared/externalTools.ts` を変更したら `alcon-api` も、`_shared/boardTools.ts` を変更したら `alcon-api` と `alcon-copilot` も再デプロイする。
 
-PAT を受け付けるには、Edge Function のシークレット `ALCON_JWT_SIGNING_KEY` に、プロジェクトの JWT シークレット（Legacy JWT secret）を入れる。ない場合、PAT は 500「server not configured」で断られ、セッションの JWT だけが通る。非対称の署名鍵に移ったら、EC の秘密鍵の JWK を入れれば ES256 で署名する。
+PAT と OAuth を受け付けるには、Edge Function のシークレット `ALCON_JWT_SIGNING_KEY` に、プロジェクトの JWT シークレット（Legacy JWT secret）を入れる。ない場合、PAT と OAuth のトークンは 500「server not configured」で断られ、セッションの JWT だけが通る。OAuth にはさらに、Authentication › OAuth Server を有効にし（Authorization path は `/oauth/consent`、Dynamic client registration は ON）、Site URL を本番のアプリにし、Authentication › Hooks の Customize Access Token に `public.custom_access_token_hook` を選ぶ。非対称の署名鍵に移ったら、EC の秘密鍵の JWK を入れれば ES256 で署名する。
 
 ## 逆向き：Alcon のエージェントが外部サービスを使う
 

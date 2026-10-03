@@ -1,6 +1,6 @@
 # 0026 — External AI reaches the board through MCP with the caller's RLS
 
-> 置き換え: [0032](0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)（認証の判断だけ。MCP の入口と公開範囲はこの ADR のまま）
+> 置き換え: [0032](0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)・[0034](0034-mcp-clients-sign-in-through-supabase-oauth-and-their-tokens-only-work-through-alcon.md)（認証の判断だけ。MCP の入口と公開範囲はこの ADR のまま）
 
 ## 背景
 
@@ -28,7 +28,6 @@ Next.js の API ルートに置くと、`app/` にはページだけを置くと
 
 ## 覆す条件
 
-- OAuth（ELE_PLT-004）を入れたら、トークンの発行元と失効の経路をこの ADR の認証の節に合わせて見直す
 - 外部 AI に削除や一括変更を委ねたいという実際の要求が、確認付きで出てきたら、公開範囲を広げる別の判断を書く
 - `element_comments` と `subelements` の RLS が `user_can_see_element` に揃ったら、UUID の可視性確認は防御の重ね掛けとして残すか外すかを決め直す
 - Copilot と MCP で必要なツールの形が分かれてきたら、共有をやめてそれぞれに持たせる

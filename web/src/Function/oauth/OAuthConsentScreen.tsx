@@ -25,19 +25,19 @@ type State =
 export function OAuthConsentScreen() {
   const { t } = useI18n();
   const { user } = useAuthContext();
-  const [state, setState] = useState<State>({ kind: 'loading' });
+  // The page renders only after the session check, in the browser.
+  const [authorizationId] = useState(() => (typeof window === 'undefined' ? null : authorizationIdFrom(window.location.search)));
+  const [state, setState] = useState<State>(() => authorizationId
+    ? { kind: 'loading' }
+    : { kind: 'error', message: t('This link has no authorization request. Start connecting again from the app.') });
   const [access, setAccess] = useState<OAuthAccess>('read_write');
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    const id = authorizationIdFrom(window.location.search);
-    if (!id) {
-      setState({ kind: 'error', message: t('This link has no authorization request. Start connecting again from the app.') });
-      return;
-    }
+    if (!authorizationId) return;
     let cancelled = false;
-    void supabase.auth.oauth.getAuthorizationDetails(id).then(({ data, error }) => {
+    void supabase.auth.oauth.getAuthorizationDetails(authorizationId).then(({ data, error }) => {
       if (cancelled) return;
       if (error || !data) {
         setState({ kind: 'error', message: t('This request has expired or is no longer valid. Start connecting again from the app.') });
@@ -57,7 +57,7 @@ export function OAuthConsentScreen() {
       setState({ kind: 'ready', details: data });
     });
     return () => { cancelled = true; };
-  }, [t]);
+  }, [authorizationId, t]);
 
   const decide = async (approve: boolean) => {
     if (state.kind !== 'ready' || busy) return;
