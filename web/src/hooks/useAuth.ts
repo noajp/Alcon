@@ -101,6 +101,11 @@ export function useAuth() {
       password,
       options: {
         data: { display_name: displayName || email.split('@')[0] },
+        // Signing up on the OAuth consent page: the confirmation link returns
+        // to the same request, so connecting continues after confirming.
+        ...(typeof window !== 'undefined' && window.location.pathname.startsWith('/oauth/')
+          ? { emailRedirectTo: window.location.href }
+          : {}),
       },
     });
     if (error) throw error;

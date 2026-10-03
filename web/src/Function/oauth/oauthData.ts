@@ -52,6 +52,8 @@ export function useConnectedAppActions() {
     mutationFn: async (clientId: string) => {
       const { error } = await supabase.auth.oauth.revokeGrant({ clientId });
       if (error) throw error;
+      // The grant is gone either way; a row left behind is overwritten on the
+      // next consent, so its delete is best-effort.
       await supabase.from('oauth_client_access').delete().eq('client_id', clientId);
     },
     onSettled: refresh,

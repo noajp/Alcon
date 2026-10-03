@@ -37,7 +37,7 @@ Supabase のセッションの JWT（1 時間で切れる）も受け付ける�
 2. Alcon のサインイン画面が開く。サインインすると同意画面（`/oauth/consent`）に、クライアント名・戻り先・できること・できないことが出る
 3. 「読み取りと書き込み」か「読み取りのみ」を選んで承認する
 
-接続したアプリは、Settings › Integrations の「接続中のアプリ」に並ぶ。権限を替えたり、切断したりでき、切断すると次の呼び出しから 401 になる。OAuth で発行されたトークンは、Alcon の MCP（と REST API）を通したときだけ使え、PostgREST などに直接持ち込んでも何もできない。書き込みは「Claude (MCP · OAuth)」の形で記録される。
+接続したアプリは、Settings › Integrations の「接続中のアプリ」に並ぶ。権限を替えたり、切断したりでき、切断すると次の呼び出しから 401 になる。OAuth で発行されたトークンで盤面に届くのは、Alcon の MCP（と REST API）を通したときだけで、PostgREST などに直接持ち込んでも盤面は読み書きできない。書き込みは「Claude (MCP · OAuth)」の形で記録される。
 
 仕組み：401 の `WWW-Authenticate` が `resource_metadata` で `…/alcon-mcp/.well-known/oauth-protected-resource` を指し、そこに認可サーバー（Supabase Auth の OAuth サーバー、`https://<ref>.supabase.co/auth/v1`）が書いてある。クライアントの登録・PKCE・トークンの発行と更新は Supabase が行う。
 
@@ -59,7 +59,14 @@ env -u SUPABASE_ACCESS_TOKEN supabase functions deploy alcon-mcp --project-ref r
 
 `--no-verify-jwt` を付けるのは、トークンがない場合や、期限切れ・取り消し済みの場合に、関数自身が MCP の形式に沿った 401（保護リソースのメタデータを指す `WWW-Authenticate` 付き）を返し、メタデータをトークンなしで配るため。トークンの検証は関数の中で行う。`_shared/externalTools.ts` を変更したら `alcon-api` も、`_shared/boardTools.ts` を変更したら `alcon-api` と `alcon-copilot` も再デプロイする。
 
-PAT と OAuth を受け付けるには、Edge Function のシークレット `ALCON_JWT_SIGNING_KEY` に、プロジェクトの JWT シークレット（Legacy JWT secret）を入れる。ない場合、PAT と OAuth のトークンは 500「server not configured」で断られ、セッションの JWT だけが通る。OAuth にはさらに、Authentication › OAuth Server を有効にし（Authorization path は `/oauth/consent`、Dynamic client registration は ON）、Site URL を本番のアプリにし、Authentication › Hooks の Customize Access Token に `public.custom_access_token_hook` を選ぶ。非対称の署名鍵に移ったら、EC の秘密鍵の JWK を入れれば ES256 で署名する。
+PAT と OAuth を受け付けるには、Edge Function のシークレット `ALCON_JWT_SIGNING_KEY` に、プロジェクトの JWT シークレット（Legacy JWT secret）を入れる。ない場合、PAT と OAuth のトークンは 500「server not configured」で断られ、セッションの JWT だけが通る。OAuth にはさらに次を行う。
+
+- Authentication › OAuth Server を有効にする（Authorization path は `/oauth/consent`、Dynamic client registration は ON）
+- Site URL を本番のアプリにし、Redirect URLs に `<本番のアプリ>/oauth/consent**` を足す（同意画面で登録した人の確認メールが同意に戻るため）
+- Authentication › Hooks の Customize Access Token に `public.custom_access_token_hook` を選ぶ。選ばないうちは、関数が OAuth のトークンを 500「OAuth access token hook not enabled」で断る
+- 「Require current password when updating」と「Secure email change」を ON にする。Supabase Auth はトークンのロールを見ないので、これがないと、承認されたクライアントが本人のパスワードを変えられる
+
+非対称の署名鍵に移ったら、EC の秘密鍵の JWK を入れれば ES256 で署名する。
 
 ## 逆向き：Alcon のエージェントが外部サービスを使う
 

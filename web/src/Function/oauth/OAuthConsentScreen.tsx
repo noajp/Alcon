@@ -111,7 +111,7 @@ export function OAuthConsentScreen() {
                 <span className="text-[12px] text-muted-foreground">{t('Read the board, and create and update Elements, comments, assignees and labels.')}</span>
               </ChoiceCard>
               <ChoiceCard selected={access === 'read'} label={t('Read only')} onClick={() => setAccess('read')}>
-                <span className="text-[12px] text-muted-foreground">{t('Read the board. Every write is refused.')}</span>
+                <span className="text-[12px] text-muted-foreground">{t('Read the board. Every write to the board is refused.')}</span>
               </ChoiceCard>
             </div>
 

@@ -106,3 +106,17 @@ describe('connected apps', () => {
     expect(authorizationIdFrom('')).toBeNull();
   });
 });
+
+describe('OAuth tokens must carry the hook role', () => {
+  it('accepts only alcon_oauth_client', () => {
+    expect(auth.OAUTH_CLIENT_ROLE).toBe('alcon_oauth_client');
+    expect(auth.hasOAuthClientRole(jwt({ client_id: CLIENT, role: 'alcon_oauth_client' }))).toBe(true);
+    expect(auth.hasOAuthClientRole(jwt({ client_id: CLIENT, role: 'authenticated' }))).toBe(false);
+    expect(auth.hasOAuthClientRole(jwt({ client_id: CLIENT }))).toBe(false);
+    expect(auth.hasOAuthClientRole('not.a.jwt')).toBe(false);
+  });
+
+  it('advertises scopes without openid', () => {
+    expect(oauth.protectedResourceMetadata(SUPABASE).scopes_supported).toEqual(['email', 'profile']);
+  });
+});

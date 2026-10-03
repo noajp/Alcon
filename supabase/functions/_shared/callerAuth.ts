@@ -24,7 +24,7 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   bearerToken, DelegatedAuthNotConfigured, isPersonalAccessToken, isWellFormedPersonalAccessToken,
-  mintUserJwt, oauthClientIdOf, parseSigningKey, sha256Hex,
+  hasOAuthClientRole, mintUserJwt, oauthClientIdOf, parseSigningKey, sha256Hex,
 } from "./delegatedAuth.ts";
 
 export type CallerAccess = "read" | "read_write";
@@ -143,6 +143,12 @@ async function viaOAuth(token: string, clientId: string, url: string, anonKey: s
   const probe = userClient(url, anonKey, token);
   const { data: { user }, error: userError } = await probe.auth.getUser(token);
   if (userError || !user) return unauthorized("token is invalid or expired");
+  // Fail closed until the access token hook is on: without it the client's
+  // token also reaches PostgREST as the person, outside the allowlist.
+  if (!hasOAuthClientRole(token)) {
+    console.error("[callerAuth] OAuth token without the alcon_oauth_client role: enable custom_access_token_hook");
+    return notConfigured("OAuth access token hook not enabled");
+  }
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data, error } = await admin.rpc("resolve_oauth_caller", { p_user_id: user.id, p_client_id: clientId });

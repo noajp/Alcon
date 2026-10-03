@@ -31,6 +31,9 @@ export function protectedResourceMetadata(supabaseUrl: string): Record<string, u
     resource: resourceUrl(supabaseUrl),
     authorization_servers: [`${base(supabaseUrl)}/auth/v1`],
     bearer_methods_supported: ["header"],
+    // No openid: the project signs with HS256 only, and Supabase issues ID
+    // tokens only with asymmetric keys.
+    scopes_supported: ["email", "profile"],
     resource_name: "Alcon",
     resource_documentation: "https://github.com/noajp/Alcon/blob/main/docs/mcp.md",
   };
