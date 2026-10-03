@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { X, ChevronRight, Loader2, Wrench, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { SendIcon } from '@/Function/shared/SendIcon';
 import { useAlconCopilot, type CopilotContext, type ToolEvent } from './useAlconCopilot';
+import { COPILOT_ASK_EVENT, type CopilotAsk } from './copilotBridge';
 import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
 
 const WIDTH_KEY = 'alcon.copilot.width';
@@ -69,6 +70,18 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onOpenChange]);
+
+  // A surface asked a question (e.g. SCM's "Discuss with AI"): open and send it.
+  useEffect(() => {
+    const onAsk = (event: Event) => {
+      const request = (event as CustomEvent<CopilotAsk>).detail;
+      if (!request?.text || streaming) return;
+      onOpenChange(true);
+      send(request.text, { context: { viewLabel: request.viewLabel ?? 'Alcon', domainId: activeDomainId ?? undefined, spaceId: request.spaceId } });
+    };
+    window.addEventListener(COPILOT_ASK_EVENT, onAsk);
+    return () => window.removeEventListener(COPILOT_ASK_EVENT, onAsk);
+  }, [send, streaming, onOpenChange, activeDomainId]);
 
   // Auto-scroll to bottom on new content while streaming.
   useEffect(() => {

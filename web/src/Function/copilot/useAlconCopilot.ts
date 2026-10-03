@@ -35,6 +35,8 @@ export interface CopilotContext {
   elementId?: string;
   objectId?: string;
   domainId?: string;
+  /** The Space a Space-wide tool (SCM) should read. */
+  spaceId?: string;
 }
 
 interface SendOptions {

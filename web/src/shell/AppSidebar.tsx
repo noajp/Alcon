@@ -49,6 +49,7 @@ import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarSto
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
 import { OperationsNavigation } from '@/ActivitySpace/sustainment/operations/OperationsNavigation';
+import { ScmSidebar } from '@/ActivitySpace/sustainment/scm/ScmSidebar';
 import { InboxList } from '@/ActivitySpace/home/InboxList';
 import { CalendarSidebar } from '@/ActivitySpace/sustainment/calendar/CalendarSidebar';
 import { operationsQueue, operationsQueueRoute } from '@/ActivitySpace/sustainment/operations/operationsQueues';
@@ -532,8 +533,9 @@ export function AppSidebar({
           {/* ── Calendar ── today, a mini month that moves the grid, and who is shown. */}
           {railMode === 'calendar' && <><SidebarModeLabel label={t('Calendar')} /><CalendarSidebar /></>}
           {railMode === 'team' && <SidebarModeLabel label={t('Team')} />}
-          {(railMode === 'crm' || railMode === 'scm') && <OperationsNavigation sidebar kind={railMode}
-            queue={operationsQueue(navigation, railMode)} onSelect={queue => onNavigate(operationsQueueRoute(railMode, queue))} />}
+          {railMode === 'crm' && <OperationsNavigation sidebar
+            queue={operationsQueue(navigation)} onSelect={queue => onNavigate(operationsQueueRoute(queue))} />}
+          {railMode === 'scm' && <ScmSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'scm') onViewChange('scm'); }} />}
           </>
           )}
         </nav></ButtonAppearanceProvider>

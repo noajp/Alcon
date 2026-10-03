@@ -99,16 +99,10 @@ export const OBJECT_SUMMARY_BOARD: BoardLayout = {
   rail: [],
 };
 
-/** Business tools use one planner with a different question on each surface. */
+/** The CRM surface is one operations planner. */
 export const CRM_BOARD: BoardLayout = {
   band: [],
   main: [{ id: 'crm-planner', type: 'operations-planner', size: 'full', params: { kind: 'crm' } }],
-  rail: [],
-};
-
-export const SCM_BOARD: BoardLayout = {
-  band: [],
-  main: [{ id: 'scm-planner', type: 'operations-planner', size: 'full', params: { kind: 'scm' } }],
   rail: [],
 };
 

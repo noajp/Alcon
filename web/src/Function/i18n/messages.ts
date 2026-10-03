@@ -1,4 +1,5 @@
 import type { Locale } from './locales';
+import { SCM_MESSAGES } from './scmMessages';
 
 type TranslationMap = Record<string, string>;
 
@@ -835,3 +836,9 @@ Object.assign(ja, { 'You can create an Object only in a Domain you can see.': 'O
 Object.assign(ko, { 'You can create an Object only in a Domain you can see.': 'Object는 내가 볼 수 있는 Domain 안에서만 만들 수 있습니다.' });
 Object.assign(fr, { 'You can create an Object only in a Domain you can see.': 'Vous ne pouvez créer un Object que dans un Domain que vous pouvez voir.' });
 Object.assign(es, { 'You can create an Object only in a Domain you can see.': 'Solo puedes crear un Object en un Domain que puedas ver.' });
+
+// The SCM App (Sustainment).
+Object.assign(ja, SCM_MESSAGES.ja);
+Object.assign(ko, SCM_MESSAGES.ko);
+Object.assign(fr, SCM_MESSAGES.fr);
+Object.assign(es, SCM_MESSAGES.es);
