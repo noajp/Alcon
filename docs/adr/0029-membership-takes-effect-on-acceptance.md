@@ -25,6 +25,7 @@ Space・Domain・Object の所属（`activity_space_members` / `domain_members` 
 - **Domain は参加している Space の中に作る。** Domain を作れるのは、`activity_space_id` が自分の参加している Space か空のときだけ。Domain を別の Space へ移せる（`activity_space_id` を変えられる）のは、その Domain の owner・admin のうち、移動元と移動先の両方の Space のオーナーである人だけ（どちらかが空ならもう一方だけ）。Space を削除したときは、その Domain は Space のない Domain として残る。
 - **ブラウザが書ける所属の行は、見えている Domain・Object に member として自分が加わる行だけ（Discover）。** 他人の行も、owner の行も、Space の行も書けない。所属の行は人と対象を変えられず、変えられるのは役割だけ。`domain_members` / `object_members` の役割は owner / admin / member で、Domain と Object は Space と同じく最後の owner を外せない（対象そのものやアカウントの削除は別）。例外は、Object の Domain の owner・admin がその Object の最後の owner を外すときで、その人が同じ操作の中で owner を引き継ぐ。引き継いだ人は Object の owner なので、その Object を削除することもできる。Domain の owner・admin は、Object に参加しなくてもそのメンバーを見て外せる。
 - **Object を管理する人は主 Domain（`objects.domain_id`）で決まり、その列は両端を管理する人だけが変えられる。** Object を別の Domain に移せるのは、移動元の Domain の owner・admin（Domain のない Object ならその Object の owner・admin）で、かつ移動先の Domain の owner・admin である人だけ。管理の判定（`user_manages_scope_as`）は `object_domains`（複数 Domain への所属）を読まない。
+- **Object を別の Domain にも入れられるのは、Object とその Domain の両方を管理する人だけ。** `object_domains` の行を足す・変えるには、Object を管理する人（主 Domain の owner・admin。Domain のない Object ならその Object の owner・admin。主 Domain の移動と同じ判定）で、かつ入れる先の Domain の owner・admin であること。主 Domain と同じ Domain の行は可視性を広げないので、Object の owner・admin も書ける（Object の作成と取り込みが書く行）。行を消す（Domain から外す）のは、Object を管理する人か Domain の owner・admin のどちらかで、その行が見えている人（Domain と Object の両方が見える人）に限られる。
 - **どの経路で参加しても、同じ対象への保留中の招待は承諾済みになる。** 保留中の招待の相手がすでにメンバーである状態は作らない。
 - **招待は Inbox と Profile に届く。** Inbox では Accept / Decline を出し、答えた後はその結果を示す。Space をまだ持たない人の初回画面にも保留中の招待を並べ、Space を作らずに招待へ参加できるようにする。メンバー一覧は保留中の招待を「Invited」として淡く示し、管理する人には「Cancel invite」を出す。保留中の招待はピッカー・Worker・所属の判定のどれにも入らない。
 
@@ -44,7 +45,9 @@ Domain を作れる Space を参加している Space に限るのは、作っ�
 
 最後の owner を外せないようにしたのは、owner のいない Domain・Object を誰も管理できなくなるから。Space にはすでに同じ制約がある。ただし Object を作った人が Space や Domain から外れても、その Object の唯一の owner として中身を見続け、削除もできてしまう。Object を管理するのはその Domain の owner・admin なので、その人たちが最後の owner を外したときは引き継ぎにした。外すことを拒めば外れた人のアクセスが残り、引き継がずに外せば owner のいない Object が残る。
 
-引き継ぎは「Domain の管理者なら Object の owner になれる」ことでもあるので、Domain の管理者であることを Object のメンバーが作れてはならない。`objects` の UPDATE は Object のメンバーなら列を問わず通すため、主 Domain を自分の作った Domain に書き換えれば、その Domain の owner として Object の管理者になり、最後の owner を外して引き継げた。移動を両端の管理者に限れば、管理者の立場は移動元の管理者から渡されたときにしか生まれない。`object_domains` は Domain の作成者が任意の Object を結び付けられる（可視性の穴として別に扱う）ので、管理の判定には使わない。
+引き継ぎは「Domain の管理者なら Object の owner になれる」ことでもあるので、Domain の管理者であることを Object のメンバーが作れてはならない。`objects` の UPDATE は Object のメンバーなら列を問わず通すため、主 Domain を自分の作った Domain に書き換えれば、その Domain の owner として Object の管理者になり、最後の owner を外して引き継げた。移動を両端の管理者に限れば、管理者の立場は移動元の管理者から渡されたときにしか生まれない。`object_domains` は管理の判定には使わない。
+
+`object_domains` の行は Object の可視性（`user_can_see_object`）を広げる。Domain の側だけで行を書けると、自分の Domain に他人の Object を入れて、その Object と Element を Domain を見られる全員に見せられる。Object の側だけで書けると、他人の Domain に Object を押し込める。だから足すには両方を管理する人を求める。Domain に入っている Object の owner を管理する人に数えないのは、作った人が必ず Object の owner になるから。数えると、Domain の一般メンバーが作った Object（他の人が Element を入れたものを含む）を、移動は拒まれても、結び付けによって別の Space の Domain に見せられる。外すことは可視性を狭めるだけなので、どちらか一方の管理者でよい。両方を求めると、管理者が入れ替わった後に誰も外せない行が残る。
 
 招いた人の権限を承諾の時点で確かめ直すのは、外されたオーナーの古い招待が、外された後に所属を作らないようにするため。
 

@@ -10,12 +10,14 @@ import {
   deleteObject,
   setObjectDomains,
   fetchObjectDomainIds,
+  fileObjectUnderDomains,
   useDomains,
   type AlconObjectWithChildren,
 } from '@/hooks/useSupabase';
 import { EntityActionsMenu, type ActionTarget } from '@/Function/shared/EntityActionsMenu';
 import { DropdownMenuItem } from '@/ui/dropdown-menu';
 import { RenamePrefixDialog } from './RenamePrefixDialog';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /**
  * "⋯" menu for an Object, wired next to the Object name in the hierarchy
@@ -36,6 +38,7 @@ export function ObjectActionsMenu({
   onDeleted?: () => void;
 }) {
   const { data: domains } = useDomains();
+  const { t } = useI18n();
   const [renameOpen, setRenameOpen] = useState(false);
   // Domain membership (primary first), cached per Object.
   const qc = useQueryClient();
@@ -62,15 +65,26 @@ export function ObjectActionsMenu({
 
   const duplicate = async () => {
     try {
-      await createObject({
+      // The copy lands in the primary Domain; the other Domains need someone
+      // who manages them, so file it there one by one and say what was skipped.
+      const primary = object.domain_id ?? memberIds[0] ?? null;
+      const created = await createObject({
         name: `${object.name} (copy)`,
         description: object.description ?? null,
         color: object.color ?? null,
-        domain_id: object.domain_id ?? null,
-        domain_ids: memberIds.length > 0 ? memberIds : undefined,
+        domain_id: primary,
+        domain_ids: primary ? [primary] : undefined,
       });
+      const refused = await fileObjectUnderDomains(created.id, memberIds.filter((id) => id !== primary));
       await onRefresh?.();
-    } catch (e) { console.error('Duplicate Object failed', e); }
+      if (refused.length > 0) {
+        const names = refused.map((id) => domains.find((d) => d.id === id)?.name ?? id).join(', ');
+        await appDialog.alert(t('The copy was not filed under {names}. Only owners or admins of those Domains can file it there.', { names }));
+      }
+    } catch (e) {
+      console.error('Duplicate Object failed', e);
+      if (e instanceof Error && e.message) await appDialog.alert(e.message);
+    }
   };
 
   const move = async (domainId: string) => {

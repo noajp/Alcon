@@ -69,6 +69,7 @@ export {
   fetchObjectDomainIds,
   fetchObjectLabels,
   fetchObjectTabs,
+  fileObjectUnderDomains,
   moveObject,
   renameObjectPrefix,
   reorderObjects,
