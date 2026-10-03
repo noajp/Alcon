@@ -14,7 +14,12 @@ import type { IntegrationInsertRow } from './catalog';
 // The credential is write-only from here: it goes to set_integration_secret
 // (Vault) and is never selected back. `secret_id` only says whether one is set.
 
-const COLUMNS = 'id, activity_space_id, preset, kind, name, description, icon, endpoint, auth_type, auth_header, secret_id, delegation, enabled, last_test, created_by, created_at, updated_at';
+//
+// An OAuth connection (Google Drive) has no credential to type: the
+// integration-oauth Edge Function signs in with Google and stores the tokens;
+// `external_account` says which account it signed in as.
+
+const COLUMNS = 'id, activity_space_id, preset, kind, name, description, icon, endpoint, auth_type, auth_header, secret_id, delegation, enabled, last_test, external_account, created_by, created_at, updated_at';
 
 const integrationsKey = (spaceId: string | null) => ['integrations', spaceId] as const;
 
@@ -72,17 +77,62 @@ async function setIntegrationSecret(integrationId: string, secret: string): Prom
   if (error) throw error;
 }
 
+/** An Edge Function error with the function's own `error` message when it sent one. */
+async function functionError(error: Error): Promise<Error> {
+  let message = error.message;
+  if ('context' in error && error.context instanceof Response) {
+    try { message = (await error.context.json()).error ?? message; } catch { /* keep the transport error */ }
+  }
+  return new Error(message);
+}
+
 /** Runs the integration-test Edge Function; returns the stored last_test. */
 async function testIntegration(integrationId: string): Promise<Json> {
   const { data, error } = await supabase.functions.invoke('integration-test', { body: { integrationId } });
-  if (error) {
-    let message = error.message;
-    if ('context' in error && error.context instanceof Response) {
-      try { message = (await error.context.json()).error ?? message; } catch { /* keep the transport error */ }
-    }
-    throw new Error(message);
-  }
+  if (error) throw await functionError(error);
   return (data as { last_test: Json }).last_test;
+}
+
+/** Starts Google sign-in for an OAuth integration; returns the URL to navigate to. */
+async function startIntegrationOAuth(integrationId: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('integration-oauth/start', { body: { integrationId } });
+  if (error) throw await functionError(error);
+  const url = (data as { url?: unknown } | null)?.url;
+  if (typeof url !== 'string' || !url.startsWith('https://')) throw new Error('Google sign-in could not be started.');
+  return url;
+}
+
+/** Confirms a finished Google sign-in (the one-time handle from the return
+ *  URL) as the signed-in person; returns the connected integration's id. */
+export async function finishIntegrationOAuth(handle: string): Promise<string | null> {
+  const { data, error } = await supabase.functions.invoke('integration-oauth/finish', { body: { handle } });
+  if (error) throw await functionError(error);
+  const id = (data as { integrationId?: unknown } | null)?.integrationId;
+  return typeof id === 'string' ? id : null;
+}
+
+/** Revokes an OAuth integration's grant at the provider and clears its stored
+ *  tokens. `revoked` is false when the provider could not confirm it. */
+async function revokeIntegrationOAuth(integrationId: string): Promise<{ revoked: boolean }> {
+  const { data, error } = await supabase.functions.invoke('integration-oauth/revoke', { body: { integrationId } });
+  if (error) throw await functionError(error);
+  return { revoked: (data as { revoked?: unknown } | null)?.revoked === true };
+}
+
+/** Whether Google sign-in is configured on the server: true / false, null while
+ *  loading. An unreachable function reads as not configured. */
+export function useIntegrationOAuthStatus(enabled: boolean): boolean | null {
+  const query = useQuery({
+    queryKey: ['integration-oauth-status'],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('integration-oauth/status', { method: 'GET' });
+      if (error) return false;
+      return (data as { google?: unknown } | null)?.google === true;
+    },
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+  return query.data === undefined ? null : query.data;
 }
 
 /** Create / update / delete / secret / test for one Space. Updates and deletes
@@ -168,5 +218,12 @@ export function useIntegrationActions(spaceId: string | null) {
     },
   });
 
-  return { create, update, remove, secret, test };
+  const signIn = useMutation({ mutationFn: (id: string) => startIntegrationOAuth(id) });
+
+  const revoke = useMutation({
+    mutationFn: (id: string) => revokeIntegrationOAuth(id),
+    onSettled: refresh,
+  });
+
+  return { create, update, remove, secret, test, signIn, revoke };
 }

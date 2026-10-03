@@ -72,3 +72,29 @@ PAT と OAuth を受け付けるには、Edge Function のシークレット `AL
 ## 逆向き：Alcon のエージェントが外部サービスを使う
 
 この文書は外部の AI が Alcon を操作する入口を扱う。Alcon のエージェント（run-agent）が Linear・Asana・任意の MCP / API を道具として使う接続は、Settings › Integrations の「外部サービスをつなぐ」で Space の owner が設定する。資格情報は Vault に置かれ、外部への書き込みは既定で毎回承認を待つ。設計は [ADR 0027](adr/0027-agents-act-on-elements-with-the-callers-rls-and-stop-for-approval.md)。エージェントは Alcon 自身を指す連携を使わず、Alcon の PAT は連携の資格情報として保存できない（エージェントは開始した人の権限で、盤面の道具をすでに持っている）。
+
+### Google Drive（OAuth）
+
+Google Drive は資格情報を貼り付けず、owner が Google にサインインしてつなぐ。スコープは `drive.file` だけなので、エージェントが扱えるのは Alcon が作ったファイルと利用者が選んだファイルに限られ、作ったファイルは接続した Google アカウントの名義になる。エージェントには `drive_search`・`drive_read`（読み取り）と `drive_create`・`drive_update`・`drive_create_folder`（書き込み、承認を通る）が出る。設計は [ADR 0035](adr/0035-oauth-integrations-sign-in-through-an-edge-function-and-keep-tokens-in-vault.md)。
+
+アクセスは Google アカウントに付き、Space ごとには分かれない。同じ Google アカウントを 2 つの Space でつなぐと、どちらの Space のエージェントも、もう一方で Alcon が作ったファイルを見られる。また切断は Google で Alcon の許可全体を取り消すので、一方の Space で切断すると、同じアカウントをつないだ他の Space も次のリフレッシュで `oauth_expired`（再接続が必要）になる。
+
+サインインは Edge Function `integration-oauth` が行う。ブラウザが JWT なしで `/go` と `/callback` に来るので `--no-verify-jwt` で配置し、`/start`・`/finish`・`/revoke` は関数の中で JWT を確かめる。コールバックはトークンを預かるだけで連携には保存せず、アプリに戻ったあと、サインイン中の利用者の JWT で `/finish` を呼んだときに、`/start` を呼んだ本人であり今もオーナーである場合だけ保存する。他人が完了したサインインのトークンは、Google で取り消さずに捨てる（取り消すと、その人が自分の Space で使っている接続まで切れる）。
+
+配置は順番を守る。アプリは `integrations.external_account` を読むので、先に migration `20261006090000_integration_oauth.sql` を本番に適用し、次に関数、最後にアプリを公開する。
+
+```bash
+env -u SUPABASE_ACCESS_TOKEN supabase functions deploy integration-oauth --project-ref rkugtcqztkkacvoylupw --no-verify-jwt --use-api
+env -u SUPABASE_ACCESS_TOKEN supabase functions deploy integration-test --project-ref rkugtcqztkkacvoylupw --use-api
+env -u SUPABASE_ACCESS_TOKEN supabase functions deploy run-agent --project-ref rkugtcqztkkacvoylupw --use-api
+```
+
+Edge Function のシークレットに次の 3 つを入れる。どれかがない間、`GET /integration-oauth/status` は `{ "google": false }` を返し、画面は「Google サインインはまだ設定されていません」と示して接続を押せなくする。
+
+| シークレット | 内容 |
+| --- | --- |
+| `GOOGLE_OAUTH_CLIENT_ID` | Google Cloud の OAuth クライアント（ウェブアプリケーション）の ID |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | 同じクライアントのシークレット |
+| `APP_ORIGIN` | サインイン後に戻るアプリの origin（例 `https://alcon.example.com`）。パスは付けない。保存を確定する `/finish` はこのアプリから呼ばれるので、ない間はサインインを完了できない（コールバックは何も保存せず「APP_ORIGIN を設定してください」と返す） |
+
+OAuth クライアントには、承認済みのリダイレクト URI として `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/integration-oauth/callback` を登録し、同意画面に `https://www.googleapis.com/auth/drive.file` を加える。

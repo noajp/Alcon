@@ -1283,6 +1283,8 @@ export interface Integration {
   delegation: 'approve_each' | 'full_delegation'
   enabled: boolean
   last_test: Json | null
+  /** The account an OAuth connection signed in as (the Google email). Written only by integration-oauth. */
+  external_account: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -2116,7 +2118,7 @@ export interface Database {
       }
       integrations: {
         Row: Integration
-        Insert: Omit<Integration, 'id' | 'secret_id' | 'last_test' | 'created_by' | 'created_at' | 'updated_at'>
+        Insert: Omit<Integration, 'id' | 'secret_id' | 'last_test' | 'external_account' | 'created_by' | 'created_at' | 'updated_at'>
         Update: IntegrationUpdate
       }
     }

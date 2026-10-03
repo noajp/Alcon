@@ -375,6 +375,8 @@ Claude API を Supabase Edge Functions 経由で利用：
 
 外部の AI は `alcon-mcp`（MCP サーバー）から、スクリプトやノーコードツールは `alcon-api`（REST API）から、本人として盤面を読み書きする。どちらも同じ許可リストのツールを呼ぶので、外から削除や一括変更はできない（[ADR 0033](../docs/adr/0033-the-rest-api-is-the-mcp-tool-layer-over-http.md)）。資格情報は、claude.ai や ChatGPT のコネクタなら OAuth のサインインと同意（`/oauth/consent`）、スクリプトなら本人が Settings › Integrations で発行する個人用アクセストークン。どちらも読み取りのみを選べ、いつでも取り消せる。OAuth のトークンで盤面に届くのは Alcon の関数を通したときだけ（[ADR 0034](../docs/adr/0034-mcp-clients-sign-in-through-supabase-oauth-and-their-tokens-only-work-through-alcon.md)）。関数がそれを本人の短命な JWT に交換するので、アプリと同じ RLS が効き、書き込みの記録にはどのトークン経由かが残る（[ADR 0032](../docs/adr/0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)）。
 
+逆向きに、Alcon のエージェントは Space の owner がつないだ外部サービス（Linear・Asana・任意の MCP / API）を道具として使い、外部への書き込みは既定で毎回承認を待つ（[ADR 0027](../docs/adr/0027-agents-act-on-elements-with-the-callers-rls-and-stop-for-approval.md)）。Google Drive は owner が Google にサインインしてつなぎ（`integration-oauth`）、スコープは `drive.file` だけなので、エージェントが扱えるのは Alcon が作ったファイルと利用者が選んだファイルに限られる。サインインは、アプリに戻ってからサインインを始めた本人が確定したときだけ保存される。トークンは Vault にだけ置き、ブラウザには出さない。アクセスは Google アカウントに付くので、同じアカウントを複数の Space でつなぐと、どの Space のエージェントも他方で Alcon が作ったファイルを見られ、一方で切断すると他方も再接続が必要になる（[ADR 0035](../docs/adr/0035-oauth-integrations-sign-in-through-an-edge-function-and-keep-tokens-in-vault.md)）。
+
 ## 拡張構想
 
 拡張は、実顧客の反復業務で現在の道具では解けない負担が確認でき、導入と日常操作を複雑にする費用を上回る場合に選ぶ。Sustainmentでは、Workload・CRM・SCMを起点に、Object単位の道具を横断して使うことや、予算・会計・契約・購買・勤怠・設備まで扱うことが候補になる。概念上分類できることだけを開発理由にしない。

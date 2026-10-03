@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronDown, ExternalLink, LayoutGrid, List, Search } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
@@ -18,6 +19,7 @@ import {
 import { useIntegrations, useIsSpaceOwner } from './data';
 import { IntegrationDetailDialog, IntegrationIcon, SourceChip } from './IntegrationDetailDialog';
 import { AlconConnectPanel } from './AlconConnectPanel';
+import { setOAuthOutcome, useOAuthOutcome } from './oauthReturn';
 
 // Settings › Integrations (ADR 0027). Two tabs:
 //   external  connect a Space's external services so agents can use them on
@@ -45,6 +47,14 @@ function ExternalServicesPanel() {
   const [filter, setFilter] = useState<CatalogFilter>(EMPTY_FILTER);
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const [opened, setOpened] = useState<Opened>(null);
+  const oauthOutcome = useOAuthOutcome();
+  const oauthReturnName = oauthOutcome?.integrationId ? integrations.find((i) => i.id === oauthOutcome.integrationId)?.name ?? null : null;
+  // A confirmed sign-in changed the row (account, last test): read it again.
+  const queryClient = useQueryClient();
+  const oauthStatus = oauthOutcome?.status ?? null;
+  useEffect(() => {
+    if (oauthStatus === 'ok' || oauthStatus === 'error') void queryClient.invalidateQueries({ queryKey: ['integrations'] });
+  }, [oauthStatus, queryClient]);
 
   const installed = useMemo(() => installedPresetIds(integrations), [integrations]);
   const visible = useMemo(() => filterPresets(INTEGRATION_PRESETS, filter), [filter]);
@@ -81,6 +91,24 @@ function ExternalServicesPanel() {
           </a>
         </Button>
       </div>
+
+      {oauthOutcome && (
+        <div role="status" className={cn('flex items-start justify-between gap-3 rounded-lg border border-border/60 px-3 py-2 text-[12px] text-foreground',
+          oauthOutcome.status === 'ok' ? 'bg-[var(--status-success-subtle)]' : oauthOutcome.status === 'error' ? 'bg-[var(--status-danger-subtle)]' : 'bg-[var(--surface-strong)]')}>
+          <span>
+            {oauthOutcome.status === 'pending'
+              ? t('Finishing Google sign-in…')
+              : oauthOutcome.status === 'ok'
+                ? t('{name} is connected.', { name: oauthReturnName ?? t('Google Drive') })
+                : oauthOutcome.message
+                  ? t(oauthOutcome.message)
+                  : t('Google sign-in did not finish, so nothing was connected. Try again.')}
+          </span>
+          {oauthOutcome.status !== 'pending' && (
+            <Button variant="ghost" size="xs" onClick={() => setOAuthOutcome(null)}>{t('Dismiss')}</Button>
+          )}
+        </div>
+      )}
 
       {ownerRole === false && (
         <p className="text-[12px] text-muted-foreground">{t('Only Space owners can connect or change integrations. You can see what is connected.')}</p>

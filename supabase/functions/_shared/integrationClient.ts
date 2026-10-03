@@ -7,12 +7,19 @@
 //         confined to that base; GET / HEAD are reads, the rest are writes.
 //
 // The secret is passed in by the caller (read from Vault with the service
-// role) and only ever goes into the outgoing request's header. Endpoints are
-// checked before every request: https only, no localhost / private / link-
-// local hosts, and an http_request path can never leave its base URL.
+// role) and only ever goes into the outgoing request's header. An OAuth
+// integration's stored secret is a token set; resolveCredential turns it into
+// a current access token, refreshing it when it is about to expire. Endpoints
+// are checked before every request: https only, no localhost / private /
+// link-local hosts, and an http_request path can never leave its base URL.
+
+import {
+  GOOGLE_TOKEN_URL, isGoogleDriveRow, needsRefresh, parseOAuthSecret, secretFromTokenResponse, sha256Hex,
+} from "./googleOAuth.ts";
 
 export interface IntegrationRow {
   id: string;
+  preset?: string | null;
   kind: "mcp" | "http";
   name: string;
   description: string | null;
@@ -132,11 +139,13 @@ export async function readCapped(res: Response, limit = MAX_BODY_BYTES): Promise
   return new TextDecoder().decode(all);
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
+
+async function fetchWithTimeout(url: string, init: RequestInit, fetchImpl: FetchLike = fetch): Promise<Response> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
   try {
-    return await fetch(url, { ...init, signal: ctl.signal, redirect: "manual" });
+    return await fetchImpl(url, { ...init, signal: ctl.signal, redirect: "manual" });
   } finally {
     clearTimeout(t);
   }
@@ -269,4 +278,94 @@ export async function callHttp(row: IntegrationRow, secret: string | null, input
   const res = await fetchWithTimeout(url, { method, headers, body });
   const text = method === "HEAD" ? "" : await readCapped(res);
   return { text: truncate(`HTTP ${res.status}\n${text}`), isError: !res.ok };
+}
+
+// ── Credentials ────────────────────────────────────────────────────────────
+
+/** The part of a service-role Supabase client resolveCredential uses. */
+export interface CredentialStore {
+  rpc(fn: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string } | null }>;
+  from(table: string): {
+    update(values: Record<string, unknown>): { eq(column: string, value: string): PromiseLike<{ error: { message: string } | null }> };
+  };
+}
+
+export interface OAuthClientConfig {
+  clientId: string;
+  clientSecret: string;
+}
+
+/** The Google OAuth client from the Edge secrets, or null until both are set. */
+export function googleClientFromEnv(get: (key: string) => string | undefined): OAuthClientConfig | null {
+  const clientId = get("GOOGLE_OAUTH_CLIENT_ID")?.trim();
+  const clientSecret = get("GOOGLE_OAUTH_CLIENT_SECRET")?.trim();
+  return clientId && clientSecret ? { clientId, clientSecret } : null;
+}
+
+function envGet(key: string): string | undefined {
+  // deno-lint-ignore no-explicit-any
+  return (globalThis as any).Deno?.env?.get(key);
+}
+
+/**
+ * The credential to send for `row`, given the raw Vault value.
+ *   none / bearer / header   the raw value as stored.
+ *   oauth (google-drive)     the access token, refreshed through Google when
+ *                            it expires within two minutes; the new token set
+ *                            is saved with store_integration_oauth_token,
+ *                            only if the stored refresh token is still the
+ *                            one refreshed (otherwise the result is null).
+ *                            When Google refuses the refresh token
+ *                            (invalid_grant) the row's last_test becomes
+ *                            oauth_expired and the result is null.
+ * Any other OAuth row, a malformed secret or a missing OAuth client gives
+ * null. A refresh that fails for another reason throws.
+ */
+export async function resolveCredential(
+  admin: CredentialStore,
+  row: IntegrationRow,
+  raw: string | null,
+  opts: { client?: OAuthClientConfig | null; fetchImpl?: FetchLike; now?: number } = {},
+): Promise<string | null> {
+  if (row.auth_type !== "oauth") return raw && raw.length > 0 ? raw : null;
+  if (!isGoogleDriveRow(row)) return null;
+  const secret = parseOAuthSecret(raw);
+  if (!secret) return null;
+  const now = opts.now ?? Date.now();
+  if (!needsRefresh(secret, now)) return secret.access_token;
+
+  const client = opts.client !== undefined ? opts.client : googleClientFromEnv(envGet);
+  if (!client) return null;
+  const res = await fetchWithTimeout(GOOGLE_TOKEN_URL, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: secret.refresh_token,
+      client_id: client.clientId,
+      client_secret: client.clientSecret,
+    }).toString(),
+  }, opts.fetchImpl);
+  const text = await readCapped(res, 100_000);
+  let body: Record<string, unknown> = {};
+  try { body = JSON.parse(text); } catch { /* not JSON */ }
+  if (!res.ok) {
+    if (body.error === "invalid_grant") {
+      await admin.from("integrations").update({
+        last_test: { ok: false, at: new Date(now).toISOString(), code: "oauth_expired", detail: "" },
+      }).eq("id", row.id);
+      return null;
+    }
+    throw new Error(`Google token refresh failed: HTTP ${res.status}${typeof body.error === "string" ? ` ${body.error.slice(0, 60)}` : ""}`);
+  }
+  const next = secretFromTokenResponse(body, now, secret);
+  if (!next) throw new Error("Google token refresh returned no access token");
+  // Written only over the token set this refresh started from: a reconnect
+  // (perhaps with another account) or a revoke in the meantime wins, and this
+  // run gets no token rather than one for a connection that has changed.
+  const { data: written, error } = await admin.rpc("store_integration_oauth_token", {
+    p_integration_id: row.id, p_secret: JSON.stringify(next), p_expected_refresh_hash: await sha256Hex(secret.refresh_token),
+  });
+  if (error) throw new Error("could not save the refreshed token");
+  return written === false ? null : next.access_token;
 }
