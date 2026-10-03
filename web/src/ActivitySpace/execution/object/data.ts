@@ -16,6 +16,7 @@ const UNLINK_REFUSED = 'Only owners or admins of this Object or of the Domain ca
 const CREATE_CLEANUP_FAILED = 'The Object was created but could not be filed under every chosen Domain, and it could not be removed. Delete it, or ask an owner or admin of those Domains to file it.';
 const MOVE_NEEDS_MEMBERSHIP = 'You need to be a member of this Object to move it.';
 const CREATE_REFUSED = 'You can create an Object only in a Domain you can see.';
+const DOMAIN_REQUIRED = 'Choose a Domain for this Object.';
 
 // ============================================
 // Object CRUD
@@ -67,6 +68,10 @@ export async function createObject(obj: {
   lead_id?: string | null;
   due_date?: string | null;
 }): Promise<AlconObject> {
+  // An Object always sits in a Domain (Domain → Object → Element).
+  const primaryDomainId = obj.domain_id ?? obj.domain_ids?.[0] ?? null;
+  if (!primaryDomainId) throw new Error(translate(DOMAIN_REQUIRED));
+
   // Top-level only — pick the next order_index across the whole table.
   const { data: existing } = await supabase
     .from('objects')
@@ -84,14 +89,14 @@ export async function createObject(obj: {
   // leave prefix off and let the trigger decide.
   const prefixScope = Array.from(new Set([
     ...(obj.domain_ids ?? []),
-    ...(obj.domain_id ? [obj.domain_id] : []),
+    primaryDomainId,
   ].filter(Boolean)));
   const prefix = await suggestPrefixForDomains(obj.name, prefixScope);
 
   // Insert without RETURNING, then read the row back by an id chosen here.
   // RETURNING is checked against the objects SELECT policy before the AFTER
-  // INSERT trigger enrols the creator as owner, so a Domain-less Object would
-  // be refused as invisible (42501) even though the insert itself is allowed.
+  // INSERT trigger enrols the creator as owner, so an Object in a private
+  // Domain the caller sees only through that Object would be refused (42501).
   // The creator (objects.user_id) and the owner row are written by the
   // database (objects_stamp_creator / objects_enrol_creator).
   const id = crypto.randomUUID();
@@ -103,13 +108,13 @@ export async function createObject(obj: {
       color: obj.color || null,
       description: obj.description || null,
       order_index: obj.order_index ?? maxOrder + 1,
-      domain_id: obj.domain_id ?? null,
+      domain_id: primaryDomainId,
       ...(obj.type !== undefined ? { type: obj.type } : {}),
       ...(obj.lead_id !== undefined ? { lead_id: obj.lead_id } : {}),
       ...(obj.due_date !== undefined ? { due_date: obj.due_date } : {}),
       ...(prefix ? { prefix } : {}),
     });
-  // Objects are created only in a Domain the caller can see, or with none.
+  // Objects are created only in a Domain the caller can see.
   if (insertError?.code === '42501') throw new Error(translate(CREATE_REFUSED));
   if (insertError) throw insertError;
 
@@ -119,7 +124,7 @@ export async function createObject(obj: {
   // Write to object_domains junction table for domain multi-homing
   const domainIds = obj.domain_ids && obj.domain_ids.length > 0
     ? obj.domain_ids
-    : obj.domain_id ? [obj.domain_id] : [];
+    : [primaryDomainId];
   if (domainIds.length > 0) {
     // Filing under a Domain other than the primary needs an owner/admin of
     // that Domain (object_domains_insert). On a refusal, take the new Object

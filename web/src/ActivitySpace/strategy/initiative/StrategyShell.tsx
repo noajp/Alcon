@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/ui/button';
+import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
@@ -687,6 +688,7 @@ function StrategyDetailView({
       closePicker();
     } catch (e) {
       console.error('create Object failed:', e);
+      void appDialog.alert(e instanceof Error ? e.message : String(e));
     } finally {
       setCreatingObject(false);
     }

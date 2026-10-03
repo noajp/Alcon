@@ -3,6 +3,7 @@ import type { Locale } from './locales';
 type TranslationMap = Record<string, string>;
 
 const ja: TranslationMap = {
+  'Choose a Domain for this Object.': 'この Object を置く Domain を選んでください。',
   'Ask the agent': 'エージェントに頼む',
   'Leave a comment… @AI asks the agent': 'コメントを書く… @AI でエージェントに頼めます',
   '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '{n} 人の担当者は追加しませんでした（inactive か、この Element を見られない人です）。',
@@ -58,6 +59,7 @@ const ja: TranslationMap = {
 };
 
 const ko: TranslationMap = {
+  'Choose a Domain for this Object.': '이 Object를 둘 Domain을 선택하세요.',
   'Ask the agent': '에이전트에게 요청',
   'Leave a comment… @AI asks the agent': '댓글 남기기… @AI로 에이전트에게 요청할 수 있습니다',
   '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '담당자 {n}명은 추가하지 않았습니다(비활성이거나 이 Element를 볼 수 없는 사람입니다).',
@@ -133,6 +135,7 @@ const ko: TranslationMap = {
 };
 
 const fr: TranslationMap = {
+  'Choose a Domain for this Object.': 'Choisissez un Domain pour cet Object.',
   'Ask the agent': 'Demander à l’agent',
   'Leave a comment… @AI asks the agent': 'Laisser un commentaire… @AI pour demander à l’agent',
   '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '{n} responsable(s) non ajouté(s) : inactif(s) ou sans accès à cet Element.',
@@ -209,6 +212,7 @@ const fr: TranslationMap = {
 };
 
 const es: TranslationMap = {
+  'Choose a Domain for this Object.': 'Elige un Domain para este Object.',
   'Ask the agent': 'Pedir al agente',
   'Leave a comment… @AI asks the agent': 'Deja un comentario… @AI para pedírselo al agente',
   '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '{n} responsable(s) no se añadieron: están inactivos o no pueden ver este Element.',
