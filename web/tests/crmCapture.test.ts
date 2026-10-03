@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { OPERATIONS_FIELDS } from '@/ActivitySpace/sustainment/operations/operationsModel';
 import { buildCrmWorkspace, DEFAULT_CRM_STAGES } from '@/ActivitySpace/sustainment/crm/crmModel';
 import {
-  captureChanges, extractJson, findDates, parseAiCapture, parseAmount, readCapture,
+  captureChanges, extractJson, findDates, parseAiCapture, parseAmount, readCapture, reviewRows, reviewValues,
 } from '@/ActivitySpace/sustainment/crm/crmCapture';
 
 const today = '2026-10-03'; // a Saturday
@@ -35,6 +35,7 @@ describe('dates', () => {
     expect(findDates('tomorrow', today)[0].date).toBe('2026-10-04');
     expect(findDates('demo on Tuesday', today)[0].date).toBe('2026-10-06');
     expect(findDates('1/15 kickoff', today)[0].date).toBe('2027-01-15');
+    expect(findDates('visited 10/1', today)[0].date).toBe('2026-10-01');
   });
 });
 
@@ -55,8 +56,25 @@ describe('local capture', () => {
     expect(proposal.activity.type).toBe('meeting');
   });
 
-  it('marks a deal won', () => {
-    expect(readCapture('Acme rollout signed today!', today, deals, DEFAULT_CRM_STAGES).fields.stage).toBe('won');
+  it('marks a deal won only on an unambiguous outcome', () => {
+    expect(readCapture('Acme rollout: contract signed today!', today, deals, DEFAULT_CRM_STAGES).fields.stage).toBe('won');
+    expect(readCapture('Acme rollout: NDA signed', today, deals, DEFAULT_CRM_STAGES).fields.stage).toBeUndefined();
+    expect(readCapture('Acme 受注確度は60%', today, deals, DEFAULT_CRM_STAGES).fields).toMatchObject({ probability: 60 });
+    expect(readCapture('Acme 受注確度は60%', today, deals, DEFAULT_CRM_STAGES).fields.stage).toBeUndefined();
+  });
+
+  it('does not invent dates, likelihoods or deals from ordinary words', () => {
+    const quiet = readCapture('We sat down with the CFO about Globex', today, [...deals, { ...deals[0], id: 'it', name: 'IT refresh', account: 'IT' }], DEFAULT_CRM_STAGES);
+    expect(quiet.dealId).toBeNull();
+    expect(quiet.fields.nextActionDate).toBeUndefined();
+    expect(readCapture('Acme: 10%値引きを依頼された', today, deals, DEFAULT_CRM_STAGES).fields.probability).toBeUndefined();
+    expect(readCapture('Acme 10/1に訪問しました', today, deals, DEFAULT_CRM_STAGES).fields.nextActionDate).toBeUndefined();
+    expect(readCapture('Acme社と打ち合わせ', today, deals, DEFAULT_CRM_STAGES).dealId).toBe('acme');
+  });
+
+  it('reads amounts after a colon and the top of a range', () => {
+    expect(parseAmount('Budget:$50k')).toEqual({ amount: 50_000, currency: 'USD' });
+    expect(parseAmount('予算50-60万円')).toEqual({ amount: 600_000, currency: 'JPY' });
   });
 });
 
@@ -79,5 +97,23 @@ describe('AI capture', () => {
   it('lists only real changes for review', () => {
     const proposal = parseAiCapture(JSON.stringify({ dealId: 'acme', fields: { amount: 1000, probability: 60, name: 'Renamed' } }), 'x', deals, DEFAULT_CRM_STAGES)!;
     expect(captureChanges(proposal, deals[0])).toEqual([{ key: 'probability', from: 50, to: 60 }]);
+  });
+});
+
+describe('capture review', () => {
+  const options = { primaryCurrency: 'USD', fallbackName: 'New deal', hasField: () => true };
+  it('shows a stage move\'s implied likelihood and leaves closing a deal unticked', () => {
+    const rows = reviewRows({ dealId: 'acme', fields: { stage: 'won' }, activity: { type: 'note', text: '' }, source: 'local' }, deals[0], DEFAULT_CRM_STAGES, options);
+    expect(rows).toEqual([
+      { key: 'stage', from: 'proposal', to: 'won', optIn: true },
+      { key: 'probability', from: 50, to: 100, impliedBy: 'stage' },
+    ]);
+    const untouched = (row: { optIn?: boolean }) => !row.optIn;
+    expect(reviewValues(rows, untouched)).toEqual({});
+    expect(reviewValues(rows, () => true)).toEqual({ stage: 'won', probability: 100 });
+  });
+  it('lists a new deal\'s defaults', () => {
+    const rows = reviewRows({ dealId: null, fields: { name: 'Gamma', amount: 5 }, activity: { type: 'note', text: '' }, source: 'local' }, null, DEFAULT_CRM_STAGES, options);
+    expect(reviewValues(rows, row => !row.optIn)).toEqual({ name: 'Gamma', amount: 5, stage: 'lead', currency: 'USD', probability: 10 });
   });
 });

@@ -8,6 +8,7 @@ import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { useOperationsTables } from '@/hooks/useOperationsTemplate';
 import { useWidgetTableData } from '@/hooks/useWidgetTableData';
 import { addDataTableColumns } from '@/ActivitySpace/sustainment/table/data';
+import { supabase } from '@/lib/supabase';
 import type { Json } from '@/types/database';
 import { normalizeOperationsParams, OPERATIONS_FIELDS, type OperationsParams } from '@/ActivitySpace/sustainment/operations/operationsModel';
 import { appendActivity, buildCrmWorkspace, normalizeCrmStages, type CrmActivity, type CrmDeal, type CrmStage } from './crmModel';
@@ -64,15 +65,25 @@ export function useCrm({ restore = false }: { restore?: boolean } = {}) {
       const column = columnFor(key);
       if (column && value !== undefined) cells[column] = value;
     }
-    const id = dealId ?? (await source.createRow()).id;
-    await source.setCells(id, cells);
+    if (dealId) { await source.setCells(dealId, cells); return dealId; }
+    // A new deal is a row plus its cells; if the cells fail, do not leave an empty "Row N" behind.
+    const { id } = await source.createRow();
+    try { await source.setCells(id, cells); }
+    catch (cause) { await source.deleteRow(id).catch(() => {}); throw cause; }
     return id;
   }, [columnFor, source]);
 
   /** Logs a touchpoint. A call, email or meeting also becomes the last contact. */
   const logActivity = useCallback(async (deal: CrmDeal, entry: CrmActivity, extra: CrmValues = {}) => {
     const values: CrmValues = { ...extra };
-    if (columnFor('activity')) values.activity = appendActivity(deal.activityRaw, entry);
+    const column = columnFor('activity');
+    if (column) {
+      // Append to the log as stored now, not as this screen last loaded it, so
+      // a line a teammate or the Table app just added is kept.
+      const { data: current, error } = await supabase.from('table_cells').select('value').eq('row_id', deal.id).eq('column_id', column).maybeSingle();
+      if (error) throw error;
+      values.activity = appendActivity(current ? current.value : deal.activityRaw, entry);
+    }
     if (entry.type !== 'note' && entry.date && entry.date <= today && (!deal.lastContact || entry.date > deal.lastContact)) values.lastContact = entry.date;
     await saveDeal(deal.id, values);
   }, [columnFor, saveDeal, today]);

@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dial
 import { DateField } from '@/Function/shared/date';
 import { useEscapeLayer } from '@/Function/shared/keyboard/useEscapeLayer';
 import { CrmIcon } from '@/Function/shared/conceptIcons';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { NavigationState } from '@/types/navigation';
 import { inList, searchDeals, type CrmList } from './crmModel';
@@ -89,6 +90,12 @@ interface SurfaceProps {
 }
 
 export function CrmView(props: SurfaceProps) {
+  // One mount per Space: the planner placement, and whether it was restored, belong to it.
+  const spaceId = useActiveSpaceId();
+  return <CrmMount key={spaceId ?? 'me'} {...props} />;
+}
+
+function CrmMount(props: SurfaceProps) {
   const crm = useCrm({ restore: true });
   return <CrmSurface crm={crm} {...props} />;
 }
@@ -116,7 +123,12 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange }: SurfaceProps 
   }, [workspace, route.query, route.stage, route.list, route.account]);
 
   const selected = workspace && route.dealId ? workspace.deals.find(deal => deal.id === route.dealId) ?? null : null;
-  useEscapeLayer(!!selected && capture === undefined && !creating, () => go({ dealId: null }));
+  // Escape closes the panel, except while typing in one of its fields — a draft is not thrown away.
+  useEscapeLayer(!!selected && capture === undefined && !creating, () => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && (active.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName))) return;
+    go({ dealId: null });
+  });
   const openDeal = (dealId: string) => go({ dealId });
   const openTable = crm.data && onViewChange ? () => { onViewChange('tables'); onNavigate({ tableId: crm.data!.table.id }); } : undefined;
 

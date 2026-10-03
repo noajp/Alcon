@@ -1,26 +1,55 @@
 'use client';
 
-// The CRM's AI reads through the deployed alcon-copilot function under the
-// caller's own session, so it can see only what the person can see. Every
-// answer is a proposal: callers validate it and the person applies it.
+// The CRM's AI runs through alcon-copilot in its tool-free JSON mode, under
+// the caller's own session. Pasted customer text is untrusted: it is sent only
+// after the server confirms that mode exists, so nothing in an email can make
+// the model touch the board. Every answer is a proposal the person applies.
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { extractJson, captureInstruction, parseAiCapture, type CaptureProposal } from './crmCapture';
 import type { CrmDeal, CrmStage } from './crmModel';
 
-async function askCopilot(prompt: string, signal?: AbortSignal): Promise<string> {
+async function request(body: object, signal?: AbortSignal): Promise<Response> {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   if (!base) throw new Error('AI is not configured for this workspace.');
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) throw new Error('Sign in to use AI.');
-  const response = await fetch(`${base.replace(/\/$/, '')}/functions/v1/alcon-copilot`, {
+  return fetch(`${base.replace(/\/$/, '')}/functions/v1/alcon-copilot`, {
     method: 'POST', signal,
     headers: {
       Authorization: `Bearer ${session.access_token}`,
       apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
       'Content-Type': 'application/json', Accept: 'text/event-stream',
     },
-    body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], context: { viewLabel: 'CRM' } }),
+    body: JSON.stringify(body),
   });
+}
+
+let probe: Promise<boolean> | null = null;
+/** Whether the deployed function offers the tool-free mode. The probe runs no
+ * model; an older deployment rejects it, and AI stays off until it is updated. */
+function jsonModeAvailable(): Promise<boolean> {
+  probe ??= request({ mode: 'probe', messages: [] })
+    .then(async response => response.ok && ((await response.json()) as { modes?: string[] }).modes?.includes('json') === true)
+    .catch(() => false)
+    .then(ok => { if (!ok) probe = null; return ok; });
+  return probe;
+}
+
+export type AiState = 'checking' | 'ready' | 'unavailable';
+export function useCrmAi(): AiState {
+  const [state, setState] = useState<AiState>('checking');
+  useEffect(() => {
+    let live = true;
+    void jsonModeAvailable().then(ok => { if (live) setState(ok ? 'ready' : 'unavailable'); });
+    return () => { live = false; };
+  }, []);
+  return state;
+}
+
+async function askCopilot(prompt: string, signal?: AbortSignal): Promise<string> {
+  if (!(await jsonModeAvailable())) throw new Error('AI needs the updated alcon-copilot function. The quick reading still works.');
+  const response = await request({ mode: 'json', messages: [{ role: 'user', content: prompt }], context: { viewLabel: 'CRM' } }, signal);
   if (!response.ok || !response.body) throw new Error((await response.text().catch(() => '')) || `AI request failed (${response.status}).`);
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -38,6 +67,9 @@ async function askCopilot(prompt: string, signal?: AbortSignal): Promise<string>
       const data = /^data: (.+)$/m.exec(raw)?.[1];
       if (!event || !data) continue;
       const payload = JSON.parse(data) as { delta?: string; error?: string };
+      // Defence in depth: this request offers no tools, so a tool call means
+      // the server is not honouring the mode. Stop reading and refuse the answer.
+      if (event === 'tool_use') { await reader.cancel(); throw new Error('AI tried to use a tool; the answer was discarded.'); }
       if (event === 'text' && payload.delta) reply += payload.delta;
       if (event === 'error') throw new Error(payload.error ?? 'AI request failed.');
     }

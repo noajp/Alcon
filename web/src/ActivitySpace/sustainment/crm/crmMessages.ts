@@ -4,6 +4,12 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const CRM_MESSAGES: Record<string, Row> = {
+  'AI is not configured for this workspace.': ['このワークスペースでは AI が設定されていません。', '이 워크스페이스에는 AI가 설정되어 있지 않습니다.', 'L’IA n’est pas configurée pour cet espace.', 'La IA no está configurada en este espacio.'],
+  'Sign in to use AI.': ['AI を使うにはサインインしてください。', 'AI를 사용하려면 로그인하세요.', 'Connectez-vous pour utiliser l’IA.', 'Inicia sesión para usar la IA.'],
+  'AI needs the updated alcon-copilot function. The quick reading still works.': ['AI には更新した alcon-copilot 関数が必要です。クイック読み取りは使えます。', 'AI에는 업데이트된 alcon-copilot 함수가 필요합니다. 빠른 읽기는 사용할 수 있습니다.', 'L’IA nécessite la fonction alcon-copilot mise à jour. La lecture rapide fonctionne toujours.', 'La IA necesita la función alcon-copilot actualizada. La lectura rápida sigue funcionando.'],
+  'AI tried to use a tool; the answer was discarded.': ['AI がツールを使おうとしたため、回答を破棄しました。', 'AI가 도구를 사용하려 해서 답변을 폐기했습니다.', 'L’IA a tenté d’utiliser un outil ; la réponse a été ignorée.', 'La IA intentó usar una herramienta; se descartó la respuesta.'],
+  'The AI reply could not be read. Try again.': ['AI の回答を読み取れませんでした。もう一度お試しください。', 'AI 답변을 읽지 못했습니다. 다시 시도하세요.', 'Impossible de lire la réponse de l’IA. Réessayez.', 'No se pudo leer la respuesta de la IA. Inténtalo de nuevo.'],
+  'The AI reply could not be read. The local reading is shown instead.': ['AI の回答を読み取れなかったため、クイック読み取りの結果を表示しています。', 'AI 답변을 읽지 못해 빠른 읽기 결과를 표시합니다.', 'Impossible de lire la réponse de l’IA ; la lecture rapide est affichée.', 'No se pudo leer la respuesta de la IA; se muestra la lectura rápida.'],
   '+3 days': ['3日後', '3일 후', '+3 jours', '+3 días'],
   'AI assist': ['AI アシスト', 'AI 지원', 'Assistance IA', 'Asistencia de IA'],
   'AI is reading…': ['AI が読み取り中…', 'AI가 읽는 중…', 'L’IA lit…', 'La IA está leyendo…'],
@@ -39,7 +45,9 @@ const CRM_MESSAGES: Record<string, Row> = {
   'Clear filter {name}': ['絞り込みを解除: {name}', '필터 해제: {name}', 'Effacer le filtre {name}', 'Quitar filtro {name}'],
   'Close date': ['成約予定日', '예상 성사일', 'Date de clôture', 'Fecha de cierre'],
   'Close date {date} has passed': ['成約予定日 {date} を過ぎています', '예상 성사일 {date}이(가) 지났습니다', 'La date de clôture {date} est dépassée', 'La fecha de cierre {date} ya pasó'],
-  'Close deal': ['商談を閉じる', '거래 닫기', 'Fermer l’affaire', 'Cerrar el negocio'],
+  'Close panel': ['パネルを閉じる', '패널 닫기', 'Fermer le panneau', 'Cerrar el panel'],
+  'AI drafting turns on once the updated alcon-copilot function is deployed.': ['AI の下書きは、更新した alcon-copilot 関数のデプロイ後に使えます。', 'AI 초안은 업데이트된 alcon-copilot 함수가 배포된 후 사용할 수 있습니다.', 'La rédaction par IA s’active une fois la fonction alcon-copilot mise à jour déployée.', 'La redacción con IA se activa cuando se despliega la función alcon-copilot actualizada.'],
+  'from the stage': ['ステージから', '단계 기준', 'selon l’étape', 'según la etapa'],
   'Closed': ['終了', '종료', 'Clôturée', 'Cerrado'],
   'Closes {date} — secure the decision': ['{date} 成約予定 — 決裁を確実にする', '{date} 성사 예정 — 결정을 확보하세요', 'Clôture le {date} — sécurisez la décision', 'Cierra el {date} — asegura la decisión'],
   'Closing in the next {n} days': ['今後 {n} 日で成約予定', '향후 {n}일 내 성사 예정', 'Clôture dans les {n} prochains jours', 'Cierre en los próximos {n} días'],

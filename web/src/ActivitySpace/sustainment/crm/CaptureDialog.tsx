@@ -9,9 +9,9 @@ import { MenuShell, MENU_ROW } from '@/Function/shared/menu';
 import { Textarea } from '@/ui/textarea';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { Json } from '@/types/database';
-import { ACTIVITY_TYPES, formatActivity, resolveStage, stageChange, type CrmActivityType } from './crmModel';
-import { captureChanges, readCapture, type CaptureFields, type CaptureProposal } from './crmCapture';
-import { aiCapture } from './crmAi';
+import { ACTIVITY_TYPES, formatActivity, resolveStage, type CrmActivityType } from './crmModel';
+import { readCapture, reviewRows, reviewValues, type CaptureFields, type CaptureProposal, type ReviewRow } from './crmCapture';
+import { aiCapture, useCrmAi } from './crmAi';
 import { money } from './crmFormat';
 import type { Crm } from './useCrm';
 
@@ -33,11 +33,13 @@ export function CrmCapture({ crm, initialDealId, onClose, onApplied }: {
   const [reading, setReading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [target, setTarget] = useState<string | null | undefined>(initialDealId ?? undefined); // undefined = follow the reading
-  const [skipped, setSkipped] = useState<Set<string>>(new Set());
+  // Rows whose default (ticked, or opt-in for closing a deal) the person flipped.
+  const [toggled, setToggled] = useState<Set<string>>(new Set());
   const [activityType, setActivityType] = useState<CrmActivityType | null>(null);
   const [logActivity, setLogActivity] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const aiState = useCrmAi();
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
 
@@ -46,8 +48,10 @@ export function CrmCapture({ crm, initialDealId, onClose, onApplied }: {
   const proposal = ai && aiFor === input ? ai : local;
   const dealId = target !== undefined ? target : proposal?.dealId ?? null;
   const deal = dealId ? workspace.deals.find(item => item.id === dealId) ?? null : null;
-  const changes = proposal ? captureChanges({ ...proposal, fields: { ...proposal.fields, ...(deal ? {} : { name: proposal.fields.name }) } }, deal)
-    .filter(change => crm.hasField(change.key) || change.key === 'stage') : [];
+  const changes = proposal ? reviewRows(proposal, deal, workspace.stages, { primaryCurrency: workspace.primaryCurrency, fallbackName: t('New deal'), hasField: crm.hasField }) : [];
+  const checked = (row: ReviewRow) => !row.optIn !== toggled.has(row.key);
+  const willLog = logActivity && crm.hasField('activity');
+  const canApply = !!proposal && !saving && (changes.some(checked) || willLog);
   const type = activityType ?? proposal?.activity.type ?? 'note';
 
   async function readWithAi() {
@@ -59,32 +63,19 @@ export function CrmCapture({ crm, initialDealId, onClose, onApplied }: {
     const text = input;
     try {
       const result = await aiCapture(text, workspace.today, workspace.deals, workspace.stages, controller.signal);
-      setAi(result); setAiFor(text); setSkipped(new Set());
+      setAi(result); setAiFor(text); setToggled(new Set());
     } catch (cause) {
       if (!controller.signal.aborted) setAiError(cause instanceof Error ? cause.message : t('AI is unavailable right now.'));
     } finally { if (abort.current === controller) setReading(false); }
   }
 
   async function apply() {
-    if (!proposal || saving) return;
+    if (!proposal || !canApply) return;
     setSaving(true); setError(null);
     try {
-      const values: Record<string, Json | null> = {};
-      for (const change of changes) if (!skipped.has(change.key)) values[change.key] = change.to;
-      if (typeof values.stage === 'string') {
-        const stage = resolveStage(values.stage, workspace.stages)!;
-        const moved = stageChange(deal ?? { probability: null, stage: null }, stage);
-        values.stage = moved.stage;
-        if (values.probability === undefined) values.probability = moved.probability;
-      }
-      if (!deal) {
-        // A new deal starts in the first stage at that stage's likelihood unless the note said otherwise.
-        const first = workspace.stages[0];
-        values.name ??= proposal.fields.name ?? t('New deal');
-        if (values.stage === undefined && first) { values.stage = first.id; values.probability ??= first.probability; }
-        if (values.currency === undefined && workspace.primaryCurrency) values.currency = workspace.primaryCurrency;
-      }
-      if (logActivity && crm.hasField('activity')) {
+      const values: Record<string, Json | null> = reviewValues(changes, checked);
+      if (!deal) values.name ??= proposal.fields.name ?? t('New deal');
+      if (willLog) {
         const entry = { date: workspace.today, type, text: proposal.summary ? `${proposal.summary} — ${input.trim()}` : input.trim() };
         if (deal) { await crm.logActivity(deal, entry, values); onApplied(deal.id); return; }
         values.activity = formatActivity(entry);
@@ -113,7 +104,7 @@ export function CrmCapture({ crm, initialDealId, onClose, onApplied }: {
       <Textarea autoFocus rows={5} aria-label={t('Capture notes')} value={input} disabled={saving}
         placeholder={t('e.g. Call with Acme — budget ¥1.2M, 70% likely, contract by end of month. Next: send revised quote Tuesday.')}
         onChange={event => setInput(event.target.value)}
-        onKeyDown={event => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void (proposal ? apply() : readWithAi()); } }} />
+        onKeyDown={event => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); if (canApply) void apply(); } }} />
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
         {proposal && <>
@@ -137,9 +128,9 @@ export function CrmCapture({ crm, initialDealId, onClose, onApplied }: {
           {proposal.summary && <p className="text-sm">{proposal.summary}</p>}
           {changes.length > 0 ? <ul className="divide-y divide-[var(--border-subtle)] text-sm" aria-label={t('Changes')}>
             {changes.map(change => <li key={change.key} className="flex items-center gap-3 py-2">
-              <input type="checkbox" aria-label={t('Apply {field}', { field: t(FIELD_LABEL[change.key]) })} checked={!skipped.has(change.key)} disabled={saving}
-                onChange={event => setSkipped(current => { const next = new Set(current); if (event.target.checked) next.delete(change.key); else next.add(change.key); return next; })} />
-              <span className="w-36 shrink-0 text-xs text-muted-foreground">{t(FIELD_LABEL[change.key])}</span>
+              <input type="checkbox" aria-label={t('Apply {field}', { field: t(FIELD_LABEL[change.key]) })} checked={checked(change)} disabled={saving}
+                onChange={() => setToggled(current => { const next = new Set(current); if (next.has(change.key)) next.delete(change.key); else next.add(change.key); return next; })} />
+              <span className="w-36 shrink-0 text-xs text-muted-foreground">{t(FIELD_LABEL[change.key])}{change.impliedBy && <span className="block">{t('from the stage')}</span>}</span>
               <span className="min-w-0 flex-1 truncate">{deal && <><span className="text-muted-foreground line-through">{display(change.key, change.from, 'from')}</span><span className="px-1.5 text-muted-foreground">→</span></>}<span className="font-medium">{display(change.key, change.to, 'to')}</span></span>
             </li>)}
           </ul> : <p className="text-sm text-muted-foreground">{t('No field changes found. The note can still be logged as activity.')}</p>}
@@ -148,15 +139,15 @@ export function CrmCapture({ crm, initialDealId, onClose, onApplied }: {
             {ACTIVITY_TYPES.map(item => <Button key={item} shape="tab" size="xs" variant={type === item ? 'secondary' : 'ghost'} aria-pressed={type === item} disabled={!logActivity || saving} onClick={() => setActivityType(item)}>{t(ACTIVITY_LABEL[item])}</Button>)}
           </div>}
         </>}
-        {aiError && <p role="alert" className="text-xs text-[var(--status-danger)]">{aiError}</p>}
+        {aiError && <p role="alert" className="text-xs text-[var(--status-danger)]">{t(aiError)}</p>}
         {error && <p role="alert" className="text-sm text-[var(--status-danger)]">{error}</p>}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-auto text-xs text-muted-foreground">{t('⌘↵ to apply')}</span>
         <Button variant="ghost" disabled={saving} onClick={onClose}>{t('Cancel')}</Button>
-        <Button variant="ghost" disabled={!input.trim() || reading || saving || (ai !== null && aiFor === input)} onClick={() => void readWithAi()}>{reading ? t('Reading…') : t('Read with AI')}</Button>
-        <Button variant="primary" disabled={!proposal || saving || (!changes.some(change => !skipped.has(change.key)) && !(logActivity && crm.hasField('activity')))} onClick={() => void apply()}>
+        <Button variant="ghost" disabled={aiState !== 'ready' || !input.trim() || reading || saving || (ai !== null && aiFor === input)} title={aiState === 'unavailable' ? t('AI drafting turns on once the updated alcon-copilot function is deployed.') : undefined} onClick={() => void readWithAi()}>{reading ? t('Reading…') : t('Read with AI')}</Button>
+        <Button variant="primary" disabled={!canApply} onClick={() => void apply()}>
           {saving ? t('Saving…') : deal ? t('Update deal') : t('Create deal')}
         </Button>
       </div>

@@ -10,7 +10,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { OperationsAction } from '@/ActivitySpace/sustainment/operations/OperationsAction';
 import type { Json } from '@/types/database';
 import { ACTIVITY_TYPES, LOST_STAGE, shiftDate, stageChange, WON_STAGE, type CrmActivityType, type CrmDeal, type CrmStage } from './crmModel';
-import { aiBrief, aiEmail, type DealBrief, type DealEmail } from './crmAi';
+import { aiBrief, aiEmail, useCrmAi, type DealBrief, type DealEmail } from './crmAi';
 import { HealthBadge, money, relativeDay } from './crmFormat';
 import type { Crm } from './useCrm';
 
@@ -60,6 +60,7 @@ export function CrmDealPanel({ crm, deal, onClose, onOpenTable, onCapture }: {
   const [emailIntent, setEmailIntent] = useState('');
   const [ai, setAi] = useState<'brief' | 'email' | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  const aiState = useCrmAi();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [createdElement, setCreatedElement] = useState<string>();
   const abort = useRef<AbortController | null>(null);
@@ -110,7 +111,7 @@ export function CrmDealPanel({ crm, deal, onClose, onOpenTable, onCapture }: {
           <HealthBadge level={deal.health.level} score={deal.health.score} t={t} />
         </div>
       </div>
-      <Button variant="ghost" size="icon-sm" aria-label={t('Close deal')} onClick={onClose}><X size={14} /></Button>
+      <Button variant="ghost" size="icon-sm" aria-label={t('Close panel')} onClick={onClose}><X size={14} /></Button>
     </div>
 
     <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 pb-6">
@@ -156,11 +157,12 @@ export function CrmDealPanel({ crm, deal, onClose, onOpenTable, onCapture }: {
       <section aria-label={t('AI assist')} className="space-y-3">
         <h3 className="text-xs font-medium text-muted-foreground">{t('AI assist')}</h3>
         <div className="flex flex-wrap gap-1">
-          <Button size="xs" variant="ghost" disabled={ai !== null} onClick={() => void askAi('brief')}>{ai === 'brief' ? t('Reading the deal…') : t('Brief me')}</Button>
-          <Button size="xs" variant="ghost" disabled={ai !== null} onClick={() => void askAi('email')}>{ai === 'email' ? t('Drafting…') : t('Draft follow-up email')}</Button>
+          <Button size="xs" variant="ghost" disabled={ai !== null || aiState !== 'ready'} onClick={() => void askAi('brief')}>{ai === 'brief' ? t('Reading the deal…') : t('Brief me')}</Button>
+          <Button size="xs" variant="ghost" disabled={ai !== null || aiState !== 'ready'} onClick={() => void askAi('email')}>{ai === 'email' ? t('Drafting…') : t('Draft follow-up email')}</Button>
           <Button size="xs" variant="ghost" onClick={() => onCapture(deal.id)}>{t('Update from notes')}</Button>
         </div>
-        {aiError && <p role="alert" className="text-xs text-[var(--status-danger)]">{aiError}</p>}
+        {aiState === 'unavailable' && <p className="text-xs text-muted-foreground">{t('AI drafting turns on once the updated alcon-copilot function is deployed.')}</p>}
+        {aiError && <p role="alert" className="text-xs text-[var(--status-danger)]">{t(aiError)}</p>}
         {brief && <div className="space-y-2 text-[13px] leading-relaxed">
           <p>{brief.summary}</p>
           {brief.nextStep && <div className="flex flex-wrap items-center gap-2"><span className="font-medium">{t('Recommended')}:</span><span>{brief.nextStep}</span>

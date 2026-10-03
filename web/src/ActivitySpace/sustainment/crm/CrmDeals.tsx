@@ -54,7 +54,7 @@ export function CrmDeals({ deals, today, onOpen, selectedId, emptyLabel }: {
         </tr></thead>
         <tbody>{sorted.slice(0, limit).map(deal => {
           const late = deal.outcome === 'open' && deal.nextActionDate && deal.nextActionDate < today;
-          return <tr key={deal.id} onClick={() => onOpen(deal.id)} aria-selected={deal.id === selectedId}
+          return <tr key={deal.id} onClick={() => onOpen(deal.id)} aria-current={deal.id === selectedId ? 'true' : undefined}
             className={`cursor-pointer border-t border-[var(--border-subtle)] hover:bg-muted/30 ${deal.id === selectedId ? 'bg-muted/40' : ''}`}>
             <td className="max-w-72 py-2 pr-2">
               <button type="button" className="block max-w-full truncate rounded-sm text-left font-medium" onClick={event => { event.stopPropagation(); onOpen(deal.id); }}>{deal.name}</button>
