@@ -18,7 +18,7 @@ const TOOLTIP = { background: 'var(--popover)', border: '1px solid var(--border)
 /** One item at one location: where its stock is heading, why the plan says what it says. */
 export function ScmItemDetail({ node, onBack }: { node: ScmNode; onBack: () => void }) {
   const { t, locale } = useI18n();
-  const { plan, data, openNode, openOrder, openDialog, askCopilot, locationName, supplierName } = useScmSurface();
+  const { plan, data, go, openNode, openOrder, openDialog, askCopilot, locationName, supplierName } = useScmSurface();
   const item = data.items.find(entry => entry.id === node.itemId) ?? null;
   const siblings = plan.nodes.filter(entry => entry.itemId === node.itemId);
   const q = (value: number | null, digits = 1) => formatQuantity(value, locale, digits);
@@ -130,7 +130,7 @@ export function ScmItemDetail({ node, onBack }: { node: ScmNode; onBack: () => v
       </Section>
     </div>
 
-    <Section title={t('Orders')}>
+    <Section title={t('Orders')} action={<Button size="sm" variant="ghost" onClick={() => go('ledger', { scmLedgerItemId: node.itemId })}>{t('Stock ledger')}</Button>}>
       {orders.length ? <ul className="divide-y divide-[var(--border-subtle)]">{orders.map(order => {
         const line = order.lines.find(entry => entry.itemId === node.itemId)!;
         const overdue = ['approved', 'sent', 'partial'].includes(order.status) && order.expectedOn < data.today;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ComponentType } from 'react';
-import { AlertTriangle, Bot, Boxes, FlaskConical, LayoutDashboard, MapPin, Search, Settings2, ShoppingCart, Truck, Warehouse, X } from 'lucide-react';
+import { AlertTriangle, Bot, Boxes, ScrollText, FlaskConical, LayoutDashboard, MapPin, Search, Settings2, ShoppingCart, Truck, Warehouse, X } from 'lucide-react';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useScmData, useScmPlan } from '@/hooks/useScm';
@@ -17,10 +17,10 @@ import { Dot } from './ScmParts';
 
 const ICONS: Record<ScmView, ComponentType<{ size?: number }>> = {
   tower: LayoutDashboard, exceptions: AlertTriangle, replenish: ShoppingCart, orders: Truck,
-  inventory: Boxes, suppliers: Warehouse, scenarios: FlaskConical, settings: Settings2,
+  inventory: Boxes, ledger: ScrollText, suppliers: Warehouse, scenarios: FlaskConical, settings: Settings2,
 };
 const PRIMARY: ScmView[] = ['tower', 'exceptions', 'replenish', 'orders'];
-const SECONDARY: ScmView[] = ['inventory', 'suppliers', 'scenarios', 'settings'];
+const SECONDARY: ScmView[] = ['inventory', 'ledger', 'suppliers', 'scenarios', 'settings'];
 
 const ROW = 'flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[12px] font-semibold transition-colors duration-100';
 const rowState = (active: boolean) => active ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground';
@@ -71,7 +71,7 @@ export function ScmSidebar({ navigation, onNavigate, onOpen }: {
     return plan.nodes.filter(node => (!locationId || node.locationId === locationId) && (node.sku.toLowerCase().includes(needle) || node.name.toLowerCase().includes(needle))).slice(0, 8);
   }, [query, plan, locationId]);
 
-  const go = (next: ScmView) => { onOpen(); onNavigate({ scmView: next, scmNode: null, scmHealth: null, scmSupplierDelay: null }); };
+  const go = (next: ScmView) => { onOpen(); onNavigate({ scmView: next, scmNode: null, scmHealth: null, scmSupplierDelay: null, scmLedgerItemId: null, scmCatalog: null }); };
   const badge = (id: ScmView) => {
     if (!counts) return null;
     if (id === 'exceptions' && counts.exceptions) return <span className={`text-[11px] tabular-nums ${counts.urgent ? 'text-[var(--status-danger)]' : 'text-muted-foreground/70'}`}>{counts.exceptions}</span>;
