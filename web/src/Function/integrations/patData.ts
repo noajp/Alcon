@@ -10,8 +10,9 @@ import type { IssuedPersonalAccessToken, PersonalAccessToken, PersonalAccessToke
 // selectable at all. Issue and revoke are RPCs; the database refuses both
 // when the caller is itself a delegated client.
 //
-// The plaintext is returned once by `issue` and is never cached: it lives in
-// the dialog that shows it and disappears when that closes.
+// The plaintext is returned once by `issue` and is not kept: the mutation is
+// dropped from React Query's MutationCache as soon as nothing observes it
+// (gcTime 0), and the dialog that shows the token resets it on close.
 
 // Every column the browser may read — token_hash is deliberately not one.
 const COLUMNS = 'id, user_id, name, token_prefix, access, expires_at, last_used_at, last_used_client, revoked_at, created_at';
@@ -60,6 +61,8 @@ export function usePersonalAccessTokenActions() {
   const key = tokensKey(userId);
 
   const issue = useMutation({
+    // The result is the plaintext token: never let the cache outlive the dialog.
+    gcTime: 0,
     mutationFn: async (input: { name: string; expiresDays: TokenExpiryDays; access: PersonalAccessTokenAccess }) => {
       const { data, error } = await supabase.rpc('create_personal_access_token', {
         p_name: input.name.trim(),

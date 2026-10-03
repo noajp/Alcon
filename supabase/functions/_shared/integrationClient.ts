@@ -56,19 +56,32 @@ export function isSafeEndpoint(raw: string): boolean {
 }
 
 /**
- * Pure. True when an integration points at this Alcon project itself (its
- * Supabase host — alcon-mcp, the REST API, any Edge Function). An agent
- * already has the board tools under its starter's RLS; reaching Alcon again
- * through a stored credential would act outside that run (ADR 0031).
+ * Pure. True when an integration points at this Alcon project itself — its
+ * Supabase host or the legacy `<ref>.functions.supabase.co` host, which also
+ * serves alcon-mcp (REST API, any Edge Function). Case, a trailing dot and a
+ * port do not change the answer. An agent already has the board tools under
+ * its starter's RLS; reaching Alcon again through a stored credential would
+ * act outside that run (ADR 0031).
  */
 export function pointsAtAlcon(endpoint: string, supabaseUrl: string | null | undefined): boolean {
   if (!supabaseUrl) return false;
-  try {
-    const host = (raw: string) => new URL(raw).hostname.toLowerCase().replace(/\.+$/, "");
-    return host(endpoint) === host(supabaseUrl);
-  } catch {
-    return false;
+  const host = (raw: string): string | null => {
+    try {
+      return new URL(raw).hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.+$/, "");
+    } catch {
+      return null;
+    }
+  };
+  const target = host(endpoint);
+  const own = host(supabaseUrl);
+  if (!target || !own) return false;
+  const alcon = new Set([own]);
+  const ref = own.match(/^([a-z0-9-]+)\.(?:functions\.)?supabase\.(co|in|net)$/);
+  if (ref) {
+    alcon.add(`${ref[1]}.supabase.${ref[2]}`);
+    alcon.add(`${ref[1]}.functions.supabase.${ref[2]}`);
   }
+  return alcon.has(target);
 }
 
 /** Pure. The URL an http_request may hit: base + path, never outside base. */

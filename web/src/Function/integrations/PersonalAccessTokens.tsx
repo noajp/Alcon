@@ -116,6 +116,12 @@ function GenerateTokenDialog({ onClose }: { onClose: () => void }) {
   // The plaintext lives here only, and goes when the dialog closes.
   const [issued, setIssued] = useState<string | null>(null);
 
+  // Drop the issued token from the MutationCache too, not only from this state.
+  const close = () => {
+    issue.reset();
+    onClose();
+  };
+
   const generate = async () => {
     if (issue.isPending) return;
     setError(null);
@@ -132,7 +138,7 @@ function GenerateTokenDialog({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
+    <Dialog open onOpenChange={(next) => { if (!next) close(); }}>
       <DialogContent className="max-h-[calc(100dvh-48px)] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{issued ? t('Token generated') : t('Generate token')}</DialogTitle>
@@ -141,6 +147,9 @@ function GenerateTokenDialog({ onClose }: { onClose: () => void }) {
               ? t('Copy the token now. It is not shown again; if you lose it, revoke it and generate a new one.')
               : t('The token acts as you, within your permissions, until it expires or you revoke it.')}
           </DialogDescription>
+          <p className="text-[12px] text-muted-foreground">
+            {t('Revoke tokens you no longer use; changing your password does not revoke them.')}
+          </p>
         </DialogHeader>
 
         {issued ? (
@@ -189,10 +198,10 @@ function GenerateTokenDialog({ onClose }: { onClose: () => void }) {
 
         <DialogFooter>
           {issued ? (
-            <Button variant="primary" size="sm" onClick={onClose}>{t('Done')}</Button>
+            <Button variant="primary" size="sm" onClick={close}>{t('Done')}</Button>
           ) : (
             <>
-              <Button variant="ghost" size="sm" onClick={onClose}>{t('Cancel')}</Button>
+              <Button variant="ghost" size="sm" onClick={close}>{t('Cancel')}</Button>
               <Button variant="primary" size="sm" onClick={generate} disabled={issue.isPending}>
                 {issue.isPending ? t('Generating…') : t('Generate')}
               </Button>

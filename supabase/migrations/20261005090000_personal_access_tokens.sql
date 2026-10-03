@@ -244,7 +244,9 @@ begin
       if v_space is null or not public.is_activity_space_owner(v_space) then
         raise exception 'not allowed' using errcode = '42501';
       end if;
-      if p_secret is not null and left(btrim(p_secret), 8) = 'alc_pat_' then
+      -- Anywhere in the value: "Bearer alc_pat_…" for a header credential,
+      -- leading whitespace, or a token inside a JSON blob are all refused.
+      if p_secret is not null and position('alc_pat_' in p_secret) > 0 then
         raise exception 'An Alcon personal access token cannot be used as an integration credential.' using errcode = '22023';
       end if;
       -- The secret is found by its name, never by a secret_id a row claims.

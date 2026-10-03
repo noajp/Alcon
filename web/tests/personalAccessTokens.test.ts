@@ -145,6 +145,18 @@ describe('agents never reach Alcon through an integration', () => {
     expect(client.pointsAtAlcon('https://mcp.linear.app/mcp', base)).toBe(false);
     expect(client.pointsAtAlcon('https://other.supabase.co/functions/v1/alcon-mcp', base)).toBe(false);
     expect(client.pointsAtAlcon('not a url', base)).toBe(false);
+  });
+
+  it('also recognises the legacy functions host, in any case, with a trailing dot or a port', () => {
+    const base = 'https://rkugtcqztkkacvoylupw.supabase.co';
+    expect(client.pointsAtAlcon('https://rkugtcqztkkacvoylupw.functions.supabase.co/alcon-mcp', base)).toBe(true);
+    expect(client.pointsAtAlcon('https://RKUGTCQZTKKACVOYLUPW.Functions.Supabase.co./alcon-mcp', base)).toBe(true);
+    expect(client.pointsAtAlcon('https://rkugtcqztkkacvoylupw.functions.supabase.co:443/alcon-mcp', base)).toBe(true);
+    expect(client.pointsAtAlcon('https://rkugtcqztkkacvoylupw.supabase.co:8443/functions/v1/alcon-mcp', base)).toBe(true);
+    expect(client.pointsAtAlcon('https://other.functions.supabase.co/alcon-mcp', base)).toBe(false);
+    expect(client.pointsAtAlcon('https://rkugtcqztkkacvoylupw.supabase.co.evil.example/x', base)).toBe(false);
+    // A custom-domain SUPABASE_URL still matches itself.
+    expect(client.pointsAtAlcon('https://api.alcon.example/functions/v1/alcon-mcp', 'https://api.alcon.example')).toBe(true);
     expect(client.pointsAtAlcon(`${base}/x`, undefined)).toBe(false);
   });
 });
