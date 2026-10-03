@@ -25,11 +25,12 @@ function FormDialog({ title, description, children, onClose, busy, wide }: { tit
 }
 
 function useSubmit(onDone: () => void) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function run(work: () => Promise<unknown>) {
     setBusy(true); setError(null);
-    try { await work(); onDone(); } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); } finally { setBusy(false); }
+    try { await work(); onDone(); } catch (cause) { setError(t(cause instanceof Error ? cause.message : String(cause))); } finally { setBusy(false); }
   }
   return { busy, error, run, setError };
 }
@@ -295,7 +296,7 @@ export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { d
 
   async function act(work: () => Promise<unknown>, close = false) {
     setBusy(true); setError(null);
-    try { await work(); if (close) onClose(); } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); } finally { setBusy(false); }
+    try { await work(); if (close) onClose(); } catch (cause) { setError(t(cause instanceof Error ? cause.message : String(cause))); } finally { setBusy(false); }
   }
 
   return <FormDialog title={`PO-${order.number} · ${supplier?.name ?? ''}`} onClose={onClose} busy={busy} wide>

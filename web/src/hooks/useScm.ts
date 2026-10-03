@@ -24,6 +24,8 @@ export interface ScmRunSummary {
   created: { poId: string; number: number; supplier: string; location: string; total: number; currency: string; status: ScmPoStatus; lines: number }[];
   skipped: number;
   trigger: 'manual' | 'autopilot';
+  status?: 'running' | 'failed';
+  error?: string;
 }
 
 export interface ScmData {
@@ -261,11 +263,11 @@ export function useScmActions(spaceId: string | null) {
       }
       const created: ScmRunSummary['created'] = [];
       let skipped = 0;
+      try {
       for (const proposal of proposals) {
         if (!proposal.lines.length) { skipped += 1; continue; }
         const status: ScmPoStatus = options.mode === 'place' ? 'approved'
           : options.mode === 'autopilot' && options.policy.autopilotEnabled && proposal.authority === 'auto' ? 'approved' : 'draft';
-        // A failure mid-run leaves the orders already written; the run log says so.
         const rationale = options.explain(proposal);  // evidence travels with the order
         const order = await createOrder({
           supplierId: proposal.supplierId, locationId: proposal.locationId, status, orderedOn: options.today, expectedOn: proposal.expectedOn,
@@ -274,6 +276,12 @@ export function useScmActions(spaceId: string | null) {
         });
         if (status === 'draft') await escalate(order, proposal, rationale).catch(() => null);
         created.push({ poId: order.id, number: order.number, supplier: proposal.supplierName, location: proposal.locationName, total: proposal.total, currency: proposal.currency, status, lines: proposal.lines.length });
+      }
+      } catch (cause) {
+        // A failure mid-run leaves the orders already written; the run log records them and the error.
+        const error = cause instanceof Error ? cause.message : String(cause);
+        if (runId) await supabase.from('scm_autopilot_runs').update({ summary: { created, skipped, trigger: 'autopilot', status: 'failed', error } }).eq('id', runId);
+        throw cause;
       }
       const summary: ScmRunSummary = { created, skipped, trigger: options.mode === 'autopilot' ? 'autopilot' : 'manual' };
       if (runId) await check(supabase.from('scm_autopilot_runs').update({ summary }).eq('id', runId));

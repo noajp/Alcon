@@ -62,7 +62,8 @@ export function ScmView({ navigation, onNavigate }: { navigation: NavigationStat
     const proposals = trigger === 'manual' && locationId ? plan.proposals.filter(proposal => proposal.locationId === locationId) : plan.proposals;
     setRunning(true); setRunError(null);
     try {
-      await actions.placeProposals(proposals, { mode, policy: data.policy, today: data.today, minHoursSinceLastRun: trigger === 'daily' ? AUTOPILOT_INTERVAL_MS / 3_600_000 : undefined, explain: proposal => explainProposal(proposal, plan, t, locale, mode) });
+      const result = await actions.placeProposals(proposals, { mode, policy: data.policy, today: data.today, minHoursSinceLastRun: trigger === 'daily' ? AUTOPILOT_INTERVAL_MS / 3_600_000 : undefined, explain: proposal => explainProposal(proposal, plan, t, locale, mode) });
+      if (result === null && trigger === 'manual') setRunError(t('The planner ran moments ago in another window. Refresh to see its orders.'));
     } catch (cause) {
       setRunError(cause instanceof Error ? cause.message : String(cause));
     } finally { setRunning(false); }

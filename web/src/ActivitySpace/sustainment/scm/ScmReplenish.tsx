@@ -109,12 +109,14 @@ export function ScmReplenish({ onRunPlanner, running }: { onRunPlanner: () => vo
     <Section title={t('Autopilot log')} description={t('What the planner did on its own, and why it stopped where it did.')}>
       {data.runs.length ? <ul className="divide-y divide-[var(--border-subtle)]">{data.runs.map(run => <li key={run.id} className="space-y-1 py-2.5">
         <p className="text-xs text-muted-foreground">{new Date(run.ranAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })}</p>
+        {run.summary.status === 'failed' && <p role="alert" className="text-sm text-destructive">{t('Stopped with an error: {error}', { error: run.summary.error ?? '' })}</p>}
+        {run.summary.status === 'running' && <p className="text-sm text-muted-foreground">{t('Running…')}</p>}
         {run.summary.created?.length ? <ul className="space-y-0.5">{run.summary.created.map(entry => <li key={entry.poId} className="flex flex-wrap items-center gap-2 text-sm">
           <button type="button" className="font-medium hover:underline" onClick={() => openOrder(entry.poId)}>PO-{entry.number}</button>
           <span className="text-muted-foreground">{entry.supplier} → {entry.location}</span>
           <span className="tabular-nums">{formatMoney(entry.total, entry.currency, locale)}</span>
           <Pill tone={entry.status === 'approved' ? 'success' : 'warning'}>{entry.status === 'approved' ? t('Approved automatically') : t(PO_STATUS_LABEL[entry.status])}</Pill>
-        </li>)}</ul> : <p className="text-sm text-muted-foreground">{t('No orders needed.')}</p>}
+        </li>)}</ul> : !run.summary.status && <p className="text-sm text-muted-foreground">{t('No orders needed.')}</p>}
       </li>)}</ul> : <p className="text-sm text-muted-foreground">{t('The autopilot has not run yet.')}</p>}
     </Section>
     <p className="text-xs text-muted-foreground">{t('Quantities cover lead time plus the {review}-day review period and safety stock, less stock and open orders, rounded to MOQ and pack size. {health} lines come first.', { review: data.policy.reviewDays, health: t(HEALTH_LABEL.critical) })}</p>
