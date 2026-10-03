@@ -544,16 +544,21 @@ export function planScm(input: ScmInput): ScmPlan {
     const sigma = forecast.sigma * multiplier;
     const coverWindow = Math.ceil(leadTime + review);
     const dailyDemand = mean(daily.slice(0, Math.max(1, coverWindow)));
-    // Periodic review (R, s, S): orders are placed only at reviews, so an order
-    // placed now must carry the item until the next order can arrive — one
-    // lead time plus one review period. That is the reorder point; the order
-    // brings the position up to one more review period beyond it.
+    // Periodic review (R, s, S). Orders are placed only at reviews, so when the
+    // position at a review is just above s and no order is placed, what is
+    // there must last until the next review's order arrives: one review plus
+    // one lead time. That fixes s. An order brings the position up to S = s + Q,
+    // where Q is at least one review of demand, or the economic order quantity
+    // when ordering costs make larger, rarer orders cheaper. Ordering only when
+    // the position is strictly below s is what lets Q buy fewer orders rather
+    // than standing extra stock.
     const safetyStock = z * Math.sqrt((leadTime + review) * sigma ** 2 + dailyDemand ** 2 * leadTimeSd ** 2);
     const reorderPoint = dailyDemand * (leadTime + review) + safetyStock;
-    const orderUpTo = reorderPoint + dailyDemand * review;
     const annualDemand = dailyDemand * 365;
     const eoq = policy.orderingCost > 0 && item.unitCost > 0 && policy.holdingRate > 0 && annualDemand > 0
       ? Math.sqrt((2 * annualDemand * policy.orderingCost) / (policy.holdingRate * item.unitCost)) : null;
+    const orderQuantity = Math.max(dailyDemand * review, eoq === null ? 0 : Math.min(eoq, dailyDemand * 120));
+    const orderUpTo = reorderPoint + orderQuantity;
 
     const stockNow = onHand.get(key) ?? 0;
     const arrivals: ScmArrival[] = [];
@@ -579,10 +584,8 @@ export function planScm(input: ScmInput): ScmPlan {
 
     let suggested = 0;
     if (dailyDemand > 0 || stockNow < safetyStock) {
-      if (inventoryPosition <= reorderPoint) {
-        let quantity = orderUpTo - inventoryPosition;
-        if (eoq !== null) quantity = Math.max(quantity, Math.min(eoq, dailyDemand * 120));
-        suggested = roundOrder(quantity, item.moq, item.orderMultiple);
+      if (inventoryPosition < reorderPoint) {
+        suggested = roundOrder(orderUpTo - inventoryPosition, item.moq, item.orderMultiple);
       }
     }
     const earliestNewSupply = today + Math.max(1, Math.ceil(leadTime));
@@ -612,9 +615,8 @@ export function planScm(input: ScmInput): ScmPlan {
         for (const [arrivalDay, quantity] of pipeline) if (arrivalDay > day) incoming += quantity;
         const position = planned + incoming;
         if (h === 0 && suggested > 0) pipeline.set(earliestNewSupply, (pipeline.get(earliestNewSupply) ?? 0) + suggested);
-        else if (h > 0 && dailyDemand > 0 && position <= reorderPoint) {
-          let quantity = orderUpTo - position;
-          if (eoq !== null) quantity = Math.max(quantity, Math.min(eoq, dailyDemand * 120));
+        else if (h > 0 && dailyDemand > 0 && position < reorderPoint) {
+          const quantity = orderUpTo - position;
           const rounded = roundOrder(quantity, item.moq, item.orderMultiple);
           if (rounded > 0) pipeline.set(day + leadDays, (pipeline.get(day + leadDays) ?? 0) + rounded);
         }
@@ -665,7 +667,7 @@ export function planScm(input: ScmInput): ScmPlan {
       // order due now makes one worth flagging.
       signals.push({ code: 'stockout_in_horizon', severity: 'medium', values: { day: dayString(stockout), units: Math.ceil(idleShortfall) } });
     }
-    if (suggested > 0 && inventoryPosition <= reorderPoint) signals.push({ code: 'below_reorder_point', severity: 'medium', values: { position: round2(inventoryPosition), reorderPoint: round2(reorderPoint), quantity: suggested } });
+    if (suggested > 0 && inventoryPosition < reorderPoint) signals.push({ code: 'below_reorder_point', severity: 'medium', values: { position: round2(inventoryPosition), reorderPoint: round2(reorderPoint), quantity: suggested } });
     for (const arrival of arrivals.filter(item => item.overdue)) signals.push({ code: 'overdue_order', severity: 'high', values: { po: arrival.poNumber, quantity: arrival.quantity, assumed: arrival.day } });
     if (inDraft > 0) signals.push({ code: 'draft_pending', severity: 'low', values: { quantity: inDraft } });
     if (dead) signals.push({ code: 'dead_stock', severity: 'low', values: { onHand: stockNow, value: Math.round(stockNow * item.unitCost), days: lookback } });

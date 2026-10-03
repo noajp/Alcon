@@ -29,6 +29,7 @@ function sampleInput(): ScmInput {
       id: item.key, sku: item.sku, name: item.name, unit: item.unit, category: item.category, supplierId: item.supplierKey,
       unitCost: item.unitCost, unitPrice: item.unitPrice, currency: 'JPY', leadTimeDays: null, moq: item.moq,
       orderMultiple: item.orderMultiple, serviceLevel: null, baselineDailyDemand: null, active: true,
+      createdAt: `${addDays(TODAY, -120)}T00:00:00Z`,
     })),
     stock: [...stock.entries()].map(([key, onHand]) => { const [itemId, locationId] = key.split(':'); return { itemId, locationId, onHand }; }),
     demand: [...demand.entries()].map(([key, quantity]) => { const [itemId, locationId, day] = key.split(':'); return { itemId, locationId, day, quantity }; }),
@@ -168,6 +169,16 @@ describe('planning a node', () => {
     const node = planScm(input).nodes[0];
     expect(node.shortfallUnits).toBe(0);
     expect(planScm(input).totals[0].fillRate).toBe(1);
+  });
+
+  it('does not hold a standing extra review of stock in steady state', () => {
+    const input = flatInput(300, 10);
+    const node = planScm({ ...input, policy: { ...input.policy, horizonDays: 120 } }).nodes[0];
+    // Safety stock is zero for flat demand; following the plan, stock must
+    // reach well below one review of demand between orders.
+    const steady = node.projection.slice(40).map(point => point.planned);
+    expect(Math.min(...steady)).toBeLessThan(10 * 7);
+    expect(node.shortfallUnits).toBe(0);
   });
 
   it('does not call a newly set-up item dead stock', () => {

@@ -65,7 +65,7 @@ export function signalText(signal: ScmSignal, t: Translate, locale: string, curr
       ? t('Runs out {day}; PO-{po} lands {poDay}, {days} days later. Pull it forward or bridge about {units} units.', { ...v, day: day('day'), poDay: day('poDay') })
       : t('Runs out {day}, before a new order could arrive ({earliest}). Expedite, transfer or substitute: about {units} units short.', { ...v, day: day('day'), earliest: day('earliest') });
     case 'stockout_in_horizon': return t('Runs out {day} unless the suggested order is placed now.', { ...v, day: day('day') });
-    case 'below_reorder_point': return t('Stock plus incoming ({position}) is at or below the reorder point ({reorderPoint}). Order {quantity}.', v);
+    case 'below_reorder_point': return t('Stock plus incoming ({position}) is below the reorder point ({reorderPoint}). Order {quantity}.', v);
     case 'overdue_order': return t('PO-{po} is overdue ({quantity} units). Planned to arrive {assumed}; confirm with the supplier.', { ...v, assumed: day('assumed') });
     case 'draft_pending': return t('{quantity} units are in a draft order waiting for approval.', v);
     case 'excess_stock': return t('{units} units beyond need (worth {value}), about {cover} days of cover.', v);
@@ -108,7 +108,7 @@ export function explainProposal(proposal: ScmProposal, plan: ScmPlan, t: Transla
     const q = (value: number | null) => formatQuantity(value, locale);
     return `- ${line.sku} ${line.name}: ${t('order {quantity}. On hand {onHand}, incoming {onOrder}, demand {daily}/day, lead time {lead} days, reorder point {rop}, order-up-to {upTo}.', {
       quantity: q(line.quantity), onHand: q(node.onHand), onOrder: q(node.onOrder + node.inDraft), daily: q(node.dailyDemand), lead: q(node.leadTime), rop: q(node.reorderPoint), upTo: q(node.orderUpTo),
-    })}${node.eoq !== null && line.quantity > node.orderUpTo - node.inventoryPosition + 1 ? ` ${t('Sized up to the economic order quantity ({eoq}).', { eoq: q(node.eoq) })}` : ''}${node.stockoutDay ? ` ${t('Runs out {day} without it.', { day: formatDay(node.stockoutDay, locale) })}` : ''}`;
+    })}${node.eoq !== null && node.eoq > node.dailyDemand * plan.policy.reviewDays ? ` ${t('Sized up to the economic order quantity ({eoq}).', { eoq: q(node.eoq) })}` : ''}${node.stockoutDay ? ` ${t('Runs out {day} without it.', { day: formatDay(node.stockoutDay, locale) })}` : ''}`;
   });
   const authority = mode === 'place' ? t('Placed by a person from the planner proposal.')
     : mode === 'draft' ? t('Saved as a draft for approval.')

@@ -520,6 +520,8 @@ export function useScmActions(spaceId: string | null) {
         await insertChunks('scm_items', sample.items.map(item => ({
           id: id(`i:${item.key}`), activity_space_id, sku: item.sku, name: item.name, unit: item.unit, category: item.category,
           supplier_id: id(`s:${item.supplierKey}`), unit_cost: item.unitCost, unit_price: item.unitPrice, currency: 'JPY', moq: item.moq, order_multiple: item.orderMultiple,
+          // The sample's history starts 120 days back; its items existed from then.
+          created_at: `${addDays(today, -120)}T00:00:00Z`,
         })));
         await insertChunks('scm_purchase_orders', sample.orders.map(order => ({
           id: id(`p:${order.key}`), activity_space_id, supplier_id: id(`s:${order.supplierKey}`), location_id: id(`l:${order.locationKey}`),
