@@ -18,19 +18,21 @@ import { useCallback, useMemo } from 'react';
 // ============================================
 
 export async function createDomain(domain: DomainInsert & { user_id: string }): Promise<Domain> {
-  const { data, error } = await supabase
-    .from('domains')
-    .insert(domain)
-    .select()
-    .single();
+  // Insert without RETURNING, then read the row back by an id chosen here.
+  // A Domain is visible through membership (or its Space, when workspace),
+  // never through having created it, and RETURNING is checked against the
+  // domains SELECT policy before the AFTER INSERT trigger enrols the creator
+  // as owner (domains_enrol_creator) — so a private or Space-less Domain
+  // would be refused as invisible (42501) even though the insert is allowed.
+  const id = domain.id ?? crypto.randomUUID();
+  const { error: insertError } = await supabase.from('domains').insert({ ...domain, id });
   // A Domain is created only inside a Space the caller belongs to (RLS);
   // a stale active Space is the usual way to hit that.
-  if (error?.code === '42501') throw new Error(translate('You can create a Domain only in a Space you belong to.'));
-  if (error) throw error;
+  if (insertError?.code === '42501') throw new Error(translate('You can create a Domain only in a Space you belong to.'));
+  if (insertError) throw insertError;
 
-  // The database enrols the creator as the Domain's owner in the same insert
-  // (domains_enrol_creator), which the membership-based RLS and TeamSettings
-  // read; the browser writes no owner rows.
+  const { data, error } = await supabase.from('domains').select().eq('id', id).single();
+  if (error) throw error;
   notifyDomainsChanged();
   return data;
 }
@@ -315,8 +317,8 @@ interface DomainsQueryData {
 
 async function fetchMemberDomains(userId: string): Promise<DomainsQueryData> {
   // Membership-scoped — sidebar shows only Domains the user is a member of
-  // (creator gets auto-membership in createDomain; others join via the 🔍
-  // Discover modal). The two membership lookups are independent, so they run
+  // (the creator is enrolled as owner by domains_enrol_creator; others join
+  // via the 🔍 Discover modal). The two membership lookups are independent, so they run
   // in parallel rather than as a waterfall.
   const [mySpaceIds, { data: memberRows, error: memberErr }] = await Promise.all([
     fetchMySpaceIds(userId),
