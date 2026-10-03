@@ -12,7 +12,7 @@
 |---|---|
 | listMyDomains / listObjects / listElements / getElement / findByText / getProgress / getRecentActivity / listWorkers / listInitiatives / getInitiative | createElement / updateElement / addElementComment / addElementAssignee / setElementLabels / createSubelement / toggleSubelementComplete |
 
-削除、一括変更、Object 間の移動、Object の編集はできない。見える範囲と書ける範囲は、アプリでの本人の権限（RLS）と同じ。書き込みは Element の Activity に「… — via Claude Code (MCP · token: laptop)」の形で、どのトークン経由かまで記録され、コメントは AI 名で投稿される。
+削除、一括変更、Object 間の移動、Object の編集はできない。この許可リスト（`_shared/externalTools.ts`）は REST API（[api.md](api.md)）と共通。見える範囲と書ける範囲は、アプリでの本人の権限（RLS）と同じ。書き込みは Element の Activity に「… — via Claude Code (MCP · token: laptop)」の形で、どのトークン経由かまで記録され、コメントは AI 名で投稿される。
 
 担当にできるのは、Element と同じ Space の Worker だけ（[ADR 0028](adr/0028-workers-belong-to-a-space.md)）。`listWorkers` は `elementId` を渡すとその Element に割り当てられる Worker を、`objectId` / `domainId` を渡すとその Domain を見られる人を、引数なしなら本人が属する Space 全体の Worker を返す。`addElementAssignee` は Space の外の Worker を `Worker is outside this Element's Space` で断り、`createElement` の `assigneeWorkerIds` は割り当てられない Worker を飛ばして `assigneeError` に名前を返す。
 
@@ -45,7 +45,7 @@ claude mcp add --transport http alcon "https://rkugtcqztkkacvoylupw.supabase.co/
 env -u SUPABASE_ACCESS_TOKEN supabase functions deploy alcon-mcp --project-ref rkugtcqztkkacvoylupw --no-verify-jwt --use-api
 ```
 
-`--no-verify-jwt` を付けるのは、トークンがない場合や、期限切れ・取り消し済みの場合に、関数自身が MCP の形式に沿った 401（`WWW-Authenticate` 付き）を返すため。トークンの検証は関数の中で行う。`_shared/boardTools.ts` を変更したら、`alcon-copilot` も再デプロイする。
+`--no-verify-jwt` を付けるのは、トークンがない場合や、期限切れ・取り消し済みの場合に、関数自身が MCP の形式に沿った 401（`WWW-Authenticate` 付き）を返すため。トークンの検証は関数の中で行う。`_shared/externalTools.ts` を変更したら `alcon-api` も、`_shared/boardTools.ts` を変更したら `alcon-api` と `alcon-copilot` も再デプロイする。
 
 PAT を受け付けるには、Edge Function のシークレット `ALCON_JWT_SIGNING_KEY` に、プロジェクトの JWT シークレット（Legacy JWT secret）を入れる。ない場合、PAT は 500「server not configured」で断られ、セッションの JWT だけが通る。非対称の署名鍵に移ったら、EC の秘密鍵の JWK を入れれば ES256 で署名する。
 

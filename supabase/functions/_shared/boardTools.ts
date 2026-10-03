@@ -595,7 +595,7 @@ export async function runBoardTool(
         const query = String(input.query ?? "").trim();
         if (!query) return { ok: false, error: "query is required" };
         const limit = Math.min(Math.max(Number(input.limit ?? 20), 1), 100);
-        const pattern = `%${query.replace(/[\\%_]/g, m => "\\" + m)}%`;
+        const pattern = quoteFilterValue(`%${query.replace(/[\\%_]/g, m => "\\" + m)}%`);
         let q = supabase
           .from("elements")
           .select("id, display_id, seq_number, title, status, priority, object_id, updated_at")
@@ -1039,6 +1039,15 @@ export async function runBoardTool(
   } catch (e) {
     return { ok: false, error: errorMessage(e) };
   }
+}
+
+/**
+ * Pure. A value for a PostgREST `.or()` filter, double-quoted so commas,
+ * parentheses and dots in it stay part of the value instead of adding
+ * conditions; `"` and `\\` are backslash-escaped inside the quotes.
+ */
+export function quoteFilterValue(value: string): string {
+  return `"${value.replace(/["\\]/g, (m) => "\\" + m)}"`;
 }
 
 /** Pure. Supabase throws plain `{ message }` objects, not Error instances. */

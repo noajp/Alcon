@@ -1,4 +1,7 @@
 import type { ToolResult } from "../_shared/boardTools.ts";
+import { sanitizeName } from "../_shared/callerName.ts";
+
+export { sanitizeName };
 
 // The MCP wire protocol, stateless: every POST carries one JSON-RPC message
 // (or a batch from an older client) and gets its answer in the response
@@ -155,13 +158,6 @@ const KNOWN_CLIENTS: [RegExp, string][] = [
   [/openai|chatgpt/i, "ChatGPT"],
   [/cursor/i, "Cursor"],
 ];
-
-const NAME_UNSAFE = /[^\p{L}\p{N} ._-]/gu;
-
-/** Pure. A caller-supplied name, reduced to letters, digits, space and ._- and at most 40 characters. */
-export function sanitizeName(raw: string | null | undefined): string {
-  return (raw ?? "").replace(NAME_UNSAFE, "").trim().slice(0, 40).trim();
-}
 
 /**
  * Pure. The client a call came from: `?client=` on the connection URL when

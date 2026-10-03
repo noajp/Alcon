@@ -64,3 +64,4 @@
 | [0030](0030-unused-objects-are-archived-and-domains-with-objects-stay.md) | 使わなくなった Object はアーカイブし、Object が残る Domain は削除しない |
 | [0031](0031-scm-owns-its-ledger-and-acts-within-a-policy.md) | SCM は専用の台帳を持ち、人が示した方針の範囲で AI が発注する |
 | [0032](0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md) | 外部の呼び出しは PAT か OAuth で認証し、関数が本人の短命な JWT を発行する |
+| [0033](0033-the-rest-api-is-the-mcp-tool-layer-over-http.md) | REST API は MCP と同じツール層を HTTP の形で出す |
