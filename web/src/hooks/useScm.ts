@@ -143,7 +143,7 @@ async function fetchScm(spaceId: string, today: string): Promise<ScmData> {
       id: String(row.id), sku: String(row.sku), name: String(row.name), unit: String(row.unit), category: (row.category as string | null) || null,
       supplierId: (row.supplier_id as string | null) ?? null, unitCost: num(row.unit_cost), unitPrice: numOrNull(row.unit_price),
       currency: String(row.currency), leadTimeDays: numOrNull(row.lead_time_days), moq: num(row.moq), orderMultiple: num(row.order_multiple, 1),
-      serviceLevel: numOrNull(row.service_level), baselineDailyDemand: numOrNull(row.baseline_daily_demand), active: row.active !== false,
+      serviceLevel: numOrNull(row.service_level), baselineDailyDemand: numOrNull(row.baseline_daily_demand), active: row.active !== false, createdAt: (row.created_at as string | null) ?? null,
     })).sort((a, b) => a.sku.localeCompare(b.sku)),
     stock: stock.map(row => ({ itemId: String(row.item_id), locationId: String(row.location_id), onHand: num(row.on_hand) })),
     demand: demand.map(row => ({ itemId: String(row.item_id), locationId: String(row.location_id), day: String(row.day), quantity: num(row.quantity) })),
@@ -520,6 +520,8 @@ export function useScmActions(spaceId: string | null) {
         await insertChunks('scm_items', sample.items.map(item => ({
           id: id(`i:${item.key}`), activity_space_id, sku: item.sku, name: item.name, unit: item.unit, category: item.category,
           supplier_id: id(`s:${item.supplierKey}`), unit_cost: item.unitCost, unit_price: item.unitPrice, currency: 'JPY', moq: item.moq, order_multiple: item.orderMultiple,
+          // The sample's history starts 120 days back; its items existed from then.
+          created_at: `${addDays(today, -120)}T00:00:00Z`,
         })));
         await insertChunks('scm_purchase_orders', sample.orders.map(order => ({
           id: id(`p:${order.key}`), activity_space_id, supplier_id: id(`s:${order.supplierKey}`), location_id: id(`l:${order.locationKey}`),
