@@ -32,10 +32,12 @@ const field = (key: string, label: string, type: DataTableColumnType, required =
 export const OPERATIONS_FIELDS: Record<OperationsKind, OperationsField[]> = {
   crm: [
     field('name', 'Opportunity', 'text'), field('account', 'Account', 'text', false),
-    field('stage', 'Stage (open / won / lost)', 'text'), field('amount', 'Amount', 'number'),
+    field('contact', 'Contact', 'text', false), field('email', 'Contact email', 'text', false),
+    field('stage', 'Stage', 'text'), field('amount', 'Amount', 'number'),
     field('probability', 'Probability (%)', 'number'), field('closeDate', 'Close date', 'date'),
     field('lastContact', 'Last contact', 'date', false), field('nextActionDate', 'Next action date', 'date', false),
-    field('currency', 'Currency', 'text'),
+    field('nextStep', 'Next step', 'text', false), field('currency', 'Currency', 'text'),
+    field('activity', 'Activity log', 'text', false),
   ],
   scm: [
     field('name', 'Item / SKU', 'text'), field('supplier', 'Supplier', 'text', false),
@@ -86,8 +88,17 @@ interface OperationsRow {
   priority: number;
 }
 
+/** Pipeline stages are free text; only won and lost (any case) end a deal. */
+function crmStageOutcome(value: string | null): 'open' | 'won' | 'lost' | null {
+  const stage = value?.trim().toLowerCase();
+  if (!stage) return null;
+  return stage === 'won' || stage === 'lost' ? stage : 'open';
+}
+
 export interface CRMRowAnalysis extends OperationsRow {
   account: string | null;
+  /** The recorded pipeline stage, e.g. "proposal"; `stage` is its outcome. */
+  stageId: string | null;
   stage: 'open' | 'won' | 'lost' | null;
   amount: number | null;
   probability: number | null;
@@ -260,9 +271,9 @@ export function analyzeOperations(schema: OperationsSchema, rawParams: Operation
       const read = rowReader(schema, params, row.id);
       const name = read.text('name') ?? `Row ${index + 1}`;
       const account = read.text('account', false);
+      // Won and lost close an opportunity; every other pipeline stage is open.
       const stageValue = read.text('stage');
-      const stage = stageValue === 'open' || stageValue === 'won' || stageValue === 'lost' ? stageValue : null;
-      if (stageValue && !stage) read.issues.push('Stage must be open, won, or lost.');
+      const stage = crmStageOutcome(stageValue);
       const amount = read.number('amount');
       const probability = read.number('probability', stage === 'open', 100);
       const currency = read.currency();
@@ -281,7 +292,7 @@ export function analyzeOperations(schema: OperationsSchema, rawParams: Operation
         if (!lastContact) signals.push(signal('contact_missing', 'medium', 'Last contact is missing; verify the relationship status.'));
         else if (day - dayNumber(lastContact)! >= params.followUpDays) signals.push(signal('contact_stale', 'medium', `${day - dayNumber(lastContact)!} days since contact (threshold ${params.followUpDays}); confirm progress.`));
       }
-      return { rowId: row.id, name, account, stage, amount, probability, weightedAmount, currency, closeDate, lastContact, nextActionDate, valid, issues: read.issues, signals, priority: priority(signals, valid) };
+      return { rowId: row.id, name, account, stageId: stageValue, stage, amount, probability, weightedAmount, currency, closeDate, lastContact, nextActionDate, valid, issues: read.issues, signals, priority: priority(signals, valid) };
     });
     const totals = new Map<string, CRMCurrencyTotals>();
     for (const row of rows) {

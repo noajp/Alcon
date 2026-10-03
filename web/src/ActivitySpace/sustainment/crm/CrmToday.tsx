@@ -1,0 +1,118 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { CheckCircle2, ChevronDown, PenLine } from 'lucide-react';
+import { Button } from '@/ui/button';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { MenuShell, MENU_ROW } from '@/Function/shared/menu';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { forecastFor, inList, shiftDate, todayQueue, upcoming, type CrmDeal, type CrmUrgency, type CrmWorkspace } from './crmModel';
+import { HealthDot, money, relativeDay } from './crmFormat';
+import type { Crm } from './useCrm';
+
+const GROUPS: { id: CrmUrgency; label: string }[] = [
+  { id: 'overdue', label: 'Overdue' }, { id: 'today', label: 'Today' }, { id: 'soon', label: 'This week' }, { id: 'plan', label: 'Needs a plan' },
+];
+
+export function Metric({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: 'danger' }) {
+  return <div className="min-w-0 space-y-1">
+    <dt className="truncate text-xs text-muted-foreground">{label}</dt>
+    <dd className={`truncate text-xl font-semibold tabular-nums ${tone === 'danger' ? 'text-[var(--status-danger)]' : ''}`}>{value}</dd>
+    {hint && <dd className="truncate text-xs text-muted-foreground">{hint}</dd>}
+  </div>;
+}
+
+function Snooze({ deal, crm }: { deal: CrmDeal; crm: Crm }) {
+  const { t } = useI18n();
+  const [saving, setSaving] = useState(false);
+  const move = async (days: number) => { setSaving(true); try { await crm.saveDeal(deal.id, { nextActionDate: shiftDate(crm.today, days) }); } finally { setSaving(false); } };
+  return <DropdownMenu>
+    <DropdownMenuTrigger asChild><Button size="xs" variant="ghost" disabled={saving}>{t('Reschedule')}<ChevronDown size={12} /></Button></DropdownMenuTrigger>
+    <MenuShell as="dropdown" width="standard" align="end">
+      {[[1, 'Tomorrow'], [3, 'In 3 days'], [7, 'Next week'], [14, 'In 2 weeks']].map(([days, label]) =>
+        <DropdownMenuItem key={days} className={MENU_ROW} onSelect={() => void move(days as number).catch(() => {})}>{t(label as string)}</DropdownMenuItem>)}
+    </MenuShell>
+  </DropdownMenu>;
+}
+
+export function CrmToday({ crm, workspace, onOpen, onCapture, onList }: {
+  crm: Crm; workspace: CrmWorkspace; onOpen: (dealId: string) => void; onCapture: () => void; onList: (list: 'at-risk' | 'closing-soon') => void;
+}) {
+  const { t, locale } = useI18n();
+  const { deals, today, params, primaryCurrency } = workspace;
+  const queue = useMemo(() => todayQueue(deals), [deals]);
+  const next = useMemo(() => upcoming(deals, today), [deals, today]);
+  const forecast = useMemo(() => forecastFor(deals, primaryCurrency, today, 1), [deals, primaryCurrency, today]);
+  const totals = workspace.analysis.totals.find(total => total.currency === primaryCurrency);
+  const atRisk = deals.filter(deal => inList(deal, 'at-risk', today, params.horizonDays));
+  const closing = deals.filter(deal => inList(deal, 'closing-soon', today, params.horizonDays));
+  const overdue = queue.filter(deal => deal.action!.urgency === 'overdue').length;
+
+  if (!deals.length) return <div className="max-w-xl space-y-4 py-10">
+    <h2 className="text-xl font-semibold">{t('Your pipeline is ready')}</h2>
+    <p className="text-sm leading-relaxed text-muted-foreground">{t('Start by capturing a deal you are working on. Paste the notes from your last call — Alcon fills in the account, amount, dates and next step for you to confirm.')}</p>
+    <Button variant="primary" onClick={onCapture}><PenLine size={14} />{t('Capture a deal')}</Button>
+  </div>;
+
+  return <div className="space-y-8">
+    <dl className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+      <Metric label={t('Forecast · next {n} days', { n: params.horizonDays })} value={totals ? money(totals.forecast, primaryCurrency, locale, true) : '—'} hint={t('Weighted by likelihood')} />
+      <Metric label={t('Open pipeline')} value={totals ? money(totals.pipeline, primaryCurrency, locale, true) : '—'} hint={t('{n} open deals', { n: totals?.openCount ?? 0 })} />
+      <Metric label={t('Won this month')} value={money(forecast.months[0]?.won ?? 0, primaryCurrency, locale, true)} hint={forecast.winRate !== null ? t('{p}% win rate', { p: Math.round(forecast.winRate * 100) }) : undefined} />
+      <Metric label={t('Needs attention')} value={String(queue.length)} hint={overdue ? t('{n} overdue', { n: overdue }) : t('Nothing overdue')} tone={overdue ? 'danger' : undefined} />
+    </dl>
+
+    <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
+      <section aria-label={t('Next best actions')} className="min-w-0 space-y-5">
+        <div className="space-y-1"><h2 className="text-lg font-semibold">{t('Next best actions')}</h2>
+          <p className="text-xs text-muted-foreground">{t('Ranked by urgency, then by weighted value. Work from the top.')}</p></div>
+        {!queue.length && <div className="flex gap-3 py-4"><CheckCircle2 size={20} className="shrink-0 text-[var(--status-success)]" />
+          <div className="space-y-1"><p className="text-sm font-medium">{t('You are clear for today')}</p><p className="text-xs text-muted-foreground">{t('Every open deal has a scheduled next step and recent contact.')}</p></div></div>}
+        {GROUPS.map(group => {
+          const items = queue.filter(deal => deal.action!.urgency === group.id);
+          if (!items.length) return null;
+          return <div key={group.id} className="space-y-1">
+            <h3 className={`text-xs font-medium ${group.id === 'overdue' ? 'text-[var(--status-danger)]' : 'text-muted-foreground'}`}>{t(group.label)} <span className="tabular-nums">{items.length}</span></h3>
+            <ul className="divide-y divide-[var(--border-subtle)]">{items.map(deal => <li key={deal.id} className="group flex items-center gap-3 py-2.5">
+              <HealthDot level={deal.health.level} />
+              <button type="button" className="min-w-0 flex-1 rounded-sm text-left hover:bg-muted/30" onClick={() => onOpen(deal.id)}>
+                <span className="flex items-baseline gap-2"><span className="truncate text-sm font-medium">{deal.name}</span><span className="truncate text-xs text-muted-foreground">{deal.account}</span></span>
+                <span className="block truncate text-[13px] text-muted-foreground">{t(deal.action!.message, deal.action!.values)}</span>
+              </button>
+              <span className="hidden shrink-0 text-right text-xs tabular-nums sm:block">{money(deal.amount, deal.currency, locale, true)}<span className="block text-muted-foreground">{deal.probability ?? '—'}%</span></span>
+              <div className="hidden shrink-0 gap-1 sm:flex">
+                <Snooze deal={deal} crm={crm} />
+                <Button size="xs" variant="ghost" onClick={() => onOpen(deal.id)}>{t('Open')}</Button>
+              </div>
+            </li>)}</ul>
+          </div>;
+        })}
+      </section>
+
+      <aside className="min-w-0 space-y-8 border-t border-[var(--border-subtle)] pt-6 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+        <section className="space-y-2">
+          <h3 className="text-sm font-medium">{t('Coming up')}</h3>
+          {next.length ? <ul className="space-y-2">{next.map(deal => <li key={deal.id}>
+            <button type="button" className="flex w-full items-baseline gap-3 rounded-sm text-left hover:bg-muted/30" onClick={() => onOpen(deal.id)}>
+              <span className="w-16 shrink-0 text-xs text-muted-foreground">{relativeDay(deal.nextActionDate, today, locale, t)}</span>
+              <span className="min-w-0 flex-1"><span className="block truncate text-[13px]">{deal.nextStep ?? deal.name}</span>{deal.nextStep && <span className="block truncate text-xs text-muted-foreground">{deal.name}</span>}</span>
+            </button></li>)}</ul> : <p className="text-xs text-muted-foreground">{t('Nothing scheduled in the next 7 days.')}</p>}
+        </section>
+        <section className="space-y-2">
+          <div className="flex items-center justify-between"><h3 className="text-sm font-medium">{t('Closing in the next {n} days', { n: params.horizonDays })}</h3>
+            {closing.length > 0 && <Button size="xs" variant="ghost" onClick={() => onList('closing-soon')}>{t('All')}</Button>}</div>
+          {closing.length ? <ul className="space-y-1.5">{[...closing].sort((a, b) => a.closeDate!.localeCompare(b.closeDate!)).slice(0, 6).map(deal => <li key={deal.id}>
+            <button type="button" className="flex w-full items-center gap-2 rounded-sm text-left text-[13px] hover:bg-muted/30" onClick={() => onOpen(deal.id)}>
+              <HealthDot level={deal.health.level} /><span className="min-w-0 flex-1 truncate">{deal.name}</span>
+              <span className="text-xs tabular-nums text-muted-foreground">{money(deal.amount, deal.currency, locale, true)}</span>
+            </button></li>)}</ul> : <p className="text-xs text-muted-foreground">{t('No open deals close in this period.')}</p>}
+        </section>
+        {atRisk.length > 0 && <section className="space-y-2">
+          <div className="flex items-center justify-between"><h3 className="text-sm font-medium text-[var(--status-danger)]">{t('At risk')} <span className="tabular-nums">{atRisk.length}</span></h3>
+            <Button size="xs" variant="ghost" onClick={() => onList('at-risk')}>{t('All')}</Button></div>
+          <p className="text-xs text-muted-foreground">{t('{amount} of pipeline needs rescuing.', { amount: money(atRisk.filter(deal => deal.currency === primaryCurrency).reduce((sum, deal) => sum + (deal.amount ?? 0), 0), primaryCurrency, locale, true) })}</p>
+        </section>}
+      </aside>
+    </div>
+  </div>;
+}

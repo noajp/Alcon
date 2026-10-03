@@ -1,9 +1,12 @@
 import type { OperationsQueue } from '@/ActivitySpace/sustainment/operations/operationsQueues';
+import type { CrmRoute } from '@/ActivitySpace/sustainment/crm/crmRoute';
 
 export interface NavigationState {
   /** Each operations App keeps its selected queue within this window tab. */
   crmQueue?: OperationsQueue;
   scmQueue?: OperationsQueue;
+  /** The CRM App's view, filters and open deal within this window tab. */
+  crm?: CrmRoute;
   objectId: string | null;
   /** Domain accompanying an explicit Object route. Keeps the destination
    * Object selected while the shell changes its active Domain. */
