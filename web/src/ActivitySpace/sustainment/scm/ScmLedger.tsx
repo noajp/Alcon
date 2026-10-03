@@ -70,7 +70,7 @@ export function ScmLedger({ itemId, onItem }: { itemId: string | null; onItem: (
         <tbody>{(ledger.data?.rows ?? []).map(movement => {
           const item = items.get(movement.itemId);
           const order = movement.poId ? orders.get(movement.poId) : undefined;
-          const reversible = !movement.poId && movement.kind !== 'transfer_in' && movement.kind !== 'transfer_out';
+          const reversible = !movement.poId && !movement.reversed && movement.kind !== 'transfer_in' && movement.kind !== 'transfer_out';
           return <tr key={movement.id} className="border-b border-[var(--border-subtle)]">
             <td className="whitespace-nowrap py-2 pr-2 tabular-nums text-muted-foreground">{formatDay(movement.occurredOn, locale)}</td>
             <td className="max-w-64 px-2 py-2"><button type="button" className="block max-w-full truncate text-left hover:underline" onClick={() => onItem(movement.itemId)}>{item ? `${item.sku} · ${item.name}` : '—'}</button></td>
@@ -80,7 +80,7 @@ export function ScmLedger({ itemId, onItem }: { itemId: string | null; onItem: (
             <td className="max-w-72 px-2 py-2 text-xs text-muted-foreground">
               {order ? <button type="button" className="hover:underline" onClick={() => openOrder(order.id)}>PO-{order.number}</button> : <span className="block truncate" title={movement.note ?? undefined}>{movement.note ?? '—'}</span>}
             </td>
-            <td className="py-1 pl-2 text-right">{reversible && <Button size="icon-sm" variant="ghost" aria-label={t('Reverse this movement')} title={t('Reverse this movement')} onClick={() => setReversing(movement)}><Undo2 size={14} /></Button>}</td>
+            <td className="py-1 pl-2 text-right">{movement.reversed && <Pill tone="muted">{t('Reversed')}</Pill>}{reversible && <Button size="icon-sm" variant="ghost" aria-label={t('Reverse this movement')} title={t('Reverse this movement')} onClick={() => setReversing(movement)}><Undo2 size={14} /></Button>}</td>
           </tr>;
         })}</tbody>
       </table>

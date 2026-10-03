@@ -101,7 +101,6 @@ export function ScmLocations({ data, actions }: { data: ScmData; actions: ScmAct
   }
   return <Section title={t('Locations')} description={t('Warehouses, stores or sites that hold stock. Each item is planned per location.')}>
     <ul className="divide-y divide-[var(--border-subtle)]">{data.locations.map(location => {
-      const used = data.stock.some(row => row.locationId === location.id) || data.orders.some(order => order.locationId === location.id);
       return <li key={location.id} className="flex items-center gap-3 py-2 text-sm">
         {renaming?.id === location.id ? <form className="flex flex-1 flex-wrap items-center gap-2" onSubmit={event => { event.preventDefault(); void rename(); }}>
           <input autoFocus aria-label={t('Name')} className={`${SCM_INPUT} min-w-40 flex-1`} value={renaming.name} onChange={event => setRenaming({ ...renaming, name: event.target.value })} />
@@ -111,7 +110,7 @@ export function ScmLocations({ data, actions }: { data: ScmData; actions: ScmAct
         </form> : <>
           <span className="flex-1">{location.name}</span><span className="text-xs text-muted-foreground">{location.code}</span>
           <Button size="icon-sm" variant="ghost" aria-label={t('Rename {name}', { name: location.name })} onClick={() => setRenaming({ id: location.id, name: location.name, code: location.code ?? '' })}><Pencil size={14} /></Button>
-          {!used && <Button size="icon-sm" variant="ghost" aria-label={t('Delete {name}', { name: location.name })} onClick={() => setConfirm(location.id)}><Trash2 size={14} /></Button>}
+          <Button size="icon-sm" variant="ghost" aria-label={t('Delete {name}', { name: location.name })} onClick={() => setConfirm(location.id)}><Trash2 size={14} /></Button>
         </>}
       </li>;
     })}</ul>
@@ -122,7 +121,7 @@ export function ScmLocations({ data, actions }: { data: ScmData; actions: ScmAct
       <Button type="submit" variant="secondary" disabled={!name.trim()}><Plus size={14} />{t('Add location')}</Button>
     </form>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    <ConfirmDialog open={!!confirm} title={t('Delete this location?')} description={t('This location has no stock history or orders. It will be removed.')}
+    <ConfirmDialog open={!!confirm} title={t('Delete this location?')} description={t('Only a location with no stock history or orders can be deleted. Otherwise rename it.')}
       confirmLabel={t('Delete')} onCancel={() => setConfirm(null)} onConfirm={() => { const id = confirm; setConfirm(null); if (id) void actions.deleteLocation(id).catch(cause => setError(t(cause instanceof Error ? cause.message : String(cause)))); }} />
   </Section>;
 }
@@ -167,7 +166,7 @@ export function ScmDataSection({ data, actions }: { data: ScmData; actions: ScmA
     <Button variant="danger" disabled={busy} onClick={() => setConfirm(true)}><Trash2 size={14} />{t('Delete all SCM data')}</Button>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     <ConfirmDialog open={confirm} busy={busy} title={t('Delete all SCM data?')} description={t('{n} items and their full history will be deleted for everyone in this Space. This cannot be undone.', { n: data.items.length })} confirmLabel={t('Delete all')}
-      onCancel={() => setConfirm(false)} onConfirm={() => { setBusy(true); void actions.clearAll().catch(cause => setError(String(cause))).finally(() => { setBusy(false); setConfirm(false); }); }} />
+      onCancel={() => setConfirm(false)} onConfirm={() => { setBusy(true); void actions.clearAll().catch(cause => setError(t(cause instanceof Error ? cause.message : String(cause)))).finally(() => { setBusy(false); setConfirm(false); }); }} />
   </Section>;
 }
 

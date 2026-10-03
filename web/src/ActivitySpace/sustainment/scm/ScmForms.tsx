@@ -5,6 +5,7 @@ import { ArrowRight, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
 import { DateField } from '@/Function/shared/date';
+import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { ScmActions, ScmData, ScmItemDraft, ScmSupplierDraft } from '@/hooks/useScm';
 import { addDays, type ScmItem, type ScmNode, type ScmPoStatus } from './scmEngine';
@@ -80,8 +81,6 @@ export function ItemDialog({ data, actions, item, onClose }: { data: ScmData; ac
   }));
   const set = (key: keyof typeof form) => (value: string) => setForm(current => ({ ...current, [key]: value }));
   const categories = useMemo(() => [...new Set(data.items.map(entry => entry.category).filter(Boolean) as string[])].sort(), [data.items]);
-  // The database refuses to delete anything with history; offer only what it allows.
-  const hasHistory = !!item && (data.stock.some(row => row.itemId === item.id) || data.orders.some(order => order.lines.some(line => line.itemId === item.id)));
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -125,9 +124,9 @@ export function ItemDialog({ data, actions, item, onClose }: { data: ScmData; ac
       </div>}
       <Footer busy={busy} error={error} onClose={onClose} submit={item ? t('Save') : t('Add item')} extra={item && <>
         <Button type="button" variant="ghost" disabled={busy} onClick={() => void run(() => actions.setItemActive(item.id, !item.active))}>{item.active ? t('Archive') : t('Restore')}</Button>
-        {!hasHistory && <Button type="button" variant="danger" disabled={busy} onClick={() => void run(() => actions.deleteItem(item.id))}>{t('Delete')}</Button>}
+        <Button type="button" variant="danger" disabled={busy} onClick={() => void (async () => { if (await appDialog.confirm(t('Delete {name}? Only an item with no stock history or orders can be deleted.', { name: item.name }))) await run(() => actions.deleteItem(item.id)); })()}>{t('Delete')}</Button>
       </>} />
-      {item && <p className="text-[11px] text-muted-foreground">{hasHistory ? t('This item has stock history or orders, so it can be archived but not deleted. Archived items leave the plan and keep their history.') : t('This item has no history yet, so it can be deleted.')}</p>}
+      {item && <p className="text-[11px] text-muted-foreground">{t('Archived items leave the plan and keep their history. An item with stock history or orders cannot be deleted; archive it instead.')}</p>}
     </form>
   </FormDialog>;
 }
@@ -159,9 +158,8 @@ export function SupplierDialog({ data, actions, supplierId, onClose }: { data: S
         <Field label={t('Currency')}><input maxLength={3} className={SCM_INPUT} value={form.currency} onChange={event => set('currency')(event.target.value.toUpperCase())} /></Field>
         <div className="sm:col-span-2"><Field label={t('Remarks')}><textarea rows={2} className={`${SCM_INPUT} h-auto py-1.5`} value={form.notes} onChange={event => set('notes')(event.target.value)} /></Field></div>
       </div>
-      <Footer busy={busy} error={error} onClose={onClose} submit={supplier ? t('Save') : t('Add supplier')} extra={supplier && !data.orders.some(order => order.supplierId === supplier.id) &&
-        <Button type="button" variant="danger" disabled={busy} onClick={() => void run(() => actions.deleteSupplier(supplier.id))}>{t('Delete')}</Button>} />
-      {supplier && data.orders.some(order => order.supplierId === supplier.id) && <p className="text-[11px] text-muted-foreground">{t('This supplier has purchase orders, so it is kept for their history.')}</p>}
+      <Footer busy={busy} error={error} onClose={onClose} submit={supplier ? t('Save') : t('Add supplier')} extra={supplier &&
+        <Button type="button" variant="danger" disabled={busy} onClick={() => void (async () => { if (await appDialog.confirm(t('Delete {name}? A supplier with purchase orders is kept for their history and cannot be deleted.', { name: supplier.name }))) await run(() => actions.deleteSupplier(supplier.id)); })()}>{t('Delete')}</Button>} />
     </form>
   </FormDialog>;
 }
@@ -306,13 +304,21 @@ export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { d
   const open = ['approved', 'sent', 'partial'].includes(order.status);
   const overdue = open && order.expectedOn < data.today;
   const editable = order.status === 'draft' || open;
-  const addable = data.items.filter(item => item.active && !order.lines.some(line => line.itemId === item.id));
+  /** Items that can still be added: not on the order and not picked in another new row. */
+  const addableFor = (index: number) => data.items.filter(item => item.active && !order.lines.some(line => line.itemId === item.id)
+    && !adding.some((entry, at) => at !== index && entry.itemId === item.id));
   function saveLines() {
     if (!editing) return;
-    const lines = order!.lines.map(line => ({ id: line.id, quantity: Number(editing[line.id] ?? line.quantity) })).filter((line, index) => line.quantity !== order!.lines[index].quantity);
-    if (lines.some(line => !Number.isFinite(line.quantity) || line.quantity < 0)) { setError(t('Enter a quantity of zero or more. Zero removes the line.')); return; }
-    const add = adding.filter(line => line.itemId && Number(line.quantity) > 0)
-      .map(line => ({ itemId: line.itemId, quantity: Number(line.quantity), unitCost: data.items.find(item => item.id === line.itemId)?.unitCost ?? 0 }));
+    // An emptied field is a mistake, not a removal: only an explicit 0 or the bin removes a line.
+    const typed = order!.lines.map(line => ({ line, text: (editing[line.id] ?? String(line.quantity)).trim() }));
+    if (typed.some(entry => entry.text === '' || !Number.isFinite(Number(entry.text)) || Number(entry.text) < 0)) { setError(t('Enter a quantity of zero or more. Zero removes the line.')); return; }
+    const lines = typed.map(entry => ({ id: entry.line.id, quantity: Number(entry.text) })).filter((line, index) => line.quantity !== order!.lines[index].quantity);
+    const filled = adding.filter(line => line.itemId || line.quantity.trim());
+    if (filled.some(line => !line.itemId || !(Number(line.quantity) > 0))) { setError(t('Enter a quantity above zero for every new line.')); return; }
+    const add = filled.map(line => ({ itemId: line.itemId, quantity: Number(line.quantity), unitCost: data.items.find(item => item.id === line.itemId)?.unitCost ?? 0 }));
+    const kept = typed.filter(entry => Number(entry.text) > 0).length + add.length;
+    if (kept === 0) { setError(t('An order needs at least one line. Cancel it instead of removing every line.')); return; }
+    if (!lines.length && !add.length) { setEditing(null); setAdding([]); return; }
     void act(async () => { await actions.updateOrder(order!.id, { lines, add }); setEditing(null); setAdding([]); });
   }
 
@@ -355,7 +361,7 @@ export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { d
         })}</tbody>
         {editing && <tbody>{adding.map((line, index) => <tr key={`add-${index}`} className="border-t border-[var(--border-subtle)]">
           <td className="py-1"><Select label={t('Item')} value={line.itemId} onChange={value => setAdding(current => current.map((entry, at) => at === index ? { ...entry, itemId: value } : entry))}
-            options={[{ id: '', label: t('Choose…') }, ...addable.map(item => ({ id: item.id, label: `${item.sku} · ${item.name}` }))]} /></td>
+            options={[{ id: '', label: t('Choose…') }, ...addableFor(index).map(item => ({ id: item.id, label: `${item.sku} · ${item.name}` }))]} /></td>
           <td className="py-1 text-right"><input aria-label={t('Quantity')} inputMode="decimal" className={`${SCM_INPUT} ml-auto w-20 text-right`} value={line.quantity} onChange={event => setAdding(current => current.map((entry, at) => at === index ? { ...entry, quantity: event.target.value } : entry))} /></td>
           <td /><td />
         </tr>)}
@@ -378,7 +384,7 @@ export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { d
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {!receiving && !editing && <div className="flex flex-wrap justify-end gap-2">
         {editable && <Button variant="ghost" disabled={busy} className="mr-auto" onClick={() => setEditing({})}>{t('Edit lines')}</Button>}
-        {order.status === 'draft' && <Button variant="ghost" disabled={busy} onClick={() => void act(() => actions.deleteDraftOrder(order.id), true)}>{t('Delete draft')}</Button>}
+        {order.status === 'draft' && <Button variant="ghost" disabled={busy} onClick={() => void (async () => { if (await appDialog.confirm(t('Delete this draft? It is removed, and its approval Element is cancelled.'))) await act(() => actions.deleteDraftOrder(order.id), true); })()}>{t('Delete draft')}</Button>}
         {order.status === 'draft' && <>
           <Button variant="danger" disabled={busy} onClick={() => void act(() => actions.setOrderStatus(order.id, order.status, 'cancelled'), true)}>{t('Reject')}</Button>
           <Button variant="primary" disabled={busy} onClick={() => void act(() => actions.setOrderStatus(order.id, order.status, 'approved'), true)}>{t('Approve order')}</Button>

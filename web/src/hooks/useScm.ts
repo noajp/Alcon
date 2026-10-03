@@ -31,6 +31,8 @@ export interface ScmRunSummary {
 export interface ScmMovementRecord {
   id: string; itemId: string; locationId: string; kind: ScmMovementKind; quantity: number;
   occurredOn: string; poId: string | null; note: string | null; createdAt: string;
+  /** The movement this one reverses, and whether this one has been reversed. */
+  reversesId: string | null; reversed: boolean;
 }
 export interface ScmLedgerFilter { itemId?: string | null; locationId?: string | null; kind?: ScmMovementKind | null; from?: string | null; to?: string | null }
 
@@ -39,6 +41,8 @@ export function useScmLedger(spaceId: string | null, filter: ScmLedgerFilter, li
   const query = useQuery({
     queryKey: [...KEY(spaceId), 'ledger', filter, limit],
     enabled: !!spaceId,
+    // "Show more" keeps the rows on screen while the longer page loads.
+    placeholderData: previous => previous,
     queryFn: async () => {
       let request = supabase.from('scm_movements').select('*', { count: 'exact' }).eq('activity_space_id', spaceId!);
       if (filter.itemId) request = request.eq('item_id', filter.itemId);
@@ -48,12 +52,20 @@ export function useScmLedger(spaceId: string | null, filter: ScmLedgerFilter, li
       if (filter.to) request = request.lte('occurred_on', filter.to);
       const { data, error, count } = await request.order('occurred_on', { ascending: false }).order('created_at', { ascending: false }).order('id').range(0, limit - 1);
       if (error) throw new Error(error.message);
+      const ids = (data ?? []).map((row: Row) => String(row.id));
+      const reversed = new Set<string>();
+      for (let index = 0; index < ids.length; index += 100) {
+        const { data: hits, error: hitError } = await supabase.from('scm_movements').select('reverses_id').in('reverses_id', ids.slice(index, index + 100));
+        if (hitError) throw new Error(hitError.message);
+        for (const hit of hits ?? []) reversed.add(String((hit as Row).reverses_id));
+      }
       return {
         total: count ?? 0,
         rows: (data ?? []).map((row: Row): ScmMovementRecord => ({
           id: String(row.id), itemId: String(row.item_id), locationId: String(row.location_id), kind: row.kind as ScmMovementKind,
           quantity: num(row.quantity), occurredOn: String(row.occurred_on), poId: (row.po_id as string | null) ?? null,
           note: (row.note as string | null) ?? null, createdAt: String(row.created_at),
+          reversesId: (row.reverses_id as string | null) ?? null, reversed: reversed.has(String(row.id)),
         })),
       };
     },
@@ -255,7 +267,14 @@ export function useScmActions(spaceId: string | null) {
         await supabase.from('scm_purchase_orders').delete().eq('id', order.id);
         throw cause;
       }
-      if (draft.status !== 'draft') await check(supabase.from('scm_purchase_orders').update({ status: draft.status }).eq('id', order.id));
+      if (draft.status !== 'draft') {
+        try { await check(supabase.from('scm_purchase_orders').update({ status: draft.status }).eq('id', order.id)); }
+        catch (cause) {
+          // A draft nobody asked for is worse than no order: undo it.
+          await supabase.from('scm_purchase_orders').delete().eq('id', order.id);
+          throw cause;
+        }
+      }
       return order as { id: string; number: number };
     }
 
@@ -391,19 +410,19 @@ export function useScmActions(spaceId: string | null) {
           void queryClient.invalidateQueries({ queryKey: ['my-elements'] });
         }
       })()),
-      /** Changes an open order: its date, line quantities (0 removes a line) and new lines.
-       * The database refuses edits to closed orders and cuts below what was received. */
-      updateOrder: (id: string, patch: { expectedOn?: string; lines?: { id: string; quantity: number; unitCost?: number }[]; add?: { itemId: string; quantity: number; unitCost: number }[] }) => done((async () => {
+      /** Changes an open order: its date, and its lines all-or-nothing (quantity 0
+       * removes a line). The database keeps at least one line, refuses closed
+       * orders and cuts below what was received, and closes a partly received
+       * order once nothing is left open. */
+      updateOrder: (id: string, patch: { expectedOn?: string; lines?: { id: string; quantity: number }[]; add?: { itemId: string; quantity: number; unitCost: number }[] }) => done((async () => {
         if (patch.expectedOn) await check(supabase.from('scm_purchase_orders').update({ expected_on: patch.expectedOn }).eq('id', id));
-        for (const line of patch.lines ?? []) {
-          if (line.quantity > 0) await check(supabase.from('scm_po_lines').update({ quantity: line.quantity, ...(line.unitCost !== undefined ? { unit_cost: line.unitCost } : {}) }).eq('id', line.id).eq('po_id', id));
-          else await check(supabase.from('scm_po_lines').delete().eq('id', line.id).eq('po_id', id));
+        if (patch.lines?.length || patch.add?.length) {
+          await check(supabase.rpc('scm_update_po_lines', {
+            p_po: id,
+            p_changes: (patch.lines ?? []).map(line => ({ line_id: line.id, quantity: line.quantity })),
+            p_adds: (patch.add ?? []).map(line => ({ item_id: line.itemId, quantity: line.quantity, unit_cost: line.unitCost })),
+          }));
         }
-        if (patch.add?.length) {
-          await check(supabase.from('scm_po_lines').insert(patch.add.map(line => ({ activity_space_id: space(), po_id: id, item_id: line.itemId, quantity: line.quantity, unit_cost: line.unitCost }))));
-        }
-        const { count } = await supabase.from('scm_po_lines').select('id', { count: 'exact', head: true }).eq('po_id', id);
-        if (count === 0) throw new Error('An order needs at least one line. Cancel it instead of removing every line.');
       })()),
       /** Only a draft can be deleted; anything placed is cancelled so its history stays. */
       deleteDraftOrder: (id: string) => done((async () => {
@@ -411,7 +430,10 @@ export function useScmActions(spaceId: string | null) {
         if (error) throw new Error(error.message);
         if (!rows?.length) throw new Error('This order changed since you opened it. Refresh and try again.');
         const elementId = (rows[0] as Row).element_id as string | null;
-        if (elementId) await supabase.from('elements').update({ status: 'cancelled' }).eq('id', elementId);
+        if (elementId) {
+          await supabase.from('elements').update({ status: 'cancelled' }).eq('id', elementId);
+          void queryClient.invalidateQueries({ queryKey: ['my-elements'] });
+        }
       })()),
       /** The ledger is never edited: a mistaken movement is undone by an opposite adjustment. */
       reverseMovement: (movement: ScmMovementRecord, today: string, note: string) => done((async () => {
@@ -419,7 +441,7 @@ export function useScmActions(spaceId: string | null) {
         if (movement.kind === 'transfer_in' || movement.kind === 'transfer_out') throw new Error('Transfers are undone with a transfer back.');
         await check(supabase.from('scm_movements').insert({
           activity_space_id: space(), item_id: movement.itemId, location_id: movement.locationId, kind: 'adjust', quantity: -movement.quantity,
-          occurred_on: today, note,
+          occurred_on: today, note, reverses_id: movement.id,
         }));
       })()),
       receiveOrder: (id: string, lines: { lineId: string; quantity: number }[], receivedOn: string) =>
