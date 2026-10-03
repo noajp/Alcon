@@ -9,7 +9,7 @@
 // itself while it has no Domain (alcon_internal.user_manages_object).
 
 /** The column the database stamps when an Object is archived. */
-export const ARCHIVED_AT = 'archived_at';
+const ARCHIVED_AT = 'archived_at';
 
 export function isArchivedObject(object: { archived_at?: string | null } | null | undefined): boolean {
   return !!object?.archived_at;

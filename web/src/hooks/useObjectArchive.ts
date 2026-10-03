@@ -45,7 +45,7 @@ export async function restoreObject(objectId: string): Promise<void> {
 }
 
 /** Archived Objects whose primary Domain is `domainId`, newest first. */
-export async function fetchArchivedObjects(domainId: string): Promise<ArchivedObject[]> {
+async function fetchArchivedObjects(domainId: string): Promise<ArchivedObject[]> {
   const { data, error } = await supabase
     .from('objects')
     .select('id, name, color, domain_id, archived_at, archived_by')
@@ -71,7 +71,7 @@ export function useArchivedObjects(domainId: string | null) {
  * archived Objects out, so a link to one is resolved here. Cached under the
  * explorer prefix, so Element edits patch it and Object changes refresh it.
  */
-export async function fetchObjectById(objectId: string): Promise<ExplorerData> {
+async function fetchObjectById(objectId: string): Promise<ExplorerData> {
   const { data, error } = await supabase.rpc('get_explorer_data', { p_domain_id: null, p_object_id: objectId });
   if (error) throw error;
   return normalizeExplorerData(data as ExplorerData | null);
