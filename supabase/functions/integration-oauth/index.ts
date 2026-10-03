@@ -25,8 +25,8 @@
 //   POST /finish { handle }      (JWT) Takes the held token set once. Stores
 //                                it only when the caller is the person who
 //                                called /start and still owns the Space;
-//                                otherwise revokes it at Google and discards
-//                                it. A link that walks someone else through
+//                                otherwise discards it without revoking (see
+//                                discardHeld). A link that walks someone else through
 //                                the sign-in therefore never lands their
 //                                Google account in the starter's Space.
 //   POST /revoke { integrationId } (JWT, Space owner) → { ok, revoked }
@@ -298,10 +298,7 @@ Deno.serve(async (req: Request) => {
     if (!token || token.status !== 200) return await fail();
     const secret = secretFromTokenResponse(token.body, Date.now());
     if (!secret) return await fail();
-    if (!hasScope(secret.scope)) {
-      await revokeAtGoogle(secret.refresh_token);
-      return await fail();
-    }
+    if (!hasScope(secret.scope)) return await fail();
 
     // Held, not stored: only /finish, under the starter's own JWT, stores it.
     const email = await googleEmail(secret.access_token);
@@ -309,10 +306,7 @@ Deno.serve(async (req: Request) => {
     const { error: stashErr } = await admin.rpc("stash_integration_oauth_pending", {
       p_flow_id: flowId, p_secret: JSON.stringify(secret), p_account: email, p_completion_hash: await sha256Hex(handle),
     });
-    if (stashErr) {
-      await revokeAtGoogle(secret.refresh_token);
-      return await fail();
-    }
+    if (stashErr) return await fail();
     return backToApp("finish", integrationId, handle);
   }
 
@@ -333,10 +327,11 @@ Deno.serve(async (req: Request) => {
     if (!pending) return json({ error: "This Google sign-in has already been used or has expired.", code: "not_found" }, 404);
     const secret = parseOAuthSecret(pending.token_set);
     const integrationId = pending.flow_integration_id;
-    const discard = async (status: number, error: string, code: string) => {
-      if (secret) await revokeAtGoogle(secret.refresh_token);
-      return json({ error, code, integrationId }, status);
-    };
+    // Discarded, not revoked: Google's revoke ends Alcon's whole grant for
+    // that Google account, which would also cut the connections that person
+    // already has in their own Spaces. The held tokens are gone once taken,
+    // so nobody holds a usable token for this sign-in.
+    const discard = async (status: number, error: string, code: string) => json({ error, code, integrationId }, status);
     if (!secret) return json({ error: "could not finish the sign-in", integrationId }, 500);
 
     const decision = finishDecision({ flowUserId: pending.flow_user_id, callerId: who.userId, expiresAt: pending.flow_expires_at, nowMs: Date.now() });
