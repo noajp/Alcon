@@ -55,6 +55,22 @@ export function isSafeEndpoint(raw: string): boolean {
   return true;
 }
 
+/**
+ * Pure. True when an integration points at this Alcon project itself (its
+ * Supabase host — alcon-mcp, the REST API, any Edge Function). An agent
+ * already has the board tools under its starter's RLS; reaching Alcon again
+ * through a stored credential would act outside that run (ADR 0031).
+ */
+export function pointsAtAlcon(endpoint: string, supabaseUrl: string | null | undefined): boolean {
+  if (!supabaseUrl) return false;
+  try {
+    const host = (raw: string) => new URL(raw).hostname.toLowerCase().replace(/\.+$/, "");
+    return host(endpoint) === host(supabaseUrl);
+  } catch {
+    return false;
+  }
+}
+
 /** Pure. The URL an http_request may hit: base + path, never outside base. */
 export function resolveUnderBase(base: string, path: string, query?: Record<string, unknown>): string {
   if (typeof path !== "string" || /^[a-z][a-z0-9+.-]*:/i.test(path) || path.startsWith("//") || path.includes("\\")) {

@@ -156,16 +156,40 @@ const KNOWN_CLIENTS: [RegExp, string][] = [
   [/cursor/i, "Cursor"],
 ];
 
+const NAME_UNSAFE = /[^\p{L}\p{N} ._-]/gu;
+
+/** Pure. A caller-supplied name, reduced to letters, digits, space and ._- and at most 40 characters. */
+export function sanitizeName(raw: string | null | undefined): string {
+  return (raw ?? "").replace(NAME_UNSAFE, "").trim().slice(0, 40).trim();
+}
+
 /**
- * Pure. The name an MCP write is recorded under: `?client=` on the
- * connection URL when the person set one, else the client recognised from
- * its User-Agent, always suffixed "(MCP)" so the Activity rail says which
- * door the change came through.
+ * Pure. The client a call came from: `?client=` on the connection URL when
+ * the person set one, else the client recognised from its User-Agent.
  */
-export function clientLabel(url: URL, userAgent: string | null): string {
-  const explicit = (url.searchParams.get("client") ?? "").replace(/[^\p{L}\p{N} ._-]/gu, "").trim().slice(0, 40);
-  if (explicit) return `${explicit} (MCP)`;
+export function clientName(url: URL, userAgent: string | null): string {
+  const explicit = sanitizeName(url.searchParams.get("client"));
+  if (explicit) return explicit;
   const ua = userAgent ?? "";
   const known = KNOWN_CLIENTS.find(([re]) => re.test(ua));
-  return `${known ? known[1] : "AI"} (MCP)`;
+  return known ? known[1] : "AI";
+}
+
+/** How the caller authenticated, when it adds to the record: a personal access token's name. */
+export interface ClientVia {
+  token?: string | null;
+}
+
+/**
+ * Pure. The name an MCP write is recorded under: the client's name suffixed
+ * "(MCP)" so the Activity rail says which door the change came through, and,
+ * for a personal access token, which token — "Claude Code (MCP · token: laptop)".
+ */
+export function clientLabel(url: URL, userAgent: string | null, via?: ClientVia | null): string {
+  const name = clientName(url, userAgent);
+  if (via && typeof via.token === "string") {
+    const token = sanitizeName(via.token);
+    return token ? `${name} (MCP · token: ${token})` : `${name} (MCP · token)`;
+  }
+  return `${name} (MCP)`;
 }

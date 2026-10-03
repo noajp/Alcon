@@ -1291,6 +1291,32 @@ export interface Integration {
 export type IntegrationUpdate = Partial<Pick<Integration,
   'name' | 'description' | 'endpoint' | 'auth_type' | 'auth_header' | 'delegation' | 'enabled'>>
 
+export type PersonalAccessTokenAccess = 'read' | 'read_write'
+
+// A personal access token (ADR 0031): lets an external client act as its
+// owner through alcon-mcp, under the owner's RLS. Only the owner reads their
+// rows, and never the hash; the plaintext exists once, in the result of
+// create_personal_access_token. Issue and revoke go through RPCs.
+export interface PersonalAccessToken {
+  id: string
+  user_id: string
+  name: string
+  /** The first 12 characters of the token ("alc_pat_" + 4), to tell tokens apart. */
+  token_prefix: string
+  access: PersonalAccessTokenAccess
+  expires_at: string | null
+  last_used_at: string | null
+  last_used_client: string | null
+  revoked_at: string | null
+  created_at: string
+}
+
+/** What create_personal_access_token returns — the only time the token is readable. */
+export interface IssuedPersonalAccessToken {
+  id: string
+  token: string
+}
+
 export type AgentActionStatus = 'pending' | 'approved' | 'rejected' | 'executed' | 'failed'
 
 /** One proposal waiting for (or decided by) a person — an external write, or a batch of them. */

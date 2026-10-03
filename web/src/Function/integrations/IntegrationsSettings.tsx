@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, ChevronDown, Copy, ExternalLink, LayoutGrid, List, Search } from 'lucide-react';
+import { Check, ChevronDown, ExternalLink, LayoutGrid, List, Search } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
@@ -17,20 +17,17 @@ import {
 } from './catalog';
 import { useIntegrations, useIsSpaceOwner } from './data';
 import { IntegrationDetailDialog, IntegrationIcon, SourceChip } from './IntegrationDetailDialog';
+import { AlconConnectPanel } from './AlconConnectPanel';
 
 // Settings › Integrations (ADR 0027). Two tabs:
 //   external  connect a Space's external services so agents can use them on
 //             Elements — a catalog modelled on Supabase's Integrations page,
 //             then the Space's connections.
-//   alcon     the other direction: point an MCP client at Alcon.
+//   alcon     the other direction: point an MCP client or script at Alcon
+//             with a personal access token (AlconConnectPanel, ADR 0031).
 // Members see everything read-only; only owners can connect or change.
 
 const DOCS_URL = 'https://github.com/noajp/Alcon/blob/main/docs/mcp.md';
-// Derived from the project this build talks to, so preview and local builds
-// show their own addresses.
-const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/\/+$/, '');
-const ALCON_MCP_URL = `${SUPABASE_URL}/functions/v1/alcon-mcp`;
-const AUTH_STORAGE_KEY = `sb-${SUPABASE_URL.replace(/^https?:\/\//, '').split('.')[0]}-auth-token`;
 
 export function IntegrationsSettings({ tab }: { tab: string | null }) {
   return tab === 'alcon' ? <AlconConnectPanel /> : <ExternalServicesPanel />;
@@ -280,61 +277,5 @@ function TestStatus({ integration }: { integration: Integration }) {
         tone === 'success' ? 'bg-[var(--status-success)]' : tone === 'danger' ? 'bg-[var(--status-danger)]' : 'bg-muted-foreground')} />
       {tone === 'success' ? t('Connected') : tone === 'neutral' ? t('Reachable') : t('Error')}
     </span>
-  );
-}
-
-// ── Alcon へ接続する ────────────────────────────────────────────────────────
-
-function AlconConnectPanel() {
-  const { t } = useI18n();
-  const command = `claude mcp add --transport http alcon "${ALCON_MCP_URL}?client=Claude%20Code" --header "Authorization: Bearer <access_token>"`;
-  return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-[15px] font-semibold text-foreground">{t('Connect to Alcon')}</h2>
-        <p className="mt-1 text-[12px] text-muted-foreground">
-          {t("Alcon is an MCP server. Point an MCP client at it and the client can read and update this board within your permissions.")}
-        </p>
-      </div>
-
-      <section className="space-y-2">
-        <h3 className="text-[13px] font-medium text-foreground">{t('Endpoint')}</h3>
-        <CopyField value={ALCON_MCP_URL} />
-      </section>
-
-      <section className="space-y-2">
-        <h3 className="text-[13px] font-medium text-foreground">Claude Code</h3>
-        <ol className="list-decimal space-y-2 pl-5 text-[12px] text-muted-foreground">
-          <li>{t('In a signed-in Alcon tab, open DevTools and copy access_token from the localStorage entry {key}.', { key: AUTH_STORAGE_KEY })}</li>
-          <li>{t('Run this command, replacing <access_token> with it:')}</li>
-        </ol>
-        <CopyField value={command} multiline />
-        <p className="text-[12px] text-muted-foreground">{t('The access token expires after an hour. When requests start failing, run the command again with a new token.')}</p>
-      </section>
-
-      <p className="rounded-lg border border-border/60 bg-[var(--surface-rail)]/40 px-4 py-3 text-[12px] text-muted-foreground">
-        {t('Coming next: OAuth for claude.ai and ChatGPT connectors, and personal access tokens.')}
-      </p>
-    </div>
-  );
-}
-
-function CopyField({ value, multiline = false }: { value: string; multiline?: boolean }) {
-  const { t } = useI18n();
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch { /* clipboard unavailable; the text stays selectable */ }
-  };
-  return (
-    <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-[var(--surface-rail)]/40 px-3 py-2">
-      <code className={cn('min-w-0 flex-1 select-all font-mono text-[12px] text-foreground', multiline ? 'whitespace-pre-wrap break-all' : 'truncate')}>{value}</code>
-      <Button variant="ghost" size="icon-xs" aria-label={copied ? t('Copied') : t('Copy')} onClick={copy}>
-        {copied ? <Check size={12} /> : <Copy size={12} />}
-      </Button>
-    </div>
   );
 }
