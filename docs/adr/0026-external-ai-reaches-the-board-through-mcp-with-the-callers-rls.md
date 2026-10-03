@@ -1,5 +1,7 @@
 # 0026 — External AI reaches the board through MCP with the caller's RLS
 
+> 置き換え: [0032](0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)（認証の判断だけ。MCP の入口と公開範囲はこの ADR のまま）
+
 ## 背景
 
 Claude や ChatGPT などの外部 AI から盤面を読み書きしたいという要望がある（ELE_PLT-003）。PRODUCT.md は「モデルや外部 AI が交代しても同じ権限と実行契約を使える」ことを目指し、「誰／どの AI が、何に基づいて変更したか」を辿れることを求めている。アプリ内 Copilot（`alcon-copilot`）は、呼び出したユーザーの JWT で RLS を効かせるボードツールをすでに持っていた。ただしそれは Copilot の中にしかなく、一部のツールは実在しない列を参照して失敗していた（`domains.prefix`、`estimate_hours`、`workers.kind`、`element_comments.body`、および display_id で Element を引けない不具合）。

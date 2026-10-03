@@ -31,7 +31,7 @@ import { runBoardTool, errorMessage, type BoardActor, type ToolDef } from "../_s
 import { runStrategyTool } from "../_shared/strategyTools.ts";
 import { AGENT_MODELS, DEFAULT_AGENT_MODEL, costOf, isAgentModel, type AgentModel, type ModelUsage } from "../_shared/aiPricing.ts";
 import {
-  McpSession, callHttp, httpIsRead, HTTP_REQUEST_SCHEMA, isSafeEndpoint, type IntegrationRow, type RemoteTool,
+  McpSession, callHttp, httpIsRead, HTTP_REQUEST_SCHEMA, isSafeEndpoint, pointsAtAlcon, type IntegrationRow, type RemoteTool,
 } from "../_shared/integrationClient.ts";
 import { approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR } from "./agentTools.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
@@ -285,6 +285,12 @@ async function execute(a: ExecArgs): Promise<void> {
       .eq("activity_space_id", run.activity_space_id).eq("enabled", true).order("created_at");
     for (const row of (rows ?? []) as (IntegrationRow & { enabled: boolean })[]) {
       if (!isSafeEndpoint(row.endpoint)) continue;
+      // Never Alcon itself: the board tools already act as the starter, and a
+      // stored token would act outside this run.
+      if (pointsAtAlcon(row.endpoint, Deno.env.get("SUPABASE_URL"))) {
+        await addStep(admin, run.id, "error", `連携「${row.name}」は Alcon 自身を指しているため使いません`, "盤面の操作はエージェントの標準の道具で行います。");
+        continue;
+      }
       const { data: secret } = await admin.rpc("get_integration_secret", { p_integration_id: row.id });
       const prefix = integrationPrefix(row.name, row.id);
       try {

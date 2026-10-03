@@ -1,12 +1,15 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { BOARD_TOOLS, runBoardTool, type BoardActor, type ToolDef } from "../_shared/boardTools.ts";
 import { STRATEGY_TOOLS, runStrategyTool } from "../_shared/strategyTools.ts";
+import type { CallerAccess } from "../_shared/callerAuth.ts";
 import type { McpTool, ToolHost } from "./protocol.ts";
 
 // What an external AI may do through MCP. Reads, plus the writes a person
 // delegates day to day: create and update Elements, comment, assign, label,
 // and tick subelements. Deletes, bulk writes, moving between Objects and
 // Object edits stay in the app, where the person sees what they touch.
+// A read-only personal access token is offered the reads alone, so the
+// allowlist in protocol.ts refuses every write before it reaches a tool.
 
 export const MCP_READ_TOOLS = [
   "listMyDomains",
@@ -54,21 +57,28 @@ function toMcp(def: ToolDef): McpTool {
   };
 }
 
-export function mcpTools(): McpTool[] {
+export function mcpTools(access: CallerAccess = "read_write"): McpTool[] {
   const byName = new Map([...BOARD_TOOLS, ...STRATEGY_TOOLS].map((t) => [t.name, t]));
-  return [...MCP_READ_TOOLS, ...MCP_WRITE_TOOLS].map((name) => {
+  const names: readonly string[] = access === "read_write" ? [...MCP_READ_TOOLS, ...MCP_WRITE_TOOLS] : MCP_READ_TOOLS;
+  return names.map((name) => {
     const def = byName.get(name);
     if (!def) throw new Error(`MCP tool ${name} has no definition`);
     return toMcp(def);
   });
 }
 
-export function mcpHost(supabase: SupabaseClient, actor: BoardActor): ToolHost {
+export function mcpHost(supabase: SupabaseClient, actor: BoardActor, access: CallerAccess = "read_write"): ToolHost {
+  const tools = mcpTools(access);
+  const offered = new Set(tools.map((t) => t.name));
   return {
-    tools: mcpTools(),
-    call: (name, args) =>
-      STRATEGY_NAMES.has(name)
-        ? runStrategyTool(supabase, name, args)
-        : runBoardTool(supabase, name, args, actor),
+    tools,
+    call: async (name, args) => {
+      // protocol.ts already refuses tools that are not listed; this keeps a
+      // read-only host read-only even if called directly.
+      if (!offered.has(name)) return { ok: false, error: `Tool ${name} is not available to this connection` };
+      return STRATEGY_NAMES.has(name)
+        ? await runStrategyTool(supabase, name, args)
+        : await runBoardTool(supabase, name, args, actor);
+    },
   };
 }

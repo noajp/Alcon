@@ -373,6 +373,8 @@ Claude API を Supabase Edge Functions 経由で利用：
 - `analyze-change`：変更分析
 - `validate-task`：Element 検証
 
+外部の AI やスクリプトは `alcon-mcp`（MCP サーバー）から本人として盤面を読み書きする。資格情報は、本人が Settings › Integrations で発行する個人用アクセストークン（読み取りのみも選べ、いつでも取り消せる）。関数がそれを本人の短命な JWT に交換するので、アプリと同じ RLS が効き、書き込みの記録にはどのトークン経由かが残る（[ADR 0032](../docs/adr/0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)）。
+
 ## 拡張構想
 
 拡張は、実顧客の反復業務で現在の道具では解けない負担が確認でき、導入と日常操作を複雑にする費用を上回る場合に選ぶ。Sustainmentでは、Workload・CRM・SCMを起点に、Object単位の道具を横断して使うことや、予算・会計・契約・購買・勤怠・設備まで扱うことが候補になる。概念上分類できることだけを開発理由にしない。
