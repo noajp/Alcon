@@ -32,7 +32,7 @@ import { DomainOverview } from '@/ActivitySpace/execution/domain/DomainOverview'
 import { DomainView } from '@/ActivitySpace/execution/domain/DomainView'; // eager — default landing view
 const DomainsView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
 const TableView = dynamic(() => import('@/ActivitySpace/sustainment/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
-const OperationsView = dynamic(() => import('@/ActivitySpace/sustainment/operations/OperationsView').then(m => m.OperationsView), { ssr: false, loading: viewLoading });
+const ScmView = dynamic(() => import('@/ActivitySpace/sustainment/scm/ScmView').then(m => m.ScmView), { ssr: false, loading: viewLoading });
 const CrmView = dynamic(() => import('@/ActivitySpace/sustainment/crm/CrmView').then(m => m.CrmView), { ssr: false, loading: viewLoading });
 const TeamView = dynamic(() => import('@/ActivitySpace/sustainment/team/TeamView').then(m => m.TeamView), { ssr: false, loading: viewLoading });
 const MyCalendarView = dynamic(() => import('@/ActivitySpace/home/MyCalendarView').then(m => m.MyCalendarView), { ssr: false, loading: viewLoading });
@@ -221,9 +221,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             <CrmView navigation={navigation} onNavigate={onNavigate} onViewChange={onViewChange} />
           )}
 
-          {activeActivity === 'scm' && (
-            <OperationsView navigation={navigation} kind={activeActivity} onNavigate={onNavigate} onViewChange={onViewChange} />
-          )}
+          {activeActivity === 'scm' && <ScmView navigation={navigation} onNavigate={onNavigate} />}
 
           {activeActivity === 'team' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">

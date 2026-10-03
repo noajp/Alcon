@@ -13,7 +13,7 @@ import type { Json } from '@/types/database';
 import { normalizeOperationsParams, OPERATIONS_FIELDS, type OperationsParams } from '@/ActivitySpace/sustainment/operations/operationsModel';
 import { appendActivity, buildCrmWorkspace, normalizeCrmStages, type CrmActivity, type CrmDeal, type CrmStage } from './crmModel';
 
-export type CrmFieldKey = typeof OPERATIONS_FIELDS.crm[number]['key'];
+export type CrmFieldKey = typeof OPERATIONS_FIELDS[number]['key'];
 export type CrmValues = Partial<Record<string, Json | null>>;
 
 /** The CRM App's single source: the saved pipeline settings (the CRM board's
@@ -44,7 +44,7 @@ export function useCrm({ restore = false }: { restore?: boolean } = {}) {
   const source = useWidgetTableData(!tables.loading && !tables.error && eligible ? params.tableId : null);
   const data = source.data;
   const today = toDateOnlyString(new Date());
-  const ready = !!data && OPERATIONS_FIELDS.crm.every(field => !field.required || data.columns.some(column => column.id === params.fields[field.key] && field.allowedTypes.includes(column.type)));
+  const ready = !!data && OPERATIONS_FIELDS.every(field => !field.required || data.columns.some(column => column.id === params.fields[field.key] && field.allowedTypes.includes(column.type)));
   const workspace = useMemo(() => data && ready ? buildCrmWorkspace(data, rawParams, today) : null, [data, ready, rawParams, today]);
 
   const instanceId = instance?.id ?? null;
@@ -88,7 +88,7 @@ export function useCrm({ restore = false }: { restore?: boolean } = {}) {
     await saveDeal(deal.id, values);
   }, [columnFor, saveDeal, today]);
 
-  const missingColumns = OPERATIONS_FIELDS.crm.filter(field => !field.required && !columnFor(field.key));
+  const missingColumns = OPERATIONS_FIELDS.filter(field => !field.required && !columnFor(field.key));
   /** Adds the optional CRM columns an older pipeline Table lacks, and connects them. */
   const addMissingColumns = useCallback(async () => {
     if (!params.tableId || !data || !missingColumns.length) return;

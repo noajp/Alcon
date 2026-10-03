@@ -7,11 +7,11 @@ import {
 } from '@/ActivitySpace/sustainment/crm/crmModel';
 
 const today = '2026-10-03';
-const fields = Object.fromEntries(OPERATIONS_FIELDS.crm.map(field => [field.key, field.key]));
+const fields = Object.fromEntries(OPERATIONS_FIELDS.map(field => [field.key, field.key]));
 
 function workspace(values: Record<string, Json | null>[], extra: Record<string, unknown> = {}) {
   const schema = {
-    columns: OPERATIONS_FIELDS.crm.map(field => ({ id: field.key, type: field.type })),
+    columns: OPERATIONS_FIELDS.map(field => ({ id: field.key, type: field.type })),
     rows: values.map((_, index) => ({ id: `r${index}`, created_at: '2026-09-01T00:00:00Z' })),
     cellsByRow: Object.fromEntries(values.map((value, index) => [`r${index}`, value])),
   };

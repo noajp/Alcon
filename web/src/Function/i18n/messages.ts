@@ -1,5 +1,6 @@
 import type { Locale } from './locales';
 import { CRM_TRANSLATIONS } from '@/ActivitySpace/sustainment/crm/crmMessages';
+import { SCM_MESSAGES } from './scmMessages';
 
 type TranslationMap = Record<string, string>;
 
@@ -901,3 +902,9 @@ Object.assign(ja, CRM_TRANSLATIONS.ja);
 Object.assign(ko, CRM_TRANSLATIONS.ko);
 Object.assign(fr, CRM_TRANSLATIONS.fr);
 Object.assign(es, CRM_TRANSLATIONS.es);
+
+// The SCM App (Sustainment).
+Object.assign(ja, SCM_MESSAGES.ja);
+Object.assign(ko, SCM_MESSAGES.ko);
+Object.assign(fr, SCM_MESSAGES.fr);
+Object.assign(es, SCM_MESSAGES.es);

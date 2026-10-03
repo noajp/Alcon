@@ -1,10 +1,19 @@
-import type { OperationsQueue } from '@/ActivitySpace/sustainment/operations/operationsQueues';
+import type { ScmView } from '@/ActivitySpace/sustainment/scm/scmNavigation';
+import type { ScmHealth } from '@/ActivitySpace/sustainment/scm/scmEngine';
 import type { CrmRoute } from '@/ActivitySpace/sustainment/crm/crmRoute';
 
 export interface NavigationState {
-  /** Each operations App keeps its selected queue within this window tab. */
-  crmQueue?: OperationsQueue;
-  scmQueue?: OperationsQueue;
+  /** SCM: the open pane, the location every pane is filtered to (null = all),
+   * the item-location open in detail (`itemId:locationId`), and the open
+   * purchase order. */
+  scmView?: ScmView;
+  scmLocationId?: string | null;
+  scmNode?: string | null;
+  scmOrderId?: string | null;
+  /** Inventory filtered to one stock health, when opened from a health count. */
+  scmHealth?: ScmHealth | null;
+  /** Scenarios opened from a supplier, pre-set to simulate its delay. */
+  scmSupplierDelay?: string | null;
   /** The CRM App's view, filters and open deal within this window tab. */
   crm?: CrmRoute;
   objectId: string | null;

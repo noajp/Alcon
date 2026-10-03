@@ -70,7 +70,7 @@ export function CrmSettings({ crm, onOpenTable, onDone }: { crm: Crm; onOpenTabl
   const { t } = useI18n();
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const setup = <OperationsSetup params={crm.params} tables={crm.tables.data} columns={crm.data?.columns ?? []} allowKindChange={false}
+  const setup = <OperationsSetup params={crm.params} tables={crm.tables.data} columns={crm.data?.columns ?? []}
     onChange={patch => crm.setParams(typeof patch === 'function' ? patch(crm.params) : patch)} onDone={onDone} />;
   if (!crm.workspace) return <div className="space-y-4">{crm.params.tableId && !crm.eligible && !crm.loading && <p role="alert" className="text-sm text-muted-foreground">{t('The connected Table is no longer available. Choose another below.')}</p>}{setup}</div>;
   return <div className="max-w-3xl space-y-10">

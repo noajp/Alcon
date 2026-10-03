@@ -6,9 +6,9 @@ import {
 } from '@/ActivitySpace/sustainment/crm/crmCapture';
 
 const today = '2026-10-03'; // a Saturday
-const fields = Object.fromEntries(OPERATIONS_FIELDS.crm.map(field => [field.key, field.key]));
+const fields = Object.fromEntries(OPERATIONS_FIELDS.map(field => [field.key, field.key]));
 const { deals } = buildCrmWorkspace({
-  columns: OPERATIONS_FIELDS.crm.map(field => ({ id: field.key, type: field.type })),
+  columns: OPERATIONS_FIELDS.map(field => ({ id: field.key, type: field.type })),
   rows: [{ id: 'acme' }, { id: 'beta' }],
   cellsByRow: {
     acme: { name: 'Acme rollout', account: 'Acme', stage: 'proposal', amount: 1000, probability: 50, currency: 'USD', closeDate: '2026-11-01' },
