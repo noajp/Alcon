@@ -18,6 +18,7 @@ import { ScmExceptions, ScmInventory, ScmOrders, ScmSuppliers } from './ScmLists
 import { ScmReplenish } from './ScmReplenish';
 import { ScmItemDetail } from './ScmItemDetail';
 import { ScmScenarios } from './ScmScenarios';
+import { ScmLedger } from './ScmLedger';
 import { ScmDataSection, ScmImport, ScmLocations, ScmOnboarding, ScmPolicyForm } from './ScmSettings';
 
 const DESCRIPTION: Record<ScmPane, string> = {
@@ -26,6 +27,7 @@ const DESCRIPTION: Record<ScmPane, string> = {
   replenish: 'Orders the planner proposes, with the evidence for each line.',
   orders: 'Every purchase order, from draft to received.',
   inventory: 'Stock, demand and cover for every item at every location.',
+  ledger: 'Every receipt, issue, transfer and adjustment, newest first.',
   suppliers: 'How each supplier really delivers.',
   scenarios: 'Change an assumption and see what breaks.',
   settings: 'The policy the planner works within, locations, and data.',
@@ -49,7 +51,7 @@ export function ScmView({ navigation, onNavigate }: { navigation: NavigationStat
 
   const nodes = useMemo(() => plan?.nodes.filter(node => !locationId || node.locationId === locationId) ?? [], [plan, locationId]);
   const go = useCallback((next: ScmPane, extra: Partial<NavigationState> = {}) => {
-    onNavigate({ scmView: next, scmNode: null, scmHealth: null, scmSupplierDelay: null, ...extra });
+    onNavigate({ scmView: next, scmNode: null, scmHealth: null, scmSupplierDelay: null, scmLedgerItemId: null, scmCatalog: null, ...extra });
   }, [onNavigate]);
   // A new pane or item starts at the top.
   useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [view, navigation.scmNode]);
@@ -120,7 +122,8 @@ export function ScmView({ navigation, onNavigate }: { navigation: NavigationStat
             {view === 'exceptions' && <ScmExceptions />}
             {view === 'replenish' && <ScmReplenish running={running} onRunPlanner={() => void runPlanner('manual')} />}
             {view === 'orders' && <ScmOrders />}
-            {view === 'inventory' && <ScmInventory health={navigation.scmHealth ?? null} onHealth={health => onNavigate({ scmHealth: health })} />}
+            {view === 'inventory' && <ScmInventory health={navigation.scmHealth ?? null} onHealth={health => onNavigate({ scmHealth: health })} catalog={!!navigation.scmCatalog} onCatalog={catalog => onNavigate({ scmCatalog: catalog })} />}
+            {view === 'ledger' && <ScmLedger itemId={navigation.scmLedgerItemId ?? null} onItem={itemId => onNavigate({ scmLedgerItemId: itemId })} />}
             {view === 'suppliers' && <ScmSuppliers />}
             {view === 'scenarios' && <ScmScenarios key={navigation.scmSupplierDelay ?? 'none'} supplierDelay={navigation.scmSupplierDelay ?? null} />}
             {view === 'settings' && <div className="space-y-12">

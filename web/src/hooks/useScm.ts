@@ -28,6 +28,52 @@ export interface ScmRunSummary {
   error?: string;
 }
 
+export interface ScmMovementRecord {
+  id: string; itemId: string; locationId: string; kind: ScmMovementKind; quantity: number;
+  occurredOn: string; poId: string | null; note: string | null; createdAt: string;
+  /** The movement this one reverses, and whether this one has been reversed. */
+  reversesId: string | null; reversed: boolean;
+}
+export interface ScmLedgerFilter { itemId?: string | null; locationId?: string | null; kind?: ScmMovementKind | null; from?: string | null; to?: string | null }
+
+/** The stock ledger, newest first, a page at a time. */
+export function useScmLedger(spaceId: string | null, filter: ScmLedgerFilter, limit: number) {
+  const query = useQuery({
+    queryKey: [...KEY(spaceId), 'ledger', filter, limit],
+    enabled: !!spaceId,
+    // "Show more" keeps the rows on screen while the longer page loads; a new
+    // filter starts empty rather than showing the previous filter's rows.
+    placeholderData: (previous, previousQuery) => previousQuery && JSON.stringify(previousQuery.queryKey[3]) === JSON.stringify(filter) ? previous : undefined,
+    queryFn: async () => {
+      let request = supabase.from('scm_movements').select('*', { count: 'exact' }).eq('activity_space_id', spaceId!);
+      if (filter.itemId) request = request.eq('item_id', filter.itemId);
+      if (filter.locationId) request = request.eq('location_id', filter.locationId);
+      if (filter.kind) request = request.eq('kind', filter.kind);
+      if (filter.from) request = request.gte('occurred_on', filter.from);
+      if (filter.to) request = request.lte('occurred_on', filter.to);
+      const { data, error, count } = await request.order('occurred_on', { ascending: false }).order('created_at', { ascending: false }).order('id').range(0, limit - 1);
+      if (error) throw new Error(error.message);
+      const ids = (data ?? []).map((row: Row) => String(row.id));
+      const reversed = new Set<string>();
+      for (let index = 0; index < ids.length; index += 100) {
+        const { data: hits, error: hitError } = await supabase.from('scm_movements').select('reverses_id').in('reverses_id', ids.slice(index, index + 100));
+        if (hitError) throw new Error(hitError.message);
+        for (const hit of hits ?? []) reversed.add(String((hit as Row).reverses_id));
+      }
+      return {
+        total: count ?? 0,
+        rows: (data ?? []).map((row: Row): ScmMovementRecord => ({
+          id: String(row.id), itemId: String(row.item_id), locationId: String(row.location_id), kind: row.kind as ScmMovementKind,
+          quantity: num(row.quantity), occurredOn: String(row.occurred_on), poId: (row.po_id as string | null) ?? null,
+          note: (row.note as string | null) ?? null, createdAt: String(row.created_at),
+          reversesId: (row.reverses_id as string | null) ?? null, reversed: reversed.has(String(row.id)),
+        })),
+      };
+    },
+  });
+  return { data: query.data ?? null, loading: query.isLoading, error: query.error as Error | null };
+}
+
 export interface ScmData {
   spaceId: string;
   today: string;
@@ -203,11 +249,13 @@ export function useScmActions(spaceId: string | null) {
   return useMemo(() => {
     const done = async <T,>(work: Promise<T>) => { try { return await work; } finally { await refresh(); } };
 
+    /** Lines are written while the order is a draft, so a failed line insert
+     * can be undone; the order then moves to its intended status. */
     async function createOrder(draft: ScmOrderDraft) {
       const activity_space_id = space();
       if (!draft.lines.length) throw new Error('Add at least one line.');
       const order = await check(supabase.from('scm_purchase_orders').insert({
-        activity_space_id, supplier_id: draft.supplierId, location_id: draft.locationId, status: draft.status,
+        activity_space_id, supplier_id: draft.supplierId, location_id: draft.locationId, status: 'draft',
         ordered_on: draft.orderedOn, expected_on: draft.expectedOn < draft.orderedOn ? draft.orderedOn : draft.expectedOn,
         currency: draft.currency, source: draft.source, rationale: draft.rationale,
       }).select('id, number').single());
@@ -219,6 +267,14 @@ export function useScmActions(spaceId: string | null) {
         // Never leave an order without lines.
         await supabase.from('scm_purchase_orders').delete().eq('id', order.id);
         throw cause;
+      }
+      if (draft.status !== 'draft') {
+        try { await check(supabase.from('scm_purchase_orders').update({ status: draft.status }).eq('id', order.id)); }
+        catch (cause) {
+          // A draft nobody asked for is worse than no order: undo it.
+          await supabase.from('scm_purchase_orders').delete().eq('id', order.id);
+          throw cause;
+        }
       }
       return order as { id: string; number: number };
     }
@@ -355,12 +411,42 @@ export function useScmActions(spaceId: string | null) {
           void queryClient.invalidateQueries({ queryKey: ['my-elements'] });
         }
       })()),
-      updateOrder: (id: string, patch: { expectedOn?: string; lines?: { id: string; quantity: number }[] }) => done((async () => {
+      /** Changes an open order: its date, and its lines all-or-nothing (quantity 0
+       * removes a line). The database keeps at least one line, refuses closed
+       * orders and cuts below what was received, and closes a partly received
+       * order once nothing is left open. */
+      updateOrder: (id: string, patch: { expectedOn?: string; lines?: { id: string; quantity: number }[]; add?: { itemId: string; quantity: number; unitCost: number }[] }) => done((async () => {
         if (patch.expectedOn) await check(supabase.from('scm_purchase_orders').update({ expected_on: patch.expectedOn }).eq('id', id));
-        for (const line of patch.lines ?? []) {
-          if (line.quantity > 0) await check(supabase.from('scm_po_lines').update({ quantity: line.quantity }).eq('id', line.id).eq('po_id', id));
-          else await check(supabase.from('scm_po_lines').delete().eq('id', line.id).eq('po_id', id));
+        if (patch.lines?.length || patch.add?.length) {
+          await check(supabase.rpc('scm_update_po_lines', {
+            p_po: id,
+            p_changes: (patch.lines ?? []).map(line => ({ line_id: line.id, quantity: line.quantity })),
+            p_adds: (patch.add ?? []).map(line => ({ item_id: line.itemId, quantity: line.quantity, unit_cost: line.unitCost })),
+          }));
         }
+      })()),
+      /** Only a draft can be deleted; anything placed is cancelled so its history stays. */
+      deleteDraftOrder: (id: string) => done((async () => {
+        const { data: rows, error } = await supabase.from('scm_purchase_orders').delete().eq('id', id).eq('status', 'draft').select('element_id');
+        if (error) throw new Error(error.message);
+        if (!rows?.length) throw new Error('This order changed since you opened it. Refresh and try again.');
+        const elementId = (rows[0] as Row).element_id as string | null;
+        if (elementId) {
+          await supabase.from('elements').update({ status: 'cancelled' }).eq('id', elementId);
+          void queryClient.invalidateQueries({ queryKey: ['my-elements'] });
+        }
+      })()),
+      /** The ledger is never edited: a mistaken movement is undone by an opposite adjustment. */
+      reverseMovement: (movement: ScmMovementRecord, today: string, note: string) => done((async () => {
+        if (movement.poId) throw new Error('A receipt against a purchase order is corrected with a stock count, so the order keeps its received quantity.');
+        if (movement.kind === 'transfer_in' || movement.kind === 'transfer_out') throw new Error('Transfers are undone with a transfer back.');
+        const { error } = await supabase.from('scm_movements').insert({
+          activity_space_id: space(), item_id: movement.itemId, location_id: movement.locationId, kind: 'adjust', quantity: -movement.quantity,
+          occurred_on: today, note, reverses_id: movement.id,
+        });
+        // Another window reversed it first; the unique index keeps it to one.
+        if (error?.code === '23505') throw new Error('This movement has already been reversed.');
+        if (error) throw new Error(error.message);
       })()),
       receiveOrder: (id: string, lines: { lineId: string; quantity: number }[], receivedOn: string) =>
         done(check(supabase.rpc('scm_receive_po', { p_po: id, p_lines: lines.map(line => ({ line_id: line.lineId, quantity: line.quantity })), p_received_on: receivedOn }))),
@@ -437,11 +523,16 @@ export function useScmActions(spaceId: string | null) {
         })));
         await insertChunks('scm_purchase_orders', sample.orders.map(order => ({
           id: id(`p:${order.key}`), activity_space_id, supplier_id: id(`s:${order.supplierKey}`), location_id: id(`l:${order.locationKey}`),
-          status: order.status, ordered_on: order.orderedOn, expected_on: order.expectedOn, received_on: order.receivedOn, currency: 'JPY', source: 'human',
+          status: 'draft', ordered_on: order.orderedOn, expected_on: order.expectedOn, received_on: order.receivedOn, currency: 'JPY', source: 'human',
         })), 200);
         await insertChunks('scm_po_lines', sample.orders.flatMap(order => order.lines.map(line => ({
           activity_space_id, po_id: id(`p:${order.key}`), item_id: id(`i:${line.itemKey}`), quantity: line.quantity, unit_cost: line.unitCost, received_quantity: line.receivedQuantity,
         }))));
+        // Lines go in while the orders are drafts; then each order takes its status.
+        for (const status of [...new Set(sample.orders.map(order => order.status))]) {
+          const ids = sample.orders.filter(order => order.status === status).map(order => id(`p:${order.key}`));
+          for (let index = 0; index < ids.length; index += 100) await check(supabase.from('scm_purchase_orders').update({ status }).in('id', ids.slice(index, index + 100)));
+        }
         await insertChunks('scm_movements', sample.movements.map(movement => ({
           activity_space_id, item_id: id(`i:${movement.itemKey}`), location_id: id(`l:${movement.locationKey}`), kind: movement.kind,
           quantity: movement.quantity, occurred_on: movement.occurredOn, po_id: movement.poKey ? id(`p:${movement.poKey}`) : null, note: movement.note,
@@ -451,12 +542,7 @@ export function useScmActions(spaceId: string | null) {
           autopilot_enabled: false, auto_approve_limit: 150000, monthly_budget: 6000000, currency: 'JPY',
         }));
       })()),
-      clearAll: () => done((async () => {
-        const activity_space_id = space();
-        for (const table of ['scm_purchase_orders', 'scm_items', 'scm_suppliers', 'scm_locations', 'scm_autopilot_runs', 'scm_policies']) {
-          await check(supabase.from(table).delete().eq('activity_space_id', activity_space_id));
-        }
-      })()),
+      clearAll: () => done(check(supabase.rpc('scm_reset_space', { p_space: space() }))),
     };
   }, [queryClient, refresh, space]);
 }

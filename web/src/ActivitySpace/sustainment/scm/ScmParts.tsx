@@ -73,5 +73,7 @@ export function Meter({ value, tone = 'info', label }: { value: number; tone?: T
 }
 
 export const SCM_INPUT = 'h-8 w-full min-w-0 rounded-md border border-[var(--border-default)] bg-transparent px-2 text-sm hover:bg-muted/40 focus:bg-muted/60 disabled:opacity-50';
+/** An inline filter select: sized to its content, never full width. */
+export const SCM_SELECT_INLINE = `${SCM_INPUT.replace('w-full ', '')} w-auto max-w-64 text-foreground`;
 export const SCM_LABEL = 'block space-y-1 text-xs text-muted-foreground';
 export const SCM_ROW = 'w-full rounded-md text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted';
