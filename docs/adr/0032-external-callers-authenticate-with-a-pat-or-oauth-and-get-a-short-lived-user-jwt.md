@@ -20,7 +20,7 @@
 - **委任された呼び出しはトークンを管理できない。** `is_delegated_request()` は、JWT に `alcon_via`（PAT から発行した JWT）か `client_id`（OAuth のクライアントに発行された JWT）があれば真になる。発行・取り消しの RPC と一覧の RLS は、これが真なら拒む。外部の AI が自分の権限を延長したり、別のトークンを作ったりはできない。
 - **関数は PAT を本人の 5 分間の JWT に交換する。** `_shared/callerAuth.ts` の `authenticateCaller` が、`alc_pat_` で始まるトークンを SHA-256 にし、service role で `resolve_personal_access_token` を呼ぶ（service role を使うのはこの照会だけ）。照会は、取り消し済み・期限切れのトークンと、BAN・削除・匿名のユーザーを拒み、最終使用日時とクライアント名を 1 分に 1 回だけ記録する。通ったら `_shared/delegatedAuth.ts` の `mintUserJwt` が `sub`＝本人、`role`／`aud`＝`authenticated`、`exp`＝5 分後、`alcon_via`、`pat_id` の JWT を署名し、anon key とその JWT で作ったクライアントでツールを動かす。`role` は決して `service_role` にしない（純粋関数 `buildUserClaims` で固定し、テストする）。それ以外のトークンは、これまでどおりセッションの JWT として `auth.getUser` で確かめる。
 - **署名鍵は Edge Function のシークレット `ALCON_JWT_SIGNING_KEY`。** 今は旧来の JWT シークレットを入れ、HS256 で署名する。値が EC の秘密鍵の JWK なら、その `kid` で ES256 で署名するので、非対称鍵への移行は設定の変更だけで済む。鍵がなければ、PAT は照会の前に 500「server not configured」で断る。セッションの JWT の経路は影響を受けない。
-- **読み取り専用のトークンには読み取りのツールだけを見せる。** `mcpTools('read')` は `MCP_READ_TOOLS` だけを返すので、書き込みは許可リストで `INVALID_PARAMS` になる。
+- **読み取り専用のトークンには読み取りのツールだけを見せる。** `mcpTools('read')` は読み取りのツールだけを返すので、MCP の書き込みは許可リストで `INVALID_PARAMS` になる。REST（`alcon-api`）の書き込みの経路は 403 になる。
 - **どのトークンで書いたかを残す。** Activity とコメントの名義は「Claude Code (MCP · token: laptop)」の形にする。トークン名は名前に使える文字だけに絞り、40 文字までにする。
 - **エージェントは連携で Alcon 自身に入らない。** `run-agent` は、接続先がこのプロジェクトのホスト（`SUPABASE_URL` のホスト、`<ref>.supabase.co`、alcon-mcp も配信する旧来の `<ref>.functions.supabase.co`。大文字小文字・末尾のドット・ポートは問わない）である連携を使わない。エージェントは開始した人の RLS で盤面のツールをすでに持っている。`set_integration_secret` は、値のどこかに `alc_pat_` を含むもの（`Bearer alc_pat_…` や前に空白のあるものを含む）を拒み、PAT を連携の資格情報として預けられないようにする。
 - **PAT はパスワードの変更やセッションの失効では取り消されない。** GitHub の PAT と同じく、トークンは本人が取り消すか期限が切れるまで有効。発行ダイアログで「使わなくなったトークンは取り消す。パスワードを変えても取り消されない」と示す。アカウントの BAN と削除は、照会の時点で拒む。
@@ -45,4 +45,4 @@ service role で動かすと、可視性の判定をすべてアプリ側で正�
 - トークンを Space や Domain の単位で絞りたい（本人の権限より狭くしたい）という要求が出たら、RLS とは別に、トークンの範囲を判定する層を設計する
 - 最終使用の記録を監査に使いたいという要求が出たら、1 分に 1 回の記録ではなく、要求ごとの記録を別の表に置く
 - パスワードの変更やサインアウト（全端末）で PAT も失効させてほしいという要求が出たら、`auth.users` の変更に合わせてトークンを取り消すトリガか、照会時の比較を足す
-- REST API（PostgREST）に PAT で直接入りたいという要求が出たら、PAT を JWT に交換するエンドポイントを設けるか、ゲートウェイで交換する
+- PostgREST に PAT で直接入りたいという要求が出たら、PAT を JWT に交換するエンドポイントを設けるか、ゲートウェイで交換する（REST の入口は `alcon-api`。ADR 0033）

@@ -373,7 +373,7 @@ Claude API を Supabase Edge Functions 経由で利用：
 - `analyze-change`：変更分析
 - `validate-task`：Element 検証
 
-外部の AI やスクリプトは `alcon-mcp`（MCP サーバー）から本人として盤面を読み書きする。資格情報は、本人が Settings › Integrations で発行する個人用アクセストークン（読み取りのみも選べ、いつでも取り消せる）。関数がそれを本人の短命な JWT に交換するので、アプリと同じ RLS が効き、書き込みの記録にはどのトークン経由かが残る（[ADR 0032](../docs/adr/0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)）。
+外部の AI は `alcon-mcp`（MCP サーバー）から、スクリプトやノーコードツールは `alcon-api`（REST API）から、本人として盤面を読み書きする。どちらも同じ許可リストのツールを呼ぶので、外から削除や一括変更はできない（[ADR 0033](../docs/adr/0033-the-rest-api-is-the-mcp-tool-layer-over-http.md)）。資格情報は、本人が Settings › Integrations で発行する個人用アクセストークン（読み取りのみも選べ、いつでも取り消せる）。関数がそれを本人の短命な JWT に交換するので、アプリと同じ RLS が効き、書き込みの記録にはどのトークン経由かが残る（[ADR 0032](../docs/adr/0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)）。
 
 ## 拡張構想
 
