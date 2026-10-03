@@ -77,9 +77,13 @@ export function findDates(input: string, today: string): FoundDate[] {
   for (const match of input.matchAll(/(?<![\d/.-])(\d{1,2})[/月](\d{1,2})日?(?![\d/])/g)) {
     const m = Number(match[1]); const d = Number(match[2]);
     if (m < 1 || m > 12 || d < 1 || d > 31) continue;
-    let candidate = `${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    // "10/1" written on Oct 3 is two days ago, not next year; only a date months back rolls forward.
-    if (dayIndex(candidate) !== null && dayIndex(today)! - dayIndex(candidate)! > 120) candidate = `${year + 1}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    // The nearest of last, this and next year's date: "10/1" written on Oct 3 is
+    // two days ago, "12/20" written on Jan 5 is last December, "1/15" in October is next year.
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const candidate = [year - 1, year, year + 1].map(y => `${y}-${pad(m)}-${pad(d)}`)
+      .filter(value => dayIndex(value) !== null)
+      .sort((a, b) => Math.abs(dayIndex(a)! - dayIndex(today)!) - Math.abs(dayIndex(b)! - dayIndex(today)!))[0];
+    if (!candidate) continue;
     push(candidate, match.index!);
   }
   const relative: [RegExp, () => string][] = [
@@ -292,6 +296,8 @@ export interface ReviewRow {
   impliedBy?: keyof CaptureFields;
   /** Ticked unless the person opts in — closing a deal is never a default. */
   optIn?: boolean;
+  /** Always written: a new deal cannot exist without its name. */
+  required?: boolean;
 }
 
 /** Everything Apply will write, so nothing is written that the person did not see:
@@ -307,6 +313,7 @@ export function reviewRows(proposal: CaptureProposal, deal: CrmDeal | null, stag
   }
   const rows: ReviewRow[] = captureChanges({ ...proposal, fields }, deal)
     .filter(change => change.key === 'stage' || options.hasField(change.key));
+  if (!deal) for (const row of rows) if (row.key === 'name') row.required = true;
   const stageRow = rows.find(row => row.key === 'stage');
   if (stageRow) {
     const target = resolveStage(String(stageRow.to), stages)!;
@@ -322,6 +329,6 @@ export function reviewRows(proposal: CaptureProposal, deal: CrmDeal | null, stag
 
 /** Cell values for the rows the person kept. */
 export function reviewValues(rows: readonly ReviewRow[], checked: (row: ReviewRow) => boolean): Record<string, string | number> {
-  const kept = new Set(rows.filter(checked).map(row => row.key));
+  const kept = new Set(rows.filter(row => row.required || checked(row)).map(row => row.key));
   return Object.fromEntries(rows.filter(row => kept.has(row.key) && (!row.impliedBy || kept.has(row.impliedBy))).map(row => [row.key, row.to]));
 }

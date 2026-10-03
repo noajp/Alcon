@@ -46,10 +46,13 @@ export function CrmCapture({ crm, initialDealId, onClose, onApplied }: {
   const local = useMemo(() => input.trim() ? readCapture(input, workspace.today, workspace.deals, workspace.stages) : null, [input, workspace]);
   // An AI reading belongs to the exact text it read; editing the text falls back to the local reading.
   const proposal = ai && aiFor === input ? ai : local;
+  // Ticks belong to the reading they were made on; a new reading starts from the defaults.
+  const [toggledFor, setToggledFor] = useState(proposal);
+  if (toggledFor !== proposal) { setToggledFor(proposal); setToggled(new Set()); }
   const dealId = target !== undefined ? target : proposal?.dealId ?? null;
   const deal = dealId ? workspace.deals.find(item => item.id === dealId) ?? null : null;
   const changes = proposal ? reviewRows(proposal, deal, workspace.stages, { primaryCurrency: workspace.primaryCurrency, fallbackName: t('New deal'), hasField: crm.hasField }) : [];
-  const checked = (row: ReviewRow) => !row.optIn !== toggled.has(row.key);
+  const checked = (row: ReviewRow) => !!row.required || !row.optIn !== toggled.has(row.key);
   const willLog = logActivity && crm.hasField('activity');
   const canApply = !!proposal && !saving && (changes.some(checked) || willLog);
   const type = activityType ?? proposal?.activity.type ?? 'note';
@@ -63,7 +66,7 @@ export function CrmCapture({ crm, initialDealId, onClose, onApplied }: {
     const text = input;
     try {
       const result = await aiCapture(text, workspace.today, workspace.deals, workspace.stages, controller.signal);
-      setAi(result); setAiFor(text); setToggled(new Set());
+      setAi(result); setAiFor(text);
     } catch (cause) {
       if (!controller.signal.aborted) setAiError(cause instanceof Error ? cause.message : t('AI is unavailable right now.'));
     } finally { if (abort.current === controller) setReading(false); }
@@ -74,7 +77,6 @@ export function CrmCapture({ crm, initialDealId, onClose, onApplied }: {
     setSaving(true); setError(null);
     try {
       const values: Record<string, Json | null> = reviewValues(changes, checked);
-      if (!deal) values.name ??= proposal.fields.name ?? t('New deal');
       if (willLog) {
         const entry = { date: workspace.today, type, text: proposal.summary ? `${proposal.summary} — ${input.trim()}` : input.trim() };
         if (deal) { await crm.logActivity(deal, entry, values); onApplied(deal.id); return; }
@@ -128,7 +130,7 @@ export function CrmCapture({ crm, initialDealId, onClose, onApplied }: {
           {proposal.summary && <p className="text-sm">{proposal.summary}</p>}
           {changes.length > 0 ? <ul className="divide-y divide-[var(--border-subtle)] text-sm" aria-label={t('Changes')}>
             {changes.map(change => <li key={change.key} className="flex items-center gap-3 py-2">
-              <input type="checkbox" aria-label={t('Apply {field}', { field: t(FIELD_LABEL[change.key]) })} checked={checked(change)} disabled={saving}
+              <input type="checkbox" aria-label={t('Apply {field}', { field: t(FIELD_LABEL[change.key]) })} checked={checked(change)} disabled={saving || change.required}
                 onChange={() => setToggled(current => { const next = new Set(current); if (next.has(change.key)) next.delete(change.key); else next.add(change.key); return next; })} />
               <span className="w-36 shrink-0 text-xs text-muted-foreground">{t(FIELD_LABEL[change.key])}{change.impliedBy && <span className="block">{t('from the stage')}</span>}</span>
               <span className="min-w-0 flex-1 truncate">{deal && <><span className="text-muted-foreground line-through">{display(change.key, change.from, 'from')}</span><span className="px-1.5 text-muted-foreground">→</span></>}<span className="font-medium">{display(change.key, change.to, 'to')}</span></span>

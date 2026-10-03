@@ -36,6 +36,7 @@ describe('dates', () => {
     expect(findDates('demo on Tuesday', today)[0].date).toBe('2026-10-06');
     expect(findDates('1/15 kickoff', today)[0].date).toBe('2027-01-15');
     expect(findDates('visited 10/1', today)[0].date).toBe('2026-10-01');
+    expect(findDates('12/20に訪問済み', '2027-01-05')[0].date).toBe('2026-12-20');
   });
 });
 
