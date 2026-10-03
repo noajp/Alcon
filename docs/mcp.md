@@ -52,3 +52,25 @@ PAT を受け付けるには、Edge Function のシークレット `ALCON_JWT_SI
 ## 逆向き：Alcon のエージェントが外部サービスを使う
 
 この文書は外部の AI が Alcon を操作する入口を扱う。Alcon のエージェント（run-agent）が Linear・Asana・任意の MCP / API を道具として使う接続は、Settings › Integrations の「外部サービスをつなぐ」で Space の owner が設定する。資格情報は Vault に置かれ、外部への書き込みは既定で毎回承認を待つ。設計は [ADR 0027](adr/0027-agents-act-on-elements-with-the-callers-rls-and-stop-for-approval.md)。エージェントは Alcon 自身を指す連携を使わず、Alcon の PAT は連携の資格情報として保存できない（エージェントは開始した人の権限で、盤面の道具をすでに持っている）。
+
+### Google Drive（OAuth）
+
+Google Drive は資格情報を貼り付けず、owner が Google にサインインしてつなぐ。スコープは `drive.file` だけなので、エージェントが扱えるのは Alcon が作ったファイルと利用者が選んだファイルに限られ、作ったファイルは接続した Google アカウントの名義になる。エージェントには `drive_search`・`drive_read`（読み取り）と `drive_create`・`drive_update`・`drive_create_folder`（書き込み、承認を通る）が出る。設計は [ADR 0034](adr/0034-oauth-integrations-sign-in-through-an-edge-function-and-keep-tokens-in-vault.md)。
+
+サインインは Edge Function `integration-oauth` が行う。ブラウザが JWT なしで `/go` と `/callback` に来るので `--no-verify-jwt` で配置し、`/start` と `/revoke` は関数の中で JWT とオーナーであることを確かめる。
+
+```bash
+env -u SUPABASE_ACCESS_TOKEN supabase functions deploy integration-oauth --project-ref rkugtcqztkkacvoylupw --no-verify-jwt --use-api
+env -u SUPABASE_ACCESS_TOKEN supabase functions deploy integration-test --project-ref rkugtcqztkkacvoylupw --use-api
+env -u SUPABASE_ACCESS_TOKEN supabase functions deploy run-agent --project-ref rkugtcqztkkacvoylupw --use-api
+```
+
+Edge Function のシークレットに次を入れる。どちらかのクライアント情報がない間、`GET /integration-oauth/status` は `{ "google": false }` を返し、画面は「Google サインインはまだ設定されていません」と示して接続を押せなくする。
+
+| シークレット | 内容 |
+| --- | --- |
+| `GOOGLE_OAUTH_CLIENT_ID` | Google Cloud の OAuth クライアント（ウェブアプリケーション）の ID |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | 同じクライアントのシークレット |
+| `APP_ORIGIN` | サインイン後に戻るアプリの origin（例 `https://alcon.example.com`）。パスは付けない。ない場合は「完了しました／接続できませんでした。このタブを閉じてください」という文面を返す |
+
+OAuth クライアントには、承認済みのリダイレクト URI として `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/integration-oauth/callback` を登録し、同意画面に `https://www.googleapis.com/auth/drive.file` を加える。

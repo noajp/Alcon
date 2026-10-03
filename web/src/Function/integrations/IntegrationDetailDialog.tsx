@@ -13,15 +13,21 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ToggleRow } from '@/Function/settings/SettingsControls';
 import type { Integration } from '@/types/database';
 import {
-  KIND_LABELS, SOURCE_LABELS, buildIntegrationRow, readLastTest, testOutcomeLabel,
+  KIND_LABELS, SOURCE_LABELS, buildIntegrationRow, readLastTest, signsInWithOAuth, testOutcomeLabel,
   type IntegrationAuthType, type IntegrationDelegation, type IntegrationPreset, type IntegrationSource,
 } from './catalog';
-import { useIntegrationActions } from './data';
+import { useIntegrationActions, useIntegrationOAuthStatus } from './data';
 
 // One integration: connect a preset (or a custom MCP / API), or manage an
 // existing connection — credential, delegation, on/off, connection test,
 // disconnect. The credential is write-only: it is sent to Vault and the
 // dialog only ever knows whether one is set (`secret_id`).
+//
+// An OAuth preset (Google Drive) has no credential field. Connect creates the
+// row and sends the browser to Google sign-in (integration-oauth); the
+// dialog then shows the account it signed in as, with Reconnect. Disconnect
+// revokes the grant at Google before deleting the row. Until the server has
+// a Google OAuth client, Connect stays disabled with a note saying so.
 //
 // For an existing connection, delegation and on/off apply at once
 // (optimistically, rolled back on failure); custom name / endpoint / auth are
@@ -91,24 +97,47 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
   const lastTest = readLastTest(integration?.last_test);
   const unavailable = preset.unavailableReason;
   const readOnly = !canEdit || !!unavailable;
+  const oauth = signsInWithOAuth(preset);
+  const oauthStatus = useIntegrationOAuthStatus(oauth && canEdit);
+  const oauthReady = oauthStatus === true;
+  const oauthAccount = integration?.external_account ?? null;
+  const oauthConnected = oauth && hasSecret;
   const customDirty = !!integration && preset.custom && (
     name.trim() !== integration.name || endpoint.trim() !== integration.endpoint
     || auth !== integration.auth_type || (auth === 'header' && authHeader.trim() !== (integration.auth_header ?? ''))
   );
-  const busy = actions.create.isPending || actions.update.isPending || actions.remove.isPending || actions.secret.isPending;
+  const busy = actions.create.isPending || actions.update.isPending || actions.remove.isPending || actions.secret.isPending
+    || actions.signIn.isPending || actions.revoke.isPending;
 
   const draft = () => ({ name, endpoint, auth, authHeader, delegation, enabled });
+
+  /** Leaves the app for Google sign-in; it comes back to Settings › Integrations. */
+  const signIn = async (id: string) => {
+    const url = await actions.signIn.mutateAsync(id);
+    window.location.assign(url);
+  };
 
   const connect = async () => {
     setError(null);
     const built = buildIntegrationRow(preset, spaceId, draft());
     if (!built.ok) { setError(t(built.error)); return; }
     if (needsSecret && !secretInput.trim()) { setError(t('Enter the {label}.', { label: t(preset.credentialLabel) })); return; }
+    let created: Integration;
     try {
-      const created = await actions.create.mutateAsync({ row: built.row, secret: needsSecret ? secretInput.trim() : '' });
+      created = await actions.create.mutateAsync({ row: built.row, secret: needsSecret ? secretInput.trim() : '' });
       setSecretInput('');
       onCreated(created);
-    } catch (e) { setError(t(errorText(e))); }
+    } catch (e) { setError(t(errorText(e))); return; }
+    if (oauth) {
+      // The row stays when sign-in can't start; Sign in with Google retries.
+      try { await signIn(created.id); } catch (e) { setError(t(errorText(e))); }
+    }
+  };
+
+  const reconnect = async () => {
+    if (!integration) return;
+    setError(null);
+    try { await signIn(integration.id); } catch (e) { setError(t(errorText(e))); }
   };
 
   const setLive = (patch: { delegation?: IntegrationDelegation; enabled?: boolean }) => {
@@ -165,6 +194,16 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
     if (!await appDialog.confirm(t('Disconnect {name}? Its credential is deleted and agents can no longer use it.', { name: integration.name }))) return;
     setError(null);
     try {
+      if (oauthConnected) {
+        // Revoke the grant at Google first; deleting the row alone would only
+        // forget the tokens. If Google can't be reached, still disconnect and
+        // say where to remove the access by hand.
+        try {
+          await actions.revoke.mutateAsync(integration.id);
+        } catch {
+          await appDialog.alert(t('Alcon could not revoke its access at Google. Remove it from your Google Account under Security › Third-party access.'));
+        }
+      }
       await actions.remove.mutateAsync(integration.id);
       onClose();
     } catch (e) { setError(t(errorText(e))); }
@@ -194,6 +233,11 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
         )}
         {!canEdit && !unavailable && (
           <p className="text-[12px] text-muted-foreground">{t('Only Space owners can connect or change integrations. You can see what is connected.')}</p>
+        )}
+        {oauth && canEdit && oauthStatus === false && (
+          <p className="rounded-lg border border-border/60 bg-[var(--status-warning-subtle)] px-3 py-2 text-[12px] text-foreground">
+            {t('Google sign-in is not set up yet. An administrator needs to register the Google OAuth client before this can be connected.')}
+          </p>
         )}
 
         <div className="space-y-4">
@@ -236,6 +280,41 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
                     placeholder="X-API-Key" className="h-7 w-44 font-mono text-[12px] md:text-[12px]" />
                 )}
               </div>
+            </Field>
+          )}
+
+          {oauth && (
+            <Field label={t(preset.credentialLabel)}>
+              {oauthConnected ? (
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="min-w-0 truncate text-[13px] text-foreground">
+                      {oauthAccount ? t('Connected as {account}', { account: oauthAccount }) : t('Connected')}
+                    </span>
+                    {canEdit && (
+                      <Button variant="ghost" size="xs" onClick={reconnect} disabled={busy || !oauthReady}>
+                        {actions.signIn.isPending ? t('Opening Google…') : t('Reconnect')}
+                      </Button>
+                    )}
+                  </div>
+                  {oauthAccount && (
+                    <p className="text-[12px] text-muted-foreground">{t('Files are created as {account}.', { account: oauthAccount })}</p>
+                  )}
+                </div>
+              ) : integration ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[13px] text-muted-foreground">{t('Not connected')}</span>
+                  {canEdit && (
+                    <Button variant="secondary" size="sm" onClick={reconnect} disabled={busy || !oauthReady}>
+                      {actions.signIn.isPending ? t('Opening Google…') : t('Sign in with Google')}
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-[12px] text-muted-foreground">
+                  {t('Connect opens Google sign-in. Alcon asks only for access to files it creates or that you choose.')}
+                </p>
+              )}
             </Field>
           )}
 
@@ -338,7 +417,9 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" onClick={onClose}>{isNew ? t('Cancel') : t('Close')}</Button>
               {isNew ? (
-                <Button variant="primary" size="sm" onClick={connect} disabled={busy}>{actions.create.isPending ? t('Connecting…') : t('Connect')}</Button>
+                <Button variant="primary" size="sm" onClick={connect} disabled={busy || (oauth && !oauthReady)}>
+                  {actions.create.isPending || actions.signIn.isPending ? t('Connecting…') : t('Connect')}
+                </Button>
               ) : customDirty ? (
                 <Button variant="primary" size="sm" onClick={saveCustom} disabled={busy}>{t('Save')}</Button>
               ) : null}
