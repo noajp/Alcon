@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, Pin, Trash2 } from 'lucide-react';
+import { Bot, ChevronRight, Pin, Trash2 } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { agentMention, foldAgentRuns, plainFirstLine } from './agent/commentAgent';
 import { CommentAvatar, CommentComposer, CommentEntry, CommentMenu, CommentMenuItem, CommentMenuSeparator } from '@/Function/shared/CommentThread';
@@ -35,6 +35,15 @@ interface ElementCommentsPanelProps {
   refreshKey?: string | null;
 }
 
+interface MentionCandidate {
+  key: string;
+  label: string;
+  /** What follows the @ in the draft. */
+  insert: string;
+  kind: 'agent' | 'person';
+  hint: string | null;
+}
+
 const QUICK_EMOJI = ['👍', '🎉', '❤️', '👀', '🚀', '✅'];
 
 export function ElementCommentsPanel({ elementId, workers, onCountChange, focusCommentId, onAskAgent, refreshKey }: ElementCommentsPanelProps) {
@@ -58,6 +67,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
   // @ mention autocomplete state
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionIndex, setMentionIndex] = useState(0);
   const [mentionStart, setMentionStart] = useState(0);
 
   useEffect(() => { onCountChange?.(comments.length); }, [comments.length, onCountChange]);
@@ -95,13 +105,26 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
     return () => { cancelled = true; };
   }, [comments]);
 
+  // The @ list: the agent first (@AI, then this Element's AI Workers by
+  // name), then people. Picking an agent turns the comment into its next
+  // instruction (agentMention); picking a person notifies them.
   const mentionCandidates = useMemo(() => {
     const q = mentionQuery.toLowerCase();
-    return workers
-      .filter(w => w.type === 'human' && w.user_id)
-      .filter(w => !q || w.name.toLowerCase().includes(q) || (w.email || '').toLowerCase().includes(q))
-      .slice(0, 6);
-  }, [mentionQuery, workers]);
+    const matches = (name: string, extra?: string | null) =>
+      !q || name.toLowerCase().includes(q) || (extra || '').toLowerCase().includes(q);
+    const agents: MentionCandidate[] = onAskAgent
+      ? [
+          { key: 'ai', label: 'AI', insert: 'AI', kind: 'agent' as const, hint: t('Ask the agent') },
+          ...workers.filter(w => w.type === 'ai_agent')
+            .map(w => ({ key: w.id, label: w.name, insert: w.name, kind: 'agent' as const, hint: t('Ask the agent') })),
+        ].filter(c => matches(c.label))
+      : [];
+    const people: MentionCandidate[] = workers
+      .filter(w => w.type === 'human' && w.user_id && matches(w.name, w.email))
+      .map(w => ({ key: w.id, label: w.name, insert: w.name, kind: 'person' as const, hint: w.email ?? null }));
+    return [...agents, ...people].slice(0, 7);
+  }, [mentionQuery, workers, onAskAgent, t]);
+  const mentionListOpen = mentionOpen && mentionCandidates.length > 0;
 
   const handleDraftChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -112,27 +135,47 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
     if (m) {
       setMentionOpen(true);
       setMentionQuery(m[2]);
+      setMentionIndex(0);
       setMentionStart(cursor - m[2].length - 1); // position of '@'
     } else {
       setMentionOpen(false);
     }
   };
 
-  const insertMention = (worker: Worker) => {
+  const insertMention = (candidate: MentionCandidate) => {
     if (!mentionOpen) return;
     const before = draft.slice(0, mentionStart);
     const afterStart = mentionStart + 1 + mentionQuery.length;
     const after = draft.slice(afterStart);
-    setDraft(`${before}@${worker.name} ${after}`);
+    setDraft(`${before}@${candidate.insert} ${after}`);
     setMentionOpen(false);
     setMentionQuery('');
+  };
+
+  // While the @ list shows, ↑ / ↓ move, Enter or Tab picks, Esc closes.
+  const onComposerKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // keyCode 229: Safari reports an IME commit as not composing.
+    if (!mentionListOpen || e.nativeEvent.isComposing || e.keyCode === 229) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      setMentionIndex(i => (i + step + mentionCandidates.length) % mentionCandidates.length);
+    } else if ((e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) || e.key === 'Tab') {
+      e.preventDefault();
+      insertMention(mentionCandidates[Math.min(mentionIndex, mentionCandidates.length - 1)]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setMentionOpen(false);
+    }
   };
 
   const extractMentions = (text: string): string[] => {
     const ids = new Set<string>();
     for (const w of workers) {
       if (!w.user_id) continue;
-      const re = new RegExp(`@${w.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+      // A name ends at whitespace, punctuation or the end of the text — not \b,
+      // which only knows ASCII word characters and misses Japanese names.
+      const re = new RegExp(`@${w.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[\\s、。,.!?！？:：)）])`);
       if (re.test(text)) ids.add(w.user_id);
     }
     return Array.from(ids);
@@ -156,6 +199,8 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
       // The delta stream may have landed the row already.
       setComments(prev => (prev.some(c => c.id === created.id) ? prev : [...prev, created]));
       setDraft('');
+      setMentionOpen(false);
+      setMentionQuery('');
 
       const ask = onAskAgent ? agentMention(content, aiWorkers, humanNames) : null;
       setAskOutcome(null);
@@ -380,23 +425,30 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
         onChange={handleDraftChange}
         onSubmit={submit}
         submitting={submitting}
-        enterHeldBy={mentionOpen}
+        enterHeldBy={mentionListOpen}
+        onKeyDown={onComposerKeyDown}
+        placeholder={onAskAgent ? t('Leave a comment… @AI asks the agent') : undefined}
         sendShortcut={sendShortcut}
       >
-        {mentionOpen && mentionCandidates.length > 0 && (
-          <div className="absolute left-0 bottom-full mb-1 z-20 w-64 bg-popover border border-border rounded-md shadow-lg overflow-hidden">
-            {mentionCandidates.map(w => (
+        {mentionListOpen && (
+          <div role="listbox" className="absolute left-0 bottom-full mb-1 z-20 w-64 bg-popover border border-border rounded-md shadow-lg overflow-hidden">
+            {mentionCandidates.map((c, i) => (
               <button
-                key={w.id}
-                onClick={() => insertMention(w)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] hover:bg-accent text-left"
+                key={c.key}
+                type="button"
+                role="option"
+                aria-selected={i === mentionIndex}
+                onMouseEnter={() => setMentionIndex(i)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => insertMention(c)}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left ${i === mentionIndex ? 'bg-accent' : 'hover:bg-accent'}`}
               >
-                <div className="w-6 h-6 rounded-full bg-primary/10 text-[11px] font-medium text-primary flex items-center justify-center">
-                  {w.name.charAt(0)}
+                <div className="w-6 h-6 rounded-full bg-primary/10 text-[11px] font-medium text-primary flex items-center justify-center shrink-0">
+                  {c.kind === 'agent' ? <Bot size={13} /> : c.label.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-foreground truncate">{w.name}</div>
-                  {w.email && <div className="text-[11px] text-muted-foreground truncate">{w.email}</div>}
+                  <div className="font-medium text-foreground truncate">{c.label}</div>
+                  {c.hint && <div className="text-[11px] text-muted-foreground truncate">{c.hint}</div>}
                 </div>
               </button>
             ))}
