@@ -15,6 +15,8 @@ import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
 import { ArrowLeft, Plus, Bot, Settings, Users, Search } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
+import { domainHasObjectsMessage } from '@/ActivitySpace/execution/domain/data';
+import { countDomainObjects } from '@/hooks/useObjectArchive';
 import { supabase } from '@/lib/supabase';
 import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
 import {
@@ -759,6 +761,7 @@ function DomainGeneralSettings({
   onUpdated: (domain: Domain) => void;
   onDeleted: () => void;
 }) {
+  const { t } = useI18n();
   const isOwner = role === 'owner';
   const canEdit = isOwner || role === 'admin';
   const [name, setName] = useState(domain.name);
@@ -788,6 +791,24 @@ function DomainGeneralSettings({
   // refuse.
   const [confirming, setConfirming] = useState<'delete' | 'leave' | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // A Domain that still has Objects (archived ones included) cannot be
+  // deleted; say how many before asking to confirm. The database refuses it
+  // too (domains_delete_guard), with the same message from deleteDomain.
+  const askDelete = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const remaining = await countDomainObjects(domain.id);
+      if (remaining > 0) setError(domainHasObjectsMessage(remaining));
+      else setConfirming('delete');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('The Domain could not be deleted. Try again.'));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const runConfirmed = async () => {
     if (busy || !confirming) return;
@@ -899,14 +920,14 @@ function DomainGeneralSettings({
       {isOwner ? (
         <div className="mt-5 flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-[12px] font-semibold text-foreground">Delete Domain</div>
+            <div className="text-[12px] font-semibold text-foreground">{t('Delete Domain')}</div>
             <p className="mt-0.5 text-[12px] text-muted-foreground">
-              Permanently delete this Domain for every member.
+              {t('Permanently delete this Domain for every member. Move or delete its Objects first.')}
             </p>
           </div>
           <button
             type="button"
-            onClick={() => setConfirming('delete')}
+            onClick={() => { void askDelete(); }}
             disabled={busy}
             className="shrink-0 rounded-md bg-destructive/10 px-3 py-1.5 text-[12px] font-semibold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
           >
@@ -935,7 +956,7 @@ function DomainGeneralSettings({
       <ConfirmDialog
         open={confirming === 'delete'}
         title={`Delete "${domain.name}"?`}
-        description="Its members, Phases, and templates are deleted. Objects and Tables stay but are no longer in any Domain. This can't be undone."
+        description={t('Its members, Phases, and templates are deleted. Tables stay but are no longer in any Domain. This can’t be undone.')}
         busy={busy}
         onConfirm={() => { void runConfirmed(); }}
         onCancel={() => setConfirming(null)}

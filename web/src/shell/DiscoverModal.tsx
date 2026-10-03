@@ -8,6 +8,7 @@ import { ObjectIcon } from '@/shell/icons';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { notifyDomainsChanged } from '@/ActivitySpace/execution/domain/domainsStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 
 // "Things I haven't joined yet." Opens from the 🔍 in the ModeStrip and
 // lists Domains / Objects whose member tables don't yet have a row for the
@@ -81,9 +82,10 @@ export function DiscoverModal({ open, onOpenChange }: DiscoverModalProps) {
         .eq('user_id', user.id);
       const myObjectIds = new Set((myObjectRows ?? []).map((r) => r.object_id));
 
-      const { data: allObjects } = await supabase
+      // Archived Objects are not offered to join.
+      const { data: allObjects } = await onlyActiveObjects(supabase
         .from('objects')
-        .select('id, name, color, domain_id')
+        .select('id, name, color, domain_id'))
         .order('created_at');
 
       const unjoinedObjects: DiscoverableObject[] = (allObjects ?? [])

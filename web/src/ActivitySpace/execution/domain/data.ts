@@ -2,6 +2,7 @@
 
 import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/ActivitySpace/execution/domain/domainsStore';
 import { translate } from '@/Function/i18n/I18nProvider';
+import { domainObjectsRefusal } from '@/Function/shared/objectArchive';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { membershipErrorMessage } from '@/Function/membership/membershipErrors';
 import { selectIn } from '@/hooks/chunkedIn';
@@ -61,10 +62,18 @@ export async function reorderDomains(updates: { id: string; order_index: number 
   void invalidateDomains();
 }
 
+/** Why a Domain with Objects cannot be deleted, with how many remain. */
+export function domainHasObjectsMessage(count: number): string {
+  return translate('This Domain still has {count} Objects, including archived ones. Move them to another Domain or delete them first.', { count });
+}
+
 export async function deleteDomain(id: string): Promise<void> {
   // RLS lets only owners delete, and a refused delete is not an error — it
   // just matches no rows. Ask for the deleted ids so a refusal is visible.
   const { data, error } = await supabase.from('domains').delete().eq('id', id).select('id');
+  // A Domain that still has Objects (archived ones included) is refused.
+  const remaining = domainObjectsRefusal(error);
+  if (remaining !== null) throw new Error(domainHasObjectsMessage(remaining));
   if (error) throw error;
   if (!data?.length) throw new Error('Only an owner of this Domain can delete it.');
   notifyDomainsChanged();
