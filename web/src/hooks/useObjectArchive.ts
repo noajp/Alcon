@@ -7,6 +7,9 @@ import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { AlconObject } from '@/types/database';
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useObjects } from '@/Function/sync/explorerData';
+import { countActiveObjects } from '@/Function/shared/objectArchive';
 
 // Archive / restore an Object, and the reads that still reach an archived
 // one: the Domain's "Archived" list and the Object opened by id. Rules live
@@ -100,4 +103,14 @@ export async function countDomainObjects(domainId: string): Promise<number> {
     .eq('domain_id', domainId);
   if (error) throw error;
   return count ?? 0;
+}
+
+/**
+ * Counts an Initiative's linked Objects the way its Object list shows them:
+ * the visible Objects still in use (the all-Domains explorer, shared cache).
+ */
+export function useActiveObjectCount(): (objectIds: readonly string[]) => number {
+  const { data } = useObjects(null);
+  const activeIds = useMemo(() => new Set(data.objects.map((o) => o.id)), [data.objects]);
+  return useMemo(() => (objectIds: readonly string[]) => countActiveObjects(objectIds, activeIds), [activeIds]);
 }

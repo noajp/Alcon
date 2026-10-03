@@ -382,11 +382,18 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
       if (d.type === 'UPDATE' && id) {
         // Archiving or restoring moves the Object out of (or back into) the
         // lists and its Elements out of the active reads: refetch, not patch.
-        const caches = qc.getQueriesData<ExplorerData>({ queryKey: ['explorer'] }).flatMap(([, data]) => data ? [data] : []);
+        // The Domains' Archived lists count as copies, so a restore by
+        // someone else is seen although no explorer list holds the Object.
+        const caches = [
+          ...qc.getQueriesData<ExplorerData>({ queryKey: ['explorer'] }).flatMap(([, data]) => data ? [data] : []),
+          ...qc.getQueriesData<{ id: string; archived_at?: string | null }[]>({ queryKey: ['archived-objects'] })
+            .flatMap(([, list]) => list ? [{ objects: list }] : []),
+        ];
         if (archiveStateChanged(caches, id, (row as { archived_at?: string | null }).archived_at)) {
           invalidateSoon(qc, ['explorer']);
           invalidateSoon(qc, ['action-targets']);
           invalidateSoon(qc, ['my-elements']);
+          invalidateSoon(qc, ['nowWork']);
           return;
         }
         forEachExplorer(qc, (data) => patchObjectInExplorer(data, id, row as Record<string, unknown>));

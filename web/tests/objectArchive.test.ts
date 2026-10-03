@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   archiveStateChanged,
   canManageObject,
+  countActiveObjects,
   domainObjectsRefusal,
   isArchivedObject,
   onlyActiveObjects,
@@ -48,17 +49,33 @@ describe('canManageObject', () => {
   });
 });
 
+describe('countActiveObjects', () => {
+  it('counts only linked Objects the active list holds, once each', () => {
+    const active = new Set(['o1', 'o2']);
+    expect(countActiveObjects(['o1', 'o2', 'o3'], active)).toBe(2);
+    expect(countActiveObjects(['o1', 'o1'], active)).toBe(1);
+    expect(countActiveObjects([], active)).toBe(0);
+    expect(countActiveObjects(['o3'], new Set())).toBe(0);
+  });
+});
+
 describe('archiveStateChanged', () => {
   const active = { objects: [{ id: 'o1', archived_at: null }] };
   const archived = { objects: [{ id: 'o1', archived_at: '2026-10-03T00:00:00Z' }] };
   it('is true when a cached copy disagrees', () => {
     expect(archiveStateChanged([active], 'o1', '2026-10-03T00:00:00Z')).toBe(true);
+    // A restore seen through the Archived list or the Object opened by id.
     expect(archiveStateChanged([archived], 'o1', null)).toBe(true);
+    expect(archiveStateChanged([{ objects: [] }, archived], 'o1', null)).toBe(true);
   });
-  it('is false when the copies agree or the Object is not cached', () => {
+  it('is true for an archived row no cache holds — its Elements may be in My Elements or Now', () => {
+    expect(archiveStateChanged([active], 'o2', '2026-10-03T00:00:00Z')).toBe(true);
+    expect(archiveStateChanged([], 'o1', '2026-10-03T00:00:00Z')).toBe(true);
+  });
+  it('is false when the copies agree, or for an active row no cache holds', () => {
     expect(archiveStateChanged([active], 'o1', null)).toBe(false);
     expect(archiveStateChanged([archived], 'o1', '2026-10-04T00:00:00Z')).toBe(false);
-    expect(archiveStateChanged([active], 'o2', '2026-10-03T00:00:00Z')).toBe(false);
+    expect(archiveStateChanged([active], 'o2', null)).toBe(false);
     expect(archiveStateChanged([], 'o1', null)).toBe(false);
   });
 });

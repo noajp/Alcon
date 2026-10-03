@@ -61,6 +61,7 @@ import {
 } from '@/ui/dropdown-menu';
 import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 
 /** A Initiative page has a band and one column of readings; no side rail. */
 const INITIATIVE_ZONES: Zone[] = ['band', 'main'];
@@ -256,6 +257,8 @@ function StrategyListView({
 }) {
   // Health for every row from one read (progress / last movement / risk).
   const { byId: health } = useInitiativeHealth(strategies);
+  // Archived Objects stay linked but are not counted.
+  const countObjects = useActiveObjectCount();
   // Subscribe to the shared tick so "Today" / "3m ago" in the cells ages
   // honestly while the list stays open; the cells re-render with this view.
   useNow();
@@ -280,7 +283,7 @@ function StrategyListView({
             </div>
             <InitiativeHealthCell health={health.get(s.id)} />
             <span className="text-[12px] text-muted-foreground tabular-nums text-right">
-              {s.objectIds.length}
+              {countObjects(s.objectIds)}
             </span>
           </button>
         ))}
@@ -464,6 +467,8 @@ function StrategyDetailView({
 
   const { data: domains, refetch: refetchDomains } = useDomains();
   const { objects: allObjects, refetch: refetchObjects } = useAllObjects();
+  // Nested Initiatives' counts leave archived Objects out, like the list.
+  const countObjects = useActiveObjectCount();
 
   // A Initiative's Elements are the union of its Objects' Elements. That one
   // line is all it takes for every Element-counting widget already in the
@@ -867,7 +872,7 @@ function StrategyDetailView({
                     <NavStrategyIcon size={13} className="text-muted-foreground shrink-0" />
                     <span className="text-[13px] font-[550] text-foreground truncate flex-1 min-w-0">{child.name}</span>
                     <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
-                      {child.objectIds.length} object{child.objectIds.length === 1 ? '' : 's'}
+                      {countObjects(child.objectIds)} object{countObjects(child.objectIds) === 1 ? '' : 's'}
                     </span>
                     {canEdit && (
                     <button

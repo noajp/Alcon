@@ -37,9 +37,25 @@ export function canManageObject(
 }
 
 /**
+ * How many of an Initiative's linked Objects are in use. The links
+ * (strategy_objects) keep archived Objects; counts shown next to the list of
+ * Objects count only the ones the list shows (`activeIds`).
+ */
+export function countActiveObjects(objectIds: readonly string[], activeIds: ReadonlySet<string>): number {
+  let n = 0;
+  for (const id of new Set(objectIds)) if (activeIds.has(id)) n++;
+  return n;
+}
+
+/**
  * A realtime UPDATE that archives or restores an Object cannot be patched in
  * place: lists must drop or regain it, and its Elements leave or rejoin the
- * active reads. True when any cached copy disagrees with the new state.
+ * active reads (My Elements, Now). `caches` are every cached copy the client
+ * holds — explorer lists, the Object opened by id, the Domains' Archived lists.
+ * True when a cached copy disagrees with the new state, or when the row is
+ * archived and no copy is cached: lists leave archived Objects out, so an
+ * archive seen from elsewhere (Home, another Domain) still has to refetch the
+ * reads that hold its Elements.
  */
 export function archiveStateChanged(
   caches: readonly { objects: readonly { id: string; archived_at?: string | null }[] }[],
@@ -47,7 +63,15 @@ export function archiveStateChanged(
   archivedAt: string | null | undefined,
 ): boolean {
   const archived = !!archivedAt;
-  return caches.some((data) => data.objects.some((o) => o.id === objectId && isArchivedObject(o) !== archived));
+  let found = false;
+  for (const data of caches) {
+    for (const o of data.objects) {
+      if (o.id !== objectId) continue;
+      if (isArchivedObject(o) !== archived) return true;
+      found = true;
+    }
+  }
+  return !found && archived;
 }
 
 /**
