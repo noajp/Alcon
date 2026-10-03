@@ -58,6 +58,24 @@ export function bearerToken(header: string | null): string | null {
   return token ? token : null;
 }
 
+/**
+ * Pure. The OAuth client a bearer JWT was issued to (its `client_id` claim),
+ * read from the unverified payload — only to pick the path that then verifies
+ * it. Null for anything that is not a JWT carrying a UUID client_id.
+ */
+export function oauthClientIdOf(token: string): string | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = new TextDecoder().decode(Uint8Array.from(atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4)), (c) => c.charCodeAt(0)));
+    const payload = JSON.parse(json) as { client_id?: unknown };
+    return typeof payload.client_id === "string" && UUID.test(payload.client_id) ? payload.client_id : null;
+  } catch {
+    return null;
+  }
+}
+
 /** SHA-256 hex of a string — what personal_access_tokens.token_hash stores. */
 export async function sha256Hex(text: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));

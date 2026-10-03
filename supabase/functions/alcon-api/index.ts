@@ -7,8 +7,9 @@
 // MCP. Writes are recorded on the Element's Activity as "API · token: <name>"
 // (with the X-Alcon-Client name in front when the caller sends one).
 //
-// Auth (ADR 0032): Authorization: Bearer <personal access token> or a
-// Supabase session JWT, resolved by _shared/callerAuth.ts. verify_jwt=false
+// Auth (ADR 0032, 0034): Authorization: Bearer <personal access token>, an
+// OAuth access token or a Supabase session JWT, resolved by
+// _shared/callerAuth.ts. verify_jwt=false
 // so a bad token gets this API's JSON 401 rather than the gateway's; the
 // token is verified here before any tool runs. GET / and GET /openapi.json
 // answer without a token: they describe the API, not the board.
@@ -81,7 +82,10 @@ Deno.serve(async (req: Request) => {
   });
   if (!plan.ok) return fail(plan.error);
 
-  const actor = { agent: apiActorLabel(client, caller.via === "pat" ? caller.label : null), userId: caller.userId };
+  const actor = {
+    agent: apiActorLabel(client, caller.via === "pat" ? caller.label : null, caller.via === "oauth" ? caller.label : null),
+    userId: caller.userId,
+  };
   const result = await runExternalTool(caller.db, plan.call.tool, plan.call.args, actor, caller.access);
   const { status, body } = toResponse(result, plan.call.successStatus);
   return json(status, body);
