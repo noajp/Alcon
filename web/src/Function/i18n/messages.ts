@@ -1,4 +1,5 @@
 import type { Locale } from './locales';
+import { CRM_TRANSLATIONS } from '@/ActivitySpace/sustainment/crm/crmMessages';
 import { SCM_MESSAGES } from './scmMessages';
 
 type TranslationMap = Record<string, string>;
@@ -895,6 +896,13 @@ Object.assign(es, {
   'Delete Domain': 'Eliminar Domain',
   'Permanently delete this Domain for every member. Move or delete its Objects first.': 'Elimina este Domain de forma permanente para todos los miembros. Primero mueve o elimina sus Objects.',
 });
+
+// The CRM App (Sustainment).
+Object.assign(ja, CRM_TRANSLATIONS.ja);
+Object.assign(ko, CRM_TRANSLATIONS.ko);
+Object.assign(fr, CRM_TRANSLATIONS.fr);
+Object.assign(es, CRM_TRANSLATIONS.es);
+
 // The SCM App (Sustainment).
 Object.assign(ja, SCM_MESSAGES.ja);
 Object.assign(ko, SCM_MESSAGES.ko);

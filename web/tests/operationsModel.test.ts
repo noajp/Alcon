@@ -102,13 +102,19 @@ describe('CRM analysis', () => {
     expect(result.totals).toEqual([]);
   });
 
-  it('exposes unknown stages, out-of-range probabilities, malformed dates and missing currency', () => {
+  it('treats every pipeline stage except won and lost as open', () => {
+    const result = crm([opportunity({ stage: 'negotiation' }), opportunity({ stage: 'Won' }), opportunity({ stage: ' LOST ' })]);
+    expect(result.rows.map(row => [row.stageId, row.stage])).toEqual([['negotiation', 'open'], ['Won', 'won'], ['LOST', 'lost']]);
+    expect(result.excludedCount).toBe(0);
+  });
+
+  it('exposes out-of-range probabilities, malformed dates and missing currency', () => {
     const result = crm([
-      opportunity({ stage: 'negotiating' }), opportunity({ probability: 101 }),
+      opportunity({ probability: 101 }),
       opportunity({ closeDate: '2026-02-30' }), opportunity({ currency: null }),
       opportunity({ lastContact: '2026-09-08' }), opportunity({ nextActionDate: '2026-9-9' }),
     ]);
-    expect(result.excludedCount).toBe(6);
+    expect(result.excludedCount).toBe(5);
     expect(result.totals).toEqual([]);
     expect(result.rows.every(row => row.issues.length > 0)).toBe(true);
   });

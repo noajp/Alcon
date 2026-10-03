@@ -50,11 +50,10 @@ import { CREATE_ELEMENT_EVENT, type CreateElementDetail } from '@/shell/QuickAdd
 import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarStore';
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
-import { OperationsNavigation } from '@/ActivitySpace/sustainment/operations/OperationsNavigation';
 import { ScmSidebar } from '@/ActivitySpace/sustainment/scm/ScmSidebar';
+import { CrmSidebar } from '@/ActivitySpace/sustainment/crm/CrmSidebar';
 import { InboxList } from '@/ActivitySpace/home/InboxList';
 import { CalendarSidebar } from '@/ActivitySpace/sustainment/calendar/CalendarSidebar';
-import { operationsQueue, operationsQueueRoute } from '@/ActivitySpace/sustainment/operations/operationsQueues';
 import type { NavigationState } from '@/types/navigation';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
@@ -535,8 +534,7 @@ export function AppSidebar({
           {/* ── Calendar ── today, a mini month that moves the grid, and who is shown. */}
           {railMode === 'calendar' && <><SidebarModeLabel label={t('Calendar')} /><CalendarSidebar /></>}
           {railMode === 'team' && <SidebarModeLabel label={t('Team')} />}
-          {railMode === 'crm' && <OperationsNavigation sidebar
-            queue={operationsQueue(navigation)} onSelect={queue => onNavigate(operationsQueueRoute(queue))} />}
+          {railMode === 'crm' && <CrmSidebar navigation={navigation} onNavigate={onNavigate} />}
           {railMode === 'scm' && <ScmSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'scm') onViewChange('scm'); }} />}
           </>
           )}

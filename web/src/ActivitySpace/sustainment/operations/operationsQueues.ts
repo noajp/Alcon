@@ -1,18 +1,8 @@
-import type { NavigationState } from '@/types/navigation';
 import type { OperationsAnalysis } from './operationsModel';
 
 export type OperationsQueue = 'overview' | 'attention' | 'records' | 'incomplete';
 
 export const OPERATIONS_QUEUES: readonly OperationsQueue[] = ['overview', 'attention', 'records', 'incomplete'];
-
-export function operationsQueue(navigation: NavigationState): OperationsQueue {
-  const value = navigation.crmQueue;
-  return OPERATIONS_QUEUES.includes(value as OperationsQueue) ? value as OperationsQueue : 'overview';
-}
-
-export function operationsQueueRoute(queue: OperationsQueue): Partial<NavigationState> {
-  return { crmQueue: queue };
-}
 
 export function operationsQueueLabel(queue: OperationsQueue): string {
   switch (queue) {
