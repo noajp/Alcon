@@ -12,6 +12,7 @@ import type {
   AlconObject, Element, ElementAssignee, ElementEdge, ElementObject,
   ElementWithDetails, Strategy, StrategyChild, StrategyObject, Worker, WorkerAvailability,
 } from '@/types/database';
+import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 
 export { readAllPages as readDecisionLabPages } from '@/hooks/readAllPages';
 
@@ -91,8 +92,8 @@ export async function fetchDecisionLabData(
       .from('object_domains').select('object_id, domain_id', { count: 'exact' }).in('domain_id', chunk)
       .order('object_id').order('domain_id').range(from, to).abortSignal(signal),
     (row) => `${row.object_id}:${row.domain_id}`),
-    readIds<AlconObject>('Space Objects', domainIds, (chunk, from, to) => supabase
-      .from('objects').select('*', { count: 'exact' }).in('domain_id', chunk)
+    readIds<AlconObject>('Space Objects', domainIds, (chunk, from, to) => onlyActiveObjects(supabase
+      .from('objects').select('*', { count: 'exact' }).in('domain_id', chunk))
       .order('id').range(from, to).abortSignal(signal), rowId),
     readDecisionLabPages<{ user_id: string }>('Space members', (from, to) => supabase
       .from('activity_space_members').select('user_id', { count: 'exact' }).eq('activity_space_id', spaceId)
@@ -105,8 +106,8 @@ export async function fetchDecisionLabData(
 
   const directObjectIds = new Set(directObjects.map((row) => row.id));
   const linkedObjects = await readIds<AlconObject>('Linked Space Objects',
-    objectLinks.map((row) => row.object_id).filter((id) => !directObjectIds.has(id)), (chunk, from, to) => supabase
-      .from('objects').select('*', { count: 'exact' }).in('id', chunk)
+    objectLinks.map((row) => row.object_id).filter((id) => !directObjectIds.has(id)), (chunk, from, to) => onlyActiveObjects(supabase
+      .from('objects').select('*', { count: 'exact' }).in('id', chunk))
       .order('id').range(from, to).abortSignal(signal), rowId);
   const objects = uniqueRows([...directObjects, ...linkedObjects]);
   const objectIds = objects.map((row) => row.id);
