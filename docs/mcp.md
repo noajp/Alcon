@@ -65,6 +65,7 @@ PAT と OAuth を受け付けるには、Edge Function のシークレット `AL
 - Site URL を本番のアプリにし、Redirect URLs に `<本番のアプリ>/oauth/consent**` を足す（同意画面で登録した人の確認メールが同意に戻るため）
 - Authentication › Hooks の Customize Access Token に `public.custom_access_token_hook` を選ぶ。選ばないうちは、関数が OAuth のトークンを 500「OAuth access token hook not enabled」で断る
 - 「Require current password when updating」と「Secure email change」を ON にする。Supabase Auth はトークンのロールを見ないので、これがないと、承認されたクライアントが本人のパスワードを変えられる
+- MFA を使わない間は TOTP の登録を OFF、ID の手動リンク（Manual linking）とパスキーは OFF のままにする。どれも、承認されたクライアントが本人のトークンで操作でき、ログイン手段を足したり、本人を設定から締め出したりできる
 
 非対称の署名鍵に移ったら、EC の秘密鍵の JWK を入れれば ES256 で署名する。
 
