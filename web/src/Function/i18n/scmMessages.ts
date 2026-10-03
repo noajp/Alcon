@@ -228,7 +228,7 @@ const ROWS: readonly Row[] = [
   ["Runs out before supply can arrive", "入荷前に欠品", "입고 전에 품절", "Rupture avant l'arrivée du réapprovisionnement", "Se agota antes de que llegue el suministro"],
   ["A normal order is too late. Expedite, transfer or substitute.", "通常の発注では間に合いません。納期短縮・拠点間移動・代替品で対応してください。", "일반 발주로는 늦습니다. 긴급 발주, 이동 또는 대체하세요.", "Une commande normale arrive trop tard. Accélérez, transférez ou substituez.", "Un pedido normal llega tarde. Acelera, transfiere o sustituye."],
   ["Order now", "今すぐ発注", "지금 발주", "À commander", "Pedir ya"],
-  ["At or below the reorder point. An order placed today arrives in time.", "発注点以下です。今日発注すれば間に合います。", "재주문점 이하입니다. 오늘 발주하면 제때 도착합니다.", "Au point de commande ou en dessous. Une commande passée aujourd'hui arrivera à temps.", "En el punto de pedido o por debajo. Un pedido hecho hoy llega a tiempo."],
+  ["Below the reorder point. An order placed today arrives in time.", "発注点を下回っています。今日発注すれば間に合います。", "재주문점보다 낮습니다. 오늘 발주하면 제때 도착합니다.", "Sous le point de commande. Une commande passée aujourd'hui arrivera à temps.", "Por debajo del punto de pedido. Un pedido hecho hoy llega a tiempo."],
   ["Late supply", "入荷遅延", "입고 지연", "Approvisionnement en retard", "Suministro atrasado"],
   ["Purchase orders past their expected date.", "入荷予定日を過ぎた発注書。", "입고 예정일이 지난 발주서.", "Bons de commande ayant dépassé leur date prévue.", "Órdenes de compra que han superado su fecha prevista."],
   ["No exceptions", "例外はありません", "예외 없음", "Aucune exception", "Sin excepciones"],

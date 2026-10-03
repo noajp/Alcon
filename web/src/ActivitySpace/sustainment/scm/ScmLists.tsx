@@ -27,7 +27,7 @@ export function ScmExceptions() {
   const groups: { id: string; title: string; description: string; rows: ScmNode[] }[] = useMemo(() => [
     { id: 'now', title: t('Out of stock'), description: t('Demand is going unmet today.'), rows: nodes.filter(node => node.health === 'stockout') },
     { id: 'before', title: t('Runs out before supply can arrive'), description: t('A normal order is too late. Expedite, transfer or substitute.'), rows: nodes.filter(node => node.health === 'critical') },
-    { id: 'order', title: t('Order now'), description: t('At or below the reorder point. An order placed today arrives in time.'), rows: nodes.filter(node => node.health === 'reorder') },
+    { id: 'order', title: t('Order now'), description: t('Below the reorder point. An order placed today arrives in time.'), rows: nodes.filter(node => node.health === 'reorder') },
     { id: 'late', title: t('Late supply'), description: t('Purchase orders past their expected date.'), rows: nodes.filter(node => !['stockout', 'critical', 'reorder'].includes(node.health) && node.arrivals.some(arrival => arrival.overdue)) },
   ], [nodes, t]);
   const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
