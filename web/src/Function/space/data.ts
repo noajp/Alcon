@@ -1,6 +1,7 @@
 'use client';
 
 import { fetchMySpaceIds, SPACE_IDS_QUERY_KEY } from '@/ActivitySpace/execution/domain/data';
+import { translate } from '@/Function/i18n/I18nProvider';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { ActivitySpace, ActivitySpaceInsert, ActivitySpaceUpdate } from '@/types/database';
@@ -62,8 +63,11 @@ export async function updateActivitySpace(id: string, updates: ActivitySpaceUpda
 }
 
 export async function deleteActivitySpace(id: string): Promise<void> {
-  const { error } = await supabase.from('activity_spaces').delete().eq('id', id);
-  if (error) throw error;
+  // RLS lets only owners delete, and a refused delete matches no rows rather
+  // than erroring; ask for the deleted ids so both failures are visible.
+  const { data, error } = await supabase.from('activity_spaces').delete().eq('id', id).select('id');
+  if (error) throw new Error(translate('The Space could not be deleted. Try again.'));
+  if (!data?.length) throw new Error(translate('Only an owner of this Space can delete it.'));
 }
 
 const SPACES_QUERY_KEY = ['spaces'] as const;

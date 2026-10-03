@@ -16,7 +16,9 @@
 --   - UPDATE of activity_space_id from a signed-in session: the caller must
 --     own the Space the Domain leaves (if any) and the Space it joins (if
 --     any). The update policy already requires an owner/admin of the Domain.
---     Server jobs and the service role (auth.uid() null) are left alone.
+--     Server jobs and the service role (auth.uid() null) are left alone, and
+--     so is deleting a Space: its Domains lose their Space through the FK
+--     (on delete set null) after its memberships are gone.
 --
 -- Every existing Domain's creator is a member of its Space, so no data
 -- changes.
@@ -26,6 +28,7 @@ do $$
 begin
   if to_regclass('public.domains') is null
      or to_regclass('public.activity_space_members') is null
+     or to_regclass('public.activity_spaces') is null
      or to_regprocedure('public.is_activity_space_member(uuid)') is null then
     raise notice 'domains_created_inside_your_space skipped: base schema not present';
     return;
@@ -48,6 +51,13 @@ begin
     as $b$
     begin
       if auth.uid() is null or new.activity_space_id is not distinct from old.activity_space_id then
+        return new;
+      end if;
+      -- Deleting a Space sets its Domains' activity_space_id to null (FK
+      -- on delete set null) after its memberships are gone; that is the
+      -- Space delete itself, not a move.
+      if new.activity_space_id is null
+         and not exists (select 1 from public.activity_spaces s where s.id = old.activity_space_id) then
         return new;
       end if;
       if (old.activity_space_id is not null and not exists (
