@@ -8,13 +8,20 @@
 -- Manager checks (user_manages_scope_as) read only objects.domain_id, so this
 -- leaked visibility, not management.
 --
---   - INSERT / UPDATE: the caller manages the Object (owner/admin of the
---     Object, or owner/admin of its primary Domain) and manages the Domain
---     (owner/admin). A row that repeats the Object's own primary Domain adds
---     no visibility, so managing the Object is enough for it — that is what
---     createObject and import_existing_work write for a new Object.
---   - DELETE: the caller manages the Object or the Domain. Removing a link
---     only narrows visibility, and either side may take the Object out.
+--   Managing an Object means what objects_domain_move_guard means by it: an
+--   owner/admin of its primary Domain, or — only for an Object with no
+--   Domain — an owner/admin of the Object itself. Every creator is an Object
+--   owner, so counting Object owners for a Domain-homed Object would let a
+--   plain Domain member push their Object (and the Elements others put in
+--   it) into another Space's Domain, which the move guard already refuses.
+--
+--   - INSERT / UPDATE: the caller manages the Object and is an owner/admin
+--     of the Domain. A row that repeats the Object's own primary Domain adds
+--     no visibility, so an owner/admin of the Object may write it too — that
+--     is what createObject and import_existing_work write for a new Object.
+--   - DELETE: the caller manages the Object or is an owner/admin of the
+--     Domain (and, as for every read, can see the row). Removing a link only
+--     narrows visibility, and either side may take the Object out.
 --   - SELECT stays object_domains_visible_select (the Domain and the Object
 --     are both visible to the caller).
 --
@@ -36,11 +43,15 @@ begin
     create or replace function alcon_internal.user_manages_object(p_object uuid)
     returns boolean language sql stable security definer set search_path = ''
     as $b$
-      select auth.uid() is not null and (
-        exists (select 1 from public.object_members om
-                 where om.object_id = p_object and om.user_id = auth.uid()
-                   and om.role in ('owner', 'admin'))
-        or alcon_internal.user_manages_scope_as(auth.uid(), 'object', p_object)
+      select auth.uid() is not null and exists (
+        select 1 from public.objects o
+         where o.id = p_object
+           and case when o.domain_id is not null
+                 then alcon_internal.user_manages_scope_as(auth.uid(), 'domain', o.domain_id)
+                 else exists (select 1 from public.object_members om
+                               where om.object_id = o.id and om.user_id = auth.uid()
+                                 and om.role in ('owner', 'admin'))
+               end
       )
     $b$
   $f$;
@@ -49,10 +60,15 @@ begin
     create or replace function alcon_internal.user_can_link_object_domain(p_object uuid, p_domain uuid)
     returns boolean language sql stable security definer set search_path = ''
     as $b$
-      select alcon_internal.user_manages_object(p_object)
-        and (alcon_internal.user_manages_scope_as(auth.uid(), 'domain', p_domain)
-             or exists (select 1 from public.objects o
-                         where o.id = p_object and o.domain_id = p_domain))
+      select auth.uid() is not null and (
+        (alcon_internal.user_manages_object(p_object)
+         and alcon_internal.user_manages_scope_as(auth.uid(), 'domain', p_domain))
+        or (exists (select 1 from public.objects o
+                     where o.id = p_object and o.domain_id = p_domain)
+            and exists (select 1 from public.object_members om
+                         where om.object_id = p_object and om.user_id = auth.uid()
+                           and om.role in ('owner', 'admin')))
+      )
     $b$
   $f$;
 
