@@ -41,7 +41,7 @@ export function ScmSidebar({ navigation, onNavigate, onOpen }: {
   const plan = useScmPlan(data);
   const [query, setQuery] = useState('');
   const view = scmViewOf(navigation);
-  const locationId = navigation.scmLocationId ?? null;
+  const locationId = navigation.scmLocationId && data?.locations.some(location => location.id === navigation.scmLocationId) ? navigation.scmLocationId : null;
   const inItem = !!navigation.scmNode;
 
   const nodes = useMemo(() => plan?.nodes.filter(node => !locationId || node.locationId === locationId) ?? [], [plan, locationId]);

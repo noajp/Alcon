@@ -113,7 +113,7 @@ export function ScmTower({ onRunPlanner, running }: { onRunPlanner: () => void; 
           </div>}
           <p className="text-xs text-muted-foreground">{lastRun ? t('Last run {when}: {n} orders created.', { when: new Date(lastRun.ranAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' }), n: lastRun.summary.created?.length ?? 0 }) : t('Not run yet.')}</p>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" disabled={running || !plan.proposals.length} onClick={onRunPlanner}><Bot size={14} />{running ? t('Planning…') : t('Run planner now')}</Button>
+            <Button variant="secondary" size="sm" disabled={running || !plan.proposals.length} onClick={onRunPlanner}><Bot size={14} />{running ? t('Planning…') : data.policy.autopilotEnabled ? t('Run planner now') : t('Draft all for approval')}</Button>
             <Button variant="ghost" size="sm" onClick={() => go('settings')}>{t('Policy')}</Button>
           </div>
         </Section>

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   addDays, compareScenario, DEFAULT_POLICY, planScm,
-  type ScmInput, type ScmNode, type ScmPlan, type ScmPolicy, type ScmPoStatus, type ScmScenario,
+  type ScmInput, type ScmNode, type ScmPurchaseOrder, type ScmPlan, type ScmPolicy, type ScmPoStatus, type ScmScenario,
 } from "../../../web/src/ActivitySpace/sustainment/scm/scmEngine.ts";
 
 // SCM for the Copilot: the same planner the SCM App runs, over the caller's
@@ -90,7 +90,7 @@ async function load(db: SupabaseClient, spaceId: string, today: string): Promise
     orders: orders.map(row => ({
       id: String(row.id), number: num(row.number), supplierId: String(row.supplier_id), locationId: String(row.location_id), status: row.status as ScmPoStatus,
       orderedOn: String(row.ordered_on), expectedOn: String(row.expected_on), receivedOn: (row.received_on as string | null) ?? null, currency: String(row.currency),
-      source: row.source === 'autopilot' ? 'autopilot' as const : 'human' as const,
+      source: (row.source === 'autopilot' || row.source === 'copilot' ? row.source : 'human') as ScmPurchaseOrder['source'],
       lines: ((row.scm_po_lines as Row[] | null) ?? []).map(line => ({ id: String(line.id), itemId: String(line.item_id), quantity: num(line.quantity), unitCost: num(line.unit_cost), receivedQuantity: num(line.received_quantity) })),
     })),
   };
@@ -187,7 +187,7 @@ export async function runScmTool(db: SupabaseClient, input: Record<string, unkno
       ].join('\n');
       const { data: order, error } = await db.from('scm_purchase_orders').insert({
         activity_space_id: spaceId, supplier_id: proposal.supplierId, location_id: proposal.locationId, status: 'draft', ordered_on: asOf,
-        expected_on: proposal.expectedOn, currency: proposal.currency, source: 'autopilot', rationale,
+        expected_on: proposal.expectedOn, currency: proposal.currency, source: 'copilot', rationale,
       }).select('id, number').single();
       if (error || !order) throw new Error(error?.message ?? 'Could not create the draft');
       const { error: lineError } = await db.from('scm_po_lines').insert(proposal.lines.map(line => ({ activity_space_id: spaceId, po_id: order.id, item_id: line.itemId, quantity: line.quantity, unit_cost: line.unitCost })));

@@ -37,7 +37,7 @@ export function ScmReplenish({ onRunPlanner, running }: { onRunPlanner: () => vo
     try {
       const final = adjusted(proposal);
       const summary = await actions.placeProposals([final], { mode: draft ? 'draft' : 'place', policy: data.policy, today: data.today, explain: entry => explainProposal(entry, plan, t, locale, draft ? 'draft' : 'place') });
-      const created = summary.created[0];
+      const created = summary?.created[0];
       if (created) setPlaced(current => ({ ...current, [proposal.key]: created }));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -52,7 +52,7 @@ export function ScmReplenish({ onRunPlanner, running }: { onRunPlanner: () => vo
           ? t('Each day the planner places orders up to {limit} on its own and drafts larger ones as approval Elements for you. Monthly budget: {budget}.', { limit: formatMoney(data.policy.autoApproveLimit, data.policy.currency, locale), budget: data.policy.monthlyBudget === null ? t('none') : formatMoney(data.policy.monthlyBudget, data.policy.currency, locale) })
           : t('Review each proposal and place it, or turn on the autopilot in Planning settings to let it act within limits you set.')}</p>
       </div>
-      <Button variant="primary" disabled={running || !proposals.length} onClick={onRunPlanner}><Bot size={14} />{running ? t('Planning…') : t('Run planner now')}</Button>
+      <Button variant="primary" disabled={running || !proposals.length} onClick={onRunPlanner}><Bot size={14} />{running ? t('Planning…') : data.policy.autopilotEnabled ? t('Run planner now') : t('Draft all for approval')}</Button>
     </div>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {Object.values(placed).length > 0 && <ul role="status" className="space-y-1">{Object.values(placed).map(entry => <li key={entry.poId}>

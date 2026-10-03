@@ -175,6 +175,20 @@ describe('planning a node', () => {
     expect(planScm({ ...input, policy: { ...input.policy, autoApproveLimit: 20_000 } }).proposals[0].authority).toBe('auto');
     expect(planScm({ ...input, policy: { ...input.policy, autoApproveLimit: 1_000 } }).proposals[0].authority).toBe('approval');
     expect(planScm({ ...input, policy: { ...input.policy, autoApproveLimit: 20_000, monthlyBudget: 5_000 } }).proposals[0].authority).toBe('over_budget');
+    // A zero limit grants nothing, even to an order with no value.
+    const free = flatInput(50, 10, [], { unitCost: 0 });
+    expect(planScm({ ...free, policy: { ...free.policy, autoApproveLimit: 0 } }).proposals[0].authority).toBe('approval');
+  });
+
+  it('counts only the policy currency against the monthly budget', () => {
+    const input = flatInput(50, 10);
+    const usd: ScmPurchaseOrder = {
+      id: 'usd', number: 9, supplierId: 's', locationId: 'l', status: 'received', orderedOn: TODAY, expectedOn: TODAY, receivedOn: TODAY,
+      currency: 'USD', source: 'human', lines: [{ id: 'u', itemId: 'i', quantity: 1, unitCost: 1_000_000, receivedQuantity: 1 }],
+    };
+    const plan = planScm({ ...input, orders: [usd], policy: { ...input.policy, autoApproveLimit: 20_000, monthlyBudget: 50_000 } });
+    expect(plan.committedThisMonth).toBe(0);
+    expect(plan.proposals[0].authority).toBe('auto');
   });
 });
 

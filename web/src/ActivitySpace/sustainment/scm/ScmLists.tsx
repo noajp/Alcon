@@ -173,7 +173,7 @@ export function ScmOrders() {
           const overdue = OPEN.includes(order.status) && order.expectedOn < data.today;
           const value = order.lines.reduce((sum, line) => sum + line.quantity * line.unitCost, 0);
           return <tr key={order.id} className="cursor-pointer border-b border-[var(--border-subtle)] hover:bg-muted/40" onClick={() => openOrder(order.id)}>
-            <td className={TD}><span className="font-medium">PO-{order.number}</span>{order.source === 'autopilot' && <span className="ml-2"><Pill tone="info">{t('Autopilot')}</Pill></span>}</td>
+            <td className={TD}><span className="font-medium">PO-{order.number}</span>{order.source !== 'human' && <span className="ml-2"><Pill tone="info">{order.source === 'copilot' ? 'Copilot' : t('Autopilot')}</Pill></span>}</td>
             <td className={`${TD} max-w-48 truncate`}>{supplierName(order.supplierId)}</td>
             {!locationId && <td className={`${TD} text-muted-foreground`}>{locationName(order.locationId)}</td>}
             <td className={TD}><Pill tone={order.status === 'draft' ? 'warning' : order.status === 'cancelled' ? 'muted' : order.status === 'received' ? 'success' : overdue ? 'danger' : 'info'}>{overdue ? t('Overdue') : t(PO_STATUS_LABEL[order.status])}</Pill></td>

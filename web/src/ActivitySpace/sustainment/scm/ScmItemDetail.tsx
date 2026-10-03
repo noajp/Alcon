@@ -77,7 +77,7 @@ export function ScmItemDetail({ node, onBack }: { node: ScmNode; onBack: () => v
       <Reading label={t('Suggested order')} value={node.suggestedQuantity ? q(node.suggestedQuantity) : '—'} hint={node.suggestedQuantity ? formatMoney(node.suggestedValue, node.currency, locale) : undefined} />
     </dl>
 
-    <Section title={t('Stock projection')} description={t('Solid: with confirmed orders. Dashed: if the suggested order is placed today. Bars: arrivals.')}>
+    <Section title={t('Stock projection')} description={t('Solid: only the orders already placed. Dashed: following the plan, with every proposed and future order on time. Bars: arrivals.')}>
       <div className="h-64 w-full">
         <ResponsiveContainer>
           <ComposedChart data={projection} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
@@ -89,7 +89,7 @@ export function ScmItemDetail({ node, onBack }: { node: ScmNode; onBack: () => v
             <ReferenceLine y={node.safetyStock} stroke="var(--status-danger)" strokeDasharray="2 4" label={{ value: t('Safety stock'), position: 'insideBottomRight', fontSize: 10, fill: 'var(--status-danger)' }} />
             <Bar dataKey="arrivals" name="Arrivals" fill="var(--status-success)" opacity={0.5} barSize={6} />
             <Area type="stepAfter" dataKey="stock" name="Projected stock" stroke="var(--accent-default)" fill="var(--accent-subtle)" strokeWidth={1.5} />
-            {node.suggestedQuantity > 0 && <Line type="stepAfter" dataKey="planned" name="With suggested order" stroke="var(--accent-default)" strokeDasharray="5 4" dot={false} strokeWidth={1.5} />}
+            {node.dailyDemand > 0 && <Line type="stepAfter" dataKey="planned" name="Following the plan" stroke="var(--accent-default)" strokeDasharray="5 4" dot={false} strokeWidth={1.5} />}
           </ComposedChart>
         </ResponsiveContainer>
       </div>

@@ -102,7 +102,7 @@ async function fetchScm(spaceId: string, today: string): Promise<ScmData> {
     orders: orders.map(row => ({
       id: String(row.id), number: num(row.number), supplierId: String(row.supplier_id), locationId: String(row.location_id),
       status: row.status as ScmPoStatus, orderedOn: String(row.ordered_on), expectedOn: String(row.expected_on),
-      receivedOn: (row.received_on as string | null) ?? null, currency: String(row.currency), source: row.source === 'autopilot' ? 'autopilot' as const : 'human' as const,
+      receivedOn: (row.received_on as string | null) ?? null, currency: String(row.currency), source: (row.source === 'autopilot' || row.source === 'copilot' ? row.source : 'human') as ScmPurchaseOrder['source'],
       rationale: (row.rationale as string | null) ?? null, elementId: (row.element_id as string | null) ?? null, createdAt: String(row.created_at),
       lines: ((row.scm_po_lines as Row[] | null) ?? []).map(line => ({
         id: String(line.id), itemId: String(line.item_id), quantity: num(line.quantity), unitCost: num(line.unit_cost), receivedQuantity: num(line.received_quantity),
@@ -250,14 +250,22 @@ export function useScmActions(spaceId: string | null) {
      * authority the policy grants, otherwise drafted for approval — and logs
      * the run.
      */
-    async function placeProposals(proposals: ScmProposal[], options: { mode: 'place' | 'draft' | 'autopilot'; policy: ScmPolicy; today: string; explain: (proposal: ScmProposal) => string }) {
+    async function placeProposals(proposals: ScmProposal[], options: { mode: 'place' | 'draft' | 'autopilot'; policy: ScmPolicy; today: string; explain: (proposal: ScmProposal) => string; minHoursSinceLastRun?: number }) {
       const activity_space_id = space();
+      // An autopilot run is claimed in the database first: across tabs and
+      // members only one run proceeds; the others stop before writing.
+      let runId: string | null = null;
+      if (options.mode === 'autopilot') {
+        runId = await check(supabase.rpc('scm_claim_autopilot_run', { p_space: activity_space_id, p_min_hours: options.minHoursSinceLastRun ?? 0.01 })) as unknown as string | null;
+        if (!runId) return null;
+      }
       const created: ScmRunSummary['created'] = [];
       let skipped = 0;
       for (const proposal of proposals) {
         if (!proposal.lines.length) { skipped += 1; continue; }
         const status: ScmPoStatus = options.mode === 'place' ? 'approved'
           : options.mode === 'autopilot' && options.policy.autopilotEnabled && proposal.authority === 'auto' ? 'approved' : 'draft';
+        // A failure mid-run leaves the orders already written; the run log says so.
         const rationale = options.explain(proposal);  // evidence travels with the order
         const order = await createOrder({
           supplierId: proposal.supplierId, locationId: proposal.locationId, status, orderedOn: options.today, expectedOn: proposal.expectedOn,
@@ -268,7 +276,7 @@ export function useScmActions(spaceId: string | null) {
         created.push({ poId: order.id, number: order.number, supplier: proposal.supplierName, location: proposal.locationName, total: proposal.total, currency: proposal.currency, status, lines: proposal.lines.length });
       }
       const summary: ScmRunSummary = { created, skipped, trigger: options.mode === 'autopilot' ? 'autopilot' : 'manual' };
-      if (options.mode === 'autopilot') await check(supabase.from('scm_autopilot_runs').insert({ activity_space_id, summary }));
+      if (runId) await check(supabase.from('scm_autopilot_runs').update({ summary }).eq('id', runId));
       return summary;
     }
 
@@ -324,10 +332,17 @@ export function useScmActions(spaceId: string | null) {
         done(check(supabase.rpc('scm_count_stock', { p_item: itemId, p_location: locationId, p_counted: counted, p_on: on, p_note: note || null }))),
       createOrder: (draft: ScmOrderDraft) => done(createOrder(draft)),
       /** Approving or rejecting a draft also closes the approval Element it raised. */
-      setOrderStatus: (id: string, status: ScmPoStatus) => done((async () => {
-        const order = await check(supabase.from('scm_purchase_orders').update({ status }).eq('id', id).select('element_id').single());
-        const elementId = (order as Row).element_id as string | null;
+      /** Moves an order on only from the status the person saw, so a stale
+       * screen cannot approve a rejected draft or cancel a receipt in progress.
+       * Approving or rejecting a draft also closes the approval Element it raised. */
+      setOrderStatus: (id: string, from: ScmPoStatus, status: ScmPoStatus) => done((async () => {
+        const { data: rows, error } = await supabase.from('scm_purchase_orders').update({ status }).eq('id', id).eq('status', from).select('element_id');
+        if (error) throw new Error(error.message);
+        if (!rows?.length) throw new Error('This order changed since you opened it. Refresh and try again.');
+        const elementId = (rows[0] as Row).element_id as string | null;
         if (elementId && (status === 'approved' || status === 'cancelled')) {
+          // The Element belongs to whoever drafted the order; if this person
+          // cannot close it, the order still moves and the Element stays open.
           await supabase.from('elements').update({ status: status === 'approved' ? 'done' : 'cancelled' }).eq('id', elementId);
           void queryClient.invalidateQueries({ queryKey: ['my-elements'] });
         }

@@ -6,6 +6,8 @@ import { X, ChevronRight, Loader2, Wrench, AlertCircle, CheckCircle2 } from 'luc
 import { SendIcon } from '@/Function/shared/SendIcon';
 import { useAlconCopilot, type CopilotContext, type ToolEvent } from './useAlconCopilot';
 import { COPILOT_ASK_EVENT, type CopilotAsk } from './copilotBridge';
+import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
 
 const WIDTH_KEY = 'alcon.copilot.width';
@@ -77,7 +79,7 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
       const request = (event as CustomEvent<CopilotAsk>).detail;
       if (!request?.text || streaming) return;
       onOpenChange(true);
-      send(request.text, { context: { viewLabel: request.viewLabel ?? 'Alcon', domainId: activeDomainId ?? undefined, spaceId: request.spaceId } });
+      send(request.text, { context: { viewLabel: request.viewLabel ?? 'Alcon', domainId: activeDomainId ?? undefined, spaceId: request.spaceId ?? getActiveSpaceId() ?? undefined, today: toDateOnlyString(new Date()) } });
     };
     window.addEventListener(COPILOT_ASK_EVENT, onAsk);
     return () => window.removeEventListener(COPILOT_ASK_EVENT, onAsk);
@@ -126,6 +128,8 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
     const ctx: CopilotContext = {
       viewLabel: 'Alcon',
       domainId: activeDomainId ?? undefined,
+      spaceId: getActiveSpaceId() ?? undefined,
+      today: toDateOnlyString(new Date()),
     };
     send(text, { context: ctx });
   };

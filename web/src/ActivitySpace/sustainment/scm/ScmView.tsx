@@ -54,15 +54,19 @@ export function ScmView({ navigation, onNavigate }: { navigation: NavigationStat
   // A new pane or item starts at the top.
   useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [view, navigation.scmNode]);
 
-  const runPlanner = useCallback(async (mode: 'autopilot') => {
+  /** daily: the automatic pass on opening SCM. manual: the button, scoped to
+   * the selected location; with the autopilot off it drafts everything for approval. */
+  const runPlanner = useCallback(async (trigger: 'daily' | 'manual') => {
     if (!data || !plan) return;
+    const mode = data.policy.autopilotEnabled ? 'autopilot' as const : 'draft' as const;
+    const proposals = trigger === 'manual' && locationId ? plan.proposals.filter(proposal => proposal.locationId === locationId) : plan.proposals;
     setRunning(true); setRunError(null);
     try {
-      await actions.placeProposals(plan.proposals, { mode, policy: data.policy, today: data.today, explain: proposal => explainProposal(proposal, plan, t, locale, mode) });
+      await actions.placeProposals(proposals, { mode, policy: data.policy, today: data.today, minHoursSinceLastRun: trigger === 'daily' ? AUTOPILOT_INTERVAL_MS / 3_600_000 : undefined, explain: proposal => explainProposal(proposal, plan, t, locale, mode) });
     } catch (cause) {
       setRunError(cause instanceof Error ? cause.message : String(cause));
     } finally { setRunning(false); }
-  }, [actions, data, plan, t, locale]);
+  }, [actions, data, plan, t, locale, locationId]);
 
   // The daily autopilot pass. Guarded per Space and per session so two
   // renders or two panes never run it twice.
@@ -70,9 +74,11 @@ export function ScmView({ navigation, onNavigate }: { navigation: NavigationStat
   useEffect(() => {
     if (!data || !plan || !data.policy.autopilotEnabled || running || autoRan.current === data.spaceId) return;
     const last = data.runs[0] ? Date.parse(data.runs[0].ranAt) : 0;
-    autoRan.current = data.spaceId;
     if (Date.now() - last < AUTOPILOT_INTERVAL_MS || !plan.proposals.length) return;
-    const timer = setTimeout(() => void runPlanner('autopilot'), 0);
+    // Marked when the run actually starts, so a cancelled timer (StrictMode,
+    // a dependency change) does not swallow the day's run.
+    const spaceId = data.spaceId;
+    const timer = setTimeout(() => { autoRan.current = spaceId; void runPlanner('daily'); }, 0);
     return () => clearTimeout(timer);
   }, [data, plan, running, runPlanner]);
 
@@ -109,9 +115,9 @@ export function ScmView({ navigation, onNavigate }: { navigation: NavigationStat
           : node ? <ScmItemDetail key={node.key} node={node} onBack={() => onNavigate({ scmNode: null })} />
           : navigation.scmNode ? <div className="space-y-3 py-12 text-center"><p className="text-sm text-muted-foreground">{t('This item is no longer planned here.')}</p><Button onClick={() => onNavigate({ scmNode: null })}>{t('Back')}</Button></div>
           : <>
-            {view === 'tower' && <ScmTower running={running} onRunPlanner={() => void runPlanner('autopilot')} />}
+            {view === 'tower' && <ScmTower running={running} onRunPlanner={() => void runPlanner('manual')} />}
             {view === 'exceptions' && <ScmExceptions />}
-            {view === 'replenish' && <ScmReplenish running={running} onRunPlanner={() => void runPlanner('autopilot')} />}
+            {view === 'replenish' && <ScmReplenish running={running} onRunPlanner={() => void runPlanner('manual')} />}
             {view === 'orders' && <ScmOrders />}
             {view === 'inventory' && <ScmInventory health={navigation.scmHealth ?? null} onHealth={health => onNavigate({ scmHealth: health })} />}
             {view === 'suppliers' && <ScmSuppliers />}

@@ -17,7 +17,7 @@ import {
 // Request body:
 //   {
 //     messages:  Array<{ role: "user"|"assistant", content: string }>,
-//     context?:  { viewLabel?: string; elementId?: string; objectId?: string; domainId?: string; spaceId?: string }
+//     context?:  { viewLabel?: string; elementId?: string; objectId?: string; domainId?: string; spaceId?: string; today?: string }
 //   }
 //
 // Response: text/event-stream. Each event is JSON, prefixed by `event:` / `data:`.
@@ -156,7 +156,7 @@ Deno.serve(async (req: Request) => {
 
   let body: {
     messages: Array<{ role: "user" | "assistant"; content: string }>;
-    context?: { viewLabel?: string; elementId?: string; objectId?: string; domainId?: string; spaceId?: string };
+    context?: { viewLabel?: string; elementId?: string; objectId?: string; domainId?: string; spaceId?: string; today?: string };
   };
   try {
     body = await req.json();
@@ -187,7 +187,7 @@ Deno.serve(async (req: Request) => {
     ctx.objectId ? `現在の Object: ${ctx.objectId}` : null,
     ctx.domainId ? `現在の Domain: ${ctx.domainId}` : null,
     ctx.spaceId ? `現在の Space: ${ctx.spaceId}` : null,
-    `今日の日付 (UTC): ${new Date().toISOString().slice(0, 10)}`,
+    /^\d{4}-\d{2}-\d{2}$/.test(ctx.today ?? "") ? `ユーザーの業務日付: ${ctx.today}` : `今日の日付 (UTC): ${new Date().toISOString().slice(0, 10)}`,
   ].filter(Boolean).join("\n");
 
   const systemBlocks: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }> = [

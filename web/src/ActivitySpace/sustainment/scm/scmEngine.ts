@@ -46,7 +46,7 @@ export interface ScmPurchaseOrder {
   expectedOn: string;
   receivedOn: string | null;
   currency: string;
-  source: 'human' | 'autopilot';
+  source: 'human' | 'autopilot' | 'copilot';
   lines: ScmPoLine[];
 }
 export interface ScmPolicy {
@@ -763,7 +763,7 @@ export function planScm(input: ScmInput): ScmPlan {
   // Group proposals into purchase orders per supplier and location.
   const monthStart = dayString(today - (new Date(today * DAY_MS).getUTCDate() - 1));
   const committedThisMonth = input.orders
-    .filter(order => !['draft', 'cancelled'].includes(order.status) && order.orderedOn >= monthStart && order.orderedOn <= input.today)
+    .filter(order => order.currency === policy.currency && !['draft', 'cancelled'].includes(order.status) && order.orderedOn >= monthStart && order.orderedOn <= input.today)
     .reduce((sum, order) => sum + order.lines.reduce((total, line) => total + line.quantity * line.unitCost, 0), 0);
   const groups = new Map<string, ScmProposal>();
   for (const node of nodes) {
@@ -788,7 +788,8 @@ export function planScm(input: ScmInput): ScmPlan {
   for (const proposal of proposals) {
     const withinBudget = policy.monthlyBudget === null || proposal.currency !== policy.currency || budgetUsed + proposal.total <= policy.monthlyBudget;
     if (!withinBudget) proposal.authority = 'over_budget';
-    else if (proposal.currency === policy.currency && proposal.total <= policy.autoApproveLimit) proposal.authority = 'auto';
+    // A limit of zero grants no authority, and an order with no value is never "within" it.
+    else if (proposal.currency === policy.currency && policy.autoApproveLimit > 0 && proposal.total > 0 && proposal.total <= policy.autoApproveLimit) proposal.authority = 'auto';
     else proposal.authority = 'approval';
     if (withinBudget && proposal.currency === policy.currency) budgetUsed += proposal.total;
   }

@@ -29,6 +29,9 @@ export function ScmScenarios({ supplierDelay }: { supplierDelay: string | null }
   const { t, locale } = useI18n();
   const { data, openNode, askCopilot, locationName } = useScmSurface();
   const [draft, setDraft] = useState<Draft>(() => supplierDelay ? { ...EMPTY, delays: { [supplierDelay]: 14 } } : EMPTY);
+  const [serviceText, setServiceText] = useState('');
+  /** Presets and reset replace every assumption, the typed service level included. */
+  const choose = (next: Draft) => { setDraft(next); setServiceText(next.serviceLevel === null ? '' : String(next.serviceLevel)); };
   const scenario = useMemo(() => toScenario(draft), [draft]);
   const result = useScmScenario(data, scenario);
   const categories = useMemo(() => [...new Set(data.items.map(item => item.category).filter(Boolean) as string[])].sort(), [data.items]);
@@ -55,8 +58,8 @@ export function ScmScenarios({ supplierDelay }: { supplierDelay: string | null }
   return <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
     <div className="space-y-6">
       <Section title={t('Assumptions')} description={t('Scenarios change the calculation only. No record or setting is touched.')}
-        action={<Button size="sm" variant="ghost" onClick={() => setDraft(EMPTY)}><RotateCcw size={14} />{t('Reset')}</Button>}>
-        <div className="flex flex-wrap gap-1.5">{presets.map(preset => <Button key={preset.label} size="xs" variant="ghost" onClick={() => setDraft(preset.draft)}>{preset.label}</Button>)}</div>
+        action={<Button size="sm" variant="ghost" onClick={() => choose(EMPTY)}><RotateCcw size={14} />{t('Reset')}</Button>}>
+        <div className="flex flex-wrap gap-1.5">{presets.map(preset => <Button key={preset.label} size="xs" variant="ghost" onClick={() => choose(preset.draft)}>{preset.label}</Button>)}</div>
         <label className={SCM_LABEL}><span>{t('All demand: {n}%', { n: draft.demand })}</span>
           <input type="range" min={25} max={300} step={5} className="w-full accent-[var(--accent-default)]" value={draft.demand} onChange={event => setDraft(current => ({ ...current, demand: Number(event.target.value) }))} />
         </label>
@@ -77,8 +80,14 @@ export function ScmScenarios({ supplierDelay }: { supplierDelay: string | null }
           </label>)}
         </div>
         <label className={SCM_LABEL}><span>{t('Service level override (%)')}</span>
-          <input inputMode="decimal" placeholder={String(Math.round(data.policy.serviceLevel * 1000) / 10)} className={SCM_INPUT} value={draft.serviceLevel ?? ''}
-            onChange={event => { const value = event.target.value.trim(); setDraft(current => ({ ...current, serviceLevel: value === '' ? null : Math.max(50, Math.min(99.9, Number(value) || 50)) })); }} />
+          <input inputMode="decimal" placeholder={String(Math.round(data.policy.serviceLevel * 1000) / 10)} className={SCM_INPUT} value={serviceText}
+            onChange={event => {
+              // Typed freely; applied only once it is a valid level.
+              const text = event.target.value;
+              setServiceText(text);
+              const value = Number(text.trim());
+              setDraft(current => ({ ...current, serviceLevel: text.trim() && value >= 50 && value <= 99.9 ? value : null }));
+            }} />
         </label>
       </Section>
     </div>

@@ -302,7 +302,7 @@ export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { d
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <Pill tone={order.status === 'draft' ? 'warning' : order.status === 'cancelled' ? 'muted' : order.status === 'received' ? 'success' : overdue ? 'danger' : 'info'}>{overdue ? t('Overdue') : t(PO_STATUS_LABEL[order.status])}</Pill>
-        {order.source === 'autopilot' && <Pill tone="info">{t('Autopilot')}</Pill>}
+        {order.source !== 'human' && <Pill tone="info">{order.source === 'copilot' ? 'Copilot' : t('Autopilot')}</Pill>}
         <span>{t('To {location}', { location: location?.name ?? '' })}</span>
         <span>· {t('Ordered {day}', { day: formatDay(order.orderedOn, locale) })}</span>
         <span>· {order.status === 'received' && order.receivedOn ? t('Received {day}', { day: formatDay(order.receivedOn, locale) }) : t('Expected {day}', { day: formatDay(order.expectedOn, locale) })}</span>
@@ -329,7 +329,7 @@ export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { d
       </table>
       {receiving && <div className="flex flex-wrap items-end gap-3">
         <DateEntry label={t('Received on')} value={receivedOn} onChange={setReceivedOn} />
-        <Button variant="primary" disabled={busy || receivedOn > data.today} onClick={() => void act(() => actions.receiveOrder(order.id, Object.entries(receiving).map(([lineId, value]) => ({ lineId, quantity: Number(value) || 0 })).filter(line => line.quantity > 0), receivedOn), true)}>{t('Post receipt')}<ArrowRight size={14} /></Button>
+        <Button variant="primary" disabled={busy || receivedOn > data.today || !Object.values(receiving).some(value => Number(value) > 0)} onClick={() => void act(() => actions.receiveOrder(order.id, Object.entries(receiving).map(([lineId, value]) => ({ lineId, quantity: Number(value) || 0 })).filter(line => line.quantity > 0), receivedOn), true)}>{t('Post receipt')}<ArrowRight size={14} /></Button>
         <Button variant="ghost" disabled={busy} onClick={() => setReceiving(null)}>{t('Cancel')}</Button>
       </div>}
       {open && !receiving && <div className="flex flex-wrap items-end gap-2 border-t border-[var(--border-subtle)] pt-3">
@@ -339,11 +339,11 @@ export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { d
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {!receiving && <div className="flex flex-wrap justify-end gap-2">
         {order.status === 'draft' && <>
-          <Button variant="danger" disabled={busy} onClick={() => void act(() => actions.setOrderStatus(order.id, 'cancelled'), true)}>{t('Reject')}</Button>
-          <Button variant="primary" disabled={busy} onClick={() => void act(() => actions.setOrderStatus(order.id, 'approved'), true)}>{t('Approve order')}</Button>
+          <Button variant="danger" disabled={busy} onClick={() => void act(() => actions.setOrderStatus(order.id, order.status, 'cancelled'), true)}>{t('Reject')}</Button>
+          <Button variant="primary" disabled={busy} onClick={() => void act(() => actions.setOrderStatus(order.id, order.status, 'approved'), true)}>{t('Approve order')}</Button>
         </>}
-        {order.status === 'approved' && <Button variant="secondary" disabled={busy} onClick={() => void act(() => actions.setOrderStatus(order.id, 'sent'))}>{t('Mark as sent')}</Button>}
-        {open && order.status !== 'partial' && <Button variant="danger" disabled={busy} onClick={() => void act(() => actions.setOrderStatus(order.id, 'cancelled'), true)}>{t('Cancel order')}</Button>}
+        {order.status === 'approved' && <Button variant="secondary" disabled={busy} onClick={() => void act(() => actions.setOrderStatus(order.id, order.status, 'sent'))}>{t('Mark as sent')}</Button>}
+        {open && order.status !== 'partial' && <Button variant="danger" disabled={busy} onClick={() => void act(() => actions.setOrderStatus(order.id, order.status, 'cancelled'), true)}>{t('Cancel order')}</Button>}
         {open && <Button variant="primary" disabled={busy} onClick={() => setReceiving(Object.fromEntries(order.lines.map(line => [line.id, String(Math.max(0, line.quantity - line.receivedQuantity))])))}>{t('Receive')}</Button>}
       </div>}
     </div>

@@ -80,7 +80,7 @@ describe('Copilot SCM planner', () => {
     const { data } = await runScmTool(f.db, { action: 'draftOrders', spaceId: SPACE, asOf });
     const orders = f.writes.filter(write => write.table === 'scm_purchase_orders').map(write => write.rows as Record<string, unknown>);
     expect(orders.length).toBe(data.created.length);
-    expect(orders.every(order => order.status === 'draft' && order.source === 'autopilot')).toBe(true);
+    expect(orders.every(order => order.status === 'draft' && order.source === 'copilot')).toBe(true);
   });
 
   it('rejects a missing Space and unknown names', async () => {
