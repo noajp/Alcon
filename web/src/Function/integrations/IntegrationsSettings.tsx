@@ -24,7 +24,8 @@ import { AlconConnectPanel } from './AlconConnectPanel';
 //             Elements — a catalog modelled on Supabase's Integrations page,
 //             then the Space's connections.
 //   alcon     the other direction: point an MCP client or script at Alcon
-//             with a personal access token (AlconConnectPanel, ADR 0032).
+//             with an OAuth sign-in or a personal access token
+//             (AlconConnectPanel, ADR 0032 / 0034).
 // Members see everything read-only; only owners can connect or change.
 
 const DOCS_URL = 'https://github.com/noajp/Alcon/blob/main/docs/mcp.md';

@@ -2,12 +2,14 @@
 
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { CopyField } from './CopyField';
+import { ConnectedApps } from './ConnectedApps';
 import { PersonalAccessTokens } from './PersonalAccessTokens';
 import { ALCON_MCP_URL, claudeMcpAddCommand } from './patData';
 
 // Settings › Integrations › Connect to Alcon: point an MCP client or a script
-// at Alcon. The client acts as the signed-in person through a personal access
-// token (ADR 0032) and sees and changes only what that person can.
+// at Alcon. The client acts as the signed-in person — through a personal
+// access token (ADR 0032) or an OAuth sign-in from claude.ai / ChatGPT
+// (ADR 0034) — and sees and changes only what that person can.
 
 export function AlconConnectPanel() {
   const { t } = useI18n();
@@ -24,6 +26,8 @@ export function AlconConnectPanel() {
         <h3 className="text-[13px] font-medium text-foreground">{t('Endpoint')}</h3>
         <CopyField value={ALCON_MCP_URL} />
       </section>
+
+      <ConnectedApps />
 
       <PersonalAccessTokens />
 
