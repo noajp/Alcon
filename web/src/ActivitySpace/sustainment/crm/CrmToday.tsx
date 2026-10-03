@@ -8,7 +8,7 @@ import { MenuShell, MENU_ROW } from '@/Function/shared/menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { forecastFor, inList, shiftDate, todayQueue, upcoming, type CrmDeal, type CrmUrgency, type CrmWorkspace } from './crmModel';
 import { HealthDot, money, relativeDay } from './crmFormat';
-import type { Crm } from './useCrm';
+import type { Crm } from '@/hooks/useCrm';
 
 const GROUPS: { id: CrmUrgency; label: string }[] = [
   { id: 'overdue', label: 'Overdue' }, { id: 'today', label: 'Today' }, { id: 'soon', label: 'This week' }, { id: 'plan', label: 'Needs a plan' },
@@ -25,7 +25,12 @@ export function Metric({ label, value, hint, tone }: { label: string; value: str
 function Snooze({ deal, crm }: { deal: CrmDeal; crm: Crm }) {
   const { t } = useI18n();
   const [saving, setSaving] = useState(false);
-  const move = async (days: number) => { setSaving(true); try { await crm.saveDeal(deal.id, { nextActionDate: shiftDate(crm.today, days) }); } finally { setSaving(false); } };
+  // Moving the date moves the Element when the next step is one.
+  const move = async (days: number) => {
+    setSaving(true);
+    const due = shiftDate(crm.today, days);
+    try { await (deal.nextStep ? crm.setNextStep(deal, { title: deal.nextStep, due }) : crm.saveDeal(deal.id, { nextStepOn: due })); } finally { setSaving(false); }
+  };
   return <DropdownMenu>
     <DropdownMenuTrigger asChild><Button size="xs" variant="ghost" disabled={saving}>{t('Reschedule')}<ChevronDown size={12} /></Button></DropdownMenuTrigger>
     <MenuShell as="dropdown" width="standard" align="end">
@@ -43,7 +48,7 @@ export function CrmToday({ crm, workspace, onOpen, onCapture, onList }: {
   const queue = useMemo(() => todayQueue(deals), [deals]);
   const next = useMemo(() => upcoming(deals, today), [deals, today]);
   const forecast = useMemo(() => forecastFor(deals, primaryCurrency, today, 1), [deals, primaryCurrency, today]);
-  const totals = workspace.analysis.totals.find(total => total.currency === primaryCurrency);
+  const totals = workspace.totals.find(total => total.currency === primaryCurrency);
   const atRisk = deals.filter(deal => inList(deal, 'at-risk', today, params.horizonDays));
   const closing = deals.filter(deal => inList(deal, 'closing-soon', today, params.horizonDays));
   const overdue = queue.filter(deal => deal.action!.urgency === 'overdue').length;
@@ -55,14 +60,14 @@ export function CrmToday({ crm, workspace, onOpen, onCapture, onList }: {
   </div>;
 
   return <div className="space-y-8">
-    <dl className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+    <dl className="grid grid-cols-2 gap-6 @2xl/crm:grid-cols-4">
       <Metric label={t('Forecast · next {n} days', { n: params.horizonDays })} value={totals ? money(totals.forecast, primaryCurrency, locale, true) : '—'} hint={t('Weighted by likelihood')} />
       <Metric label={t('Open pipeline')} value={totals ? money(totals.pipeline, primaryCurrency, locale, true) : '—'} hint={t('{n} open deals', { n: totals?.openCount ?? 0 })} />
       <Metric label={t('Won this month')} value={money(forecast.months[0]?.won ?? 0, primaryCurrency, locale, true)} hint={forecast.winRate !== null ? t('{p}% win rate', { p: Math.round(forecast.winRate * 100) }) : undefined} />
       <Metric label={t('Needs attention')} value={String(queue.length)} hint={overdue ? t('{n} overdue', { n: overdue }) : t('Nothing overdue')} tone={overdue ? 'danger' : undefined} />
     </dl>
 
-    <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
+    <div className="grid items-start gap-8 @4xl/crm:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
       <section aria-label={t('Next best actions')} className="min-w-0 space-y-5">
         <div className="space-y-1"><h2 className="text-lg font-semibold">{t('Next best actions')}</h2>
           <p className="text-xs text-muted-foreground">{t('Ranked by urgency, then by weighted value. Work from the top.')}</p></div>
@@ -79,8 +84,8 @@ export function CrmToday({ crm, workspace, onOpen, onCapture, onList }: {
                 <span className="flex items-baseline gap-2"><span className="truncate text-sm font-medium">{deal.name}</span><span className="truncate text-xs text-muted-foreground">{deal.account}</span></span>
                 <span className="block truncate text-[13px] text-muted-foreground">{t(deal.action!.message, deal.action!.values)}</span>
               </button>
-              <span className="hidden shrink-0 text-right text-xs tabular-nums sm:block">{money(deal.amount, deal.currency, locale, true)}<span className="block text-muted-foreground">{deal.probability ?? '—'}%</span></span>
-              <div className="hidden shrink-0 gap-1 sm:flex">
+              <span className="hidden shrink-0 text-right text-xs tabular-nums @lg/crm:block">{money(deal.amount, deal.currency, locale, true)}<span className="block text-muted-foreground">{deal.probability ?? '—'}%</span></span>
+              <div className="hidden shrink-0 gap-1 @xl/crm:flex">
                 <Snooze deal={deal} crm={crm} />
                 <Button size="xs" variant="ghost" onClick={() => onOpen(deal.id)}>{t('Open')}</Button>
               </div>
@@ -89,7 +94,7 @@ export function CrmToday({ crm, workspace, onOpen, onCapture, onList }: {
         })}
       </section>
 
-      <aside className="min-w-0 space-y-8 border-t border-[var(--border-subtle)] pt-6 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+      <aside className="min-w-0 space-y-8 border-t border-[var(--border-subtle)] pt-6 @4xl/crm:border-l @4xl/crm:border-t-0 @4xl/crm:pl-8 @4xl/crm:pt-0">
         <section className="space-y-2">
           <h3 className="text-sm font-medium">{t('Coming up')}</h3>
           {next.length ? <ul className="space-y-2">{next.map(deal => <li key={deal.id}>

@@ -4,24 +4,68 @@ import { useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { OperationsSetup } from '@/ActivitySpace/sustainment/operations/OperationsSetup';
-import { normalizeCrmStages, stageSlug, type CrmStage } from './crmModel';
-import type { Crm } from './useCrm';
+import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
+import { useStrategies } from '@/ActivitySpace/strategy/initiative/strategyData';
+import { useInitiativeMeasures } from '@/hooks/useInitiativeMeasures';
+import type { Crm } from '@/hooks/useCrm';
+import { fieldKey, fieldOptions, metricValue, normalizeCrmStages, stageSlug, type CrmFieldRecord, type CrmMetric, type CrmStage } from './crmModel';
+import { money } from './crmFormat';
+import { CrmPicker } from './CrmPicker';
 
 const INPUT = 'h-8 min-w-0 rounded-sm bg-muted/30 px-2 text-sm outline-none hover:bg-muted/40 focus:bg-muted/60';
 
-function StagesEditor({ crm }: { crm: Crm }) {
+function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+  return <section className="space-y-3">
+    <div className="space-y-1"><h2 className="text-sm font-medium">{title}</h2>{description && <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">{description}</p>}</div>
+    {children}
+  </section>;
+}
+
+function Basics({ crm }: { crm: Crm }) {
   const { t } = useI18n();
-  const [draft, setDraft] = useState<CrmStage[]>(crm.stages);
+  const pipeline = crm.pipeline!;
+  const [name, setName] = useState(pipeline.name);
+  const [label, setLabel] = useState(pipeline.record_label ?? '');
+  const [currency, setCurrency] = useState(pipeline.currency);
+  const [horizon, setHorizon] = useState(String(pipeline.horizon_days));
+  const [followUp, setFollowUp] = useState(String(pipeline.follow_up_days));
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const days = (value: string) => /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 3650;
+  const valid = !!name.trim() && /^[A-Za-z]{3}$/.test(currency) && days(horizon) && days(followUp) && label.trim().length <= 40;
+  return <Section title={t('Pipeline')} description={t('Each pipeline has its own stages, currency and rhythm — for example new business, renewals or partners. Records (companies, contacts) are shared across pipelines.')}>
+    <div className="grid max-w-2xl gap-3 sm:grid-cols-2">
+      <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Name')}</span><input className={`${INPUT} w-full text-foreground`} value={name} onChange={event => { setName(event.target.value); setSaved(false); }} /></label>
+      <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('What you call a deal here')}</span><input className={`${INPUT} w-full text-foreground`} placeholder={t('Deal')} value={label} onChange={event => { setLabel(event.target.value); setSaved(false); }} /></label>
+      <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Default currency')}</span><input className={`${INPUT} w-24 text-foreground`} maxLength={3} value={currency} onChange={event => { setCurrency(event.target.value.toUpperCase()); setSaved(false); }} /></label>
+      <div className="flex gap-3">
+        <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Forecast period (days)')}</span><input inputMode="numeric" className={`${INPUT} w-24 tabular-nums text-foreground`} value={horizon} onChange={event => { setHorizon(event.target.value); setSaved(false); }} /></label>
+        <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Flag after days without contact')}</span><input inputMode="numeric" className={`${INPUT} w-24 tabular-nums text-foreground`} value={followUp} onChange={event => { setFollowUp(event.target.value); setSaved(false); }} /></label>
+      </div>
+    </div>
+    <div className="flex items-center gap-2">
+      <Button size="sm" variant="secondary" disabled={!valid} onClick={() => {
+        setError(null);
+        crm.savePipeline(pipeline.id, { name: name.trim(), record_label: label.trim() || null, currency, horizon_days: Number(horizon), follow_up_days: Number(followUp) })
+          .then(() => setSaved(true)).catch(cause => setError(cause instanceof Error ? cause.message : t('Could not save. Try again.')));
+      }}>{t('Save')}</Button>
+      {saved && <span role="status" className="text-xs text-muted-foreground">{t('Saved')}</span>}
+      {error && <span role="alert" className="text-xs text-[var(--status-danger)]">{error}</span>}
+    </div>
+  </Section>;
+}
+
+function Stages({ crm }: { crm: Crm }) {
+  const { t } = useI18n();
+  const pipeline = crm.pipeline!;
+  const [draft, setDraft] = useState<CrmStage[]>(normalizeCrmStages(pipeline.stages));
   const [saved, setSaved] = useState(false);
   const counts = new Map<string, number>();
   for (const deal of crm.workspace?.deals ?? []) if (deal.outcome === 'open' && deal.stage) counts.set(deal.stage.id, (counts.get(deal.stage.id) ?? 0) + 1);
   const update = (index: number, patch: Partial<CrmStage>) => { setSaved(false); setDraft(current => current.map((stage, i) => i === index ? { ...stage, ...patch } : stage)); };
   const move = (index: number, by: number) => { setSaved(false); setDraft(current => { const next = [...current]; const [item] = next.splice(index, 1); next.splice(index + by, 0, item); return next; }); };
-  const valid = draft.every(stage => stage.label.trim()) && new Set(draft.map(stage => stage.id)).size === draft.length && !draft.some(stage => ['won', 'lost'].includes(stage.id));
-  return <section className="space-y-3">
-    <div className="space-y-1"><h2 className="text-sm font-medium">{t('Pipeline stages')}</h2>
-      <p className="text-xs text-muted-foreground">{t('Open stages in order. Won and Lost are always available. A stage’s likelihood is applied when a deal moves into it, unless the deal’s likelihood was set by hand.')}</p></div>
+  const valid = draft.every(stage => stage.label.trim() && stage.id) && new Set(draft.map(stage => stage.id)).size === draft.length && !draft.some(stage => ['won', 'lost'].includes(stage.id));
+  return <Section title={t('Pipeline stages')} description={t('Open stages in order. Won and Lost are always available. A stage’s likelihood is applied when a deal moves into it, unless the deal’s likelihood was set by hand.')}>
     <ol className="space-y-1.5">
       {draft.map((stage, index) => <li key={index} className="flex flex-wrap items-center gap-2">
         <span className="w-5 text-right text-xs tabular-nums text-muted-foreground">{index + 1}</span>
@@ -41,53 +85,138 @@ function StagesEditor({ crm }: { crm: Crm }) {
     {!valid && <p role="alert" className="text-xs text-[var(--status-danger)]">{t('Each stage needs a unique name other than Won or Lost.')}</p>}
     <div className="flex flex-wrap items-center gap-2">
       <Button variant="ghost" size="sm" disabled={draft.length >= 12} onClick={() => { setSaved(false); setDraft(current => [...current, { id: `stage-${current.length + 1}`, label: t('New stage'), probability: 50 }]); }}><Plus size={14} />{t('Add stage')}</Button>
-      <Button variant="primary" size="sm" disabled={!valid} onClick={() => { const stages = normalizeCrmStages(draft); crm.setParams({ crmStages: stages }); setDraft(stages); setSaved(true); }}>{t('Save stages')}</Button>
+      <Button variant="secondary" size="sm" disabled={!valid} onClick={() => { const stages = normalizeCrmStages(draft); void crm.savePipeline(pipeline.id, { stages }).then(() => { setDraft(stages); setSaved(true); }); }}>{t('Save stages')}</Button>
       {saved && <span role="status" className="text-xs text-muted-foreground">{t('Saved')}</span>}
     </div>
-  </section>;
+  </Section>;
 }
 
-function Thresholds({ crm }: { crm: Crm }) {
-  const { t } = useI18n();
-  const [horizon, setHorizon] = useState(String(crm.params.horizonDays));
-  const [followUp, setFollowUp] = useState(String(crm.params.followUpDays));
-  const valid = (value: string) => /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 3650;
-  const dirty = horizon !== String(crm.params.horizonDays) || followUp !== String(crm.params.followUpDays);
-  return <section className="space-y-3">
-    <h2 className="text-sm font-medium">{t('Forecast and follow-up')}</h2>
-    <div className="flex flex-wrap gap-6">
-      <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Forecast period (days)')}</span>
-        <input inputMode="numeric" className={`${INPUT} w-24 tabular-nums text-foreground`} value={horizon} aria-invalid={!valid(horizon) || undefined} onChange={event => setHorizon(event.target.value)} /></label>
-      <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Flag after days without contact')}</span>
-        <input inputMode="numeric" className={`${INPUT} w-24 tabular-nums text-foreground`} value={followUp} aria-invalid={!valid(followUp) || undefined} onChange={event => setFollowUp(event.target.value)} /></label>
-    </div>
-    <Button variant="secondary" size="sm" disabled={!dirty || !valid(horizon) || !valid(followUp)}
-      onClick={() => crm.setParams({ horizonDays: Number(horizon), followUpDays: Number(followUp) })}>{t('Apply')}</Button>
-  </section>;
-}
+const METRICS: { id: CrmMetric; label: string }[] = [
+  { id: 'won_quarter', label: 'Won this quarter' }, { id: 'won_year', label: 'Won this year' }, { id: 'won_total', label: 'Won to date' },
+  { id: 'weighted', label: 'Weighted pipeline' }, { id: 'open', label: 'Open pipeline' },
+];
 
-export function CrmSettings({ crm, onOpenTable, onDone }: { crm: Crm; onOpenTable?: () => void; onDone: () => void }) {
-  const { t } = useI18n();
-  const [adding, setAdding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const setup = <OperationsSetup params={crm.params} tables={crm.tables.data} columns={crm.data?.columns ?? []}
-    onChange={patch => crm.setParams(typeof patch === 'function' ? patch(crm.params) : patch)} onDone={onDone} />;
-  if (!crm.workspace) return <div className="space-y-4">{crm.params.tableId && !crm.eligible && !crm.loading && <p role="alert" className="text-sm text-muted-foreground">{t('The connected Table is no longer available. Choose another below.')}</p>}{setup}</div>;
-  return <div className="max-w-3xl space-y-10">
-    <section className="space-y-2">
-      <h2 className="text-sm font-medium">{t('Data')}</h2>
-      <p className="text-xs text-muted-foreground">{t('Deals are rows in the Table “{name}”. Edit it there for bulk changes or imports; this App reads the same rows.', { name: crm.data?.table.name ?? '' })}</p>
-      <div className="flex flex-wrap gap-2">
-        {onOpenTable && <Button variant="ghost" size="sm" onClick={onOpenTable}>{t('Open in Table')}</Button>}
-        {crm.missingColumns.length > 0 && <Button variant="secondary" size="sm" disabled={adding} onClick={() => {
-          setAdding(true); setError(null);
-          crm.addMissingColumns().catch(cause => setError(cause instanceof Error ? cause.message : t('Could not add the columns.'))).finally(() => setAdding(false));
-        }}>{adding ? t('Adding…') : t('Add {fields} columns', { fields: crm.missingColumns.map(field => t(field.label)).join(', ') })}</Button>}
+function Connections({ crm }: { crm: Crm }) {
+  const { t, locale } = useI18n();
+  const pipeline = crm.pipeline!;
+  const { objects } = useExplorerData();
+  const strategies = useStrategies();
+  const { measures } = useInitiativeMeasures(strategies.data.map(item => item.id));
+  const names = new Map(strategies.data.map(item => [item.id, item.name]));
+  const metric = pipeline.measure_metric ?? 'won_quarter';
+  const value = crm.workspace ? metricValue(crm.workspace.deals, metric, pipeline.currency, crm.today) : null;
+  return <Section title={t('Connections')} description={t('How this pipeline meets Execution and Strategy. Next steps become Elements in the Object you choose; the result you choose is written into an Initiative’s success condition whenever deals change.')}>
+    <div className="max-w-2xl space-y-2">
+      <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-2">
+        <span className="text-xs text-muted-foreground">{t('Next steps go to')}</span>
+        <CrmPicker label={t('Object for next steps')} value={pipeline.object_id} placeholder={t('My Elements (each owner)')}
+          options={objects.map(object => ({ id: object.id, label: object.name }))} onChange={id => void crm.savePipeline(pipeline.id, { object_id: id })} />
+        <span className="text-xs text-muted-foreground">{t('Reports into')}</span>
+        <CrmPicker label={t('Success condition')} value={pipeline.measure_intent_id} placeholder={t('No Initiative')}
+          options={measures.map(measure => ({ id: measure.id, label: measure.title, hint: names.get(measure.strategy_id ?? '') ?? null }))}
+          onChange={id => void crm.savePipeline(pipeline.id, { measure_intent_id: id, measure_metric: id ? metric : null })} />
+        {pipeline.measure_intent_id && <>
+          <span className="text-xs text-muted-foreground">{t('As')}</span>
+          <div className="flex flex-wrap gap-1">{METRICS.map(item => <Button key={item.id} shape="tab" size="xs" variant={metric === item.id ? 'secondary' : 'ghost'} aria-pressed={metric === item.id}
+            onClick={() => void crm.savePipeline(pipeline.id, { measure_metric: item.id })}>{t(item.label)}</Button>)}</div>
+        </>}
       </div>
-      {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{error}</p>}
-      <details className="pt-2"><summary className="w-fit cursor-pointer rounded-sm py-1 text-xs text-muted-foreground hover:text-foreground">{t('Change column mapping or Table')}</summary>{setup}</details>
-    </section>
-    <StagesEditor key={JSON.stringify(crm.stages)} crm={crm} />
-    <Thresholds key={`${crm.params.horizonDays}:${crm.params.followUpDays}`} crm={crm} />
+      {pipeline.measure_intent_id && value !== null && <p className="text-xs text-muted-foreground">{t('Currently reporting {value}.', { value: money(value, pipeline.currency, locale) })}</p>}
+      {crm.measureError && <p role="alert" className="text-xs text-[var(--status-danger)]">{crm.measureError}</p>}
+    </div>
+  </Section>;
+}
+
+const FIELD_TYPES: CrmFieldRecord['type'][] = ['text', 'number', 'date', 'select', 'checkbox'];
+const TYPE_LABEL: Record<CrmFieldRecord['type'], string> = { text: 'Text', number: 'Number', date: 'Date', select: 'Choice', checkbox: 'Checkbox' };
+const ENTITY_LABEL = { deal: 'Deals', company: 'Companies', contact: 'Contacts' } as const;
+
+function Fields({ crm }: { crm: Crm }) {
+  const { t } = useI18n();
+  const [entity, setEntity] = useState<CrmFieldRecord['entity']>('deal');
+  const [label, setLabel] = useState('');
+  const [type, setType] = useState<CrmFieldRecord['type']>('text');
+  const [options, setOptions] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const list = crm.fields.filter(field => field.entity === entity);
+  async function add() {
+    setError(null);
+    try {
+      await crm.saveField(null, {
+        entity, label: label.trim(), type, key: fieldKey(label, list.map(field => field.key)),
+        options: type === 'select' ? options.split(/[,\n、]/).map(item => item.trim()).filter(Boolean) : [],
+        order_index: list.length,
+      });
+      setLabel(''); setOptions('');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Could not save. Try again.')); }
+  }
+  return <Section title={t('Your fields')} description={t('Add what your organisation tracks that the standard record does not — a contract type, a region, a regulatory ID. Fields appear on every record of that kind and in search.')}>
+    <div role="group" aria-label={t('Record kind')} className="flex gap-1">{(['deal', 'company', 'contact'] as const).map(item =>
+      <Button key={item} shape="tab" size="sm" variant={entity === item ? 'secondary' : 'ghost'} aria-pressed={entity === item} onClick={() => setEntity(item)}>{t(ENTITY_LABEL[item])}</Button>)}</div>
+    <ul className="max-w-2xl divide-y divide-[var(--border-subtle)]">{list.map(field => <li key={field.id} className="flex items-center gap-3 py-2 text-sm">
+      <span className="min-w-0 flex-1 truncate">{field.label}</span>
+      <span className="text-xs text-muted-foreground">{t(TYPE_LABEL[field.type])}{field.type === 'select' && ` · ${fieldOptions(field).join(', ')}`}</span>
+      <Button variant="ghost" size="icon-xs" aria-label={t('Remove field {name}', { name: field.label })} onClick={() => void crm.deleteField(field.id)}><Trash2 size={12} /></Button>
+    </li>)}{!list.length && <li className="py-2 text-xs text-muted-foreground">{t('No fields yet.')}</li>}</ul>
+    <div className="flex max-w-2xl flex-wrap items-center gap-2">
+      <input aria-label={t('Field name')} placeholder={t('Field name')} className={`${INPUT} w-48`} value={label} onChange={event => setLabel(event.target.value)} />
+      <div className="flex gap-1">{FIELD_TYPES.map(item => <Button key={item} shape="tab" size="xs" variant={type === item ? 'secondary' : 'ghost'} aria-pressed={type === item} onClick={() => setType(item)}>{t(TYPE_LABEL[item])}</Button>)}</div>
+      {type === 'select' && <input aria-label={t('Choices')} placeholder={t('Choices, separated by commas')} className={`${INPUT} w-64`} value={options} onChange={event => setOptions(event.target.value)} />}
+      <Button size="sm" variant="secondary" disabled={!label.trim() || (type === 'select' && !options.trim())} onClick={() => void add()}><Plus size={14} />{t('Add field')}</Button>
+    </div>
+    {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{error}</p>}
+  </Section>;
+}
+
+function PipelinesList({ crm, onSelect }: { crm: Crm; onSelect: (id: string) => void }) {
+  const { t } = useI18n();
+  const [name, setName] = useState('');
+  const [confirm, setConfirm] = useState(false);
+  const pipeline = crm.pipeline!;
+  const count = crm.allDeals.filter(deal => deal.pipeline_id === pipeline.id).length;
+  return <Section title={t('Pipelines')}>
+    <div className="flex flex-wrap items-center gap-2">
+      {crm.pipelines.map(item => <Button key={item.id} shape="tab" size="sm" variant={item.id === pipeline.id ? 'secondary' : 'ghost'} aria-pressed={item.id === pipeline.id} onClick={() => onSelect(item.id)}>{item.name}</Button>)}
+      <form className="flex items-center gap-2" onSubmit={event => { event.preventDefault(); if (name.trim()) void crm.savePipeline(null, { name: name.trim(), currency: pipeline.currency, order_index: crm.pipelines.length }).then(id => { setName(''); onSelect(id); }); }}>
+        <input aria-label={t('New pipeline')} placeholder={t('New pipeline…')} className={`${INPUT} w-44`} value={name} onChange={event => setName(event.target.value)} />
+        <Button type="submit" size="sm" variant="ghost" disabled={!name.trim()}><Plus size={14} />{t('Add')}</Button>
+      </form>
+    </div>
+    {crm.pipelines.length > 1 && (confirm
+      ? <div className="flex items-center gap-2"><span className="text-xs">{t('Delete “{name}” and its {n} deals?', { name: pipeline.name, n: count })}</span>
+        <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>{t('Cancel')}</Button>
+        <Button size="sm" variant="danger" onClick={() => void crm.deletePipeline(pipeline.id).then(() => { setConfirm(false); onSelect(crm.pipelines.find(item => item.id !== pipeline.id)!.id); })}>{t('Delete')}</Button></div>
+      : <Button size="xs" variant="ghost" onClick={() => setConfirm(true)}><Trash2 size={12} />{t('Delete this pipeline')}</Button>)}
+  </Section>;
+}
+
+function Import({ crm }: { crm: Crm }) {
+  const { t } = useI18n();
+  const [state, setState] = useState<{ busy: boolean; done?: number; error?: string }>({ busy: false });
+  if (!crm.legacyTable) return null;
+  return <Section title={t('Bring in your earlier pipeline')} description={t('Your CRM used to read a Table. Import its deals, companies, contacts and activity into this pipeline. The Table itself is not changed.')}>
+    <div className="flex items-center gap-2">
+      <Button size="sm" variant="secondary" disabled={state.busy || state.done !== undefined} onClick={() => {
+        setState({ busy: true });
+        crm.importFromTable(crm.legacyTable!.tableId, crm.legacyTable!.fields).then(done => setState({ busy: false, done }))
+          .catch(cause => setState({ busy: false, error: cause instanceof Error ? cause.message : t('Could not import.') }));
+      }}>{state.busy ? t('Importing…') : t('Import from Table')}</Button>
+      {state.done !== undefined && <span role="status" className="text-xs text-muted-foreground">{t('{n} deals imported.', { n: state.done })}</span>}
+      {state.error && <span role="alert" className="text-xs text-[var(--status-danger)]">{state.error}</span>}
+    </div>
+  </Section>;
+}
+
+/** What an organisation may shape: pipelines, stages, words, links and fields.
+ * The record types and calculations stay standard. */
+export function CrmSettings({ crm, onSelectPipeline }: { crm: Crm; onSelectPipeline: (id: string) => void }) {
+  if (!crm.pipeline) return null;
+  return <div className="max-w-3xl space-y-10">
+    <PipelinesList crm={crm} onSelect={onSelectPipeline} />
+    <Basics key={`basics:${crm.pipeline.id}`} crm={crm} />
+    <Stages key={`stages:${crm.pipeline.id}:${JSON.stringify(crm.pipeline.stages)}`} crm={crm} />
+    <Connections crm={crm} />
+    <Fields crm={crm} />
+    <Import crm={crm} />
   </div>;
 }

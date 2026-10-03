@@ -6,9 +6,9 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { CrmDeal } from './crmModel';
 import { HealthDot, money, relativeDay } from './crmFormat';
 
-type SortKey = 'name' | 'stage' | 'amount' | 'probability' | 'closeDate' | 'nextActionDate' | 'lastContact' | 'health';
+type SortKey = 'name' | 'stage' | 'owner' | 'amount' | 'probability' | 'closeDate' | 'nextActionDate' | 'lastContact' | 'health';
 const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
-  { key: 'name', label: 'Deal' }, { key: 'stage', label: 'Stage' }, { key: 'amount', label: 'Amount', numeric: true },
+  { key: 'name', label: 'Deal' }, { key: 'stage', label: 'Stage' }, { key: 'owner', label: 'Owner' }, { key: 'amount', label: 'Amount', numeric: true },
   { key: 'probability', label: 'Prob.', numeric: true }, { key: 'closeDate', label: 'Close date' },
   { key: 'nextActionDate', label: 'Next action' }, { key: 'lastContact', label: 'Last contact' }, { key: 'health', label: 'Health', numeric: true },
 ];
@@ -18,6 +18,7 @@ function sortValue(deal: CrmDeal, key: SortKey): string | number | null {
     case 'name': return deal.name.toLowerCase();
     case 'stage': return deal.outcome === 'won' ? 900 : deal.outcome === 'lost' ? 901 : deal.stage?.probability ?? -1;
     case 'health': return deal.health.score;
+    case 'owner': return deal.ownerName?.toLowerCase() ?? null;
     default: return deal[key];
   }
 }
@@ -40,7 +41,7 @@ export function CrmDeals({ deals, today, onOpen, selectedId, emptyLabel }: {
   if (!deals.length) return <p className="py-10 text-sm text-muted-foreground">{emptyLabel}</p>;
   return <div className="space-y-3">
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] text-left text-[13px]">
+      <table className="w-full min-w-[840px] text-left text-[13px]">
         <thead className="text-xs text-muted-foreground"><tr>
           {COLUMNS.map(column => {
             const active = sort.key === column.key;
@@ -61,6 +62,7 @@ export function CrmDeals({ deals, today, onOpen, selectedId, emptyLabel }: {
               <span className="block truncate text-xs text-muted-foreground">{[deal.account, deal.contact].filter(Boolean).join(' · ') || '—'}</span>
             </td>
             <td className="whitespace-nowrap px-2 py-2">{deal.outcome === 'won' ? <span className="text-[var(--status-success)]">{t('Won')}</span> : deal.outcome === 'lost' ? <span className="text-muted-foreground">{t('Lost')}</span> : deal.stage ? t(deal.stage.label) : '—'}</td>
+            <td className="max-w-32 truncate whitespace-nowrap px-2 py-2 text-muted-foreground">{deal.ownerName ?? '—'}</td>
             <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{money(deal.amount, deal.currency, locale, true)}</td>
             <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{deal.probability ?? '—'}{deal.probability !== null && '%'}</td>
             <td className="whitespace-nowrap px-2 py-2 tabular-nums">{relativeDay(deal.closeDate, today, locale, t)}</td>

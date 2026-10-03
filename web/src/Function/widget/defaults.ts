@@ -99,13 +99,6 @@ export const OBJECT_SUMMARY_BOARD: BoardLayout = {
   rail: [],
 };
 
-/** The CRM surface is one operations planner. */
-export const CRM_BOARD: BoardLayout = {
-  band: [],
-  main: [{ id: 'crm-planner', type: 'operations-planner', size: 'full', params: { kind: 'crm' } }],
-  rail: [],
-};
-
 /** Domain identity is the spine; execution and strategic relationships are movable. */
 export const DOMAIN_OVERVIEW_BOARD: BoardLayout = {
   band: [],

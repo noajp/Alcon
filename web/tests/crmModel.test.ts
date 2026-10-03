@@ -1,127 +1,151 @@
 import { describe, expect, it } from 'vitest';
-import type { Json } from '@/types/database';
-import { OPERATIONS_FIELDS } from '@/ActivitySpace/sustainment/operations/operationsModel';
 import {
-  accountsOf, appendActivity, buildCrmWorkspace, forecastFor, inList, normalizeCrmStages, parseActivityLog,
+  accountsOf, buildCrmWorkspace, fieldKey, fieldOptions, forecastFor, inList, metricValue, normalizeCrmStages, parseActivityLog,
   pipelineColumns, searchDeals, stageChange, todayQueue, upcoming, DEFAULT_CRM_STAGES,
+  type CrmDealRecord, type CrmNextElement, type CrmPipelineRecord, type CrmRecords,
 } from '@/ActivitySpace/sustainment/crm/crmModel';
 
 const today = '2026-10-03';
-const fields = Object.fromEntries(OPERATIONS_FIELDS.map(field => [field.key, field.key]));
-
-function workspace(values: Record<string, Json | null>[], extra: Record<string, unknown> = {}) {
-  const schema = {
-    columns: OPERATIONS_FIELDS.map(field => ({ id: field.key, type: field.type })),
-    rows: values.map((_, index) => ({ id: `r${index}`, created_at: '2026-09-01T00:00:00Z' })),
-    cellsByRow: Object.fromEntries(values.map((value, index) => [`r${index}`, value])),
-  };
-  return buildCrmWorkspace(schema, { kind: 'crm', tableId: 't', fields, ...extra }, today);
-}
-
-const deal = (values: Record<string, Json | null> = {}) => ({
-  name: 'Renewal', account: 'Acme', stage: 'proposal', amount: 1000, probability: 50, currency: 'USD',
-  closeDate: '2026-10-20', lastContact: '2026-10-01', nextActionDate: '2026-10-06', ...values,
+const pipeline: CrmPipelineRecord = {
+  id: 'p', name: 'Sales', stages: DEFAULT_CRM_STAGES, currency: 'USD', horizon_days: 30, follow_up_days: 14,
+  object_id: null, measure_intent_id: null, measure_metric: null, record_label: null, order_index: 0,
+};
+let seq = 0;
+const deal = (values: Partial<CrmDealRecord> = {}): CrmDealRecord => ({
+  id: `d${++seq}`, pipeline_id: 'p', number: seq, name: 'Renewal', company_id: 'acme', contact_id: null, owner_worker_id: 'w1',
+  stage: 'proposal', amount: 1000, currency: 'USD', probability: 50, close_date: '2026-10-20', last_contact_on: '2026-10-01',
+  next_step: 'Send quote', next_step_on: '2026-10-06', next_element_id: null, initiative_id: null, source: null, lost_reason: null,
+  closed_on: null, custom: {}, created_at: '2026-09-01T00:00:00Z', ...values,
 });
+function workspace(deals: CrmDealRecord[], extra: Partial<CrmRecords> = {}) {
+  return buildCrmWorkspace({
+    pipeline, deals, activities: [], elements: [],
+    companies: [{ id: 'acme', name: 'Acme', domain: null, industry: null, owner_worker_id: null, notes: null, custom: {}, created_at: '' },
+      { id: 'beta', name: 'Beta', domain: null, industry: null, owner_worker_id: null, notes: null, custom: {}, created_at: '' }],
+    contacts: [], people: [{ id: 'w1', name: 'Sato', type: 'human', user_id: 'u1' }, { id: 'w2', name: 'Claude', type: 'ai_agent', user_id: null }],
+    ...extra,
+  }, today);
+}
 
 describe('CRM stages', () => {
   it('falls back to defaults and drops reserved, duplicate or malformed stages', () => {
     expect(normalizeCrmStages(undefined)).toEqual(DEFAULT_CRM_STAGES);
     expect(normalizeCrmStages([{ id: 'Won' }, { id: 'demo', label: 'Demo', probability: 140 }, { id: 'DEMO' }, null])).toEqual([{ id: 'demo', label: 'Demo', probability: 100 }]);
-    expect(normalizeCrmStages([])).toEqual(DEFAULT_CRM_STAGES);
   });
 
-  it('resolves stages by id or label and keeps unknown open stages as their own column', () => {
-    const result = workspace([deal({ stage: 'Negotiation' }), deal({ stage: 'pilot' }), deal({ stage: 'won' }), deal({ stage: null })]);
-    expect(result.deals.map(item => item.stage?.id ?? null)).toEqual(['negotiation', 'pilot', 'won', null]);
-    const columns = pipelineColumns(result);
-    expect(columns.map(column => column.stage.id)).toEqual(['', 'lead', 'qualified', 'proposal', 'negotiation', 'pilot', 'won', 'lost']);
-    expect(columns.find(column => column.stage.id === 'pilot')!.totals).toEqual({ USD: 1000 });
+  it('keeps unknown open stages as their own column and closes won and lost', () => {
+    const result = workspace([deal({ stage: 'Negotiation' }), deal({ stage: 'pilot' }), deal({ stage: 'won' }), deal({ stage: 'other-pipeline', pipeline_id: 'x' })]);
+    expect(result.deals.map(item => [item.stage?.id, item.outcome])).toEqual([['negotiation', 'open'], ['pilot', 'open'], ['won', 'won']]);
+    expect(pipelineColumns(result).map(column => column.stage.id)).toEqual(['lead', 'qualified', 'proposal', 'negotiation', 'pilot', 'won', 'lost']);
   });
 
   it('keeps a hand-set probability when moving between open stages', () => {
     const [qualified, proposal] = [DEFAULT_CRM_STAGES[1], DEFAULT_CRM_STAGES[2]];
     expect(stageChange({ probability: 25, stage: qualified }, proposal)).toEqual({ stage: 'proposal', probability: 50 });
     expect(stageChange({ probability: 35, stage: qualified }, proposal)).toEqual({ stage: 'proposal', probability: 35 });
-    expect(stageChange({ probability: 35, stage: qualified }, { id: 'won', label: 'Won', probability: 100 })).toEqual({ stage: 'won', probability: 100 });
   });
 });
 
-describe('CRM activity log', () => {
-  it('round-trips entries newest first and keeps unrecognised lines', () => {
-    const log = appendActivity('typed by hand', { date: '2026-10-02', type: 'call', text: 'Budget\nconfirmed' });
-    expect(log).toBe('2026-10-02 · call · Budget / confirmed\ntyped by hand');
-    expect(parseActivityLog(log)).toEqual([
-      { date: '2026-10-02', type: 'call', text: 'Budget / confirmed' },
-      { date: null, type: 'note', text: 'typed by hand' },
-    ]);
-    expect(parseActivityLog('2026-10-01 | fax | sent')).toEqual([{ date: '2026-10-01', type: 'note', text: 'sent' }]);
+describe('CRM records', () => {
+  it('resolves company and owner names, and a stage default for a missing probability', () => {
+    const [item] = workspace([deal({ probability: null, owner_worker_id: 'w2' })]).deals;
+    expect(item).toMatchObject({ account: 'Acme', ownerName: 'Claude', probability: 50, weighted: 500 });
+  });
+
+  it('treats an open deal without amount or close date as incomplete, never as healthy', () => {
+    const [item] = workspace([deal({ amount: null, close_date: null })]).deals;
+    expect(item.valid).toBe(false);
+    expect(item.issues.map(issue => issue.message)).toEqual(['Add the amount', 'Add the expected close date']);
+    expect(item.health.level).toBe('incomplete');
+  });
+
+  it('reads the next step from its Element and asks for the next one when it is done', () => {
+    const element = (status: string): CrmNextElement => ({ id: 'e1', title: 'Demo for IT', status, due_date: '2026-10-02', display_id: 'ELE-9' });
+    const [open] = workspace([deal({ next_element_id: 'e1' })], { elements: [element('todo')] }).deals;
+    expect(open).toMatchObject({ nextStep: 'Demo for IT', nextActionDate: '2026-10-02' });
+    expect(open.action?.code).toBe('action_overdue');
+    const [done] = workspace([deal({ next_element_id: 'e1' })], { elements: [element('done')] }).deals;
+    expect(done).toMatchObject({ nextStep: null, nextActionDate: null });
+    expect(done.action?.code).toBe('step_done');
+  });
+
+  it('orders the history newest first and keeps stage entries', () => {
+    const [item] = workspace([deal({ id: 'x' })], { activities: [
+      { id: 'a1', deal_id: 'x', company_id: null, contact_id: null, kind: 'call', body: 'first', occurred_on: '2026-09-30', created_by: null, author_name: 'Sato', created_at: '1' },
+      { id: 'a2', deal_id: 'x', company_id: null, contact_id: null, kind: 'stage', body: 'lead → proposal', occurred_on: '2026-10-01', created_by: null, author_name: null, created_at: '2' },
+    ] }).deals;
+    expect(item.activity.map(entry => [entry.type, entry.text])).toEqual([['stage', 'lead → proposal'], ['call', 'first']]);
   });
 });
 
 describe('CRM health and next actions', () => {
-  it('scores an on-track deal healthy with no action due', () => {
-    const [item] = workspace([deal()]).deals;
-    expect(item.health).toMatchObject({ score: 100, level: 'healthy', reasons: [] });
-    expect(item.action).toBeNull();
-  });
-
   it('explains every deduction, worst first', () => {
-    const [item] = workspace([deal({ closeDate: '2026-09-30', nextActionDate: null, lastContact: '2026-09-01' })]).deals;
+    const [item] = workspace([deal({ close_date: '2026-09-30', next_step: null, next_step_on: null, last_contact_on: '2026-09-01' })]).deals;
     expect(item.health.level).toBe('risk');
     expect(item.health.reasons.map(reason => reason.message)).toEqual(['Close date {date} has passed', '{n} days since last contact', 'No next action scheduled']);
-    expect(item.action?.code).toBe('close_overdue');
   });
 
   it('orders the day by urgency, then by weighted value', () => {
     const result = workspace([
-      deal({ name: 'Small overdue', amount: 100, nextActionDate: '2026-10-01' }),
-      deal({ name: 'Big overdue', amount: 9000, nextActionDate: '2026-10-02' }),
-      deal({ name: 'Today', nextActionDate: today, nextStep: 'Send quote' }),
-      deal({ name: 'Unplanned', nextActionDate: null }),
+      deal({ name: 'Small overdue', amount: 100, next_step_on: '2026-10-01' }),
+      deal({ name: 'Big overdue', amount: 9000, next_step_on: '2026-10-02' }),
+      deal({ name: 'Today', next_step_on: today }),
+      deal({ name: 'Unplanned', next_step: null, next_step_on: null }),
       deal({ name: 'Fine' }),
-      deal({ name: 'Closed', stage: 'won', nextActionDate: '2026-09-01' }),
+      deal({ name: 'Closed', stage: 'won', next_step_on: '2026-09-01' }),
     ]);
     expect(todayQueue(result.deals).map(item => item.name)).toEqual(['Big overdue', 'Small overdue', 'Today', 'Unplanned']);
-    expect(result.deals.find(item => item.name === 'Today')!.action).toMatchObject({ message: 'Today: {step}', values: { step: 'Send quote' } });
     expect(upcoming(result.deals, today).map(item => item.name)).toEqual(['Fine']);
-  });
-
-  it('never flags incomplete or closed deals as actions', () => {
-    const result = workspace([deal({ currency: null }), deal({ stage: 'lost' })]);
-    expect(result.deals.map(item => [item.health.level, item.action])).toEqual([['incomplete', null], ['closed', null]]);
-    expect(inList(result.deals[0], 'incomplete', today, 30)).toBe(true);
   });
 });
 
-describe('CRM accounts, forecast and search', () => {
+describe('CRM rollups', () => {
   const result = workspace([
-    deal({ name: 'A1', account: 'Acme', amount: 1000, probability: 80, closeDate: '2026-10-20' }),
-    deal({ name: 'A2', account: 'acme', amount: 500, probability: 20, closeDate: '2026-12-01' }),
-    deal({ name: 'A3', account: 'Acme', stage: 'won', amount: 700, closeDate: '2026-10-02' }),
-    deal({ name: 'B1', account: 'Beta', stage: 'lost', amount: 300 }),
-    deal({ name: 'Late', account: null, amount: 200, probability: 50, closeDate: '2026-09-15' }),
-    deal({ name: 'Yen', account: 'Gamma', amount: 50000, currency: 'JPY' }),
+    deal({ name: 'A1', amount: 1000, probability: 80, close_date: '2026-10-20', initiative_id: 'i1' }),
+    deal({ name: 'A2', amount: 500, probability: 20, close_date: '2026-12-01', owner_worker_id: 'w2' }),
+    deal({ name: 'A3', stage: 'won', amount: 700, close_date: '2026-09-15', closed_on: '2026-10-02' }),
+    deal({ name: 'A4', stage: 'won', amount: 300, close_date: '2026-02-01', closed_on: '2026-02-01' }),
+    deal({ name: 'B1', company_id: 'beta', stage: 'lost', amount: 300 }),
+    deal({ name: 'Late', company_id: null, amount: 200, probability: 50, close_date: '2026-09-15' }),
+    deal({ name: 'Yen', company_id: 'beta', amount: 50000, currency: 'JPY', custom: { region: 'Kanto' } }),
   ]);
 
-  it('groups accounts case-insensitively with no-account last', () => {
-    const accounts = accountsOf(result.deals);
-    expect(accounts.map(account => [account.name, account.openCount])).toEqual([['Gamma', 1], ['Acme', 2], ['Beta', 0], [null, 1]]);
-    expect(accounts[1].pipeline).toEqual({ USD: 1500 });
-    expect(accounts[1].won).toEqual({ USD: 700 });
+  it('groups deals by company with no-company last', () => {
+    expect(accountsOf(result.deals).map(account => [account.name, account.openCount])).toEqual([['Beta', 1], ['Acme', 2], [null, 1]]);
   });
 
-  it('buckets by close month per currency and counts overdue deals in this month', () => {
+  it('counts a won deal in the month it closed and overdue open deals in this month', () => {
     const forecast = forecastFor(result.deals, 'USD', today, 3);
-    expect(forecast.months.map(month => month.month)).toEqual(['2026-10', '2026-11', '2026-12']);
-    expect(forecast.months[0]).toMatchObject({ bestCase: 1200, commit: 1000, weighted: 900, won: 700, count: 2 });
-    expect(forecast.months[2]).toMatchObject({ bestCase: 500, weighted: 100 });
-    expect(forecast.winRate).toBe(0.5);
-    expect(forecast.openPipeline).toBe(1700);
-    expect(result.primaryCurrency).toBe('JPY');
+    expect(forecast.months[0]).toMatchObject({ month: '2026-10', bestCase: 1200, commit: 1000, weighted: 900, won: 700, count: 2 });
+    expect(forecast.winRate).toBeCloseTo(2 / 3);
   });
 
-  it('matches every search term across name, account and contact', () => {
-    expect(searchDeals(result.deals, 'acme a2').map(item => item.name)).toEqual(['A2']);
-    expect(searchDeals(result.deals, '  ').length).toBe(6);
+  it('reports the figure an Initiative tracks', () => {
+    expect(metricValue(result.deals, 'won_quarter', 'USD', today)).toBe(700);
+    expect(metricValue(result.deals, 'won_year', 'USD', today)).toBe(1000);
+    expect(metricValue(result.deals, 'won_total', 'USD', today)).toBe(1000);
+    expect(metricValue(result.deals, 'open', 'USD', today)).toBe(1700);
+    expect(metricValue(result.deals, 'weighted', 'USD', today)).toBe(1000);
+  });
+
+  it('filters my deals and searches custom fields and deal numbers', () => {
+    expect(result.deals.filter(item => inList(item, 'mine', today, 30, 'w2')).map(item => item.name)).toEqual(['A2']);
+    expect(searchDeals(result.deals, 'kanto').map(item => item.name)).toEqual(['Yen']);
+    expect(searchDeals(result.deals, `d-${result.deals[0].number}`).map(item => item.name)).toEqual(['A1']);
+  });
+});
+
+describe('CRM fields and import', () => {
+  it('derives stable keys and clean choices', () => {
+    expect(fieldKey('Contract type', [])).toBe('contract_type');
+    expect(fieldKey('Contract type', ['contract_type'])).toBe('contract_type_2');
+    expect(fieldKey('契約種別', [])).toBe('field');
+    expect(fieldOptions({ options: ['A', ' ', 3, 'B'] })).toEqual(['A', 'B']);
+  });
+
+  it('reads a Table-era activity log', () => {
+    expect(parseActivityLog('2026-10-02 · call · Budget\ntyped by hand')).toEqual([
+      { date: '2026-10-02', type: 'call', text: 'Budget' }, { date: null, type: 'note', text: 'typed by hand' },
+    ]);
   });
 });

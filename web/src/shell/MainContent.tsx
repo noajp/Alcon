@@ -218,7 +218,11 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           )}
 
           {activeActivity === 'crm' && (
-            <CrmView navigation={navigation} onNavigate={onNavigate} onViewChange={onViewChange} />
+            <div className="flex-1 flex flex-col overflow-hidden bg-card">
+              <ElementDrilldown label="CRM" onNavigate={onNavigate} onViewChange={onViewChange}>
+                {openElement => <CrmView navigation={navigation} onNavigate={onNavigate} onViewChange={onViewChange} onOpenElement={openElement} />}
+              </ElementDrilldown>
+            </div>
           )}
 
           {activeActivity === 'scm' && <ScmView navigation={navigation} onNavigate={onNavigate} />}

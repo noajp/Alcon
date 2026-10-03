@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { pipelineColumns, resolveStage, stageChange, type CrmDeal, type CrmStage, type CrmWorkspace } from './crmModel';
 import { HealthDot, money, moneyList, relativeDay } from './crmFormat';
-import type { Crm } from './useCrm';
+import type { Crm } from '@/hooks/useCrm';
 
 const DRAG_TYPE = 'application/x-alcon-deal';
 

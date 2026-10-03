@@ -1,10 +1,6 @@
-// The CRM App's reading of a pipeline Table. Pure: the browser, the AI layer
-// and the tests share it. Validity, signals and currency totals come from the
-// shared operations calculator, so Copilot and this App never disagree.
-import {
-  analyzeOperations, normalizeOperationsParams,
-  type CRMAnalysis, type CRMRowAnalysis, type OperationsParams, type OperationsSchema,
-} from '@/ActivitySpace/sustainment/operations/operationsModel';
+// The CRM App's reading of a Space's customer records. Pure: the browser, the
+// AI layer and the tests share it. Records come from the crm_* tables; the
+// next step of a deal is an Element, so Execution and the CRM read one truth.
 
 /** A UI message key plus the values it interpolates. Translated at render. */
 export interface CrmText { message: string; values?: Record<string, string | number> }
@@ -22,8 +18,8 @@ export const LOST_STAGE: CrmStage = { id: 'lost', label: 'Lost', probability: 0 
 
 export const stageKey = (value: string | null | undefined) => value?.trim().toLowerCase() ?? '';
 
-/** Saved stages live beside the planner params. Anything malformed falls back
- * to the defaults rather than producing a pipeline with no columns. */
+/** A pipeline's stored stages. Anything malformed falls back to the defaults
+ * rather than producing a pipeline with no columns. */
 export function normalizeCrmStages(raw: unknown): CrmStage[] {
   if (!Array.isArray(raw)) return [...DEFAULT_CRM_STAGES];
   const seen = new Set<string>(['won', 'lost']);
@@ -45,15 +41,58 @@ export function normalizeCrmStages(raw: unknown): CrmStage[] {
 
 export const stageSlug = (label: string) => label.trim().toLowerCase().replace(/\s+/g, '-').slice(0, 40);
 
-// ── Activity log ────────────────────────────────────────────────────────────
-// One line per entry, newest first, readable in Table: "2026-10-03 · call · text".
+// ── Stored records ──────────────────────────────────────────────────────────
+
+export type CrmMetric = 'won_quarter' | 'won_year' | 'won_total' | 'weighted' | 'open';
+
+export interface CrmPipelineRecord {
+  id: string;
+  name: string;
+  stages: unknown;
+  currency: string;
+  horizon_days: number;
+  follow_up_days: number;
+  object_id: string | null;
+  measure_intent_id: string | null;
+  measure_metric: CrmMetric | null;
+  /** What this organisation calls a deal here (案件, Opportunity…); null = "Deal". */
+  record_label: string | null;
+  order_index: number;
+}
+export interface CrmCompanyRecord {
+  id: string; name: string; domain: string | null; industry: string | null; owner_worker_id: string | null;
+  notes: string | null; custom: Record<string, unknown>; created_at: string;
+}
+export interface CrmContactRecord {
+  id: string; company_id: string | null; name: string; title: string | null; email: string | null; phone: string | null;
+  owner_worker_id: string | null; custom: Record<string, unknown>; created_at: string;
+}
+export interface CrmDealRecord {
+  id: string; pipeline_id: string; number: number; name: string; company_id: string | null; contact_id: string | null;
+  owner_worker_id: string | null; stage: string; amount: number | string | null; currency: string; probability: number | null;
+  close_date: string | null; last_contact_on: string | null; next_step: string | null; next_step_on: string | null;
+  next_element_id: string | null; initiative_id: string | null; source: string | null; lost_reason: string | null;
+  closed_on: string | null; custom: Record<string, unknown>; created_at: string;
+}
+export type CrmActivityKind = 'call' | 'email' | 'meeting' | 'note' | 'stage';
+export interface CrmActivityRecord {
+  id: string; deal_id: string | null; company_id: string | null; contact_id: string | null; kind: CrmActivityKind;
+  body: string; occurred_on: string; created_by: string | null; author_name: string | null; created_at: string;
+}
+export interface CrmFieldRecord {
+  id: string; entity: 'deal' | 'company' | 'contact'; key: string; label: string;
+  type: 'text' | 'number' | 'date' | 'select' | 'checkbox'; options: unknown; order_index: number;
+}
+/** The Element that is a deal's next step, as far as the CRM needs it. */
+export interface CrmNextElement { id: string; title: string; status: string; due_date: string | null; display_id: string | null }
+export interface CrmPerson { id: string; name: string; type: string; user_id: string | null }
 
 export const ACTIVITY_TYPES = ['call', 'email', 'meeting', 'note'] as const;
 export type CrmActivityType = typeof ACTIVITY_TYPES[number];
-export interface CrmActivity { date: string | null; type: CrmActivityType; text: string }
+export interface CrmActivity { id?: string; date: string | null; type: CrmActivityType | 'stage'; text: string; author?: string | null }
 
+// A Table-era activity log line: "2026-10-03 · call · text". Read when importing.
 const ACTIVITY_LINE = /^(\d{4}-\d{2}-\d{2})\s*[·|]\s*([a-z]+)\s*[·|]\s*(.*)$/i;
-
 export function parseActivityLog(value: unknown): CrmActivity[] {
   if (typeof value !== 'string') return [];
   return value.split('\n').map(line => line.trim()).filter(Boolean).map(line => {
@@ -62,18 +101,6 @@ export function parseActivityLog(value: unknown): CrmActivity[] {
     const type = match[2].toLowerCase();
     return { date: match[1], type: (ACTIVITY_TYPES as readonly string[]).includes(type) ? type as CrmActivityType : 'note', text: match[3].trim() };
   });
-}
-
-export function formatActivity(entry: CrmActivity): string {
-  const text = entry.text.replace(/\s*\n+\s*/g, ' / ').trim();
-  return entry.date ? `${entry.date} · ${entry.type} · ${text}` : text;
-}
-
-/** Prepends the entry. Older history is kept verbatim, including lines this
- * format does not recognise, so nothing typed directly in Table is lost. */
-export function appendActivity(log: unknown, entry: CrmActivity): string {
-  const previous = typeof log === 'string' ? log.trim() : '';
-  return previous ? `${formatActivity(entry)}\n${previous}` : formatActivity(entry);
 }
 
 // ── Dates ───────────────────────────────────────────────────────────────────
@@ -99,10 +126,16 @@ export interface CrmAction extends CrmText { urgency: CrmUrgency; code: string }
 
 export interface CrmDeal {
   id: string;
+  number: number;
+  pipelineId: string;
   name: string;
+  companyId: string | null;
   account: string | null;
+  contactId: string | null;
   contact: string | null;
   email: string | null;
+  ownerId: string | null;
+  ownerName: string | null;
   stageId: string | null;
   stage: CrmStage | null;
   outcome: 'open' | 'won' | 'lost' | null;
@@ -111,32 +144,50 @@ export interface CrmDeal {
   weighted: number | null;
   currency: string | null;
   closeDate: string | null;
+  closedOn: string | null;
   lastContact: string | null;
+  /** The next action's date and words: the linked Element's when there is one. */
   nextActionDate: string | null;
   nextStep: string | null;
+  nextElement: CrmNextElement | null;
+  initiativeId: string | null;
+  source: string | null;
+  lostReason: string | null;
+  custom: Record<string, unknown>;
   activity: CrmActivity[];
-  activityRaw: string | null;
   createdAt: string | null;
   valid: boolean;
-  issues: string[];
+  issues: CrmText[];
   health: CrmHealth;
   action: CrmAction | null;
-  analysis: CRMRowAnalysis;
 }
 
 export interface CrmBoardColumn { stage: CrmStage; deals: CrmDeal[]; totals: Record<string, number>; closed: boolean }
 
+export interface CrmSettings { horizonDays: number; followUpDays: number }
+
 export interface CrmWorkspace {
   today: string;
-  params: OperationsParams;
+  pipeline: CrmPipelineRecord;
+  params: CrmSettings;
   stages: CrmStage[];
   deals: CrmDeal[];
-  analysis: CRMAnalysis;
   /** The currency with the largest open pipeline; headline numbers use it. */
   primaryCurrency: string | null;
+  totals: { currency: string; pipeline: number; weightedPipeline: number; forecast: number; won: number; openCount: number }[];
 }
 
-const text = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null;
+export interface CrmRecords {
+  pipeline: CrmPipelineRecord;
+  deals: readonly CrmDealRecord[];
+  companies: readonly CrmCompanyRecord[];
+  contacts: readonly CrmContactRecord[];
+  activities: readonly CrmActivityRecord[];
+  elements: readonly CrmNextElement[];
+  people: readonly CrmPerson[];
+}
+
+const DONE_STATUSES = new Set(['done', 'cancelled']);
 
 function health(deal: Omit<CrmDeal, 'health' | 'action'>, today: string, followUpDays: number): CrmHealth {
   if (!deal.valid) return { score: null, level: 'incomplete', reasons: [] };
@@ -167,7 +218,11 @@ function nextAction(deal: Omit<CrmDeal, 'health' | 'action'>, today: string, fol
     return step ? { code: 'action_overdue', urgency: 'overdue', message: 'Overdue: {step}', values: { step } } : { code: 'action_overdue', urgency: 'overdue', message: 'Follow up — due {date}', values: { date: deal.nextActionDate } };
   }
   if (deal.nextActionDate === today) return step ? { code: 'action_today', urgency: 'today', message: 'Today: {step}', values: { step } } : { code: 'action_today', urgency: 'today', message: 'Follow up today' };
-  if (!deal.nextActionDate) return { code: 'action_missing', urgency: 'plan', message: 'Agree the next step and a date' };
+  if (!deal.nextActionDate) {
+    return deal.nextElement && DONE_STATUSES.has(deal.nextElement.status)
+      ? { code: 'step_done', urgency: 'plan', message: 'Next step done — plan the one after' }
+      : { code: 'action_missing', urgency: 'plan', message: 'Agree the next step and a date' };
+  }
   if (deal.lastContact && daysBetween(deal.lastContact, today) >= followUpDays) {
     return { code: 'contact_stale', urgency: 'soon', message: 'Check in — {n} days since last contact', values: { n: daysBetween(deal.lastContact, today) } };
   }
@@ -185,37 +240,69 @@ export function resolveStage(stageId: string | null, stages: readonly CrmStage[]
     ?? { id: key, label: stageId!.trim(), probability: 50 };
 }
 
-type CrmSchema = Omit<OperationsSchema, 'rows'> & { rows: { id: string; created_at?: string }[] };
+const toNumber = (value: number | string | null) => value === null || value === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null;
 
-export function buildCrmWorkspace(schema: CrmSchema, rawParams: unknown, today: string): CrmWorkspace {
-  const params = normalizeOperationsParams({ ...(rawParams as object), kind: 'crm' });
-  const stages = normalizeCrmStages((rawParams as Record<string, unknown> | null)?.crmStages);
-  const analysis = analyzeOperations(schema, params, today) as CRMAnalysis;
-  const created = new Map(schema.rows.map(row => [row.id, row.created_at ?? null]));
-  // The calculator ranks by risk; the App keeps the Table's own row order.
-  const order = new Map(schema.rows.map((row, index) => [row.id, index]));
-  const rows = [...analysis.rows].sort((a, b) => order.get(a.rowId)! - order.get(b.rowId)!);
-  const cell = (rowId: string, key: string) => {
-    const id = params.fields[key];
-    return id ? schema.cellsByRow[rowId]?.[id] : undefined;
-  };
-  const deals = rows.map((row): CrmDeal => {
-    const activityRaw = text(cell(row.rowId, 'activity'));
+export function buildCrmWorkspace(records: CrmRecords, today: string): CrmWorkspace {
+  const { pipeline } = records;
+  const stages = normalizeCrmStages(pipeline.stages);
+  const params: CrmSettings = { horizonDays: pipeline.horizon_days, followUpDays: pipeline.follow_up_days };
+  const companies = new Map(records.companies.map(company => [company.id, company]));
+  const contacts = new Map(records.contacts.map(contact => [contact.id, contact]));
+  const people = new Map(records.people.map(person => [person.id, person]));
+  const elements = new Map(records.elements.map(element => [element.id, element]));
+  const history = new Map<string, CrmActivity[]>();
+  for (const entry of [...records.activities].sort((a, b) => b.occurred_on.localeCompare(a.occurred_on) || b.created_at.localeCompare(a.created_at))) {
+    if (!entry.deal_id) continue;
+    const list = history.get(entry.deal_id) ?? [];
+    list.push({ id: entry.id, date: entry.occurred_on, type: entry.kind, text: entry.body, author: entry.author_name });
+    history.set(entry.deal_id, list);
+  }
+  const deals = records.deals.filter(deal => deal.pipeline_id === pipeline.id).map((row): CrmDeal => {
+    const stage = resolveStage(row.stage, stages);
+    const outcome: CrmDeal['outcome'] = stage ? stage.id === 'won' ? 'won' : stage.id === 'lost' ? 'lost' : 'open' : null;
+    const amount = toNumber(row.amount);
+    const probability = outcome === 'won' ? 100 : outcome === 'lost' ? 0 : row.probability ?? stage?.probability ?? null;
+    const issues: CrmText[] = [];
+    if (outcome === 'open' && amount === null) issues.push({ message: 'Add the amount' });
+    if (outcome === 'open' && !row.close_date) issues.push({ message: 'Add the expected close date' });
+    const element = row.next_element_id ? elements.get(row.next_element_id) ?? null : null;
+    // A live Element is the next step; a finished one leaves the deal waiting for the next plan.
+    const elementOpen = element && !DONE_STATUSES.has(element.status);
+    const company = row.company_id ? companies.get(row.company_id) : undefined;
+    const contact = row.contact_id ? contacts.get(row.contact_id) : undefined;
     const base = {
-      id: row.rowId, name: row.name, account: row.account,
-      contact: text(cell(row.rowId, 'contact')), email: text(cell(row.rowId, 'email')),
-      stageId: row.stageId, stage: resolveStage(row.stageId, stages), outcome: row.stage,
-      amount: row.amount, probability: row.probability, weighted: row.weightedAmount, currency: row.currency,
-      closeDate: row.closeDate, lastContact: row.lastContact, nextActionDate: row.nextActionDate,
-      nextStep: text(cell(row.rowId, 'nextStep')),
-      activity: parseActivityLog(activityRaw), activityRaw,
-      createdAt: created.get(row.rowId) ?? null,
-      valid: row.valid, issues: row.issues, analysis: row,
+      id: row.id, number: row.number, pipelineId: row.pipeline_id, name: row.name,
+      companyId: row.company_id, account: company?.name ?? null,
+      contactId: row.contact_id, contact: contact?.name ?? null, email: contact?.email ?? null,
+      ownerId: row.owner_worker_id, ownerName: row.owner_worker_id ? people.get(row.owner_worker_id)?.name ?? null : null,
+      stageId: row.stage, stage, outcome, amount, probability,
+      weighted: outcome === 'open' && amount !== null && probability !== null ? amount * probability / 100 : null,
+      currency: row.currency, closeDate: row.close_date, closedOn: row.closed_on, lastContact: row.last_contact_on,
+      nextActionDate: element ? elementOpen ? element.due_date : null : row.next_step_on,
+      nextStep: element ? elementOpen ? element.title : null : row.next_step,
+      nextElement: element, initiativeId: row.initiative_id, source: row.source, lostReason: row.lost_reason,
+      custom: row.custom ?? {}, activity: history.get(row.id) ?? [], createdAt: row.created_at,
+      valid: issues.length === 0, issues,
     };
     return { ...base, health: health(base, today, params.followUpDays), action: nextAction(base, today, params.followUpDays) };
   });
-  const primaryCurrency = [...analysis.totals].sort((a, b) => b.pipeline - a.pipeline || b.won - a.won)[0]?.currency ?? null;
-  return { today, params, stages, deals, analysis, primaryCurrency };
+  const totals = new Map<string, CrmWorkspace['totals'][number]>();
+  const horizonEnd = shiftDate(today, params.horizonDays);
+  for (const deal of deals) {
+    if (!deal.valid || !deal.currency || deal.amount === null || deal.outcome === 'lost' || !deal.outcome) continue;
+    const total = totals.get(deal.currency) ?? { currency: deal.currency, pipeline: 0, weightedPipeline: 0, forecast: 0, won: 0, openCount: 0 };
+    if (deal.outcome === 'won') total.won += deal.amount;
+    else {
+      total.pipeline += deal.amount;
+      total.weightedPipeline += deal.weighted ?? 0;
+      total.openCount += 1;
+      if (deal.closeDate && deal.closeDate >= today && deal.closeDate <= horizonEnd) total.forecast += deal.weighted ?? 0;
+    }
+    totals.set(deal.currency, total);
+  }
+  const list = [...totals.values()].sort((a, b) => a.currency.localeCompare(b.currency));
+  const primaryCurrency = [...list].sort((a, b) => b.pipeline - a.pipeline || b.won - a.won)[0]?.currency ?? pipeline.currency;
+  return { today, pipeline, params, stages, deals, primaryCurrency, totals: list };
 }
 
 // ── Views over the workspace ────────────────────────────────────────────────
@@ -242,25 +329,24 @@ export function pipelineColumns(workspace: Pick<CrmWorkspace, 'stages' | 'deals'
   const columns = new Map<string, CrmBoardColumn>();
   for (const stage of workspace.stages) columns.set(stage.id, { stage, deals: [], totals: {}, closed: false });
   const extra: CrmBoardColumn[] = [];
-  const unstaged: CrmBoardColumn = { stage: { id: '', label: 'No stage', probability: 0 }, deals: [], totals: {}, closed: false };
   const won: CrmBoardColumn = { stage: WON_STAGE, deals: [], totals: {}, closed: true };
   const lost: CrmBoardColumn = { stage: LOST_STAGE, deals: [], totals: {}, closed: true };
   for (const deal of deals) {
     let column: CrmBoardColumn;
     if (deal.outcome === 'won') column = won;
     else if (deal.outcome === 'lost') column = lost;
-    else if (!deal.stage) column = unstaged;
     else {
-      column = columns.get(deal.stage.id) ?? extra.find(item => item.stage.id === deal.stage!.id)
-        ?? (extra.push({ stage: deal.stage, deals: [], totals: {}, closed: false }), extra[extra.length - 1]);
+      const stage = deal.stage!;
+      column = columns.get(stage.id) ?? extra.find(item => item.stage.id === stage.id)
+        ?? (extra.push({ stage, deals: [], totals: {}, closed: false }), extra[extra.length - 1]);
     }
     column.deals.push(deal);
     if (deal.amount !== null && deal.currency) column.totals[deal.currency] = (column.totals[deal.currency] ?? 0) + deal.amount;
   }
-  for (const column of [...columns.values(), ...extra, unstaged, won, lost]) {
+  for (const column of [...columns.values(), ...extra, won, lost]) {
     column.deals.sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0) || a.name.localeCompare(b.name));
   }
-  return [...(unstaged.deals.length ? [unstaged] : []), ...columns.values(), ...extra, won, lost];
+  return [...columns.values(), ...extra, won, lost];
 }
 
 export interface CrmAccount {
@@ -277,10 +363,11 @@ export interface CrmAccount {
 
 const LEVEL_ORDER: Record<CrmHealthLevel, number> = { risk: 0, watch: 1, healthy: 2, incomplete: 3, closed: 4 };
 
+/** Deals rolled up by company (key = company id, '' for none). */
 export function accountsOf(deals: readonly CrmDeal[]): CrmAccount[] {
   const accounts = new Map<string, CrmAccount>();
   for (const deal of deals) {
-    const key = deal.account?.toLowerCase() ?? '';
+    const key = deal.companyId ?? '';
     const account = accounts.get(key) ?? { key, name: deal.account, deals: [], openCount: 0, pipeline: {}, won: {}, lastContact: null, nextActionDate: null, worst: null };
     account.deals.push(deal);
     if (deal.outcome === 'open' && deal.valid) {
@@ -288,7 +375,7 @@ export function accountsOf(deals: readonly CrmDeal[]): CrmAccount[] {
       if (deal.currency && deal.amount !== null) account.pipeline[deal.currency] = (account.pipeline[deal.currency] ?? 0) + deal.amount;
       if (deal.nextActionDate && (!account.nextActionDate || deal.nextActionDate < account.nextActionDate)) account.nextActionDate = deal.nextActionDate;
     }
-    if (deal.outcome === 'won' && deal.valid && deal.currency && deal.amount !== null) account.won[deal.currency] = (account.won[deal.currency] ?? 0) + deal.amount;
+    if (deal.outcome === 'won' && deal.currency && deal.amount !== null) account.won[deal.currency] = (account.won[deal.currency] ?? 0) + deal.amount;
     if (deal.lastContact && (!account.lastContact || deal.lastContact > account.lastContact)) account.lastContact = deal.lastContact;
     if (!account.worst || LEVEL_ORDER[deal.health.level] < LEVEL_ORDER[account.worst]) account.worst = deal.health.level;
     accounts.set(key, account);
@@ -317,17 +404,14 @@ export function forecastFor(deals: readonly CrmDeal[], currency: string | null, 
   const start = today.slice(0, 7);
   const keys: string[] = [];
   const [year, month] = start.split('-').map(Number);
-  for (let index = 0; index < months; index += 1) {
-    const date = new Date(Date.UTC(year, month - 1 + index, 1));
-    keys.push(date.toISOString().slice(0, 7));
-  }
+  for (let index = 0; index < months; index += 1) keys.push(new Date(Date.UTC(year, month - 1 + index, 1)).toISOString().slice(0, 7));
   const buckets = new Map(keys.map(key => [key, { month: key, weighted: 0, commit: 0, bestCase: 0, won: 0, count: 0 }]));
-  const scoped = deals.filter(deal => deal.valid && deal.currency === currency && deal.amount !== null);
+  const scoped = deals.filter(deal => deal.currency === currency && deal.amount !== null);
   let undated = 0;
   for (const deal of scoped) {
+    if (deal.outcome === 'won') { const key = (deal.closedOn ?? deal.closeDate)?.slice(0, 7); if (key && buckets.has(key)) buckets.get(key)!.won += deal.amount!; continue; }
+    if (deal.outcome !== 'open' || !deal.valid) continue;
     const key = deal.closeDate?.slice(0, 7);
-    if (deal.outcome === 'won') { if (key && buckets.has(key)) buckets.get(key)!.won += deal.amount!; continue; }
-    if (deal.outcome !== 'open') continue;
     // Overdue open deals still count, in the current month — they are not lost yet.
     const bucket = key && key < start ? buckets.get(start) : key ? buckets.get(key) : undefined;
     if (!bucket) { if (!key) undated += 1; continue; }
@@ -336,7 +420,7 @@ export function forecastFor(deals: readonly CrmDeal[], currency: string | null, 
     if ((deal.probability ?? 0) >= commitAt) bucket.commit += deal.amount!;
     bucket.count += 1;
   }
-  const open = scoped.filter(deal => deal.outcome === 'open');
+  const open = scoped.filter(deal => deal.outcome === 'open' && deal.valid);
   const won = scoped.filter(deal => deal.outcome === 'won');
   const lost = scoped.filter(deal => deal.outcome === 'lost');
   const sum = (items: CrmDeal[], pick: (deal: CrmDeal) => number) => items.reduce((total, deal) => total + pick(deal), 0);
@@ -349,17 +433,35 @@ export function forecastFor(deals: readonly CrmDeal[], currency: string | null, 
   };
 }
 
-export type CrmList = 'at-risk' | 'closing-soon' | 'no-next-step' | 'stale' | 'won' | 'lost' | 'incomplete';
+/** The figure a pipeline reports into its Initiative's success condition. */
+export function metricValue(deals: readonly CrmDeal[], metric: CrmMetric, currency: string, today: string): number {
+  const year = today.slice(0, 4);
+  const quarter = Math.floor((Number(today.slice(5, 7)) - 1) / 3);
+  const inQuarter = (date: string | null) => !!date && date.slice(0, 4) === year && Math.floor((Number(date.slice(5, 7)) - 1) / 3) === quarter;
+  const scoped = deals.filter(deal => deal.currency === currency && deal.amount !== null);
+  const sum = (items: CrmDeal[], pick: (deal: CrmDeal) => number) => Math.round(items.reduce((total, deal) => total + pick(deal), 0) * 100) / 100;
+  const won = scoped.filter(deal => deal.outcome === 'won');
+  switch (metric) {
+    case 'won_total': return sum(won, deal => deal.amount!);
+    case 'won_year': return sum(won.filter(deal => (deal.closedOn ?? deal.closeDate)?.slice(0, 4) === year), deal => deal.amount!);
+    case 'won_quarter': return sum(won.filter(deal => inQuarter(deal.closedOn ?? deal.closeDate)), deal => deal.amount!);
+    case 'weighted': return sum(scoped.filter(deal => deal.outcome === 'open'), deal => deal.weighted ?? 0);
+    case 'open': return sum(scoped.filter(deal => deal.outcome === 'open'), deal => deal.amount!);
+  }
+}
 
-export function inList(deal: CrmDeal, list: CrmList, today: string, horizonDays: number): boolean {
+export type CrmList = 'mine' | 'at-risk' | 'closing-soon' | 'no-next-step' | 'stale' | 'won' | 'lost' | 'incomplete';
+
+export function inList(deal: CrmDeal, list: CrmList, today: string, horizonDays: number, me: string | null = null): boolean {
   switch (list) {
+    case 'mine': return !!me && deal.ownerId === me && deal.outcome === 'open';
     case 'at-risk': return deal.health.level === 'risk';
     case 'closing-soon': return deal.outcome === 'open' && deal.valid && !!deal.closeDate && deal.closeDate >= today && deal.closeDate <= shiftDate(today, horizonDays);
-    case 'no-next-step': return deal.outcome === 'open' && deal.valid && !deal.nextActionDate;
-    case 'stale': return deal.action?.code === 'contact_stale' || deal.health.reasons.some(reason => reason.message === '{n} days since last contact');
+    case 'no-next-step': return deal.outcome === 'open' && !deal.nextActionDate;
+    case 'stale': return deal.health.reasons.some(reason => reason.message === '{n} days since last contact');
     case 'won': return deal.outcome === 'won';
     case 'lost': return deal.outcome === 'lost';
-    case 'incomplete': return !deal.valid;
+    case 'incomplete': return deal.outcome === 'open' && !deal.valid;
   }
 }
 
@@ -367,12 +469,13 @@ export function searchDeals(deals: readonly CrmDeal[], query: string): CrmDeal[]
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (!terms.length) return [...deals];
   return deals.filter(deal => {
-    const haystack = [deal.name, deal.account, deal.contact, deal.email, deal.stage?.label, deal.nextStep].filter(Boolean).join(' ').toLowerCase();
+    const haystack = [deal.name, `d-${deal.number}`, deal.account, deal.contact, deal.email, deal.ownerName, deal.stage?.label, deal.nextStep, deal.source,
+      ...Object.values(deal.custom).map(value => typeof value === 'string' || typeof value === 'number' ? String(value) : '')].filter(Boolean).join(' ').toLowerCase();
     return terms.every(term => haystack.includes(term));
   });
 }
 
-/** Cell values for moving a deal to a stage. Probability follows the stage
+/** Values for moving a deal to a stage. Probability follows the stage
  * default only when the deal is entering or leaving an outcome, or when it
  * still carries the previous stage's default — a hand-set figure survives. */
 export function stageChange(deal: Pick<CrmDeal, 'probability' | 'stage'>, target: CrmStage): { stage: string; probability: number } {
@@ -380,4 +483,16 @@ export function stageChange(deal: Pick<CrmDeal, 'probability' | 'stage'>, target
   const wasDefault = deal.probability === null || deal.stage === null || deal.probability === deal.stage.probability
     || deal.stage.id === 'won' || deal.stage.id === 'lost';
   return { stage: target.id, probability: closed || wasDefault ? target.probability : deal.probability! };
+}
+
+/** Custom field definitions as typed choices; malformed options are dropped. */
+export function fieldOptions(field: Pick<CrmFieldRecord, 'options'>): string[] {
+  return Array.isArray(field.options) ? field.options.filter((item): item is string => typeof item === 'string' && !!item.trim()).slice(0, 50) : [];
+}
+
+export function fieldKey(label: string, taken: readonly string[]): string {
+  const base = label.trim().toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32) || 'field';
+  let key = base; let index = 2;
+  while (taken.includes(key)) key = `${base}_${index++}`.slice(0, 40);
+  return key;
 }
