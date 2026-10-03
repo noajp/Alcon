@@ -118,8 +118,8 @@ export function ScmItemDetail({ node, onBack }: { node: ScmNode; onBack: () => v
             [t('Lead time'), t('{n} days', { n: q(node.leadTime) }), promised !== null && Math.abs(node.leadTime - promised) > 0.05 ? t('Promised {p} days; this supplier delivers {d} days late on average', { p: q(promised), d: q(node.leadTime - promised) }) : t('As promised')],
             [t('Lead-time spread'), t('± {n} days', { n: q(node.leadTimeSd) }), stats?.samples ? t('From {n} received orders', { n: stats.samples }) : t('No receipts yet')],
             [t('Safety stock'), q(node.safetyStock, 0), t('z({level}) × √((L+R)·σ² + d²·σL²)', { level: `${Math.round(z * 1000) / 10}%` })],
-            [t('Reorder point'), q(node.reorderPoint, 0), t('Demand over lead time + its safety stock')],
-            [t('Order-up-to'), q(node.orderUpTo, 0), t('Demand over lead time + {r}-day review + safety stock', { r: data.policy.reviewDays })],
+            [t('Reorder point'), q(node.reorderPoint, 0), t('Demand over lead time + {r}-day review + safety stock', { r: data.policy.reviewDays })],
+            [t('Order-up-to'), q(node.orderUpTo, 0), t('Reorder point + another {r} days of demand', { r: data.policy.reviewDays })],
             [t('Inventory position'), q(node.inventoryPosition), t('On hand + incoming + drafts')],
             [t('Economic order quantity'), node.eoq === null ? '—' : q(node.eoq, 0), node.eoq === null ? t('Set an ordering cost in the policy to use EOQ') : t('Orders are at least this size, capped at 120 days of demand')],
           ].map(([label, value, hint]) => <div key={label} className="grid grid-cols-[8.5rem_minmax(0,1fr)] gap-2">

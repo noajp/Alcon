@@ -75,6 +75,7 @@ export function signalText(signal: ScmSignal, t: Translate, locale: string, curr
     case 'transfer_available': return t('{location} can spare {quantity} units. A transfer covers the gap faster than a new order.', v);
     case 'demand_rising': return t('Demand is up {change}% over the last two weeks.', v);
     case 'no_supplier': return t('No supplier is set, so no order can be proposed.');
+    case 'no_history': return t('No demand recorded yet. Record issues, or set an expected daily demand on the item, to plan it.');
   }
 }
 
@@ -92,7 +93,7 @@ export function briefingText(line: ScmBriefingLine, t: Translate, locale: string
     case 'proposals': return t('Proposed: {count} orders, {lines} lines, {amount}. {auto} within autopilot authority, {approval} need approval.', v);
     case 'demand': return Number(v.count) === 1 ? t('Demand for {first} is rising.', v) : t('Demand is rising for {count} items, including {first}.', v);
     case 'supplier': return t('{name} is on time {onTime}% of the time ({delay} days late on average). Its lead time is planned as observed.', v);
-    case 'excess': return t('{count} items hold excess or dead stock worth {currency} {value}.', v);
+    case 'excess': return t('{count} items hold excess or dead stock worth {amount}.', v);
     case 'healthy': return t('No urgent supply risks. {count} of {total} item-locations are healthy.', v);
   }
 }

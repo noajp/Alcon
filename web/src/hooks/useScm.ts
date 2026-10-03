@@ -143,7 +143,7 @@ async function fetchScm(spaceId: string, today: string): Promise<ScmData> {
       id: String(row.id), sku: String(row.sku), name: String(row.name), unit: String(row.unit), category: (row.category as string | null) || null,
       supplierId: (row.supplier_id as string | null) ?? null, unitCost: num(row.unit_cost), unitPrice: numOrNull(row.unit_price),
       currency: String(row.currency), leadTimeDays: numOrNull(row.lead_time_days), moq: num(row.moq), orderMultiple: num(row.order_multiple, 1),
-      serviceLevel: numOrNull(row.service_level), baselineDailyDemand: numOrNull(row.baseline_daily_demand), active: row.active !== false,
+      serviceLevel: numOrNull(row.service_level), baselineDailyDemand: numOrNull(row.baseline_daily_demand), active: row.active !== false, createdAt: (row.created_at as string | null) ?? null,
     })).sort((a, b) => a.sku.localeCompare(b.sku)),
     stock: stock.map(row => ({ itemId: String(row.item_id), locationId: String(row.location_id), onHand: num(row.on_hand) })),
     demand: demand.map(row => ({ itemId: String(row.item_id), locationId: String(row.location_id), day: String(row.day), quantity: num(row.quantity) })),

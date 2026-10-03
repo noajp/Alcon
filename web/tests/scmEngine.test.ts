@@ -109,10 +109,11 @@ describe('planning a node', () => {
   it('orders up to the target when position falls to the reorder point', () => {
     const plan = planScm(flatInput(50, 10));
     const node = plan.nodes[0];
-    // Flat demand: no safety stock beyond zero variance.
-    expect(node.reorderPoint).toBeCloseTo(100, 0);
-    expect(node.orderUpTo).toBeCloseTo(170, 0);
-    expect(node.suggestedQuantity).toBe(120);
+    // Flat demand: no safety stock beyond zero variance. Periodic review: the
+    // reorder point covers lead time + one review, the order one review more.
+    expect(node.reorderPoint).toBeCloseTo(170, 0);
+    expect(node.orderUpTo).toBeCloseTo(240, 0);
+    expect(node.suggestedQuantity).toBe(190);
     expect(node.health).toBe('critical');
     expect(node.stockoutDay).toBe(addDays(TODAY, 5));
     expect(plan.proposals).toHaveLength(1);
@@ -121,6 +122,8 @@ describe('planning a node', () => {
   it('respects MOQ and order multiples', () => {
     const plan = planScm(flatInput(50, 10, [], { moq: 200, orderMultiple: 24 }));
     expect(plan.nodes[0].suggestedQuantity).toBe(216);
+    const multiple = planScm(flatInput(50, 10, [], { orderMultiple: 24 }));
+    expect(multiple.nodes[0].suggestedQuantity).toBe(192);
   });
 
   it('counts confirmed supply and does not order twice', () => {
@@ -157,6 +160,32 @@ describe('planning a node', () => {
     expect(node.inDraft).toBe(300);
     expect(node.suggestedQuantity).toBe(0);
     expect(node.stockoutDay).not.toBeNull();
+  });
+
+  it('following the plan leaves no shortfall for a fast mover with a short lead time', () => {
+    // 2-day lead time, weekly review: the plan must not manufacture stockouts.
+    const input = flatInput(300, 100, [], { leadTimeDays: 2 });
+    const node = planScm(input).nodes[0];
+    expect(node.shortfallUnits).toBe(0);
+    expect(planScm(input).totals[0].fillRate).toBe(1);
+  });
+
+  it('does not call a newly set-up item dead stock', () => {
+    const input = flatInput(80, 0, [], { createdAt: `${TODAY}T09:00:00Z` });
+    const node = planScm({ ...input, demand: [] }).nodes[0];
+    expect(node.health).toBe('no_demand');
+    expect(node.signals.map(signal => signal.code)).toContain('no_history');
+    const old = planScm({ ...flatInput(80, 0, [], { createdAt: '2025-01-01T00:00:00Z' }), demand: [] }).nodes[0];
+    expect(old.health).toBe('dead');
+  });
+
+  it('reports excess per currency', () => {
+    const base = flatInput(0, 0);
+    const input = { ...base, demand: [],
+      items: [item({ id: 'a', currency: 'JPY', unitCost: 1000 }), item({ id: 'b', sku: 'B', currency: 'USD', unitCost: 10 })],
+      stock: [{ itemId: 'a', locationId: 'l', onHand: 5 }, { itemId: 'b', locationId: 'l', onHand: 7 }] };
+    const line = planScm(input).briefing.find(entry => entry.kind === 'excess')!;
+    expect(line.values.amount).toBe('JPY 5,000 + USD 70');
   });
 
   it('applies a demand scenario without touching the inputs', () => {

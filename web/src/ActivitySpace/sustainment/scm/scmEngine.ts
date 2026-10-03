@@ -31,6 +31,8 @@ export interface ScmItem {
   serviceLevel: number | null;
   baselineDailyDemand: number | null;
   active: boolean;
+  /** When the item was set up; an item younger than the history window cannot be dead stock. */
+  createdAt?: string | null;
 }
 export interface ScmStock { itemId: string; locationId: string; onHand: number }
 /** Outflow per item, location and day: issues and transfers out, as a positive quantity. */
@@ -347,7 +349,7 @@ export type ScmHealth = 'stockout' | 'critical' | 'reorder' | 'healthy' | 'exces
 export type ScmSignalCode =
   | 'out_of_stock' | 'stockout_before_supply' | 'stockout_in_horizon' | 'below_reorder_point'
   | 'overdue_order' | 'draft_pending' | 'excess_stock' | 'dead_stock' | 'unreliable_supplier'
-  | 'single_source' | 'transfer_available' | 'demand_rising' | 'no_supplier' | 'negative_stock';
+  | 'single_source' | 'transfer_available' | 'demand_rising' | 'no_supplier' | 'negative_stock' | 'no_history';
 export interface ScmSignal {
   code: ScmSignalCode;
   severity: 'high' | 'medium' | 'low';
@@ -542,10 +544,13 @@ export function planScm(input: ScmInput): ScmPlan {
     const sigma = forecast.sigma * multiplier;
     const coverWindow = Math.ceil(leadTime + review);
     const dailyDemand = mean(daily.slice(0, Math.max(1, coverWindow)));
+    // Periodic review (R, s, S): orders are placed only at reviews, so an order
+    // placed now must carry the item until the next order can arrive — one
+    // lead time plus one review period. That is the reorder point; the order
+    // brings the position up to one more review period beyond it.
     const safetyStock = z * Math.sqrt((leadTime + review) * sigma ** 2 + dailyDemand ** 2 * leadTimeSd ** 2);
-    const safetyLead = z * Math.sqrt(leadTime * sigma ** 2 + dailyDemand ** 2 * leadTimeSd ** 2);
-    const reorderPoint = dailyDemand * leadTime + safetyLead;
-    const orderUpTo = dailyDemand * (leadTime + review) + safetyStock;
+    const reorderPoint = dailyDemand * (leadTime + review) + safetyStock;
+    const orderUpTo = reorderPoint + dailyDemand * review;
     const annualDemand = dailyDemand * 365;
     const eoq = policy.orderingCost > 0 && item.unitCost > 0 && policy.holdingRate > 0 && annualDemand > 0
       ? Math.sqrt((2 * annualDemand * policy.orderingCost) / (policy.holdingRate * item.unitCost)) : null;
@@ -639,7 +644,10 @@ export function planScm(input: ScmInput): ScmPlan {
 
     const lookbackOutflow = forecast.historyTotal;
     const excessThreshold = orderUpTo + dailyDemand * 60;
-    const dead = stockNow > 0 && lookbackOutflow <= 0 && (item.baselineDailyDemand ?? 0) <= 0;
+    // Only an item that has been around for the whole history window can be
+    // judged dead; a new one simply has no history yet.
+    const established = !item.createdAt || dayNumber(item.createdAt.slice(0, 10)) <= historyStart;
+    const dead = established && stockNow > 0 && lookbackOutflow <= 0 && (item.baselineDailyDemand ?? 0) <= 0;
     const excessUnits = dead ? stockNow : dailyDemand > 0 ? Math.max(0, inventoryPosition - excessThreshold) : 0;
 
     const signals: ScmSignal[] = [];
@@ -662,6 +670,7 @@ export function planScm(input: ScmInput): ScmPlan {
     if (inDraft > 0) signals.push({ code: 'draft_pending', severity: 'low', values: { quantity: inDraft } });
     if (dead) signals.push({ code: 'dead_stock', severity: 'low', values: { onHand: stockNow, value: Math.round(stockNow * item.unitCost), days: lookback } });
     else if (excessUnits > 0) signals.push({ code: 'excess_stock', severity: 'low', values: { units: Math.round(excessUnits), value: Math.round(excessUnits * item.unitCost), cover: daysOfCover === null ? 0 : Math.round(daysOfCover) } });
+    if (!established && lookbackOutflow <= 0 && dailyDemand <= 0) signals.push({ code: 'no_history', severity: 'low', values: {} });
     if (!supplier) signals.push({ code: 'no_supplier', severity: dailyDemand > 0 ? 'medium' : 'low', values: {} });
     if (stats && stats.onTimeRate !== null && stats.samples >= 3 && stats.onTimeRate < 0.8 && dailyDemand > 0 && (suggested > 0 || (stockout !== null && stockout < earliestNewSupply) || arrivals.some(arrival => arrival.overdue))) {
       signals.push({ code: 'unreliable_supplier', severity: 'medium', values: { supplier: stats.name, onTime: Math.round(stats.onTimeRate * 100), delay: Math.round((stats.averageDelay ?? 0) * 10) / 10 } });
@@ -865,8 +874,10 @@ function briefing(plan: ScmPlan): ScmBriefingLine[] {
   if (unreliable.length) lines.push({ kind: 'supplier', severity: 'medium', values: { name: unreliable[0].name, onTime: Math.round((unreliable[0].onTimeRate ?? 0) * 100), delay: Math.round((unreliable[0].averageDelay ?? 0) * 10) / 10, count: unreliable.length }, nodeKeys: plan.nodes.filter(node => unreliable.some(supplier => supplier.supplierId === node.supplierId)).map(node => node.key) });
   const excess = plan.nodes.filter(node => node.health === 'excess' || node.health === 'dead');
   if (excess.length) {
-    const value = excess.reduce((sum, node) => sum + node.excessValue, 0);
-    lines.push({ kind: 'excess', severity: 'low', values: { count: excess.length, value: Math.round(value).toLocaleString('en-US'), currency: excess[0].currency }, nodeKeys: excess.map(node => node.key) });
+    const byCurrency = new Map<string, number>();
+    for (const node of excess) byCurrency.set(node.currency, (byCurrency.get(node.currency) ?? 0) + node.excessValue);
+    const amount = [...byCurrency.entries()].sort((x, y) => x[0].localeCompare(y[0])).map(([currency, value]) => `${currency} ${Math.round(value).toLocaleString('en-US')}`).join(' + ');
+    lines.push({ kind: 'excess', severity: 'low', values: { count: excess.length, amount }, nodeKeys: excess.map(node => node.key) });
   }
   if (!lines.some(line => line.severity === 'high') && plan.nodes.length) {
     lines.unshift({ kind: 'healthy', severity: 'low', values: { count: plan.counts.healthy, total: plan.nodes.length }, nodeKeys: [] });

@@ -119,6 +119,6 @@ export function ScmReplenish({ onRunPlanner, running }: { onRunPlanner: () => vo
         </li>)}</ul> : !run.summary.status && <p className="text-sm text-muted-foreground">{t('No orders needed.')}</p>}
       </li>)}</ul> : <p className="text-sm text-muted-foreground">{t('The autopilot has not run yet.')}</p>}
     </Section>
-    <p className="text-xs text-muted-foreground">{t('Quantities cover lead time plus the {review}-day review period and safety stock, less stock and open orders, rounded to MOQ and pack size. {health} lines come first.', { review: data.policy.reviewDays, health: t(HEALTH_LABEL.critical) })}</p>
+    <p className="text-xs text-muted-foreground">{t('Orders are placed at each {review}-day review: an item is ordered once stock and open orders fall to its reorder point (lead time + one review + safety stock), up to one more review of demand, rounded to MOQ and pack size. {health} lines come first.', { review: data.policy.reviewDays, health: t(HEALTH_LABEL.critical) })}</p>
   </div>;
 }
