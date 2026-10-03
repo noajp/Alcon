@@ -162,6 +162,7 @@ const ROWS: readonly Row[] = [
   ["Enter a quantity above zero for every new line.", "新しい明細にはすべて 0 より大きい数量を入力してください。", "새 라인마다 0보다 큰 수량을 입력하세요.", "Saisissez une quantité supérieure à zéro pour chaque nouvelle ligne.", "Introduce una cantidad mayor que cero en cada línea nueva."],
   ["Reversed", "取消済み", "취소됨", "Annulé", "Revertido"],
   ["Not a member of this Space", "この Space のメンバーではありません", "이 Space의 멤버가 아닙니다", "Vous n’êtes pas membre de ce Space", "No eres miembro de este Space"],
+  ["This movement has already been reversed.", "この移動はすでに取り消されています。", "이 이동은 이미 취소되었습니다.", "Ce mouvement a déjà été annulé.", "Este movimiento ya se revirtió."],
   ["Act now", "今すぐ対応", "즉시 대응", "Agir maintenant", "Actuar ya"],
   ["Plan", "計画", "계획", "Planifier", "Planificar"],
   ["On hand", "手持ち在庫", "보유 재고", "En stock", "En existencia"],

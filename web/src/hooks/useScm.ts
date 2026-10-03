@@ -41,8 +41,9 @@ export function useScmLedger(spaceId: string | null, filter: ScmLedgerFilter, li
   const query = useQuery({
     queryKey: [...KEY(spaceId), 'ledger', filter, limit],
     enabled: !!spaceId,
-    // "Show more" keeps the rows on screen while the longer page loads.
-    placeholderData: previous => previous,
+    // "Show more" keeps the rows on screen while the longer page loads; a new
+    // filter starts empty rather than showing the previous filter's rows.
+    placeholderData: (previous, previousQuery) => previousQuery && JSON.stringify(previousQuery.queryKey[3]) === JSON.stringify(filter) ? previous : undefined,
     queryFn: async () => {
       let request = supabase.from('scm_movements').select('*', { count: 'exact' }).eq('activity_space_id', spaceId!);
       if (filter.itemId) request = request.eq('item_id', filter.itemId);
@@ -439,10 +440,13 @@ export function useScmActions(spaceId: string | null) {
       reverseMovement: (movement: ScmMovementRecord, today: string, note: string) => done((async () => {
         if (movement.poId) throw new Error('A receipt against a purchase order is corrected with a stock count, so the order keeps its received quantity.');
         if (movement.kind === 'transfer_in' || movement.kind === 'transfer_out') throw new Error('Transfers are undone with a transfer back.');
-        await check(supabase.from('scm_movements').insert({
+        const { error } = await supabase.from('scm_movements').insert({
           activity_space_id: space(), item_id: movement.itemId, location_id: movement.locationId, kind: 'adjust', quantity: -movement.quantity,
           occurred_on: today, note, reverses_id: movement.id,
-        }));
+        });
+        // Another window reversed it first; the unique index keeps it to one.
+        if (error?.code === '23505') throw new Error('This movement has already been reversed.');
+        if (error) throw new Error(error.message);
       })()),
       receiveOrder: (id: string, lines: { lineId: string; quantity: number }[], receivedOn: string) =>
         done(check(supabase.rpc('scm_receive_po', { p_po: id, p_lines: lines.map(line => ({ line_id: line.lineId, quantity: line.quantity })), p_received_on: receivedOn }))),
