@@ -816,3 +816,10 @@ Object.assign(fr, { 'The Space could not be deleted. Try again.': 'Impossible de
   'You can create a Domain only in a Space you belong to.': 'Vous ne pouvez créer un Domain que dans un Space dont vous êtes membre.' });
 Object.assign(es, { 'The Space could not be deleted. Try again.': 'No se pudo eliminar el Space. Inténtalo de nuevo.', 'Only an owner of this Space can delete it.': 'Solo un propietario de este Space puede eliminarlo.',
   'You can create a Domain only in a Space you belong to.': 'Solo puedes crear un Domain en un Space del que formas parte.' });
+
+// An Object is created only in a Domain the creator can see, or with no
+// Domain (ADR 0029).
+Object.assign(ja, { 'You can create an Object only in a Domain you can see.': 'Object は、自分が見られる Domain の中にだけ作れます。' });
+Object.assign(ko, { 'You can create an Object only in a Domain you can see.': 'Object는 내가 볼 수 있는 Domain 안에서만 만들 수 있습니다.' });
+Object.assign(fr, { 'You can create an Object only in a Domain you can see.': 'Vous ne pouvez créer un Object que dans un Domain que vous pouvez voir.' });
+Object.assign(es, { 'You can create an Object only in a Domain you can see.': 'Solo puedes crear un Object en un Domain que puedas ver.' });

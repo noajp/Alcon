@@ -23,6 +23,7 @@ Space・Domain・Object の所属（`activity_space_members` / `domain_members` 
 - **招待を読めるのは**、招かれた人、招いた人、その対象のメンバー（一覧に「Invited」と出すため）、Object の Domain を管理する人。
 - **作った人の owner の行はサーバーが書く。** Space・Domain・Object を作ると、同じ INSERT の中でトリガが作った人（`auth.uid()`）を owner として登録する。作った人を表す列（`activity_spaces.created_by` / `domains.user_id` / `objects.user_id`）は作成時に呼び出した人になり、その後はログイン中の誰も変えられない。
 - **Domain は参加している Space の中に作る。** Domain を作れるのは、`activity_space_id` が自分の参加している Space か空のときだけ。Domain を別の Space へ移せる（`activity_space_id` を変えられる）のは、その Domain の owner・admin のうち、移動元と移動先の両方の Space のオーナーである人だけ（どちらかが空ならもう一方だけ）。Space を削除したときは、その Domain は Space のない Domain として残る。
+- **Object は見えている Domain の中に作る。** Object を作れるのは、`domain_id` が自分の見られる Domain（`user_can_see_domain`）か空のときだけ。Domain のない Object を見られるのは、そのメンバー（最初は作った人だけ）。
 - **ブラウザが書ける所属の行は、見えている Domain・Object に member として自分が加わる行だけ（Discover）。** 他人の行も、owner の行も、Space の行も書けない。所属の行は人と対象を変えられず、変えられるのは役割だけ。`domain_members` / `object_members` の役割は owner / admin / member で、Domain と Object は Space と同じく最後の owner を外せない（対象そのものやアカウントの削除は別）。例外は、Object の Domain の owner・admin がその Object の最後の owner を外すときで、その人が同じ操作の中で owner を引き継ぐ。引き継いだ人は Object の owner なので、その Object を削除することもできる。Domain の owner・admin は、Object に参加しなくてもそのメンバーを見て外せる。
 - **Object を管理する人は主 Domain（`objects.domain_id`）で決まり、その列は両端を管理する人だけが変えられる。** Object を別の Domain に移せるのは、移動元の Domain の owner・admin（Domain のない Object ならその Object の owner・admin）で、かつ移動先の Domain の owner・admin である人だけ。管理の判定（`user_manages_scope_as`）は `object_domains`（複数 Domain への所属）を読まない。
 - **Object を別の Domain にも入れられるのは、Object とその Domain の両方を管理する人だけ。** `object_domains` の行を足す・変えるには、Object を管理する人（主 Domain の owner・admin。Domain のない Object ならその Object の owner・admin。主 Domain の移動と同じ判定）で、かつ入れる先の Domain の owner・admin であること。主 Domain と同じ Domain の行は可視性を広げないので、Object の owner・admin も書ける（Object の作成と取り込みが書く行）。行を消す（Domain から外す）のは、Object を管理する人か Domain の owner・admin のどちらかで、その行が見えている人（Domain と Object の両方が見える人）に限られる。
@@ -40,6 +41,10 @@ Space・Domain・Object の所属（`activity_space_members` / `domain_members` 
 作った人の登録をブラウザに残すと、「作った人」を示す列が証拠になる。ところが Object のメンバーは `objects.user_id` を、Domain の admin は `domains.user_id` を書き換えられたので、「まだ誰もいないとき」に限っても、Discover で加わる → 列を自分に書き換える → 抜けて 0 人にする → 作った人として owner で戻る、という順で他人の Object の owner になれた。登録を作成と同じ INSERT のトリガに移せば、ブラウザが owner の行を書く経路そのものがなくなる。列を作成後に固定するのは、他の判定（`user_can_see_domain` の作成者の分岐など）でも作った人を偽れないようにするため。
 
 Domain を作れる Space を参加している Space に限るのは、作った人がその Domain の owner として登録されるから。どの Space にでも作れると、Domain の owner としてその Space の名簿（`worker_in_space`）に入り、「この Space の Domain」を信じる判定のすべてに加わってしまう。Space 間の移動を両方の Space のオーナーに限るのも同じ理由で、自分の Domain を他の Space へ持ち込むことも、Space の Domain を Object ごと持ち出すこともできないようにする。
+
+Object を作れる Domain を見えている Domain に限るのも同じ理由で、作った人はその Object の owner として、その Domain の Space の名簿（`worker_in_space`）と「この Domain の Object」を信じる判定に加わる。基準を Domain のメンバーにしなかったのは、見えている Domain には Discover で自分から member として加われるので、メンバーを求めても誰も締め出せず、手順が増えるだけだから。owner・admin に限ると、Domain の一般メンバーが Object を作る流れ（Object の作成・複製・既存の仕事の取り込み）が成り立たない。締め出すべきは、見えない Domain（他の組織の Domain や、招かれていない private の Domain）に入ること。
+
+作った Object の行を作成と同時に返させない（INSERT に RETURNING を付けない）のは、返す行が owner の行を書くトリガより先に SELECT の判定を受けるから。Domain のない Object は、その時点ではまだ誰にも見えない。作った人なら常に見える、という分岐を SELECT に足すと、外された作った人のアクセスが残る。だからブラウザは Object の id を自分で決めて書き、書き終えてからその id で読み直す。
 
 辞退から 7 日は同じ人を同じ対象に招けないようにしたのは、辞退の直後に招き直すと通知を繰り返し送れてしまうから。取り消した招待は相手が断ったわけではないので、待たずに招き直せる。
 

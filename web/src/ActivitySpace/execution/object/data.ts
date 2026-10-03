@@ -3,7 +3,7 @@
 import { suggestObjectPrefix } from '@/ActivitySpace/execution/object/objectPrefix';
 import { applyOptimisticExplorerPatch } from '@/Function/sync/explorerCache';
 import { translate } from '@/Function/i18n/I18nProvider';
-import { getCurrentUserId, supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import type { AlconObject, ObjectTab, ObjectTabInsert, ObjectTabUpdate } from '@/types/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
@@ -15,6 +15,7 @@ const LINK_REFUSED = 'Only owners or admins of both this Object and the Domain c
 const UNLINK_REFUSED = 'Only owners or admins of this Object or of the Domain can take it out of there.';
 const CREATE_CLEANUP_FAILED = 'The Object was created but could not be filed under every chosen Domain, and it could not be removed. Delete it, or ask an owner or admin of those Domains to file it.';
 const MOVE_NEEDS_MEMBERSHIP = 'You need to be a member of this Object to move it.';
+const CREATE_REFUSED = 'You can create an Object only in a Domain you can see.';
 
 // ============================================
 // Object CRUD
@@ -74,11 +75,6 @@ export async function createObject(obj: {
     .limit(1);
   const maxOrder = existing?.[0]?.order_index ?? -1;
 
-  // Stamp the creator. Records "who made this Object" on the row itself —
-  // mirrors domains.user_id and pairs with the object_members owner row
-  // added below.
-  const creatorId = await getCurrentUserId();
-
   // The DB trigger that backfills prefix mangles CJK names ("TF-MED — 医療"
   // → "T—医" → el_T—医-001), so compute an ASCII prefix client-side — the
   // trigger keeps an explicitly provided one. Every Domain the Object will
@@ -92,23 +88,32 @@ export async function createObject(obj: {
   ].filter(Boolean)));
   const prefix = await suggestPrefixForDomains(obj.name, prefixScope);
 
-  const { data, error } = await supabase
+  // Insert without RETURNING, then read the row back by an id chosen here.
+  // RETURNING is checked against the objects SELECT policy before the AFTER
+  // INSERT trigger enrols the creator as owner, so a Domain-less Object would
+  // be refused as invisible (42501) even though the insert itself is allowed.
+  // The creator (objects.user_id) and the owner row are written by the
+  // database (objects_stamp_creator / objects_enrol_creator).
+  const id = crypto.randomUUID();
+  const { error: insertError } = await supabase
     .from('objects')
     .insert({
+      id,
       name: obj.name,
       color: obj.color || null,
       description: obj.description || null,
       order_index: obj.order_index ?? maxOrder + 1,
       domain_id: obj.domain_id ?? null,
-      user_id: creatorId,
       ...(obj.type !== undefined ? { type: obj.type } : {}),
       ...(obj.lead_id !== undefined ? { lead_id: obj.lead_id } : {}),
       ...(obj.due_date !== undefined ? { due_date: obj.due_date } : {}),
       ...(prefix ? { prefix } : {}),
-    })
-    .select()
-    .single();
+    });
+  // Objects are created only in a Domain the caller can see, or with none.
+  if (insertError?.code === '42501') throw new Error(translate(CREATE_REFUSED));
+  if (insertError) throw insertError;
 
+  const { data, error } = await supabase.from('objects').select().eq('id', id).single();
   if (error) throw error;
 
   // Write to object_domains junction table for domain multi-homing
