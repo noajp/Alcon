@@ -94,7 +94,7 @@ async function testIntegration(integrationId: string): Promise<Json> {
 }
 
 /** Starts Google sign-in for an OAuth integration; returns the URL to navigate to. */
-export async function startIntegrationOAuth(integrationId: string): Promise<string> {
+async function startIntegrationOAuth(integrationId: string): Promise<string> {
   const { data, error } = await supabase.functions.invoke('integration-oauth/start', { body: { integrationId } });
   if (error) throw await functionError(error);
   const url = (data as { url?: unknown } | null)?.url;
@@ -113,7 +113,7 @@ export async function finishIntegrationOAuth(handle: string): Promise<string | n
 
 /** Revokes an OAuth integration's grant at the provider and clears its stored
  *  tokens. `revoked` is false when the provider could not confirm it. */
-export async function revokeIntegrationOAuth(integrationId: string): Promise<{ revoked: boolean }> {
+async function revokeIntegrationOAuth(integrationId: string): Promise<{ revoked: boolean }> {
   const { data, error } = await supabase.functions.invoke('integration-oauth/revoke', { body: { integrationId } });
   if (error) throw await functionError(error);
   return { revoked: (data as { revoked?: unknown } | null)?.revoked === true };
