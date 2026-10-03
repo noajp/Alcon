@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_FILTER, INTEGRATION_PRESETS, buildIntegrationRow, filterPresets, installedPresetIds,
-  isSafeEndpoint, presetById, readLastTest, testOutcomeLabel, type IntegrationDraft,
+  isSafeEndpoint, presetById, readLastTest, signsInWithOAuth, testOutcomeLabel, type IntegrationDraft,
 } from '@/Function/integrations/catalog';
 
 const server = await import(new URL('../../supabase/functions/_shared/integrationClient.ts', import.meta.url).pathname);
@@ -29,7 +29,10 @@ describe('integration presets', () => {
     expect(presetById('github')).toMatchObject({ kind: 'mcp', endpoint: 'https://api.githubcopilot.com/mcp/', category: 'development' });
     expect(presetById('slack')).toMatchObject({ kind: 'http', endpoint: 'https://slack.com/api', category: 'communication' });
     expect(presetById('google-drive')).toMatchObject({ auth: 'oauth' });
-    expect(presetById('google-drive')!.unavailableReason).toBeTruthy();
+    expect(presetById('google-drive')).toMatchObject({ kind: 'http', endpoint: 'https://www.googleapis.com/drive/v3', category: 'files' });
+    expect(presetById('google-drive')!.unavailableReason).toBeUndefined();
+    expect(signsInWithOAuth(presetById('google-drive')!)).toBe(true);
+    expect(signsInWithOAuth(presetById('linear')!)).toBe(false);
     expect(presetById('nope')).toBeNull();
   });
 });
@@ -90,8 +93,15 @@ describe('buildIntegrationRow', () => {
     });
   });
 
+  it('builds an OAuth row for Google Drive, with no credential', () => {
+    expect(buildIntegrationRow(presetById('google-drive')!, SPACE, draft)).toEqual({
+      ok: true,
+      row: expect.objectContaining({ preset: 'google-drive', kind: 'http', endpoint: 'https://www.googleapis.com/drive/v3', auth_type: 'oauth', auth_header: null }),
+    });
+  });
+
   it('refuses a preset that cannot be connected yet', () => {
-    expect(buildIntegrationRow(presetById('google-drive')!, SPACE, draft).ok).toBe(false);
+    expect(buildIntegrationRow({ ...presetById('google-drive')!, unavailableReason: 'Not yet.' }, SPACE, draft)).toEqual({ ok: false, error: 'Not yet.' });
   });
 
   it('validates a custom connection', () => {
@@ -136,6 +146,6 @@ describe('readLastTest', () => {
   it('words every outcome, and only a verified one as connected', () => {
     expect(testOutcomeLabel('connected')).toBe('Connected');
     expect(testOutcomeLabel('reachable')).toMatch(/not checked/);
-    for (const c of ['auth_failed', 'http_error', 'unreachable', 'blocked', 'oauth_required', 'whatever']) expect(testOutcomeLabel(c)).not.toBe('Connected');
+    for (const c of ['auth_failed', 'http_error', 'unreachable', 'blocked', 'oauth_required', 'oauth_expired', 'whatever']) expect(testOutcomeLabel(c)).not.toBe('Connected');
   });
 });

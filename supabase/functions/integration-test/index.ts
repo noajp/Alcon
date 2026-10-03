@@ -11,6 +11,10 @@
 //     http  a preset with a credential check (VERIFY) → connected or
 //           auth_failed. Any other API: GET on the base URL; a response
 //           below 500 other than 401 / 403 is only "reachable".
+//     oauth Google Drive: the stored token (refreshed when due, through
+//           resolveCredential) reads the signed-in user from Drive's about
+//           endpoint → connected. No token → oauth_required; a refresh token
+//           Google refuses → oauth_expired.
 //
 // Who may test: a Space owner. The integration must be visible to the caller
 // (RLS: Space member) and the caller must hold the owner role in that Space —
@@ -20,8 +24,9 @@
 // logged, or put in last_test.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { McpSession, callHttp, isSafeEndpoint, type IntegrationRow } from "../_shared/integrationClient.ts";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { McpSession, callHttp, isSafeEndpoint, readCapped, resolveCredential, type IntegrationRow } from "../_shared/integrationClient.ts";
+import { GOOGLE_ABOUT_URL, isGoogleDriveRow } from "../_shared/googleOAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,7 +44,7 @@ interface LastTest {
   ok: boolean;
   at: string;
   /** What happened, for the client to word in the viewer's language. */
-  code: "connected" | "reachable" | "auth_failed" | "http_error" | "unreachable" | "blocked" | "oauth_required" | "error";
+  code: "connected" | "reachable" | "auth_failed" | "http_error" | "unreachable" | "blocked" | "oauth_required" | "oauth_expired" | "error";
   /** A technical note for errors (already scrubbed of the secret); empty otherwise. */
   detail: string;
   tools?: { name: string; readOnly: boolean }[];
@@ -67,7 +72,6 @@ const VERIFY: Record<string, { path: string; okWhen: (status: number, body: stri
 async function runTest(row: IntegrationRow & { preset: string | null }, secret: string | null): Promise<LastTest> {
   const at = new Date().toISOString();
   if (!isSafeEndpoint(row.endpoint)) return { ok: false, at, code: "blocked", detail: "" };
-  if (row.auth_type === "oauth") return { ok: false, at, code: "oauth_required", detail: "" };
   try {
     if (row.kind === "mcp") {
       const session = new McpSession(row, secret);
@@ -98,6 +102,37 @@ async function runTest(row: IntegrationRow & { preset: string | null }, secret: 
     const message = e instanceof Error ? e.message : String(e);
     if (/認証に失敗/.test(message)) return { ok: false, at, code: "auth_failed", detail: "" };
     return { ok: false, at, code: timeout ? "unreachable" : "error", detail: timeout ? "" : scrub(message, secret) };
+  }
+}
+
+/** Google Drive: who the stored token belongs to, asked of Drive itself. */
+async function runOAuthTest(admin: SupabaseClient, row: IntegrationRow & { preset: string | null }, raw: string | null): Promise<LastTest> {
+  const at = new Date().toISOString();
+  if (!isGoogleDriveRow(row) || !raw) return { ok: false, at, code: "oauth_required", detail: "" };
+  let token: string | null;
+  try {
+    token = await resolveCredential(admin, row, raw);
+  } catch (e) {
+    return { ok: false, at, code: "error", detail: scrub(e instanceof Error ? e.message : String(e), null) };
+  }
+  if (!token) {
+    // resolveCredential records a refresh token Google refused as oauth_expired.
+    const { data } = await admin.from("integrations").select("last_test").eq("id", row.id).maybeSingle();
+    const expired = (data?.last_test as { code?: string } | null)?.code === "oauth_expired";
+    return { ok: false, at, code: expired ? "oauth_expired" : "oauth_required", detail: "" };
+  }
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 20_000);
+    const res = await fetch(GOOGLE_ABOUT_URL, { headers: { Authorization: `Bearer ${token}`, accept: "application/json" }, signal: ctl.signal, redirect: "manual" })
+      .finally(() => clearTimeout(timer));
+    await readCapped(res, 100_000);
+    if (res.status === 401 || res.status === 403) return { ok: false, at, code: "auth_failed", status: res.status, detail: "" };
+    if (!res.ok) return { ok: false, at, code: "http_error", status: res.status, detail: "" };
+    return { ok: true, at, code: "connected", status: res.status, detail: "" };
+  } catch (e) {
+    const timeout = e instanceof Error && e.name === "AbortError";
+    return { ok: false, at, code: timeout ? "unreachable" : "error", detail: timeout ? "" : scrub(e instanceof Error ? e.message : String(e), token) };
   }
 }
 
@@ -149,7 +184,7 @@ Deno.serve(async (req: Request) => {
   const secret = typeof secretData === "string" && secretData.length > 0 ? secretData : null;
 
   const row = visible as IntegrationRow & { activity_space_id: string; preset: string | null };
-  const lastTest = await runTest(row, secret);
+  const lastTest = row.auth_type === "oauth" ? await runOAuthTest(admin, row, secret) : await runTest(row, secret);
 
   const { error: writeErr } = await admin.from("integrations").update({ last_test: lastTest }).eq("id", integrationId);
   if (writeErr) return json({ error: "could not save the result", last_test: lastTest }, 500);

@@ -49,9 +49,8 @@ export const INTEGRATION_PRESETS: readonly IntegrationPreset[] = [
   },
   {
     id: 'google-drive', name: 'Google Drive', icon: null, kind: 'http', endpoint: 'https://www.googleapis.com/drive/v3', auth: 'oauth',
-    description: 'Find and read files in Google Drive so agents can work from your documents.',
+    description: 'Search, read, create and update Google Drive files. Agents see only files Alcon created or that you chose.',
     credentialLabel: 'Google account', category: 'files', source: 'official', builtBy: 'Google', featured: true, custom: false,
-    unavailableReason: "Google's OAuth client is not registered yet, so this can't be connected (an administrator needs to set it up).",
   },
   {
     id: 'github', name: 'GitHub', icon: null, kind: 'mcp', endpoint: 'https://api.githubcopilot.com/mcp/', auth: 'bearer',
@@ -93,6 +92,11 @@ export const SOURCE_LABELS: Record<IntegrationSource, string> = {
 
 export function presetById(id: string | null | undefined): IntegrationPreset | null {
   return INTEGRATION_PRESETS.find((p) => p.id === id) ?? null;
+}
+
+/** True for a preset that connects by signing in (OAuth) rather than a pasted credential. */
+export function signsInWithOAuth(preset: IntegrationPreset): boolean {
+  return !preset.custom && preset.auth === 'oauth';
 }
 
 // ── Filtering ──────────────────────────────────────────────────────────────
@@ -226,7 +230,7 @@ export function buildIntegrationRow(preset: IntegrationPreset, spaceId: string, 
 export interface IntegrationTestTool { name: string; readOnly: boolean }
 
 export interface IntegrationTestResult {
-  /** connected | reachable | auth_failed | http_error | unreachable | blocked | oauth_required | error */
+  /** connected | reachable | auth_failed | http_error | unreachable | blocked | oauth_required | oauth_expired | error */
   code: string;
   ok: boolean;
   at: string | null;
@@ -270,7 +274,8 @@ export function testOutcomeLabel(code: string): string {
     case 'http_error': return 'The service returned an error';
     case 'unreachable': return 'No response from the service';
     case 'blocked': return 'Only https addresses on public hosts can be used.';
-    case 'oauth_required': return 'This service needs OAuth, which is not set up yet';
+    case 'oauth_required': return 'Not connected — sign in with Google';
+    case 'oauth_expired': return 'Google sign-in expired — reconnect';
     default: return 'Failed';
   }
 }

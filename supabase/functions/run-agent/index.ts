@@ -31,8 +31,10 @@ import { runBoardTool, errorMessage, type BoardActor, type ToolDef } from "../_s
 import { runStrategyTool } from "../_shared/strategyTools.ts";
 import { AGENT_MODELS, DEFAULT_AGENT_MODEL, costOf, isAgentModel, type AgentModel, type ModelUsage } from "../_shared/aiPricing.ts";
 import {
-  McpSession, callHttp, httpIsRead, HTTP_REQUEST_SCHEMA, isSafeEndpoint, pointsAtAlcon, type IntegrationRow, type RemoteTool,
+  McpSession, callHttp, httpIsRead, HTTP_REQUEST_SCHEMA, isSafeEndpoint, pointsAtAlcon, resolveCredential, type IntegrationRow, type RemoteTool,
 } from "../_shared/integrationClient.ts";
+import { isGoogleDriveRow } from "../_shared/googleOAuth.ts";
+import { DRIVE_TOOLS, driveOperationLabel, runDriveTool } from "../_shared/googleDrive.ts";
 import { approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR } from "./agentTools.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import {
@@ -86,7 +88,20 @@ type Run = {
   continuation_count: number; continuation_token: string | null;
 };
 
-interface IntegrationTool { integration: IntegrationRow; remote: RemoteTool | null; secret: string | null; session: McpSession | null }
+/**
+ * One integration tool the agent sees. `remote` describes an MCP tool or a
+ * typed Drive tool (its readOnly decides read vs write); null is the generic
+ * http_request. `drive` marks the Google Drive tools, which run through
+ * runDriveTool with `secret` as the access token.
+ */
+interface IntegrationTool { integration: IntegrationRow; remote: RemoteTool | null; secret: string | null; session: McpSession | null; drive?: boolean }
+
+/** The operation an integration call shows on the approval card and in the log. */
+function operationOf(it: IntegrationTool | undefined, input: Record<string, unknown>): string {
+  if (it?.drive && it.remote) return driveOperationLabel(it.remote.name, input);
+  if (it?.remote) return it.remote.name;
+  return `${input.method ?? ""} ${input.path ?? ""}`.trim();
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -281,7 +296,7 @@ async function execute(a: ExecArgs): Promise<void> {
   const integrationSummary: TaskContext["integrations"] = [];
   if (run.activity_space_id) {
     const { data: rows } = await userDb.from("integrations")
-      .select("id, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled")
+      .select("id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled")
       .eq("activity_space_id", run.activity_space_id).eq("enabled", true).order("created_at");
     for (const row of (rows ?? []) as (IntegrationRow & { enabled: boolean })[]) {
       if (!isSafeEndpoint(row.endpoint)) continue;
@@ -291,23 +306,43 @@ async function execute(a: ExecArgs): Promise<void> {
         await addStep(admin, run.id, "error", `連携「${row.name}」は Alcon 自身を指しているため使いません`, "盤面の操作はエージェントの標準の道具で行います。");
         continue;
       }
-      const { data: secret } = await admin.rpc("get_integration_secret", { p_integration_id: row.id });
+      // OAuth is Google Drive's sign-in; any other OAuth row has no way to authenticate.
+      if (row.auth_type === "oauth" && !isGoogleDriveRow(row)) continue;
+      const { data: raw } = await admin.rpc("get_integration_secret", { p_integration_id: row.id });
       const prefix = integrationPrefix(row.name, row.id);
       try {
-        if (row.kind === "mcp") {
-          const session = new McpSession(row, (secret as string | null) ?? null);
+        // An OAuth token set becomes a current access token here (refreshed
+        // when due); other credentials pass through as stored.
+        const secret = await resolveCredential(admin, row, (raw as string | null) ?? null);
+        if (isGoogleDriveRow(row)) {
+          if (!secret) {
+            await addStep(admin, run.id, "error", `連携「${row.name}」は Google への接続が必要です`, "Settings › Integrations で Google にサインインし直すと使えます。");
+            continue;
+          }
+          for (const t of DRIVE_TOOLS) {
+            if (integrationDefs.length >= MAX_TOOLS) break;
+            const name = uniqueToolName(`${prefix}${INTEGRATION_SEPARATOR}${t.name}`, integrationTools);
+            integrationTools.set(name, {
+              integration: row, secret, session: null, drive: true,
+              remote: { name: t.name, description: t.description, inputSchema: t.input_schema, readOnly: t.readOnly },
+            });
+            integrationDefs.push({ name, description: `[${row.name}] ${t.description}`.slice(0, 1024), input_schema: t.input_schema });
+          }
+          integrationSummary.push({ name: row.name, kind: "Google Drive", delegation: row.delegation, tools: DRIVE_TOOLS.length });
+        } else if (row.kind === "mcp") {
+          const session = new McpSession(row, secret);
           await session.initialize();
           const tools = await session.listTools();
           for (const t of tools) {
             if (integrationDefs.length >= MAX_TOOLS) break;
             const name = uniqueToolName(`${prefix}${INTEGRATION_SEPARATOR}${t.name}`, integrationTools);
-            integrationTools.set(name, { integration: row, remote: t, secret: (secret as string | null) ?? null, session });
+            integrationTools.set(name, { integration: row, remote: t, secret, session });
             integrationDefs.push({ name, description: `[${row.name}] ${t.description}`.slice(0, 1024), input_schema: t.inputSchema });
           }
           integrationSummary.push({ name: row.name, kind: "MCP", delegation: row.delegation, tools: tools.length });
         } else {
           const name = `${prefix}${INTEGRATION_SEPARATOR}http_request`;
-          integrationTools.set(name, { integration: row, remote: null, secret: (secret as string | null) ?? null, session: null });
+          integrationTools.set(name, { integration: row, remote: null, secret, session: null });
           integrationDefs.push({
             name,
             description: `[${row.name}] ${row.description ?? ""} の API（base: ${row.endpoint}）に HTTP リクエストを送る。GET / HEAD は読み取り、それ以外は書き込み。`.slice(0, 1024),
@@ -347,9 +382,11 @@ async function execute(a: ExecArgs): Promise<void> {
   const callIntegration = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
     const it = integrationTools.get(call.name);
     if (!it) return { content: "Unknown tool.", is_error: true };
-    const r = it.remote && it.session
-      ? await it.session.callTool(it.remote.name, call.input)
-      : await callHttp(it.integration, it.secret, call.input);
+    const r = it.drive && it.remote
+      ? await runDriveTool(it.remote.name, call.input, it.secret ?? "")
+      : it.remote && it.session
+        ? await it.session.callTool(it.remote.name, call.input)
+        : await callHttp(it.integration, it.secret, call.input);
     return { content: r.text, ...(r.isError ? { is_error: true } : {}) };
   };
 
@@ -399,7 +436,7 @@ async function execute(a: ExecArgs): Promise<void> {
     const it = integrationTools.get(call.name);
     if (it) {
       const r = await callIntegration(call);
-      await addStep(admin, run.id, "action", `${it.integration.name}: ${it.remote?.name ?? `${call.input.method ?? ""} ${call.input.path ?? ""}`}`, r.is_error ? r.content.slice(0, 500) : null);
+      await addStep(admin, run.id, "action", `${it.integration.name}: ${operationOf(it, call.input)}`, r.is_error ? r.content.slice(0, 500) : null);
       return r;
     }
     return { content: "Unknown tool.", is_error: true };
@@ -579,7 +616,7 @@ async function execute(a: ExecArgs): Promise<void> {
       const calls = outcome.pending.calls;
       const display = calls.map((c) => {
         const it = integrationTools.get(c.name);
-        return { id: c.id, integration: it?.integration.name ?? c.name, operation: it?.remote ? it.remote.name : `${c.input.method ?? ""} ${c.input.path ?? ""}`.trim() };
+        return { id: c.id, integration: it?.integration.name ?? c.name, operation: operationOf(it, c.input) };
       });
       const summary = approvalSummary(display);
       const inputHash = await sha256(canonicalCalls(calls));
