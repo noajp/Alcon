@@ -223,11 +223,14 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
                   <CommandItem
                     key={`object-${r.id}`}
                     value={`object-${r.title}`}
-                    onSelect={() => handleNav('objects', { objectId: r.id })}
+                    onSelect={() => handleNav('objects', r.domainId ? { objectId: r.id, objectDomainId: r.domainId } : { objectId: r.id })}
                   >
                     <Icon />
                     <div className="flex-1 min-w-0">
-                      <div className="truncate">{r.title}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="truncate">{r.title}</span>
+                        {r.archived && <span className="shrink-0 text-[11px] text-muted-foreground">{t('Archived')}</span>}
+                      </div>
                       {r.snippet && (
                         <div className="text-[11px] text-muted-foreground truncate">{r.snippet}</div>
                       )}

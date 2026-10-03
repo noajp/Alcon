@@ -11,6 +11,7 @@ import { initiativesForObjects, domainsForObjects, type InitiativeRelation } fro
 import { chunkIds } from './chunkedIn';
 import { readAllPages, type CountedRows } from './readAllPages';
 import type { AlconObject, Domain } from '@/types/database';
+import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 
 async function readIn<Row>(label: string, ids: string[], run: (ids: string[], from: number, to: number) => PromiseLike<CountedRows<Row>>, identity: (row: Row) => string) {
   const rows: Row[] = [];
@@ -58,7 +59,7 @@ export async function fetchInitiativeDomains(initiativeId: string, viewableDomai
   const links = await readAllPages<{ object_id: string }>('Initiative Object links', (from, to) => supabase.from('strategy_objects')
     .select('object_id', { count: 'exact' }).eq('strategy_id', initiativeId).order('object_id').range(from, to), link => link.object_id);
   const objects = await readIn<Pick<AlconObject, 'id' | 'name' | 'domain_id'>>('Initiative Objects', links.map(link => link.object_id),
-    (ids, from, to) => supabase.from('objects').select('id,name,domain_id', { count: 'exact' }).in('id', ids).order('id').range(from, to), object => object.id);
+    (ids, from, to) => onlyActiveObjects(supabase.from('objects').select('id,name,domain_id', { count: 'exact' }).in('id', ids)).order('id').range(from, to), object => object.id);
   const homes = await readIn<{ object_id: string; domain_id: string }>('Object Domains', objects.map(object => object.id),
     (ids, from, to) => supabase.from('object_domains').select('object_id,domain_id', { count: 'exact' }).in('object_id', ids).order('object_id').order('domain_id').range(from, to), link => `${link.object_id}:${link.domain_id}`);
   const scope = new Set(viewableDomainIds);

@@ -1,4 +1,4 @@
-# 0030 — SCM owns its ledger and acts within a policy
+# 0031 — SCM owns its ledger and acts within a policy
 
 ## 背景
 

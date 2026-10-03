@@ -12,6 +12,7 @@ import { fetchSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { Worker } from '@/types/database';
+import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 
 function readIds<Row>(
   label: string,
@@ -48,15 +49,15 @@ export async function fetchTeamRoster(spaceId: string, signal: AbortSignal): Pro
     readIds<TeamRosterSource['objectDomains'][number]>('Object Domains', domainIds, (chunk, from, to) => supabase
       .from('object_domains').select('object_id, domain_id', { count: 'exact' }).in('domain_id', chunk)
       .order('object_id').order('domain_id').range(from, to).abortSignal(signal), (row) => `${row.object_id}:${row.domain_id}`),
-    readIds<TeamRosterSource['objects'][number]>('Team Objects', domainIds, (chunk, from, to) => supabase
-      .from('objects').select('id, domain_id', { count: 'exact' }).in('domain_id', chunk)
+    readIds<TeamRosterSource['objects'][number]>('Team Objects', domainIds, (chunk, from, to) => onlyActiveObjects(supabase
+      .from('objects').select('id, domain_id', { count: 'exact' }).in('domain_id', chunk))
       .order('id').range(from, to).abortSignal(signal), rowId),
   ]);
   const domainMembers = mergeTeamDomainMembers(domainIds, directDomainMembers, domainGuests);
   const directObjectIds = new Set(directObjects.map((row) => row.id));
   const linkedObjects = await readIds<TeamRosterSource['objects'][number]>('Linked Team Objects', objectDomains
-    .map((row) => row.object_id).filter((id) => !directObjectIds.has(id)), (chunk, from, to) => supabase
-    .from('objects').select('id, domain_id', { count: 'exact' }).in('id', chunk)
+    .map((row) => row.object_id).filter((id) => !directObjectIds.has(id)), (chunk, from, to) => onlyActiveObjects(supabase
+    .from('objects').select('id, domain_id', { count: 'exact' }).in('id', chunk))
     .order('id').range(from, to).abortSignal(signal), rowId);
   const objects = unique([...directObjects, ...linkedObjects]);
   const objectIds = objects.map((row) => row.id);

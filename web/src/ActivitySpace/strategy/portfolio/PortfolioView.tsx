@@ -18,6 +18,7 @@ import { NavPortfolioIcon, NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import type { Portfolio, StrategyWithObjects } from '@/types/database';
 import { createPortfolio, deletePortfolio, PortfolioMoveRefused, setStrategyPortfolio, updatePortfolio, usePortfolios } from './data';
 import { groupByPortfolio, initiativesInSpace } from './portfolioGroups';
+import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 
 // Strategy > Portfolio — the Space's Initiatives bundled into named
 // Portfolios. Each Portfolio row folds open on its Initiatives; the picker
@@ -193,11 +194,13 @@ function PortfolioRow({ portfolio, initiatives, candidates, onSelectStrategy }: 
 
 function InitiativeRow({ strategy, onOpen, onRemove }: { strategy: StrategyWithObjects; onOpen: () => void; onRemove?: () => void }) {
   const { t } = useI18n();
+  // Archived Objects stay linked but are not counted.
+  const countObjects = useActiveObjectCount();
   return (
     <div className="group flex min-w-0 items-center gap-1 rounded-md hover:bg-muted/40">
       <Button variant="ghost" size="md" align="start" onClick={onOpen} className="min-w-0 flex-1 gap-2.5 text-xs font-semibold text-foreground">
         <NavStrategyIcon size={16} /><span className="truncate">{strategy.name}</span>
-        <span className="ml-auto text-[11px] font-normal tabular-nums text-muted-foreground">{strategy.objectIds.length}</span>
+        <span className="ml-auto text-[11px] font-normal tabular-nums text-muted-foreground">{countObjects(strategy.objectIds)}</span>
       </Button>
       {onRemove && (
         <Button variant="ghost" size="icon-xs" onClick={onRemove} className="mr-1 text-muted-foreground opacity-0 group-hover:opacity-100 focus:opacity-100"

@@ -36,7 +36,7 @@ export const BOARD_TOOLS: ToolDef[] = [
   },
   {
     name: "listObjects",
-    description: "Domain 内の Object 一覧。domainId を省略すると、ユーザーが参加する全 Domain のものを返す。",
+    description: "Domain 内の Object 一覧。domainId を省略すると、ユーザーが参加する全 Domain のものを返す。アーカイブした Object は含まない。",
     input_schema: {
       type: "object",
       properties: {
@@ -516,6 +516,7 @@ export async function runBoardTool(
         let q = supabase
           .from("objects")
           .select("id, name, prefix, domain_id, order_index, created_at")
+          .is("archived_at", null)
           .order("order_index", { ascending: true, nullsFirst: false });
         if (input.domainId) q = q.eq("domain_id", input.domainId as string);
         const { data, error } = await q;
@@ -532,7 +533,7 @@ export async function runBoardTool(
           .limit(limit);
         if (input.domainId) {
           const { data: objs } = await supabase
-            .from("objects").select("id").eq("domain_id", input.domainId as string);
+            .from("objects").select("id").eq("domain_id", input.domainId as string).is("archived_at", null);
           const ids = (objs ?? []).map(o => o.id);
           if (ids.length === 0) return { ok: true, data: [], meta: { rows: 0 } };
           q = q.in("object_id", ids);
@@ -603,7 +604,7 @@ export async function runBoardTool(
           .limit(limit);
         if (input.domainId) {
           const { data: objs } = await supabase
-            .from("objects").select("id").eq("domain_id", input.domainId as string);
+            .from("objects").select("id").eq("domain_id", input.domainId as string).is("archived_at", null);
           const ids = (objs ?? []).map(o => o.id);
           if (ids.length === 0) return { ok: true, data: [], meta: { rows: 0 } };
           q = q.in("object_id", ids);
@@ -619,7 +620,7 @@ export async function runBoardTool(
         if (input.objectId) objectIds = [input.objectId as string];
         else if (input.domainId) {
           const { data: objs } = await supabase
-            .from("objects").select("id").eq("domain_id", input.domainId as string);
+            .from("objects").select("id").eq("domain_id", input.domainId as string).is("archived_at", null);
           objectIds = (objs ?? []).map(o => o.id);
           if (objectIds.length === 0) {
             return { ok: true, data: { total: 0, byStatus: {}, completionRate: 0, overdue: 0 } };
@@ -652,7 +653,7 @@ export async function runBoardTool(
           .limit(limit);
         if (input.domainId) {
           const { data: objs } = await supabase
-            .from("objects").select("id").eq("domain_id", input.domainId as string);
+            .from("objects").select("id").eq("domain_id", input.domainId as string).is("archived_at", null);
           const ids = (objs ?? []).map(o => o.id);
           if (ids.length === 0) return { ok: true, data: [], meta: { rows: 0 } };
           q = q.in("object_id", ids);

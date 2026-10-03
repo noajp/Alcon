@@ -61,4 +61,5 @@
 | [0027](0027-agents-act-on-elements-with-the-callers-rls-and-stop-for-approval.md) | エージェントは本人の RLS で Element を代行し、外部への書き込みは承認を通す |
 | [0028](0028-workers-belong-to-a-space.md) | Worker は Space に属する — 名前は Element に付いてきて、割り当ては境界に従う |
 | [0029](0029-membership-takes-effect-on-acceptance.md) | 所属は招かれた本人の承諾で成立する — 招待は別の表に置き、RPC だけが書く |
-| [0030](0030-scm-owns-its-ledger-and-acts-within-a-policy.md) | SCM は専用の台帳を持ち、人が示した方針の範囲で AI が発注する |
+| [0030](0030-unused-objects-are-archived-and-domains-with-objects-stay.md) | 使わなくなった Object はアーカイブし、Object が残る Domain は削除しない |
+| [0031](0031-scm-owns-its-ledger-and-acts-within-a-policy.md) | SCM は専用の台帳を持ち、人が示した方針の範囲で AI が発注する |

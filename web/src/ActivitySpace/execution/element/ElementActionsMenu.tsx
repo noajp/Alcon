@@ -15,6 +15,7 @@ import {
   invalidateElementDetail,
 } from '@/hooks/useSupabase';
 import { EntityActionsMenu, type ActionTarget } from '@/Function/shared/EntityActionsMenu';
+import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 
 /**
  * "⋯" menu for an Element, wired to the breadcrumb in ElementDetailView.
@@ -39,7 +40,8 @@ async function fetchActionTargets(primaryId: string | null): Promise<ActionTarge
       .single();
     domainId = (primaryObj?.domain_id as string | null) ?? null;
   }
-  const objQuery = supabase.from('objects').select('id, name, domain_id').order('order_index');
+  // Archived Objects are not move / multi-home targets.
+  const objQuery = onlyActiveObjects(supabase.from('objects').select('id, name, domain_id')).order('order_index');
   const { data: objs } = domainId ? await objQuery.eq('domain_id', domainId) : await objQuery;
   return (objs ?? []).map((o) => ({ id: o.id as string, name: o.name as string }));
 }

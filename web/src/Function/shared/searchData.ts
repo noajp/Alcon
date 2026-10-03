@@ -15,6 +15,10 @@ export interface SearchResult {
   objectId?: string | null;
   /** The quotable id — `ELE_MED-001`. Absent for kinds that have none. */
   displayId?: string | null;
+  /** An Object's primary Domain, so opening it switches to that Domain. */
+  domainId?: string | null;
+  /** Archived Objects are still found by search; the result says so. */
+  archived?: boolean;
 }
 
 export async function globalSearch(query: string, limit = 8): Promise<SearchResult[]> {
@@ -31,9 +35,11 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
       .select('id, title, description, object_id, display_id')
       .or(`title.ilike.${like},description.ilike.${like},display_id.ilike.${like}`)
       .limit(limit),
+    // Archived Objects stay searchable: search is how an Object that left
+    // every list is found again.
     supabase
       .from('objects')
-      .select('id, name, description')
+      .select('id, name, description, domain_id, archived_at')
       .or(`name.ilike.${like},description.ilike.${like}`)
       .limit(limit),
     supabase
@@ -48,7 +54,7 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
     out.push({ kind: 'element', id: r.id, title: r.title, snippet: r.description, objectId: r.object_id, displayId: displayIdOf(r) });
   }
   for (const r of (objectsRes.data || [])) {
-    out.push({ kind: 'object', id: r.id, title: r.name, snippet: r.description });
+    out.push({ kind: 'object', id: r.id, title: r.name, snippet: r.description, domainId: r.domain_id, archived: !!r.archived_at });
   }
   for (const r of (notesRes.data || [])) {
     out.push({ kind: 'note', id: r.id, title: r.title || 'Untitled' });

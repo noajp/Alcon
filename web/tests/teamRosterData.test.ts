@@ -18,6 +18,7 @@ vi.mock('@/lib/supabase', () => {
       select(_columns: string, selectOptions?: { count?: string }) { call.count = selectOptions?.count; return query; },
       eq(column: string, value: unknown) { filters.push((row) => row[column] === value); return query; },
       in(column: string, values: unknown[]) { filters.push((row) => values.includes(row[column])); return query; },
+      is(column: string, value: unknown) { filters.push((row) => (row[column] ?? null) === value); return query; },
       order(column: string) { order.push(column); return query; },
       range(from: number, to: number) { call.start = from; end = to; return query; },
       abortSignal(signal: AbortSignal) { call.signal = signal; return query; },
