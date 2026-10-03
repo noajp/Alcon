@@ -20,6 +20,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { authenticateCaller } from "../_shared/callerAuth.ts";
+import { sanitizeName } from "../_shared/callerName.ts";
 import { runExternalTool } from "../_shared/externalTools.ts";
 import { apiActorLabel, apiPath, openApiDocument, planRequest, ROUTES, toResponse, type ApiError } from "./routes.ts";
 
@@ -62,7 +63,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const client = req.headers.get("x-alcon-client");
-  const auth = await authenticateCaller(req, { client: client?.trim() || "API" });
+  const auth = await authenticateCaller(req, { client: sanitizeName(client) || "API" });
   if (!auth.ok) {
     if (auth.status === 401) {
       return json(401, { error: { code: "unauthorized", message: auth.detail } }, {

@@ -45,7 +45,7 @@ claude mcp add --transport http alcon "https://rkugtcqztkkacvoylupw.supabase.co/
 env -u SUPABASE_ACCESS_TOKEN supabase functions deploy alcon-mcp --project-ref rkugtcqztkkacvoylupw --no-verify-jwt --use-api
 ```
 
-`--no-verify-jwt` を付けるのは、トークンがない場合や、期限切れ・取り消し済みの場合に、関数自身が MCP の形式に沿った 401（`WWW-Authenticate` 付き）を返すため。トークンの検証は関数の中で行う。`_shared/boardTools.ts` を変更したら、`alcon-copilot` も再デプロイする。
+`--no-verify-jwt` を付けるのは、トークンがない場合や、期限切れ・取り消し済みの場合に、関数自身が MCP の形式に沿った 401（`WWW-Authenticate` 付き）を返すため。トークンの検証は関数の中で行う。`_shared/externalTools.ts` を変更したら `alcon-api` も、`_shared/boardTools.ts` を変更したら `alcon-api` と `alcon-copilot` も再デプロイする。
 
 PAT を受け付けるには、Edge Function のシークレット `ALCON_JWT_SIGNING_KEY` に、プロジェクトの JWT シークレット（Legacy JWT secret）を入れる。ない場合、PAT は 500「server not configured」で断られ、セッションの JWT だけが通る。非対称の署名鍵に移ったら、EC の秘密鍵の JWK を入れれば ES256 で署名する。
 
