@@ -117,6 +117,7 @@ function GenerateTokenDialog({ onClose }: { onClose: () => void }) {
   const [issued, setIssued] = useState<string | null>(null);
 
   const generate = async () => {
+    if (issue.isPending) return;
     setError(null);
     const trimmed = name.trim();
     if (!trimmed) { setError(t('Enter a name.')); return; }
