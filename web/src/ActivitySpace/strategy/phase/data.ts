@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import type { AlconObject, Element, ElementUpdate, Intent, Phase, PhaseInsert, PhaseStatus, PhaseUpdate, Strategy } from '@/types/database';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 
 
 // ============================================
@@ -245,10 +246,10 @@ export async function fetchPhaseCandidates(domainId: string): Promise<{
   objects: Pick<AlconObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[];
   elements: PhaseCandidateElement[];
 }> {
-  const { data: objects, error: oErr } = await supabase
+  const { data: objects, error: oErr } = await onlyActiveObjects(supabase
     .from('objects')
     .select('id, name, type, due_date, phase_id')
-    .eq('domain_id', domainId)
+    .eq('domain_id', domainId))
     .order('order_index', { ascending: true, nullsFirst: false });
   if (oErr) throw oErr;
   const objectIds = (objects || []).map((o) => o.id);

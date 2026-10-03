@@ -15,6 +15,7 @@ import { useElementSelection } from '@/ActivitySpace/execution/element/useElemen
 import { NavObjectsIcon } from '@/shell/sidebar/NavIcons';
 import { EmptyState } from '@/Function/shared/EmptyState';
 import { ListTable, type ListSection } from '@/ActivitySpace/execution/object/ListTable';
+import { ArchivedObjectsSection } from '@/ActivitySpace/execution/object/ArchivedObjects';
 
 // Objects are a flat list within the Domain.
 
@@ -86,7 +87,10 @@ export function ObjListView({
     // in the whole page.
     return (
       <div className="h-full flex flex-col overflow-hidden">
-        <ObjectsEmptyState />
+        <div className="flex-1 min-h-0">
+          <ObjectsEmptyState />
+        </div>
+        <ArchivedObjectsSection domainId={domainId} onOpen={onSelect} />
       </div>
     );
   }
@@ -128,6 +132,7 @@ export function ObjListView({
           selectedObjectIds={selectedObjectIds}
           onObjectRowSelect={handleObjectRowSelect}
         />
+        <ArchivedObjectsSection domainId={domainId} onOpen={onSelect} />
       </div>
 
     </div>

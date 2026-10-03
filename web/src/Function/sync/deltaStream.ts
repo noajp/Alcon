@@ -6,6 +6,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
 import { retainChannel } from '@/hooks/sharedRealtime';
+import { archiveStateChanged } from '@/Function/shared/objectArchive';
 import {
   type ExplorerData,
   patchElementInExplorer,
@@ -377,7 +378,17 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
     }
 
     case 'objects': {
+      invalidateSoon(qc, ['archived-objects']);
       if (d.type === 'UPDATE' && id) {
+        // Archiving or restoring moves the Object out of (or back into) the
+        // lists and its Elements out of the active reads: refetch, not patch.
+        const caches = qc.getQueriesData<ExplorerData>({ queryKey: ['explorer'] }).flatMap(([, data]) => data ? [data] : []);
+        if (archiveStateChanged(caches, id, (row as { archived_at?: string | null }).archived_at)) {
+          invalidateSoon(qc, ['explorer']);
+          invalidateSoon(qc, ['action-targets']);
+          invalidateSoon(qc, ['my-elements']);
+          return;
+        }
         forEachExplorer(qc, (data) => patchObjectInExplorer(data, id, row as Record<string, unknown>));
         return;
       }

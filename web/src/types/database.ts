@@ -294,6 +294,8 @@ export interface AlconObject {
   lead_id: string | null           // UUID FK → workers.id。Object の "Lead" (担当者)。List で編集可
   phase_id: string | null          // UUID FK → phases.id。所属 Phase (Linear の Cycle 相当、高々1つ)
   note_id: string | null           // Optional pinned Note (elements.note_id と同じ仕組み)
+  archived_at?: string | null      // 使わなくなった Object。一覧・ピッカーから外れ、id では開ける。サーバーが刻む
+  archived_by?: string | null      // アーカイブした人 (auth.users.id)
 }
 
 export interface AlconObjectInsert {

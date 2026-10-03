@@ -17,6 +17,9 @@ import { updateObject, usePhases, useObjectMilestones } from '@/hooks/useSupabas
 import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from '@/ActivitySpace/execution/object/ObjectDetailView';
 import { ObjectActionsMenu } from '@/ActivitySpace/execution/object/ObjectActionsMenu';
+import { ArchivedObjectBanner } from '@/ActivitySpace/execution/object/ArchivedObjects';
+import { isArchivedObject } from '@/Function/shared/objectArchive';
+import { useObjectById } from '@/hooks/useObjectArchive';
 import { ObjListView, findObjectInExplorerData, collectAllElements } from '@/ActivitySpace/execution/object/ObjectsView';
 import {
   ListControls,
@@ -138,9 +141,13 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
     setObjectActiveType('overview');
   }, [navigation.objectId]);
 
-  const selectedObject = navigation.objectId
+  const listedObject = navigation.objectId
     ? findObjectInExplorerData(explorerData, navigation.objectId)
     : null;
+  // Lists leave archived Objects out; an Object opened by id (a link, search,
+  // the Archived list) is read on its own.
+  const byId = useObjectById(navigation.objectId && !listedObject ? navigation.objectId : null);
+  const selectedObject = listedObject ?? byId.object;
 
   const fieldQuery = useQuery({
     queryKey: ['custom-columns', 'object', selectedObject?.id ?? ''],
@@ -237,12 +244,12 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
 
   const activeTabId = tabs.find(t => t.tab_type === effectiveActiveType)?.id ?? tabs[0].id;
 
-  // Stale objectId guard — clear if the Object no longer exists in the active Domain
+  // Stale objectId guard — clear once neither the list nor a read by id finds the Object
   useEffect(() => {
-    if (navigation.objectId && !selectedObject) {
+    if (navigation.objectId && !selectedObject && byId.settled) {
       onNavigate({ objectId: null });
     }
-  }, [navigation.objectId, selectedObject, onNavigate]);
+  }, [navigation.objectId, selectedObject, byId.settled, onNavigate]);
 
   const allDomainElements = useMemo(
     () => [...collectAllElements(explorerData.objects), ...(explorerData.rootElements ?? [])],
@@ -366,6 +373,10 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
             </>
           }
         />
+      )}
+
+      {selectedObject && isArchivedObject(selectedObject) && !elementDetailOpen && (
+        <ArchivedObjectBanner object={selectedObject} />
       )}
 
       {selectedObject ? (

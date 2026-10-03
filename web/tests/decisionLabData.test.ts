@@ -15,6 +15,7 @@ vi.mock('@/lib/supabase', () => ({
         select: () => query,
         eq(column: string, value: unknown) { filters.push((row) => row[column] === value); return query; },
         in(column: string, values: unknown[]) { filters.push((row) => values.includes(row[column])); return query; },
+        is(column: string, value: unknown) { filters.push((row) => (row[column] ?? null) === value); return query; },
         order: () => query,
         range(from: number, to: number) { start = from; end = to; return query; },
         abortSignal: () => query,

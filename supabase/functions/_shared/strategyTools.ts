@@ -72,7 +72,7 @@ export async function runStrategyTool(
         if (intents.error) throw intents.error;
         const objectIds = (links.data ?? []).map((l: { object_id: string }) => l.object_id);
         const objects = objectIds.length
-          ? (await supabase.from("objects").select("id, name, prefix, domain_id").in("id", objectIds)).data ?? []
+          ? (await supabase.from("objects").select("id, name, prefix, domain_id").in("id", objectIds).is("archived_at", null)).data ?? []
           : [];
         return {
           ok: true,

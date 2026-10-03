@@ -835,3 +835,62 @@ Object.assign(ja, { 'You can create an Object only in a Domain you can see.': 'O
 Object.assign(ko, { 'You can create an Object only in a Domain you can see.': 'Object는 내가 볼 수 있는 Domain 안에서만 만들 수 있습니다.' });
 Object.assign(fr, { 'You can create an Object only in a Domain you can see.': 'Vous ne pouvez créer un Object que dans un Domain que vous pouvez voir.' });
 Object.assign(es, { 'You can create an Object only in a Domain you can see.': 'Solo puedes crear un Object en un Domain que puedas ver.' });
+
+// Objects no longer in use are archived; a Domain with Objects cannot be
+// deleted.
+Object.assign(ja, {
+  'Archive': 'アーカイブ', 'Restore': '元に戻す', 'Archived': 'アーカイブ済み', 'Archived ({count})': 'アーカイブ済み（{count}）',
+  'Archive "{name}"? It leaves lists and pickers, and its Elements leave My Elements. Its data stays, and it can be restored from the Domain’s Archived list.': '「{name}」をアーカイブしますか？一覧やピッカーに表示されなくなり、その Element も My Elements から外れます。データは残り、Domain のアーカイブ済みの一覧から元に戻せます。',
+  'This Object was archived on {date}. It is hidden from lists and pickers.': 'この Object は {date} にアーカイブされました。一覧やピッカーには表示されません。',
+  'This Object is archived. It is hidden from lists and pickers.': 'この Object はアーカイブされています。一覧やピッカーには表示されません。',
+  'The Object could not be archived. Try again.': 'Object をアーカイブできませんでした。もう一度お試しください。',
+  'The Object could not be restored. Try again.': 'Object を元に戻せませんでした。もう一度お試しください。',
+  'Only owners or admins of this Object’s Domain can archive or restore it.': 'この Object をアーカイブしたり元に戻したりできるのは、その Domain のオーナーか admin だけです。',
+  'This Domain still has {count} Objects, including archived ones. Move them to another Domain or delete them first.': 'この Domain にはまだ Object が {count} 件あります（アーカイブ済みを含む）。先に別の Domain へ移すか、削除してください。',
+  'The Domain could not be deleted. Try again.': 'Domain を削除できませんでした。もう一度お試しください。',
+  'Its members, Phases, and templates are deleted. Tables stay but are no longer in any Domain. This can’t be undone.': 'メンバー・Phase・テンプレートは削除されます。Table は残りますが、どの Domain にも属さなくなります。元に戻せません。',
+  'Delete Domain': 'Domain を削除',
+  'Permanently delete this Domain for every member. Move or delete its Objects first.': 'この Domain を全メンバーから完全に削除します。先に中の Object を移すか削除してください。',
+});
+Object.assign(ko, {
+  'Archive': '보관', 'Restore': '복원', 'Archived': '보관됨', 'Archived ({count})': '보관됨 ({count})',
+  'Archive "{name}"? It leaves lists and pickers, and its Elements leave My Elements. Its data stays, and it can be restored from the Domain’s Archived list.': '"{name}"을(를) 보관할까요? 목록과 선택기에서 사라지고, 그 Element도 My Elements에서 빠집니다. 데이터는 남으며 Domain의 보관됨 목록에서 복원할 수 있습니다.',
+  'This Object was archived on {date}. It is hidden from lists and pickers.': '이 Object는 {date}에 보관되었습니다. 목록과 선택기에는 표시되지 않습니다.',
+  'This Object is archived. It is hidden from lists and pickers.': '이 Object는 보관되었습니다. 목록과 선택기에는 표시되지 않습니다.',
+  'The Object could not be archived. Try again.': 'Object를 보관하지 못했습니다. 다시 시도하세요.',
+  'The Object could not be restored. Try again.': 'Object를 복원하지 못했습니다. 다시 시도하세요.',
+  'Only owners or admins of this Object’s Domain can archive or restore it.': '이 Object를 보관하거나 복원할 수 있는 사람은 그 Domain의 소유자나 admin뿐입니다.',
+  'This Domain still has {count} Objects, including archived ones. Move them to another Domain or delete them first.': '이 Domain에는 아직 Object가 {count}개 있습니다(보관된 것 포함). 먼저 다른 Domain으로 옮기거나 삭제하세요.',
+  'The Domain could not be deleted. Try again.': 'Domain을 삭제하지 못했습니다. 다시 시도하세요.',
+  'Its members, Phases, and templates are deleted. Tables stay but are no longer in any Domain. This can’t be undone.': '멤버, Phase, 템플릿이 삭제됩니다. Table은 남지만 어느 Domain에도 속하지 않게 됩니다. 되돌릴 수 없습니다.',
+  'Delete Domain': 'Domain 삭제',
+  'Permanently delete this Domain for every member. Move or delete its Objects first.': '모든 멤버에게서 이 Domain을 영구 삭제합니다. 먼저 안의 Object를 옮기거나 삭제하세요.',
+});
+Object.assign(fr, {
+  'Archive': 'Archiver', 'Restore': 'Restaurer', 'Archived': 'Archivé', 'Archived ({count})': 'Archivés ({count})',
+  'Archive "{name}"? It leaves lists and pickers, and its Elements leave My Elements. Its data stays, and it can be restored from the Domain’s Archived list.': 'Archiver « {name} » ? Il disparaît des listes et des sélecteurs, et ses Elements quittent My Elements. Ses données restent, et il peut être restauré depuis la liste des archivés du Domain.',
+  'This Object was archived on {date}. It is hidden from lists and pickers.': 'Cet Object a été archivé le {date}. Il n’apparaît plus dans les listes ni les sélecteurs.',
+  'This Object is archived. It is hidden from lists and pickers.': 'Cet Object est archivé. Il n’apparaît plus dans les listes ni les sélecteurs.',
+  'The Object could not be archived. Try again.': 'Impossible d’archiver l’Object. Réessayez.',
+  'The Object could not be restored. Try again.': 'Impossible de restaurer l’Object. Réessayez.',
+  'Only owners or admins of this Object’s Domain can archive or restore it.': 'Seuls les propriétaires ou admins du Domain de cet Object peuvent l’archiver ou le restaurer.',
+  'This Domain still has {count} Objects, including archived ones. Move them to another Domain or delete them first.': 'Ce Domain contient encore {count} Objects, archivés compris. Déplacez-les vers un autre Domain ou supprimez-les d’abord.',
+  'The Domain could not be deleted. Try again.': 'Impossible de supprimer le Domain. Réessayez.',
+  'Its members, Phases, and templates are deleted. Tables stay but are no longer in any Domain. This can’t be undone.': 'Ses membres, Phases et modèles sont supprimés. Les Tables restent mais n’appartiennent plus à aucun Domain. Cette action est irréversible.',
+  'Delete Domain': 'Supprimer le Domain',
+  'Permanently delete this Domain for every member. Move or delete its Objects first.': 'Supprimer définitivement ce Domain pour tous les membres. Déplacez ou supprimez d’abord ses Objects.',
+});
+Object.assign(es, {
+  'Archive': 'Archivar', 'Restore': 'Restaurar', 'Archived': 'Archivado', 'Archived ({count})': 'Archivados ({count})',
+  'Archive "{name}"? It leaves lists and pickers, and its Elements leave My Elements. Its data stays, and it can be restored from the Domain’s Archived list.': '¿Archivar «{name}»? Deja de aparecer en listas y selectores, y sus Elements salen de My Elements. Sus datos se conservan y puede restaurarse desde la lista de archivados del Domain.',
+  'This Object was archived on {date}. It is hidden from lists and pickers.': 'Este Object se archivó el {date}. No aparece en listas ni selectores.',
+  'This Object is archived. It is hidden from lists and pickers.': 'Este Object está archivado. No aparece en listas ni selectores.',
+  'The Object could not be archived. Try again.': 'No se pudo archivar el Object. Inténtalo de nuevo.',
+  'The Object could not be restored. Try again.': 'No se pudo restaurar el Object. Inténtalo de nuevo.',
+  'Only owners or admins of this Object’s Domain can archive or restore it.': 'Solo los propietarios o admins del Domain de este Object pueden archivarlo o restaurarlo.',
+  'This Domain still has {count} Objects, including archived ones. Move them to another Domain or delete them first.': 'Este Domain aún tiene {count} Objects, incluidos los archivados. Muévelos a otro Domain o elimínalos primero.',
+  'The Domain could not be deleted. Try again.': 'No se pudo eliminar el Domain. Inténtalo de nuevo.',
+  'Its members, Phases, and templates are deleted. Tables stay but are no longer in any Domain. This can’t be undone.': 'Se eliminan sus miembros, Phases y plantillas. Las Tables se conservan, pero ya no pertenecen a ningún Domain. No se puede deshacer.',
+  'Delete Domain': 'Eliminar Domain',
+  'Permanently delete this Domain for every member. Move or delete its Objects first.': 'Elimina este Domain de forma permanente para todos los miembros. Primero mueve o elimina sus Objects.',
+});
