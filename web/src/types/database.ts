@@ -163,10 +163,6 @@ export interface ActivitySpace {
   identifier: string | null  // optional short slug
   color: string | null
   logo: string | null
-  vision: string | null      // Strategy > Vision — what the Space aims for, in one statement
-  vision_horizon: string | null      // 'YYYY-MM-DD' — by when
-  vision_narrative: string | null    // why this, and what changes
-  vision_conditions: string[]        // how the Space will know it got there
   order_index: number | null
   created_by: string | null
   created_at: string | null
@@ -188,10 +184,6 @@ export interface ActivitySpaceUpdate {
   color?: string | null
   logo?: string | null
   order_index?: number | null
-  vision?: string | null
-  vision_horizon?: string | null
-  vision_narrative?: string | null
-  vision_conditions?: string[]
 }
 
 export interface ActivitySpaceMember {
@@ -1388,16 +1380,51 @@ export interface Strategy {
   color: string | null
   icon: string | null
   portfolio_id: string | null  // Strategy > Portfolio the Initiative belongs to (at most one)
+  vision_id: string | null     // Strategy > Vision the Initiative works toward
   created_by: string | null
   created_at: string
   updated_at: string
 }
 
-// Strategy > Portfolio — a named bundle of Initiatives within an Activity
-// Space. An Initiative belongs to at most one Portfolio (strategies.portfolio_id).
+// Strategy > Vision — what a Space aims for. A Space holds any number of
+// Visions; Portfolios and Initiatives hang under one, the way Objects and
+// Elements hang under a Domain.
+export interface Vision {
+  id: string
+  activity_space_id: string
+  name: string
+  statement: string | null    // the aim, in one statement
+  horizon: string | null      // 'YYYY-MM-DD' — by when
+  narrative: string | null    // why this, and what changes
+  conditions: string[]        // how the Space will know it got there
+  order_index: number
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+export interface VisionInsert {
+  id?: string
+  activity_space_id: string
+  name: string
+  statement?: string | null
+  order_index?: number
+}
+export interface VisionUpdate {
+  name?: string
+  statement?: string | null
+  horizon?: string | null
+  narrative?: string | null
+  conditions?: string[]
+  order_index?: number
+}
+
+// Strategy > Portfolio — a named bundle of Initiatives under a Vision;
+// Portfolios nest. An Initiative belongs to at most one Portfolio
+// (strategies.portfolio_id).
 export interface Portfolio {
   id: string
   activity_space_id: string
+  vision_id: string | null   // the Vision it works toward
   parent_id: string | null   // the Portfolio this one nests in; null = top level
   name: string
   description: string | null
@@ -1409,6 +1436,7 @@ export interface Portfolio {
 export interface PortfolioInsert {
   id?: string
   activity_space_id: string
+  vision_id?: string | null
   parent_id?: string | null
   name: string
   description?: string | null
@@ -1430,6 +1458,7 @@ export interface StrategyInsert {
   color?: string | null
   icon?: string | null
   portfolio_id?: string | null
+  vision_id?: string | null
   created_by?: string | null
 }
 
@@ -1441,6 +1470,7 @@ export interface StrategyUpdate {
   color?: string | null
   icon?: string | null
   portfolio_id?: string | null
+  vision_id?: string | null
   updated_at?: string
 }
 
@@ -2018,6 +2048,11 @@ export interface Database {
         Row: Strategy
         Insert: StrategyInsert
         Update: StrategyUpdate
+      }
+      visions: {
+        Row: Vision
+        Insert: VisionInsert
+        Update: VisionUpdate
       }
       portfolios: {
         Row: Portfolio

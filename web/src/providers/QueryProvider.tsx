@@ -36,7 +36,7 @@ const persister = createAsyncStoragePersister({
 // keystroke — persisting them grows the store without ever serving a paint.
 const PERSISTED_ROOTS = new Set([
   'explorer', 'domains', 'my-space-ids', 'spaces', 'my-elements',
-  'strategies', 'portfolios', 'phases', 'workers', 'element-templates',
+  'strategies', 'portfolios', 'visions', 'phases', 'workers', 'element-templates',
 ]);
 function shouldDehydrateQuery(query: Query): boolean {
   return defaultShouldDehydrateQuery(query) && PERSISTED_ROOTS.has(String(query.queryKey[0]));

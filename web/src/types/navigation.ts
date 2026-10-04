@@ -48,6 +48,11 @@ export interface NavigationState {
   portfolioCreate?: boolean | null;
   /** Portfolio open on the Portfolio page; null = the tree. */
   portfolioId?: string | null;
+  /** The Vision the Strategy pages show (its Portfolios, its Initiatives);
+   *  null = the Space's first Vision. */
+  visionId?: string | null;
+  /** The sidebar's "+" asked for a new Vision. */
+  visionCreate?: boolean | null;
   /** What the Home main island is showing, when on the Home view. A pinned
    *  item's content renders in place (no layer/view switch) instead of the
    *  welcome. null = the welcome landing. */

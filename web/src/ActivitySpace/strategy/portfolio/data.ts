@@ -85,14 +85,16 @@ export class PortfolioMoveRefused extends Error {
   constructor() { super('portfolio move refused'); this.name = 'PortfolioMoveRefused'; }
 }
 
-/** Moves an Initiative into a Portfolio (or out of every Portfolio with null).
+/** Moves an Initiative into a Portfolio — and with it into the Portfolio's
+ *  Vision — or out of its Portfolio with null (it stays under its Vision).
  *  The write is on the Initiative, so only its creator can; a refused move
  *  updates nothing and is reported as PortfolioMoveRefused rather than as a
  *  raw "no rows" error. */
-export async function setStrategyPortfolio(strategyId: string, portfolioId: string | null): Promise<void> {
+export async function setStrategyPortfolio(strategyId: string, portfolio: { id: string; vision_id: string | null } | null): Promise<void> {
+  const patch = portfolio ? { portfolio_id: portfolio.id, vision_id: portfolio.vision_id } : { portfolio_id: null };
   const { data, error } = await supabase
     .from('strategies')
-    .update({ portfolio_id: portfolioId, updated_at: new Date().toISOString() })
+    .update({ ...patch, updated_at: new Date().toISOString() })
     .eq('id', strategyId)
     .select('id');
   if (error) throw error;

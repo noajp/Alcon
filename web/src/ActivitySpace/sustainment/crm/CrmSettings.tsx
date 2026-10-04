@@ -8,7 +8,7 @@ import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 import { useStrategies } from '@/ActivitySpace/strategy/initiative/strategyData';
 import { useInitiativeMeasures } from '@/hooks/useInitiativeMeasures';
 import type { Crm } from '@/hooks/useCrm';
-import { fieldKey, fieldOptions, metricValue, normalizeCrmStages, stageSlug, type CrmFieldRecord, type CrmMetric, type CrmStage } from './crmModel';
+import { fieldKey, fieldOptions, measureValue, metricKind, metricValue, normalizeCrmStages, readUnit, stageSlug, type CrmFieldRecord, type CrmMetric, type CrmStage } from './crmModel';
 import { money } from './crmFormat';
 import { CrmPicker } from './CrmPicker';
 
@@ -95,6 +95,7 @@ function Stages({ crm }: { crm: Crm }) {
 }
 
 const METRICS: { id: CrmMetric; label: string }[] = [
+  { id: 'won_count_quarter', label: 'Deals won this quarter' }, { id: 'won_count_year', label: 'Deals won this year' }, { id: 'won_count_total', label: 'Deals won to date' },
   { id: 'won_quarter', label: 'Won this quarter' }, { id: 'won_year', label: 'Won this year' }, { id: 'won_total', label: 'Won to date' },
   { id: 'weighted', label: 'Weighted pipeline' }, { id: 'open', label: 'Open pipeline' },
 ];
@@ -108,6 +109,16 @@ function Connections({ crm }: { crm: Crm }) {
   const names = new Map(strategies.data.map(item => [item.id, item.name]));
   const metric = pipeline.measure_metric ?? 'won_quarter';
   const value = crm.workspace ? metricValue(crm.workspace.deals, metric, pipeline.currency, crm.today) : null;
+  const linked = measures.find(measure => measure.id === pipeline.measure_intent_id);
+  const written = value === null ? null : measureValue(linked?.unit, metric, pipeline.currency, value);
+  const unit = readUnit(linked?.unit);
+  // Why nothing would be written, in the person's terms.
+  const mismatch = !linked || written !== null || value === null ? null
+    : unit.kind === 'rate' ? t('“{unit}” is a rate or a per-period figure; the CRM cannot write into it.', { unit: linked.unit ?? '' })
+    : unit.kind === 'unknown' ? t('Alcon cannot tell whether “{unit}” is money or a count. Use a currency (円, JPY) or a count (社, 件) as the unit.', { unit: linked.unit ?? '' })
+    : unit.kind === 'money' && metricKind(metric) === 'amount' ? t('This success condition is in {currency}; this pipeline reports in {pipeline}.', { currency: unit.currency, pipeline: pipeline.currency })
+    : unit.kind === 'count' ? t('This success condition counts “{unit}”. Choose a number of deals won.', { unit: linked.unit ?? '' })
+    : t('This success condition is an amount. Choose an amount won or in the pipeline.');
   const [error, setError] = useState<string | null>(null);
   const save = (patch: Parameters<Crm['savePipeline']>[1]) => { setError(null); crm.savePipeline(pipeline.id, patch).catch(cause => setError(message(cause))); };
   return <Section title={t('Connections')} description={t('How this pipeline meets Execution and Strategy. Next steps become Elements in the Object you choose, assigned to each deal’s owner. The figure you choose is written into an Initiative’s success condition when its owner opens the CRM.')}>
@@ -126,7 +137,8 @@ function Connections({ crm }: { crm: Crm }) {
             onClick={() => save({ measure_metric: item.id })}>{t(item.label)}</Button>)}</div>
         </>}
       </div>
-      {pipeline.measure_intent_id && value !== null && <p className="text-xs text-muted-foreground">{t('Currently reporting {value}.', { value: money(value, pipeline.currency, locale) })}</p>}
+      {pipeline.measure_intent_id && mismatch && <p role="alert" className="text-xs text-[var(--status-warning)]">{mismatch} {t('Nothing is written until they match.')}</p>}
+      {pipeline.measure_intent_id && linked && written !== null && <p className="text-xs text-muted-foreground">{t('Currently reporting {value}.', { value: unit.kind === 'money' || unit.kind === 'count' ? `${written.toLocaleString(locale)} ${linked?.unit ?? ''}`.trim() : metricKind(metric) === 'count' ? String(written) : money(written, pipeline.currency, locale) })}</p>}
       {crm.measureError && <p role="alert" className="text-xs text-[var(--status-danger)]">{t(crm.measureError)}</p>}
       {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{error}</p>}
     </div>

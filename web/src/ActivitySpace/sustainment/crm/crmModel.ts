@@ -43,7 +43,47 @@ export const stageSlug = (label: string) => label.trim().toLowerCase().replace(/
 
 // ── Stored records ──────────────────────────────────────────────────────────
 
-export type CrmMetric = 'won_quarter' | 'won_year' | 'won_total' | 'weighted' | 'open';
+export type CrmMetric = 'won_quarter' | 'won_year' | 'won_total' | 'weighted' | 'open' | 'won_count_quarter' | 'won_count_year' | 'won_count_total';
+
+/** Amount metrics report money in the pipeline's currency; count metrics report how many deals. */
+export const metricKind = (metric: CrmMetric): 'amount' | 'count' => metric.startsWith('won_count') ? 'count' : 'amount';
+
+const SYMBOLS: [RegExp, string][] = [[/^(円|¥|JPY)$/, 'JPY'], [/^(\$|US\$|ドル|USD)$/, 'USD'], [/^(€|ユーロ|EUR)$/, 'EUR'], [/^(£|ポンド|GBP)$/, 'GBP'], [/^(元|CNY|RMB)$/, 'CNY'], [/^(₩|ウォン|KRW)$/, 'KRW']];
+const SCALES: [string, number][] = [['百万', 1e6], ['千', 1e3], ['万', 1e4], ['億', 1e8]];
+const ISO = (() => {
+  try { return new Set((Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.('currency') ?? []); } catch { return new Set<string>(); }
+})();
+
+/** Reads a success condition's unit: money (in which currency, at what scale),
+ * a count, a rate or per-period figure, or something it cannot tell. Only a
+ * plain unit (社, 件, 人, pcs) is a count; a unit that mentions money or a
+ * scale without being fully understood is "unknown" and is never written. */
+export function readUnit(unit: string | null | undefined): { kind: 'any' } | { kind: 'money'; currency: string; scale: number } | { kind: 'count' } | { kind: 'rate' } | { kind: 'unknown' } {
+  const value = (unit ?? '').normalize('NFKC').trim();
+  if (!value) return { kind: 'any' };
+  if (/[%‰/]|毎|per\b|率/i.test(value)) return { kind: 'rate' };
+  let rest = value;
+  let scale = 1;
+  for (const [prefix, factor] of SCALES) if (rest.startsWith(prefix) && rest.length > prefix.length) { scale = factor; rest = rest.slice(prefix.length); break; }
+  const symbol = SYMBOLS.find(([pattern]) => pattern.test(rest) || pattern.test(rest.toUpperCase()));
+  if (symbol) return { kind: 'money', currency: symbol[1], scale };
+  // ISO codes only as written in capitals: "cup" is a word, "CUP" a currency.
+  if (/^[A-Z]{3}$/.test(rest) && (ISO.size ? ISO.has(rest) : ['JPY', 'USD', 'EUR', 'GBP', 'CNY', 'KRW', 'AUD', 'CAD', 'CHF', 'SGD', 'HKD', 'TWD', 'INR'].includes(rest))) return { kind: 'money', currency: rest, scale };
+  const mentionsMoney = /円|¥|\$|€|£|₩|ドル|ユーロ|ポンド|ウォン|元|yen|dollar|euro|pound/i.test(value) || /\b[A-Z]{3}\b/.test(value);
+  const mentionsScale = /[十百千万億兆]|\d|^[kmb]$/i.test(value);
+  return mentionsMoney || mentionsScale || scale !== 1 ? { kind: 'unknown' } : { kind: 'count' };
+}
+
+/** Whether a figure may be written into a success condition, and the value to
+ * write: money only into the pipeline's own currency (scaled to 万円 etc.),
+ * counts only into count units. Anything else is not written. */
+export function measureValue(unit: string | null | undefined, metric: CrmMetric, currency: string, value: number): number | null {
+  const read = readUnit(unit);
+  if (read.kind === 'any') return value;
+  if (metricKind(metric) === 'count') return read.kind === 'count' ? value : null;
+  if (read.kind !== 'money' || read.currency !== currency.toUpperCase()) return null;
+  return Math.round(value / read.scale * 100) / 100;
+}
 
 export interface CrmPipelineRecord {
   id: string;
@@ -441,7 +481,13 @@ export function metricValue(deals: readonly CrmDeal[], metric: CrmMetric, curren
   const scoped = deals.filter(deal => deal.currency === currency && deal.amount !== null);
   const sum = (items: CrmDeal[], pick: (deal: CrmDeal) => number) => Math.round(items.reduce((total, deal) => total + pick(deal), 0) * 100) / 100;
   const won = scoped.filter(deal => deal.outcome === 'won');
+  // Counts include won deals in every currency and with no amount: a customer won is a customer won.
+  const wonAll = deals.filter(deal => deal.outcome === 'won');
+  const closed = (deal: CrmDeal) => deal.closedOn ?? deal.closeDate;
   switch (metric) {
+    case 'won_count_total': return wonAll.length;
+    case 'won_count_year': return wonAll.filter(deal => closed(deal)?.slice(0, 4) === year).length;
+    case 'won_count_quarter': return wonAll.filter(deal => inQuarter(closed(deal))).length;
     case 'won_total': return sum(won, deal => deal.amount!);
     case 'won_year': return sum(won.filter(deal => (deal.closedOn ?? deal.closeDate)?.slice(0, 4) === year), deal => deal.amount!);
     case 'won_quarter': return sum(won.filter(deal => inQuarter(deal.closedOn ?? deal.closeDate)), deal => deal.amount!);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, CornerDownRight, FolderInput, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { Popover, PopoverAnchor, PopoverTrigger } from '@/ui/popover';
@@ -21,6 +21,7 @@ import type { InitiativeHealth } from '@/ActivitySpace/strategy/initiative/initi
 import { NavPortfolioIcon, NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import type { Portfolio, StrategyWithObjects } from '@/types/database';
 import { createPortfolio, deletePortfolio, movePortfolio, PortfolioMoveRefused, setStrategyPortfolio, updatePortfolio, usePortfolios } from './data';
+import { resolveVision, useVisions } from '@/ActivitySpace/strategy/vision/data';
 import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 import {
   buildPortfolioTree, findNode, flattenTree, groupByPortfolio, initiativesInSpace, portfolioPath, rollupPortfolio, subtreeIds,
@@ -33,7 +34,11 @@ import {
 // the Portfolios inside it and its Initiatives with their health. An
 // Initiative sits in at most one Portfolio. Root Initiatives outside every
 // Portfolio are listed under the tree.
-export function PortfolioView({ activePortfolioId, createRequested, onCreateHandled, onSelectPortfolio, onSelectStrategy }: {
+export function PortfolioView({ visionId, activePortfolioId, createRequested, onCreateHandled, onSelectPortfolio, onSelectStrategy, onRequestVision }: {
+  /** The Vision whose Portfolios the page shows (null = the Space's first). */
+  visionId: string | null;
+  /** No Vision exists yet — the page asks for one first. */
+  onRequestVision: () => void;
   activePortfolioId: string | null;
   createRequested: boolean;
   onCreateHandled: () => void;
@@ -42,7 +47,11 @@ export function PortfolioView({ activePortfolioId, createRequested, onCreateHand
 }) {
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
-  const { data: portfolios, loading: portfoliosLoading, refetch } = usePortfolios(spaceId);
+  const { data: visions, loading: visionsLoading } = useVisions(spaceId);
+  const vision = resolveVision(visions, visionId);
+  const { data: allPortfolios, loading: portfoliosLoading, refetch } = usePortfolios(spaceId);
+  // Portfolios belong to a Vision: the page is one Vision's tree.
+  const portfolios = useMemo(() => allPortfolios.filter((p) => !!vision && p.vision_id === vision.id), [allPortfolios, vision]);
   const { data: allStrategies, loading: strategiesLoading } = useStrategies();
   // An Initiative reaches a Space through its Objects' Domains — the page
   // lists the ones with an Object in this Space (or none yet).
@@ -52,7 +61,11 @@ export function PortfolioView({ activePortfolioId, createRequested, onCreateHand
     const objectDomain = new Map<string, string | null>(explorer.objects.map((o) => [o.id, o.domain_id]));
     return initiativesInSpace(allStrategies, objectDomain, new Set(domains.map((d) => d.id)));
   }, [allStrategies, explorer.objects, domains]);
-  const { byPortfolio, unassigned } = useMemo(() => groupByPortfolio(portfolios, strategies), [portfolios, strategies]);
+  // Inside the Vision: its Initiatives by Portfolio, and the ones placed
+  // directly under the Vision.
+  const { byPortfolio, unassigned } = useMemo(
+    () => groupByPortfolio(portfolios, strategies.filter((s) => !!vision && s.vision_id === vision.id)),
+    [portfolios, strategies, vision]);
   const tree = useMemo(() => buildPortfolioTree(portfolios), [portfolios]);
   const roots = useMemo(() => strategies.filter((s) => s.parentIds.length === 0), [strategies]);
   const { byId: healthById } = useInitiativeHealth(roots);
@@ -62,9 +75,14 @@ export function PortfolioView({ activePortfolioId, createRequested, onCreateHand
   const [localNew, setLocalNew] = useState<{ parentId: string | null } | null>(null);
   const newParent = localNew ? localNew.parentId : createRequested ? null : undefined;
   const closeNew = () => { setLocalNew(null); if (createRequested) onCreateHandled(); };
+  // A request that arrives while the Space has no Vision cannot be served;
+  // clear it so the card does not appear later, unasked.
+  useEffect(() => {
+    if (createRequested && !visionsLoading && !vision) onCreateHandled();
+  }, [createRequested, visionsLoading, vision, onCreateHandled]);
 
   const open = activePortfolioId ? findNode(tree, activePortfolioId) : null;
-  const loading = portfoliosLoading || strategiesLoading;
+  const loading = portfoliosLoading || strategiesLoading || visionsLoading;
 
   return (
     <div className="flex flex-col h-full bg-card">
@@ -78,14 +96,22 @@ export function PortfolioView({ activePortfolioId, createRequested, onCreateHand
           <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
             <NavPortfolioIcon size={12} />
             <span className="text-[12px] font-semibold text-foreground">{t('Portfolio')}</span>
+            {vision && <span className="truncate text-[12px] text-muted-foreground">{vision.name}</span>}
             <div className="flex-1" />
-            <Button variant="ghost" size="icon-xs" className="text-muted-foreground" type="button"
-              onClick={() => setLocalNew({ parentId: null })} title={t('New Portfolio')} aria-label={t('New Portfolio')}>
-              <Plus size={14} />
-            </Button>
+            {vision && (
+              <Button variant="ghost" size="icon-xs" className="text-muted-foreground" type="button"
+                onClick={() => setLocalNew({ parentId: null })} title={t('New Portfolio')} aria-label={t('New Portfolio')}>
+                <Plus size={14} />
+              </Button>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto">
-            {loading ? null : portfolios.length === 0 ? (
+            {loading ? null : !vision ? (
+              <EmptyState icon={NavPortfolioIcon} title={t('Add a Vision first')}
+                description={t('Portfolios belong to a Vision, the way Objects belong to a Domain.')}
+                hint={t('A Space can hold several Visions.')}
+                cta={t('Create Vision')} onCta={onRequestVision} />
+            ) : portfolios.length === 0 && unassigned.length === 0 ? (
               <EmptyState icon={NavPortfolioIcon} title={t('Add Portfolios')}
                 description={t('A Portfolio bundles Initiatives that serve one part of the Vision, so the Strategy reads as a few bets instead of a long list.')}
                 hint={t('Portfolios nest, and an Initiative belongs to at most one Portfolio.')}
@@ -108,7 +134,7 @@ export function PortfolioView({ activePortfolioId, createRequested, onCreateHand
         </>
       )}
 
-      {newParent !== undefined && spaceId && (
+      {newParent !== undefined && spaceId && vision && (
         <QuickCreatePopup
           open
           icon={<NavPortfolioIcon size={12} />}
@@ -118,7 +144,7 @@ export function PortfolioView({ activePortfolioId, createRequested, onCreateHand
           onClose={closeNew}
           onSubmit={async ({ name, description }) => {
             await createPortfolio({
-              activity_space_id: spaceId, parent_id: newParent, name, description: description || null,
+              activity_space_id: spaceId, vision_id: vision.id, parent_id: newParent, name, description: description || null,
               order_index: portfolios.filter((p) => (p.parent_id ?? null) === newParent).length,
             });
             await refetch();
@@ -313,10 +339,10 @@ function PortfolioDetail({ node, portfolios, byPortfolio, healthById, candidates
   const [error, setError] = useState<string | null>(null);
   const q = query.trim().toLowerCase();
   const matches = candidates.filter((s) => !q || s.name.toLowerCase().includes(q));
-  const move = async (strategyId: string, portfolioId: string | null) => {
+  const move = async (strategyId: string, into: Portfolio | null) => {
     setPickerOpen(false);
     setError(null);
-    try { await setStrategyPortfolio(strategyId, portfolioId); }
+    try { await setStrategyPortfolio(strategyId, into); }
     catch (e) {
       setError(e instanceof PortfolioMoveRefused ? t("Only the Initiative's owner can move it.") : e instanceof Error ? e.message : t("Couldn't save"));
     }
@@ -386,7 +412,7 @@ function PortfolioDetail({ node, portfolios, byPortfolio, healthById, candidates
                   <CommandList>
                     <CommandEmpty>{t('No matches.')}</CommandEmpty>
                     {matches.map((s) => (
-                      <CommandItem key={s.id} value={`${s.name} ${s.id}`} onSelect={() => void move(s.id, portfolio.id)}>
+                      <CommandItem key={s.id} value={`${s.name} ${s.id}`} onSelect={() => void move(s.id, portfolio)}>
                         <NavStrategyIcon size={12} /><span className="flex-1 truncate">{s.name}</span>
                         {s.portfolio_id && <span className="text-[11px] text-muted-foreground">{t('In another Portfolio')}</span>}
                       </CommandItem>
