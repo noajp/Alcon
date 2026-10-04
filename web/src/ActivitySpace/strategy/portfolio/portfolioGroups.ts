@@ -7,7 +7,7 @@ import type { Portfolio } from '@/types/database';
 // Nested Initiatives (with a parent Initiative) belong to their parent, not
 // to a Portfolio, and are left out here.
 
-export interface PortfolioMember { id: string; name: string; portfolio_id: string | null; parentIds: string[]; objectIds: string[] }
+export interface PortfolioMember { id: string; name: string; portfolio_id: string | null; vision_id: string | null; parentIds: string[]; objectIds: string[] }
 
 /** Initiatives that belong on this Space's Portfolio page. An Initiative has
  *  no Space of its own — it reaches a Space through its Objects' Domains — so
@@ -139,4 +139,15 @@ export function rollupPortfolio<T extends { id: string }>(
   };
   walk(node);
   return { initiatives, progressPct: measured > 0 ? Math.round(measuredSum / measured) : null, alerts, pending };
+}
+
+/** Root Initiatives split by where they stand relative to a Vision: under
+ *  it, or under no Vision at all (still to be placed). Initiatives of other
+ *  Visions are neither. */
+export function initiativesOfVision<T extends PortfolioMember>(initiatives: T[], visionId: string): { inVision: T[]; unplaced: T[] } {
+  const roots = initiatives.filter((s) => s.parentIds.length === 0);
+  return {
+    inVision: roots.filter((s) => s.vision_id === visionId),
+    unplaced: roots.filter((s) => !s.vision_id),
+  };
 }

@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildPortfolioTree, flattenTree, groupByPortfolio, initiativesInSpace, portfolioPath, rollupPortfolio, subtreeIds,
+  buildPortfolioTree, flattenTree, groupByPortfolio, initiativesInSpace, initiativesOfVision, portfolioPath, rollupPortfolio, subtreeIds,
 } from '../src/ActivitySpace/strategy/portfolio/portfolioGroups';
 import type { Portfolio } from '../src/types/database';
 
 const p = (id: string, parent_id: string | null = null, order = 0): Portfolio => ({
-  id, activity_space_id: 'sp', parent_id, name: id, description: null, order_index: order,
+  id, activity_space_id: 'sp', vision_id: 'v', parent_id, name: id, description: null, order_index: order,
   created_by: 'u', created_at: `2026-09-18T00:00:0${order}Z`, updated_at: '2026-09-18T00:00:00Z',
 });
-const s = (id: string, portfolio_id: string | null, parentIds: string[] = [], objectIds: string[] = []) => ({ id, name: id, portfolio_id, parentIds, objectIds });
+const s = (id: string, portfolio_id: string | null, parentIds: string[] = [], objectIds: string[] = [], vision_id: string | null = null) => ({ id, name: id, portfolio_id, vision_id, parentIds, objectIds });
 
 describe('groupByPortfolio', () => {
   it('keys root Initiatives by Portfolio and lists the rest as unassigned', () => {
@@ -83,5 +83,15 @@ describe('rollupPortfolio', () => {
   it('counts Initiatives whose health has not arrived', () => {
     const tree = buildPortfolioTree([p('A')]);
     expect(rollupPortfolio(tree[0], new Map([['A', [s('i1', 'A')]]]), new Map())).toEqual({ initiatives: 1, progressPct: null, alerts: 0, pending: 1 });
+  });
+});
+
+describe('initiativesOfVision', () => {
+  it('splits root Initiatives into this Vision\'s and the unplaced, leaving other Visions\' out', () => {
+    const { inVision, unplaced } = initiativesOfVision(
+      [s('mine', null, [], [], 'v1'), s('other', null, [], [], 'v2'), s('loose', null, [], [], null), s('nested', null, ['mine'], [], 'v1')],
+      'v1');
+    expect(inVision.map((i) => i.id)).toEqual(['mine']);
+    expect(unplaced.map((i) => i.id)).toEqual(['loose']);
   });
 });

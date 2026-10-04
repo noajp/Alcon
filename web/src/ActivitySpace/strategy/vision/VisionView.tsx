@@ -5,31 +5,46 @@ import { useQuery } from '@tanstack/react-query';
 import { Plus, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/ui/button';
+import { Popover, PopoverTrigger } from '@/ui/popover';
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
+import { MenuShell } from '@/Function/shared/menu';
 import { DateField } from '@/Function/shared/date';
+import { EmptyState } from '@/Function/shared/EmptyState';
+import { QuickCreatePopup } from '@/Function/shared/QuickCreatePopup';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { fromDateOnlyString } from '@/Function/shared/dateUtils';
-import { useActivitySpaces, updateActivitySpace, useStrategies, useDomains, useObjects } from '@/hooks/useSupabase';
+import { useStrategies, useDomains, useObjects } from '@/hooks/useSupabase';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useCurrentUserId } from '@/providers/authContext';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useInitiativeHealth } from '@/ActivitySpace/strategy/initiative/useInitiativeHealth';
 import { usePortfolios } from '@/ActivitySpace/strategy/portfolio/data';
 import { buildPortfolioTree, groupByPortfolio, initiativesInSpace, rollupPortfolio } from '@/ActivitySpace/strategy/portfolio/portfolioGroups';
-import { NavPortfolioIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
-import type { ActivitySpace, ActivitySpaceUpdate } from '@/types/database';
+import { NavPortfolioIcon, NavStrategyIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
+import type { StrategyWithObjects, Vision, VisionUpdate } from '@/types/database';
+import { createVision, resolveVision, setStrategyVision, updateVision, useVisions } from './data';
 
-// Strategy > Vision — what the Space aims for, in the Space's own words:
-// one statement, by when, why, and how it will know it got there. Then the
-// Portfolios that work toward it, with what each adds up to. The Space
-// owner writes; every member reads. Each field saves on blur.
-export function VisionView({ onOpenPortfolio }: { onOpenPortfolio: (id: string) => void }) {
+// Strategy > Vision — what the Space aims for. A Space holds any number of
+// Visions, the way it holds Domains: each one has a name, the aim in one
+// statement, by when, why, and how the Space will know it got there; under
+// it sit its Portfolios and the Initiatives placed directly under it. A
+// Vision is edited by whoever wrote it or by a Space owner; every member
+// reads it. Each field saves on blur.
+export function VisionView({ visionId, createRequested, onCreateHandled, onSelectVision, onOpenPortfolio, onSelectStrategy }: {
+  visionId: string | null;
+  createRequested: boolean;
+  onCreateHandled: () => void;
+  onSelectVision: (id: string) => void;
+  onOpenPortfolio: (id: string) => void;
+  onSelectStrategy: (id: string) => void;
+}) {
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
   const userId = useCurrentUserId();
-  const { data: spaces, loading, refetch } = useActivitySpaces();
-  const space = spaces.find((s) => s.id === spaceId) ?? null;
+  const { data: visions, loading } = useVisions(spaceId);
+  const vision = resolveVision(visions, visionId);
 
-  // The viewer's seat in the Space: only an owner writes the Vision.
+  // The viewer's seat in the Space: an owner may edit any Vision.
   const role = useQuery({
     queryKey: ['space-role', spaceId, userId],
     queryFn: async () => {
@@ -44,22 +59,54 @@ export function VisionView({ onOpenPortfolio }: { onOpenPortfolio: (id: string) 
     },
     enabled: !!spaceId && !!userId,
   });
-  const isOwner = role.data === 'owner';
+  const canEdit = !!vision && (vision.created_by === userId || role.data === 'owner');
+
+  const [localNew, setLocalNew] = useState(false);
+  const newOpen = localNew || createRequested;
+  const closeNew = () => { setLocalNew(false); if (createRequested) onCreateHandled(); };
 
   return (
     <div className="flex flex-col h-full bg-card">
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
         <NavVisionIcon size={12} />
-        <span className="text-[12px] font-semibold text-foreground">{t('Vision')}</span>
+        <span className="truncate text-[12px] font-semibold text-foreground">{vision?.name ?? t('Vision')}</span>
+        <div className="flex-1" />
+        <Button variant="ghost" size="icon-xs" className="text-muted-foreground" type="button"
+          onClick={() => setLocalNew(true)} title={t('New Vision')} aria-label={t('New Vision')}>
+          <Plus size={14} />
+        </Button>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {loading || !space || role.isPending ? null : (
+        {loading || role.isPending ? null : !vision ? (
+          <EmptyState icon={NavVisionIcon} title={t('Add a Vision')}
+            description={t('A Vision says what this Space aims for. Portfolios and Initiatives hang under it, the way Objects and Elements hang under a Domain.')}
+            hint={t('A Space can hold several Visions.')}
+            cta={t('Create Vision')} onCta={() => setLocalNew(true)} />
+        ) : (
           <div className="mx-auto w-full max-w-2xl px-8 py-10">
-            <VisionFields key={space.id} space={space} canEdit={isOwner} onSaved={() => void refetch()} />
-            <PortfoliosTowardVision spaceId={space.id} onOpenPortfolio={onOpenPortfolio} />
+            <VisionFields key={vision.id} vision={vision} canEdit={canEdit} />
+            <PortfoliosTowardVision spaceId={vision.activity_space_id} visionId={vision.id} onOpenPortfolio={onOpenPortfolio} />
+            <DirectInitiatives visionId={vision.id} onSelectStrategy={onSelectStrategy} />
           </div>
         )}
       </div>
+
+      {newOpen && spaceId && (
+        <QuickCreatePopup
+          open
+          icon={<NavVisionIcon size={12} />}
+          contextLabel={t('New Vision')}
+          ariaLabel={t('New Vision')}
+          namePlaceholder={t('Vision name…')}
+          descriptionPlaceholder={t('The aim, in one statement…')}
+          onClose={closeNew}
+          onSubmit={async ({ name, description }) => {
+            const created = await createVision({ activity_space_id: spaceId, name, statement: description || null, order_index: visions.length });
+            closeNew();
+            onSelectVision(created.id);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -76,50 +123,51 @@ function normalizeConditions(value: unknown): string[] {
   return list.length === 0 ? NO_CONDITIONS : list;
 }
 
-function VisionFields({ space, canEdit, onSaved }: { space: ActivitySpace; canEdit: boolean; onSaved: () => void }) {
+function VisionFields({ vision, canEdit }: { vision: Vision; canEdit: boolean }) {
   const { t, locale } = useI18n();
   const [state, setState] = useState<SaveState>('idle');
   const [error, setError] = useState<string | null>(null);
-  const save = async (patch: ActivitySpaceUpdate) => {
+  const save = async (patch: VisionUpdate) => {
     setState('saving');
     try {
-      await updateActivitySpace(space.id, patch);
+      await updateVision(vision.id, patch);
       setState('saved');
-      onSaved();
     } catch (e) {
       setState('error');
       setError(e instanceof Error ? e.message : t("Couldn't save"));
     }
   };
-  const horizon = space.vision_horizon ?? null;
-  const conditions = useMemo(() => normalizeConditions(space.vision_conditions), [space.vision_conditions]);
+  const horizon = vision.horizon ?? null;
+  const conditions = useMemo(() => normalizeConditions(vision.conditions), [vision.conditions]);
 
   return (
     <div>
-      <p className="text-[12px] text-muted-foreground">{t('What {space} aims for', { space: space.name })}</p>
-      <TextBlock canEdit={canEdit} initial={space.vision ?? ''} label={t('Vision')}
+      <TextBlock canEdit={canEdit} initial={vision.name} label={t('Vision name')}
+        placeholder={t('Vision name…')} emptyText={vision.name}
+        className="text-[22px] font-semibold leading-8 tracking-tight" onCommit={(v) => { if (v) void save({ name: v }); }} />
+      <TextBlock canEdit={canEdit} initial={vision.statement ?? ''} label={t('Vision')}
         placeholder={t('Write the Vision — the future this Space works toward, in one statement.')}
-        emptyText={t('No Vision yet. The Space owner writes it here.')}
-        className="mt-3 text-[20px] leading-8" onCommit={(v) => save({ vision: v || null })} />
+        emptyText={t('No statement yet.')}
+        className="mt-2 text-[16px] leading-7" onCommit={(v) => save({ statement: v || null })} />
 
       <div className="mt-8 grid gap-6 sm:grid-cols-[140px_1fr]">
         <FieldLabel>{t('By when')}</FieldLabel>
         <div>
           {canEdit ? (
-            <DateField value={horizon} onChange={(v) => void save({ vision_horizon: v })} placeholder={t('Set a horizon')} aria-label={t('By when')} />
+            <DateField value={horizon} onChange={(v) => void save({ horizon: v })} placeholder={t('Set a horizon')} aria-label={t('By when')} />
           ) : (
             <span className="text-[13px] text-foreground">{horizon ? fromDateOnlyString(horizon)?.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' }) : <span className="text-muted-foreground">{t('No horizon yet')}</span>}</span>
           )}
         </div>
 
         <FieldLabel>{t('Why')}</FieldLabel>
-        <TextBlock canEdit={canEdit} initial={space.vision_narrative ?? ''} label={t('Why')}
+        <TextBlock canEdit={canEdit} initial={vision.narrative ?? ''} label={t('Why')}
           placeholder={t('Why this, and what changes when it is true.')}
           emptyText={t('Not written yet.')}
-          className="text-[13px] leading-6" onCommit={(v) => save({ vision_narrative: v || null })} />
+          className="text-[13px] leading-6" onCommit={(v) => save({ narrative: v || null })} />
 
         <FieldLabel>{t('We will know because')}</FieldLabel>
-        <ConditionsList canEdit={canEdit} initial={conditions} onCommit={(list) => save({ vision_conditions: list })} />
+        <ConditionsList canEdit={canEdit} initial={conditions} onCommit={(list) => save({ conditions: list })} />
       </div>
 
       <div className="mt-3 h-4 text-[11px] text-muted-foreground" role="status">
@@ -214,10 +262,9 @@ function ConditionsList({ canEdit, initial, onCommit }: { canEdit: boolean; init
   );
 }
 
-// The Portfolios that work toward the Vision, top level, with what each
-// adds up to. Same numbers as the Portfolio page.
-function PortfoliosTowardVision({ spaceId, onOpenPortfolio }: { spaceId: string; onOpenPortfolio: (id: string) => void }) {
-  const { t } = useI18n();
+// Shared read for the two sections below: the Space's Initiatives and their
+// health, the same numbers the Portfolio page shows.
+function useVisionScope(spaceId: string | null) {
   const { data: portfolios } = usePortfolios(spaceId);
   const { data: allStrategies } = useStrategies();
   const { data: domains } = useDomains();
@@ -228,12 +275,20 @@ function PortfoliosTowardVision({ spaceId, onOpenPortfolio }: { spaceId: string;
   }, [allStrategies, explorer.objects, domains]);
   const roots = useMemo(() => strategies.filter((s) => s.parentIds.length === 0), [strategies]);
   const { byId: healthById } = useInitiativeHealth(roots);
-  const { byPortfolio } = useMemo(() => groupByPortfolio(portfolios, strategies), [portfolios, strategies]);
+  return { portfolios, roots, healthById };
+}
+
+// The Portfolios under the Vision, top level, with what each adds up to.
+function PortfoliosTowardVision({ spaceId, visionId, onOpenPortfolio }: { spaceId: string; visionId: string; onOpenPortfolio: (id: string) => void }) {
+  const { t } = useI18n();
+  const { portfolios: all, roots, healthById } = useVisionScope(spaceId);
+  const portfolios = useMemo(() => all.filter((p) => p.vision_id === visionId), [all, visionId]);
+  const { byPortfolio } = useMemo(() => groupByPortfolio(portfolios, roots), [portfolios, roots]);
   const tree = useMemo(() => buildPortfolioTree(portfolios), [portfolios]);
   if (tree.length === 0) return null;
   return (
     <section className="mt-12">
-      <h2 className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Portfolios toward this Vision')}</h2>
+      <h2 className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Portfolios')}</h2>
       {tree.map((node) => {
         const r = rollupPortfolio(node, byPortfolio, healthById);
         return (
@@ -252,6 +307,66 @@ function PortfoliosTowardVision({ spaceId, onOpenPortfolio }: { spaceId: string;
           </div>
         );
       })}
+    </section>
+  );
+}
+
+// Initiatives placed directly under the Vision — in no Portfolio — and the
+// picker that brings one in from outside the Vision.
+function DirectInitiatives({ visionId, onSelectStrategy }: { visionId: string; onSelectStrategy: (id: string) => void }) {
+  const { t } = useI18n();
+  const spaceId = useActiveSpaceId();
+  const { roots, healthById } = useVisionScope(spaceId);
+  const direct = roots.filter((s) => s.vision_id === visionId && !s.portfolio_id);
+  const candidates = roots.filter((s) => s.vision_id !== visionId);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const q = query.trim().toLowerCase();
+  const move = async (s: StrategyWithObjects, to: string | null) => {
+    setOpen(false);
+    setError(null);
+    try { await setStrategyVision(s.id, to); }
+    catch (e) { setError(e instanceof Error ? e.message : t("Couldn't save")); }
+  };
+  return (
+    <section className="mt-10">
+      <h2 className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Initiatives')}</h2>
+      {direct.map((s) => {
+        const h = healthById.get(s.id);
+        return (
+          <div key={s.id} className="group flex min-w-0 items-center gap-1 rounded-md hover:bg-muted/40">
+            <Button variant="ghost" size="md" align="start" onClick={() => onSelectStrategy(s.id)} className="min-w-0 flex-1 gap-2.5 text-xs font-semibold text-foreground">
+              <NavStrategyIcon size={16} /><span className="truncate">{s.name}</span>
+            </Button>
+            {h?.progressPct != null && (
+              <span className="flex w-24 shrink-0 items-center gap-1.5 text-[11px] tabular-nums text-muted-foreground"><SegmentedProgress value={h.progressPct} className="flex-1" /><span className="w-7 text-right">{h.progressPct}%</span></span>
+            )}
+            <Button variant="ghost" size="icon-xs" onClick={() => void move(s, null)} className="mr-1 text-muted-foreground opacity-0 group-hover:opacity-100 focus:opacity-100"
+              aria-label={t('Remove from Vision')} title={t('Remove from Vision')}><X size={12} /></Button>
+          </div>
+        );
+      })}
+      <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setQuery(''); }}>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="sm" align="start" className="mt-1 text-muted-foreground"><Plus size={12} />{t('Add Initiative')}</Button>
+        </PopoverTrigger>
+        <MenuShell width="wide" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput value={query} onValueChange={setQuery} placeholder={t('Find an Initiative…')} />
+            <CommandList>
+              <CommandEmpty>{t('No matches.')}</CommandEmpty>
+              {candidates.filter((s) => !q || s.name.toLowerCase().includes(q)).map((s) => (
+                <CommandItem key={s.id} value={`${s.name} ${s.id}`} onSelect={() => void move(s, visionId)}>
+                  <NavStrategyIcon size={12} /><span className="flex-1 truncate">{s.name}</span>
+                  {s.vision_id && <span className="text-[11px] text-muted-foreground">{t('In another Vision')}</span>}
+                </CommandItem>
+              ))}
+            </CommandList>
+          </Command>
+        </MenuShell>
+      </Popover>
+      {error && <div className="px-2 py-1 text-[11px] text-destructive">{error}</div>}
     </section>
   );
 }
