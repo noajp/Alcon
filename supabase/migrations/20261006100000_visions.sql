@@ -35,7 +35,8 @@ begin
   drop policy if exists visions_update on public.visions;
   create policy visions_update on public.visions for update to authenticated
     using (created_by = auth.uid() or public.is_activity_space_owner(activity_space_id))
-    with check (created_by = auth.uid() or public.is_activity_space_owner(activity_space_id));
+    with check ((created_by = auth.uid() or public.is_activity_space_owner(activity_space_id))
+                and public.is_activity_space_member(activity_space_id));
   drop policy if exists visions_delete on public.visions;
   create policy visions_delete on public.visions for delete to authenticated
     using (created_by = auth.uid() or public.is_activity_space_owner(activity_space_id));
@@ -127,11 +128,15 @@ begin
 end;
 $$;
 
--- When a Portfolio's Vision changes, everything under it follows: the
--- Portfolios nested in it and the Initiatives it holds.
+-- When a Portfolio's Vision changes — by a write to vision_id, or because
+-- it was nested under a parent in another Vision — everything under it
+-- follows: the Portfolios nested in it and the Initiatives it holds. It runs
+-- as definer so Initiatives written by someone else follow too; the caller
+-- has already been allowed to change the Portfolio.
 create or replace function public.propagate_portfolio_vision()
 returns trigger
 language plpgsql
+security definer
 set search_path = public, pg_catalog
 as $$
 begin
@@ -180,7 +185,7 @@ begin
     for each row execute function public.guard_portfolio_parent();
   drop trigger if exists portfolios_propagate_vision on public.portfolios;
   create trigger portfolios_propagate_vision
-    after update of vision_id on public.portfolios
+    after update of vision_id, parent_id on public.portfolios
     for each row execute function public.propagate_portfolio_vision();
   if to_regclass('public.strategies') is not null then
     drop trigger if exists strategies_guard_vision on public.strategies;
