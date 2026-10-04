@@ -5,6 +5,7 @@ import { ArrowRight, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
 import { DateField } from '@/Function/shared/date';
+import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { ScmActions, ScmData, ScmItemDraft, ScmSupplierDraft } from '@/hooks/useScm';
 import { addDays, type ScmItem, type ScmNode, type ScmPoStatus } from './scmEngine';
@@ -52,11 +53,12 @@ function Select({ value, onChange, options, label, disabled }: { value: string; 
   </select>;
 }
 
-function Footer({ busy, error, onClose, submit }: { busy: boolean; error: string | null; onClose: () => void; submit: string }) {
+function Footer({ busy, error, onClose, submit, extra }: { busy: boolean; error: string | null; onClose: () => void; submit: string; extra?: ReactNode }) {
   const { t } = useI18n();
   return <>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    <div className="flex justify-end gap-2 pt-1">
+    <div className="flex flex-wrap justify-end gap-2 pt-1">
+      {extra && <div className="mr-auto flex flex-wrap gap-2">{extra}</div>}
       <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>{t('Cancel')}</Button>
       <Button type="submit" variant="primary" disabled={busy}>{busy ? t('Saving…') : submit}</Button>
     </div>
@@ -120,7 +122,11 @@ export function ItemDialog({ data, actions, item, onClose }: { data: ScmData; ac
         <Field label={t('Opening stock at')}><Select label={t('Opening stock at')} value={form.openingLocation} onChange={set('openingLocation')} options={data.locations.map(location => ({ id: location.id, label: location.name }))} /></Field>
         <Field label={t('Opening quantity')}><input inputMode="decimal" className={SCM_INPUT} value={form.opening} onChange={event => set('opening')(event.target.value)} /></Field>
       </div>}
-      <Footer busy={busy} error={error} onClose={onClose} submit={item ? t('Save') : t('Add item')} />
+      <Footer busy={busy} error={error} onClose={onClose} submit={item ? t('Save') : t('Add item')} extra={item && <>
+        <Button type="button" variant="ghost" disabled={busy} onClick={() => void run(() => actions.setItemActive(item.id, !item.active))}>{item.active ? t('Archive') : t('Restore')}</Button>
+        <Button type="button" variant="danger" disabled={busy} onClick={() => void (async () => { if (await appDialog.confirm(t('Delete {name}? Only an item with no stock history or orders can be deleted.', { name: item.name }))) await run(() => actions.deleteItem(item.id)); })()}>{t('Delete')}</Button>
+      </>} />
+      {item && <p className="text-[11px] text-muted-foreground">{t('Archived items leave the plan and keep their history. An item with stock history or orders cannot be deleted; archive it instead.')}</p>}
     </form>
   </FormDialog>;
 }
@@ -152,7 +158,8 @@ export function SupplierDialog({ data, actions, supplierId, onClose }: { data: S
         <Field label={t('Currency')}><input maxLength={3} className={SCM_INPUT} value={form.currency} onChange={event => set('currency')(event.target.value.toUpperCase())} /></Field>
         <div className="sm:col-span-2"><Field label={t('Remarks')}><textarea rows={2} className={`${SCM_INPUT} h-auto py-1.5`} value={form.notes} onChange={event => set('notes')(event.target.value)} /></Field></div>
       </div>
-      <Footer busy={busy} error={error} onClose={onClose} submit={supplier ? t('Save') : t('Add supplier')} />
+      <Footer busy={busy} error={error} onClose={onClose} submit={supplier ? t('Save') : t('Add supplier')} extra={supplier &&
+        <Button type="button" variant="danger" disabled={busy} onClick={() => void (async () => { if (await appDialog.confirm(t('Delete {name}? A supplier with purchase orders is kept for their history and cannot be deleted.', { name: supplier.name }))) await run(() => actions.deleteSupplier(supplier.id)); })()}>{t('Delete')}</Button>} />
     </form>
   </FormDialog>;
 }
@@ -287,12 +294,33 @@ export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { d
   const [receiving, setReceiving] = useState<Record<string, string> | null>(null);
   const [receivedOn, setReceivedOn] = useState(data.today);
   const [expectedOn, setExpectedOn] = useState(order?.expectedOn ?? data.today);
+  /** Line quantities being edited (by line id) and lines being added. */
+  const [editing, setEditing] = useState<Record<string, string> | null>(null);
+  const [adding, setAdding] = useState<{ itemId: string; quantity: string }[]>([]);
   if (!order) return null;
   const supplier = data.suppliers.find(entry => entry.id === order.supplierId);
   const location = data.locations.find(entry => entry.id === order.locationId);
   const total = order.lines.reduce((sum, line) => sum + line.quantity * line.unitCost, 0);
   const open = ['approved', 'sent', 'partial'].includes(order.status);
   const overdue = open && order.expectedOn < data.today;
+  const editable = order.status === 'draft' || open;
+  /** Items that can still be added: not on the order and not picked in another new row. */
+  const addableFor = (index: number) => data.items.filter(item => item.active && !order.lines.some(line => line.itemId === item.id)
+    && !adding.some((entry, at) => at !== index && entry.itemId === item.id));
+  function saveLines() {
+    if (!editing) return;
+    // An emptied field is a mistake, not a removal: only an explicit 0 or the bin removes a line.
+    const typed = order!.lines.map(line => ({ line, text: (editing[line.id] ?? String(line.quantity)).trim() }));
+    if (typed.some(entry => entry.text === '' || !Number.isFinite(Number(entry.text)) || Number(entry.text) < 0)) { setError(t('Enter a quantity of zero or more. Zero removes the line.')); return; }
+    const lines = typed.map(entry => ({ id: entry.line.id, quantity: Number(entry.text) })).filter((line, index) => line.quantity !== order!.lines[index].quantity);
+    const filled = adding.filter(line => line.itemId || line.quantity.trim());
+    if (filled.some(line => !line.itemId || !(Number(line.quantity) > 0))) { setError(t('Enter a quantity above zero for every new line.')); return; }
+    const add = filled.map(line => ({ itemId: line.itemId, quantity: Number(line.quantity), unitCost: data.items.find(item => item.id === line.itemId)?.unitCost ?? 0 }));
+    const kept = typed.filter(entry => Number(entry.text) > 0).length + add.length;
+    if (kept === 0) { setError(t('An order needs at least one line. Cancel it instead of removing every line.')); return; }
+    if (!lines.length && !add.length) { setEditing(null); setAdding([]); return; }
+    void act(async () => { await actions.updateOrder(order!.id, { lines, add }); setEditing(null); setAdding([]); });
+  }
 
   async function act(work: () => Promise<unknown>, close = false) {
     setBusy(true); setError(null);
@@ -320,12 +348,24 @@ export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { d
           const item = data.items.find(entry => entry.id === line.itemId);
           return <tr key={line.id} className="border-t border-[var(--border-subtle)]">
             <td className="py-1.5"><button type="button" className="text-left hover:underline" onClick={() => onOpenNode(`${line.itemId}:${order.locationId}`)}>{item ? `${item.sku} · ${item.name}` : '—'}</button></td>
-            <td className="py-1.5 text-right tabular-nums">{formatQuantity(line.quantity, locale)}</td>
+            <td className="py-1.5 text-right tabular-nums">{editing
+              ? <span className="flex items-center justify-end gap-1">
+                  <input aria-label={t('Quantity for {name}', { name: item?.name ?? '' })} inputMode="decimal" className={`${SCM_INPUT} w-20 text-right`} value={editing[line.id] ?? String(line.quantity)} onChange={event => setEditing(current => ({ ...current, [line.id]: event.target.value }))} />
+                  {line.receivedQuantity === 0 && <Button type="button" variant="ghost" size="icon-sm" aria-label={t('Remove line')} onClick={() => setEditing(current => ({ ...current, [line.id]: '0' }))}><Trash2 size={14} /></Button>}
+                </span>
+              : formatQuantity(line.quantity, locale)}</td>
             <td className="py-1.5 text-right tabular-nums">{formatQuantity(line.receivedQuantity, locale)}</td>
             <td className="py-1.5 text-right tabular-nums">{formatMoney(line.quantity * line.unitCost, order.currency, locale)}</td>
             {receiving && <td className="py-1 pl-3"><input aria-label={t('Receive now')} inputMode="decimal" className={`${SCM_INPUT} text-right`} value={receiving[line.id] ?? ''} onChange={event => setReceiving(current => ({ ...current, [line.id]: event.target.value }))} /></td>}
           </tr>;
         })}</tbody>
+        {editing && <tbody>{adding.map((line, index) => <tr key={`add-${index}`} className="border-t border-[var(--border-subtle)]">
+          <td className="py-1"><Select label={t('Item')} value={line.itemId} onChange={value => setAdding(current => current.map((entry, at) => at === index ? { ...entry, itemId: value } : entry))}
+            options={[{ id: '', label: t('Choose…') }, ...addableFor(index).map(item => ({ id: item.id, label: `${item.sku} · ${item.name}` }))]} /></td>
+          <td className="py-1 text-right"><input aria-label={t('Quantity')} inputMode="decimal" className={`${SCM_INPUT} ml-auto w-20 text-right`} value={line.quantity} onChange={event => setAdding(current => current.map((entry, at) => at === index ? { ...entry, quantity: event.target.value } : entry))} /></td>
+          <td /><td />
+        </tr>)}
+        <tr><td colSpan={4} className="py-1"><Button type="button" variant="ghost" size="sm" onClick={() => setAdding(current => [...current, { itemId: '', quantity: '' }])}><Plus size={14} />{t('Add line')}</Button></td></tr></tbody>}
         <tfoot><tr className="border-t border-[var(--border-subtle)] font-medium"><td className="py-1.5">{t('Total')}</td><td /><td /><td className="py-1.5 text-right tabular-nums">{formatMoney(total, order.currency, locale)}</td>{receiving && <td />}</tr></tfoot>
       </table>
       {receiving && <div className="flex flex-wrap items-end gap-3">
@@ -333,12 +373,18 @@ export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { d
         <Button variant="primary" disabled={busy || receivedOn > data.today || !Object.values(receiving).some(value => Number(value) > 0)} onClick={() => void act(() => actions.receiveOrder(order.id, Object.entries(receiving).map(([lineId, value]) => ({ lineId, quantity: Number(value) || 0 })).filter(line => line.quantity > 0), receivedOn), true)}>{t('Post receipt')}<ArrowRight size={14} /></Button>
         <Button variant="ghost" disabled={busy} onClick={() => setReceiving(null)}>{t('Cancel')}</Button>
       </div>}
-      {open && !receiving && <div className="flex flex-wrap items-end gap-2 border-t border-[var(--border-subtle)] pt-3">
+      {editing && <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="ghost" disabled={busy} onClick={() => { setEditing(null); setAdding([]); }}>{t('Cancel')}</Button>
+        <Button variant="primary" disabled={busy} onClick={saveLines}>{busy ? t('Saving…') : t('Save lines')}</Button>
+      </div>}
+      {open && !receiving && !editing && <div className="flex flex-wrap items-end gap-2 border-t border-[var(--border-subtle)] pt-3">
         <DateEntry label={t('Expected arrival')} value={expectedOn} onChange={setExpectedOn} />
         <Button variant="ghost" disabled={busy || expectedOn === order.expectedOn || expectedOn < order.orderedOn} onClick={() => void act(() => actions.updateOrder(order.id, { expectedOn }))}>{t('Update date')}</Button>
       </div>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      {!receiving && <div className="flex flex-wrap justify-end gap-2">
+      {!receiving && !editing && <div className="flex flex-wrap justify-end gap-2">
+        {editable && <Button variant="ghost" disabled={busy} className="mr-auto" onClick={() => setEditing({})}>{t('Edit lines')}</Button>}
+        {order.status === 'draft' && <Button variant="ghost" disabled={busy} onClick={() => void (async () => { if (await appDialog.confirm(t('Delete this draft? It is removed, and its approval Element is cancelled.'))) await act(() => actions.deleteDraftOrder(order.id), true); })()}>{t('Delete draft')}</Button>}
         {order.status === 'draft' && <>
           <Button variant="danger" disabled={busy} onClick={() => void act(() => actions.setOrderStatus(order.id, order.status, 'cancelled'), true)}>{t('Reject')}</Button>
           <Button variant="primary" disabled={busy} onClick={() => void act(() => actions.setOrderStatus(order.id, order.status, 'approved'), true)}>{t('Approve order')}</Button>

@@ -14,6 +14,10 @@ export interface NavigationState {
   scmHealth?: ScmHealth | null;
   /** Scenarios opened from a supplier, pre-set to simulate its delay. */
   scmSupplierDelay?: string | null;
+  /** The stock ledger filtered to one item. */
+  scmLedgerItemId?: string | null;
+  /** Inventory showing the item catalogue rather than stock. */
+  scmCatalog?: boolean | null;
   /** The CRM App's view, filters and open deal within this window tab. */
   crm?: CrmRoute;
   objectId: string | null;

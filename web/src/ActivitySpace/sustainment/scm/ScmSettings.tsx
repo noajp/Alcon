@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, type FormEvent } from 'react';
-import { ArrowRight, Boxes, ClipboardPaste, Plus, Trash2 } from 'lucide-react';
+import { ArrowRight, Boxes, ClipboardPaste, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -87,6 +87,12 @@ export function ScmLocations({ data, actions }: { data: ScmData; actions: ScmAct
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; name: string; code: string } | null>(null);
+  async function rename() {
+    if (!renaming?.name.trim()) return;
+    try { await actions.saveLocation(renaming.id, { name: renaming.name, code: renaming.code }); setRenaming(null); setError(null); }
+    catch (cause) { setError(t(cause instanceof Error ? cause.message : String(cause))); }
+  }
   async function add(event: FormEvent) {
     event.preventDefault();
     if (!name.trim()) return;
@@ -94,18 +100,29 @@ export function ScmLocations({ data, actions }: { data: ScmData; actions: ScmAct
     catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
   }
   return <Section title={t('Locations')} description={t('Warehouses, stores or sites that hold stock. Each item is planned per location.')}>
-    <ul className="divide-y divide-[var(--border-subtle)]">{data.locations.map(location => <li key={location.id} className="flex items-center gap-3 py-2 text-sm">
-      <span className="flex-1">{location.name}</span><span className="text-xs text-muted-foreground">{location.code}</span>
-      <Button size="icon-sm" variant="ghost" aria-label={t('Delete {name}', { name: location.name })} onClick={() => setConfirm(location.id)}><Trash2 size={14} /></Button>
-    </li>)}</ul>
+    <ul className="divide-y divide-[var(--border-subtle)]">{data.locations.map(location => {
+      return <li key={location.id} className="flex items-center gap-3 py-2 text-sm">
+        {renaming?.id === location.id ? <form className="flex flex-1 flex-wrap items-center gap-2" onSubmit={event => { event.preventDefault(); void rename(); }}>
+          <input autoFocus aria-label={t('Name')} className={`${SCM_INPUT} min-w-40 flex-1`} value={renaming.name} onChange={event => setRenaming({ ...renaming, name: event.target.value })} />
+          <input aria-label={t('Code')} className={`${SCM_INPUT} w-24`} value={renaming.code} onChange={event => setRenaming({ ...renaming, code: event.target.value })} />
+          <Button type="submit" size="sm" variant="primary" disabled={!renaming.name.trim()}>{t('Save')}</Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setRenaming(null)}>{t('Cancel')}</Button>
+        </form> : <>
+          <span className="flex-1">{location.name}</span><span className="text-xs text-muted-foreground">{location.code}</span>
+          <Button size="icon-sm" variant="ghost" aria-label={t('Rename {name}', { name: location.name })} onClick={() => setRenaming({ id: location.id, name: location.name, code: location.code ?? '' })}><Pencil size={14} /></Button>
+          <Button size="icon-sm" variant="ghost" aria-label={t('Delete {name}', { name: location.name })} onClick={() => setConfirm(location.id)}><Trash2 size={14} /></Button>
+        </>}
+      </li>;
+    })}</ul>
+    <p className="text-[11px] text-muted-foreground">{t('A location with stock history or orders can be renamed but not deleted.')}</p>
     <form onSubmit={add} className="flex flex-wrap items-end gap-2">
       <label className={`${SCM_LABEL} min-w-48 flex-1`}><span>{t('Name')}</span><input className={SCM_INPUT} value={name} onChange={event => setName(event.target.value)} /></label>
       <label className={`${SCM_LABEL} w-28`}><span>{t('Code')}</span><input className={SCM_INPUT} value={code} onChange={event => setCode(event.target.value)} /></label>
       <Button type="submit" variant="secondary" disabled={!name.trim()}><Plus size={14} />{t('Add location')}</Button>
     </form>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    <ConfirmDialog open={!!confirm} title={t('Delete this location?')} description={t('Its stock, ledger and orders are deleted with it. This cannot be undone.')}
-      confirmLabel={t('Delete')} onCancel={() => setConfirm(null)} onConfirm={() => { const id = confirm; setConfirm(null); if (id) void actions.deleteLocation(id).catch(cause => setError(String(cause))); }} />
+    <ConfirmDialog open={!!confirm} title={t('Delete this location?')} description={t('Only a location with no stock history or orders can be deleted. Otherwise rename it.')}
+      confirmLabel={t('Delete')} onCancel={() => setConfirm(null)} onConfirm={() => { const id = confirm; setConfirm(null); if (id) void actions.deleteLocation(id).catch(cause => setError(t(cause instanceof Error ? cause.message : String(cause)))); }} />
   </Section>;
 }
 
@@ -149,7 +166,7 @@ export function ScmDataSection({ data, actions }: { data: ScmData; actions: ScmA
     <Button variant="danger" disabled={busy} onClick={() => setConfirm(true)}><Trash2 size={14} />{t('Delete all SCM data')}</Button>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     <ConfirmDialog open={confirm} busy={busy} title={t('Delete all SCM data?')} description={t('{n} items and their full history will be deleted for everyone in this Space. This cannot be undone.', { n: data.items.length })} confirmLabel={t('Delete all')}
-      onCancel={() => setConfirm(false)} onConfirm={() => { setBusy(true); void actions.clearAll().catch(cause => setError(String(cause))).finally(() => { setBusy(false); setConfirm(false); }); }} />
+      onCancel={() => setConfirm(false)} onConfirm={() => { setBusy(true); void actions.clearAll().catch(cause => setError(t(cause instanceof Error ? cause.message : String(cause)))).finally(() => { setBusy(false); setConfirm(false); }); }} />
   </Section>;
 }
 

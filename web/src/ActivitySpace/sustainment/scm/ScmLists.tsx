@@ -6,7 +6,7 @@ import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { ScmHealth, ScmNode, ScmPoStatus } from './scmEngine';
 import { daysFrom, formatDay, formatMoney, formatQuantity, HEALTH_LABEL, PO_STATUS_LABEL, signalText } from './scmText';
-import { HealthBadge, Pill, Section, SCM_INPUT, SCM_ROW } from './ScmParts';
+import { HealthBadge, Pill, Section, SCM_INPUT, SCM_ROW, SCM_SELECT_INLINE } from './ScmParts';
 import { useScmSurface } from './scmSurface';
 import { nodeOrderLines } from './ScmForms';
 
@@ -27,7 +27,7 @@ export function ScmExceptions() {
   const groups: { id: string; title: string; description: string; rows: ScmNode[] }[] = useMemo(() => [
     { id: 'now', title: t('Out of stock'), description: t('Demand is going unmet today.'), rows: nodes.filter(node => node.health === 'stockout') },
     { id: 'before', title: t('Runs out before supply can arrive'), description: t('A normal order is too late. Expedite, transfer or substitute.'), rows: nodes.filter(node => node.health === 'critical') },
-    { id: 'order', title: t('Order now'), description: t('At or below the reorder point. An order placed today arrives in time.'), rows: nodes.filter(node => node.health === 'reorder') },
+    { id: 'order', title: t('Order now'), description: t('Below the reorder point. An order placed today arrives in time.'), rows: nodes.filter(node => node.health === 'reorder') },
     { id: 'late', title: t('Late supply'), description: t('Purchase orders past their expected date.'), rows: nodes.filter(node => !['stockout', 'critical', 'reorder'].includes(node.health) && node.arrivals.some(arrival => arrival.overdue)) },
   ], [nodes, t]);
   const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
@@ -73,9 +73,67 @@ export function ScmExceptions() {
 
 type SortKey = 'priority' | 'name' | 'onHand' | 'cover' | 'value' | 'demand';
 
-export function ScmInventory({ health, onHealth }: { health: ScmHealth | null; onHealth: (health: ScmHealth | null) => void }) {
+export function ScmInventory({ health, onHealth, catalog, onCatalog }: { health: ScmHealth | null; onHealth: (health: ScmHealth | null) => void; catalog: boolean; onCatalog: (catalog: boolean) => void }) {
+  const { t } = useI18n();
+  return <div className="space-y-4">
+    <div className="flex flex-wrap gap-1">
+      <Button shape="tab" size="sm" variant={!catalog ? 'secondary' : 'ghost'} aria-pressed={!catalog} onClick={() => onCatalog(false)}>{t('Stock')}</Button>
+      <Button shape="tab" size="sm" variant={catalog ? 'secondary' : 'ghost'} aria-pressed={catalog} onClick={() => onCatalog(true)}>{t('Item catalog')}</Button>
+    </div>
+    {catalog ? <ScmCatalog /> : <ScmStock health={health} onHealth={onHealth} />}
+  </div>;
+}
+
+/** Every item the Space knows, stocked or not, active or archived. */
+function ScmCatalog() {
   const { t, locale } = useI18n();
-  const { nodes, data, openNode, openDialog, locationName, locationId } = useScmSurface();
+  const { data, plan, openDialog, supplierName } = useScmSurface();
+  const [query, setQuery] = useState('');
+  const [archived, setArchived] = useState(false);
+  const needle = query.trim().toLowerCase();
+  const stock = new Map<string, { total: number; locations: number }>();
+  for (const row of data.stock) {
+    const entry = stock.get(row.itemId) ?? { total: 0, locations: 0 };
+    entry.total += row.onHand;
+    if (row.onHand !== 0) entry.locations += 1;
+    stock.set(row.itemId, entry);
+  }
+  const rows = data.items.filter(item => (archived || item.active) && (!needle || item.sku.toLowerCase().includes(needle) || item.name.toLowerCase().includes(needle)));
+  const archivedCount = data.items.filter(item => !item.active).length;
+  return <div className="space-y-4">
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="relative w-full max-w-xs"><Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <input aria-label={t('Search items')} placeholder={t('Search SKU or name…')} className={`${SCM_INPUT} pl-7`} value={query} onChange={event => setQuery(event.target.value)} /></div>
+      {archivedCount > 0 && <label className="flex items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={archived} onChange={event => setArchived(event.target.checked)} />{t('Show archived ({n})', { n: archivedCount })}</label>}
+      <Button className="ml-auto" size="sm" variant="secondary" onClick={() => openDialog({ kind: 'item', item: null })}><Plus size={14} />{t('Add item')}</Button>
+    </div>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead><tr className="border-b border-[var(--border-subtle)]">
+          <th className={TH}>{t('Item')}</th><th className={TH}>{t('Category')}</th><th className={TH}>{t('Supplier')}</th>
+          <th className={`${TH} text-right`}>{t('Unit cost')}</th><th className={`${TH} text-right`}>{t('On hand')}</th><th className={TH}>{t('Status')}</th>
+        </tr></thead>
+        <tbody>{rows.map(item => {
+          const held = stock.get(item.id);
+          return <tr key={item.id} className="cursor-pointer border-b border-[var(--border-subtle)] hover:bg-muted/40" onClick={() => openDialog({ kind: 'item', item })}>
+            <td className={`${TD} max-w-72`}><span className="block truncate font-medium">{item.name}</span><span className="block truncate text-xs text-muted-foreground">{item.sku} · {item.unit}</span></td>
+            <td className={`${TD} text-muted-foreground`}>{item.category ?? '—'}</td>
+            <td className={`${TD} max-w-48 truncate text-muted-foreground`}>{supplierName(item.supplierId)}</td>
+            <td className={`${TD} text-right`}>{formatMoney(item.unitCost, item.currency, locale)}</td>
+            <td className={`${TD} text-right`}>{held ? t('{qty} at {n} locations', { qty: formatQuantity(held.total, locale), n: held.locations }) : '—'}</td>
+            <td className={TD}>{!item.active ? <Pill tone="muted">{t('Archived')}</Pill> : plan.nodes.some(node => node.itemId === item.id) ? <Pill tone="success">{t('Planned')}</Pill> : <Pill tone="warning">{t('Not stocked yet')}</Pill>}</td>
+          </tr>;
+        })}</tbody>
+      </table>
+      {!rows.length && <p className="py-8 text-center text-sm text-muted-foreground">{t('No items match.')}</p>}
+    </div>
+    <p className="text-xs text-muted-foreground">{t('An item is planned once it has stock, history or an order at a location. Record its opening stock with a count.')}</p>
+  </div>;
+}
+
+function ScmStock({ health, onHealth }: { health: ScmHealth | null; onHealth: (health: ScmHealth | null) => void }) {
+  const { t, locale } = useI18n();
+  const { nodes, openNode, openDialog, locationName, locationId } = useScmSurface();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
   const [sort, setSort] = useState<SortKey>('priority');
@@ -90,7 +148,6 @@ export function ScmInventory({ health, onHealth }: { health: ScmHealth | null; o
     };
     return sort === 'priority' ? filtered : [...filtered].sort(by[sort]);
   }, [nodes, health, category, query, sort]);
-  const unstocked = data.items.filter(item => item.active && !nodes.some(node => node.itemId === item.id));
   const sortButton = (key: SortKey, label: string) => <th className={`${TH} ${key === 'name' ? '' : 'text-right'}`}>
     <button type="button" className={`hover:text-foreground ${sort === key ? 'text-foreground' : ''}`} aria-pressed={sort === key} onClick={() => setSort(sort === key ? 'priority' : key)}>{label}</button>
   </th>;
@@ -99,7 +156,7 @@ export function ScmInventory({ health, onHealth }: { health: ScmHealth | null; o
     <div className="flex flex-wrap items-center gap-2">
       <div className="relative w-full max-w-xs"><Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <input aria-label={t('Search items')} placeholder={t('Search SKU or name…')} className={`${SCM_INPUT} pl-7`} value={query} onChange={event => setQuery(event.target.value)} /></div>
-      {categories.length > 0 && <select aria-label={t('Category')} className={`${SCM_INPUT} w-auto text-foreground`} value={category} onChange={event => setCategory(event.target.value)}>
+      {categories.length > 0 && <select aria-label={t('Category')} className={SCM_SELECT_INLINE} value={category} onChange={event => setCategory(event.target.value)}>
         <option value="">{t('All categories')}</option>{categories.map(entry => <option key={entry} value={entry}>{entry}</option>)}
       </select>}
       {health && <Button size="sm" variant="secondary" onClick={() => onHealth(null)}>{t(HEALTH_LABEL[health])} ✕</Button>}
@@ -137,7 +194,6 @@ export function ScmInventory({ health, onHealth }: { health: ScmHealth | null; o
       </table>
       {!rows.length && <p className="py-8 text-center text-sm text-muted-foreground">{t('No items match.')}</p>}
     </div>
-    {unstocked.length > 0 && !health && !query && <p className="text-xs text-muted-foreground">{t('{n} items have no stock or history at this location yet: {names}.', { n: unstocked.length, names: unstocked.slice(0, 5).map(item => item.sku).join(', ') })}</p>}
   </div>;
 }
 
