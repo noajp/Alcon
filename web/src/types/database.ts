@@ -163,7 +163,10 @@ export interface ActivitySpace {
   identifier: string | null  // optional short slug
   color: string | null
   logo: string | null
-  vision: string | null      // Strategy > Vision — what the Space aims for
+  vision: string | null      // Strategy > Vision — what the Space aims for, in one statement
+  vision_horizon: string | null      // 'YYYY-MM-DD' — by when
+  vision_narrative: string | null    // why this, and what changes
+  vision_conditions: string[]        // how the Space will know it got there
   order_index: number | null
   created_by: string | null
   created_at: string | null
@@ -186,6 +189,9 @@ export interface ActivitySpaceUpdate {
   logo?: string | null
   order_index?: number | null
   vision?: string | null
+  vision_horizon?: string | null
+  vision_narrative?: string | null
+  vision_conditions?: string[]
 }
 
 export interface ActivitySpaceMember {
@@ -1392,6 +1398,7 @@ export interface Strategy {
 export interface Portfolio {
   id: string
   activity_space_id: string
+  parent_id: string | null   // the Portfolio this one nests in; null = top level
   name: string
   description: string | null
   order_index: number
@@ -1402,11 +1409,13 @@ export interface Portfolio {
 export interface PortfolioInsert {
   id?: string
   activity_space_id: string
+  parent_id?: string | null
   name: string
   description?: string | null
   order_index?: number
 }
 export interface PortfolioUpdate {
+  parent_id?: string | null
   name?: string
   description?: string | null
   order_index?: number

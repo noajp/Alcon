@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { translate } from '@/Function/i18n/I18nProvider';
 import { getQueryClient } from '@/lib/queryClient';
 import type { Portfolio, PortfolioInsert, PortfolioUpdate } from '@/types/database';
 
@@ -60,6 +61,17 @@ export async function updatePortfolio(id: string, updates: PortfolioUpdate): Pro
   return data as Portfolio;
 }
 
+/** Nests a Portfolio under another (null = top level). The caller keeps a
+ *  Portfolio out of its own subtree — see subtreeIds. */
+export async function movePortfolio(id: string, parentId: string | null): Promise<void> {
+  const { data, error } = await supabase.from('portfolios').update({ parent_id: parentId }).eq('id', id).select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error(translate('The Portfolio could not be moved.'));
+  void invalidatePortfolios();
+}
+
+/** Deleting a Portfolio deletes the Portfolios nested in it (cascade); the
+ *  Initiatives in any of them stay, outside every Portfolio. */
 export async function deletePortfolio(id: string): Promise<void> {
   const { error } = await supabase.from('portfolios').delete().eq('id', id);
   if (error) throw error;
