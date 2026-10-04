@@ -16,10 +16,12 @@ import type { ScmImportRow } from '@/ActivitySpace/sustainment/scm/scmImport';
 
 // Everything SCM reads and writes. One query per Space loads the whole supply
 // chain; the planner runs in the browser over that snapshot, and every write
-// invalidates it. RLS scopes every table to members of the Space.
+// invalidates it. RLS scopes every table to members of the Space, and a record
+// that belongs to a Domain to the people who can see that Domain.
 
 export interface ScmSupplierRecord extends ScmSupplier { contact: string | null; email: string | null; notes: string | null }
-export interface ScmRun { id: string; ranAt: string; summary: ScmRunSummary }
+/** domainId: the scope the run planned — null for the Space-wide records. */
+export interface ScmRun { id: string; ranAt: string; domainId: string | null; summary: ScmRunSummary }
 export interface ScmRunSummary {
   created: { poId: string; number: number; supplier: string; location: string; total: number; currency: string; status: ScmPoStatus; lines: number }[];
   skipped: number;
@@ -128,22 +130,24 @@ async function fetchScm(spaceId: string, today: string): Promise<ScmData> {
     readAllPages<Row>('demand history', (from, to) => supabase.rpc('scm_demand_history', { p_space: spaceId, p_since: addDays(today, -policy.lookbackDays) }, { count: 'exact' })
       .range(from, to) as unknown as Page,
     row => `${row.item_id}:${row.location_id}:${row.day}`),
-    supabase.from('scm_autopilot_runs').select('*').eq('activity_space_id', spaceId).order('ran_at', { ascending: false }).limit(20),
+    supabase.from('scm_autopilot_runs').select('*').eq('activity_space_id', spaceId).order('ran_at', { ascending: false }).limit(60),
   ]);
   if (runs.error) throw new Error(runs.error.message);
   return {
     spaceId, today, policy, hasPolicy: !!policyRow,
-    locations: locations.map(row => ({ id: String(row.id), name: String(row.name), code: (row.code as string | null) ?? null }))
+    locations: locations.map(row => ({ id: String(row.id), name: String(row.name), code: (row.code as string | null) ?? null, domainId: (row.domain_id as string | null) ?? null }))
       .sort((a, b) => a.name.localeCompare(b.name)),
     suppliers: suppliers.map(row => ({
       id: String(row.id), name: String(row.name), leadTimeDays: num(row.lead_time_days, 14), currency: String(row.currency),
       contact: (row.contact as string | null) ?? null, email: (row.email as string | null) ?? null, notes: (row.notes as string | null) ?? null,
+      domainId: (row.domain_id as string | null) ?? null,
     })).sort((a, b) => a.name.localeCompare(b.name)),
     items: items.map(row => ({
       id: String(row.id), sku: String(row.sku), name: String(row.name), unit: String(row.unit), category: (row.category as string | null) || null,
       supplierId: (row.supplier_id as string | null) ?? null, unitCost: num(row.unit_cost), unitPrice: numOrNull(row.unit_price),
       currency: String(row.currency), leadTimeDays: numOrNull(row.lead_time_days), moq: num(row.moq), orderMultiple: num(row.order_multiple, 1),
       serviceLevel: numOrNull(row.service_level), baselineDailyDemand: numOrNull(row.baseline_daily_demand), active: row.active !== false, createdAt: (row.created_at as string | null) ?? null,
+      domainId: (row.domain_id as string | null) ?? null,
     })).sort((a, b) => a.sku.localeCompare(b.sku)),
     stock: stock.map(row => ({ itemId: String(row.item_id), locationId: String(row.location_id), onHand: num(row.on_hand) })),
     demand: demand.map(row => ({ itemId: String(row.item_id), locationId: String(row.location_id), day: String(row.day), quantity: num(row.quantity) })),
@@ -156,7 +160,7 @@ async function fetchScm(spaceId: string, today: string): Promise<ScmData> {
         id: String(line.id), itemId: String(line.item_id), quantity: num(line.quantity), unitCost: num(line.unit_cost), receivedQuantity: num(line.received_quantity),
       })),
     })).sort((a, b) => b.number - a.number),
-    runs: (runs.data ?? []).map(row => ({ id: String(row.id), ranAt: String(row.ran_at), summary: row.summary as ScmRunSummary })),
+    runs: (runs.data ?? []).map(row => ({ id: String(row.id), ranAt: String(row.ran_at), domainId: (row.domain_id as string | null) ?? null, summary: row.summary as ScmRunSummary })),
   };
 }
 
@@ -214,8 +218,11 @@ export interface ScmItemDraft {
   sku: string; name: string; unit: string; category: string | null; supplierId: string | null;
   unitCost: number; unitPrice: number | null; currency: string; leadTimeDays: number | null;
   moq: number; orderMultiple: number; serviceLevel: number | null; baselineDailyDemand: number | null;
+  /** The Domain the item belongs to; null = shared by the Space. */
+  domainId: string | null;
 }
-export interface ScmSupplierDraft { name: string; contact: string | null; email: string | null; leadTimeDays: number; currency: string; notes: string | null }
+export interface ScmSupplierDraft { name: string; contact: string | null; email: string | null; leadTimeDays: number; currency: string; notes: string | null; domainId: string | null }
+export interface ScmLocationDraft { name: string; code: string | null; domainId: string | null }
 export interface ScmOrderDraft {
   supplierId: string; locationId: string; status: ScmPoStatus; orderedOn: string; expectedOn: string; currency: string;
   source: 'human' | 'autopilot'; rationale: string | null; lines: { itemId: string; quantity: number; unitCost: number }[];
@@ -225,11 +232,11 @@ const itemRow = (draft: ScmItemDraft) => ({
   sku: draft.sku.trim(), name: draft.name.trim(), unit: draft.unit.trim() || 'pcs', category: draft.category?.trim() || null,
   supplier_id: draft.supplierId, unit_cost: draft.unitCost, unit_price: draft.unitPrice, currency: draft.currency.toUpperCase(),
   lead_time_days: draft.leadTimeDays, moq: draft.moq, order_multiple: draft.orderMultiple, service_level: draft.serviceLevel,
-  baseline_daily_demand: draft.baselineDailyDemand,
+  baseline_daily_demand: draft.baselineDailyDemand, domain_id: draft.domainId,
 });
 const supplierRow = (draft: ScmSupplierDraft) => ({
   name: draft.name.trim(), contact: draft.contact?.trim() || null, email: draft.email?.trim() || null,
-  lead_time_days: draft.leadTimeDays, currency: draft.currency.toUpperCase(), notes: draft.notes?.trim() || null,
+  lead_time_days: draft.leadTimeDays, currency: draft.currency.toUpperCase(), notes: draft.notes?.trim() || null, domain_id: draft.domainId,
 });
 
 const SIGN: Record<ScmMovementKind, 1 | -1 | 0> = { receipt: 1, transfer_in: 1, issue: -1, transfer_out: -1, adjust: 0 };
@@ -308,13 +315,14 @@ export function useScmActions(spaceId: string | null) {
      * authority the policy grants, otherwise drafted for approval — and logs
      * the run.
      */
-    async function placeProposals(proposals: ScmProposal[], options: { mode: 'place' | 'draft' | 'autopilot'; policy: ScmPolicy; today: string; explain: (proposal: ScmProposal) => string; minHoursSinceLastRun?: number }) {
+    async function placeProposals(proposals: ScmProposal[], options: { mode: 'place' | 'draft' | 'autopilot'; policy: ScmPolicy; today: string; explain: (proposal: ScmProposal) => string; minHoursSinceLastRun?: number; domainId?: string | null }) {
       const activity_space_id = space();
-      // An autopilot run is claimed in the database first: across tabs and
-      // members only one run proceeds; the others stop before writing.
+      // An autopilot run is claimed in the database first, per scope (the
+      // Space-wide records or one Domain): across tabs and members only one
+      // run proceeds; the others stop before writing.
       let runId: string | null = null;
       if (options.mode === 'autopilot') {
-        runId = await check(supabase.rpc('scm_claim_autopilot_run', { p_space: activity_space_id, p_min_hours: options.minHoursSinceLastRun ?? 0.01 })) as unknown as string | null;
+        runId = await check(supabase.rpc('scm_claim_autopilot_run', { p_space: activity_space_id, p_min_hours: options.minHoursSinceLastRun ?? 0.01, p_domain: options.domainId ?? null })) as unknown as string | null;
         if (!runId) return null;
       }
       const created: ScmRunSummary['created'] = [];
@@ -352,9 +360,10 @@ export function useScmActions(spaceId: string | null) {
         autopilot_enabled: policy.autopilotEnabled, auto_approve_limit: policy.autoApproveLimit, monthly_budget: policy.monthlyBudget,
         currency: policy.currency.toUpperCase(), updated_at: new Date().toISOString(),
       }))),
-      saveLocation: (id: string | null, draft: { name: string; code: string | null }) => done(id
-        ? check(supabase.from('scm_locations').update({ name: draft.name.trim(), code: draft.code?.trim() || null }).eq('id', id))
-        : check(supabase.from('scm_locations').insert({ activity_space_id: space(), name: draft.name.trim(), code: draft.code?.trim() || null }))),
+      saveLocation: (id: string | null, draft: ScmLocationDraft) => {
+        const row = { name: draft.name.trim(), code: draft.code?.trim() || null, domain_id: draft.domainId };
+        return done(id ? check(supabase.from('scm_locations').update(row).eq('id', id)) : check(supabase.from('scm_locations').insert({ activity_space_id: space(), ...row })));
+      },
       deleteLocation: (id: string) => done(check(supabase.from('scm_locations').delete().eq('id', id))),
       saveSupplier: (id: string | null, draft: ScmSupplierDraft) => done(id
         ? check(supabase.from('scm_suppliers').update(supplierRow(draft)).eq('id', id))
@@ -454,25 +463,27 @@ export function useScmActions(spaceId: string | null) {
       /** Items matched by SKU are updated, new SKUs created; suppliers and
        * locations are matched by name and created when missing. Stock is set
        * by a count, so the ledger records the difference. */
-      importRows: (rows: ScmImportRow[], current: ScmData) => done((async () => {
+      importRows: (rows: ScmImportRow[], current: ScmData, domainId: string | null = null) => done((async () => {
+        // Imported into a Domain, the new suppliers, locations and items belong to it.
         const activity_space_id = space();
+        const domain_id = domainId;
         const suppliers = new Map(current.suppliers.map(supplier => [supplier.name.trim().toLowerCase(), supplier.id]));
         const locations = new Map(current.locations.map(location => [location.name.trim().toLowerCase(), location.id]));
         for (const row of rows) {
           const name = row.supplier?.trim();
           if (name && !suppliers.has(name.toLowerCase())) {
-            const created = await check(supabase.from('scm_suppliers').insert({ activity_space_id, name, lead_time_days: row.leadTimeDays ?? 14, currency: row.currency ?? current.policy.currency }).select('id').single());
+            const created = await check(supabase.from('scm_suppliers').insert({ activity_space_id, domain_id, name, lead_time_days: row.leadTimeDays ?? 14, currency: row.currency ?? current.policy.currency }).select('id').single());
             suppliers.set(name.toLowerCase(), created.id as string);
           }
         }
         if (!locations.size && rows.some(row => row.onHand !== null)) {
-          const created = await check(supabase.from('scm_locations').insert({ activity_space_id, name: rows.find(row => row.location)?.location ?? 'Main' }).select('id, name').single());
+          const created = await check(supabase.from('scm_locations').insert({ activity_space_id, domain_id, name: rows.find(row => row.location)?.location ?? 'Main' }).select('id, name').single());
           locations.set(String(created.name).toLowerCase(), created.id as string);
         }
         for (const row of rows) {
           const name = row.location?.trim();
           if (name && !locations.has(name.toLowerCase())) {
-            const created = await check(supabase.from('scm_locations').insert({ activity_space_id, name }).select('id').single());
+            const created = await check(supabase.from('scm_locations').insert({ activity_space_id, domain_id, name }).select('id').single());
             locations.set(name.toLowerCase(), created.id as string);
           }
         }
@@ -494,7 +505,7 @@ export function useScmActions(spaceId: string | null) {
           if (itemId) await check(supabase.from('scm_items').update(patch).eq('id', itemId));
           else {
             if (patch.currency === undefined) patch.currency = current.policy.currency;
-            itemId = (await check(supabase.from('scm_items').insert({ activity_space_id, ...patch }).select('id').single())).id as string;
+            itemId = (await check(supabase.from('scm_items').insert({ activity_space_id, domain_id, ...patch }).select('id').single())).id as string;
             existing.set(patch.sku as string, itemId);
           }
           items += 1;

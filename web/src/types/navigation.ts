@@ -7,6 +7,9 @@ export interface NavigationState {
    * the item-location open in detail (`itemId:locationId`), and the open
    * purchase order. */
   scmView?: ScmView;
+  /** SCM scope: null = everything visible, 'space' = records shared by the
+   * Space, otherwise the Domain whose supply the panes show. */
+  scmScope?: string | null;
   scmLocationId?: string | null;
   scmNode?: string | null;
   scmOrderId?: string | null;

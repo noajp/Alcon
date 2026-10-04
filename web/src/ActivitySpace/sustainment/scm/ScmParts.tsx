@@ -77,3 +77,15 @@ export const SCM_INPUT = 'h-8 w-full min-w-0 rounded-md border border-[var(--bor
 export const SCM_SELECT_INLINE = `${SCM_INPUT.replace('w-full ', '')} w-auto max-w-64 text-foreground`;
 export const SCM_LABEL = 'block space-y-1 text-xs text-muted-foreground';
 export const SCM_ROW = 'w-full rounded-md text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted';
+
+/** Which Domain a location, supplier or item belongs to. Blank = shared by the Space. */
+export function ScmDomainSelect({ value, onChange, domains, label, disabled, className = SCM_INPUT }: {
+  value: string | null; onChange: (value: string | null) => void; domains: { id: string; name: string }[]; label: string; disabled?: boolean; className?: string;
+}) {
+  const { t } = useI18n();
+  return <select aria-label={label} disabled={disabled} className={`${className} text-foreground`} value={value ?? ''} onChange={event => onChange(event.target.value || null)}>
+    <option value="">{t('Shared by the Space')}</option>
+    {domains.map(domain => <option key={domain.id} value={domain.id}>{domain.name}</option>)}
+    {value && !domains.some(domain => domain.id === value) && <option value={value}>{t('Unknown Domain')}</option>}
+  </select>;
+}

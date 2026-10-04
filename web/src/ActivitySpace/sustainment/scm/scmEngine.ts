@@ -13,8 +13,9 @@
 export type ScmPoStatus = 'draft' | 'approved' | 'sent' | 'partial' | 'received' | 'cancelled';
 export type ScmMovementKind = 'receipt' | 'issue' | 'adjust' | 'transfer_in' | 'transfer_out';
 
-export interface ScmLocation { id: string; name: string; code: string | null }
-export interface ScmSupplier { id: string; name: string; leadTimeDays: number; currency: string }
+/** domainId: the Domain the record belongs to; null or absent = shared by the Space. */
+export interface ScmLocation { id: string; name: string; code: string | null; domainId?: string | null }
+export interface ScmSupplier { id: string; name: string; leadTimeDays: number; currency: string; domainId?: string | null }
 export interface ScmItem {
   id: string;
   sku: string;
@@ -31,6 +32,7 @@ export interface ScmItem {
   serviceLevel: number | null;
   baselineDailyDemand: number | null;
   active: boolean;
+  domainId?: string | null;
   /** When the item was set up; an item younger than the history window cannot be dead stock. */
   createdAt?: string | null;
 }
