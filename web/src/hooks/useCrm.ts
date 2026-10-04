@@ -33,6 +33,8 @@ export interface CrmDealPatch {
   currency?: string;
   probability?: number | null;
   closeDate?: string | null;
+  /** When the deal was won or lost; defaults to today when it closes now. */
+  closedOn?: string | null;
   ownerId?: string | null;
   companyId?: string | null;
   companyName?: string | null;
@@ -131,15 +133,14 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     const lower = name.trim().toLowerCase();
     const known = resolved.current.get(`company:${lower}`) ?? (companies.data ?? []).find(company => company.name.trim().toLowerCase() === lower)?.id;
     if (known) return known;
+    // A name another member added since this screen loaded is reused, not duplicated.
+    const fresh = await supabase.from('crm_companies').select('id,name').eq('activity_space_id', space());
+    const match = (fresh.data ?? []).find(company => (company.name as string).trim().toLowerCase() === lower);
+    if (match) { resolved.current.set(`company:${lower}`, match.id as string); return match.id as string; }
     const inserted = await supabase.from('crm_companies').insert({ activity_space_id: space(), name: name.trim(), owner_worker_id: me }).select('id').single();
-    let id = inserted.data?.id as string | undefined;
-    if (inserted.error?.code === '23505') {
-      // Another member created it a moment ago: use theirs.
-      const found = await supabase.from('crm_companies').select('id').eq('activity_space_id', space()).ilike('name', name.trim()).limit(1).maybeSingle();
-      id = check(found).id;
-    } else check(inserted);
-    resolved.current.set(`company:${lower}`, id!);
-    return id!;
+    const id = check(inserted).id as string;
+    resolved.current.set(`company:${lower}`, id);
+    return id;
   }
   async function contactFor(name: string, email: string | null, companyId: string | null): Promise<string> {
     const lower = name.trim().toLowerCase();
@@ -163,8 +164,11 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     if (patch.name !== undefined) row.name = patch.name.trim();
     if (patch.stage !== undefined) {
       row.stage = patch.stage;
-      // Won or lost today in the person's own calendar, not the server's.
-      if (['won', 'lost'].includes(patch.stage.toLowerCase())) row.closed_on = today;
+      // Closing now is dated in the person's own calendar, not the server's;
+      // a deal that was already closed keeps the day it closed.
+      const closing = ['won', 'lost'].includes(patch.stage.toLowerCase());
+      const wasClosed = !!dealId && ['won', 'lost'].includes(deals.data?.find(item => item.id === dealId)?.stage.toLowerCase() ?? '');
+      if (closing && !wasClosed) row.closed_on = patch.closedOn ?? today;
     }
     if (patch.amount !== undefined) row.amount = patch.amount;
     if (patch.currency !== undefined) row.currency = patch.currency.toUpperCase();
@@ -324,9 +328,9 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     const text = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null;
     const date = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
     const marker = `table:${tableId}`;
-    const { data: done, error: doneError } = await supabase.from('crm_deals').select('custom').eq('activity_space_id', space()).not('custom->>imported_from', 'is', null);
-    if (doneError) throw new Error(doneError.message);
-    const imported = new Set((done ?? []).map(row => (row.custom as Record<string, unknown>)?.imported_from).filter(value => typeof value === 'string' && value.startsWith(marker)));
+    const done = await readAllPages<{ id: string; custom: Record<string, unknown> }>('imported deals', (from, to) => supabase.from('crm_deals')
+      .select('id,custom', { count: 'exact' }).eq('activity_space_id', space()).not('custom->>imported_from', 'is', null).order('id').range(from, to) as never, row => row.id);
+    const imported = new Set(done.map(row => row.custom?.imported_from).filter(value => typeof value === 'string' && value.startsWith(marker)));
     const stages = normalizeCrmStages(pipeline?.stages);
     let count = 0;
     try {
@@ -345,6 +349,8 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
           name, stage: stage === 'open' ? stages[0].id : stage, amount, probability,
           currency: text(cell(row.id, 'currency'))?.toUpperCase() ?? pipeline?.currency ?? 'JPY', closeDate: date(cell(row.id, 'closeDate')),
           companyId, contactId, custom: { imported_from: origin },
+          // A historical win keeps its own date rather than today's.
+          closedOn: date(cell(row.id, 'closeDate')),
           nextStep: text(cell(row.id, 'nextStep')), nextStepOn: date(cell(row.id, 'nextActionDate')),
         }, { quiet: true });
         for (const entry of [...parseActivityLog(cell(row.id, 'activity'))].reverse()) {

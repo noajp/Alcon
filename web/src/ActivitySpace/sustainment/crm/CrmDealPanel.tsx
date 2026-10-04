@@ -58,7 +58,9 @@ function NextStep({ crm, deal }: { crm: Crm; deal: CrmDeal }) {
       {dirty && <Button size="xs" variant="primary" disabled={busy || !title.trim()} onClick={() => void save()}>{element ? t('Update next step') : t('Set next step')}</Button>}
       {(deal.nextStep || deal.nextActionDate) && !dirty && <Button size="xs" variant="ghost" disabled={busy} onClick={() => void done()}><Check size={12} />{t('Mark done')}</Button>}
     </div>
-    <p className="text-[11px] leading-relaxed text-muted-foreground">{crm.pipeline?.object_id ? t('Saved as an Element in the pipeline’s Object, assigned to the owner — it shows in Calendar and Workload.') : t('Saved as an Element in My Elements. Choose an Object in Pipeline settings to share next steps with the team.')}</p>
+    <p className="text-[11px] leading-relaxed text-muted-foreground">{crm.pipeline?.object_id ? t('Saved as an Element in the pipeline’s Object, assigned to the owner — it shows in Calendar and Workload.')
+      : !deal.ownerId || deal.ownerId === crm.me ? t('Saved as an Element in your My Elements. Choose an Object in Pipeline settings to give next steps to their owners.')
+      : t('Saved on the deal. Choose an Object in Pipeline settings to make next steps Elements for their owners.')}</p>
     {notice && <p role="status" className="text-xs text-[var(--status-warning)]">{t(notice)}</p>}
     {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{t(error)}</p>}
   </section>;

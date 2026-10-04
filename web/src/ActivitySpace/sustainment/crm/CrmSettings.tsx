@@ -110,11 +110,11 @@ function Connections({ crm }: { crm: Crm }) {
   const value = crm.workspace ? metricValue(crm.workspace.deals, metric, pipeline.currency, crm.today) : null;
   const [error, setError] = useState<string | null>(null);
   const save = (patch: Parameters<Crm['savePipeline']>[1]) => { setError(null); crm.savePipeline(pipeline.id, patch).catch(cause => setError(message(cause))); };
-  return <Section title={t('Connections')} description={t('How this pipeline meets Execution and Strategy. Next steps become Elements in the Object you choose; the result you choose is written into an Initiative’s success condition whenever deals change.')}>
+  return <Section title={t('Connections')} description={t('How this pipeline meets Execution and Strategy. Next steps become Elements in the Object you choose, assigned to each deal’s owner. The figure you choose is written into an Initiative’s success condition when its owner opens the CRM.')}>
     <div className="max-w-2xl space-y-2">
       <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-2">
         <span className="text-xs text-muted-foreground">{t('Next steps go to')}</span>
-        <CrmPicker label={t('Object for next steps')} value={pipeline.object_id} placeholder={t('My Elements (each owner)')}
+        <CrmPicker label={t('Object for next steps')} value={pipeline.object_id} placeholder={t('None — your own deals go to My Elements')}
           options={objects.map(object => ({ id: object.id, label: object.name }))} onChange={id => save({ object_id: id })} />
         <span className="text-xs text-muted-foreground">{t('Reports into')}</span>
         <CrmPicker label={t('Success condition')} value={pipeline.measure_intent_id} placeholder={t('No Initiative')}

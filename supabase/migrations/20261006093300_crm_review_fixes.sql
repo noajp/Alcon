@@ -4,7 +4,6 @@
 -- * A logged call advances last contact even when the caller's local date is
 --   ahead of the database's UTC date (mornings east of UTC).
 -- * A Space gets one seeded pipeline even when two people open it at once.
--- * A company name is one record per Space.
 do $$
 begin
   if to_regclass('public.crm_deals') is null then raise notice 'crm tables not present'; return; end if;
@@ -41,6 +40,5 @@ begin
   end $fn$;
 
   create unique index if not exists crm_pipelines_one_seed on public.crm_pipelines (activity_space_id) where order_index = 0;
-  create unique index if not exists crm_companies_name on public.crm_companies (activity_space_id, lower(btrim(name)));
   $ddl$;
 end $$;
