@@ -207,9 +207,10 @@ export interface ActivitySpaceMember {
 // Visibility cascades: a Space member sees 'workspace' Domains; a
 // domain_member who is NOT a Space member is a Guest (sees only that
 // Domain). object_members are typically a subset of domain_members,
-// but also allow Object-only guests.
+// but also allow Object-only guests. A row is an active membership: an
+// invitation becomes one only when the invitee accepts it.
 // =====================================================
-export type MemberRole = 'owner' | 'member'
+export type MemberRole = 'owner' | 'admin' | 'member'
 
 export interface DomainMember {
   id: string
@@ -239,6 +240,28 @@ export interface ObjectMemberInsert {
   object_id: string
   user_id: string
   role?: MemberRole
+}
+
+// An invitation to a Space, Domain or Object (exactly one is set). It grants
+// nothing until the invitee accepts it through respond_to_invite; written
+// only by the invite_member / respond_to_invite / cancel_invite RPCs.
+export type InvitationScope = 'space' | 'domain' | 'object'
+export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'canceled'
+
+export interface MembershipInvitation {
+  id: string
+  activity_space_id: string | null
+  domain_id: string | null
+  object_id: string | null
+  invitee_id: string
+  invited_by: string | null
+  role: 'member'
+  /** The Space / Domain / Object name when the invitation was sent. */
+  scope_name: string
+  inviter_name: string | null
+  status: InvitationStatus
+  created_at: string
+  responded_at: string | null
 }
 
 // object_domains junction: Object multi-homes across Domains
@@ -277,6 +300,8 @@ export interface AlconObject {
   lead_id: string | null           // UUID FK → workers.id。Object の "Lead" (担当者)。List で編集可
   phase_id: string | null          // UUID FK → phases.id。所属 Phase (Linear の Cycle 相当、高々1つ)
   note_id: string | null           // Optional pinned Note (elements.note_id と同じ仕組み)
+  archived_at?: string | null      // 使わなくなった Object。一覧・ピッカーから外れ、id では開ける。サーバーが刻む
+  archived_by?: string | null      // アーカイブした人 (auth.users.id)
 }
 
 export interface AlconObjectInsert {
@@ -521,6 +546,9 @@ export interface Worker {
   id: string
   object_id: string | null
   user_id: string | null
+  /** The Space an unlinked Worker (no user_id, no object_id) belongs to.
+   *  A person's Space follows their memberships, an Object's Worker its Object. */
+  activity_space_id: string | null
   type: 'human' | 'ai_agent' | 'robot'
   name: string
   display_id: string | null       // e.g. "wrk_001"
@@ -583,6 +611,7 @@ export interface WorkerAvailabilityUpdate {
 export interface WorkerInsert {
   id?: string
   object_id?: string | null
+  activity_space_id?: string | null
   type: 'human' | 'ai_agent' | 'robot'
   name: string
   role?: string | null
@@ -598,6 +627,7 @@ export interface WorkerInsert {
 export interface WorkerUpdate {
   id?: string
   object_id?: string | null
+  activity_space_id?: string | null
   type?: 'human' | 'ai_agent' | 'robot'
   name?: string
   role?: string | null
@@ -1100,6 +1130,7 @@ export type NotificationKind =
   | 'approval_decided'
   | 'due_soon'
   | 'review_due'
+  | 'invite'
 
 export interface Notification {
   id: string
@@ -1117,26 +1148,13 @@ export interface Notification {
   strategy_comment_id: string | null
   object_id: string | null
   brief_id: string | null
+  /** The membership invitation an 'invite' notification is about. */
+  invitation_id?: string | null
   title: string
   body: string | null
   is_read: boolean
   is_archived: boolean
   created_at: string
-}
-
-export interface NotificationInsert {
-  recipient_id: string
-  actor_id?: string | null
-  actor_name?: string | null
-  kind: NotificationKind
-  element_id?: string | null
-  comment_id?: string | null
-  strategy_id?: string | null
-  strategy_comment_id?: string | null
-  object_id?: string | null
-  brief_id?: string | null
-  title: string
-  body?: string | null
 }
 
 // =====================================================
@@ -1165,15 +1183,22 @@ export interface ElementApprovalInsert {
 // Agent Runs — AI-driven Element execution (Symphony-style)
 // =====================================================
 
-// An agent run executes a single Element autonomously and stops at "review"
-// for a human to approve. agent_run_steps is the live "Workpad".
+// An agent run carries out a single Element's task on behalf of the person
+// who started it (ADR 0027): it stops for that person's approval before
+// external writes, and ends with a report on the Element. agent_run_steps is
+// the live "Workpad"; agent_actions are the approvals; agent_artifacts are
+// deliverables everyone on the Element can read.
 export type AgentRunStatus =
   | 'queued'
   | 'running'
+  | 'awaiting_approval'
+  | 'paused'
   | 'awaiting_review'
   | 'completed'
   | 'failed'
   | 'cancelled'
+
+export type AgentRunMode = 'execute' | 'reply'
 
 export type AgentRunStepType =
   | 'plan'
@@ -1184,6 +1209,8 @@ export type AgentRunStepType =
   | 'status'
   | 'result'
   | 'error'
+  | 'approval'
+  | 'artifact'
 
 export interface AgentRun {
   id: string
@@ -1201,6 +1228,14 @@ export interface AgentRun {
   started_at: string | null
   finished_at: string | null
   created_at: string
+  mode: AgentRunMode
+  prompt: string | null
+  reply_to: string | null
+  input_tokens: number
+  output_tokens: number
+  cost_usd: number | string
+  activity_space_id: string | null
+  continuation_count: number
 }
 
 export interface AgentRunInsert {
@@ -1212,6 +1247,9 @@ export interface AgentRunInsert {
   model?: string | null
   triggered_from?: string | null
   triggered_by?: string | null
+  mode?: AgentRunMode
+  prompt?: string | null
+  reply_to?: string | null
 }
 
 export interface AgentRunUpdate {
@@ -1230,6 +1268,94 @@ export interface AgentRunStep {
   title: string
   detail: string | null
   created_at: string
+}
+
+// An external service a Space connects for its agents (ADR 0027). Members
+// read; owners write. The credential lives in Vault: secret_id only says one
+// is set, and the browser writes it through set_integration_secret and never
+// reads it back. last_test is written by the integration-test Edge Function.
+export interface Integration {
+  id: string
+  activity_space_id: string
+  preset: string | null
+  kind: 'mcp' | 'http'
+  name: string
+  description: string | null
+  icon: string | null
+  endpoint: string
+  auth_type: 'none' | 'bearer' | 'header' | 'oauth'
+  auth_header: string | null
+  secret_id: string | null
+  delegation: 'approve_each' | 'full_delegation'
+  enabled: boolean
+  last_test: Json | null
+  /** The account an OAuth connection signed in as (the Google email). Written only by integration-oauth. */
+  external_account: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type IntegrationUpdate = Partial<Pick<Integration,
+  'name' | 'description' | 'endpoint' | 'auth_type' | 'auth_header' | 'delegation' | 'enabled'>>
+
+export type PersonalAccessTokenAccess = 'read' | 'read_write'
+
+// A personal access token (ADR 0032): lets an external client act as its
+// owner through alcon-mcp, under the owner's RLS. Only the owner reads their
+// rows, and never the hash; the plaintext exists once, in the result of
+// create_personal_access_token. Issue and revoke go through RPCs.
+export interface PersonalAccessToken {
+  id: string
+  user_id: string
+  name: string
+  /** The first 12 characters of the token ("alc_pat_" + 4), to tell tokens apart. */
+  token_prefix: string
+  access: PersonalAccessTokenAccess
+  expires_at: string | null
+  last_used_at: string | null
+  last_used_client: string | null
+  revoked_at: string | null
+  created_at: string
+}
+
+/** What create_personal_access_token returns — the only time the token is readable. */
+export interface IssuedPersonalAccessToken {
+  id: string
+  token: string
+}
+
+export type AgentActionStatus = 'pending' | 'approved' | 'rejected' | 'executed' | 'failed'
+
+/** One proposal waiting for (or decided by) a person — an external write, or a batch of them. */
+export interface AgentAction {
+  id: string
+  run_id: string
+  element_id: string
+  tool: string
+  input: { calls?: { id: string; name: string; input: Record<string, unknown> }[] }
+  input_hash: string
+  summary: string
+  integration_id: string | null
+  status: AgentActionStatus
+  decided_by: string | null
+  decided_at: string | null
+  decision_note: string | null
+  result: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface AgentArtifact {
+  id: string
+  element_id: string
+  run_id: string | null
+  title: string
+  content: string
+  format: 'markdown' | 'text' | 'csv' | 'json' | 'html'
+  created_by: string | null
+  author_name: string | null
+  created_at: string
+  updated_at: string
 }
 
 // =====================================================
@@ -1828,6 +1954,11 @@ export interface Database {
         Insert: DomainInsert
         Update: DomainUpdate
       }
+      membership_invitations: {
+        Row: MembershipInvitation
+        Insert: never
+        Update: never
+      }
       object_domains: {
         Row: ObjectDomain
         Insert: ObjectDomainInsert
@@ -1993,6 +2124,11 @@ export interface Database {
       agent_run_steps: {
         Row: AgentRunStep
         Insert: Omit<AgentRunStep, 'id' | 'created_at'>
+      }
+      integrations: {
+        Row: Integration
+        Insert: Omit<Integration, 'id' | 'secret_id' | 'last_test' | 'external_account' | 'created_by' | 'created_at' | 'updated_at'>
+        Update: IntegrationUpdate
       }
     }
   }

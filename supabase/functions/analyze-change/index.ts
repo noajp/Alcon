@@ -753,20 +753,6 @@ Use the tools to:
       .select()
       .single();
 
-    // Create notifications for high-severity impacts
-    if (severity === 'critical' || severity === 'high') {
-      for (const alert of crossDepartmentAlerts) {
-        await supabase.from('notifications').insert({
-          type: 'cross_department_alert',
-          title: `${alert.alert_type}: ${alert.from_dept} → ${alert.to_dept}`,
-          message: alert.message,
-          severity: alert.urgency || severity,
-          related_task_id: taskId,
-          created_at: new Date().toISOString()
-        });
-      }
-    }
-
     return new Response(JSON.stringify({
       task_id: taskId,
       change_type: changeType,

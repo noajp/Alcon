@@ -24,6 +24,7 @@ beforeEach(() => {
       select: () => query,
       eq: (field: string, value: unknown) => { rows = rows.filter(row => row[field] === value); return query; },
       in: (field: string, values: unknown[]) => { rows = rows.filter(row => values.includes(row[field])); return query; },
+      is: (field: string, value: unknown) => { rows = rows.filter(row => (row[field] ?? null) === value); return query; },
       order: () => query,
       // Emulate a server cap below the requested page size.
       range: (from: number) => Promise.resolve({ data: rows.slice(from, from + 1), count: rows.length, error: fail === table ? { message: 'read failed' } : null }),
@@ -42,6 +43,11 @@ describe('Domain overview data reads', () => {
   it('reads all Initiative Objects and includes their secondary Domains', async () => {
     const data = await fetchInitiativeDomains('i1', ['d1', 'd2']);
     expect(data.map(row => [row.domain.id, row.objects.map(object => object.id)])).toEqual([['d1', ['o1', 'o2']], ['d2', ['o1']]]);
+  });
+  it('leaves archived Objects out of an Initiative\'s Domains', async () => {
+    tables.objects = [tables.objects[0], { ...tables.objects[1], archived_at: '2026-10-03T00:00:00Z' }];
+    const data = await fetchInitiativeDomains('i1', ['d1', 'd2']);
+    expect(data.map(row => [row.domain.id, row.objects.map(object => object.id)])).toEqual([['d1', ['o1']], ['d2', ['o1']]]);
   });
   it('limits Domain links to the current Space and guest scope', async () => {
     expect((await fetchInitiativeDomains('i1', ['d2'])).map(row => row.domain.id)).toEqual(['d2']);

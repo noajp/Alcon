@@ -7,6 +7,7 @@ import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell, MENU_SEPARATOR } from '@/Function/shared/menu/MenuShell';
 import type { CommentAuthorKind } from '@/types/database';
+import { MarkdownLite } from './MarkdownLite';
 
 // =============================================================
 // The parts every comment thread is made of.
@@ -14,13 +15,13 @@ import type { CommentAuthorKind } from '@/types/database';
 // Alcon has two threads — one on an Element, one on a Initiative — and they are
 // the same object with two homes, so they render through the same parts. What
 // differs between them (reactions, pinning, who may delete) is passed in as
-// slots rather than forked: a second hand-rolled bubble is where the two
+// slots rather than forked: a second hand-rolled entry is where the two
 // quietly stop looking alike.
 // =============================================================
 
-/** The subset of a comment row a bubble actually renders — both
+/** The subset of a comment row an entry actually renders — both
  *  ElementComment and StrategyComment satisfy it. */
-export interface CommentBubbleData {
+export interface CommentEntryData {
   author_name: string | null;
   author_kind: CommentAuthorKind;
   content: string;
@@ -79,14 +80,14 @@ export function CommentAvatar({
     return (
       <WorkerAvatar
         worker={{ name: name ?? '', avatar_url: imageUrl }}
-        size={28}
+        size={20}
         className="flex-shrink-0"
       />
     );
   }
   return (
     <div
-      className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-medium flex-shrink-0 ${
+      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium flex-shrink-0 ${
         kind === 'ai_agent'
           ? 'bg-purple-500/15 text-purple-300'
           : isMine
@@ -99,48 +100,46 @@ export function CommentAvatar({
   );
 }
 
-export function CommentBubble({
+export function CommentEntry({
   comment,
-  isMine,
   avatar,
   meta,
   footer,
   menu,
 }: {
-  comment: CommentBubbleData;
-  /** Own comments hang on the right, everyone else's on the left. */
-  isMine: boolean;
+  comment: CommentEntryData;
   avatar: React.ReactNode;
   /** Extra marks on the byline (pin, badges). */
   meta?: React.ReactNode;
-  /** Under the bubble, aligned with it (reactions). */
+  /** Under the body, aligned with it (reactions). */
   footer?: React.ReactNode;
-  /** The "…" trigger, anchored at the end of the byline furthest from the
-   *  avatar — revealed on hover, like the rest of the row's own verbs. */
+  /** The "…" trigger at the end of the byline — revealed on hover, like the
+   *  rest of the row's own verbs. */
   menu?: React.ReactNode;
 }) {
-  const isAi = comment.author_kind === 'ai_agent';
+  // A thread is a record of the work, not a chat: every entry hangs from the
+  // same left edge, unboxed, so the body lines up with the document above it
+  // whoever wrote it. Byline on one line with the avatar; the body starts
+  // under the name (avatar 20px + gap 8px).
   return (
-    <div className={`group flex gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
-      {avatar}
-      <div className={`flex flex-col max-w-[78%] min-w-0 ${isMine ? 'items-end' : 'items-start'}`}>
-        <div className={`flex items-center gap-1.5 mb-0.5 text-[10px] text-muted-foreground ${isMine ? 'flex-row-reverse' : ''}`}>
-          <span className="font-medium text-foreground/85">{comment.author_name || 'Unknown'}</span>
-          {meta}
-          <span>{formatCommentAge(comment.created_at)}</span>
-          {menu}
-        </div>
-        <div
-          className={`relative px-3 py-1.5 rounded-2xl text-[12px] leading-[1.5] whitespace-pre-wrap break-words ${
-            isMine
-              ? 'bg-primary/15 text-foreground rounded-tr-sm'
-              : 'bg-muted/60 text-foreground/90 rounded-tl-sm'
-          }`}
-        >
+    <div className="group min-w-0">
+      <div className="flex items-center gap-2 h-6 min-w-0">
+        {avatar}
+        <span className="text-[13px] font-medium text-foreground truncate">{comment.author_name || 'Unknown'}</span>
+        {meta}
+        <span className="text-[12px] text-muted-foreground shrink-0">{formatCommentAge(comment.created_at)}</span>
+        {menu && <span className="ml-auto shrink-0">{menu}</span>}
+      </div>
+      {comment.author_kind === 'ai_agent' ? (
+        // Agents write reports in Markdown — headings, tables, lists — so
+        // they read as a document rather than raw marks.
+        <div className="pl-7 break-words"><MarkdownLite text={comment.content} className="text-foreground/90" /></div>
+      ) : (
+        <div className="pl-7 text-[13px] leading-[1.6] text-foreground/90 whitespace-pre-wrap break-words">
           {renderWithMentions(comment.content)}
         </div>
-        {footer}
-      </div>
+      )}
+      {footer && <div className="pl-7">{footer}</div>}
     </div>
   );
 }

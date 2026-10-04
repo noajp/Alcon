@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 
 // =============================================================
 // Where a surface's widget controls render.
@@ -18,7 +18,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 
 interface SlotValue {
   node: HTMLElement | null;
-  setNode: (el: HTMLElement | null) => void;
+  setNode: React.Dispatch<React.SetStateAction<HTMLElement | null>>;
 }
 
 const SlotContext = createContext<SlotValue | null>(null);
@@ -47,8 +47,22 @@ export function WidgetActionSlotTarget({ className = '' }: { className?: string 
   // A stable callback ref: an inline arrow would be a new function every
   // render, which React answers by calling it with null and then the node
   // again — remounting the portal's children on every parent render.
+  // Two targets can share one provider (an Element detail's header inside a
+  // Domain shell whose TabBar has its own). Detaching clears the slot only if
+  // it still points at THIS target, so an old target unmounting after a new
+  // one attached cannot empty the slot and drop the picker back in place.
+  const mine = useRef<HTMLDivElement | null>(null);
   const attach = useCallback(
-    (el: HTMLDivElement | null) => { setNode?.(el); },
+    (el: HTMLDivElement | null) => {
+      if (el) {
+        mine.current = el;
+        setNode?.(el);
+      } else {
+        const prev = mine.current;
+        mine.current = null;
+        setNode?.((current) => (current === prev ? null : current));
+      }
+    },
     [setNode],
   );
   if (!ctx) return null;

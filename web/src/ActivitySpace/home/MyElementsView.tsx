@@ -7,12 +7,15 @@ import { Plus } from 'lucide-react';
 import { fetchMyElements, type MyElementsData } from '@/ActivitySpace/home/myElementsData';
 import { useAuthContext } from '@/providers/AuthProvider';
 import {
-  addElementAssignee,
+  assignWorkersToElement,
+  noticeSkippedAssignees,
   createElement,
   updateElement,
   deleteElement,
   useDomains,
+  useWorkers,
 } from '@/hooks/useSupabase';
+import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
 import type {
@@ -141,6 +144,10 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
     }
     return Array.from(map.values());
   }, [myWorkers, elements]);
+  // QuickAdd's Assignee pill: yourself, then the Workers assignable in the
+  // active Space.
+  const { data: spaceWorkers } = useWorkers();
+  const popupWorkers = useMemo(() => withCurrentWorkers(myWorkers, spaceWorkers), [myWorkers, spaceWorkers]);
 
   const handleElementUpdate = useCallback(async (
     elementId: string,
@@ -231,6 +238,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
 
   const handleQuickAddSubmit = useCallback(async (inputs: NewElementInput[]) => {
     if (!userId) return;
+    let skippedAssignees = 0;
     for (const input of inputs) {
       try {
         // Personal Element: no object, owner = me. Honor the popup's shared
@@ -250,17 +258,12 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
         const assigneeIds = input.assigneeWorkerIds && input.assigneeWorkerIds.length > 0
           ? input.assigneeWorkerIds
           : (myWorkers[0] ? [myWorkers[0].id] : []);
-        for (const wid of assigneeIds) {
-          try {
-            await addElementAssignee({ element_id: created.id, worker_id: wid, role: 'assignee' });
-          } catch (assignErr) {
-            console.warn('Could not assign personal Element:', assignErr);
-          }
-        }
+        skippedAssignees += (await assignWorkersToElement(created.id, assigneeIds)).skipped.length;
       } catch (e) {
         console.error('Failed to create personal Element', e);
       }
     }
+    noticeSkippedAssignees(skippedAssignees);
     await fetchMine();
     await onRefresh?.();
   }, [userId, myWorkers, fetchMine, onRefresh]);
@@ -345,7 +348,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
         types={elementTypes}
-        workers={workerOptions.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
+        workers={popupWorkers.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
         availableLabels={labelOptions}
       />
 

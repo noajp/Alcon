@@ -21,6 +21,7 @@ import type { InitiativeHealth } from '@/ActivitySpace/strategy/initiative/initi
 import { NavPortfolioIcon, NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import type { Portfolio, StrategyWithObjects } from '@/types/database';
 import { createPortfolio, deletePortfolio, movePortfolio, PortfolioMoveRefused, setStrategyPortfolio, updatePortfolio, usePortfolios } from './data';
+import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 import {
   buildPortfolioTree, findNode, flattenTree, groupByPortfolio, initiativesInSpace, portfolioPath, rollupPortfolio, subtreeIds,
   type PortfolioNode, type PortfolioRollup,
@@ -412,6 +413,8 @@ function InitiativeRow({ strategy, health, onOpen, onRemove }: {
   strategy: StrategyWithObjects; health: InitiativeHealth | undefined; onOpen: () => void; onRemove?: () => void;
 }) {
   const { t } = useI18n();
+  // Archived Objects stay linked but are not counted.
+  const countObjects = useActiveObjectCount();
   const alerts = health ? health.risk.overdue + health.risk.stalled + health.risk.blocked : 0;
   const moved = health?.lastActivityAt != null ? formatRelative(new Date(health.lastActivityAt).toISOString()) : null;
   return (
@@ -428,7 +431,7 @@ function InitiativeRow({ strategy, health, onOpen, onRemove }: {
         )}
         {moved && <span className="hidden text-muted-foreground/70 sm:inline">{moved}</span>}
         {alerts > 0 && <span className="text-destructive">{t('{n} alerts', { n: String(alerts) })}</span>}
-        <span className="w-6 text-right" title={t('Objects')}>{strategy.objectIds.length}</span>
+        <span className="w-6 text-right" title={t('Objects')}>{countObjects(strategy.objectIds)}</span>
       </div>
       {onRemove ? (
         <Button variant="ghost" size="icon-xs" onClick={onRemove} className="mr-1 text-muted-foreground opacity-0 group-hover:opacity-100 focus:opacity-100"

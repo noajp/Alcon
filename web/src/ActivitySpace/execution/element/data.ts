@@ -461,11 +461,15 @@ export async function removeElementAssignee(id: string): Promise<void> {
     return any ? { objects, rootElements } : data;
   });
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('element_assignees')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select('id');
     if (error) throw error;
+    // RLS turns a refused delete into "no rows" (the Element is no longer
+    // visible); say so rather than leave the chip gone until the next read.
+    if (!data?.length) throw new Error('This assignee could not be removed.');
   } catch (err) {
     rollback();
     throw err;

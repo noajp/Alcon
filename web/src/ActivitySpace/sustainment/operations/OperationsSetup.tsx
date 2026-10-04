@@ -41,8 +41,7 @@ export function OperationsChoice({ label, value, options, onChange, disabled }: 
   );
 }
 
-export function OperationsSetup({ params, tables, columns, onChange, onDone, allowKindChange = true }: {
-  allowKindChange?: boolean;
+export function OperationsSetup({ params, tables, columns, onChange, onDone }: {
   params: OperationsParams;
   tables: { id: string; name: string }[];
   columns: DataTableColumn[];
@@ -50,36 +49,33 @@ export function OperationsSetup({ params, tables, columns, onChange, onDone, all
   onDone: () => void;
 }) {
   const template = useOperationsTemplate();
-  const [name, setName] = useState(params.kind === 'crm' ? 'Sales pipeline' : 'Inventory plan');
+  const [name, setName] = useState('Sales pipeline');
   const [useExisting, setUseExisting] = useState(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const fields = OPERATIONS_FIELDS[params.kind];
+  const fields = OPERATIONS_FIELDS;
   const ready = fields.filter(field => field.required).every(field => columns.some(column => column.id === params.fields[field.key] && field.allowedTypes.includes(column.type)));
 
   async function create() {
     try {
-      const result = await template.create(params.kind, name.trim());
+      const result = await template.create(name.trim());
       if (mounted.current) onChange(result);
     } catch { /* The hook retains the actionable error beside the form. */ }
   }
 
-  const crm = params.kind === 'crm';
   if (!params.tableId) return <div className="grid gap-8 py-4 sm:py-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:gap-16">
     <div className="space-y-6">
       <div className="space-y-2">
-        <h3 className="text-xl font-semibold">{crm ? 'Start with your opportunities' : 'Start with your inventory'}</h3>
-        <p className="max-w-lg text-sm leading-relaxed text-muted-foreground">{crm
-          ? 'Add the deals you are working on. Keep the next contact in view and see a forecast based on their value and likelihood.'
-          : 'Add your items, stock levels, and demand. See which supplies need attention before they interrupt your work.'}</p>
+        <h3 className="text-xl font-semibold">Start with your opportunities</h3>
+        <p className="max-w-lg text-sm leading-relaxed text-muted-foreground">Add the deals you are working on. Keep the next contact in view and see a forecast based on their value and likelihood.</p>
       </div>
       {!useExisting ? <form className="max-w-md space-y-3" onSubmit={event => { event.preventDefault(); void create(); }}>
         <label className="block space-y-2 text-sm">
-          <span>{crm ? 'Pipeline name' : 'Inventory name'}</span>
-          <input aria-label={crm ? 'Pipeline name' : 'Inventory name'} className={`${OPERATIONS_INPUT} bg-muted/40`} value={name} disabled={template.creating} onChange={event => setName(event.target.value)} />
+          <span>Pipeline name</span>
+          <input aria-label="Pipeline name" className={`${OPERATIONS_INPUT} bg-muted/40`} value={name} disabled={template.creating} onChange={event => setName(event.target.value)} />
         </label>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="primary" type="submit" size="md" disabled={template.creating || !name.trim()}>{template.creating ? 'Creating…' : crm ? 'Create pipeline' : 'Create inventory'}<ArrowRight size={14} /></Button>
+          <Button variant="primary" type="submit" size="md" disabled={template.creating || !name.trim()}>{template.creating ? 'Creating…' : 'Create pipeline'}<ArrowRight size={14} /></Button>
           <Button variant="ghost" type="button" size="md" disabled={template.creating} onClick={() => setUseExisting(true)}>Use an existing Table</Button>
         </div>
         {template.error && <p role="alert" className="text-sm text-destructive">{template.error}</p>}
@@ -88,24 +84,16 @@ export function OperationsSetup({ params, tables, columns, onChange, onDone, all
           <OperationsChoice label="Source Table" value={null} options={tables.map(table => ({ id: table.id, label: table.name }))} onChange={tableId => onChange({ tableId, fields: {} })} />
         </div>
         <p className="text-xs text-muted-foreground">{tables.length ? 'Next, choose the columns that contain the details for this plan.' : 'You do not have any available Tables yet. Create one to get started.'}</p>
-        <Button variant="ghost" onClick={() => setUseExisting(false)}>Back to creating {crm ? 'a pipeline' : 'inventory'}</Button>
+        <Button variant="ghost" onClick={() => setUseExisting(false)}>Back to creating a pipeline</Button>
       </div>}
       <p className="text-xs text-muted-foreground">Your data is private to your account. You can also edit it in Table.</p>
-      {allowKindChange && <details className="text-xs text-muted-foreground"><summary className="w-fit cursor-pointer rounded-sm py-2 hover:text-foreground focus-visible:bg-muted">Advanced</summary>
-        {allowKindChange && <div className="flex flex-wrap items-center gap-2 py-2"><span>Planner type</span><OperationsChoice label="Tool" value={params.kind} disabled={template.creating} options={[{ id: 'crm', label: 'CRM' }, { id: 'scm', label: 'SCM' }]}
-          onChange={kind => onChange({ kind: kind as OperationsParams['kind'], tableId: null, fields: {} })} /></div>}
-      </details>}
     </div>
     <ol className="space-y-5 border-t border-[var(--border-subtle)] pt-6 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
-      {(crm ? [
+      {[
         ['Add opportunities', 'Capture the customer, value, likelihood, and expected close.'],
         ['Follow up at the right time', 'Find overdue conversations and opportunities without a next step.'],
         ['See what is likely to close', 'Review a forecast for each currency, then turn follow-ups into Elements.'],
-      ] : [
-        ['Add stock and demand', 'Capture what you have, daily usage, and supplier lead times.'],
-        ['Spot gaps before they happen', 'See how long stock lasts and whether incoming supply arrives in time.'],
-        ['Plan the replenishment', 'Review suggested quantities and cost, then create Elements to act.'],
-      ]).map(([title, description], index) => <li key={title} className="flex gap-3">
+      ].map(([title, description], index) => <li key={title} className="flex gap-3">
         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground">{index + 1}</span>
         <div className="space-y-1"><p className="text-sm font-medium">{title}</p><p className="text-xs leading-relaxed text-muted-foreground">{description}</p></div>
       </li>)}
@@ -129,14 +117,12 @@ export function OperationsSetup({ params, tables, columns, onChange, onDone, all
         </div>)}
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="primary" disabled={!ready} onClick={onDone}>Open {crm ? 'pipeline' : 'inventory' }<ArrowRight size={14} /></Button>
+        <Button variant="primary" disabled={!ready} onClick={onDone}>Open pipeline<ArrowRight size={14} /></Button>
         <span className="text-xs text-muted-foreground">{ready ? 'Required details are connected.' : '* Connect these details to calculate your plan.'}</span>
       </div>
     </> : <p role="status" className="text-sm text-muted-foreground">No columns are available. Choose another Table, or add its columns in Table.</p>}
     <details className="text-xs text-muted-foreground"><summary className="w-fit cursor-pointer rounded-sm py-2 hover:text-foreground focus-visible:bg-muted">Advanced</summary>
-      <Button variant="ghost" onClick={() => onChange({ tableId: null, fields: {} })}>Start a new {crm ? 'pipeline' : 'inventory'}</Button>
-      {allowKindChange && <div className="flex flex-wrap items-center gap-2 py-2"><span>Planner type</span><OperationsChoice label="Tool" value={params.kind} options={[{ id: 'crm', label: 'CRM' }, { id: 'scm', label: 'SCM' }]}
-        onChange={kind => onChange({ kind: kind as OperationsParams['kind'], tableId: null, fields: {} })} /></div>}
+      <Button variant="ghost" onClick={() => onChange({ tableId: null, fields: {} })}>Start a new pipeline</Button>
     </details>
   </div>;
 }

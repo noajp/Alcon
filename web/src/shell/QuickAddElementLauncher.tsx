@@ -5,7 +5,8 @@ import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { QuickAddElementPopup, type NewElementInput } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
 import {
-  addElementAssignee,
+  assignWorkersToElement,
+  noticeSkippedAssignees,
   createElement,
   fetchAllWorkers,
   useDomains,
@@ -164,6 +165,7 @@ export function QuickAddElementLauncher({
   // Same three save scopes as the list views' quick-add handlers:
   // personal (owner_id = me) / Object / Domain-direct (object_id = null).
   const handleSubmit = async (inputs: NewElementInput[]) => {
+    let skippedAssignees = 0;
     for (const input of inputs) {
       try {
         const created = await createElement({
@@ -176,13 +178,10 @@ export function QuickAddElementLauncher({
           priority: input.priority ?? undefined,
           due_date: presetDueDate ?? undefined,
         });
-        for (const wid of input.assigneeWorkerIds ?? []) {
-          try {
-            await addElementAssignee({ element_id: created.id, worker_id: wid, role: 'assignee' });
-          } catch (e) { console.warn('Could not assign Element:', e); }
-        }
+        skippedAssignees += (await assignWorkersToElement(created.id, input.assigneeWorkerIds ?? [])).skipped.length;
       } catch (e) { console.error('Failed to create Element', e); }
     }
+    noticeSkippedAssignees(skippedAssignees);
     // Remember the landing Object so the next context-less C targets it too.
     const first = inputs[0];
     if (first && !first.personal && first.objectId) writeLastObjectId(first.objectId);

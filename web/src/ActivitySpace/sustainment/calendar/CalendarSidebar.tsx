@@ -7,7 +7,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { parseDateOnly, toDateOnlyString } from '@/Function/shared/dateUtils';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
-import { useWorkers } from '@/ActivitySpace/sustainment/team/data';
+import { useWorkersByIds } from '@/ActivitySpace/sustainment/team/data';
 import { miniMonthDays, monthOf, shiftMonth } from './schedule';
 import {
   setCalendarDay, setCalendarWorkerHidden, showAllCalendarWorkers,
@@ -32,8 +32,10 @@ export function CalendarSidebar() {
   const todayDate = parseDateOnly(today)!;
   const monthDate = parseDateOnly(`${month}-01`)!;
 
-  const { data: workers } = useWorkers();
   const onCalendar = useCalendarWorkerIds();
+  // People put on the calendar are read by id, so a pick from outside the
+  // active Space's roster still shows.
+  const workers = useWorkersByIds(onCalendar);
   const people = useMemo(() => workers.filter(worker => onCalendar.includes(worker.id)).sort((a, b) =>
     (a.type === 'human' ? 0 : 1) - (b.type === 'human' ? 0 : 1) || a.name.localeCompare(b.name)), [workers, onCalendar]);
 

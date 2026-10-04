@@ -11,6 +11,9 @@ import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { Button } from '@/ui/button';
 import { SettingsSection } from './SettingsSection';
+import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
+import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
+import { membershipErrorMessage } from '@/Function/membership/membershipErrors';
 
 // Cross-boundary read of the current ActivitySpace: every Space member (role
 // editable here) plus every Guest across the Space's Domains (a domain_member
@@ -47,6 +50,8 @@ export function MemberSettings() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  // Invited to the Space but not yet accepted: listed, never a member.
+  const { invitees, refetch: refetchInvitees } = useScopeInvitations('space', active?.id);
 
   const reload = useCallback(async () => {
     if (!active) return;
@@ -84,6 +89,7 @@ export function MemberSettings() {
   useEffect(() => {
     void reload();
   }, [reload]);
+  useWhenInvitationsSettle(invitees, () => void reload());
 
   const myRole = members.find((m) => m.user_id === user?.id)?.role ?? null;
   const isOwner = myRole === 'owner';
@@ -169,7 +175,7 @@ export function MemberSettings() {
       setMembers((list) => list.map((m) => (m.user_id === member.user_id ? { ...m, role: prevRole } : m)));
       setRowErrors((prev) => ({
         ...prev,
-        [member.user_id]: e instanceof Error ? e.message : 'Failed to update role',
+        [member.user_id]: membershipErrorMessage(e, 'Failed to update role'),
       }));
     } finally {
       setPendingUserId(null);
@@ -246,6 +252,7 @@ export function MemberSettings() {
             );
           })
         )}
+        <PendingInviteRows invitees={invitees} canCancel={(i) => isOwner || i.invitedBy === user?.id} onChanged={() => void refetchInvitees()} />
       </SettingsSection>
 
       <div className="mb-2 mt-8">

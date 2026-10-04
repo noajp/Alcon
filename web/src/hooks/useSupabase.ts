@@ -69,6 +69,7 @@ export {
   fetchObjectDomainIds,
   fetchObjectLabels,
   fetchObjectTabs,
+  fileObjectUnderDomains,
   moveObject,
   renameObjectPrefix,
   reorderObjects,
@@ -114,6 +115,8 @@ export {
   fetchCustomColumnsWithValues,
   fetchDomainCustomColumnsWithValues,
   fetchElementCustomColumnsWithValues,
+  isPropertyWriteRefused,
+  noticePropertyValueFailed,
   reorderCustomColumns,
   setCustomColumnObjectValue,
   setCustomColumnValue,
@@ -121,15 +124,23 @@ export {
 } from '@/Function/property/data';
 
 export {
+  assignWorkersToElement,
+  noticeSkippedAssignees,
+  noticeAssignmentFailed,
   createWorker,
   deleteWorker,
   fetchAllWorkers,
+  fetchAssignableWorkers,
   fetchWorkerAvailability,
   invalidateWorkersCache,
   updateWorker,
+  useAssignableWorkers,
+  useSelfWorker,
   useWorkerAvailability,
+  useWorkerById,
   useWorkerCommitments,
   useWorkers,
+  useWorkersByIds,
 } from '@/ActivitySpace/sustainment/team/data';
 
 export {
@@ -173,11 +184,10 @@ export {
 
 export {
   archiveNotification,
-  createNotification,
   fetchNotifications,
   markAllNotificationsRead,
   markNotificationRead,
-  notifyMany,
+  notifyAboutElement,
   useNotifications,
 } from '@/ActivitySpace/execution/element/notificationData';
 
@@ -217,6 +227,7 @@ export {
   pingAgentRuntime,
   startAgentRun,
   useAgentRun,
+  type AgentStartOutcome,
 } from '@/Function/copilot/agentData';
 
 export {

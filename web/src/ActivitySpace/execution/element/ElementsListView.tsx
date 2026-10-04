@@ -23,7 +23,9 @@ import { GanttView } from '@/ActivitySpace/execution/element/gantt';
 import { CalendarView } from '@/ActivitySpace/sustainment/calendar/CalendarView';
 import { CustomView } from '@/ActivitySpace/execution/element/custom';
 import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
-import { addElementAssignee } from '@/hooks/useSupabase';
+import { assignWorkersToElement, noticeSkippedAssignees, useAssignableWorkers } from '@/hooks/useSupabase';
+import { partitionAssignable } from '@/Function/shared/assignableWorkers';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { type ListSection } from '@/ActivitySpace/execution/object/ListTable';
 import { TabBar } from '@/shell/TabBar';
 import type { NavigationState } from '@/types/navigation';
@@ -187,6 +189,10 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   // popup hides the pill in that case.
   const { templates: elementTemplates } = useElementTemplates(activeDomainId ?? null);
   const { data: domainPhases } = usePhases(activeDomainId ?? null);
+  // QuickAdd's Assignee pill offers the Workers assignable in this Space.
+  const activeSpaceId = useActiveSpaceId();
+  const { data: popupWorkers } = useAssignableWorkers({ spaceId: activeSpaceId, domainId: activeDomainId ?? null });
+  // A template keeps only the assignees that are on that list.
   const quickAddTemplates = useMemo<QuickAddTemplate[]>(
     () => elementTemplates.map((t) => ({
       id: t.id,
@@ -195,11 +201,11 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
       status: t.status,
       priority: t.priority,
       labels: t.labels,
-      assigneeWorkerIds: t.assignee_worker_ids,
+      assigneeWorkerIds: partitionAssignable(t.assignee_worker_ids, popupWorkers).assignable,
       description: t.description,
       estimatedHours: t.estimated_hours,
     })),
-    [elementTemplates],
+    [elementTemplates, popupWorkers],
   );
 
   const objectsWithElements = useMemo<AlconObjectWithChildren[]>(() => {
@@ -463,6 +469,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
     // total failure comes back as a rejection instead of a quiet resolve.
     let createdAny = false;
     let lastError: unknown = null;
+    let skippedAssignees = 0;
 
     for (const input of inputs) {
       try {
@@ -480,16 +487,13 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
           estimated_hours: input.estimatedHours ?? null,
         });
         createdAny = true;
-        for (const wid of input.assigneeWorkerIds ?? []) {
-          try {
-            await addElementAssignee({ element_id: created.id, worker_id: wid, role: 'assignee' });
-          } catch (e) { console.warn('Could not assign Element:', e); }
-        }
+        skippedAssignees += (await assignWorkersToElement(created.id, input.assigneeWorkerIds ?? [])).skipped.length;
       } catch (e) {
         lastError = e;
         console.error('Failed to create Element', e);
       }
     }
+    noticeSkippedAssignees(skippedAssignees);
     await onRefresh?.();
     if (!createdAny && inputs.length > 0) {
       throw lastError ?? new Error('No Elements were created');
@@ -518,7 +522,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
           onClose={() => setQuickAddOpen(false)}
           onSubmit={handleQuickAddSubmit}
           types={elementTypes}
-          workers={workerOptions.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
+          workers={popupWorkers.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
           objects={objectFilterOptions}
           availableLabels={labelOptions}
           templates={quickAddTemplates}
@@ -648,7 +652,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
         types={elementTypes}
-        workers={workerOptions.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
+        workers={popupWorkers.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
         objects={objectFilterOptions}
         availableLabels={labelOptions}
         defaultObjectId={quickAddTargetObjectId}
@@ -697,7 +701,7 @@ function ElementsHierarchyHeader({
       </button>
       <div className="flex-1" />
       {onAdd && (
-        <Button variant="primary" size="icon-xs"
+        <Button variant="ghost" size="icon-xs"
           type="button"
           onClick={onAdd}
           title="Add Element"

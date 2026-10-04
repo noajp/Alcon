@@ -6,6 +6,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
 import { retainChannel } from '@/hooks/sharedRealtime';
+import { archiveStateChanged } from '@/Function/shared/objectArchive';
 import {
   type ExplorerData,
   patchElementInExplorer,
@@ -61,7 +62,7 @@ const WORKSPACE_TABLES = [
   'element_comments', 'element_reactions', 'element_edges', 'element_activity',
   'objects', 'workers', 'domains', 'worker_availability',
   'domain_members', 'object_members', 'activity_space_members', 'object_domains',
-  'widget_boards', 'tables', 'table_columns', 'table_rows', 'table_cells',
+  'membership_invitations', 'widget_boards', 'tables', 'table_columns', 'table_rows', 'table_cells',
   'strategies', 'strategy_objects', 'strategy_children', 'strategy_comments', 'portfolios',
   'phases', 'domain_approaches', 'approach_conditions', 'approach_contributions', 'approach_assessments', 'approach_reviews',
   'intents', 'intent_bindings', 'intent_lineage', 'intent_next_actions',
@@ -176,6 +177,10 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
   }
   if (['domains', 'domain_members', 'activity_space_members'].includes(d.table)) {
     invalidateSoon(qc, ['sustainment-domains']);
+  }
+  // Who can be assigned follows memberships (list_assignable_workers).
+  if (['domain_members', 'object_members', 'activity_space_members', 'object_domains'].includes(d.table)) {
+    invalidateSoon(qc, ['workers']);
   }
   if (['elements', 'element_assignees', 'element_objects'].includes(d.table)) {
     invalidateSoon(qc, ['worker-commitments']);
@@ -373,7 +378,24 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
     }
 
     case 'objects': {
+      invalidateSoon(qc, ['archived-objects']);
       if (d.type === 'UPDATE' && id) {
+        // Archiving or restoring moves the Object out of (or back into) the
+        // lists and its Elements out of the active reads: refetch, not patch.
+        // The Domains' Archived lists count as copies, so a restore by
+        // someone else is seen although no explorer list holds the Object.
+        const caches = [
+          ...qc.getQueriesData<ExplorerData>({ queryKey: ['explorer'] }).flatMap(([, data]) => data ? [data] : []),
+          ...qc.getQueriesData<{ id: string; archived_at?: string | null }[]>({ queryKey: ['archived-objects'] })
+            .flatMap(([, list]) => list ? [{ objects: list }] : []),
+        ];
+        if (archiveStateChanged(caches, id, (row as { archived_at?: string | null }).archived_at)) {
+          invalidateSoon(qc, ['explorer']);
+          invalidateSoon(qc, ['action-targets']);
+          invalidateSoon(qc, ['my-elements']);
+          invalidateSoon(qc, ['nowWork']);
+          return;
+        }
         forEachExplorer(qc, (data) => patchObjectInExplorer(data, id, row as Record<string, unknown>));
         return;
       }
@@ -403,6 +425,12 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
       invalidateSoon(qc, ['domains']);
       invalidateSoon(qc, ['my-space-ids']);
       invalidateSoon(qc, ['explorer']);
+      return;
+
+    // An invitation grants nothing until accepted, so only the invitation
+    // lists move; accepting arrives as a membership row of its own.
+    case 'membership_invitations':
+      invalidateSoon(qc, ['membership-invitations']);
       return;
 
     case 'strategies':

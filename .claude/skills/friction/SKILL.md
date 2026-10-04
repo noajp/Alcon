@@ -119,6 +119,7 @@ node ops/lease.mjs whoami                              # 保持者トークン C
 
 ## 実装規約
 
+- **Element を起票・着手するときは `start_date` / `due_date` も入れる。** 空のままだと Gantt / Calendar が機能しない。Object 全体の見通し（同じ Object の他 Element の期日、優先度）から逆算し、同じ日に固め打ちしない
 - **1 Element = 1 branch = 1 PR。** branch 名は `claude/fric-<prefix>-<slug>`、`origin/main` から分岐。branch は使い捨て
 - **セッション worktree は `main` を checkout しない。** `main` は primary checkout 専用で、参照をグローバルに占有する。同期したいなら detached HEAD（`git switch --detach origin/main`）
 - **マージまで担当する**: ① [code-review](../code-review/SKILL.md) による独立レビュー → ②指摘を修正・検証・Push して再レビュー → ③通過した head をマージ → ④同期と後片付け。**main 直 push は禁止**

@@ -13,6 +13,7 @@ import { NotificationSettings } from './NotificationSettings';
 import { SlaSettings } from './SlaSettings';
 import { LabelSettings } from './LabelSettings';
 import { ElementTemplateSettings } from './ElementTemplateSettings';
+import { IntegrationsSettings } from '@/Function/integrations/IntegrationsSettings';
 import { useActiveSettingsSection, useActiveSettingsTab, setActiveSettingsSection, SETTINGS_ITEMS, SETTINGS_ITEM_TITLES } from './settingsNav';
 import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 import { LanguageSelect } from '@/Function/i18n/LanguageSelect';
@@ -31,7 +32,7 @@ import { InitiativeJudgementSettings, PhaseDefaultsSettings, TimelineDisplaySett
 // Projects → Objects, Team(s) → Domain(s).
 //
 // Panels with real implementations (Profile / Security / Domain / Activity
-// space / Member / Notifications / Preferences, and the Elements tabs
+// space / Member / Integrations / Notifications / Preferences, and the Elements tabs
 // Labels / Templates / SLAs) hold their own backing-store wiring; the rest
 // fall through to ComingSoon. Objects and Elements are one page each with
 // tabs — see settingsNav.
@@ -57,6 +58,8 @@ export function SettingsView() {
           <PanelShell title={t('Domain')}><TeamSettings /></PanelShell>
         ) : active === 'members' ? (
           <PanelShell title={t('Member')}><MemberSettings /></PanelShell>
+        ) : active === 'integrations' ? (
+          <TabbedPanel id="integrations" tab={tab}><IntegrationsSettings tab={tab} /></TabbedPanel>
         ) : active === 'notifications' ? (
           <PanelShell title={t('Notifications')}><NotificationSettings /></PanelShell>
         ) : active === 'elements' ? (

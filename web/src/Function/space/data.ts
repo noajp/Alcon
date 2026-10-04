@@ -1,6 +1,7 @@
 'use client';
 
 import { fetchMySpaceIds, SPACE_IDS_QUERY_KEY } from '@/ActivitySpace/execution/domain/data';
+import { translate } from '@/Function/i18n/I18nProvider';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { ActivitySpace, ActivitySpaceInsert, ActivitySpaceUpdate } from '@/types/database';
@@ -39,21 +40,14 @@ export async function createActivitySpace(
   input: ActivitySpaceInsert & { user_id: string },
 ): Promise<ActivitySpace> {
   const { user_id, ...fields } = input;
+  // The database enrols the creator as the Space's owner in the same insert
+  // (activity_spaces_enrol_creator); the browser writes no membership rows.
   const { data, error } = await supabase
     .from('activity_spaces')
-    .insert(fields)
+    .insert({ ...fields, created_by: user_id })
     .select()
     .single();
   if (error) throw error;
-
-  // Enrol the creator as 'owner' so the membership-scoped RLS + roster work
-  // (mirrors createDomain's domain_members enrolment).
-  await supabase.from('activity_space_members').insert({
-    activity_space_id: data.id,
-    user_id,
-    role: 'owner',
-  });
-
   return data as ActivitySpace;
 }
 
@@ -69,8 +63,11 @@ export async function updateActivitySpace(id: string, updates: ActivitySpaceUpda
 }
 
 export async function deleteActivitySpace(id: string): Promise<void> {
-  const { error } = await supabase.from('activity_spaces').delete().eq('id', id);
-  if (error) throw error;
+  // RLS lets only owners delete, and a refused delete matches no rows rather
+  // than erroring; ask for the deleted ids so both failures are visible.
+  const { data, error } = await supabase.from('activity_spaces').delete().eq('id', id).select('id');
+  if (error) throw new Error(translate('The Space could not be deleted. Try again.'));
+  if (!data?.length) throw new Error(translate('Only an owner of this Space can delete it.'));
 }
 
 const SPACES_QUERY_KEY = ['spaces'] as const;

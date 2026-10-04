@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUserId } from '@/providers/authContext';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { ElementDependencies } from './ElementDependencies';
 import { CheckInDialog } from '../../home/now/CheckInDialog';
 import { STATUS, PRIORITY } from '@/shared/designTokens';
@@ -25,16 +25,20 @@ import { Calendar as DateCalendar } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
 import type { DateRange } from 'react-day-picker';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
+import { isAgentRunOpen } from '@/Function/copilot/agentData';
+import { AgentRunPanel, DelegateToAiButton } from './agent';
 import {
   updateElement,
   fetchElementWithDetails,
   updateSubelement,
   deleteSubelement,
-  fetchAllWorkers,
+  fetchAssignableWorkers,
   addElementAssignee,
   removeElementAssignee,
+  noticeAssignmentFailed,
   setCustomColumnValue,
-  notifyMany,
+  noticePropertyValueFailed,
+  notifyAboutElement,
   useAgentRun,
   useDomains,
   addDomainElementType,
@@ -65,6 +69,8 @@ import {
   useBoard,
   WidgetSurface,
   WidgetZone,
+  WidgetActionSlotProvider,
+  WidgetActionSlotTarget,
   ELEMENT_DETAIL_BOARD,
   type WidgetHost,
   type Zone,
@@ -85,7 +91,7 @@ import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
 import { Smile, FileText } from 'lucide-react';
-import { isCancelKey, isCommitEnter, isSubmitChord, useCancelOnEscape, useEscapeLayer } from '@/Function/shared/keyboard';
+import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NotePicker } from '@/ActivitySpace/sustainment/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/sustainment/notebook/LinkedNoteEmbed';
 import { logActivity, useElementActivityLog, invalidateElementActivity, mergeActivity, type ActivityKind } from './elementActivity';
@@ -283,16 +289,11 @@ function ElementDetailBody({
 
   // Esc goes back to the list this Element was opened from — one level.
   // Anything open above the page (a picker, the Subelement modal, a field
-  // cancelling its own edit) takes the key first; the page gets the next one.
+  // ending its own edit) takes the key first; the page gets the next one.
   // The root ref keeps an Escape typed into a field elsewhere (the sidebar's
   // rename, say) from counting as this page's.
   const rootRef = useRef<HTMLDivElement | null>(null);
   useEscapeLayer(true, onBack, rootRef);
-
-  // Escape in the title / description is a cancel: put the saved value back
-  // and make the blur that follows skip its save — see useCancelOnEscape.
-  const titleCancel = useCancelOnEscape();
-  const descriptionCancel = useCancelOnEscape();
 
   // Reactions on this Element — cached per Element, refreshed on toggle.
   const { reactions, refresh: refreshReactions } = useElementReactions(element.id);
@@ -311,7 +312,8 @@ function ElementDetailBody({
   const edges = { incoming: allEdges.incoming.filter(edge => edge.edge_type !== 'depends_on'),
     outgoing: allEdges.outgoing.filter(edge => edge.edge_type !== 'depends_on') };
 
-  // Workers for assignee management
+  // Workers assignable to this Element (its Space's people and AI). Already
+  // assigned Workers keep their names through element.assignees.
   const [allWorkers, setAllWorkers] = useState<Worker[]>([]);
   const [, setShowAssigneeDropdown] = useState(false);
 
@@ -380,9 +382,21 @@ function ElementDetailBody({
   // AI agent execution — Symphony-style autonomous run for this Element.
   // (The quick-start button was removed; the run still surfaces in comments.)
   const agent = useAgentRun(element.id);
+  const aiWorkers = useMemo(() => allWorkers.filter((w) => w.type === 'ai_agent'), [allWorkers]);
+  // Preselect the assigned AI only when it is one this Element can be handed to.
+  const assignedAiWorkerId = useMemo(
+    () => (element.assignees || [])
+      .map((a) => a.worker)
+      .find((w) => w?.type === 'ai_agent' && aiWorkers.some((ai) => ai.id === w.id))?.id ?? null,
+    [element.assignees, aiWorkers],
+  );
+  // Run again keeps the previous run's AI only while this Element can still be
+  // handed to it (agent_runs refuses any other); otherwise the assigned AI.
+  const rerunWorkerId = (previous: string | null | undefined) =>
+    previous && aiWorkers.some((ai) => ai.id === previous) ? previous : assignedAiWorkerId;
   // When a run finishes it moves the Element to "review" and posts its
   // deliverable as a comment — refresh the parent so the status updates.
-  // (The comments panel is remounted via a finished_at-based key below.)
+  // (The comments panel re-reads its thread as the run moves on: refreshKey.)
   const agentWasActive = useRef(false);
   // Multi-select for the sub-element checklist — same hook the Elements list
   // uses. `hasSubSelectionRef` lets a plain row click replace the selection
@@ -446,20 +460,59 @@ function ElementDetailBody({
     setEstimatedHours(element.estimated_hours?.toString() || '');
   }, [element.id, element.title, element.description, element.estimated_hours]);
 
-  useEffect(() => { fetchAllWorkers(domainId).then(setAllWorkers).catch(console.error); }, [domainId]);
+  useEffect(() => { fetchAssignableWorkers({ elementId: element.id }).then(setAllWorkers).catch(console.error); }, [element.id]);
   const handleCustomChange = useCallback(async (columnId: string, value: Json) => {
     try {
       await setCustomColumnValue(columnId, element.id, value);
       reloadCustomColumns();
     } catch (e) {
-      console.error('Failed to save property', e);
+      noticePropertyValueFailed(e);
     }
   }, [element.id, reloadCustomColumns]);
 
+  // What the title / description fields hold versus what was last sent, so
+  // an edit still pending when the view goes away is saved rather than lost.
+  // A detail opened inside a dialog closes on Escape at the document's
+  // capture phase, before the field's own Escape runs, and a field removed
+  // while focused gets no blur — so blur alone cannot be the only save.
+  const sentRef = useRef({ id: element.id, title: element.title, description: element.description || '' });
+  const draftRef = useRef({ title, description });
+  useEffect(() => { draftRef.current = { title, description }; }, [title, description]);
+  // What a close-time save needs after the view is gone: who to credit on
+  // the Activity rail and whom to tell the list changed (a dialog's owner
+  // reads its own query, not the explorer cache updateElement patches).
+  const closeRef = useRef({ author, onRefresh });
+  useEffect(() => { closeRef.current = { author, onRefresh }; }, [author, onRefresh]);
+  useEffect(() => {
+    sentRef.current = { id: element.id, title: element.title, description: element.description || '' };
+  }, [element.id, element.title, element.description]);
+  useEffect(() => () => {
+    const sent = sentRef.current;
+    const draft = draftRef.current;
+    const patch: { title?: string; description?: string | null } = {};
+    if (draft.title.trim() && draft.title.trim() !== sent.title) patch.title = draft.title.trim();
+    if (draft.description !== sent.description) patch.description = draft.description || null;
+    if (!Object.keys(patch).length) return;
+    const { author: by, onRefresh: refresh } = closeRef.current;
+    void updateElement(sent.id, patch)
+      .then(() => {
+        // The list first: the save landed, whatever happens to the rail.
+        refresh?.();
+        const record = (kind: ActivityKind, detail: string) =>
+          void logActivity(sent.id, kind, detail, by).catch((e) => console.error('Failed to record activity:', e));
+        if (patch.title !== undefined) record('renamed', `Renamed to “${patch.title}”`);
+        if (patch.description !== undefined) record('description', patch.description ? 'Updated description' : 'Cleared description');
+      })
+      .catch((e) => console.error('Failed to save on close', e));
+  }, []);
+
   // Handlers
   const handleTitleSave = async () => {
-    if (titleCancel.consumeCancel()) return;
-    if (title.trim() && title !== element.title) {
+    // An emptied title is not saved; show the saved one again rather than
+    // leaving the field blank until the next navigation.
+    if (!title.trim()) { setTitle(element.title); return; }
+    if (title !== element.title) {
+      sentRef.current = { ...sentRef.current, title: title.trim() };
       try {
         await updateElement(element.id, { title: title.trim() });
         log('renamed', `Renamed to “${title.trim()}”`);
@@ -469,8 +522,8 @@ function ElementDetailBody({
   };
 
   const handleDescriptionSave = async () => {
-    if (descriptionCancel.consumeCancel()) return;
     if (description !== (element.description || '')) {
+      sentRef.current = { ...sentRef.current, description };
       try {
         await updateElement(element.id, { description: description || null });
         log('description', description ? 'Updated description' : 'Cleared description');
@@ -493,20 +546,10 @@ function ElementDetailBody({
       // The status row is written by the element_activity trigger — from here,
       // from an agent, or from SQL alike — so ask the rail to look again.
       void invalidateElementActivity(element.id);
-      const assigneeUserIds = (element.assignees || [])
-        .map(a => a.worker?.user_id)
-        .filter((u): u is string => !!u && u !== user?.id);
-      if (assigneeUserIds.length > 0) {
-        const actorName = profile?.display_name || user?.email?.split('@')[0] || 'Someone';
-        await notifyMany(assigneeUserIds, {
-          actor_id: user?.id ?? null,
-          actor_name: actorName,
-          kind: 'status_change',
-          element_id: element.id,
-          title: `${actorName} changed status to ${newStatus.replace('_', ' ')}`,
-          body: element.title,
-        });
-      }
+      // StatusPicker also reports progress-only edits; only a real change is
+      // news. The RPC tells the assignees, bound to the status row just
+      // written (done / blocked come from the notify_element_status trigger).
+      if (newStatus !== element.status) await notifyAboutElement(element.id, 'status_change');
       onRefresh?.();
     } catch (e) { console.error(e); }
   };
@@ -557,19 +600,11 @@ function ElementDetailBody({
       await addElementAssignee({ element_id: element.id, worker_id: workerId, role: 'assignee', worker });
       if (worker) log('assigned', `Assigned ${worker.name}`);
       if (worker?.user_id && worker.user_id !== user?.id) {
-        const actorName = profile?.display_name || user?.email?.split('@')[0] || 'Someone';
-        await notifyMany([worker.user_id], {
-          actor_id: user?.id ?? null,
-          actor_name: actorName,
-          kind: 'assigned',
-          element_id: element.id,
-          title: `${actorName} assigned you to "${element.title}"`,
-          body: null,
-        });
+        await notifyAboutElement(element.id, 'assigned', workerId);
       }
       setShowAssigneeDropdown(false);
       onRefresh?.();
-    } catch (e) { console.error(e); }
+    } catch (e) { noticeAssignmentFailed(e); }
   };
 
   const handleRemoveAssignee = async (assigneeId: string) => {
@@ -578,7 +613,7 @@ function ElementDetailBody({
       await removeElementAssignee(assigneeId);
       if (removed?.worker?.name) log('unassigned', `Unassigned ${removed.worker.name}`);
       onRefresh?.();
-    } catch (e) { console.error(e); }
+    } catch (e) { noticeAssignmentFailed(e); }
   };
 
   // Note linking — pin one Note to this Element. The picker offers
@@ -654,6 +689,7 @@ function ElementDetailBody({
   );
 
   return (
+    <WidgetActionSlotProvider>
     <div ref={rootRef} className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Breadcrumb — data hierarchy only: Domain > Object > Element. */}
       <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
@@ -679,23 +715,26 @@ function ElementDetailBody({
           <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack} />
         </div>
         <div className="flex-1" />
-        {/* Start/Run lives in the right-rail AgentRunPanel only — no
-            duplicate header CTA. */}
+        {/* The rail's "Add widget" is page chrome, not content: it portals
+            here, beside the breadcrumb, instead of heading the rail. */}
+        <WidgetActionSlotTarget className="flex items-center gap-1" />
       </div>
 
       {/* Scrollable body — Linear-style two-column layout */}
       <div className="flex-1 overflow-auto">
         <div className={layout === 'reader' ? "mx-auto w-full max-w-4xl px-5 py-7 flex flex-col gap-8" : "max-w-7xl mx-auto px-8 py-8 flex gap-8"}>
-          <div className="flex-1 min-w-0 space-y-5">
+          <div className="flex-1 min-w-0 flex flex-col gap-6">
 
           {/* Title & description */}
           <div>
-            <div className="flex items-start gap-2 mb-6">
+            <div className="flex items-start gap-2 mb-2">
               {/* Auto-grow textarea so long titles wrap to multiple
-                  lines instead of being clipped. Enter saves (via blur);
-                  Shift+Enter inserts a newline within the title; Escape
-                  restores the saved title and is consumed here, so the
-                  page's own Escape (back to the list) is the next press.
+                  lines instead of being clipped. Enter and Escape both
+                  save (via blur) — the title autosaves, so Escape ends the
+                  edit rather than discarding it (Cmd+Z undoes while
+                  typing); Shift+Enter inserts a newline. Escape is
+                  consumed here, so the page's own Escape (back to the
+                  list) is the next press.
                   NOTE: the global base resets typed content (input /
                   textarea / contenteditable) to font-weight 400, which
                   beats a `font-semibold` utility — so the heading's
@@ -707,13 +746,8 @@ function ElementDetailBody({
                 onChange={(e) => setTitle(e.target.value)}
                 onBlur={handleTitleSave}
                 onKeyDown={(e) => {
-                  if (isCommitEnter(e) || isSubmitChord(e)) {
+                  if (isCommitEnter(e) || isSubmitChord(e) || isCancelKey(e)) {
                     e.preventDefault();
-                    e.currentTarget.blur();
-                  } else if (isCancelKey(e)) {
-                    e.preventDefault();
-                    titleCancel.cancel();
-                    setTitle(element.title);
                     e.currentTarget.blur();
                   }
                 }}
@@ -739,14 +773,10 @@ function ElementDetailBody({
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleDescriptionSave}
               onKeyDown={(e) => {
-                // Multi-line: Enter is a newline, Cmd/Ctrl+Enter saves.
-                if (isSubmitChord(e)) {
+                // Multi-line: Enter is a newline; Cmd/Ctrl+Enter and
+                // Escape end the edit and save.
+                if (isSubmitChord(e) || isCancelKey(e)) {
                   e.preventDefault();
-                  e.currentTarget.blur();
-                } else if (isCancelKey(e)) {
-                  e.preventDefault();
-                  descriptionCancel.cancel();
-                  setDescription(element.description || '');
                   e.currentTarget.blur();
                 }
               }}
@@ -756,11 +786,13 @@ function ElementDetailBody({
             />
           </div>
 
-          {/* Action row — reactions / Note link (icon-only). Sits flush
+          {/* Action row — reactions, Note link, approval and Share an update,
+              all borderless inline verbs. Sits flush
               with the title/description block (no extra horizontal
               padding) and wraps so reaction chips line up next to the
               affordances. */}
-          <div className="flex items-center gap-1 flex-wrap">
+          <ButtonAppearanceProvider appearance="inline">
+          <div className="-mt-3 -ml-1.5 flex items-center gap-0.5 flex-wrap">
             {/* Smile button → quick-emoji popover that toggles a
                 reaction on this Element. */}
             <div className="relative">
@@ -815,16 +847,23 @@ function ElementDetailBody({
               </div>
             )}
 
-            {/* (Agent quick-start button removed — the run still surfaces in
-                the comments thread; start it from elsewhere.) */}
+            {/* Hand the Element to an agent — it works the task with your
+                permissions and stops for your approval before external
+                writes (ADR 0027). */}
+            <DelegateToAiButton
+              aiWorkers={aiWorkers}
+              defaultWorkerId={assignedAiWorkerId}
+              disabled={isAgentRunOpen(agent.run)}
+              starting={agent.starting}
+              error={agent.error}
+              onStart={({ workerId, prompt }) => agent.start({ workerId, prompt, triggeredFrom: 'detail', domainId })}
+            />
 
             {/* Approval — one button that opens a menu to enable the workflow
                 and record a decision (Approve / Request changes / Reject).
                 Moved here from the right rail's "Approval" island. */}
             <ElementApprovalMenu element={element} onRefresh={onRefresh} />
-            <Button size="sm" onClick={() => setCheckInOpen(true)}>Share an update</Button>
-            {checkInOpen && <CheckInDialog element={element} onClose={() => setCheckInOpen(false)}
-              onSaved={() => { setCheckInOpen(false); onRefresh?.(); }} />}
+            <Button variant="ghost" size="sm" onClick={() => setCheckInOpen(true)}>Share an update</Button>
 
             {/* Existing reactions as toggleable chips, aggregated by
                 emoji so two thumbs-ups read as 👍 ×2 with my own
@@ -853,6 +892,13 @@ function ElementDetailBody({
               ));
             })()}
           </div>
+          </ButtonAppearanceProvider>
+          <AgentRunPanel
+            agent={agent}
+            onRunAgain={() => void agent.start({ workerId: rerunWorkerId(agent.run?.worker_id), triggeredFrom: 'detail', domainId })}
+          />
+          {checkInOpen && <CheckInDialog element={element} onClose={() => setCheckInOpen(false)}
+            onSaved={() => { setCheckInOpen(false); onRefresh?.(); }} />}
 
           {/* Linked Note — embedded inline once chosen. */}
           {element.note_id && (
@@ -866,6 +912,11 @@ function ElementDetailBody({
               between the linked Note and the Sub-elements so the read order
               is intent → its breakdown → discussion. Keyed by element.id so
               switching Elements resets the editing state. */}
+          {/* Direction, sub-elements and dependencies share one wrapping row:
+              an empty one is a single quiet "+" verb that sits beside the
+              others (Linear's "+ Add sub-issues"); a filled one takes the full
+              width with its own small heading. */}
+          <div className="-ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
           <ElementDirectionSection
             key={`direction-${element.id}`}
             element={element}
@@ -879,9 +930,9 @@ function ElementDetailBody({
               the only entry point is a small "+" at the right end of the
               header. Empty state still shows a labelled "Add sub-element"
               link so the affordance is obvious. */}
-          <div className="space-y-1.5 px-1">
+          <div className={totalSubs > 0 ? 'w-full space-y-1.5' : ''}>
             {totalSubs > 0 && (
-              <div className="flex items-center gap-2 text-[12px] font-semibold text-muted-foreground">
+              <div className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
                 <span>Sub-elements</span>
                 <span className="tabular-nums">{completedSubs}/{totalSubs}</span>
                 <div className="flex-1" />
@@ -911,12 +962,11 @@ function ElementDetailBody({
                 />
               ))}
               {totalSubs === 0 && (
-                <button
-                  onClick={() => setSubModal({ mode: 'create' })}
-                  className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground py-1 transition-colors"
-                >
-                  <Plus size={13} strokeWidth={2.5} /> Add sub-element
-                </button>
+                <ButtonAppearanceProvider appearance="inline">
+                  <Button variant="ghost" size="sm" onClick={() => setSubModal({ mode: 'create' })}>
+                    <Plus size={13} strokeWidth={2.5} />Add sub-element
+                  </Button>
+                </ButtonAppearanceProvider>
               )}
             </div>
           </div>
@@ -929,49 +979,27 @@ function ElementDetailBody({
             onClear={subSelection.clearSelection}
           />
 
-          <section className="space-y-2 px-1" aria-label="Dependencies">
-            <h2 className="text-[13px] font-semibold">Dependencies</h2>
-            <ElementDependencies elementId={element.id} spaceId={coordinationSpaceId ?? null}
-              onOpenElement={onOpenElement} onChanged={onRefresh} />
-          </section>
-
-          {layout === 'reader' && <section className="space-y-3 border-t border-border pt-5" aria-label="Activity">
-            <h2 className="text-[13px] font-semibold">Activity</h2>
-            <ActivityFeed entries={activityLog} compact />
-          </section>}
-
-          {/* The reader keeps changes next to their discussion. */}
-          <div>
-            <div className="h-px bg-border mb-3" />
-            <div className="mb-3 text-[13px] font-semibold text-foreground/95">
-              Comments
-            </div>
-            <ElementCommentsPanel
-              key={`comments-${element.id}-${agent.run?.finished_at ?? 'live'}`}
-              elementId={element.id}
-              elementTitle={element.title}
-              workers={allWorkers}
-              focusCommentId={focusCommentId}
-            />
+          <ElementDependencies elementId={element.id} spaceId={coordinationSpaceId ?? null}
+            onOpenElement={onOpenElement} onChanged={onRefresh} />
           </div>
 
           {/* Linked Elements */}
           {(edges.incoming.length > 0 || edges.outgoing.length > 0) && (
-            <div className="rounded-xl bg-muted/30 p-3">
-              <div className="flex items-center gap-1.5 px-1 pb-2">
-                <Link2 size={11} className="text-muted-foreground" />
-                <span className="text-[12px] font-semibold text-muted-foreground">Linked elements</span>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Link2 size={12} className="text-muted-foreground" />
+                <span className="text-[12px] font-medium text-muted-foreground">Linked elements</span>
               </div>
               <div className="space-y-1">
                 {edges.outgoing.map(edge => (
-                  <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1.5 px-2 bg-muted/30 rounded-md">
+                  <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1">
                     <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')}</span>
-                    <span className="font-semibold">{edge.related_element?.title || 'Unknown'}</span>
+                    <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
                   </div>
                 ))}
                 {edges.incoming.map(edge => (
-                  <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1.5 px-2 bg-muted/30 rounded-md">
-                    <span className="font-semibold">{edge.related_element?.title || 'Unknown'}</span>
+                  <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1">
+                    <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
                     <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')} this</span>
                   </div>
                 ))}
@@ -979,15 +1007,33 @@ function ElementDetailBody({
             </div>
           )}
 
+          {layout === 'reader' && <section className="space-y-3 border-t border-border pt-5" aria-label="Activity">
+            <h2 className="text-[13px] font-semibold">Activity</h2>
+            <ActivityFeed entries={activityLog} compact />
+          </section>}
+
+          {/* The reader keeps changes next to their discussion. */}
+          <div className={layout === 'reader' ? '' : 'mt-4 border-t border-border pt-8'}>
+            <h2 className="mb-5 text-[15px] font-medium text-foreground">Comments</h2>
+            <ElementCommentsPanel
+              key={`comments-${element.id}`}
+              refreshKey={agent.run ? `${agent.run.id}:${agent.run.status}:${agent.run.step_count}` : null}
+              elementId={element.id}
+              workers={allWorkers}
+              focusCommentId={focusCommentId}
+              onAskAgent={({ prompt, commentId, workerId }) =>
+                agent.start({ mode: 'reply', prompt, replyTo: commentId, workerId: workerId ?? assignedAiWorkerId, triggeredFrom: 'comment', domainId })}
+            />
+          </div>
+
           {/* Bottom spacer */}
           <div className="h-8" />
           </div>
 
-          {/* Right rail — Linear-style floating cards. Each section is its
-              own card with a small chevron header; rows hover-highlight
-              and open inline pickers. The bg is intentionally grey-ish
-              (zinc-100 / zinc-900/40) so the cards lift off the page. */}
-          <aside className={layout === 'reader' ? "w-full space-y-3" : "w-80 shrink-0 hidden lg:block space-y-3"}>
+          {/* Right rail — unboxed sections (RailCard): a small heading and its
+              rows, separated by space. Rows hover-highlight and open inline
+              pickers. */}
+          <aside className={layout === 'reader' ? "w-full space-y-6" : "w-72 shrink-0 hidden lg:block space-y-6"}>
             {/* What this Element is standing on — the decisions and
                 assumptions the Initiative bound to it. Above Properties for the
                 same reason Initiative intent sits above them on an Object: why
@@ -1139,19 +1185,6 @@ function ElementDetailBody({
                 </PopoverContent>
               </Popover>
 
-              {/* Inset hairline under Date — soft section break before the
-                  Custom Property block. mx-2 keeps it off the card edges so it
-                  reads as a divider, not a full rule. */}
-              <div className="mx-2 mt-4 mb-2 h-px bg-border/50" />
-
-              {/* Custom Property section — the add-property "+" relocated here
-                  from the card header, with a label so the affordance is
-                  explicit rather than a bare "+" in the corner. */}
-              <div className="flex items-center justify-between px-2 py-1">
-                <span className="text-[12px] font-semibold text-muted-foreground">Custom fields</span>
-
-              </div>
-
               {/* Assignees */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1234,10 +1267,15 @@ function ElementDetailBody({
                 />
               </label>
 
-              {/* Custom Properties (object-scoped) — editable value + inline add. */}
+              {/* Custom Properties (object-scoped). Assignee, Lease and Estimate
+                  are built-in fields and sit with the others above; this
+                  heading only appears when the Object defines fields of its own. */}
+              {customColumns.length > 0 && (
+                <div className="px-2 pt-4 pb-1 text-[12px] font-medium text-muted-foreground">Custom fields</div>
+              )}
               {customColumns.map((col) => (
-                <div key={col.id} className="flex items-center gap-2 px-2 py-2">
-                  <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground">{col.name}</span>
+                <div key={col.id} className="flex items-center gap-2 px-2 min-h-8">
+                  <span className="shrink-0 w-24 text-left text-[12px] text-muted-foreground">{col.name}</span>
                   <div className="flex-1 min-w-0">
                     <CustomColumnCell
                       column={col}
@@ -1261,7 +1299,7 @@ function ElementDetailBody({
               }
             >
               {(element.labels?.length ?? 0) === 0 ? (
-                <div className="px-2 py-1.5 text-[11px] text-muted-foreground/60">No label yet…</div>
+                <div className="px-2 h-8 flex items-center text-[13px] text-muted-foreground">No labels</div>
               ) : (
                 <div className="px-2 py-1.5">
                   <LabelEditor labels={element.labels ?? []} />
@@ -1306,15 +1344,9 @@ function ElementDetailBody({
         />
       )}
     </div>
+    </WidgetActionSlotProvider>
   );
 }
-
-// ============================================
-// Right-rail card — Linear-style floating block.
-// ============================================
-// RailCard moved to @/Function/shared/RailCard (shared with the Object overview).
-
-// RailRow moved to @/Function/shared/RailRow (shared with the Object overview).
 
 // ============================================
 // Type picker — the Element's required `type`.

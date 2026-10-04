@@ -20,6 +20,19 @@ export function useMyObjectMemberships(userId: string | null) {
   });
 }
 
+export function useMyObjectRoles(userId: string | null) {
+  return useQuery({
+    queryKey: ['my-object-roles', userId],
+    enabled: !!userId,
+    staleTime: 60_000,
+    queryFn: async (): Promise<ReadonlyMap<string, string>> => {
+      const { data, error } = await supabase.from('object_members').select('object_id, role').eq('user_id', userId!);
+      if (error) throw error;
+      return new Map((data ?? []).map((r) => [r.object_id as string, r.role as string]));
+    },
+  });
+}
+
 export function useMyDomainRoles(userId: string | null) {
   return useQuery({
     queryKey: ['my-domain-roles', userId],

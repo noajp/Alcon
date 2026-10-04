@@ -9,8 +9,16 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { CONTROL } from "@/shared/designTokens"
 
-const ButtonAppearance = React.createContext<'control' | 'navigation'>('control');
-export function ButtonAppearanceProvider({ children, appearance }: { children: React.ReactNode; appearance: 'control' | 'navigation' }) {
+/**
+ * - control: the default — fine border, capsule.
+ * - navigation: sidebar / rail / launcher — no border, selection by ground.
+ * - inline: an affordance inside a document body (add a sub-element, link a
+ *   Note, share an update). No border and a muted label, so the page reads
+ *   as content and the verbs recede until hovered.
+ */
+type Appearance = 'control' | 'navigation' | 'inline';
+const ButtonAppearance = React.createContext<Appearance>('control');
+export function ButtonAppearanceProvider({ children, appearance }: { children: React.ReactNode; appearance: Appearance }) {
   return <ButtonAppearance.Provider value={appearance}>{children}</ButtonAppearance.Provider>;
 }
 
@@ -126,7 +134,8 @@ function Button({
       data-size={size}
       data-shape={shape}
       className={cn(buttonVariants({ variant, size, align: resolvedAlign, shape, multiline, className }),
-        appearance === 'navigation' && 'rounded-[var(--control-tab-radius)] border-transparent hover:border-transparent aria-pressed:border-transparent aria-selected:border-transparent'
+        appearance !== 'control' && 'rounded-[var(--control-tab-radius)] border-transparent hover:border-transparent aria-pressed:border-transparent aria-selected:border-transparent',
+        appearance === 'inline' && variant === 'ghost' && 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] font-normal'
       )}
       {...props}
     >

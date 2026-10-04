@@ -7,9 +7,8 @@ import { useCallback, useState, type ReactElement, type ReactNode } from 'react'
 import type { DateRange } from 'react-day-picker';
 import { CalendarIcon, Menu, Plus, Check, Tag, X } from 'lucide-react';
 import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
-import { addElementAssignee, removeElementAssignee, fetchAllWorkers } from '@/hooks/useSupabase';
+import { addElementAssignee, removeElementAssignee, fetchAssignableWorkers, useWorkerById, noticeAssignmentFailed } from '@/hooks/useSupabase';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
-import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
 import { ReachHint, WorkerAvatar, WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
@@ -21,7 +20,7 @@ import { MenuShell } from '@/Function/shared/menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
-import { CustomColumnCell, CellText, CELL_TRIGGER_BASE, CELL_TRIGGER_EMPTY, CELL_POPOVER_RADIUS } from '@/Function/property/CustomColumnCell';
+import { CustomColumnCell, CellText, EmptyCellMark, CELL_TRIGGER_BASE, CELL_TRIGGER_EMPTY, CELL_POPOVER_RADIUS } from '@/Function/property/CustomColumnCell';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { PriorityPicker } from '@/Function/shared/PriorityPicker';
 import { StatusPicker } from '@/ActivitySpace/execution/element/StatusPicker';
@@ -113,7 +112,7 @@ export function TypeCell({
     <button
       type="button"
       disabled={!canEdit}
-      className={`${CELL_TRIGGER_BASE} ${current ? '' : 'text-amber-600 dark:text-amber-400'}`}
+      className={`${CELL_TRIGGER_BASE} ${current ? '' : CELL_TRIGGER_EMPTY}`}
     >
       <CellText>{current ?? 'Set type'}</CellText>
     </button>
@@ -433,7 +432,7 @@ export function ElementCell({
     return (
       <td className="table-cell px-1.5 py-1 max-w-0 overflow-hidden">
         {empty ? (
-          <span className={`${CELL_TRIGGER_BASE} ${CELL_TRIGGER_EMPTY}`}>Empty</span>
+          <span className={`${CELL_TRIGGER_BASE} ${CELL_TRIGGER_EMPTY}`}><EmptyCellMark /></span>
         ) : (
           <span className="inline-flex items-center gap-1 max-w-full overflow-hidden">
             {homes.slice(0, 2).map((o) => (
@@ -462,15 +461,14 @@ export function ElementCell({
     // The "Due date" column shows the DUE date only — not the start→due range.
     // (start_date is still editable via the popover for the Gantt, just not
     // rendered as a range here.)
-    const display = dateString ? formatDateShort(dateString) : 'Empty';
+    const display = dateString ? formatDateShort(dateString) : null;
     const trigger = (
       <button
         type="button"
         disabled={!canUpdate}
         className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? (isOverdue ? 'text-[var(--status-danger)]' : '') : CELL_TRIGGER_EMPTY}`}
       >
-        <CalendarIcon size={11} className="opacity-60" />
-        <CellText>{display}</CellText>
+        {display ? <><CalendarIcon size={11} className="opacity-60" /><CellText>{display}</CellText></> : <EmptyCellMark />}
       </button>
     );
     return (
@@ -506,7 +504,8 @@ export function ElementCell({
 // Reads the current set from el.assignees; add/remove write element_assignees
 // directly, then onRefresh reloads the row so the chips reflect the new set.
 // Read-only (plain chips, no dropdown) when canUpdate is false or onRefresh
-// isn't wired. Workers are fetched lazily on first open.
+// isn't wired. The Workers assignable to this Element are fetched lazily on
+// first open.
 function AssigneeCell({
   el, canUpdate, onRefresh,
 }: {
@@ -521,7 +520,7 @@ function AssigneeCell({
 
   const display = (
     <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
-      {empty ? 'Empty' : all.length === 1 ? (
+      {empty ? <EmptyCellMark /> : all.length === 1 ? (
         <>
           <WorkerAvatar worker={all[0].worker ?? null} size={16} />
           <CellText>{all[0].worker?.name ?? 'Unknown'}</CellText>
@@ -541,7 +540,7 @@ function AssigneeCell({
   const handleOpen = (next: boolean) => {
     setOpen(next);
     if (next && workers.length === 0) {
-      fetchAllWorkers(getActiveDomainId()).then(setWorkers).catch((e) => console.error('Failed to load workers', e));
+      fetchAssignableWorkers({ elementId: el.id }).then(setWorkers).catch((e) => console.error('Failed to load workers', e));
     }
   };
   const handleAdd = async (workerId: string) => {
@@ -549,13 +548,13 @@ function AssigneeCell({
       await addElementAssignee({ element_id: el.id, worker_id: workerId, role: 'assignee', worker: workers.find((w) => w.id === workerId) });
       setOpen(false);
       await onRefresh();
-    } catch (e) { console.error('Failed to add assignee', e); }
+    } catch (e) { noticeAssignmentFailed(e); }
   };
   const handleRemove = async (assigneeId: string) => {
     try {
       await removeElementAssignee(assigneeId);
       await onRefresh();
-    } catch (e) { console.error('Failed to remove assignee', e); }
+    } catch (e) { noticeAssignmentFailed(e); }
   };
 
   return (
@@ -698,7 +697,7 @@ export function DueDateCell({
 }) {
   const dateString = obj.due_date ? obj.due_date.slice(0, 10) : null;
   const selected = parseDateOnly(dateString);
-  const display = dateString ? formatDateShort(dateString) : 'Empty';
+  const display = dateString ? formatDateShort(dateString) : null;
   const canEdit = !!onObjectUpdate;
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
   const trigger = (
@@ -707,8 +706,7 @@ export function DueDateCell({
       disabled={!canEdit}
       className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? '' : CELL_TRIGGER_EMPTY}`}
     >
-      <CalendarIcon size={11} className="opacity-60" />
-      <CellText>{display}</CellText>
+      {display ? <><CalendarIcon size={11} className="opacity-60" /><CellText>{display}</CellText></> : <EmptyCellMark />}
     </button>
   );
   if (!canEdit) return trigger;
@@ -734,8 +732,9 @@ export function DueDateCell({
 }
 
 // Lead cell — single-select Worker picker for objects.lead_id. Resolves the
-// current lead from the passed worker list (for display) and offers a dropdown
-// of all workers (+ Clear) to set it. Read-only chip when onObjectUpdate isn't
+// current lead by id (from the passed list, else read on its own, so a lead
+// outside the list still shows by name) and offers a dropdown of the passed
+// workers (+ Clear) to set it. Read-only chip when onObjectUpdate isn't
 // wired. Exported for the same cross-surface reuse as DueDateCell above.
 export function LeadCell({
   obj, workers, onObjectUpdate,
@@ -745,10 +744,10 @@ export function LeadCell({
   onObjectUpdate?: (objectId: string, updates: { lead_id?: string | null }) => void | Promise<void>;
 }) {
   const empty = !obj.lead_id;
-  const lead = obj.lead_id ? workers.find((w) => w.id === obj.lead_id) ?? null : null;
+  const lead = useWorkerById(obj.lead_id ?? null, workers);
   const display = (
     <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
-      {empty ? 'Empty' : (
+      {empty ? <EmptyCellMark /> : (
         <>
           <WorkerAvatar worker={lead} size={16} />
           <CellText>{lead?.name ?? 'Unknown'}</CellText>

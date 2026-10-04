@@ -12,6 +12,8 @@ import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { SettingsSection, SettingsRow } from './SettingsSection';
 import { InviteUserDialog } from './InviteUserDialog';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
+import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
+import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
 
 interface SpaceMember {
   user_id: string;
@@ -42,6 +44,7 @@ export function ActivitySpaceSettings() {
   const [saving, setSaving] = useState(false);
   const [members, setMembers] = useState<SpaceMember[]>([]);
   const [showInvite, setShowInvite] = useState(false);
+  const { invitees, refetch: refetchInvitees } = useScopeInvitations('space', active?.id);
 
   const [logoValue, setLogoValue] = useState<string | null>(null);
   const [logoOpen, setLogoOpen] = useState(false);
@@ -85,6 +88,7 @@ export function ActivitySpaceSettings() {
   useEffect(() => {
     void reloadMembers();
   }, [reloadMembers]);
+  useWhenInvitationsSettle(invitees, () => void reloadMembers());
 
   const myRole = members.find((m) => m.user_id === user?.id)?.role ?? null;
   const isOwner = myRole === 'owner';
@@ -175,6 +179,7 @@ export function ActivitySpaceSettings() {
       window.location.reload();
     } catch (e) {
       console.error('Delete failed', e);
+      if (e instanceof Error && e.message) await appDialog.alert(e.message);
     }
   };
 
@@ -307,6 +312,7 @@ export function ActivitySpaceSettings() {
             </div>
           ))
         )}
+        <PendingInviteRows invitees={invitees} canCancel={(i) => isOwner || i.invitedBy === user?.id} onChanged={() => void refetchInvitees()} />
       </SettingsSection>
 
       <SettingsSection title="Danger zone">
@@ -325,10 +331,11 @@ export function ActivitySpaceSettings() {
         <InviteUserDialog
           target={{ kind: 'space', spaceId: active.id }}
           existingMemberIds={new Set(members.map((m) => m.user_id))}
+          pendingInviteeIds={new Set(invitees.map((i) => i.userId))}
           onClose={() => setShowInvite(false)}
           onInvited={() => {
             setShowInvite(false);
-            void reloadMembers();
+            void refetchInvitees();
           }}
         />
       )}

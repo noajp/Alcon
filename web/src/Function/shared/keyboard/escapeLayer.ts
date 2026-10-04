@@ -10,8 +10,8 @@
 //
 // A layer registers when it opens and leaves when it closes. Escape goes to
 // the layer that opened last, and only to it. An Escape another handler has
-// already consumed (`defaultPrevented` — a Radix layer, or a field cancelling
-// its own edit) is not delivered at all, and an Escape that ends an IME
+// already consumed (`defaultPrevented` — a Radix layer, or a field ending its
+// own edit) is not delivered at all, and an Escape that ends an IME
 // composition is the IME's, not ours.
 
 export interface EscapeLayerOptions {

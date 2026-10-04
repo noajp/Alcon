@@ -49,7 +49,7 @@ const DEFAULT_COLUMN_WIDTH = 144;
 // + persistence reuse the same code path.
 export const NAME_COL_KEY = '__name__';
 // Name can shrink on compact layouts while retaining a readable title.
-const NAME_DEFAULT_WIDTH = 360;
+const NAME_DEFAULT_WIDTH = 520;
 const NAME_MIN_WIDTH = 240;
 const NAME_MAX_WIDTH = 1200;
 

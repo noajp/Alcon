@@ -57,3 +57,13 @@
 | [0023](0023-domain-approaches-preserve-the-basis-of-judgment.md) | Domain の構想と判断根拠を保存する |
 | [0024](0024-generated-apps-live-in-object-widgets.md) | Objectのウィジェット内で生成アプリと入力を分けて保存する |
 | [0025](0025-generated-apps-read-scoped-object-context.md) | 生成アプリに配置先Objectの実データ読み取り契約を提供する |
+| [0026](0026-external-ai-reaches-the-board-through-mcp-with-the-callers-rls.md) | 外部 AI は MCP（Edge Function）から本人の RLS で盤面を読み書きする |
+| [0027](0027-agents-act-on-elements-with-the-callers-rls-and-stop-for-approval.md) | エージェントは本人の RLS で Element を代行し、外部への書き込みは承認を通す |
+| [0028](0028-workers-belong-to-a-space.md) | Worker は Space に属する — 名前は Element に付いてきて、割り当ては境界に従う |
+| [0029](0029-membership-takes-effect-on-acceptance.md) | 所属は招かれた本人の承諾で成立する — 招待は別の表に置き、RPC だけが書く |
+| [0030](0030-unused-objects-are-archived-and-domains-with-objects-stay.md) | 使わなくなった Object はアーカイブし、Object が残る Domain は削除しない |
+| [0031](0031-scm-owns-its-ledger-and-acts-within-a-policy.md) | SCM は専用の台帳を持ち、人が示した方針の範囲で AI が発注する |
+| [0032](0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md) | 外部の呼び出しは PAT か OAuth で認証し、関数が本人の短命な JWT を発行する |
+| [0033](0033-the-rest-api-is-the-mcp-tool-layer-over-http.md) | REST API は MCP と同じツール層を HTTP の形で出す |
+| [0034](0034-mcp-clients-sign-in-through-supabase-oauth-and-their-tokens-only-work-through-alcon.md) | MCP クライアントは Supabase の OAuth でサインインし、そのトークンは Alcon の関数でだけ使える |
+| [0035](0035-oauth-integrations-sign-in-through-an-edge-function-and-keep-tokens-in-vault.md) | OAuth の連携は Edge Function でサインインし、トークンは Vault にだけ置く |

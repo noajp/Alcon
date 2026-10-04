@@ -18,6 +18,7 @@ vi.mock('@/lib/supabase', () => {
       select(_columns: string, selectOptions?: { count?: string }) { call.count = selectOptions?.count; return query; },
       eq(column: string, value: unknown) { filters.push((row) => row[column] === value); return query; },
       in(column: string, values: unknown[]) { filters.push((row) => values.includes(row[column])); return query; },
+      is(column: string, value: unknown) { filters.push((row) => (row[column] ?? null) === value); return query; },
       order(column: string) { order.push(column); return query; },
       range(from: number, to: number) { call.start = from; end = to; return query; },
       abortSignal(signal: AbortSignal) { call.signal = signal; return query; },
@@ -47,7 +48,7 @@ import { buildTeamRoster } from '@/ActivitySpace/sustainment/team/teamRoster';
 
 const RPC = 'get_space_guest_domain_members';
 const worker = (id: string, userId: string) => ({
-  id, name: id, user_id: userId, object_id: null, type: 'human', display_id: null,
+  id, name: id, user_id: userId, object_id: null, activity_space_id: null, type: 'human', display_id: null,
   seq_number: null, role: null, email: null, avatar_url: null, ai_model: null,
   ai_config: null, status: 'active', capacity_hours_per_day: null, created_at: null, updated_at: null,
 } satisfies Worker);

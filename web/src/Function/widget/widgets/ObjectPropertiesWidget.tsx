@@ -6,10 +6,12 @@ import { Calendar, Check, User as UserIcon, X } from 'lucide-react';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import {
   fetchDomainCustomColumnsWithValues,
+  noticePropertyValueFailed,
   setCustomColumnObjectValue,
   updateObject,
   useDomains,
   useStrategies,
+  useWorkerById,
   useWorkers,
 } from '@/hooks/useSupabase';
 import type { Domain, Json, Worker } from '@/types/database';
@@ -91,8 +93,8 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
     domains.find((d) => d.id === object?.domain_id) ?? null;
   const objectTypes: string[] = primaryDomain?.object_types ?? [];
 
-  const leadWorker: Worker | null =
-    (object?.lead_id ? allWorkers.find((w) => w.id === object.lead_id) : null) ?? null;
+  // Resolved by id: a lead from outside the picker's list still shows by name.
+  const leadWorker: Worker | null = useWorkerById(object?.lead_id ?? null, allWorkers);
 
   // Custom Properties (domain-scoped) for this Object — the same columns the
   // Object list shows, surfaced here as editable property rows. Fetched in an
@@ -127,7 +129,7 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
       await setCustomColumnObjectValue(columnId, objectId, value);
       setReloadToken((n) => n + 1);
     } catch (e) {
-      console.error('Failed to save property', e);
+      noticePropertyValueFailed(e);
     }
   }, [objectId]);
 
@@ -208,7 +210,7 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
         label={
           <span className="flex items-center gap-2 w-full">
             <SegmentedProgress value={stats.progress} className="flex-1" />
-            <span className="text-[11px] tabular-nums text-foreground/80 shrink-0">
+            <span className="text-[12px] tabular-nums text-muted-foreground shrink-0">
               {stats.progress}%
             </span>
           </span>
@@ -222,7 +224,7 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
           <span className="tabular-nums">
             {stats.done}/{stats.total} done
             {stats.inProgress > 0 && (
-              <span className="ml-1.5 text-[var(--status-warning)]">· {stats.inProgress} in progress</span>
+              <span className="ml-1.5 text-muted-foreground">· <span className="text-[var(--element-status-in-progress)]">{stats.inProgress} in progress</span></span>
             )}
             {stats.overdue > 0 && (
               <span className="ml-1.5 text-[var(--status-danger)]">· {stats.overdue} overdue</span>
@@ -232,8 +234,8 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
       />
 
       {customCols.map((col) => (
-        <div key={col.id} className="flex items-center gap-2 px-2 py-2">
-          <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground">{col.name}</span>
+        <div key={col.id} className="flex items-center gap-2 px-2 min-h-8">
+          <span className="shrink-0 w-24 text-left text-[12px] text-muted-foreground">{col.name}</span>
           <div className="flex-1 min-w-0">
             <CustomColumnCell
               column={col}

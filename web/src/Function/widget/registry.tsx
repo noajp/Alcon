@@ -58,13 +58,19 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'operations-planner': {
     type: 'operations-planner',
     label: 'Operations planner',
-    description: 'CRM forecasts and follow-ups, or SCM stock coverage and replenishment',
+    description: 'CRM forecasts and follow-ups from a pipeline Table',
     group: 'plan',
     accepts: ['me', 'domain', 'object', 'initiative'],
     zones: ['main'],
     defaultSize: 'full',
     normalizeParams: normalizeOperationsParams,
     load: async () => (await import('./widgets/OperationsPlannerWidget')).default,
+  },
+  'scm-risks': {
+    type: 'scm-risks', label: 'Supply risks',
+    description: 'Items that will run out first in this Space, from the SCM plan',
+    group: 'plan', accepts: ['me'], zones: ['main', 'rail'], singleton: true, defaultSize: 'half',
+    load: async () => (await import('./widgets/ScmRiskWidget')).ScmRiskWidget,
   },
   'data-view': {
     type: 'data-view',

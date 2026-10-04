@@ -5,7 +5,8 @@ import { Button } from '@/ui/button';
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import type { ElementPriority } from '@/types/database';
-import { updateElement, createElement, useWorkers, addElementAssignee, removeElementAssignee, useElementCommentActivity, withCommentActivity } from '@/hooks/useSupabase';
+import { updateElement, createElement, useAssignableWorkers, addElementAssignee, removeElementAssignee, noticeAssignmentFailed, useElementCommentActivity, withCommentActivity } from '@/hooks/useSupabase';
+import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { Skeleton } from '@/ui/skeleton';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
@@ -22,6 +23,7 @@ import { formatElementDate, toDateOnlyString } from '@/Function/shared/dateUtils
 import { CardAgentControl } from '../agent';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { ActivitySignal } from '../ActivitySignal';
+import { isCancelKey, isCommitEnter, isSubmitChord } from '@/Function/shared/keyboard';
 
 // A card title reads at most three lines — beyond that it ellipsises, and the
 // inline rename box grows to the same three lines before it scrolls. Both
@@ -43,14 +45,21 @@ const COLUMNS: { status: ElementStatus; label: string }[] = [
 
 interface ElementCardProps {
   element: ElementWithDetails;
-  workers: Worker[];
   onRefresh?: () => void;
   /** A plain click on the card (not a drag, not one of its inline controls)
    *  opens the Element — the same gesture every other list surface has. */
   onOpen?: (element: ElementWithDetails) => void;
 }
 
-function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) {
+function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
+  // Who can be assigned to THIS Element, read when the assignee menu opens;
+  // the people already on it stay listed so they can be removed.
+  const [assigneeMenuOpen, setAssigneeMenuOpen] = useState(false);
+  const { data: candidates } = useAssignableWorkers({ elementId: element.id }, assigneeMenuOpen);
+  const workers = useMemo(
+    () => withCurrentWorkers(candidates, (element.assignees ?? []).map((a) => a.worker as Worker | null | undefined)),
+    [candidates, element.assignees],
+  );
   const draggingRef = React.useRef(false);
   const startPosRef = React.useRef<{ x: number; y: number } | null>(null);
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
@@ -78,7 +87,8 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
   const saveTitle = async () => {
     setEditingTitle(false);
     const next = titleDraft.trim();
-    if (next && next !== element.title) {
+    if (!next) { setTitleDraft(element.title); return; }
+    if (next !== element.title) {
       try { await updateElement(element.id, { title: next }); onRefresh?.(); }
       catch (e) { console.error('Failed to rename element', e); }
     }
@@ -97,13 +107,13 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
     try {
       await addElementAssignee({ element_id: element.id, worker_id: w.id, role: 'assignee', worker: w });
       onRefresh?.();
-    } catch (e) { console.error('Failed to update assignee', e); }
+    } catch (e) { noticeAssignmentFailed(e); }
   };
   const removeAssignee = async (assigneeId: string) => {
     try {
       await removeElementAssignee(assigneeId);
       onRefresh?.();
-    } catch (e) { console.error('Failed to update assignee', e); }
+    } catch (e) { noticeAssignmentFailed(e); }
   };
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
@@ -135,7 +145,7 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
         if (!(e.target instanceof Node) || !e.currentTarget.contains(e.target)) return;
         onOpen?.(element);
       }}
-      className="rounded-xl border border-border bg-card hover:shadow-sm transition-shadow cursor-grab active:cursor-grabbing"
+      className="group/card rounded-xl border border-border bg-card hover:border-[var(--border-strong)] transition-colors cursor-grab active:cursor-grabbing"
     >
       <div className="p-4">
         {editingTitle ? (
@@ -147,8 +157,9 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
             onChange={(e) => setTitleDraft(e.target.value)}
             onBlur={saveTitle}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).blur(); }
-              else if (e.key === 'Escape') { e.preventDefault(); setTitleDraft(element.title); setEditingTitle(false); }
+              // Enter (not an IME conversion) and Escape both end the rename
+              // and save, like the detail page's title.
+              if (isCommitEnter(e) || isSubmitChord(e) || isCancelKey(e)) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).blur(); }
             }}
             onPointerDown={stop}
             onClick={stop}
@@ -165,9 +176,11 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
           </p>
         )}
 
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
-            {/* Due date — click to pick / change. Shown even when empty. */}
+            {/* Due date — click to pick / change. Unset, it appears only while
+                the card is hovered or has keyboard focus inside it: a column
+                of "Date · Priority" placeholders is chrome on every card. */}
             <Popover>
               <PopoverTrigger asChild>
                 <button
@@ -175,8 +188,8 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
                   onPointerDown={stop}
                   onClick={stop}
                   className={cn(
-                    'flex items-center gap-1 -mx-1 px-1 rounded hover:bg-muted/40 hover:text-foreground transition-colors',
-                    !dueDate && 'opacity-60',
+                    'items-center gap-1 -mx-1 px-1 rounded hover:bg-muted/40 hover:text-foreground transition-colors',
+                    dueDate ? 'flex' : 'hidden opacity-60 group-hover/card:flex group-focus-within/card:flex data-[state=open]:flex',
                   )}
                 >
                   <Calendar className="h-3 w-3" />
@@ -201,8 +214,8 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
                   onPointerDown={stop}
                   onClick={stop}
                   className={cn(
-                    'inline-flex items-center gap-1 -mx-1 px-1 rounded hover:bg-muted/40 hover:text-foreground transition-colors',
-                    !priority && 'opacity-60',
+                    'items-center gap-1 -mx-1 px-1 rounded hover:bg-muted/40 hover:text-foreground transition-colors',
+                    priority ? 'inline-flex' : 'hidden opacity-60 group-hover/card:inline-flex group-focus-within/card:inline-flex data-[state=open]:inline-flex',
                   )}
                 >
                   {priority ? (
@@ -242,7 +255,7 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
             <ActivitySignal activity={element.activity} showRelative={false} className="mr-1" />
             <CardAgentControl elementId={element.id} onFinished={onRefresh} />
             {/* Assignee — click to assign / change. */}
-            <DropdownMenu>
+            <DropdownMenu open={assigneeMenuOpen} onOpenChange={setAssigneeMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
@@ -295,10 +308,6 @@ interface ElementBoardViewProps {
 export function ElementBoardView({ elements, loading = false, onRefresh, objectId, onElementClick }: ElementBoardViewProps) {
   const [items, setItems] = useState<ElementWithDetails[]>(elements);
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  // Fetched once for the whole board (NOT per card) and handed to each card's
-  // assignee picker.
-  const { data: workers } = useWorkers();
-
   // One aggregated fetch for the whole board, hung on the Elements the same
   // way the list does it, so a card and a row cannot disagree about what
   // "active" means.
@@ -367,7 +376,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
                 <span className="text-sm font-medium">{col.label}</span>
                 <span className="text-xs text-muted-foreground">{colItems.length}</span>
               </div>
-              <Button variant="primary" size="icon-xs"
+              <Button variant="ghost" size="icon-xs"
                 type="button"
                 onClick={async () => {
                   try {
@@ -402,7 +411,6 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
                 >
                   <ElementCard
                     element={el}
-                    workers={workers}
                     onRefresh={onRefresh}
                     onOpen={onElementClick}
                   />

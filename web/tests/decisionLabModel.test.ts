@@ -12,7 +12,7 @@ const TODAY = '2026-09-07'; // Monday
 function worker(id = 'w', extra: Partial<Worker> = {}): Worker {
   return {
     id, name: id, type: 'human', status: 'active', capacity_hours_per_day: 8,
-    object_id: null, user_id: null, display_id: null, seq_number: null, role: null,
+    object_id: null, user_id: null, activity_space_id: null, display_id: null, seq_number: null, role: null,
     email: null, avatar_url: null, ai_model: null, ai_config: null, created_at: null,
     updated_at: null, ...extra,
   };

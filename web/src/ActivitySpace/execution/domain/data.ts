@@ -1,7 +1,10 @@
 'use client';
 
 import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/ActivitySpace/execution/domain/domainsStore';
+import { translate } from '@/Function/i18n/I18nProvider';
+import { domainObjectsRefusal } from '@/Function/shared/objectArchive';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { membershipErrorMessage } from '@/Function/membership/membershipErrors';
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase, getCurrentUserId } from '@/lib/supabase';
@@ -16,22 +19,21 @@ import { useCallback, useMemo } from 'react';
 // ============================================
 
 export async function createDomain(domain: DomainInsert & { user_id: string }): Promise<Domain> {
-  const { data, error } = await supabase
-    .from('domains')
-    .insert(domain)
-    .select()
-    .single();
+  // Insert without RETURNING, then read the row back by an id chosen here.
+  // A Domain is visible through membership (or its Space, when workspace),
+  // never through having created it, and RETURNING is checked against the
+  // domains SELECT policy before the AFTER INSERT trigger enrols the creator
+  // as owner (domains_enrol_creator) — so a private or Space-less Domain
+  // would be refused as invisible (42501) even though the insert is allowed.
+  const id = domain.id ?? crypto.randomUUID();
+  const { error: insertError } = await supabase.from('domains').insert({ ...domain, id });
+  // A Domain is created only inside a Space the caller belongs to (RLS);
+  // a stale active Space is the usual way to hit that.
+  if (insertError?.code === '42501') throw new Error(translate('You can create a Domain only in a Space you belong to.'));
+  if (insertError) throw insertError;
+
+  const { data, error } = await supabase.from('domains').select().eq('id', id).single();
   if (error) throw error;
-
-  // Auto-enrol the creator as a domain_member with 'owner' role so they
-  // appear in TeamSettings for this Domain and have full read/write rights
-  // via the membership-based RLS policies.
-  await supabase.from('domain_members').insert({
-    domain_id: data.id,
-    user_id: domain.user_id,
-    role: 'owner',
-  });
-
   notifyDomainsChanged();
   return data;
 }
@@ -60,10 +62,18 @@ export async function reorderDomains(updates: { id: string; order_index: number 
   void invalidateDomains();
 }
 
+/** Why a Domain with Objects cannot be deleted, with how many remain. */
+export function domainHasObjectsMessage(count: number): string {
+  return translate('This Domain still has {count} Objects, including archived ones. Move them to another Domain or delete them first.', { count });
+}
+
 export async function deleteDomain(id: string): Promise<void> {
   // RLS lets only owners delete, and a refused delete is not an error — it
   // just matches no rows. Ask for the deleted ids so a refusal is visible.
   const { data, error } = await supabase.from('domains').delete().eq('id', id).select('id');
+  // A Domain that still has Objects (archived ones included) is refused.
+  const remaining = domainObjectsRefusal(error);
+  if (remaining !== null) throw new Error(domainHasObjectsMessage(remaining));
   if (error) throw error;
   if (!data?.length) throw new Error('Only an owner of this Domain can delete it.');
   notifyDomainsChanged();
@@ -80,7 +90,9 @@ export async function leaveDomain(domainId: string): Promise<void> {
     .eq('domain_id', domainId)
     .eq('user_id', userId)
     .select('id');
-  if (error) throw error;
+  // The last owner cannot leave (guard_last_scope_owner); say so in the
+  // viewer's language rather than the database's.
+  if (error) throw new Error(membershipErrorMessage(error, 'Failed to leave Domain'));
   if (!data?.length) throw new Error('You are not a member of this Domain.');
   notifyDomainsChanged();
 }
@@ -314,8 +326,8 @@ interface DomainsQueryData {
 
 async function fetchMemberDomains(userId: string): Promise<DomainsQueryData> {
   // Membership-scoped — sidebar shows only Domains the user is a member of
-  // (creator gets auto-membership in createDomain; others join via the 🔍
-  // Discover modal). The two membership lookups are independent, so they run
+  // (the creator is enrolled as owner by domains_enrol_creator; others join
+  // via the 🔍 Discover modal). The two membership lookups are independent, so they run
   // in parallel rather than as a waterfall.
   const [mySpaceIds, { data: memberRows, error: memberErr }] = await Promise.all([
     fetchMySpaceIds(userId),

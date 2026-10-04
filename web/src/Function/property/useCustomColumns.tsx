@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createCustomColumn, updateCustomColumn, deleteCustomColumn, setCustomColumnValue, fetchCustomColumnsWithValues, type CustomColumnWithValues } from '@/hooks/useSupabase';
+import { createCustomColumn, updateCustomColumn, deleteCustomColumn, setCustomColumnValue, fetchCustomColumnsWithValues, isPropertyWriteRefused, noticePropertyValueFailed, type CustomColumnWithValues } from '@/hooks/useSupabase';
 import { revealCustomColumn } from '@/ActivitySpace/execution/object/useListColumns';
 import type { Json } from '@/types/database';
 import { Button } from '@/ui/button';
@@ -39,7 +39,13 @@ export function useCustomColumns(scope: ColumnScope | null, options: { colStorag
     const next = previous.catch(() => {}).then(write);
     writes.current.set(key, next);
     try { await next; if (writes.current.get(key) === next) setFailure(null); }
-    catch (error) { if (objectId && writes.current.get(key) === next) setFailure({ objectId, retry: write }); throw error; }
+    catch (error) {
+      // A refusal (outside the boundary) cannot succeed on retry: say why
+      // instead of offering Retry. The cell drops its optimistic value.
+      if (isPropertyWriteRefused(error)) noticePropertyValueFailed(error);
+      else if (objectId && writes.current.get(key) === next) setFailure({ objectId, retry: write });
+      throw error;
+    }
     finally { if (writes.current.get(key) === next) writes.current.delete(key); }
   }, [refetch, objectId]);
   return {

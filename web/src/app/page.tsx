@@ -26,7 +26,11 @@ import { AuthPage } from '@/auth/AuthPage';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/ActivitySpace/execution/domain/domainsStore';
 import { useActiveSpaceId, setActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { OnboardingCreate } from '@/Function/space/OnboardingCreate';
+import { MyInvitations } from '@/Function/membership/MyInvitations';
 import { getCachedHomeViewId } from '@/Function/settings/preferencesStore';
+import { setActiveSettingsSection } from '@/Function/settings/settingsNav';
+import { completeOAuthReturn, readOAuthReturn, stripOAuthReturn } from '@/Function/integrations/oauthReturn';
+import { finishIntegrationOAuth } from '@/Function/integrations/data';
 import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
@@ -201,7 +205,10 @@ function AppContent() {
         placeholder="Acme Inc."
         cta={t('Create Space')}
         onCreate={handleCreateSpace}
-      />
+      >
+        {/* Invited to someone else's Space? Accepting is how you join it. */}
+        <MyInvitations className="mt-8 divide-y divide-border/40 rounded-lg border border-border bg-card" onAccepted={() => void refetchSpaces()} />
+      </OnboardingCreate>
     );
   }
 
@@ -288,6 +295,19 @@ function WorkspaceContent({
     setSettingsReturnView(activeTab.activeView);
     setActiveView('settings');
   };
+  // Back from Google sign-in (integration-oauth): drop the parameters from
+  // the URL, confirm the sign-in as this person (POST /finish — nothing is
+  // stored before that) and open Settings › Integrations to show the outcome.
+  useEffect(() => {
+    const result = readOAuthReturn(window.location.search);
+    if (!result) return;
+    window.history.replaceState(window.history.state, '', stripOAuthReturn(window.location.href));
+    void completeOAuthReturn(result, finishIntegrationOAuth);
+    setActiveSettingsSection('integrations', 'external');
+    const launchView = initialTabRef.current?.activeView ?? 'inbox';
+    if (launchView !== 'settings') setSettingsReturnView(launchView);
+    setTabs(prev => prev.map(t => (t.id === activeTabId ? { ...t, activeView: 'settings' } : t)));
+  }, [activeTabId]);
   const handleCloseSettings = () => {
     setActiveView(settingsReturnView && settingsReturnView !== 'settings' ? settingsReturnView : 'inbox');
     setSettingsReturnView(null);

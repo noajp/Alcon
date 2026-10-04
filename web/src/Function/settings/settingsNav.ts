@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { useSyncExternalStore } from 'react';
-import { SlidersHorizontal, User, Bell, KeyRound, Plug, Globe, Users } from 'lucide-react';
+import { SlidersHorizontal, User, Bell, KeyRound, Plug, Globe, Users, Blocks } from 'lucide-react';
 import { DomainIcon, ObjectIcon, ElementIcon } from '@/Function/shared/conceptIcons';
 import {
   NavStrategyIcon, NavPhaseIcon, NavTimelineIcon,
@@ -40,6 +40,13 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     items: [
       { id: 'workspace', label: 'Activity space', icon: Globe },
       { id: 'members', label: 'Member', icon: Users },
+      {
+        id: 'integrations', label: 'Integrations', icon: Blocks,
+        tabs: [
+          { id: 'external', label: 'Connect external services' },
+          { id: 'alcon', label: 'Connect to Alcon' },
+        ],
+      },
     ],
   },
   {

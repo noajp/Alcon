@@ -37,6 +37,7 @@ import type {
 } from '@/types/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
+import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 
 
 // ============================================
@@ -84,7 +85,13 @@ export async function fetchStrategyElements(opts: {
 
   if (objectScope.size === 0) return { elements: [], objects: [] };
 
-  const objectIdsArr = Array.from(objectScope);
+  // Archived Objects leave the scope, and with them the Elements that live
+  // only in archived Objects.
+  const objectsData = await selectIn(Array.from(objectScope), chunk =>
+    onlyActiveObjects(supabase.from('objects').select('*').in('id', chunk)),
+  ) as AlconObject[];
+  if (objectsData.length === 0) return { elements: [], objects: [] };
+  const objectIdsArr = objectsData.map(o => o.id);
 
   // 2. Find every Element attached to any Object in scope (junction-first, then legacy)
   const elementIdSet = new Set<string>();
@@ -99,19 +106,14 @@ export async function fetchStrategyElements(opts: {
   for (const r of junctionRows) elementIdSet.add(r.element_id as string);
   for (const r of legacyElems) elementIdSet.add(r.id as string);
 
-  if (elementIdSet.size === 0) {
-    const objectsOnly = await selectIn(objectIdsArr, chunk =>
-      supabase.from('objects').select('*').in('id', chunk),
-    ) as AlconObject[];
-    return { elements: [], objects: objectsOnly };
-  }
+  if (elementIdSet.size === 0) return { elements: [], objects: objectsData };
 
   const elementIdsArr = Array.from(elementIdSet);
 
   // 3. Fetch elements + subelements + assignees + workers in parallel.
   //    start_date orders the whole set, so it is re-applied across chunks:
   //    ascending with the undated last, the way PostgREST hands it back.
-  const [elementsData, subs, assignees, objectsData, junctions] = await Promise.all([
+  const [elementsData, subs, assignees, junctions] = await Promise.all([
     selectIn(
       elementIdsArr,
       chunk => supabase.from('elements').select('*').in('id', chunk).order('start_date'),
@@ -123,9 +125,6 @@ export async function fetchStrategyElements(opts: {
     selectIn(elementIdsArr, chunk =>
       supabase.from('element_assignees').select('*').in('element_id', chunk),
     ) as Promise<ElementAssignee[]>,
-    selectIn(objectIdsArr, chunk =>
-      supabase.from('objects').select('*').in('id', chunk),
-    ) as Promise<AlconObject[]>,
     selectIn(elementIdsArr, chunk =>
       supabase.from('element_objects').select('*').in('element_id', chunk),
     ) as Promise<ElementObject[]>,

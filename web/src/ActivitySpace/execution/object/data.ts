@@ -2,11 +2,21 @@
 
 import { suggestObjectPrefix } from '@/ActivitySpace/execution/object/objectPrefix';
 import { applyOptimisticExplorerPatch } from '@/Function/sync/explorerCache';
-import { getCurrentUserId, supabase } from '@/lib/supabase';
+import { translate } from '@/Function/i18n/I18nProvider';
+import { supabase } from '@/lib/supabase';
 import type { AlconObject, ObjectTab, ObjectTabInsert, ObjectTabUpdate } from '@/types/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
+// object_domains refusals (RLS): filing an Object under a Domain needs
+// someone who manages the Object (an owner/admin of its Domain) and is an
+// owner/admin of that Domain; taking it out needs one of the two.
+const LINK_REFUSED = 'Only owners or admins of both this Object and the Domain can file it there.';
+const UNLINK_REFUSED = 'Only owners or admins of this Object or of the Domain can take it out of there.';
+const CREATE_CLEANUP_FAILED = 'The Object was created but could not be filed under every chosen Domain, and it could not be removed. Delete it, or ask an owner or admin of those Domains to file it.';
+const MOVE_NEEDS_MEMBERSHIP = 'You need to be a member of this Object to move it.';
+const CREATE_REFUSED = 'You can create an Object only in a Domain you can see.';
+const DOMAIN_REQUIRED = 'Choose a Domain for this Object.';
 
 // ============================================
 // Object CRUD
@@ -58,6 +68,10 @@ export async function createObject(obj: {
   lead_id?: string | null;
   due_date?: string | null;
 }): Promise<AlconObject> {
+  // An Object always sits in a Domain (Domain → Object → Element).
+  const primaryDomainId = obj.domain_id ?? obj.domain_ids?.[0] ?? null;
+  if (!primaryDomainId) throw new Error(translate(DOMAIN_REQUIRED));
+
   // Top-level only — pick the next order_index across the whole table.
   const { data: existing } = await supabase
     .from('objects')
@@ -65,11 +79,6 @@ export async function createObject(obj: {
     .order('order_index', { ascending: false })
     .limit(1);
   const maxOrder = existing?.[0]?.order_index ?? -1;
-
-  // Stamp the creator. Records "who made this Object" on the row itself —
-  // mirrors domains.user_id and pairs with the object_members owner row
-  // added below.
-  const creatorId = await getCurrentUserId();
 
   // The DB trigger that backfills prefix mangles CJK names ("TF-MED — 医療"
   // → "T—医" → el_T—医-001), so compute an ASCII prefix client-side — the
@@ -80,35 +89,47 @@ export async function createObject(obj: {
   // leave prefix off and let the trigger decide.
   const prefixScope = Array.from(new Set([
     ...(obj.domain_ids ?? []),
-    ...(obj.domain_id ? [obj.domain_id] : []),
+    primaryDomainId,
   ].filter(Boolean)));
   const prefix = await suggestPrefixForDomains(obj.name, prefixScope);
 
-  const { data, error } = await supabase
+  // Insert without RETURNING, then read the row back by an id chosen here.
+  // RETURNING is checked against the objects SELECT policy before the AFTER
+  // INSERT trigger enrols the creator as owner, so an Object in a private
+  // Domain the caller sees only through that Object would be refused (42501).
+  // The creator (objects.user_id) and the owner row are written by the
+  // database (objects_stamp_creator / objects_enrol_creator).
+  const id = crypto.randomUUID();
+  const { error: insertError } = await supabase
     .from('objects')
     .insert({
+      id,
       name: obj.name,
       color: obj.color || null,
       description: obj.description || null,
       order_index: obj.order_index ?? maxOrder + 1,
-      domain_id: obj.domain_id ?? null,
-      user_id: creatorId,
+      domain_id: primaryDomainId,
       ...(obj.type !== undefined ? { type: obj.type } : {}),
       ...(obj.lead_id !== undefined ? { lead_id: obj.lead_id } : {}),
       ...(obj.due_date !== undefined ? { due_date: obj.due_date } : {}),
       ...(prefix ? { prefix } : {}),
-    })
-    .select()
-    .single();
+    });
+  // Objects are created only in a Domain the caller can see.
+  if (insertError?.code === '42501') throw new Error(translate(CREATE_REFUSED));
+  if (insertError) throw insertError;
 
+  const { data, error } = await supabase.from('objects').select().eq('id', id).single();
   if (error) throw error;
 
   // Write to object_domains junction table for domain multi-homing
   const domainIds = obj.domain_ids && obj.domain_ids.length > 0
     ? obj.domain_ids
-    : obj.domain_id ? [obj.domain_id] : [];
+    : [primaryDomainId];
   if (domainIds.length > 0) {
-    await supabase.from('object_domains').insert(
+    // Filing under a Domain other than the primary needs an owner/admin of
+    // that Domain (object_domains_insert). On a refusal, take the new Object
+    // back so the create is all-or-nothing and retrying makes no duplicate.
+    const { error: linkError } = await supabase.from('object_domains').insert(
       domainIds.map((did, i) => ({
         object_id: data.id,
         domain_id: did,
@@ -116,18 +137,16 @@ export async function createObject(obj: {
         order_index: i,
       }))
     );
+    if (linkError) {
+      const { data: removed, error: removeError } = await supabase
+        .from('objects').delete().eq('id', data.id).select('id');
+      if (removeError || !removed?.length) throw new Error(translate(CREATE_CLEANUP_FAILED));
+      throw linkError.code === '42501' ? new Error(translate(LINK_REFUSED)) : linkError;
+    }
   }
 
-  // Auto-enrol the creator as an object_member with 'owner' role — same
-  // pattern as createDomain, scoped one level finer.
-  if (creatorId) {
-    await supabase.from('object_members').insert({
-      object_id: data.id,
-      user_id: creatorId,
-      role: 'owner',
-    });
-  }
-
+  // The database enrols the creator as the Object's owner in the same insert
+  // (objects_enrol_creator) — the browser writes no owner rows.
   return data;
 }
 
@@ -186,28 +205,110 @@ export async function fetchObjectDomainIds(objectId: string): Promise<string[]> 
 }
 
 /**
- * Replace an Object's full Domain membership, keeping the legacy primary FK
+ * File an existing Object under more Domains, one link at a time, and return
+ * the Domain ids that were refused (the caller does not manage the Object or
+ * that Domain). Used where a partial result is better than none — Duplicate
+ * keeps the copy in its primary Domain and says which links it skipped.
+ */
+export async function fileObjectUnderDomains(objectId: string, domainIds: string[], firstOrderIndex = 1): Promise<string[]> {
+  const refused: string[] = [];
+  for (const [i, did] of domainIds.entries()) {
+    const { error } = await supabase.from('object_domains').insert({
+      object_id: objectId,
+      domain_id: did,
+      is_primary: false,
+      order_index: firstOrderIndex + i,
+    });
+    if (error?.code === '42501') refused.push(did);
+    else if (error) throw error;
+  }
+  return refused;
+}
+
+/**
+ * Replace an Object's Domain membership, keeping the legacy primary FK
  * (objects.domain_id) in sync with the object_domains junction so every
  * resolver — list, overview rail, membership queries — agrees. The first id in
  * `domainIds` becomes the primary; passing a single id is a plain "move".
+ *
+ * Only the links that change are written, in an order that leaves the
+ * previous state in place when something is refused: add the new links,
+ * then move the primary, then drop the old links. Filing under a Domain needs
+ * someone who manages the Object and that Domain, taking it out needs one of
+ * the two (object_domains RLS), and moving needs an owner/admin of both
+ * Domains who is also a member of the Object (objects RLS and
+ * objects_domain_move_guard). Links to Domains the caller cannot see are
+ * never read, so they are never touched.
  */
 export async function setObjectDomains(objectId: string, domainIds: string[]): Promise<void> {
   const unique = Array.from(new Set(domainIds.filter(Boolean)));
   const primary = unique[0] ?? null;
-  await supabase
-    .from('objects')
-    .update({ domain_id: primary, updated_at: new Date().toISOString() })
-    .eq('id', objectId);
-  await supabase.from('object_domains').delete().eq('object_id', objectId);
-  if (unique.length > 0) {
-    await supabase.from('object_domains').insert(
-      unique.map((did, i) => ({
+
+  const [{ data: objectRow, error: objectError }, { data: rows, error: readError }] = await Promise.all([
+    supabase.from('objects').select('domain_id').eq('id', objectId).single(),
+    supabase.from('object_domains').select('domain_id, is_primary').eq('object_id', objectId),
+  ]);
+  if (objectError) throw objectError;
+  if (readError) throw readError;
+  const currentPrimary = (objectRow?.domain_id as string | null) ?? null;
+  const current = new Map((rows ?? []).map((r) => [r.domain_id as string, Boolean(r.is_primary)]));
+
+  // 1. Add the new links.
+  const added = unique.filter((id) => !current.has(id));
+  if (added.length > 0) {
+    const { error } = await supabase.from('object_domains').insert(
+      added.map((did) => ({
         object_id: objectId,
         domain_id: did,
-        is_primary: i === 0,
-        order_index: i,
+        is_primary: did === primary,
+        order_index: unique.indexOf(did),
       })),
     );
+    if (error?.code === '42501') throw new Error(translate(LINK_REFUSED));
+    if (error) throw error;
+  }
+
+  // 2. Move the primary. A refusal takes the links just added back out.
+  if (primary !== currentPrimary) {
+    const { data: moved, error: moveError } = await supabase
+      .from('objects')
+      .update({ domain_id: primary, updated_at: new Date().toISOString() })
+      .eq('id', objectId)
+      .select('id');
+    if (moveError || !moved?.length) {
+      if (added.length > 0) {
+        await supabase.from('object_domains').delete().eq('object_id', objectId).in('domain_id', added);
+      }
+      if (moveError?.code === '42501') throw new Error(translate('Only owners or admins of both Domains can move this Object.'));
+      if (moveError) throw moveError;
+      throw new Error(translate(MOVE_NEEDS_MEMBERSHIP));
+    }
+  }
+
+  // 3. Keep the primary flag on the kept links in step with objects.domain_id.
+  // Only a move changes it, and the mover manages both of those Domains.
+  const flips = [...current.entries()].filter(([id, isPrimary]) => unique.includes(id) && isPrimary !== (id === primary));
+  const flipped = await Promise.all(flips.map(([id]) =>
+    supabase.from('object_domains').update({ is_primary: id === primary })
+      .eq('object_id', objectId).eq('domain_id', id).select('domain_id'),
+  ));
+  for (const { data, error } of flipped) {
+    if (error?.code === '42501' || (!error && !data?.length)) throw new Error(translate(LINK_REFUSED));
+    if (error) throw error;
+  }
+
+  // 4. Drop the old links. A refused delete matches no rows; ask for them so
+  // a refusal is visible.
+  const removed = [...current.keys()].filter((id) => !unique.includes(id));
+  if (removed.length > 0) {
+    const { data: gone, error } = await supabase
+      .from('object_domains')
+      .delete()
+      .eq('object_id', objectId)
+      .in('domain_id', removed)
+      .select('domain_id');
+    if (error) throw error;
+    if ((gone?.length ?? 0) < removed.length) throw new Error(translate(UNLINK_REFUSED));
   }
 }
 

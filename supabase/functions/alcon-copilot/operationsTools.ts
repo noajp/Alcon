@@ -6,7 +6,7 @@ import {
 
 export const OPERATIONS_TOOLS = [{
   name: 'analyzeOperations',
-  description: 'Read-only diagnosis and what-if comparison using the same CRM/SCM calculator as the UI. First discover a saved operations-planner with widgetBoard list/get. Supply its boardKey, widgetId and the user business date asOf. Reads the saved field mappings and all source rows under caller RLS; never guesses mappings or writes data. Optional scenario changes only calculation assumptions, not records or saved settings. Totals cover all loaded rows; detail rows are paginated by risk priority. Report missing data, source and limitations. A forecast, lower warning count or changed threshold is not an observed improvement. No persistent trial, automatic execution or outcome tracking is performed.',
+  description: 'Read-only diagnosis and what-if comparison using the same CRM pipeline calculator as the UI. First discover a saved operations-planner with widgetBoard list/get. Supply its boardKey, widgetId and the user business date asOf. Reads the saved field mappings and all source rows under caller RLS; never guesses mappings or writes data. Optional scenario changes only the forecast horizon and follow-up threshold, not records or saved settings. Totals cover all loaded rows; detail rows are paginated by risk priority. Report missing data, source and limitations. A forecast, lower warning count or changed threshold is not an observed improvement. No persistent trial, automatic execution or outcome tracking is performed.',
   input_schema: {
     type: 'object', additionalProperties: false,
     properties: {
@@ -16,7 +16,6 @@ export const OPERATIONS_TOOLS = [{
         type: 'object', additionalProperties: false,
         properties: {
           horizonDays: { type: 'integer', minimum: 1, maximum: 3650 },
-          demandMultiplier: { type: 'number', minimum: 0, maximum: 100 },
           followUpDays: { type: 'integer', minimum: 1, maximum: 3650 },
         },
       },
@@ -40,14 +39,14 @@ function integer(value: unknown, min: number, max: number): number {
 
 function checkedParams(raw: unknown): OperationsParams {
   const value = record(raw);
-  if (!['crm', 'scm'].includes(String(value.kind))) throw new Error('Saved planner kind must be crm or scm');
+  if (value.kind !== 'crm') throw new Error('Saved planner kind must be crm; set up the CRM planner first');
   if (typeof value.tableId !== 'string' || !UUID.test(value.tableId)) throw new Error('Connect a Table in the planner first');
   const params = normalizeOperationsParams(value);
   // Do not silently turn corrupt saved settings into a different scenario.
-  for (const key of ['horizonDays', 'demandMultiplier', 'followUpDays']) {
+  for (const key of ['horizonDays', 'followUpDays']) {
     if (value[key] !== undefined && value[key] !== params[key]) throw new Error(`Invalid saved ${key}; repair the planner settings first`);
   }
-  for (const field of OPERATIONS_FIELDS[params.kind]) {
+  for (const field of OPERATIONS_FIELDS) {
     const id = params.fields[field.key];
     if (field.required && !id || id && !UUID.test(id)) throw new Error(`Map a valid column for ${field.label} first`);
   }
@@ -57,13 +56,9 @@ function checkedParams(raw: unknown): OperationsParams {
 function scenarioParams(base: OperationsParams, raw: unknown): OperationsParams | null {
   if (raw === undefined) return null;
   const patch = record(raw);
-  const allowed = ['horizonDays', base.kind === 'crm' ? 'followUpDays' : 'demandMultiplier'];
-  if (!Object.keys(patch).length || Object.keys(patch).some(key => !allowed.includes(key))) throw new Error('Scenario must contain applicable calculation settings only');
-  for (const [key, value] of Object.entries(patch)) {
-    if (key === 'demandMultiplier') {
-      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) throw new Error('Demand multiplier must be from 0 to 100');
-    } else integer(value, 1, 3650);
-  }
+  const allowed = ['horizonDays', 'followUpDays'];
+  if (!Object.keys(patch).length || Object.keys(patch).some(key => !allowed.includes(key))) throw new Error('Scenario must contain horizonDays and/or followUpDays only');
+  for (const value of Object.values(patch)) integer(value, 1, 3650);
   return { ...base, ...patch };
 }
 
@@ -144,7 +139,7 @@ export async function runOperationsTool(db: SupabaseClient, input: Record<string
         'Read-only calculation of one saved planner and its caller-visible Table; no settings, records or Elements were changed.',
         'Scenarios change assumptions on the same input, not observed outcomes. Fewer warnings after relaxing a threshold do not prove improvement.',
         'Reads are paginated, not an atomic database snapshot. Concurrent edits may affect results; reread before acting. Missing or invalid rows are not healthy rows.',
-        'Amounts are grouped by currency. Forecasts and replenishment estimates are conditional; execution, real outcomes and costs require separate verification.',
+        'Amounts are grouped by currency. Forecasts are conditional; execution and real outcomes require separate verification.',
       ],
     },
   };

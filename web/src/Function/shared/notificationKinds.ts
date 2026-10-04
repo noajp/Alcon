@@ -23,6 +23,7 @@ export const NOTIFICATION_KIND_META: Record<NotificationKind, NotificationKindMe
   approval_decided:   { icon: ShieldCheck,   color: 'text-purple-400',  label: 'Approval decision' },
   due_soon:           { icon: Calendar,      color: 'text-[var(--status-danger)]',     label: 'Due soon' },
   review_due:         { icon: CalendarClock,  color: 'text-amber-400',   label: 'Review due' },
+  invite:             { icon: UserPlus,      color: 'text-[var(--accent-default)]', label: 'Invitation' },
 };
 
 export const NOTIFICATION_KINDS = Object.keys(NOTIFICATION_KIND_META) as NotificationKind[];

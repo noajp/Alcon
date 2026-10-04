@@ -7,7 +7,7 @@ import type { CustomColumnOptions } from '@/types/database';
 import { MenuShell } from '@/Function/shared/menu';
 import { CalendarIcon, Check } from 'lucide-react';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
-import { useWorkers } from '@/hooks/useSupabase';
+import { useAssignableWorkers, useWorkerById, useWorkers } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
@@ -59,6 +59,21 @@ export function CellText({ children, className = '' }: { children: React.ReactNo
   return <span className={`min-w-0 truncate ${className}`}>{children}</span>;
 }
 
+/**
+ * What an unset cell shows: a faint dash, with "Empty" for screen readers.
+ * The word "Empty" repeated down a column is noise that outweighs the values
+ * around it; the dash keeps the column's rhythm, and the cell's hover ground
+ * still shows where to click.
+ */
+export function EmptyCellMark() {
+  return (
+    <>
+      <span aria-hidden className="opacity-60">–</span>
+      <span className="sr-only">Empty</span>
+    </>
+  );
+}
+
 const TRIGGER_BASE = CELL_TRIGGER_BASE;
 const TRIGGER_EMPTY = CELL_TRIGGER_EMPTY;
 
@@ -84,6 +99,7 @@ export function CustomColumnCell(props: CustomColumnCellProps) {
 
 function CustomColumnCellBody({
   column,
+  elementId,
   value,
   onChange,
   displayMode = 'table',
@@ -133,8 +149,7 @@ function CustomColumnCellBody({
             type="button"
             className={`${TRIGGER_BASE} gap-1 ${dateString ? '' : TRIGGER_EMPTY}`}
           >
-            <CalendarIcon size={11} className="opacity-60" />
-            {dateString ? formatDate(dateString) : 'Empty'}
+            {dateString ? <><CalendarIcon size={11} className="opacity-60" />{formatDate(dateString)}</> : <EmptyCellMark />}
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0 rounded-xl" align="start">
@@ -159,7 +174,7 @@ function CustomColumnCellBody({
         {selected.length ? selected.map((v) => {
           const option = options.find((o) => o.value === v);
           return <span key={v} className="inline-flex items-center gap-1 min-w-0"><span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: option?.color ?? 'var(--text-secondary)' }} /><CellText>{option ? optionLabel(option) : v}</CellText></span>;
-        }) : 'Empty'}
+        }) : <EmptyCellMark />}
       </button></DropdownMenuTrigger>
       <MenuShell as="dropdown" align="start">
         {options.filter((opt) => !opt.archived).map((opt) => <DropdownMenuItem key={opt.value} onSelect={(e) => {
@@ -174,7 +189,10 @@ function CustomColumnCellBody({
 
   // ── Person (Assignee) ────────────────────────────────────────────────
   if (column.column_type === 'person') {
-    return <PersonCell value={value} onChange={onChange} renderWithLabel={renderWithLabel} columnLabel={column.name} />;
+    // A Domain column tags Objects (`elementId` is then the Object's id); every
+    // other column holds an Element value.
+    return <PersonCell value={value} onChange={onChange} renderWithLabel={renderWithLabel} columnLabel={column.name}
+      elementId={column.domain_id ? null : elementId} />;
   }
 
   // ── Progress ─────────────────────────────────────────────────────────
@@ -197,26 +215,34 @@ function CustomColumnCellBody({
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Person picker: fetches workers once, lets user pick by name. Stores
-// the worker_id as the cell value.
+// Person picker: offers the Workers the database accepts here — on an
+// Element, exactly its assignable Workers (worker_assignable, read when the
+// picker opens, as the board's assignee menu does); on an Object, the active
+// Space's. Stores the worker_id as the cell value. The current value resolves
+// by id, so a Worker outside the list still shows its name.
 // ─────────────────────────────────────────────────────────────────────
 function PersonCell({
   value,
   onChange,
   renderWithLabel,
   columnLabel,
+  elementId,
 }: {
   value: Json;
   onChange: (v: Json) => void;
   renderWithLabel: (c: React.ReactNode) => React.ReactNode;
   columnLabel: string;
+  elementId: string | null;
 }) {
-  const { data: workers } = useWorkers();
+  const [open, setOpen] = useState(false);
+  const { data: spaceWorkers } = useWorkers();
+  const { data: elementWorkers, loading } = useAssignableWorkers({ elementId }, !!elementId && open);
+  const workers = elementId ? elementWorkers : spaceWorkers;
   const currentId = typeof value === 'string' ? value : '';
-  const current = workers.find((w) => w.id === currentId) || null;
+  const current = useWorkerById(currentId || null, spaceWorkers);
 
   return renderWithLabel(
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -224,12 +250,12 @@ function PersonCell({
           className={`${TRIGGER_BASE} gap-1.5 ${current ? '' : TRIGGER_EMPTY}`}
         >
           {current ? <WorkerAvatar worker={current} size={16} /> : null}
-          <CellText>{current ? current.name : 'Empty'}</CellText>
+          <CellText>{current ? current.name : <EmptyCellMark />}</CellText>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-56 p-1 rounded-xl">
         <div className="max-h-64 overflow-auto">
-          {workers.length === 0 && (
+          {workers.length === 0 && !(elementId && loading) && (
             <div className="px-2 py-1.5 text-[12px] text-muted-foreground">
               No workers yet
             </div>
@@ -298,7 +324,7 @@ function TextCell({
           type="button"
           className={`${TRIGGER_BASE} ${display ? '' : TRIGGER_EMPTY}`}
         >
-          <CellText>{display || 'Empty'}</CellText>
+          <CellText>{display || <EmptyCellMark />}</CellText>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-2 rounded-xl">
@@ -393,7 +419,7 @@ function NumberCell({
       }}
       className={`${TRIGGER_BASE} ${display ? '' : TRIGGER_EMPTY}`}
     >
-      <CellText>{display || 'Empty'}</CellText>
+      <CellText>{display || <EmptyCellMark />}</CellText>
     </button>,
   );
 }

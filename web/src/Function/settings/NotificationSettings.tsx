@@ -12,6 +12,7 @@ const KIND_HINT: Partial<Record<string, string>> = {
   approval_requested: 'Your approval is requested on an Element',
   approval_decided: 'A decision is recorded on an approval you requested',
   due_soon: "An Element you're involved with is due soon",
+  invite: 'Someone invites you to a Space, Domain or Object. Invitations also wait in Settings > Profile',
 };
 
 function ToggleSwitch({

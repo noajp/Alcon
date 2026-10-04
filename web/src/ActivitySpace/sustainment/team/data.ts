@@ -1,6 +1,11 @@
 'use client';
 
+import { appDialog } from '@/Function/shared/appDialogStore';
+import { translate } from '@/Function/i18n/I18nProvider';
+import { addElementAssignee } from '@/ActivitySpace/execution/element/data';
+import { partitionAssignable } from '@/Function/shared/assignableWorkers';
 import type { LoadElement } from '@/Function/shared/assignmentLoad';
+import { getActiveSpaceId, useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
@@ -12,19 +17,53 @@ import { useCallback, useMemo } from 'react';
 // ============================================
 // Hook: Fetch Workers
 // ============================================
-// Workers through the query cache, keyed by scope. PersonCell (the Assign /
+// Who can be assigned follows the Space boundary, and the server decides it:
+// every list here reads `list_assignable_workers` (a person through their
+// Space / Domain / Object memberships, an Object's Worker through its Object,
+// an unlinked Worker through workers.activity_space_id).
+//
+// Workers go through the query cache, keyed by scope. PersonCell (the Assign /
 // person-column cell) calls useWorkers PER CELL, so an Object list with N rows
-// once fired N identical `workers` queries. One query key per scope means N
-// cells share one request, remounts read the cache, and a warm cache fires
-// nothing until a worker mutation invalidates it.
+// once fired N identical queries. One query key per scope means N cells share
+// one request, remounts read the cache, and a warm cache fires nothing until a
+// worker mutation invalidates it.
+//
+// Every value under ['workers'] is a Worker[] — the delta stream scans them
+// all for a Worker by id (findWorkerInCaches).
 const WORKERS_QUERY_PREFIX = ['workers'] as const;
 
-async function loadWorkers(objectId?: string): Promise<Worker[]> {
-  let query = supabase.from('workers').select('*');
-  if (objectId) query = query.eq('object_id', objectId);
-  const { data, error } = await query.order('name');
+export interface AssignableScope {
+  /** The Space the pickers offer Workers from — normally the active Space. */
+  spaceId?: string | null;
+  /** Narrow to people who can see this Domain (its own Space wins). */
+  domainId?: string | null;
+  /** Exactly the Workers assignable to this Element; the other keys are ignored. */
+  elementId?: string | null;
+}
+
+function assignableKey(scope: AssignableScope) {
+  return scope.elementId
+    ? [...WORKERS_QUERY_PREFIX, 'assignable', 'element', scope.elementId]
+    : [...WORKERS_QUERY_PREFIX, 'assignable', scope.spaceId ?? '__all__', scope.domainId ?? '__all__'];
+}
+
+async function loadAssignableWorkers(scope: AssignableScope): Promise<Worker[]> {
+  const { data, error } = await supabase.rpc('list_assignable_workers', {
+    p_space_id: scope.elementId ? null : scope.spaceId ?? null,
+    p_domain_id: scope.elementId ? null : scope.domainId ?? null,
+    p_element_id: scope.elementId ?? null,
+  });
   if (error) throw error;
-  return (data || []) as Worker[];
+  return (data ?? []) as Worker[];
+}
+
+/** Workers the caller may assign in `scope`, through the query cache. */
+export function fetchAssignableWorkers(scope: AssignableScope): Promise<Worker[]> {
+  return getQueryClient().fetchQuery({
+    queryKey: assignableKey(scope),
+    queryFn: () => loadAssignableWorkers(scope),
+    staleTime: 30_000,
+  });
 }
 
 /** Drop every cached worker list so the next read refetches (e.g. after a
@@ -38,10 +77,11 @@ export function invalidateWorkersCache() {
 
 const EMPTY_WORKERS: Worker[] = [];
 
-export function useWorkers(objectId?: string) {
+export function useAssignableWorkers(scope: AssignableScope, enabled = true) {
   const query = useQuery({
-    queryKey: [...WORKERS_QUERY_PREFIX, 'scope', objectId ?? '__all__'],
-    queryFn: () => loadWorkers(objectId),
+    queryKey: assignableKey(scope),
+    queryFn: () => loadAssignableWorkers(scope),
+    enabled,
   });
   return {
     data: query.data ?? EMPTY_WORKERS,
@@ -50,26 +90,163 @@ export function useWorkers(objectId?: string) {
   };
 }
 
+/** The Workers assignable in the active Space. */
+export function useWorkers() {
+  return useAssignableWorkers({ spaceId: useActiveSpaceId() });
+}
+
+async function loadWorkerById(id: string): Promise<Worker[]> {
+  const { data, error } = await supabase.from('workers').select('*').eq('id', id);
+  if (error) throw error;
+  return (data ?? []) as Worker[];
+}
+
+/**
+ * The Worker behind a stored id, for showing a current value by name. Taken
+ * from `candidates` when it is there; otherwise read by id, so a value chosen
+ * outside the current candidate list (another Space, or before the boundary)
+ * still renders by name.
+ */
+export function useWorkerById(
+  id: string | null | undefined,
+  candidates: readonly Worker[] = EMPTY_WORKERS,
+): Worker | null {
+  const fromList = id ? candidates.find((w) => w.id === id) ?? null : null;
+  const query = useQuery({
+    queryKey: [...WORKERS_QUERY_PREFIX, 'byId', id ?? ''],
+    queryFn: () => loadWorkerById(id as string),
+    enabled: !!id && !fromList,
+    staleTime: 60_000,
+  });
+  return fromList ?? query.data?.[0] ?? null;
+}
+
+async function loadWorkersByIds(ids: readonly string[]): Promise<Worker[]> {
+  return selectIn<Worker>(ids, (chunk) => supabase.from('workers').select('*').in('id', chunk));
+}
+
+/** The Workers behind stored ids (bindings, calendar picks), read by id so a
+ *  name renders even when it is not a candidate in the active Space. */
+export function useWorkersByIds(ids: readonly string[]): Worker[] {
+  const sorted = useMemo(() => [...new Set(ids)].sort(), [ids]);
+  const query = useQuery({
+    queryKey: [...WORKERS_QUERY_PREFIX, 'byIds', sorted.join(',')],
+    queryFn: () => loadWorkersByIds(sorted),
+    enabled: sorted.length > 0,
+    staleTime: 60_000,
+  });
+  return query.data ?? EMPTY_WORKERS;
+}
+
+async function loadSelfWorkers(userId: string): Promise<Worker[]> {
+  const { data, error } = await supabase
+    .from('workers').select('*')
+    .eq('user_id', userId).eq('type', 'human').is('object_id', null)
+    .limit(1);
+  if (error) throw error;
+  return (data ?? []) as Worker[];
+}
+
+/** The signed-in person's own human Worker. */
+export function useSelfWorker(userId: string | null | undefined): Worker | null {
+  const query = useQuery({
+    queryKey: [...WORKERS_QUERY_PREFIX, 'self', userId ?? ''],
+    queryFn: () => loadSelfWorkers(userId as string),
+    enabled: !!userId,
+  });
+  return query.data?.[0] ?? null;
+}
+
+/**
+ * Assign Workers to a just-created Element. The ids are checked against the
+ * Element's assignable list first, so a template or default naming a Worker
+ * from another Space is skipped and reported instead of attempted; one
+ * refusal does not stop the rest.
+ */
+export async function assignWorkersToElement(
+  elementId: string,
+  workerIds: readonly string[],
+): Promise<{ assigned: string[]; skipped: string[] }> {
+  if (workerIds.length === 0) return { assigned: [], skipped: [] };
+  let candidates: Worker[] = [];
+  try {
+    candidates = await loadAssignableWorkers({ elementId });
+  } catch (e) {
+    console.warn('Could not read who can be assigned:', e);
+    return { assigned: [], skipped: [...new Set(workerIds)] };
+  }
+  const { assignable, skipped } = partitionAssignable(workerIds, candidates);
+  const assigned: string[] = [];
+  for (const wid of assignable) {
+    try {
+      await addElementAssignee({
+        element_id: elementId, worker_id: wid, role: 'assignee',
+        worker: candidates.find((w) => w.id === wid),
+      });
+      assigned.push(wid);
+    } catch (e) {
+      console.warn('Could not assign Element:', e);
+      skipped.push(wid);
+    }
+  }
+  return { assigned, skipped };
+}
+
+/** Tell the person, once per batch, that some chosen assignees were left off. */
+export function noticeSkippedAssignees(count: number): void {
+  if (count <= 0) return;
+  void appDialog.alert(translate(
+    '{n} assignee(s) were not added: they are inactive or cannot see this Element.', { n: count }));
+}
+
+/** Tell the person an assignee change did not save. The database refuses
+ *  (42501) a Worker that worker_assignable does not accept; anything else is a
+ *  plain failure. The optimistic chip has already been rolled back. */
+export function noticeAssignmentFailed(error: unknown): void {
+  console.error('Assignee change failed:', error);
+  const code = (error as { code?: string } | null)?.code;
+  void appDialog.alert(translate(code === '42501'
+    ? 'This Worker cannot be assigned to this Element: they are inactive, outside its Space, or cannot see it.'
+    : 'The assignees could not be changed. Try again.'));
+}
+
 // ============================================
 // Worker CRUD
+//
+// The database decides who may change a Worker (workers RLS): your own
+// Worker; an unlinked Worker of a Space you belong to; an Object's Worker on
+// an Object you can see; and, as an owner of a person's Space or Domain, only
+// that person's capacity and status. A Worker's type never changes and a
+// person's Worker never leaves their account. Removing is only for unlinked
+// Workers, by an owner of their Space — a person's Worker stays so the work
+// they did keeps their name. RLS turns a
+// refused UPDATE / DELETE into "no rows", so both writers below say so instead
+// of reporting success.
 // ============================================
+
+const WORKER_REFUSED = 'You cannot change this Worker. Ask an owner of its Space or Domain.';
 
 export async function createWorker(worker: {
   name: string;
   type: 'human' | 'ai_agent';
   object_id?: string | null;
+  /** For a Worker with no Object: the Space it belongs to. Defaults to the
+   *  active Space. */
+  activity_space_id?: string | null;
   role?: string | null;
   email?: string | null;
   avatar_url?: string | null;
   ai_model?: string | null;
   ai_config?: Json | null;
 }): Promise<Worker> {
+  const objectId = worker.object_id || null;
   const { data, error } = await supabase
     .from('workers')
     .insert({
       name: worker.name,
       type: worker.type,
-      object_id: worker.object_id || null,
+      object_id: objectId,
+      activity_space_id: objectId ? null : worker.activity_space_id ?? getActiveSpaceId(),
       role: worker.role || null,
       email: worker.email || null,
       avatar_url: worker.avatar_url || null,
@@ -94,20 +271,23 @@ export async function updateWorker(
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
+  if (!data) throw new Error(translate(WORKER_REFUSED));
   invalidateWorkersCache();
   return data;
 }
 
 export async function deleteWorker(id: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('workers')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
   if (error) throw error;
+  if (!data?.length) throw new Error(translate(WORKER_REFUSED));
   invalidateWorkersCache();
 }
 
@@ -161,12 +341,16 @@ async function createWorkerAvailability(
 }
 
 async function deleteWorkerAvailability(id: string): Promise<void> {
-  const { error } = await supabase
+  // Only someone who manages the Worker may remove a span (RLS); a refused
+  // delete matches no row and returns no error, so report it.
+  const { data, error } = await supabase
     .from('worker_availability')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
   if (error) throw error;
+  if (!data?.length) throw new Error('Only someone who manages this Worker can change their availability.');
 }
 
 /** Shared empty map, so an empty roster returns the same object every render. */
@@ -357,37 +541,9 @@ export function useWorkerCommitments(workerIds: string[]) {
 // ============================================
 // Fetch All Workers (for actor selection)
 // ============================================
+/** The Workers assignable in the active Space, narrowed to people who can see
+ *  `domainId` when one is given. Cached per scope: a dozen surfaces (detail
+ *  views, table rows, pickers) call this from an effect. */
 export function fetchAllWorkers(domainId?: string | null): Promise<Worker[]> {
-  // Cached per Domain: a dozen surfaces (detail views, table rows, pickers)
-  // each call this from an effect, so without the cache an Element table
-  // fired one workers + one domain_members query per row.
-  return getQueryClient().fetchQuery({
-    queryKey: [...WORKERS_QUERY_PREFIX, 'domain', domainId ?? '__all__'],
-    queryFn: () => fetchAllWorkersUncached(domainId),
-    staleTime: 30_000,
-  });
-}
-
-async function fetchAllWorkersUncached(domainId?: string | null): Promise<Worker[]> {
-  // Domain-scoped — humans must be members of this Domain (via
-  // domain_members.user_id), AI / robot workers are always included since
-  // membership for them is implicit (they're scoped via ai_config etc.).
-  // No domainId given → return everyone (global view / backwards-compat).
-  // The two lookups are independent, so they run in parallel.
-  const [{ data, error }, memberRows] = await Promise.all([
-    supabase.from('workers').select('*').order('name'),
-    domainId
-      ? supabase.from('domain_members').select('user_id').eq('domain_id', domainId).then((r) => r.data)
-      : Promise.resolve(null),
-  ]);
-  if (error) throw error;
-  const workers = (data || []) as Worker[];
-  if (!domainId) return workers;
-
-  const memberUserIds = new Set(
-    ((memberRows ?? []) as { user_id: string }[]).map((r) => r.user_id),
-  );
-  return workers.filter(
-    (w) => w.type !== 'human' || (w.user_id != null && memberUserIds.has(w.user_id)),
-  );
+  return fetchAssignableWorkers({ spaceId: getActiveSpaceId(), domainId: domainId ?? null });
 }

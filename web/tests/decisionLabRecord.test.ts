@@ -20,7 +20,7 @@ function element(id: string, extra: Partial<ElementWithDetails> = {}): ElementWi
 
 const worker: Worker = {
   id: 'worker', name: 'Rin', type: 'human', status: 'active', capacity_hours_per_day: 8,
-  object_id: null, user_id: null, display_id: null, seq_number: null, role: null,
+  object_id: null, user_id: null, activity_space_id: null, display_id: null, seq_number: null, role: null,
   email: null, avatar_url: null, ai_model: null, ai_config: null, created_at: null, updated_at: null,
 };
 

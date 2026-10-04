@@ -65,6 +65,7 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
       window.location.reload();
     } catch (e) {
       console.error('Delete Space failed', e);
+      if (e instanceof Error && e.message) await appDialog.alert(e.message);
     }
   };
 
