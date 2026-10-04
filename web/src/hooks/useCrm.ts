@@ -107,12 +107,18 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
   const invalidate = useCallback(() => qc.invalidateQueries({ queryKey: ['crm', spaceId] }), [qc, spaceId]);
 
   // Every Space starts with one pipeline, so the App always has somewhere to put
-  // a deal. Only the main pane seeds, so two readers never create two.
+  // a deal. Only the main pane seeds, so two readers never create two. When the
+  // Space's first pipeline exists but sits in a Domain this reader cannot see,
+  // its slot is taken: the reader gets a Space-wide pipeline after it instead.
   const seeded = useRef<string | null>(null);
   useEffect(() => {
     if (!seed || !spaceId || !pipelines.data || pipelines.data.length || seeded.current === spaceId) return;
     seeded.current = spaceId;
-    void supabase.from('crm_pipelines').insert({ activity_space_id: spaceId, name: 'Sales', order_index: 0 }).then(() => invalidate());
+    void (async () => {
+      const first = await supabase.from('crm_pipelines').insert({ activity_space_id: spaceId, name: 'Sales', order_index: 0 });
+      if (first.error?.code === '23505') await supabase.from('crm_pipelines').insert({ activity_space_id: spaceId, name: 'Sales', order_index: 1 });
+      await invalidate();
+    })();
   }, [seed, spaceId, pipelines.data, invalidate]);
 
   const pipeline = (pipelines.data ?? []).find(item => item.id === pipelineId) ?? pipelines.data?.[0] ?? null;

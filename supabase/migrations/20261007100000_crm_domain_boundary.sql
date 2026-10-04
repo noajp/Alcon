@@ -3,8 +3,8 @@
 -- it is visible to whoever can see that Domain — its members, its guests, and
 -- Space members when the Domain is workspace-wide. Without one, it is shared
 -- with the Space's members as before. Deals follow their pipeline; history
--- follows the deal, company or contact it is about. Deleting a Domain removes
--- its CRM records rather than handing private data to the whole Space.
+-- follows the deal, company or contact it is about. The follow-up migration
+-- refuses to delete a Domain that still holds CRM records.
 do $$
 begin
   if to_regclass('public.crm_pipelines') is null
