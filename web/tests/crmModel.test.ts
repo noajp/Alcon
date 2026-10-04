@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  accountsOf, buildCrmWorkspace, unitFits, fieldKey, fieldOptions, forecastFor, inList, metricValue, normalizeCrmStages, parseActivityLog,
+  accountsOf, buildCrmWorkspace, measureValue, readUnit, fieldKey, fieldOptions, forecastFor, inList, metricValue, normalizeCrmStages, parseActivityLog,
   pipelineColumns, searchDeals, stageChange, todayQueue, upcoming, DEFAULT_CRM_STAGES,
   type CrmDealRecord, type CrmNextElement, type CrmPipelineRecord, type CrmRecords,
 } from '@/ActivitySpace/sustainment/crm/crmModel';
@@ -138,13 +138,21 @@ describe('CRM rollups', () => {
     expect(metricValue(counted.deals, 'won_count_total', 'USD', today)).toBe(3);
   });
 
-  it('writes money only into money conditions and counts only into the rest', () => {
-    expect(unitFits('社', 'won_quarter')).toBe(false);
-    expect(unitFits('社', 'won_count_quarter')).toBe(true);
-    expect(unitFits('円', 'won_quarter')).toBe(true);
-    expect(unitFits('JPY', 'won_count_total')).toBe(false);
-    expect(unitFits(null, 'open')).toBe(true);
-    expect(unitFits('', 'won_count_year')).toBe(true);
+  it('writes money only into the pipeline currency at the condition scale, and counts only into counts', () => {
+    expect(measureValue('円', 'won_quarter', 'JPY', 48_000_000)).toBe(48_000_000);
+    expect(measureValue('万円', 'won_quarter', 'JPY', 48_000_000)).toBe(4800);
+    expect(measureValue('百万円', 'won_total', 'JPY', 48_000_000)).toBe(48);
+    expect(measureValue('￥', 'won_quarter', 'JPY', 10)).toBe(10);
+    expect(measureValue('ＪＰＹ', 'open', 'JPY', 10)).toBe(10);
+    expect(measureValue('USD', 'won_quarter', 'JPY', 10)).toBeNull();
+    expect(measureValue('社', 'won_quarter', 'JPY', 10)).toBeNull();
+    expect(measureValue('社', 'won_count_quarter', 'JPY', 3)).toBe(3);
+    expect(measureValue('pcs', 'won_count_total', 'JPY', 3)).toBe(3);
+    expect(measureValue('円', 'won_count_total', 'JPY', 3)).toBeNull();
+    expect(measureValue('%', 'won_count_total', 'JPY', 3)).toBeNull();
+    expect(measureValue('円/月', 'won_quarter', 'JPY', 3)).toBeNull();
+    expect(measureValue(null, 'open', 'JPY', 7)).toBe(7);
+    expect(readUnit('US$')).toEqual({ kind: 'money', currency: 'USD', scale: 1 });
   });
 
   it('filters my deals and searches custom fields and deal numbers', () => {

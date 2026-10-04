@@ -48,13 +48,38 @@ export type CrmMetric = 'won_quarter' | 'won_year' | 'won_total' | 'weighted' | 
 /** Amount metrics report money in the pipeline's currency; count metrics report how many deals. */
 export const metricKind = (metric: CrmMetric): 'amount' | 'count' => metric.startsWith('won_count') ? 'count' : 'amount';
 
-/** Whether a success condition's unit can hold a metric's figure. An empty unit takes either;
- * a currency (code or symbol) takes amounts; anything else (社, 件, %) takes counts. */
-export function unitFits(unit: string | null | undefined, metric: CrmMetric): boolean {
-  const value = unit?.trim() ?? '';
-  if (!value) return true;
-  const money = /^[A-Za-z]{3}$/.test(value) || /^(円|万円|億円|千円|ドル|ユーロ|[¥$€£])$/.test(value);
-  return metricKind(metric) === 'amount' ? money : !money;
+const SYMBOLS: [RegExp, string][] = [[/^(円|¥|JPY)$/, 'JPY'], [/^(\$|US\$|ドル|USD)$/, 'USD'], [/^(€|ユーロ|EUR)$/, 'EUR'], [/^(£|ポンド|GBP)$/, 'GBP'], [/^(元|CNY|RMB)$/, 'CNY'], [/^(₩|ウォン|KRW)$/, 'KRW']];
+const SCALES: [string, number][] = [['百万', 1e6], ['千', 1e3], ['万', 1e4], ['億', 1e8]];
+const ISO = (() => {
+  try { return new Set((Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.('currency') ?? []); } catch { return new Set<string>(); }
+})();
+
+/** Reads a success condition's unit: money (in which currency, at what scale),
+ * a count, or something a CRM figure must not be written into (a rate, a
+ * per-period amount). Full-width forms are folded first (￥ → ¥, ＪＰＹ → JPY). */
+export function readUnit(unit: string | null | undefined): { kind: 'any' } | { kind: 'money'; currency: string; scale: number } | { kind: 'count' } | { kind: 'other' } {
+  const value = (unit ?? '').normalize('NFKC').trim();
+  if (!value) return { kind: 'any' };
+  if (/[%‰/]|毎|per\b|率/i.test(value)) return { kind: 'other' };
+  let rest = value;
+  let scale = 1;
+  for (const [prefix, factor] of SCALES) if (rest.startsWith(prefix) && rest.length > prefix.length) { scale = factor; rest = rest.slice(prefix.length); break; }
+  const upper = rest.toUpperCase();
+  const symbol = SYMBOLS.find(([pattern]) => pattern.test(rest) || pattern.test(upper));
+  if (symbol) return { kind: 'money', currency: symbol[1], scale };
+  if (/^[A-Z]{3}$/.test(upper) && (ISO.size ? ISO.has(upper) : ['JPY', 'USD', 'EUR', 'GBP', 'CNY', 'KRW', 'AUD', 'CAD', 'CHF', 'SGD', 'HKD', 'TWD', 'INR'].includes(upper))) return { kind: 'money', currency: upper, scale };
+  return scale === 1 ? { kind: 'count' } : { kind: 'other' };
+}
+
+/** Whether a figure may be written into a success condition, and the value to
+ * write: money only into the pipeline's own currency (scaled to 万円 etc.),
+ * counts only into count units. Anything else is not written. */
+export function measureValue(unit: string | null | undefined, metric: CrmMetric, currency: string, value: number): number | null {
+  const read = readUnit(unit);
+  if (read.kind === 'any') return value;
+  if (metricKind(metric) === 'count') return read.kind === 'count' ? value : null;
+  if (read.kind !== 'money' || read.currency !== currency.toUpperCase()) return null;
+  return Math.round(value / read.scale * 100) / 100;
 }
 
 export interface CrmPipelineRecord {

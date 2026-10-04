@@ -58,7 +58,7 @@ export function CrmToday({ crm, workspace, onOpen, onCapture, onList, pipelineDe
   // "None of mine" is not "none at all": the onboarding is for an empty pipeline only.
   if (!deals.length && pipelineDeals > 0) return <div className="max-w-xl space-y-3 py-10">
     <h2 className="text-lg font-semibold">{t('Nothing assigned to you')}</h2>
-    <p className="text-sm leading-relaxed text-muted-foreground">{t('None of this pipeline’s {n} deals are yours yet.', { n: pipelineDeals })}</p>
+    <p className="text-sm leading-relaxed text-muted-foreground">{t('None of the deals in this pipeline are yours yet.')}</p>
     {onShowEveryone && <Button variant="secondary" onClick={onShowEveryone}>{t('Show everyone’s deals')}</Button>}
   </div>;
 

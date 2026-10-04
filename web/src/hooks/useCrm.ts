@@ -11,7 +11,7 @@ import { createElement, updateElement } from '@/ActivitySpace/execution/element/
 import { fetchDataTableSchema } from '@/ActivitySpace/sustainment/table/data';
 import { readAllPages } from '@/hooks/readAllPages';
 import {
-  buildCrmWorkspace, metricValue, normalizeCrmStages, unitFits, parseActivityLog, resolveStage,
+  buildCrmWorkspace, measureValue, metricValue, normalizeCrmStages, parseActivityLog, resolveStage,
   type CrmActivityRecord, type CrmActivityType, type CrmCompanyRecord, type CrmContactRecord, type CrmDeal,
   type CrmDealRecord, type CrmFieldRecord, type CrmNextElement, type CrmPerson, type CrmPipelineRecord,
 } from '@/ActivitySpace/sustainment/crm/crmModel';
@@ -312,10 +312,13 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     void (async () => {
       const { data, error } = await supabase.from('intents').select('actual_value,unit').eq('id', p.measure_intent_id!).maybeSingle();
       if (error || !data) { setMeasureError(error?.message ?? 'The linked success condition is not visible to you.'); return; }
-      // A count is never written into a money condition, nor money into a count.
-      if (!unitFits(data.unit as string | null, p.measure_metric!)) { setMeasureError(null); return; }
-      if (Number(data.actual_value) === value) { setMeasureError(null); return; }
-      const { error: writeError } = await supabase.from('intents').update({ actual_value: value, measured_at: new Date().toISOString() }).eq('id', p.measure_intent_id!).select('id').single();
+      // Money goes only into the pipeline's own currency, at the condition's scale
+      // (万円…); counts only into count units. Anything else is not written.
+      const written = measureValue(data.unit as string | null, p.measure_metric!, p.currency, value);
+      // Not written now; a later refresh tries again (the unit may have been corrected).
+      if (written === null) { reported.current = null; setMeasureError(null); return; }
+      if (Number(data.actual_value) === written) { setMeasureError(null); return; }
+      const { error: writeError } = await supabase.from('intents').update({ actual_value: written, measured_at: new Date().toISOString() }).eq('id', p.measure_intent_id!).select('id').single();
       // Success conditions are written by the Initiative's owner; for anyone else the figure updates when they open the CRM.
       setMeasureError(writeError ? 'Only the Initiative’s owner can update this success condition. It updates when they open the CRM.' : null);
       if (!writeError) void qc.invalidateQueries({ queryKey: ['initiative-measures'] });
