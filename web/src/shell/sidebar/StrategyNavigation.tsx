@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
-import { Button } from '@/ui/button';
 import { VIEW_REGISTRY } from '@/shell/viewRegistry';
+import { SidebarRow, SidebarRowAction } from '@/Function/shared/SidebarRow';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // The Strategy mode's navigation: the Vision row with Portfolio and
-// Initiative nested under it — the same row anatomy as a Domain in Execution
+// Initiative nested under it — the same SidebarRow as a Domain in Execution
 // (name, a chevron that folds the children, a "…" that opens its settings).
 // Phase and Timeline stay routable from an Initiative but are not listed.
 export function StrategyNavigation({ activeView, onSelect, onOpenSettings }: {
@@ -28,24 +28,17 @@ export function StrategyNavigation({ activeView, onSelect, onOpenSettings }: {
   const rootActive = activeView === 'vision';
   const { icon: RootIcon, label: rootLabel } = VIEW_REGISTRY.vision;
   return <nav aria-label={t('Strategy')} className="mb-1 mt-1">
-    <div className={`flex min-w-0 items-center rounded-md ${rootActive ? 'bg-sidebar-accent' : ''}`}>
-      <Button variant="ghost" size="md" align="start" onClick={() => onSelect('vision')}
-        aria-current={rootActive ? 'page' : undefined}
-        className={`min-w-0 flex-1 gap-2.5 text-xs font-semibold ${rootActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-        {RootIcon && <RootIcon size={16} />}<span className="truncate">{t(rootLabel)}</span>
-      </Button>
-      <Button variant="ghost" size="icon-sm" onClick={() => setExpanded((v) => !v)}
-        aria-label={`${t(expanded ? 'Collapse' : 'Expand')} ${t(rootLabel)}`} aria-expanded={expanded}>
-        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-      </Button>
-      <Button variant="ghost" size="icon-xs" onClick={onOpenSettings} aria-label={t('Strategy settings')} className="mr-1"><MoreHorizontal size={12} /></Button>
-    </div>
+    <SidebarRow active={rootActive} icon={RootIcon && <RootIcon size={16} />} label={t(rootLabel)} onClick={() => onSelect('vision')}
+      actions={<>
+        <SidebarRowAction label={`${t(expanded ? 'Collapse' : 'Expand')} ${t(rootLabel)}`} aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        </SidebarRowAction>
+        <SidebarRowAction label={t('Strategy settings')} onClick={onOpenSettings}><MoreHorizontal size={12} /></SidebarRowAction>
+      </>} />
     {expanded && <div className="mt-0.5 pl-7">
       {(['portfolio', 'strategy'] as const).map((id) => {
         const { icon: Icon, label } = VIEW_REGISTRY[id];
-        return <Button key={id} variant="ghost" size="md" align="start" aria-current={activeView === id ? 'page' : undefined}
-          className={`w-full gap-2.5 text-xs font-semibold ${activeView === id ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-          onClick={() => onSelect(id)}>{Icon && <Icon size={16} />}{t(label)}</Button>;
+        return <SidebarRow key={id} active={activeView === id} icon={Icon && <Icon size={16} />} label={t(label)} onClick={() => onSelect(id)} />;
       })}
     </div>}
   </nav>;

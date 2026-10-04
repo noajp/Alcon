@@ -9,6 +9,7 @@ import {
   type SettingsNavItem,
 } from './settingsNav';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 
 /** A page listed in the nav — opened on `tab` when the search matched one of its tabs. */
 interface NavHit { item: SettingsNavItem; tab?: string }
@@ -55,32 +56,19 @@ export function SettingsSidebarPanel() {
 
       {filtered.map((section) => (
         <div key={section.title} className="mb-3">
-          <div className="px-2.5 mb-1 text-[11px] font-bold tracking-wide text-muted-foreground/60">
-            {t(section.title)}
-          </div>
+          <SidebarSectionLabel className="mb-1">{t(section.title)}</SidebarSectionLabel>
           <div className="space-y-0.5">
             {section.items.map(({ item, tab }) => {
               const Icon = item.icon;
-              const isActive = active === item.id;
               return (
-                <button
+                <SidebarRow
                   key={item.id}
-                  type="button"
+                  active={active === item.id}
+                  icon={<Icon size={16} />}
+                  label={t(item.label)}
+                  meta={tab ? t(item.tabs!.find((x) => x.id === tab)!.label) : undefined}
                   onClick={() => setActiveSettingsSection(item.id, tab)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                    isActive
-                      ? 'bg-sidebar-accent text-foreground'
-                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                  }`}
-                >
-                  <Icon size={15} className="shrink-0" />
-                  <span className="truncate">{t(item.label)}</span>
-                  {tab && (
-                    <span className="ml-auto shrink-0 text-[11px] font-medium text-muted-foreground/70">
-                      {t(item.tabs!.find((x) => x.id === tab)!.label)}
-                    </span>
-                  )}
-                </button>
+                />
               );
             })}
           </div>

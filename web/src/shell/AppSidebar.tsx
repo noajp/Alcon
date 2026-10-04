@@ -43,6 +43,7 @@ import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from
 import { SpaceSwitcher } from '@/Function/space/SpaceSwitcher';
 
 import { NavTableIcon } from '@/shell/sidebar/NavIcons';
+import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 import { useDataTables } from '@/hooks/useSupabase';
 import { railModeOf } from '@/shell/ModeRail';
 import type { RailMode } from '@/shell/railApps';
@@ -130,30 +131,19 @@ function TableSidebar({
 
   return (
     <div className="mt-1">
-      <div className="flex items-center gap-1 px-2 h-6 mt-3">
-        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Table')}</span>
-      </div>
+      <SidebarSectionLabel>{t('Table')}</SidebarSectionLabel>
       <div className="mt-1 flex flex-col">
-        {tables.map((t) => {
-          const active = t.id === activeTableId;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => { onViewChange('tables'); onNavigate({ tableId: t.id }); }}
-              title={t.name}
-              className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                active
-                  ? 'bg-sidebar-accent text-foreground'
-                  : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-              }`}
-            >
-              <NavTableIcon size={16} />
-              <span className="min-w-0 flex-1 text-left truncate">{t.name}</span>
-              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/60">{t.rowCount}</span>
-            </button>
-          );
-        })}
+        {tables.map((t) => (
+          <SidebarRow
+            key={t.id}
+            active={t.id === activeTableId}
+            icon={<NavTableIcon size={16} />}
+            label={t.name}
+            title={t.name}
+            meta={t.rowCount}
+            onClick={() => { onViewChange('tables'); onNavigate({ tableId: t.id }); }}
+          />
+        ))}
         {tables.length === 0 && (
           <div className="px-2.5 py-6 text-[11px] text-muted-foreground/60 leading-relaxed">
             {t('No tables yet — click + to add one.')}

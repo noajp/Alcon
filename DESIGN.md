@@ -28,7 +28,7 @@ Alcon の画面・ウィジェット・生成アプリに共通するデザイ�
 
 Inboxの一覧ヘッダーと通知行のメニューボタンも枠なしのナビゲーション文脈とする。詳細側の既読・アーカイブなどラベル付き実行操作には薄枠を使う。
 
-サイドバー・ModeRail・アプリランチャーのナビゲーションは `ButtonAppearanceProvider appearance="navigation"` で枠なしにする。選択・ホバーは背景で示す。サイドバーの外周線も付けない。アプリランチャーは影と面色で区別し、ポップアップ内の操作にも同じ枠なし文脈を引き継ぐ。サイドバー外の実行操作には通常の薄枠を使う。アイコン専用ボタンは左右の配置指定にかかわらず中央に置く。
+サイドバー上部の操作・ModeRail・アプリランチャーは `ButtonAppearanceProvider appearance="navigation"` で枠なしにする。選択・ホバーは背景で示す。サイドバーの外周線も付けない。アプリランチャーは影と面色で区別し、ポップアップ内の操作にも同じ枠なし文脈を引き継ぐ。サイドバー外の実行操作には通常の薄枠を使う。アイコン専用ボタンは左右の配置指定にかかわらず中央に置く。
 
 詳細画面の本文に置く操作（リアクション、Note の連携、Share an update、Set direction、Add sub-element、Add dependency）は `ButtonAppearanceProvider appearance="inline"` の `ghost` にする。枠なし・淡いラベルで、ホバーで濃くなる。本文は内容として読ませ、操作は必要なときに見つかればよい。1行に並ぶ本文内の操作は、枠つきと枠なしを混ぜない。未設定の Direction・Sub-elements・Dependencies は見出しを出さず、「+ 動詞」の操作だけを1行に並べる。中身ができたものだけが見出しを持ち全幅になる。Add widget は右レールの先頭ではなく、画面ヘッダーの右端に置く。Provider はトリガーだけを包み、開いたポップアップ内のボタンには通常の薄枠を残す。
 
@@ -56,7 +56,7 @@ Object・Domain・Element・Initiative等の作成は、入口を無彩色、確
 
 製品の概念名（Strategy / Execution / Sustainment、Initiatives / Phase / Timeline、Domain / Objects / Elements、Inbox / Calendar / Notebook / Table / Team / Workload / CRM / SCM、Profile）は固有名詞として扱い、どの言語でも英語表記のまま出す。これはコードで固定するのではなく、各言語の辞書でその語を自分自身に写して実現する（`'Timeline': 'Timeline'`）。概念名を含む文も同じ（`'Open Calendar': 'Calendar を開く'`）。日付・曜日は `toLocaleDateString(locale)` で設定言語に従う。
 
-サイドバーのナビ項目は、選択中だけ `text-foreground`（背景 `bg-sidebar-accent`）で、非選択は `text-muted-foreground`（hover で `text-foreground`）。
+サイドバーの一覧（Domain・Strategy・Notebook・Table・CRM・SCM・Settings）は、すべて共通の `SidebarRow` で作る。行ごとに見た目を書かない。行全体がホバーと選択の対象で、選択中は `bg-sidebar-accent` と `text-foreground`、非選択は `text-muted-foreground`、ホバーとキーボードフォーカスでは `bg-sidebar-accent/50` と `text-foreground` にする。行の右端の操作（折りたたみの矢印、「…」）は `SidebarRowAction` とし、背景を持たず記号だけを濃くするので、ハイライトは行の端まで切れずにつながる。行は左から 16px のアイコン枠・名前・件数などの補足・右端の操作の順に並べ、通常は 32px、入れ子の行は 24px。一覧の見出しは `SidebarSectionLabel`。
 
 ## 入力と面
 

@@ -10,6 +10,7 @@ import { SCM_VIEW_LABEL, scmViewOf, type ScmView } from './scmNavigation';
 import type { ScmNode } from './scmEngine';
 import { HEALTH_TONE } from './scmText';
 import { Dot } from './ScmParts';
+import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 
 // The SCM sidebar is the App's map: where to go (with live counts, so the
 // sidebar alone says where attention is needed), which location everything is
@@ -22,12 +23,6 @@ const ICONS: Record<ScmView, ComponentType<{ size?: number }>> = {
 const PRIMARY: ScmView[] = ['tower', 'exceptions', 'replenish', 'orders'];
 const SECONDARY: ScmView[] = ['inventory', 'ledger', 'suppliers', 'scenarios', 'settings'];
 
-const ROW = 'flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[12px] font-semibold transition-colors duration-100';
-const rowState = (active: boolean) => active ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground';
-
-function Label({ children }: { children: React.ReactNode }) {
-  return <div className="mt-3 flex h-6 items-center px-2 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{children}</div>;
-}
 
 export function ScmSidebar({ navigation, onNavigate, onOpen }: {
   navigation: NavigationState;
@@ -87,13 +82,11 @@ export function ScmSidebar({ navigation, onNavigate, onOpen }: {
   const navRow = (id: ScmView) => {
     const Icon = ICONS[id];
     const active = view === id && !inItem;
-    return <button key={id} type="button" aria-current={active ? 'page' : undefined} className={`${ROW} ${rowState(active)}`} onClick={() => go(id)}>
-      <Icon size={15} /><span className="min-w-0 flex-1 truncate">{t(SCM_VIEW_LABEL[id])}</span>{badge(id)}
-    </button>;
+    return <SidebarRow key={id} active={active} icon={<Icon size={16} />} label={t(SCM_VIEW_LABEL[id])} meta={badge(id)} onClick={() => go(id)} />;
   };
 
   return <div className="mt-1 flex flex-col">
-    <Label>SCM</Label>
+    <SidebarSectionLabel>SCM</SidebarSectionLabel>
     {data && data.items.length > 0 && <div className="relative mb-1 mt-1 px-0.5">
       <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/70" />
       <input aria-label={t('Find an item')} placeholder={t('Find an item…')} value={query} onChange={event => setQuery(event.target.value)}
@@ -102,10 +95,9 @@ export function ScmSidebar({ navigation, onNavigate, onOpen }: {
       {query && <button type="button" aria-label={t('Clear')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setQuery('')}><X size={12} /></button>}
     </div>}
     {query.trim() && <div className="mb-2 flex flex-col">
-      {matches.map(node => <button key={node.key} type="button" className={`${ROW} h-auto py-1.5 ${rowState(navigation.scmNode === node.key)}`} onClick={() => { onOpen(); onNavigate({ scmNode: node.key }); setQuery(''); }}>
-        <Dot tone={HEALTH_TONE[node.health]} />
-        <span className="min-w-0 flex-1"><span className="block truncate">{node.name}</span><span className="block truncate text-[11px] font-normal text-muted-foreground/70">{node.sku} · {data?.locations.find(location => location.id === node.locationId)?.name}</span></span>
-      </button>)}
+      {matches.map(node => <SidebarRow key={node.key} size="tall" active={navigation.scmNode === node.key} icon={<Dot tone={HEALTH_TONE[node.health]} />}
+        label={<><span className="block truncate">{node.name}</span><span className="block truncate text-[11px] font-normal text-muted-foreground/70">{node.sku} · {data?.locations.find(location => location.id === node.locationId)?.name}</span></>}
+        onClick={() => { onOpen(); onNavigate({ scmNode: node.key }); setQuery(''); }} />)}
       {!matches.length && <p className="px-2.5 py-2 text-[11px] text-muted-foreground/60">{t('No matching items.')}</p>}
     </div>}
 
@@ -114,26 +106,21 @@ export function ScmSidebar({ navigation, onNavigate, onOpen }: {
     <div className="flex flex-col">{SECONDARY.map(navRow)}</div>
 
     {data && data.locations.length > 1 && <>
-      <Label>{t('Locations')}</Label>
+      <SidebarSectionLabel>{t('Locations')}</SidebarSectionLabel>
       <div className="flex flex-col">
         {[{ id: null as string | null, name: t('All locations') }, ...data.locations].map(location => {
           const risk = location.id ? riskByLocation.get(location.id) ?? 0 : [...riskByLocation.values()].reduce((sum, value) => sum + value, 0);
-          return <button key={location.id ?? 'all'} type="button" aria-pressed={locationId === location.id} className={`${ROW} ${rowState(locationId === location.id)}`}
-            onClick={() => { onOpen(); onNavigate({ scmLocationId: location.id, scmNode: null }); }}>
-            <MapPin size={15} /><span className="min-w-0 flex-1 truncate">{location.name}</span>
-            {risk > 0 && <span className="text-[11px] tabular-nums text-[var(--status-danger)]" title={t('{n} at risk', { n: risk })}>{risk}</span>}
-          </button>;
+          return <SidebarRow key={location.id ?? 'all'} active={locationId === location.id} buttonProps={{ 'aria-pressed': locationId === location.id, 'aria-current': undefined }}
+            icon={<MapPin size={16} />} label={location.name}
+            meta={risk > 0 ? <span className="text-[var(--status-danger)]" title={t('{n} at risk', { n: risk })}>{risk}</span> : null}
+            onClick={() => { onOpen(); onNavigate({ scmLocationId: location.id, scmNode: null }); }} />;
         })}
       </div>
     </>}
 
-    {data && data.items.length > 0 && <button type="button" className={`${ROW} mt-3 h-auto py-2 ${rowState(false)}`} onClick={() => go('settings')}>
-      <Bot size={15} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate">{t('Autopilot')}</span>
-        <span className="block truncate text-[11px] font-normal text-muted-foreground/70">{data.policy.autopilotEnabled ? t('On · approves up to {n}', { n: data.policy.autoApproveLimit.toLocaleString() }) : t('Off · proposals only')}</span>
-      </span>
-      <Dot tone={data.policy.autopilotEnabled ? 'success' : 'muted'} />
-    </button>}
+    {data && data.items.length > 0 && <SidebarRow size="tall" className="mt-3" icon={<Bot size={16} />}
+      label={<><span className="block truncate">{t('Autopilot')}</span><span className="block truncate text-[11px] font-normal text-muted-foreground/70">{data.policy.autopilotEnabled ? t('On · approves up to {n}', { n: data.policy.autoApproveLimit.toLocaleString() }) : t('Off · proposals only')}</span></>}
+      meta={<Dot tone={data.policy.autopilotEnabled ? 'success' : 'muted'} />}
+      onClick={() => go('settings')} />}
   </div>;
 }
