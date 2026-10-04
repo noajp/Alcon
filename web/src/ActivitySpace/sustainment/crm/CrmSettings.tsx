@@ -8,7 +8,7 @@ import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 import { useStrategies } from '@/ActivitySpace/strategy/initiative/strategyData';
 import { useInitiativeMeasures } from '@/hooks/useInitiativeMeasures';
 import type { Crm } from '@/hooks/useCrm';
-import { fieldKey, fieldOptions, metricValue, normalizeCrmStages, stageSlug, type CrmFieldRecord, type CrmMetric, type CrmStage } from './crmModel';
+import { fieldKey, fieldOptions, metricKind, metricValue, normalizeCrmStages, stageSlug, unitFits, type CrmFieldRecord, type CrmMetric, type CrmStage } from './crmModel';
 import { money } from './crmFormat';
 import { CrmPicker } from './CrmPicker';
 
@@ -95,6 +95,7 @@ function Stages({ crm }: { crm: Crm }) {
 }
 
 const METRICS: { id: CrmMetric; label: string }[] = [
+  { id: 'won_count_quarter', label: 'Deals won this quarter' }, { id: 'won_count_year', label: 'Deals won this year' }, { id: 'won_count_total', label: 'Deals won to date' },
   { id: 'won_quarter', label: 'Won this quarter' }, { id: 'won_year', label: 'Won this year' }, { id: 'won_total', label: 'Won to date' },
   { id: 'weighted', label: 'Weighted pipeline' }, { id: 'open', label: 'Open pipeline' },
 ];
@@ -107,6 +108,8 @@ function Connections({ crm }: { crm: Crm }) {
   const { measures } = useInitiativeMeasures(strategies.data.map(item => item.id));
   const names = new Map(strategies.data.map(item => [item.id, item.name]));
   const metric = pipeline.measure_metric ?? 'won_quarter';
+  const linked = measures.find(measure => measure.id === pipeline.measure_intent_id);
+  const fits = unitFits(linked?.unit, metric);
   const value = crm.workspace ? metricValue(crm.workspace.deals, metric, pipeline.currency, crm.today) : null;
   const [error, setError] = useState<string | null>(null);
   const save = (patch: Parameters<Crm['savePipeline']>[1]) => { setError(null); crm.savePipeline(pipeline.id, patch).catch(cause => setError(message(cause))); };
@@ -126,7 +129,8 @@ function Connections({ crm }: { crm: Crm }) {
             onClick={() => save({ measure_metric: item.id })}>{t(item.label)}</Button>)}</div>
         </>}
       </div>
-      {pipeline.measure_intent_id && value !== null && <p className="text-xs text-muted-foreground">{t('Currently reporting {value}.', { value: money(value, pipeline.currency, locale) })}</p>}
+      {pipeline.measure_intent_id && !fits && <p role="alert" className="text-xs text-[var(--status-warning)]">{t('This success condition is measured in “{unit}”. Choose a {kind} figure — nothing is written until they match.', { unit: linked?.unit ?? '', kind: metricKind(metric) === 'amount' ? t('count') : t('money') })}</p>}
+      {pipeline.measure_intent_id && fits && value !== null && <p className="text-xs text-muted-foreground">{t('Currently reporting {value}.', { value: metricKind(metric) === 'count' ? `${value}${linked?.unit ? ` ${linked.unit}` : ''}` : money(value, pipeline.currency, locale) })}</p>}
       {crm.measureError && <p role="alert" className="text-xs text-[var(--status-danger)]">{t(crm.measureError)}</p>}
       {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{error}</p>}
     </div>

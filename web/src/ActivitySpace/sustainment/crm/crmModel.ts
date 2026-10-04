@@ -43,7 +43,19 @@ export const stageSlug = (label: string) => label.trim().toLowerCase().replace(/
 
 // ── Stored records ──────────────────────────────────────────────────────────
 
-export type CrmMetric = 'won_quarter' | 'won_year' | 'won_total' | 'weighted' | 'open';
+export type CrmMetric = 'won_quarter' | 'won_year' | 'won_total' | 'weighted' | 'open' | 'won_count_quarter' | 'won_count_year' | 'won_count_total';
+
+/** Amount metrics report money in the pipeline's currency; count metrics report how many deals. */
+export const metricKind = (metric: CrmMetric): 'amount' | 'count' => metric.startsWith('won_count') ? 'count' : 'amount';
+
+/** Whether a success condition's unit can hold a metric's figure. An empty unit takes either;
+ * a currency (code or symbol) takes amounts; anything else (社, 件, %) takes counts. */
+export function unitFits(unit: string | null | undefined, metric: CrmMetric): boolean {
+  const value = unit?.trim() ?? '';
+  if (!value) return true;
+  const money = /^[A-Za-z]{3}$/.test(value) || /^(円|万円|億円|千円|ドル|ユーロ|[¥$€£])$/.test(value);
+  return metricKind(metric) === 'amount' ? money : !money;
+}
 
 export interface CrmPipelineRecord {
   id: string;
@@ -441,7 +453,13 @@ export function metricValue(deals: readonly CrmDeal[], metric: CrmMetric, curren
   const scoped = deals.filter(deal => deal.currency === currency && deal.amount !== null);
   const sum = (items: CrmDeal[], pick: (deal: CrmDeal) => number) => Math.round(items.reduce((total, deal) => total + pick(deal), 0) * 100) / 100;
   const won = scoped.filter(deal => deal.outcome === 'won');
+  // Counts include won deals in every currency and with no amount: a customer won is a customer won.
+  const wonAll = deals.filter(deal => deal.outcome === 'won');
+  const closed = (deal: CrmDeal) => deal.closedOn ?? deal.closeDate;
   switch (metric) {
+    case 'won_count_total': return wonAll.length;
+    case 'won_count_year': return wonAll.filter(deal => closed(deal)?.slice(0, 4) === year).length;
+    case 'won_count_quarter': return wonAll.filter(deal => inQuarter(closed(deal))).length;
     case 'won_total': return sum(won, deal => deal.amount!);
     case 'won_year': return sum(won.filter(deal => (deal.closedOn ?? deal.closeDate)?.slice(0, 4) === year), deal => deal.amount!);
     case 'won_quarter': return sum(won.filter(deal => inQuarter(deal.closedOn ?? deal.closeDate)), deal => deal.amount!);

@@ -11,7 +11,7 @@ import { createElement, updateElement } from '@/ActivitySpace/execution/element/
 import { fetchDataTableSchema } from '@/ActivitySpace/sustainment/table/data';
 import { readAllPages } from '@/hooks/readAllPages';
 import {
-  buildCrmWorkspace, metricValue, normalizeCrmStages, parseActivityLog, resolveStage,
+  buildCrmWorkspace, metricValue, normalizeCrmStages, unitFits, parseActivityLog, resolveStage,
   type CrmActivityRecord, type CrmActivityType, type CrmCompanyRecord, type CrmContactRecord, type CrmDeal,
   type CrmDealRecord, type CrmFieldRecord, type CrmNextElement, type CrmPerson, type CrmPipelineRecord,
 } from '@/ActivitySpace/sustainment/crm/crmModel';
@@ -310,8 +310,10 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     if (reported.current === stamp) return;
     reported.current = stamp;
     void (async () => {
-      const { data, error } = await supabase.from('intents').select('actual_value').eq('id', p.measure_intent_id!).maybeSingle();
+      const { data, error } = await supabase.from('intents').select('actual_value,unit').eq('id', p.measure_intent_id!).maybeSingle();
       if (error || !data) { setMeasureError(error?.message ?? 'The linked success condition is not visible to you.'); return; }
+      // A count is never written into a money condition, nor money into a count.
+      if (!unitFits(data.unit as string | null, p.measure_metric!)) { setMeasureError(null); return; }
       if (Number(data.actual_value) === value) { setMeasureError(null); return; }
       const { error: writeError } = await supabase.from('intents').update({ actual_value: value, measured_at: new Date().toISOString() }).eq('id', p.measure_intent_id!).select('id').single();
       // Success conditions are written by the Initiative's owner; for anyone else the figure updates when they open the CRM.

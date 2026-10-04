@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  accountsOf, buildCrmWorkspace, fieldKey, fieldOptions, forecastFor, inList, metricValue, normalizeCrmStages, parseActivityLog,
+  accountsOf, buildCrmWorkspace, unitFits, fieldKey, fieldOptions, forecastFor, inList, metricValue, normalizeCrmStages, parseActivityLog,
   pipelineColumns, searchDeals, stageChange, todayQueue, upcoming, DEFAULT_CRM_STAGES,
   type CrmDealRecord, type CrmNextElement, type CrmPipelineRecord, type CrmRecords,
 } from '@/ActivitySpace/sustainment/crm/crmModel';
@@ -126,6 +126,25 @@ describe('CRM rollups', () => {
     expect(metricValue(result.deals, 'won_total', 'USD', today)).toBe(1000);
     expect(metricValue(result.deals, 'open', 'USD', today)).toBe(1700);
     expect(metricValue(result.deals, 'weighted', 'USD', today)).toBe(1000);
+  });
+
+  it('counts deals won in every currency, by when they closed', () => {
+    const counted = workspace([
+      deal({ stage: 'won', closed_on: '2026-10-02' }), deal({ stage: 'won', currency: 'JPY', amount: null, closed_on: '2026-08-01' }),
+      deal({ stage: 'won', closed_on: '2025-12-01' }), deal({ stage: 'lost', closed_on: '2026-10-01' }), deal(),
+    ]);
+    expect(metricValue(counted.deals, 'won_count_quarter', 'USD', today)).toBe(1);
+    expect(metricValue(counted.deals, 'won_count_year', 'USD', today)).toBe(2);
+    expect(metricValue(counted.deals, 'won_count_total', 'USD', today)).toBe(3);
+  });
+
+  it('writes money only into money conditions and counts only into the rest', () => {
+    expect(unitFits('社', 'won_quarter')).toBe(false);
+    expect(unitFits('社', 'won_count_quarter')).toBe(true);
+    expect(unitFits('円', 'won_quarter')).toBe(true);
+    expect(unitFits('JPY', 'won_count_total')).toBe(false);
+    expect(unitFits(null, 'open')).toBe(true);
+    expect(unitFits('', 'won_count_year')).toBe(true);
   });
 
   it('filters my deals and searches custom fields and deal numbers', () => {
