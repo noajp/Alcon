@@ -216,10 +216,14 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     links: { companyId?: string | null; contactId?: string | null; quiet?: boolean } = {}) => {
     const deal = deals.data?.find(item => item.id === dealId);
     const author = people.find(person => person.id === me)?.name ?? null;
+    // A note links only what its writer can see: a deal can still point at a
+    // company or contact that has since moved into a Domain this writer is not in.
+    const companyId = links.companyId !== undefined ? links.companyId : deal?.company_id ?? null;
+    const contactId = links.contactId !== undefined ? links.contactId : deal?.contact_id ?? null;
     check(await supabase.from('crm_activities').insert({
       activity_space_id: space(), deal_id: dealId,
-      company_id: links.companyId !== undefined ? links.companyId : deal?.company_id ?? null,
-      contact_id: links.contactId !== undefined ? links.contactId : deal?.contact_id ?? null,
+      company_id: companyId && (companies.data ?? []).some(item => item.id === companyId) ? companyId : null,
+      contact_id: contactId && (contacts.data ?? []).some(item => item.id === contactId) ? contactId : null,
       kind: entry.type, body: entry.text.trim().slice(0, 8000), occurred_on: entry.date ?? today, author_name: author,
     }).select('id').single());
     if (!links.quiet) await invalidate();
@@ -303,7 +307,17 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
   const saveField = async (id: string | null, patch: Partial<Omit<CrmFieldRecord, 'id'>>) => {
     try {
       if (id) check(await supabase.from('crm_fields').update(patch).eq('id', id).select('id').single());
-      else check(await supabase.from('crm_fields').insert({ activity_space_id: space(), ...patch }).select('id').single());
+      else {
+        // A key may already be taken in a Domain this writer cannot see; the
+        // database refuses it, and the field takes the next free suffix.
+        for (let attempt = 0; ; attempt += 1) {
+          const key = attempt && patch.key ? `${patch.key}_${attempt + 1}` : patch.key;
+          const result = await supabase.from('crm_fields').insert({ activity_space_id: space(), ...patch, key }).select('id').single();
+          if (result.error?.code === '23505' && attempt < 5) continue;
+          check(result);
+          break;
+        }
+      }
     } finally { await invalidate(); }
   };
   const deleteField = async (id: string) => { check(await supabase.from('crm_fields').delete().eq('id', id).select('id').single()); await invalidate(); };
