@@ -87,13 +87,22 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'vision' && (
             <div className="flex-1 overflow-hidden bg-card">
-              <VisionView onOpenPortfolio={(id) => { onNavigate({ portfolioId: id }); onViewChange?.('portfolio'); }} />
+              <VisionView
+                visionId={navigation.visionId ?? null}
+                createRequested={!!navigation.visionCreate}
+                onCreateHandled={() => onNavigate({ visionCreate: null })}
+                onSelectVision={(id) => onNavigate({ visionId: id })}
+                onOpenPortfolio={(id) => { onNavigate({ portfolioId: id }); onViewChange?.('portfolio'); }}
+                onSelectStrategy={(id) => { onNavigate({ strategyId: id }); onViewChange?.('strategy'); }}
+              />
             </div>
           )}
 
           {activeActivity === 'portfolio' && (
             <div className="flex-1 overflow-hidden bg-card">
               <PortfolioView
+                visionId={navigation.visionId ?? null}
+                onRequestVision={() => { onNavigate({ visionCreate: true }); onViewChange?.('vision'); }}
                 activePortfolioId={navigation.portfolioId ?? null}
                 onSelectPortfolio={(id) => onNavigate({ portfolioId: id })}
                 createRequested={!!navigation.portfolioCreate}
@@ -109,6 +118,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {activeActivity === 'strategy' && (
             <div className="flex-1 overflow-hidden bg-card">
               <StrategyShell
+                visionId={navigation.visionId ?? null}
                 activeStrategyId={navigation.strategyId ?? null}
                 createRequested={!!navigation.strategyCreate}
                 onCreateHandled={() => onNavigate({ strategyCreate: null })}

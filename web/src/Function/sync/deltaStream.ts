@@ -63,7 +63,7 @@ const WORKSPACE_TABLES = [
   'objects', 'workers', 'domains', 'worker_availability',
   'domain_members', 'object_members', 'activity_space_members', 'object_domains',
   'membership_invitations', 'widget_boards', 'tables', 'table_columns', 'table_rows', 'table_cells',
-  'strategies', 'strategy_objects', 'strategy_children', 'strategy_comments', 'portfolios',
+  'strategies', 'strategy_objects', 'strategy_children', 'strategy_comments', 'portfolios', 'visions',
   'phases', 'domain_approaches', 'approach_conditions', 'approach_contributions', 'approach_assessments', 'approach_reviews',
   'intents', 'intent_bindings', 'intent_lineage', 'intent_next_actions',
   'intent_escalations', 'intent_alignments', 'intent_audits', 'intent_predictions', 'intent_resources',
@@ -441,6 +441,10 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
 
     case 'portfolios':
       invalidateSoon(qc, ['portfolios']);
+      return;
+
+    case 'visions':
+      invalidateSoon(qc, ['visions']);
       return;
 
     case 'strategy_comments': {

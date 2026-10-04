@@ -6,6 +6,10 @@ import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgen
 import { StrategyNavigation } from './sidebar/StrategyNavigation';
 import { SettingsModal } from '@/Function/settings/SettingsModal';
 import { StrategySettingsModal } from '@/Function/settings/StrategySettingsModal';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { resolveVision, useSpaceRole, useVisions } from '@/ActivitySpace/strategy/vision/data';
+import { useCurrentUserId } from '@/providers/authContext';
+import { NavPortfolioIcon, NavStrategyIcon, NavVisionIcon } from './sidebar/NavIcons';
 import { NotebookTree } from './sidebar/NotebookTree';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
@@ -207,7 +211,15 @@ export function AppSidebar({
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
-  const [strategySettingsOpen, setStrategySettingsOpen] = useState(false);
+  // Strategy: the Space's Visions (the sidebar's rows) and the one whose
+  // settings modal is open.
+  const strategySpaceId = useActiveSpaceId();
+  const { data: visions } = useVisions(strategySpaceId);
+  const activeVision = resolveVision(visions, navigation.visionId);
+  const [settingsVisionId, setSettingsVisionId] = useState<string | null>(null);
+  const settingsVision = visions.find((v) => v.id === settingsVisionId) ?? null;
+  const visionViewerId = useCurrentUserId();
+  const visionViewerRole = useSpaceRole(strategySpaceId);
   const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const railMode = railModeOf(activeView);
@@ -232,21 +244,13 @@ export function AppSidebar({
   // Execution) a Domain or Object from a small menu. Modes with nothing to
   // create show no "+".
   const calendarDay = useCalendarDay();
-  const createLabel = activeView === 'portfolio' ? 'New Portfolio' : ({
-    notebook: 'Add Notebook', tables: 'Add Table', strategy: 'New Initiative',
+  const createLabel = ({
+    notebook: 'Add Notebook', tables: 'Add Table', strategy: 'Create new',
     calendar: 'Add schedule', execution: 'Create new',
   } as Partial<Record<RailMode, string>>)[railMode ?? 'execution'];
   const openCreateMenu = () => {
     if (railMode === 'tables') { openCreate('table'); return; }
     if (railMode === 'notebook') { openCreate('notebook'); return; }
-    if (railMode === 'strategy') {
-      if (activeView === 'portfolio') { onNavigate({ portfolioCreate: true }); return; }
-      // Land on the Initiative list (an open Initiative's detail has no
-      // create dialog) and let this tab's surface open it once mounted.
-      onNavigate({ strategyId: null, strategyCreate: true });
-      onViewChange('strategy');
-      return;
-    }
     if (railMode === 'calendar') {
       window.dispatchEvent(new CustomEvent<CreateElementDetail>(CREATE_ELEMENT_EVENT, { detail: { dueDate: calendarDay } }));
       return;
@@ -441,11 +445,12 @@ export function AppSidebar({
           {railMode === 'strategy' && (
           <>
           <SidebarModeLabel label={t('Strategy')} />
-          <StrategyNavigation activeView={activeView} onSelect={(id) => {
-            if (id === 'strategy') onNavigate({ strategyId: null });
-            if (id === 'portfolio') onNavigate({ portfolioId: null });
-            onViewChange(id);
-          }} onOpenSettings={() => setStrategySettingsOpen(true)} />
+          <StrategyNavigation visions={visions} activeVisionId={activeVision?.id ?? null} activeView={activeView}
+            onSelect={(visionId, view) => {
+              onNavigate({ visionId, strategyId: null, portfolioId: null });
+              onViewChange(view);
+            }}
+            onOpenSettings={setSettingsVisionId} />
           </>
           )}
 
@@ -561,23 +566,59 @@ export function AppSidebar({
             className="fixed w-52 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden"
             style={{ top: createMenuPos.top, left: createMenuPos.left }}
           >
-            <CreateMenuItem
-              icon={<DomainIcon size={16} />}
-              label={t('Domain')}
-              desc={t('Top-level container')}
-              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
-            />
-            <CreateMenuItem
-              icon={<ObjectIcon size={14} />}
-              label={t('Object')}
-              desc={t('Mid-level structural unit')}
-              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('object'); }}
-            />
+            {railMode === 'strategy' ? (
+              <>
+                {/* Vision → Portfolio → Initiative, the Strategy tree. Each
+                    page opens its own create card once mounted; Portfolio
+                    and Initiative are made under the active Vision. */}
+                <CreateMenuItem
+                  icon={<NavVisionIcon size={16} />}
+                  label={t('Vision')}
+                  desc={t('What this Space aims for')}
+                  onClick={() => { setCreateMenuOpen(false); onNavigate({ visionCreate: true }); onViewChange('vision'); }}
+                />
+                {activeVision && (
+                  <>
+                    <CreateMenuItem
+                      icon={<NavPortfolioIcon size={16} />}
+                      label={t('Portfolio')}
+                      desc={t('A bundle of Initiatives in {name}', { name: activeVision.name })}
+                      onClick={() => { setCreateMenuOpen(false); onNavigate({ visionId: activeVision.id, portfolioId: null, portfolioCreate: true }); onViewChange('portfolio'); }}
+                    />
+                    <CreateMenuItem
+                      icon={<NavStrategyIcon size={16} />}
+                      label={t('Initiative')}
+                      desc={t('An outcome to win in {name}', { name: activeVision.name })}
+                      onClick={() => { setCreateMenuOpen(false); onNavigate({ visionId: activeVision.id, strategyId: null, strategyCreate: true }); onViewChange('strategy'); }}
+                    />
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <CreateMenuItem
+                  icon={<DomainIcon size={16} />}
+                  label={t('Domain')}
+                  desc={t('Top-level container')}
+                  onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
+                />
+                <CreateMenuItem
+                  icon={<ObjectIcon size={14} />}
+                  label={t('Object')}
+                  desc={t('Mid-level structural unit')}
+                  onClick={() => { setCreateMenuOpen(false); onCreateNew?.('object'); }}
+                />
+              </>
+            )}
           </div>
         </>
       )}
 
-      {strategySettingsOpen && <StrategySettingsModal onClose={() => setStrategySettingsOpen(false)} />}
+      {settingsVision && (
+        <StrategySettingsModal vision={settingsVision} canEdit={settingsVision.created_by === visionViewerId || visionViewerRole === 'owner'}
+          onClose={() => setSettingsVisionId(null)}
+          onDeleted={() => { setSettingsVisionId(null); onNavigate({ visionId: null, portfolioId: null }); }} />
+      )}
       {settingsDomain && (
         <DomainSettingsModal
           domain={settingsDomain}

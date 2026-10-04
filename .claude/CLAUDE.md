@@ -8,7 +8,7 @@ Next.js 16 + Supabase + Tailwind CSS + recharts。企業・軍事作戦・病院
 
 | 分類 | 何を扱うか | 単位 |
 |---|---|---|
-| **Strategy** | 何を達成し、どう勝つか | Vision（Space が目指す姿）/ Portfolio（Initiative の束）/ Initiative（複数で戦略を構成）。Phase（活動を期間で区切る単位）はナビに出さない |
+| **Strategy** | 何を達成し、どう勝つか | Vision（Space が目指す姿）→ Portfolio（Initiative の束、入れ子可）→ Initiative（複数で戦略を構成）。Phase（活動を期間で区切る単位）はナビに出さない |
 | **Execution** | 実際に行動する | Domain（活動の場）→ Object（成果物）→ Element（行動の最小単位） |
 | **Sustainment** | 仕事道具 | Workload / CRM / SCM / Notebook / Table / Team / Calendar |
 
