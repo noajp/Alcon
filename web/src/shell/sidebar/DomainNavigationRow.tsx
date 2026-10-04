@@ -14,15 +14,18 @@ export function DomainNavigationRow({ name, mark, active, expanded, activeView, 
 }) {
   const { t } = useI18n();
   return <div className="group/domain">
-    <div className={`flex min-w-0 items-center rounded-md ${active && activeView === 'domain-overview' ? 'bg-sidebar-accent' : ''}`}>
+    {/* The row is one hover target: the name, the chevron and "…" light up
+        together, so the highlight never stops short of the row's own controls.
+        The buttons inside paint no ground of their own. */}
+    <div className={`flex min-w-0 items-center rounded-md transition-colors ${active && activeView === 'domain-overview' ? 'bg-sidebar-accent' : 'hover:bg-[var(--surface-strong)]'} group/domain-row`}>
       <Button variant="ghost" size="md" align="start" {...dragProps} onClick={onOpen} title={name}
         aria-current={active && activeView === 'domain-overview' ? 'page' : undefined}
-        className={`min-w-0 flex-1 gap-2.5 text-xs font-semibold ${active && activeView === 'domain-overview' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}><span className="shrink-0">{mark}</span><span className="truncate">{name}</span></Button>
-      <Button variant="ghost" size="icon-sm" onClick={onToggle} aria-label={`${t(expanded ? 'Collapse' : 'Expand')} ${name}`} aria-expanded={expanded}>
+        className={`min-w-0 flex-1 gap-2.5 text-xs font-semibold hover:bg-transparent ${active && activeView === 'domain-overview' ? 'text-foreground' : 'text-muted-foreground group-hover/domain-row:text-foreground'}`}><span className="shrink-0">{mark}</span><span className="truncate">{name}</span></Button>
+      <Button variant="ghost" size="icon-sm" className="hover:bg-transparent text-muted-foreground hover:text-foreground" onClick={onToggle} aria-label={`${t(expanded ? 'Collapse' : 'Expand')} ${name}`} aria-expanded={expanded}>
         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
       </Button>
       {onSettings
-        ? <Button variant="ghost" size="icon-xs" onClick={onSettings} aria-label={`${name} settings`} className="mr-1"><MoreHorizontal size={12} /></Button>
+        ? <Button variant="ghost" size="icon-xs" onClick={onSettings} aria-label={`${name} settings`} className="mr-1 hover:bg-transparent text-muted-foreground hover:text-foreground"><MoreHorizontal size={12} /></Button>
         : <span aria-hidden className={`mr-1 shrink-0 ${CONTROL.square.xs}`} />}
     </div>
     {expanded && <div className="mt-0.5 pl-7">
