@@ -4,6 +4,7 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const CRM_MESSAGES: Record<string, Row> = {
+  'Alcon cannot tell whether “{unit}” is money or a count. Use a currency (円, JPY) or a count (社, 件) as the unit.': ['「{unit}」が金額か件数か判別できません。単位を通貨（円・JPY）か数（社・件）にしてください。', '“{unit}”이(가) 금액인지 건수인지 판단할 수 없습니다. 단위를 통화(엔, JPY)나 수(사, 건)로 하세요.', 'Impossible de savoir si « {unit} » est un montant ou un nombre. Utilisez une devise (円, JPY) ou un nombre (社, 件).', 'No se puede saber si «{unit}» es un importe o un número. Usa una moneda (円, JPY) o un número (社, 件) como unidad.'],
   'None of the deals in this pipeline are yours yet.': ['このパイプラインの商談に、あなたの担当はまだありません。', '이 파이프라인의 거래 중 내 담당은 아직 없습니다.', 'Aucune affaire de ce pipeline ne vous est encore attribuée.', 'Ningún negocio de este pipeline es tuyo todavía.'],
   '“{unit}” is a rate or a per-period figure; the CRM cannot write into it.': ['「{unit}」は率または期間あたりの値のため、CRM から書き込めません。', '“{unit}”은(는) 비율 또는 기간당 값이라 CRM이 기록할 수 없습니다.', '« {unit} » est un taux ou une valeur par période ; le CRM ne peut pas y écrire.', '«{unit}» es una tasa o un valor por periodo; el CRM no puede escribir en él.'],
   'This success condition is in {currency}; this pipeline reports in {pipeline}.': ['この成功条件は {currency} で、このパイプラインは {pipeline} で集計しています。', '이 성공 조건은 {currency}이고, 이 파이프라인은 {pipeline}로 집계합니다.', 'Cette condition est en {currency} ; ce pipeline compte en {pipeline}.', 'Esta condición está en {currency}; este pipeline informa en {pipeline}.'],

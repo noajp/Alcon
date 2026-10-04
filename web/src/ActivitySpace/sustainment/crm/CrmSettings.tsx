@@ -113,10 +113,11 @@ function Connections({ crm }: { crm: Crm }) {
   const written = value === null ? null : measureValue(linked?.unit, metric, pipeline.currency, value);
   const unit = readUnit(linked?.unit);
   // Why nothing would be written, in the person's terms.
-  const mismatch = written !== null || value === null ? null
-    : unit.kind === 'other' ? t('“{unit}” is a rate or a per-period figure; the CRM cannot write into it.', { unit: linked?.unit ?? '' })
+  const mismatch = !linked || written !== null || value === null ? null
+    : unit.kind === 'rate' ? t('“{unit}” is a rate or a per-period figure; the CRM cannot write into it.', { unit: linked.unit ?? '' })
+    : unit.kind === 'unknown' ? t('Alcon cannot tell whether “{unit}” is money or a count. Use a currency (円, JPY) or a count (社, 件) as the unit.', { unit: linked.unit ?? '' })
     : unit.kind === 'money' && metricKind(metric) === 'amount' ? t('This success condition is in {currency}; this pipeline reports in {pipeline}.', { currency: unit.currency, pipeline: pipeline.currency })
-    : metricKind(metric) === 'amount' ? t('This success condition counts “{unit}”. Choose a number of deals won.', { unit: linked?.unit ?? '' })
+    : unit.kind === 'count' ? t('This success condition counts “{unit}”. Choose a number of deals won.', { unit: linked.unit ?? '' })
     : t('This success condition is an amount. Choose an amount won or in the pipeline.');
   const [error, setError] = useState<string | null>(null);
   const save = (patch: Parameters<Crm['savePipeline']>[1]) => { setError(null); crm.savePipeline(pipeline.id, patch).catch(cause => setError(message(cause))); };
@@ -137,7 +138,7 @@ function Connections({ crm }: { crm: Crm }) {
         </>}
       </div>
       {pipeline.measure_intent_id && mismatch && <p role="alert" className="text-xs text-[var(--status-warning)]">{mismatch} {t('Nothing is written until they match.')}</p>}
-      {pipeline.measure_intent_id && written !== null && <p className="text-xs text-muted-foreground">{t('Currently reporting {value}.', { value: unit.kind === 'money' || unit.kind === 'count' ? `${written.toLocaleString(locale)} ${linked?.unit ?? ''}`.trim() : metricKind(metric) === 'count' ? String(written) : money(written, pipeline.currency, locale) })}</p>}
+      {pipeline.measure_intent_id && linked && written !== null && <p className="text-xs text-muted-foreground">{t('Currently reporting {value}.', { value: unit.kind === 'money' || unit.kind === 'count' ? `${written.toLocaleString(locale)} ${linked?.unit ?? ''}`.trim() : metricKind(metric) === 'count' ? String(written) : money(written, pipeline.currency, locale) })}</p>}
       {crm.measureError && <p role="alert" className="text-xs text-[var(--status-danger)]">{t(crm.measureError)}</p>}
       {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{error}</p>}
     </div>

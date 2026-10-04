@@ -153,6 +153,13 @@ describe('CRM rollups', () => {
     expect(measureValue('円/月', 'won_quarter', 'JPY', 3)).toBeNull();
     expect(measureValue(null, 'open', 'JPY', 7)).toBe(7);
     expect(readUnit('US$')).toEqual({ kind: 'money', currency: 'USD', scale: 1 });
+    for (const unknown of ['円(税込)', '米ドル', 'yen', 'dollars', '十万円', '千万円', '万人', '万', 'k']) {
+      expect(readUnit(unknown).kind, unknown).toBe('unknown');
+      expect(measureValue(unknown, 'won_count_total', 'JPY', 3), unknown).toBeNull();
+      expect(measureValue(unknown, 'won_total', 'JPY', 3), unknown).toBeNull();
+    }
+    expect(readUnit('cup')).toEqual({ kind: 'count' });
+    expect(readUnit('人')).toEqual({ kind: 'count' });
   });
 
   it('filters my deals and searches custom fields and deal numbers', () => {

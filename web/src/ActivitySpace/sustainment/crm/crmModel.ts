@@ -55,20 +55,23 @@ const ISO = (() => {
 })();
 
 /** Reads a success condition's unit: money (in which currency, at what scale),
- * a count, or something a CRM figure must not be written into (a rate, a
- * per-period amount). Full-width forms are folded first (￥ → ¥, ＪＰＹ → JPY). */
-export function readUnit(unit: string | null | undefined): { kind: 'any' } | { kind: 'money'; currency: string; scale: number } | { kind: 'count' } | { kind: 'other' } {
+ * a count, a rate or per-period figure, or something it cannot tell. Only a
+ * plain unit (社, 件, 人, pcs) is a count; a unit that mentions money or a
+ * scale without being fully understood is "unknown" and is never written. */
+export function readUnit(unit: string | null | undefined): { kind: 'any' } | { kind: 'money'; currency: string; scale: number } | { kind: 'count' } | { kind: 'rate' } | { kind: 'unknown' } {
   const value = (unit ?? '').normalize('NFKC').trim();
   if (!value) return { kind: 'any' };
-  if (/[%‰/]|毎|per\b|率/i.test(value)) return { kind: 'other' };
+  if (/[%‰/]|毎|per\b|率/i.test(value)) return { kind: 'rate' };
   let rest = value;
   let scale = 1;
   for (const [prefix, factor] of SCALES) if (rest.startsWith(prefix) && rest.length > prefix.length) { scale = factor; rest = rest.slice(prefix.length); break; }
-  const upper = rest.toUpperCase();
-  const symbol = SYMBOLS.find(([pattern]) => pattern.test(rest) || pattern.test(upper));
+  const symbol = SYMBOLS.find(([pattern]) => pattern.test(rest) || pattern.test(rest.toUpperCase()));
   if (symbol) return { kind: 'money', currency: symbol[1], scale };
-  if (/^[A-Z]{3}$/.test(upper) && (ISO.size ? ISO.has(upper) : ['JPY', 'USD', 'EUR', 'GBP', 'CNY', 'KRW', 'AUD', 'CAD', 'CHF', 'SGD', 'HKD', 'TWD', 'INR'].includes(upper))) return { kind: 'money', currency: upper, scale };
-  return scale === 1 ? { kind: 'count' } : { kind: 'other' };
+  // ISO codes only as written in capitals: "cup" is a word, "CUP" a currency.
+  if (/^[A-Z]{3}$/.test(rest) && (ISO.size ? ISO.has(rest) : ['JPY', 'USD', 'EUR', 'GBP', 'CNY', 'KRW', 'AUD', 'CAD', 'CHF', 'SGD', 'HKD', 'TWD', 'INR'].includes(rest))) return { kind: 'money', currency: rest, scale };
+  const mentionsMoney = /円|¥|\$|€|£|₩|ドル|ユーロ|ポンド|ウォン|元|yen|dollar|euro|pound/i.test(value) || /\b[A-Z]{3}\b/.test(value);
+  const mentionsScale = /[十百千万億兆]|\d|^[kmb]$/i.test(value);
+  return mentionsMoney || mentionsScale || scale !== 1 ? { kind: 'unknown' } : { kind: 'count' };
 }
 
 /** Whether a figure may be written into a success condition, and the value to
