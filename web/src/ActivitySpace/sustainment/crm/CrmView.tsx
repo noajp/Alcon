@@ -179,7 +179,7 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
         {crm.error && <div role="alert" className="space-y-2"><p className="text-sm text-[var(--status-danger)]">{t('Could not load your pipeline.')} {crm.error instanceof Error ? crm.error.message : ''}</p>
           <Button onClick={() => void crm.refetch()}>{t('Retry')}</Button></div>}
 
-        {todayWorkspace && view === 'today' && <CrmToday crm={crm} workspace={todayWorkspace} onOpen={openDeal} onCapture={() => setCaptureFor(null)} onList={list => go({ view: 'deals', list })} />}
+        {todayWorkspace && view === 'today' && <CrmToday crm={crm} workspace={todayWorkspace} pipelineDeals={workspace?.deals.length ?? 0} onShowEveryone={() => setEveryone(true)} onOpen={openDeal} onCapture={() => setCaptureFor(null)} onList={list => go({ view: 'deals', list })} />}
         {workspace && view === 'pipeline' && <CrmPipeline crm={crm} workspace={workspace} deals={filtered} onOpen={openDeal} selectedId={route.dealId ?? null} />}
         {workspace && view === 'deals' && <CrmDeals deals={filtered} today={workspace.today} onOpen={openDeal} selectedId={route.dealId ?? null}
           emptyLabel={workspace.deals.length ? t('No deals match these filters.') : t('No deals yet. Use Capture or New deal to add one.')} />}

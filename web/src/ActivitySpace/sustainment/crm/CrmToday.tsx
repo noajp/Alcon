@@ -40,8 +40,10 @@ function Snooze({ deal, crm }: { deal: CrmDeal; crm: Crm }) {
   </DropdownMenu>;
 }
 
-export function CrmToday({ crm, workspace, onOpen, onCapture, onList }: {
+export function CrmToday({ crm, workspace, onOpen, onCapture, onList, pipelineDeals, onShowEveryone }: {
   crm: Crm; workspace: CrmWorkspace; onOpen: (dealId: string) => void; onCapture: () => void; onList: (list: 'at-risk' | 'closing-soon') => void;
+  /** How many deals the pipeline has before Today narrows it to mine. */
+  pipelineDeals: number; onShowEveryone?: () => void;
 }) {
   const { t, locale } = useI18n();
   const { deals, today, params, primaryCurrency } = workspace;
@@ -52,6 +54,13 @@ export function CrmToday({ crm, workspace, onOpen, onCapture, onList }: {
   const atRisk = deals.filter(deal => inList(deal, 'at-risk', today, params.horizonDays));
   const closing = deals.filter(deal => inList(deal, 'closing-soon', today, params.horizonDays));
   const overdue = queue.filter(deal => deal.action!.urgency === 'overdue').length;
+
+  // "None of mine" is not "none at all": the onboarding is for an empty pipeline only.
+  if (!deals.length && pipelineDeals > 0) return <div className="max-w-xl space-y-3 py-10">
+    <h2 className="text-lg font-semibold">{t('Nothing assigned to you')}</h2>
+    <p className="text-sm leading-relaxed text-muted-foreground">{t('None of the deals in this pipeline are yours yet.')}</p>
+    {onShowEveryone && <Button variant="secondary" onClick={onShowEveryone}>{t('Show everyone’s deals')}</Button>}
+  </div>;
 
   if (!deals.length) return <div className="max-w-xl space-y-4 py-10">
     <h2 className="text-xl font-semibold">{t('Your pipeline is ready')}</h2>
