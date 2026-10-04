@@ -17,6 +17,7 @@ import {
   ContextMenuSeparator,
 } from '@/ui/context-menu';
 import type { NavigationState } from '@/types/navigation';
+import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 
 // Notebook mode's sidebar — the Books (root Folders) with their Sections
 // always listed beneath, the way Obsidian lists a vault. Picking a Book or
@@ -118,16 +119,14 @@ export function NotebookTree({
       className={`min-w-0 flex-1 bg-transparent ${className} text-foreground`}
     />
   ) : (
-    <button type="button" onClick={onOpen} title={node.name} className="min-w-0 flex-1 truncate text-left">
+    <button type="button" onClick={onOpen} title={node.name} className="h-full min-w-0 flex-1 truncate text-left outline-none">
       {node.name}
     </button>
   );
 
   return (
     <div className="mt-1">
-      <div className="flex items-center gap-1 px-2 h-6 mt-3">
-        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Notebook')}</span>
-      </div>
+      <SidebarSectionLabel>{t('Notebook')}</SidebarSectionLabel>
       <div className="mt-1 flex flex-col">
         {folders.map((folder) => {
           const sections = sectionsInFolder(nodes, folder.id);
@@ -140,16 +139,9 @@ export function NotebookTree({
             <div key={folder.id} className="mt-2.5 first:mt-0">
               <ContextMenu>
                 <ContextMenuTrigger asChild>
-                  <div
-                    className={`group flex h-8 w-full items-center gap-2 rounded-md px-2 text-[12px] font-semibold transition-colors duration-100 ${
-                      bookActive ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                    }`}
-                  >
-                    {/* The icon slot is the same width on Book and Section
-                        rows (w-4), so both names start on one edge. */}
-                    <span className="flex w-4 shrink-0 items-center justify-center"><NavNoteIcon size={16} /></span>
+                  <SidebarRow active={bookActive} icon={<NavNoteIcon size={16} />}>
                     {nameOrInput(folder, () => openBook(folder.id), 'text-[12px] font-semibold')}
-                  </div>
+                  </SidebarRow>
                 </ContextMenuTrigger>
                 <ContextMenuContent className="min-w-[180px]" onCloseAutoFocus={(e) => e.preventDefault()}>
                   <ContextMenuItem onSelect={() => void addSection(folder.id)}><FolderPlus /> {t('New section')}</ContextMenuItem>
@@ -163,16 +155,10 @@ export function NotebookTree({
                 return (
                   <ContextMenu key={section.id}>
                     <ContextMenuTrigger asChild>
-                      <div
-                        className={`group flex h-6 w-full items-center gap-2 rounded-md px-2 text-[12px] font-medium transition-colors duration-100 ${
-                          active ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                        }`}
-                      >
-                        <span className="flex w-4 shrink-0 items-center justify-center">
-                          <span className={`h-3.5 w-[3px] rounded-full ${active ? 'bg-[var(--accent-default)]' : 'bg-[var(--text-tertiary)]'}`} />
-                        </span>
+                      <SidebarRow size="sm" active={active}
+                        icon={<span className={`h-3.5 w-[3px] rounded-full ${active ? 'bg-[var(--accent-default)]' : 'bg-[var(--text-tertiary)]'}`} />}>
                         {nameOrInput(section, () => openSection(folder.id, section.id), 'text-[12px] font-medium')}
-                      </div>
+                      </SidebarRow>
                     </ContextMenuTrigger>
                     <ContextMenuContent className="min-w-[180px]" onCloseAutoFocus={(e) => e.preventDefault()}>
                       <ContextMenuItem onSelect={() => void addPage(folder.id, section.id)}><FilePlus /> {t('New page')}</ContextMenuItem>

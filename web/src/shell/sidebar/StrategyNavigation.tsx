@@ -2,15 +2,15 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
-import { Button } from '@/ui/button';
 import { VIEW_REGISTRY } from '@/shell/viewRegistry';
+import { SidebarRow, SidebarRowAction } from '@/Function/shared/SidebarRow';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { Vision } from '@/types/database';
 
 // The Strategy mode's navigation: one row per Vision with Portfolio and
-// Initiative nested under it — the same tree as Execution's Domain with its
-// Objects and Elements (name, a chevron that folds the children, a "…" that
-// opens its settings). Phase and Timeline stay routable from an Initiative
+// Initiative nested under it — the same tree, built from the same SidebarRow,
+// as Execution's Domain with its Objects and Elements (name, a chevron that
+// folds the children, a "…" that opens its settings). Phase and Timeline stay routable from an Initiative
 // but are not listed.
 export function StrategyNavigation({ visions, activeVisionId, activeView, onSelect, onOpenSettings }: {
   visions: Vision[];
@@ -40,26 +40,20 @@ export function StrategyNavigation({ visions, activeVisionId, activeView, onSele
       const rootActive = active && activeView === 'vision';
       const expanded = !folded.has(vision.id);
       return <div key={vision.id} className="mb-0.5">
-        <div className={`flex min-w-0 items-center rounded-md ${rootActive ? 'bg-sidebar-accent' : ''}`}>
-          <Button variant="ghost" size="md" align="start" onClick={() => onSelect(vision.id, 'vision')} title={vision.name}
-            aria-current={rootActive ? 'page' : undefined}
-            className={`min-w-0 flex-1 gap-2.5 text-xs font-semibold ${rootActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-            {VisionIcon && <span className="shrink-0"><VisionIcon size={16} /></span>}<span className="truncate">{vision.name}</span>
-          </Button>
-          <Button variant="ghost" size="icon-sm"
-            onClick={() => setFolded((prev) => { const n = new Set(prev); if (n.has(vision.id)) n.delete(vision.id); else n.add(vision.id); return n; })}
-            aria-label={`${t(expanded ? 'Collapse' : 'Expand')} ${vision.name}`} aria-expanded={expanded}>
-            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          </Button>
-          <Button variant="ghost" size="icon-xs" onClick={() => onOpenSettings(vision.id)} aria-label={`${vision.name} — ${t('Vision settings')}`} className="mr-1"><MoreHorizontal size={12} /></Button>
-        </div>
+        <SidebarRow active={rootActive} icon={VisionIcon && <VisionIcon size={16} />} label={vision.name} title={vision.name}
+          onClick={() => onSelect(vision.id, 'vision')}
+          actions={<>
+            <SidebarRowAction label={`${t(expanded ? 'Collapse' : 'Expand')} ${vision.name}`} aria-expanded={expanded}
+              onClick={() => setFolded((prev) => { const n = new Set(prev); if (n.has(vision.id)) n.delete(vision.id); else n.add(vision.id); return n; })}>
+              {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </SidebarRowAction>
+            <SidebarRowAction label={`${vision.name} — ${t('Vision settings')}`} onClick={() => onOpenSettings(vision.id)}><MoreHorizontal size={12} /></SidebarRowAction>
+          </>} />
         {expanded && <div className="mt-0.5 pl-7">
           {(['portfolio', 'strategy'] as const).map((id) => {
             const { icon: Icon, label } = VIEW_REGISTRY[id];
-            const current = active && activeView === id;
-            return <Button key={id} variant="ghost" size="md" align="start" aria-current={current ? 'page' : undefined}
-              className={`w-full gap-2.5 text-xs font-semibold ${current ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-              onClick={() => onSelect(vision.id, id)}>{Icon && <Icon size={16} />}{t(label)}</Button>;
+            return <SidebarRow key={id} active={active && activeView === id} icon={Icon && <Icon size={16} />} label={t(label)}
+              onClick={() => onSelect(vision.id, id)} />;
           })}
         </div>}
       </div>;

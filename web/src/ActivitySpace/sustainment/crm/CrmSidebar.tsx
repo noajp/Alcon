@@ -2,8 +2,8 @@
 
 import { useMemo } from 'react';
 import { BarChart3, Building2, Columns3, List, PenLine, Search, Settings2, Sun, Users } from 'lucide-react';
-import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 import type { NavigationState } from '@/types/navigation';
 import { useCrm, type Crm } from '@/hooks/useCrm';
 import { inList, pipelineColumns, todayQueue, type CrmList } from './crmModel';
@@ -21,12 +21,8 @@ const LISTS: { id: CrmList; label: string }[] = [
   { id: 'incomplete', label: 'Missing details' },
 ];
 
-const ROW = 'w-full gap-2.5 text-xs font-semibold';
-const rowState = (active: boolean) => active ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:text-foreground';
-const COUNT = 'ml-auto text-[11px] font-normal tabular-nums text-muted-foreground/70';
-
 function Section({ label }: { label: string }) {
-  return <div className="mt-4 flex h-6 items-center px-2 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{label}</div>;
+  return <SidebarSectionLabel className="mt-4">{label}</SidebarSectionLabel>;
 }
 
 interface SidebarProps {
@@ -74,11 +70,12 @@ function CrmSidebarList({ crm, navigation, onNavigate }: SidebarProps & { crm: C
   const filtered = route.view === 'deals' || route.view === 'pipeline';
 
   return <div className="mt-1 pb-4">
-    <div className="mt-3 flex h-6 items-center px-2 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('CRM')}</div>
+    <SidebarSectionLabel>{t('CRM')}</SidebarSectionLabel>
     <div className="mt-1 space-y-1">
-      <Button variant="ghost" align="start" className={`${ROW} text-foreground`} disabled={!workspace} onClick={() => go({ capture: true })}>
-        <PenLine size={16} />{t('Capture')}<span className="ml-auto text-[11px] font-normal text-muted-foreground/70">{t('Notes, email, a line')}</span>
-      </Button>
+      {/* Capture is the one verb in a list of places: its name stays in the
+          foreground so it reads as the entry point. */}
+      <SidebarRow icon={<PenLine size={16} className="text-foreground" />} label={<span className="text-foreground">{t('Capture')}</span>}
+        meta={t('Notes, email, a line')} disabled={!workspace} onClick={() => go({ capture: true })} />
       <label className="flex h-8 items-center gap-2.5 rounded-md px-2.5 text-muted-foreground focus-within:bg-sidebar-accent hover:bg-sidebar-accent/50">
         <Search size={16} className="shrink-0" />
         <input type="search" aria-label={t('Search CRM')} placeholder={t('Search CRM')} disabled={!workspace}
@@ -91,19 +88,17 @@ function CrmSidebarList({ crm, navigation, onNavigate }: SidebarProps & { crm: C
       <Section label={t('Pipelines')} />
       <div className="space-y-px">{crm.pipelines.map(item => {
         const active = item.id === crm.pipeline?.id;
-        return <Button key={item.id} variant="ghost" align="start" className={`${ROW} ${rowState(active)}`} aria-current={active ? 'true' : undefined}
-          onClick={() => go({ pipelineId: item.id })}><span className="min-w-0 flex-1 truncate text-left">{item.name}</span>
-          <span className={COUNT}>{crm.allDeals.filter(deal => deal.pipeline_id === item.id && !['won', 'lost'].includes(deal.stage.toLowerCase())).length}</span></Button>;
+        return <SidebarRow key={item.id} active={active} buttonProps={{ 'aria-current': active ? 'true' : undefined }} label={item.name}
+          meta={crm.allDeals.filter(deal => deal.pipeline_id === item.id && !['won', 'lost'].includes(deal.stage.toLowerCase())).length}
+          onClick={() => go({ pipelineId: item.id })} />;
       })}</div>
     </>}
 
     <div className="mt-3 space-y-px">
       {views.map(({ id, label, icon: Icon, count }) => {
         const active = route.view === id && !(id === 'deals' && (route.stage !== null && route.stage !== undefined || route.list || route.account));
-        return <Button key={id} variant="ghost" align="start" className={`${ROW} ${rowState(active)}`} aria-current={active ? 'page' : undefined}
-          disabled={!workspace && id !== 'settings'} onClick={() => go({ view: id, stage: null, list: null, account: null })}>
-          <Icon size={16} /><span className="min-w-0 flex-1 truncate text-left">{t(label)}</span><span className={COUNT}>{count}</span>
-        </Button>;
+        return <SidebarRow key={id} active={active} icon={<Icon size={16} />} label={t(label)} meta={count}
+          disabled={!workspace && id !== 'settings'} onClick={() => go({ view: id, stage: null, list: null, account: null })} />;
       })}
     </div>
 
@@ -113,12 +108,9 @@ function CrmSidebarList({ crm, navigation, onNavigate }: SidebarProps & { crm: C
         {summary.stages.map(column => {
           const active = filtered && route.stage === column.stage.id;
           const amount = summary.primaryCurrency ? column.totals[summary.primaryCurrency] : undefined;
-          return <Button key={column.stage.id} variant="ghost" align="start" className={`${ROW} ${rowState(active)}`} aria-current={active ? 'page' : undefined}
-            onClick={() => go({ view: 'deals', stage: column.stage.id, list: null, account: null })}>
-            <span className="w-4 text-center text-[11px] tabular-nums">{column.deals.length}</span>
-            <span className="min-w-0 flex-1 truncate text-left">{t(column.stage.label)}</span>
-            {amount ? <span className="text-[11px] font-normal tabular-nums text-muted-foreground/70">{money(amount, summary.primaryCurrency, locale, true)}</span> : null}
-          </Button>;
+          return <SidebarRow key={column.stage.id} active={active} icon={<span className="text-[11px] tabular-nums">{column.deals.length}</span>}
+            label={t(column.stage.label)} meta={amount ? money(amount, summary.primaryCurrency, locale, true) : null}
+            onClick={() => go({ view: 'deals', stage: column.stage.id, list: null, account: null })} />;
         })}
       </div>
     </>}
@@ -129,20 +121,16 @@ function CrmSidebarList({ crm, navigation, onNavigate }: SidebarProps & { crm: C
         {LISTS.filter(list => (list.id !== 'incomplete' || summary.lists.incomplete > 0) && (list.id !== 'mine' || crm.me)).map(list => {
           const active = filtered && route.list === list.id;
           const count = summary.lists[list.id];
-          return <Button key={list.id} variant="ghost" align="start" className={`${ROW} ${rowState(active)}`} aria-current={active ? 'page' : undefined}
-            onClick={() => go({ view: 'deals', list: list.id, stage: null, account: null })}>
-            <span className="flex w-4 justify-center">{list.id === 'at-risk' ? <HealthDot level="risk" /> : list.id === 'incomplete' ? <HealthDot level="watch" /> : <span className="size-1.5 rounded-full bg-current opacity-40" />}</span>
-            <span className="min-w-0 flex-1 truncate text-left">{t(list.label)}</span>
-            <span className={`text-[11px] font-normal tabular-nums ${count ? 'text-muted-foreground/70' : 'text-muted-foreground/30'}`}>{count}</span>
-          </Button>;
+          return <SidebarRow key={list.id} active={active}
+            icon={list.id === 'at-risk' ? <HealthDot level="risk" /> : list.id === 'incomplete' ? <HealthDot level="watch" /> : <span className="size-1.5 rounded-full bg-current opacity-40" />}
+            label={t(list.label)} meta={<span className={count ? undefined : 'opacity-40'}>{count}</span>}
+            onClick={() => go({ view: 'deals', list: list.id, stage: null, account: null })} />;
         })}
       </div>
     </>}
 
     <div className="mt-4 space-y-px">
-      <Button variant="ghost" align="start" className={`${ROW} ${rowState(route.view === 'settings')}`} aria-current={route.view === 'settings' ? 'page' : undefined} onClick={() => go({ view: 'settings' })}>
-        <Settings2 size={16} />{t('Pipeline settings')}
-      </Button>
+      <SidebarRow active={route.view === 'settings'} icon={<Settings2 size={16} />} label={t('Pipeline settings')} onClick={() => go({ view: 'settings' })} />
     </div>
   </div>;
 }
