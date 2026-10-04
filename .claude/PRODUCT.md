@@ -131,7 +131,7 @@ AIによる変更も、バージョンと適用範囲を持つ業務設定とし
 
 ### Activity Space — 組織活動の文脈と信頼境界
 
-Strategy・Execution・Sustainment の三分類、および横断機能の Home・Property は、**Activity Space** を組織活動の文脈として使う。Activity Space は組織の信頼境界であり（詳細は [境界と権限](#境界と権限boundary--permissions) を参照）、ユーザーが所属する組織・チームそのものを表す。Activity Space を切り替えると、三分類一式ごと別の組織の文脈へ移る。組織の行動を起票するときは、その Space 内の Object を選ぶ。個人の My Elements と Table は所有者の権限で扱い、Space への所属だけで共有されない。CRM と SCM のデータは Space に属し、その Space のメンバーで共有する。
+Strategy・Execution・Sustainment の三分類、および横断機能の Home・Property は、**Activity Space** を組織活動の文脈として使う。Activity Space は組織の信頼境界であり（詳細は [境界と権限](#境界と権限boundary--permissions) を参照）、ユーザーが所属する組織・チームそのものを表す。Activity Space を切り替えると、三分類一式ごと別の組織の文脈へ移る。組織の行動を起票するときは、その Space 内の Object を選ぶ。個人の My Elements と Table は所有者の権限で扱い、Space への所属だけで共有されない。CRM の記録は Domain に属させることができ、Domain に属する記録はその Domain を見られる人だけが扱う（Domain に属さない記録は Space のメンバーで共有する）。SCM のデータは Space に属し、その Space のメンバーで共有する。
 
 ```
 ╔═══════════════════════ Activity Space ═══════════════════════╗
@@ -232,7 +232,8 @@ Team の名簿は Space メンバー、閲覧できる Domain のゲスト、実
 
 - **パイプライン** — 新規・更新・代理店のように複数持て、それぞれがステージ（名前と既定の確度）・既定の通貨・予測期間・連絡が途絶えたとみなす日数を持つ（`crm_pipelines`）
 - **呼び方** — パイプラインごとに商談の呼び名（案件、引合など）を決められる
-- **独自項目** — 商談・会社・担当者に、テキスト・数値・日付・選択肢・チェックの項目を足せる（`crm_fields`、値は各記録の `custom`）。項目は詳細と検索に出る
+- **独自項目** — 商談・会社・担当者に、テキスト・数値・日付・選択肢・チェックの項目を足せる（`crm_fields`、値は各記録の `custom`）。Domain の項目はその Domain の記録（パイプライン・会社・担当者）にだけ出て、Space の項目はすべての記録に出る
+- **Domain** — パイプライン・会社・担当者は Domain（部署・病棟・部隊・事業会社）に属させられる。商談はパイプラインの Domain に従い、商談から作った会社・担当者はその Domain に属する
 - **つながり** — 次のステップの Element を置く Object と、成果を書き込む Initiative の成功条件（今四半期・今年・累計の受注件数または受注額、加重パイプライン、進行中パイプラインのいずれか。金額はパイプラインと同じ通貨の成功条件にだけ、その桁（円・万円・百万円・億円）に直して書き込み、件数は社・件などの数の成功条件にだけ書き込む。率・期間あたりの値や通貨の違う成功条件には書き込まない）
 
 Strategy・Execution とは次のようにつながる。商談の次のステップは Element であり、パイプラインの Object に起票して担当者にアサインする。Object が未指定なら、自分の商談は自分の My Elements に起票し、他人の商談は Element にせず商談上の次のステップとしてチーム全員に見せる（Element は作った人にしか個人のものにできないため）。Element の期日と状態が商談の次回アクションになり、Element を完了すると CRM は次の一手を求める。商談は貢献先の Initiative を持ち、Forecast は担当者別・Initiative 別に集計する。パイプラインに成功条件をつなぐと、CRM を開いた人が書き込める場合（Initiative の作成者）に実績値を書き込む。それ以外の人には書き込めない旨を示す。
@@ -372,7 +373,7 @@ Workers / Resource / Calendar / Gantt は Sustainment の道具を Object 単位
 - **Property は付く先に従う** — 値（`custom_column_values`）を読み書きできるのは、付いている Element / Object と列の定義を見られる人だけ。書くときは、列がその付き先のものであることも確かめる（Element なら所属 Object のローカル列、所属 Object か自分の My Elements に配置した Space の列、自分の個人列。Object なら所属 Domain の列）。定義（`custom_columns`）はスコープの中で見え、変えられる（Object・Domain の列はそれを見られる人、Space の列はメンバー、個人の列は本人）。Domain の列はその Domain に入った Object を見られる人も、Space の列は配置先の Object を見られる人も読める。列のスコープは作った後に変えられない。配置（`custom_column_placements`）では、Object を見られる人が、その Object 自身の列か、その Object の Space の列を置ける。Domain に入っていない Object（以前からある Object だけ）には、Space のメンバーがその Space の列を置ける。My Elements には、本人が自分の個人列か、自分が属する Space の列を置ける。Person 値が指せるのは、Element なら `worker_assignable` が通す Worker、Object ならその Space に属し一覧できる Worker だけ。
 - **所属は承諾で成立する** — 所属の表は参加している人だけを表す。招く側は招待（`membership_invitations`）を送るだけで、招かれた本人が承諾したときに所属の行ができ、Worker が用意される。招待は `invite_member`（対象を管理する人：Space のオーナー、Domain のオーナー・admin、Object の Domain のオーナー・admin）・`respond_to_invite`（本人だけ）・`cancel_invite`（招いた人か管理する人）の RPC だけが書き、辞退から 7 日は同じ人を同じ対象に招けない。作った人の owner の行は作成時のトリガが書き、作った人を表す列は作成後に変えられない。ブラウザが書ける所属の行は、見えている Domain・Object に member として自分が加わる（Discover）行だけ。所属の行は人と対象を変えられず、Domain・Object も Space と同じく最後の owner を外せない（Object の Domain の owner・admin が外すときだけ、その人が owner を引き継ぐ。Domain の owner・admin は Object のメンバーを参加せずに見て外せる）。Object を別の Domain へ移せるのは、移動元と移動先の両方の Domain の owner・admin だけ。Object を別の Domain にも入れる（`object_domains`）のは、Object の主 Domain（Domain のない Object なら Object 自身）とその Domain の両方の owner・admin だけ。外すのはどちらか一方の owner・admin でよいが、その行が見えている必要がある。保留中の招待はピッカー・Worker・所属の判定に入らない。判断は [ADR 0029](../docs/adr/0029-membership-takes-effect-on-acceptance.md)。
 - **招待 UI** — Space 招待は ActivitySpace 設定（owner のみ）、Domain 招待（Guest 化）は Domain の Team 設定、Object 招待は Object の Members タブ（その Domain の owner・admin）から。招かれた人は Inbox・Profile・（Space をまだ持たなければ）初回画面で Accept / Decline する。メンバー一覧は保留中の招待を「Invited」と示し、管理する人は取り消せる。
-- **Table と CRM** — Table の RLS は `created_by = auth.uid()` による所有者限定。`domain_id` を付けても Space メンバー全員に共有されない。CRM の記録（`crm_*`）は Space のメンバーが読み書きする。CRM の記録どうしの参照は同じ Space の行だけを指す（複合外部キー）。Element・Worker・Initiative・成功条件・Object への参照は通常の外部キーで、読み取りはそれぞれの RLS に従う。同名の会社は別の記録として持てる（入力時は同じ名前の既存の会社を使う）。会社・担当者を消しても商談の履歴は残り、その記録だけの履歴が消える。画面が読む履歴は新しい 3000 件まで。活動履歴は追記と本人による削除だけで、ステージ変更の行は DB だけが書く。
+- **Table と CRM** — Table の RLS は `created_by = auth.uid()` による所有者限定。`domain_id` を付けても Space メンバー全員に共有されない。CRM の記録（`crm_*`）は、Domain に属するものはその Domain を見られる人（メンバー・ゲスト、公開範囲が workspace なら Space のメンバー）が、属さないものは Space のメンバーが読み書きする。商談はパイプラインに、履歴は商談・会社・担当者に従う。Domain を消すとその CRM の記録も消え、Space 全体へ公開されることはない。CRM の記録どうしの参照は同じ Space の行だけを指す（複合外部キー）。Element・Worker・Initiative・成功条件・Object への参照は通常の外部キーで、読み取りはそれぞれの RLS に従う。同名の会社は別の記録として持てる（入力時は同じ名前の既存の会社を使う）。会社・担当者を消しても商談の履歴は残り、その記録だけの履歴が消える。画面が読む履歴は新しい 3000 件まで。活動履歴は追記と本人による削除だけで、ステージ変更の行は DB だけが書く。
 
 ## AI 連携
 

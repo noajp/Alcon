@@ -7,6 +7,7 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useCurrentUserId } from '@/providers/authContext';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { useWorkers } from '@/ActivitySpace/sustainment/team/data';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { createElement, updateElement } from '@/ActivitySpace/execution/element/data';
 import { fetchDataTableSchema } from '@/ActivitySpace/sustainment/table/data';
 import { readAllPages } from '@/hooks/readAllPages';
@@ -97,6 +98,8 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
       return planner?.params?.tableId ? { tableId: planner.params.tableId, fields: planner.params.fields ?? {} } : null;
     },
   });
+  const domainRows = useSustainmentDomains();
+  const domains = useMemo(() => domainRows.data.map(domain => ({ id: domain.id, name: domain.name })), [domainRows.data]);
   const workers = useWorkers();
   const people: CrmPerson[] = useMemo(() => workers.data.map(worker => ({ id: worker.id, name: worker.name, type: worker.type, user_id: worker.user_id ?? null })), [workers.data]);
   const me = people.find(person => person.user_id === userId)?.id ?? null;
@@ -137,7 +140,8 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     const fresh = await supabase.from('crm_companies').select('id,name').eq('activity_space_id', space());
     const match = (fresh.data ?? []).find(company => (company.name as string).trim().toLowerCase() === lower);
     if (match) { resolved.current.set(`company:${lower}`, match.id as string); return match.id as string; }
-    const inserted = await supabase.from('crm_companies').insert({ activity_space_id: space(), name: name.trim(), owner_worker_id: me }).select('id').single();
+    // A company met through a Domain's pipeline belongs to that Domain.
+    const inserted = await supabase.from('crm_companies').insert({ activity_space_id: space(), name: name.trim(), owner_worker_id: me, domain_id: pipeline?.domain_id ?? null }).select('id').single();
     const id = check(inserted).id as string;
     resolved.current.set(`company:${lower}`, id);
     return id;
@@ -153,7 +157,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
       resolved.current.set(cacheKey, existing.id);
       return existing.id;
     }
-    const id = check(await supabase.from('crm_contacts').insert({ activity_space_id: space(), name: name.trim(), email, company_id: companyId, owner_worker_id: me }).select('id').single()).id;
+    const id = check(await supabase.from('crm_contacts').insert({ activity_space_id: space(), name: name.trim(), email, company_id: companyId, owner_worker_id: me, domain_id: pipeline?.domain_id ?? null }).select('id').single()).id;
     resolved.current.set(cacheKey, id);
     return id;
   }
@@ -371,7 +375,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
 
   const error = pipelines.error ?? deals.error ?? companies.error ?? contacts.error ?? activities.error ?? fields.error ?? elements.error ?? null;
   return {
-    spaceId, today, me, people, workspace, pipeline, legacyTable: legacy.data ?? null,
+    spaceId, today, me, people, domains, workspace, pipeline, legacyTable: legacy.data ?? null,
     pipelines: pipelines.data ?? EMPTY as CrmPipelineRecord[],
     companies: companies.data ?? EMPTY as CrmCompanyRecord[],
     contacts: contacts.data ?? EMPTY as CrmContactRecord[],
