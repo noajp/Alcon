@@ -45,15 +45,22 @@ export function groupByPortfolio<T extends PortfolioMember>(portfolios: Portfoli
 export interface PortfolioNode { portfolio: Portfolio; depth: number; children: PortfolioNode[] }
 
 /** The Portfolio tree in display order: siblings by order_index then
- *  creation; a Portfolio whose parent is missing is shown at the top level. */
+ *  creation. A Portfolio whose parent is missing is shown at the top level,
+ *  and so is one caught in a parent loop — every Portfolio appears exactly
+ *  once, whatever the rows say. */
 export function buildPortfolioTree(portfolios: Portfolio[]): PortfolioNode[] {
   const ids = new Set(portfolios.map((p) => p.id));
   const sorted = [...portfolios].sort((a, b) => a.order_index - b.order_index || a.created_at.localeCompare(b.created_at));
-  const build = (parentId: string | null, depth: number): PortfolioNode[] =>
+  const placed = new Set<string>();
+  const build = (parentId: string, depth: number): PortfolioNode[] =>
     sorted
-      .filter((p) => (parentId === null ? !p.parent_id || !ids.has(p.parent_id) : p.parent_id === parentId))
-      .map((p) => ({ portfolio: p, depth, children: build(p.id, depth + 1) }));
-  return build(null, 0);
+      .filter((p) => p.parent_id === parentId && !placed.has(p.id))
+      .map((p) => { placed.add(p.id); return { portfolio: p, depth, children: build(p.id, depth + 1) }; });
+  const root = (p: Portfolio): PortfolioNode => { placed.add(p.id); return { portfolio: p, depth: 0, children: build(p.id, 1) }; };
+  const tops = sorted.filter((p) => !p.parent_id || !ids.has(p.parent_id)).map(root);
+  // Whatever no root reaches sits in a loop: lift each remaining one in turn.
+  for (const p of sorted) if (!placed.has(p.id)) tops.push(root(p));
+  return tops;
 }
 
 /** Every node of the tree, depth first — what a folded list renders. */

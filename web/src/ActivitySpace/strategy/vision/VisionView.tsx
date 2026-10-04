@@ -66,6 +66,16 @@ export function VisionView({ onOpenPortfolio }: { onOpenPortfolio: (id: string) 
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
+// vision_conditions is jsonb with no shape constraint: read it as a list of
+// strings whatever was written, and keep one empty list so an absent value
+// is the same array on every render.
+const NO_CONDITIONS: string[] = [];
+function normalizeConditions(value: unknown): string[] {
+  if (!Array.isArray(value)) return NO_CONDITIONS;
+  const list = value.filter((x): x is string => typeof x === 'string');
+  return list.length === 0 ? NO_CONDITIONS : list;
+}
+
 function VisionFields({ space, canEdit, onSaved }: { space: ActivitySpace; canEdit: boolean; onSaved: () => void }) {
   const { t, locale } = useI18n();
   const [state, setState] = useState<SaveState>('idle');
@@ -82,7 +92,7 @@ function VisionFields({ space, canEdit, onSaved }: { space: ActivitySpace; canEd
     }
   };
   const horizon = space.vision_horizon ?? null;
-  const conditions = space.vision_conditions ?? [];
+  const conditions = useMemo(() => normalizeConditions(space.vision_conditions), [space.vision_conditions]);
 
   return (
     <div>
@@ -186,7 +196,11 @@ function ConditionsList({ canEdit, initial, onCommit }: { canEdit: boolean; init
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
             className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-1 text-[13px] leading-6 text-foreground outline-none transition-colors focus:bg-muted/30" />
           <Button variant="ghost" size="icon-xs" className="text-muted-foreground opacity-0 group-hover:opacity-100 focus:opacity-100"
-            aria-label={t('Remove condition')} onClick={() => commit(items.filter((_, j) => j !== i))}><X size={12} /></Button>
+            aria-label={t('Remove condition')}
+            // Keep the field's blur from running first: it would drop empty
+            // lines and shift the index this button was rendered for.
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => commit(items.filter((_, j) => j !== i))}><X size={12} /></Button>
         </div>
       ))}
       <Button variant="ghost" size="sm" align="start" className="mt-1 text-muted-foreground" onClick={() => setItems((prev) => [...prev, ''])}>

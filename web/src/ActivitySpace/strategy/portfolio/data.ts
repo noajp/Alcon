@@ -63,8 +63,9 @@ export async function updatePortfolio(id: string, updates: PortfolioUpdate): Pro
 /** Nests a Portfolio under another (null = top level). The caller keeps a
  *  Portfolio out of its own subtree — see subtreeIds. */
 export async function movePortfolio(id: string, parentId: string | null): Promise<void> {
-  const { error } = await supabase.from('portfolios').update({ parent_id: parentId }).eq('id', id);
+  const { data, error } = await supabase.from('portfolios').update({ parent_id: parentId }).eq('id', id).select('id');
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error('The Portfolio could not be moved.');
   void invalidatePortfolios();
 }
 

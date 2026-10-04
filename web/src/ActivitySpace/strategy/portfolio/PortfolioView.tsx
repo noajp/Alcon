@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, CornerDownRight, FolderInput, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/ui/button';
-import { Popover, PopoverTrigger } from '@/ui/popover';
+import { Popover, PopoverAnchor, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '@/ui/context-menu';
 import { MenuShell } from '@/Function/shared/menu';
@@ -92,7 +92,7 @@ export function PortfolioView({ activePortfolioId, createRequested, onCreateHand
                 cta={t('Create Portfolio')} onCta={() => setLocalNew({ parentId: null })} />
             ) : (
               <div className="px-4 py-3">
-                <PortfolioTree tree={tree} portfolios={portfolios} byPortfolio={byPortfolio} healthById={healthById}
+                <PortfolioTree tree={tree} byPortfolio={byPortfolio} healthById={healthById}
                   onOpen={onSelectPortfolio} onNewInside={(id) => setLocalNew({ parentId: id })} />
                 {unassigned.length > 0 && (
                   <div className="mt-4">
@@ -130,10 +130,19 @@ export function PortfolioView({ activePortfolioId, createRequested, onCreateHand
   );
 }
 
+// A Portfolio write from a menu has no field to show its error in; a failed
+// one is reported in a dialog instead of vanishing.
+function useGuardedWrite() {
+  const { t } = useI18n();
+  return async (write: () => Promise<unknown>) => {
+    try { await write(); }
+    catch (e) { await appDialog.alert(`${t("Couldn't save")}: ${e instanceof Error ? e.message : String(e)}`); }
+  };
+}
+
 // ── The tree ────────────────────────────────────────────────────────────
-function PortfolioTree({ tree, portfolios, byPortfolio, healthById, onOpen, onNewInside }: {
+function PortfolioTree({ tree, byPortfolio, healthById, onOpen, onNewInside }: {
   tree: PortfolioNode[];
-  portfolios: Portfolio[];
   byPortfolio: Map<string, StrategyWithObjects[]>;
   healthById: Map<string, InitiativeHealth>;
   onOpen: (id: string) => void;
@@ -141,11 +150,11 @@ function PortfolioTree({ tree, portfolios, byPortfolio, healthById, onOpen, onNe
 }) {
   const [folded, setFolded] = useState<Set<string>>(new Set());
   const isOpen = (id: string) => !folded.has(id);
-  const rows = useMemo(() => flattenTree(tree, isOpen), [tree, folded]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rows = useMemo(() => flattenTree(tree, (id) => !folded.has(id)), [tree, folded]);
   return (
     <div>
       {rows.map((node) => (
-        <PortfolioTreeRow key={node.portfolio.id} node={node} portfolios={portfolios} tree={tree}
+        <PortfolioTreeRow key={node.portfolio.id} node={node} tree={tree}
           rollup={rollupPortfolio(node, byPortfolio, healthById)}
           open={isOpen(node.portfolio.id)}
           onToggle={() => setFolded((prev) => { const n = new Set(prev); if (n.has(node.portfolio.id)) n.delete(node.portfolio.id); else n.add(node.portfolio.id); return n; })}
@@ -155,16 +164,17 @@ function PortfolioTree({ tree, portfolios, byPortfolio, healthById, onOpen, onNe
   );
 }
 
-function PortfolioTreeRow({ node, portfolios, tree, rollup, open, onToggle, onOpen, onNewInside }: {
-  node: PortfolioNode; portfolios: Portfolio[]; tree: PortfolioNode[]; rollup: PortfolioRollup;
+function PortfolioTreeRow({ node, tree, rollup, open, onToggle, onOpen, onNewInside }: {
+  node: PortfolioNode; tree: PortfolioNode[]; rollup: PortfolioRollup;
   open: boolean; onToggle: () => void; onOpen: () => void; onNewInside: () => void;
 }) {
   const { t } = useI18n();
   const { portfolio } = node;
   const [renaming, setRenaming] = useState(false);
+  const guarded = useGuardedWrite();
   const hasChildren = node.children.length > 0;
   return (
-    <PortfolioMenu portfolio={portfolio} node={node} portfolios={portfolios} tree={tree}
+    <PortfolioMenu portfolio={portfolio} node={node} tree={tree}
       onRename={() => setRenaming(true)} onNewInside={onNewInside}>
       <div className="flex min-w-0 items-center gap-1 rounded-md pr-2 hover:bg-muted/40" style={{ paddingLeft: node.depth * 20 }}>
         <Button variant="ghost" size="icon-sm" onClick={onToggle} disabled={!hasChildren}
@@ -175,7 +185,7 @@ function PortfolioTreeRow({ node, portfolios, tree, rollup, open, onToggle, onOp
         {renaming ? (
           <span className="flex min-w-0 flex-1 items-center gap-2.5 py-1"><NavPortfolioIcon size={16} />
             <RenameInput initial={portfolio.name} className="text-xs font-semibold"
-              onCommit={async (v) => { setRenaming(false); if (v.trim() && v.trim() !== portfolio.name) await updatePortfolio(portfolio.id, { name: v.trim() }); }}
+              onCommit={(v) => { setRenaming(false); if (v.trim() && v.trim() !== portfolio.name) void guarded(() => updatePortfolio(portfolio.id, { name: v.trim() })); }}
               onCancel={() => setRenaming(false)} />
           </span>
         ) : (
@@ -190,37 +200,44 @@ function PortfolioTreeRow({ node, portfolios, tree, rollup, open, onToggle, onOp
   );
 }
 
-function PortfolioMenu({ portfolio, node, portfolios, tree, onRename, onNewInside, children }: {
-  portfolio: Portfolio; node: PortfolioNode; portfolios: Portfolio[]; tree: PortfolioNode[];
+function PortfolioMenu({ portfolio, node, tree, onRename, onNewInside, children }: {
+  portfolio: Portfolio; node: PortfolioNode; tree: PortfolioNode[];
   onRename: () => void; onNewInside: () => void; children: React.ReactNode;
 }) {
   const { t } = useI18n();
   const [moveOpen, setMoveOpen] = useState(false);
+  const guarded = useGuardedWrite();
   const excluded = useMemo(() => subtreeIds(node), [node]);
-  const targets = portfolios.filter((p) => !excluded.has(p.id) && p.id !== portfolio.parent_id);
+  // Targets in tree order, so the picker's indentation reads as the tree.
+  const targets = useMemo(
+    () => flattenTree(tree, () => true).filter((n) => !excluded.has(n.portfolio.id) && n.portfolio.id !== portfolio.parent_id),
+    [tree, excluded, portfolio.parent_id]);
   const remove = async () => {
     const nested = subtreeIds(node).size - 1;
     const msg = nested > 0
       ? t('Delete the Portfolio "{name}" and the {n} Portfolios inside it? Their Initiatives stay, outside any Portfolio.', { name: portfolio.name, n: String(nested) })
       : t('Delete the Portfolio "{name}"? Its Initiatives stay, outside any Portfolio.', { name: portfolio.name });
     if (!await appDialog.confirm(msg)) return;
-    await deletePortfolio(portfolio.id);
+    await guarded(() => deletePortfolio(portfolio.id));
   };
   return (
     <>
       <ContextMenu>
         <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-        <ContextMenuContent>
+        {/* Focus is not handed back to the row on close: Rename's input and the
+            Move picker open from this menu and must keep it. */}
+        <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
           <ContextMenuItem onSelect={onNewInside}><FolderPlus size={14} />{t('New Portfolio inside')}</ContextMenuItem>
-          <ContextMenuItem onSelect={onRename}><Pencil size={14} />{t('Rename')}</ContextMenuItem>
-          <ContextMenuItem onSelect={() => setMoveOpen(true)}><FolderInput size={14} />{t('Move into…')}</ContextMenuItem>
+          {/* After the menu has closed, so the input mounts into a settled focus. */}
+          <ContextMenuItem onSelect={() => setTimeout(onRename, 0)}><Pencil size={14} />{t('Rename')}</ContextMenuItem>
+          <ContextMenuItem onSelect={() => setTimeout(() => setMoveOpen(true), 0)}><FolderInput size={14} />{t('Move into…')}</ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem variant="destructive" onSelect={() => void remove()}><Trash2 size={14} />{t('Delete')}</ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
       {moveOpen && (
-        <MovePicker targets={targets} allowTopLevel={portfolio.parent_id !== null} tree={tree}
-          onPick={async (parentId) => { setMoveOpen(false); await movePortfolio(portfolio.id, parentId); }}
+        <MovePicker targets={targets} allowTopLevel={portfolio.parent_id !== null}
+          onPick={(parentId) => { setMoveOpen(false); void guarded(() => movePortfolio(portfolio.id, parentId)); }}
           onClose={() => setMoveOpen(false)} />
       )}
     </>
@@ -229,17 +246,16 @@ function PortfolioMenu({ portfolio, node, portfolios, tree, onRename, onNewInsid
 
 // Where to nest a Portfolio: every other Portfolio outside its own subtree,
 // plus the top level when it is nested now.
-function MovePicker({ targets, allowTopLevel, tree, onPick, onClose }: {
-  targets: Portfolio[]; allowTopLevel: boolean; tree: PortfolioNode[];
+function MovePicker({ targets, allowTopLevel, onPick, onClose }: {
+  targets: PortfolioNode[]; allowTopLevel: boolean;
   onPick: (parentId: string | null) => void; onClose: () => void;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
-  const depthOf = (id: string) => findNode(tree, id)?.depth ?? 0;
   return (
     <Popover open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <PopoverTrigger asChild><span className="sr-only" /></PopoverTrigger>
+      <PopoverAnchor className="h-0" />
       <MenuShell width="wide" align="start">
         <Command shouldFilter={false}>
           <CommandInput value={query} onValueChange={setQuery} placeholder={t('Move into…')} autoFocus />
@@ -248,9 +264,9 @@ function MovePicker({ targets, allowTopLevel, tree, onPick, onClose }: {
             {allowTopLevel && !q && (
               <CommandItem value="__top" onSelect={() => onPick(null)}><CornerDownRight size={12} /><span className="flex-1">{t('Top level')}</span></CommandItem>
             )}
-            {targets.filter((p) => !q || p.name.toLowerCase().includes(q)).map((p) => (
-              <CommandItem key={p.id} value={`${p.name} ${p.id}`} onSelect={() => onPick(p.id)}>
-                <span style={{ width: depthOf(p.id) * 10 }} /><NavPortfolioIcon size={12} /><span className="flex-1 truncate">{p.name}</span>
+            {targets.filter((n) => !q || n.portfolio.name.toLowerCase().includes(q)).map((n) => (
+              <CommandItem key={n.portfolio.id} value={`${n.portfolio.name} ${n.portfolio.id}`} onSelect={() => onPick(n.portfolio.id)}>
+                <span style={{ width: q ? 0 : n.depth * 10 }} /><NavPortfolioIcon size={12} /><span className="flex-1 truncate">{n.portfolio.name}</span>
               </CommandItem>
             ))}
           </CommandList>

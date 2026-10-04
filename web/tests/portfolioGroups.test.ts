@@ -53,6 +53,13 @@ describe('buildPortfolioTree', () => {
     expect(flattenTree(tree, () => true).map((n) => n.portfolio.id)).toEqual(['A', 'A1', 'A1x', 'A2', 'B', 'lost']);
     expect(flattenTree(tree, (id) => id !== 'A1').map((n) => n.portfolio.id)).toEqual(['A', 'A1', 'A2', 'B', 'lost']);
   });
+  it('lifts Portfolios caught in a parent loop so each appears exactly once', () => {
+    const tree = buildPortfolioTree([p('A', 'B', 0), p('B', 'A', 1), p('C', null, 2), p('B1', 'B', 0)]);
+    const all = flattenTree(tree, () => true).map((n) => n.portfolio.id);
+    expect([...all].sort()).toEqual(['A', 'B', 'B1', 'C']);
+    expect(new Set(all).size).toBe(all.length);
+    expect(tree.map((n) => n.portfolio.id)).toContain('C');
+  });
   it('knows a subtree and a path', () => {
     const tree = buildPortfolioTree(list);
     expect([...subtreeIds(tree[0])].sort()).toEqual(['A', 'A1', 'A1x', 'A2']);
