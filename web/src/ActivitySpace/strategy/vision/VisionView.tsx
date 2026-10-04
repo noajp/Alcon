@@ -166,19 +166,26 @@ function TextBlock({ canEdit, initial, label, placeholder, emptyText, className,
 }
 
 // The success conditions — one line each. A line saves on blur; an empty
-// line is dropped; the list is written whole.
+// line is dropped; the list is written whole. Rows carry their own id, so
+// removing one never depends on where the others ended up after a blur.
+interface ConditionRow { id: number; text: string }
+let conditionSeq = 0;
+const toRows = (list: string[]): ConditionRow[] => list.map((text) => ({ id: conditionSeq++, text }));
+const textsOf = (rows: ConditionRow[]) => rows.map((r) => r.text.trim()).filter(Boolean);
+
 function ConditionsList({ canEdit, initial, onCommit }: { canEdit: boolean; initial: string[]; onCommit: (list: string[]) => void }) {
   const { t } = useI18n();
-  const [items, setItems] = useState<string[]>(initial);
+  const [rows, setRows] = useState<ConditionRow[]>(() => toRows(initial));
   const [seen, setSeen] = useState(initial);
   if (initial !== seen) {
     setSeen(initial);
-    if (JSON.stringify(items) === JSON.stringify(seen)) setItems(initial);
+    if (JSON.stringify(textsOf(rows)) === JSON.stringify(seen)) setRows(toRows(initial));
   }
-  const commit = (next: string[]) => {
-    const cleaned = next.map((s) => s.trim()).filter(Boolean);
-    setItems(cleaned);
-    if (JSON.stringify(cleaned) !== JSON.stringify(seen)) onCommit(cleaned);
+  const commit = (next: ConditionRow[]) => {
+    const kept = next.map((r) => ({ ...r, text: r.text.trim() })).filter((r) => r.text);
+    setRows(kept);
+    const texts = kept.map((r) => r.text);
+    if (JSON.stringify(texts) !== JSON.stringify(seen)) onCommit(texts);
   };
   if (!canEdit) {
     return initial.length === 0
@@ -187,23 +194,20 @@ function ConditionsList({ canEdit, initial, onCommit }: { canEdit: boolean; init
   }
   return (
     <div className="-mx-2">
-      {items.map((c, i) => (
-        <div key={i} className="group flex items-center gap-1">
+      {rows.map((row, i) => (
+        <div key={row.id} className="group flex items-center gap-1">
           <span className="pl-2 text-muted-foreground/60">•</span>
-          <input value={c} aria-label={t('Condition {n}', { n: String(i + 1) })}
-            onChange={(e) => setItems((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))}
-            onBlur={() => commit(items)}
+          <input value={row.text} aria-label={t('Condition {n}', { n: String(i + 1) })}
+            onChange={(e) => setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, text: e.target.value } : r)))}
+            onBlur={() => commit(rows)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
             className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-1 text-[13px] leading-6 text-foreground outline-none transition-colors focus:bg-muted/30" />
           <Button variant="ghost" size="icon-xs" className="text-muted-foreground opacity-0 group-hover:opacity-100 focus:opacity-100"
             aria-label={t('Remove condition')}
-            // Keep the field's blur from running first: it would drop empty
-            // lines and shift the index this button was rendered for.
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => commit(items.filter((_, j) => j !== i))}><X size={12} /></Button>
+            onClick={() => commit(rows.filter((r) => r.id !== row.id))}><X size={12} /></Button>
         </div>
       ))}
-      <Button variant="ghost" size="sm" align="start" className="mt-1 text-muted-foreground" onClick={() => setItems((prev) => [...prev, ''])}>
+      <Button variant="ghost" size="sm" align="start" className="mt-1 text-muted-foreground" onClick={() => setRows((prev) => [...prev, ...toRows([''])])}>
         <Plus size={12} />{t('Add a condition')}
       </Button>
     </div>

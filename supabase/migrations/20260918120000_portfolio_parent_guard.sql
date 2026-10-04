@@ -14,6 +14,9 @@ declare
   hops integer := 0;
 begin
   if new.parent_id is null then return new; end if;
+  -- One nesting change per Space at a time: two concurrent moves cannot each
+  -- miss the other's uncommitted row and tie a loop between them.
+  perform pg_advisory_xact_lock(hashtext('portfolio-nesting:' || new.activity_space_id::text));
   if new.parent_id = new.id then
     raise exception 'a Portfolio cannot be its own parent' using errcode = '23514';
   end if;

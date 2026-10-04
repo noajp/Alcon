@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { translate } from '@/Function/i18n/I18nProvider';
 import { getQueryClient } from '@/lib/queryClient';
 import type { Portfolio, PortfolioInsert, PortfolioUpdate } from '@/types/database';
 
@@ -65,7 +66,7 @@ export async function updatePortfolio(id: string, updates: PortfolioUpdate): Pro
 export async function movePortfolio(id: string, parentId: string | null): Promise<void> {
   const { data, error } = await supabase.from('portfolios').update({ parent_id: parentId }).eq('id', id).select('id');
   if (error) throw error;
-  if (!data || data.length === 0) throw new Error('The Portfolio could not be moved.');
+  if (!data || data.length === 0) throw new Error(translate('The Portfolio could not be moved.'));
   void invalidatePortfolios();
 }
 
