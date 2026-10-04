@@ -16,7 +16,13 @@ type VisionTab = 'general' | 'initiative' | 'phase' | 'timeline';
 // Opened from a Vision row's "…" in the sidebar — the Strategy counterpart
 // of a Domain's settings modal: the Vision itself (name, delete), then how
 // Initiatives are judged, Phases seeded and the Timeline drawn.
-export function StrategySettingsModal({ vision, onClose, onDeleted }: { vision: Vision; onClose: () => void; onDeleted: () => void }) {
+export function StrategySettingsModal({ vision, canEdit, onClose, onDeleted }: {
+  vision: Vision;
+  /** The viewer wrote the Vision or owns the Space — the rule RLS enforces. */
+  canEdit: boolean;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
   const { t } = useI18n();
   const [tab, setTab] = useState<VisionTab>('general');
   const titles: Record<VisionTab, string> = { general: t('General'), initiative: t('Initiative'), phase: t('Phase'), timeline: t('Timeline') };
@@ -36,7 +42,7 @@ export function StrategySettingsModal({ vision, onClose, onDeleted }: { vision: 
       onSelect={(id) => setTab(id as VisionTab)}
     >
       <h3 className="mb-4 text-[15px] font-semibold text-foreground">{titles[tab]}</h3>
-      {tab === 'general' ? <VisionGeneral key={vision.id} vision={vision} onDeleted={onDeleted} />
+      {tab === 'general' ? <VisionGeneral key={vision.id} vision={vision} canEdit={canEdit} onDeleted={onDeleted} />
         : tab === 'initiative' ? <InitiativeJudgementSettings />
         : tab === 'phase' ? <PhaseDefaultsSettings />
         : <TimelineDisplaySettings />}
@@ -44,7 +50,7 @@ export function StrategySettingsModal({ vision, onClose, onDeleted }: { vision: 
   );
 }
 
-function VisionGeneral({ vision, onDeleted }: { vision: Vision; onDeleted: () => void }) {
+function VisionGeneral({ vision, canEdit, onDeleted }: { vision: Vision; canEdit: boolean; onDeleted: () => void }) {
   const { t } = useI18n();
   const [name, setName] = useState(vision.name);
   const [error, setError] = useState<string | null>(null);
@@ -63,9 +69,10 @@ function VisionGeneral({ vision, onDeleted }: { vision: Vision; onDeleted: () =>
     <div className="space-y-6">
       <div>
         <label className="mb-1.5 block text-[12px] font-semibold text-foreground" htmlFor="vision-name">{t('Name')}</label>
-        <input id="vision-name" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => void save()}
+        <input id="vision-name" value={name} disabled={!canEdit} onChange={(e) => setName(e.target.value)} onBlur={() => void save()}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
-          className="w-full rounded-md bg-muted/40 px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:bg-muted/70" />
+          className="w-full rounded-md bg-muted/40 px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:bg-muted/70 disabled:opacity-60" />
+        {!canEdit && <p className="mt-1.5 text-[11px] text-muted-foreground">{t("Only the Vision's author or a Space owner can change it.")}</p>}
       </div>
       {error && <div className="text-[11px] text-destructive">{error}</div>}
       <div className="flex items-center justify-between gap-4 border-t border-border/60 pt-4">
@@ -73,7 +80,7 @@ function VisionGeneral({ vision, onDeleted }: { vision: Vision; onDeleted: () =>
           <div className="text-[12px] font-semibold text-foreground">{t('Delete Vision')}</div>
           <p className="mt-0.5 text-[12px] text-muted-foreground">{t('Its Portfolios are deleted with it; its Initiatives stay, outside any Vision.')}</p>
         </div>
-        <Button variant="danger" onClick={() => void remove()}>{t('Delete')}</Button>
+        <Button variant="danger" disabled={!canEdit} onClick={() => void remove()}>{t('Delete')}</Button>
       </div>
     </div>
   );

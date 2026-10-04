@@ -1,9 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Plus, X } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import { Button } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
@@ -22,7 +20,7 @@ import { usePortfolios } from '@/ActivitySpace/strategy/portfolio/data';
 import { buildPortfolioTree, groupByPortfolio, initiativesInSpace, rollupPortfolio } from '@/ActivitySpace/strategy/portfolio/portfolioGroups';
 import { NavPortfolioIcon, NavStrategyIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
 import type { StrategyWithObjects, Vision, VisionUpdate } from '@/types/database';
-import { createVision, resolveVision, setStrategyVision, updateVision, useVisions } from './data';
+import { createVision, resolveVision, setStrategyVision, updateVision, useSpaceRoleQuery, useVisions } from './data';
 
 // Strategy > Vision — what the Space aims for. A Space holds any number of
 // Visions, the way it holds Domains: each one has a name, the aim in one
@@ -45,20 +43,7 @@ export function VisionView({ visionId, createRequested, onCreateHandled, onSelec
   const vision = resolveVision(visions, visionId);
 
   // The viewer's seat in the Space: an owner may edit any Vision.
-  const role = useQuery({
-    queryKey: ['space-role', spaceId, userId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('activity_space_members')
-        .select('role')
-        .eq('activity_space_id', spaceId!)
-        .eq('user_id', userId!)
-        .maybeSingle();
-      if (error) throw error;
-      return (data?.role as 'owner' | 'member' | undefined) ?? null;
-    },
-    enabled: !!spaceId && !!userId,
-  });
+  const role = useSpaceRoleQuery(spaceId);
   const canEdit = !!vision && (vision.created_by === userId || role.data === 'owner');
 
   const [localNew, setLocalNew] = useState(false);
@@ -142,9 +127,9 @@ function VisionFields({ vision, canEdit }: { vision: Vision; canEdit: boolean })
 
   return (
     <div>
-      <TextBlock canEdit={canEdit} initial={vision.name} label={t('Vision name')}
+      <TextBlock canEdit={canEdit} initial={vision.name} label={t('Vision name')} required singleLine
         placeholder={t('Vision name…')} emptyText={vision.name}
-        className="text-[22px] font-semibold leading-8 tracking-tight" onCommit={(v) => { if (v) void save({ name: v }); }} />
+        className="text-[22px] font-semibold leading-8 tracking-tight" onCommit={(v) => void save({ name: v })} />
       <TextBlock canEdit={canEdit} initial={vision.statement ?? ''} label={t('Vision')}
         placeholder={t('Write the Vision — the future this Space works toward, in one statement.')}
         emptyText={t('No statement yet.')}
@@ -183,8 +168,12 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 // A text field that grows with its text and saves on blur; read-only it is
 // the text itself. Adopts a refetched value unless it holds an unsaved edit.
-function TextBlock({ canEdit, initial, label, placeholder, emptyText, className, onCommit }: {
+function TextBlock({ canEdit, initial, label, placeholder, emptyText, className, required = false, singleLine = false, onCommit }: {
   canEdit: boolean; initial: string; label: string; placeholder: string; emptyText: string; className: string;
+  /** An emptied field snaps back to the saved text instead of saving ''. */
+  required?: boolean;
+  /** Enter commits (blurs) instead of adding a line. */
+  singleLine?: boolean;
   onCommit: (value: string) => void;
 }) {
   const [text, setText] = useState(initial);
@@ -208,7 +197,12 @@ function TextBlock({ canEdit, initial, label, placeholder, emptyText, className,
   return (
     <textarea ref={ref} value={text} rows={1} aria-label={label} placeholder={placeholder}
       onChange={(e) => setText(e.target.value)}
-      onBlur={() => { const next = text.trim(); if (next !== seenInitial.trim()) onCommit(next); }}
+      onBlur={() => {
+        const next = singleLine ? text.replace(/\s*\n\s*/g, ' ').trim() : text.trim();
+        if (required && !next) { setText(seenInitial); return; }
+        if (next !== seenInitial.trim()) onCommit(next);
+      }}
+      onKeyDown={(e) => { if (singleLine && e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.blur(); } }}
       className={`-mx-2 w-[calc(100%+1rem)] resize-none rounded-md bg-transparent px-2 py-1 text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors focus:bg-muted/30 ${className}`} />
   );
 }
@@ -283,7 +277,7 @@ function PortfoliosTowardVision({ spaceId, visionId, onOpenPortfolio }: { spaceI
   const { t } = useI18n();
   const { portfolios: all, roots, healthById } = useVisionScope(spaceId);
   const portfolios = useMemo(() => all.filter((p) => p.vision_id === visionId), [all, visionId]);
-  const { byPortfolio } = useMemo(() => groupByPortfolio(portfolios, roots), [portfolios, roots]);
+  const { byPortfolio } = useMemo(() => groupByPortfolio(portfolios, roots.filter((s) => s.vision_id === visionId)), [portfolios, roots, visionId]);
   const tree = useMemo(() => buildPortfolioTree(portfolios), [portfolios]);
   if (tree.length === 0) return null;
   return (

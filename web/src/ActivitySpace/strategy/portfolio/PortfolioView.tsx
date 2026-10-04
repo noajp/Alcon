@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, CornerDownRight, FolderInput, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { Popover, PopoverAnchor, PopoverTrigger } from '@/ui/popover';
@@ -75,6 +75,11 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
   const [localNew, setLocalNew] = useState<{ parentId: string | null } | null>(null);
   const newParent = localNew ? localNew.parentId : createRequested ? null : undefined;
   const closeNew = () => { setLocalNew(null); if (createRequested) onCreateHandled(); };
+  // A request that arrives while the Space has no Vision cannot be served;
+  // clear it so the card does not appear later, unasked.
+  useEffect(() => {
+    if (createRequested && !visionsLoading && !vision) onCreateHandled();
+  }, [createRequested, visionsLoading, vision, onCreateHandled]);
 
   const open = activePortfolioId ? findNode(tree, activePortfolioId) : null;
   const loading = portfoliosLoading || strategiesLoading || visionsLoading;

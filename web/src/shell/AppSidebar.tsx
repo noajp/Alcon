@@ -7,7 +7,8 @@ import { StrategyNavigation } from './sidebar/StrategyNavigation';
 import { SettingsModal } from '@/Function/settings/SettingsModal';
 import { StrategySettingsModal } from '@/Function/settings/StrategySettingsModal';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { resolveVision, useVisions } from '@/ActivitySpace/strategy/vision/data';
+import { resolveVision, useSpaceRole, useVisions } from '@/ActivitySpace/strategy/vision/data';
+import { useCurrentUserId } from '@/providers/authContext';
 import { NavPortfolioIcon, NavStrategyIcon, NavVisionIcon } from './sidebar/NavIcons';
 import { NotebookTree } from './sidebar/NotebookTree';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
@@ -217,6 +218,8 @@ export function AppSidebar({
   const activeVision = resolveVision(visions, navigation.visionId);
   const [settingsVisionId, setSettingsVisionId] = useState<string | null>(null);
   const settingsVision = visions.find((v) => v.id === settingsVisionId) ?? null;
+  const visionViewerId = useCurrentUserId();
+  const visionViewerRole = useSpaceRole(strategySpaceId);
   const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const railMode = railModeOf(activeView);
@@ -612,7 +615,8 @@ export function AppSidebar({
       )}
 
       {settingsVision && (
-        <StrategySettingsModal vision={settingsVision} onClose={() => setSettingsVisionId(null)}
+        <StrategySettingsModal vision={settingsVision} canEdit={settingsVision.created_by === visionViewerId || visionViewerRole === 'owner'}
+          onClose={() => setSettingsVisionId(null)}
           onDeleted={() => { setSettingsVisionId(null); onNavigate({ visionId: null, portfolioId: null }); }} />
       )}
       {settingsDomain && (

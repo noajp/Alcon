@@ -178,7 +178,7 @@ export function StrategyShell({
             {unplaced.length > 0 && (
               <>
                 <div className="px-6 pt-4 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Not in a Vision')}</div>
-                <StrategyListView strategies={unplaced} onSelectStrategy={(s) => setOpenStrategyId(s.id)} />
+                <StrategyListView strategies={unplaced} onSelectStrategy={(s) => setOpenStrategyId(s.id)} showHeader={inVision.length === 0} />
               </>
             )}
           </div>
@@ -275,9 +275,12 @@ function InitiativeHealthCell({ health }: { health: InitiativeHealth | undefined
 function StrategyListView({
   strategies,
   onSelectStrategy,
+  showHeader = true,
 }: {
   strategies: StrategyWithObjects[];
   onSelectStrategy: (strategy: StrategyWithObjects) => void;
+  /** The column headings; a second list under the first leaves them out. */
+  showHeader?: boolean;
 }) {
   // Health for every row from one read (progress / last movement / risk).
   const { byId: health } = useInitiativeHealth(strategies);
@@ -288,11 +291,13 @@ function StrategyListView({
   useNow();
   return (
     <div className="px-2 pb-2 pt-2">
-      <div className="grid grid-cols-[1fr_minmax(0,18rem)_120px] gap-3 px-4 py-2 text-[11px] tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
-        <span>Name</span>
-        <span>Health</span>
-        <span className="text-right">Objects</span>
-      </div>
+      {showHeader && (
+        <div className="grid grid-cols-[1fr_minmax(0,18rem)_120px] gap-3 px-4 py-2 text-[11px] tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
+          <span>Name</span>
+          <span>Health</span>
+          <span className="text-right">Objects</span>
+        </div>
+      )}
       <div className="flex flex-col gap-1.5">
         {strategies.map((s) => (
           <button

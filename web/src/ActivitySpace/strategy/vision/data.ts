@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
 import { translate } from '@/Function/i18n/I18nProvider';
+import { useCurrentUserId } from '@/providers/authContext';
 import type { Vision, VisionInsert, VisionUpdate } from '@/types/database';
 
 // Visions of the active Space. Every member reads them and can add one; a
@@ -34,7 +35,9 @@ export function useVisions(spaceId: string | null) {
     queryKey: [...VISIONS_QUERY_KEY, spaceId],
     queryFn: () => fetchVisions(spaceId!),
     enabled: !!spaceId,
-    placeholderData: keepPreviousData,
+    // No previous-Space placeholder: a Vision of the Space just left must
+    // never stand in while this Space's load, or a create would pair it with
+    // the new Space.
   });
   const refetch = useCallback(() => invalidateVisions(), []);
   return {
@@ -80,10 +83,10 @@ export async function deleteVision(id: string): Promise<void> {
 }
 
 /** Puts an Initiative directly under a Vision (or outside every Vision with
- *  null). Leaving a Vision also leaves its Portfolios. The write is on the
- *  Initiative, so only its creator can. */
+ *  null). Either way it leaves the Portfolio it was in — a Portfolio belongs
+ *  to one Vision. The write is on the Initiative, so only its creator can. */
 export async function setStrategyVision(strategyId: string, visionId: string | null): Promise<void> {
-  const patch = visionId === null ? { vision_id: null, portfolio_id: null } : { vision_id: visionId };
+  const patch = { vision_id: visionId, portfolio_id: null };
   const { data, error } = await supabase
     .from('strategies')
     .update({ ...patch, updated_at: new Date().toISOString() })
@@ -92,4 +95,29 @@ export async function setStrategyVision(strategyId: string, visionId: string | n
   if (error) throw error;
   if (!data || data.length === 0) throw new Error(translate("Only the Initiative's owner can move it."));
   void getQueryClient().invalidateQueries({ queryKey: ['strategies'] });
+}
+
+/** The viewer's seat in a Space ('owner' | 'member'), or null while unknown.
+ *  An owner may change any Vision; `pending` lets a page wait instead of
+ *  flashing its read-only form. */
+export function useSpaceRole(spaceId: string | null): 'owner' | 'member' | null {
+  return useSpaceRoleQuery(spaceId).data ?? null;
+}
+
+export function useSpaceRoleQuery(spaceId: string | null) {
+  const userId = useCurrentUserId();
+  return useQuery({
+    queryKey: ['space-role', spaceId, userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('activity_space_members')
+        .select('role')
+        .eq('activity_space_id', spaceId!)
+        .eq('user_id', userId!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.role as 'owner' | 'member' | undefined) ?? null;
+    },
+    enabled: !!spaceId && !!userId,
+  });
 }

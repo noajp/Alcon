@@ -184,7 +184,7 @@ ModeRail の固定セレクタは Inbox / Calendar / Strategy / Execution。Stra
 | **Phase** | 活動を期間で区切り、力の配分を決める単位 | `phases`（Domain スコープ）。Object / Element は高々 1 つの Phase に所属。ナビには出さず、Initiative や Domain から到達する |
 | **Timeline** | Initiative の期間・シーケンスを月スケール Gantt で俯瞰 | 行を展開すると参加 Object のバーが同じ軸に並ぶ。ナビには出さない |
 
-Vision の設定（名前・削除）と Strategy の設定は、サイドバーの Vision 行の「…」（モーダル）と Settings > Strategy の両方から同じパネルで開く。**Initiative** は判定閾値（Due soon / Stalled / Idle）で、Domain ごとの `risk_thresholds` を編集する（Elements > SLAs と同じ値）。**Phase** は Domain ごとの作成既定値（既定の長さ、開始日を「今日」か「最後の Phase の翌日」にする）で、新規 Phase ダイアログの日付に効く。**Timeline** は個人の表示設定（月 / 四半期スケール、前後の月数、今日の線、進捗の塗り）で `user_preferences` に持つ。
+Vision の名前変更と削除は、サイドバーの Vision 行の「…」（モーダルの General）で行う。Strategy の設定は、同じモーダルと Settings > Strategy の両方から同じパネルで開く。**Initiative** は判定閾値（Due soon / Stalled / Idle）で、Domain ごとの `risk_thresholds` を編集する（Elements > SLAs と同じ値）。**Phase** は Domain ごとの作成既定値（既定の長さ、開始日を「今日」か「最後の Phase の翌日」にする）で、新規 Phase ダイアログの日付に効く。**Timeline** は個人の表示設定（月 / 四半期スケール、前後の月数、今日の線、進捗の塗り）で `user_preferences` に持つ。
 
 Initiative を開くと、意図・状況・前提・決定・指標・リスクの各ウィジェットと、参加 Object の一覧が並ぶ。そこから Object 詳細を一クリックで開ける。
 
