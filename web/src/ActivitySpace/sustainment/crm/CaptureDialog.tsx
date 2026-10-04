@@ -8,12 +8,11 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdo
 import { MenuShell, MENU_ROW } from '@/Function/shared/menu';
 import { Textarea } from '@/ui/textarea';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import type { Json } from '@/types/database';
-import { ACTIVITY_TYPES, formatActivity, resolveStage, type CrmActivityType } from './crmModel';
+import { ACTIVITY_TYPES, resolveStage, type CrmActivityType } from './crmModel';
 import { readCapture, reviewRows, reviewValues, type CaptureFields, type CaptureProposal, type ReviewRow } from './crmCapture';
 import { aiCapture, useCrmAi } from './crmAi';
 import { money } from './crmFormat';
-import type { Crm } from './useCrm';
+import type { Crm, CrmDealPatch } from '@/hooks/useCrm';
 
 const FIELD_LABEL: Record<keyof CaptureFields, string> = {
   name: 'Deal name', account: 'Account', contact: 'Contact', email: 'Email', stage: 'Stage', amount: 'Amount', currency: 'Currency',
@@ -51,9 +50,9 @@ export function CrmCapture({ crm, initialDealId, onClose, onApplied }: {
   if (toggledFor !== proposal) { setToggledFor(proposal); setToggled(new Set()); }
   const dealId = target !== undefined ? target : proposal?.dealId ?? null;
   const deal = dealId ? workspace.deals.find(item => item.id === dealId) ?? null : null;
-  const changes = proposal ? reviewRows(proposal, deal, workspace.stages, { primaryCurrency: workspace.primaryCurrency, fallbackName: t('New deal'), hasField: crm.hasField }) : [];
+  const changes = proposal ? reviewRows(proposal, deal, workspace.stages, { primaryCurrency: workspace.primaryCurrency, fallbackName: t('New deal'), hasField: () => true }) : [];
   const checked = (row: ReviewRow) => !!row.required || !row.optIn !== toggled.has(row.key);
-  const willLog = logActivity && crm.hasField('activity');
+  const willLog = logActivity;
   const canApply = !!proposal && !saving && (changes.some(checked) || willLog);
   const type = activityType ?? proposal?.activity.type ?? 'note';
 
@@ -76,14 +75,26 @@ export function CrmCapture({ crm, initialDealId, onClose, onApplied }: {
     if (!proposal || !canApply) return;
     setSaving(true); setError(null);
     try {
-      const values: Record<string, Json | null> = reviewValues(changes, checked);
-      if (willLog) {
-        const entry = { date: workspace.today, type, text: proposal.summary ? `${proposal.summary} — ${input.trim()}` : input.trim() };
-        if (deal) { await crm.logActivity(deal, entry, values); onApplied(deal.id); return; }
-        values.activity = formatActivity(entry);
-        if (type !== 'note') values.lastContact = workspace.today;
+      const values = reviewValues(changes, checked) as Partial<Record<keyof CaptureFields, string | number>>;
+      const text = (key: keyof CaptureFields) => typeof values[key] === 'string' ? values[key] as string : undefined;
+      const patch: CrmDealPatch = {
+        name: text('name'), stage: text('stage'), currency: text('currency'), closeDate: text('closeDate'),
+        amount: typeof values.amount === 'number' ? values.amount : undefined,
+        probability: typeof values.probability === 'number' ? values.probability : undefined,
+        companyName: text('account'), contactName: text('contact'), contactEmail: text('email'),
+      };
+      for (const key of Object.keys(patch) as (keyof CrmDealPatch)[]) if (patch[key] === undefined) delete patch[key];
+      // A contact email with no name of its own lands on the deal's contact.
+      if (patch.contactEmail && !patch.contactName && deal?.contactId) await crm.saveContact(deal.contactId, { email: patch.contactEmail });
+      const activity = willLog ? { type, text: proposal.summary ? `${proposal.summary} — ${input.trim()}` : input.trim() } : undefined;
+      const id = await crm.saveDeal(deal?.id ?? null, patch, { activity });
+      // The next step is an Element, written after the deal so it can name it.
+      const step = text('nextStep'); const due = text('nextActionDate');
+      if (step || due) {
+        await crm.setNextStep({ id, name: patch.name ?? deal?.name ?? '', account: patch.companyName ?? deal?.account ?? null, ownerId: deal?.ownerId ?? crm.me, nextElement: deal?.nextElement ?? null, number: deal?.number },
+          { title: step ?? deal?.nextStep ?? t('Follow up'), due: due ?? deal?.nextActionDate ?? null });
       }
-      onApplied(await crm.saveDeal(deal?.id ?? null, values));
+      onApplied(id);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t('Could not save. Try again.'));
     } finally { setSaving(false); }
@@ -136,7 +147,7 @@ export function CrmCapture({ crm, initialDealId, onClose, onApplied }: {
               <span className="min-w-0 flex-1 truncate">{deal && <><span className="text-muted-foreground line-through">{display(change.key, change.from, 'from')}</span><span className="px-1.5 text-muted-foreground">→</span></>}<span className="font-medium">{display(change.key, change.to, 'to')}</span></span>
             </li>)}
           </ul> : <p className="text-sm text-muted-foreground">{t('No field changes found. The note can still be logged as activity.')}</p>}
-          {crm.hasField('activity') && <div className="flex flex-wrap items-center gap-2 text-sm">
+          {<div className="flex flex-wrap items-center gap-2 text-sm">
             <label className="flex items-center gap-2"><input type="checkbox" checked={logActivity} disabled={saving} onChange={event => setLogActivity(event.target.checked)} />{t('Log as')}</label>
             {ACTIVITY_TYPES.map(item => <Button key={item} shape="tab" size="xs" variant={type === item ? 'secondary' : 'ghost'} aria-pressed={type === item} disabled={!logActivity || saving} onClick={() => setActivityType(item)}>{t(ACTIVITY_LABEL[item])}</Button>)}
           </div>}

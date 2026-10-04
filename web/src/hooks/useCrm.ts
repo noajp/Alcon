@@ -1,0 +1,385 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { useCurrentUserId } from '@/providers/authContext';
+import { toDateOnlyString } from '@/Function/shared/dateUtils';
+import { useWorkers } from '@/ActivitySpace/sustainment/team/data';
+import { createElement, updateElement } from '@/ActivitySpace/execution/element/data';
+import { fetchDataTableSchema } from '@/ActivitySpace/sustainment/table/data';
+import { readAllPages } from '@/hooks/readAllPages';
+import {
+  buildCrmWorkspace, metricValue, normalizeCrmStages, parseActivityLog, resolveStage,
+  type CrmActivityRecord, type CrmActivityType, type CrmCompanyRecord, type CrmContactRecord, type CrmDeal,
+  type CrmDealRecord, type CrmFieldRecord, type CrmNextElement, type CrmPerson, type CrmPipelineRecord,
+} from '@/ActivitySpace/sustainment/crm/crmModel';
+
+const EMPTY: never[] = [];
+const ACTIVITY_WINDOW = 3000;
+
+function all<Row extends { id: string }>(label: string, table: string, spaceId: string, order = 'created_at') {
+  return readAllPages<Row>(label, (from, to) => supabase.from(table).select('*', { count: 'exact' })
+    .eq('activity_space_id', spaceId).order(order, { ascending: true }).order('id').range(from, to) as never, row => row.id);
+}
+
+/** Deal values the App writes. Company and contact may be given by name; a
+ * new name creates the record in this Space. */
+export interface CrmDealPatch {
+  name?: string;
+  stage?: string;
+  amount?: number | null;
+  currency?: string;
+  probability?: number | null;
+  closeDate?: string | null;
+  /** When the deal was won or lost; defaults to today when it closes now. */
+  closedOn?: string | null;
+  ownerId?: string | null;
+  companyId?: string | null;
+  companyName?: string | null;
+  contactId?: string | null;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  initiativeId?: string | null;
+  source?: string | null;
+  lostReason?: string | null;
+  custom?: Record<string, unknown>;
+  /** Next step without an Element (no Object to file it in). */
+  nextStep?: string | null;
+  nextStepOn?: string | null;
+}
+
+/** The CRM App's single source: the active Space's pipelines and records,
+ * shared by every member. The sidebar and the main pane read the same queries. */
+export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: boolean } = {}) {
+  const qc = useQueryClient();
+  const spaceId = useActiveSpaceId();
+  const userId = useCurrentUserId();
+  const enabled = !!spaceId && !!userId;
+  const key = (part: string) => ['crm', spaceId, part];
+  const options = { enabled, staleTime: 15_000, refetchOnWindowFocus: true };
+
+  const pipelines = useQuery({ ...options, queryKey: key('pipelines'), queryFn: () => all<CrmPipelineRecord>('pipelines', 'crm_pipelines', spaceId!, 'order_index') });
+  const deals = useQuery({ ...options, queryKey: key('deals'), queryFn: () => all<CrmDealRecord>('deals', 'crm_deals', spaceId!) });
+  const companies = useQuery({ ...options, queryKey: key('companies'), queryFn: () => all<CrmCompanyRecord>('companies', 'crm_companies', spaceId!) });
+  const contacts = useQuery({ ...options, queryKey: key('contacts'), queryFn: () => all<CrmContactRecord>('contacts', 'crm_contacts', spaceId!) });
+  // The newest history only: health reads last contact from the deal, so older
+  // entries matter only on a record's own timeline.
+  const activities = useQuery({ ...options, queryKey: key('activities'), queryFn: async () => {
+    const { data, error } = await supabase.from('crm_activities').select('*').eq('activity_space_id', spaceId!)
+      .order('occurred_on', { ascending: false }).order('created_at', { ascending: false }).limit(ACTIVITY_WINDOW);
+    if (error) throw error;
+    return (data ?? []) as CrmActivityRecord[];
+  } });
+  const fields = useQuery({ ...options, queryKey: key('fields'), queryFn: () => all<CrmFieldRecord>('fields', 'crm_fields', spaceId!, 'order_index') });
+  const elementIds = useMemo(() => [...new Set((deals.data ?? []).map(deal => deal.next_element_id).filter((id): id is string => !!id))].sort(), [deals.data]);
+  const elements = useQuery({
+    ...options, enabled: enabled && elementIds.length > 0, queryKey: [...key('elements'), elementIds],
+    queryFn: async () => {
+      const rows: CrmNextElement[] = [];
+      for (let index = 0; index < elementIds.length; index += 150) {
+        const { data, error } = await supabase.from('elements').select('id,title,status,due_date,display_id').in('id', elementIds.slice(index, index + 150));
+        if (error) throw error;
+        rows.push(...(data ?? []) as CrmNextElement[]);
+      }
+      return rows;
+    },
+  });
+  // The Table this Space's CRM used before it had its own records, offered once for import.
+  const legacy = useQuery({
+    ...options, queryKey: [...key('legacy'), userId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('widget_boards').select('layout').eq('owner_id', userId!).eq('board_key', `crm:${spaceId}`).maybeSingle();
+      if (error || !data) return null;
+      const zones = (data.layout as { zones?: Record<string, { type?: string; params?: { kind?: string; tableId?: string; fields?: Record<string, string> } }[]> })?.zones ?? {};
+      const planner = Object.values(zones).flat().find(item => item?.type === 'operations-planner' && (item.params?.kind ?? 'crm') === 'crm' && item.params?.tableId);
+      return planner?.params?.tableId ? { tableId: planner.params.tableId, fields: planner.params.fields ?? {} } : null;
+    },
+  });
+  const workers = useWorkers();
+  const people: CrmPerson[] = useMemo(() => workers.data.map(worker => ({ id: worker.id, name: worker.name, type: worker.type, user_id: worker.user_id ?? null })), [workers.data]);
+  const me = people.find(person => person.user_id === userId)?.id ?? null;
+
+  const invalidate = useCallback(() => qc.invalidateQueries({ queryKey: ['crm', spaceId] }), [qc, spaceId]);
+
+  // Every Space starts with one pipeline, so the App always has somewhere to put
+  // a deal. Only the main pane seeds, so two readers never create two.
+  const seeded = useRef<string | null>(null);
+  useEffect(() => {
+    if (!seed || !spaceId || !pipelines.data || pipelines.data.length || seeded.current === spaceId) return;
+    seeded.current = spaceId;
+    void supabase.from('crm_pipelines').insert({ activity_space_id: spaceId, name: 'Sales', order_index: 0 }).then(() => invalidate());
+  }, [seed, spaceId, pipelines.data, invalidate]);
+
+  const pipeline = (pipelines.data ?? []).find(item => item.id === pipelineId) ?? pipelines.data?.[0] ?? null;
+  const today = toDateOnlyString(new Date());
+  const loaded = !!pipeline && !!deals.data && !!companies.data && !!contacts.data && !!activities.data && (elementIds.length === 0 || !!elements.data);
+  const workspace = useMemo(() => loaded ? buildCrmWorkspace({
+    pipeline: pipeline!, deals: deals.data!, companies: companies.data!, contacts: contacts.data!,
+    activities: activities.data!, elements: elements.data ?? EMPTY, people,
+  }, today) : null, [loaded, pipeline, deals.data, companies.data, contacts.data, activities.data, elements.data, people, today]);
+
+  // ── Writes ────────────────────────────────────────────────────────────────
+  const space = () => { if (!spaceId) throw new Error('Choose a Space first.'); return spaceId; };
+  const check = <T,>(result: { data: T; error: { message: string } | null }): NonNullable<T> => {
+    if (result.error) throw new Error(result.error.message);
+    if (result.data === null) throw new Error('The record is not available to you.');
+    return result.data as NonNullable<T>;
+  };
+
+  const resolved = useRef(new Map<string, string>());
+  async function companyFor(name: string): Promise<string> {
+    const lower = name.trim().toLowerCase();
+    const known = resolved.current.get(`company:${lower}`) ?? (companies.data ?? []).find(company => company.name.trim().toLowerCase() === lower)?.id;
+    if (known) return known;
+    // A name another member added since this screen loaded is reused, not duplicated.
+    const fresh = await supabase.from('crm_companies').select('id,name').eq('activity_space_id', space());
+    const match = (fresh.data ?? []).find(company => (company.name as string).trim().toLowerCase() === lower);
+    if (match) { resolved.current.set(`company:${lower}`, match.id as string); return match.id as string; }
+    const inserted = await supabase.from('crm_companies').insert({ activity_space_id: space(), name: name.trim(), owner_worker_id: me }).select('id').single();
+    const id = check(inserted).id as string;
+    resolved.current.set(`company:${lower}`, id);
+    return id;
+  }
+  async function contactFor(name: string, email: string | null, companyId: string | null): Promise<string> {
+    const lower = name.trim().toLowerCase();
+    const cacheKey = `contact:${companyId ?? ''}:${lower}`;
+    const cached = resolved.current.get(cacheKey);
+    if (cached) return cached;
+    const existing = (contacts.data ?? []).find(contact => contact.name.trim().toLowerCase() === lower && (!companyId || !contact.company_id || contact.company_id === companyId));
+    if (existing) {
+      if (email && !existing.email) check(await supabase.from('crm_contacts').update({ email }).eq('id', existing.id).select('id').single());
+      resolved.current.set(cacheKey, existing.id);
+      return existing.id;
+    }
+    const id = check(await supabase.from('crm_contacts').insert({ activity_space_id: space(), name: name.trim(), email, company_id: companyId, owner_worker_id: me }).select('id').single()).id;
+    resolved.current.set(cacheKey, id);
+    return id;
+  }
+
+  /** Creates or updates a deal in one row write (company / contact rows first when named). */
+  const saveDeal = async (dealId: string | null, patch: CrmDealPatch, extra?: { activity?: { type: CrmActivityType; text: string; date?: string }; quiet?: boolean }): Promise<string> => {
+    const row: Record<string, unknown> = {};
+    if (patch.name !== undefined) row.name = patch.name.trim();
+    if (patch.stage !== undefined) {
+      row.stage = patch.stage;
+      // Closing now is dated in the person's own calendar, not the server's;
+      // a deal that was already closed keeps the day it closed.
+      const closing = ['won', 'lost'].includes(patch.stage.toLowerCase());
+      const wasClosed = !!dealId && ['won', 'lost'].includes(deals.data?.find(item => item.id === dealId)?.stage.toLowerCase() ?? '');
+      if (closing && !wasClosed) row.closed_on = patch.closedOn ?? today;
+    }
+    if (patch.amount !== undefined) row.amount = patch.amount;
+    if (patch.currency !== undefined) row.currency = patch.currency.toUpperCase();
+    if (patch.probability !== undefined) row.probability = patch.probability === null ? null : Math.round(Math.min(100, Math.max(0, patch.probability)));
+    if (patch.closeDate !== undefined) row.close_date = patch.closeDate;
+    if (patch.ownerId !== undefined) row.owner_worker_id = patch.ownerId;
+    if (patch.initiativeId !== undefined) row.initiative_id = patch.initiativeId;
+    if (patch.source !== undefined) row.source = patch.source;
+    if (patch.lostReason !== undefined) row.lost_reason = patch.lostReason;
+    if (patch.custom !== undefined) row.custom = patch.custom;
+    if (patch.nextStep !== undefined) row.next_step = patch.nextStep;
+    if (patch.nextStepOn !== undefined) row.next_step_on = patch.nextStepOn;
+    if (patch.companyId !== undefined) row.company_id = patch.companyId;
+    if (patch.companyName) row.company_id = await companyFor(patch.companyName);
+    if (patch.contactId !== undefined) row.contact_id = patch.contactId;
+    if (patch.contactName) row.contact_id = await contactFor(patch.contactName, patch.contactEmail ?? null, (row.company_id as string | undefined) ?? null);
+    try {
+      let id = dealId;
+      if (id) { if (Object.keys(row).length) check(await supabase.from('crm_deals').update(row).eq('id', id).select('id').single()); }
+      else {
+        const first = normalizeCrmStages(pipeline?.stages)[0];
+        const stage = (row.stage as string | undefined) ?? first.id;
+        id = check(await supabase.from('crm_deals').insert({
+          activity_space_id: space(), pipeline_id: pipeline?.id, currency: pipeline?.currency ?? 'JPY',
+          owner_worker_id: me, probability: resolveStage(stage, normalizeCrmStages(pipeline?.stages))?.probability ?? null,
+          ...row, stage, name: (row.name as string | undefined) || pipeline?.record_label || 'New deal',
+        }).select('id').single()).id;
+      }
+      if (extra?.activity) await logActivity(id!, extra.activity, { companyId: (row.company_id as string | null | undefined), contactId: (row.contact_id as string | null | undefined), quiet: true });
+      return id!;
+    } finally { if (!extra?.quiet) await invalidate(); }
+  };
+
+  const logActivity = async (dealId: string, entry: { type: CrmActivityType; text: string; date?: string },
+    links: { companyId?: string | null; contactId?: string | null; quiet?: boolean } = {}) => {
+    const deal = deals.data?.find(item => item.id === dealId);
+    const author = people.find(person => person.id === me)?.name ?? null;
+    check(await supabase.from('crm_activities').insert({
+      activity_space_id: space(), deal_id: dealId,
+      company_id: links.companyId !== undefined ? links.companyId : deal?.company_id ?? null,
+      contact_id: links.contactId !== undefined ? links.contactId : deal?.contact_id ?? null,
+      kind: entry.type, body: entry.text.trim().slice(0, 8000), occurred_on: entry.date ?? today, author_name: author,
+    }).select('id').single());
+    if (!links.quiet) await invalidate();
+  };
+
+  /** A touchpoint with a company or person outside any one deal. */
+  const logRecordActivity = async (target: { companyId?: string | null; contactId?: string | null }, entry: { type: CrmActivityType; text: string }) => {
+    const author = people.find(person => person.id === me)?.name ?? null;
+    check(await supabase.from('crm_activities').insert({
+      activity_space_id: space(), company_id: target.companyId ?? null, contact_id: target.contactId ?? null,
+      kind: entry.type, body: entry.text.trim().slice(0, 8000), occurred_on: today, author_name: author,
+    }).select('id').single());
+    await invalidate();
+  };
+
+  /** The next step is an Element whenever someone can act on it: in the
+   * pipeline's Object, assigned to the deal owner; or, with no Object, in my
+   * own My Elements when the deal is mine. A colleague's deal without an
+   * Object keeps the step on the deal itself, visible to the whole team.
+   * Returns a notice when the step could not become the owner's Element. */
+  const setNextStep = async (deal: Pick<CrmDeal, 'id' | 'name' | 'account' | 'ownerId' | 'nextElement'> & { number?: number }, step: { title: string; due: string | null }): Promise<string | null> => {
+    const title = step.title.trim();
+    if (!title) throw new Error('Describe the next step.');
+    const element = deal.nextElement && !['done', 'cancelled'].includes(deal.nextElement.status) ? deal.nextElement : null;
+    const objectId = pipeline?.object_id ?? null;
+    const mine = !deal.ownerId || deal.ownerId === me;
+    let elementId = element?.id ?? null;
+    let notice: string | null = null;
+    if (element) await updateElement(element.id, { title, due_date: step.due });
+    else if (objectId || mine) {
+      const created = await createElement({
+        title, due_date: step.due, start_date: step.due, status: 'todo', priority: 'medium',
+        object_id: objectId, owner_id: objectId ? null : userId,
+        description: `CRM${deal.number ? ` D-${deal.number}` : ''} · ${deal.name}${deal.account ? ` · ${deal.account}` : ''}`,
+        labels: ['crm'],
+      });
+      elementId = created.id;
+      if (deal.ownerId) {
+        const { error } = await supabase.from('element_assignees').insert({ element_id: created.id, worker_id: deal.ownerId, role: 'assignee' });
+        if (error) notice = 'The owner cannot see the pipeline’s Object, so the next step is unassigned. Give them access to the Object.';
+      }
+    } else notice = 'Saved on the deal. Choose an Object in Pipeline settings to make next steps Elements for their owners.';
+    check(await supabase.from('crm_deals').update({ next_element_id: elementId, next_step: title, next_step_on: step.due }).eq('id', deal.id).select('id').single());
+    await Promise.all([invalidate(), qc.invalidateQueries({ queryKey: ['my-elements'] })]);
+    return notice;
+  };
+
+  const completeNextStep = async (deal: CrmDeal) => {
+    if (deal.nextElement && !['done', 'cancelled'].includes(deal.nextElement.status)) await updateElement(deal.nextElement.id, { status: 'done' });
+    // The deal's own copy clears too, so people who cannot see the Element do not see a stale step.
+    check(await supabase.from('crm_deals').update({ next_step: null, next_step_on: null }).eq('id', deal.id).select('id').single());
+    if (deal.nextStep) await logActivity(deal.id, { type: 'note', text: `✓ ${deal.nextStep}` });
+    await Promise.all([invalidate(), qc.invalidateQueries({ queryKey: ['my-elements'] })]);
+  };
+
+  const deleteDeal = async (dealId: string) => { check(await supabase.from('crm_deals').delete().eq('id', dealId).select('id').single()); await invalidate(); };
+
+  const savePipeline = async (id: string | null, patch: Partial<Omit<CrmPipelineRecord, 'id'>>): Promise<string> => {
+    try {
+      if (id) { check(await supabase.from('crm_pipelines').update(patch).eq('id', id).select('id').single()); return id; }
+      return check(await supabase.from('crm_pipelines').insert({ activity_space_id: space(), ...patch }).select('id').single()).id;
+    } finally { await invalidate(); }
+  };
+  const deletePipeline = async (id: string) => { check(await supabase.from('crm_pipelines').delete().eq('id', id).select('id').single()); await invalidate(); };
+
+  const saveCompany = async (id: string | null, patch: Partial<Omit<CrmCompanyRecord, 'id' | 'created_at'>>): Promise<string> => {
+    try {
+      if (id) { check(await supabase.from('crm_companies').update(patch).eq('id', id).select('id').single()); return id; }
+      return check(await supabase.from('crm_companies').insert({ activity_space_id: space(), owner_worker_id: me, ...patch }).select('id').single()).id;
+    } finally { await invalidate(); }
+  };
+  const deleteCompany = async (id: string) => { check(await supabase.from('crm_companies').delete().eq('id', id).select('id').single()); await invalidate(); };
+  const saveContact = async (id: string | null, patch: Partial<Omit<CrmContactRecord, 'id' | 'created_at'>>): Promise<string> => {
+    try {
+      if (id) { check(await supabase.from('crm_contacts').update(patch).eq('id', id).select('id').single()); return id; }
+      return check(await supabase.from('crm_contacts').insert({ activity_space_id: space(), owner_worker_id: me, ...patch }).select('id').single()).id;
+    } finally { await invalidate(); }
+  };
+  const deleteContact = async (id: string) => { check(await supabase.from('crm_contacts').delete().eq('id', id).select('id').single()); await invalidate(); };
+
+  const saveField = async (id: string | null, patch: Partial<Omit<CrmFieldRecord, 'id'>>) => {
+    try {
+      if (id) check(await supabase.from('crm_fields').update(patch).eq('id', id).select('id').single());
+      else check(await supabase.from('crm_fields').insert({ activity_space_id: space(), ...patch }).select('id').single());
+    } finally { await invalidate(); }
+  };
+  const deleteField = async (id: string) => { check(await supabase.from('crm_fields').delete().eq('id', id).select('id').single()); await invalidate(); };
+
+  // ── Strategy: report the pipeline's figure into its Initiative measure ──
+  const [measureError, setMeasureError] = useState<string | null>(null);
+  const reported = useRef<string | null>(null);
+  useEffect(() => {
+    const p = workspace?.pipeline;
+    // One writer (the main pane), and only from fresh data, never a cached stale view.
+    if (!seed || !p?.measure_intent_id || !p.measure_metric || !workspace || deals.isFetching) return;
+    const value = metricValue(workspace.deals, p.measure_metric, p.currency, today);
+    const stamp = `${p.measure_intent_id}:${p.measure_metric}:${value}`;
+    if (reported.current === stamp) return;
+    reported.current = stamp;
+    void (async () => {
+      const { data, error } = await supabase.from('intents').select('actual_value').eq('id', p.measure_intent_id!).maybeSingle();
+      if (error || !data) { setMeasureError(error?.message ?? 'The linked success condition is not visible to you.'); return; }
+      if (Number(data.actual_value) === value) { setMeasureError(null); return; }
+      const { error: writeError } = await supabase.from('intents').update({ actual_value: value, measured_at: new Date().toISOString() }).eq('id', p.measure_intent_id!).select('id').single();
+      // Success conditions are written by the Initiative's owner; for anyone else the figure updates when they open the CRM.
+      setMeasureError(writeError ? 'Only the Initiative’s owner can update this success condition. It updates when they open the CRM.' : null);
+      if (!writeError) void qc.invalidateQueries({ queryKey: ['initiative-measures'] });
+    })();
+  }, [seed, workspace, deals.isFetching, today, qc]);
+
+  /** Moves a Table-based pipeline (the CRM's former store) into this Space's
+   * records. Safe to run again: deals it already imported are skipped. */
+  const importFromTable = async (tableId: string, mapping: Record<string, string>): Promise<number> => {
+    const schema = await fetchDataTableSchema(tableId);
+    const cell = (rowId: string, field: string) => mapping[field] ? schema.cellsByRow[rowId]?.[mapping[field]] ?? null : null;
+    const text = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null;
+    const date = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+    const marker = `table:${tableId}`;
+    const done = await readAllPages<{ id: string; custom: Record<string, unknown> }>('imported deals', (from, to) => supabase.from('crm_deals')
+      .select('id,custom', { count: 'exact' }).eq('activity_space_id', space()).not('custom->>imported_from', 'is', null).order('id').range(from, to) as never, row => row.id);
+    const imported = new Set(done.map(row => row.custom?.imported_from).filter(value => typeof value === 'string' && value.startsWith(marker)));
+    const stages = normalizeCrmStages(pipeline?.stages);
+    let count = 0;
+    try {
+      for (const row of schema.rows) {
+        const name = text(cell(row.id, 'name'));
+        const origin = `${marker}:${row.id}`;
+        if (!name || imported.has(origin)) continue;
+        const stage = text(cell(row.id, 'stage'))?.toLowerCase() ?? stages[0].id;
+        const amount = typeof cell(row.id, 'amount') === 'number' ? cell(row.id, 'amount') as number : null;
+        const probability = typeof cell(row.id, 'probability') === 'number' ? cell(row.id, 'probability') as number : null;
+        const companyName = text(cell(row.id, 'account'));
+        const companyId = companyName ? await companyFor(companyName) : null;
+        const contactName = text(cell(row.id, 'contact'));
+        const contactId = contactName ? await contactFor(contactName, text(cell(row.id, 'email')), companyId) : null;
+        const dealId = await saveDeal(null, {
+          name, stage: stage === 'open' ? stages[0].id : stage, amount, probability,
+          currency: text(cell(row.id, 'currency'))?.toUpperCase() ?? pipeline?.currency ?? 'JPY', closeDate: date(cell(row.id, 'closeDate')),
+          companyId, contactId, custom: { imported_from: origin },
+          // A historical win keeps its own date rather than today's.
+          closedOn: date(cell(row.id, 'closeDate')),
+          nextStep: text(cell(row.id, 'nextStep')), nextStepOn: date(cell(row.id, 'nextActionDate')),
+        }, { quiet: true });
+        for (const entry of [...parseActivityLog(cell(row.id, 'activity'))].reverse()) {
+          if (entry.type !== 'stage') await logActivity(dealId, { type: entry.type, text: entry.text, date: entry.date ?? today }, { companyId, contactId, quiet: true });
+        }
+        const last = date(cell(row.id, 'lastContact'));
+        if (last) check(await supabase.from('crm_deals').update({ last_contact_on: last }).eq('id', dealId).select('id').single());
+        count += 1;
+      }
+    } finally { await invalidate(); }
+    return count;
+  };
+
+  const error = pipelines.error ?? deals.error ?? companies.error ?? contacts.error ?? activities.error ?? fields.error ?? elements.error ?? null;
+  return {
+    spaceId, today, me, people, workspace, pipeline, legacyTable: legacy.data ?? null,
+    pipelines: pipelines.data ?? EMPTY as CrmPipelineRecord[],
+    companies: companies.data ?? EMPTY as CrmCompanyRecord[],
+    contacts: contacts.data ?? EMPTY as CrmContactRecord[],
+    activities: activities.data ?? EMPTY as CrmActivityRecord[],
+    fields: fields.data ?? EMPTY as CrmFieldRecord[],
+    allDeals: deals.data ?? EMPTY as CrmDealRecord[],
+    loading: enabled && !workspace && !error,
+    error, measureError,
+    refetch: invalidate,
+    saveDeal, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
+    savePipeline, deletePipeline, saveCompany, deleteCompany, saveContact, deleteContact, saveField, deleteField,
+    importFromTable,
+  };
+}
+
+export type Crm = ReturnType<typeof useCrm>;

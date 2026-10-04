@@ -5,7 +5,8 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { Button } from '@/ui/button';
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { forecastFor, type CrmWorkspace } from './crmModel';
+import { useStrategies } from '@/ActivitySpace/strategy/initiative/strategyData';
+import { forecastFor, type CrmDeal, type CrmWorkspace } from './crmModel';
 import { money } from './crmFormat';
 import { Metric } from './CrmToday';
 
@@ -18,9 +19,36 @@ const SERIES = [
 ] as const;
 
 /** Six months by expected close, one currency at a time. */
-export function CrmForecast({ workspace }: { workspace: CrmWorkspace }) {
+/** Open, weighted and won per group, for one currency. */
+function Breakdown({ title, rows, currency, onOpen }: { title: string; rows: { id: string; label: string; deals: CrmDeal[] }[]; currency: string; onOpen?: (id: string) => void }) {
   const { t, locale } = useI18n();
-  const currencies = workspace.analysis.totals.map(total => total.currency);
+  const sum = (deals: CrmDeal[], pick: (deal: CrmDeal) => number) => deals.filter(deal => deal.currency === currency).reduce((total, deal) => total + pick(deal), 0);
+  const data = rows.map(row => ({ ...row,
+    open: sum(row.deals.filter(deal => deal.outcome === 'open'), deal => deal.amount ?? 0),
+    weighted: sum(row.deals.filter(deal => deal.outcome === 'open'), deal => deal.weighted ?? 0),
+    won: sum(row.deals.filter(deal => deal.outcome === 'won'), deal => deal.amount ?? 0) }))
+    .filter(row => row.open || row.won).sort((a, b) => b.weighted + b.won - (a.weighted + a.won));
+  if (!data.length) return null;
+  return <section className="space-y-2"><h2 className="text-sm font-medium">{title}</h2>
+    <div className="overflow-x-auto"><table className="w-full min-w-[480px] text-left text-[13px] tabular-nums">
+      <thead className="text-xs text-muted-foreground"><tr>{['', 'Open pipeline', 'Weighted', 'Won'].map(item => <th key={item} scope="col" className="px-2 py-2 font-medium first:pl-0">{item && t(item)}</th>)}</tr></thead>
+      <tbody>{data.map(row => <tr key={row.id} className="border-t border-[var(--border-subtle)]">
+        <td className="max-w-64 truncate py-2 pr-2">{onOpen && row.id ? <button type="button" className="truncate rounded-sm text-left hover:underline" onClick={() => onOpen(row.id)}>{row.label}</button> : row.label}</td>
+        {[row.open, row.weighted, row.won].map((value, index) => <td key={index} className="px-2 py-2">{money(value, currency, locale, true)}</td>)}
+      </tr>)}</tbody>
+    </table></div></section>;
+}
+
+function group(deals: readonly CrmDeal[], key: (deal: CrmDeal) => string | null, label: (id: string) => string) {
+  const map = new Map<string, CrmDeal[]>();
+  for (const deal of deals) { const id = key(deal) ?? ''; map.set(id, [...(map.get(id) ?? []), deal]); }
+  return [...map.entries()].map(([id, items]) => ({ id, label: label(id), deals: items }));
+}
+
+export function CrmForecast({ workspace, onOpenInitiative }: { workspace: CrmWorkspace; onOpenInitiative?: (id: string) => void }) {
+  const strategies = useStrategies();
+  const { t, locale } = useI18n();
+  const currencies = workspace.totals.map(total => total.currency);
   const [chosen, setChosen] = useState<string | null>(null);
   const currency = chosen && currencies.includes(chosen) ? chosen : workspace.primaryCurrency;
   const forecast = useMemo(() => forecastFor(workspace.deals, currency, workspace.today, 6), [workspace, currency]);
@@ -31,7 +59,7 @@ export function CrmForecast({ workspace }: { workspace: CrmWorkspace }) {
     {currencies.length > 1 && <div role="group" aria-label={t('Currency')} className="flex flex-wrap gap-1">
       {currencies.map(code => <Button key={code} shape="tab" variant={code === currency ? 'secondary' : 'ghost'} aria-pressed={code === currency} onClick={() => setChosen(code)}>{code}</Button>)}
     </div>}
-    <dl className="grid grid-cols-2 gap-6 sm:grid-cols-5">
+    <dl className="grid grid-cols-2 gap-6 @2xl/crm:grid-cols-5">
       <Metric label={t('Open pipeline')} value={money(forecast.openPipeline, currency, locale, true)} />
       <Metric label={t('Weighted')} value={money(forecast.weightedPipeline, currency, locale, true)} />
       <Metric label={t('Won to date')} value={money(forecast.wonTotal, currency, locale, true)} />
@@ -60,6 +88,10 @@ export function CrmForecast({ workspace }: { workspace: CrmWorkspace }) {
       <p className="text-xs leading-relaxed text-muted-foreground">{t('Commit counts open deals at 70% likelihood or more. Weighted multiplies each amount by its likelihood. Overdue open deals are counted in the current month until they are won, lost or re-dated.')}
         {forecast.undated > 0 && ` ${t('{n} open deals have no close date and are not shown.', { n: forecast.undated })}`}</p>
     </section>
+    <div className="grid gap-8 @4xl/crm:grid-cols-2">
+      <Breakdown title={t('By owner')} currency={currency} rows={group(workspace.deals, deal => deal.ownerId, id => workspace.deals.find(deal => deal.ownerId === id)?.ownerName ?? t('Unassigned'))} />
+      <Breakdown title={t('By Initiative')} currency={currency} onOpen={onOpenInitiative} rows={group(workspace.deals, deal => deal.initiativeId, id => strategies.data.find(item => item.id === id)?.name ?? t('Not linked'))} />
+    </div>
     <div className="overflow-x-auto">
       <table className="w-full min-w-[560px] text-left text-[13px] tabular-nums">
         <thead className="text-xs text-muted-foreground"><tr>{['Month', 'Deals', 'Won', 'Commit', 'Weighted', 'Best case'].map(item => <th key={item} scope="col" className="px-2 py-2 font-medium first:pl-0">{t(item)}</th>)}</tr></thead>
