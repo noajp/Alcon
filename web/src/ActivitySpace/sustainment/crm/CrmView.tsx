@@ -162,7 +162,7 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
           {workspace && view !== 'settings' && <div className="flex flex-wrap items-center gap-2">
             {view === 'today' && crm.me && <div role="group" aria-label={t('Whose deals')} className="flex gap-1">
               <Button shape="tab" size="sm" variant={!everyone ? 'secondary' : 'ghost'} aria-pressed={!everyone} onClick={() => setEveryone(false)}>{t('Mine')}</Button>
-              <Button shape="tab" size="sm" variant={everyone ? 'secondary' : 'ghost'} aria-pressed={everyone} onClick={() => setEveryone(true)}>{t('Team')}</Button>
+              <Button shape="tab" size="sm" variant={everyone ? 'secondary' : 'ghost'} aria-pressed={everyone} onClick={() => setEveryone(true)}>{t('Everyone')}</Button>
             </div>}
             <Button variant="ghost" onClick={() => setCaptureFor(route.dealId ?? null)}><PenLine size={14} />{t('Capture')}</Button>
             <Button variant="secondary" onClick={() => setCreating(true)}><Plus size={14} />{recordLabel ? t('New {name}', { name: recordLabel }) : t('New deal')}</Button>

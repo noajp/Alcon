@@ -12,6 +12,7 @@ import { fieldKey, fieldOptions, metricValue, normalizeCrmStages, stageSlug, typ
 import { money } from './crmFormat';
 import { CrmPicker } from './CrmPicker';
 
+const message = (cause: unknown) => cause instanceof Error ? cause.message : 'Could not save. Try again.';
 const INPUT = 'h-8 min-w-0 rounded-sm bg-muted/30 px-2 text-sm outline-none hover:bg-muted/40 focus:bg-muted/60';
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
@@ -60,6 +61,7 @@ function Stages({ crm }: { crm: Crm }) {
   const pipeline = crm.pipeline!;
   const [draft, setDraft] = useState<CrmStage[]>(normalizeCrmStages(pipeline.stages));
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const counts = new Map<string, number>();
   for (const deal of crm.workspace?.deals ?? []) if (deal.outcome === 'open' && deal.stage) counts.set(deal.stage.id, (counts.get(deal.stage.id) ?? 0) + 1);
   const update = (index: number, patch: Partial<CrmStage>) => { setSaved(false); setDraft(current => current.map((stage, i) => i === index ? { ...stage, ...patch } : stage)); };
@@ -85,8 +87,9 @@ function Stages({ crm }: { crm: Crm }) {
     {!valid && <p role="alert" className="text-xs text-[var(--status-danger)]">{t('Each stage needs a unique name other than Won or Lost.')}</p>}
     <div className="flex flex-wrap items-center gap-2">
       <Button variant="ghost" size="sm" disabled={draft.length >= 12} onClick={() => { setSaved(false); setDraft(current => [...current, { id: `stage-${current.length + 1}`, label: t('New stage'), probability: 50 }]); }}><Plus size={14} />{t('Add stage')}</Button>
-      <Button variant="secondary" size="sm" disabled={!valid} onClick={() => { const stages = normalizeCrmStages(draft); void crm.savePipeline(pipeline.id, { stages }).then(() => { setDraft(stages); setSaved(true); }); }}>{t('Save stages')}</Button>
+      <Button variant="secondary" size="sm" disabled={!valid} onClick={() => { const stages = normalizeCrmStages(draft); setError(null); crm.savePipeline(pipeline.id, { stages }).then(() => { setDraft(stages); setSaved(true); }).catch(cause => setError(message(cause))); }}>{t('Save stages')}</Button>
       {saved && <span role="status" className="text-xs text-muted-foreground">{t('Saved')}</span>}
+      {error && <span role="alert" className="text-xs text-[var(--status-danger)]">{error}</span>}
     </div>
   </Section>;
 }
@@ -105,24 +108,27 @@ function Connections({ crm }: { crm: Crm }) {
   const names = new Map(strategies.data.map(item => [item.id, item.name]));
   const metric = pipeline.measure_metric ?? 'won_quarter';
   const value = crm.workspace ? metricValue(crm.workspace.deals, metric, pipeline.currency, crm.today) : null;
+  const [error, setError] = useState<string | null>(null);
+  const save = (patch: Parameters<Crm['savePipeline']>[1]) => { setError(null); crm.savePipeline(pipeline.id, patch).catch(cause => setError(message(cause))); };
   return <Section title={t('Connections')} description={t('How this pipeline meets Execution and Strategy. Next steps become Elements in the Object you choose; the result you choose is written into an Initiative’s success condition whenever deals change.')}>
     <div className="max-w-2xl space-y-2">
       <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-2">
         <span className="text-xs text-muted-foreground">{t('Next steps go to')}</span>
         <CrmPicker label={t('Object for next steps')} value={pipeline.object_id} placeholder={t('My Elements (each owner)')}
-          options={objects.map(object => ({ id: object.id, label: object.name }))} onChange={id => void crm.savePipeline(pipeline.id, { object_id: id })} />
+          options={objects.map(object => ({ id: object.id, label: object.name }))} onChange={id => save({ object_id: id })} />
         <span className="text-xs text-muted-foreground">{t('Reports into')}</span>
         <CrmPicker label={t('Success condition')} value={pipeline.measure_intent_id} placeholder={t('No Initiative')}
           options={measures.map(measure => ({ id: measure.id, label: measure.title, hint: names.get(measure.strategy_id ?? '') ?? null }))}
-          onChange={id => void crm.savePipeline(pipeline.id, { measure_intent_id: id, measure_metric: id ? metric : null })} />
+          onChange={id => save({ measure_intent_id: id, measure_metric: id ? metric : null })} />
         {pipeline.measure_intent_id && <>
           <span className="text-xs text-muted-foreground">{t('As')}</span>
           <div className="flex flex-wrap gap-1">{METRICS.map(item => <Button key={item.id} shape="tab" size="xs" variant={metric === item.id ? 'secondary' : 'ghost'} aria-pressed={metric === item.id}
-            onClick={() => void crm.savePipeline(pipeline.id, { measure_metric: item.id })}>{t(item.label)}</Button>)}</div>
+            onClick={() => save({ measure_metric: item.id })}>{t(item.label)}</Button>)}</div>
         </>}
       </div>
       {pipeline.measure_intent_id && value !== null && <p className="text-xs text-muted-foreground">{t('Currently reporting {value}.', { value: money(value, pipeline.currency, locale) })}</p>}
-      {crm.measureError && <p role="alert" className="text-xs text-[var(--status-danger)]">{crm.measureError}</p>}
+      {crm.measureError && <p role="alert" className="text-xs text-[var(--status-danger)]">{t(crm.measureError)}</p>}
+      {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{error}</p>}
     </div>
   </Section>;
 }
@@ -156,7 +162,7 @@ function Fields({ crm }: { crm: Crm }) {
     <ul className="max-w-2xl divide-y divide-[var(--border-subtle)]">{list.map(field => <li key={field.id} className="flex items-center gap-3 py-2 text-sm">
       <span className="min-w-0 flex-1 truncate">{field.label}</span>
       <span className="text-xs text-muted-foreground">{t(TYPE_LABEL[field.type])}{field.type === 'select' && ` · ${fieldOptions(field).join(', ')}`}</span>
-      <Button variant="ghost" size="icon-xs" aria-label={t('Remove field {name}', { name: field.label })} onClick={() => void crm.deleteField(field.id)}><Trash2 size={12} /></Button>
+      <Button variant="ghost" size="icon-xs" aria-label={t('Remove field {name}', { name: field.label })} onClick={() => { setError(null); crm.deleteField(field.id).catch(cause => setError(message(cause))); }}><Trash2 size={12} /></Button>
     </li>)}{!list.length && <li className="py-2 text-xs text-muted-foreground">{t('No fields yet.')}</li>}</ul>
     <div className="flex max-w-2xl flex-wrap items-center gap-2">
       <input aria-label={t('Field name')} placeholder={t('Field name')} className={`${INPUT} w-48`} value={label} onChange={event => setLabel(event.target.value)} />
@@ -172,12 +178,13 @@ function PipelinesList({ crm, onSelect }: { crm: Crm; onSelect: (id: string) => 
   const { t } = useI18n();
   const [name, setName] = useState('');
   const [confirm, setConfirm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const pipeline = crm.pipeline!;
   const count = crm.allDeals.filter(deal => deal.pipeline_id === pipeline.id).length;
   return <Section title={t('Pipelines')}>
     <div className="flex flex-wrap items-center gap-2">
       {crm.pipelines.map(item => <Button key={item.id} shape="tab" size="sm" variant={item.id === pipeline.id ? 'secondary' : 'ghost'} aria-pressed={item.id === pipeline.id} onClick={() => onSelect(item.id)}>{item.name}</Button>)}
-      <form className="flex items-center gap-2" onSubmit={event => { event.preventDefault(); if (name.trim()) void crm.savePipeline(null, { name: name.trim(), currency: pipeline.currency, order_index: crm.pipelines.length }).then(id => { setName(''); onSelect(id); }); }}>
+      <form className="flex items-center gap-2" onSubmit={event => { event.preventDefault(); if (!name.trim()) return; setError(null); crm.savePipeline(null, { name: name.trim(), currency: pipeline.currency, order_index: Math.max(1, ...crm.pipelines.map(item => item.order_index + 1)) }).then(id => { setName(''); onSelect(id); }).catch(cause => setError(message(cause))); }}>
         <input aria-label={t('New pipeline')} placeholder={t('New pipeline…')} className={`${INPUT} w-44`} value={name} onChange={event => setName(event.target.value)} />
         <Button type="submit" size="sm" variant="ghost" disabled={!name.trim()}><Plus size={14} />{t('Add')}</Button>
       </form>
@@ -185,8 +192,9 @@ function PipelinesList({ crm, onSelect }: { crm: Crm; onSelect: (id: string) => 
     {crm.pipelines.length > 1 && (confirm
       ? <div className="flex items-center gap-2"><span className="text-xs">{t('Delete “{name}” and its {n} deals?', { name: pipeline.name, n: count })}</span>
         <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>{t('Cancel')}</Button>
-        <Button size="sm" variant="danger" onClick={() => void crm.deletePipeline(pipeline.id).then(() => { setConfirm(false); onSelect(crm.pipelines.find(item => item.id !== pipeline.id)!.id); })}>{t('Delete')}</Button></div>
+        <Button size="sm" variant="danger" onClick={() => { setError(null); crm.deletePipeline(pipeline.id).then(() => { setConfirm(false); onSelect(crm.pipelines.find(item => item.id !== pipeline.id)!.id); }).catch(cause => setError(message(cause))); }}>{t('Delete')}</Button></div>
       : <Button size="xs" variant="ghost" onClick={() => setConfirm(true)}><Trash2 size={12} />{t('Delete this pipeline')}</Button>)}
+    {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{error}</p>}
   </Section>;
 }
 

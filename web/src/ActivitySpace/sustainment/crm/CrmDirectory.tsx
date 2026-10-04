@@ -98,6 +98,7 @@ export function CrmContacts({ crm, query, onOpen, selectedId }: { crm: Crm; quer
 function RecordShell({ title, subtitle, onClose, onDelete, children }: { title: string; subtitle: string; onClose: () => void; onDelete: () => Promise<void>; children: React.ReactNode }) {
   const { t } = useI18n();
   const [confirm, setConfirm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   return <aside aria-label={title} className="flex h-full w-full min-w-0 flex-col bg-card">
     <div className="flex items-start gap-2 px-5 pb-3 pt-5">
       <div className="min-w-0 flex-1"><p className="px-1 text-[11px] text-muted-foreground">{subtitle}</p><h2 className="truncate px-1 text-lg font-semibold">{title}</h2></div>
@@ -108,8 +109,9 @@ function RecordShell({ title, subtitle, onClose, onDelete, children }: { title: 
       <section className="flex justify-end border-t border-[var(--border-subtle)] pt-4">
         {confirm ? <span className="flex items-center gap-2"><span className="text-xs">{t('Delete this record? Its deals stay, without this link.')}</span>
           <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>{t('Cancel')}</Button>
-          <Button size="sm" variant="danger" onClick={() => void onDelete().then(onClose)}>{t('Delete')}</Button></span>
+          <Button size="sm" variant="danger" onClick={() => { setError(null); onDelete().then(onClose).catch(cause => setError(cause instanceof Error ? cause.message : t('Could not save. Try again.'))); }}>{t('Delete')}</Button></span>
           : <Button size="sm" variant="ghost" aria-label={t('Delete')} onClick={() => setConfirm(true)}><Trash2 size={14} /></Button>}
+        {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{error}</p>}
       </section>
     </div>
   </aside>;

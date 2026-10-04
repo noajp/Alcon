@@ -4,6 +4,11 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const CRM_MESSAGES: Record<string, Row> = {
+  'Delete this {name}?': ['この{name}を削除しますか？', '이 {name}을(를) 삭제할까요?', 'Supprimer ce {name} ?', '¿Eliminar este {name}?'],
+  'Everyone': ['全員', '전체', 'Tout le monde', 'Todos'],
+  'The owner cannot see the pipeline’s Object, so the next step is unassigned. Give them access to the Object.': ['担当者がパイプラインの Object を見られないため、次のステップは未割り当てです。担当者に Object へのアクセスを付与してください。', '담당자가 파이프라인의 Object를 볼 수 없어 다음 단계가 미배정입니다. 담당자에게 Object 접근 권한을 주세요.', 'Le responsable ne voit pas l’Object du pipeline : l’étape n’est pas attribuée. Donnez-lui accès à l’Object.', 'El responsable no ve el Object del pipeline, así que el paso queda sin asignar. Dale acceso al Object.'],
+  'Saved on the deal. Choose an Object in Pipeline settings to make next steps Elements for their owners.': ['商談に保存しました。次のステップを担当者の Element にするには、パイプライン設定で Object を選んでください。', '거래에 저장했습니다. 다음 단계를 담당자의 Element로 만들려면 파이프라인 설정에서 Object를 선택하세요.', 'Enregistré sur l’affaire. Choisissez un Object dans les réglages du pipeline pour en faire des Elements pour les responsables.', 'Guardado en el negocio. Elige un Object en la configuración del pipeline para convertir los pasos en Elements de sus responsables.'],
+  'Only the Initiative’s owner can update this success condition. It updates when they open the CRM.': ['この成功条件を更新できるのは Initiative の作成者だけです。作成者が CRM を開くと更新されます。', '이 성공 조건은 Initiative 작성자만 업데이트할 수 있습니다. 작성자가 CRM을 열면 업데이트됩니다.', 'Seul le propriétaire de l’Initiative peut mettre à jour cette condition. Elle se met à jour quand il ouvre le CRM.', 'Solo el propietario de la Initiative puede actualizar esta condición. Se actualiza cuando abre el CRM.'],
   'A name is required.': ['名前は必須です。', '이름은 필수입니다.', 'Un nom est requis.', 'El nombre es obligatorio.'],
   'Add': ['追加', '추가', 'Ajouter', 'Añadir'],
   'Add a company…': ['会社を追加…', '회사 추가…', 'Ajouter une entreprise…', 'Añadir una empresa…'],

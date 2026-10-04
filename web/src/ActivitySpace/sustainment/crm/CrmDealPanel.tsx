@@ -25,12 +25,13 @@ function NextStep({ crm, deal }: { crm: Crm; deal: CrmDeal }) {
   if (synced !== `${deal.nextStep}|${deal.nextActionDate}`) { setSynced(`${deal.nextStep}|${deal.nextActionDate}`); setTitle(deal.nextStep ?? ''); setDue(deal.nextActionDate); }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const today = crm.today;
   const dirty = title.trim() !== (deal.nextStep ?? '') || due !== deal.nextActionDate;
   async function save(nextDue = due) {
     if (!title.trim()) { setError(t('Describe the next step.')); return; }
     setBusy(true); setError(null);
-    try { await crm.setNextStep(deal, { title, due: nextDue }); } catch (cause) { setError(cause instanceof Error ? cause.message : t('Could not save. Try again.')); } finally { setBusy(false); }
+    try { setNotice(await crm.setNextStep(deal, { title, due: nextDue })); } catch (cause) { setError(cause instanceof Error ? cause.message : t('Could not save. Try again.')); } finally { setBusy(false); }
   }
   async function done() {
     setBusy(true); setError(null);
@@ -58,6 +59,7 @@ function NextStep({ crm, deal }: { crm: Crm; deal: CrmDeal }) {
       {(deal.nextStep || deal.nextActionDate) && !dirty && <Button size="xs" variant="ghost" disabled={busy} onClick={() => void done()}><Check size={12} />{t('Mark done')}</Button>}
     </div>
     <p className="text-[11px] leading-relaxed text-muted-foreground">{crm.pipeline?.object_id ? t('Saved as an Element in the pipeline’s Object, assigned to the owner — it shows in Calendar and Workload.') : t('Saved as an Element in My Elements. Choose an Object in Pipeline settings to share next steps with the team.')}</p>
+    {notice && <p role="status" className="text-xs text-[var(--status-warning)]">{t(notice)}</p>}
     {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{t(error)}</p>}
   </section>;
 }
@@ -248,7 +250,7 @@ export function CrmDealPanel({ crm, deal, onClose, onCapture, onOpenElement, onO
 
       <section className="flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-4">
         {confirmDelete
-          ? <span className="ml-auto flex items-center gap-2"><span className="text-xs">{t('Delete this deal?')}</span>
+          ? <span className="ml-auto flex items-center gap-2"><span className="text-xs">{workspace.pipeline.record_label ? t('Delete this {name}?', { name: workspace.pipeline.record_label }) : t('Delete this deal?')}</span>
             <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>{t('Cancel')}</Button>
             <Button size="sm" variant="danger" disabled={busy} onClick={() => void run(() => crm.deleteDeal(deal.id)).then(onClose).catch(() => {})}>{t('Delete')}</Button></span>
           : <Button size="sm" variant="ghost" className="ml-auto" aria-label={t('Delete deal')} onClick={() => setConfirmDelete(true)}><Trash2 size={14} /></Button>}
