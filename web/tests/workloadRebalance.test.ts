@@ -413,6 +413,37 @@ describe('proposalPrerequisites', () => {
   });
 });
 
+describe('planRebalance — fourth review', () => {
+  it('re-reads start-earlier after a hand-over frees the day, instead of postponing', () => {
+    const plan = planRebalance({
+      today: TODAY,
+      workers: [worker('a'), worker('b', { capacity_hours_per_day: 8 })],
+      spans: {},
+      elements: [
+        el({ id: 'u', start_date: '2026-11-12', due_date: '2026-11-12', estimated_hours: 6, holders: ['a'] }),
+        el({ id: 'x', start_date: '2026-11-12', due_date: '2026-11-12', estimated_hours: 6, holders: ['a'] }),
+        el({ id: 'y', start_date: '2026-11-12', due_date: '2026-11-12', estimated_hours: 6, holders: ['a'] }),
+        el({ id: 'bwork', start_date: '2026-11-12', due_date: '2026-11-12', estimated_hours: 2, holders: ['b'], priority: 'urgent', status: 'in_progress' }),
+      ],
+    });
+    expect(plan.proposals.some((p) => p.kind === 'reschedule' && p.mode === 'postpone')).toBe(false);
+    expect(plan.overAfter).toBe(0);
+  });
+
+  it('hands over work not yet started before work under way', () => {
+    const plan = planRebalance({
+      today: TODAY,
+      workers: [worker('a'), worker('b')],
+      spans: {},
+      elements: [
+        el({ id: 'doing', start_date: TODAY, due_date: TODAY, estimated_hours: 6, holders: ['a'], status: 'in_progress', priority: 'low' }),
+        el({ id: 'todo', start_date: TODAY, due_date: TODAY, estimated_hours: 6, holders: ['a'], priority: 'high' }),
+      ],
+    });
+    expect(plan.proposals[0]?.elementId).toBe('todo');
+  });
+});
+
 describe('planRebalance — second review', () => {
   it('does not drag a small Element weeks earlier when its day stays over because of other work', () => {
     const plan = planRebalance({

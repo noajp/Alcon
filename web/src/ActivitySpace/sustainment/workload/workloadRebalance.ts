@@ -485,12 +485,6 @@ export function planRebalance(input: PlanInput): Plan {
   const overloaded = [...board.workers.keys()]
     .filter((w) => eligible(board.workers.get(w)!) && overHours(board, w) > EPS)
     .sort((a, b) => overHours(board, b) - overHours(board, a) || (a < b ? -1 : 1));
-  // A fix that did not fit stays unfit for the rest of the pass, near enough:
-  // later proposals mostly add load to the people they hand work to. Without
-  // remembering, every round re-tries every candidate at every tier.
-  const noEarlier = new Set<string>();
-  const noTarget = new Set<string>();
-  const noLater = new Set<string>();
   for (const wid of overloaded) {
     for (let guard = 0; guard < 25 && overHours(board, wid) > EPS; guard++) {
       const load = board.load.get(wid)!;
@@ -504,35 +498,25 @@ export function planRebalance(input: PlanInput): Plan {
           return { el, c };
         })
         .filter((x) => x.c > EPS)
-        // Work already under way is the last to move — someone is in the middle of it.
-        .sort((a, b) => Number(a.el.status === 'in_progress' || a.el.status === 'review') - Number(b.el.status === 'in_progress' || b.el.status === 'review')
-          || PRIORITY_RANK[a.el.priority ?? 'medium'] - PRIORITY_RANK[b.el.priority ?? 'medium']
-          || b.c - a.c || (a.el.id < b.el.id ? -1 : 1));
+        .sort((a, b) => PRIORITY_RANK[a.el.priority ?? 'medium'] - PRIORITY_RANK[b.el.priority ?? 'medium']
+          || b.c - a.c || (a.el.id < b.el.id ? -1 : 1))
+        .map((x) => x.el);
       // Cheapest fix first across every candidate, not per candidate: a
       // hand-over of the third Element keeps every date, and must win over
-      // breaking the first Element's deadline.
-      const tiers: ((el: SimElement) => boolean)[] = [
-        (el) => {
-          if (noEarlier.has(el.id)) return false;
-          if (reschedule(el, wid, 'overload', 'start-earlier', tryStartEarlier(board, el, today))) return true;
-          noEarlier.add(el.id);
-          return false;
-        },
-        (el) => {
-          const key = `${el.id}:${wid}`;
-          if (noTarget.has(key)) return false;
-          if (reassign(el, wid, 'overload')) return true;
-          noTarget.add(key);
-          return false;
-        },
-        (el) => {
-          if (noLater.has(el.id)) return false;
-          if (reschedule(el, wid, 'overload', 'postpone', tryPostpone(board, el))) return true;
-          noLater.add(el.id);
-          return false;
-        },
-      ];
-      const progressed = tiers.some((tier) => candidates.some(({ el }) => tier(el)));
+      // breaking the first Element's deadline. Among fixes of one kind, work
+      // not yet started moves before work under way (moving that costs the
+      // context of whoever is in the middle of it); but a deadline outranks
+      // that context, so every hand-over is tried before any postpone. An
+      // earlier start moves nobody, so it is tried on everything first.
+      const underway = (el: SimElement) => el.status === 'in_progress' || el.status === 'review';
+      const fresh = candidates.filter((el) => !underway(el));
+      const started = candidates.filter(underway);
+      const earlier = (el: SimElement) => reschedule(el, wid, 'overload', 'start-earlier', tryStartEarlier(board, el, today));
+      const handOver = (el: SimElement) => reassign(el, wid, 'overload');
+      const later = (el: SimElement) => reschedule(el, wid, 'overload', 'postpone', tryPostpone(board, el));
+      const progressed = candidates.some(earlier)
+        || fresh.some(handOver) || started.some(handOver)
+        || fresh.some(later) || started.some(later);
       if (!progressed) break;
     }
   }
