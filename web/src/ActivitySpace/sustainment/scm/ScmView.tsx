@@ -8,6 +8,9 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { askCopilot } from '@/Function/copilot/copilotBridge';
 import { useScmActions, useScmData, useScmPlan } from '@/hooks/useScm';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
+import type { ScmProposal } from './scmEngine';
+import { scmScopes, scopeDomain, scopeScmData, SPACE_SCOPE } from './scmScope';
 import type { NavigationState } from '@/types/navigation';
 import { explainProposal } from './scmText';
 import { SCM_VIEW_LABEL, scmViewOf, type ScmView as ScmPane } from './scmNavigation';
@@ -39,8 +42,14 @@ const AUTOPILOT_INTERVAL_MS = 20 * 60 * 60 * 1000;
 export function ScmView({ navigation, onNavigate }: { navigation: NavigationState; onNavigate: (navigation: Partial<NavigationState>) => void }) {
   const { t, locale } = useI18n();
   const spaceId = useActiveSpaceId();
-  const { data, loading, error, refetch } = useScmData(spaceId);
+  const { data: everything, loading, error, refetch } = useScmData(spaceId);
+  const { data: spaceDomains } = useSustainmentDomains();
+  const domains = useMemo(() => spaceDomains.map(domain => ({ id: domain.id, name: domain.name })).sort((a, b) => a.name.localeCompare(b.name)), [spaceDomains]);
+  // The panes show one scope; the autopilot always acts on everything the viewer can see.
+  const scope = navigation.scmScope ?? null;
+  const data = useMemo(() => everything ? scopeScmData(everything, scope) : null, [everything, scope]);
   const plan = useScmPlan(data);
+  const fullPlan = useScmPlan(everything);
   const actions = useScmActions(spaceId);
   const view = scmViewOf(navigation);
   const locationId = navigation.scmLocationId && data?.locations.some(location => location.id === navigation.scmLocationId) ? navigation.scmLocationId : null;
@@ -56,44 +65,77 @@ export function ScmView({ navigation, onNavigate }: { navigation: NavigationStat
   // A new pane or item starts at the top.
   useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [view, navigation.scmNode]);
 
-  /** daily: the automatic pass on opening SCM. manual: the button, scoped to
-   * the selected location; with the autopilot off it drafts everything for approval. */
-  const runPlanner = useCallback(async (trigger: 'daily' | 'manual') => {
-    if (!data || !plan) return;
-    const mode = data.policy.autopilotEnabled ? 'autopilot' as const : 'draft' as const;
-    const proposals = trigger === 'manual' && locationId ? plan.proposals.filter(proposal => proposal.locationId === locationId) : plan.proposals;
+  /** The proposals of each scope the autopilot claims separately: the
+   * Space-wide locations, and each Domain's. */
+  const proposalsByScope = useCallback((proposals: ScmProposal[]) => {
+    const domainOf = new Map(everything?.locations.map(location => [location.id, location.domainId ?? null]) ?? []);
+    const groups = new Map<string | null, ScmProposal[]>();
+    for (const proposal of proposals) {
+      const domain = domainOf.get(proposal.locationId) ?? null;
+      groups.set(domain, [...groups.get(domain) ?? [], proposal]);
+    }
+    return groups;
+  }, [everything]);
+
+  /** daily: the automatic pass on opening SCM, for every scope whose run is
+   * due. manual: the button, for the panes' scope and location; with the
+   * autopilot off it drafts everything for approval. */
+  const runPlanner = useCallback(async (trigger: 'daily' | 'manual', scopes?: (string | null)[]) => {
+    if (!everything || !fullPlan) return;
+    const mode = everything.policy.autopilotEnabled ? 'autopilot' as const : 'draft' as const;
+    const shown = scopeDomain(scope);
+    const proposals = trigger === 'daily' ? fullPlan.proposals
+      : fullPlan.proposals.filter(proposal => (!locationId || proposal.locationId === locationId)
+        && (shown === undefined || (everything.locations.find(location => location.id === proposal.locationId)?.domainId ?? null) === shown));
     setRunning(true); setRunError(null);
     try {
-      const result = await actions.placeProposals(proposals, { mode, policy: data.policy, today: data.today, minHoursSinceLastRun: trigger === 'daily' ? AUTOPILOT_INTERVAL_MS / 3_600_000 : undefined, explain: proposal => explainProposal(proposal, plan, t, locale, mode) });
-      if (result === null && trigger === 'manual') setRunError(t('The planner ran moments ago in another window. Refresh to see its orders.'));
+      let skipped = false;
+      for (const [domainId, group] of proposalsByScope(proposals)) {
+        if (scopes && !scopes.includes(domainId)) continue;
+        const result = await actions.placeProposals(group, {
+          mode, policy: everything.policy, today: everything.today, domainId,
+          minHoursSinceLastRun: trigger === 'daily' ? AUTOPILOT_INTERVAL_MS / 3_600_000 : undefined,
+          explain: proposal => explainProposal(proposal, fullPlan, t, locale, mode),
+        });
+        if (result === null) skipped = true;
+      }
+      if (skipped && trigger === 'manual') setRunError(t('The planner ran moments ago in another window. Refresh to see its orders.'));
     } catch (cause) {
       setRunError(cause instanceof Error ? cause.message : String(cause));
     } finally { setRunning(false); }
-  }, [actions, data, plan, t, locale, locationId]);
+  }, [actions, everything, fullPlan, proposalsByScope, scope, t, locale, locationId]);
 
-  // The daily autopilot pass. Guarded per Space and per session so two
-  // renders or two panes never run it twice.
+  // The daily autopilot pass, per scope. Guarded per Space and per session so
+  // two renders or two panes never run it twice.
   const autoRan = useRef<string | null>(null);
   useEffect(() => {
-    if (!data || !plan || !data.policy.autopilotEnabled || running || autoRan.current === data.spaceId) return;
-    const last = data.runs[0] ? Date.parse(data.runs[0].ranAt) : 0;
-    if (Date.now() - last < AUTOPILOT_INTERVAL_MS || !plan.proposals.length) return;
+    if (!everything || !fullPlan || !everything.policy.autopilotEnabled || running || autoRan.current === everything.spaceId) return;
+    const pending = proposalsByScope(fullPlan.proposals);
+    const due = scmScopes(everything.locations).filter(domainId => {
+      const last = everything.runs.find(run => run.domainId === domainId);
+      return pending.has(domainId) && Date.now() - (last ? Date.parse(last.ranAt) : 0) >= AUTOPILOT_INTERVAL_MS;
+    });
+    if (!due.length) return;
     // Marked when the run actually starts, so a cancelled timer (StrictMode,
     // a dependency change) does not swallow the day's run.
-    const spaceId = data.spaceId;
-    const timer = setTimeout(() => { autoRan.current = spaceId; void runPlanner('daily'); }, 0);
+    const spaceId = everything.spaceId;
+    const timer = setTimeout(() => { autoRan.current = spaceId; void runPlanner('daily', due); }, 0);
     return () => clearTimeout(timer);
-  }, [data, plan, running, runPlanner]);
+  }, [everything, fullPlan, running, runPlanner, proposalsByScope]);
+
+  const domainName = useCallback((id: string | null | undefined) => id ? domains.find(domain => domain.id === id)?.name ?? t('Unknown Domain') : null, [domains, t]);
+  const scopeLabel = scope === null ? null : scope === SPACE_SCOPE ? t('Shared by the Space') : domainName(scope);
 
   const surface = useMemo<ScmSurface | null>(() => data && plan ? {
     data, plan, actions, locationId, nodes, go,
+    scope, scopeDomainId: scopeDomain(scope) ?? null, domains, domainName,
     openNode: key => onNavigate({ scmNode: key }),
     openOrder: id => onNavigate({ scmOrderId: id }),
     openDialog: setDialog,
     askCopilot: text => askCopilot({ text, viewLabel: `SCM › ${t(SCM_VIEW_LABEL[view])}`, spaceId: data.spaceId }),
     locationName: id => data.locations.find(location => location.id === id)?.name ?? '—',
     supplierName: id => (id && data.suppliers.find(supplier => supplier.id === id)?.name) || t('No supplier'),
-  } : null, [data, plan, actions, locationId, nodes, go, onNavigate, t, view]);
+  } : null, [data, plan, actions, locationId, nodes, go, onNavigate, t, view, scope, domains, domainName]);
 
   if (!spaceId) return <Frame><p className="py-12 text-center text-sm text-muted-foreground">{t('Choose or create a Space to use SCM. Supply chain data belongs to a Space and is shared with its members.')}</p></Frame>;
   if (loading) return <Frame><div className="space-y-4 py-6">{[0, 1, 2].map(index => <div key={index} className="h-16 animate-pulse rounded-lg bg-muted/50" />)}</div></Frame>;
@@ -107,7 +149,7 @@ export function ScmView({ navigation, onNavigate }: { navigation: NavigationStat
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
         {!node && <header className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0 space-y-1.5">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground"><ScmIcon size={16} />SCM{locationId && <> · {surface.locationName(locationId)}</>}</div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground"><ScmIcon size={16} />SCM{scopeLabel && <> · {scopeLabel}</>}{locationId && <> · {surface.locationName(locationId)}</>}</div>
             <h1 className="text-2xl font-semibold">{empty ? t('Supply chain') : t(SCM_VIEW_LABEL[view])}</h1>
             {!empty && <p className="text-sm text-muted-foreground">{t(DESCRIPTION[view])}</p>}
           </div>
@@ -128,7 +170,7 @@ export function ScmView({ navigation, onNavigate }: { navigation: NavigationStat
             {view === 'scenarios' && <ScmScenarios key={navigation.scmSupplierDelay ?? 'none'} supplierDelay={navigation.scmSupplierDelay ?? null} />}
             {view === 'settings' && <div className="space-y-12">
               <ScmPolicyForm key={`${data.spaceId}:${data.hasPolicy}`} data={data} actions={actions} />
-              <ScmLocations data={data} actions={actions} />
+              <ScmLocations key={scope ?? 'all'} data={data} actions={actions} />
               <ScmImport data={data} actions={actions} />
               <ScmDataSection data={data} actions={actions} />
             </div>}

@@ -69,6 +69,9 @@ async function load(db: SupabaseClient, spaceId: string, today: string): Promise
     if (or) query = query.or(or);
     return query.order('id').range(from, to) as never;
   });
+  // The budget is the Space's: the month's committed spend counts orders the caller cannot see.
+  const spend = await db.rpc('scm_committed_spend', { p_space: spaceId, p_from: `${today.slice(0, 8)}01`, p_to: today, p_currency: policy.currency });
+  if (spend.error) throw new Error(spend.error.message);
   const [locations, suppliers, items, stock, orders, demand] = await Promise.all([
     bySpace('scm_locations'), bySpace('scm_suppliers'), bySpace('scm_items'),
     pages('scm_stock', (from, to) => db.from('scm_stock').select('*', { count: 'exact' }).eq('activity_space_id', spaceId).order('item_id').order('location_id').range(from, to) as never),
@@ -76,7 +79,7 @@ async function load(db: SupabaseClient, spaceId: string, today: string): Promise
     pages('demand history', (from, to) => db.rpc('scm_demand_history', { p_space: spaceId, p_since: addDays(today, -policy.lookbackDays) }, { count: 'exact' }).range(from, to) as never),
   ]);
   return {
-    today, policy,
+    today, policy, committedThisMonth: num(spend.data),
     locations: locations.map(row => ({ id: String(row.id), name: String(row.name), code: (row.code as string | null) ?? null })),
     suppliers: suppliers.map(row => ({ id: String(row.id), name: String(row.name), leadTimeDays: num(row.lead_time_days, 14), currency: String(row.currency) })),
     items: items.map(row => ({

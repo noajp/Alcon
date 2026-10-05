@@ -10,7 +10,9 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { ScmActions, ScmData, ScmItemDraft, ScmSupplierDraft } from '@/hooks/useScm';
 import { addDays, type ScmItem, type ScmNode, type ScmPoStatus } from './scmEngine';
 import { daysFrom, formatDay, formatMoney, formatQuantity, PO_STATUS_LABEL } from './scmText';
-import { Pill, SCM_INPUT, SCM_LABEL } from './ScmParts';
+import { Pill, ScmDomainSelect, SCM_INPUT, SCM_LABEL } from './ScmParts';
+import { useScmSurface } from './scmSurface';
+import { servesLocation } from './scmScope';
 
 // Every write a person makes in SCM goes through one of these dialogs. Each
 // keeps its draft when a save fails and shows the reason beside the form.
@@ -69,16 +71,24 @@ function Footer({ busy, error, onClose, submit, extra }: { busy: boolean; error:
 
 export function ItemDialog({ data, actions, item, onClose }: { data: ScmData; actions: ScmActions; item: ScmItem | null; onClose: () => void }) {
   const { t } = useI18n();
+  const { domains, scopeDomainId } = useScmSurface();
   const { busy, error, run, setError } = useSubmit(onClose);
+  const [domainId, setDomainId] = useState<string | null>(item ? item.domainId ?? null : scopeDomainId);
+  // A Domain's item is supplied by that Domain's or the Space's suppliers and
+  // stocked only at that Domain's locations.
+  const suppliers = data.suppliers.filter(supplier => servesLocation(supplier.domainId, domainId));
+  const openingLocations = data.locations.filter(location => servesLocation(domainId, location.domainId));
   const [form, setForm] = useState(() => ({
     sku: item?.sku ?? '', name: item?.name ?? '', unit: item?.unit ?? 'pcs', category: item?.category ?? '',
-    supplierId: item?.supplierId ?? data.suppliers[0]?.id ?? '', unitCost: String(item?.unitCost ?? ''), unitPrice: item?.unitPrice === null || item?.unitPrice === undefined ? '' : String(item.unitPrice),
+    supplierId: item?.supplierId ?? suppliers[0]?.id ?? '', unitCost: String(item?.unitCost ?? ''), unitPrice: item?.unitPrice === null || item?.unitPrice === undefined ? '' : String(item.unitPrice),
     currency: item?.currency ?? data.policy.currency, leadTimeDays: item?.leadTimeDays === null || item?.leadTimeDays === undefined ? '' : String(item.leadTimeDays),
     moq: String(item?.moq ?? 0), orderMultiple: String(item?.orderMultiple ?? 1),
     serviceLevel: item?.serviceLevel ? String(Math.round(item.serviceLevel * 1000) / 10) : '',
     baseline: item?.baselineDailyDemand === null || item?.baselineDailyDemand === undefined ? '' : String(item.baselineDailyDemand),
-    openingLocation: data.locations[0]?.id ?? '', opening: '',
+    openingLocation: openingLocations[0]?.id ?? '', opening: '',
   }));
+  const supplierId = suppliers.some(supplier => supplier.id === form.supplierId) ? form.supplierId : '';
+  const openingLocation = openingLocations.some(location => location.id === form.openingLocation) ? form.openingLocation : openingLocations[0]?.id ?? '';
   const set = (key: keyof typeof form) => (value: string) => setForm(current => ({ ...current, [key]: value }));
   const categories = useMemo(() => [...new Set(data.items.map(entry => entry.category).filter(Boolean) as string[])].sort(), [data.items]);
 
@@ -91,12 +101,12 @@ export function ItemDialog({ data, actions, item, onClose }: { data: ScmData; ac
     if (serviceLevel !== null && !(serviceLevel >= 50 && serviceLevel <= 99.9)) { setError(t('Service level must be between 50 and 99.9%.')); return; }
     if (!/^[A-Za-z]{3}$/.test(form.currency)) { setError(t('Currency must be a three-letter code, such as JPY or USD.')); return; }
     const draft: ScmItemDraft = {
-      sku: form.sku, name: form.name, unit: form.unit, category: form.category || null, supplierId: form.supplierId || null,
+      sku: form.sku, name: form.name, unit: form.unit, category: form.category || null, supplierId: supplierId || null, domainId,
       unitCost, unitPrice: parseNumber(form.unitPrice), currency: form.currency, leadTimeDays: parseNumber(form.leadTimeDays),
       moq: parseNumber(form.moq) ?? 0, orderMultiple: parseNumber(form.orderMultiple) || 1,
       serviceLevel: serviceLevel === null ? null : serviceLevel / 100, baselineDailyDemand: parseNumber(form.baseline),
     };
-    const opening = !item && form.openingLocation && form.opening.trim() ? { locationId: form.openingLocation, quantity: Number(form.opening) } : null;
+    const opening = !item && openingLocation && form.opening.trim() ? { locationId: openingLocation, quantity: Number(form.opening) } : null;
     void run(() => actions.saveItem(item?.id ?? null, draft, opening));
   }
 
@@ -108,7 +118,8 @@ export function ItemDialog({ data, actions, item, onClose }: { data: ScmData; ac
         <Field label={t('Category')}><input list="scm-categories" className={SCM_INPUT} value={form.category} onChange={event => set('category')(event.target.value)} />
           <datalist id="scm-categories">{categories.map(category => <option key={category} value={category} />)}</datalist></Field>
         <Field label={t('Unit')}><input className={SCM_INPUT} value={form.unit} onChange={event => set('unit')(event.target.value)} /></Field>
-        <Field label={t('Supplier')}><Select label={t('Supplier')} value={form.supplierId} onChange={set('supplierId')} options={[{ id: '', label: t('None') }, ...data.suppliers.map(supplier => ({ id: supplier.id, label: supplier.name }))]} /></Field>
+        <Field label={t('Domain')} hint={t('Only people who can see the Domain see the item and its stock.')}><ScmDomainSelect label={t('Domain')} value={domainId} onChange={setDomainId} domains={domains} /></Field>
+        <Field label={t('Supplier')}><Select label={t('Supplier')} value={supplierId} onChange={set('supplierId')} options={[{ id: '', label: t('None') }, ...suppliers.map(supplier => ({ id: supplier.id, label: supplier.name }))]} /></Field>
         <Field label={t('Unit cost')}><input inputMode="decimal" className={SCM_INPUT} value={form.unitCost} onChange={event => set('unitCost')(event.target.value)} /></Field>
         <Field label={t('Selling price (optional)')} hint={t('Used to value lost sales.')}><input inputMode="decimal" className={SCM_INPUT} value={form.unitPrice} onChange={event => set('unitPrice')(event.target.value)} /></Field>
         <Field label={t('Currency')}><input className={SCM_INPUT} maxLength={3} value={form.currency} onChange={event => set('currency')(event.target.value.toUpperCase())} /></Field>
@@ -118,8 +129,8 @@ export function ItemDialog({ data, actions, item, onClose }: { data: ScmData; ac
         <Field label={t('Service level override (%)')} hint={t('Blank uses the policy.')}><input inputMode="decimal" className={SCM_INPUT} value={form.serviceLevel} onChange={event => set('serviceLevel')(event.target.value)} /></Field>
         <Field label={t('Expected daily demand')} hint={t('Used until the item has history.')}><input inputMode="decimal" className={SCM_INPUT} value={form.baseline} onChange={event => set('baseline')(event.target.value)} /></Field>
       </div>
-      {!item && data.locations.length > 0 && <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] pt-3 sm:grid-cols-3">
-        <Field label={t('Opening stock at')}><Select label={t('Opening stock at')} value={form.openingLocation} onChange={set('openingLocation')} options={data.locations.map(location => ({ id: location.id, label: location.name }))} /></Field>
+      {!item && openingLocations.length > 0 && <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] pt-3 sm:grid-cols-3">
+        <Field label={t('Opening stock at')}><Select label={t('Opening stock at')} value={openingLocation} onChange={set('openingLocation')} options={openingLocations.map(location => ({ id: location.id, label: location.name }))} /></Field>
         <Field label={t('Opening quantity')}><input inputMode="decimal" className={SCM_INPUT} value={form.opening} onChange={event => set('opening')(event.target.value)} /></Field>
       </div>}
       <Footer busy={busy} error={error} onClose={onClose} submit={item ? t('Save') : t('Add item')} extra={item && <>
@@ -134,7 +145,9 @@ export function ItemDialog({ data, actions, item, onClose }: { data: ScmData; ac
 export function SupplierDialog({ data, actions, supplierId, onClose }: { data: ScmData; actions: ScmActions; supplierId: string | null; onClose: () => void }) {
   const { t } = useI18n();
   const supplier = data.suppliers.find(entry => entry.id === supplierId) ?? null;
+  const { domains, scopeDomainId } = useScmSurface();
   const { busy, error, run, setError } = useSubmit(onClose);
+  const [domainId, setDomainId] = useState<string | null>(supplier ? supplier.domainId ?? null : scopeDomainId);
   const [form, setForm] = useState({
     name: supplier?.name ?? '', contact: supplier?.contact ?? '', email: supplier?.email ?? '',
     leadTimeDays: String(supplier?.leadTimeDays ?? 14), currency: supplier?.currency ?? data.policy.currency, notes: supplier?.notes ?? '',
@@ -145,7 +158,7 @@ export function SupplierDialog({ data, actions, supplierId, onClose }: { data: S
     const leadTime = Number(form.leadTimeDays);
     if (!form.name.trim()) { setError(t('Enter a name.')); return; }
     if (!Number.isFinite(leadTime) || leadTime < 0 || leadTime > 730) { setError(t('Lead time must be 0 to 730 days.')); return; }
-    const draft: ScmSupplierDraft = { name: form.name, contact: form.contact, email: form.email, leadTimeDays: leadTime, currency: form.currency, notes: form.notes };
+    const draft: ScmSupplierDraft = { name: form.name, contact: form.contact, email: form.email, leadTimeDays: leadTime, currency: form.currency, notes: form.notes, domainId };
     void run(() => actions.saveSupplier(supplier?.id ?? null, draft));
   }
   return <FormDialog title={supplier ? t('Edit supplier') : t('Add supplier')} description={t('Promised lead time is a starting point; the planner learns the real one from receipts.')} onClose={onClose} busy={busy}>
@@ -156,6 +169,7 @@ export function SupplierDialog({ data, actions, supplierId, onClose }: { data: S
         <Field label={t('Email')}><input type="email" className={SCM_INPUT} value={form.email} onChange={event => set('email')(event.target.value)} /></Field>
         <Field label={t('Promised lead time (days)')}><input inputMode="decimal" className={SCM_INPUT} value={form.leadTimeDays} onChange={event => set('leadTimeDays')(event.target.value)} /></Field>
         <Field label={t('Currency')}><input maxLength={3} className={SCM_INPUT} value={form.currency} onChange={event => set('currency')(event.target.value.toUpperCase())} /></Field>
+        <div className="sm:col-span-2"><Field label={t('Domain')} hint={t("A Domain's supplier delivers only to that Domain's locations, and only people who can see the Domain see it.")}><ScmDomainSelect label={t('Domain')} value={domainId} onChange={setDomainId} domains={domains} /></Field></div>
         <div className="sm:col-span-2"><Field label={t('Remarks')}><textarea rows={2} className={`${SCM_INPUT} h-auto py-1.5`} value={form.notes} onChange={event => set('notes')(event.target.value)} /></Field></div>
       </div>
       <Footer busy={busy} error={error} onClose={onClose} submit={supplier ? t('Save') : t('Add supplier')} extra={supplier &&
@@ -189,8 +203,13 @@ export function MovementDialog({ data, actions, initial, onClose }: {
   const [quantity, setQuantity] = useState(initial?.quantity ? String(initial.quantity) : '');
   const [day, setDay] = useState(data.today);
   const [note, setNote] = useState('');
-  const onHand = data.stock.find(row => row.itemId === itemId && row.locationId === locationId)?.onHand ?? 0;
   const item = data.items.find(entry => entry.id === itemId);
+  // A Domain's item moves only between that Domain's locations.
+  const places = data.locations.filter(location => servesLocation(item?.domainId, location.domainId));
+  const from = places.some(location => location.id === locationId) ? locationId : places[0]?.id ?? '';
+  const destinations = places.filter(location => location.id !== from);
+  const to = destinations.some(location => location.id === toLocationId) ? toLocationId : destinations[0]?.id ?? '';
+  const onHand = data.stock.find(row => row.itemId === itemId && row.locationId === from)?.onHand ?? 0;
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -198,9 +217,10 @@ export function MovementDialog({ data, actions, initial, onClose }: {
     if (!quantity.trim() || !Number.isFinite(value)) { setError(t('Enter a quantity.')); return; }
     if (mode !== 'adjust' && value < 0) { setError(t('Enter a positive quantity.')); return; }
     if (day > data.today) { setError(t('The date cannot be in the future.')); return; }
-    if (mode === 'count') void run(() => actions.countStock(itemId, locationId, value, day, note));
-    else if (mode === 'transfer') void run(() => actions.transfer({ itemId, from: locationId, to: toLocationId, quantity: value, occurredOn: day, note }));
-    else void run(() => actions.recordMovement({ itemId, locationId, kind: mode, quantity: value, occurredOn: day, note }));
+    if (!from || (mode === 'transfer' && !to)) { setError(t('Choose a location of the item\'s Domain.')); return; }
+    if (mode === 'count') void run(() => actions.countStock(itemId, from, value, day, note));
+    else if (mode === 'transfer') void run(() => actions.transfer({ itemId, from, to, quantity: value, occurredOn: day, note }));
+    else void run(() => actions.recordMovement({ itemId, locationId: from, kind: mode, quantity: value, occurredOn: day, note }));
   }
 
   return <FormDialog title={t('Record stock movement')} description={t(MODE_HINT[mode])} onClose={onClose} busy={busy}>
@@ -212,9 +232,9 @@ export function MovementDialog({ data, actions, initial, onClose }: {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2"><Field label={t('Item')}><Select label={t('Item')} value={itemId} onChange={setItemId} options={data.items.filter(entry => entry.active).map(entry => ({ id: entry.id, label: `${entry.sku} · ${entry.name}` }))} /></Field></div>
         <Field label={mode === 'transfer' ? t('From') : t('Location')} hint={t('On hand: {n}', { n: formatQuantity(onHand, locale) })}>
-          <Select label={t('Location')} value={locationId} onChange={setLocationId} options={data.locations.map(location => ({ id: location.id, label: location.name }))} />
+          <Select label={t('Location')} value={from} onChange={setLocationId} options={places.map(location => ({ id: location.id, label: location.name }))} />
         </Field>
-        {mode === 'transfer' && <Field label={t('To')}><Select label={t('To')} value={toLocationId} onChange={setToLocationId} options={data.locations.filter(location => location.id !== locationId).map(location => ({ id: location.id, label: location.name }))} /></Field>}
+        {mode === 'transfer' && <Field label={t('To')}><Select label={t('To')} value={to} onChange={setToLocationId} options={destinations.map(location => ({ id: location.id, label: location.name }))} /></Field>}
         <Field label={mode === 'count' ? t('Counted quantity') : mode === 'adjust' ? t('Change (+/-)') : t('Quantity')} hint={item?.unit}>
           <input autoFocus inputMode="decimal" className={SCM_INPUT} value={quantity} onChange={event => setQuantity(event.target.value)} />
         </Field>
@@ -239,24 +259,30 @@ export function NewOrderDialog({ data, actions, onClose, initial }: {
   const supplier = data.suppliers.find(entry => entry.id === supplierId);
   const [expectedOn, setExpectedOn] = useState(() => addDays(data.today, Math.ceil(supplier?.leadTimeDays ?? 14)));
   const [lines, setLines] = useState(() => (initial?.lines?.length ? initial.lines : []).map(line => ({ itemId: line.itemId, quantity: String(line.quantity) })));
-  const supplied = data.items.filter(item => item.active && (item.supplierId === supplierId || !item.supplierId));
+  // A Domain's supplier delivers only to that Domain's locations, and a
+  // location takes only its Domain's or the Space's items.
+  const destinations = data.locations.filter(location => servesLocation(supplier?.domainId, location.domainId));
+  const deliverTo = destinations.some(location => location.id === locationId) ? locationId : destinations[0]?.id ?? '';
+  const deliverToDomain = data.locations.find(location => location.id === deliverTo)?.domainId;
+  const supplied = data.items.filter(item => item.active && (item.supplierId === supplierId || !item.supplierId) && servesLocation(item.domainId, deliverToDomain));
   const currency = supplier?.currency ?? data.policy.currency;
   const total = lines.reduce((sum, line) => sum + (Number(line.quantity) || 0) * (data.items.find(item => item.id === line.itemId)?.unitCost ?? 0), 0);
 
   function submit(status: ScmPoStatus) {
     const parsed = lines.map(line => ({ itemId: line.itemId, quantity: Number(line.quantity), unitCost: data.items.find(item => item.id === line.itemId)?.unitCost ?? 0 }))
       .filter(line => line.itemId && line.quantity > 0);
-    if (!supplierId || !locationId) { setError(t('Choose a supplier and a location.')); return; }
+    if (!supplierId || !deliverTo) { setError(t('Choose a supplier and a location.')); return; }
+    if (parsed.some(line => !supplied.some(item => item.id === line.itemId))) { setError(t('Some lines are items of another Domain than the delivery location.')); return; }
     if (expectedOn < data.today) { setError(t('Expected arrival cannot be before today.')); return; }
     if (!parsed.length) { setError(t('Add at least one line with a quantity.')); return; }
-    void run(() => actions.createOrder({ supplierId, locationId, status, orderedOn: data.today, expectedOn, currency, source: 'human', rationale: initial?.rationale ?? null, lines: parsed }));
+    void run(() => actions.createOrder({ supplierId, locationId: deliverTo, status, orderedOn: data.today, expectedOn, currency, source: 'human', rationale: initial?.rationale ?? null, lines: parsed }));
   }
 
   return <FormDialog title={t('New purchase order')} description={t('Approved orders count as incoming supply in every plan. Drafts wait for approval.')} onClose={onClose} busy={busy} wide>
     <form onSubmit={event => { event.preventDefault(); submit('approved'); }} className="space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Field label={t('Supplier')}><Select label={t('Supplier')} value={supplierId} onChange={value => { setSupplierId(value); const next = data.suppliers.find(entry => entry.id === value); if (next) setExpectedOn(addDays(data.today, Math.ceil(next.leadTimeDays))); }} options={data.suppliers.map(entry => ({ id: entry.id, label: entry.name }))} /></Field>
-        <Field label={t('Deliver to')}><Select label={t('Deliver to')} value={locationId} onChange={setLocationId} options={data.locations.map(location => ({ id: location.id, label: location.name }))} /></Field>
+        <Field label={t('Deliver to')}><Select label={t('Deliver to')} value={deliverTo} onChange={setLocationId} options={destinations.map(location => ({ id: location.id, label: location.name }))} /></Field>
         <DateEntry label={t('Expected arrival')} value={expectedOn} onChange={setExpectedOn} />
       </div>
       <div className="space-y-2">
@@ -305,7 +331,7 @@ export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { d
   const overdue = open && order.expectedOn < data.today;
   const editable = order.status === 'draft' || open;
   /** Items that can still be added: not on the order and not picked in another new row. */
-  const addableFor = (index: number) => data.items.filter(item => item.active && !order.lines.some(line => line.itemId === item.id)
+  const addableFor = (index: number) => data.items.filter(item => item.active && servesLocation(item.domainId, location?.domainId) && !order.lines.some(line => line.itemId === item.id)
     && !adding.some((entry, at) => at !== index && entry.itemId === item.id));
   function saveLines() {
     if (!editing) return;

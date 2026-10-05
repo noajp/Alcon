@@ -67,9 +67,9 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     load: async () => (await import('./widgets/OperationsPlannerWidget')).default,
   },
   'scm-risks': {
-    type: 'scm-risks', label: 'Supply risks',
-    description: 'Items that will run out first in this Space, from the SCM plan',
-    group: 'plan', accepts: ['me'], zones: ['main', 'rail'], singleton: true, defaultSize: 'half',
+    type: 'scm-risks', label: 'Supply',
+    description: 'Items that will run out first, from the SCM plan. On a Domain, how well its locations are stocked',
+    group: 'plan', accepts: ['me', 'domain'], zones: ['main', 'rail'], singleton: true, defaultSize: 'half',
     load: async () => (await import('./widgets/ScmRiskWidget')).ScmRiskWidget,
   },
   'data-view': {

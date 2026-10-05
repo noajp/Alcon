@@ -21,7 +21,7 @@ const PAGE = 100;
 /** Every stock change, newest first. The ledger is never edited; a mistake is reversed. */
 export function ScmLedger({ itemId, onItem }: { itemId: string | null; onItem: (itemId: string | null) => void }) {
   const { t, locale } = useI18n();
-  const { data, actions, locationId, openOrder, openDialog, locationName } = useScmSurface();
+  const { data, actions, locationId, openOrder, openDialog, locationName, scope } = useScmSurface();
   const [kind, setKind] = useState<ScmMovementKind | ''>('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -29,7 +29,9 @@ export function ScmLedger({ itemId, onItem }: { itemId: string | null; onItem: (
   const [reversing, setReversing] = useState<ScmMovementRecord | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const ledger = useScmLedger(data.spaceId, { itemId, locationId, kind: kind || null, from: from || null, to: to || null }, limit);
+  // Within a scope, the ledger shows the scope's locations only.
+  const locationIds = scope !== null && !locationId ? data.locations.map(location => location.id) : null;
+  const ledger = useScmLedger(data.spaceId, { itemId, locationId, locationIds, kind: kind || null, from: from || null, to: to || null }, limit);
   const items = new Map(data.items.map(item => [item.id, item]));
   const orders = new Map(data.orders.map(order => [order.id, order]));
 

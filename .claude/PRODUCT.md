@@ -131,7 +131,7 @@ AIによる変更も、バージョンと適用範囲を持つ業務設定とし
 
 ### Activity Space — 組織活動の文脈と信頼境界
 
-Strategy・Execution・Sustainment の三分類、および横断機能の Home・Property は、**Activity Space** を組織活動の文脈として使う。Activity Space は組織の信頼境界であり（詳細は [境界と権限](#境界と権限boundary--permissions) を参照）、ユーザーが所属する組織・チームそのものを表す。Activity Space を切り替えると、三分類一式ごと別の組織の文脈へ移る。組織の行動を起票するときは、その Space 内の Object を選ぶ。個人の My Elements と Table は所有者の権限で扱い、Space への所属だけで共有されない。CRM と SCM のデータは Space に属し、その Space のメンバーで共有する。
+Strategy・Execution・Sustainment の三分類、および横断機能の Home・Property は、**Activity Space** を組織活動の文脈として使う。Activity Space は組織の信頼境界であり（詳細は [境界と権限](#境界と権限boundary--permissions) を参照）、ユーザーが所属する組織・チームそのものを表す。Activity Space を切り替えると、三分類一式ごと別の組織の文脈へ移る。組織の行動を起票するときは、その Space 内の Object を選ぶ。個人の My Elements と Table は所有者の権限で扱い、Space への所属だけで共有されない。CRM のデータは Space に属し、その Space のメンバーで共有する。SCM の拠点・仕入先・品目は Space か、その中の 1 つの Domain に属し、Domain に属するものはその Domain を見られる人だけが扱う。
 
 ```
 ╔═══════════════════════ Activity Space ═══════════════════════╗
@@ -216,7 +216,7 @@ Object は Element をまとめる単位で、Object 同士はネストしない
 |------|------|------|
 | **Workload** | Space 内の Worker 別日次負荷・不在・未計画作業を俯瞰 | Apps ランチャーの App。Domain は自前のフィルタで絞る |
 | **CRM** | 今日動かすべき商談を示し、記録の手間なく商談を前に進める | Space で共有する会社・担当者・商談・活動履歴（`crm_*`）。Today / Pipeline / Deals / Companies / Contacts / Forecast、メモやメールから更新する Capture、健全度と次の一手、AI の要約・メール下書き |
-| **SCM** | 欠品を予測し、需要の変化に応じた補充を計画 | 専用の `scm_*` テーブルに拠点・品目・仕入先・入出庫・発注を持つ独立した App。拠点ごとの品目について需要予測・安全在庫・在庫推移・発注案を出す |
+| **SCM** | 欠品を予測し、需要の変化に応じた補充を計画 | 専用の `scm_*` テーブルに拠点・品目・仕入先・入出庫・発注を持つ独立した App。拠点ごとの品目について需要予測・安全在庫・在庫推移・発注案を出す。拠点・品目・仕入先は Domain に持たせられ、Domain の Overview に充足状況が出る |
 | **Notebook** | 思考・記録のドキュメント（議事録 / メモ） | 独自 HTML エディタ（`AppleNoteEditor` + `htmlSanitizer`）。**Folder → File の 2 階層**ツリー（`notes` + `note_contents.html`） |
 | **Table** | 任意の表 | `tables` + `table_columns` / `table_rows` / `table_cells`。所有者限定の RLS |
 | **Team** | Worker の所属・担当・通常稼働時間を管理 | `workers`（human \| ai_agent）。`element_assignees` で Element にアサイン |
@@ -248,7 +248,9 @@ Strategy・Execution とは次のようにつながる。商談の次のステ�
 
 **SCM** は品目を拠点ごとに計画する。在庫は入出庫台帳（`scm_movements`、追記のみ）から導き、訂正は棚卸・調整の行で残す。出庫の履歴から需要を予測し（傾向と曜日の型、欠品日は需要ゼロと読まない）、サービス水準と需要・リードタイムのばらつきから安全在庫を決める。リードタイムは仕入先の約束ではなく実際の入荷実績で見積もる。未入荷の発注を含めて在庫を日ごとに見通し、期限を過ぎた発注は入荷済みと見なさない。発注案は仕入先・拠点ごとにまとめ、拠点間移動や既存発注の前倒しで足りる場合はそれを示す。
 
-意図は Space の方針（`scm_policies`）として人が示す：サービス水準、計画期間、発注間隔、月次予算、自動承認の上限。オートパイロットはその権限内の発注だけを承認済みで出し、超えるものは下書きにして承認者の Element を起票する。下書きを SCM で承認・却下すると Element も閉じる。発注には根拠（在庫・需要・リードタイム・発注点・補充目標）を書き残し、実行は `scm_autopilot_runs` に記録する。what-if（需要変動・仕入先遅延・サービス水準）は記録を変えずに計算だけを比べる。データは Space のメンバーで共有する。
+意図は Space の方針（`scm_policies`）として人が示す：サービス水準、計画期間、発注間隔、月次予算、自動承認の上限。オートパイロットはその権限内の発注だけを承認済みで出し、超えるものは下書きにして承認者の Element を起票する。下書きを SCM で承認・却下すると Element も閉じる。発注には根拠（在庫・需要・リードタイム・発注点・補充目標）を書き残し、実行は `scm_autopilot_runs` に記録する。what-if（需要変動・仕入先遅延・サービス水準）は記録を変えずに計算だけを比べる。
+
+物資の持ち主は Domain（部隊・病棟・店舗・事業）か Space。拠点・仕入先・品目は任意で 1 つの Domain に属し、無ければ Space で共有する。Domain の品目は同じ Domain の拠点にだけ置き、Domain の仕入先は同じ Domain の拠点にだけ納める。共有の品目・仕入先はどの拠点にも使える。SCM のサイドバーで範囲（すべて／Space で共有／各 Domain）を選ぶと全ペインがその範囲で計画を示し、新しい記録はその Domain に入る。方針と発注番号は Space に 1 つ、日次のオートパイロットは範囲ごとに 1 回走る。Domain の Overview のウィジェット `scm-risks` は、その Domain の充足率・拠点・発注残・欠品リスクを示す（[ADR 0036](../docs/adr/0036-supply-records-belong-to-a-domain-or-the-space.md)）。
 
 ウィジェット `operations-planner` は、任意の Table の商談行を列対応で読み、通貨別の予測とフォローアップを試算する。Table ID・列 ID の対応・予測期間・連絡間隔は `widget_boards` の配置パラメータに保存し、`me` / `domain` / `object` / `initiative` の `main` に配置できる。CRM App の記録とは別で、手元の表を分析する道具である。
 
@@ -372,6 +374,7 @@ Workers / Resource / Calendar / Gantt は Sustainment の道具を Object 単位
 - **Property は付く先に従う** — 値（`custom_column_values`）を読み書きできるのは、付いている Element / Object と列の定義を見られる人だけ。書くときは、列がその付き先のものであることも確かめる（Element なら所属 Object のローカル列、所属 Object か自分の My Elements に配置した Space の列、自分の個人列。Object なら所属 Domain の列）。定義（`custom_columns`）はスコープの中で見え、変えられる（Object・Domain の列はそれを見られる人、Space の列はメンバー、個人の列は本人）。Domain の列はその Domain に入った Object を見られる人も、Space の列は配置先の Object を見られる人も読める。列のスコープは作った後に変えられない。配置（`custom_column_placements`）では、Object を見られる人が、その Object 自身の列か、その Object の Space の列を置ける。Domain に入っていない Object（以前からある Object だけ）には、Space のメンバーがその Space の列を置ける。My Elements には、本人が自分の個人列か、自分が属する Space の列を置ける。Person 値が指せるのは、Element なら `worker_assignable` が通す Worker、Object ならその Space に属し一覧できる Worker だけ。
 - **所属は承諾で成立する** — 所属の表は参加している人だけを表す。招く側は招待（`membership_invitations`）を送るだけで、招かれた本人が承諾したときに所属の行ができ、Worker が用意される。招待は `invite_member`（対象を管理する人：Space のオーナー、Domain のオーナー・admin、Object の Domain のオーナー・admin）・`respond_to_invite`（本人だけ）・`cancel_invite`（招いた人か管理する人）の RPC だけが書き、辞退から 7 日は同じ人を同じ対象に招けない。作った人の owner の行は作成時のトリガが書き、作った人を表す列は作成後に変えられない。ブラウザが書ける所属の行は、見えている Domain・Object に member として自分が加わる（Discover）行だけ。所属の行は人と対象を変えられず、Domain・Object も Space と同じく最後の owner を外せない（Object の Domain の owner・admin が外すときだけ、その人が owner を引き継ぐ。Domain の owner・admin は Object のメンバーを参加せずに見て外せる）。Object を別の Domain へ移せるのは、移動元と移動先の両方の Domain の owner・admin だけ。Object を別の Domain にも入れる（`object_domains`）のは、Object の主 Domain（Domain のない Object なら Object 自身）とその Domain の両方の owner・admin だけ。外すのはどちらか一方の owner・admin でよいが、その行が見えている必要がある。保留中の招待はピッカー・Worker・所属の判定に入らない。判断は [ADR 0029](../docs/adr/0029-membership-takes-effect-on-acceptance.md)。
 - **招待 UI** — Space 招待は ActivitySpace 設定（owner のみ）、Domain 招待（Guest 化）は Domain の Team 設定、Object 招待は Object の Members タブ（その Domain の owner・admin）から。招かれた人は Inbox・Profile・（Space をまだ持たなければ）初回画面で Accept / Decline する。メンバー一覧は保留中の招待を「Invited」と示し、管理する人は取り消せる。
+- **SCM は Domain の公開範囲に従う** — Domain に属する拠点・仕入先・品目は、Space のメンバーのうちその Domain を見られる人だけが読み書きする。在庫・台帳・発注・明細は、名指す拠点・品目・仕入先がすべて見える人にだけ見える（`scm_location_visible` ほかを RLS から呼ぶ）。1 つの記録が 2 つの Domain の物を含むことはトリガが拒み、物資を持つ Domain は削除も別の Space への移動もできない。SCM のリセットは見えない記録があると拒む。
 - **Table と CRM** — Table の RLS は `created_by = auth.uid()` による所有者限定。`domain_id` を付けても Space メンバー全員に共有されない。CRM の記録（`crm_*`）は Space のメンバーが読み書きする。CRM の記録どうしの参照は同じ Space の行だけを指す（複合外部キー）。Element・Worker・Initiative・成功条件・Object への参照は通常の外部キーで、読み取りはそれぞれの RLS に従う。同名の会社は別の記録として持てる（入力時は同じ名前の既存の会社を使う）。会社・担当者を消しても商談の履歴は残り、その記録だけの履歴が消える。画面が読む履歴は新しい 3000 件まで。活動履歴は追記と本人による削除だけで、ステージ変更の行は DB だけが書く。
 
 ## AI 連携
