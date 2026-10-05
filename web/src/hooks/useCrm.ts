@@ -7,6 +7,7 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useCurrentUserId } from '@/providers/authContext';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { useWorkers } from '@/ActivitySpace/sustainment/team/data';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { createElement, updateElement } from '@/ActivitySpace/execution/element/data';
 import { fetchDataTableSchema } from '@/ActivitySpace/sustainment/table/data';
 import { readAllPages } from '@/hooks/readAllPages';
@@ -97,6 +98,8 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
       return planner?.params?.tableId ? { tableId: planner.params.tableId, fields: planner.params.fields ?? {} } : null;
     },
   });
+  const domainRows = useSustainmentDomains();
+  const domains = useMemo(() => domainRows.data.map(domain => ({ id: domain.id, name: domain.name })), [domainRows.data]);
   const workers = useWorkers();
   const people: CrmPerson[] = useMemo(() => workers.data.map(worker => ({ id: worker.id, name: worker.name, type: worker.type, user_id: worker.user_id ?? null })), [workers.data]);
   const me = people.find(person => person.user_id === userId)?.id ?? null;
@@ -104,12 +107,18 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
   const invalidate = useCallback(() => qc.invalidateQueries({ queryKey: ['crm', spaceId] }), [qc, spaceId]);
 
   // Every Space starts with one pipeline, so the App always has somewhere to put
-  // a deal. Only the main pane seeds, so two readers never create two.
+  // a deal. Only the main pane seeds, so two readers never create two. When the
+  // Space's first pipeline exists but sits in a Domain this reader cannot see,
+  // its slot is taken: the reader gets a Space-wide pipeline after it instead.
   const seeded = useRef<string | null>(null);
   useEffect(() => {
     if (!seed || !spaceId || !pipelines.data || pipelines.data.length || seeded.current === spaceId) return;
     seeded.current = spaceId;
-    void supabase.from('crm_pipelines').insert({ activity_space_id: spaceId, name: 'Sales', order_index: 0 }).then(() => invalidate());
+    void (async () => {
+      const first = await supabase.from('crm_pipelines').insert({ activity_space_id: spaceId, name: 'Sales', order_index: 0 });
+      if (first.error?.code === '23505') await supabase.from('crm_pipelines').insert({ activity_space_id: spaceId, name: 'Sales', order_index: 1 });
+      await invalidate();
+    })();
   }, [seed, spaceId, pipelines.data, invalidate]);
 
   const pipeline = (pipelines.data ?? []).find(item => item.id === pipelineId) ?? pipelines.data?.[0] ?? null;
@@ -137,7 +146,8 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     const fresh = await supabase.from('crm_companies').select('id,name').eq('activity_space_id', space());
     const match = (fresh.data ?? []).find(company => (company.name as string).trim().toLowerCase() === lower);
     if (match) { resolved.current.set(`company:${lower}`, match.id as string); return match.id as string; }
-    const inserted = await supabase.from('crm_companies').insert({ activity_space_id: space(), name: name.trim(), owner_worker_id: me }).select('id').single();
+    // A company met through a Domain's pipeline belongs to that Domain.
+    const inserted = await supabase.from('crm_companies').insert({ activity_space_id: space(), name: name.trim(), owner_worker_id: me, domain_id: pipeline?.domain_id ?? null }).select('id').single();
     const id = check(inserted).id as string;
     resolved.current.set(`company:${lower}`, id);
     return id;
@@ -153,7 +163,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
       resolved.current.set(cacheKey, existing.id);
       return existing.id;
     }
-    const id = check(await supabase.from('crm_contacts').insert({ activity_space_id: space(), name: name.trim(), email, company_id: companyId, owner_worker_id: me }).select('id').single()).id;
+    const id = check(await supabase.from('crm_contacts').insert({ activity_space_id: space(), name: name.trim(), email, company_id: companyId, owner_worker_id: me, domain_id: pipeline?.domain_id ?? null }).select('id').single()).id;
     resolved.current.set(cacheKey, id);
     return id;
   }
@@ -206,10 +216,14 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     links: { companyId?: string | null; contactId?: string | null; quiet?: boolean } = {}) => {
     const deal = deals.data?.find(item => item.id === dealId);
     const author = people.find(person => person.id === me)?.name ?? null;
+    // Links taken from the deal are kept only when this writer can see them: a
+    // deal can still point at a company or contact that has since moved into a
+    // Domain this writer is not in. Links passed in were just chosen or created.
+    const visible = (rows: { id: string }[] | undefined, id: string | null) => id && (rows ?? []).some(item => item.id === id) ? id : null;
     check(await supabase.from('crm_activities').insert({
       activity_space_id: space(), deal_id: dealId,
-      company_id: links.companyId !== undefined ? links.companyId : deal?.company_id ?? null,
-      contact_id: links.contactId !== undefined ? links.contactId : deal?.contact_id ?? null,
+      company_id: links.companyId !== undefined ? links.companyId : visible(companies.data, deal?.company_id ?? null),
+      contact_id: links.contactId !== undefined ? links.contactId : visible(contacts.data, deal?.contact_id ?? null),
       kind: entry.type, body: entry.text.trim().slice(0, 8000), occurred_on: entry.date ?? today, author_name: author,
     }).select('id').single());
     if (!links.quiet) await invalidate();
@@ -293,7 +307,17 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
   const saveField = async (id: string | null, patch: Partial<Omit<CrmFieldRecord, 'id'>>) => {
     try {
       if (id) check(await supabase.from('crm_fields').update(patch).eq('id', id).select('id').single());
-      else check(await supabase.from('crm_fields').insert({ activity_space_id: space(), ...patch }).select('id').single());
+      else {
+        // A key may already be taken in a Domain this writer cannot see; the
+        // database refuses it, and the field takes the next free suffix.
+        for (let attempt = 0; ; attempt += 1) {
+          const key = attempt && patch.key ? `${patch.key}_${attempt + 1}` : patch.key;
+          const result = await supabase.from('crm_fields').insert({ activity_space_id: space(), ...patch, key }).select('id').single();
+          if (result.error?.code === '23505' && attempt < 5) continue;
+          check(result);
+          break;
+        }
+      }
     } finally { await invalidate(); }
   };
   const deleteField = async (id: string) => { check(await supabase.from('crm_fields').delete().eq('id', id).select('id').single()); await invalidate(); };
@@ -371,7 +395,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
 
   const error = pipelines.error ?? deals.error ?? companies.error ?? contacts.error ?? activities.error ?? fields.error ?? elements.error ?? null;
   return {
-    spaceId, today, me, people, workspace, pipeline, legacyTable: legacy.data ?? null,
+    spaceId, today, me, people, domains, workspace, pipeline, legacyTable: legacy.data ?? null,
     pipelines: pipelines.data ?? EMPTY as CrmPipelineRecord[],
     companies: companies.data ?? EMPTY as CrmCompanyRecord[],
     contacts: contacts.data ?? EMPTY as CrmContactRecord[],

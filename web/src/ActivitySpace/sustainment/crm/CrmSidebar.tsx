@@ -25,6 +25,18 @@ function Section({ label }: { label: string }) {
   return <SidebarSectionLabel className="mt-4">{label}</SidebarSectionLabel>;
 }
 
+/** Pipelines under the Domain they belong to; Space-wide ones last. */
+function pipelineGroups(crm: Crm) {
+  const groups = new Map<string | null, { id: string | null; name: string | null; pipelines: Crm['pipelines'][number][] }>();
+  for (const pipeline of crm.pipelines) {
+    const id = pipeline.domain_id ?? null;
+    const group = groups.get(id) ?? { id, name: id ? crm.domains.find(domain => domain.id === id)?.name ?? null : null, pipelines: [] };
+    group.pipelines.push(pipeline);
+    groups.set(id, group);
+  }
+  return [...groups.values()].sort((a, b) => (a.id ? 0 : 1) - (b.id ? 0 : 1) || (a.name ?? '').localeCompare(b.name ?? ''));
+}
+
 interface SidebarProps {
   navigation: NavigationState;
   onNavigate: (navigation: Partial<NavigationState>) => void;
@@ -86,12 +98,15 @@ function CrmSidebarList({ crm, navigation, onNavigate }: SidebarProps & { crm: C
 
     {crm.pipelines.length > 1 && <>
       <Section label={t('Pipelines')} />
-      <div className="space-y-px">{crm.pipelines.map(item => {
-        const active = item.id === crm.pipeline?.id;
-        return <SidebarRow key={item.id} active={active} buttonProps={{ 'aria-current': active ? 'true' : undefined }} label={item.name}
-          meta={crm.allDeals.filter(deal => deal.pipeline_id === item.id && !['won', 'lost'].includes(deal.stage.toLowerCase())).length}
-          onClick={() => go({ pipelineId: item.id })} />;
-      })}</div>
+      <div className="space-y-px">{pipelineGroups(crm).map(group => <div key={group.id ?? 'space'}>
+        {pipelineGroups(crm).length > 1 && <p className="truncate px-2.5 pb-0.5 pt-1.5 text-[11px] text-muted-foreground/60">{group.name ?? t('Whole Space')}</p>}
+        {group.pipelines.map(item => {
+          const active = item.id === crm.pipeline?.id;
+          return <SidebarRow key={item.id} active={active} buttonProps={{ 'aria-current': active ? 'true' : undefined }} label={item.name}
+            meta={crm.allDeals.filter(deal => deal.pipeline_id === item.id && !['won', 'lost'].includes(deal.stage.toLowerCase())).length}
+            onClick={() => go({ pipelineId: item.id })} />;
+        })}
+      </div>)}</div>
     </>}
 
     <div className="mt-3 space-y-px">

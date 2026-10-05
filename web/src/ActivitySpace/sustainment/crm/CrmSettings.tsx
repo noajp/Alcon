@@ -38,6 +38,12 @@ function Basics({ crm }: { crm: Crm }) {
     <div className="grid max-w-2xl gap-3 sm:grid-cols-2">
       <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Name')}</span><input className={`${INPUT} w-full text-foreground`} value={name} onChange={event => { setName(event.target.value); setSaved(false); }} /></label>
       <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('What you call a deal here')}</span><input className={`${INPUT} w-full text-foreground`} placeholder={t('Deal')} value={label} onChange={event => { setLabel(event.target.value); setSaved(false); }} /></label>
+      <div className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Domain')}</span>
+        <CrmPicker label={t('Domain')} value={pipeline.domain_id} placeholder={t('Whole Space')}
+          options={crm.domains.map(domain => ({ id: domain.id, label: domain.name }))}
+          onChange={id => { setError(null); crm.savePipeline(pipeline.id, { domain_id: id }).catch(cause => setError(cause instanceof Error ? cause.message : t('Could not save. Try again.'))); }} />
+        <span className="block">{t('Only people who can see the Domain see this pipeline and its deals.')}</span>
+      </div>
       <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Default currency')}</span><input className={`${INPUT} w-24 text-foreground`} maxLength={3} value={currency} onChange={event => { setCurrency(event.target.value.toUpperCase()); setSaved(false); }} /></label>
       <div className="flex gap-3">
         <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Forecast period (days)')}</span><input inputMode="numeric" className={`${INPUT} w-24 tabular-nums text-foreground`} value={horizon} onChange={event => { setHorizon(event.target.value); setSaved(false); }} /></label>
@@ -156,23 +162,27 @@ function Fields({ crm }: { crm: Crm }) {
   const [type, setType] = useState<CrmFieldRecord['type']>('text');
   const [options, setOptions] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // A new field belongs to the open pipeline's Domain unless chosen otherwise.
+  const [scope, setScope] = useState<string | null>(crm.pipeline?.domain_id ?? null);
   const list = crm.fields.filter(field => field.entity === entity);
+  const domainName = (id: string | null) => id ? crm.domains.find(domain => domain.id === id)?.name ?? t('Domain') : t('Whole Space');
   async function add() {
     setError(null);
     try {
       await crm.saveField(null, {
         entity, label: label.trim(), type, key: fieldKey(label, list.map(field => field.key)),
         options: type === 'select' ? options.split(/[,\n、]/).map(item => item.trim()).filter(Boolean) : [],
-        order_index: list.length,
+        order_index: list.length, domain_id: scope,
       });
       setLabel(''); setOptions('');
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Could not save. Try again.')); }
   }
-  return <Section title={t('Your fields')} description={t('Add what your organisation tracks that the standard record does not — a contract type, a region, a regulatory ID. Fields appear on every record of that kind and in search.')}>
+  return <Section title={t('Your fields')} description={t('Add what your organisation tracks that the standard record does not — a contract type, a region, a regulatory ID. A field of a Domain appears only on that Domain’s records; a Space field appears everywhere.')}>
     <div role="group" aria-label={t('Record kind')} className="flex gap-1">{(['deal', 'company', 'contact'] as const).map(item =>
       <Button key={item} shape="tab" size="sm" variant={entity === item ? 'secondary' : 'ghost'} aria-pressed={entity === item} onClick={() => setEntity(item)}>{t(ENTITY_LABEL[item])}</Button>)}</div>
     <ul className="max-w-2xl divide-y divide-[var(--border-subtle)]">{list.map(field => <li key={field.id} className="flex items-center gap-3 py-2 text-sm">
       <span className="min-w-0 flex-1 truncate">{field.label}</span>
+      <span className="max-w-40 truncate text-xs text-muted-foreground">{domainName(field.domain_id)}</span>
       <span className="text-xs text-muted-foreground">{t(TYPE_LABEL[field.type])}{field.type === 'select' && ` · ${fieldOptions(field).join(', ')}`}</span>
       <Button variant="ghost" size="icon-xs" aria-label={t('Remove field {name}', { name: field.label })} onClick={() => { setError(null); crm.deleteField(field.id).catch(cause => setError(message(cause))); }}><Trash2 size={12} /></Button>
     </li>)}{!list.length && <li className="py-2 text-xs text-muted-foreground">{t('No fields yet.')}</li>}</ul>
@@ -180,6 +190,7 @@ function Fields({ crm }: { crm: Crm }) {
       <input aria-label={t('Field name')} placeholder={t('Field name')} className={`${INPUT} w-48`} value={label} onChange={event => setLabel(event.target.value)} />
       <div className="flex gap-1">{FIELD_TYPES.map(item => <Button key={item} shape="tab" size="xs" variant={type === item ? 'secondary' : 'ghost'} aria-pressed={type === item} onClick={() => setType(item)}>{t(TYPE_LABEL[item])}</Button>)}</div>
       {type === 'select' && <input aria-label={t('Choices')} placeholder={t('Choices, separated by commas')} className={`${INPUT} w-64`} value={options} onChange={event => setOptions(event.target.value)} />}
+      <CrmPicker label={t('Shown in')} value={scope} placeholder={t('Whole Space')} options={crm.domains.map(domain => ({ id: domain.id, label: domain.name }))} onChange={setScope} />
       <Button size="sm" variant="secondary" disabled={!label.trim() || (type === 'select' && !options.trim())} onClick={() => void add()}><Plus size={14} />{t('Add field')}</Button>
     </div>
     {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{error}</p>}

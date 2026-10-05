@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  accountsOf, buildCrmWorkspace, measureValue, readUnit, fieldKey, fieldOptions, forecastFor, inList, metricValue, normalizeCrmStages, parseActivityLog,
+  accountsOf, buildCrmWorkspace, fieldsFor, measureValue, readUnit, fieldKey, fieldOptions, forecastFor, inList, metricValue, normalizeCrmStages, parseActivityLog,
   pipelineColumns, searchDeals, stageChange, todayQueue, upcoming, DEFAULT_CRM_STAGES,
   type CrmDealRecord, type CrmNextElement, type CrmPipelineRecord, type CrmRecords,
 } from '@/ActivitySpace/sustainment/crm/crmModel';
@@ -8,7 +8,7 @@ import {
 const today = '2026-10-03';
 const pipeline: CrmPipelineRecord = {
   id: 'p', name: 'Sales', stages: DEFAULT_CRM_STAGES, currency: 'USD', horizon_days: 30, follow_up_days: 14,
-  object_id: null, measure_intent_id: null, measure_metric: null, record_label: null, order_index: 0,
+  object_id: null, measure_intent_id: null, measure_metric: null, record_label: null, domain_id: null, order_index: 0,
 };
 let seq = 0;
 const deal = (values: Partial<CrmDealRecord> = {}): CrmDealRecord => ({
@@ -20,8 +20,8 @@ const deal = (values: Partial<CrmDealRecord> = {}): CrmDealRecord => ({
 function workspace(deals: CrmDealRecord[], extra: Partial<CrmRecords> = {}) {
   return buildCrmWorkspace({
     pipeline, deals, activities: [], elements: [],
-    companies: [{ id: 'acme', name: 'Acme', domain: null, industry: null, owner_worker_id: null, notes: null, custom: {}, created_at: '' },
-      { id: 'beta', name: 'Beta', domain: null, industry: null, owner_worker_id: null, notes: null, custom: {}, created_at: '' }],
+    companies: [{ id: 'acme', name: 'Acme', domain: null, industry: null, owner_worker_id: null, notes: null, custom: {}, created_at: '', domain_id: null },
+      { id: 'beta', name: 'Beta', domain: null, industry: null, owner_worker_id: null, notes: null, custom: {}, created_at: '', domain_id: null }],
     contacts: [], people: [{ id: 'w1', name: 'Sato', type: 'human', user_id: 'u1' }, { id: 'w2', name: 'Claude', type: 'ai_agent', user_id: null }],
     ...extra,
   }, today);
@@ -170,6 +170,16 @@ describe('CRM rollups', () => {
 });
 
 describe('CRM fields and import', () => {
+  it('shows a Domain field only on that Domain\'s records, and Space fields everywhere', () => {
+    const fields = [
+      { id: '1', entity: 'deal' as const, domain_id: null }, { id: '2', entity: 'deal' as const, domain_id: 'nexus' },
+      { id: '3', entity: 'deal' as const, domain_id: 'hokushin' }, { id: '4', entity: 'company' as const, domain_id: null },
+    ];
+    expect(fieldsFor(fields, 'deal', 'hokushin').map(field => field.id)).toEqual(['1', '3']);
+    expect(fieldsFor(fields, 'deal', null).map(field => field.id)).toEqual(['1']);
+    expect(fieldsFor(fields, 'company', 'nexus').map(field => field.id)).toEqual(['4']);
+  });
+
   it('derives stable keys and clean choices', () => {
     expect(fieldKey('Contract type', [])).toBe('contract_type');
     expect(fieldKey('Contract type', ['contract_type'])).toBe('contract_type_2');

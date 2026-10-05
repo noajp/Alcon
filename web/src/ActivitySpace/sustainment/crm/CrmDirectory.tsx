@@ -6,7 +6,7 @@ import { Button } from '@/ui/button';
 import { TextComposer } from '@/ui/text-composer';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { Crm } from '@/hooks/useCrm';
-import { ACTIVITY_TYPES, normalizeCrmStages, resolveStage, type CrmActivityRecord, type CrmActivityType, type CrmDealRecord } from './crmModel';
+import { ACTIVITY_TYPES, fieldsFor, normalizeCrmStages, resolveStage, type CrmActivityRecord, type CrmActivityType, type CrmDealRecord } from './crmModel';
 import { moneyList, relativeDay } from './crmFormat';
 import { CrmPicker } from './CrmPicker';
 import { CustomFields, EditableText, Property } from './CrmFields';
@@ -165,10 +165,11 @@ export function CrmCompanyPanel({ crm, companyId, onClose, onOpenDeal, onOpenCon
     <section className="space-y-1">
       <Property label={t('Name')}><EditableText label={t('Name')} value={company.name} onSave={value => value ? save({ name: String(value) }) : Promise.reject(new Error('A name is required.'))} /></Property>
       <Property label={t('Owner')}><CrmPicker label={t('Owner')} value={company.owner_worker_id} placeholder={t('Unassigned')} options={crm.people.map(person => ({ id: person.id, label: person.name }))} onChange={id => void save({ owner_worker_id: id })} /></Property>
+      <Property label={t('Domain')}><CrmPicker label={t('Domain')} value={company.domain_id} placeholder={t('Whole Space')} options={crm.domains.map(domain => ({ id: domain.id, label: domain.name }))} onChange={id => void save({ domain_id: id })} /></Property>
       <Property label={t('Website')}><EditableText label={t('Website')} value={company.domain} placeholder="example.com" onSave={value => save({ domain: value as string | null })} /></Property>
       <Property label={t('Industry')}><EditableText label={t('Industry')} value={company.industry} onSave={value => save({ industry: value as string | null })} /></Property>
       <Property label={t('Notes')}><EditableText multiline label={t('Notes')} value={company.notes} onSave={value => save({ notes: value as string | null })} /></Property>
-      <CustomFields fields={crm.fields.filter(field => field.entity === 'company')} values={company.custom ?? {}} onSave={custom => save({ custom })} />
+      <CustomFields fields={fieldsFor(crm.fields, 'company', company.domain_id)} values={company.custom ?? {}} onSave={custom => save({ custom })} />
     </section>
     <section className="space-y-1">
       <h3 className="text-xs font-medium text-muted-foreground">{t('Contacts')}</h3>
@@ -205,7 +206,8 @@ export function CrmContactPanel({ crm, contactId, onClose, onOpenDeal, onOpenCom
       <Property label={t('Email')}><EditableText label={t('Email')} value={contact.email} onSave={value => save({ email: value as string | null })} /></Property>
       <Property label={t('Phone')}><EditableText label={t('Phone')} value={contact.phone} onSave={value => save({ phone: value as string | null })} /></Property>
       <Property label={t('Owner')}><CrmPicker label={t('Owner')} value={contact.owner_worker_id} placeholder={t('Unassigned')} options={crm.people.map(person => ({ id: person.id, label: person.name }))} onChange={id => void save({ owner_worker_id: id })} /></Property>
-      <CustomFields fields={crm.fields.filter(field => field.entity === 'contact')} values={contact.custom ?? {}} onSave={custom => save({ custom })} />
+      <Property label={t('Domain')}><CrmPicker label={t('Domain')} value={contact.domain_id} placeholder={t('Whole Space')} options={crm.domains.map(domain => ({ id: domain.id, label: domain.name }))} onChange={id => void save({ domain_id: id })} /></Property>
+      <CustomFields fields={fieldsFor(crm.fields, 'contact', contact.domain_id)} values={contact.custom ?? {}} onSave={custom => save({ custom })} />
     </section>
     <DealList crm={crm} deals={crm.allDeals.filter(deal => deal.contact_id === contact.id)} onOpenDeal={onOpenDeal} />
     <Timeline crm={crm} entries={crm.activities.filter(entry => entry.contact_id === contact.id)} onLog={(type, text) => crm.logRecordActivity({ contactId: contact.id, companyId: contact.company_id }, { type, text })} />

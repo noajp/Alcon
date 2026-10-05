@@ -11,14 +11,14 @@ const record = (values: Partial<CrmDealRecord>): CrmDealRecord => ({
   next_element_id: null, initiative_id: null, source: null, lost_reason: null, closed_on: null, custom: {}, created_at: '', ...values,
 });
 const { deals } = buildCrmWorkspace({
-  pipeline: { id: 'p', name: 'Sales', stages: DEFAULT_CRM_STAGES, currency: 'USD', horizon_days: 30, follow_up_days: 14, object_id: null, measure_intent_id: null, measure_metric: null, record_label: null, order_index: 0 },
+  pipeline: { id: 'p', name: 'Sales', stages: DEFAULT_CRM_STAGES, currency: 'USD', horizon_days: 30, follow_up_days: 14, object_id: null, measure_intent_id: null, measure_metric: null, record_label: null, domain_id: null, order_index: 0 },
   deals: [
     record({ id: 'acme', number: 1, name: 'Acme rollout', company_id: 'c-acme', stage: 'proposal', amount: 1000, probability: 50, close_date: '2026-11-01' }),
     record({ id: 'beta', number: 2, name: 'Beta pilot', company_id: 'c-beta', stage: 'won', amount: 10 }),
   ],
   companies: [
-    { id: 'c-acme', name: 'Acme', domain: null, industry: null, owner_worker_id: null, notes: null, custom: {}, created_at: '' },
-    { id: 'c-beta', name: 'Beta Corp', domain: null, industry: null, owner_worker_id: null, notes: null, custom: {}, created_at: '' },
+    { id: 'c-acme', name: 'Acme', domain: null, industry: null, owner_worker_id: null, notes: null, custom: {}, created_at: '', domain_id: null },
+    { id: 'c-beta', name: 'Beta Corp', domain: null, industry: null, owner_worker_id: null, notes: null, custom: {}, created_at: '', domain_id: null },
   ],
   contacts: [], activities: [], elements: [], people: [],
 }, today);

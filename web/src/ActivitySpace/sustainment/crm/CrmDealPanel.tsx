@@ -9,7 +9,7 @@ import { DateField } from '@/Function/shared/date';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useStrategies } from '@/ActivitySpace/strategy/initiative/strategyData';
 import type { Crm, CrmDealPatch } from '@/hooks/useCrm';
-import { ACTIVITY_TYPES, LOST_STAGE, shiftDate, stageChange, WON_STAGE, type CrmActivity, type CrmActivityType, type CrmDeal, type CrmStage } from './crmModel';
+import { ACTIVITY_TYPES, fieldsFor, LOST_STAGE, shiftDate, stageChange, WON_STAGE, type CrmActivity, type CrmActivityType, type CrmDeal, type CrmStage } from './crmModel';
 import { aiBrief, aiEmail, useCrmAi, type DealBrief, type DealEmail } from './crmAi';
 import { HealthBadge, money, relativeDay } from './crmFormat';
 import { CrmPicker } from './CrmPicker';
@@ -116,7 +116,7 @@ export function CrmDealPanel({ crm, deal, onClose, onCapture, onOpenElement, onO
   const mailto = email && deal.email ? `mailto:${encodeURIComponent(deal.email)}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}` : null;
   const companyContacts = crm.contacts.filter(contact => !deal.companyId || contact.company_id === deal.companyId || contact.id === deal.contactId);
   const initiative = strategies.data.find(item => item.id === deal.initiativeId);
-  const dealFields = crm.fields.filter(field => field.entity === 'deal');
+  const dealFields = fieldsFor(crm.fields, 'deal', workspace.pipeline.domain_id);
 
   return <aside aria-label={t('Deal')} className="flex h-full w-full min-w-0 flex-col bg-card">
     <div className="flex items-start gap-2 px-5 pb-3 pt-5">

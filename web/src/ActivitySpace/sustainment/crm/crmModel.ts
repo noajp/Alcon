@@ -97,15 +97,17 @@ export interface CrmPipelineRecord {
   measure_metric: CrmMetric | null;
   /** What this organisation calls a deal here (案件, Opportunity…); null = "Deal". */
   record_label: string | null;
+  /** The Domain this pipeline belongs to; null = shared with the whole Space. */
+  domain_id: string | null;
   order_index: number;
 }
 export interface CrmCompanyRecord {
   id: string; name: string; domain: string | null; industry: string | null; owner_worker_id: string | null;
-  notes: string | null; custom: Record<string, unknown>; created_at: string;
+  notes: string | null; custom: Record<string, unknown>; created_at: string; domain_id: string | null;
 }
 export interface CrmContactRecord {
   id: string; company_id: string | null; name: string; title: string | null; email: string | null; phone: string | null;
-  owner_worker_id: string | null; custom: Record<string, unknown>; created_at: string;
+  owner_worker_id: string | null; custom: Record<string, unknown>; created_at: string; domain_id: string | null;
 }
 export interface CrmDealRecord {
   id: string; pipeline_id: string; number: number; name: string; company_id: string | null; contact_id: string | null;
@@ -122,6 +124,8 @@ export interface CrmActivityRecord {
 export interface CrmFieldRecord {
   id: string; entity: 'deal' | 'company' | 'contact'; key: string; label: string;
   type: 'text' | 'number' | 'date' | 'select' | 'checkbox'; options: unknown; order_index: number;
+  /** Fields of a Domain show only on that Domain's records; null = everywhere. */
+  domain_id: string | null;
 }
 /** The Element that is a deal's next step, as far as the CRM needs it. */
 export interface CrmNextElement { id: string; title: string; status: string; due_date: string | null; display_id: string | null }
@@ -534,6 +538,11 @@ export function stageChange(deal: Pick<CrmDeal, 'probability' | 'stage'>, target
 /** Custom field definitions as typed choices; malformed options are dropped. */
 export function fieldOptions(field: Pick<CrmFieldRecord, 'options'>): string[] {
   return Array.isArray(field.options) ? field.options.filter((item): item is string => typeof item === 'string' && !!item.trim()).slice(0, 50) : [];
+}
+
+/** The fields a record of this kind shows: the Space's own and its Domain's. */
+export function fieldsFor<T extends Pick<CrmFieldRecord, 'entity' | 'domain_id'>>(fields: readonly T[], entity: T['entity'], domainId: string | null): T[] {
+  return fields.filter(field => field.entity === entity && (!field.domain_id || field.domain_id === domainId));
 }
 
 export function fieldKey(label: string, taken: readonly string[]): string {
