@@ -918,8 +918,7 @@ function AreaChart({
   neutral = false,
 }: {
   daily: number[];
-  /** Hours available each day. A step, not a level — an absence is the days
-   *  where it drops to zero. */
+  /** Hours available each day. An absence is the days where it drops to zero. */
   capacity: number[];
   /** The load after a proposal, drawn as a line over the current fill. */
   previewDaily: number[] | null;
@@ -933,74 +932,38 @@ function AreaChart({
    *  used by the Unassigned pseudo-row where "too much" has no meaning. */
   neutral?: boolean;
 }) {
-  const hatchId = useId();
+  const uid = useId();
+  const hatchId = `${uid}-hatch`;
+  const overId = `${uid}-over`;
+  const previewClipId = `${uid}-preview`;
   const baseY = topPad + height;
   const maxH = MAX_DISPLAY_HOURS;
   const yFor = (h: number) => topPad + height - (clamp(h, 0, maxH) / maxH) * height;
 
-  // Step-shape path: rectangle per day
-  let path = `M 0 ${baseY}`;
-  for (let i = 0; i < daily.length; i++) {
-    const x0 = i * dayW;
-    const x1 = x0 + dayW;
-    const y = yFor(daily[i]);
-    path += ` L ${x0} ${y} L ${x1} ${y}`;
-  }
-  path += ` L ${daily.length * dayW} ${baseY} Z`;
-
-  // The capacity reference follows the same step as the load, so a day off
-  // reads as the line falling to the floor rather than as an unexplained red
-  // band floating under a flat line.
-  let capPath = '';
-  for (let i = 0; i < capacity.length; i++) {
-    const x0 = i * dayW;
-    const y = yFor(capacity[i]);
-    capPath += `${i === 0 ? 'M' : ' L'} ${x0} ${y} L ${x0 + dayW} ${y}`;
-  }
+  // Load and capacity are drawn as smooth curves through each day's centre.
+  // A day is still a day — the readout and the hatching keep day columns —
+  // but the shape reads as a flow of work rather than a stack of bricks.
+  const loadLine = smoothPath(daily.map(yFor), dayW);
+  const loadArea = `${loadLine} L ${width} ${baseY} L 0 ${baseY} Z`;
+  const capLine = smoothPath(capacity.map(yFor), dayW);
+  // Everything above the capacity curve: the overload is the load area
+  // clipped to this region, so the red follows both curves exactly.
+  const aboveCap = `${capLine} L ${width} 0 L 0 0 Z`;
+  const anyOver = !neutral && daily.some((h, i) => h > capacity[i] + 0.01);
 
   // Only the days the proposal changes: a line along every untouched day
   // would draw the whole row and bury the part that moves.
-  let previewPath = '';
+  const changed: { x: number; w: number }[] = [];
   if (previewDaily) {
-    let open = false;
     for (let i = 0; i < previewDaily.length; i++) {
-      const changed = Math.abs(previewDaily[i] - daily[i]) > 0.01;
-      if (!changed) { open = false; continue; }
-      const x0 = i * dayW;
-      const y = yFor(previewDaily[i]);
-      previewPath += `${open ? ' L' : ' M'} ${x0} ${y} L ${x0 + dayW} ${y}`;
-      open = true;
+      if (Math.abs(previewDaily[i] - daily[i]) <= 0.01) continue;
+      const x = Math.max(0, i * dayW - dayW / 2);
+      const last = changed[changed.length - 1];
+      if (last && x <= last.x + last.w) last.w = Math.min(width, (i + 1.5) * dayW) - last.x;
+      else changed.push({ x, w: Math.min(width, (i + 1.5) * dayW) - x });
     }
   }
-
-  // Overload-only path: portions where the day's load exceeds that day's
-  // capacity, drawn on top. Every segment closes along its own capacity step.
-  let overloadPath = '';
-  let inOverload = false;
-  let segStart = 0;
-  const overAt = (i: number) => !neutral && i < daily.length && daily[i] > capacity[i] + 0.01;
-  const closeSegment = (end: number) => {
-    overloadPath += ` M ${segStart * dayW} ${yFor(capacity[segStart])}`;
-    for (let j = segStart; j < end; j++) {
-      const jx0 = j * dayW;
-      overloadPath += ` L ${jx0} ${yFor(daily[j])} L ${jx0 + dayW} ${yFor(daily[j])}`;
-    }
-    for (let j = end - 1; j >= segStart; j--) {
-      const jx0 = j * dayW;
-      overloadPath += ` L ${jx0 + dayW} ${yFor(capacity[j])} L ${jx0} ${yFor(capacity[j])}`;
-    }
-    overloadPath += ' Z';
-  };
-  for (let i = 0; i <= daily.length; i++) {
-    const over = overAt(i);
-    if (over && !inOverload) {
-      segStart = i;
-      inOverload = true;
-    } else if (!over && inOverload) {
-      closeSegment(i);
-      inOverload = false;
-    }
-  }
+  const previewLine = previewDaily && changed.length > 0 ? smoothPath(previewDaily.map(yFor), dayW) : '';
 
   // Days with no hours at all, marked whether or not work landed on them —
   // an empty week off is a fact about the plan even when nothing collides.
@@ -1031,6 +994,12 @@ function AreaChart({
         >
           <line x1={0} y1={0} x2={0} y2={6} stroke="var(--text-tertiary)" strokeWidth={1} />
         </pattern>
+        {anyOver && <clipPath id={overId}><path d={aboveCap} /></clipPath>}
+        {previewLine && (
+          <clipPath id={previewClipId}>
+            {changed.map((c) => <rect key={c.x} x={c.x} y={0} width={c.w} height={rowHeight} />)}
+          </clipPath>
+        )}
       </defs>
       {awaySpans.map((s) => (
         <rect
@@ -1043,28 +1012,54 @@ function AreaChart({
           opacity={0.35}
         />
       ))}
-      {/* Capacity reference step */}
-      {!neutral && capPath && (
-        <path
-          d={capPath}
-          fill="none"
-          stroke="var(--border-default)"
-          strokeDasharray="2 3"
-          strokeWidth={1}
-        />
+      {/* Capacity reference */}
+      {!neutral && (
+        <path d={capLine} fill="none" stroke="var(--border-default)" strokeDasharray="2 3" strokeWidth={1} />
       )}
-      {/* Healthy area fill — faded while a proposal is previewed */}
-      <path d={path} fill={fill} opacity={(neutral ? 0.18 : isAgent ? 0.25 : 0.22) * (previewDaily ? 0.5 : 1)} />
-      {/* Overload band */}
-      {overloadPath && (
-        <path d={overloadPath} fill="var(--status-danger)" opacity={previewDaily ? 0.2 : 0.45} />
+      {/* Load — faded while a proposal is previewed */}
+      <path d={loadArea} fill={fill} opacity={(neutral ? 0.18 : isAgent ? 0.25 : 0.22) * (previewDaily ? 0.5 : 1)} />
+      <path d={loadLine} fill="none" stroke={fill} strokeWidth={1.25} opacity={(neutral ? 0.35 : 0.6) * (previewDaily ? 0.5 : 1)} />
+      {/* Overload — the load area above the capacity curve */}
+      {anyOver && (
+        <path d={loadArea} fill="var(--status-danger)" opacity={previewDaily ? 0.2 : 0.45} clipPath={`url(#${overId})`} />
       )}
       {/* The load after the previewed proposal */}
-      {previewPath && (
-        <path d={previewPath} fill="none" stroke="var(--accent-default)" strokeWidth={2} />
+      {previewLine && (
+        <path d={previewLine} fill="none" stroke="var(--accent-default)" strokeWidth={2} clipPath={`url(#${previewClipId})`} />
       )}
     </svg>
   );
+}
+
+/**
+ * A smooth line through one value per day, each at its day's centre, held
+ * flat to both edges. Monotone cubic (Fritsch–Carlson): the curve never
+ * overshoots its points, so a quiet day between two busy ones never dips
+ * below zero and a peak is never drawn higher than it is.
+ */
+function smoothPath(ys: number[], dayW: number): string {
+  if (ys.length === 0) return '';
+  const xs = ys.map((_, i) => i * dayW + dayW / 2);
+  const n = ys.length;
+  const m: number[] = new Array(n).fill(0);
+  const d: number[] = [];
+  for (let i = 0; i < n - 1; i++) d.push((ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]));
+  for (let i = 1; i < n - 1; i++) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2;
+  if (n > 1) { m[0] = d[0]; m[n - 1] = d[n - 2]; }
+  for (let i = 0; i < n - 1; i++) {
+    if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+    const a = m[i] / d[i];
+    const b = m[i + 1] / d[i];
+    const h = a * a + b * b;
+    if (h > 9) { const t = 3 / Math.sqrt(h); m[i] = t * a * d[i]; m[i + 1] = t * b * d[i]; }
+  }
+  let path = `M 0 ${ys[0]} L ${xs[0]} ${ys[0]}`;
+  for (let i = 0; i < n - 1; i++) {
+    const dx = (xs[i + 1] - xs[i]) / 3;
+    path += ` C ${xs[i] + dx} ${ys[i] + m[i] * dx} ${xs[i + 1] - dx} ${ys[i + 1] - m[i + 1] * dx} ${xs[i + 1]} ${ys[i + 1]}`;
+  }
+  path += ` L ${n * dayW} ${ys[n - 1]}`;
+  return path;
 }
 
 // =============================================================
