@@ -216,14 +216,14 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     links: { companyId?: string | null; contactId?: string | null; quiet?: boolean } = {}) => {
     const deal = deals.data?.find(item => item.id === dealId);
     const author = people.find(person => person.id === me)?.name ?? null;
-    // A note links only what its writer can see: a deal can still point at a
-    // company or contact that has since moved into a Domain this writer is not in.
-    const companyId = links.companyId !== undefined ? links.companyId : deal?.company_id ?? null;
-    const contactId = links.contactId !== undefined ? links.contactId : deal?.contact_id ?? null;
+    // Links taken from the deal are kept only when this writer can see them: a
+    // deal can still point at a company or contact that has since moved into a
+    // Domain this writer is not in. Links passed in were just chosen or created.
+    const visible = (rows: { id: string }[] | undefined, id: string | null) => id && (rows ?? []).some(item => item.id === id) ? id : null;
     check(await supabase.from('crm_activities').insert({
       activity_space_id: space(), deal_id: dealId,
-      company_id: companyId && (companies.data ?? []).some(item => item.id === companyId) ? companyId : null,
-      contact_id: contactId && (contacts.data ?? []).some(item => item.id === contactId) ? contactId : null,
+      company_id: links.companyId !== undefined ? links.companyId : visible(companies.data, deal?.company_id ?? null),
+      contact_id: links.contactId !== undefined ? links.contactId : visible(contacts.data, deal?.contact_id ?? null),
       kind: entry.type, body: entry.text.trim().slice(0, 8000), occurred_on: entry.date ?? today, author_name: author,
     }).select('id').single());
     if (!links.quiet) await invalidate();
