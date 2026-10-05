@@ -94,6 +94,9 @@ export interface ScmInput {
   demand: ScmDemandPoint[];
   orders: ScmPurchaseOrder[];
   scenario?: ScmScenario;
+  /** This month's committed spend in the policy currency across the whole
+   * Space, including orders the viewer cannot see. Absent = from `orders`. */
+  committedThisMonth?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -775,7 +778,7 @@ export function planScm(input: ScmInput): ScmPlan {
 
   // Group proposals into purchase orders per supplier and location.
   const monthStart = dayString(today - (new Date(today * DAY_MS).getUTCDate() - 1));
-  const committedThisMonth = input.orders
+  const committedThisMonth = input.committedThisMonth ?? input.orders
     .filter(order => order.currency === policy.currency && !['draft', 'cancelled'].includes(order.status) && order.orderedOn >= monthStart && order.orderedOn <= input.today)
     .reduce((sum, order) => sum + order.lines.reduce((total, line) => total + line.quantity * line.unitCost, 0), 0);
   const groups = new Map<string, ScmProposal>();

@@ -19,6 +19,10 @@
 -- The daily autopilot is claimed per scope (the Space-wide records, or one
 -- Domain), so a member who cannot see a Domain does not use up its run.
 -- Resetting SCM is refused while it would delete records the caller cannot see.
+-- Order numbers and the monthly budget stay one per Space: numbering and the
+-- month's committed spend are read across every Domain (as definer), so a
+-- member who cannot see a Domain neither reuses its numbers nor spends its
+-- share of the budget twice.
 do $$
 begin
   if to_regclass('public.scm_locations') is null
@@ -140,7 +144,7 @@ begin
 
     if tg_table_name = 'scm_items' then
       if new.supplier_id is not null then
-        select domain_id into other from public.scm_suppliers where id = new.supplier_id;
+        select domain_id into other from public.scm_suppliers where id = new.supplier_id for share;
         if other is not null and other is distinct from new.domain_id then
           raise exception 'This supplier belongs to another Domain. Choose a supplier of the item''s Domain or one shared by the Space.';
         end if;
@@ -181,14 +185,16 @@ begin
         end if;
       end if;
     elsif tg_table_name in ('scm_stock', 'scm_movements') then
-      select domain_id into target from public.scm_locations where id = new.location_id;
-      select domain_id into other from public.scm_items where id = new.item_id;
+      -- FOR SHARE waits for a concurrent change of either record's Domain,
+      -- whose own check then sees this row.
+      select domain_id into target from public.scm_locations where id = new.location_id for share;
+      select domain_id into other from public.scm_items where id = new.item_id for share;
       if other is not null and other is distinct from target then
         raise exception 'This item belongs to another Domain than the location.';
       end if;
     elsif tg_table_name = 'scm_purchase_orders' then
-      select domain_id into target from public.scm_locations where id = new.location_id;
-      select domain_id into other from public.scm_suppliers where id = new.supplier_id;
+      select domain_id into target from public.scm_locations where id = new.location_id for share;
+      select domain_id into other from public.scm_suppliers where id = new.supplier_id for share;
       if other is not null and other is distinct from target then
         raise exception 'This supplier belongs to another Domain than the delivery location.';
       end if;
@@ -198,8 +204,8 @@ begin
         raise exception 'This order has items of another Domain than the delivery location.';
       end if;
     elsif tg_table_name = 'scm_po_lines' then
-      select l.domain_id into target from public.scm_purchase_orders o join public.scm_locations l on l.id = o.location_id where o.id = new.po_id;
-      select domain_id into other from public.scm_items where id = new.item_id;
+      select l.domain_id into target from public.scm_purchase_orders o join public.scm_locations l on l.id = o.location_id where o.id = new.po_id for share of o, l;
+      select domain_id into other from public.scm_items where id = new.item_id for share;
       if other is not null and other is distinct from target then
         raise exception 'This item belongs to another Domain than the order''s delivery location.';
       end if;
@@ -309,9 +315,10 @@ begin
   execute $ddl$
   create or replace function public.scm_has_hidden_records(p_space uuid) returns boolean
   language sql stable security definer set search_path = public as $fn$
-    select exists (select 1 from public.scm_locations where activity_space_id = p_space and domain_id is not null and not public.user_can_see_domain(domain_id))
+    select public.is_activity_space_member(p_space) and (
+           exists (select 1 from public.scm_locations where activity_space_id = p_space and domain_id is not null and not public.user_can_see_domain(domain_id))
         or exists (select 1 from public.scm_suppliers where activity_space_id = p_space and domain_id is not null and not public.user_can_see_domain(domain_id))
-        or exists (select 1 from public.scm_items where activity_space_id = p_space and domain_id is not null and not public.user_can_see_domain(domain_id))
+        or exists (select 1 from public.scm_items where activity_space_id = p_space and domain_id is not null and not public.user_can_see_domain(domain_id)))
   $fn$;
   revoke all on function public.scm_has_hidden_records(uuid) from public, anon;
   grant execute on function public.scm_has_hidden_records(uuid) to authenticated;
@@ -334,5 +341,34 @@ begin
   end $fn$;
   revoke all on function public.scm_reset_space(uuid) from public, anon;
   grant execute on function public.scm_reset_space(uuid) to authenticated;
+  $ddl$;
+  -- One order number sequence per Space, across Domains the writer cannot see.
+  execute $ddl$
+  create or replace function public.scm_number_po() returns trigger
+  language plpgsql security definer set search_path = public as $fn$
+  begin
+    perform pg_advisory_xact_lock(hashtext('scm_po:' || new.activity_space_id::text));
+    select coalesce(max(number), 0) + 1 into new.number from public.scm_purchase_orders where activity_space_id = new.activity_space_id;
+    return new;
+  end $fn$;
+  revoke all on function public.scm_number_po() from public, anon, authenticated;
+  $ddl$;
+
+  -- The month's committed spend in the policy currency, across every Domain:
+  -- the budget is the Space's, so the planner's authority is judged against
+  -- all of it. Only the total is returned.
+  execute $ddl$
+  create or replace function public.scm_committed_spend(p_space uuid, p_from date, p_to date, p_currency text) returns numeric
+  language plpgsql stable security definer set search_path = public as $fn$
+  begin
+    if not public.is_activity_space_member(p_space) then raise exception 'Not a member of this Space'; end if;
+    return coalesce((
+      select sum(l.quantity * l.unit_cost)
+        from public.scm_purchase_orders o join public.scm_po_lines l on l.po_id = o.id
+       where o.activity_space_id = p_space and o.currency = p_currency
+         and o.status not in ('draft', 'cancelled') and o.ordered_on between p_from and p_to), 0);
+  end $fn$;
+  revoke all on function public.scm_committed_spend(uuid, date, date, text) from public, anon;
+  grant execute on function public.scm_committed_spend(uuid, date, date, text) to authenticated;
   $ddl$;
 end $$;

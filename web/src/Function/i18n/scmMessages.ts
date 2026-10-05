@@ -526,6 +526,8 @@ const ROWS: readonly Row[] = [
   ["Cancelled", "取消", "취소됨", "Annulée", "Cancelado"],
   // Domain scope: which Domain a location, supplier or item belongs to
   ["The policy applies to the whole Space, every Domain included.", "方針は Space 全体に適用されます（すべての Domain を含む）。", "방침은 모든 Domain을 포함해 Space 전체에 적용됩니다.", "La politique s'applique à tout le Space, tous les Domains compris.", "La política se aplica a todo el Space, con todos sus Domains."],
+  ["Not a member of this Space or Domain", "この Space か Domain のメンバーではありません", "이 Space 또는 Domain의 멤버가 아닙니다", "Vous n'êtes pas membre de ce Space ou de ce Domain", "No eres miembro de este Space o Domain"],
+  ["This Domain holds SCM locations, suppliers or items. Move them to the Space or another Domain first.", "この Domain には SCM の拠点・仕入先・品目があります。先に Space か別の Domain へ移してください。", "이 Domain에는 SCM 거점·공급업체·품목이 있습니다. 먼저 Space나 다른 Domain으로 옮기세요.", "Ce Domain contient des sites, fournisseurs ou articles SCM. Déplacez-les d'abord vers le Space ou un autre Domain.", "Este Domain tiene ubicaciones, proveedores o artículos de SCM. Muévelos primero al Space o a otro Domain."],
   ["Shared by the Space", "Space で共有", "Space에서 공유", "Partagé par le Space", "Compartido por el Space"],
   ["Unknown Domain", "不明な Domain", "알 수 없는 Domain", "Domain inconnu", "Domain desconocido"],
   ["Everything", "すべて", "전체", "Tout", "Todo"],

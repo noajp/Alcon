@@ -36,7 +36,8 @@ export interface ScmMovementRecord {
   /** The movement this one reverses, and whether this one has been reversed. */
   reversesId: string | null; reversed: boolean;
 }
-export interface ScmLedgerFilter { itemId?: string | null; locationId?: string | null; kind?: ScmMovementKind | null; from?: string | null; to?: string | null }
+/** locationIds: the scope's locations, when no single location is chosen. */
+export interface ScmLedgerFilter { itemId?: string | null; locationId?: string | null; locationIds?: string[] | null; kind?: ScmMovementKind | null; from?: string | null; to?: string | null }
 
 /** The stock ledger, newest first, a page at a time. */
 export function useScmLedger(spaceId: string | null, filter: ScmLedgerFilter, limit: number) {
@@ -50,6 +51,10 @@ export function useScmLedger(spaceId: string | null, filter: ScmLedgerFilter, li
       let request = supabase.from('scm_movements').select('*', { count: 'exact' }).eq('activity_space_id', spaceId!);
       if (filter.itemId) request = request.eq('item_id', filter.itemId);
       if (filter.locationId) request = request.eq('location_id', filter.locationId);
+      else if (filter.locationIds) {
+        if (!filter.locationIds.length) return { total: 0, rows: [] as ScmMovementRecord[] };
+        request = request.in('location_id', filter.locationIds);
+      }
       if (filter.kind) request = request.eq('kind', filter.kind);
       if (filter.from) request = request.gte('occurred_on', filter.from);
       if (filter.to) request = request.lte('occurred_on', filter.to);
@@ -88,6 +93,8 @@ export interface ScmData {
   demand: ScmDemandPoint[];
   orders: (ScmPurchaseOrder & { rationale: string | null; elementId: string | null; createdAt: string })[];
   runs: ScmRun[];
+  /** The Space's committed spend this month, across Domains the viewer cannot see. */
+  committedThisMonth: number;
 }
 
 const KEY = (spaceId: string | null) => ['scm', spaceId] as const;
@@ -120,7 +127,8 @@ async function fetchScm(spaceId: string, today: string): Promise<ScmData> {
     monthlyBudget: numOrNull(policyRow.monthly_budget), currency: String(policyRow.currency ?? 'JPY'),
   } : DEFAULT_POLICY;
   const since = addDays(today, -365);
-  const [locations, suppliers, items, stock, orders, demand, runs] = await Promise.all([
+  const monthStart = `${today.slice(0, 8)}01`;
+  const [locations, suppliers, items, stock, orders, demand, runs, spend] = await Promise.all([
     all('locations', 'scm_locations', spaceId),
     all('suppliers', 'scm_suppliers', spaceId),
     all('items', 'scm_items', spaceId),
@@ -131,10 +139,12 @@ async function fetchScm(spaceId: string, today: string): Promise<ScmData> {
       .range(from, to) as unknown as Page,
     row => `${row.item_id}:${row.location_id}:${row.day}`),
     supabase.from('scm_autopilot_runs').select('*').eq('activity_space_id', spaceId).order('ran_at', { ascending: false }).limit(60),
+    supabase.rpc('scm_committed_spend', { p_space: spaceId, p_from: monthStart, p_to: today, p_currency: policy.currency }),
   ]);
   if (runs.error) throw new Error(runs.error.message);
+  if (spend.error) throw new Error(spend.error.message);
   return {
-    spaceId, today, policy, hasPolicy: !!policyRow,
+    spaceId, today, policy, hasPolicy: !!policyRow, committedThisMonth: num(spend.data),
     locations: locations.map(row => ({ id: String(row.id), name: String(row.name), code: (row.code as string | null) ?? null, domainId: (row.domain_id as string | null) ?? null }))
       .sort((a, b) => a.name.localeCompare(b.name)),
     suppliers: suppliers.map(row => ({
@@ -468,12 +478,14 @@ export function useScmActions(spaceId: string | null) {
         const activity_space_id = space();
         const domain_id = domainId;
         const suppliers = new Map(current.suppliers.map(supplier => [supplier.name.trim().toLowerCase(), supplier.id]));
+        const supplierDomain = new Map(current.suppliers.map(supplier => [supplier.id, supplier.domainId ?? null]));
         const locations = new Map(current.locations.map(location => [location.name.trim().toLowerCase(), location.id]));
         for (const row of rows) {
           const name = row.supplier?.trim();
           if (name && !suppliers.has(name.toLowerCase())) {
             const created = await check(supabase.from('scm_suppliers').insert({ activity_space_id, domain_id, name, lead_time_days: row.leadTimeDays ?? 14, currency: row.currency ?? current.policy.currency }).select('id').single());
             suppliers.set(name.toLowerCase(), created.id as string);
+            supplierDomain.set(created.id as string, domain_id);
           }
         }
         if (!locations.size && rows.some(row => row.onHand !== null)) {
@@ -487,26 +499,39 @@ export function useScmActions(spaceId: string | null) {
             locations.set(name.toLowerCase(), created.id as string);
           }
         }
-        const existing = new Map(current.items.map(item => [item.sku, item.id]));
+        // SKUs are unique in the Space: match against every item the viewer
+        // can see, not only the ones in the current scope.
+        const existing = new Map<string, { id: string; domainId: string | null }>();
+        const skus = [...new Set(rows.map(row => row.sku.trim()))];
+        for (let index = 0; index < skus.length; index += 100) {
+          const found = await check(supabase.from('scm_items').select('id, sku, domain_id').eq('activity_space_id', activity_space_id).in('sku', skus.slice(index, index + 100)));
+          for (const item of found as Row[]) existing.set(String(item.sku), { id: String(item.id), domainId: (item.domain_id as string | null) ?? null });
+        }
         let items = 0;
         let counts = 0;
         for (const row of rows) {
           const patch: Row = { sku: row.sku.trim(), name: row.name.trim() };
           if (row.category !== null) patch.category = row.category;
           if (row.unit !== null) patch.unit = row.unit;
-          if (row.supplier) patch.supplier_id = suppliers.get(row.supplier.trim().toLowerCase()) ?? null;
+          const match = existing.get(patch.sku as string);
+          if (row.supplier) {
+            const supplierId = suppliers.get(row.supplier.trim().toLowerCase()) ?? null;
+            // An item takes a supplier only of its own Domain or the Space's.
+            const supplierScope = supplierId ? supplierDomain.get(supplierId) ?? null : null;
+            if (!supplierScope || supplierScope === (match ? match.domainId : domain_id)) patch.supplier_id = supplierId;
+          }
           if (row.unitCost !== null) patch.unit_cost = row.unitCost;
           if (row.unitPrice !== null) patch.unit_price = row.unitPrice;
           if (row.currency !== null) patch.currency = row.currency;
           if (row.moq !== null) patch.moq = row.moq;
           if (row.orderMultiple !== null) patch.order_multiple = row.orderMultiple;
           if (row.dailyDemand !== null) patch.baseline_daily_demand = row.dailyDemand;
-          let itemId = existing.get(patch.sku as string);
+          let itemId = match?.id;
           if (itemId) await check(supabase.from('scm_items').update(patch).eq('id', itemId));
           else {
             if (patch.currency === undefined) patch.currency = current.policy.currency;
             itemId = (await check(supabase.from('scm_items').insert({ activity_space_id, domain_id, ...patch }).select('id').single())).id as string;
-            existing.set(patch.sku as string, itemId);
+            existing.set(patch.sku as string, { id: itemId, domainId: domain_id });
           }
           items += 1;
           if (row.onHand !== null) {

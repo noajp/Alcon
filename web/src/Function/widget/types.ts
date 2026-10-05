@@ -80,7 +80,7 @@ export interface WidgetHost {
   /** Present on space-wide boards (Home). */
   explorerData?: ExplorerData;
   onRefresh?: () => void;
-  onNavigate?: (nav: { objectId?: string; strategyId?: string; domainId?: string | null; tableId?: string; scmView?: ScmView; scmNode?: string | null }) => void;
+  onNavigate?: (nav: { objectId?: string; strategyId?: string; domainId?: string | null; tableId?: string; scmView?: ScmView; scmNode?: string | null; scmScope?: string | null; scmLocationId?: string | null }) => void;
   onViewChange?: (view: string) => void;
 }
 
