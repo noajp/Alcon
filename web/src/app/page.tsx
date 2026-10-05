@@ -335,7 +335,8 @@ function WorkspaceContent({
     setCopilotOpen(next);
     try { localStorage.setItem('alcon.copilot.open', next ? '1' : '0'); } catch { /* ignore */ }
   };
-  const [createType, setCreateType] = useState<CreateType | null>(null);
+  // A Space with no Domain has nothing to show yet, so it opens on Create Domain.
+  const [createType, setCreateType] = useState<CreateType | null>(() => (domains.length === 0 ? 'domain' : null));
   const [pendingNewNote, setPendingNewNote] = useState(0);
   // The workspace owns the Object creation popup.
   const [objectPopupOpen, setObjectPopupOpen] = useState(false);
