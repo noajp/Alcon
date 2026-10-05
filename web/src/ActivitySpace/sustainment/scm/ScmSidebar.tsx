@@ -1,10 +1,12 @@
 'use client';
 
 import { useMemo, useState, type ComponentType } from 'react';
-import { AlertTriangle, Bot, Boxes, ScrollText, FlaskConical, LayoutDashboard, MapPin, Search, Settings2, ShoppingCart, Truck, Warehouse, X } from 'lucide-react';
+import { AlertTriangle, Bot, Boxes, Layers, ScrollText, FlaskConical, LayoutDashboard, MapPin, Search, Settings2, ShoppingCart, Truck, Warehouse, X } from 'lucide-react';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useScmData, useScmPlan } from '@/hooks/useScm';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
+import { scopeScmData, SPACE_SCOPE } from './scmScope';
 import type { NavigationState } from '@/types/navigation';
 import { SCM_VIEW_LABEL, scmViewOf, type ScmView } from './scmNavigation';
 import type { ScmNode } from './scmEngine';
@@ -13,8 +15,9 @@ import { Dot } from './ScmParts';
 import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 
 // The SCM sidebar is the App's map: where to go (with live counts, so the
-// sidebar alone says where attention is needed), which location everything is
-// filtered to, a jump-to-item search, and the autopilot's state.
+// sidebar alone says where attention is needed), whose supply (a Domain's or
+// the Space's) and which location everything is filtered to, a jump-to-item
+// search, and the autopilot's state.
 
 const ICONS: Record<ScmView, ComponentType<{ size?: number }>> = {
   tower: LayoutDashboard, exceptions: AlertTriangle, replenish: ShoppingCart, orders: Truck,
@@ -32,8 +35,21 @@ export function ScmSidebar({ navigation, onNavigate, onOpen }: {
 }) {
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
-  const { data } = useScmData(spaceId);
+  const { data: everything } = useScmData(spaceId);
+  const { data: spaceDomains } = useSustainmentDomains();
+  const scope = navigation.scmScope ?? null;
+  const data = useMemo(() => everything ? scopeScmData(everything, scope) : null, [everything, scope]);
   const plan = useScmPlan(data);
+  // Scopes worth offering: the Domains that hold supply records, and the one shown.
+  const scopes = useMemo(() => {
+    if (!everything) return [];
+    const used = new Set<string>();
+    for (const record of [...everything.locations, ...everything.suppliers, ...everything.items]) if (record.domainId) used.add(record.domainId);
+    if (scope && scope !== SPACE_SCOPE) used.add(scope);
+    if (!used.size) return [];
+    const named = [...used].map(id => ({ id, name: spaceDomains.find(domain => domain.id === id)?.name ?? t('Unknown Domain') })).sort((a, b) => a.name.localeCompare(b.name));
+    return [{ id: null as string | null, name: t('Everything') }, { id: SPACE_SCOPE as string | null, name: t('Shared by the Space') }, ...named];
+  }, [everything, spaceDomains, scope, t]);
   const [query, setQuery] = useState('');
   const view = scmViewOf(navigation);
   const locationId = navigation.scmLocationId && data?.locations.some(location => location.id === navigation.scmLocationId) ? navigation.scmLocationId : null;
@@ -104,6 +120,15 @@ export function ScmSidebar({ navigation, onNavigate, onOpen }: {
     <div className="flex flex-col">{PRIMARY.map(navRow)}</div>
     <div className="my-2 h-px bg-[var(--border-subtle)]" />
     <div className="flex flex-col">{SECONDARY.map(navRow)}</div>
+
+    {scopes.length > 0 && <>
+      <SidebarSectionLabel>{t('Domains')}</SidebarSectionLabel>
+      <div className="flex flex-col">
+        {scopes.map(entry => <SidebarRow key={entry.id ?? 'all'} active={scope === entry.id} buttonProps={{ 'aria-pressed': scope === entry.id, 'aria-current': undefined }}
+          icon={<Layers size={16} />} label={entry.name}
+          onClick={() => { onOpen(); onNavigate({ scmScope: entry.id, scmLocationId: null, scmNode: null }); }} />)}
+      </div>
+    </>}
 
     {data && data.locations.length > 1 && <>
       <SidebarSectionLabel>{t('Locations')}</SidebarSectionLabel>

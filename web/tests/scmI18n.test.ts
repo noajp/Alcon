@@ -14,8 +14,13 @@ const SCM_DIR = join(__dirname, '../src/ActivitySpace/sustainment/scm');
 function scmMessageKeys(): string[] {
   const keys = new Set<string>();
   const literal = /'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"/g;
-  for (const file of readdirSync(SCM_DIR).filter(name => /\.tsx?$/.test(name))) {
-    const source = readFileSync(join(SCM_DIR, file), 'utf8');
+  // The SCM App, and the widget that shows its supply on other boards.
+  const files = [
+    ...readdirSync(SCM_DIR).filter(name => /\.tsx?$/.test(name)).map(name => join(SCM_DIR, name)),
+    join(__dirname, '../src/Function/widget/widgets/ScmRiskWidget.tsx'),
+  ];
+  for (const file of files) {
+    const source = readFileSync(file, 'utf8');
     const call = /(?<![\w.$])t\(/g;
     for (let match = call.exec(source); match; match = call.exec(source)) {
       // The first argument runs to the top-level comma or closing paren.

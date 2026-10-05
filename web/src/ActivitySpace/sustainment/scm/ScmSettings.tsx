@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type FormEvent } from 'react';
+import { useContext, useMemo, useState, type FormEvent } from 'react';
 import { ArrowRight, Boxes, ClipboardPaste, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
@@ -9,13 +9,15 @@ import type { ScmActions, ScmData } from '@/hooks/useScm';
 import type { ScmPolicy } from './scmEngine';
 import { parseScmImport } from './scmImport';
 import { formatMoney } from './scmText';
-import { Section, SCM_INPUT, SCM_LABEL } from './ScmParts';
+import { ScmDomainSelect, Section, SCM_INPUT, SCM_LABEL } from './ScmParts';
+import { ScmSurfaceContext, useScmSurface } from './scmSurface';
 
 // The intent the planner works within (service level, horizon, budget,
 // approval authority), where stock lives, and getting data in.
 
 export function ScmPolicyForm({ data, actions }: { data: ScmData; actions: ScmActions }) {
   const { t, locale } = useI18n();
+  const scoped = (useContext(ScmSurfaceContext)?.scope ?? null) !== null;
   const policy = data.policy;
   const [form, setForm] = useState(() => ({
     serviceLevel: String(Math.round(policy.serviceLevel * 1000) / 10), horizonDays: String(policy.horizonDays), reviewDays: String(policy.reviewDays),
@@ -55,6 +57,7 @@ export function ScmPolicyForm({ data, actions }: { data: ScmData; actions: ScmAc
   </label>;
 
   return <form onSubmit={submit} className="space-y-8">
+    {scoped && <p className="text-xs text-muted-foreground">{t('The policy applies to the whole Space, every Domain included.')}</p>}
     <Section title={t('Service and planning')} description={t('The intent every recommendation is sized to.')}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {field('serviceLevel', t('Service level (%)'), t('Chance of not running out during a replenishment cycle.'))}
@@ -83,33 +86,38 @@ export function ScmPolicyForm({ data, actions }: { data: ScmData; actions: ScmAc
 
 export function ScmLocations({ data, actions }: { data: ScmData; actions: ScmActions }) {
   const { t } = useI18n();
+  const { domains, scopeDomainId, domainName } = useScmSurface();
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  const [domainId, setDomainId] = useState<string | null>(scopeDomainId);
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
-  const [renaming, setRenaming] = useState<{ id: string; name: string; code: string } | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; name: string; code: string; domainId: string | null } | null>(null);
   async function rename() {
     if (!renaming?.name.trim()) return;
-    try { await actions.saveLocation(renaming.id, { name: renaming.name, code: renaming.code }); setRenaming(null); setError(null); }
+    try { await actions.saveLocation(renaming.id, { name: renaming.name, code: renaming.code, domainId: renaming.domainId }); setRenaming(null); setError(null); }
     catch (cause) { setError(t(cause instanceof Error ? cause.message : String(cause))); }
   }
   async function add(event: FormEvent) {
     event.preventDefault();
     if (!name.trim()) return;
-    try { await actions.saveLocation(null, { name, code }); setName(''); setCode(''); setError(null); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    try { await actions.saveLocation(null, { name, code, domainId }); setName(''); setCode(''); setError(null); }
+    catch (cause) { setError(t(cause instanceof Error ? cause.message : String(cause))); }
   }
-  return <Section title={t('Locations')} description={t('Warehouses, stores or sites that hold stock. Each item is planned per location.')}>
+  return <Section title={t('Locations')} description={t('Warehouses, stores or sites that hold stock. A location that belongs to a Domain, and its stock and orders, are seen only by the people who can see that Domain.')}>
     <ul className="divide-y divide-[var(--border-subtle)]">{data.locations.map(location => {
       return <li key={location.id} className="flex items-center gap-3 py-2 text-sm">
         {renaming?.id === location.id ? <form className="flex flex-1 flex-wrap items-center gap-2" onSubmit={event => { event.preventDefault(); void rename(); }}>
           <input autoFocus aria-label={t('Name')} className={`${SCM_INPUT} min-w-40 flex-1`} value={renaming.name} onChange={event => setRenaming({ ...renaming, name: event.target.value })} />
           <input aria-label={t('Code')} className={`${SCM_INPUT} w-24`} value={renaming.code} onChange={event => setRenaming({ ...renaming, code: event.target.value })} />
+          <ScmDomainSelect label={t('Domain')} className={`${SCM_INPUT} w-48`} value={renaming.domainId} onChange={value => setRenaming({ ...renaming, domainId: value })} domains={domains} />
           <Button type="submit" size="sm" variant="primary" disabled={!renaming.name.trim()}>{t('Save')}</Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => setRenaming(null)}>{t('Cancel')}</Button>
         </form> : <>
-          <span className="flex-1">{location.name}</span><span className="text-xs text-muted-foreground">{location.code}</span>
-          <Button size="icon-sm" variant="ghost" aria-label={t('Rename {name}', { name: location.name })} onClick={() => setRenaming({ id: location.id, name: location.name, code: location.code ?? '' })}><Pencil size={14} /></Button>
+          <span className="min-w-0 flex-1 truncate">{location.name}</span>
+          <span className="truncate text-xs text-muted-foreground">{domainName(location.domainId) ?? t('Shared by the Space')}</span>
+          <span className="text-xs text-muted-foreground">{location.code}</span>
+          <Button size="icon-sm" variant="ghost" aria-label={t('Edit {name}', { name: location.name })} onClick={() => setRenaming({ id: location.id, name: location.name, code: location.code ?? '', domainId: location.domainId ?? null })}><Pencil size={14} /></Button>
           <Button size="icon-sm" variant="ghost" aria-label={t('Delete {name}', { name: location.name })} onClick={() => setConfirm(location.id)}><Trash2 size={14} /></Button>
         </>}
       </li>;
@@ -118,6 +126,7 @@ export function ScmLocations({ data, actions }: { data: ScmData; actions: ScmAct
     <form onSubmit={add} className="flex flex-wrap items-end gap-2">
       <label className={`${SCM_LABEL} min-w-48 flex-1`}><span>{t('Name')}</span><input className={SCM_INPUT} value={name} onChange={event => setName(event.target.value)} /></label>
       <label className={`${SCM_LABEL} w-28`}><span>{t('Code')}</span><input className={SCM_INPUT} value={code} onChange={event => setCode(event.target.value)} /></label>
+      <label className={`${SCM_LABEL} w-48`}><span>{t('Domain')}</span><ScmDomainSelect label={t('Domain')} value={domainId} onChange={setDomainId} domains={domains} /></label>
       <Button type="submit" variant="secondary" disabled={!name.trim()}><Plus size={14} />{t('Add location')}</Button>
     </form>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
@@ -128,6 +137,8 @@ export function ScmLocations({ data, actions }: { data: ScmData; actions: ScmAct
 
 export function ScmImport({ data, actions, onDone }: { data: ScmData; actions: ScmActions; onDone?: () => void }) {
   const { t } = useI18n();
+  // Imported while SCM shows one Domain, the new records belong to it.
+  const scopeDomainId = useContext(ScmSurfaceContext)?.scopeDomainId ?? null;
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -137,7 +148,7 @@ export function ScmImport({ data, actions, onDone }: { data: ScmData; actions: S
     if (!parsed?.rows.length) return;
     setBusy(true); setError(null);
     try {
-      const outcome = await actions.importRows(parsed.rows, data);
+      const outcome = await actions.importRows(parsed.rows, data, scopeDomainId);
       setResult(t('Imported {items} items and {counts} stock counts.', outcome));
       setText('');
       onDone?.();

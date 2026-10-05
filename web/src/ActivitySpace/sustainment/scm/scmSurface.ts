@@ -6,6 +6,7 @@ import type { ScmActions, ScmData } from '@/hooks/useScm';
 import type { ScmItem, ScmNode, ScmPlan } from './scmEngine';
 import type { MovementMode } from './ScmForms';
 import type { ScmView } from './scmNavigation';
+import type { ScmScope } from './scmScope';
 
 export type ScmDialog =
   | { kind: 'item'; item: ScmItem | null }
@@ -15,7 +16,16 @@ export type ScmDialog =
 
 /** What every SCM pane needs: the snapshot, its plan, writes and navigation. */
 export interface ScmSurface {
+  /** The snapshot narrowed to the scope. */
   data: ScmData;
+  /** Which records the panes cover: null = all, 'space' = shared by the Space, or a Domain id. */
+  scope: ScmScope;
+  /** The Domain new records start in: the scope's Domain, or none. */
+  scopeDomainId: string | null;
+  /** The Space's Domains the viewer can see, for choosing where a record belongs. */
+  domains: { id: string; name: string }[];
+  /** A record's Domain name; null when it is shared by the Space. */
+  domainName: (id: string | null | undefined) => string | null;
   plan: ScmPlan;
   actions: ScmActions;
   /** The location every pane is filtered to; null = all locations. */

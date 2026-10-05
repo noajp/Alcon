@@ -87,7 +87,7 @@ export function ScmInventory({ health, onHealth, catalog, onCatalog }: { health:
 /** Every item the Space knows, stocked or not, active or archived. */
 function ScmCatalog() {
   const { t, locale } = useI18n();
-  const { data, plan, openDialog, supplierName } = useScmSurface();
+  const { data, plan, openDialog, supplierName, domainName } = useScmSurface();
   const [query, setQuery] = useState('');
   const [archived, setArchived] = useState(false);
   const needle = query.trim().toLowerCase();
@@ -116,7 +116,7 @@ function ScmCatalog() {
         <tbody>{rows.map(item => {
           const held = stock.get(item.id);
           return <tr key={item.id} className="cursor-pointer border-b border-[var(--border-subtle)] hover:bg-muted/40" onClick={() => openDialog({ kind: 'item', item })}>
-            <td className={`${TD} max-w-72`}><span className="block truncate font-medium">{item.name}</span><span className="block truncate text-xs text-muted-foreground">{item.sku} · {item.unit}</span></td>
+            <td className={`${TD} max-w-72`}><span className="block truncate font-medium">{item.name}</span><span className="block truncate text-xs text-muted-foreground">{[item.sku, item.unit, domainName(item.domainId)].filter(Boolean).join(' · ')}</span></td>
             <td className={`${TD} text-muted-foreground`}>{item.category ?? '—'}</td>
             <td className={`${TD} max-w-48 truncate text-muted-foreground`}>{supplierName(item.supplierId)}</td>
             <td className={`${TD} text-right`}>{formatMoney(item.unitCost, item.currency, locale)}</td>
@@ -249,7 +249,7 @@ export function ScmOrders() {
 
 export function ScmSuppliers() {
   const { t, locale } = useI18n();
-  const { plan, data, openDialog, go } = useScmSurface();
+  const { plan, data, openDialog, go, domainName } = useScmSurface();
   const records = new Map(data.suppliers.map(supplier => [supplier.id, supplier]));
   return <div className="space-y-4">
     <div className="flex justify-between gap-2">
@@ -265,6 +265,7 @@ export function ScmSuppliers() {
             <div className="min-w-0 flex-1">
               <h3 className="truncate text-sm font-semibold">{supplier.name}</h3>
               <p className="truncate text-xs text-muted-foreground">{[record?.contact, record?.email].filter(Boolean).join(' · ') || t('No contact recorded')}</p>
+              {record?.domainId && <p className="truncate text-xs text-muted-foreground">{domainName(record.domainId)}</p>}
             </div>
             <Pill tone={tone}>{supplier.score === null ? t('No history') : t('Score {n}', { n: supplier.score })}</Pill>
           </div>
