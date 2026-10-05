@@ -356,6 +356,15 @@ function tryStartEarlier(board: Board, element: SimElement, today: string): Plan
   const span = elementSpan(element);
   if (!span || !element.due_date || span.start <= today) return null;
   const end = board.index.get(span.end) ?? board.days.length - 1;
+  // The due day stays in the stretch whatever the start, with some of this
+  // Element on it. If another holder's other work already fills that day,
+  // no start can clear it — skip the search.
+  const own = perDay(element);
+  for (const wid of element.holders.keys()) {
+    const load = board.load.get(wid);
+    const cap = board.capacity.get(wid);
+    if (load && cap && end < load.length && load[end] - own >= cap[end] - EPS) return null;
+  }
   const before = holdersOver(board, element);
   for (let start = addDays(span.start, -1); start >= today; start = addDays(start, -1)) {
     if (isWeekend(start)) continue;
@@ -442,7 +451,8 @@ export function planRebalance(input: PlanInput): Plan {
   const reschedule = (el: SimElement, wid: string, issue: PlanIssue, mode: 'start-earlier' | 'pull-in' | 'postpone', to: PlanDates | null): boolean => {
     if (!to) return false;
     const id = proposalId([mode, el.id, to.start, to.due]);
-    if (!allowed(id, [wid])) return false;
+    // New dates move every holder's load, so any of them counts as involved.
+    if (!allowed(id, [...el.holders.keys()])) return false;
     const before = overHours(board, wid);
     const from = datesOf(el);
     setDates(board, el, to);
@@ -475,6 +485,12 @@ export function planRebalance(input: PlanInput): Plan {
   const overloaded = [...board.workers.keys()]
     .filter((w) => eligible(board.workers.get(w)!) && overHours(board, w) > EPS)
     .sort((a, b) => overHours(board, b) - overHours(board, a) || (a < b ? -1 : 1));
+  // A fix that did not fit stays unfit for the rest of the pass, near enough:
+  // later proposals mostly add load to the people they hand work to. Without
+  // remembering, every round re-tries every candidate at every tier.
+  const noEarlier = new Set<string>();
+  const noTarget = new Set<string>();
+  const noLater = new Set<string>();
   for (const wid of overloaded) {
     for (let guard = 0; guard < 25 && overHours(board, wid) > EPS; guard++) {
       const load = board.load.get(wid)!;
@@ -492,15 +508,31 @@ export function planRebalance(input: PlanInput): Plan {
         .sort((a, b) => Number(a.el.status === 'in_progress' || a.el.status === 'review') - Number(b.el.status === 'in_progress' || b.el.status === 'review')
           || PRIORITY_RANK[a.el.priority ?? 'medium'] - PRIORITY_RANK[b.el.priority ?? 'medium']
           || b.c - a.c || (a.el.id < b.el.id ? -1 : 1));
-      let progressed = false;
-      for (const { el } of candidates) {
-        if (reschedule(el, wid, 'overload', 'start-earlier', tryStartEarlier(board, el, today))
-          || reassign(el, wid, 'overload')
-          || reschedule(el, wid, 'overload', 'postpone', tryPostpone(board, el))) {
-          progressed = true;
-          break;
-        }
-      }
+      // Cheapest fix first across every candidate, not per candidate: a
+      // hand-over of the third Element keeps every date, and must win over
+      // breaking the first Element's deadline.
+      const tiers: ((el: SimElement) => boolean)[] = [
+        (el) => {
+          if (noEarlier.has(el.id)) return false;
+          if (reschedule(el, wid, 'overload', 'start-earlier', tryStartEarlier(board, el, today))) return true;
+          noEarlier.add(el.id);
+          return false;
+        },
+        (el) => {
+          const key = `${el.id}:${wid}`;
+          if (noTarget.has(key)) return false;
+          if (reassign(el, wid, 'overload')) return true;
+          noTarget.add(key);
+          return false;
+        },
+        (el) => {
+          if (noLater.has(el.id)) return false;
+          if (reschedule(el, wid, 'overload', 'postpone', tryPostpone(board, el))) return true;
+          noLater.add(el.id);
+          return false;
+        },
+      ];
+      const progressed = tiers.some((tier) => candidates.some(({ el }) => tier(el)));
       if (!progressed) break;
     }
   }
