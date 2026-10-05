@@ -61,7 +61,7 @@ export function WorkloadSidebar({ navigation, onNavigate, onOpen }: {
           <span className={`text-[26px] font-semibold leading-none tabular-nums ${team?.utilization != null && team.utilization > 1 ? 'text-[var(--status-danger)]' : 'text-foreground'}`}>
             {team?.utilization != null ? `${Math.round(team.utilization * 100)}%` : '—'}
           </span>
-          <span className="min-w-0 truncate text-[11px] text-muted-foreground">{t('team load ahead')}</span>
+          <span className="min-w-0 truncate text-[11px] text-muted-foreground">{published?.ahead === false ? t('team load in view') : t('team load ahead')}</span>
         </div>
         {team?.utilization != null && <LoadMeter value={team.utilization} className="mt-2" />}
         {team && (
@@ -75,10 +75,12 @@ export function WorkloadSidebar({ navigation, onNavigate, onOpen }: {
 
       <div className="mt-1 space-y-px">
         <SidebarRow
-          active={planOpen}
+          active={planOpen && published?.proposals !== null}
+          disabled={published?.proposals === null}
+          title={published?.proposals === null ? t('Rebalancing reads everyone’s whole load. Choose All Domains to plan.') : undefined}
           icon={<Scale size={16} />}
           label={t('Rebalance plan')}
-          meta={published && published.proposals > 0
+          meta={published?.proposals
             ? <span className="rounded-full bg-[var(--accent-default)] px-1.5 py-px text-[10px] font-semibold text-white">{published.proposals}</span>
             : null}
           buttonProps={{ 'aria-pressed': planOpen, 'aria-current': undefined }}
@@ -95,18 +97,20 @@ export function WorkloadSidebar({ navigation, onNavigate, onOpen }: {
 
       {!published ? (
         <p className="px-2.5 py-3 text-[12px] text-muted-foreground">{t('Loading workload…')}</p>
+      ) : published.failed ? (
+        <p role="alert" className="px-2.5 py-3 text-[12px] text-[var(--status-danger)]">{t('Could not load the work in this scope.')}</p>
       ) : (
         <>
           {people.length > 0 && <>
             <SidebarSectionLabel className="mt-4">{t('People')}</SidebarSectionLabel>
             <div className="space-y-px">
-              {people.map((p) => <PersonRow key={p.worker.id} person={p} active={focus === p.worker.id} onClick={() => focusOn(p.worker.id)} />)}
+              {people.map((p) => <PersonRow key={p.worker.id} person={p} active={focus === p.worker.id} ahead={published.ahead} onClick={() => focusOn(p.worker.id)} />)}
             </div>
           </>}
           {agents.length > 0 && <>
             <SidebarSectionLabel className="mt-4">{t('AI agents')}</SidebarSectionLabel>
             <div className="space-y-px">
-              {agents.map((p) => <PersonRow key={p.worker.id} person={p} active={focus === p.worker.id} onClick={() => focusOn(p.worker.id)} />)}
+              {agents.map((p) => <PersonRow key={p.worker.id} person={p} active={focus === p.worker.id} ahead={published.ahead} onClick={() => focusOn(p.worker.id)} />)}
             </div>
           </>}
           {people.length + agents.length === 0 && (
@@ -128,12 +132,14 @@ function attentionOrder(a: WorkloadPerson, b: WorkloadPerson): number {
     || a.worker.name.localeCompare(b.worker.name);
 }
 
-function PersonRow({ person, active, onClick }: { person: WorkloadPerson; active: boolean; onClick: () => void }) {
+function PersonRow({ person, active, ahead, onClick }: { person: WorkloadPerson; active: boolean; ahead: boolean; onClick: () => void }) {
   const { t } = useI18n();
   const { worker, utilization, overDays, awayDays, dueAway } = person;
   const over = overDays > 0;
   const notes = [
-    utilization !== null ? t('{p}% of capacity ahead', { p: Math.round(utilization * 100) }) : t('No hours ahead'),
+    utilization !== null
+      ? (ahead ? t('{p}% of capacity ahead', { p: Math.round(utilization * 100) }) : t('{p}% of capacity in view', { p: Math.round(utilization * 100) }))
+      : (ahead ? t('No hours ahead') : t('No hours in view')),
     over ? t('{n} days over', { n: overDays }) : null,
     awayDays > 0 ? t('away {n}d', { n: awayDays }) : null,
     dueAway > 0 ? t('{n} due while away', { n: dueAway }) : null,

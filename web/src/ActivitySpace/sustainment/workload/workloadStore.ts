@@ -35,7 +35,12 @@ export interface WorkloadPerson {
 export interface WorkloadPublished {
   people: WorkloadPerson[];
   team: WorkloadTeamSummary;
-  proposals: number;
+  /** Readings run from today; false when the whole window is in the past. */
+  ahead: boolean;
+  /** The surface could not read the board; it shows Retry. */
+  failed: boolean;
+  /** Proposals over the whole Space; null when a filter makes planning unsafe. */
+  proposals: number | null;
 }
 
 type State = {
@@ -132,7 +137,7 @@ function signature(p: WorkloadPublished | null): string {
   if (!p) return '';
   const pct = (n: number | null) => (n === null ? '-' : Math.round(n * 1000));
   return [
-    p.proposals,
+    p.proposals ?? '-', p.ahead, p.failed,
     pct(p.team.utilization), p.team.overloadedPeople, p.team.overDays, Math.round(p.team.hours), pct(p.team.aiShare),
     ...p.people.map((x) => `${x.worker.id}|${x.worker.name}|${x.worker.avatar_url ?? ''}|${x.worker.type}|${pct(x.utilization)}|${x.overDays}|${x.awayDays}|${x.dueAway}`),
   ].join('\n');

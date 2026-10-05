@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, type UseQueryResult } from '@tanstack/react-query';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { fetchExplorerData } from '@/Function/sync/explorerData';
 import type { ExplorerData } from '@/Function/sync/explorerPatch';
@@ -72,6 +72,27 @@ export async function fetchWorkloadObject(objectId: string, signal?: AbortSignal
   return { objects: [{ ...object, elements: rows }], rootElements: [] };
 }
 
+type WorkloadCombine = (results: UseQueryResult<ExplorerData, Error>[]) => { results: UseQueryResult<ExplorerData, Error>[]; elements: ElementWithDetails[] };
+const combines = new Map<string, WorkloadCombine>();
+
+/** Folds the explorer queries of one scope into its Elements. The same
+ * function is handed back for the same scope, so useQueries keeps the result
+ * — and the Elements their identity — until a query result changes. */
+function combineWorkload(scopeKey: string): WorkloadCombine {
+  const cached = combines.get(scopeKey);
+  if (cached) return cached;
+  const [domainIds, objectIds] = JSON.parse(scopeKey) as [string[], string[]];
+  const combine: WorkloadCombine = (results) => ({
+    results,
+    elements: selectWorkloadElements(results.flatMap((query, index) => query.data
+      ? [{ domainId: domainIds[index] ?? null, data: query.data }] : []), domainIds, objectIds),
+  });
+  // A handful of scopes are open at a time; the cache only has to outlive a render.
+  if (combines.size > 32) combines.clear();
+  combines.set(scopeKey, combine);
+  return combine;
+}
+
 /** Workload observes the same Domain explorer entries as Execution. Optimistic
  * edits and confirmed deltas therefore update both surfaces through one cache. */
 export function useWorkloadData(scopeOverride?: WorkloadScope) {
@@ -89,7 +110,13 @@ export function useWorkloadData(scopeOverride?: WorkloadScope) {
     // Every Domain chosen is "follow all", so a Domain created later joins.
     setWorkloadDomainChoice(contextKey, next.length === accessibleIds.length && accessibleIds.every(id => next.includes(id)) ? null : next);
   };
-  const explorers = useQueries({ queries: [
+  // useQueries hands back fresh arrays every render; `combine` re-runs only
+  // when a query result or the scope changes, so the Elements keep their
+  // identity and the chart and the rebalancing plan downstream recompute
+  // only when the board does.
+  const scopeKey = JSON.stringify([domainIds, objectIds]);
+  const combine = combineWorkload(scopeKey);
+  const { results: explorers, elements } = useQueries({ combine, queries: [
     ...domainIds.map(id => ({
       queryKey: ['explorer', id],
       queryFn: () => fetchExplorerData(id),
@@ -101,8 +128,6 @@ export function useWorkloadData(scopeOverride?: WorkloadScope) {
       enabled: Boolean(userId),
     })),
   ] });
-  const elements = selectWorkloadElements(explorers.flatMap((query, index) => query.data
-    ? [{ domainId: domainIds[index] ?? null, data: query.data }] : []), domainIds, objectIds);
   // Exact guest Domain/Object tabs do not depend on the active Space's list.
   const needsDomains = !scopeOverride;
   const loading = (needsDomains && domainQuery.loading) || Boolean(userId && explorers.some(query => query.isPending));

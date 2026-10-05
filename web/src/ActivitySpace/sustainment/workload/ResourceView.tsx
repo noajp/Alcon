@@ -50,7 +50,7 @@ import {
   workloadUtilization,
   type WorkloadTeamSummary,
 } from '@/ActivitySpace/sustainment/workload/workloadModel';
-import { applyProposals, planRebalance, proposalWorkers } from '@/ActivitySpace/sustainment/workload/workloadRebalance';
+import { applyProposals, planRebalance, proposalWorkers, type Proposal } from '@/ActivitySpace/sustainment/workload/workloadRebalance';
 import {
   WORKLOAD_RANGES,
   publishWorkload,
@@ -135,13 +135,17 @@ export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', on
   // Today index within the visible window (-1 if not visible)
   const todayIdx = useMemo(() => days.findIndex(d => toDateOnlyString(d) === today), [days, today]);
   // Readings look forward: from today (when it is in view) to the end of the
-  // window. Yesterday's overload is a record, not something to act on.
+  // window. Yesterday's overload is a record, not something to act on. A
+  // window wholly in the past is read as it stands, and labelled so.
   const from = todayIdx > 0 ? todayIdx : 0;
+  const ahead = todayIdx >= 0 || toDateOnlyString(days[0]) > today;
 
   // A Space roster can supply idle Workers in its full scope. Narrow Domain
   // filters only show assignments known to belong to those Domains.
   const showIdleWorkers = !scopeOverride && selectedDomainIds.length === domains.length;
-  const grouped: Row[] = useMemo(() => {
+  // Who holds what, independent of the window — so zooming or paging the
+  // dates does not rebuild the plan's inputs.
+  const holdings = useMemo(() => {
     const byWorker = new Map<string, { worker: Worker; elements: ElementWithDetails[] }>();
     if (showIdleWorkers) {
       for (const worker of roster ?? []) byWorker.set(worker.id, { worker, elements: [] });
@@ -154,12 +158,17 @@ export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', on
         byWorker.get(wid)!.elements.push(el);
       }
     }
-    return [...byWorker.values()].map(({ worker, elements: els }) => ({ worker, elements: els, daily: computeDailyHours(els, days) }));
-  }, [elements, days, roster, showIdleWorkers]);
+    return [...byWorker.values()];
+  }, [elements, roster, showIdleWorkers]);
+  const grouped: Row[] = useMemo(
+    () => holdings.map(({ worker, elements: els }) => ({ worker, elements: els, daily: computeDailyHours(els, days) })),
+    [holdings, days],
+  );
 
   // Every Worker in scope, not just the focused one: the plan hands work to
   // whoever has room, and the sidebar lists everybody.
-  const workerIds = useMemo(() => grouped.map((r) => r.worker.id), [grouped]);
+  const scopeWorkers = useMemo(() => holdings.map((h) => h.worker), [holdings]);
+  const workerIds = useMemo(() => scopeWorkers.map((w) => w.id), [scopeWorkers]);
   const { byWorker: availability, add: addAvailability, remove: removeAvailability, loading: availabilityLoading, error: availabilityError, refetch: retryAvailability } =
     useWorkerAvailability(workerIds);
 
@@ -203,36 +212,47 @@ export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', on
   const dueAwayTotal = useMemo(() => allRows.reduce((s, r) => s + r.dueAway, 0), [allRows]);
 
   // ---- The plan ----------------------------------------------------------
+  // The plan hands work to whoever has room, so it needs everyone's whole
+  // load. A Domain filter or an embedded Domain/Object tab hides the work
+  // people hold elsewhere — a plan there would promise free hours it cannot
+  // see. It is offered only over the whole Space.
+  const canPlan = !scopeOverride && showIdleWorkers;
   const ready = !loading && !availabilityLoading && !error && !availabilityError;
-  const plan = useMemo(() => ready
-    ? planRebalance({ workers: allRows.map((r) => r.worker), spans: availability, elements, today })
-    : null, [ready, allRows, availability, elements, today]);
   const [dismissed, setDismissed] = useState<{ contextKey: string; ids: Set<string> }>({ contextKey, ids: new Set() });
   const dismissedIds = dismissed.contextKey === contextKey ? dismissed.ids : EMPTY_SET;
-  const open = useMemo(() => (plan?.proposals ?? []).filter((p) => !dismissedIds.has(p.id)), [plan, dismissedIds]);
-  const shown = useMemo(() => workerId ? open.filter((p) => proposalWorkers(p).includes(workerId)) : open, [open, workerId]);
-  const [previewId, setPreviewId] = useState<string | null>(null);
-  const preview = shown.find((p) => p.id === previewId) ?? null;
-  const workerById = useMemo(() => new Map(allRows.map((r) => [r.worker.id, r.worker])), [allRows]);
+  const fullPlan = useMemo(() => canPlan && ready
+    ? planRebalance({ workers: scopeWorkers, spans: availability, elements, today, dismissed: dismissedIds })
+    : null, [canPlan, ready, scopeWorkers, availability, elements, today, dismissedIds]);
+  // Focused, the plan is worked out again with the restriction, so every
+  // proposal shown stands only on proposals that are also shown.
+  const focusPlan = useMemo(() => fullPlan && workerId
+    ? planRebalance({ workers: scopeWorkers, spans: availability, elements, today, dismissed: dismissedIds, focusWorkerId: workerId })
+    : null, [fullPlan, workerId, scopeWorkers, availability, elements, today, dismissedIds]);
+  const plan = focusPlan ?? fullPlan;
+  const [preview, setPreview] = useState<Proposal[] | null>(null);
+  const workerById = useMemo(() => new Map(scopeWorkers.map((w) => [w.id, w])), [scopeWorkers]);
   const previewDaily = useMemo(() => {
-    if (!preview) return null;
-    const after = applyProposals(elements, [preview], (id) => workerById.get(id));
+    if (!preview || preview.length === 0) return null;
+    const after = applyProposals(elements, preview, (id) => workerById.get(id));
     const out = new Map<string, number[]>();
-    for (const wid of proposalWorkers(preview)) {
+    for (const wid of new Set(preview.flatMap(proposalWorkers))) {
       out.set(wid, computeDailyHours(after.filter((el) => (el.assignees ?? []).some((a) => a.worker_id === wid)), days));
     }
     return out;
   }, [preview, elements, workerById, days]);
 
   // ---- Readings for the sidebar --------------------------------------------
+  const failedReading = Boolean(error || availabilityError);
   useEffect(() => {
     if (!publish) return;
-    publishWorkload(ready ? {
-      people: allRows.map((r) => ({ worker: r.worker, utilization: r.utilization, overDays: r.overDays, awayDays: awayDayCount(r.capacity), dueAway: r.dueAway })),
+    publishWorkload(ready || failedReading ? {
+      people: ready ? allRows.map((r) => ({ worker: r.worker, utilization: r.utilization, overDays: r.overDays, awayDays: awayDayCount(r.capacity), dueAway: r.dueAway })) : [],
       team,
-      proposals: open.length,
+      ahead,
+      failed: failedReading,
+      proposals: fullPlan ? fullPlan.proposals.length : null,
     } : null);
-  }, [publish, ready, allRows, team, open.length]);
+  }, [publish, ready, failedReading, allRows, team, ahead, fullPlan]);
   useEffect(() => () => { if (publish) publishWorkload(null); }, [publish]);
 
   // Per-Worker expansion. Clicking a row reveals its assigned
@@ -261,13 +281,16 @@ export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', on
         range={range}
         anchor={anchor}
         step={cfg.step}
-        planOpen={planOpen}
-        proposals={ready ? open.length : null}
+        planOpen={planOpen && canPlan}
+        canPlan={canPlan}
+        embedded={Boolean(scopeOverride)}
+        proposals={plan ? plan.proposals.length : null}
         focusName={focusName ?? null}
         onClearWorker={onClearWorker}
       />
       <KpiStrip
         loading={busy || failed}
+        ahead={ahead}
         team={team}
         dueAway={dueAwayTotal}
         unassignedHours={unassignedHours}
@@ -358,14 +381,14 @@ export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', on
             </div>
           )}
         </div>
-        {planOpen && (
+        {planOpen && canPlan && (
           <WorkloadPlanPanel
             plan={plan}
-            proposals={shown}
+            proposals={plan?.proposals ?? []}
             elements={elements}
             workers={workerById}
             focusName={focusName ?? null}
-            onPreview={setPreviewId}
+            onPreview={setPreview}
             onDismiss={(id) => setDismissed({ contextKey, ids: new Set([...dismissedIds, id]) })}
             onElementClick={onElementClick}
             onClose={() => setWorkloadPlanOpen(false)}
@@ -393,6 +416,8 @@ function Header({
   anchor,
   step,
   planOpen,
+  canPlan,
+  embedded,
   proposals,
   focusName,
   onClearWorker,
@@ -402,6 +427,10 @@ function Header({
   anchor: number;
   step: number;
   planOpen: boolean;
+  /** The plan needs the whole Space; a Domain filter disables it. */
+  canPlan: boolean;
+  /** Inside a Domain/Object tab, where the plan is not offered at all. */
+  embedded: boolean;
   /** Open proposals; null while the plan cannot be read yet. */
   proposals: number | null;
   focusName: string | null;
@@ -447,14 +476,18 @@ function Header({
         </Button>
       </div>
 
-      <Button type="button" size="xs" variant={planOpen ? 'secondary' : 'ghost'} aria-pressed={planOpen}
-        onClick={() => setWorkloadPlanOpen(!planOpen)}>
-        <Scale size={CONTROL.icon.xs} />
-        {t('Rebalance')}
-        {proposals !== null && proposals > 0 && (
-          <span className="rounded-full bg-[var(--accent-default)] px-1.5 text-[10px] font-semibold tabular-nums text-white">{proposals}</span>
-        )}
-      </Button>
+      {!embedded && (
+        <Button type="button" size="xs" variant={planOpen ? 'secondary' : 'ghost'} aria-pressed={planOpen}
+          disabled={!canPlan}
+          title={canPlan ? undefined : t('Rebalancing reads everyone’s whole load. Choose All Domains to plan.')}
+          onClick={() => setWorkloadPlanOpen(!planOpen)}>
+          <Scale size={CONTROL.icon.xs} />
+          {t('Rebalance')}
+          {canPlan && proposals !== null && proposals > 0 && (
+            <span className="rounded-full bg-[var(--accent-default)] px-1.5 text-[10px] font-semibold tabular-nums text-white">{proposals}</span>
+          )}
+        </Button>
+      )}
     </div>
   );
 }
@@ -464,12 +497,15 @@ function Header({
 // =============================================================
 function KpiStrip({
   loading,
+  ahead,
   team,
   dueAway,
   unassignedHours,
   unassignedCount,
 }: {
   loading: boolean;
+  /** Readings run from today; false when the whole window is in the past. */
+  ahead: boolean;
   team: WorkloadTeamSummary;
   dueAway: number;
   unassignedHours: number;
@@ -480,7 +516,7 @@ function KpiStrip({
   const util = team.utilization;
   return (
     <div className="flex flex-shrink-0 items-stretch gap-6 overflow-x-auto border-b border-border/60 bg-card px-4 py-2.5">
-      <Kpi label={t('Team load')} hint={t('Booked hours ÷ available hours from today to the end of the view')}
+      <Kpi label={t('Team load')} hint={ahead ? t('Booked hours ÷ available hours from today to the end of the view') : t('Booked hours ÷ available hours in this window')}
         value={loading || util === null ? dash : pct(util)}
         tone={!loading && util !== null && util > 1 ? 'danger' : 'neutral'}
         meter={loading || util === null ? null : util} />
@@ -937,7 +973,9 @@ function AreaChart({
   const overId = `${uid}-over`;
   const previewClipId = `${uid}-preview`;
   const baseY = topPad + height;
-  const maxH = MAX_DISPLAY_HOURS;
+  // A 16h agent day would sit on the ceiling with its overload clipped away;
+  // the scale grows to keep every row's capacity line inside the row.
+  const maxH = Math.max(MAX_DISPLAY_HOURS, ...capacity.map((c) => c * 1.15));
   const yFor = (h: number) => topPad + height - (clamp(h, 0, maxH) / maxH) * height;
 
   // Load and capacity are drawn as smooth curves through each day's centre.

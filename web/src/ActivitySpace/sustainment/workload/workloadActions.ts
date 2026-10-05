@@ -23,5 +23,13 @@ export async function applyWorkloadProposal(p: Proposal): Promise<void> {
   if (!assigned.includes(p.toWorkerId)) {
     throw new Error(translate('This Worker cannot be assigned to this Element: they are inactive, outside its Space, or cannot see it.'));
   }
-  if (p.kind === 'reassign') await removeElementAssignee(p.assigneeId);
+  if (p.kind !== 'reassign') return;
+  try {
+    await removeElementAssignee(p.assigneeId);
+  } catch {
+    // The new holder is in; only the old one could not be taken off (already
+    // removed elsewhere, or no longer visible). Nothing is lost — say exactly
+    // what is left so the person can finish it by hand.
+    throw new Error(translate('Handed over, but the previous assignee is still on this Element. Remove them from the Element.'));
+  }
 }

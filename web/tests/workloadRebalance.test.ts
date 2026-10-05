@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyProposals,
   planHorizon,
+  proposalPrerequisites,
   planRebalance,
   proposalWorkers,
   type PlanElement,
@@ -79,7 +80,7 @@ describe('planRebalance — overload', () => {
     if (p.kind !== 'reschedule') return;
     expect(p.mode).toBe('start-earlier');
     expect(p.to.due).toBe('2026-10-07');
-    expect(p.to.start < '2026-10-07').toBe(true);
+    expect((p.to.start ?? '') < '2026-10-07').toBe(true);
   });
 
   it('postpones only when no one has room and nothing can start earlier', () => {
@@ -303,5 +304,112 @@ describe('planRebalance — scale', () => {
     const ms = performance.now() - t0;
     expect(plan.overAfter).toBeLessThan(plan.overBefore);
     expect(ms).toBeLessThan(2000);
+  });
+});
+
+describe('planRebalance — review fixes', () => {
+  it('starts earlier only as far as its own stretch needs, even with another overload elsewhere', () => {
+    const plan = planRebalance({
+      today: TODAY,
+      workers: [worker('a')],
+      spans: {},
+      elements: [
+        el({ id: 'far', start_date: '2026-11-12', due_date: '2026-11-12', estimated_hours: 12, holders: ['a'] }),
+        el({ id: 'near', start_date: '2026-10-07', due_date: '2026-10-07', estimated_hours: 12, holders: ['a'], priority: 'urgent' }),
+      ],
+    });
+    const far = plan.proposals.find((p) => p.elementId === 'far');
+    expect(far?.kind).toBe('reschedule');
+    if (far?.kind !== 'reschedule') return;
+    expect(far.mode).toBe('start-earlier');
+    expect(far.to).toEqual({ start: '2026-11-11', due: '2026-11-12' });
+  });
+
+  it('plans around a dismissed proposal instead of leaving its dependants standing on it', () => {
+    const board = {
+      today: TODAY,
+      workers: [worker('a'), worker('b')],
+      spans: {},
+      elements: [
+        el({ id: 'x', start_date: TODAY, due_date: TODAY, estimated_hours: 8, holders: ['a'], priority: 'urgent' }),
+        el({ id: 'y', start_date: TODAY, due_date: TODAY, estimated_hours: 4, holders: ['a'] }),
+      ],
+    };
+    const first = planRebalance(board).proposals[0];
+    expect(first.kind).toBe('reassign');
+    const again = planRebalance({ ...board, dismissed: new Set([first.id]) });
+    expect(again.proposals.map((p) => p.id)).not.toContain(first.id);
+    expect(again.proposals[0]?.kind).toBe('reschedule');
+  });
+
+  it('when focused, plans only changes involving that Worker', () => {
+    const plan = planRebalance({
+      today: TODAY,
+      workers: [worker('a'), worker('b'), worker('c')],
+      spans: {},
+      elements: [
+        el({ id: 'x1', start_date: TODAY, due_date: TODAY, estimated_hours: 6, holders: ['a'] }),
+        el({ id: 'x2', start_date: TODAY, due_date: TODAY, estimated_hours: 6, holders: ['a'] }),
+        el({ id: 'y1', start_date: TODAY, due_date: TODAY, estimated_hours: 6, holders: ['b'] }),
+        el({ id: 'y2', start_date: TODAY, due_date: TODAY, estimated_hours: 6, holders: ['b'] }),
+      ],
+      focusWorkerId: 'b',
+    });
+    expect(plan.proposals.length).toBeGreaterThan(0);
+    for (const p of plan.proposals) expect(proposalWorkers(p)).toContain('b');
+  });
+
+  it('does not invent a due date when postponing work that has only a start', () => {
+    const plan = planRebalance({
+      today: TODAY,
+      workers: [worker('a')],
+      spans: {},
+      elements: [
+        el({ id: 'x', start_date: '2026-10-08', due_date: '2026-10-08', estimated_hours: 8, holders: ['a'], priority: 'urgent' }),
+        el({ id: 'y', start_date: '2026-10-08', due_date: null, estimated_hours: 4, holders: ['a'] }),
+      ],
+    });
+    const y = plan.proposals.find((p) => p.elementId === 'y');
+    expect(y?.kind).toBe('reschedule');
+    if (y?.kind !== 'reschedule') return;
+    expect(y.to.due).toBeNull();
+  });
+
+  it('decides absences the same way whatever order the Workers arrive in', () => {
+    const workers = [worker('a'), worker('b'), worker('c')];
+    const spans = {
+      a: [{ start_date: '2026-10-08', end_date: '2026-10-08', capacity_hours_per_day: 0 }],
+      b: [{ start_date: '2026-10-08', end_date: '2026-10-08', capacity_hours_per_day: 0 }],
+    };
+    const elements = [
+      el({ id: 'xa', start_date: '2026-10-08', due_date: '2026-10-08', estimated_hours: 6, holders: ['a'] }),
+      el({ id: 'xb', start_date: '2026-10-08', due_date: '2026-10-08', estimated_hours: 6, holders: ['b'] }),
+    ];
+    const one = planRebalance({ today: TODAY, workers, spans, elements });
+    const two = planRebalance({ today: TODAY, workers: [...workers].reverse(), spans, elements: [...elements].reverse() });
+    expect(two.proposals.map((p) => p.id)).toEqual(one.proposals.map((p) => p.id));
+  });
+
+  it('never hands over a reviewer', () => {
+    const plan = planRebalance({
+      today: TODAY,
+      workers: [worker('a'), worker('b')],
+      spans: {},
+      elements: [{ ...el({ id: 'x', start_date: TODAY, due_date: TODAY, estimated_hours: 12, priority: 'urgent' }), assignees: [{ id: 'x:a', worker_id: 'a', role: 'reviewer' }] }],
+    });
+    expect(plan.proposals.filter((p) => p.kind === 'reassign')).toEqual([]);
+  });
+});
+
+describe('proposalPrerequisites', () => {
+  const r = (id: string, elementId: string, from: string, to: string): Proposal => ({
+    kind: 'reassign', id, elementId, issue: 'overload', workerId: from, fromWorkerId: from, assigneeId: `${elementId}:${from}`,
+    toWorkerId: to, target: { peakAfter: 0.5, freeHours: 4, familiarity: 0 }, overBefore: 1, overAfter: 0,
+  });
+  it('follows shared Workers back through the plan, and skips unrelated proposals', () => {
+    const plan = [r('p1', 'e1', 'b', 'c'), r('p2', 'e2', 'x', 'y'), r('p3', 'e3', 'a', 'b')];
+    expect(proposalPrerequisites(plan, 2).map((p) => p.id)).toEqual(['p1']);
+    expect(proposalPrerequisites(plan, 1)).toEqual([]);
+    expect(proposalPrerequisites(plan, 0)).toEqual([]);
   });
 });

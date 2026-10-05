@@ -7,7 +7,7 @@ import { CONTROL } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { fromDateOnlyString } from '@/Function/shared/dateUtils';
-import { PLAN_HORIZON_DAYS, type Plan, type PlanIssue, type Proposal } from './workloadRebalance';
+import { PLAN_HORIZON_DAYS, proposalPrerequisites, type Plan, type PlanIssue, type Proposal } from './workloadRebalance';
 import { applyWorkloadProposal } from './workloadActions';
 
 // =============================================================
@@ -41,12 +41,14 @@ export function WorkloadPlanPanel({
 }: {
   /** Null while the board is still being read. */
   plan: Plan | null;
-  /** The open proposals to show (dismissed and out-of-focus ones removed). */
+  /** The plan's proposals, in plan order (worked out without the dismissed
+   *  ones and, when focused, only those involving the focused Worker). */
   proposals: Proposal[];
   elements: ElementWithDetails[];
   workers: Map<string, Worker>;
   focusName: string | null;
-  onPreview: (id: string | null) => void;
+  /** The proposals to draw on the chart: a card and everything it stands on. */
+  onPreview: (proposals: Proposal[] | null) => void;
   onDismiss: (id: string) => void;
   onElementClick?: (element: ElementWithDetails) => void;
   onClose: () => void;
@@ -57,29 +59,36 @@ export function WorkloadPlanPanel({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [applyingAll, setApplyingAll] = useState(false);
 
-  const apply = async (p: Proposal) => {
-    setBusy((prev) => new Set(prev).add(p.id));
+  const writeOne = async (p: Proposal) => {
     setErrors((prev) => { const next = { ...prev }; delete next[p.id]; return next; });
     try {
       await applyWorkloadProposal(p);
-      onPreview(null);
       return true;
     } catch (e) {
       setErrors((prev) => ({ ...prev, [p.id]: e instanceof Error ? e.message : t('Could not apply this change. Try again.') }));
       return false;
-    } finally {
-      setBusy((prev) => { const next = new Set(prev); next.delete(p.id); return next; });
     }
   };
 
-  // One at a time, in plan order: each proposal was chosen on the board as the
-  // ones before it left it, so applying them out of order is not the same plan.
+  // In plan order, stopping at the first failure: each proposal was chosen on
+  // the board as the ones before it left it, so a later one written without
+  // an earlier one is not the change the card described.
+  const applyInOrder = async (list: Proposal[]) => {
+    setBusy(new Set(list.map((p) => p.id)));
+    onPreview(null);
+    try {
+      for (const p of list) if (!(await writeOne(p))) break;
+    } finally {
+      setBusy(new Set());
+    }
+  };
+
+  const apply = (index: number) => applyInOrder([...proposalPrerequisites(proposals, index), proposals[index]]);
+
   const applyAll = async () => {
     setApplyingAll(true);
     try {
-      for (const p of proposals) {
-        if (!(await apply(p))) break;
-      }
+      await applyInOrder(proposals);
     } finally {
       setApplyingAll(false);
     }
@@ -144,20 +153,26 @@ export function WorkloadPlanPanel({
               {t(ISSUE_LABEL[g.issue])} <span className="ml-1.5 tabular-nums">{g.items.length}</span>
             </h3>
             <ul className="space-y-1">
-              {g.items.map((p) => (
-                <ProposalCard
-                  key={p.id}
-                  proposal={p}
-                  element={elementById.get(p.elementId)}
-                  name={name}
-                  busy={busy.has(p.id) || applyingAll}
-                  error={errors[p.id] ?? null}
-                  onApply={() => { void apply(p); }}
-                  onDismiss={() => { onPreview(null); onDismiss(p.id); }}
-                  onPreview={onPreview}
-                  onElementClick={onElementClick}
-                />
-              ))}
+              {g.items.map((p) => {
+                const index = proposals.indexOf(p);
+                const before = proposalPrerequisites(proposals, index);
+                return (
+                  <ProposalCard
+                    key={p.id}
+                    proposal={p}
+                    element={elementById.get(p.elementId)}
+                    name={name}
+                    prerequisites={before.length}
+                    applying={busy.has(p.id)}
+                    locked={busy.size > 0 || applyingAll}
+                    error={errors[p.id] ?? null}
+                    onApply={() => { void apply(index); }}
+                    onDismiss={() => { onPreview(null); onDismiss(p.id); }}
+                    onPreview={(on) => onPreview(on ? [...before, p] : null)}
+                    onElementClick={onElementClick}
+                  />
+                );
+              })}
             </ul>
           </section>
         ))}
@@ -166,15 +181,19 @@ export function WorkloadPlanPanel({
   );
 }
 
-function ProposalCard({ proposal: p, element, name, busy, error, onApply, onDismiss, onPreview, onElementClick }: {
+function ProposalCard({ proposal: p, element, name, prerequisites, applying, locked, error, onApply, onDismiss, onPreview, onElementClick }: {
   proposal: Proposal;
   element: ElementWithDetails | undefined;
   name: (id: string | null) => string;
-  busy: boolean;
+  /** Earlier proposals this one stands on; Apply writes them first. */
+  prerequisites: number;
+  applying: boolean;
+  /** Any write in flight: one at a time, so no card acts on a half-written board. */
+  locked: boolean;
   error: string | null;
   onApply: () => void;
   onDismiss: () => void;
-  onPreview: (id: string | null) => void;
+  onPreview: (on: boolean) => void;
   onElementClick?: (element: ElementWithDetails) => void;
 }) {
   const { t, locale } = useI18n();
@@ -200,18 +219,22 @@ function ProposalCard({ proposal: p, element, name, busy, error, onApply, onDism
     headline = t('Finish by {due}', { due: day(p.to.due) });
     detail = t('{name} is away on {old}, and nobody else has room that day.', { name: name(p.workerId), old: day(p.from.due) });
   } else {
-    headline = t('Move to {start} – {due}', { start: day(p.to.start), due: day(p.to.due) });
-    detail = t('The due date moves {n} days. Nobody has room, and nothing can start earlier.', { n: daysBetween(p.from.due, p.to.due) });
+    headline = p.to.start && p.to.due && p.to.start !== p.to.due
+      ? t('Move to {start} – {due}', { start: day(p.to.start), due: day(p.to.due) })
+      : t('Move to {date}', { date: day(p.to.due ?? p.to.start) });
+    detail = p.to.due
+      ? t('The due date moves {n} days. Nobody has room, and nothing can start earlier.', { n: daysBetween(p.from.due, p.to.due) })
+      : t('The start moves {n} days. Nobody has room on the current day.', { n: daysBetween(p.from.start, p.to.start) });
     warn = true;
   }
 
   return (
     <li
       className="group rounded-lg px-2.5 py-2 transition-colors hover:bg-[var(--surface-strong)] focus-within:bg-[var(--surface-strong)]"
-      onMouseEnter={() => onPreview(p.id)}
-      onMouseLeave={() => onPreview(null)}
-      onFocus={() => onPreview(p.id)}
-      onBlur={() => onPreview(null)}
+      onMouseEnter={() => onPreview(true)}
+      onMouseLeave={() => onPreview(false)}
+      onFocus={() => onPreview(true)}
+      onBlur={() => onPreview(false)}
     >
       <button type="button" disabled={!element || !onElementClick} onClick={() => element && onElementClick?.(element)}
         className="block w-full truncate text-left text-[12px] text-muted-foreground outline-none hover:text-foreground disabled:hover:text-muted-foreground"
@@ -230,10 +253,11 @@ function ProposalCard({ proposal: p, element, name, busy, error, onApply, onDism
       )}
       {error && <p role="alert" className="mt-1 pl-[19px] text-[11px] text-[var(--status-danger)]">{error}</p>}
       <div className="mt-1.5 flex items-center gap-1 pl-[19px]">
-        <Button type="button" size="xs" variant="secondary" disabled={busy} onClick={onApply}>
-          {busy ? t('Applying…') : t('Apply')}
+        <Button type="button" size="xs" variant="secondary" disabled={locked} onClick={onApply}
+          title={prerequisites > 0 ? t('Applies the {n} earlier changes this one depends on first', { n: prerequisites }) : undefined}>
+          {applying ? t('Applying…') : prerequisites > 0 ? t('Apply with {n} earlier', { n: prerequisites }) : t('Apply')}
         </Button>
-        <Button type="button" size="xs" variant="ghost" disabled={busy} onClick={onDismiss}>{t('Dismiss')}</Button>
+        <Button type="button" size="xs" variant="ghost" disabled={locked} onClick={onDismiss}>{t('Dismiss')}</Button>
       </div>
     </li>
   );
@@ -247,9 +271,9 @@ function targetDetail(target: { peakAfter: number; freeHours: number; familiarit
   return parts.join(' · ');
 }
 
-function daysBetween(from: string | null, to: string): number {
+function daysBetween(from: string | null, to: string | null): number {
   const a = from ? fromDateOnlyString(from) : null;
-  const b = fromDateOnlyString(to);
+  const b = to ? fromDateOnlyString(to) : null;
   if (!a || !b) return 0;
   return Math.round((b.getTime() - a.getTime()) / 86_400_000);
 }
