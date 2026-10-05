@@ -31,7 +31,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-import { workloadBar, workloadDailyHours, workloadDomainIds, workloadElementsInWindow, selectWorkloadElements, resolveWorkloadScope } from '@/ActivitySpace/sustainment/workload/workloadModel';
+import { summarizeWorkload, workloadBar, workloadDailyHours, workloadDomainIds, workloadElementsInWindow, workloadOverDays, workloadUtilization, selectWorkloadElements, resolveWorkloadScope } from '@/ActivitySpace/sustainment/workload/workloadModel';
 import { fetchWorkloadObject } from '@/ActivitySpace/sustainment/workload/useWorkloadData';
 import { fetchSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/types/database';
@@ -160,5 +160,26 @@ describe('Workload calendar arithmetic', () => {
     expect(workloadElementsInWindow([undated, outside, dated], days).map(row => row.id)).toEqual(['dated', 'undated']);
     expect(workloadDailyHours([undated], days, days[0])).toEqual([0, 0, 0, 0]);
     expect(workloadBar(undated, days)).toBeNull();
+  });
+});
+
+describe('workload summary', () => {
+  it('reads utilization as load over capacity, and no capacity as no reading', () => {
+    expect(workloadUtilization([4, 8], [8, 8])).toBe(0.75);
+    expect(workloadUtilization([4], [0])).toBeNull();
+  });
+
+  it('counts overloaded people, over days and the AI share of the hours', () => {
+    expect(workloadOverDays([8, 8.005, 9], [8, 8, 8])).toBe(1);
+    const summary = summarizeWorkload([
+      { type: 'human', daily: [10, 4], capacity: [8, 8] },
+      { type: 'ai_agent', daily: [6, 6], capacity: [16, 16] },
+      { type: 'robot', daily: [30, 0], capacity: [8, 8] },
+    ]);
+    expect(summary.overloadedPeople).toBe(1);
+    expect(summary.overDays).toBe(2);
+    expect(summary.hours).toBe(56);
+    expect(summary.aiShare).toBeCloseTo(12 / 56);
+    expect(summary.utilization).toBeCloseTo(56 / 64);
   });
 });

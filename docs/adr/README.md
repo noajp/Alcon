@@ -68,3 +68,4 @@
 | [0034](0034-mcp-clients-sign-in-through-supabase-oauth-and-their-tokens-only-work-through-alcon.md) | MCP クライアントは Supabase の OAuth でサインインし、そのトークンは Alcon の関数でだけ使える |
 | [0035](0035-oauth-integrations-sign-in-through-an-edge-function-and-keep-tokens-in-vault.md) | OAuth の連携は Edge Function でサインインし、トークンは Vault にだけ置く |
 | [0036](0036-supply-records-belong-to-a-domain-or-the-space.md) | SCM の拠点・仕入先・品目は Domain か Space に属し、Domain の公開範囲で見える |
+| [0037](0037-workload-rebalancing-is-computed-not-generated-and-applied-by-a-person.md) | Workload の平準化は決定的に算出し、人が適用する |
