@@ -108,3 +108,64 @@ export function workloadElementsInWindow<T extends LoadElement>(elements: readon
       return aSpan.start.localeCompare(bSpan.start) || a.id.localeCompare(b.id);
     });
 }
+
+/** Load as a share of capacity across a run of days; null when there were no
+ *  hours to fill (a fortnight away is not "0% loaded", it is no reading). */
+export function workloadUtilization(daily: readonly number[], capacity: readonly number[]): number | null {
+  let load = 0;
+  let cap = 0;
+  for (let i = 0; i < daily.length; i++) {
+    load += daily[i];
+    cap += Math.max(0, capacity[i] ?? 0);
+  }
+  return cap > 0 ? load / cap : null;
+}
+
+/** Days whose load is over that day's capacity. */
+export function workloadOverDays(daily: readonly number[], capacity: readonly number[]): number {
+  let n = 0;
+  for (let i = 0; i < daily.length; i++) if (daily[i] > (capacity[i] ?? 0) + 0.01) n += 1;
+  return n;
+}
+
+export interface WorkloadTeamSummary {
+  /** Team load ÷ team capacity over the window; null with no capacity. */
+  utilization: number | null;
+  /** Workers over capacity on at least one day. */
+  overloadedPeople: number;
+  /** Worker-days over capacity, summed. */
+  overDays: number;
+  /** Booked hours in the window, and the part held by AI agents. */
+  hours: number;
+  aiShare: number | null;
+}
+
+/** The team at a glance, from the same rows the chart draws. Robots are
+ *  equipment: their hours are counted, but they are not "people overloaded". */
+export function summarizeWorkload(rows: readonly {
+  type: 'human' | 'ai_agent' | 'robot';
+  daily: readonly number[];
+  capacity: readonly number[];
+}[]): WorkloadTeamSummary {
+  let load = 0;
+  let cap = 0;
+  let ai = 0;
+  let overloadedPeople = 0;
+  let overDays = 0;
+  for (const row of rows) {
+    const hours = row.daily.reduce((s, h) => s + h, 0);
+    load += hours;
+    cap += row.capacity.reduce((s, c) => s + Math.max(0, c), 0);
+    if (row.type === 'ai_agent') ai += hours;
+    const over = workloadOverDays(row.daily, row.capacity);
+    overDays += over;
+    if (over > 0 && row.type !== 'robot') overloadedPeople += 1;
+  }
+  return {
+    utilization: cap > 0 ? load / cap : null,
+    overloadedPeople,
+    overDays,
+    hours: load,
+    aiShare: load > 0 ? ai / load : null,
+  };
+}

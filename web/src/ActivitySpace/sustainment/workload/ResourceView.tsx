@@ -1,13 +1,12 @@
 'use client';
 
-import { Fragment, useId, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   CalendarClock,
-  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Filter,
+  Scale,
   UserRound,
   X,
 } from 'lucide-react';
@@ -21,10 +20,11 @@ import {
 import { CONTROL, SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
 import { MenuSectionLabel, MenuShell, MENU_SEPARATOR } from '@/Function/shared/menu';
 import { DateField } from '@/Function/shared/date/DateControl';
 import { formatElementDate, fromDateOnlyString, toDateOnlyString } from '@/Function/shared/dateUtils';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { isOpenStatus } from '@/Function/shared/completion';
 import { unreachableMarkProps } from '@/Function/shared/workerReach';
 import { UnreachableAvatarTooltip } from '@/Function/shared/WorkerAvatar';
 import {
@@ -33,31 +33,53 @@ import {
   dailyCapacity,
 } from '@/Function/shared/workerCapacity';
 import {
+  countsOnDay,
   dueWhileAway,
   elementHours,
   elementSpan,
   elementsDueInSpan,
+  hoursPerDay,
 } from '@/Function/shared/assignmentLoad';
 import { useWorkloadData } from '@/ActivitySpace/sustainment/workload/useWorkloadData';
-import { workloadBar, workloadDailyHours, workloadElementsInWindow } from '@/ActivitySpace/sustainment/workload/workloadModel';
+import {
+  summarizeWorkload,
+  workloadBar,
+  workloadDailyHours,
+  workloadElementsInWindow,
+  workloadOverDays,
+  workloadUtilization,
+  type WorkloadTeamSummary,
+} from '@/ActivitySpace/sustainment/workload/workloadModel';
+import { applyProposals, planRebalance, proposalWorkers } from '@/ActivitySpace/sustainment/workload/workloadRebalance';
+import {
+  WORKLOAD_RANGES,
+  publishWorkload,
+  setWorkloadPlanOpen,
+  setWorkloadRange,
+  shiftWorkloadAnchor,
+  useWorkloadPlanOpen,
+  useWorkloadRange,
+  type WorkloadRange,
+} from '@/ActivitySpace/sustainment/workload/workloadStore';
+import { WorkloadPlanPanel } from '@/ActivitySpace/sustainment/workload/WorkloadPlanPanel';
+import { LoadMeter } from '@/ActivitySpace/sustainment/workload/LoadMeter';
 
 // =============================================================
-// Resource — Asana-style per-Worker daily-load area chart
+// Resource — per-Worker daily load, and what to change about it.
 // Rows are Workers. The body of each row is a small SVG area
 // chart showing total assigned hours per day across the visible
-// window. Aggregate over assignees + element duration so the
-// shape reflects "how loaded is this worker every day".
+// window against that Worker's capacity on each day. The plan
+// panel beside it proposes the changes that bring every row back
+// under its line, and previews each one on the chart before it is
+// written.
 //
 // Scope:
-//   - Standalone (Sustainment): user picks Domains via filter
+//   - Standalone (Sustainment): Domains chosen in the Workload sidebar
 //   - Embedded in Object Detail tab: pass scopeOverride.objectIds
 //   - Embedded in Domain Detail tab: pass scopeOverride.domainIds
 // =============================================================
 
-const DAY_W = 22;
-const VISIBLE_DAYS = 31;       // ~1 month
-const PAST_DAYS = 6;           // anchor = today - 6
-const WORKER_COL_W = 220;
+const WORKER_COL_W = 240;
 const MONTH_HEADER_H = 22;
 const DAY_HEADER_H = 22;
 const ROW_H = 56;
@@ -66,15 +88,12 @@ const CHART_TOP_PAD = 8;       // px from top of row to chart top
 const MAX_DISPLAY_HOURS = 16;  // y-axis max (clip overflow)
 
 export interface ResourceViewProps {
-  /** Override the scope. When omitted, view loads via the user's
-   *  Domain filter (Sustainment behavior). When provided, the
-   *  filter button is hidden by default. */
+  /** Override the scope. When omitted, the view follows the Workload
+   *  sidebar's Domain choice (Sustainment behavior). */
   scopeOverride?: { domainIds?: string[]; objectIds?: string[] };
-  /** Hide the top header bar (use when embedded in another shell
-   *  that owns the title/controls). */
+  /** Hide the title (use when embedded in another shell that owns it).
+   *  The zoom, the date controls and the plan stay. */
   hideHeader?: boolean;
-  /** Force-hide the filter button even in standalone mode. */
-  hideFilter?: boolean;
   /** Header title. The same surface serves as the embedded "Resource" tab
    *  and the Sustainment layer's standalone "Workload" view. */
   title?: string;
@@ -82,42 +101,43 @@ export interface ResourceViewProps {
   onElementClick?: (element: ElementWithDetails) => void;
   /** An explicitly scoped roster supplied by Team, including idle Workers. */
   roster?: Worker[];
-  /** Opens one Worker's load directly from Team. */
+  /** Narrows the chart to one Worker (chosen in the sidebar or from Team). */
   workerId?: string;
+  /** Clears `workerId`; shown as the × on the focus chip. */
+  onClearWorker?: () => void;
+  /** The standalone surface publishes its readings for the Workload sidebar. */
+  publish?: boolean;
 }
 
-export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'Resource', onElementClick, roster, workerId }: ResourceViewProps = {}) {
-  const { contextKey, domains, selectedDomainIds, setSelectedDomainIds, elements, loading, error, retry } = useWorkloadData(scopeOverride);
+type Row = { worker: Worker; elements: ElementWithDetails[]; daily: number[] };
+type LoadedRow = Row & { capacity: number[]; spans: WorkerAvailability[]; utilization: number | null; overDays: number; dueAway: number };
 
-  // Anchor day (= leftmost visible day). Negative offset = back in time.
-  const [anchorOffset, setAnchorOffset] = useState(0); // in days from default
-
-  const anchorDate = useMemo(() => {
-    const t = new Date();
-    t.setHours(0, 0, 0, 0);
-    t.setDate(t.getDate() - PAST_DAYS + anchorOffset);
-    return t;
-  }, [anchorOffset]);
+export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', onElementClick, roster, workerId, onClearWorker, publish = false }: ResourceViewProps = {}) {
+  const { t } = useI18n();
+  const { contextKey, domains, selectedDomainIds, elements, loading, error, retry } = useWorkloadData(scopeOverride);
+  const { range, anchor } = useWorkloadRange();
+  const cfg = WORKLOAD_RANGES[range];
+  const dayW = cfg.dayW;
+  const planOpen = useWorkloadPlanOpen();
+  const today = toDateOnlyString(new Date());
 
   const days = useMemo(() => {
-    const arr: Date[] = [];
-    for (let i = 0; i < VISIBLE_DAYS; i++) {
-      const d = new Date(anchorDate);
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - cfg.past + anchor);
+    return Array.from({ length: cfg.days }, (_, i) => {
+      const d = new Date(start);
       d.setDate(d.getDate() + i);
-      arr.push(d);
-    }
-    return arr;
-  }, [anchorDate]);
+      return d;
+    });
+  }, [cfg.past, cfg.days, anchor]);
 
   // Today index within the visible window (-1 if not visible)
-  const todayIdx = useMemo(() => {
-    const t = new Date();
-    t.setHours(0, 0, 0, 0);
-    return days.findIndex(d => sameDay(d, t));
-  }, [days]);
+  const todayIdx = useMemo(() => days.findIndex(d => toDateOnlyString(d) === today), [days, today]);
+  // Readings look forward: from today (when it is in view) to the end of the
+  // window. Yesterday's overload is a record, not something to act on.
+  const from = todayIdx > 0 ? todayIdx : 0;
 
-  // Group elements by Worker
-  type Row = { worker: Worker; elements: ElementWithDetails[]; daily: number[] };
   // A Space roster can supply idle Workers in its full scope. Narrow Domain
   // filters only show assignments known to belong to those Domains.
   const showIdleWorkers = !scopeOverride && selectedDomainIds.length === domains.length;
@@ -134,24 +154,11 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
         byWorker.get(wid)!.elements.push(el);
       }
     }
-    const out: Row[] = [];
-    for (const { worker, elements: els } of byWorker.values()) {
-      if (workerId && worker.id !== workerId) continue;
-      const daily = computeDailyHours(els, days);
-      out.push({ worker, elements: els, daily });
-    }
-    // Order: by type (human → ai_agent → robot), then by total load desc
-    const typeOrder = { human: 0, ai_agent: 1, robot: 2 } as const;
-    out.sort((a, b) => {
-      const t = (typeOrder[a.worker.type] ?? 3) - (typeOrder[b.worker.type] ?? 3);
-      if (t !== 0) return t;
-      const sa = a.daily.reduce((s, h) => s + h, 0);
-      const sb = b.daily.reduce((s, h) => s + h, 0);
-      return sb - sa || a.worker.name.localeCompare(b.worker.name);
-    });
-    return out;
-  }, [elements, days, roster, showIdleWorkers, workerId]);
+    return [...byWorker.values()].map(({ worker, elements: els }) => ({ worker, elements: els, daily: computeDailyHours(els, days) }));
+  }, [elements, days, roster, showIdleWorkers]);
 
+  // Every Worker in scope, not just the focused one: the plan hands work to
+  // whoever has room, and the sidebar lists everybody.
   const workerIds = useMemo(() => grouped.map((r) => r.worker.id), [grouped]);
   const { byWorker: availability, add: addAvailability, remove: removeAvailability, loading: availabilityLoading, error: availabilityError, refetch: retryAvailability } =
     useWorkerAvailability(workerIds);
@@ -160,46 +167,73 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
   // 7th has no hours those days and their standing day on either side. Every
   // "is this too much" question below reads this array, so an absence and an
   // overload are the same comparison.
-  type LoadedRow = Row & { capacity: number[]; spans: WorkerAvailability[] };
-  const rows: LoadedRow[] = useMemo(
-    () => grouped.map((r) => {
+  const allRows: LoadedRow[] = useMemo(() => {
+    const out = grouped.map((r) => {
       const spans = availability[r.worker.id] ?? [];
-      return { ...r, spans, capacity: dailyCapacity(r.worker, spans, days) };
-    }),
-    [grouped, availability, days],
-  );
+      const capacity = dailyCapacity(r.worker, spans, days);
+      const dueAway = dueWhileAway(r.worker, spans, r.elements)
+        .filter(({ element, day }) => day >= today && isOpenStatus(element.status)).length;
+      return {
+        ...r, spans, capacity, dueAway,
+        utilization: workloadUtilization(r.daily.slice(from), capacity.slice(from)),
+        overDays: workloadOverDays(r.daily.slice(from), capacity.slice(from)),
+      };
+    });
+    // Order: by type (human → ai_agent → robot), then by total load desc
+    const typeOrder = { human: 0, ai_agent: 1, robot: 2 } as const;
+    out.sort((a, b) => {
+      const t = (typeOrder[a.worker.type] ?? 3) - (typeOrder[b.worker.type] ?? 3);
+      if (t !== 0) return t;
+      return (b.utilization ?? 0) - (a.utilization ?? 0) || a.worker.name.localeCompare(b.worker.name);
+    });
+    return out;
+  }, [grouped, availability, days, today, from]);
+  const rows = useMemo(() => workerId ? allRows.filter((r) => r.worker.id === workerId) : allRows, [allRows, workerId]);
 
   // Unstaffed work stays visible, including Elements still needing dates.
-  const unassigned = useMemo(
-    () => workerId ? [] : elements.filter((el) => (el.assignees ?? []).length === 0),
-    [elements, workerId],
-  );
-  const unassignedDaily = useMemo(
-    () => computeDailyHours(unassigned, days),
-    [unassigned, days],
-  );
+  const unassignedAll = useMemo(() => elements.filter((el) => (el.assignees ?? []).length === 0), [elements]);
+  const unassigned = workerId ? [] : unassignedAll;
+  const unassignedDaily = useMemo(() => computeDailyHours(unassignedAll, days), [unassignedAll, days]);
+  const unassignedHours = unassignedDaily.reduce((s, h) => s + h, 0);
 
-  // KPIs
-  const stats = useMemo(() => {
-    let overloadedDays = 0;
-    let humans = 0;
-    let agents = 0;
-    for (const r of rows) {
-      if (r.worker.type === 'human') humans += 1;
-      else if (r.worker.type === 'ai_agent') agents += 1;
-      // Work booked onto a day someone is away counts here, and should: an
-      // absence with an Element sitting on it is exactly the thing the board
-      // could not say before.
-      for (let i = 0; i < r.daily.length; i++) if (r.daily[i] > r.capacity[i]) overloadedDays += 1;
+  const team: WorkloadTeamSummary = useMemo(
+    () => summarizeWorkload(allRows.map((r) => ({ type: r.worker.type, daily: r.daily.slice(from), capacity: r.capacity.slice(from) }))),
+    [allRows, from],
+  );
+  const dueAwayTotal = useMemo(() => allRows.reduce((s, r) => s + r.dueAway, 0), [allRows]);
+
+  // ---- The plan ----------------------------------------------------------
+  const ready = !loading && !availabilityLoading && !error && !availabilityError;
+  const plan = useMemo(() => ready
+    ? planRebalance({ workers: allRows.map((r) => r.worker), spans: availability, elements, today })
+    : null, [ready, allRows, availability, elements, today]);
+  const [dismissed, setDismissed] = useState<{ contextKey: string; ids: Set<string> }>({ contextKey, ids: new Set() });
+  const dismissedIds = dismissed.contextKey === contextKey ? dismissed.ids : EMPTY_SET;
+  const open = useMemo(() => (plan?.proposals ?? []).filter((p) => !dismissedIds.has(p.id)), [plan, dismissedIds]);
+  const shown = useMemo(() => workerId ? open.filter((p) => proposalWorkers(p).includes(workerId)) : open, [open, workerId]);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const preview = shown.find((p) => p.id === previewId) ?? null;
+  const workerById = useMemo(() => new Map(allRows.map((r) => [r.worker.id, r.worker])), [allRows]);
+  const previewDaily = useMemo(() => {
+    if (!preview) return null;
+    const after = applyProposals(elements, [preview], (id) => workerById.get(id));
+    const out = new Map<string, number[]>();
+    for (const wid of proposalWorkers(preview)) {
+      out.set(wid, computeDailyHours(after.filter((el) => (el.assignees ?? []).some((a) => a.worker_id === wid)), days));
     }
-    return { humans, agents, overloadedDays };
-  }, [rows]);
+    return out;
+  }, [preview, elements, workerById, days]);
 
-  const [filterOpen, setFilterOpen] = useState(false);
-  const showFilterButton = !hideFilter && !scopeOverride;
-  const filterActive = !scopeOverride
-    && domains.length > 0
-    && selectedDomainIds.length < domains.length;
+  // ---- Readings for the sidebar --------------------------------------------
+  useEffect(() => {
+    if (!publish) return;
+    publishWorkload(ready ? {
+      people: allRows.map((r) => ({ worker: r.worker, utilization: r.utilization, overDays: r.overDays, awayDays: awayDayCount(r.capacity), dueAway: r.dueAway })),
+      team,
+      proposals: open.length,
+    } : null);
+  }, [publish, ready, allRows, team, open.length]);
+  useEffect(() => () => { if (publish) publishWorkload(null); }, [publish]);
 
   // Per-Worker expansion. Clicking a row reveals its assigned
   // Elements as mini-rows on the same date axis below.
@@ -215,240 +249,299 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
     });
   };
 
-  const totalW = DAY_W * VISIBLE_DAYS;
+  const totalW = dayW * cfg.days;
+  const focusName = workerId ? allRows.find((r) => r.worker.id === workerId)?.worker.name ?? roster?.find((w) => w.id === workerId)?.name : null;
+  const busy = loading || availabilityLoading;
+  const failed = Boolean(error || availabilityError);
 
   return (
     <div className="flex flex-col h-full bg-card">
-      {!hideHeader && (
-        <Header
-          title={title}
-          loading={loading || availabilityLoading || Boolean(error || availabilityError)}
-          stats={stats}
-          anchorOffset={anchorOffset}
-          setAnchorOffset={setAnchorOffset}
-          showFilterButton={showFilterButton}
-          filterActive={filterActive}
-          filterOpen={filterOpen}
-          setFilterOpen={setFilterOpen}
-          domains={domains}
-          selectedDomainIds={selectedDomainIds}
-          setSelectedDomainIds={setSelectedDomainIds}
-        />
-      )}
+      <Header
+        title={hideHeader ? null : title}
+        range={range}
+        anchor={anchor}
+        step={cfg.step}
+        planOpen={planOpen}
+        proposals={ready ? open.length : null}
+        focusName={focusName ?? null}
+        onClearWorker={onClearWorker}
+      />
+      <KpiStrip
+        loading={busy || failed}
+        team={team}
+        dueAway={dueAwayTotal}
+        unassignedHours={unassignedHours}
+        unassignedCount={unassignedAll.length}
+      />
 
-      <div className="flex-1 overflow-auto" aria-busy={loading || availabilityLoading}>
-        {error || availabilityError ? (
-          <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-[13px] text-muted-foreground">
-            <p>{error ? 'Could not load the work in this scope.' : 'Could not load Worker availability.'}</p>
-            <Button variant="secondary" onClick={() => { void retry(); void retryAvailability(); }}>Retry</Button>
-          </div>
-        ) : loading || availabilityLoading ? (
-          <CenterMessage>Loading workload…</CenterMessage>
-        ) : rows.length === 0 && unassigned.length === 0 ? (
-          <CenterMessage>
-            {!scopeOverride && selectedDomainIds.length === 0
-              ? 'Choose a Domain to see its workload.'
-              : workerId ? 'This Worker has no assignments in the selected scope.'
-                : 'No Workers or Elements in this scope yet.'}
-          </CenterMessage>
-        ) : (
-          <div className="min-w-fit">
-            <DateHeader days={days} todayIdx={todayIdx} totalW={totalW} />
-            {rows.map((r) => {
-              const isOpen = expanded.has(r.worker.id);
-              const sortedElements = sortedForWindow(r.elements, days);
-              return (
-                <Fragment key={r.worker.id}>
-                  <WorkerRow
-                    key={`${contextKey}:${r.worker.id}`}
-                    worker={r.worker}
-                    elements={r.elements}
-                    daily={r.daily}
-                    capacity={r.capacity}
-                    spans={r.spans}
+      <div className="flex min-h-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-auto" aria-busy={busy}>
+          {failed ? (
+            <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-[13px] text-muted-foreground">
+              <p>{error ? t('Could not load the work in this scope.') : t('Could not load Worker availability.')}</p>
+              <Button variant="secondary" onClick={() => { void retry(); void retryAvailability(); }}>{t('Retry')}</Button>
+            </div>
+          ) : busy ? (
+            <CenterMessage>{t('Loading workload…')}</CenterMessage>
+          ) : rows.length === 0 && unassigned.length === 0 ? (
+            <CenterMessage>
+              {!scopeOverride && selectedDomainIds.length === 0
+                ? t('Choose a Domain to see its workload.')
+                : workerId ? t('This Worker has no assignments in the selected scope.')
+                  : t('No Workers or Elements in this scope yet.')}
+            </CenterMessage>
+          ) : (
+            <div className="min-w-fit">
+              <DateHeader days={days} todayIdx={todayIdx} totalW={totalW} dayW={dayW} range={range} />
+              {rows.map((r) => {
+                const isOpen = expanded.has(r.worker.id);
+                const sortedElements = sortedForWindow(r.elements, days);
+                return (
+                  <Fragment key={r.worker.id}>
+                    <WorkerRow
+                      key={`${contextKey}:${r.worker.id}`}
+                      row={r}
+                      days={days}
+                      today={today}
+                      todayIdx={todayIdx}
+                      totalW={totalW}
+                      dayW={dayW}
+                      previewDaily={previewDaily?.get(r.worker.id) ?? null}
+                      expanded={isOpen}
+                      onToggle={() => toggleExpanded(r.worker.id)}
+                      onAddSpan={addAvailability}
+                      onRemoveSpan={removeAvailability}
+                      onElementClick={onElementClick}
+                    />
+                    {isOpen && sortedElements.length === 0 && (
+                      <ElementSubEmpty totalW={totalW} />
+                    )}
+                    {isOpen && sortedElements.map((el) => (
+                      <ElementSubRow
+                        key={el.id}
+                        element={el}
+                        days={days}
+                        todayIdx={todayIdx}
+                        totalW={totalW}
+                        dayW={dayW}
+                        onElementClick={onElementClick}
+                      />
+                    ))}
+                  </Fragment>
+                );
+              })}
+              {unassigned.length > 0 && (
+                <Fragment>
+                  <UnassignedRow
+                    elements={unassigned}
+                    daily={unassignedDaily}
                     days={days}
                     todayIdx={todayIdx}
                     totalW={totalW}
-                    expanded={isOpen}
-                    onToggle={() => toggleExpanded(r.worker.id)}
-                    onAddSpan={addAvailability}
-                    onRemoveSpan={removeAvailability}
-                    onElementClick={onElementClick}
+                    dayW={dayW}
+                    expanded={expanded.has('unassigned')}
+                    onToggle={() => toggleExpanded('unassigned')}
                   />
-                  {isOpen && sortedElements.length === 0 && (
-                    <ElementSubEmpty totalW={totalW} />
-                  )}
-                  {isOpen && sortedElements.map((el) => (
+                  {expanded.has('unassigned') && sortedForWindow(unassigned, days).map((el) => (
                     <ElementSubRow
                       key={el.id}
                       element={el}
                       days={days}
                       todayIdx={todayIdx}
                       totalW={totalW}
+                      dayW={dayW}
                       onElementClick={onElementClick}
                     />
                   ))}
                 </Fragment>
-              );
-            })}
-            {unassigned.length > 0 && (
-              <Fragment>
-                <UnassignedRow
-                  elements={unassigned}
-                  daily={unassignedDaily}
-                  days={days}
-                  todayIdx={todayIdx}
-                  totalW={totalW}
-                  expanded={expanded.has('unassigned')}
-                  onToggle={() => toggleExpanded('unassigned')}
-                />
-                {expanded.has('unassigned') && sortedForWindow(unassigned, days).map((el) => (
-                  <ElementSubRow
-                    key={el.id}
-                    element={el}
-                    days={days}
-                    todayIdx={todayIdx}
-                    totalW={totalW}
-                    onElementClick={onElementClick}
-                  />
-                ))}
-              </Fragment>
-            )}
-          </div>
+              )}
+            </div>
+          )}
+        </div>
+        {planOpen && (
+          <WorkloadPlanPanel
+            plan={plan}
+            proposals={shown}
+            elements={elements}
+            workers={workerById}
+            focusName={focusName ?? null}
+            onPreview={setPreviewId}
+            onDismiss={(id) => setDismissed({ contextKey, ids: new Set([...dismissedIds, id]) })}
+            onElementClick={onElementClick}
+            onClose={() => setWorkloadPlanOpen(false)}
+          />
         )}
       </div>
     </div>
   );
 }
 
+const EMPTY_SET: Set<string> = new Set();
+
 // =============================================================
-// Header
+// Header — zoom, date controls, the plan toggle
 // =============================================================
+const RANGE_LABELS: { id: WorkloadRange; label: string }[] = [
+  { id: '2w', label: '2 weeks' },
+  { id: 'month', label: 'Month' },
+  { id: 'quarter', label: 'Quarter' },
+];
+
 function Header({
   title,
-  loading,
-  stats,
-  anchorOffset,
-  setAnchorOffset,
-  showFilterButton,
-  filterActive,
-  filterOpen,
-  setFilterOpen,
-  domains,
-  selectedDomainIds,
-  setSelectedDomainIds,
+  range,
+  anchor,
+  step,
+  planOpen,
+  proposals,
+  focusName,
+  onClearWorker,
 }: {
-  title: string;
-  loading: boolean;
-  stats: { humans: number; agents: number; overloadedDays: number };
-  anchorOffset: number;
-  setAnchorOffset: (fn: (prev: number) => number) => void;
-  showFilterButton: boolean;
-  filterActive: boolean;
-  filterOpen: boolean;
-  setFilterOpen: (v: boolean) => void;
-  domains: { id: string; name: string }[];
-  selectedDomainIds: string[];
-  setSelectedDomainIds: (fn: (prev: string[]) => string[]) => void;
+  title: string | null;
+  range: WorkloadRange;
+  anchor: number;
+  step: number;
+  planOpen: boolean;
+  /** Open proposals; null while the plan cannot be read yet. */
+  proposals: number | null;
+  focusName: string | null;
+  onClearWorker?: () => void;
 }) {
+  const { t } = useI18n();
   return (
-    <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0 overflow-hidden">
-      <span className="text-[12px] font-semibold text-foreground">{title}</span>
-      <span className="text-[11px] text-muted-foreground">
-        {loading ? 'Loading…' : `${stats.humans} humans · ${stats.agents} agents`}
-      </span>
+    <div className="flex h-[50px] flex-shrink-0 items-center gap-2 overflow-hidden border-b border-border/60 bg-card px-4">
+      {title && <span className="text-[13px] font-semibold text-foreground">{t(title)}</span>}
+      {focusName && (
+        <span className="flex min-w-0 items-center gap-1 rounded-full bg-[var(--surface-strong)] py-0.5 pl-2.5 pr-1 text-[12px] text-foreground">
+          <span className="truncate">{focusName}</span>
+          {onClearWorker && (
+            <button type="button" onClick={onClearWorker} aria-label={t('Show everyone')} title={t('Show everyone')}
+              className="flex size-4 items-center justify-center rounded-full text-muted-foreground hover:text-foreground">
+              <X size={11} />
+            </button>
+          )}
+        </span>
+      )}
       <div className="flex-1" />
 
-      <div className="flex items-center gap-1 mr-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          onClick={() => setAnchorOffset((o) => o - 7)}
-          title="Back one week"
-          aria-label="Back one week"
-        >
+      <div className="flex items-center gap-1" role="group" aria-label={t('Zoom')}>
+        {RANGE_LABELS.map((r) => (
+          <Button key={r.id} type="button" size="xs" shape="tab" variant={range === r.id ? 'secondary' : 'ghost'}
+            aria-pressed={range === r.id} onClick={() => setWorkloadRange(r.id)}>
+            {t(r.label)}
+          </Button>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-1">
+        <Button type="button" variant="ghost" size="icon-xs" onClick={() => shiftWorkloadAnchor(-step)}
+          title={t('Earlier')} aria-label={t('Earlier')}>
           <ChevronLeft size={CONTROL.icon.xs} />
         </Button>
-        <Button
-          type="button"
-          variant={anchorOffset === 0 ? 'secondary' : 'ghost'}
-          size="xs"
-          onClick={() => setAnchorOffset(() => 0)}
-        >
-          Today
+        <Button type="button" variant={anchor === 0 ? 'secondary' : 'ghost'} size="xs" onClick={() => shiftWorkloadAnchor(null)}>
+          {t('Today')}
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          onClick={() => setAnchorOffset((o) => o + 7)}
-          title="Forward one week"
-          aria-label="Forward one week"
-        >
+        <Button type="button" variant="ghost" size="icon-xs" onClick={() => shiftWorkloadAnchor(step)}
+          title={t('Later')} aria-label={t('Later')}>
           <ChevronRight size={CONTROL.icon.xs} />
         </Button>
       </div>
 
-      <KpiPill label="Overload days" value={loading ? '—' : stats.overloadedDays} tone={!loading && stats.overloadedDays > 0 ? 'red' : 'neutral'} />
-
-      {showFilterButton && (
-        <Popover open={filterOpen} onOpenChange={setFilterOpen}>
-          <PopoverTrigger asChild>
-            <Button variant={filterActive ? 'secondary' : 'ghost'} size="xs" align="start" aria-label="Choose workload Domains"
-              title={domains.filter(domain => selectedDomainIds.includes(domain.id)).map(domain => domain.name).join(', ')}>
-              <Filter size={CONTROL.icon.xs} />
-              <span className="max-w-40 truncate">
-                {selectedDomainIds.length === 0 ? 'No Domains'
-                  : !filterActive ? 'All Domains'
-                    : selectedDomainIds.length === 1 ? domains.find(domain => domain.id === selectedDomainIds[0])?.name
-                      : `${selectedDomainIds.length} Domains`}
-              </span>
-            </Button>
-          </PopoverTrigger>
-          <MenuShell align="end">
-            <Command>
-              <CommandInput placeholder="Find a Domain…" />
-              <CommandList>
-                <CommandEmpty>No matching Domains.</CommandEmpty>
-                <CommandItem onSelect={() => setSelectedDomainIds(() => domains.map(domain => domain.id))}>
-                  <span className="flex-1">All Domains</span>
-                  {!filterActive && selectedDomainIds.length > 0 && <Check size={CONTROL.icon.xs} />}
-                </CommandItem>
-                {domains.map(domain => {
-                  const checked = selectedDomainIds.includes(domain.id);
-                  return (
-                    <CommandItem key={domain.id} value={`${domain.name} ${domain.id}`} onSelect={() => setSelectedDomainIds(previous =>
-                      previous.includes(domain.id) ? previous.filter(id => id !== domain.id) : [...previous, domain.id])}>
-                      <span className="flex-1 truncate">{domain.name}</span>
-                      {checked && <Check size={CONTROL.icon.xs} />}
-                    </CommandItem>
-                  );
-                })}
-              </CommandList>
-            </Command>
-          </MenuShell>
-        </Popover>
-      )}
+      <Button type="button" size="xs" variant={planOpen ? 'secondary' : 'ghost'} aria-pressed={planOpen}
+        onClick={() => setWorkloadPlanOpen(!planOpen)}>
+        <Scale size={CONTROL.icon.xs} />
+        {t('Rebalance')}
+        {proposals !== null && proposals > 0 && (
+          <span className="rounded-full bg-[var(--accent-default)] px-1.5 text-[10px] font-semibold tabular-nums text-white">{proposals}</span>
+        )}
+      </Button>
     </div>
   );
 }
 
 // =============================================================
+// KPI strip — the window at a glance
+// =============================================================
+function KpiStrip({
+  loading,
+  team,
+  dueAway,
+  unassignedHours,
+  unassignedCount,
+}: {
+  loading: boolean;
+  team: WorkloadTeamSummary;
+  dueAway: number;
+  unassignedHours: number;
+  unassignedCount: number;
+}) {
+  const { t } = useI18n();
+  const dash = '—';
+  const util = team.utilization;
+  return (
+    <div className="flex flex-shrink-0 items-stretch gap-6 overflow-x-auto border-b border-border/60 bg-card px-4 py-2.5">
+      <Kpi label={t('Team load')} hint={t('Booked hours ÷ available hours from today to the end of the view')}
+        value={loading || util === null ? dash : pct(util)}
+        tone={!loading && util !== null && util > 1 ? 'danger' : 'neutral'}
+        meter={loading || util === null ? null : util} />
+      <Kpi label={t('Overloaded')} hint={t('People over their hours on at least one day')}
+        value={loading ? dash : t('{n} people', { n: team.overloadedPeople })}
+        sub={loading || team.overDays === 0 ? null : t('{n} days over', { n: team.overDays })}
+        tone={!loading && team.overloadedPeople > 0 ? 'danger' : 'neutral'} />
+      <Kpi label={t('Due while away')} hint={t('Open Elements due on a day their owner has no hours')}
+        value={loading ? dash : dueAway} tone={!loading && dueAway > 0 ? 'danger' : 'neutral'} />
+      <Kpi label={t('Unassigned')} hint={t('Work nobody holds yet')}
+        value={loading ? dash : `${Math.round(unassignedHours)}h`}
+        sub={loading || unassignedCount === 0 ? null : t('{n} Elements', { n: unassignedCount })}
+        tone={!loading && unassignedHours > 0 ? 'warning' : 'neutral'} />
+      <Kpi label={t('AI agents')} hint={t('Share of the booked hours held by AI agents')}
+        value={loading || team.aiShare === null ? dash : pct(team.aiShare)}
+        sub={loading ? null : t('of {h}h booked', { h: Math.round(team.hours) })} tone="neutral" />
+    </div>
+  );
+}
+
+function Kpi({ label, hint, value, sub, tone, meter }: {
+  label: string;
+  hint: string;
+  value: React.ReactNode;
+  sub?: string | null;
+  tone: 'danger' | 'warning' | 'neutral';
+  meter?: number | null;
+}) {
+  const color = tone === 'danger' ? 'text-[var(--status-danger)]' : tone === 'warning' ? 'text-[var(--status-warning)]' : 'text-foreground';
+  return (
+    <div className="flex min-w-[96px] flex-col gap-0.5" title={hint}>
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span className="flex items-baseline gap-1.5">
+        <span className={`text-[18px] font-semibold leading-none tabular-nums ${color}`}>{value}</span>
+        {sub && <span className="text-[11px] text-muted-foreground">{sub}</span>}
+      </span>
+      {meter != null && <LoadMeter value={meter} className="mt-1 w-24" />}
+    </div>
+  );
+}
+
+function pct(n: number): string {
+  return `${Math.round(n * 100)}%`;
+}
+
+// =============================================================
 // Date header — month strip + day numbers
 // =============================================================
-function DateHeader({ days, todayIdx, totalW }: { days: Date[]; todayIdx: number; totalW: number }) {
+function DateHeader({ days, todayIdx, totalW, dayW, range }: { days: Date[]; todayIdx: number; totalW: number; dayW: number; range: WorkloadRange }) {
+  const { locale } = useI18n();
   // Month spans: consecutive runs of the same month
   const spans = useMemo(() => {
     const arr: { label: string; start: number; len: number }[] = [];
     for (let i = 0; i < days.length; i++) {
-      const monthLabel = days[i].toLocaleDateString('en-US', { month: 'short' });
+      const monthLabel = days[i].toLocaleDateString(locale, { month: 'short' });
       const last = arr[arr.length - 1];
       if (last && last.label === monthLabel) last.len += 1;
       else arr.push({ label: monthLabel, start: i, len: 1 });
     }
     return arr;
-  }, [days]);
+  }, [days, locale]);
 
   return (
     <div
@@ -459,10 +552,10 @@ function DateHeader({ days, todayIdx, totalW }: { days: Date[]; todayIdx: number
         {spans.map((s, i) => (
           <div
             key={i}
-            className="flex-shrink-0 text-[11px] text-muted-foreground font-medium px-2 flex items-center"
-            style={{ width: s.len * DAY_W }}
+            className="flex-shrink-0 overflow-hidden whitespace-nowrap text-[11px] text-muted-foreground font-medium px-2 flex items-center"
+            style={{ width: s.len * dayW }}
           >
-            {s.label}
+            {s.len * dayW >= 28 ? s.label : ''}
           </div>
         ))}
       </div>
@@ -470,26 +563,29 @@ function DateHeader({ days, todayIdx, totalW }: { days: Date[]; todayIdx: number
         {days.map((d, i) => {
           const isWeekend = d.getDay() === 0 || d.getDay() === 6;
           const isToday = i === todayIdx;
+          // A quarter is too narrow for every date: label the Mondays.
+          const label = range === 'quarter' ? (d.getDay() === 1 || isToday ? d.getDate() : '') : range === '2w'
+            ? `${d.toLocaleDateString(locale, { weekday: 'narrow' })} ${d.getDate()}` : d.getDate();
           return (
             <div
               key={i}
-              className={`flex-shrink-0 text-[10px] flex items-center justify-center tabular-nums ${
+              className={`flex-shrink-0 overflow-visible whitespace-nowrap text-[10px] flex items-center justify-center tabular-nums ${
                 isToday
                   ? 'text-foreground font-semibold'
                   : isWeekend
                     ? 'text-muted-foreground/40'
                     : 'text-muted-foreground'
               }`}
-              style={{ width: DAY_W }}
+              style={{ width: dayW }}
             >
-              {d.getDate()}
+              {label}
             </div>
           );
         })}
         {todayIdx >= 0 && (
           <div
             className="absolute top-1 w-1.5 h-1.5 rounded-full bg-[var(--accent-default)]"
-            style={{ left: todayIdx * DAY_W + DAY_W / 2 - 3 }}
+            style={{ left: todayIdx * dayW + dayW / 2 - 3 }}
           />
         )}
       </div>
@@ -498,48 +594,75 @@ function DateHeader({ days, todayIdx, totalW }: { days: Date[]; todayIdx: number
 }
 
 // =============================================================
+// Day grid — weekend tint, today column and line, shared by rows
+// =============================================================
+function DayGrid({ days, todayIdx, dayW }: { days: Date[]; todayIdx: number; dayW: number }) {
+  return (
+    <>
+      {days.map((d, i) => {
+        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+        const isToday = i === todayIdx;
+        if (!isToday && !isWeekend) return null;
+        return (
+          <div
+            key={i}
+            className={`absolute top-0 bottom-0 ${isToday ? 'bg-[var(--accent-subtle)]' : 'bg-muted/15'}`}
+            style={{ left: i * dayW, width: dayW }}
+          />
+        );
+      })}
+      {todayIdx >= 0 && (
+        <div
+          className="absolute top-0 bottom-0 border-l border-[var(--accent-default)]/60"
+          style={{ left: todayIdx * dayW + dayW / 2 }}
+        />
+      )}
+    </>
+  );
+}
+
+// =============================================================
 // Worker row — left meta col + SVG area chart on the right
 // =============================================================
 function WorkerRow({
-  worker,
-  elements,
-  daily,
-  capacity,
-  spans,
+  row,
   days,
+  today,
   todayIdx,
   totalW,
+  dayW,
+  previewDaily,
   expanded,
   onToggle,
   onAddSpan,
   onRemoveSpan,
   onElementClick,
 }: {
-  worker: Worker;
-  elements: ElementWithDetails[];
-  daily: number[];
-  capacity: number[];
-  spans: WorkerAvailability[];
+  row: LoadedRow;
   days: Date[];
+  today: string;
   todayIdx: number;
   totalW: number;
+  dayW: number;
+  /** The load this row would carry if the hovered proposal were applied. */
+  previewDaily: number[] | null;
   expanded: boolean;
   onToggle: () => void;
   onAddSpan: (span: AvailabilityDraft) => Promise<void>;
   onRemoveSpan: (span: WorkerAvailability) => Promise<void>;
   onElementClick?: (element: ElementWithDetails) => void;
 }) {
-  const isOverloaded = daily.some((h, i) => h > capacity[i]);
-  const peak = daily.reduce((m, h) => (h > m ? h : m), 0);
+  const { t } = useI18n();
+  const { worker, elements, daily, capacity, spans, utilization } = row;
+  const isOverloaded = row.overDays > 0;
   const awayDays = awayDayCount(capacity);
-  const subtitle = workerSubtitle(worker, elements);
+  const subtitle = workerSubtitle(worker, elements, t);
   // Work whose date falls on a day this Worker has none. The chart already
   // draws it as a red band over a hatched stretch, which says a collision
   // exists without saying which Elements are in it; the count carries into the
   // availability menu, where they are listed under the period they land in.
-  // Not clipped to the visible window — a rotation in November is still a
-  // rotation when the chart happens to be showing September.
-  const dueAway = dueWhileAway(worker, spans, elements);
+  const dueAway = row.dueAway;
+  const [hover, setHover] = useState<number | null>(null);
 
   return (
     <div
@@ -550,7 +673,7 @@ function WorkerRow({
           opens this Worker's availability. Two jobs, so two controls: nesting
           the second inside the first would make one press mean either. */}
       <div
-        className="sticky left-0 z-[1] bg-card flex items-center pr-1 border-r border-border/40 flex-shrink-0"
+        className="sticky left-0 z-[2] bg-card flex items-center pr-1 border-r border-border/40 flex-shrink-0"
         style={{ width: WORKER_COL_W }}
       >
         <Button
@@ -559,7 +682,7 @@ function WorkerRow({
           align="start"
           onClick={onToggle}
           aria-expanded={expanded}
-          className="gap-2 pl-2 pr-1 h-full min-w-0 flex-1 rounded-none"
+          className="gap-2 pl-2 pr-1 h-full min-w-0 flex-1 rounded-none border-0"
         >
           <span
             className={`w-4 h-4 flex items-center justify-center text-muted-foreground transition-transform ${
@@ -569,25 +692,27 @@ function WorkerRow({
             <ChevronDown size={12} />
           </span>
           <ResourceWorkerAvatar worker={worker} />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 text-left">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px] font-medium text-foreground truncate">{worker.name}</span>
-              {isOverloaded && <OverloadFlag />}
+              {isOverloaded && <OverloadFlag label={t('Overloaded')} />}
+              <span className="flex-1" />
+              {utilization !== null && (
+                <span className={`text-[11px] tabular-nums ${utilization > 1 ? 'text-[var(--status-danger)] font-semibold' : 'text-muted-foreground'}`}>
+                  {pct(utilization)}
+                </span>
+              )}
             </div>
-            {/* 220px of row, so the two facts do not both fit. Work landing on
-                days with no hours takes the space when it fires — the day count
-                it displaces is implied by it, and the menu one button away
-                carries the dates and the names. */}
-            <div className="text-[11px] text-muted-foreground truncate" title={loadNote(subtitle, awayDays, dueAway.length)}>
-              {dueAway.length > 0 ? (
+            <div className="text-[11px] text-muted-foreground truncate" title={loadNote(subtitle, awayDays, dueAway, t)}>
+              {dueAway > 0 ? (
                 <>
                   {subtitle}
                   <span className="text-[var(--status-danger)]">
-                    {` · ${dueAway.length} due while away`}
+                    {` · ${t('{n} due while away', { n: dueAway })}`}
                   </span>
                 </>
               ) : awayDays > 0 ? (
-                `${subtitle} · away ${awayDays}d`
+                `${subtitle} · ${t('away {n}d', { n: awayDays })}`
               ) : (
                 subtitle
               )}
@@ -604,45 +729,99 @@ function WorkerRow({
         />
       </div>
 
-      {/* Chart cell */}
-      <div className="relative flex-shrink-0" style={{ width: totalW, height: ROW_H }}>
-        {/* Day column dividers (weekend tint, today highlight) */}
-        {days.map((d, i) => {
-          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-          const isToday = i === todayIdx;
-          return (
-            <div
-              key={i}
-              className={`absolute top-0 bottom-0 ${
-                isToday ? 'bg-[var(--accent-subtle)]' : isWeekend ? 'bg-muted/15' : ''
-              }`}
-              style={{ left: i * DAY_W, width: DAY_W }}
-            />
-          );
-        })}
-        {/* Today vertical line */}
-        {todayIdx >= 0 && (
-          <div
-            className="absolute top-0 bottom-0 border-l border-[var(--accent-default)]/60"
-            style={{ left: todayIdx * DAY_W + DAY_W / 2 }}
-          />
-        )}
-
+      {/* Chart cell — hovering a day reads it out: hours against hours
+          available, and the Elements that make up the day. */}
+      <div
+        className="relative flex-shrink-0"
+        style={{ width: totalW, height: ROW_H }}
+        onMouseMove={(e) => {
+          const x = e.clientX - e.currentTarget.getBoundingClientRect().left;
+          const i = Math.floor(x / dayW);
+          setHover(i >= 0 && i < days.length ? i : null);
+        }}
+        onMouseLeave={() => setHover(null)}
+      >
+        <DayGrid days={days} todayIdx={todayIdx} dayW={dayW} />
         <AreaChart
           daily={daily}
           capacity={capacity}
+          previewDaily={previewDaily}
+          dayW={dayW}
           width={totalW}
           height={CHART_H}
           topPad={CHART_TOP_PAD}
           rowHeight={ROW_H}
           isAgent={worker.type === 'ai_agent'}
         />
-
-        {/* Peak tooltip data (no-op for now — visible on hover later) */}
-        <span className="sr-only">Peak {peak.toFixed(1)} hours</span>
+        {hover !== null && (
+          <DayReadout
+            day={days[hover]}
+            index={hover}
+            hours={daily[hover]}
+            capacity={capacity[hover]}
+            elements={elements}
+            today={today}
+            dayW={dayW}
+            totalW={totalW}
+          />
+        )}
       </div>
     </div>
   );
+}
+
+/** What one day of one Worker is made of. */
+function DayReadout({ day, index, hours, capacity, elements, today, dayW, totalW }: {
+  day: Date;
+  index: number;
+  hours: number;
+  capacity: number;
+  elements: ElementWithDetails[];
+  today: string;
+  dayW: number;
+  totalW: number;
+}) {
+  const { t, locale } = useI18n();
+  const iso = toDateOnlyString(day);
+  const parts = useMemo(() => elements
+    .filter((el) => {
+      const span = elementSpan(el);
+      return span !== null && span.start <= iso && iso <= span.end && countsOnDay(el, iso, today);
+    })
+    .map((el) => ({ el, h: hoursPerDay(el) }))
+    .sort((a, b) => b.h - a.h), [elements, iso, today]);
+  const W = 220;
+  const left = Math.min(Math.max(0, index * dayW + dayW / 2 - W / 2), Math.max(0, totalW - W));
+  const over = hours > capacity + 0.01;
+  return (
+    <div className="pointer-events-none absolute top-full z-30 mt-1 rounded-lg border border-border bg-popover px-3 py-2 shadow-xl" style={{ left, width: W }}>
+      <div className="flex items-baseline gap-2">
+        <span className="flex-1 text-[12px] font-medium text-foreground">
+          {day.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' })}
+        </span>
+        <span className={`text-[12px] tabular-nums ${over ? 'font-semibold text-[var(--status-danger)]' : 'text-muted-foreground'}`}>
+          {capacity <= 0 ? t('Away') : `${round1(hours)}h / ${round1(capacity)}h`}
+        </span>
+      </div>
+      {parts.length === 0 ? (
+        <div className="mt-1 text-[11px] text-muted-foreground">{t('Nothing booked')}</div>
+      ) : (
+        <ul className="mt-1 space-y-0.5">
+          {parts.slice(0, 4).map(({ el, h }) => (
+            <li key={el.id} className="flex items-center gap-2 text-[11px]">
+              <span className="min-w-0 flex-1 truncate text-foreground">{el.title}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">{round1(h)}h</span>
+            </li>
+          ))}
+          {parts.length > 4 && <li className="text-[11px] text-muted-foreground">{t('and {n} more', { n: parts.length - 4 })}</li>}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function round1(n: number): string {
+  return (Math.round(n * 10) / 10).toString();
 }
 
 // =============================================================
@@ -656,6 +835,7 @@ function UnassignedRow({
   days,
   todayIdx,
   totalW,
+  dayW,
   expanded,
   onToggle,
 }: {
@@ -664,9 +844,12 @@ function UnassignedRow({
   days: Date[];
   todayIdx: number;
   totalW: number;
+  dayW: number;
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useI18n();
+  const unscheduled = elements.filter(element => !elementSpan(element)).length;
   return (
     <div
       className="flex items-stretch border-b border-border/30 hover:bg-muted/5"
@@ -678,7 +861,7 @@ function UnassignedRow({
         align="start"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="sticky left-0 z-[1] bg-card gap-2 h-full pl-2 pr-3 rounded-none border-r border-[var(--border-subtle)]"
+        className="sticky left-0 z-[2] bg-card gap-2 h-full pl-2 pr-3 rounded-none border-0 border-r border-[var(--border-subtle)]"
         style={{ width: WORKER_COL_W }}
       >
         <span
@@ -691,39 +874,22 @@ function UnassignedRow({
         <div className="w-8 h-8 rounded-full border border-dashed border-border flex items-center justify-center text-muted-foreground flex-shrink-0">
           <UserRound size={CONTROL.icon.xs} />
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-medium text-muted-foreground truncate">Unassigned</div>
+        <div className="min-w-0 flex-1 text-left">
+          <div className="text-[13px] font-medium text-muted-foreground truncate">{t('Unassigned')}</div>
           <div className="text-[11px] text-muted-foreground/70 truncate">
-            {elements.length} Element{elements.length === 1 ? '' : 's'}
-            {elements.some(element => !elementSpan(element)) && ` · ${elements.filter(element => !elementSpan(element)).length} unscheduled`}
+            {t('{n} Elements', { n: elements.length })}
+            {unscheduled > 0 && ` · ${t('{n} unscheduled', { n: unscheduled })}`}
           </div>
         </div>
       </Button>
 
       <div className="relative flex-shrink-0" style={{ width: totalW, height: ROW_H }}>
-        {days.map((d, i) => {
-          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-          const isToday = i === todayIdx;
-          return (
-            <div
-              key={i}
-              className={`absolute top-0 bottom-0 ${
-                isToday ? 'bg-[var(--accent-subtle)]' : isWeekend ? 'bg-muted/15' : ''
-              }`}
-              style={{ left: i * DAY_W, width: DAY_W }}
-            />
-          );
-        })}
-        {todayIdx >= 0 && (
-          <div
-            className="absolute top-0 bottom-0 border-l border-[var(--accent-default)]/60"
-            style={{ left: todayIdx * DAY_W + DAY_W / 2 }}
-          />
-        )}
-
+        <DayGrid days={days} todayIdx={todayIdx} dayW={dayW} />
         <AreaChart
           daily={daily}
           capacity={daily.map(() => DEFAULT_CAPACITY_PER_DAY)}
+          previewDaily={null}
+          dayW={dayW}
           width={totalW}
           height={CHART_H}
           topPad={CHART_TOP_PAD}
@@ -742,6 +908,8 @@ function UnassignedRow({
 function AreaChart({
   daily,
   capacity,
+  previewDaily,
+  dayW,
   width,
   height,
   topPad,
@@ -753,6 +921,9 @@ function AreaChart({
   /** Hours available each day. A step, not a level — an absence is the days
    *  where it drops to zero. */
   capacity: number[];
+  /** The load after a proposal, drawn as a line over the current fill. */
+  previewDaily: number[] | null;
+  dayW: number;
   width: number;
   height: number;
   topPad: number;
@@ -770,21 +941,36 @@ function AreaChart({
   // Step-shape path: rectangle per day
   let path = `M 0 ${baseY}`;
   for (let i = 0; i < daily.length; i++) {
-    const x0 = i * DAY_W;
-    const x1 = x0 + DAY_W;
+    const x0 = i * dayW;
+    const x1 = x0 + dayW;
     const y = yFor(daily[i]);
     path += ` L ${x0} ${y} L ${x1} ${y}`;
   }
-  path += ` L ${daily.length * DAY_W} ${baseY} Z`;
+  path += ` L ${daily.length * dayW} ${baseY} Z`;
 
   // The capacity reference follows the same step as the load, so a day off
   // reads as the line falling to the floor rather than as an unexplained red
   // band floating under a flat line.
   let capPath = '';
   for (let i = 0; i < capacity.length; i++) {
-    const x0 = i * DAY_W;
+    const x0 = i * dayW;
     const y = yFor(capacity[i]);
-    capPath += `${i === 0 ? 'M' : ' L'} ${x0} ${y} L ${x0 + DAY_W} ${y}`;
+    capPath += `${i === 0 ? 'M' : ' L'} ${x0} ${y} L ${x0 + dayW} ${y}`;
+  }
+
+  // Only the days the proposal changes: a line along every untouched day
+  // would draw the whole row and bury the part that moves.
+  let previewPath = '';
+  if (previewDaily) {
+    let open = false;
+    for (let i = 0; i < previewDaily.length; i++) {
+      const changed = Math.abs(previewDaily[i] - daily[i]) > 0.01;
+      if (!changed) { open = false; continue; }
+      const x0 = i * dayW;
+      const y = yFor(previewDaily[i]);
+      previewPath += `${open ? ' L' : ' M'} ${x0} ${y} L ${x0 + dayW} ${y}`;
+      open = true;
+    }
   }
 
   // Overload-only path: portions where the day's load exceeds that day's
@@ -792,16 +978,16 @@ function AreaChart({
   let overloadPath = '';
   let inOverload = false;
   let segStart = 0;
-  const overAt = (i: number) => !neutral && i < daily.length && daily[i] > capacity[i];
+  const overAt = (i: number) => !neutral && i < daily.length && daily[i] > capacity[i] + 0.01;
   const closeSegment = (end: number) => {
-    overloadPath += ` M ${segStart * DAY_W} ${yFor(capacity[segStart])}`;
+    overloadPath += ` M ${segStart * dayW} ${yFor(capacity[segStart])}`;
     for (let j = segStart; j < end; j++) {
-      const jx0 = j * DAY_W;
-      overloadPath += ` L ${jx0} ${yFor(daily[j])} L ${jx0 + DAY_W} ${yFor(daily[j])}`;
+      const jx0 = j * dayW;
+      overloadPath += ` L ${jx0} ${yFor(daily[j])} L ${jx0 + dayW} ${yFor(daily[j])}`;
     }
     for (let j = end - 1; j >= segStart; j--) {
-      const jx0 = j * DAY_W;
-      overloadPath += ` L ${jx0 + DAY_W} ${yFor(capacity[j])} L ${jx0} ${yFor(capacity[j])}`;
+      const jx0 = j * dayW;
+      overloadPath += ` L ${jx0 + dayW} ${yFor(capacity[j])} L ${jx0} ${yFor(capacity[j])}`;
     }
     overloadPath += ' Z';
   };
@@ -822,8 +1008,8 @@ function AreaChart({
   for (let i = 0; i < capacity.length; i++) {
     if (neutral || capacity[i] > 0) continue;
     const last = awaySpans[awaySpans.length - 1];
-    if (last && last.x + last.w === i * DAY_W) last.w += DAY_W;
-    else awaySpans.push({ x: i * DAY_W, w: DAY_W });
+    if (last && last.x + last.w === i * dayW) last.w += dayW;
+    else awaySpans.push({ x: i * dayW, w: dayW });
   }
 
   const fill = neutral ? 'var(--text-tertiary)' : 'var(--accent-default)';
@@ -867,11 +1053,15 @@ function AreaChart({
           strokeWidth={1}
         />
       )}
-      {/* Healthy area fill */}
-      <path d={path} fill={fill} opacity={neutral ? 0.18 : isAgent ? 0.25 : 0.22} />
+      {/* Healthy area fill — faded while a proposal is previewed */}
+      <path d={path} fill={fill} opacity={(neutral ? 0.18 : isAgent ? 0.25 : 0.22) * (previewDaily ? 0.5 : 1)} />
       {/* Overload band */}
       {overloadPath && (
-        <path d={overloadPath} fill="var(--status-danger)" opacity={0.45} />
+        <path d={overloadPath} fill="var(--status-danger)" opacity={previewDaily ? 0.2 : 0.45} />
+      )}
+      {/* The load after the previewed proposal */}
+      {previewPath && (
+        <path d={previewPath} fill="none" stroke="var(--accent-default)" strokeWidth={2} />
       )}
     </svg>
   );
@@ -1171,6 +1361,7 @@ function spanDetail(span: WorkerAvailability): string {
 }
 
 // =============================================================
+// =============================================================
 // Element sub-row — rendered under an expanded worker. Shows
 // the Element title + a thin bar aligned to the same date axis
 // so the user can see which Element contributes to which peak.
@@ -1183,15 +1374,18 @@ function ElementSubRow({
   days,
   todayIdx,
   totalW,
+  dayW,
   onElementClick,
 }: {
   element: ElementWithDetails;
   days: Date[];
   todayIdx: number;
   totalW: number;
+  dayW: number;
   onElementClick?: (element: ElementWithDetails) => void;
 }) {
-  const bar = useMemo(() => barFor(element, days), [element, days]);
+  const { t } = useI18n();
+  const bar = useMemo(() => barFor(element, days, dayW), [element, days, dayW]);
   const statusColor =
     SEMANTIC_COLORS.status[element.status as keyof typeof SEMANTIC_COLORS.status]
     ?? SEMANTIC_COLORS.status.todo;
@@ -1204,12 +1398,12 @@ function ElementSubRow({
       align="start"
       onClick={() => onElementClick?.(element)}
       disabled={!onElementClick}
-      aria-label={`Open ${element.title}`}
-      className="flex w-full items-stretch gap-0 rounded-none border-b border-[var(--border-subtle)] p-0"
+      aria-label={t('Open {title}', { title: element.title })}
+      className="flex w-full items-stretch gap-0 rounded-none border-0 border-b border-[var(--border-subtle)] p-0"
       style={{ height: SUB_ROW_H }}
     >
       <span
-        className="sticky left-0 z-[1] bg-card flex items-center gap-2 pr-3 border-r border-[var(--border-subtle)] flex-shrink-0"
+        className="sticky left-0 z-[2] bg-card flex items-center gap-2 pr-3 border-r border-[var(--border-subtle)] flex-shrink-0 text-left"
         style={{ width: WORKER_COL_W, paddingLeft: 32 }}
       >
         <span
@@ -1219,7 +1413,7 @@ function ElementSubRow({
         />
         <span className="text-[12px] text-foreground truncate flex-1">{element.title}</span>
         <span className="text-[11px] text-muted-foreground tabular-nums flex-shrink-0"
-          title={element.estimated_hours == null ? 'Approximate hours based on priority; set an estimate in the Element.' : 'Estimated hours'}>
+          title={element.estimated_hours == null ? t('Approximate hours based on priority; set an estimate in the Element.') : t('Estimated hours')}>
           {element.estimated_hours == null ? '~' : ''}{hours}h
         </span>
       </span>
@@ -1228,7 +1422,7 @@ function ElementSubRow({
         {todayIdx >= 0 && (
           <span
             className="absolute top-0 bottom-0 border-l border-[var(--accent-default)]/30"
-            style={{ left: todayIdx * DAY_W + DAY_W / 2 }}
+            style={{ left: todayIdx * dayW + dayW / 2 }}
           />
         )}
         {bar && (
@@ -1236,7 +1430,7 @@ function ElementSubRow({
             className="absolute rounded-sm truncate"
             style={{
               left: bar.left,
-              width: Math.max(bar.width, 12),
+              width: Math.max(bar.width, 6),
               top: (SUB_ROW_H - SUB_BAR_H) / 2,
               height: SUB_BAR_H,
               background: statusColor,
@@ -1245,23 +1439,24 @@ function ElementSubRow({
             title={`${element.title} · ${statusLabel} · ${hours}h`}
           />
         )}
-        {!bar && !elementSpan(element) && <span className="flex h-full items-center px-3 text-[11px] text-muted-foreground">Unscheduled</span>}
+        {!bar && !elementSpan(element) && <span className="flex h-full items-center px-3 text-[11px] text-muted-foreground">{t('Unscheduled')}</span>}
       </span>
     </Button>
   );
 }
 
 function ElementSubEmpty({ totalW }: { totalW: number }) {
+  const { t } = useI18n();
   return (
     <div
       className="flex items-stretch border-b border-border/20 bg-muted/5"
       style={{ height: SUB_ROW_H }}
     >
       <div
-        className="sticky left-0 z-[1] bg-card flex items-center text-[11px] text-muted-foreground italic"
+        className="sticky left-0 z-[2] bg-card flex items-center text-[11px] text-muted-foreground italic"
         style={{ width: WORKER_COL_W, paddingLeft: 32 }}
       >
-        No elements in this window
+        {t('No Elements in this window')}
       </div>
       <div className="flex-shrink-0" style={{ width: totalW, height: SUB_ROW_H }} />
     </div>
@@ -1299,7 +1494,7 @@ function ResourceWorkerAvatar({ worker }: { worker: Worker }) {
   );
 }
 
-function OverloadFlag() {
+function OverloadFlag({ label }: { label: string }) {
   return (
     <svg
       width={11}
@@ -1310,26 +1505,11 @@ function OverloadFlag() {
       strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
-      aria-label="Overloaded"
+      aria-label={label}
+      className="flex-shrink-0"
     >
       <path d="M4 22V4h14l-2 5 2 5H4" />
     </svg>
-  );
-}
-
-function KpiPill({
-  label,
-  value,
-  tone,
-}: { label: string; value: number | string; tone: 'red' | 'neutral' }) {
-  const toneClass = tone === 'red'
-    ? 'bg-[var(--status-danger-subtle)] text-[var(--status-danger)]'
-    : 'bg-muted text-muted-foreground';
-  return (
-    <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] ${toneClass}`}>
-      <span className="opacity-80">{label}</span>
-      <span className="font-semibold tabular-nums">{value}</span>
-    </span>
   );
 }
 
@@ -1345,6 +1525,8 @@ function CenterMessage({ children }: { children: React.ReactNode }) {
 // Helpers
 // =============================================================
 
+type Translate = (message: string, values?: Record<string, string | number>) => string;
+
 /** Returns Elements ordered by their start_date (then due_date) so the
  *  expanded sub-rows feel chronological. Elements with no dates fall
  *  to the bottom — the area chart already excludes them, but we still
@@ -1359,9 +1541,10 @@ function sortedForWindow(elements: ElementWithDetails[], days: Date[]): ElementW
 function barFor(
   element: ElementWithDetails,
   days: Date[],
+  dayW: number,
 ): { left: number; width: number } | null {
   const bar = workloadBar(element, days.map(toDateOnlyString));
-  return bar ? { left: bar.offset * DAY_W, width: bar.length * DAY_W } : null;
+  return bar ? { left: bar.offset * dayW, width: bar.length * dayW } : null;
 }
 
 function computeDailyHours(elements: ElementWithDetails[], days: Date[]): number[] {
@@ -1369,28 +1552,20 @@ function computeDailyHours(elements: ElementWithDetails[], days: Date[]): number
 }
 
 /** The whole of the subtitle line, for the hover the truncation makes necessary. */
-function loadNote(subtitle: string, awayDays: number, dueAway: number): string {
+function loadNote(subtitle: string, awayDays: number, dueAway: number, t: Translate): string {
   const parts = [subtitle];
-  if (awayDays > 0) parts.push(`away ${awayDays} ${awayDays === 1 ? 'day' : 'days'} in this window`);
-  if (dueAway > 0) {
-    parts.push(`${dueAway} ${dueAway === 1 ? 'Element comes' : 'Elements come'} due while away`);
-  }
+  if (awayDays > 0) parts.push(t('away {n} days in this window', { n: awayDays }));
+  if (dueAway > 0) parts.push(t('{n} Elements come due while away', { n: dueAway }));
   return parts.join(' · ');
 }
 
-function workerSubtitle(worker: Worker, elements: ElementWithDetails[]): string {
+function workerSubtitle(worker: Worker, elements: ElementWithDetails[], t: Translate): string {
   const count = elements.length;
   const unscheduled = elements.filter(element => !elementSpan(element)).length;
-  const role = worker.role ?? (worker.type === 'ai_agent' ? `AI · ${worker.ai_model ?? 'Agent'}` : worker.type === 'robot' ? 'Robot' : null);
-  return [role ?? `${count} Element${count === 1 ? '' : 's'}`, unscheduled > 0 ? `${unscheduled} unscheduled` : null].filter(Boolean).join(' · ');
+  const role = worker.role ?? (worker.type === 'ai_agent' ? `AI · ${worker.ai_model ?? 'Agent'}` : worker.type === 'robot' ? t('Robot') : null);
+  return [role ?? t('{n} Elements', { n: count }), unscheduled > 0 ? t('{n} unscheduled', { n: unscheduled }) : null].filter(Boolean).join(' · ');
 }
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
-}
-
-function sameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear()
-    && a.getMonth() === b.getMonth()
-    && a.getDate() === b.getDate();
 }

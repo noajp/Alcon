@@ -59,6 +59,7 @@ import { ScmSidebar } from '@/ActivitySpace/sustainment/scm/ScmSidebar';
 import { CrmSidebar } from '@/ActivitySpace/sustainment/crm/CrmSidebar';
 import { InboxList } from '@/ActivitySpace/home/InboxList';
 import { CalendarSidebar } from '@/ActivitySpace/sustainment/calendar/CalendarSidebar';
+import { WorkloadSidebar } from '@/ActivitySpace/sustainment/workload/WorkloadSidebar';
 import type { NavigationState } from '@/types/navigation';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
@@ -522,9 +523,10 @@ export function AppSidebar({
               onViewChange={onViewChange}
             />
           )}
-          {/* ── Workload / Team modes ── each a single full surface in the
-              main pane, so the sidebar just names the mode. */}
-          {railMode === 'workload' && <SidebarModeLabel label={t('Workload')} />}
+          {/* ── Workload ── the team's load, the plan that fixes it, and
+              each person, narrowing the chart to them. */}
+          {railMode === 'workload' && <WorkloadSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'workload') onViewChange('workload'); }} />}
+          {/* ── Team ── a single full surface in the main pane. */}
           {/* ── Inbox ── the notification list; the main pane reads the open one. */}
           {railMode === 'inbox' && <InboxList onNavigate={onNavigate} onViewChange={onViewChange} onOpen={() => onViewChange('inbox')} />}
           {/* ── Calendar ── today, a mini month that moves the grid, and who is shown. */}

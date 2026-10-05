@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { fetchExplorerData } from '@/Function/sync/explorerData';
@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { AlconObject, Element, ElementAssignee, ElementWithDetails, Worker } from '@/types/database';
 import { resolveWorkloadScope, selectWorkloadElements, workloadDomainIds, type WorkloadScope, type WorkloadSelection } from './workloadModel';
+import { setWorkloadDomainChoice, useWorkloadDomainChoice } from './workloadStore';
 export type { WorkloadScope } from './workloadModel';
 
 function readIds<Row>(
@@ -79,14 +80,14 @@ export function useWorkloadData(scopeOverride?: WorkloadScope) {
   const contextKey = JSON.stringify([userId, spaceId]);
   const domainQuery = useSustainmentDomains();
   const domains = domainQuery.data;
-  const [selection, setSelection] = useState<WorkloadSelection>({ contextKey, domainIds: null });
+  // The standalone surface and its sidebar share one Domain choice per Space.
+  const selection: WorkloadSelection = { contextKey, domainIds: useWorkloadDomainChoice(contextKey) };
   const accessibleIds = domains.map(domain => domain.id);
   const { selectedDomainIds, domainIds, objectIds } = resolveWorkloadScope(selection, contextKey, accessibleIds, scopeOverride);
   const setSelectedDomainIds = (update: (previous: string[]) => string[]) => {
-    setSelection(previous => ({
-      contextKey,
-      domainIds: update(workloadDomainIds(previous, contextKey, accessibleIds)),
-    }));
+    const next = update(workloadDomainIds(selection, contextKey, accessibleIds));
+    // Every Domain chosen is "follow all", so a Domain created later joins.
+    setWorkloadDomainChoice(contextKey, next.length === accessibleIds.length && accessibleIds.every(id => next.includes(id)) ? null : next);
   };
   const explorers = useQueries({ queries: [
     ...domainIds.map(id => ({

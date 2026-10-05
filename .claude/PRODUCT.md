@@ -214,7 +214,7 @@ Object は Element をまとめる単位で、Object 同士はネストしない
 
 | 道具 | 役割 | 実装 |
 |------|------|------|
-| **Workload** | Space 内の Worker 別日次負荷・不在・未計画作業を俯瞰 | Apps ランチャーの App。Domain は自前のフィルタで絞る |
+| **Workload** | Space 内の Worker 別日次負荷・不在・未計画作業を俯瞰し、平準化の提案（担当替え・前倒し・後ろ倒し・割り当て）をプレビューして適用する | Apps ランチャーの App。サイドバーにチームの負荷・平準化プラン・注意が要る順の人・Domain の範囲。提案は決定的に算出し、人が適用する（[ADR 0037](../docs/adr/0037-workload-rebalancing-is-computed-not-generated-and-applied-by-a-person.md)） |
 | **CRM** | 今日動かすべき商談を示し、記録の手間なく商談を前に進める | Space か Domain に属する会社・担当者・商談・活動履歴（`crm_*`）。Today / Pipeline / Deals / Companies / Contacts / Forecast、メモやメールから更新する Capture、健全度と次の一手、AI の要約・メール下書き |
 | **SCM** | 欠品を予測し、需要の変化に応じた補充を計画 | 専用の `scm_*` テーブルに拠点・品目・仕入先・入出庫・発注を持つ独立した App。拠点ごとの品目について需要予測・安全在庫・在庫推移・発注案を出す。拠点・品目・仕入先は Domain に持たせられ、Domain の Overview に充足状況が出る |
 | **Notebook** | 思考・記録のドキュメント（議事録 / メモ） | 独自 HTML エディタ（`AppleNoteEditor` + `htmlSanitizer`）。**Folder → File の 2 階層**ツリー（`notes` + `note_contents.html`） |

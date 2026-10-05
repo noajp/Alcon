@@ -1,5 +1,6 @@
 import type { Locale } from './locales';
 import { CRM_TRANSLATIONS } from '@/ActivitySpace/sustainment/crm/crmMessages';
+import { WORKLOAD_TRANSLATIONS } from '@/ActivitySpace/sustainment/workload/workloadMessages';
 import { SCM_MESSAGES } from './scmMessages';
 
 type TranslationMap = Record<string, string>;
@@ -1174,6 +1175,11 @@ Object.assign(ja, SCM_MESSAGES.ja);
 Object.assign(ko, SCM_MESSAGES.ko);
 Object.assign(fr, SCM_MESSAGES.fr);
 Object.assign(es, SCM_MESSAGES.es);
+
+Object.assign(ja, WORKLOAD_TRANSLATIONS.ja);
+Object.assign(ko, WORKLOAD_TRANSLATIONS.ko);
+Object.assign(fr, WORKLOAD_TRANSLATIONS.fr);
+Object.assign(es, WORKLOAD_TRANSLATIONS.es);
 
 // Settings › Integrations: Google sign-in (OAuth) for Google Drive.
 Object.assign(ja, {
