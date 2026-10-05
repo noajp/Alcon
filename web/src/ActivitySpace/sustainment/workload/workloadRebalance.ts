@@ -86,6 +86,8 @@ export type Proposal =
       mode: 'start-earlier' | 'pull-in' | 'postpone';
       from: PlanDates;
       to: PlanDates;
+      /** Everyone holding the Element: new dates move all of their loads. */
+      holders: string[];
     });
 
 export type TargetReading = {
@@ -345,24 +347,23 @@ function moveHolder(board: Board, element: SimElement, from: string | null, to: 
  *
  * Judged on the Element's own stretch of days (its new start through its due
  * date), not the whole horizon: an overload three weeks away is not this
- * Element's to fix, and asking it to would drag every start back to today.
- * Takes the latest start that clears that stretch; failing that, the start
- * that lowers the holders' overload most, latest first on ties.
+ * Element's to fix. Takes the latest start that clears that stretch, and
+ * nothing otherwise — a start that only shaves a day which stays over because
+ * of other work moves this Element weeks for no result, and the next fix (a
+ * hand-over, or that other work) is the one that actually helps.
  */
 function tryStartEarlier(board: Board, element: SimElement, today: string): PlanDates | null {
   const span = elementSpan(element);
   if (!span || !element.due_date || span.start <= today) return null;
   const end = board.index.get(span.end) ?? board.days.length - 1;
   const before = holdersOver(board, element);
-  let best: { start: string; over: number } | null = null;
   for (let start = addDays(span.start, -1); start >= today; start = addDays(start, -1)) {
     if (isWeekend(start)) continue;
     const from = board.index.get(start) ?? 0;
     const [local, total] = withDates(board, element, { start, due: span.end }, () => [holdersOver(board, element, from, end), holdersOver(board, element)]);
     if (local <= EPS && total < before - EPS) return { start, due: span.end };
-    if (total < before - EPS && (!best || total < best.over - EPS)) best = { start, over: total };
   }
-  return best && { start: best.start, due: span.end };
+  return null;
 }
 
 /** Later dates, same length. Breaks the date, so it is offered last. A date
@@ -446,7 +447,7 @@ export function planRebalance(input: PlanInput): Plan {
     const from = datesOf(el);
     setDates(board, el, to);
     touched.add(el.id);
-    proposals.push({ kind: 'reschedule', mode, id, elementId: el.id, issue, workerId: wid, from, to, overBefore: before, overAfter: overHours(board, wid) });
+    proposals.push({ kind: 'reschedule', mode, id, elementId: el.id, issue, workerId: wid, from, to, holders: [...el.holders.keys()].sort(), overBefore: before, overAfter: overHours(board, wid) });
     return true;
   };
 
@@ -541,7 +542,7 @@ const PRIORITY_RANK: Record<string, number> = { low: 0, medium: 1, high: 2, urge
 export function proposalWorkers(p: Proposal): string[] {
   if (p.kind === 'reassign') return [p.fromWorkerId, p.toWorkerId];
   if (p.kind === 'assign') return [p.toWorkerId];
-  return p.workerId ? [p.workerId] : [];
+  return p.holders;
 }
 
 /**

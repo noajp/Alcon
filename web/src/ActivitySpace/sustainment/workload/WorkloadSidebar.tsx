@@ -77,7 +77,8 @@ export function WorkloadSidebar({ navigation, onNavigate, onOpen }: {
         <SidebarRow
           active={planOpen && published?.proposals !== null}
           disabled={published?.proposals === null}
-          title={published?.proposals === null ? t('Rebalancing reads everyone’s whole load. Choose All Domains to plan.') : undefined}
+          title={published?.failed ? t('Could not load the work in this scope.')
+            : published?.proposals === null ? t('Rebalancing reads everyone’s whole load. Choose All Domains to plan.') : undefined}
           icon={<Scale size={16} />}
           label={t('Rebalance plan')}
           meta={published?.proposals

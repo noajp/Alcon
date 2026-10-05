@@ -70,7 +70,7 @@ describe('planRebalance — overload', () => {
       workers: [worker('a'), worker('b')],
       spans: {},
       elements: [
-        el({ id: 'x', start_date: '2026-10-07', due_date: '2026-10-07', estimated_hours: 8, holders: ['a'] }),
+        el({ id: 'x', start_date: '2026-10-07', due_date: '2026-10-07', estimated_hours: 4, holders: ['a'] }),
         el({ id: 'y', start_date: '2026-10-07', due_date: '2026-10-07', estimated_hours: 8, holders: ['a'], priority: 'low' }),
       ],
     });
@@ -281,7 +281,7 @@ describe('applyProposals', () => {
 
   it('moves dates for a reschedule', () => {
     const p: Proposal = {
-      kind: 'reschedule', mode: 'postpone', id: 's', elementId: 'x', issue: 'overload', workerId: 'a',
+      kind: 'reschedule', mode: 'postpone', id: 's', elementId: 'x', issue: 'overload', workerId: 'a', holders: ['a'],
       from: { start: TODAY, due: TODAY }, to: { start: '2026-10-06', due: '2026-10-06' }, overBefore: 1, overAfter: 0,
     };
     const after = applyProposals(base, [p], () => null);
@@ -411,5 +411,36 @@ describe('proposalPrerequisites', () => {
     expect(proposalPrerequisites(plan, 2).map((p) => p.id)).toEqual(['p1']);
     expect(proposalPrerequisites(plan, 1)).toEqual([]);
     expect(proposalPrerequisites(plan, 0)).toEqual([]);
+  });
+});
+
+describe('planRebalance — second review', () => {
+  it('does not drag a small Element weeks earlier when its day stays over because of other work', () => {
+    const plan = planRebalance({
+      today: TODAY,
+      workers: [worker('a')],
+      spans: {},
+      elements: [
+        el({ id: 'x', start_date: '2026-11-12', due_date: '2026-11-12', estimated_hours: 4, holders: ['a'] }),
+        el({ id: 'y', start_date: '2026-11-12', due_date: '2026-11-12', estimated_hours: 12, holders: ['a'], status: 'in_progress' }),
+      ],
+    });
+    for (const p of plan.proposals) {
+      if (p.kind === 'reschedule' && p.mode === 'start-earlier') expect(p.to.start! >= '2026-11-02').toBe(true);
+    }
+    expect(plan.overAfter).toBe(0);
+  });
+
+  it('attributes a date change on a shared Element to every holder', () => {
+    const plan = planRebalance({
+      today: TODAY,
+      workers: [worker('a'), worker('b')],
+      spans: {},
+      elements: [
+        el({ id: 'shared', start_date: '2026-10-07', due_date: '2026-10-07', estimated_hours: 10, holders: ['a', 'b'] }),
+      ],
+    });
+    const p = plan.proposals.find((x) => x.kind === 'reschedule');
+    expect(p && proposalWorkers(p)).toEqual(['a', 'b']);
   });
 });
