@@ -371,8 +371,8 @@ function MyElementsEmptyState({ onAdd }: { onAdd: () => void }) {
     <EmptyState
       icon={NavMyTasksIcon}
       title="Your personal Elements"
-      description={<>Anything that&apos;s yours alone — quick captures, personal todos, ideas — lives here.</>}
-      hint={<>You&apos;ll also see Elements from shared Domains where you&apos;re assigned.</>}
+      description="Anything that's yours alone — quick captures, personal todos, ideas — lives here."
+      hint="You'll also see Elements from shared Domains where you're assigned."
       cta="Create Element"
       onCta={onAdd}
     />

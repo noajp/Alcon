@@ -36,6 +36,7 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { seedStarterSpace } from '@/Function/space/seedStarterSpace';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 
 export default function Home() {
@@ -110,7 +111,7 @@ function AppContent() {
   // on the saved home view before any fetch; reading them here, at launch,
   // is what keeps that cache in step with the account across devices.
   useUserPreferences();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { user } = useAuthContext();
   // Every server-confirmed change reaches the caches through this one channel.
   useWorkspaceDeltaStream(user?.id ?? null);
@@ -188,6 +189,9 @@ function AppContent() {
     if (!user) return;
     const space = await createActivitySpace({ name, user_id: user.id });
     setActiveSpaceId(space.id);
+    // The Space exists either way; a failed seed just leaves it empty.
+    try { await seedStarterSpace(space.id, user.id, locale); }
+    catch (err) { console.error('Failed to seed the starter Space:', err); }
     await refetchSpaces();
   };
 
@@ -199,11 +203,11 @@ function AppContent() {
   if (spaces.length === 0) {
     return (
       <OnboardingCreate
-        title={t('Create your Space')}
+        title={t('Create your ActivitySpace')}
         subtitle={t('A shared place for your team. Bring in one existing project to get started.')}
         label={t('Name')}
         placeholder="Acme Inc."
-        cta={t('Create Space')}
+        cta={t('Create ActivitySpace')}
         onCreate={handleCreateSpace}
       >
         {/* Invited to someone else's Space? Accepting is how you join it. */}
@@ -335,7 +339,8 @@ function WorkspaceContent({
     setCopilotOpen(next);
     try { localStorage.setItem('alcon.copilot.open', next ? '1' : '0'); } catch { /* ignore */ }
   };
-  const [createType, setCreateType] = useState<CreateType | null>(null);
+  // A Space with no Domain has nothing to show yet, so it opens on Create Domain.
+  const [createType, setCreateType] = useState<CreateType | null>(() => (domains.length === 0 ? 'domain' : null));
   const [pendingNewNote, setPendingNewNote] = useState(0);
   // The workspace owns the Object creation popup.
   const [objectPopupOpen, setObjectPopupOpen] = useState(false);
