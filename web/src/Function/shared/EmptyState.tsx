@@ -3,6 +3,7 @@
 import type { ComponentType, ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/ui/button';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // The one "nothing here yet" surface for a list — Objects, Elements,
 // Initiatives, Phases. One fixed-width column sits in the middle of the
@@ -18,6 +19,10 @@ export function EmptyState({ icon: Icon, title, description, hint, cta, onCta }:
   cta: string;
   onCta: () => void;
 }) {
+  // Callers pass English; plain strings are translated here so every empty
+  // state follows the viewer's language without wiring `t` at each call site.
+  const { t } = useI18n();
+  const tr = (value: ReactNode) => (typeof value === 'string' ? t(value) : value);
   return (
     // flex-1 for a flex-column host, h-full for a plain block host (the
     // Initiative and Phase panes) — either way the column fills the pane.
@@ -34,17 +39,17 @@ export function EmptyState({ icon: Icon, title, description, hint, cta, onCta }:
             </div>
           ))}
         </div>
-        <h2 className="text-[15px] font-semibold text-foreground mb-1.5">{title}</h2>
+        <h2 className="text-[15px] font-semibold text-foreground mb-1.5">{t(title)}</h2>
         <p className="text-[13px] leading-5 min-h-10 text-muted-foreground mb-2">
-          {description}
+          {tr(description)}
         </p>
         <p className="text-[12px] leading-[18px] min-h-9 text-muted-foreground/60 mb-6">
-          {hint}
+          {tr(hint)}
         </p>
         {/* gap-1.5: the md control gap (gap-2) reads as a hole next to a 14px "+". */}
         <Button variant="primary" size="md" onClick={onCta} className="min-w-40 gap-1.5">
           <Plus size={14} />
-          {cta}
+          {t(cta)}
         </Button>
       </div>
     </div>

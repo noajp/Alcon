@@ -36,6 +36,7 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { seedStarterSpace } from '@/Function/space/seedStarterSpace';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 
 export default function Home() {
@@ -110,7 +111,7 @@ function AppContent() {
   // on the saved home view before any fetch; reading them here, at launch,
   // is what keeps that cache in step with the account across devices.
   useUserPreferences();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { user } = useAuthContext();
   // Every server-confirmed change reaches the caches through this one channel.
   useWorkspaceDeltaStream(user?.id ?? null);
@@ -188,6 +189,9 @@ function AppContent() {
     if (!user) return;
     const space = await createActivitySpace({ name, user_id: user.id });
     setActiveSpaceId(space.id);
+    // The Space exists either way; a failed seed just leaves it empty.
+    try { await seedStarterSpace(space.id, user.id, locale); }
+    catch (err) { console.error('Failed to seed the starter Space:', err); }
     await refetchSpaces();
   };
 
