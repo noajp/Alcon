@@ -199,11 +199,11 @@ function AppContent() {
   if (spaces.length === 0) {
     return (
       <OnboardingCreate
-        title={t('Create your Space')}
+        title={t('Create your ActivitySpace')}
         subtitle={t('A shared place for your team. Bring in one existing project to get started.')}
         label={t('Name')}
         placeholder="Acme Inc."
-        cta={t('Create Space')}
+        cta={t('Create ActivitySpace')}
         onCreate={handleCreateSpace}
       >
         {/* Invited to someone else's Space? Accepting is how you join it. */}
