@@ -1,7 +1,7 @@
 'use client';
 
 import { useDomainOverview } from '@/hooks/useDomainOverview';
-import { useBoard, WidgetSurface, WidgetZone, type WidgetHost } from '@/Function/widget';
+import { useBoard, WidgetSurface, WidgetZone, WidgetActionSlotProvider, WidgetActionSlotTarget, type WidgetHost } from '@/Function/widget';
 import { DOMAIN_OVERVIEW_BOARD } from '@/Function/widget/defaults';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
@@ -33,17 +33,20 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
     },
     onViewChange,
   };
-  return <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
+  return <WidgetActionSlotProvider><div className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
     <header className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
       <DomainIcon size={12} />
-      <h1 className="truncate text-xs font-semibold">{domain.name}</h1>
+      <span className="truncate text-xs font-semibold">{domain.name}</span>
+      <div className="flex-1" />
+      {/* "Add widget" is page chrome: it sits in the header, as on Element detail. */}
+      <WidgetActionSlotTarget className="flex items-center gap-1" />
     </header>
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className={`${PAGE_BODY} flex flex-col gap-6`}>
         {query.isError && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm"><p>Unable to refresh this Domain. Showing the last loaded data; drafts are retained.</p><Button variant="ghost" onClick={() => void query.refetch()}>Retry</Button></div>}
         {/* The spine — title, then description — is what Element detail opens
             with; the Domain's own readings and relationships sit below it. */}
-        <PageHead key={domain.id} title={domain.name} description={domain.description ?? ''}
+        <PageHead key={`head-${domain.id}`} icon={<DomainIcon size={18} />} title={domain.name} description={domain.description ?? ''}
           canEdit={role.data === 'owner' || role.data === 'admin'}
           titleLabel="Domain name" titlePlaceholder="Domain name…"
           descriptionLabel="Description" descriptionPlaceholder="What this Domain is for…"
@@ -59,10 +62,10 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
             <span className="px-2.5">{domain.privacy === 'private' ? 'Private' : 'Space'}{domain.identifier ? ` · ${domain.identifier}` : ''}</span>
           </div>
         </ButtonAppearanceProvider>
-        <WidgetSurface key={domain.id} board={board} host={host} zones={['main']}>
+        <WidgetSurface key={`board-${domain.id}`} board={board} host={host} zones={['main']}>
           <WidgetZone zone="main" columns={1} />
         </WidgetSurface>
       </div>
     </div>
-  </div>;
+  </div></WidgetActionSlotProvider>;
 }

@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { updateObject } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
+import { PageIcon } from '@/Function/shared/PageHead';
 import {
   useBoard,
   WidgetSurface,
@@ -162,9 +163,7 @@ export function OverviewView({
               {/* Icon stacked above the name; the name sits flush with the
                   column's left edge so it lines up with the description. */}
               <div>
-                <span className="w-9 h-9 -ml-2 rounded-lg bg-muted/40 flex items-center justify-center text-foreground/70 mb-3">
-                  <ObjectIcon size={18} />
-                </span>
+                <PageIcon><ObjectIcon size={18} /></PageIcon>
                 <textarea
                   ref={titleRef}
                   value={title}

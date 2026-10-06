@@ -372,7 +372,7 @@ function PortfolioDetail({ node, portfolios, byPortfolio, healthById, candidates
       </div>
       <div className="flex-1 overflow-y-auto">
         <div className={PAGE_BODY}>
-          <PageHead key={portfolio.id} title={portfolio.name} description={portfolio.description ?? ''} canEdit
+          <PageHead key={portfolio.id} icon={<NavPortfolioIcon size={18} />} title={portfolio.name} description={portfolio.description ?? ''} canEdit
             titleLabel={t('Portfolio name')} titlePlaceholder={t('Portfolio name…')}
             descriptionLabel={t('Description')} descriptionPlaceholder={t('What this Portfolio is a bet on, and what it should add up to.')}
             onSaveTitle={(name) => void updatePortfolio(portfolio.id, { name })}

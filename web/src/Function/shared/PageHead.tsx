@@ -18,6 +18,14 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 // page is. A section is a small muted heading and flat rows — no box.
 // =============================================================
 
+/** The concept's icon, above its title — on every concept page, in the same
+ *  place: icon, then title, then description. */
+export function PageIcon({ children }: { children: ReactNode }) {
+  return (
+    <span className="mb-3 -ml-2 flex size-9 items-center justify-center rounded-lg bg-muted/40 text-foreground/70">{children}</span>
+  );
+}
+
 /** The page column: centred, one width for every concept page. */
 export const PAGE_BODY = 'mx-auto w-full max-w-4xl px-8 py-8';
 
@@ -70,9 +78,11 @@ function useDraft(saved: string) {
 const message = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 
 export function PageHead({
-  title, description, canEdit, titleLabel, titlePlaceholder, descriptionLabel, descriptionPlaceholder, emptyDescription,
+  icon, title, description, canEdit, titleLabel, titlePlaceholder, descriptionLabel, descriptionPlaceholder, emptyDescription,
   onSaveTitle, onSaveDescription,
 }: {
+  /** The concept's icon, shown above the title (18px). */
+  icon?: ReactNode;
   title: string;
   description: string;
   /** Read-only, the title and description are plain text. */
@@ -109,6 +119,7 @@ export function PageHead({
   if (!canEdit) {
     return (
       <div>
+        {icon && <PageIcon>{icon}</PageIcon>}
         <h1 className="text-2xl leading-tight text-foreground" style={{ fontWeight: 600 }}>{title}</h1>
         {description
           ? <p className="mt-3 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-foreground">{description}</p>
@@ -118,6 +129,7 @@ export function PageHead({
   }
   return (
     <div>
+      {icon && <PageIcon>{icon}</PageIcon>}
       {/* The global base resets typed content to weight 400, which beats a
           `font-semibold` utility — so the title's weight is set inline, as it
           is on Element detail. */}

@@ -132,7 +132,7 @@ function VisionFields({ vision, canEdit }: { vision: Vision; canEdit: boolean })
       {/* The spine — title, then the statement as its description — is the
           same block every concept page opens with. The fields below it are
           what this one adds. */}
-      <PageHead title={vision.name} description={vision.statement ?? ''} canEdit={canEdit}
+      <PageHead icon={<NavVisionIcon size={18} />} title={vision.name} description={vision.statement ?? ''} canEdit={canEdit}
         titleLabel={t('Vision name')} titlePlaceholder={t('Vision name…')}
         descriptionLabel={t('Vision')} descriptionPlaceholder={t('Write the Vision — the future this Space works toward, in one statement.')}
         emptyDescription={t('No statement yet.')}
@@ -255,7 +255,7 @@ function ConditionsList({ canEdit, initial, onCommit }: { canEdit: boolean; init
             onClick={() => commit(rows.filter((r) => r.id !== row.id))}><X size={12} /></Button>
         </div>
       ))}
-      <Button variant="ghost" size="sm" align="start" className="mt-1 ml-2 text-muted-foreground" onClick={() => setRows((prev) => [...prev, ...toRows([''])])}>
+      <Button variant="ghost" size="sm" align="start" className="mt-1 -ml-0.5 text-muted-foreground" onClick={() => setRows((prev) => [...prev, ...toRows([''])])}>
         <Plus size={13} strokeWidth={2.5} />{t('Add a condition')}
       </Button>
     </div>

@@ -81,6 +81,7 @@ const ELEMENT_ZONES: Zone[] = ['rail'];
 import { RailRow } from '@/Function/shared/RailRow';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { ElementTypeIcon, ObjectIcon } from '@/shell/icons';
+import { PageIcon } from '@/Function/shared/PageHead';
 import { StatusPicker } from './StatusPicker';
 import { ElementDirectionSection } from './ElementDirectionSection';
 import { SubelementRow } from './SubelementRow';
@@ -98,7 +99,7 @@ import { logActivity, useElementActivityLog, invalidateElementActivity, mergeAct
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
 import { formatElementDate } from '@/Function/shared/dateUtils';
-import { MessageIcon } from '@/Function/shared/conceptIcons';
+import { ElementIcon, MessageIcon } from '@/Function/shared/conceptIcons';
 
 // Date <-> 'YYYY-MM-DD' helpers for the range picker. Built from local
 // Y/M/D parts (not Date.parse of a bare ISO date, which would shift across
@@ -725,8 +726,9 @@ function ElementDetailBody({
         <div className={layout === 'reader' ? "mx-auto w-full max-w-4xl px-5 py-7 flex flex-col gap-8" : "max-w-7xl mx-auto px-8 py-8 flex gap-8"}>
           <div className="flex-1 min-w-0 flex flex-col gap-6">
 
-          {/* Title & description */}
+          {/* Title & description — under the concept's icon, like every concept page */}
           <div>
+            <PageIcon><ElementIcon size={18} /></PageIcon>
             <div className="flex items-start gap-2 mb-2">
               {/* Auto-grow textarea so long titles wrap to multiple
                   lines instead of being clipped. Enter and Escape both

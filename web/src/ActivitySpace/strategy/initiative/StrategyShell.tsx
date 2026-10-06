@@ -6,6 +6,7 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
+import { PageIcon } from '@/Function/shared/PageHead';
 import { EmptyState } from '@/Function/shared/EmptyState';
 import { QuickCreatePopup, quickCreatePillClass } from '@/Function/shared/QuickCreatePopup';
 import { Popover, PopoverTrigger } from '@/ui/popover';
@@ -798,9 +799,7 @@ function StrategyDetailView({
         <WidgetSurface board={board} host={host} zones={INITIATIVE_ZONES} className="space-y-5">
           <WidgetZone zone="band" className="mb-4" />
           <div>
-            <span className="w-9 h-9 -ml-2 rounded-lg bg-muted/40 flex items-center justify-center text-foreground/70 mb-3">
-              <NavStrategyIcon size={18} />
-            </span>
+            <PageIcon><NavStrategyIcon size={18} /></PageIcon>
             <textarea
               ref={nameRef}
               value={name}
