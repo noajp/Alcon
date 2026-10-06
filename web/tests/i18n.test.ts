@@ -29,7 +29,7 @@ describe('i18n locale resolution', () => {
 
   it('keeps product concept names in English in every locale', () => {
     const concepts = ['Strategy', 'Execution', 'Sustainment', 'Initiative', 'Initiatives', 'Phase', 'Timeline', 'Domain', 'Objects', 'Elements',
-      'Inbox', 'Calendar', 'Notebook', 'Table', 'Team', 'Workload', 'Profile'];
+      'Inbox', 'Calendar', 'Notebook', 'Table', 'Team', 'People', 'Workload', 'Profile'];
     for (const locale of Object.keys(MESSAGES) as Array<keyof typeof MESSAGES>) {
       for (const name of concepts) expect(MESSAGES[locale][name], `${locale}:${name}`).toBe(name);
     }
@@ -38,7 +38,7 @@ describe('i18n locale resolution', () => {
   it('includes translations for dynamic navigation and preference labels', () => {
     const required = [
       'New Element', 'New Object', 'New Initiative', 'Go to Now', 'Open Inbox',
-      'Domain Elements', 'Open Notebook', 'Open Table', 'Open Team', 'Open Workload',
+      'Domain Elements', 'Open Notebook', 'Open Table', 'Open People', 'Open Workload',
       'Open Calendar', 'Full name', 'Short name', 'Username', 'Monday', 'Sunday',
       'Saturday', 'System', 'Light', 'Dark', 'Smaller', 'Small', 'Default', 'Large',
       'Larger', 'Remove {label} from the rail',

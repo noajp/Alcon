@@ -54,7 +54,7 @@ Object・Domain・Element・Initiative等の作成は、入口を無彩色、確
 
 製品の固定UIラベル・入力例・候補ボタンは `Function/i18n` の辞書を通し、選択された言語で一貫して表示する。未翻訳の文言は英語へフォールバックする。ユーザーが入力した内容や生成を依頼したアプリの言語は保持する。画面に英語リテラルを直接書かず、必ず `t()` を通す。
 
-製品の概念名（Strategy / Execution / Sustainment、Initiatives / Phase / Timeline、Domain / Objects / Elements、Inbox / Calendar / Notebook / Table / Team / Workload / CRM / SCM、Profile）は固有名詞として扱い、どの言語でも英語表記のまま出す。これはコードで固定するのではなく、各言語の辞書でその語を自分自身に写して実現する（`'Timeline': 'Timeline'`）。概念名を含む文も同じ（`'Open Calendar': 'Calendar を開く'`）。日付・曜日は `toLocaleDateString(locale)` で設定言語に従う。
+製品の概念名（Strategy / Execution / Sustainment、Initiatives / Phase / Timeline、Domain / Objects / Elements、Inbox / Calendar / Notebook / Table / People / Team / Workload / CRM / SCM、Profile）は固有名詞として扱い、どの言語でも英語表記のまま出す。これはコードで固定するのではなく、各言語の辞書でその語を自分自身に写して実現する（`'Timeline': 'Timeline'`）。概念名を含む文も同じ（`'Open Calendar': 'Calendar を開く'`）。日付・曜日は `toLocaleDateString(locale)` で設定言語に従う。
 
 サイドバーの一覧（Domain・Strategy・Notebook・Table・CRM・SCM・Settings）は、すべて共通の `SidebarRow` で作る。行ごとに見た目を書かない。行全体がホバーと選択の対象で、選択中は `bg-sidebar-accent` と `text-foreground`、非選択は `text-muted-foreground`、ホバーとキーボードフォーカスでは `bg-sidebar-accent/50` と `text-foreground` にする。行の右端の操作（折りたたみの矢印、「…」）は `SidebarRowAction` とし、背景を持たず記号だけを濃くするので、ハイライトは行の端まで切れずにつながる。行は左から 16px のアイコン枠・名前・件数などの補足・右端の操作の順に並べ、通常は 32px、入れ子の行は 24px。一覧の見出しは `SidebarSectionLabel`。
 
