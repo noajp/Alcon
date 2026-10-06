@@ -14,6 +14,7 @@ import { PageHead, PageLayout, PageSection } from '@/Function/shared/PageHead';
 import { RailCard } from '@/Function/shared/RailCard';
 import { RailRow } from '@/Function/shared/RailRow';
 import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
+import { IndexList, IndexRow } from '@/Function/shared/IndexList';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { RenameInput } from '@/ActivitySpace/sustainment/notebook/RenameInput';
@@ -99,7 +100,7 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
         <>
           <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
             <NavPortfolioIcon size={12} />
-            <span className="text-[12px] font-semibold text-foreground">{t('Portfolio')}</span>
+            <span className="text-[12px] font-semibold text-foreground">{t('Portfolios')}</span>
             {vision && <span className="truncate text-[12px] text-muted-foreground">{vision.name}</span>}
             <div className="flex-1" />
             {vision && (
@@ -121,16 +122,20 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
                 hint={t('Portfolios nest, and an Initiative belongs to at most one Portfolio.')}
                 cta={t('Create Portfolio')} onCta={() => setLocalNew({ parentId: null })} />
             ) : (
-              <div className="px-4 py-3">
-                <PortfolioTree tree={tree} byPortfolio={byPortfolio} healthById={healthById}
-                  onOpen={onSelectPortfolio} onNewInside={(id) => setLocalNew({ parentId: id })} />
+              <div className="h-full overflow-auto">
+                <IndexList headers={[t('Name'), t('Health'), t('Initiatives')]}>
+                  <PortfolioTree tree={tree} byPortfolio={byPortfolio} healthById={healthById}
+                    onOpen={onSelectPortfolio} onNewInside={(id) => setLocalNew({ parentId: id })} />
+                </IndexList>
                 {unassigned.length > 0 && (
-                  <div className="mt-4">
-                    <div className="px-2 h-6 flex items-center text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Not in a Portfolio')}</div>
-                    {unassigned.map((s) => (
-                      <InitiativeRow key={s.id} strategy={s} health={healthById.get(s.id)} onOpen={() => onSelectStrategy(s.id)} />
-                    ))}
-                  </div>
+                  <>
+                    <div className="px-6 pt-4 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Not in a Portfolio')}</div>
+                    <IndexList headers={[t('Name'), t('Health'), t('Objects')]} showHeader={false}>
+                      {unassigned.map((s) => (
+                        <InitiativeIndexRow key={s.id} strategy={s} health={healthById.get(s.id)} onOpen={() => onSelectStrategy(s.id)} />
+                      ))}
+                    </IndexList>
+                  </>
                 )}
               </div>
             )}
@@ -181,21 +186,25 @@ function PortfolioTree({ tree, byPortfolio, healthById, onOpen, onNewInside }: {
   const [folded, setFolded] = useState<Set<string>>(new Set());
   const isOpen = (id: string) => !folded.has(id);
   const rows = useMemo(() => flattenTree(tree, (id) => !folded.has(id)), [tree, folded]);
+  // The fold arrows take a gutter at the left of each row — but only when
+  // something nests. A flat list keeps its cards flush with the page, like
+  // the Initiative list.
+  const gutter = tree.some((n) => n.children.length > 0);
   return (
-    <div>
+    <>
       {rows.map((node) => (
-        <PortfolioTreeRow key={node.portfolio.id} node={node} tree={tree}
+        <PortfolioTreeRow key={node.portfolio.id} node={node} tree={tree} gutter={gutter}
           rollup={rollupPortfolio(node, byPortfolio, healthById)}
           open={isOpen(node.portfolio.id)}
           onToggle={() => setFolded((prev) => { const n = new Set(prev); if (n.has(node.portfolio.id)) n.delete(node.portfolio.id); else n.add(node.portfolio.id); return n; })}
           onOpen={() => onOpen(node.portfolio.id)} onNewInside={() => onNewInside(node.portfolio.id)} />
       ))}
-    </div>
+    </>
   );
 }
 
-function PortfolioTreeRow({ node, tree, rollup, open, onToggle, onOpen, onNewInside }: {
-  node: PortfolioNode; tree: PortfolioNode[]; rollup: PortfolioRollup;
+function PortfolioTreeRow({ node, tree, gutter, rollup, open, onToggle, onOpen, onNewInside }: {
+  node: PortfolioNode; tree: PortfolioNode[]; gutter: boolean; rollup: PortfolioRollup;
   open: boolean; onToggle: () => void; onOpen: () => void; onNewInside: () => void;
 }) {
   const { t } = useI18n();
@@ -207,22 +216,22 @@ function PortfolioTreeRow({ node, tree, rollup, open, onToggle, onOpen, onNewIns
     <PortfolioMenu portfolio={portfolio} node={node} tree={tree}
       onRename={() => setRenaming(true)} onNewInside={onNewInside}>
       <div>
-        <ContentRow indent={node.depth * 20} icon={<NavPortfolioIcon size={16} />} name={portfolio.name} description={portfolio.description}
+        <IndexRow indent={node.depth * 20} icon={<NavPortfolioIcon size={13} />} name={portfolio.name} description={portfolio.description}
           onOpen={onOpen}
-          body={renaming ? (
-            <span className="flex h-8 min-w-0 flex-1 items-center gap-2.5 px-2"><span className="flex w-4 shrink-0 items-center justify-center"><NavPortfolioIcon size={16} /></span>
-              <RenameInput initial={portfolio.name} className="text-[13px] font-medium"
-                onCommit={(v) => { setRenaming(false); if (v.trim() && v.trim() !== portfolio.name) void guarded(() => updatePortfolio(portfolio.id, { name: v.trim() })); }}
-                onCancel={() => setRenaming(false)} />
-            </span>
+          lead={hasChildren ? (
+            <button type="button" onClick={onToggle}
+              className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground"
+              aria-label={`${t(open ? 'Collapse' : 'Expand')} ${portfolio.name}`} aria-expanded={open}>
+              {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </button>
+          ) : gutter ? <span aria-hidden className="size-6 shrink-0" /> : undefined}
+          renameField={renaming ? (
+            <RenameInput initial={portfolio.name} className="text-[13px] font-semibold"
+              onCommit={(v) => { setRenaming(false); if (v.trim() && v.trim() !== portfolio.name) void guarded(() => updatePortfolio(portfolio.id, { name: v.trim() })); }}
+              onCancel={() => setRenaming(false)} />
           ) : undefined}
-          meta={<RollupFigures rollup={rollup} />}>
-          <button type="button" onClick={onToggle} disabled={!hasChildren}
-            className={`flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground ${hasChildren ? '' : 'invisible'}`}
-            aria-label={`${t(open ? 'Collapse' : 'Expand')} ${portfolio.name}`} aria-expanded={hasChildren ? open : undefined}>
-            {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          </button>
-        </ContentRow>
+          health={<PortfolioHealthCell rollup={rollup} />}
+          count={rollup.initiatives} />
       </div>
     </PortfolioMenu>
   );
@@ -301,6 +310,52 @@ function MovePicker({ targets, allowTopLevel, onPick, onClose }: {
         </Command>
       </MenuShell>
     </Popover>
+  );
+}
+
+// How a Portfolio is going, in the Initiative list's own register: progress,
+// then what needs a look. The number is the signal, so it stays quiet.
+function PortfolioHealthCell({ rollup }: { rollup: PortfolioRollup }) {
+  const { t } = useI18n();
+  return (
+    <div className="flex min-w-0 items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
+      {rollup.progressPct === null ? (
+        <span className="shrink-0 text-muted-foreground/60">{t('No Initiatives')}</span>
+      ) : (
+        <span className="flex w-24 shrink-0 items-center gap-1.5">
+          <SegmentedProgress value={rollup.progressPct} className="flex-1" />
+          <span className="w-7 text-right">{rollup.progressPct}%</span>
+        </span>
+      )}
+      {rollup.alerts > 0 && <span className="min-w-0 truncate text-foreground/80">{t('{n} alerts', { n: String(rollup.alerts) })}</span>}
+    </div>
+  );
+}
+
+// An Initiative that sits in no Portfolio, listed under the Portfolios in the
+// same row.
+function InitiativeIndexRow({ strategy, health, onOpen }: {
+  strategy: StrategyWithObjects; health: InitiativeHealth | undefined; onOpen: () => void;
+}) {
+  const { t } = useI18n();
+  const countObjects = useActiveObjectCount();
+  const alerts = health ? health.risk.overdue + health.risk.stalled + health.risk.blocked : 0;
+  const moved = health?.lastActivityAt != null ? formatRelative(new Date(health.lastActivityAt).toISOString()) : null;
+  return (
+    <IndexRow icon={<NavStrategyIcon size={13} />} name={strategy.name} onOpen={onOpen}
+      count={countObjects(strategy.objectIds)}
+      health={
+        <div className="flex min-w-0 items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
+          {health?.progressPct != null && (
+            <span className="flex w-24 shrink-0 items-center gap-1.5">
+              <SegmentedProgress value={health.progressPct} className="flex-1" />
+              <span className="w-7 text-right">{health.progressPct}%</span>
+            </span>
+          )}
+          {moved && <span className="shrink-0 text-muted-foreground/70">{moved}</span>}
+          {alerts > 0 && <span className="min-w-0 truncate text-foreground/80">{t('{n} alerts', { n: String(alerts) })}</span>}
+        </div>
+      } />
   );
 }
 

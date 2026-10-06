@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { PageIcon } from '@/Function/shared/PageHead';
+import { IndexList, IndexRow } from '@/Function/shared/IndexList';
 import { EmptyState } from '@/Function/shared/EmptyState';
 import { QuickCreatePopup, quickCreatePillClass } from '@/Function/shared/QuickCreatePopup';
 import { Popover, PopoverTrigger } from '@/ui/popover';
@@ -283,6 +284,7 @@ function StrategyListView({
   /** The column headings; a second list under the first leaves them out. */
   showHeader?: boolean;
 }) {
+  const { t } = useI18n();
   // Health for every row from one read (progress / last movement / risk).
   const { byId: health } = useInitiativeHealth(strategies);
   // Archived Objects stay linked but are not counted.
@@ -291,34 +293,14 @@ function StrategyListView({
   // honestly while the list stays open; the cells re-render with this view.
   useNow();
   return (
-    <div className="px-2 pb-2 pt-2">
-      {showHeader && (
-        <div className="grid grid-cols-[1fr_minmax(0,18rem)_120px] gap-3 px-4 py-2 text-[11px] tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
-          <span>Name</span>
-          <span>Health</span>
-          <span className="text-right">Objects</span>
-        </div>
-      )}
-      <div className="flex flex-col gap-1.5">
-        {strategies.map((s) => (
-          <button
-            type="button"
-            key={s.id}
-            onClick={() => onSelectStrategy(s)}
-            className="w-full grid grid-cols-[1fr_minmax(0,18rem)_120px] gap-3 px-4 py-3.5 min-h-[3.25rem] bg-transparent hover:bg-muted/30 border border-border rounded-lg transition-colors items-center text-left"
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <NavStrategyIcon size={13} className="text-muted-foreground" />
-              <span className="text-[13px] font-semibold text-foreground/95 truncate">{s.name}</span>
-            </div>
-            <InitiativeHealthCell health={health.get(s.id)} />
-            <span className="text-[12px] text-muted-foreground tabular-nums text-right">
-              {countObjects(s.objectIds)}
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
+    <IndexList headers={[t('Name'), t('Health'), t('Objects')]} showHeader={showHeader}>
+      {strategies.map((s) => (
+        <IndexRow key={s.id} icon={<NavStrategyIcon size={13} />} name={s.name}
+          health={<InitiativeHealthCell health={health.get(s.id)} />}
+          count={countObjects(s.objectIds)}
+          onOpen={() => onSelectStrategy(s)} />
+      ))}
+    </IndexList>
   );
 }
 
