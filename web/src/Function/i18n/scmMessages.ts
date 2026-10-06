@@ -531,6 +531,10 @@ const ROWS: readonly Row[] = [
   ["Shared by the Space", "Space で共有", "Space에서 공유", "Partagé par le Space", "Compartido por el Space"],
   ["Unknown Domain", "不明な Domain", "알 수 없는 Domain", "Domain inconnu", "Domain desconocido"],
   ["Everything", "すべて", "전체", "Tout", "Todo"],
+  // The supply's page: its Properties.
+  ["Whose supply", "誰の供給か", "누구의 공급", "Approvisionnement de", "Suministro de"],
+  ["None yet", "まだありません", "아직 없음", "Aucun pour l’instant", "Ninguno todavía"],
+  ["Items", "品目", "품목", "Articles", "Artículos"],
   ["Edit {name}", "{name} を編集", "{name} 편집", "Modifier {name}", "Editar {name}"],
   ["Only people who can see the Domain see the item and its stock.", "この品目と在庫は、Domain を見られる人にだけ見えます。", "이 품목과 재고는 Domain을 볼 수 있는 사람에게만 보입니다.", "Seules les personnes qui voient le Domain voient l'article et son stock.", "Solo quienes pueden ver el Domain ven el artículo y su stock."],
   ["A Domain's supplier delivers only to that Domain's locations, and only people who can see the Domain see it.", "Domain の仕入先は、その Domain の拠点にだけ納品します。Domain を見られる人にだけ見えます。", "Domain의 공급업체는 그 Domain의 거점에만 납품하며, Domain을 볼 수 있는 사람에게만 보입니다.", "Le fournisseur d'un Domain ne livre que les sites de ce Domain, et seules les personnes qui voient le Domain le voient.", "El proveedor de un Domain solo entrega en las ubicaciones de ese Domain, y solo lo ven quienes pueden ver el Domain."],

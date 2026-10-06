@@ -1389,3 +1389,9 @@ Object.assign(es, {
   "Each Initiative gets its own timeline and resource view.": "Cada Initiative tiene su propia línea de tiempo y vista de recursos.",
   "Create Initiative": "Crear Initiative",
 });
+
+// Tool pages (CRM, SCM): the tab strip and the subject's head.
+Object.assign(ja, { 'Overview': '概要', 'Properties': 'プロパティ', 'Description': '説明', 'Hide this view': 'このビューを隠す', 'Show a view': 'ビューを表示', '{n} days': '{n} 日' });
+Object.assign(ko, { 'Overview': '개요', 'Properties': '속성', 'Description': '설명', 'Hide this view': '이 보기 숨기기', 'Show a view': '보기 표시', '{n} days': '{n}일' });
+Object.assign(fr, { 'Overview': 'Aperçu', 'Properties': 'Propriétés', 'Description': 'Description', 'Hide this view': 'Masquer cette vue', 'Show a view': 'Afficher une vue', '{n} days': '{n} jours' });
+Object.assign(es, { 'Overview': 'Resumen', 'Properties': 'Propiedades', 'Description': 'Descripción', 'Hide this view': 'Ocultar esta vista', 'Show a view': 'Mostrar una vista', '{n} days': '{n} días' });
