@@ -3,9 +3,13 @@
 import { useDomainOverview } from '@/hooks/useDomainOverview';
 import { useBoard, WidgetSurface, WidgetZone, WidgetActionSlotProvider, WidgetActionSlotTarget, type WidgetHost } from '@/Function/widget';
 import { DOMAIN_OVERVIEW_BOARD } from '@/Function/widget/defaults';
-import { DomainIcon } from '@/Function/shared/conceptIcons';
-import { Button, ButtonAppearanceProvider } from '@/ui/button';
-import { PAGE_BODY, PageHead } from '@/Function/shared/PageHead';
+import { DomainIcon, ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
+import { Hash, Lock, Users } from 'lucide-react';
+import { Button } from '@/ui/button';
+import { PageHead, PageLayout } from '@/Function/shared/PageHead';
+import { RailCard } from '@/Function/shared/RailCard';
+import { RailRow } from '@/Function/shared/RailRow';
+import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { updateDomain, useDomainRole } from './data';
 import type { NavigationState } from '@/types/navigation';
 
@@ -42,10 +46,24 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
       <WidgetActionSlotTarget className="flex items-center gap-1" />
     </header>
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className={`${PAGE_BODY} flex flex-col gap-6`}>
+      <PageLayout rail={
+        <RailCard title="Properties">
+          <RailRow icon={domain.privacy === 'private' ? <Lock className="size-3.5 text-muted-foreground" /> : <Users className="size-3.5 text-muted-foreground" />}
+            name="Access" label={domain.privacy === 'private' ? 'Private' : 'Space'} dense />
+          {domain.identifier && <RailRow icon={<Hash className="size-3.5 text-muted-foreground" />} name="Identifier" label={domain.identifier} dense />}
+          <button type="button" className="w-full" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('objects'); }}>
+            <RailRow icon={<ObjectIcon size={14} />} name="Objects" label={String(explorer.objects.length)} dense />
+          </button>
+          <button type="button" className="w-full" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('domain-elements'); }}>
+            <RailRow icon={<ElementIcon size={14} />} name="Elements" label={String(elements.length)} dense />
+          </button>
+          <RailRow icon={<NavStrategyIcon size={14} />} name="Initiatives" label={String(initiatives.length)} placeholder={initiatives.length === 0} dense />
+        </RailCard>
+      }>
         {query.isError && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm"><p>Unable to refresh this Domain. Showing the last loaded data; drafts are retained.</p><Button variant="ghost" onClick={() => void query.refetch()}>Retry</Button></div>}
-        {/* The spine — title, then description — is what Element detail opens
-            with; the Domain's own readings and relationships sit below it. */}
+        {/* The spine — icon, title, description — is what Element detail opens
+            with; the Domain's own readings and relationships sit below it, its
+            facts in the island on the right. */}
         <PageHead key={`head-${domain.id}`} icon={<DomainIcon size={18} />} title={domain.name} description={domain.description ?? ''}
           canEdit={role.data === 'owner' || role.data === 'admin'}
           titleLabel="Domain name" titlePlaceholder="Domain name…"
@@ -53,19 +71,10 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
           emptyDescription="No description yet."
           onSaveTitle={async (name) => { await updateDomain(domain.id, { name }); await query.refetch(); }}
           onSaveDescription={async (description) => { await updateDomain(domain.id, { description: description || null }); await query.refetch(); }} />
-        <ButtonAppearanceProvider appearance="inline">
-          <div className="-mt-3 -ml-2.5 flex flex-wrap items-center gap-0.5 text-[13px] text-muted-foreground">
-            <Button variant="ghost" size="sm" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('objects'); }}>{explorer.objects.length} Objects</Button>
-            <Button variant="ghost" size="sm" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('domain-elements'); }}>{elements.length} Elements</Button>
-            <span className="px-2.5">{initiatives.length} Initiatives linked through Objects</span>
-            <span aria-hidden>·</span>
-            <span className="px-2.5">{domain.privacy === 'private' ? 'Private' : 'Space'}{domain.identifier ? ` · ${domain.identifier}` : ''}</span>
-          </div>
-        </ButtonAppearanceProvider>
         <WidgetSurface key={`board-${domain.id}`} board={board} host={host} zones={['main']}>
           <WidgetZone zone="main" columns={1} />
         </WidgetSurface>
-      </div>
+      </PageLayout>
     </div>
   </div></WidgetActionSlotProvider>;
 }

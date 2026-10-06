@@ -13,8 +13,7 @@ import type { FrameVariant } from './types';
 // board into arrange mode.
 //
 // The frame was not invented here. `RailCard` — the collapsible island the
-// Properties rail is already made of — IS the widget frame (an unboxed
-// heading and its rows, see RailCard); the island
+// Properties rail is already made of — IS the widget frame; the island
 // variant renders it verbatim, so a widget and a hand-placed rail card are
 // the same object to the eye. The `section` variant is the other look this
 // app already had (heading + hairline-bordered body, as Milestones and Child
@@ -253,7 +252,7 @@ export function WidgetFrame({
           // The frame closes over the title: one box per widget, with its
           // name inside it. A heading floating above an unrelated box reads
           // as two things, which is wrong the moment the box can be picked up
-          // and moved. (Rail widgets are unboxed instead — see RailCard.)
+          // and moved.
           <section className="relative">
             <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
               {/* The title row is a plain heading inside the box — no tinted

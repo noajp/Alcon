@@ -1,16 +1,18 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Calendar, Plus, X } from 'lucide-react';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
 import { MenuShell } from '@/Function/shared/menu';
-import { DateField } from '@/Function/shared/date';
+import { DatePopover } from '@/Function/shared/date';
 import { EmptyState } from '@/Function/shared/EmptyState';
 import { QuickCreatePopup } from '@/Function/shared/QuickCreatePopup';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
-import { PAGE_BODY, PageHead, PageSection } from '@/Function/shared/PageHead';
+import { PageHead, PageLayout, PageSection } from '@/Function/shared/PageHead';
+import { RailCard } from '@/Function/shared/RailCard';
+import { RailRow } from '@/Function/shared/RailRow';
 import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
 import { fromDateOnlyString } from '@/Function/shared/dateUtils';
 import { useStrategies, useDomains, useObjects } from '@/hooks/useSupabase';
@@ -70,11 +72,7 @@ export function VisionView({ visionId, createRequested, onCreateHandled, onSelec
             hint={t('A Space can hold several Visions.')}
             cta={t('Create Vision')} onCta={() => setLocalNew(true)} />
         ) : (
-          <div className={PAGE_BODY}>
-            <VisionFields key={vision.id} vision={vision} canEdit={canEdit} />
-            <PortfoliosTowardVision spaceId={vision.activity_space_id} visionId={vision.id} onOpenPortfolio={onOpenPortfolio} />
-            <DirectInitiatives visionId={vision.id} onSelectStrategy={onSelectStrategy} />
-          </div>
+          <VisionPage key={vision.id} vision={vision} canEdit={canEdit} onOpenPortfolio={onOpenPortfolio} onSelectStrategy={onSelectStrategy} />
         )}
       </div>
 
@@ -110,7 +108,13 @@ function normalizeConditions(value: unknown): string[] {
   return list.length === 0 ? NO_CONDITIONS : list;
 }
 
-function VisionFields({ vision, canEdit }: { vision: Vision; canEdit: boolean }) {
+// The Vision's page, laid out like every concept page: the document on the
+// left (icon, name, the statement, then the Why and the conditions, then the
+// Portfolios and Initiatives under it), its facts on the right as an island.
+function VisionPage({ vision, canEdit, onOpenPortfolio, onSelectStrategy }: {
+  vision: Vision; canEdit: boolean;
+  onOpenPortfolio: (id: string) => void; onSelectStrategy: (id: string) => void;
+}) {
   const { t, locale } = useI18n();
   const [state, setState] = useState<SaveState>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -125,51 +129,62 @@ function VisionFields({ vision, canEdit }: { vision: Vision; canEdit: boolean })
     }
   };
   const horizon = vision.horizon ?? null;
+  const horizonText = horizon ? fromDateOnlyString(horizon)?.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' }) : null;
   const conditions = useMemo(() => normalizeConditions(vision.conditions), [vision.conditions]);
+  const { portfolios, roots } = useVisionScope(vision.activity_space_id);
+  const portfolioCount = portfolios.filter((p) => p.vision_id === vision.id).length;
+  const initiativeCount = roots.filter((s) => s.vision_id === vision.id).length;
+
+  const rail = (
+    <RailCard title={t('Properties')}>
+      {canEdit ? (
+        <DatePopover value={horizon} onChange={(v) => void save({ horizon: v })}>
+          <button type="button" className="w-full" aria-label={t('By when')}>
+            <RailRow icon={<Calendar className="size-3.5 text-muted-foreground" />} name={t('By when')}
+              label={horizonText ?? t('Set a horizon')} placeholder={!horizon} dense />
+          </button>
+        </DatePopover>
+      ) : (
+        <RailRow icon={<Calendar className="size-3.5 text-muted-foreground" />} name={t('By when')}
+          label={horizonText ?? t('No horizon yet')} placeholder={!horizon} dense />
+      )}
+      <RailRow icon={<NavPortfolioIcon size={14} />} name={t('Portfolios')} label={String(portfolioCount)} placeholder={portfolioCount === 0} dense />
+      <RailRow icon={<NavStrategyIcon size={14} />} name={t('Initiatives')} label={String(initiativeCount)} placeholder={initiativeCount === 0} dense />
+    </RailCard>
+  );
 
   return (
-    <div>
-      {/* The spine — title, then the statement as its description — is the
-          same block every concept page opens with. The fields below it are
-          what this one adds. */}
-      <PageHead icon={<NavVisionIcon size={18} />} title={vision.name} description={vision.statement ?? ''} canEdit={canEdit}
-        titleLabel={t('Vision name')} titlePlaceholder={t('Vision name…')}
-        descriptionLabel={t('Vision')} descriptionPlaceholder={t('Write the Vision — the future this Space works toward, in one statement.')}
-        emptyDescription={t('No statement yet.')}
-        onSaveTitle={(v) => save({ name: v })} onSaveDescription={(v) => save({ statement: v || null })} />
-
-      <ButtonAppearanceProvider appearance="inline">
-        <div className="mt-8 grid gap-x-6 gap-y-5 sm:grid-cols-[140px_1fr]">
-          <FieldLabel>{t('By when')}</FieldLabel>
-          <div>
-            {canEdit ? (
-              <DateField value={horizon} onChange={(v) => void save({ horizon: v })} placeholder={t('Set a horizon')} aria-label={t('By when')}
-                className={`-ml-2.5 ${horizon ? 'text-foreground' : ''}`} />
-            ) : (
-              <span className="text-[13px] text-foreground">{horizon ? fromDateOnlyString(horizon)?.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' }) : <span className="text-muted-foreground">{t('No horizon yet')}</span>}</span>
-            )}
-          </div>
-
-          <FieldLabel>{t('Why')}</FieldLabel>
-          <TextBlock canEdit={canEdit} initial={vision.narrative ?? ''} label={t('Why')}
-            placeholder={t('Why this, and what changes when it is true.')}
-            emptyText={t('Not written yet.')}
-            className="text-[13px] leading-6" onCommit={(v) => save({ narrative: v || null })} />
-
-          <FieldLabel>{t('We will know because')}</FieldLabel>
-          <ConditionsList canEdit={canEdit} initial={conditions} onCommit={(list) => save({ conditions: list })} />
+    <PageLayout rail={rail}>
+      <div>
+        {/* The spine — icon, name, then the statement as its description — is
+            the same block every concept page opens with. */}
+        <PageHead icon={<NavVisionIcon size={18} />} title={vision.name} description={vision.statement ?? ''} canEdit={canEdit}
+          titleLabel={t('Vision name')} titlePlaceholder={t('Vision name…')}
+          descriptionLabel={t('Vision')} descriptionPlaceholder={t('Write the Vision — the future this Space works toward, in one statement.')}
+          emptyDescription={t('No statement yet.')}
+          onSaveTitle={(v) => save({ name: v })} onSaveDescription={(v) => save({ statement: v || null })} />
+        <div className="mt-2 h-4 text-[11px] text-muted-foreground" role="status">
+          {state === 'saving' ? t('Saving…') : state === 'saved' ? t('Saved') : state === 'error' ? `${t("Couldn't save")}: ${error}` : ''}
         </div>
-      </ButtonAppearanceProvider>
-
-      <div className="mt-3 h-4 text-[11px] text-muted-foreground" role="status">
-        {state === 'saving' ? t('Saving…') : state === 'saved' ? t('Saved') : state === 'error' ? `${t("Couldn't save")}: ${error}` : ''}
       </div>
-    </div>
-  );
-}
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <div className="pt-1.5 text-[12px] text-muted-foreground">{children}</div>;
+      <PageSection title={t('Why')}>
+        <TextBlock canEdit={canEdit} initial={vision.narrative ?? ''} label={t('Why')}
+          placeholder={t('Why this, and what changes when it is true.')}
+          emptyText={t('Not written yet.')}
+          className="text-[13px] leading-6" onCommit={(v) => save({ narrative: v || null })} />
+      </PageSection>
+
+      <PageSection title={t('We will know because')}>
+        <ButtonAppearanceProvider appearance="inline">
+          <ConditionsList canEdit={canEdit} initial={conditions} onCommit={(list) => save({ conditions: list })} />
+        </ButtonAppearanceProvider>
+      </PageSection>
+
+      <PortfoliosTowardVision spaceId={vision.activity_space_id} visionId={vision.id} onOpenPortfolio={onOpenPortfolio} />
+      <DirectInitiatives visionId={vision.id} onSelectStrategy={onSelectStrategy} />
+    </PageLayout>
+  );
 }
 
 // A text field that grows with its text and saves on blur; read-only it is
@@ -287,7 +302,7 @@ function PortfoliosTowardVision({ spaceId, visionId, onOpenPortfolio }: { spaceI
   const tree = useMemo(() => buildPortfolioTree(portfolios), [portfolios]);
   if (tree.length === 0) return null;
   return (
-    <PageSection title={t('Portfolios')} className="mt-10">
+    <PageSection title={t('Portfolios')}>
       {tree.map((node) => {
         const r = rollupPortfolio(node, byPortfolio, healthById);
         return (
@@ -325,7 +340,7 @@ function DirectInitiatives({ visionId, onSelectStrategy }: { visionId: string; o
     catch (e) { setError(e instanceof Error ? e.message : t("Couldn't save")); }
   };
   return (
-    <PageSection title={t('Initiatives')} className="mt-10">
+    <PageSection title={t('Initiatives')}>
       {direct.map((s) => {
         const h = healthById.get(s.id);
         return (

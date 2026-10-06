@@ -10,7 +10,9 @@ import { MenuShell } from '@/Function/shared/menu';
 import { EmptyState } from '@/Function/shared/EmptyState';
 import { QuickCreatePopup } from '@/Function/shared/QuickCreatePopup';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
-import { PAGE_BODY, PageHead, PageSection } from '@/Function/shared/PageHead';
+import { PageHead, PageLayout, PageSection } from '@/Function/shared/PageHead';
+import { RailCard } from '@/Function/shared/RailCard';
+import { RailRow } from '@/Function/shared/RailRow';
 import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import { appDialog } from '@/Function/shared/appDialogStore';
@@ -20,7 +22,7 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useStrategies, useDomains, useObjects } from '@/hooks/useSupabase';
 import { useInitiativeHealth } from '@/ActivitySpace/strategy/initiative/useInitiativeHealth';
 import type { InitiativeHealth } from '@/ActivitySpace/strategy/initiative/initiativeHealthModel';
-import { NavPortfolioIcon, NavStrategyIcon } from '@/shell/sidebar/NavIcons';
+import { NavPortfolioIcon, NavStrategyIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
 import type { Portfolio, StrategyWithObjects } from '@/types/database';
 import { createPortfolio, deletePortfolio, movePortfolio, PortfolioMoveRefused, setStrategyPortfolio, updatePortfolio, usePortfolios } from './data';
 import { resolveVision, useVisions } from '@/ActivitySpace/strategy/vision/data';
@@ -89,7 +91,7 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
   return (
     <div className="flex flex-col h-full bg-card">
       {open ? (
-        <PortfolioDetail node={open} portfolios={portfolios} byPortfolio={byPortfolio} healthById={healthById}
+        <PortfolioDetail node={open} visionName={vision?.name ?? null} portfolios={portfolios} byPortfolio={byPortfolio} healthById={healthById}
           candidates={roots.filter((s) => s.portfolio_id !== open.portfolio.id)}
           onOpenPortfolio={onSelectPortfolio} onSelectStrategy={onSelectStrategy}
           onNewInside={() => setLocalNew({ parentId: open.portfolio.id })} />
@@ -319,8 +321,10 @@ function RollupFigures({ rollup }: { rollup: PortfolioRollup }) {
 }
 
 // ── One Portfolio, opened ───────────────────────────────────────────────
-function PortfolioDetail({ node, portfolios, byPortfolio, healthById, candidates, onOpenPortfolio, onSelectStrategy, onNewInside }: {
+function PortfolioDetail({ node, visionName, portfolios, byPortfolio, healthById, candidates, onOpenPortfolio, onSelectStrategy, onNewInside }: {
   node: PortfolioNode;
+  /** The Vision this Portfolio sits under. */
+  visionName: string | null;
   portfolios: Portfolio[];
   byPortfolio: Map<string, StrategyWithObjects[]>;
   healthById: Map<string, InitiativeHealth>;
@@ -339,6 +343,7 @@ function PortfolioDetail({ node, portfolios, byPortfolio, healthById, candidates
   const [error, setError] = useState<string | null>(null);
   const q = query.trim().toLowerCase();
   const matches = candidates.filter((s) => !q || s.name.toLowerCase().includes(q));
+  const parent = path.length > 1 ? path[path.length - 2] : null;
   const move = async (strategyId: string, into: Portfolio | null) => {
     setPickerOpen(false);
     setError(null);
@@ -371,20 +376,38 @@ function PortfolioDetail({ node, portfolios, byPortfolio, healthById, candidates
           title={t('New Portfolio inside')} aria-label={t('New Portfolio inside')}><FolderPlus size={14} /></Button>
       </div>
       <div className="flex-1 overflow-y-auto">
-        <div className={PAGE_BODY}>
+        <PageLayout rail={
+          <RailCard title={t('Properties')}>
+            <RailRow icon={<NavVisionIcon size={14} />} name={t('Vision')} label={visionName ?? '—'} placeholder={!visionName} dense />
+            {parent ? (
+              <button type="button" className="w-full" onClick={() => onOpenPortfolio(parent.id)}>
+                <RailRow icon={<NavPortfolioIcon size={14} />} name={t('Inside')} label={parent.name} dense />
+              </button>
+            ) : (
+              <RailRow icon={<NavPortfolioIcon size={14} />} name={t('Inside')} label={t('Top level')} placeholder dense />
+            )}
+            <RailRow icon={<NavStrategyIcon size={14} />} name={t('Initiatives')} label={String(rollup.initiatives)} placeholder={rollup.initiatives === 0} dense />
+            {rollup.progressPct !== null && (
+              <RailRow name={t('Progress')} dense label={
+                <span className="flex w-full items-center gap-2">
+                  <SegmentedProgress value={rollup.progressPct} className="flex-1" />
+                  <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">{rollup.progressPct}%</span>
+                </span>
+              } />
+            )}
+            {rollup.alerts > 0 && (
+              <RailRow name={t('Alerts')} dense label={<span className="text-destructive">{t('{n} alerts', { n: String(rollup.alerts) })}</span>} />
+            )}
+          </RailCard>
+        }>
           <PageHead key={portfolio.id} icon={<NavPortfolioIcon size={18} />} title={portfolio.name} description={portfolio.description ?? ''} canEdit
             titleLabel={t('Portfolio name')} titlePlaceholder={t('Portfolio name…')}
             descriptionLabel={t('Description')} descriptionPlaceholder={t('What this Portfolio is a bet on, and what it should add up to.')}
             onSaveTitle={(name) => void updatePortfolio(portfolio.id, { name })}
             onSaveDescription={(description) => void updatePortfolio(portfolio.id, { description: description || null })} />
-          <div className="mt-3 flex items-center gap-4 text-[12px] text-muted-foreground tabular-nums">
-            <span>{t('{n} Initiatives', { n: String(rollup.initiatives) })}</span>
-            {rollup.progressPct !== null && <span>{t('{n}% done', { n: String(rollup.progressPct) })}</span>}
-            {rollup.alerts > 0 && <span className="text-destructive">{t('{n} alerts', { n: String(rollup.alerts) })}</span>}
-          </div>
 
           {node.children.length > 0 && (
-            <PageSection title={t('Portfolios inside')} className="mt-8">
+            <PageSection title={t('Portfolios inside')}>
               {node.children.map((child) => (
                 <ContentRow key={child.portfolio.id} icon={<NavPortfolioIcon size={16} />} name={child.portfolio.name}
                   onOpen={() => onOpenPortfolio(child.portfolio.id)}
@@ -393,7 +416,7 @@ function PortfolioDetail({ node, portfolios, byPortfolio, healthById, candidates
             </PageSection>
           )}
 
-          <PageSection title={t('Initiatives')} className="mt-8">
+          <PageSection title={t('Initiatives')}>
             {initiatives.length === 0 && (
               <p className="px-2 py-2 text-[12px] text-muted-foreground">{t('No Initiatives in this Portfolio yet.')}</p>
             )}
@@ -423,7 +446,7 @@ function PortfolioDetail({ node, portfolios, byPortfolio, healthById, candidates
             </ButtonAppearanceProvider>
             {error && <div className="px-2 py-1 text-[11px] text-destructive">{error}</div>}
           </PageSection>
-        </div>
+        </PageLayout>
       </div>
     </>
   );

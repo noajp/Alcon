@@ -22,12 +22,30 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
  *  place: icon, then title, then description. */
 export function PageIcon({ children }: { children: ReactNode }) {
   return (
-    <span className="mb-3 -ml-2 flex size-9 items-center justify-center rounded-lg bg-muted/40 text-foreground/70">{children}</span>
+    <span className="mb-4 -ml-2 flex size-9 items-center justify-center rounded-lg bg-muted/40 text-foreground/70">{children}</span>
   );
 }
 
-/** The page column: centred, one width for every concept page. */
-export const PAGE_BODY = 'mx-auto w-full max-w-4xl px-8 py-8';
+/** The page frame: centred, one width and one set of margins for every
+ *  concept page. */
+export const PAGE_BODY = 'mx-auto w-full max-w-7xl px-8 py-8';
+
+/**
+ * Every concept page's layout: the document on the left (icon, title,
+ * description, then what you can do), the concept's facts on the right as
+ * islands (Properties, …). Below the `lg` breakpoint the rail drops under the
+ * document instead of disappearing, so no field is ever out of reach.
+ */
+export function PageLayout({ rail, children }: { rail?: ReactNode; children: ReactNode }) {
+  return (
+    <div className={PAGE_BODY}>
+      <div className="flex flex-col gap-8 lg:flex-row">
+        <div className="flex min-w-0 flex-1 flex-col gap-8">{children}</div>
+        {rail && <aside className="w-full shrink-0 space-y-4 lg:w-72">{rail}</aside>}
+      </div>
+    </div>
+  );
+}
 
 /** A textarea that is as tall as its text — and stays so when the column
  *  is resized (a sidebar toggled, a split pane dragged). */
@@ -122,8 +140,8 @@ export function PageHead({
         {icon && <PageIcon>{icon}</PageIcon>}
         <h1 className="text-2xl leading-tight text-foreground" style={{ fontWeight: 600 }}>{title}</h1>
         {description
-          ? <p className="mt-3 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-foreground">{description}</p>
-          : emptyDescription && <p className="mt-3 text-[14px] leading-relaxed text-muted-foreground">{emptyDescription}</p>}
+          ? <p className="mt-4 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-foreground">{description}</p>
+          : emptyDescription && <p className="mt-4 text-[14px] leading-relaxed text-muted-foreground">{emptyDescription}</p>}
       </div>
     );
   }
@@ -140,7 +158,7 @@ export function PageHead({
         }}
         className="w-full resize-none overflow-hidden border-none bg-transparent text-2xl leading-tight text-foreground focus:outline-none"
         style={{ fontWeight: 600 }} />
-      <div className="mt-2">
+      <div className="mt-3">
         <AutoField label={descriptionLabel} placeholder={descriptionPlaceholder} value={descDraft} onChange={setDescDraft} onBlur={() => void commitDescription()}
           onKeyDown={(e) => {
             // Enter is a newline; ⌘Enter and Escape end the edit, which saves it.
