@@ -56,7 +56,7 @@ function NextStep({ crm, deal }: { crm: Crm; deal: CrmDeal }) {
       {dirty && <Button size="xs" variant="primary" disabled={busy || !title.trim()} onClick={() => void save()}>{element ? t('Update next step') : t('Set next step')}</Button>}
       {(deal.nextStep || deal.nextActionDate) && !dirty && <Button size="xs" variant="ghost" disabled={busy} onClick={() => void done()}><Check size={12} />{t('Mark done')}</Button>}
     </div>
-    <p className="max-w-xl text-[11px] leading-relaxed text-muted-foreground">{crm.pipeline?.object_id ? t('Saved as an Element in the pipeline’s Object, assigned to the owner — it shows in Calendar and Workload.')
+    <p className="max-w-xl text-[11px] leading-relaxed text-muted-foreground">{crm.pipelines.find(item => item.id === deal.pipelineId)?.object_id ? t('Saved as an Element in the pipeline’s Object, assigned to the owner — it shows in Calendar and Workload.')
       : !deal.ownerId || deal.ownerId === crm.me ? t('Saved as an Element in your My Elements. Choose an Object in Pipeline settings to give next steps to their owners.')
       : t('Saved on the deal. Choose an Object in Pipeline settings to make next steps Elements for their owners.')}</p>
     {notice && <p role="status" className="text-xs text-[var(--status-warning)]">{t(notice)}</p>}
@@ -70,7 +70,8 @@ export function CrmDealPage({ crm, deal, onBack, onOpenPipeline, onCapture, onOp
 }) {
   const { t, locale } = useI18n();
   const strategies = useStrategies();
-  const workspace = crm.workspace!;
+  // The deal's own pipeline: its stages, its name — not whichever the board shows.
+  const workspace = crm.workspaces.find(item => item.pipeline.id === deal.pipelineId) ?? crm.workspace!;
   const today = crm.today;
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

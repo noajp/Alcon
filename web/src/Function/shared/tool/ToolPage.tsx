@@ -86,8 +86,10 @@ export function ToolPage({
   onSelectView: (id: string) => void;
   /** Controls for the active view, at the right of the tab strip. */
   viewControls?: ReactNode;
-  /** The subject's icon, title and description (a PageHead) — on the Overview. */
-  head: ReactNode;
+  /** The subject's icon, title and description (a PageHead) — on the
+   *  Overview. Without one, the first tab is a view like the others (a
+   *  pipeline opens on its board). */
+  head?: ReactNode;
   /** The subject's Properties islands — on the Overview. */
   properties?: ReactNode;
   /** A record opened beside the view (a deal, a company). */
@@ -160,7 +162,7 @@ export function ToolPage({
         <div ref={scroller} className="min-w-0 flex-1 overflow-y-auto">
           {record ? (
             <div className={VIEW_BODY}>{record}</div>
-          ) : active.id === home ? (
+          ) : active.id === home && head ? (
             <PageLayout rail={properties}>
               {head}
               {children}

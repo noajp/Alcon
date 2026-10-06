@@ -568,6 +568,10 @@ const ROWS: readonly Row[] = [
   ["This order has items of another Domain than the delivery location.", "この発注には納品先とは別の Domain の品目があります。", "이 발주에는 납품처와 다른 Domain의 품목이 있습니다.", "Cette commande contient des articles d'un autre Domain que le site de livraison.", "Este pedido tiene artículos de otro Domain distinto de la ubicación de entrega."],
   ["This item belongs to another Domain than the order's delivery location.", "この品目は発注の納品先とは別の Domain に属しています。", "이 품목은 발주 납품처와 다른 Domain에 속합니다.", "Cet article appartient à un autre Domain que le site de livraison de la commande.", "Este artículo pertenece a otro Domain distinto de la ubicación de entrega del pedido."],
   ["Some supply records belong to Domains you cannot see. Ask a member of those Domains to remove them first.", "見られない Domain に属する記録があります。先にその Domain のメンバーに削除してもらってください。", "볼 수 없는 Domain에 속한 기록이 있습니다. 먼저 그 Domain의 멤버에게 삭제를 요청하세요.", "Certains enregistrements appartiennent à des Domains que vous ne voyez pas. Demandez d'abord à un membre de ces Domains de les supprimer.", "Algunos registros pertenecen a Domains que no puedes ver. Pide primero a un miembro de esos Domains que los elimine."],
+  ['Orders drafted by the planner or a person. Approve to send them.', 'プランナーや担当者が起案した発注です。承認すると送信されます。', '플래너나 담당자가 작성한 발주입니다. 승인하면 발송됩니다.', 'Commandes préparées par le planificateur ou une personne. Approuvez pour les envoyer.', 'Pedidos preparados por el planificador o una persona. Apruébalos para enviarlos.'],
+  ['Late', '遅延', '지연', 'En retard', 'Atrasados'],
+  ['No locations yet.', '拠点はまだありません。', '아직 거점이 없습니다.', 'Aucun site pour l’instant.', 'Aún no hay ubicaciones.'],
+  ['Manage locations', '拠点を管理', '거점 관리', 'Gérer les sites', 'Gestionar ubicaciones'],
 ];
 
 const LOCALES = ['ja', 'ko', 'fr', 'es'] as const;

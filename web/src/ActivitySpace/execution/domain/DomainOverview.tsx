@@ -33,7 +33,7 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
       if (nav.objectId) { onNavigate({ objectId: nav.objectId, objectDomainId: domain.id }); onViewChange?.('objects'); }
       else if (nav.strategyId) { onNavigate({ strategyId: nav.strategyId }); onViewChange?.('strategy'); }
       // The supply widget opens SCM on this Domain's supply.
-      else if (nav.scmView) onNavigate({ scmView: nav.scmView, scmNode: nav.scmNode ?? null, scmScope: nav.scmScope ?? null, scmLocationId: nav.scmLocationId ?? null });
+      else if (nav.scmView) onNavigate({ scmView: nav.scmView, scmNode: nav.scmNode ?? null, scmLocationId: nav.scmLocationId ?? null });
     },
     onViewChange,
   };

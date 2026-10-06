@@ -23,17 +23,28 @@ function cover(node: ScmNode, locale: string, t: (m: string, v?: Record<string, 
 /** What needs a decision, grouped by how soon. Each row carries its next action. */
 export function ScmExceptions() {
   const { t, locale } = useI18n();
-  const { nodes, plan, openNode, openOrder, openDialog, locationName, supplierName } = useScmSurface();
+  const { data, nodes, plan, openNode, openOrder, openDialog, locationName, supplierName } = useScmSurface();
+  const drafts = data.orders.filter(order => order.status === 'draft');
   const groups: { id: string; title: string; description: string; rows: ScmNode[] }[] = useMemo(() => [
     { id: 'now', title: t('Out of stock'), description: t('Demand is going unmet today.'), rows: nodes.filter(node => node.health === 'stockout') },
     { id: 'before', title: t('Runs out before supply can arrive'), description: t('A normal order is too late. Expedite, transfer or substitute.'), rows: nodes.filter(node => node.health === 'critical') },
     { id: 'order', title: t('Order now'), description: t('Below the reorder point. An order placed today arrives in time.'), rows: nodes.filter(node => node.health === 'reorder') },
     { id: 'late', title: t('Late supply'), description: t('Purchase orders past their expected date.'), rows: nodes.filter(node => !['stockout', 'critical', 'reorder'].includes(node.health) && node.arrivals.some(arrival => arrival.overdue)) },
   ], [nodes, t]);
-  const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
+  const total = drafts.length + groups.reduce((sum, group) => sum + group.rows.length, 0);
   if (!total) return <div className="space-y-2 py-12 text-center"><p className="text-sm font-medium">{t('No exceptions')}</p><p className="text-sm text-muted-foreground">{t('Every item is covered by stock or orders that arrive in time.')}</p></div>;
 
   return <div className="space-y-8">
+    {drafts.length > 0 && <Section title={`${t('Awaiting approval')} · ${drafts.length}`} description={t('Orders drafted by the planner or a person. Approve to send them.')}>
+      <ul className="divide-y divide-[var(--border-subtle)]">{drafts.map(order => <li key={order.id}>
+        <button type="button" className="flex w-full flex-wrap items-center gap-3 py-3 text-left text-sm" onClick={() => openOrder(order.id)}>
+          <span className="font-medium hover:underline">PO-{order.number}</span>
+          <span className="min-w-0 truncate text-muted-foreground">{supplierName(order.supplierId)} · {locationName(order.locationId)}</span>
+          {order.source !== 'human' && <Pill tone="info">{order.source === 'copilot' ? 'Copilot' : t('Autopilot')}</Pill>}
+          <span className="ml-auto text-xs tabular-nums text-muted-foreground">{formatMoney(order.lines.reduce((sum, line) => sum + line.quantity * line.unitCost, 0), order.currency, locale)}</span>
+        </button>
+      </li>)}</ul>
+    </Section>}
     {groups.filter(group => group.rows.length).map(group => <Section key={group.id} title={`${group.title} · ${group.rows.length}`} description={group.description}>
       <ul className="divide-y divide-[var(--border-subtle)]">
         {group.rows.map(node => {
@@ -73,7 +84,7 @@ export function ScmExceptions() {
 
 type SortKey = 'priority' | 'name' | 'onHand' | 'cover' | 'value' | 'demand';
 
-export function ScmInventory({ health, onHealth, catalog, onCatalog }: { health: ScmHealth | null; onHealth: (health: ScmHealth | null) => void; catalog: boolean; onCatalog: (catalog: boolean) => void }) {
+export function ScmInventory({ health, onHealth, catalog, onCatalog }: { health: ScmHealth | 'at-risk' | null; onHealth: (health: ScmHealth | 'at-risk' | null) => void; catalog: boolean; onCatalog: (catalog: boolean) => void }) {
   const { t } = useI18n();
   return <div className="space-y-4">
     <div className="flex flex-wrap gap-1">
@@ -131,7 +142,9 @@ function ScmCatalog() {
   </div>;
 }
 
-function ScmStock({ health, onHealth }: { health: ScmHealth | null; onHealth: (health: ScmHealth | null) => void }) {
+const AT_RISK: ScmHealth[] = ['stockout', 'critical'];
+
+function ScmStock({ health, onHealth }: { health: ScmHealth | 'at-risk' | null; onHealth: (health: ScmHealth | 'at-risk' | null) => void }) {
   const { t, locale } = useI18n();
   const { nodes, openNode, openDialog, locationName, locationId } = useScmSurface();
   const [query, setQuery] = useState('');
@@ -140,7 +153,7 @@ function ScmStock({ health, onHealth }: { health: ScmHealth | null; onHealth: (h
   const categories = useMemo(() => [...new Set(nodes.map(node => node.category).filter(Boolean) as string[])].sort(), [nodes]);
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    const filtered = nodes.filter(node => (!health || node.health === health) && (!category || node.category === category)
+    const filtered = nodes.filter(node => (!health || (health === 'at-risk' ? AT_RISK.includes(node.health) : node.health === health)) && (!category || node.category === category)
       && (!needle || node.name.toLowerCase().includes(needle) || node.sku.toLowerCase().includes(needle)));
     const by: Record<SortKey, (a: ScmNode, b: ScmNode) => number> = {
       priority: () => 0, name: (a, b) => a.name.localeCompare(b.name), onHand: (a, b) => b.onHand - a.onHand,
@@ -159,7 +172,7 @@ function ScmStock({ health, onHealth }: { health: ScmHealth | null; onHealth: (h
       {categories.length > 0 && <select aria-label={t('Category')} className={SCM_SELECT_INLINE} value={category} onChange={event => setCategory(event.target.value)}>
         <option value="">{t('All categories')}</option>{categories.map(entry => <option key={entry} value={entry}>{entry}</option>)}
       </select>}
-      {health && <Button size="sm" variant="secondary" onClick={() => onHealth(null)}>{t(HEALTH_LABEL[health])} ✕</Button>}
+      {health && <Button size="sm" variant="secondary" onClick={() => onHealth(null)}>{t(health === 'at-risk' ? 'At risk' : HEALTH_LABEL[health])} ✕</Button>}
       <div className="ml-auto flex gap-2">
         <Button size="sm" variant="ghost" onClick={() => openDialog({ kind: 'movement', initial: { locationId: locationId ?? undefined } })}><SquarePen size={14} />{t('Record movement')}</Button>
         <Button size="sm" variant="secondary" onClick={() => openDialog({ kind: 'item', item: null })}><Plus size={14} />{t('Add item')}</Button>
@@ -199,22 +212,27 @@ function ScmStock({ health, onHealth }: { health: ScmHealth | null; onHealth: (h
 
 // ---------------------------------------------------------------------------
 
-type OrderFilter = 'open' | 'draft' | 'received' | 'all';
+export type OrderFilter = 'open' | 'late' | 'draft' | 'received' | 'all';
 const OPEN: ScmPoStatus[] = ['approved', 'sent', 'partial'];
 
-export function ScmOrders() {
+/** Every purchase order, filtered by where it stands. The filter is the
+ *  caller's, so the sidebar's "Late" and "Awaiting approval" open it set. */
+export function ScmOrders({ filter, onFilter }: { filter: OrderFilter; onFilter: (filter: OrderFilter) => void }) {
   const { t, locale } = useI18n();
   const { data, openOrder, openDialog, locationName, supplierName, locationId } = useScmSurface();
-  const [filter, setFilter] = useState<OrderFilter>('open');
-  const orders = data.orders.filter(order => (!locationId || order.locationId === locationId) && (
-    filter === 'all' || (filter === 'open' && OPEN.includes(order.status)) || order.status === filter));
-  const count = (value: OrderFilter) => data.orders.filter(order => (!locationId || order.locationId === locationId) && (value === 'all' || (value === 'open' ? OPEN.includes(order.status) : order.status === value))).length;
-  const sorted = filter === 'open' ? [...orders].sort((a, b) => a.expectedOn.localeCompare(b.expectedOn)) : orders;
+  const setFilter = onFilter;
+  const matches = (status: ScmPoStatus, expectedOn: string, value: OrderFilter) => value === 'all'
+    || (value === 'open' && OPEN.includes(status))
+    || (value === 'late' && OPEN.includes(status) && expectedOn < data.today)
+    || status === value;
+  const orders = data.orders.filter(order => (!locationId || order.locationId === locationId) && matches(order.status, order.expectedOn, filter));
+  const count = (value: OrderFilter) => data.orders.filter(order => (!locationId || order.locationId === locationId) && matches(order.status, order.expectedOn, value)).length;
+  const sorted = filter === 'open' || filter === 'late' ? [...orders].sort((a, b) => a.expectedOn.localeCompare(b.expectedOn)) : orders;
 
   return <div className="space-y-4">
     <div className="flex flex-wrap items-center gap-1">
-      {(['open', 'draft', 'received', 'all'] as OrderFilter[]).map(value => <Button key={value} shape="tab" size="sm" variant={filter === value ? 'secondary' : 'ghost'} aria-pressed={filter === value} onClick={() => setFilter(value)}>
-        {t(value === 'open' ? 'Open' : value === 'draft' ? 'Awaiting approval' : value === 'received' ? 'Received' : 'All')}<span className="text-xs tabular-nums text-muted-foreground">{count(value)}</span>
+      {(['open', 'late', 'draft', 'received', 'all'] as OrderFilter[]).map(value => <Button key={value} shape="tab" size="sm" variant={filter === value ? 'secondary' : 'ghost'} aria-pressed={filter === value} onClick={() => setFilter(value)}>
+        {t(value === 'open' ? 'Open' : value === 'late' ? 'Late' : value === 'draft' ? 'Awaiting approval' : value === 'received' ? 'Received' : 'All')}<span className="text-xs tabular-nums text-muted-foreground">{count(value)}</span>
       </Button>)}
       <Button className="ml-auto" size="sm" variant="secondary" onClick={() => openDialog({ kind: 'new-order', initial: { locationId: locationId ?? undefined } })}><Plus size={14} />{t('New order')}</Button>
     </div>
@@ -288,5 +306,35 @@ export function ScmSuppliers() {
       })}
     </div>
     {!plan.suppliers.length && <button type="button" className={`${SCM_ROW} p-6 text-center text-sm text-muted-foreground`} onClick={() => openDialog({ kind: 'supplier', supplierId: null })}>{t('Add your first supplier.')}</button>}
+  </div>;
+}
+
+// ---------------------------------------------------------------------------
+
+/** Every location, with what it holds and what is at risk there. A row opens
+ *  the items held there; adding and renaming live in the planning settings. */
+export function ScmLocationList({ onOpen }: { onOpen: (locationId: string) => void }) {
+  const { t } = useI18n();
+  const { data, plan, domainName } = useScmSurface();
+  return <div className="overflow-x-auto">
+    <table className="w-full text-sm">
+      <thead><tr className="border-b border-[var(--border-subtle)]">
+        <th className={TH}>{t('Location')}</th><th className={TH}>{t('Domain')}</th>
+        <th className={`${TH} text-right`}>{t('Items')}</th><th className={`${TH} text-right`}>{t('At risk')}</th><th className={`${TH} text-right`}>{t('Open orders')}</th>
+      </tr></thead>
+      <tbody>{data.locations.map(location => {
+        const held = plan.nodes.filter(node => node.locationId === location.id);
+        const risk = held.filter(node => AT_RISK.includes(node.health)).length;
+        const open = data.orders.filter(order => order.locationId === location.id && OPEN.includes(order.status)).length;
+        return <tr key={location.id} className="cursor-pointer border-b border-[var(--border-subtle)] hover:bg-muted/40" onClick={() => onOpen(location.id)}>
+          <td className={`${TD} max-w-72`}><span className="block truncate font-medium">{location.name}</span>{location.code && <span className="block truncate text-xs text-muted-foreground">{location.code}</span>}</td>
+          <td className={`${TD} text-muted-foreground`}>{domainName(location.domainId) ?? t('Shared by the Space')}</td>
+          <td className={`${TD} text-right`}>{held.length}</td>
+          <td className={`${TD} text-right ${risk ? 'text-[var(--status-danger)]' : 'text-muted-foreground'}`}>{risk || '—'}</td>
+          <td className={`${TD} text-right`}>{open || '—'}</td>
+        </tr>;
+      })}</tbody>
+    </table>
+    {!data.locations.length && <p className="py-8 text-center text-sm text-muted-foreground">{t('No locations yet.')}</p>}
   </div>;
 }

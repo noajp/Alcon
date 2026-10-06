@@ -7,16 +7,16 @@ export interface NavigationState {
    * the item-location open in detail (`itemId:locationId`), and the open
    * purchase order. */
   scmView?: ScmView;
-  /** SCM scope: null = everything visible, 'space' = records shared by the
-   * Space, otherwise the Domain whose supply the panes show. */
-  scmScope?: string | null;
   scmLocationId?: string | null;
   scmNode?: string | null;
   scmOrderId?: string | null;
   /** The supplier open as a page. */
   scmSupplierId?: string | null;
-  /** Inventory filtered to one stock health, when opened from a health count. */
-  scmHealth?: ScmHealth | null;
+  /** Inventory filtered to one stock health, or to everything at risk
+   *  (out of stock, or out before supply can arrive). */
+  scmHealth?: ScmHealth | 'at-risk' | null;
+  /** Purchase orders filtered to a status, or to the late ones. */
+  scmOrderFilter?: 'open' | 'draft' | 'received' | 'all' | 'late' | null;
   /** Scenarios opened from a supplier, pre-set to simulate its delay. */
   scmSupplierDelay?: string | null;
   /** The stock ledger filtered to one item. */

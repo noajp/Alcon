@@ -22,7 +22,7 @@ const TOOLTIP = { background: 'var(--popover)', border: '1px solid var(--border)
 
 /** One item at one location, as a page: where its stock is heading, why the
  *  plan says what it says. Its readings sit on the right as the Properties. */
-export function ScmItemPage({ node, onBack, onOpenLocation }: { node: ScmNode; onBack: () => void; onOpenLocation: () => void }) {
+export function ScmItemPage({ node, onBack, onOpenItems, onOpenLocation }: { node: ScmNode; onBack: () => void; onOpenItems: () => void; onOpenLocation: () => void }) {
   const { t, locale } = useI18n();
   const { plan, data, go, openNode, openOrder, openDialog, askCopilot, locationName, supplierName } = useScmSurface();
   const item = data.items.find(entry => entry.id === node.itemId) ?? null;
@@ -68,7 +68,7 @@ export function ScmItemPage({ node, onBack, onOpenLocation }: { node: ScmNode; o
     </RailCard>
   </>;
 
-  return <RecordPage icon={ScmIcon} crumbs={[{ label: locationName(node.locationId), onClick: onOpenLocation }, { label: node.name }]} onBack={onBack} rail={rail}
+  return <RecordPage icon={ScmIcon} crumbs={[{ label: t('Items'), onClick: onOpenItems }, { label: node.name }]} onBack={onBack} rail={rail}
     actions={<>
       <Button size="sm" variant="ghost" onClick={() => askCopilot(t('Explain the stock plan for {sku} {name} at {location}: is the forecast credible, is the safety stock right, and what should I do now?', { sku: node.sku, name: node.name, location: locationName(node.locationId) }))}><MessageSquare size={14} />{t('Ask AI')}</Button>
       <Button size="sm" variant="ghost" onClick={() => openDialog({ kind: 'movement', initial: { itemId: node.itemId, locationId: node.locationId } })}><SquarePen size={14} />{t('Record movement')}</Button>

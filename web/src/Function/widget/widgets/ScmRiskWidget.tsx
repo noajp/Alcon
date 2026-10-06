@@ -6,6 +6,7 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useScmData, useScmPlan } from '@/hooks/useScm';
 import { Dot } from '@/ActivitySpace/sustainment/scm/ScmParts';
 import { scopeScmData } from '@/ActivitySpace/sustainment/scm/scmScope';
+import { setToolScope } from '@/Function/shared/tool/toolScope';
 import { daysFrom, formatDay, HEALTH_LABEL, HEALTH_TONE } from '@/ActivitySpace/sustainment/scm/scmText';
 import { useWidgetEmpty } from '../WidgetFrame';
 import type { WidgetProps } from '../types';
@@ -28,7 +29,9 @@ export function ScmRiskWidget({ host }: WidgetProps) {
   if (!plan || !data) return null;
   const open = (key: string | null) => {
     host.onViewChange?.('scm');
-    host.onNavigate?.({ scmView: (key || risks.length) ? 'exceptions' : 'inventory', scmNode: key, ...(domainId ? { scmScope: domainId, scmLocationId: null } : {}) });
+    // The Domain's supply: SCM opens scoped to it, as its own sidebar would.
+    if (domainId) setToolScope('scm', domainId);
+    host.onNavigate?.({ scmView: (key || risks.length) ? 'exceptions' : 'inventory', scmNode: key, ...(domainId ? { scmLocationId: null } : {}) });
   };
   const openOrders = data.orders.filter(order => ['approved', 'sent', 'partial'].includes(order.status)).length;
   const drafts = data.orders.filter(order => order.status === 'draft').length;

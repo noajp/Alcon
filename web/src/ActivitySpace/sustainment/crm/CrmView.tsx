@@ -1,25 +1,28 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { BarChart3, Check, ChevronDown, ClipboardList, Columns3, Filter, Layers, List, MoreHorizontal, PenLine, Plus, Settings2, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Building2, Check, ChevronDown, Columns3, Filter, Layers, List, PenLine, Plus, Settings2, Users, X } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell, MENU_ROW } from '@/Function/shared/menu';
 import { DateField } from '@/Function/shared/date';
-import { PageHead } from '@/Function/shared/PageHead';
+import { PageHead, PageLayout, PageSection } from '@/Function/shared/PageHead';
 import { RailCard } from '@/Function/shared/RailCard';
 import { RailRow } from '@/Function/shared/RailRow';
+import { IndexList, IndexRow } from '@/Function/shared/IndexList';
 import { ToolPage, type ToolView } from '@/Function/shared/tool/ToolPage';
 import { PlacePage as SharedPlacePage } from '@/Function/shared/tool/PlacePage';
 import { CrmIcon } from '@/Function/shared/conceptIcons';
+import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { NavigationState } from '@/types/navigation';
 import { useCrm, type Crm } from '@/hooks/useCrm';
-import { inList, searchDeals, todayQueue, type CrmDealRecord, type CrmList, type CrmWorkspace } from './crmModel';
-import { crmRoute, routeTo, PIPELINE_VIEWS, type CrmRoute, type CrmViewId } from './crmRoute';
-import { money } from './crmFormat';
+import { forecastFor, inList, searchDeals, type CrmDealRecord, type CrmHealthLevel, type CrmList, type CrmWorkspace } from './crmModel';
+import { crmRoute, routeTo, type CrmRoute, type CrmViewId } from './crmRoute';
+import { useCrmScope } from './crmScope';
+import { HealthDot, money } from './crmFormat';
 import { CrmToday } from './CrmToday';
 import { CrmPipeline } from './CrmPipeline';
 import { CrmDeals } from './CrmDeals';
@@ -30,23 +33,22 @@ import { CrmDealPage } from './CrmDealPage';
 import { CrmCapture } from './CaptureDialog';
 import { CrmPicker } from './CrmPicker';
 
-// The CRM App, in the App's three levels (see crmRoute):
-//   a pipeline is a container, read through its views (the tabs);
-//   Today, Companies and Contacts are the other places in the sidebar;
-//   a deal, a company or a contact opens as a page of its own.
+// The CRM App. Read through a scope (whose records — see crmScope), the way
+// SCM is: the scope's overview, Today, the deals (a list across pipelines or
+// one pipeline's board), the forecast, the ledgers; a deal, company or
+// contact opens as a page of its own.
 
 const LIST_LABEL: Record<CrmList, string> = {
   mine: 'My deals', 'at-risk': 'At risk', 'closing-soon': 'Closing soon', 'no-next-step': 'No next step', stale: 'Going quiet', won: 'Won', lost: 'Lost', incomplete: 'Missing details',
 };
 const LISTS = Object.keys(LIST_LABEL) as CrmList[];
+const HEALTH_ORDER: CrmHealthLevel[] = ['risk', 'watch', 'healthy', 'incomplete'];
+const HEALTH_LABEL: Record<CrmHealthLevel, string> = { risk: 'At risk', watch: 'Watch', healthy: 'Healthy', incomplete: 'Missing details', closed: 'Closed' };
 
-// The pipeline's views. Overview is its page — head and Properties — the
-// rest are readings of its deals.
-const PIPELINE_TABS: readonly (ToolView & { id: typeof PIPELINE_VIEWS[number] })[] = [
-  { id: 'overview', label: 'Overview', icon: ClipboardList },
-  { id: 'deals', label: 'Deals', icon: List, description: 'Every deal in this pipeline.' },
-  { id: 'board', label: 'Board', icon: Columns3, wide: true, description: 'Every open deal, by stage. Drag a card to move it.' },
-  { id: 'forecast', label: 'Forecast', icon: BarChart3, description: 'What the open pipeline is expected to bring in.' },
+// The deals' two readings — the tabs on Deals.
+const DEAL_TABS: readonly ToolView[] = [
+  { id: 'deals', label: 'List', icon: List },
+  { id: 'board', label: 'Board', icon: Columns3, wide: true },
 ];
 
 const INPUT = 'h-8 w-full min-w-0 rounded-sm bg-muted/30 px-2 text-sm outline-none hover:bg-muted/40 focus:bg-muted/60';
@@ -123,7 +125,7 @@ function CrmMount(props: SurfaceProps) {
   return <CrmSurface crm={crm} {...props} />;
 }
 
-/** A place that is not a pipeline: Today, Companies, Contacts. */
+/** A place in the CRM that is not a record. */
 function PlacePage(props: Omit<React.ComponentProps<typeof SharedPlacePage>, 'icon' | 'container'>) {
   return <SharedPlacePage icon={CrmIcon} container="crm" {...props} />;
 }
@@ -135,29 +137,36 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
   const [captureFor, setCaptureFor] = useState<string | null | undefined>(undefined);
   const [creating, setCreating] = useState(false);
   const [everyone, setEveryone] = useState(false);
-  const workspace = crm.workspace;
-  const pipeline = crm.pipeline;
+  const scoped = useCrmScope(crm, route.pipelineId);
+  const { pipeline, workspace, pooled } = scoped;
 
-  // Capture opens from the header (local state) or from the sidebar (a route
-  // request, cleared when the dialog closes).
+  // New deals and the board belong to one pipeline: keep the hook's pipeline
+  // on one the scope holds, so a deal is never created outside the scope.
+  useEffect(() => {
+    if (pipeline && crm.pipeline && crm.pipeline.id !== pipeline.id) onNavigate({ crm: routeTo(route, { pipelineId: pipeline.id }) });
+  }, [pipeline, crm.pipeline, route, onNavigate]);
+
+  // Capture opens from the header (local state) or from a route request.
   const capture = captureFor !== undefined ? captureFor : route.capture && workspace ? route.dealId ?? null : undefined;
   const closeCapture = () => { setCaptureFor(undefined); if (route.capture) go({ capture: false }); };
 
+  // The deals a list reads: the board's pipeline, or every pipeline in the scope.
+  const listSource = route.view === 'board' ? workspace : route.pipelineId ? workspace : pooled;
   const filtered = useMemo(() => {
-    if (!workspace) return [];
-    let deals = searchDeals(workspace.deals, route.query ?? '');
+    if (!listSource) return [];
+    let deals = searchDeals(listSource.deals, route.query ?? '');
     if (route.stage !== undefined && route.stage !== null) deals = deals.filter(deal => deal.outcome === 'open' && deal.stage?.id === route.stage);
-    if (route.list) deals = deals.filter(deal => inList(deal, route.list!, workspace.today, workspace.params.horizonDays, crm.me));
+    if (route.list) deals = deals.filter(deal => inList(deal, route.list!, listSource.today, listSource.params.horizonDays, crm.me));
     if (route.account !== undefined && route.account !== null) deals = deals.filter(deal => (deal.companyId ?? '') === route.account);
     if (route.owner) deals = deals.filter(deal => deal.ownerId === route.owner);
     return deals;
-  }, [workspace, route.query, route.stage, route.list, route.account, route.owner, crm.me]);
+  }, [listSource, route.query, route.stage, route.list, route.account, route.owner, crm.me]);
   // Today is personal by default: my deals and the ones nobody owns yet.
-  const todayWorkspace = useMemo<CrmWorkspace | null>(() => workspace && !everyone && crm.me
-    ? { ...workspace, deals: workspace.deals.filter(deal => !deal.ownerId || deal.ownerId === crm.me) } : workspace, [workspace, everyone, crm.me]);
+  const todayWorkspace = useMemo<CrmWorkspace | null>(() => pooled && !everyone && crm.me
+    ? { ...pooled, deals: pooled.deals.filter(deal => !deal.ownerId || deal.ownerId === crm.me) } : pooled, [pooled, everyone, crm.me]);
 
   const openDeal = (dealId: string) => go({ dealId, companyId: null, contactId: null });
-  const openDealRecord = (deal: CrmDealRecord) => go({ dealId: deal.id, companyId: null, contactId: null, pipelineId: deal.pipeline_id === crm.pipeline?.id ? route.pipelineId : deal.pipeline_id });
+  const openDealRecord = (deal: CrmDealRecord) => go({ dealId: deal.id, companyId: null, contactId: null });
   const openInitiative = onViewChange ? (id: string) => { onNavigate({ strategyId: id }); onViewChange('strategy'); } : undefined;
   const closeRecord = () => go({ dealId: null, companyId: null, contactId: null });
   const recordLabel = pipeline?.record_label;
@@ -171,23 +180,26 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
     {workspace && capture !== undefined && <CrmCapture crm={crm} initialDealId={capture} onClose={closeCapture}
       onApplied={dealId => { setCaptureFor(undefined); go({ dealId, capture: false }); }} />}
     {workspace && creating && <NewDeal crm={crm} onClose={() => setCreating(false)} onCreated={dealId => { setCreating(false); go({ dealId }); }} />}
-    {route.settings && pipeline && <Dialog open onOpenChange={open => { if (!open) go({ settings: false }); }}>
+    {route.settings && <Dialog open onOpenChange={open => { if (!open) go({ settings: false }); }}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
         <DialogTitle>{t('Pipeline settings')}</DialogTitle>
         <DialogDescription>{t('The pipeline’s stages, currency and rhythm.')}</DialogDescription>
-        <CrmSettings crm={crm} onSelectPipeline={pipelineId => go({ pipelineId })} />
+        {crm.pipeline ? <CrmSettings crm={crm} onSelectPipeline={pipelineId => go({ pipelineId })} /> : <p className="text-sm text-muted-foreground">{t('Loading your pipeline…')}</p>}
       </DialogContent>
     </Dialog>}
   </>;
 
   // ── A record's page ─────────────────────────────────────────────────
-  const selected = workspace && route.dealId ? workspace.deals.find(deal => deal.id === route.dealId) ?? null : null;
-  if (selected) return <>
-    <CrmDealPage key={selected.id} crm={crm} deal={selected} onBack={closeRecord} onOpenPipeline={() => go({ dealId: null, view: 'overview' })}
-      onCapture={dealId => setCaptureFor(dealId)} onOpenElement={onOpenElement} onOpenInitiative={openInitiative}
-      onOpenCompany={companyId => go({ companyId, dealId: null })} onOpenContact={contactId => go({ contactId, dealId: null })} />
-    {dialogs}
-  </>;
+  const selected = route.dealId ? crm.workspaces.flatMap(item => item.deals).find(deal => deal.id === route.dealId) ?? null : null;
+  if (selected) {
+    return <>
+      <CrmDealPage key={selected.id} crm={crm} deal={selected} onBack={closeRecord}
+        onOpenPipeline={() => go({ dealId: null, view: 'board', pipelineId: selected.pipelineId })}
+        onCapture={dealId => setCaptureFor(dealId)} onOpenElement={onOpenElement} onOpenInitiative={openInitiative}
+        onOpenCompany={companyId => go({ companyId, dealId: null })} onOpenContact={contactId => go({ contactId, dealId: null })} />
+      {dialogs}
+    </>;
+  }
   if (route.companyId) return <>
     <CrmCompanyPage key={route.companyId} crm={crm} companyId={route.companyId} onBack={closeRecord} onOpenCompanies={() => go({ view: 'companies' })}
       onOpenDeal={openDealRecord} onOpenContact={contactId => go({ contactId, companyId: null })} />
@@ -203,41 +215,81 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
     {crm.loading && <p role="status" className="py-6 text-sm text-muted-foreground">{t('Loading your pipeline…')}</p>}
     {crm.error && <div role="alert" className="space-y-2"><p className="text-sm text-[var(--status-danger)]">{t('Could not load your pipeline.')} {crm.error instanceof Error ? crm.error.message : ''}</p>
       <Button onClick={() => void crm.refetch()}>{t('Retry')}</Button></div>}
+    {!crm.loading && !crm.error && !scoped.pipelines.length && <div className="space-y-3 py-6">
+      <p className="text-sm text-muted-foreground">{t('No pipeline in this scope yet.')}</p>
+      <Button variant="secondary" onClick={() => go({ settings: true })}><Settings2 size={14} />{t('Pipeline settings')}</Button>
+    </div>}
   </>;
 
-  // ── The places beside the pipelines ─────────────────────────────────
+  // ── The scope's overview ────────────────────────────────────────────
+  if (route.view === 'home') return <>
+    <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
+      <header className="flex h-[50px] flex-shrink-0 items-center gap-1.5 border-b border-border/60 bg-card pl-4 pr-2">
+        <CrmIcon size={12} /><span className="text-[12px] font-semibold text-foreground">{t('CRM')}</span>
+        <span className="min-w-0 truncate text-[12px] text-muted-foreground">{scoped.scopeName}</span>
+        <div className="flex-1" />
+        {headerActions && <div className="flex shrink-0 items-center gap-1.5">{headerActions}</div>}
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <PageLayout rail={<RailCard title={t('Properties')}>
+          <RailRow icon={<Layers className="size-3.5 text-muted-foreground" />} name={t('Scope')} dense label={scoped.scopeName} placeholder={scoped.scope === null} />
+          <RailRow icon={<Columns3 className="size-3.5 text-muted-foreground" />} name={t('Pipelines')} dense label={String(scoped.pipelines.length)} placeholder={!scoped.pipelines.length} />
+          <button type="button" className="w-full" onClick={() => go({ view: 'companies' })}><RailRow icon={<Building2 className="size-3.5 text-muted-foreground" />} name={t('Companies')} dense label={String(scoped.companies.length)} placeholder={!scoped.companies.length} /></button>
+          <button type="button" className="w-full" onClick={() => go({ view: 'contacts' })}><RailRow icon={<Users className="size-3.5 text-muted-foreground" />} name={t('Contacts')} dense label={String(scoped.contacts.length)} placeholder={!scoped.contacts.length} /></button>
+        </RailCard>}>
+          <PageHead icon={<CrmIcon size={18} />} title={scoped.scopeName === t('Everything') ? t('CRM') : scoped.scopeName}
+            description={t('Where every deal in this scope stands, pipeline by pipeline.')} canEdit={false}
+            titleLabel={t('CRM')} titlePlaceholder="" descriptionLabel="" descriptionPlaceholder="" onSaveTitle={() => {}} />
+          <div className="@container/crm space-y-8">
+            {status}
+            {pooled && <ScopeOverview workspaces={scoped.workspaces} pooled={pooled} locale={locale} onOpenPipeline={id => go({ view: 'board', pipelineId: id })} onOpenList={list => go({ view: 'deals', list, pipelineId: null })} />}
+          </div>
+        </PageLayout>
+      </div>
+    </div>
+    {dialogs}
+  </>;
+
+  // ── Today ───────────────────────────────────────────────────────────
   if (route.view === 'today') return <>
     <PlacePage title={t('Today')} actions={<>
-      {workspace && crm.me && <div role="group" aria-label={t('Whose deals')} className="mr-2 flex gap-1">
+      {pooled && crm.me && <div role="group" aria-label={t('Whose deals')} className="mr-2 flex gap-1">
         <Button shape="tab" size="sm" variant={!everyone ? 'secondary' : 'ghost'} aria-pressed={!everyone} onClick={() => setEveryone(false)}>{t('Mine')}</Button>
         <Button shape="tab" size="sm" variant={everyone ? 'secondary' : 'ghost'} aria-pressed={everyone} onClick={() => setEveryone(true)}>{t('Everyone')}</Button>
       </div>}
       {headerActions}
     </>}>
       {status}
-      {todayWorkspace && <CrmToday crm={crm} workspace={todayWorkspace} pipelineDeals={workspace?.deals.length ?? 0} onShowEveryone={() => setEveryone(true)}
-        onOpen={openDeal} onCapture={() => setCaptureFor(null)} onList={list => go({ view: 'deals', list })} />}
+      {todayWorkspace && <CrmToday crm={crm} workspace={todayWorkspace} pipelineDeals={pooled?.deals.length ?? 0} onShowEveryone={() => setEveryone(true)}
+        onOpen={openDeal} onCapture={() => setCaptureFor(null)} onList={list => go({ view: 'deals', list, pipelineId: null })} />}
     </PlacePage>
     {dialogs}
   </>;
+
+  // ── The ledgers ─────────────────────────────────────────────────────
   if (route.view === 'companies') return <>
-    <PlacePage title={t('Companies')}>{status}{workspace && <CrmCompanies crm={crm} query={route.query ?? ''} selectedId={null} onOpen={companyId => go({ companyId })} />}</PlacePage>
+    <PlacePage title={t('Companies')}>{status}{pooled && <CrmCompanies crm={{ ...crm, companies: scoped.companies }} query={route.query ?? ''} selectedId={null} onOpen={companyId => go({ companyId })} />}</PlacePage>
     {dialogs}
   </>;
   if (route.view === 'contacts') return <>
-    <PlacePage title={t('Contacts')}>{status}{workspace && <CrmContacts crm={crm} query={route.query ?? ''} selectedId={null} onOpen={contactId => go({ contactId })} />}</PlacePage>
+    <PlacePage title={t('Contacts')}>{status}{pooled && <CrmContacts crm={{ ...crm, contacts: scoped.contacts }} query={route.query ?? ''} selectedId={null} onOpen={contactId => go({ contactId })} />}</PlacePage>
     {dialogs}
   </>;
 
-  // ── The pipeline ────────────────────────────────────────────────────
-  const view = (PIPELINE_VIEWS as readonly string[]).includes(route.view) ? route.view : 'overview';
-  const open = workspace?.deals.filter(deal => deal.outcome === 'open') ?? [];
-  const weighted = workspace?.totals.find(total => total.currency === workspace.primaryCurrency)?.weightedPipeline ?? null;
-  const views = PIPELINE_TABS.map(tab => ({
-    ...tab,
-    label: tab.id === 'deals' && recordLabel ? recordLabel : tab.label,
-    badge: tab.id === 'deals' ? workspace?.deals.length || null : tab.id === 'board' ? open.length || null : null,
-  }));
+  // ── Forecast: each pipeline in the scope, in its own currency ───────
+  if (route.view === 'forecast') return <>
+    <PlacePage title={t('Forecast')} actions={headerActions}>
+      {status}
+      <div className="space-y-12">{scoped.workspaces.map(item => <section key={item.pipeline.id} className="space-y-4">
+        {scoped.workspaces.length > 1 && <h2 className="text-[15px] font-medium">{item.pipeline.name}</h2>}
+        <CrmForecast workspace={item} onOpenInitiative={openInitiative} />
+      </section>)}</div>
+    </PlacePage>
+    {dialogs}
+  </>;
+
+  // ── Deals: a list across the scope, or one pipeline's board ─────────
+  const view: 'deals' | 'board' = route.view === 'board' ? 'board' : 'deals';
   const chips = [
     route.stage !== undefined && route.stage !== null && { key: 'stage', label: `${t('Stage')}: ${t(workspace?.stages.find(stage => stage.id === route.stage)?.label ?? route.stage)}` },
     route.list && { key: 'list', label: t(LIST_LABEL[route.list]) },
@@ -245,20 +297,20 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
     route.owner && { key: 'owner', label: `${t('Owner')}: ${crm.people.find(person => person.id === route.owner)?.name ?? ''}` },
     route.query && { key: 'query', label: `“${route.query}”` },
   ].filter(Boolean) as { key: 'stage' | 'list' | 'account' | 'owner' | 'query'; label: string }[];
-  const filtering = view === 'deals' || view === 'board';
+  const boardOf = view === 'board' || !!route.pipelineId;
 
-  // What narrows the deals: a stage, a list, whose. A filter, where the
-  // Elements list has its own — not a place in the sidebar.
-  const filterMenu = workspace && filtering && <DropdownMenu>
+  // What narrows the deals: a stage (one pipeline's), a list, whose.
+  const filterMenu = listSource && <DropdownMenu>
     <DropdownMenuTrigger asChild><Button size="sm" variant={chips.length ? 'secondary' : 'ghost'}><Filter size={14} />{t('Filter')}{chips.length > 0 && <span className="tabular-nums text-muted-foreground">{chips.length}</span>}<ChevronDown size={12} /></Button></DropdownMenuTrigger>
     <MenuShell as="dropdown" width="wide" align="end">
-      <p className="px-2 pb-1 pt-1.5 text-[11px] text-muted-foreground">{t('Stage')}</p>
-      {workspace.stages.map(stage => <DropdownMenuItem key={stage.id} className={MENU_ROW} onSelect={() => go({ stage: route.stage === stage.id ? null : stage.id })}>
-        <span className="min-w-0 flex-1 truncate">{t(stage.label)}</span><span className="flex w-4 justify-end">{route.stage === stage.id && <Check size={12} />}</span></DropdownMenuItem>)}
+      {boardOf && workspace && <>
+        <p className="px-2 pb-1 pt-1.5 text-[11px] text-muted-foreground">{t('Stage')}</p>
+        {workspace.stages.map(stage => <DropdownMenuItem key={stage.id} className={MENU_ROW} onSelect={() => go({ stage: route.stage === stage.id ? null : stage.id })}>
+          <span className="min-w-0 flex-1 truncate">{t(stage.label)}</span><span className="flex w-4 justify-end">{route.stage === stage.id && <Check size={12} />}</span></DropdownMenuItem>)}
+      </>}
       <p className="px-2 pb-1 pt-2 text-[11px] text-muted-foreground">{t('Lists')}</p>
       {LISTS.filter(list => list !== 'mine' || crm.me).map(list => <DropdownMenuItem key={list} className={MENU_ROW} onSelect={() => go({ list: route.list === list ? null : list })}>
         <span className="min-w-0 flex-1 truncate">{t(LIST_LABEL[list])}</span>
-        <span className="text-xs tabular-nums text-muted-foreground">{workspace.deals.filter(deal => inList(deal, list, workspace.today, workspace.params.horizonDays, crm.me)).length}</span>
         <span className="flex w-4 justify-end">{route.list === list && <Check size={12} />}</span></DropdownMenuItem>)}
       {crm.people.length > 1 && <>
         <p className="px-2 pb-1 pt-2 text-[11px] text-muted-foreground">{t('Owner')}</p>
@@ -267,103 +319,93 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
       </>}
     </MenuShell>
   </DropdownMenu>;
-
-  // The pipeline's facts, on the Overview. Pipeline and Domain switch in
-  // place; the rest open its settings.
-  const properties = pipeline && <RailCard title={t('Properties')}>
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button type="button" className="w-full" aria-label={t('Domain')}>
-          <RailRow icon={<Layers className="size-3.5 text-muted-foreground" />} name={t('Domain')}
-            label={crm.domains.find(domain => domain.id === pipeline.domain_id)?.name ?? t('Whole Space')} placeholder={!pipeline.domain_id} dense />
-        </button>
-      </DropdownMenuTrigger>
-      <MenuShell as="dropdown" align="start">
-        <DropdownMenuItem className="gap-2" onSelect={() => void crm.savePipeline(pipeline.id, { domain_id: null })}>
-          <span className="min-w-0 flex-1 truncate">{t('Whole Space')}</span>{!pipeline.domain_id && <Check size={12} />}
-        </DropdownMenuItem>
-        {crm.domains.map(domain => <DropdownMenuItem key={domain.id} className="gap-2" onSelect={() => void crm.savePipeline(pipeline.id, { domain_id: domain.id })}>
-          <span className="min-w-0 flex-1 truncate">{domain.name}</span>{domain.id === pipeline.domain_id && <Check size={12} />}
-        </DropdownMenuItem>)}
-      </MenuShell>
-    </DropdownMenu>
-    {[
-      { key: 'label', name: t('A deal is called'), value: pipeline.record_label ?? t('Deal'), placeholder: !pipeline.record_label },
-      { key: 'currency', name: t('Currency'), value: pipeline.currency },
-      { key: 'horizon', name: t('Forecast period'), value: t('{n} days', { n: pipeline.horizon_days }) },
-      { key: 'follow', name: t('Going quiet after'), value: t('{n} days', { n: pipeline.follow_up_days }) },
-      { key: 'stages', name: t('Stages'), value: String(workspace?.stages.length ?? 0) },
-    ].map(row => <button key={row.key} type="button" className="w-full" onClick={() => go({ settings: true })}>
-      <RailRow icon={<Settings2 className="size-3.5 text-muted-foreground" />} name={row.name} label={row.value} placeholder={row.placeholder} dense />
-    </button>)}
-    {workspace && <>
-      <div className="mx-2 my-2 h-px bg-[var(--border-subtle)]" />
-      <RailRow name={t('Open deals')} label={String(open.length)} dense />
-      {weighted !== null && workspace.primaryCurrency && <RailRow name={t('Weighted')} label={money(weighted, workspace.primaryCurrency, locale, true)} dense />}
-    </>}
-  </RailCard>;
+  // Which pipeline the board shows, when the scope holds more than one.
+  const pipelinePicker = scoped.pipelines.length > 1 && <DropdownMenu>
+    <DropdownMenuTrigger asChild><Button size="sm" variant="ghost"><Columns3 size={14} />{boardOf ? pipeline?.name : t('All pipelines')}<ChevronDown size={12} /></Button></DropdownMenuTrigger>
+    <MenuShell as="dropdown" align="end">
+      {view === 'deals' && <DropdownMenuItem className={MENU_ROW} onSelect={() => go({ pipelineId: null })}><span className="min-w-0 flex-1 truncate">{t('All pipelines')}</span><span className="flex w-4 justify-end">{!route.pipelineId && <Check size={12} />}</span></DropdownMenuItem>}
+      {scoped.pipelines.map(item => <DropdownMenuItem key={item.id} className={MENU_ROW} onSelect={() => go({ pipelineId: item.id })}>
+        <span className="min-w-0 flex-1 truncate">{item.name}</span><span className="flex w-4 justify-end">{boardOf && pipeline?.id === item.id && <Check size={12} />}</span></DropdownMenuItem>)}
+    </MenuShell>
+  </DropdownMenu>;
 
   return <>
-    <ToolPage icon={CrmIcon} tool={t('CRM')} crumb={pipeline?.name} storageKey="crm-pipeline" home="overview"
-      views={views} activeView={view} onSelectView={id => go({ view: id as CrmViewId })}
-      actions={<>
-        {headerActions}
-        {pipeline && <DropdownMenu>
-          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label={t('More')}><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
-          <MenuShell as="dropdown" align="end">
-            <DropdownMenuItem className="gap-2" onSelect={() => go({ settings: true })}><Settings2 size={12} />{t('Pipeline settings')}</DropdownMenuItem>
-          </MenuShell>
-        </DropdownMenu>}
-      </>}
-      viewControls={filterMenu}
-      head={<PageHead key={pipeline?.id ?? 'none'} icon={<CrmIcon size={18} />} title={pipeline?.name ?? t('CRM')}
-        description={t('What needs you today, and where every deal in this pipeline stands.')}
-        canEdit={!!pipeline} titleLabel={t('Pipeline name')} titlePlaceholder={t('Pipeline name…')}
-        descriptionLabel={t('Description')} descriptionPlaceholder=""
-        onSaveTitle={async name => { if (pipeline) await crm.savePipeline(pipeline.id, { name }); }} />}
-      properties={properties}>
+    <ToolPage icon={CrmIcon} tool={t('CRM')} crumb={boardOf ? pipeline?.name : scoped.scopeName} storageKey="crm-deals" home="deals"
+      views={DEAL_TABS.map(tab => ({ ...tab, label: tab.id === 'deals' && recordLabel ? recordLabel : tab.label }))} activeView={view}
+      onSelectView={id => go({ view: id as CrmViewId })}
+      actions={headerActions}
+      viewControls={<div className="flex items-center gap-1">{pipelinePicker}{filterMenu}</div>}>
       <div className="@container/crm space-y-6">
-        {filtering && chips.length > 0 && <div className="flex flex-wrap items-center gap-2">
+        {chips.length > 0 && <div className="flex flex-wrap items-center gap-2">
           {chips.map(chip => <Button key={chip.key} size="xs" variant="secondary" aria-label={t('Clear filter {name}', { name: chip.label })}
             onClick={() => go(chip.key === 'query' ? { query: '' } : { [chip.key]: null })}>{chip.label}<X size={12} /></Button>)}
           <span className="text-xs text-muted-foreground">{t('{n} deals', { n: filtered.length })}</span>
         </div>}
         {status}
-        {workspace && view === 'overview' && <PipelineOverview workspace={workspace} open={open.length} onDeals={() => go({ view: 'deals' })} onBoard={() => go({ view: 'board' })} onToday={() => go({ view: 'today' })} />}
-        {workspace && view === 'deals' && <CrmDeals deals={filtered} today={workspace.today} onOpen={openDeal} selectedId={null}
-          emptyLabel={workspace.deals.length ? t('No deals match these filters.') : t('No deals yet. Use Capture or New deal to add one.')} />}
+        {listSource && view === 'deals' && <CrmDeals deals={filtered} today={listSource.today} onOpen={openDeal} selectedId={null}
+          emptyLabel={listSource.deals.length ? t('No deals match these filters.') : t('No deals yet. Use Capture or New deal to add one.')} />}
         {workspace && view === 'board' && <CrmPipeline crm={crm} workspace={workspace} deals={filtered} onOpen={openDeal} selectedId={null} />}
-        {workspace && view === 'forecast' && <CrmForecast workspace={workspace} onOpenInitiative={openInitiative} />}
       </div>
     </ToolPage>
     {dialogs}
   </>;
 }
 
-/** The pipeline's Overview body: the numbers that say how it is going, and
- *  the queue that says what needs doing. */
-function PipelineOverview({ workspace, open, onDeals, onBoard, onToday }: { workspace: CrmWorkspace; open: number; onDeals: () => void; onBoard: () => void; onToday: () => void }) {
-  const { t, locale } = useI18n();
-  const totals = workspace.totals.find(total => total.currency === workspace.primaryCurrency);
-  const queue = todayQueue(workspace.deals);
-  const overdue = queue.filter(deal => deal.action!.urgency === 'overdue').length;
-  const metric = (label: string, value: string, hint?: string, danger?: boolean) => <div className="min-w-0 space-y-1">
+/** The scope's overview: the totals that say how the deals stand (per
+ *  currency, never summed across), their health, and each pipeline. */
+function ScopeOverview({ workspaces, pooled, locale, onOpenPipeline, onOpenList }: {
+  workspaces: CrmWorkspace[]; pooled: CrmWorkspace; locale: string;
+  onOpenPipeline: (id: string) => void; onOpenList: (list: CrmList) => void;
+}) {
+  const { t } = useI18n();
+  const open = pooled.deals.filter(deal => deal.outcome === 'open');
+  const won = forecastFor(pooled.deals, pooled.primaryCurrency, pooled.today, 3);
+  const health = HEALTH_ORDER.map(level => ({ level, count: open.filter(deal => deal.health.level === level).length }));
+  const metric = (label: string, value: string, hint?: string) => <div className="min-w-0 space-y-1">
     <dt className="truncate text-xs text-muted-foreground">{label}</dt>
-    <dd className={`truncate text-xl font-semibold tabular-nums ${danger ? 'text-[var(--status-danger)]' : ''}`}>{value}</dd>
+    <dd className="truncate text-xl font-semibold tabular-nums">{value}</dd>
     {hint && <dd className="truncate text-xs text-muted-foreground">{hint}</dd>}
   </div>;
-  if (!workspace.deals.length) return <p className="text-sm text-muted-foreground">{t('No deals yet. Use Capture or New deal to add one.')}</p>;
-  return <div className="space-y-6">
-    <dl className="grid grid-cols-2 gap-6 @2xl/crm:grid-cols-4">
-      {metric(t('Open pipeline'), totals ? money(totals.pipeline, workspace.primaryCurrency, locale, true) : '—', t('{n} open deals', { n: open }))}
-      {metric(t('Forecast · next {n} days', { n: workspace.params.horizonDays }), totals ? money(totals.forecast, workspace.primaryCurrency, locale, true) : '—', t('Weighted by likelihood'))}
-      {metric(t('Weighted'), totals ? money(totals.weightedPipeline, workspace.primaryCurrency, locale, true) : '—')}
-      {metric(t('Needs attention'), String(queue.length), overdue ? t('{n} overdue', { n: overdue }) : t('Nothing overdue'), overdue > 0)}
-    </dl>
-    <div className="-ml-2.5 flex flex-wrap gap-0.5">
-      <Button variant="ghost" size="sm" onClick={onToday}>{t('Today')}</Button>
-      <Button variant="ghost" size="sm" onClick={onDeals}>{t('Deals')}</Button>
-      <Button variant="ghost" size="sm" onClick={onBoard}>{t('Board')}</Button>
-    </div>
-  </div>;
+  if (!pooled.deals.length) return <p className="text-sm text-muted-foreground">{t('No deals yet. Use Capture or New deal to add one.')}</p>;
+  return <>
+    {pooled.totals.map(total => <dl key={total.currency} className="grid grid-cols-2 gap-6 @2xl/crm:grid-cols-4">
+      {metric(t('Open pipeline'), money(total.pipeline, total.currency, locale, true), t('{n} open deals', { n: total.openCount }))}
+      {metric(t('Weighted'), money(total.weightedPipeline, total.currency, locale, true), t('Weighted by likelihood'))}
+      {metric(t('Forecast · next {n} days', { n: pooled.params.horizonDays }), money(total.forecast, total.currency, locale, true))}
+      {metric(t('Won'), money(total.currency === pooled.primaryCurrency ? won.months.reduce((sum, month) => sum + month.won, 0) : total.won, total.currency, locale, true), total.currency === pooled.primaryCurrency ? t('Last 3 months') : undefined)}
+    </dl>)}
+
+    <PageSection title={t('Health')}>
+      <div className="max-w-xl space-y-2">
+        <div className="flex h-2 overflow-hidden rounded-full bg-muted">
+          {health.map(({ level, count }) => count ? <span key={level} className={level === 'risk' ? 'bg-[var(--status-danger)]' : level === 'watch' ? 'bg-[var(--status-warning)]' : level === 'healthy' ? 'bg-[var(--status-success)]' : 'bg-muted-foreground/40'} style={{ width: `${(count / Math.max(1, open.length)) * 100}%` }} /> : null)}
+        </div>
+        <ul className="grid grid-cols-2 gap-1 @xl/crm:grid-cols-4">{health.map(({ level, count }) => <li key={level}>
+          <button type="button" disabled={!count || (level !== 'risk' && level !== 'incomplete')} onClick={() => onOpenList(level === 'risk' ? 'at-risk' : 'incomplete')}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs enabled:hover:bg-muted/40 disabled:cursor-default">
+            <HealthDot level={level} /><span className="flex-1 truncate">{t(HEALTH_LABEL[level])}</span><span className="tabular-nums text-muted-foreground">{count}</span>
+          </button>
+        </li>)}</ul>
+      </div>
+    </PageSection>
+
+    <PageSection title={t('Pipelines')}>
+      <IndexList headers={[t('Name'), t('Health'), t('Open deals')]}>
+        {workspaces.map(item => {
+          const itemOpen = item.deals.filter(deal => deal.outcome === 'open');
+          const risk = itemOpen.filter(deal => deal.health.level === 'risk').length;
+          const totals = item.totals.find(total => total.currency === item.primaryCurrency);
+          const healthy = itemOpen.length ? Math.round((itemOpen.filter(deal => deal.health.level === 'healthy').length / itemOpen.length) * 100) : null;
+          return <IndexRow key={item.pipeline.id} icon={<Columns3 size={13} />} name={item.pipeline.name}
+            description={totals && item.primaryCurrency ? money(totals.weightedPipeline, item.primaryCurrency, locale, true) : undefined}
+            health={<div className="flex min-w-0 items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
+              {healthy === null ? <span className="text-muted-foreground/60">{t('No open deals')}</span>
+                : <span className="flex w-24 shrink-0 items-center gap-1.5"><SegmentedProgress value={healthy} className="flex-1" /><span className="w-7 text-right">{healthy}%</span></span>}
+              {risk > 0 && <span className="text-[var(--status-danger)]">{t('{n} at risk', { n: risk })}</span>}
+            </div>}
+            count={itemOpen.length} onOpen={() => onOpenPipeline(item.pipeline.id)} />;
+        })}
+      </IndexList>
+    </PageSection>
+  </>;
 }

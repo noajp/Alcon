@@ -57,15 +57,6 @@ export function Section({ title, description, action, children }: { title: strin
   </section>;
 }
 
-/** A labelled number in a dense grid of readings. */
-export function Reading({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
-  return <div className="min-w-0">
-    <dt className="truncate text-[11px] text-muted-foreground">{label}</dt>
-    <dd className="mt-0.5 truncate text-sm tabular-nums">{value}</dd>
-    {hint && <dd className="truncate text-[11px] text-muted-foreground">{hint}</dd>}
-  </div>;
-}
-
 export function Meter({ value, tone = 'info', label }: { value: number; tone?: Tone; label: string }) {
   const width = Math.max(0, Math.min(1, value)) * 100;
   return <div role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(width)} className="h-1.5 w-full overflow-hidden rounded-full bg-muted">

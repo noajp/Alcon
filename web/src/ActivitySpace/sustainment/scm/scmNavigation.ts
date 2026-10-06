@@ -5,17 +5,17 @@ import type { ScmData } from '@/hooks/useScm';
 import type { ScmNode, ScmPlan } from './scmEngine';
 
 /** The SCM App's panes — its views, shown as tabs. */
-export type ScmView = 'tower' | 'location' | 'exceptions' | 'replenish' | 'orders' | 'inventory' | 'ledger' | 'suppliers' | 'scenarios' | 'settings';
+export type ScmView = 'tower' | 'exceptions' | 'replenish' | 'orders' | 'inventory' | 'locations' | 'ledger' | 'suppliers' | 'scenarios' | 'settings';
 
-export const SCM_VIEWS: readonly ScmView[] = ['tower', 'location', 'exceptions', 'replenish', 'orders', 'inventory', 'ledger', 'suppliers', 'scenarios', 'settings'];
+const SCM_VIEWS: readonly ScmView[] = ['tower', 'exceptions', 'replenish', 'orders', 'inventory', 'locations', 'ledger', 'suppliers', 'scenarios', 'settings'];
 
-/** The whole supply's tabs, and a location's. Suppliers and Orders are places
- *  of their own in the sidebar; settings is a dialog. */
-export const ROOT_VIEWS: readonly ScmView[] = ['tower', 'exceptions', 'replenish', 'inventory', 'ledger', 'scenarios'];
-export const LOCATION_VIEWS: readonly ScmView[] = ['location', 'inventory', 'orders', 'ledger'];
+/** The scope overview's tabs: the tower, then the readings of the whole supply.
+ *  Needs attention, Orders, Items, Suppliers and Locations are places of their
+ *  own in the sidebar; settings is a dialog. */
+export const ROOT_VIEWS: readonly ScmView[] = ['tower', 'replenish', 'ledger', 'scenarios'];
 
 export const SCM_VIEW_LABEL: Record<ScmView, string> = {
-  tower: 'Control tower', location: 'Location', exceptions: 'Exceptions', replenish: 'Replenishment', orders: 'Purchase orders',
+  tower: 'Control tower', exceptions: 'Needs attention', locations: 'Locations', replenish: 'Replenishment', orders: 'Purchase orders',
   inventory: 'Inventory', ledger: 'Stock ledger', suppliers: 'Suppliers', scenarios: 'Scenarios', settings: 'Planning settings',
 };
 
@@ -25,15 +25,15 @@ export function scmViewOf(navigation: NavigationState): ScmView {
 
 /** The panes' icons — the same on the tabs and anywhere a pane is named. */
 export const SCM_VIEW_ICON: Record<ScmView, ComponentType<{ size?: number }>> = {
-  tower: LayoutDashboard, location: MapPin, exceptions: AlertTriangle, replenish: ShoppingCart, orders: Truck,
+  tower: LayoutDashboard, locations: MapPin, exceptions: AlertTriangle, replenish: ShoppingCart, orders: Truck,
   inventory: Boxes, ledger: ScrollText, suppliers: Warehouse, scenarios: FlaskConical, settings: Settings2,
 };
 
 /** What each pane shows, in one line — under its tab and on the Overview. */
 export const SCM_VIEW_DESCRIPTION: Record<ScmView, string> = {
   tower: 'What runs out, what to order, and what the autopilot did.',
-  location: 'What this location holds, what runs out here, and what is on its way.',
-  exceptions: 'Items that need a decision, soonest first.',
+  locations: 'Every location, with what it holds and what is at risk there.',
+  exceptions: 'Orders awaiting approval, late orders, and items that run out — soonest first.',
   replenish: 'Orders the planner proposes, with the evidence for each line.',
   orders: 'Every purchase order, from draft to received.',
   inventory: 'Stock, demand and cover for every item at every location.',
