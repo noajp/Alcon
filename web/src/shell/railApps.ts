@@ -40,7 +40,7 @@ export const MODE_META: Record<RailMode, ModeMeta> = {
   workload:  { label: 'Workload',  icon: NavWorkloadIcon, defaultView: 'workload', views: ['workload'] },
   notebook:  { label: 'Notebook',  icon: NavNoteIcon, defaultView: 'note', views: ['note'] },
   tables:    { label: 'Table',     icon: NavTableIcon, defaultView: 'tables', views: ['tables'] },
-  team:      { label: 'Team',      icon: NavTeamsIcon, defaultView: 'team', views: ['team'] },
+  team:      { label: 'People',    icon: NavTeamsIcon, defaultView: 'team', views: ['team'] },
   calendar:  { label: 'Calendar',  icon: NavCalendarIcon, defaultView: 'calendar', views: ['calendar', 'schedule'] },
   crm:       { label: 'CRM',       icon: NavCrmIcon, defaultView: 'crm', views: ['crm'] },
   scm:       { label: 'SCM',       icon: NavScmIcon, defaultView: 'scm', views: ['scm'] },

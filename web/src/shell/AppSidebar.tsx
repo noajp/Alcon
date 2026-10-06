@@ -531,7 +531,7 @@ export function AppSidebar({
           {railMode === 'inbox' && <InboxList onNavigate={onNavigate} onViewChange={onViewChange} onOpen={() => onViewChange('inbox')} />}
           {/* ── Calendar ── today, a mini month that moves the grid, and who is shown. */}
           {railMode === 'calendar' && <><SidebarModeLabel label={t('Calendar')} /><CalendarSidebar /></>}
-          {railMode === 'team' && <SidebarModeLabel label={t('Team')} />}
+          {railMode === 'team' && <SidebarModeLabel label={t('People')} />}
           {railMode === 'crm' && <CrmSidebar navigation={navigation} onNavigate={onNavigate} />}
           {railMode === 'scm' && <ScmSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'scm') onViewChange('scm'); }} />}
           </>

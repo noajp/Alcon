@@ -600,6 +600,31 @@ export interface WorkerAvailabilityUpdate {
   updated_at?: string
 }
 
+// =====================================================
+// Worker skills — what a Worker (human or AI agent) knows, at a declared
+// level, backed by their own done Elements as evidence. A skill is as visible
+// as its Worker; an evidence row only to those who can see its Element.
+// =====================================================
+
+/** 1 Learning · 2 Capable · 3 Proficient · 4 Expert */
+export type WorkerSkillLevel = 1 | 2 | 3 | 4
+
+export interface WorkerSkill {
+  id: string
+  worker_id: string
+  name: string
+  level: WorkerSkillLevel
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkerSkillEvidence {
+  skill_id: string
+  element_id: string
+  created_at: string
+}
+
 export interface WorkerInsert {
   id?: string
   object_id?: string | null
