@@ -47,7 +47,7 @@ export function WidgetZone({
 
   const { setNodeRef, isOver } = useDroppable({ id: zoneDroppableId(zone), data: { zone } });
 
-  const gapClass = zone === 'rail' ? 'space-y-6' : zone === 'band' ? 'space-y-2' : 'space-y-6';
+  const gapClass = zone === 'rail' ? 'space-y-4' : zone === 'band' ? 'space-y-2' : 'space-y-6';
 
   // Empty and idle, a zone takes no space at all — the + that fills it lives
   // on the surface. While arranging it becomes a visible drop target, so a

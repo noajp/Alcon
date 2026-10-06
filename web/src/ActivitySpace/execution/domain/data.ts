@@ -50,6 +50,25 @@ export async function updateDomain(id: string, updates: DomainUpdate): Promise<D
   return data;
 }
 
+export type DomainRole = 'owner' | 'admin' | 'member';
+
+/** The viewer's own seat in a Domain. It answers the question RLS answers on
+ *  write — owner and admin may change the Domain — so a page can show an
+ *  editable field only to someone the database would let save it. */
+export function useDomainRole(domainId: string | null) {
+  const userId = useCurrentUserId();
+  return useQuery({
+    queryKey: ['domain-role', userId, domainId],
+    enabled: Boolean(userId && domainId),
+    staleTime: 60_000,
+    queryFn: async (): Promise<DomainRole | null> => {
+      const { data, error } = await supabase.from('domain_members').select('role').eq('domain_id', domainId!).eq('user_id', userId!).maybeSingle();
+      if (error) throw error;
+      return (data?.role as DomainRole | undefined) ?? null;
+    },
+  });
+}
+
 // Persist a new Domain ordering. Caller passes the full list with its
 // desired 0..N order_index; we write them all in parallel. Mirrors
 // reorderObjects but for the sidebar Domain list.
