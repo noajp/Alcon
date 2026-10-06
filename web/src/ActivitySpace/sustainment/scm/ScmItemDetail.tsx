@@ -1,13 +1,18 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ArrowLeft, ArrowLeftRight, MessageSquare, Pencil, ShoppingCart, SquarePen } from 'lucide-react';
+import { ArrowLeftRight, MessageSquare, Pencil, ShoppingCart, SquarePen } from 'lucide-react';
 import { Area, Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { addDays, type ScmNode } from './scmEngine';
 import { formatDay, formatMoney, formatQuantity, PO_STATUS_LABEL, signalText } from './scmText';
-import { HealthBadge, Pill, Reading, Section } from './ScmParts';
+import { HealthBadge, Pill, Section } from './ScmParts';
+import { PageHead } from '@/Function/shared/PageHead';
+import { RailCard } from '@/Function/shared/RailCard';
+import { RailRow } from '@/Function/shared/RailRow';
+import { RecordPage } from '@/Function/shared/tool/RecordPage';
+import { ScmIcon } from '@/Function/shared/conceptIcons';
 import { useScmSurface } from './scmSurface';
 import { nodeOrderLines } from './ScmForms';
 
@@ -15,8 +20,9 @@ const METHOD_LABEL = { holt_weekly: 'Trend + weekly pattern', holt: 'Trend', bas
 const AXIS = { fontSize: 11, fill: 'var(--muted-foreground)' };
 const TOOLTIP = { background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 };
 
-/** One item at one location: where its stock is heading, why the plan says what it says. */
-export function ScmItemDetail({ node, onBack }: { node: ScmNode; onBack: () => void }) {
+/** One item at one location, as a page: where its stock is heading, why the
+ *  plan says what it says. Its readings sit on the right as the Properties. */
+export function ScmItemPage({ node, onBack, onOpenLocation }: { node: ScmNode; onBack: () => void; onOpenLocation: () => void }) {
   const { t, locale } = useI18n();
   const { plan, data, go, openNode, openOrder, openDialog, askCopilot, locationName, supplierName } = useScmSurface();
   const item = data.items.find(entry => entry.id === node.itemId) ?? null;
@@ -42,23 +48,38 @@ export function ScmItemDetail({ node, onBack }: { node: ScmNode; onBack: () => v
   const promised = item?.leadTimeDays ?? data.suppliers.find(supplier => supplier.id === node.supplierId)?.leadTimeDays ?? null;
   const z = node.serviceLevel;
 
-  return <div className="space-y-8">
-    <div className="space-y-3">
-      <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft size={14} />{t('Back')}</Button>
-      <div className="flex flex-wrap items-start gap-3">
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-semibold">{node.name}</h2><HealthBadge health={node.health} />{node.abc && <Pill tone="muted">{t('Class {c}', { c: `${node.abc}${node.xyz ?? ''}` })}</Pill>}</div>
-          <p className="text-sm text-muted-foreground">{node.sku}{node.category ? ` · ${node.category}` : ''} · {supplierName(node.supplierId)}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="ghost" onClick={() => askCopilot(t('Explain the stock plan for {sku} {name} at {location}: is the forecast credible, is the safety stock right, and what should I do now?', { sku: node.sku, name: node.name, location: locationName(node.locationId) }))}><MessageSquare size={14} />{t('Ask AI')}</Button>
-          <Button size="sm" variant="ghost" onClick={() => openDialog({ kind: 'movement', initial: { itemId: node.itemId, locationId: node.locationId } })}><SquarePen size={14} />{t('Record movement')}</Button>
-          {item && <Button size="sm" variant="ghost" onClick={() => openDialog({ kind: 'item', item })}><Pencil size={14} />{t('Edit')}</Button>}
-          {node.transferFrom && <Button size="sm" variant="secondary" onClick={() => openDialog({ kind: 'movement', initial: { mode: 'transfer', itemId: node.itemId, locationId: node.transferFrom!.locationId, toLocationId: node.locationId, quantity: node.transferFrom!.quantity } })}><ArrowLeftRight size={14} />{t('Transfer {n}', { n: node.transferFrom.quantity })}</Button>}
-          {node.supplierId && <Button size="sm" variant="primary" onClick={() => openDialog({ kind: 'new-order', initial: { supplierId: node.supplierId!, locationId: node.locationId, lines: nodeOrderLines(node) } })}><ShoppingCart size={14} />{t('Order')}</Button>}
-        </div>
-      </div>
-      {siblings.length > 1 && <div className="flex flex-wrap gap-1">{siblings.map(entry => <Button key={entry.key} shape="tab" size="sm" variant={entry.key === node.key ? 'secondary' : 'ghost'} aria-pressed={entry.key === node.key} onClick={() => openNode(entry.key)}>
+  const rail = <>
+    <RailCard title={t('Properties')}>
+      <RailRow name={t('Health')} dense label={<HealthBadge health={node.health} />} />
+      <RailRow name={t('On hand')} dense label={`${q(node.onHand)} ${node.unit}`} />
+      <RailRow name={t('Incoming')} dense label={node.inDraft ? `${q(node.onOrder)} (+${q(node.inDraft)})` : q(node.onOrder)} placeholder={!node.onOrder} />
+      <RailRow name={t('On-hand cover (days)')} dense label={node.daysOfCover === null ? '—' : q(node.daysOfCover, 0)} placeholder={node.daysOfCover === null} />
+      <RailRow name={t('Runs out')} dense label={node.stockoutDay ? formatDay(node.stockoutDay, locale) : t('No stockout in {n} days', { n: data.policy.horizonDays })} placeholder={!node.stockoutDay} />
+      <RailRow name={t('Reorder point')} dense label={q(node.reorderPoint, 0)} />
+      <RailRow name={t('Order-up-to')} dense label={q(node.orderUpTo, 0)} />
+      <RailRow name={t('Safety stock')} dense label={q(node.safetyStock, 0)} />
+      <RailRow name={t('Suggested order')} dense label={node.suggestedQuantity ? `${q(node.suggestedQuantity)} · ${formatMoney(node.suggestedValue, node.currency, locale)}` : '—'} placeholder={!node.suggestedQuantity} />
+      <div className="mx-2 my-2 h-px bg-[var(--border-subtle)]" />
+      <button type="button" className="w-full" onClick={onOpenLocation}><RailRow name={t('Location')} dense label={locationName(node.locationId)} /></button>
+      <RailRow name={t('Supplier')} dense label={supplierName(node.supplierId)} placeholder={!node.supplierId} />
+      <RailRow name={t('Lead time')} dense label={t('{n} days', { n: q(node.leadTime) })} />
+      {node.abc && <RailRow name={t('Class')} dense label={`${node.abc}${node.xyz ?? ''}`} />}
+      <RailRow name={t('Inventory value')} dense label={formatMoney(node.inventoryValue, node.currency, locale)} />
+    </RailCard>
+  </>;
+
+  return <RecordPage icon={ScmIcon} crumbs={[{ label: locationName(node.locationId), onClick: onOpenLocation }, { label: node.name }]} onBack={onBack} rail={rail}
+    actions={<>
+      <Button size="sm" variant="ghost" onClick={() => askCopilot(t('Explain the stock plan for {sku} {name} at {location}: is the forecast credible, is the safety stock right, and what should I do now?', { sku: node.sku, name: node.name, location: locationName(node.locationId) }))}><MessageSquare size={14} />{t('Ask AI')}</Button>
+      <Button size="sm" variant="ghost" onClick={() => openDialog({ kind: 'movement', initial: { itemId: node.itemId, locationId: node.locationId } })}><SquarePen size={14} />{t('Record movement')}</Button>
+      {item && <Button size="sm" variant="ghost" onClick={() => openDialog({ kind: 'item', item })}><Pencil size={14} />{t('Edit')}</Button>}
+      {node.transferFrom && <Button size="sm" variant="secondary" onClick={() => openDialog({ kind: 'movement', initial: { mode: 'transfer', itemId: node.itemId, locationId: node.transferFrom!.locationId, toLocationId: node.locationId, quantity: node.transferFrom!.quantity } })}><ArrowLeftRight size={14} />{t('Transfer {n}', { n: node.transferFrom.quantity })}</Button>}
+      {node.supplierId && <Button size="sm" variant="primary" onClick={() => openDialog({ kind: 'new-order', initial: { supplierId: node.supplierId!, locationId: node.locationId, lines: nodeOrderLines(node) } })}><ShoppingCart size={14} />{t('Order')}</Button>}
+    </>}>
+    <div>
+      <PageHead icon={<ScmIcon size={18} />} title={node.name} description={`${node.sku}${node.category ? ` · ${node.category}` : ''} · ${supplierName(node.supplierId)}`}
+        canEdit={false} titleLabel={t('Item')} titlePlaceholder="" descriptionLabel="" descriptionPlaceholder="" onSaveTitle={() => {}} />
+      {siblings.length > 1 && <div className="mt-4 flex flex-wrap gap-1">{siblings.map(entry => <Button key={entry.key} shape="tab" size="sm" variant={entry.key === node.key ? 'secondary' : 'ghost'} aria-pressed={entry.key === node.key} onClick={() => openNode(entry.key)}>
         {locationName(entry.locationId)}<span className="text-xs tabular-nums text-muted-foreground">{q(entry.onHand)}</span>
       </Button>)}</div>}
     </div>
@@ -67,15 +88,6 @@ export function ScmItemDetail({ node, onBack }: { node: ScmNode; onBack: () => v
       <Pill tone={signal.severity === 'high' ? 'danger' : signal.severity === 'medium' ? 'warning' : 'muted'}>{t(signal.severity === 'high' ? 'Act now' : signal.severity === 'medium' ? 'Plan' : 'Watch')}</Pill>
       <span className="leading-relaxed">{signalText(signal, t, locale, node.currency)}</span>
     </li>)}</ul>}
-
-    <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-      <Reading label={t('On hand')} value={`${q(node.onHand)} ${node.unit}`} hint={formatMoney(node.inventoryValue, node.currency, locale)} />
-      <Reading label={t('Incoming')} value={q(node.onOrder)} hint={node.inDraft ? t('+{n} in drafts', { n: q(node.inDraft) }) : undefined} />
-      <Reading label={t('On-hand cover (days)')} value={node.daysOfCover === null ? '—' : q(node.daysOfCover, 0)} hint={node.stockoutDay ? t('Runs out {day}', { day: formatDay(node.stockoutDay, locale) }) : t('No stockout in {n} days', { n: data.policy.horizonDays })} />
-      <Reading label={t('Reorder point')} value={q(node.reorderPoint, 0)} hint={t('Order up to {n}', { n: q(node.orderUpTo, 0) })} />
-      <Reading label={t('Safety stock')} value={q(node.safetyStock, 0)} hint={t('{n}% service level', { n: Math.round(z * 1000) / 10 })} />
-      <Reading label={t('Suggested order')} value={node.suggestedQuantity ? q(node.suggestedQuantity) : '—'} hint={node.suggestedQuantity ? formatMoney(node.suggestedValue, node.currency, locale) : undefined} />
-    </dl>
 
     <Section title={t('Stock projection')} description={t('Solid: only the orders already placed. Dashed: following the plan, with every proposed and future order on time. Bars: arrivals.')}>
       <div className="h-64 w-full">
@@ -142,5 +154,5 @@ export function ScmItemDetail({ node, onBack }: { node: ScmNode; onBack: () => v
         </button></li>;
       })}</ul> : <p className="text-sm text-muted-foreground">{t('No orders for this item here yet.')}</p>}
     </Section>
-  </div>;
+  </RecordPage>;
 }

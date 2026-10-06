@@ -13,6 +13,8 @@ export interface NavigationState {
   scmLocationId?: string | null;
   scmNode?: string | null;
   scmOrderId?: string | null;
+  /** The supplier open as a page. */
+  scmSupplierId?: string | null;
   /** Inventory filtered to one stock health, when opened from a health count. */
   scmHealth?: ScmHealth | null;
   /** Scenarios opened from a supplier, pre-set to simulate its delay. */

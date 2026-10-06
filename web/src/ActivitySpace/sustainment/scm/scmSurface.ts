@@ -35,6 +35,7 @@ export interface ScmSurface {
   go: (view: ScmView, extra?: Partial<NavigationState>) => void;
   openNode: (key: string) => void;
   openOrder: (id: string) => void;
+  openSupplier: (id: string) => void;
   openDialog: (dialog: ScmDialog) => void;
   askCopilot: (prompt: string) => void;
   locationName: (id: string) => string;

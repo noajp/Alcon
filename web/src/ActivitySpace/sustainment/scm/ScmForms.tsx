@@ -9,8 +9,8 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { ScmActions, ScmData, ScmItemDraft, ScmSupplierDraft } from '@/hooks/useScm';
 import { addDays, type ScmItem, type ScmNode, type ScmPoStatus } from './scmEngine';
-import { daysFrom, formatDay, formatMoney, formatQuantity, PO_STATUS_LABEL } from './scmText';
-import { Pill, ScmDomainSelect, SCM_INPUT, SCM_LABEL } from './ScmParts';
+import { formatMoney, formatQuantity } from './scmText';
+import { ScmDomainSelect, SCM_INPUT, SCM_LABEL } from './ScmParts';
 import { useScmSurface } from './scmSurface';
 import { servesLocation } from './scmScope';
 
@@ -312,7 +312,9 @@ export function NewOrderDialog({ data, actions, onClose, initial }: {
 }
 
 /** One purchase order: what was ordered and received, its next step, and receiving. */
-export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { data: ScmData; actions: ScmActions; orderId: string; onClose: () => void; onOpenNode: (key: string) => void }) {
+/** A purchase order's document — its lines, receipt and status verbs. The
+ *  page around it (breadcrumb, Properties) is ScmOrderPage in ScmView. */
+export function OrderBody({ data, actions, orderId, onClose, onOpenNode }: { data: ScmData; actions: ScmActions; orderId: string; onClose: () => void; onOpenNode: (key: string) => void }) {
   const { t, locale } = useI18n();
   const order = data.orders.find(entry => entry.id === orderId);
   const [busy, setBusy] = useState(false);
@@ -324,11 +326,9 @@ export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { d
   const [editing, setEditing] = useState<Record<string, string> | null>(null);
   const [adding, setAdding] = useState<{ itemId: string; quantity: string }[]>([]);
   if (!order) return null;
-  const supplier = data.suppliers.find(entry => entry.id === order.supplierId);
   const location = data.locations.find(entry => entry.id === order.locationId);
   const total = order.lines.reduce((sum, line) => sum + line.quantity * line.unitCost, 0);
   const open = ['approved', 'sent', 'partial'].includes(order.status);
-  const overdue = open && order.expectedOn < data.today;
   const editable = order.status === 'draft' || open;
   /** Items that can still be added: not on the order and not picked in another new row. */
   const addableFor = (index: number) => data.items.filter(item => item.active && servesLocation(item.domainId, location?.domainId) && !order.lines.some(line => line.itemId === item.id)
@@ -353,16 +353,8 @@ export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { d
     try { await work(); if (close) onClose(); } catch (cause) { setError(t(cause instanceof Error ? cause.message : String(cause))); } finally { setBusy(false); }
   }
 
-  return <FormDialog title={`PO-${order.number} · ${supplier?.name ?? ''}`} onClose={onClose} busy={busy} wide>
+  return <div className="max-w-3xl">
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <Pill tone={order.status === 'draft' ? 'warning' : order.status === 'cancelled' ? 'muted' : order.status === 'received' ? 'success' : overdue ? 'danger' : 'info'}>{overdue ? t('Overdue') : t(PO_STATUS_LABEL[order.status])}</Pill>
-        {order.source !== 'human' && <Pill tone="info">{order.source === 'copilot' ? 'Copilot' : t('Autopilot')}</Pill>}
-        <span>{t('To {location}', { location: location?.name ?? '' })}</span>
-        <span>· {t('Ordered {day}', { day: formatDay(order.orderedOn, locale) })}</span>
-        <span>· {order.status === 'received' && order.receivedOn ? t('Received {day}', { day: formatDay(order.receivedOn, locale) }) : t('Expected {day}', { day: formatDay(order.expectedOn, locale) })}</span>
-        {overdue && <span className="text-[var(--status-danger)]">({t('{n} days late', { n: -daysFrom(data.today, order.expectedOn) })})</span>}
-      </div>
       {order.rationale && <p className="whitespace-pre-line rounded-md bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">{order.rationale}</p>}
       <table className="w-full text-sm">
         <thead className="text-left text-xs text-muted-foreground"><tr>
@@ -420,7 +412,7 @@ export function OrderDialog({ data, actions, orderId, onClose, onOpenNode }: { d
         {open && <Button variant="primary" disabled={busy} onClick={() => setReceiving(Object.fromEntries(order.lines.map(line => [line.id, String(Math.max(0, line.quantity - line.receivedQuantity))])))}>{t('Receive')}</Button>}
       </div>}
     </div>
-  </FormDialog>;
+  </div>;
 }
 
 /** The suggested order for one item, or an empty line to fill in when nothing is suggested. */

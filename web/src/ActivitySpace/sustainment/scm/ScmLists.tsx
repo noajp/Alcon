@@ -249,7 +249,7 @@ export function ScmOrders() {
 
 export function ScmSuppliers() {
   const { t, locale } = useI18n();
-  const { plan, data, openDialog, go, domainName } = useScmSurface();
+  const { plan, data, openDialog, openSupplier, domainName } = useScmSurface();
   const records = new Map(data.suppliers.map(supplier => [supplier.id, supplier]));
   return <div className="space-y-4">
     <div className="flex justify-between gap-2">
@@ -260,10 +260,10 @@ export function ScmSuppliers() {
       {plan.suppliers.map(supplier => {
         const record = records.get(supplier.supplierId);
         const tone = supplier.score === null ? 'muted' : supplier.score >= 85 ? 'success' : supplier.score >= 65 ? 'warning' : 'danger';
-        return <article key={supplier.supplierId} className="space-y-3 rounded-lg border border-[var(--border-subtle)] p-4">
+        return <article key={supplier.supplierId} className="space-y-3 rounded-lg border border-[var(--border-subtle)] p-4 transition-colors hover:border-[var(--border-strong)]">
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
-              <h3 className="truncate text-sm font-semibold">{supplier.name}</h3>
+              <button type="button" className="block max-w-full truncate rounded-sm text-left text-sm font-semibold hover:underline" onClick={() => openSupplier(supplier.supplierId)}>{supplier.name}</button>
               <p className="truncate text-xs text-muted-foreground">{[record?.contact, record?.email].filter(Boolean).join(' · ') || t('No contact recorded')}</p>
               {record?.domainId && <p className="truncate text-xs text-muted-foreground">{domainName(record.domainId)}</p>}
             </div>
@@ -280,9 +280,8 @@ export function ScmSuppliers() {
             ].map(([label, value]) => <div key={label} className="min-w-0"><dt className="truncate text-[11px] text-muted-foreground">{label}</dt><dd className={`truncate text-sm tabular-nums ${label === t('Open orders') && supplier.overdueOrders ? 'text-[var(--status-danger)]' : ''}`}>{value}</dd></div>)}
           </dl>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="ghost" onClick={() => openDialog({ kind: 'supplier', supplierId: supplier.supplierId })}>{t('Edit')}</Button>
+            <Button size="sm" variant="ghost" onClick={() => openSupplier(supplier.supplierId)}>{t('Open')}</Button>
             <Button size="sm" variant="ghost" onClick={() => openDialog({ kind: 'new-order', initial: { supplierId: supplier.supplierId } })}>{t('New order')}</Button>
-            <Button size="sm" variant="ghost" onClick={() => go('scenarios', { scmSupplierDelay: supplier.supplierId })}>{t('Simulate a delay')}</Button>
             <span className="ml-auto self-center text-xs text-muted-foreground">{t('{n} items', { n: supplier.itemCount })}</span>
           </div>
         </article>;

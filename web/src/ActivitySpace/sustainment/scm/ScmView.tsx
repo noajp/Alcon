@@ -1,8 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { Boxes, Check, Layers, MapPin, MoreHorizontal, Plus, RefreshCw, Settings2, Warehouse, Bot } from 'lucide-react';
 import { Button } from '@/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { MenuShell } from '@/Function/shared/menu';
+import { PageHead } from '@/Function/shared/PageHead';
+import { RailCard } from '@/Function/shared/RailCard';
+import { RailRow } from '@/Function/shared/RailRow';
+import { ToolPage, type ToolView } from '@/Function/shared/tool/ToolPage';
+import { PlacePage } from '@/Function/shared/tool/PlacePage';
+import { RecordPage } from '@/Function/shared/tool/RecordPage';
 import { ScmIcon } from '@/Function/shared/conceptIcons';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -10,31 +19,22 @@ import { askCopilot } from '@/Function/copilot/copilotBridge';
 import { useScmActions, useScmData, useScmPlan } from '@/hooks/useScm';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { ScmProposal } from './scmEngine';
-import { scmScopes, scopeDomain, scopeScmData, SPACE_SCOPE } from './scmScope';
+import { scmScopes, scopeDomain, scopeScmData, supplyDomainIds, SPACE_SCOPE } from './scmScope';
 import type { NavigationState } from '@/types/navigation';
 import { explainProposal } from './scmText';
-import { SCM_VIEW_LABEL, scmViewOf, type ScmView as ScmPane } from './scmNavigation';
+import { LOCATION_VIEWS, ROOT_VIEWS, SCM_VIEW_DESCRIPTION, SCM_VIEW_ICON, SCM_VIEW_LABEL, scmViewCounts, scmViewOf, type ScmView as ScmPane } from './scmNavigation';
+import { Pill, ScmViewBadge } from './ScmParts';
 import { ScmSurfaceContext, type ScmDialog, type ScmSurface } from './scmSurface';
-import { ItemDialog, MovementDialog, NewOrderDialog, OrderDialog, SupplierDialog } from './ScmForms';
+import { ItemDialog, MovementDialog, NewOrderDialog, OrderBody, SupplierDialog } from './ScmForms';
 import { ScmTower } from './ScmTower';
 import { ScmExceptions, ScmInventory, ScmOrders, ScmSuppliers } from './ScmLists';
 import { ScmReplenish } from './ScmReplenish';
-import { ScmItemDetail } from './ScmItemDetail';
+import { ScmItemPage } from './ScmItemDetail';
+import { ScmSupplierPage } from './ScmSupplierPage';
+import { formatDay, formatMoney, PO_STATUS_LABEL } from './scmText';
 import { ScmScenarios } from './ScmScenarios';
 import { ScmLedger } from './ScmLedger';
 import { ScmDataSection, ScmImport, ScmLocations, ScmOnboarding, ScmPolicyForm } from './ScmSettings';
-
-const DESCRIPTION: Record<ScmPane, string> = {
-  tower: 'What runs out, what to order, and what the autopilot did.',
-  exceptions: 'Items that need a decision, soonest first.',
-  replenish: 'Orders the planner proposes, with the evidence for each line.',
-  orders: 'Every purchase order, from draft to received.',
-  inventory: 'Stock, demand and cover for every item at every location.',
-  ledger: 'Every receipt, issue, transfer and adjustment, newest first.',
-  suppliers: 'How each supplier really delivers.',
-  scenarios: 'Change an assumption and see what breaks.',
-  settings: 'The policy the planner works within, locations, and data.',
-};
 
 /** Autopilot runs at most once a day, the first time SCM is opened. */
 const AUTOPILOT_INTERVAL_MS = 20 * 60 * 60 * 1000;
@@ -56,15 +56,15 @@ export function ScmView({ navigation, onNavigate }: { navigation: NavigationStat
   const [dialog, setDialog] = useState<ScmDialog | null>(null);
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   const nodes = useMemo(() => plan?.nodes.filter(node => !locationId || node.locationId === locationId) ?? [], [plan, locationId]);
+  // Going to a pane leaves any record page and its filters behind. A pane of
+  // the whole supply (Suppliers, Orders, the tower's own) also leaves the
+  // location; a location's pane keeps it.
   const go = useCallback((next: ScmPane, extra: Partial<NavigationState> = {}) => {
-    onNavigate({ scmView: next, scmNode: null, scmHealth: null, scmSupplierDelay: null, scmLedgerItemId: null, scmCatalog: null, ...extra });
+    const leavesLocation = next === 'suppliers' || next === 'tower' || next === 'settings' || next === 'exceptions' || next === 'replenish' || next === 'scenarios';
+    onNavigate({ scmView: next, scmNode: null, scmOrderId: null, scmSupplierId: null, scmHealth: null, scmSupplierDelay: null, scmLedgerItemId: null, scmCatalog: null, ...(leavesLocation ? { scmLocationId: null } : {}), ...extra });
   }, [onNavigate]);
-  // A new pane or item starts at the top.
-  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [view, navigation.scmNode]);
-
   /** The proposals of each scope the autopilot claims separately: the
    * Space-wide locations, and each Domain's. */
   const proposalsByScope = useCallback((proposals: ScmProposal[]) => {
@@ -129,8 +129,9 @@ export function ScmView({ navigation, onNavigate }: { navigation: NavigationStat
   const surface = useMemo<ScmSurface | null>(() => data && plan ? {
     data, plan, actions, locationId, nodes, go,
     scope, scopeDomainId: scopeDomain(scope) ?? null, domains, domainName,
-    openNode: key => onNavigate({ scmNode: key }),
-    openOrder: id => onNavigate({ scmOrderId: id }),
+    openNode: key => onNavigate({ scmNode: key, scmOrderId: null, scmSupplierId: null }),
+    openOrder: id => onNavigate({ scmOrderId: id, scmNode: null, scmSupplierId: null }),
+    openSupplier: id => onNavigate({ scmSupplierId: id, scmNode: null, scmOrderId: null }),
     openDialog: setDialog,
     askCopilot: text => askCopilot({ text, viewLabel: `SCM › ${t(SCM_VIEW_LABEL[view])}`, spaceId: data.spaceId }),
     locationName: id => data.locations.find(location => location.id === id)?.name ?? '—',
@@ -143,46 +144,173 @@ export function ScmView({ navigation, onNavigate }: { navigation: NavigationStat
 
   const empty = !data.items.length;
   const node = navigation.scmNode ? plan.nodes.find(entry => entry.key === navigation.scmNode) ?? null : null;
-
-  return <ScmSurfaceContext.Provider value={surface}>
-    <div ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto bg-card">
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
-        {!node && <header className="flex flex-wrap items-end justify-between gap-3">
-          <div className="min-w-0 space-y-1.5">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground"><ScmIcon size={16} />SCM{scopeLabel && <> · {scopeLabel}</>}{locationId && <> · {surface.locationName(locationId)}</>}</div>
-            <h1 className="text-2xl font-semibold">{empty ? t('Supply chain') : t(SCM_VIEW_LABEL[view])}</h1>
-            {!empty && <p className="text-sm text-muted-foreground">{t(DESCRIPTION[view])}</p>}
-          </div>
-          {!empty && <Button variant="ghost" size="icon-sm" aria-label={t('Refresh')} onClick={() => void refetch()}><RefreshCw size={14} /></Button>}
-        </header>}
-        {runError && <p role="alert" className="text-sm text-destructive">{runError}</p>}
-        {empty ? <ScmOnboarding data={data} actions={actions} onAddItem={() => setDialog({ kind: 'item', item: null })} />
-          : node ? <ScmItemDetail key={node.key} node={node} onBack={() => onNavigate({ scmNode: null })} />
-          : navigation.scmNode ? <div className="space-y-3 py-12 text-center"><p className="text-sm text-muted-foreground">{t('This item is no longer planned here.')}</p><Button onClick={() => onNavigate({ scmNode: null })}>{t('Back')}</Button></div>
-          : <>
-            {view === 'tower' && <ScmTower running={running} onRunPlanner={() => void runPlanner('manual')} />}
-            {view === 'exceptions' && <ScmExceptions />}
-            {view === 'replenish' && <ScmReplenish running={running} onRunPlanner={() => void runPlanner('manual')} />}
-            {view === 'orders' && <ScmOrders />}
-            {view === 'inventory' && <ScmInventory health={navigation.scmHealth ?? null} onHealth={health => onNavigate({ scmHealth: health })} catalog={!!navigation.scmCatalog} onCatalog={catalog => onNavigate({ scmCatalog: catalog })} />}
-            {view === 'ledger' && <ScmLedger itemId={navigation.scmLedgerItemId ?? null} onItem={itemId => onNavigate({ scmLedgerItemId: itemId })} />}
-            {view === 'suppliers' && <ScmSuppliers />}
-            {view === 'scenarios' && <ScmScenarios key={navigation.scmSupplierDelay ?? 'none'} supplierDelay={navigation.scmSupplierDelay ?? null} />}
-            {view === 'settings' && <div className="space-y-12">
-              <ScmPolicyForm key={`${data.spaceId}:${data.hasPolicy}`} data={data} actions={actions} />
-              <ScmLocations key={scope ?? 'all'} data={data} actions={actions} />
-              <ScmImport data={data} actions={actions} />
-              <ScmDataSection data={data} actions={actions} />
-            </div>}
-          </>}
+  const order = navigation.scmOrderId ? data.orders.find(entry => entry.id === navigation.scmOrderId) ?? null : null;
+  const location = locationId ? data.locations.find(entry => entry.id === locationId) ?? null : null;
+  const counts = scmViewCounts(data, plan, nodes, locationId);
+  const muted = 'size-3.5 text-muted-foreground';
+  const tabsFor = (ids: readonly ScmPane[]) => ids.map((id): ToolView => ({
+    id, label: id === 'tower' || id === 'location' ? 'Overview' : SCM_VIEW_LABEL[id], icon: SCM_VIEW_ICON[id],
+    description: SCM_VIEW_DESCRIPTION[id], badge: <ScmViewBadge view={id} counts={counts} />,
+  }));
+  const settingsDialog = view === 'settings' && <Dialog open onOpenChange={open => { if (!open) go('tower', { scmLocationId: locationId }); }}>
+    <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+      <DialogTitle>{t('Planning settings')}</DialogTitle>
+      <DialogDescription>{t('Planning settings for the policy, locations and data.')}</DialogDescription>
+      <div className="space-y-10">
+        <ScmPolicyForm key={`${data.spaceId}:${data.hasPolicy}`} data={data} actions={actions} />
+        <ScmLocations key={scope ?? 'all'} data={data} actions={actions} />
+        <ScmImport data={data} actions={actions} />
+        <ScmDataSection data={data} actions={actions} />
       </div>
-    </div>
+    </DialogContent>
+  </Dialog>;
+  const dialogs = <>
+    {settingsDialog}
     {dialog?.kind === 'item' && <ItemDialog data={data} actions={actions} item={dialog.item} onClose={() => setDialog(null)} />}
     {dialog?.kind === 'supplier' && <SupplierDialog data={data} actions={actions} supplierId={dialog.supplierId} onClose={() => setDialog(null)} />}
     {dialog?.kind === 'movement' && <MovementDialog data={data} actions={actions} initial={dialog.initial} onClose={() => setDialog(null)} />}
     {dialog?.kind === 'new-order' && <NewOrderDialog data={data} actions={actions} initial={dialog.initial} onClose={() => setDialog(null)} />}
-    {navigation.scmOrderId && <OrderDialog key={navigation.scmOrderId} data={data} actions={actions} orderId={navigation.scmOrderId} onClose={() => onNavigate({ scmOrderId: null })}
-      onOpenNode={key => onNavigate({ scmOrderId: null, scmNode: key })} />}
+  </>;
+  const moreMenu = <DropdownMenu>
+    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label={t('More')}><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
+    <MenuShell as="dropdown" align="end">
+      <DropdownMenuItem className="gap-2" onSelect={() => void refetch()}><RefreshCw size={12} />{t('Refresh')}</DropdownMenuItem>
+      <DropdownMenuItem className="gap-2" onSelect={() => onNavigate({ scmView: 'settings' })}><Settings2 size={12} />{t('Planning settings')}</DropdownMenuItem>
+    </MenuShell>
+  </DropdownMenu>;
+
+  // ── A record's page ─────────────────────────────────────────────────
+  if (node || navigation.scmNode) return <ScmSurfaceContext.Provider value={surface}>
+    {node ? <ScmItemPage key={node.key} node={node} onBack={() => onNavigate({ scmNode: null })}
+      onOpenLocation={() => onNavigate({ scmNode: null, scmLocationId: node.locationId, scmView: 'location' })} />
+      : <PlacePage icon={ScmIcon} title={t('Inventory')}><div className="space-y-3 py-12 text-center"><p className="text-sm text-muted-foreground">{t('This item is no longer planned here.')}</p><Button onClick={() => onNavigate({ scmNode: null })}>{t('Back')}</Button></div></PlacePage>}
+    {dialogs}
+  </ScmSurfaceContext.Provider>;
+  if (order) {
+    const openStatus = ['approved', 'sent', 'partial'].includes(order.status);
+    const overdue = openStatus && order.expectedOn < data.today;
+    const total = order.lines.reduce((sum, line) => sum + line.quantity * line.unitCost, 0);
+    return <ScmSurfaceContext.Provider value={surface}>
+      <RecordPage icon={ScmIcon} crumbs={[{ label: t('Purchase orders'), onClick: () => go('orders') }, { label: `PO-${order.number}` }]} onBack={() => onNavigate({ scmOrderId: null })}
+        rail={<RailCard title={t('Properties')}>
+          <RailRow name={t('Status')} dense label={<Pill tone={order.status === 'draft' ? 'warning' : order.status === 'cancelled' ? 'muted' : order.status === 'received' ? 'success' : overdue ? 'danger' : 'info'}>{overdue ? t('Overdue') : t(PO_STATUS_LABEL[order.status])}</Pill>} />
+          <button type="button" className="w-full" onClick={() => surface.openSupplier(order.supplierId)}><RailRow name={t('Supplier')} dense label={surface.supplierName(order.supplierId)} /></button>
+          <button type="button" className="w-full" onClick={() => onNavigate({ scmOrderId: null, scmLocationId: order.locationId, scmView: 'location' })}><RailRow name={t('Deliver to')} dense label={surface.locationName(order.locationId)} /></button>
+          <RailRow name={t('Ordered')} dense label={formatDay(order.orderedOn, locale)} />
+          <RailRow name={order.status === 'received' ? t('Received') : t('Expected')} dense label={<span className={overdue ? 'text-[var(--status-danger)]' : undefined}>{formatDay(order.status === 'received' && order.receivedOn ? order.receivedOn : order.expectedOn, locale)}</span>} />
+          <RailRow name={t('Lines')} dense label={String(order.lines.length)} />
+          <RailRow name={t('Value')} dense label={formatMoney(total, order.currency, locale)} />
+          <RailRow name={t('Source')} dense label={order.source === 'human' ? t('Person') : order.source === 'copilot' ? 'Copilot' : t('Autopilot')} />
+        </RailCard>}>
+        <PageHead icon={<ScmIcon size={18} />} title={`PO-${order.number} · ${surface.supplierName(order.supplierId)}`} description={t('To {location}', { location: surface.locationName(order.locationId) })}
+          canEdit={false} titleLabel={t('Order')} titlePlaceholder="" descriptionLabel="" descriptionPlaceholder="" onSaveTitle={() => {}} />
+        <OrderBody key={order.id} data={data} actions={actions} orderId={order.id} onClose={() => onNavigate({ scmOrderId: null })} onOpenNode={key => onNavigate({ scmOrderId: null, scmNode: key })} />
+      </RecordPage>
+      {dialogs}
+    </ScmSurfaceContext.Provider>;
+  }
+  if (navigation.scmSupplierId) return <ScmSurfaceContext.Provider value={surface}>
+    <ScmSupplierPage key={navigation.scmSupplierId} supplierId={navigation.scmSupplierId} onBack={() => onNavigate({ scmSupplierId: null })} onOpenSuppliers={() => go('suppliers')} />
+    {dialogs}
+  </ScmSurfaceContext.Provider>;
+
+  // ── The places beside the locations ─────────────────────────────────
+  if (view === 'suppliers') return <ScmSurfaceContext.Provider value={surface}>
+    <PlacePage icon={ScmIcon} title={t('Suppliers')} actions={<Button size="sm" variant="secondary" onClick={() => setDialog({ kind: 'supplier', supplierId: null })}><Plus size={14} />{t('Add supplier')}</Button>}>
+      <ScmSuppliers />
+    </PlacePage>
+    {dialogs}
+  </ScmSurfaceContext.Provider>;
+  if (view === 'orders' && !location) return <ScmSurfaceContext.Provider value={surface}>
+    <PlacePage icon={ScmIcon} title={t('Purchase orders')}><ScmOrders /></PlacePage>
+    {dialogs}
+  </ScmSurfaceContext.Provider>;
+
+  // ── A location ──────────────────────────────────────────────────────
+  if (location) {
+    const tab = (LOCATION_VIEWS as readonly string[]).includes(view) ? view : 'location';
+    const risk = nodes.filter(entry => entry.health === 'stockout' || entry.health === 'critical').length;
+    const openOrders = data.orders.filter(entry => entry.locationId === location.id && ['approved', 'sent', 'partial'].includes(entry.status)).length;
+    return <ScmSurfaceContext.Provider value={surface}>
+      <ToolPage icon={ScmIcon} tool="SCM" crumb={location.name} storageKey="scm-location" home="location"
+        views={tabsFor(LOCATION_VIEWS)} activeView={tab} onSelectView={id => onNavigate({ scmView: id as ScmPane, scmNode: null, scmOrderId: null, scmHealth: null, scmLedgerItemId: null, scmCatalog: null })}
+        actions={moreMenu}
+        head={<PageHead icon={<ScmIcon size={18} />} title={location.name} description={t(SCM_VIEW_DESCRIPTION.location)} canEdit={false}
+          titleLabel={t('Location')} titlePlaceholder="" descriptionLabel="" descriptionPlaceholder="" onSaveTitle={() => {}} />}
+        properties={<RailCard title={t('Properties')}>
+          {location.code && <RailRow icon={<MapPin className={muted} />} name={t('Code')} dense label={location.code} />}
+          <RailRow icon={<Layers className={muted} />} name={t('Domain')} dense label={domainName(location.domainId) ?? t('Shared by the Space')} placeholder={!location.domainId} />
+          <button type="button" className="w-full" onClick={() => onNavigate({ scmView: 'inventory' })}><RailRow icon={<Boxes className={muted} />} name={t('Items here')} dense label={String(nodes.length)} placeholder={!nodes.length} /></button>
+          <button type="button" className="w-full" onClick={() => onNavigate({ scmView: 'inventory', scmHealth: 'critical' })}><RailRow name={t('At risk')} dense label={<span className={risk ? 'text-[var(--status-danger)]' : undefined}>{risk}</span>} placeholder={!risk} /></button>
+          <button type="button" className="w-full" onClick={() => onNavigate({ scmView: 'orders' })}><RailRow name={t('Open orders')} dense label={String(openOrders)} placeholder={!openOrders} /></button>
+        </RailCard>}
+        scrollKey={locationId}>
+        <div className="space-y-6">
+          {runError && <p role="alert" className="text-sm text-destructive">{runError}</p>}
+          {tab === 'location' && <ScmTower running={running} onRunPlanner={() => void runPlanner('manual')} />}
+          {tab === 'inventory' && <ScmInventory health={navigation.scmHealth ?? null} onHealth={health => onNavigate({ scmHealth: health })} catalog={!!navigation.scmCatalog} onCatalog={catalog => onNavigate({ scmCatalog: catalog })} />}
+          {tab === 'orders' && <ScmOrders />}
+          {tab === 'ledger' && <ScmLedger itemId={navigation.scmLedgerItemId ?? null} onItem={itemId => onNavigate({ scmLedgerItemId: itemId })} />}
+        </div>
+      </ToolPage>
+      {dialogs}
+    </ScmSurfaceContext.Provider>;
+  }
+
+  // ── The whole supply: the control tower ─────────────────────────────
+  const tab = (ROOT_VIEWS as readonly string[]).includes(view) ? view : 'tower';
+  const scopeOptions = (() => {
+    const used = supplyDomainIds(everything ?? data, scope);
+    if (!used.length) return [];
+    const named = used.map(id => ({ id: id as string | null, name: domainName(id) ?? t('Unknown Domain') })).sort((a, b) => a.name.localeCompare(b.name));
+    return [{ id: null as string | null, name: t('Everything') }, { id: SPACE_SCOPE as string | null, name: t('Shared by the Space') }, ...named];
+  })();
+  const properties = !empty && <RailCard title={t('Properties')}>
+    {scopeOptions.length > 0 && <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="w-full" aria-label={t('Whose supply')}><RailRow icon={<Layers className={muted} />} name={t('Whose supply')} label={scopeLabel ?? t('Everything')} placeholder={scope === null} dense /></button>
+      </DropdownMenuTrigger>
+      <MenuShell as="dropdown" align="start">
+        {scopeOptions.map(option => <DropdownMenuItem key={option.id ?? 'all'} className="gap-2" onSelect={() => onNavigate({ scmScope: option.id, scmLocationId: null, scmNode: null })}>
+          <span className="min-w-0 flex-1 truncate">{option.name}</span>{option.id === scope && <Check size={12} />}
+        </DropdownMenuItem>)}
+      </MenuShell>
+    </DropdownMenu>}
+    <button type="button" className="w-full" onClick={() => onNavigate({ scmView: 'settings' })}>
+      <RailRow icon={<Bot className={muted} />} name={t('Autopilot')} dense
+        label={data.policy.autopilotEnabled ? t('On · approves up to {n}', { n: data.policy.autoApproveLimit.toLocaleString() }) : t('Off · proposals only')}
+        placeholder={!data.policy.autopilotEnabled} />
+    </button>
+    <button type="button" className="w-full" onClick={() => onNavigate({ scmView: 'settings' })}>
+      <RailRow icon={<Settings2 className={muted} />} name={t('Service level')} dense label={`${Math.round(data.policy.serviceLevel * 1000) / 10}%`} />
+    </button>
+    <div className="mx-2 my-2 h-px bg-[var(--border-subtle)]" />
+    <RailRow icon={<MapPin className={muted} />} name={t('Locations')} dense label={String(data.locations.length)} placeholder={!data.locations.length} />
+    <button type="button" className="w-full" onClick={() => go('inventory')}><RailRow icon={<Boxes className={muted} />} name={t('Items')} dense label={String(data.items.length)} placeholder={!data.items.length} /></button>
+    <button type="button" className="w-full" onClick={() => go('suppliers')}><RailRow icon={<Warehouse className={muted} />} name={t('Suppliers')} dense label={String(data.suppliers.length)} placeholder={!data.suppliers.length} /></button>
+  </RailCard>;
+
+  return <ScmSurfaceContext.Provider value={surface}>
+    <ToolPage icon={ScmIcon} tool="SCM" crumb={scopeLabel ?? undefined} storageKey="scm-tower" home="tower"
+      views={tabsFor(ROOT_VIEWS)} activeView={tab} onSelectView={id => go(id as ScmPane)}
+      actions={!empty && moreMenu}
+      head={<PageHead icon={<ScmIcon size={18} />} title={scopeLabel ?? t('Supply chain')} description={t(SCM_VIEW_DESCRIPTION.tower)}
+        canEdit={false} titleLabel={t('Supply chain')} titlePlaceholder="" descriptionLabel={t('Description')} descriptionPlaceholder="" onSaveTitle={() => {}} />}
+      properties={properties}>
+      <div className="space-y-6">
+        {runError && <p role="alert" className="text-sm text-destructive">{runError}</p>}
+        {empty ? <ScmOnboarding data={data} actions={actions} onAddItem={() => setDialog({ kind: 'item', item: null })} />
+          : <>
+            {tab === 'tower' && <ScmTower running={running} onRunPlanner={() => void runPlanner('manual')} />}
+            {tab === 'exceptions' && <ScmExceptions />}
+            {tab === 'replenish' && <ScmReplenish running={running} onRunPlanner={() => void runPlanner('manual')} />}
+            {tab === 'inventory' && <ScmInventory health={navigation.scmHealth ?? null} onHealth={health => onNavigate({ scmHealth: health })} catalog={!!navigation.scmCatalog} onCatalog={catalog => onNavigate({ scmCatalog: catalog })} />}
+            {tab === 'ledger' && <ScmLedger itemId={navigation.scmLedgerItemId ?? null} onItem={itemId => onNavigate({ scmLedgerItemId: itemId })} />}
+            {tab === 'scenarios' && <ScmScenarios key={navigation.scmSupplierDelay ?? 'none'} supplierDelay={navigation.scmSupplierDelay ?? null} />}
+          </>}
+      </div>
+    </ToolPage>
+    {dialogs}
   </ScmSurfaceContext.Provider>;
 }
 

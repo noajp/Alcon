@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { BarChart3, Check, ChevronDown, ClipboardList, Columns3, Filter, Layers, List, MoreHorizontal, PenLine, Plus, Settings2, X } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
@@ -11,6 +11,7 @@ import { PageHead } from '@/Function/shared/PageHead';
 import { RailCard } from '@/Function/shared/RailCard';
 import { RailRow } from '@/Function/shared/RailRow';
 import { ToolPage, type ToolView } from '@/Function/shared/tool/ToolPage';
+import { PlacePage as SharedPlacePage } from '@/Function/shared/tool/PlacePage';
 import { CrmIcon } from '@/Function/shared/conceptIcons';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -122,16 +123,9 @@ function CrmMount(props: SurfaceProps) {
   return <CrmSurface crm={crm} {...props} />;
 }
 
-/** The header of a place that is not a pipeline: Today, Companies, Contacts. */
-function PlacePage({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) {
-  return <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
-    <header className="flex h-[50px] flex-shrink-0 items-center gap-1.5 border-b border-border/60 bg-card pl-4 pr-2">
-      <CrmIcon size={12} /><span className="text-[12px] font-semibold text-foreground">{title}</span>
-      <div className="flex-1" />
-      {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
-    </header>
-    <div className="min-h-0 flex-1 overflow-y-auto"><div className="@container/crm mx-auto w-full max-w-7xl px-8 py-6">{children}</div></div>
-  </div>;
+/** A place that is not a pipeline: Today, Companies, Contacts. */
+function PlacePage(props: Omit<React.ComponentProps<typeof SharedPlacePage>, 'icon' | 'container'>) {
+  return <SharedPlacePage icon={CrmIcon} container="crm" {...props} />;
 }
 
 function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }: SurfaceProps & { crm: Crm }) {
