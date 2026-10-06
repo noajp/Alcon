@@ -1,13 +1,13 @@
 'use client';
 
 import { useMemo } from 'react';
-import { BarChart3, Building2, Columns3, List, PenLine, Search, Settings2, Sun, Users } from 'lucide-react';
+import { PenLine, Search } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 import type { NavigationState } from '@/types/navigation';
 import { useCrm, type Crm } from '@/hooks/useCrm';
-import { inList, pipelineColumns, todayQueue, type CrmList } from './crmModel';
-import { crmRoute, routeTo, type CrmRoute, type CrmViewId } from './crmRoute';
+import { inList, pipelineColumns, type CrmList } from './crmModel';
+import { crmRoute, routeTo, type CrmRoute } from './crmRoute';
 import { HealthDot, money } from './crmFormat';
 
 const LISTS: { id: CrmList; label: string }[] = [
@@ -54,31 +54,16 @@ function CrmSidebarList({ crm, navigation, onNavigate }: SidebarProps & { crm: C
   const route = crmRoute(navigation.crm);
   const go = (patch: Partial<CrmRoute>) => onNavigate({ crm: routeTo(route, { dealId: null, companyId: null, contactId: null, ...patch }) });
   const workspace = crm.workspace;
-  const recordLabel = crm.pipeline?.record_label;
   const summary = useMemo(() => {
     if (!workspace) return null;
     const { deals, today, params, primaryCurrency } = workspace;
-    const queue = todayQueue(deals.filter(deal => !crm.me || !deal.ownerId || deal.ownerId === crm.me));
     return {
-      today: queue.length,
-      overdue: queue.filter(deal => deal.action!.urgency === 'overdue').length,
-      open: deals.filter(deal => deal.outcome === 'open').length,
-      deals: deals.length,
-      weighted: workspace.totals.find(total => total.currency === primaryCurrency)?.weightedPipeline ?? null,
       primaryCurrency,
       stages: pipelineColumns(workspace).filter(column => !column.closed),
       lists: Object.fromEntries(LISTS.map(list => [list.id, deals.filter(deal => inList(deal, list.id, today, params.horizonDays, crm.me)).length])) as Record<CrmList, number>,
     };
   }, [workspace, crm.me]);
 
-  const views: { id: CrmViewId; label: string; icon: typeof Sun; count?: React.ReactNode }[] = [
-    { id: 'today', label: 'Today', icon: Sun, count: summary?.today ? <span className={summary.overdue ? 'text-[var(--status-danger)]' : undefined}>{summary.today}</span> : null },
-    { id: 'pipeline', label: 'Pipeline', icon: Columns3, count: summary?.open },
-    { id: 'deals', label: recordLabel ?? 'Deals', icon: List, count: summary?.deals },
-    { id: 'companies', label: 'Companies', icon: Building2, count: crm.companies.length || null },
-    { id: 'contacts', label: 'Contacts', icon: Users, count: crm.contacts.length || null },
-    { id: 'forecast', label: 'Forecast', icon: BarChart3, count: summary?.weighted && summary.primaryCurrency ? money(summary.weighted, summary.primaryCurrency, locale, true) : null },
-  ];
   const filtered = route.view === 'deals' || route.view === 'pipeline';
 
   return <div className="mt-1 pb-4">
@@ -109,14 +94,6 @@ function CrmSidebarList({ crm, navigation, onNavigate }: SidebarProps & { crm: C
       </div>)}</div>
     </>}
 
-    <div className="mt-3 space-y-px">
-      {views.map(({ id, label, icon: Icon, count }) => {
-        const active = route.view === id && !(id === 'deals' && (route.stage !== null && route.stage !== undefined || route.list || route.account));
-        return <SidebarRow key={id} active={active} icon={<Icon size={16} />} label={t(label)} meta={count}
-          disabled={!workspace && id !== 'settings'} onClick={() => go({ view: id, stage: null, list: null, account: null })} />;
-      })}
-    </div>
-
     {summary && summary.stages.length > 0 && <>
       <Section label={t('Stages')} />
       <div className="space-y-px">
@@ -144,8 +121,5 @@ function CrmSidebarList({ crm, navigation, onNavigate }: SidebarProps & { crm: C
       </div>
     </>}
 
-    <div className="mt-4 space-y-px">
-      <SidebarRow active={route.view === 'settings'} icon={<Settings2 size={16} />} label={t('Pipeline settings')} onClick={() => go({ view: 'settings' })} />
-    </div>
   </div>;
 }

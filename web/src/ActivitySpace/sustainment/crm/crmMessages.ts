@@ -335,6 +335,19 @@ const CRM_MESSAGES: Record<string, Row> = {
   '{n} overdue': ['{n} 件が期限切れ', '{n}건 지연', '{n} en retard', '{n} vencidos'],
   '{p}% win rate': ['受注率 {p}%', '수주율 {p}%', '{p} % de réussite', '{p} % de éxito'],
   '⌘↵ to apply': ['⌘↵ で適用', '⌘↵로 적용', '⌘↵ pour appliquer', '⌘↵ para aplicar'],
+  // The pipeline's page: its head, Properties and what each view shows.
+  'Pipeline name': ['パイプライン名', '파이프라인 이름', 'Nom du pipeline', 'Nombre del pipeline'],
+  'Pipeline name…': ['パイプライン名…', '파이프라인 이름…', 'Nom du pipeline…', 'Nombre del pipeline…'],
+  'What needs you today, and where every deal in this pipeline stands.': ['今日あなたがやるべきことと、このパイプラインの全商談の現在地。', '오늘 해야 할 일과 이 파이프라인의 모든 거래 현황.', 'Ce qui vous attend aujourd’hui, et où en est chaque affaire de ce pipeline.', 'Lo que te espera hoy y dónde está cada negocio de este pipeline.'],
+  'A deal is called': ['商談の呼び方', '거래의 명칭', 'Une affaire s’appelle', 'Un negocio se llama'],
+  'Forecast period': ['予測期間', '예측 기간', 'Période de prévision', 'Período de previsión'],
+  'Going quiet after': ['連絡途絶の判定', '연락 뜸함 기준', 'Silencieuse après', 'Sin contacto tras'],
+  'Every open deal, by stage.': ['進行中の全商談をステージ別に。', '진행 중인 모든 거래를 단계별로.', 'Chaque affaire ouverte, par étape.', 'Cada negocio abierto, por etapa.'],
+  'Every deal in this pipeline.': ['このパイプラインの全商談。', '이 파이프라인의 모든 거래.', 'Chaque affaire de ce pipeline.', 'Cada negocio de este pipeline.'],
+  'The companies your deals are with.': ['商談相手の会社。', '거래 상대 회사.', 'Les entreprises de vos affaires.', 'Las empresas de tus negocios.'],
+  'The people at those companies.': ['その会社の担当者。', '그 회사의 담당자.', 'Les personnes de ces entreprises.', 'Las personas de esas empresas.'],
+  'What the open pipeline is expected to bring in.': ['進行中のパイプラインから見込める金額。', '진행 중인 파이프라인에서 예상되는 금액.', 'Ce que le pipeline ouvert devrait rapporter.', 'Lo que se espera que aporte el pipeline abierto.'],
+  'The pipeline’s stages, currency and rhythm.': ['パイプラインのステージ・通貨・リズム。', '파이프라인의 단계, 통화, 리듬.', 'Les étapes, la devise et le rythme du pipeline.', 'Las etapas, la moneda y el ritmo del pipeline.'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(CRM_MESSAGES).map(([key, row]) => [key, row[index]]));

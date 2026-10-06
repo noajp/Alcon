@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { ScmHealth } from './scmEngine';
 import { HEALTH_LABEL, HEALTH_TONE } from './scmText';
+import type { ScmView, ScmViewCounts } from './scmNavigation';
 
 // Small pieces every SCM pane shares, so tone, spacing and number styling stay
 // one decision.
@@ -88,4 +89,19 @@ export function ScmDomainSelect({ value, onChange, domains, label, disabled, cla
     {domains.map(domain => <option key={domain.id} value={domain.id}>{domain.name}</option>)}
     {value && !domains.some(domain => domain.id === value) && <option value={value}>{t('Unknown Domain')}</option>}
   </select>;
+}
+
+/** A pane's count, as its tab shows it: urgent work in red, drafts awaiting
+ *  approval in amber, the rest quiet. */
+export function ScmViewBadge({ view, counts }: { view: ScmView; counts: ScmViewCounts }) {
+  const { t } = useI18n();
+  if (view === 'exceptions' && counts.exceptions) return <span className={counts.urgent ? 'text-[var(--status-danger)]' : undefined}>{counts.exceptions}</span>;
+  if (view === 'replenish' && counts.replenish) return <>{counts.replenish}</>;
+  if (view === 'orders' && (counts.orders || counts.drafts)) return <span className="inline-flex items-center gap-1.5">
+    {counts.drafts > 0 && <span className="text-[var(--status-warning)]" title={t('Awaiting approval')}>{counts.drafts}</span>}
+    <span className={counts.overdue ? 'text-[var(--status-danger)]' : undefined} title={counts.overdue ? t('{n} overdue', { n: counts.overdue }) : undefined}>{counts.orders}</span>
+  </span>;
+  if (view === 'inventory' && counts.inventory) return <>{counts.inventory}</>;
+  if (view === 'suppliers' && counts.suppliers) return <>{counts.suppliers}</>;
+  return null;
 }

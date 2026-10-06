@@ -1,9 +1,15 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { PenLine, Plus, X } from 'lucide-react';
+import { BarChart3, Building2, Calendar, Check, ClipboardList, Coins, Columns3, Layers, List, PenLine, Plus, Settings2, Tag, Users, X } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { MenuShell } from '@/Function/shared/menu';
+import { PageHead } from '@/Function/shared/PageHead';
+import { RailCard } from '@/Function/shared/RailCard';
+import { RailRow } from '@/Function/shared/RailRow';
+import { ToolPage, type ToolView } from '@/Function/shared/tool/ToolPage';
 import { DateField } from '@/Function/shared/date';
 import { useEscapeLayer } from '@/Function/shared/keyboard/useEscapeLayer';
 import { CrmIcon } from '@/Function/shared/conceptIcons';
@@ -11,7 +17,8 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { NavigationState } from '@/types/navigation';
 import { useCrm, type Crm } from '@/hooks/useCrm';
-import { inList, searchDeals, type CrmDealRecord, type CrmList, type CrmWorkspace } from './crmModel';
+import { money } from './crmFormat';
+import { inList, searchDeals, todayQueue, type CrmDealRecord, type CrmList, type CrmWorkspace } from './crmModel';
 import { crmRoute, routeTo, type CrmRoute, type CrmViewId } from './crmRoute';
 import { CrmToday } from './CrmToday';
 import { CrmPipeline } from './CrmPipeline';
@@ -23,9 +30,17 @@ import { CrmDealPanel } from './CrmDealPanel';
 import { CrmCapture } from './CaptureDialog';
 import { CrmPicker } from './CrmPicker';
 
-const TITLES: Record<CrmViewId, string> = {
-  today: 'Today', pipeline: 'Pipeline', deals: 'Deals', companies: 'Companies', contacts: 'Contacts', forecast: 'Forecast', settings: 'Pipeline settings',
-};
+// The CRM's views — the tabs. Today is the Overview: the pipeline's head and
+// Properties, then what needs you today.
+const CRM_VIEWS: readonly (ToolView & { id: CrmViewId })[] = [
+  { id: 'today', label: 'Overview', icon: ClipboardList },
+  { id: 'pipeline', label: 'Pipeline', icon: Columns3, wide: true, description: 'Every open deal, by stage.' },
+  { id: 'deals', label: 'Deals', icon: List, description: 'Every deal in this pipeline.' },
+  { id: 'companies', label: 'Companies', icon: Building2, description: 'The companies your deals are with.' },
+  { id: 'contacts', label: 'Contacts', icon: Users, description: 'The people at those companies.' },
+  { id: 'forecast', label: 'Forecast', icon: BarChart3, description: 'What the open pipeline is expected to bring in.' },
+  { id: 'settings', label: 'Settings', icon: Settings2, description: 'The pipeline’s stages, currency and rhythm.' },
+];
 const LIST_LABEL: Record<CrmList, string> = {
   mine: 'My deals', 'at-risk': 'At risk', 'closing-soon': 'Closing soon', 'no-next-step': 'No next step', stale: 'Going quiet', won: 'Won', lost: 'Lost', incomplete: 'Missing details',
 };
@@ -104,7 +119,7 @@ function CrmMount(props: SurfaceProps) {
 }
 
 function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }: SurfaceProps & { crm: Crm }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const route = crmRoute(navigation.crm);
   const go = (patch: Partial<CrmRoute>) => onNavigate({ crm: routeTo(route, patch) });
   const [captureFor, setCaptureFor] = useState<string | null | undefined>(undefined);
@@ -143,6 +158,26 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
 
   const view: CrmViewId = route.view;
   const recordLabel = crm.pipeline?.record_label;
+  const pipeline = crm.pipeline;
+  // Each tab carries the count that says whether it is worth opening — what
+  // the sidebar used to show beside each view.
+  const views = useMemo(() => {
+    const deals = workspace?.deals ?? [];
+    const queue = workspace ? todayQueue(deals.filter(deal => !crm.me || !deal.ownerId || deal.ownerId === crm.me)) : [];
+    const overdue = queue.filter(deal => deal.action!.urgency === 'overdue').length;
+    const badges: Partial<Record<CrmViewId, React.ReactNode>> = workspace ? {
+      today: queue.length ? <span className={overdue ? 'text-[var(--status-danger)]' : undefined}>{queue.length}</span> : null,
+      pipeline: deals.filter(deal => deal.outcome === 'open').length || null,
+      deals: deals.length || null,
+      companies: crm.companies.length || null,
+      contacts: crm.contacts.length || null,
+      forecast: (() => {
+        const weighted = workspace.totals.find(total => total.currency === workspace.primaryCurrency)?.weightedPipeline ?? null;
+        return weighted && workspace.primaryCurrency ? money(weighted, workspace.primaryCurrency, locale, true) : null;
+      })(),
+    } : {};
+    return CRM_VIEWS.map(item => ({ ...item, label: item.id === 'deals' && recordLabel ? recordLabel : item.label, badge: badges[item.id] }));
+  }, [recordLabel, workspace, crm.me, crm.companies.length, crm.contacts.length, locale]);
   const chips = [
     route.stage !== undefined && route.stage !== null && { key: 'stage', label: `${t('Stage')}: ${t(workspace?.stages.find(stage => stage.id === route.stage)?.label ?? route.stage)}` },
     route.list && { key: 'list', label: t(LIST_LABEL[route.list]) },
@@ -150,25 +185,85 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
     route.query && { key: 'query', label: `“${route.query}”` },
   ].filter(Boolean) as { key: 'stage' | 'list' | 'account' | 'query'; label: string }[];
   const showChips = chips.length > 0 && (view === 'deals' || view === 'pipeline');
+  const openPipeline = workspace?.deals.filter(deal => deal.outcome === 'open') ?? [];
+  const weighted = workspace?.totals.find(total => total.currency === workspace.primaryCurrency)?.weightedPipeline ?? null;
 
-  return <div className="flex min-w-0 flex-1 overflow-hidden bg-card">
-    <div className="@container/crm min-w-0 flex-1 overflow-y-auto">
-      <div className={`mx-auto space-y-6 px-4 py-6 sm:px-8 sm:py-8 ${view === 'pipeline' ? 'max-w-none' : 'max-w-6xl'}`}>
-        <header className="flex flex-wrap items-end justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground"><CrmIcon size={16} />{t('CRM')}{crm.pipeline && <span>· {crm.pipeline.name}</span>}</div>
-            <h1 className="text-2xl font-semibold">{view === 'deals' && recordLabel ? recordLabel : t(TITLES[view])}</h1>
-          </div>
-          {workspace && view !== 'settings' && <div className="flex flex-wrap items-center gap-2">
-            {view === 'today' && crm.me && <div role="group" aria-label={t('Whose deals')} className="flex gap-1">
-              <Button shape="tab" size="sm" variant={!everyone ? 'secondary' : 'ghost'} aria-pressed={!everyone} onClick={() => setEveryone(false)}>{t('Mine')}</Button>
-              <Button shape="tab" size="sm" variant={everyone ? 'secondary' : 'ghost'} aria-pressed={everyone} onClick={() => setEveryone(true)}>{t('Everyone')}</Button>
-            </div>}
-            <Button variant="ghost" onClick={() => setCaptureFor(route.dealId ?? null)}><PenLine size={14} />{t('Capture')}</Button>
-            <Button variant="secondary" onClick={() => setCreating(true)}><Plus size={14} />{recordLabel ? t('New {name}', { name: recordLabel }) : t('New deal')}</Button>
-          </div>}
-        </header>
+  // The pipeline's facts — what every view reads through. Switching pipeline
+  // and its Domain happen here; the rest opens Settings, where they are edited.
+  const properties = pipeline && <RailCard title={t('Properties')}>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="w-full" aria-label={t('Pipeline')}>
+          <RailRow icon={<Layers className="size-3.5 text-muted-foreground" />} name={t('Pipeline')} label={pipeline.name} dense />
+        </button>
+      </DropdownMenuTrigger>
+      <MenuShell as="dropdown" align="start">
+        {crm.pipelines.map(item => <DropdownMenuItem key={item.id} className="gap-2" onSelect={() => go({ pipelineId: item.id })}>
+          <span className="min-w-0 flex-1 truncate">{item.name}</span>{item.id === pipeline.id && <Check size={12} />}
+        </DropdownMenuItem>)}
+        <DropdownMenuItem className="gap-2 text-muted-foreground" onSelect={() => go({ view: 'settings' })}><Settings2 size={12} />{t('Pipeline settings')}</DropdownMenuItem>
+      </MenuShell>
+    </DropdownMenu>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="w-full" aria-label={t('Domain')}>
+          <RailRow icon={<Layers className="size-3.5 text-muted-foreground" />} name={t('Domain')}
+            label={crm.domains.find(domain => domain.id === pipeline.domain_id)?.name ?? t('Whole Space')} placeholder={!pipeline.domain_id} dense />
+        </button>
+      </DropdownMenuTrigger>
+      <MenuShell as="dropdown" align="start">
+        <DropdownMenuItem className="gap-2" onSelect={() => void crm.savePipeline(pipeline.id, { domain_id: null })}>
+          <span className="min-w-0 flex-1 truncate">{t('Whole Space')}</span>{!pipeline.domain_id && <Check size={12} />}
+        </DropdownMenuItem>
+        {crm.domains.map(domain => <DropdownMenuItem key={domain.id} className="gap-2" onSelect={() => void crm.savePipeline(pipeline.id, { domain_id: domain.id })}>
+          <span className="min-w-0 flex-1 truncate">{domain.name}</span>{domain.id === pipeline.domain_id && <Check size={12} />}
+        </DropdownMenuItem>)}
+      </MenuShell>
+    </DropdownMenu>
+    {[
+      { key: 'label', icon: Tag, name: t('A deal is called'), value: pipeline.record_label ?? t('Deal'), placeholder: !pipeline.record_label },
+      { key: 'currency', icon: Coins, name: t('Currency'), value: pipeline.currency },
+      { key: 'horizon', icon: Calendar, name: t('Forecast period'), value: t('{n} days', { n: pipeline.horizon_days }) },
+      { key: 'follow', icon: Calendar, name: t('Going quiet after'), value: t('{n} days', { n: pipeline.follow_up_days }) },
+      { key: 'stages', icon: Columns3, name: t('Stages'), value: String(workspace?.stages.length ?? 0) },
+    ].map(row => <button key={row.key} type="button" className="w-full" onClick={() => go({ view: 'settings' })}>
+      <RailRow icon={<row.icon className="size-3.5 text-muted-foreground" />} name={row.name} label={row.value} placeholder={row.placeholder} dense />
+    </button>)}
+    {workspace && <>
+      <div className="mx-2 my-2 h-px bg-[var(--border-subtle)]" />
+      <RailRow name={t('Open deals')} label={String(openPipeline.length)} dense />
+      {weighted !== null && workspace.primaryCurrency && <RailRow name={t('Weighted')} label={money(weighted, workspace.primaryCurrency, locale, true)} dense />}
+    </>}
+  </RailCard>;
 
+  return <>
+    <ToolPage icon={CrmIcon} tool={t('CRM')} crumb={pipeline?.name} storageKey="crm" home="today"
+      views={views} activeView={view} onSelectView={id => go({ view: id as CrmViewId })}
+      actions={workspace && <>
+        <Button variant="ghost" size="sm" onClick={() => setCaptureFor(route.dealId ?? null)}><PenLine size={14} />{t('Capture')}</Button>
+        <Button variant="secondary" size="sm" onClick={() => setCreating(true)}><Plus size={14} />{recordLabel ? t('New {name}', { name: recordLabel }) : t('New deal')}</Button>
+      </>}
+      viewControls={workspace && view === 'today' && crm.me && <div role="group" aria-label={t('Whose deals')} className="flex gap-1">
+        <Button shape="tab" size="sm" variant={!everyone ? 'secondary' : 'ghost'} aria-pressed={!everyone} onClick={() => setEveryone(false)}>{t('Mine')}</Button>
+        <Button shape="tab" size="sm" variant={everyone ? 'secondary' : 'ghost'} aria-pressed={everyone} onClick={() => setEveryone(true)}>{t('Everyone')}</Button>
+      </div>}
+      head={<PageHead key={pipeline?.id ?? 'none'} icon={<CrmIcon size={18} />} title={pipeline?.name ?? t('CRM')}
+        description={t('What needs you today, and where every deal in this pipeline stands.')}
+        canEdit={!!pipeline} titleLabel={t('Pipeline name')} titlePlaceholder={t('Pipeline name…')}
+        descriptionLabel={t('Description')} descriptionPlaceholder=""
+        onSaveTitle={async name => { if (pipeline) await crm.savePipeline(pipeline.id, { name }); }} />}
+      properties={properties}
+      panel={panelOpen && <div className="fixed inset-0 z-30 flex justify-end bg-black/20 md:static md:z-auto md:w-[420px] md:shrink-0 md:border-l md:border-[var(--border-subtle)] md:bg-transparent">
+        <div className="h-full w-full max-w-md overflow-y-auto md:max-w-none">
+          {selected ? <CrmDealPanel key={selected.id} crm={crm} deal={selected} onClose={() => go({ dealId: null })} onCapture={dealId => setCaptureFor(dealId)}
+            onOpenElement={onOpenElement} onOpenInitiative={openInitiative} onOpenCompany={companyId => go({ companyId, dealId: null })} />
+            : route.companyId ? <CrmCompanyPanel key={route.companyId} crm={crm} companyId={route.companyId} onClose={() => go({ companyId: null })}
+              onOpenDeal={openDealRecord} onOpenContact={contactId => go({ contactId, companyId: null })} />
+            : route.contactId ? <CrmContactPanel key={route.contactId} crm={crm} contactId={route.contactId} onClose={() => go({ contactId: null })}
+              onOpenDeal={openDealRecord} onOpenCompany={companyId => go({ companyId, contactId: null })} /> : null}
+        </div>
+      </div>}>
+      <div className="@container/crm space-y-6">
         {showChips && <div className="flex flex-wrap items-center gap-2">
           {chips.map(chip => <Button key={chip.key} size="xs" variant="secondary" aria-label={t('Clear filter {name}', { name: chip.label })}
             onClick={() => go(chip.key === 'query' ? { query: '' } : { [chip.key]: null })}>{chip.label}<X size={12} /></Button>)}
@@ -188,21 +283,10 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
         {workspace && view === 'forecast' && <CrmForecast workspace={workspace} onOpenInitiative={openInitiative} />}
         {view === 'settings' && <CrmSettings crm={crm} onSelectPipeline={pipelineId => go({ pipelineId })} />}
       </div>
-    </div>
-
-    {panelOpen && <div className="fixed inset-0 z-30 flex justify-end bg-black/20 md:static md:z-auto md:w-[420px] md:shrink-0 md:border-l md:border-[var(--border-subtle)] md:bg-transparent">
-      <div className="h-full w-full max-w-md md:max-w-none">
-        {selected ? <CrmDealPanel key={selected.id} crm={crm} deal={selected} onClose={() => go({ dealId: null })} onCapture={dealId => setCaptureFor(dealId)}
-          onOpenElement={onOpenElement} onOpenInitiative={openInitiative} onOpenCompany={companyId => go({ companyId, dealId: null })} />
-          : route.companyId ? <CrmCompanyPanel key={route.companyId} crm={crm} companyId={route.companyId} onClose={() => go({ companyId: null })}
-            onOpenDeal={openDealRecord} onOpenContact={contactId => go({ contactId, companyId: null })} />
-          : route.contactId ? <CrmContactPanel key={route.contactId} crm={crm} contactId={route.contactId} onClose={() => go({ contactId: null })}
-            onOpenDeal={openDealRecord} onOpenCompany={companyId => go({ companyId, contactId: null })} /> : null}
-      </div>
-    </div>}
+    </ToolPage>
 
     {workspace && capture !== undefined && <CrmCapture crm={crm} initialDealId={capture} onClose={closeCapture}
       onApplied={dealId => { setCaptureFor(undefined); go({ dealId, capture: false }); }} />}
     {workspace && creating && <NewDeal crm={crm} onClose={() => setCreating(false)} onCreated={dealId => { setCreating(false); go({ dealId }); }} />}
-  </div>;
+  </>;
 }
