@@ -1,13 +1,13 @@
 import type { ActivitySpaceMember, DomainMember, Element, Worker } from '@/types/database';
 
-export type TeamElement = Pick<Element, 'id' | 'title' | 'display_id' | 'status' | 'due_date' | 'object_id'>;
+export type TeamElement = Pick<Element, 'id' | 'title' | 'display_id' | 'status' | 'due_date' | 'object_id' | 'start_date' | 'created_at' | 'updated_at'>;
 
 export interface TeamRosterSource {
   workers: Worker[];
   spaceMembers: Pick<ActivitySpaceMember, 'user_id' | 'role'>[];
   domainMembers: Pick<DomainMember, 'user_id' | 'domain_id' | 'role'>[];
   domains: { id: string; name: string }[];
-  objects: { id: string; domain_id: string | null }[];
+  objects: { id: string; domain_id: string | null; name?: string | null }[];
   objectDomains: { object_id: string; domain_id: string }[];
   elements: TeamElement[];
   assignees: { element_id: string; worker_id: string }[];
@@ -20,6 +20,9 @@ export interface TeamRosterEntry {
   domainNames: string[];
   canManage: boolean;
   activeElements: TeamElement[];
+  /** Every visible Element assigned to this Worker, open or not — the record
+   * their assignment history and skill evidence are read from. */
+  elements: TeamElement[];
 }
 
 /** Both reads enforce their own boundary. Keep only the current visible
@@ -101,6 +104,7 @@ export function buildTeamRoster(source: TeamRosterSource, userId: string): TeamR
       activeElements: [...assignments].map((id) => elements.get(id)!)
         .filter((element) => element.status !== 'done' && element.status !== 'cancelled')
         .sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || a.title.localeCompare(b.title)),
+      elements: [...assignments].map((id) => elements.get(id)!),
     }];
   }).sort((a, b) => a.worker.name.localeCompare(b.worker.name) || a.worker.id.localeCompare(b.worker.id));
 }

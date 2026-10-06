@@ -1,6 +1,7 @@
 import type { Locale } from './locales';
 import { CRM_TRANSLATIONS } from '@/ActivitySpace/sustainment/crm/crmMessages';
 import { WORKLOAD_TRANSLATIONS } from '@/ActivitySpace/sustainment/workload/workloadMessages';
+import { PEOPLE_TRANSLATIONS } from '@/ActivitySpace/sustainment/team/peopleMessages';
 import { SCM_MESSAGES } from './scmMessages';
 
 type TranslationMap = Record<string, string>;
@@ -377,7 +378,7 @@ const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
     'New Element': '新しい Element', 'New Initiative': '新しい Initiative', 'New Object': '新しい Object',
     'No notebooks yet — click + to add one.': 'ノートブックはまだありません。+ で追加できます。',
     'No tables yet — click + to add one.': 'テーブルはまだありません。+ で追加できます。',
-    'Open Calendar': 'Calendar を開く', 'Open Inbox': 'Inbox を開く', 'Open Notebook': 'Notebook を開く', 'Open Table': 'Table を開く', 'Open Team': 'Team を開く', 'Open Workload': 'Workload を開く',
+    'Open Calendar': 'Calendar を開く', 'Open Inbox': 'Inbox を開く', 'Open Notebook': 'Notebook を開く', 'Open Table': 'Table を開く', 'Open People': 'People を開く', 'Open Workload': 'Workload を開く',
     'Go to Now': '現在へ移動', 'Snow': 'スノー', 'Something went wrong': '問題が発生しました', 'Strings like :) will be converted to 🙂': ':) などの文字を 🙂 に変換します', 'Sustainment apps': 'Sustainment アプリ',
   },
   ko: {
@@ -393,7 +394,7 @@ const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
     'Carbon': '카본', "Couldn't save": '저장할 수 없습니다', 'Domain Elements': 'Domain Elements', 'Graphite': '그래파이트', 'Ivory': '아이보리',
     'Mid-level structural unit': '중간 수준 구조 단위', 'Midnight': '미드나잇', 'Mist': '미스트', 'New Element': '새 Element', 'New Initiative': '새 Initiative', 'New Object': '새 Object',
     'No notebooks yet — click + to add one.': '노트북이 없습니다. +를 눌러 추가하세요.', 'No tables yet — click + to add one.': '테이블이 없습니다. +를 눌러 추가하세요.',
-    'Open Calendar': 'Calendar 열기', 'Open Inbox': 'Inbox 열기', 'Open Notebook': 'Notebook 열기', 'Open Table': 'Table 열기', 'Open Team': 'Team 열기', 'Open Workload': 'Workload 열기',
+    'Open Calendar': 'Calendar 열기', 'Open Inbox': 'Inbox 열기', 'Open Notebook': 'Notebook 열기', 'Open Table': 'Table 열기', 'Open People': 'People 열기', 'Open Workload': 'Workload 열기',
     'Go to Now': '지금으로 이동', 'Snow': '스노우', 'Something went wrong': '문제가 발생했습니다', 'Strings like :) will be converted to 🙂': ':)와 같은 문자열을 🙂로 변환합니다', 'Sustainment apps': 'Sustainment 앱',
   },
   fr: {
@@ -409,7 +410,7 @@ const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
     'Carbon': 'Carbone', "Couldn't save": 'Enregistrement impossible', 'Domain Elements': 'Elements du Domain', 'Graphite': 'Graphite', 'Ivory': 'Ivoire',
     'Mid-level structural unit': 'Unité structurelle intermédiaire', 'Midnight': 'Minuit', 'Mist': 'Brume', 'New Element': 'Nouvel Element', 'New Initiative': 'Nouvelle Initiative', 'New Object': 'Nouvel Object',
     'No notebooks yet — click + to add one.': 'Aucun carnet. Cliquez sur + pour en ajouter un.', 'No tables yet — click + to add one.': 'Aucun tableau. Cliquez sur + pour en ajouter un.',
-    'Open Calendar': 'Ouvrir Calendar', 'Open Inbox': 'Ouvrir Inbox', 'Open Notebook': 'Ouvrir Notebook', 'Open Table': 'Ouvrir Table', 'Open Team': 'Ouvrir Team', 'Open Workload': 'Ouvrir Workload',
+    'Open Calendar': 'Ouvrir Calendar', 'Open Inbox': 'Ouvrir Inbox', 'Open Notebook': 'Ouvrir Notebook', 'Open Table': 'Ouvrir Table', 'Open People': 'Ouvrir People', 'Open Workload': 'Ouvrir Workload',
     'Go to Now': 'Aller à Maintenant', 'Snow': 'Neige', 'Something went wrong': 'Un problème est survenu', 'Strings like :) will be converted to 🙂': 'Les chaînes comme :) seront converties en 🙂', 'Sustainment apps': 'Applications Sustainment',
   },
   es: {
@@ -425,7 +426,7 @@ const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
     'Carbon': 'Carbono', "Couldn't save": 'No se pudo guardar', 'Domain Elements': 'Elements del Domain', 'Graphite': 'Grafito', 'Ivory': 'Marfil',
     'Mid-level structural unit': 'Unidad estructural intermedia', 'Midnight': 'Medianoche', 'Mist': 'Niebla', 'New Element': 'Nuevo Element', 'New Initiative': 'Nueva Initiative', 'New Object': 'Nuevo Object',
     'No notebooks yet — click + to add one.': 'Todavía no hay cuadernos. Pulsa + para añadir uno.', 'No tables yet — click + to add one.': 'Todavía no hay tablas. Pulsa + para añadir una.',
-    'Open Calendar': 'Abrir Calendar', 'Open Inbox': 'Abrir Inbox', 'Open Notebook': 'Abrir Notebook', 'Open Table': 'Abrir Table', 'Open Team': 'Abrir Team', 'Open Workload': 'Abrir Workload',
+    'Open Calendar': 'Abrir Calendar', 'Open Inbox': 'Abrir Inbox', 'Open Notebook': 'Abrir Notebook', 'Open Table': 'Abrir Table', 'Open People': 'Abrir People', 'Open Workload': 'Abrir Workload',
     'Go to Now': 'Ir a Ahora', 'Snow': 'Nieve', 'Something went wrong': 'Algo salió mal', 'Strings like :) will be converted to 🙂': 'Las cadenas como :) se convertirán en 🙂', 'Sustainment apps': 'Aplicaciones Sustainment',
   },
 };
@@ -1389,3 +1390,10 @@ Object.assign(es, {
   "Each Initiative gets its own timeline and resource view.": "Cada Initiative tiene su propia línea de tiempo y vista de recursos.",
   "Create Initiative": "Crear Initiative",
 });
+
+// People (ActivitySpace/sustainment/team). Last, so the app name stays
+// English everywhere, like every other concept name.
+Object.assign(ja, PEOPLE_TRANSLATIONS.ja);
+Object.assign(ko, PEOPLE_TRANSLATIONS.ko);
+Object.assign(fr, PEOPLE_TRANSLATIONS.fr);
+Object.assign(es, PEOPLE_TRANSLATIONS.es);

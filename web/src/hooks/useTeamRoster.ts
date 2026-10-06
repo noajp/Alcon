@@ -27,7 +27,7 @@ function readIds<Row>(
 
 const rowId = (row: { id: string }) => row.id;
 const unique = <Row extends { id: string }>(rows: Row[]) => [...new Map(rows.map((row) => [row.id, row])).values()];
-const ELEMENT_FIELDS = 'id, title, display_id, status, due_date, object_id';
+const ELEMENT_FIELDS = 'id, title, display_id, status, due_date, object_id, start_date, created_at, updated_at';
 
 export async function fetchTeamRoster(spaceId: string, signal: AbortSignal): Promise<TeamRosterSource> {
   const [domains, spaceMembers] = await Promise.all([
@@ -50,14 +50,14 @@ export async function fetchTeamRoster(spaceId: string, signal: AbortSignal): Pro
       .from('object_domains').select('object_id, domain_id', { count: 'exact' }).in('domain_id', chunk)
       .order('object_id').order('domain_id').range(from, to).abortSignal(signal), (row) => `${row.object_id}:${row.domain_id}`),
     readIds<TeamRosterSource['objects'][number]>('Team Objects', domainIds, (chunk, from, to) => onlyActiveObjects(supabase
-      .from('objects').select('id, domain_id', { count: 'exact' }).in('domain_id', chunk))
+      .from('objects').select('id, domain_id, name', { count: 'exact' }).in('domain_id', chunk))
       .order('id').range(from, to).abortSignal(signal), rowId),
   ]);
   const domainMembers = mergeTeamDomainMembers(domainIds, directDomainMembers, domainGuests);
   const directObjectIds = new Set(directObjects.map((row) => row.id));
   const linkedObjects = await readIds<TeamRosterSource['objects'][number]>('Linked Team Objects', objectDomains
     .map((row) => row.object_id).filter((id) => !directObjectIds.has(id)), (chunk, from, to) => onlyActiveObjects(supabase
-    .from('objects').select('id, domain_id', { count: 'exact' }).in('id', chunk))
+    .from('objects').select('id, domain_id, name', { count: 'exact' }).in('id', chunk))
     .order('id').range(from, to).abortSignal(signal), rowId);
   const objects = unique([...directObjects, ...linkedObjects]);
   const objectIds = objects.map((row) => row.id);
@@ -147,9 +147,11 @@ export function useTeamRoster() {
   }, [enabled, userId, spaceId, contextKey, queryClient, queryKey]);
 
   const workers = useMemo(() => entries.map((entry) => entry.worker), [entries]);
+  const objectNames = useMemo(() => new Map((enabled ? query.data?.objects ?? [] : [])
+    .map((row) => [row.id, row.name ?? ''] as const)), [enabled, query.data]);
 
   return {
-    entries, workers, contextKey, enabled,
+    entries, workers, objectNames, contextKey, enabled,
     loading: enabled && query.isPending,
     refreshing: enabled && query.isFetching && !query.isPending,
     error: enabled ? query.error : null,

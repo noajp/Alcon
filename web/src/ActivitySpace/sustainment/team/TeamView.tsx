@@ -1,18 +1,19 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
-import { Bot, ChevronDown, ChevronRight, LoaderCircle, Search } from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Bot, LoaderCircle, Search } from 'lucide-react';
 import { useTeamRoster } from '@/hooks/useTeamRoster';
-import { ReachHint, WorkerAvatar } from '@/Function/shared/WorkerAvatar';
-import { formatElementDate, toDateOnlyString } from '@/Function/shared/dateUtils';
+import { useWorkerSkills } from '@/hooks/useWorkerSkills';
+import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { standingCapacity } from '@/Function/shared/workerCapacity';
 import { parseCapacityDraft, type TeamRosterEntry } from '@/ActivitySpace/sustainment/team/teamRoster';
+import { skillIndex, skillLevelLabel } from '@/ActivitySpace/sustainment/team/people';
+import { PersonPanel } from '@/ActivitySpace/sustainment/team/PersonPanel';
 import { NavTeamsIcon } from '@/shell/sidebar/NavIcons';
-import { FONT, STATUS } from '@/shared/designTokens';
+import { FONT } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
-import type { Worker } from '@/types/database';
-import { displayIdOf } from '@/ActivitySpace/execution/element/displayId';
+import type { Worker, WorkerSkill } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface TeamViewProps {
@@ -91,97 +92,125 @@ function CapacityField({ worker, canManage, onSave }: { worker: Worker; canManag
   );
 }
 
-function WorkerRow({ entry, onSave, onOpenWorkload, onOpenElement }: {
+function PersonRow({ entry, skills, selected, onSelect }: {
   entry: TeamRosterEntry;
-  onSave: SaveCapacity;
-} & Pick<TeamViewProps, 'onOpenWorkload' | 'onOpenElement'>) {
-  const [expanded, setExpanded] = useState(false);
-  const listId = useId();
+  skills: WorkerSkill[];
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const { t } = useI18n();
   const { worker, activeElements } = entry;
-  const today = toDateOnlyString(new Date());
-  const overdue = activeElements.filter((element) => element.due_date && element.due_date.slice(0, 10) < today).length;
-  const typeLabel = worker.type === 'ai_agent' ? 'AI agent' : worker.type === 'robot' ? 'Robot' : null;
-  const context = [entry.membership, ...entry.domainNames].join(' · ');
-
-  return (
-    <li className="border-b border-[var(--border-subtle)] last:border-b-0">
-      <div className="flex flex-wrap items-center gap-3 px-2 py-3 hover:bg-muted/20 transition-colors">
-        <WorkerAvatar worker={worker} size={28} />
-        <div className="flex-1 min-w-40">
-          <div className="flex items-center gap-2">
-            <span className={`${FONT.base} font-medium text-foreground truncate`}>{worker.name}</span>
-            {typeLabel && <span className={`${FONT.xs} text-muted-foreground flex items-center gap-1`}><Bot size={12} />{typeLabel}</span>}
-            <ReachHint worker={worker} />
-          </div>
-          <p className={`${FONT.sm} text-muted-foreground truncate`} title={context}>{worker.role ? `${worker.role} · ` : ''}{context}</p>
-        </div>
-        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 pl-10 sm:w-auto sm:pl-0">
-          <Button variant="ghost" size="sm" disabled={activeElements.length === 0} aria-expanded={expanded} aria-controls={listId} onClick={() => setExpanded((value) => !value)}>
-            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            {activeElements.length} open{overdue > 0 && <span className="text-[var(--status-warning)]"> · {overdue} overdue</span>}
-          </Button>
-          <CapacityField worker={worker} canManage={entry.canManage} onSave={onSave} />
-          {onOpenWorkload && <Button variant="ghost" size="sm" onClick={() => onOpenWorkload(worker.id)}>Workload</Button>}
-        </div>
-      </div>
-      {expanded && <ul id={listId} className="pb-3 pl-12 pr-2 space-y-1">
-        {activeElements.map((element) => {
-          const status = STATUS[element.status ?? 'todo'];
-          const content = <>
-            <span className={`size-2 rounded-full shrink-0 ${status.dot}`} aria-label={status.label} />
-            {displayIdOf(element) && <span className={`${FONT.mono} shrink-0`}>{displayIdOf(element)}</span>}
-            <span className="flex-1 truncate">{element.title}</span>
-            <span className={`${FONT.xs} shrink-0 text-muted-foreground`}>{element.due_date ? formatElementDate(element.due_date) : 'No due date'}</span>
-          </>;
-          return <li key={element.id}>{onOpenElement
-            ? <Button variant="ghost" size="md" align="start" className="w-full min-w-0" onClick={() => onOpenElement(element.id)}>{content}</Button>
-            : <div className={`${FONT.base} flex items-center gap-2 h-8 px-3`}>{content}</div>}
-          </li>;
-        })}
-      </ul>}
-    </li>
-  );
+  const top = skills.slice(0, 3);
+  return <li>
+    <button type="button" aria-current={selected || undefined} onClick={onSelect}
+      className={`w-full flex items-center gap-3 rounded-md px-2 py-2 text-left transition-colors ${selected ? 'bg-[var(--surface-strong)]' : 'hover:bg-muted/30'}`}>
+      <WorkerAvatar worker={worker} size={28} />
+      <span className="flex-1 min-w-0">
+        <span className="flex items-center gap-1.5">
+          <span className={`${FONT.base} font-medium text-foreground truncate`}>{worker.name}</span>
+          {worker.type === 'ai_agent' && <Bot size={12} className="text-muted-foreground shrink-0" aria-label={t('AI agent')} />}
+        </span>
+        <span className={`${FONT.xs} text-muted-foreground block truncate`}>
+          {top.length > 0 ? top.map((skill) => skill.name).join(' · ') : worker.role ?? t(entry.membership)}
+        </span>
+      </span>
+      <span className={`${FONT.xs} text-muted-foreground tabular-nums shrink-0`}>{t('{n} open', { n: activeElements.length })}</span>
+    </button>
+  </li>;
 }
 
 function TeamContent({ roster, onOpenWorkload, onOpenElement, onManageTeam }: TeamViewProps & { roster: ReturnType<typeof useTeamRoster> }) {
   const { t } = useI18n();
   const [search, setSearch] = useState('');
-  const query = search.trim().toLocaleLowerCase();
-  const filtered = roster.entries.filter(({ worker, domainNames, membership }) => [worker.name, worker.role, worker.email, worker.type, membership, ...domainNames]
-    .some((value) => value?.toLocaleLowerCase().includes(query)));
-  const groups = [
-    { title: 'Members', entries: filtered.filter((entry) => entry.isMember) },
-    { title: 'Participating Workers', entries: filtered.filter((entry) => !entry.isMember) },
-  ];
+  const [skillFilter, setSkillFilter] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const workerIds = useMemo(() => roster.entries.map((entry) => entry.worker.id), [roster.entries]);
+  const skills = useWorkerSkills(workerIds);
+  const index = useMemo(() => skillIndex(skills.data.skills, skills.data.evidence, new Set(workerIds)), [skills.data, workerIds]);
+  const skillsByWorker = useMemo(() => {
+    const map = new Map<string, WorkerSkill[]>();
+    for (const skill of skills.data.skills) map.set(skill.worker_id, [...(map.get(skill.worker_id) ?? []), skill]);
+    for (const list of map.values()) list.sort((a, b) => b.level - a.level || a.name.localeCompare(b.name));
+    return map;
+  }, [skills.data.skills]);
 
-  return <div className="max-w-5xl mx-auto px-4 sm:px-8 py-6 space-y-6">
+  const query = search.trim().toLocaleLowerCase();
+  const holders = skillFilter ? index.find((row) => row.key === skillFilter)?.holders ?? [] : null;
+  const rank = new Map(holders?.map((holder, position) => [holder.workerId, position]));
+  const filtered = roster.entries
+    .filter((entry) => !holders || rank.has(entry.worker.id))
+    .filter(({ worker, domainNames, membership }) => [worker.name, worker.role, worker.email, worker.type, membership, ...domainNames,
+      ...(skillsByWorker.get(worker.id) ?? []).map((skill) => skill.name)]
+      .some((value) => value?.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => (rank.get(a.worker.id) ?? 0) - (rank.get(b.worker.id) ?? 0));
+  const groups = [
+    { title: t('Members'), entries: filtered.filter((entry) => entry.isMember) },
+    { title: t('Participating Workers'), entries: filtered.filter((entry) => !entry.isMember) },
+  ];
+  const selected = filtered.find((entry) => entry.worker.id === selectedId) ?? filtered[0] ?? null;
+  const filterSummary = holders && skillFilter
+    ? holders.map((holder) => `${roster.entries.find((entry) => entry.worker.id === holder.workerId)?.worker.name ?? ''} (${t(skillLevelLabel(holder.level))})`).join(', ')
+    : null;
+
+  return <div className="max-w-6xl mx-auto px-4 sm:px-8 py-6 space-y-5">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h1 className={`${FONT.xl} text-foreground`}>{t('Team')}</h1>
-        <p className={`${FONT.sm} text-muted-foreground mt-1`}>Members and Workers supporting this Space. Capacity applies across their work.</p>
+        <h1 className={`${FONT.xl} text-foreground`}>{t('People')}</h1>
+        <p className={`${FONT.sm} text-muted-foreground mt-1`}>{t('Who is here, what they know, and what they have worked on. People and AI agents share one roster.')}</p>
       </div>
       <div className="flex items-center gap-2">
-        {onManageTeam && <Button variant="ghost" size="sm" onClick={onManageTeam}>Manage team</Button>}
-        {onOpenWorkload && <Button variant="secondary" size="sm" onClick={() => onOpenWorkload()}>Open Workload</Button>}
+        {onManageTeam && <Button variant="ghost" size="sm" onClick={onManageTeam}>{t('Manage team')}</Button>}
+        {onOpenWorkload && <Button variant="secondary" size="sm" onClick={() => onOpenWorkload()}>{t('Open Workload')}</Button>}
       </div>
     </div>
     <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-3">
       <Search size={16} className="text-muted-foreground shrink-0" />
-      <input type="search" aria-label="Find a Worker" placeholder="Find a Worker…" value={search} onChange={(event) => setSearch(event.target.value)}
+      <input type="search" aria-label={t('Find a person or skill')} placeholder={t('Find a person or skill…')} value={search} onChange={(event) => setSearch(event.target.value)}
         className={`${FONT.base} h-8 flex-1 min-w-0 px-2 bg-transparent focus:bg-[var(--surface-raised)] rounded-md`} />
-      <span className={`${FONT.sm} text-muted-foreground tabular-nums`}>{filtered.length} Workers</span>
+      <span className={`${FONT.sm} text-muted-foreground tabular-nums`}>{t('{n} Workers', { n: filtered.length })}</span>
       <Button variant="ghost" size="sm" disabled={roster.loading || roster.refreshing || !roster.enabled} onClick={() => { void roster.refresh(); }}>
-        {roster.refreshing ? 'Refreshing…' : 'Refresh'}
+        {roster.refreshing ? t('Refreshing…') : t('Refresh')}
       </Button>
     </div>
-    {roster.error && <div role="alert" className={`${FONT.base} text-[var(--status-danger)]`}>Could not refresh Team. {roster.error.message}</div>}
-    {!roster.enabled ? <p className={`${FONT.base} text-muted-foreground`}>Select a Space to view its Team.</p>
-      : roster.loading ? <p role="status" className={`${FONT.base} text-muted-foreground`}>Loading Team…</p>
-        : filtered.length === 0 ? <p className={`${FONT.base} text-muted-foreground`}>{query ? 'No Workers match your search.' : 'No Workers are connected to this Space yet. Space members and Workers assigned to its Objects or Elements appear here.'}</p>
-          : groups.map((group) => group.entries.length > 0 && <section key={group.title}>
-            <h2 className={`${FONT.lg} text-foreground mb-2`}>{group.title} <span className="text-muted-foreground">{group.entries.length}</span></h2>
-            <ul>{group.entries.map((entry) => <WorkerRow key={entry.worker.id} entry={entry} onSave={roster.saveCapacity} onOpenWorkload={onOpenWorkload} onOpenElement={onOpenElement} />)}</ul>
-          </section>)}
+    {index.length > 0 && <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('Filter by skill')}>
+        <span className={`${FONT.sm} text-muted-foreground mr-1`}>{t('Skills')}</span>
+        {index.slice(0, 16).map((row) => {
+          const active = skillFilter === row.key;
+          return <Button key={row.key} shape="tab" size="xs" variant={active ? 'secondary' : 'ghost'} aria-pressed={active}
+            onClick={() => setSkillFilter(active ? null : row.key)}>
+            {row.name} <span className="text-muted-foreground tabular-nums">{row.holders.length}</span>
+          </Button>;
+        })}
+      </div>
+      {filterSummary && <p className={`${FONT.xs} text-muted-foreground`}>{t('Strongest first: {list}', { list: filterSummary })}</p>}
+    </div>}
+    {roster.error && <div role="alert" className={`${FONT.base} text-[var(--status-danger)]`}>{t('Could not refresh People.')} {roster.error.message}</div>}
+    {!roster.enabled ? <p className={`${FONT.base} text-muted-foreground`}>{t('Select a Space to see its people.')}</p>
+      : roster.loading ? <p role="status" className={`${FONT.base} text-muted-foreground`}>{t('Loading people…')}</p>
+        : filtered.length === 0 ? <p className={`${FONT.base} text-muted-foreground`}>{query || skillFilter ? t('Nobody matches.') : t('No Workers are connected to this Space yet. Space members and Workers assigned to its Objects or Elements appear here.')}</p>
+          : <div className="grid gap-6 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
+            <nav aria-label={t('People')} className="space-y-4 min-w-0">
+              {groups.map((group) => group.entries.length > 0 && <section key={group.title}>
+                <h2 className={`${FONT.sm} text-muted-foreground mb-1 px-2`}>{group.title} <span className="tabular-nums">{group.entries.length}</span></h2>
+                <ul className="space-y-0.5">{group.entries.map((entry) => <PersonRow key={entry.worker.id} entry={entry}
+                  skills={skillsByWorker.get(entry.worker.id) ?? []} selected={entry.worker.id === selected?.worker.id}
+                  onSelect={() => {
+                    setSelectedId(entry.worker.id);
+                    // Below lg the panel sits under the list; bring it into view.
+                    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches) {
+                      requestAnimationFrame(() => panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+                    }
+                  }} />)}</ul>
+              </section>)}
+            </nav>
+            <div ref={panelRef} className="min-w-0 lg:border-l lg:border-[var(--border-subtle)] lg:pl-6">
+              {selected && <PersonPanel key={selected.worker.id} entry={selected} skills={skills} objectNames={roster.objectNames}
+                skillSuggestions={index.map((row) => row.name)} onOpenWorkload={onOpenWorkload} onOpenElement={onOpenElement}
+                capacity={<CapacityField worker={selected.worker} canManage={selected.canManage} onSave={roster.saveCapacity} />} />}
+            </div>
+          </div>}
   </div>;
 }
 
@@ -190,7 +219,7 @@ export function TeamView(props: TeamViewProps = {}) {
   const roster = useTeamRoster();
   return <div className="flex flex-col h-full bg-card">
     <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
-      <NavTeamsIcon size={12} /><span className={`${FONT.sm} font-semibold text-foreground`}>{t('Team')}</span>
+      <NavTeamsIcon size={12} /><span className={`${FONT.sm} font-semibold text-foreground`}>{t('People')}</span>
     </div>
     <div className="flex-1 overflow-auto"><TeamContent key={roster.contextKey} roster={roster} {...props} /></div>
   </div>;
