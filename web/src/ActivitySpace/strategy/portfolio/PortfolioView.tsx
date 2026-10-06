@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, CornerDownRight, FolderInput, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverAnchor, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '@/ui/context-menu';
@@ -10,6 +10,8 @@ import { MenuShell } from '@/Function/shared/menu';
 import { EmptyState } from '@/Function/shared/EmptyState';
 import { QuickCreatePopup } from '@/Function/shared/QuickCreatePopup';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
+import { PAGE_BODY, PageHead, PageSection } from '@/Function/shared/PageHead';
+import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { RenameInput } from '@/ActivitySpace/sustainment/notebook/RenameInput';
@@ -202,25 +204,23 @@ function PortfolioTreeRow({ node, tree, rollup, open, onToggle, onOpen, onNewIns
   return (
     <PortfolioMenu portfolio={portfolio} node={node} tree={tree}
       onRename={() => setRenaming(true)} onNewInside={onNewInside}>
-      <div className="flex min-w-0 items-center gap-1 rounded-md pr-2 hover:bg-muted/40" style={{ paddingLeft: node.depth * 20 }}>
-        <Button variant="ghost" size="icon-sm" onClick={onToggle} disabled={!hasChildren}
-          className={hasChildren ? '' : 'invisible'}
-          aria-label={`${t(open ? 'Collapse' : 'Expand')} ${portfolio.name}`} aria-expanded={hasChildren ? open : undefined}>
-          {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        </Button>
-        {renaming ? (
-          <span className="flex min-w-0 flex-1 items-center gap-2.5 py-1"><NavPortfolioIcon size={16} />
-            <RenameInput initial={portfolio.name} className="text-xs font-semibold"
-              onCommit={(v) => { setRenaming(false); if (v.trim() && v.trim() !== portfolio.name) void guarded(() => updatePortfolio(portfolio.id, { name: v.trim() })); }}
-              onCancel={() => setRenaming(false)} />
-          </span>
-        ) : (
-          <Button variant="ghost" size="md" align="start" onClick={onOpen} className="min-w-0 flex-1 gap-2.5 text-xs font-semibold text-foreground">
-            <NavPortfolioIcon size={16} /><span className="truncate">{portfolio.name}</span>
-            {portfolio.description && <span className="hidden min-w-0 truncate text-[12px] font-normal text-muted-foreground sm:inline">{portfolio.description}</span>}
-          </Button>
-        )}
-        <RollupCell rollup={rollup} />
+      <div>
+        <ContentRow indent={node.depth * 20} icon={<NavPortfolioIcon size={16} />} name={portfolio.name} description={portfolio.description}
+          onOpen={onOpen}
+          body={renaming ? (
+            <span className="flex h-8 min-w-0 flex-1 items-center gap-2.5 px-2"><span className="flex w-4 shrink-0 items-center justify-center"><NavPortfolioIcon size={16} /></span>
+              <RenameInput initial={portfolio.name} className="text-[13px] font-medium"
+                onCommit={(v) => { setRenaming(false); if (v.trim() && v.trim() !== portfolio.name) void guarded(() => updatePortfolio(portfolio.id, { name: v.trim() })); }}
+                onCancel={() => setRenaming(false)} />
+            </span>
+          ) : undefined}
+          meta={<RollupFigures rollup={rollup} />}>
+          <button type="button" onClick={onToggle} disabled={!hasChildren}
+            className={`flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground ${hasChildren ? '' : 'invisible'}`}
+            aria-label={`${t(open ? 'Collapse' : 'Expand')} ${portfolio.name}`} aria-expanded={hasChildren ? open : undefined}>
+            {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          </button>
+        </ContentRow>
       </div>
     </PortfolioMenu>
   );
@@ -302,10 +302,10 @@ function MovePicker({ targets, allowTopLevel, onPick, onClose }: {
   );
 }
 
-function RollupCell({ rollup }: { rollup: PortfolioRollup }) {
+function RollupFigures({ rollup }: { rollup: PortfolioRollup }) {
   const { t } = useI18n();
   return (
-    <div className="flex shrink-0 items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
+    <>
       {rollup.progressPct !== null && (
         <span className="flex w-24 items-center gap-1.5">
           <SegmentedProgress value={rollup.progressPct} className="flex-1" />
@@ -314,7 +314,7 @@ function RollupCell({ rollup }: { rollup: PortfolioRollup }) {
       )}
       {rollup.alerts > 0 && <span className="text-destructive">{t('{n} alerts', { n: String(rollup.alerts) })}</span>}
       <span className="w-6 text-right" title={t('Initiatives')}>{rollup.initiatives}</span>
-    </div>
+    </>
   );
 }
 
@@ -371,83 +371,61 @@ function PortfolioDetail({ node, portfolios, byPortfolio, healthById, candidates
           title={t('New Portfolio inside')} aria-label={t('New Portfolio inside')}><FolderPlus size={14} /></Button>
       </div>
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-3xl px-8 py-8">
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">{portfolio.name}</h1>
-          <DescriptionField key={portfolio.id} portfolioId={portfolio.id} initial={portfolio.description ?? ''} />
-          <div className="mt-4 flex items-center gap-4 text-[12px] text-muted-foreground tabular-nums">
+        <div className={PAGE_BODY}>
+          <PageHead key={portfolio.id} title={portfolio.name} description={portfolio.description ?? ''} canEdit
+            titleLabel={t('Portfolio name')} titlePlaceholder={t('Portfolio name…')}
+            descriptionLabel={t('Description')} descriptionPlaceholder={t('What this Portfolio is a bet on, and what it should add up to.')}
+            onSaveTitle={(name) => void updatePortfolio(portfolio.id, { name })}
+            onSaveDescription={(description) => void updatePortfolio(portfolio.id, { description: description || null })} />
+          <div className="mt-3 flex items-center gap-4 text-[12px] text-muted-foreground tabular-nums">
             <span>{t('{n} Initiatives', { n: String(rollup.initiatives) })}</span>
             {rollup.progressPct !== null && <span>{t('{n}% done', { n: String(rollup.progressPct) })}</span>}
             {rollup.alerts > 0 && <span className="text-destructive">{t('{n} alerts', { n: String(rollup.alerts) })}</span>}
           </div>
 
           {node.children.length > 0 && (
-            <section className="mt-8">
-              <h2 className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Portfolios inside')}</h2>
+            <PageSection title={t('Portfolios inside')} className="mt-8">
               {node.children.map((child) => (
-                <div key={child.portfolio.id} className="flex min-w-0 items-center gap-1 rounded-md pr-2 hover:bg-muted/40">
-                  <Button variant="ghost" size="md" align="start" onClick={() => onOpenPortfolio(child.portfolio.id)} className="min-w-0 flex-1 gap-2.5 text-xs font-semibold text-foreground">
-                    <NavPortfolioIcon size={16} /><span className="truncate">{child.portfolio.name}</span>
-                  </Button>
-                  <RollupCell rollup={rollupPortfolio(child, byPortfolio, healthById)} />
-                </div>
+                <ContentRow key={child.portfolio.id} icon={<NavPortfolioIcon size={16} />} name={child.portfolio.name}
+                  onOpen={() => onOpenPortfolio(child.portfolio.id)}
+                  meta={<RollupFigures rollup={rollupPortfolio(child, byPortfolio, healthById)} />} />
               ))}
-            </section>
+            </PageSection>
           )}
 
-          <section className="mt-8">
-            <h2 className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Initiatives')}</h2>
+          <PageSection title={t('Initiatives')} className="mt-8">
             {initiatives.length === 0 && (
               <p className="px-2 py-2 text-[12px] text-muted-foreground">{t('No Initiatives in this Portfolio yet.')}</p>
             )}
             {initiatives.map((s) => (
               <InitiativeRow key={s.id} strategy={s} health={healthById.get(s.id)} onOpen={() => onSelectStrategy(s.id)} onRemove={() => void move(s.id, null)} />
             ))}
-            <Popover open={pickerOpen} onOpenChange={(v) => { setPickerOpen(v); if (!v) setQuery(''); }}>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" align="start" className="mt-1 text-muted-foreground"><Plus size={12} />{t('Add Initiative')}</Button>
-              </PopoverTrigger>
-              <MenuShell width="wide" align="start">
-                <Command shouldFilter={false}>
-                  <CommandInput value={query} onValueChange={setQuery} placeholder={t('Find an Initiative…')} />
-                  <CommandList>
-                    <CommandEmpty>{t('No matches.')}</CommandEmpty>
-                    {matches.map((s) => (
-                      <CommandItem key={s.id} value={`${s.name} ${s.id}`} onSelect={() => void move(s.id, portfolio)}>
-                        <NavStrategyIcon size={12} /><span className="flex-1 truncate">{s.name}</span>
-                        {s.portfolio_id && <span className="text-[11px] text-muted-foreground">{t('In another Portfolio')}</span>}
-                      </CommandItem>
-                    ))}
-                  </CommandList>
-                </Command>
-              </MenuShell>
-            </Popover>
+            <ButtonAppearanceProvider appearance="inline">
+              <Popover open={pickerOpen} onOpenChange={(v) => { setPickerOpen(v); if (!v) setQuery(''); }}>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" align="start" className="text-muted-foreground"><Plus size={13} strokeWidth={2.5} />{t('Add Initiative')}</Button>
+                </PopoverTrigger>
+                <MenuShell width="wide" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput value={query} onValueChange={setQuery} placeholder={t('Find an Initiative…')} />
+                    <CommandList>
+                      <CommandEmpty>{t('No matches.')}</CommandEmpty>
+                      {matches.map((s) => (
+                        <CommandItem key={s.id} value={`${s.name} ${s.id}`} onSelect={() => void move(s.id, portfolio)}>
+                          <NavStrategyIcon size={12} /><span className="flex-1 truncate">{s.name}</span>
+                          {s.portfolio_id && <span className="text-[11px] text-muted-foreground">{t('In another Portfolio')}</span>}
+                        </CommandItem>
+                      ))}
+                    </CommandList>
+                  </Command>
+                </MenuShell>
+              </Popover>
+            </ButtonAppearanceProvider>
             {error && <div className="px-2 py-1 text-[11px] text-destructive">{error}</div>}
-          </section>
+          </PageSection>
         </div>
       </div>
     </>
-  );
-}
-
-// The Portfolio's description: what this bet is. Saves on blur.
-function DescriptionField({ portfolioId, initial }: { portfolioId: string; initial: string }) {
-  const { t } = useI18n();
-  const [text, setText] = useState(initial);
-  const [error, setError] = useState<string | null>(null);
-  const save = async () => {
-    const next = text.trim();
-    if (next === initial.trim()) return;
-    try { await updatePortfolio(portfolioId, { description: next || null }); setError(null); }
-    catch (e) { setError(e instanceof Error ? e.message : t("Couldn't save")); }
-  };
-  return (
-    <div className="mt-2">
-      <textarea value={text} onChange={(e) => setText(e.target.value)} onBlur={() => void save()} rows={2}
-        aria-label={t('Description')}
-        placeholder={t('What this Portfolio is a bet on, and what it should add up to.')}
-        className="-mx-2 w-[calc(100%+1rem)] resize-none rounded-md bg-transparent px-2 py-1 text-[13px] leading-6 text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors focus:bg-muted/30" />
-      {error && <div className="text-[11px] text-destructive">{error}</div>}
-    </div>
   );
 }
 
@@ -460,11 +438,8 @@ function InitiativeRow({ strategy, health, onOpen, onRemove }: {
   const alerts = health ? health.risk.overdue + health.risk.stalled + health.risk.blocked : 0;
   const moved = health?.lastActivityAt != null ? formatRelative(new Date(health.lastActivityAt).toISOString()) : null;
   return (
-    <div className="group flex min-w-0 items-center gap-1 rounded-md hover:bg-muted/40">
-      <Button variant="ghost" size="md" align="start" onClick={onOpen} className="min-w-0 flex-1 gap-2.5 text-xs font-semibold text-foreground">
-        <NavStrategyIcon size={16} /><span className="truncate">{strategy.name}</span>
-      </Button>
-      <div className="flex shrink-0 items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
+    <ContentRow icon={<NavStrategyIcon size={16} />} name={strategy.name} onOpen={onOpen}
+      meta={<>
         {health?.progressPct != null && (
           <span className="flex w-24 items-center gap-1.5">
             <SegmentedProgress value={health.progressPct} className="flex-1" />
@@ -474,11 +449,9 @@ function InitiativeRow({ strategy, health, onOpen, onRemove }: {
         {moved && <span className="hidden text-muted-foreground/70 sm:inline">{moved}</span>}
         {alerts > 0 && <span className="text-destructive">{t('{n} alerts', { n: String(alerts) })}</span>}
         <span className="w-6 text-right" title={t('Objects')}>{countObjects(strategy.objectIds)}</span>
-      </div>
-      {onRemove ? (
-        <Button variant="ghost" size="icon-xs" onClick={onRemove} className="mr-1 text-muted-foreground opacity-0 group-hover:opacity-100 focus:opacity-100"
-          aria-label={t('Remove from Portfolio')} title={t('Remove from Portfolio')}><X size={12} /></Button>
-      ) : <span className="mr-1 w-6 shrink-0" />}
-    </div>
+      </>}
+      actions={onRemove
+        ? <ContentRowAction label={t('Remove from Portfolio')} onClick={onRemove}><X size={12} /></ContentRowAction>
+        : <span className="w-6" />} />
   );
 }
