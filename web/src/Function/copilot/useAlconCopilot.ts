@@ -35,7 +35,7 @@ export interface CopilotContext {
   elementId?: string;
   objectId?: string;
   domainId?: string;
-  /** The Space a Space-wide tool (SCM) should read. */
+  /** The Space a Space-wide tool should read. */
   spaceId?: string;
   /** The person's business date (local), so date-based tools agree with the UI. */
   today?: string;

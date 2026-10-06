@@ -14,7 +14,7 @@ import { readAllPages } from '@/hooks/readAllPages';
 import {
   buildCrmWorkspace, measureValue, metricValue, normalizeCrmStages, parseActivityLog, resolveStage,
   type CrmActivityRecord, type CrmActivityType, type CrmCompanyRecord, type CrmContactRecord, type CrmDeal,
-  type CrmDealRecord, type CrmFieldRecord, type CrmNextElement, type CrmPerson, type CrmPipelineRecord,
+  type CrmDealRecord, type CrmFieldRecord, type CrmNextElement, type CrmPerson, type CrmPipelineRecord, type CrmWorkspace,
 } from '@/ActivitySpace/sustainment/crm/crmModel';
 
 const EMPTY: never[] = [];
@@ -128,6 +128,13 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     pipeline: pipeline!, deals: deals.data!, companies: companies.data!, contacts: contacts.data!,
     activities: activities.data!, elements: elements.data ?? EMPTY, people,
   }, today) : null, [loaded, pipeline, deals.data, companies.data, contacts.data, activities.data, elements.data, people, today]);
+  // Every pipeline's workspace, for what reads across pipelines — the scope's
+  // overview, Today, the saved lists. Each keeps its own stages, currency and
+  // rhythm; nothing here sums across currencies.
+  const workspaces = useMemo(() => loaded ? (pipelines.data ?? []).map(item => item.id === pipeline!.id && workspace ? workspace : buildCrmWorkspace({
+    pipeline: item, deals: deals.data!, companies: companies.data!, contacts: contacts.data!,
+    activities: activities.data!, elements: elements.data ?? EMPTY, people,
+  }, today)) : EMPTY as CrmWorkspace[], [loaded, pipelines.data, pipeline, workspace, deals.data, companies.data, contacts.data, activities.data, elements.data, people, today]);
 
   // ── Writes ────────────────────────────────────────────────────────────────
   const space = () => { if (!spaceId) throw new Error('Choose a Space first.'); return spaceId; };
@@ -244,11 +251,13 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
    * own My Elements when the deal is mine. A colleague's deal without an
    * Object keeps the step on the deal itself, visible to the whole team.
    * Returns a notice when the step could not become the owner's Element. */
-  const setNextStep = async (deal: Pick<CrmDeal, 'id' | 'name' | 'account' | 'ownerId' | 'nextElement'> & { number?: number }, step: { title: string; due: string | null }): Promise<string | null> => {
+  const setNextStep = async (deal: Pick<CrmDeal, 'id' | 'name' | 'account' | 'ownerId' | 'nextElement'> & { number?: number; pipelineId?: string }, step: { title: string; due: string | null }): Promise<string | null> => {
     const title = step.title.trim();
     if (!title) throw new Error('Describe the next step.');
     const element = deal.nextElement && !['done', 'cancelled'].includes(deal.nextElement.status) ? deal.nextElement : null;
-    const objectId = pipeline?.object_id ?? null;
+    // The deal's own pipeline decides where its next step lands, whichever
+    // pipeline this screen happens to be on.
+    const objectId = ((deal.pipelineId ? (pipelines.data ?? []).find(item => item.id === deal.pipelineId) : null) ?? pipeline)?.object_id ?? null;
     const mine = !deal.ownerId || deal.ownerId === me;
     let elementId = element?.id ?? null;
     let notice: string | null = null;
@@ -395,7 +404,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
 
   const error = pipelines.error ?? deals.error ?? companies.error ?? contacts.error ?? activities.error ?? fields.error ?? elements.error ?? null;
   return {
-    spaceId, today, me, people, domains, workspace, pipeline, legacyTable: legacy.data ?? null,
+    spaceId, today, me, people, domains, workspace, workspaces, pipeline, legacyTable: legacy.data ?? null,
     pipelines: pipelines.data ?? EMPTY as CrmPipelineRecord[],
     companies: companies.data ?? EMPTY as CrmCompanyRecord[],
     contacts: contacts.data ?? EMPTY as CrmContactRecord[],

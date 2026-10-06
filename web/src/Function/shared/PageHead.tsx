@@ -113,7 +113,9 @@ export function PageHead({
   emptyDescription?: string;
   /** Called with the trimmed value when it changed. Throw to report a failure. */
   onSaveTitle: (value: string) => void | Promise<void>;
-  onSaveDescription: (value: string) => void | Promise<void>;
+  /** Omit when the description is not the subject's own (a tool's fixed
+   *  explanation): it is then shown as text even while the title edits. */
+  onSaveDescription?: (value: string) => void | Promise<void>;
 }) {
   const { t } = useI18n();
   const [titleDraft, setTitleDraft, savedTitle] = useDraft(title);
@@ -130,7 +132,7 @@ export function PageHead({
   };
   const commitDescription = async () => {
     const next = descDraft.trim();
-    if (next === savedDesc.trim()) return;
+    if (!onSaveDescription || next === savedDesc.trim()) return;
     try { await onSaveDescription(next); setError(null); } catch (e) { setError(message(e, t("Couldn't save"))); }
   };
 
@@ -158,14 +160,16 @@ export function PageHead({
         }}
         className="w-full resize-none overflow-hidden border-none bg-transparent text-2xl leading-tight text-foreground focus:outline-none"
         style={{ fontWeight: 600 }} />
-      <div className="mt-3">
+      {!onSaveDescription ? (
+        description && <p className="mt-3 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-muted-foreground">{description}</p>
+      ) : <div className="mt-3">
         <AutoField label={descriptionLabel} placeholder={descriptionPlaceholder} value={descDraft} onChange={setDescDraft} onBlur={() => void commitDescription()}
           onKeyDown={(e) => {
             // Enter is a newline; ⌘Enter and Escape end the edit, which saves it.
             if (isSubmitChord(e) || isCancelKey(e)) { e.preventDefault(); e.currentTarget.blur(); }
           }}
           className="min-h-[36px] w-full resize-none overflow-hidden border-none bg-transparent text-[14px] leading-relaxed text-foreground focus:outline-none" />
-      </div>
+      </div>}
       {error && <div role="alert" className="text-[11px] text-destructive">{error}</div>}
     </div>
   );

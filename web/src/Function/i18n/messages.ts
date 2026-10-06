@@ -2,7 +2,6 @@ import type { Locale } from './locales';
 import { CRM_TRANSLATIONS } from '@/ActivitySpace/sustainment/crm/crmMessages';
 import { WORKLOAD_TRANSLATIONS } from '@/ActivitySpace/sustainment/workload/workloadMessages';
 import { PEOPLE_TRANSLATIONS } from '@/ActivitySpace/sustainment/team/peopleMessages';
-import { SCM_MESSAGES } from './scmMessages';
 
 type TranslationMap = Record<string, string>;
 
@@ -302,8 +301,8 @@ Object.assign(ja, {
   'How names are shown across the interface': '画面全体での名前の表示方法', 'Labels': 'ラベル', 'Large': '大', 'Larger': 'より大',
   'Light': 'ライト', 'Match the system or pick a colour theme': 'システムに合わせるかカラーテーマを選びます',
   'Monday': '月曜日', 'Navigation': 'ナビゲーション', 'Note': 'ノート', 'Notes': 'ノート', 'Object': 'Object',
-  'Remove {label} from the rail': 'レールから {label} を外す', 'Saturday': '土曜日', 'Search elements, objects, notes. Press ⌘K to open.': 'Elements、Objects、ノートを検索します。⌘K で開きます。',
-  'Search elements, objects, notes…': 'Elements、Objects、ノートを検索…', 'Searching…': '検索中…',
+  'Remove {label} from the rail': 'レールから {label} を外す', 'Saturday': '土曜日', 'Search elements, objects, notes and records. Press ⌘K to open.': 'Elements、Objects、ノート、記録を検索します。⌘K で開きます。', 'Records': '記録', 'Deal': '商談', 'Item': '品目',
+  'Search elements, objects, notes, records…': 'Elements、Objects、ノート、記録を検索…', 'Searching…': '検索中…',
   'Select which view to open when launching Alcon': 'Alcon の起動時に開くビューを選択します',
   'Send comment on…': 'コメントの送信キー', 'Short name': '短い名前', 'Show AI': 'AI を表示', 'Show sidebar': 'サイドバーを表示',
   'SLAs': 'SLA', 'Small': '小', 'Smaller': 'より小', 'Statuses': 'ステータス', 'Sunday': '日曜日',
@@ -321,8 +320,8 @@ Object.assign(ko, {
   'How names are shown across the interface': '인터페이스에서 이름을 표시하는 방식', 'Labels': '라벨', 'Light': '라이트',
   'Match the system or pick a colour theme': '시스템에 맞추거나 색상 테마를 선택합니다',
   'Monday': '월요일', 'Navigation': '탐색', 'Note': '노트', 'Notes': '노트', 'Object': 'Object', 'Remove {label} from the rail': '레일에서 {label} 제거', 'Saturday': '토요일',
-  'Search elements, objects, notes. Press ⌘K to open.': 'Elements, Objects, 노트를 검색합니다. ⌘K로 엽니다.',
-  'Search elements, objects, notes…': 'Elements, Objects, 노트 검색…', 'Searching…': '검색 중…',
+  'Search elements, objects, notes and records. Press ⌘K to open.': 'Elements, Objects, 노트, 기록을 검색합니다. ⌘K로 엽니다.', 'Records': '기록', 'Deal': '거래', 'Item': '품목',
+  'Search elements, objects, notes, records…': 'Elements, Objects, 노트, 기록 검색…', 'Searching…': '검색 중…',
   'Select which view to open when launching Alcon': 'Alcon 시작 시 열 뷰를 선택합니다', 'Send comment on…': '댓글 제출 키', 'Short name': '짧은 이름',
   'Show AI': 'AI 표시', 'Show sidebar': '사이드바 표시', 'SLAs': 'SLA', 'Small': '작음', 'Smaller': '더 작음', 'Statuses': '상태', 'Sunday': '일요일', 'Templates': '템플릿', 'Top-level container': '최상위 컨테이너', 'Try Again': '다시 시도', 'Updates': '업데이트',
   'Used for date pickers': '날짜 선택기에 사용', 'Username': '사용자 이름', 'Which key press submits a comment': '댓글을 제출할 키',
@@ -338,8 +337,8 @@ Object.assign(fr, {
   'How names are shown across the interface': 'Mode d’affichage des noms dans l’interface', 'Labels': 'Étiquettes', 'Light': 'Clair',
   'Match the system or pick a colour theme': 'Suivre le système ou choisir un thème de couleur',
   'Monday': 'Lundi', 'Navigation': 'Navigation', 'Note': 'Note', 'Notes': 'Notes', 'Object': 'Object', 'Remove {label} from the rail': 'Retirer {label} de la barre', 'Saturday': 'Samedi',
-  'Search elements, objects, notes. Press ⌘K to open.': 'Recherchez des Elements, Objects et notes. Appuyez sur ⌘K pour ouvrir.',
-  'Search elements, objects, notes…': 'Rechercher des Elements, Objects et notes…', 'Searching…': 'Recherche…',
+  'Search elements, objects, notes and records. Press ⌘K to open.': 'Recherchez des Elements, Objects, notes et fiches. Appuyez sur ⌘K pour ouvrir.', 'Records': 'Fiches', 'Deal': 'Affaire', 'Item': 'Article',
+  'Search elements, objects, notes, records…': 'Rechercher des Elements, Objects, notes, fiches…', 'Searching…': 'Recherche…',
   'Select which view to open when launching Alcon': 'Choisir la vue ouverte au lancement d’Alcon', 'Send comment on…': 'Envoyer le commentaire avec…', 'Short name': 'Prénom',
   'Show AI': 'Afficher l’IA', 'Show sidebar': 'Afficher la barre latérale', 'SLAs': 'SLA', 'Small': 'Petit', 'Smaller': 'Très petit', 'Statuses': 'Statuts', 'Sunday': 'Dimanche', 'Templates': 'Modèles', 'Top-level container': 'Conteneur principal', 'Try Again': 'Réessayer', 'Updates': 'Mises à jour',
   'Used for date pickers': 'Utilisé dans les sélecteurs de date', 'Username': "Nom d’utilisateur", 'Which key press submits a comment': 'Touche utilisée pour envoyer un commentaire',
@@ -355,8 +354,8 @@ Object.assign(es, {
   'How names are shown across the interface': 'Cómo se muestran los nombres en la interfaz', 'Labels': 'Etiquetas', 'Light': 'Claro',
   'Match the system or pick a colour theme': 'Usa el tema del sistema o elige un tema de color',
   'Monday': 'Lunes', 'Navigation': 'Navegación', 'Note': 'Nota', 'Notes': 'Notas', 'Object': 'Object', 'Remove {label} from the rail': 'Quitar {label} de la barra', 'Saturday': 'Sábado',
-  'Search elements, objects, notes. Press ⌘K to open.': 'Busca Elements, Objects y notas. Pulsa ⌘K para abrir.',
-  'Search elements, objects, notes…': 'Buscar Elements, Objects y notas…', 'Searching…': 'Buscando…',
+  'Search elements, objects, notes and records. Press ⌘K to open.': 'Busca Elements, Objects, notas y registros. Pulsa ⌘K para abrir.', 'Records': 'Registros', 'Deal': 'Trato', 'Item': 'Artículo',
+  'Search elements, objects, notes, records…': 'Buscar Elements, Objects, notas, registros…', 'Searching…': 'Buscando…',
   'Select which view to open when launching Alcon': 'Selecciona la vista que se abrirá al iniciar Alcon', 'Send comment on…': 'Enviar comentario con…', 'Short name': 'Nombre corto',
   'Show AI': 'Mostrar IA', 'Show sidebar': 'Mostrar barra lateral', 'SLAs': 'SLA', 'Small': 'Pequeño', 'Smaller': 'Más pequeño', 'Statuses': 'Estados', 'Sunday': 'Domingo', 'Templates': 'Plantillas', 'Top-level container': 'Contenedor principal', 'Try Again': 'Reintentar', 'Updates': 'Actualizaciones',
   'Used for date pickers': 'Se usa en los selectores de fecha', 'Username': 'Nombre de usuario', 'Which key press submits a comment': 'Tecla que envía un comentario',
@@ -1171,12 +1170,6 @@ Object.assign(ko, CRM_TRANSLATIONS.ko);
 Object.assign(fr, CRM_TRANSLATIONS.fr);
 Object.assign(es, CRM_TRANSLATIONS.es);
 
-// The SCM App (Sustainment).
-Object.assign(ja, SCM_MESSAGES.ja);
-Object.assign(ko, SCM_MESSAGES.ko);
-Object.assign(fr, SCM_MESSAGES.fr);
-Object.assign(es, SCM_MESSAGES.es);
-
 Object.assign(ja, WORKLOAD_TRANSLATIONS.ja);
 Object.assign(ko, WORKLOAD_TRANSLATIONS.ko);
 Object.assign(fr, WORKLOAD_TRANSLATIONS.fr);
@@ -1390,6 +1383,12 @@ Object.assign(es, {
   "Each Initiative gets its own timeline and resource view.": "Cada Initiative tiene su propia línea de tiempo y vista de recursos.",
   "Create Initiative": "Crear Initiative",
 });
+
+// Tool pages (CRM): the tab strip and the subject's head.
+Object.assign(ja, { 'Overview': '概要', 'Properties': 'プロパティ', 'Description': '説明', 'Hide this view': 'このビューを隠す', 'Show a view': 'ビューを表示', '{n} days': '{n} 日' });
+Object.assign(ko, { 'Overview': '개요', 'Properties': '속성', 'Description': '설명', 'Hide this view': '이 보기 숨기기', 'Show a view': '보기 표시', '{n} days': '{n}일' });
+Object.assign(fr, { 'Overview': 'Aperçu', 'Properties': 'Propriétés', 'Description': 'Description', 'Hide this view': 'Masquer cette vue', 'Show a view': 'Afficher une vue', '{n} days': '{n} jours' });
+Object.assign(es, { 'Overview': 'Resumen', 'Properties': 'Propiedades', 'Description': 'Descripción', 'Hide this view': 'Ocultar esta vista', 'Show a view': 'Mostrar una vista', '{n} days': '{n} días' });
 
 // People (ActivitySpace/sustainment/team). Last, so the app name stays
 // English everywhere, like every other concept name.

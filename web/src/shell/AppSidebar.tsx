@@ -55,7 +55,6 @@ import { CREATE_ELEMENT_EVENT, type CreateElementDetail } from '@/shell/QuickAdd
 import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarStore';
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
-import { ScmSidebar } from '@/ActivitySpace/sustainment/scm/ScmSidebar';
 import { CrmSidebar } from '@/ActivitySpace/sustainment/crm/CrmSidebar';
 import { InboxList } from '@/ActivitySpace/home/InboxList';
 import { CalendarSidebar } from '@/ActivitySpace/sustainment/calendar/CalendarSidebar';
@@ -533,7 +532,6 @@ export function AppSidebar({
           {railMode === 'calendar' && <><SidebarModeLabel label={t('Calendar')} /><CalendarSidebar /></>}
           {railMode === 'team' && <SidebarModeLabel label={t('People')} />}
           {railMode === 'crm' && <CrmSidebar navigation={navigation} onNavigate={onNavigate} />}
-          {railMode === 'scm' && <ScmSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'scm') onViewChange('scm'); }} />}
           </>
           )}
         </nav></ButtonAppearanceProvider>

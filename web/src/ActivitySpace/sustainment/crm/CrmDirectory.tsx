@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus, Trash2, X } from 'lucide-react';
+import { ArrowUpRight, Plus } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { TextComposer } from '@/ui/text-composer';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -10,6 +10,10 @@ import { ACTIVITY_TYPES, fieldsFor, normalizeCrmStages, resolveStage, type CrmAc
 import { moneyList, relativeDay } from './crmFormat';
 import { CrmPicker } from './CrmPicker';
 import { CustomFields, EditableText, Property } from './CrmFields';
+import { PageHead } from '@/Function/shared/PageHead';
+import { RailCard } from '@/Function/shared/RailCard';
+import { CrmIcon } from '@/Function/shared/conceptIcons';
+import { CrmRecordPage, RecordSection } from './CrmRecordPage';
 
 const ACTIVITY_LABEL: Record<CrmActivityRecord['kind'], string> = { call: 'Call', email: 'Mail', meeting: 'Meeting', note: 'Memo', stage: 'Stage' };
 
@@ -95,28 +99,6 @@ export function CrmContacts({ crm, query, onOpen, selectedId }: { crm: Crm; quer
   </div>;
 }
 
-function RecordShell({ title, subtitle, onClose, onDelete, children }: { title: string; subtitle: string; onClose: () => void; onDelete: () => Promise<void>; children: React.ReactNode }) {
-  const { t } = useI18n();
-  const [confirm, setConfirm] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  return <aside aria-label={title} className="flex h-full w-full min-w-0 flex-col bg-card">
-    <div className="flex items-start gap-2 px-5 pb-3 pt-5">
-      <div className="min-w-0 flex-1"><p className="px-1 text-[11px] text-muted-foreground">{subtitle}</p><h2 className="truncate px-1 text-lg font-semibold">{title}</h2></div>
-      <Button variant="ghost" size="icon-sm" aria-label={t('Close panel')} onClick={onClose}><X size={14} /></Button>
-    </div>
-    <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 pb-6">
-      {children}
-      <section className="flex justify-end border-t border-[var(--border-subtle)] pt-4">
-        {confirm ? <span className="flex items-center gap-2"><span className="text-xs">{t('Delete this record? Its deals stay, without this link.')}</span>
-          <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>{t('Cancel')}</Button>
-          <Button size="sm" variant="danger" onClick={() => { setError(null); onDelete().then(onClose).catch(cause => setError(cause instanceof Error ? cause.message : t('Could not save. Try again.'))); }}>{t('Delete')}</Button></span>
-          : <Button size="sm" variant="ghost" aria-label={t('Delete')} onClick={() => setConfirm(true)}><Trash2 size={14} /></Button>}
-        {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{error}</p>}
-      </section>
-    </div>
-  </aside>;
-}
-
 function Timeline({ crm, entries, onLog }: { crm: Crm; entries: readonly CrmActivityRecord[]; onLog: (type: CrmActivityType, text: string) => Promise<void> }) {
   const { t, locale } = useI18n();
   const [note, setNote] = useState('');
@@ -124,8 +106,7 @@ function Timeline({ crm, entries, onLog }: { crm: Crm; entries: readonly CrmActi
   const [busy, setBusy] = useState(false);
   const log = async () => { if (!note.trim()) return; setBusy(true); try { await onLog(type, note.trim()); setNote(''); } finally { setBusy(false); } };
   const sorted = [...entries].sort((a, b) => b.occurred_on.localeCompare(a.occurred_on) || b.created_at.localeCompare(a.created_at)).slice(0, 60);
-  return <section aria-label={t('Activity')} className="space-y-3">
-    <h3 className="text-xs font-medium text-muted-foreground">{t('Activity')}</h3>
+  return <RecordSection title={t('Activity')}><div className="max-w-2xl space-y-3">
     <TextComposer rows={2} aria-label={t('Log activity')} placeholder={t('What happened?')} value={note} disabled={busy}
       onChange={event => setNote(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void log(); } }}
       hint={<span className="flex flex-wrap gap-1">{ACTIVITY_TYPES.map(item => <Button key={item} shape="tab" size="xs" variant={type === item ? 'secondary' : 'ghost'} aria-pressed={type === item} onClick={() => setType(item)}>{t(ACTIVITY_LABEL[item])}</Button>)}</span>}
@@ -135,25 +116,25 @@ function Timeline({ crm, entries, onLog }: { crm: Crm; entries: readonly CrmActi
         {entry.deal_id && <span className="truncate">· {crm.allDeals.find(deal => deal.id === entry.deal_id)?.name}</span>}</div>
       <p className={`whitespace-pre-wrap break-words text-[13px] leading-relaxed ${entry.kind === 'stage' ? 'text-muted-foreground' : ''}`}>{entry.body}</p>
     </li>)}</ol> : <p className="text-xs text-muted-foreground">{t('No activity yet.')}</p>}
-  </section>;
+  </div></RecordSection>;
 }
 
 function DealList({ crm, deals, onOpenDeal }: { crm: Crm; deals: readonly CrmDealRecord[]; onOpenDeal: (deal: CrmDealRecord) => void }) {
   const { t } = useI18n();
   if (!deals.length) return null;
-  return <section className="space-y-1"><h3 className="text-xs font-medium text-muted-foreground">{t('Deals')}</h3>
-    <ul className="space-y-1">{deals.map(deal => {
+  return <RecordSection title={t('Deals')}>
+    <ul className="max-w-2xl space-y-1">{deals.map(deal => {
       const pipeline = crm.pipelines.find(item => item.id === deal.pipeline_id);
       const stage = resolveStage(deal.stage, normalizeCrmStages(pipeline?.stages));
       return <li key={deal.id}><button type="button" className="flex w-full items-center gap-2 rounded-sm text-left text-[13px] hover:bg-muted/30" onClick={() => onOpenDeal(deal)}>
         <span className="tabular-nums text-xs text-muted-foreground">D-{deal.number}</span><span className="min-w-0 flex-1 truncate">{deal.name}</span>
         <span className="text-xs text-muted-foreground">{stage ? t(stage.label) : deal.stage}</span>
       </button></li>;
-    })}</ul></section>;
+    })}</ul></RecordSection>;
 }
 
-export function CrmCompanyPanel({ crm, companyId, onClose, onOpenDeal, onOpenContact }: {
-  crm: Crm; companyId: string; onClose: () => void; onOpenDeal: (deal: CrmDealRecord) => void; onOpenContact: (id: string) => void;
+export function CrmCompanyPage({ crm, companyId, onBack, onOpenCompanies, onOpenDeal, onOpenContact }: {
+  crm: Crm; companyId: string; onBack: () => void; onOpenCompanies: () => void; onOpenDeal: (deal: CrmDealRecord) => void; onOpenContact: (id: string) => void;
 }) {
   const { t } = useI18n();
   const company = crm.companies.find(item => item.id === companyId);
@@ -161,45 +142,47 @@ export function CrmCompanyPanel({ crm, companyId, onClose, onOpenDeal, onOpenCon
   if (!company) return null;
   const save = (patch: Parameters<Crm['saveCompany']>[1]) => crm.saveCompany(company.id, patch);
   const contacts = crm.contacts.filter(contact => contact.company_id === company.id);
-  return <RecordShell title={company.name} subtitle={t('Company')} onClose={onClose} onDelete={() => crm.deleteCompany(company.id)}>
-    <section className="space-y-1">
-      <Property label={t('Name')}><EditableText label={t('Name')} value={company.name} onSave={value => value ? save({ name: String(value) }) : Promise.reject(new Error('A name is required.'))} /></Property>
+  const rail = <RailCard title={t('Properties')} padded>
+    <div className="space-y-1">
       <Property label={t('Owner')}><CrmPicker label={t('Owner')} value={company.owner_worker_id} placeholder={t('Unassigned')} options={crm.people.map(person => ({ id: person.id, label: person.name }))} onChange={id => void save({ owner_worker_id: id })} /></Property>
       <Property label={t('Domain')}><CrmPicker label={t('Domain')} value={company.domain_id} placeholder={t('Whole Space')} options={crm.domains.map(domain => ({ id: domain.id, label: domain.name }))} onChange={id => void save({ domain_id: id })} /></Property>
       <Property label={t('Website')}><EditableText label={t('Website')} value={company.domain} placeholder="example.com" onSave={value => save({ domain: value as string | null })} /></Property>
       <Property label={t('Industry')}><EditableText label={t('Industry')} value={company.industry} onSave={value => save({ industry: value as string | null })} /></Property>
-      <Property label={t('Notes')}><EditableText multiline label={t('Notes')} value={company.notes} onSave={value => save({ notes: value as string | null })} /></Property>
       <CustomFields fields={fieldsFor(crm.fields, 'company', company.domain_id)} values={company.custom ?? {}} onSave={custom => save({ custom })} />
-    </section>
-    <section className="space-y-1">
-      <h3 className="text-xs font-medium text-muted-foreground">{t('Contacts')}</h3>
-      <ul className="space-y-1">{contacts.map(contact => <li key={contact.id}><button type="button" className="flex w-full items-baseline gap-2 rounded-sm text-left text-[13px] hover:bg-muted/30" onClick={() => onOpenContact(contact.id)}>
+    </div>
+  </RailCard>;
+  return <CrmRecordPage crumbs={[{ label: t('Companies'), onClick: onOpenCompanies }, { label: company.name }]} onBack={onBack}
+    onDelete={() => crm.deleteCompany(company.id)} deleteLabel={t('Delete this record? Its deals stay, without this link.')} rail={rail}>
+    <PageHead icon={<CrmIcon size={18} />} title={company.name} description={company.notes ?? ''} canEdit
+      titleLabel={t('Name')} titlePlaceholder={t('Name')} descriptionLabel={t('Notes')} descriptionPlaceholder={t('Notes')}
+      onSaveTitle={name => save({ name }).then(() => {})} onSaveDescription={notes => save({ notes: notes || null }).then(() => {})} />
+    <RecordSection title={t('Contacts')}>
+      <ul className="max-w-2xl space-y-1">{contacts.map(contact => <li key={contact.id}><button type="button" className="flex w-full items-baseline gap-2 rounded-sm text-left text-[13px] hover:bg-muted/30" onClick={() => onOpenContact(contact.id)}>
         <span className="truncate">{contact.name}</span><span className="truncate text-xs text-muted-foreground">{contact.title ?? contact.email}</span></button></li>)}</ul>
-      <form className="flex gap-2" onSubmit={event => { event.preventDefault(); if (contactName.trim()) void crm.saveContact(null, { name: contactName.trim(), company_id: company.id }).then(() => setContactName('')); }}>
+      <form className="flex max-w-md gap-2" onSubmit={event => { event.preventDefault(); if (contactName.trim()) void crm.saveContact(null, { name: contactName.trim(), company_id: company.id }).then(() => setContactName('')); }}>
         <input aria-label={t('New contact')} placeholder={t('Add a contact…')} value={contactName} onChange={event => setContactName(event.target.value)} className="h-7 min-w-0 flex-1 rounded-sm bg-muted/30 px-2 text-xs outline-none focus:bg-muted/60" />
         <Button type="submit" size="xs" variant="ghost" disabled={!contactName.trim()}>{t('Add')}</Button>
       </form>
-    </section>
+    </RecordSection>
     <DealList crm={crm} deals={crm.allDeals.filter(deal => deal.company_id === company.id)} onOpenDeal={onOpenDeal} />
     <Timeline crm={crm} entries={crm.activities.filter(entry => entry.company_id === company.id)} onLog={(type, text) => crm.logRecordActivity({ companyId: company.id }, { type, text })} />
-  </RecordShell>;
+  </CrmRecordPage>;
 }
 
-export function CrmContactPanel({ crm, contactId, onClose, onOpenDeal, onOpenCompany }: {
-  crm: Crm; contactId: string; onClose: () => void; onOpenDeal: (deal: CrmDealRecord) => void; onOpenCompany: (id: string) => void;
+export function CrmContactPage({ crm, contactId, onBack, onOpenContacts, onOpenDeal, onOpenCompany }: {
+  crm: Crm; contactId: string; onBack: () => void; onOpenContacts: () => void; onOpenDeal: (deal: CrmDealRecord) => void; onOpenCompany: (id: string) => void;
 }) {
   const { t } = useI18n();
   const contact = crm.contacts.find(item => item.id === contactId);
   if (!contact) return null;
   const save = (patch: Parameters<Crm['saveContact']>[1]) => crm.saveContact(contact.id, patch);
-  return <RecordShell title={contact.name} subtitle={t('Contact')} onClose={onClose} onDelete={() => crm.deleteContact(contact.id)}>
-    <section className="space-y-1">
-      <Property label={t('Name')}><EditableText label={t('Name')} value={contact.name} onSave={value => value ? save({ name: String(value) }) : Promise.reject(new Error('A name is required.'))} /></Property>
+  const rail = <RailCard title={t('Properties')} padded>
+    <div className="space-y-1">
       <Property label={t('Company')}>
         <div className="flex items-center gap-1">
           <CrmPicker label={t('Company')} value={contact.company_id} placeholder={t('No company')} options={crm.companies.map(company => ({ id: company.id, label: company.name }))}
             onChange={id => void save({ company_id: id })} onCreate={name => void crm.saveCompany(null, { name }).then(id => save({ company_id: id }))} />
-          {contact.company_id && <Button variant="ghost" size="xs" onClick={() => onOpenCompany(contact.company_id!)}>{t('Open')}</Button>}
+          {contact.company_id && <Button variant="ghost" size="icon-xs" aria-label={t('Open')} onClick={() => onOpenCompany(contact.company_id!)}><ArrowUpRight size={12} /></Button>}
         </div>
       </Property>
       <Property label={t('Title')}><EditableText label={t('Title')} value={contact.title} onSave={value => save({ title: value as string | null })} /></Property>
@@ -208,8 +191,14 @@ export function CrmContactPanel({ crm, contactId, onClose, onOpenDeal, onOpenCom
       <Property label={t('Owner')}><CrmPicker label={t('Owner')} value={contact.owner_worker_id} placeholder={t('Unassigned')} options={crm.people.map(person => ({ id: person.id, label: person.name }))} onChange={id => void save({ owner_worker_id: id })} /></Property>
       <Property label={t('Domain')}><CrmPicker label={t('Domain')} value={contact.domain_id} placeholder={t('Whole Space')} options={crm.domains.map(domain => ({ id: domain.id, label: domain.name }))} onChange={id => void save({ domain_id: id })} /></Property>
       <CustomFields fields={fieldsFor(crm.fields, 'contact', contact.domain_id)} values={contact.custom ?? {}} onSave={custom => save({ custom })} />
-    </section>
+    </div>
+  </RailCard>;
+  return <CrmRecordPage crumbs={[{ label: t('Contacts'), onClick: onOpenContacts }, { label: contact.name }]} onBack={onBack}
+    onDelete={() => crm.deleteContact(contact.id)} deleteLabel={t('Delete this record? Its deals stay, without this link.')} rail={rail}>
+    <PageHead icon={<CrmIcon size={18} />} title={contact.name} description="" canEdit
+      titleLabel={t('Name')} titlePlaceholder={t('Name')} descriptionLabel="" descriptionPlaceholder=""
+      onSaveTitle={name => save({ name }).then(() => {})} />
     <DealList crm={crm} deals={crm.allDeals.filter(deal => deal.contact_id === contact.id)} onOpenDeal={onOpenDeal} />
     <Timeline crm={crm} entries={crm.activities.filter(entry => entry.contact_id === contact.id)} onLog={(type, text) => crm.logRecordActivity({ contactId: contact.id, companyId: contact.company_id }, { type, text })} />
-  </RecordShell>;
+  </CrmRecordPage>;
 }

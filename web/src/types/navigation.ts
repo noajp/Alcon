@@ -1,26 +1,6 @@
-import type { ScmView } from '@/ActivitySpace/sustainment/scm/scmNavigation';
-import type { ScmHealth } from '@/ActivitySpace/sustainment/scm/scmEngine';
 import type { CrmRoute } from '@/ActivitySpace/sustainment/crm/crmRoute';
 
 export interface NavigationState {
-  /** SCM: the open pane, the location every pane is filtered to (null = all),
-   * the item-location open in detail (`itemId:locationId`), and the open
-   * purchase order. */
-  scmView?: ScmView;
-  /** SCM scope: null = everything visible, 'space' = records shared by the
-   * Space, otherwise the Domain whose supply the panes show. */
-  scmScope?: string | null;
-  scmLocationId?: string | null;
-  scmNode?: string | null;
-  scmOrderId?: string | null;
-  /** Inventory filtered to one stock health, when opened from a health count. */
-  scmHealth?: ScmHealth | null;
-  /** Scenarios opened from a supplier, pre-set to simulate its delay. */
-  scmSupplierDelay?: string | null;
-  /** The stock ledger filtered to one item. */
-  scmLedgerItemId?: string | null;
-  /** Inventory showing the item catalogue rather than stock. */
-  scmCatalog?: boolean | null;
   /** The CRM App's view, filters and open deal within this window tab. */
   crm?: CrmRoute;
   objectId: string | null;

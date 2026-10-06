@@ -5,7 +5,8 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import { FileText, Inbox, Home, ListTodo, Settings } from 'lucide-react';
-import { ObjectIcon, ElementIcon } from '@/Function/shared/conceptIcons';
+import { ObjectIcon, ElementIcon, CrmIcon } from '@/Function/shared/conceptIcons';
+import { crmRoute, routeTo } from '@/ActivitySpace/sustainment/crm/crmRoute';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { APP_GROUPS, MODE_META } from '@/shell/railApps';
 import {
@@ -54,6 +55,7 @@ function kindIcon(kind: SearchResult['kind']): React.ComponentType<{ size?: numb
     case 'element': return ElementIcon;
     case 'object':  return ObjectIcon;
     case 'note':    return FileText;
+    case 'deal': case 'company': case 'contact': return CrmIcon;
   }
 }
 
@@ -138,7 +140,11 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
     element: results.filter(r => r.kind === 'element'),
     object:  results.filter(r => r.kind === 'object'),
     note:    results.filter(r => r.kind === 'note'),
+    record:  results.filter(r => r.kind === 'deal' || r.kind === 'company' || r.kind === 'contact'),
   };
+  // A CRM record opens its page in the CRM, as its sidebar row would.
+  const openRecord = (r: SearchResult) => handleNav('crm', { crm: routeTo(crmRoute(undefined), r.kind === 'deal' ? { view: 'deals', dealId: r.id } : r.kind === 'company' ? { view: 'companies', companyId: r.id } : { view: 'contacts', contactId: r.id }) });
+  const RECORD_KIND: Partial<Record<SearchResult['kind'], string>> = { deal: 'Deal', company: 'Company', contact: 'Contact' };
   const visibleCreateCommands = filterCreateCommands(query);
 
   return (
@@ -146,10 +152,10 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
       open={open}
       onOpenChange={setOpen}
       title={t('Search')}
-      description={t('Search elements, objects, notes. Press ⌘K to open.')}
+      description={t('Search elements, objects, notes and records. Press ⌘K to open.')}
     >
       <CommandInput
-        placeholder={t('Search elements, objects, notes…')}
+        placeholder={t('Search elements, objects, notes, records…')}
         value={query}
         onValueChange={setQuery}
       />
@@ -256,6 +262,27 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
                   >
                     <Icon />
                     <span className="truncate">{r.title}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </>
+        )}
+
+        {grouped.record.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading={t('Records')}>
+              {grouped.record.map(r => {
+                const Icon = kindIcon(r.kind);
+                return (
+                  <CommandItem key={`${r.kind}-${r.id}`} value={`${r.kind}-${r.id} ${r.title} ${r.snippet ?? ''}`} onSelect={() => openRecord(r)}>
+                    <Icon />
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate">{r.title}</div>
+                      {r.snippet && <div className="text-[11px] text-muted-foreground truncate">{r.snippet}</div>}
+                    </div>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">{t(RECORD_KIND[r.kind] ?? '')}</span>
                   </CommandItem>
                 );
               })}

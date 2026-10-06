@@ -551,3 +551,21 @@ export function fieldKey(label: string, taken: readonly string[]): string {
   while (taken.includes(key)) key = `${base}_${index++}`.slice(0, 40);
   return key;
 }
+
+/** Several pipelines read as one — for what crosses pipelines in a scope
+ *  (Today, the saved lists, the scope's overview). Deals are pooled; totals
+ *  are added per currency only, never across; the headline currency is the
+ *  one with the largest open pipeline. Stages and rhythm stay the base
+ *  pipeline's: they are what a pooled list is sorted and flagged by. */
+export function scopeWorkspace(workspaces: readonly CrmWorkspace[], base: CrmWorkspace): CrmWorkspace {
+  if (workspaces.length <= 1) return workspaces[0] ?? base;
+  const totals = new Map<string, CrmWorkspace['totals'][number]>();
+  for (const workspace of workspaces) for (const total of workspace.totals) {
+    const sum = totals.get(total.currency) ?? { currency: total.currency, pipeline: 0, weightedPipeline: 0, forecast: 0, won: 0, openCount: 0 };
+    sum.pipeline += total.pipeline; sum.weightedPipeline += total.weightedPipeline; sum.forecast += total.forecast;
+    sum.won += total.won; sum.openCount += total.openCount;
+    totals.set(total.currency, sum);
+  }
+  const pooled = [...totals.values()].sort((a, b) => b.pipeline - a.pipeline);
+  return { ...base, deals: workspaces.flatMap(workspace => workspace.deals), totals: pooled, primaryCurrency: pooled[0]?.currency ?? base.primaryCurrency };
+}

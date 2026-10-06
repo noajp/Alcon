@@ -2,13 +2,15 @@
 
 import { supabase } from '@/lib/supabase';
 import { displayIdOf } from '@/ActivitySpace/execution/element/displayId';
+import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 
 
 // ============================================
-// Global Search (⌘K) — searches Elements, Objects, Notes
+// Global Search (⌘K) — searches Elements, Objects, Notes, and the active
+// Space's CRM records (deals, companies, contacts). The CRM has no search box of their own: finding a record is ⌘K's job.
 // ============================================
 export interface SearchResult {
-  kind: 'element' | 'object' | 'note';
+  kind: 'element' | 'object' | 'note' | 'deal' | 'company' | 'contact';
   id: string;
   title: string;
   snippet?: string | null;
@@ -26,7 +28,9 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
   if (!q) return [];
   const like = `%${q.replace(/[%_]/g, '\\$&')}%`;
 
-  const [elementsRes, objectsRes, notesRes] = await Promise.all([
+  const spaceId = getActiveSpaceId();
+  const none = Promise.resolve({ data: [] as { id: string; name: string; detail: string | null }[] });
+  const [elementsRes, objectsRes, notesRes, dealsRes, companiesRes, contactsRes] = await Promise.all([
     // display_id is searched as well as returned. It is the string an Element
     // is called by in a comment or a SITREP, so someone reading "ELE_MED-001 is
     // blocked" reaches for ⌘K and types exactly that.
@@ -47,6 +51,9 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
       .select('id, title, parent_id')
       .ilike('title', like)
       .limit(limit),
+    spaceId ? supabase.from('crm_deals').select('id, name, detail:next_step').eq('activity_space_id', spaceId).ilike('name', like).limit(limit) : none,
+    spaceId ? supabase.from('crm_companies').select('id, name, detail:industry').eq('activity_space_id', spaceId).ilike('name', like).limit(limit) : none,
+    spaceId ? supabase.from('crm_contacts').select('id, name, detail:email').eq('activity_space_id', spaceId).or(`name.ilike.${like},email.ilike.${like}`).limit(limit) : none,
   ]);
 
   const out: SearchResult[] = [];
@@ -58,6 +65,10 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
   }
   for (const r of (notesRes.data || [])) {
     out.push({ kind: 'note', id: r.id, title: r.title || 'Untitled' });
+  }
+  const records = [['deal', dealsRes], ['company', companiesRes], ['contact', contactsRes]] as const;
+  for (const [kind, res] of records) {
+    for (const r of (res.data || []) as { id: string; name: string; detail: string | null }[]) out.push({ kind, id: r.id, title: r.name, snippet: r.detail });
   }
   return out;
 }

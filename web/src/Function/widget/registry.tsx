@@ -66,12 +66,6 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     normalizeParams: normalizeOperationsParams,
     load: async () => (await import('./widgets/OperationsPlannerWidget')).default,
   },
-  'scm-risks': {
-    type: 'scm-risks', label: 'Supply',
-    description: 'Items that will run out first, from the SCM plan. On a Domain, how well its locations are stocked',
-    group: 'plan', accepts: ['me', 'domain'], zones: ['main', 'rail'], singleton: true, defaultSize: 'half',
-    load: async () => (await import('./widgets/ScmRiskWidget')).ScmRiskWidget,
-  },
   'data-view': {
     type: 'data-view',
     label: 'Data',
