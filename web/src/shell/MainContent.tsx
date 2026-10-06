@@ -241,7 +241,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'team' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <ElementDrilldown label="Team" onNavigate={onNavigate} onViewChange={onViewChange}>
+              <ElementDrilldown label="People" onNavigate={onNavigate} onViewChange={onViewChange}>
                 {openElement => <TeamView onOpenElement={openElement} onOpenWorkload={(workerId) => {
                   onNavigate({ workerId: workerId ?? null });
                   onViewChange?.('workload');

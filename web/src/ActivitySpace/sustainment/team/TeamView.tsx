@@ -136,7 +136,10 @@ function TeamContent({ roster, onOpenWorkload, onOpenElement, onManageTeam }: Te
   }, [skills.data.skills]);
 
   const query = search.trim().toLocaleLowerCase();
-  const holders = skillFilter ? index.find((row) => row.key === skillFilter)?.holders ?? [] : null;
+  // A filter whose skill was just removed from everyone is no filter — its
+  // chip is gone, so nothing would be left to click to clear it.
+  const activeFilter = skillFilter ? index.find((row) => row.key === skillFilter) ?? null : null;
+  const holders = activeFilter?.holders ?? null;
   const rank = new Map(holders?.map((holder, position) => [holder.workerId, position]));
   const filtered = roster.entries
     .filter((entry) => !holders || rank.has(entry.worker.id))
@@ -148,8 +151,8 @@ function TeamContent({ roster, onOpenWorkload, onOpenElement, onManageTeam }: Te
     { title: t('Members'), entries: filtered.filter((entry) => entry.isMember) },
     { title: t('Participating Workers'), entries: filtered.filter((entry) => !entry.isMember) },
   ];
-  const selected = filtered.find((entry) => entry.worker.id === selectedId) ?? filtered[0] ?? null;
-  const filterSummary = holders && skillFilter
+  const selected = filtered.find((entry) => entry.worker.id === selectedId) ?? groups.flatMap((group) => group.entries)[0] ?? null;
+  const filterSummary = holders
     ? holders.map((holder) => `${roster.entries.find((entry) => entry.worker.id === holder.workerId)?.worker.name ?? ''} (${t(skillLevelLabel(holder.level))})`).join(', ')
     : null;
 
@@ -177,7 +180,7 @@ function TeamContent({ roster, onOpenWorkload, onOpenElement, onManageTeam }: Te
       <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('Filter by skill')}>
         <span className={`${FONT.sm} text-muted-foreground mr-1`}>{t('Skills')}</span>
         {index.slice(0, 16).map((row) => {
-          const active = skillFilter === row.key;
+          const active = activeFilter?.key === row.key;
           return <Button key={row.key} shape="tab" size="xs" variant={active ? 'secondary' : 'ghost'} aria-pressed={active}
             onClick={() => setSkillFilter(active ? null : row.key)}>
             {row.name} <span className="text-muted-foreground tabular-nums">{row.holders.length}</span>
@@ -189,7 +192,7 @@ function TeamContent({ roster, onOpenWorkload, onOpenElement, onManageTeam }: Te
     {roster.error && <div role="alert" className={`${FONT.base} text-[var(--status-danger)]`}>{t('Could not refresh People.')} {roster.error.message}</div>}
     {!roster.enabled ? <p className={`${FONT.base} text-muted-foreground`}>{t('Select a Space to see its people.')}</p>
       : roster.loading ? <p role="status" className={`${FONT.base} text-muted-foreground`}>{t('Loading people…')}</p>
-        : filtered.length === 0 ? <p className={`${FONT.base} text-muted-foreground`}>{query || skillFilter ? t('Nobody matches.') : t('No Workers are connected to this Space yet. Space members and Workers assigned to its Objects or Elements appear here.')}</p>
+        : filtered.length === 0 ? <p className={`${FONT.base} text-muted-foreground`}>{query || activeFilter ? t('Nobody matches.') : t('No Workers are connected to this Space yet. Space members and Workers assigned to its Objects or Elements appear here.')}</p>
           : <div className="grid gap-6 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
             <nav aria-label={t('People')} className="space-y-4 min-w-0">
               {groups.map((group) => group.entries.length > 0 && <section key={group.title}>

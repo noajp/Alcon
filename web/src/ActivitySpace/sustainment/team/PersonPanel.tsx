@@ -18,10 +18,12 @@ type Skills = ReturnType<typeof useWorkerSkills>;
 
 const SELECT = `${FIELD.base} ${FONT.sm} h-7 px-2 bg-transparent`;
 
-function ElementLine({ element, onOpenElement, trailing }: {
+function ElementLine({ element, onOpenElement, trailing, note }: {
   element: TeamElement;
   onOpenElement?: (elementId: string) => void;
   trailing?: React.ReactNode;
+  /** A short flag before the date, e.g. evidence whose Element was reopened. */
+  note?: string;
 }) {
   const { t } = useI18n();
   const status = STATUS[element.status ?? 'todo'];
@@ -29,6 +31,7 @@ function ElementLine({ element, onOpenElement, trailing }: {
     <span className={`size-2 rounded-full shrink-0 ${status.dot}`} aria-label={status.label} />
     {displayIdOf(element) && <span className={`${FONT.mono} shrink-0`}>{displayIdOf(element)}</span>}
     <span className="flex-1 truncate">{element.title}</span>
+    {note && <span className={`${FONT.xs} shrink-0 text-[var(--status-warning)]`}>{note}</span>}
     <span className={`${FONT.xs} shrink-0 text-muted-foreground`}>{element.due_date ? formatElementDate(element.due_date) : t('No due date')}</span>
   </>;
   return <li className="flex items-center gap-1">
@@ -65,7 +68,9 @@ function SkillRow({ skill, entry, evidenceIds, skills, onOpenElement, onError }:
   const known = useMemo(() => new Map(entry.elements.map((element) => [element.id, element])), [entry.elements]);
   const attached = useMemo(() => new Set(evidenceIds), [evidenceIds]);
   const shown = evidenceIds.map((id) => known.get(id)).filter((element): element is TeamElement => Boolean(element));
-  const elsewhere = evidenceIds.length - shown.length;
+  // Evidence whose Element is no longer one of their assignments here (moved,
+  // unassigned, or in another Space) stays removable rather than vanishing.
+  const elsewhere = evidenceIds.filter((id) => !known.has(id));
   const candidates = evidenceCandidates(entry, attached);
 
   const run = async (action: () => Promise<unknown>) => {
@@ -93,12 +98,19 @@ function SkillRow({ skill, entry, evidenceIds, skills, onOpenElement, onError }:
         onClick={() => { void run(() => skills.removeSkill(skill.id)); }}><X size={12} /></Button>}
     </div>
     {open && <div id={listId} className="pb-3 pl-2 space-y-2">
-      {shown.length === 0 && elsewhere === 0
+      {evidenceIds.length === 0
         ? <p className={`${FONT.sm} text-muted-foreground`}>{t('No evidence yet. Link done Elements that show this skill.')}</p>
-        : <ul className="space-y-1">{shown.map((element) => <ElementLine key={element.id} element={element} onOpenElement={onOpenElement}
-          trailing={entry.canManage && <Button variant="ghost" size="icon-sm" aria-label={t('Remove evidence {title}', { title: element.title })} disabled={busy}
-            onClick={() => { void run(() => skills.removeEvidence(skill.id, element.id)); }}><X size={12} /></Button>} />)}</ul>}
-      {elsewhere > 0 && <p className={`${FONT.sm} text-muted-foreground`}>{t('{n} more from work outside this Space', { n: elsewhere })}</p>}
+        : <ul className="space-y-1">
+          {shown.map((element) => <ElementLine key={element.id} element={element} onOpenElement={onOpenElement}
+            note={element.status !== 'done' ? t('Reopened') : undefined}
+            trailing={entry.canManage && <Button variant="ghost" size="icon-sm" aria-label={t('Remove evidence {title}', { title: element.title })} disabled={busy}
+              onClick={() => { void run(() => skills.removeEvidence(skill.id, element.id)); }}><X size={12} /></Button>} />)}
+          {elsewhere.map((id) => <li key={id} className="flex items-center gap-1">
+            <span className={`${FONT.sm} flex-1 min-w-0 h-8 px-3 flex items-center text-muted-foreground`}>{t('Not one of their assignments in this Space')}</span>
+            {entry.canManage && <Button variant="ghost" size="icon-sm" aria-label={t('Remove this evidence')} disabled={busy}
+              onClick={() => { void run(() => skills.removeEvidence(skill.id, id)); }}><X size={12} /></Button>}
+          </li>)}
+        </ul>}
       {entry.canManage && (candidates.length > 0
         ? <form className="flex flex-wrap items-center gap-2" onSubmit={(event) => {
           event.preventDefault();

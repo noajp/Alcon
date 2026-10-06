@@ -120,7 +120,7 @@ export function useTeamRoster() {
     if (hours !== null && (!Number.isFinite(hours) || hours < 0 || hours > 24)) throw new Error('Capacity must be between 0 and 24 hours per day.');
     const assertContext = () => {
       if (!enabled || !userId || !spaceId || currentContext.current !== contextKey || getActiveSpaceId() !== spaceId) {
-        throw new Error('The active Space or account changed. Open Team again before saving.');
+        throw new Error('The active Space or account changed. Open People again before saving.');
       }
     };
     assertContext();
