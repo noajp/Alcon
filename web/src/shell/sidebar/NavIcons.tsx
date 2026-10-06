@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Notebook, BarChart3,
   ChartArea, ChartGantt, Users, Share2, Search, Workflow, Compass, Milestone, Telescope, Folder,
 } from 'lucide-react';
-import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon, ScmIcon } from '@/Function/shared/conceptIcons';
+import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon } from '@/Function/shared/conceptIcons';
 
 // ── Nav / tab / item icons ───────────────────────────────────────────────
 // Everything uses Lucide at strokeWidth 2. Lucide draws on a 24-unit grid, so
@@ -65,4 +65,3 @@ export const NavPortfolioIcon = ({ size = 20 }: { size?: number }) => <Folder si
 export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} className="scale-110" />;
 
 export const NavCrmIcon = CrmIcon;
-export const NavScmIcon = ScmIcon;

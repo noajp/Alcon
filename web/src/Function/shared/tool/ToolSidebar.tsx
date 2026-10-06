@@ -10,11 +10,11 @@ import type { ToolScope } from './toolScope';
 
 // =============================================================
 // ToolSidebar — the one sidebar every Sustainment tool is built on (CRM,
-// SCM, and the tools that come after them). Four slots, top to bottom:
+// and the tools that come after them). Four slots, top to bottom:
 //
 //   scope    whose records: the row opens the scope's overview (as a
 //            Domain's row opens the Domain), its ▾ only switches scope
-//   queue    what needs me now (CRM's Today, SCM's Needs attention)
+//   queue    what needs me now (CRM's Today)
 //   sections the collections, each with saved filters as children. A
 //            child opens its parent's page with the filter applied — no
 //            new screen to learn

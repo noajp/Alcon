@@ -71,9 +71,6 @@
     "src/hooks/useSupabase.ts#deleteElementEdge": "Element の依存関係は現行 ElementDetailView が読む。既存の書込 API はデータ層の契約として保持し、未使用の旧パネル削除に連動して撤去しない（ELE_QLT-049）。",
     "src/hooks/useSupabase.ts#fetchObjectMilestones": "同じモジュールの useObjectMilestones が呼び、DomainView・ObjectDetailView・ElementsListView に供給する。外部 import がなくても現行の読取経路で使う（ELE_QLT-049）。",
     "src/hooks/useSupabase.ts#createObjectMilestone": "Object Milestone は現行一覧/Gantt が読む。既存の書込 API はデータ層の契約として保持し、未使用の旧 Timeline 削除に連動して撤去しない（ELE_QLT-049）。",
-    "src/hooks/useSupabase.ts#deleteObjectMilestone": "Object Milestone は現行一覧/Gantt が読む。既存の書込 API はデータ層の契約として保持し、未使用の旧 Timeline 削除に連動して撤去しない（ELE_QLT-049）。",
-    "src/ActivitySpace/sustainment/scm/scmEngine.ts#inverseNormal": "SCM 計画エンジンの純粋関数。planScm の内部で使い、tests/scmEngine.test.ts が直接検証する（統計の正しさは単体で固定する）",
-    "src/ActivitySpace/sustainment/scm/scmEngine.ts#forecastDemand": "SCM 計画エンジンの純粋関数。planScm の内部で使い、tests/scmEngine.test.ts が直接検証する（統計の正しさは単体で固定する）",
-    "src/ActivitySpace/sustainment/scm/scmEngine.ts#uncensor": "SCM 計画エンジンの純粋関数。planScm の内部で使い、tests/scmEngine.test.ts が直接検証する（統計の正しさは単体で固定する）"
+    "src/hooks/useSupabase.ts#deleteObjectMilestone": "Object Milestone は現行一覧/Gantt が読む。既存の書込 API はデータ層の契約として保持し、未使用の旧 Timeline 削除に連動して撤去しない（ELE_QLT-049）。"
   }
 }

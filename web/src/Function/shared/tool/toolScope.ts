@@ -5,9 +5,9 @@ import { useCallback, useSyncExternalStore } from 'react';
 // =============================================================
 // Whose records a Sustainment tool shows — its scope.
 //
-// CRM and SCM records belong to a Domain or to the Space (ADR 0036 for
-// supply; the CRM's pipelines, companies and contacts carry the same
-// `domain_id`). So both tools are read through the same three scopes:
+// A tool's records belong to a Domain or to the Space (the CRM's pipelines,
+// companies and contacts carry a `domain_id`), so a tool is read through
+// three scopes:
 //
 //   null      everything the viewer can see
 //   'space'   the records shared by the Space (no Domain)
@@ -17,7 +17,7 @@ import { useCallback, useSyncExternalStore } from 'react';
 // kept per tool in localStorage, shared by the tool's sidebar and pages.
 // =============================================================
 
-export type ToolApp = 'crm' | 'scm';
+export type ToolApp = 'crm';
 export type ToolScope = string | null;
 export const SPACE_SCOPE = 'space';
 
@@ -36,7 +36,7 @@ function read(app: ToolApp): string | null {
   try { return window.localStorage.getItem(key(app)); } catch { return null; }
 }
 
-export function setToolScope(app: ToolApp, scope: ToolScope) {
+function setToolScope(app: ToolApp, scope: ToolScope) {
   try {
     if (scope === null) window.localStorage.removeItem(key(app));
     else window.localStorage.setItem(key(app), scope);

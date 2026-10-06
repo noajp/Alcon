@@ -62,11 +62,9 @@
 | [0028](0028-workers-belong-to-a-space.md) | Worker は Space に属する — 名前は Element に付いてきて、割り当ては境界に従う |
 | [0029](0029-membership-takes-effect-on-acceptance.md) | 所属は招かれた本人の承諾で成立する — 招待は別の表に置き、RPC だけが書く |
 | [0030](0030-unused-objects-are-archived-and-domains-with-objects-stay.md) | 使わなくなった Object はアーカイブし、Object が残る Domain は削除しない |
-| [0031](0031-scm-owns-its-ledger-and-acts-within-a-policy.md) | SCM は専用の台帳を持ち、人が示した方針の範囲で AI が発注する |
 | [0032](0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md) | 外部の呼び出しは PAT か OAuth で認証し、関数が本人の短命な JWT を発行する |
 | [0033](0033-the-rest-api-is-the-mcp-tool-layer-over-http.md) | REST API は MCP と同じツール層を HTTP の形で出す |
 | [0034](0034-mcp-clients-sign-in-through-supabase-oauth-and-their-tokens-only-work-through-alcon.md) | MCP クライアントは Supabase の OAuth でサインインし、そのトークンは Alcon の関数でだけ使える |
 | [0035](0035-oauth-integrations-sign-in-through-an-edge-function-and-keep-tokens-in-vault.md) | OAuth の連携は Edge Function でサインインし、トークンは Vault にだけ置く |
-| [0036](0036-supply-records-belong-to-a-domain-or-the-space.md) | SCM の拠点・仕入先・品目は Domain か Space に属し、Domain の公開範囲で見える |
 | [0037](0037-workload-rebalancing-is-computed-not-generated-and-applied-by-a-person.md) | Workload の平準化は決定的に算出し、人が適用する |
 | [0038](0038-people-skills-are-backed-by-done-elements-and-evaluations-wait-for-a-reporting-line.md) | People のスキルは完了済み Element を根拠に持ち、評価はレポートラインを待つ |

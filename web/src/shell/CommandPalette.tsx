@@ -5,7 +5,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import { FileText, Inbox, Home, ListTodo, Settings } from 'lucide-react';
-import { ObjectIcon, ElementIcon, CrmIcon, ScmIcon } from '@/Function/shared/conceptIcons';
+import { ObjectIcon, ElementIcon, CrmIcon } from '@/Function/shared/conceptIcons';
 import { crmRoute, routeTo } from '@/ActivitySpace/sustainment/crm/crmRoute';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { APP_GROUPS, MODE_META } from '@/shell/railApps';
@@ -56,7 +56,6 @@ function kindIcon(kind: SearchResult['kind']): React.ComponentType<{ size?: numb
     case 'object':  return ObjectIcon;
     case 'note':    return FileText;
     case 'deal': case 'company': case 'contact': return CrmIcon;
-    case 'item':    return ScmIcon;
   }
 }
 
@@ -141,13 +140,11 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
     element: results.filter(r => r.kind === 'element'),
     object:  results.filter(r => r.kind === 'object'),
     note:    results.filter(r => r.kind === 'note'),
-    record:  results.filter(r => r.kind === 'deal' || r.kind === 'company' || r.kind === 'contact' || r.kind === 'item'),
+    record:  results.filter(r => r.kind === 'deal' || r.kind === 'company' || r.kind === 'contact'),
   };
-  // A tool record opens its page in its tool, as its sidebar row would.
-  const openRecord = (r: SearchResult) => r.kind === 'item'
-    ? handleNav('scm', { scmView: 'inventory', scmNode: `${r.id}:`, scmOrderId: null, scmSupplierId: null })
-    : handleNav('crm', { crm: routeTo(crmRoute(undefined), r.kind === 'deal' ? { view: 'deals', dealId: r.id } : r.kind === 'company' ? { view: 'companies', companyId: r.id } : { view: 'contacts', contactId: r.id }) });
-  const RECORD_KIND: Partial<Record<SearchResult['kind'], string>> = { deal: 'Deal', company: 'Company', contact: 'Contact', item: 'Item' };
+  // A CRM record opens its page in the CRM, as its sidebar row would.
+  const openRecord = (r: SearchResult) => handleNav('crm', { crm: routeTo(crmRoute(undefined), r.kind === 'deal' ? { view: 'deals', dealId: r.id } : r.kind === 'company' ? { view: 'companies', companyId: r.id } : { view: 'contacts', contactId: r.id }) });
+  const RECORD_KIND: Partial<Record<SearchResult['kind'], string>> = { deal: 'Deal', company: 'Company', contact: 'Contact' };
   const visibleCreateCommands = filterCreateCommands(query);
 
   return (

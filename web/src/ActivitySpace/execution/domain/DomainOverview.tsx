@@ -32,8 +32,6 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
     onNavigate: nav => {
       if (nav.objectId) { onNavigate({ objectId: nav.objectId, objectDomainId: domain.id }); onViewChange?.('objects'); }
       else if (nav.strategyId) { onNavigate({ strategyId: nav.strategyId }); onViewChange?.('strategy'); }
-      // The supply widget opens SCM on this Domain's supply.
-      else if (nav.scmView) onNavigate({ scmView: nav.scmView, scmNode: nav.scmNode ?? null, scmLocationId: nav.scmLocationId ?? null });
     },
     onViewChange,
   };

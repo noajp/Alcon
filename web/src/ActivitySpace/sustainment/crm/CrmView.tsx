@@ -33,8 +33,8 @@ import { CrmDealPage } from './CrmDealPage';
 import { CrmCapture } from './CaptureDialog';
 import { CrmPicker } from './CrmPicker';
 
-// The CRM App. Read through a scope (whose records — see crmScope), the way
-// SCM is: the scope's overview, Today, the deals (a list across pipelines or
+// The CRM App. Read through a scope (whose records — see crmScope): the
+// scope's overview, Today, the deals (a list across pipelines or
 // one pipeline's board), the forecast, the ledgers; a deal, company or
 // contact opens as a page of its own.
 

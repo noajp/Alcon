@@ -15,12 +15,12 @@ import { constrainTabDrag } from '@/shell/tabDrag';
 import { arrangeViews, nextViewTabState, parseViewTabState, type ViewTabState } from './viewTabs';
 
 // =============================================================
-// ToolPage — the page of a Sustainment tool (CRM, SCM).
+// ToolPage — the page of a Sustainment tool (CRM).
 //
 // A tool is read the way an Object is: ONE SUBJECT seen through SEVERAL
 // VIEWS.
 //
-//   subject  what the tool is about — a CRM pipeline, an SCM supply scope.
+//   subject  what the tool is about — a CRM pipeline or scope.
 //            It has a title and a description, and Properties: the facts
 //            and settings that decide what every view shows (the pipeline's
 //            currency and what it calls a deal, the supply scope and
@@ -78,7 +78,7 @@ export function ToolPage({
   /** Header verbs at the right (Capture, New deal, Refresh). */
   actions?: ReactNode;
   views: readonly ToolView[];
-  /** Where the viewer's tab choice is kept ("crm", "scm"). */
+  /** Where the viewer's tab choice is kept ("crm-deals"). */
   storageKey: string;
   /** The Overview view: first, cannot be hidden, and the only one with the head and Properties. */
   home: string;
@@ -94,7 +94,7 @@ export function ToolPage({
   properties?: ReactNode;
   /** A record opened beside the view (a deal, a company). */
   panel?: ReactNode;
-  /** A record opened in place of the view (an SCM item), full width, with its own way back. */
+  /** A record opened in place of the view (a deal), full width, with its own way back. */
   record?: ReactNode;
   /** Changes when a different record opens, so the page starts at the top. */
   scrollKey?: string | null;

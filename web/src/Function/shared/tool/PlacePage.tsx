@@ -3,7 +3,7 @@
 import type { ComponentType, ReactNode } from 'react';
 
 // A place in a tool's sidebar that is not a container with views of its own
-// — CRM's Today, Companies and Contacts; SCM's Suppliers and Orders. One
+// — CRM's Today, Companies and Contacts. One
 // header naming it, then its content in the page column.
 
 export function PlacePage({ icon: Icon, title, actions, children, container }: {

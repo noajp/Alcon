@@ -2,7 +2,6 @@ import type { Locale } from './locales';
 import { CRM_TRANSLATIONS } from '@/ActivitySpace/sustainment/crm/crmMessages';
 import { WORKLOAD_TRANSLATIONS } from '@/ActivitySpace/sustainment/workload/workloadMessages';
 import { PEOPLE_TRANSLATIONS } from '@/ActivitySpace/sustainment/team/peopleMessages';
-import { SCM_MESSAGES } from './scmMessages';
 
 type TranslationMap = Record<string, string>;
 
@@ -1171,12 +1170,6 @@ Object.assign(ko, CRM_TRANSLATIONS.ko);
 Object.assign(fr, CRM_TRANSLATIONS.fr);
 Object.assign(es, CRM_TRANSLATIONS.es);
 
-// The SCM App (Sustainment).
-Object.assign(ja, SCM_MESSAGES.ja);
-Object.assign(ko, SCM_MESSAGES.ko);
-Object.assign(fr, SCM_MESSAGES.fr);
-Object.assign(es, SCM_MESSAGES.es);
-
 Object.assign(ja, WORKLOAD_TRANSLATIONS.ja);
 Object.assign(ko, WORKLOAD_TRANSLATIONS.ko);
 Object.assign(fr, WORKLOAD_TRANSLATIONS.fr);
@@ -1391,7 +1384,7 @@ Object.assign(es, {
   "Create Initiative": "Crear Initiative",
 });
 
-// Tool pages (CRM, SCM): the tab strip and the subject's head.
+// Tool pages (CRM): the tab strip and the subject's head.
 Object.assign(ja, { 'Overview': '概要', 'Properties': 'プロパティ', 'Description': '説明', 'Hide this view': 'このビューを隠す', 'Show a view': 'ビューを表示', '{n} days': '{n} 日' });
 Object.assign(ko, { 'Overview': '개요', 'Properties': '속성', 'Description': '설명', 'Hide this view': '이 보기 숨기기', 'Show a view': '보기 표시', '{n} days': '{n}일' });
 Object.assign(fr, { 'Overview': 'Aperçu', 'Properties': 'Propriétés', 'Description': 'Description', 'Hide this view': 'Masquer cette vue', 'Show a view': 'Afficher une vue', '{n} days': '{n} jours' });

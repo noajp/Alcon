@@ -106,7 +106,6 @@ export const DOMAIN_OVERVIEW_BOARD: BoardLayout = {
     { id: 'domain-approaches', type: 'domain-approaches' },
     { id: 'domain-initiatives', type: 'domain-initiatives' },
     { id: 'domain-kpi', type: 'kpi-cards' },
-    { id: 'domain-supply', type: 'scm-risks' },
     { id: 'domain-objects', type: 'domain-objects' },
   ],
   rail: [],
