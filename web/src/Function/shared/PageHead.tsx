@@ -28,7 +28,7 @@ export function PageIcon({ children }: { children: ReactNode }) {
 
 /** The page frame: centred, one width and one set of margins for every
  *  concept page. */
-export const PAGE_BODY = 'mx-auto w-full max-w-7xl px-8 py-8';
+const PAGE_BODY = 'mx-auto w-full max-w-7xl px-8 py-8';
 
 /**
  * Every concept page's layout: the document on the left (icon, title,
