@@ -88,7 +88,8 @@ export interface WidgetFrameProps {
   /** Body sits flush (tables draw their own edges). */
   padded?: boolean;
   onLongPress: () => void;
-  onRemove: () => void;
+  /** Absent when this viewer may not take the widget off the board. */
+  onRemove?: () => void;
   children: React.ReactNode;
 }
 
@@ -278,7 +279,7 @@ export function WidgetFrame({
           </div>
         )}
       </div>
-      {arranging && <RemoveBadge title={title} onRemove={onRemove} />}
+      {arranging && onRemove && <RemoveBadge title={title} onRemove={onRemove} />}
     </div>
   );
 }

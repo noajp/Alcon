@@ -102,7 +102,7 @@ export type WidgetParams = Record<string, unknown>;
  * the subject knowing anything about configuration.
  */
 export interface WidgetProps {
-  /** Stable placement identity for persisted generated apps. */
+  /** The widget's row id — what a widget keeps its own data under. */
   instanceId?: string;
   host: WidgetHost;
   params: WidgetParams;
@@ -138,6 +138,11 @@ export interface WidgetDefinition {
    */
   normalizeParams?: (raw: WidgetParams | undefined) => WidgetParams;
   /**
+   * Born on its author rather than on the board's subject, so only the author
+   * can see it — for a widget whose contents are still kept per person.
+   */
+  personal?: boolean;
+  /**
    * Lazy component. The definition owning its own import is what removed the
    * central `renderWidget` switch — every widget now code-splits by default
    * instead of one chart being special-cased.
@@ -145,23 +150,30 @@ export interface WidgetDefinition {
   load: () => Promise<WidgetComponent>;
 }
 
-/** One placed widget. `id` is per-instance so a board can hold two of a kind. */
+/**
+ * One placed widget.
+ *
+ * `id` is what the board addresses it by and stays the same for as long as it
+ * is placed: a surface's default instance keeps its hand-written id
+ * (`ov-trail`), anything added later uses its widget's id. A default instance
+ * has no rows until the board's first edit writes them, so `widgetId` and
+ * `placementId` are absent until then.
+ */
 export interface WidgetInstance {
   id: string;
   type: string;
   size?: WidgetSize;
   params?: WidgetParams;
+  /** The `widgets` row — what a widget keeps its own data under. */
+  widgetId?: string;
+  placementId?: string;
+  position?: number;
+  /** Placed here from somewhere the viewer cannot see. Its type and contents
+   *  are unknown to this client; only its place on the board is. */
+  hidden?: boolean;
 }
 
 export type BoardLayout = Record<Zone, WidgetInstance[]>;
-
-export interface StoredBoard {
-  version: number;
-  zones: BoardLayout;
-  /** Ids of default instances the user removed on purpose — see
-   *  `reconcileBoard`. */
-  dismissed?: string[];
-}
 
 export const ZONES: Zone[] = ['band', 'main', 'rail'];
 

@@ -119,8 +119,32 @@ function SortableWidget({
     [def, instance.params],
   );
 
+  // Placed here from an origin this person cannot see. The board is theirs to
+  // arrange, so the place is shown and can be moved. The widget is not theirs:
+  // nothing about it is shown, and taking it off the board is left to someone
+  // who can see it — its author could not find it again otherwise.
+  if (instance.hidden) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={{ transform: CSS.Transform.toString(transform), transition }}
+        {...(arranging ? { ...attributes, ...listeners } : {})}
+      >
+        <WidgetFrame
+          variant={ZONE_VARIANT[zone]}
+          title="Private widget"
+          arranging={arranging}
+          isDragging={isDragging}
+          onLongPress={() => setArranging(true)}
+        >
+          <p className="text-xs text-muted-foreground">You don’t have access to this widget.</p>
+        </WidgetFrame>
+      </div>
+    );
+  }
+
   // A layout can outlive the widget it names (a build that removed one, a
-  // board synced from another client). `migrate` drops those on read; this is
+  // board written by another client). `layoutFromRows` drops those on read; this is
   // the belt to that braces.
   if (!def) return null;
 
@@ -148,7 +172,7 @@ function SortableWidget({
           <Body
             key={`${host.subject.kind}:${host.subject.id ?? 'me'}:${String(params.tableId ?? '')}`}
             host={host}
-            instanceId={instance.id}
+            instanceId={instance.widgetId ?? instance.id}
             params={params}
             setParams={(next) => board.setParams(instance.id, next)}
           />

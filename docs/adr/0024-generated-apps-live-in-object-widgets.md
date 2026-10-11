@@ -1,6 +1,6 @@
 # 0024 — Generated apps live in Object widgets
 
-> 読み取り能力の境界は [0025](0025-generated-apps-read-scoped-object-context.md) で拡張。
+> 読み取り能力の境界は [0025](0025-generated-apps-read-scoped-object-context.md) で拡張。配置は [0039](0039-widgets-are-shared-components-with-an-origin-and-boards-are-placements.md) の Widget になり、アプリは作成者の個人 Widget として置かれる。
 
 ## 背景
 

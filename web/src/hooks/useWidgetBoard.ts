@@ -1,118 +1,189 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { migrateBoard, reconcileBoard } from '@/Function/widget/boardModel';
-import type { BoardLayout, StoredBoard } from '@/Function/widget/types';
+import {
+  SURFACE_SUBJECT,
+  applyEdit,
+  boardLayout,
+  findInstance,
+  fitsZone,
+  movePosition,
+  paramsPatch,
+  positionBetween,
+  unplacedDefaults,
+  type BoardEdit,
+  type BoardRows,
+} from '@/Function/widget/boardModel';
+import { WIDGET_REGISTRY } from '@/Function/widget/registry';
+import type { BoardLayout, SubjectKind } from '@/Function/widget/types';
 
-interface BoardRow {
-  id: string;
-  owner_id: string;
-  board_key: string;
-  layout: StoredBoard;
-  revision: number;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+interface BoardTarget {
+  surface: string;
+  kind: SubjectKind;
+  subjectId: string;
+  /** A personal board is kept per Space. */
+  spaceId: string | null;
 }
 
-type Edit = {
-  ownerId: string | null;
-  boardKey: string;
-  legacyKey: string;
-  defaults: BoardLayout;
-  apply: (layout: BoardLayout) => BoardLayout;
-  dismiss?: { id: string; dismissed: boolean };
-  reset?: boolean;
-};
-
-async function fetchBoard(ownerId: string, boardKey: string): Promise<BoardRow | null> {
-  const { data, error } = await supabase.from('widget_boards').select('*')
-    .eq('owner_id', ownerId).eq('board_key', boardKey).maybeSingle();
+async function fetchBoard(target: BoardTarget): Promise<BoardRows | null> {
+  const query = supabase.from('boards')
+    .select('id, dismissed_defaults, board_placements(id, widget_id, zone, position, size, default_id, widget:widgets(id, kind, params))')
+    .eq('surface', target.surface).eq('subject_kind', target.kind).eq('subject_id', target.subjectId);
+  // Most boards have never been edited and have no row; asking for a list
+  // keeps that ordinary case from being answered as an HTTP error.
+  const { data, error } = await (target.spaceId ? query.eq('space_id', target.spaceId) : query.is('space_id', null)).limit(1);
   if (error) throw error;
-  if (data) {
-    // Remember a server board even if it is later deleted by another client.
-    // Its old browser arrangement must not reappear after that deletion.
-    try { localStorage.setItem(`alcon:board:imported:${ownerId}:${boardKey}`, '1'); } catch { /* Storage can be disabled. */ }
+  // The untyped client reads the embedded widget as a list; a placement has one.
+  return (data?.[0] ?? null) as unknown as BoardRows | null;
+}
+
+function check({ error }: { error: { message: string } | null }): void {
+  if (error) throw new Error(error.message);
+}
+
+/** One edit, applied to the board as it is on the server right now. */
+async function persistEdit(target: BoardTarget, defaults: BoardLayout, edit: BoardEdit): Promise<void> {
+  let rows = await fetchBoard(target);
+  if (edit.op === 'reset') {
+    // Clears every placement the caller can see and forgets what was
+    // dismissed, which leaves the surface's defaults.
+    if (rows) check(await supabase.rpc('reset_board', { p_board_id: rows.id }));
+    return;
   }
-  return data as BoardRow | null;
+  let layout = boardLayout(rows, defaults);
+  const unplaced = unplacedDefaults(layout);
+  if (!rows || unplaced.length) {
+    // The first edit writes the defaults it was looking at, so the edit below
+    // addresses rows. The server derives their ids from the board, so two
+    // people making that first edit at once write one set.
+    check(await supabase.rpc('ensure_board', {
+      p_surface: target.surface,
+      p_subject_kind: target.kind,
+      p_subject_id: target.kind === 'me' ? null : target.subjectId,
+      p_space_id: target.spaceId,
+      p_instances: unplaced,
+    }));
+    rows = await fetchBoard(target);
+    if (!rows) throw new Error('This board is unavailable.');
+    layout = boardLayout(rows, defaults);
+  }
+
+  if (edit.op === 'add') {
+    const def = Object.hasOwn(WIDGET_REGISTRY, edit.type) ? WIDGET_REGISTRY[edit.type] : undefined;
+    if (!def || !def.zones.includes(edit.zone)) return;
+    const items = layout[edit.zone];
+    const index = Math.max(0, Math.min(edit.index ?? items.length, items.length));
+    check(await supabase.rpc('add_widget', {
+      p_board_id: rows.id,
+      p_kind: def.type,
+      p_zone: edit.zone,
+      p_position: positionBetween(items[index - 1]?.position, items[index]?.position),
+      p_size: def.defaultSize ?? null,
+      p_params: def.normalizeParams?.(undefined) ?? {},
+      p_personal: !!def.personal,
+      p_singleton: !!def.singleton,
+    }));
+    return;
+  }
+
+  const found = findInstance(layout, edit.id);
+  if (!found?.instance.placementId) return;
+  const { zone, instance } = found;
+  if (edit.op === 'remove') {
+    if (instance.hidden) return;
+    check(await supabase.from('board_placements').delete().eq('id', instance.placementId));
+  } else if (edit.op === 'move') {
+    if (!fitsZone(instance, zone, edit.zone)) return;
+    check(await supabase.from('board_placements')
+      .update({ zone: edit.zone, position: movePosition(layout, edit.id, edit.zone, edit.index) })
+      .eq('id', instance.placementId));
+  } else if (edit.op === 'size') {
+    check(await supabase.from('board_placements').update({ size: edit.size }).eq('id', instance.placementId));
+  } else if (!instance.hidden) {
+    check(await supabase.rpc('merge_widget_params', {
+      p_widget_id: instance.widgetId,
+      p_patch: paramsPatch(instance, edit.params),
+    }));
+  }
 }
 
-function initialBoard(legacyKey: string, defaults: BoardLayout, ownerId: string | null, boardKey: string): StoredBoard {
-  // Import a browser's previous arrangement only when no server board exists.
-  // The legacy value stays intact so a failed first save never loses it.
-  try {
-    const imported = localStorage.getItem(`alcon:board:imported:${ownerId}:${boardKey}`);
-    const legacy = imported ? null : migrateBoard(JSON.parse(localStorage.getItem(legacyKey) ?? 'null'));
-    if (legacy) return { version: 2, zones: reconcileBoard(legacy, defaults), dismissed: [...legacy.dismissed] };
-  } catch { /* Unreadable local preferences use the supplied defaults. */ }
-  return { version: 2, zones: defaults, dismissed: [] };
-}
-
-export function useWidgetBoard(boardKey: string, legacyKey: string, defaults: BoardLayout) {
+/**
+ * A surface's board for one subject. `subjectRef` is the subject's id; on a
+ * personal surface (Home) the board is the signed-in person's and
+ * `subjectRef` is the Space it is kept for.
+ */
+export function useWidgetBoard(surface: string, defaults: BoardLayout, subjectRef: string) {
   const qc = useQueryClient();
-  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setOwnerId(session?.user.id ?? null);
+      setUserId(session?.user.id ?? null);
       setAuthReady(true);
     });
     return () => subscription.unsubscribe();
   }, []);
-  const key = ['widget-board', ownerId, boardKey];
+
+  const kind = SURFACE_SUBJECT[surface];
+  const reference = UUID.test(subjectRef) ? subjectRef : null;
+  const subjectId = kind === 'me' ? userId : reference;
+  const spaceId = kind === 'me' ? reference : null;
+  const key = ['widget-board', surface, subjectId, spaceId];
+  const enabled = !!userId && !!kind && !!subjectId;
+
   const query = useQuery({
     queryKey: key,
-    enabled: !!ownerId,
-    queryFn: () => fetchBoard(ownerId!, boardKey),
+    enabled,
+    queryFn: () => fetchBoard({ surface, kind, subjectId: subjectId!, spaceId }),
     staleTime: 0,
   });
+  const rows = query.data ?? null;
+  const stored = useMemo(() => boardLayout(rows, defaults), [rows, defaults]);
+
+  // What the board will look like once the edits in flight land. Shown in
+  // place of the stored layout until the last of them has settled and been
+  // read back, so a drag does not snap home and then jump.
+  const [anticipated, setAnticipated] = useState<{ key: string; layout: BoardLayout } | null>(null);
+  const inFlight = useRef(0);
+  const scope = key.join(':');
+  const layout = anticipated?.key === scope ? anticipated.layout : stored;
+  const storedRef = useRef(stored);
+  useEffect(() => { storedRef.current = stored; }, [stored]);
 
   const mutation = useMutation({
-    // The queue is shared across mounted readers of this exact board.
-    mutationKey: ['widget-board-write', ownerId, boardKey],
-    scope: { id: `widget-board:${ownerId}:${boardKey}` },
+    // Serial per board: each edit reads the board the one before it left.
+    mutationKey: ['widget-board-write', scope],
+    scope: { id: `widget-board:${scope}` },
     retry: false,
-    mutationFn: async (edit: Edit) => {
-      const { ownerId, boardKey, legacyKey, defaults } = edit;
-      if (!ownerId) throw new Error('Sign in to save widgets.');
-      // Read inside the serial queue: each edit applies to the latest saved
-      // board, including AI edits. Revision matching catches concurrent writers.
-      const row = await fetchBoard(ownerId, boardKey);
-      const stored = row?.layout ?? initialBoard(legacyKey, defaults, ownerId, boardKey);
-      const parsed = migrateBoard(stored);
-      if (!parsed) throw new Error('This board uses an unsupported format. Reload with the latest app.');
-      const current = reconcileBoard(parsed, defaults);
-      const next = edit.apply(current);
-      const dismissed = edit.reset ? new Set<string>() : parsed.dismissed;
-      if (edit.dismiss) {
-        if (edit.dismiss.dismissed) dismissed.add(edit.dismiss.id);
-        else dismissed.delete(edit.dismiss.id);
-      }
-      const layout: StoredBoard = { version: 2, zones: next, dismissed: [...dismissed] };
-      const result = row
-        ? await supabase.from('widget_boards').update({ layout }).eq('id', row.id).eq('revision', row.revision).select().maybeSingle()
-        : await supabase.from('widget_boards').insert({ owner_id: ownerId, board_key: boardKey, layout }).select().single();
-      if (result.error) throw result.error;
-      if (!result.data) throw new Error('The board changed elsewhere. Reload and repeat this edit.');
-      try { localStorage.setItem(`alcon:board:imported:${ownerId}:${boardKey}`, '1'); } catch { /* Storage can be disabled. */ }
-      return result.data as BoardRow;
+    mutationFn: ({ target, edit }: { target: BoardTarget; edit: BoardEdit }) => persistEdit(target, defaults, edit),
+    onSettled: async () => {
+      await qc.invalidateQueries({ queryKey: key });
+      inFlight.current -= 1;
+      if (inFlight.current === 0) setAnticipated(null);
     },
-    onSuccess: row => { qc.setQueryData(['widget-board', row.owner_id, row.board_key], row); },
-    onSettled: (_data, _error, edit) => { void qc.invalidateQueries({ queryKey: ['widget-board', edit.ownerId, edit.boardKey] }); },
   });
   const mutate = mutation.mutate;
-  const update = useCallback((apply: Edit['apply'], dismiss?: Edit['dismiss'], reset?: boolean) => {
-    mutate({ apply, dismiss, reset, ownerId, boardKey, legacyKey, defaults });
-  }, [mutate, ownerId, boardKey, legacyKey, defaults]);
-  const parsed = query.data ? migrateBoard(query.data.layout) : null;
-  const legacy = query.data === null ? migrateBoard(initialBoard(legacyKey, defaults, ownerId, boardKey)) : null;
-  const layout = parsed ? reconcileBoard(parsed, defaults) : legacy ? reconcileBoard(legacy, defaults) : defaults;
+  const update = useCallback((edit: BoardEdit) => {
+    if (!enabled || !subjectId) return;
+    inFlight.current += 1;
+    setAnticipated((current) => ({
+      key: scope,
+      layout: applyEdit(current?.key === scope ? current.layout : storedRef.current, edit, defaults),
+    }));
+    mutate({ target: { surface, kind, subjectId, spaceId }, edit });
+  }, [mutate, enabled, surface, kind, subjectId, spaceId, scope, defaults]);
+
   const error = mutation.error ?? query.error;
   return {
     layout,
     update,
-    loading: !authReady || (!!ownerId && query.isPending),
+    loading: !authReady || (enabled && query.isPending),
     saving: mutation.isPending,
-    error: error ? error.message : authReady && !ownerId ? 'Sign in to save widgets.' : null,
+    error: error ? error.message : authReady && !userId ? 'Sign in to save widgets.' : null,
     retry: () => { mutation.reset(); void query.refetch(); },
   };
 }
