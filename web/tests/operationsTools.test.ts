@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeOperations, normalizeOperationsParams, OPERATIONS_FIELDS } from '@/ActivitySpace/sustainment/operations/operationsModel';
 const { runOperationsTool } = await import(new URL('../../supabase/functions/alcon-copilot/operationsTools.ts', import.meta.url).pathname);
-const { runWidgetTool } = await import(new URL('../../supabase/functions/alcon-copilot/widgetTools.ts', import.meta.url).pathname);
 
 const uuid = (n: number) => `aaaaaaaa-aaaa-aaaa-aaaa-${String(n).padStart(12, '0')}`;
 const asOf = '2026-09-07';
@@ -15,9 +14,9 @@ function fixture(values: Record<string, unknown>[] = [opportunity], options: { c
   const rows = values.map((_, index) => ({ id: uuid(index + 100), table_id: uuid(1), order_index: index }));
   const cellsByRow = Object.fromEntries(values.map((value, index) => [rows[index].id, Object.fromEntries(Object.entries(value).map(([key, val]) => [fields[key], val]))]));
   const cells = Object.entries(cellsByRow).flatMap(([row_id, cells]) => Object.entries(cells).map(([column_id, value]) => ({ row_id, column_id, value })));
-  const board = { board_key: 'crm:me', revision: 3, layout: { version: 2, zones: { main: [{ id: 'planner', type: 'operations-planner', params }], band: [], rail: [] } } };
+  const widget = { id: uuid(5), kind: 'operations-planner', revision: 3, params };
   const tables: Record<string, Record<string, unknown>[]> = {
-    widget_boards: [board], tables: [{ id: uuid(1), name: 'Operational source' }], table_columns: columns,
+    widgets: [widget], tables: [{ id: uuid(1), name: 'Operational source' }], table_columns: columns,
     table_rows: rows, table_cells: cells,
   };
   if (options.extraColumn) tables.table_cells.push({ row_id: rows[0].id, column_id: uuid(99), value: 'Unmapped private notes' });
@@ -41,7 +40,7 @@ function fixture(values: Record<string, unknown>[] = [opportunity], options: { c
     };
     return query;
   } };
-  return { db, params, schema: { columns, rows, cellsByRow }, tables, calls, input: { boardKey: board.board_key, widgetId: 'planner', asOf } };
+  return { db, params, schema: { columns, rows, cellsByRow }, tables, calls, input: { widgetId: widget.id, asOf } };
 }
 
 describe('Copilot operations diagnosis', () => {
@@ -86,7 +85,7 @@ describe('Copilot operations diagnosis', () => {
   });
 
   it('refuses denied sources and incomplete reads without returning partial totals', async () => {
-    for (const denied of ['widget_boards', 'tables', 'table_rows', 'table_columns', 'table_cells']) {
+    for (const denied of ['widgets', 'tables', 'table_rows', 'table_columns', 'table_cells']) {
       const f = fixture([opportunity], { denied });
       await expect(runOperationsTool(f.db, f.input)).rejects.toThrow('Permission denied');
     }
@@ -126,12 +125,8 @@ describe('Copilot operations diagnosis', () => {
     const f = fixture([]);
     const { data } = await runOperationsTool(f.db, f.input);
     expect(data).toMatchObject({ totalRows: 0, nextOffset: null, baseline: { validCount: 0 }, rows: [] });
-    await expect(runOperationsTool(f.db, { ...f.input, widgetId: 'missing' })).rejects.toThrow('Choose one');
-  });
-
-  it('makes the saved CRM board discoverable through the existing tool', async () => {
-    const f = fixture();
-    await expect(runWidgetTool(f.db, 'widgetBoard', { action: 'get', boardKey: 'crm:me' })).resolves.toMatchObject({ ok: true, data: { board_key: 'crm:me' } });
-    await expect(runWidgetTool(f.db, 'widgetBoard', { action: 'get', boardKey: 'crm:invalid' })).rejects.toThrow('Invalid boardKey');
+    await expect(runOperationsTool(f.db, { ...f.input, widgetId: 'missing' })).rejects.toThrow('widget UUID');
+    f.tables.widgets[0].kind = 'data-view';
+    await expect(runOperationsTool(f.db, f.input)).rejects.toThrow('Choose one');
   });
 });

@@ -6,11 +6,11 @@ import {
 
 export const OPERATIONS_TOOLS = [{
   name: 'analyzeOperations',
-  description: 'Read-only diagnosis and what-if comparison using the same CRM pipeline calculator as the UI. First discover a saved operations-planner with widgetBoard list/get. Supply its boardKey, widgetId and the user business date asOf. Reads the saved field mappings and all source rows under caller RLS; never guesses mappings or writes data. Optional scenario changes only the forecast horizon and follow-up threshold, not records or saved settings. Totals cover all loaded rows; detail rows are paginated by risk priority. Report missing data, source and limitations. A forecast, lower warning count or changed threshold is not an observed improvement. No persistent trial, automatic execution or outcome tracking is performed.',
+  description: 'Read-only diagnosis and what-if comparison using the same CRM pipeline calculator as the UI. First discover a saved operations-planner with widgetBoard get. Supply its widget_id as widgetId and the user business date asOf. Reads the saved field mappings and all source rows under caller RLS; never guesses mappings or writes data. Optional scenario changes only the forecast horizon and follow-up threshold, not records or saved settings. Totals cover all loaded rows; detail rows are paginated by risk priority. Report missing data, source and limitations. A forecast, lower warning count or changed threshold is not an observed improvement. No persistent trial, automatic execution or outcome tracking is performed.',
   input_schema: {
     type: 'object', additionalProperties: false,
     properties: {
-      boardKey: { type: 'string' }, widgetId: { type: 'string' },
+      widgetId: { type: 'string', description: 'The operations-planner widget UUID.' },
       asOf: { type: 'string', description: 'Business date YYYY-MM-DD; explicit to match the user timezone.' },
       scenario: {
         type: 'object', additionalProperties: false,
@@ -21,7 +21,7 @@ export const OPERATIONS_TOOLS = [{
       },
       offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 50 },
     },
-    required: ['boardKey', 'widgetId', 'asOf'],
+    required: ['widgetId', 'asOf'],
   },
 }];
 
@@ -86,23 +86,17 @@ function summary(analysis: OperationsAnalysis) {
 }
 
 export async function runOperationsTool(db: SupabaseClient, input: Record<string, unknown>) {
-  const boardKey = input.boardKey;
   const widgetId = input.widgetId;
-  if (typeof boardKey !== 'string' || !boardKey || boardKey.length > 160 || typeof widgetId !== 'string' || !widgetId || widgetId.length > 200) throw new Error('boardKey and widgetId are required');
+  if (typeof widgetId !== 'string' || !UUID.test(widgetId)) throw new Error('widgetId must be the operations-planner widget UUID');
   const asOf = input.asOf;
   if (typeof asOf !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(asOf) || !Number.isFinite(Date.parse(asOf)) || new Date(asOf).toISOString().slice(0, 10) !== asOf) throw new Error('asOf must be a valid YYYY-MM-DD date');
   const offset = integer(input.offset ?? 0, 0, MAX_ROWS);
   const limit = integer(input.limit ?? 20, 1, 50);
   // The client is the existing per-request caller-JWT client. Never use service_role.
-  const { data: board, error: boardError } = await db.from('widget_boards').select('board_key,revision,layout').eq('board_key', boardKey).single();
-  if (boardError || !board) throw new Error(boardError?.message ?? 'Saved board unavailable');
-  const layout = record(board.layout);
-  if (layout.version !== 2) throw new Error('Unsupported saved layout version');
-  const zones = record(layout.zones);
-  const matches = ['band', 'main', 'rail'].flatMap(zone => Array.isArray(zones[zone]) ? zones[zone] as unknown[] : [])
-    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object' && !Array.isArray(item) && (item as Record<string, unknown>).id === widgetId);
-  if (matches.length !== 1 || matches[0].type !== 'operations-planner') throw new Error('Choose one saved operations-planner instance');
-  const base = checkedParams(matches[0].params);
+  const { data: widget, error: widgetError } = await db.from('widgets').select('id,kind,params,revision').eq('id', widgetId).single();
+  if (widgetError || !widget) throw new Error(widgetError?.message ?? 'Saved planner unavailable');
+  if (widget.kind !== 'operations-planner') throw new Error('Choose one saved operations-planner widget');
+  const base = checkedParams(widget.params);
   const candidate = scenarioParams(base, input.scenario);
   const { data: table, error: tableError } = await db.from('tables').select('id,name').eq('id', base.tableId).single();
   if (tableError || !table) throw new Error(tableError?.message ?? 'Source Table unavailable');
@@ -129,7 +123,7 @@ export async function runOperationsTool(db: SupabaseClient, input: Record<string
   return {
     ok: true as const,
     data: {
-      source: { boardKey, widgetId, revision: board.revision, tableId: table.id, tableName: table.name, asOf, readAt: new Date().toISOString(), rowCount: rows.length, params: base },
+      source: { widgetId, revision: widget.revision, tableId: table.id, tableName: table.name, asOf, readAt: new Date().toISOString(), rowCount: rows.length, params: base },
       baseline: summary(baseline),
       scenario: scenario ? { params: candidate, ...summary(scenario) } : null,
       rows: page.map(row => ({ rowId: row.rowId, baseline: baseRows.get(row.rowId), scenario: scenarioRows.get(row.rowId) ?? null })),

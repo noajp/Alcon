@@ -4,6 +4,11 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 const columnTypes = ['text', 'number', 'date', 'select', 'checkbox'];
 const actions = ['list', 'get', 'create', 'update', 'delete'];
 const objectSchema = { type: 'object', additionalProperties: true };
+const zones = ['band', 'main', 'rail'];
+const sizes = ['half', 'full'];
+/** What each surface's board is about — the same table as web boardModel SURFACE_SUBJECT. */
+const surfaces: Record<string,string> = {home:'me',campaign:'initiative','object-overview':'object','object-summary':'object','domain-overview':'domain','element-detail':'element'};
+const boardSelect = 'id,surface,subject_kind,subject_id,space_id,dismissed_defaults,revision,board_placements(id,widget_id,zone,position,size,default_id,widget:widgets(id,kind,params,revision))';
 export const WIDGET_TOOLS = [
   {
     name: 'tableData',
@@ -12,8 +17,8 @@ export const WIDGET_TOOLS = [
   },
   {
     name: 'widgetBoard',
-    description: 'CRUD the signed-in user widget boards. list is paginated. get/create/update/delete use boardKey: home:<space UUID or me>, crm:<space UUID or me>, campaign:<UUID>, object-overview:<UUID>, object-summary:<UUID>, element-detail:<UUID>. create/update layout: {version:2,zones:{band:[],main:[],rail:[]},dismissed:[]}. Each instance: {id:string,type:string,size:half|full,params:object}. Read current layout first, preserve unrelated widgets and dismissed IDs. update/delete require expectedRevision from get; on conflict reread and reapply intended changes, never overwrite blindly. Data widget type data-view supports params {tableId,view:table|cards|bar,labelColumnId,valueColumnId,groupColumnId,columnIds,title}; use real Table/column IDs from tableData. New table structures and data stay in Tables, never inline in widget params. delete resets saved layout to defaults.',
-    input_schema: { type:'object',properties:{action:{type:'string',enum:actions},boardKey:{type:'string'},layout:objectSchema,expectedRevision:{type:'integer',minimum:1},offset:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:100}},required:['action'],additionalProperties:false },
+    description: 'Read and edit widget boards under the signed-in user permissions. A board belongs to a subject and is the same for everyone who can see that subject; a widget is its own record, placed on a board, visible to whoever can see where it was created. boardKey: home:me or home:<Space UUID> (personal), campaign:<Initiative UUID>, object-overview:<UUID>, object-summary:<UUID>, domain-overview:<UUID>, element-detail:<UUID>. list: boards that have been edited, paginated. get (boardKey): board with placements {id, widget_id, zone, position, size, default_id, widget:{id,kind,params,revision}}; widget null means it was placed from somewhere you cannot see; board null means nobody has edited it and it shows the surface defaults. create (boardKey, kind, zone, optional size and params): a new widget at the end of the zone. update (widgetId): params are merged into the saved ones; zone, size and position move it and need boardKey. delete (boardKey, widgetId): takes it off the board. Read before writing and change only what was asked. Data widget kind data-view takes params {tableId,view:table|cards|bar,labelColumnId,valueColumnId,groupColumnId,columnIds,title}; use real Table/column IDs from tableData. New table structures and data stay in Tables, never inline in widget params.',
+    input_schema: { type:'object',properties:{action:{type:'string',enum:actions},boardKey:{type:'string'},widgetId:{type:'string'},kind:{type:'string'},zone:{type:'string',enum:zones},size:{type:'string',enum:sizes},position:{type:'number'},params:objectSchema,offset:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:100}},required:['action'],additionalProperties:false },
   },
 ];
 function record(value: unknown): Record<string, unknown> {
@@ -43,33 +48,23 @@ export function validateTablePatch(entity: string, raw: unknown, creating: boole
   if ('order_index' in patch && !(entity === 'table' && patch.order_index === null) && (typeof patch.order_index !== 'number' || !Number.isFinite(patch.order_index))) throw new Error('Invalid order_index');
   return patch;
 }
-export function validateBoardLayout(raw: unknown): Record<string, unknown> {
-  const layout = record(raw);
-  if (layout.version !== 2) throw new Error('Layout version must be 2');
-  const zones = record(layout.zones);
-  if (Object.keys(zones).some(k => !['band','main','rail'].includes(k))) throw new Error('Invalid zone');
-  const ids = new Set<string>();
-  for (const zone of ['band','main','rail']) {
-    if (!Array.isArray(zones[zone])) throw new Error('Each zone must be an array');
-    for (const rawItem of zones[zone] as unknown[]) {
-      const item = record(rawItem);
-      if (typeof item.id !== 'string' || !item.id || ids.has(item.id) || typeof item.type !== 'string' || !item.type) throw new Error('Widget IDs must be unique and types nonempty');
-      ids.add(item.id);
-      if (item.size !== undefined && !['half','full'].includes(String(item.size))) throw new Error('Invalid widget size');
-      if (item.params !== undefined) record(item.params);
-      if (item.type === 'data-view') {
-        const params = record(item.params);
-        if (params.tableId != null) uuid(params.tableId);
-        if (!['table','cards','bar'].includes(String(params.view))) throw new Error('Invalid data view');
-        for (const key of ['labelColumnId','valueColumnId','groupColumnId']) if (params[key] != null && params[key] !== '') uuid(params[key]);
-        if (params.columnIds !== undefined) { if (!Array.isArray(params.columnIds)) throw new Error('Invalid columnIds'); params.columnIds.forEach(uuid); }
-        if (params.title !== undefined && typeof params.title !== 'string') throw new Error('Invalid title');
-      }
-    }
-  }
-  if (ids.size > 100 || JSON.stringify(layout).length > 100000) throw new Error('Layout is too large');
-  if (!Array.isArray(layout.dismissed) || layout.dismissed.some(id => typeof id !== 'string')) throw new Error('dismissed must be a string array');
-  return layout;
+export function validateDataView(raw: unknown): Record<string, unknown> {
+  const params = record(raw);
+  if (params.tableId != null) uuid(params.tableId);
+  if (!['table','cards','bar'].includes(String(params.view))) throw new Error('Invalid data view');
+  for (const key of ['labelColumnId','valueColumnId','groupColumnId']) if (params[key] != null && params[key] !== '') uuid(params[key]);
+  if (params.columnIds !== undefined) { if (!Array.isArray(params.columnIds)) throw new Error('Invalid columnIds'); params.columnIds.forEach(uuid); }
+  if (params.title !== undefined && typeof params.title !== 'string') throw new Error('Invalid title');
+  return params;
+}
+export function parseBoardKey(raw: unknown): {surface:string;kind:string;subjectId:string|null;spaceId:string|null} {
+  const [surface,id,...extra] = String(raw ?? '').split(':');
+  if (extra.length || !Object.hasOwn(surfaces,surface)) throw new Error('Invalid boardKey');
+  const kind = surfaces[surface];
+  // A personal board is the caller's own; the id names the Space it is kept for.
+  if (kind === 'me' && id === 'me') return {surface,kind,subjectId:null,spaceId:null};
+  if (!uuidPattern.test(id ?? '')) throw new Error('Invalid boardKey');
+  return kind === 'me' ? {surface,kind,subjectId:null,spaceId:id} : {surface,kind,subjectId:id,spaceId:null};
 }
 async function result(query: PromiseLike<{data: unknown;error: {message:string}|null}>) {
   const {data,error} = await query;
@@ -79,40 +74,34 @@ async function result(query: PromiseLike<{data: unknown;error: {message:string}|
 function sourceSignature(params: Record<string, unknown>) {
   return JSON.stringify(['tableId','labelColumnId','valueColumnId','groupColumnId','columnIds'].map(key => params[key] ?? null));
 }
-async function checkedLayout(db: SupabaseClient, raw: unknown, previous?: unknown) {
-  const layout = validateBoardLayout(raw);
-  const zones = record(layout.zones);
-  const previousInstances = new Map<string, Record<string, unknown>>();
-  if (previous && typeof previous === 'object') {
-    const previousZones = (previous as Record<string, unknown>).zones;
-    if (previousZones && typeof previousZones === 'object') for (const zone of ['band','main','rail']) {
-      const items = (previousZones as Record<string, unknown>)[zone];
-      if (Array.isArray(items)) for (const value of items) {
-        if (value && typeof value === 'object' && typeof value.id === 'string') previousInstances.set(value.id,value);
-      }
-    }
+/** A data view may only be bound to a Table and columns the caller can see. */
+async function checkedParams(db: SupabaseClient, kind: string, raw: unknown, previous?: unknown) {
+  const params = record(raw);
+  if (JSON.stringify(params).length > 50000) throw new Error('Params are too large');
+  if (kind !== 'data-view') return params;
+  validateDataView(params);
+  if (params.tableId == null) return params;
+  // An unavailable source remains a valid saved reference. Only new or
+  // changed bindings need lookup; editing a title must still work.
+  if (previous && typeof previous === 'object' && sourceSignature(record(previous)) === sourceSignature(params)) return params;
+  await result(db.from('tables').select('id').eq('id',params.tableId).single());
+  const ids = [...new Set([
+    params.labelColumnId, params.valueColumnId, params.groupColumnId,
+    ...(Array.isArray(params.columnIds) ? params.columnIds : []),
+  ].filter((id): id is string => typeof id === 'string' && id.length > 0))];
+  if (ids.length > 100) throw new Error('Too many source columns');
+  if (ids.length) {
+    const columns = await result(db.from('table_columns').select('id').eq('table_id',params.tableId).in('id',ids));
+    if (!Array.isArray(columns) || columns.length !== ids.length) throw new Error('Source columns must belong to the visible Table');
   }
-  for (const zone of ['band','main','rail']) for (const rawItem of zones[zone] as unknown[]) {
-    const item = record(rawItem);
-    if (item.type !== 'data-view') continue;
-    const params = record(item.params);
-    if (params.tableId == null) continue;
-    const old = previousInstances.get(String(item.id));
-    // An unavailable source remains a valid saved reference. Only new or
-    // changed bindings need lookup; editing another widget must still work.
-    if (old?.type === 'data-view' && old.params && typeof old.params === 'object' && sourceSignature(record(old.params)) === sourceSignature(params)) continue;
-    await result(db.from('tables').select('id').eq('id',params.tableId).single());
-    const ids = [...new Set([
-      params.labelColumnId, params.valueColumnId, params.groupColumnId,
-      ...(Array.isArray(params.columnIds) ? params.columnIds : []),
-    ].filter((id): id is string => typeof id === 'string' && id.length > 0))];
-    if (ids.length > 100) throw new Error('Too many source columns');
-    if (ids.length) {
-      const columns = await result(db.from('table_columns').select('id').eq('table_id',params.tableId).in('id',ids));
-      if (!Array.isArray(columns) || columns.length !== ids.length) throw new Error('Source columns must belong to the visible Table');
-    }
-  }
-  return layout;
+  return params;
+}
+async function findBoard(db: SupabaseClient, key: unknown) {
+  const target = parseBoardKey(key);
+  let query = db.from('boards').select(boardSelect).eq('surface',target.surface).eq('subject_kind',target.kind);
+  if (target.subjectId) query = query.eq('subject_id',target.subjectId);
+  query = target.spaceId ? query.eq('space_id',target.spaceId) : query.is('space_id',null);
+  return {target, board: await result(query.maybeSingle()) as Record<string,unknown>|null};
 }
 export async function runWidgetTool(db: SupabaseClient, name: string, input: Record<string,unknown>): Promise<{ok:true;data:unknown;meta?:{rows?:number;nextOffset:number|null;total:number|null}}> {
   if (!actions.includes(String(input.action))) throw new Error('Invalid action');
@@ -121,27 +110,49 @@ export async function runWidgetTool(db: SupabaseClient, name: string, input: Rec
   const limit = integer(input.limit ?? 100,1,100);
   if (name === 'widgetBoard') {
     if (action === 'list') {
-      const {data,error,count} = await db.from('widget_boards').select('*',{count:'exact'}).order('board_key').range(offset,offset+limit-1);
+      const {data,error,count} = await db.from('boards').select('id,surface,subject_kind,subject_id,space_id,revision,updated_at',{count:'exact'}).order('surface').order('id').range(offset,offset+limit-1);
       if(error) throw error;
       return {ok:true,data:{items:data ?? [],nextOffset:offset+(data?.length??0)<(count??0)?offset+(data?.length??0):null,total:count}};
     }
-    const key = String(input.boardKey ?? '');
-    const [surface,id,...extra] = key.split(':');
-    if (extra.length || !['home','crm','campaign','object-overview','object-summary','element-detail'].includes(surface) || !(['home','crm'].includes(surface) && id === 'me') && !uuidPattern.test(id ?? '')) throw new Error('Invalid boardKey');
-    let query;
-    if (action === 'get') query = db.from('widget_boards').select('*').eq('board_key',key).single();
-    else if (action === 'create') query = db.from('widget_boards').insert({board_key:key,layout:await checkedLayout(db,input.layout)}).select().single();
-    else {
-      const revision = integer(input.expectedRevision,1);
-      if (action === 'update') {
-        const {data: currentData,error: currentError} = await db.from('widget_boards').select('layout').eq('board_key',key).eq('revision',revision).single();
-        if (currentError) throw new Error(`Board unavailable or revision conflict; reread before retrying: ${currentError.message}`);
-        const current = record(currentData);
-        query = db.from('widget_boards').update({layout:await checkedLayout(db,input.layout,current.layout)}).eq('board_key',key).eq('revision',revision).select().single();
-      } else query = db.from('widget_boards').delete().eq('board_key',key).eq('revision',revision).select().single();
+    if (action === 'get') {
+      const {board} = await findBoard(db,input.boardKey);
+      return {ok:true,data:{boardKey:input.boardKey,board}};
     }
-    const {data,error} = await query;
-    if (error) throw new Error(action === 'update' || action === 'delete' ? `Board write failed (missing, denied, or revision conflict); reread before retrying: ${error.message}` : error.message);
+    if (action === 'create') {
+      const target = parseBoardKey(input.boardKey);
+      const kind = input.kind;
+      if (typeof kind !== 'string' || !kind || kind.length > 100) throw new Error('kind is required');
+      if (!zones.includes(String(input.zone))) throw new Error('Invalid zone');
+      if (input.size !== undefined && !sizes.includes(String(input.size))) throw new Error('Invalid widget size');
+      const params = await checkedParams(db,kind,input.params ?? {});
+      // The board row is made here if nobody has edited it yet; its defaults stay as the surface shows them.
+      const boardId = await result(db.rpc('ensure_board',{p_surface:target.surface,p_subject_kind:target.kind,p_subject_id:target.subjectId,p_space_id:target.spaceId,p_instances:[]}));
+      const widgetId = await result(db.rpc('add_widget',{p_board_id:boardId,p_kind:kind,p_zone:input.zone,p_size:input.size ?? null,p_params:params}));
+      return {ok:true,data:{boardId,widgetId}};
+    }
+    const widgetId = uuid(input.widgetId);
+    if (action === 'delete') {
+      const {board} = await findBoard(db,input.boardKey);
+      if (!board) throw new Error('Board has no saved placements; reread before retrying');
+      return {ok:true,data:await result(db.from('board_placements').delete().eq('board_id',board.id).eq('widget_id',widgetId).select().single())};
+    }
+    const placement: Record<string,unknown> = {};
+    if (input.zone !== undefined) { if (!zones.includes(String(input.zone))) throw new Error('Invalid zone'); placement.zone = input.zone; }
+    if (input.size !== undefined) { if (!sizes.includes(String(input.size))) throw new Error('Invalid widget size'); placement.size = input.size; }
+    if (input.position !== undefined) { if (typeof input.position !== 'number' || !Number.isFinite(input.position)) throw new Error('Invalid position'); placement.position = input.position; }
+    if (input.params === undefined && !Object.keys(placement).length) throw new Error('Nothing to update');
+    const data: Record<string,unknown> = {widgetId};
+    if (input.params !== undefined) {
+      const current = record(await result(db.from('widgets').select('kind,params').eq('id',widgetId).single()));
+      const patch = record(input.params);
+      await checkedParams(db,String(current.kind),{...record(current.params ?? {}),...patch},current.params);
+      data.params = await result(db.rpc('merge_widget_params',{p_widget_id:widgetId,p_patch:patch}));
+    }
+    if (Object.keys(placement).length) {
+      const {board} = await findBoard(db,input.boardKey);
+      if (!board) throw new Error('Board has no saved placements; reread before retrying');
+      data.placement = await result(db.from('board_placements').update(placement).eq('board_id',board.id).eq('widget_id',widgetId).select().single());
+    }
     return {ok:true,data};
   }
   const entity = String(input.entity);

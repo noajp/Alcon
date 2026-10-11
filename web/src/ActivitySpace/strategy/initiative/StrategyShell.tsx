@@ -491,9 +491,8 @@ function StrategyDetailView({
     return allObjects.filter((o) => scope.has(o.id)).flatMap((o) => o.elements ?? []);
   }, [allObjects, strategy.objectIds]);
 
-  // Surface key stays 'campaign' — it's the first half of the persisted
-  // widget_boards.board_key ('campaign:<id>'), not a display string. Renaming
-  // it would orphan every board a user already saved under the old key.
+  // Surface key stays 'campaign' — it is the persisted boards.surface, not a
+  // display string. Renaming it would orphan every board saved under it.
   const board = useBoard('campaign', INITIATIVE_BOARD, strategy.id);
   const host = useMemo<WidgetHost>(
     () => ({

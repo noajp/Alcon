@@ -1,5 +1,7 @@
 # 0020 — Widget は永続データを参照し、配置を対象別に保存する
 
+> 置き換え: 配置の保存先と共有範囲は [0039](0039-widgets-are-shared-components-with-an-origin-and-boards-are-placements.md)。Widget が Table を参照し、業務データを持たない点はそのまま。
+
 ## 背景
 
 人間とAIが個別データ・情報・分析の構造をCRUDし、同じデータを異なる表示に配置できる必要がある。コンポーネントの定数とブラウザだけの配置では、データの編集も対象別の構成も共有のAPIから扱えない。

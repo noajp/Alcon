@@ -72,7 +72,7 @@ root 直下は `supabase/`（migrations と functions）、`ops/`（自走ルー
 1. 変更後は必ず `npx tsc --noEmit` と `npm test`
 2. 新規ファイルは、盤面の画面なら `ActivitySpace/<分類>/<概念>/`、それを支える仕組みなら `Function/<concept>/`。横断 UI は `Function/shared/`、外殻は `shell/`
 3. **新 view**：`viewRegistry.ts`（label/icon の単一情報源）→ `MainContent` 分岐 → `railApps.ts` の `MODE_META`。新モードを App にするなら `RailMode` / `APP_GROUPS` も
-4. **新 Widget**：本体を `Function/widget/widgets/` に、定義を `registry.tsx` に1つ（`accepts` / `zones` / `load()` の動的 import）、既定配置は `defaults.ts`。既存ウィジェットを別の Subject でも使う場合は、`accepts` に対象を追加する
+4. **新 Widget**：本体を `Function/widget/widgets/` に、定義を `registry.tsx` に1つ（`accepts` / `zones` / `load()` の動的 import）、既定配置は `defaults.ts`。既存ウィジェットを別の Subject でも使う場合は、`accepts` に対象を追加する。Home 以外のボードは対象を見られる全員が共有するので、ウィジェットに本人だけの保存先を持たせない（持たせるなら定義を `personal` にする）
 5. **グラフの集計軸を固定しない** — 集計軸は `Function/shared/dimensions.ts` の `Dimension` から選択できるようにし、`WidgetInstance.params` に保存する。軸の違いだけで別のウィジェットを作らない
 6. **フレームワークは永続データの見せ方にする** — OKR / Gap は `intents` の measure の読み替え、任意の分類による分析には Table を使い、文章は Note に保存する。業界固有のデータや分析結果をコンポーネントや配置パラメータへ直書きしない
 7. **Object のネスト禁止**。Element の multi-homing は `object_id` + `element_objects` の二重書き

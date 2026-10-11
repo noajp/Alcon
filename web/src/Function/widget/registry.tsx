@@ -27,7 +27,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'generated-app': {
     type: 'generated-app', label: 'AI app',
     description: 'Create a persistent calculator, checklist or mini app with AI',
-    group: 'core', accepts: ['object'], zones: ['main'], defaultSize: 'full',
+    group: 'core', accepts: ['object'], zones: ['main'], defaultSize: 'full', personal: true,
     load: async () => (await import('./widgets/GeneratedAppWidget')).GeneratedAppWidget,
   },
   'approach-references': {
