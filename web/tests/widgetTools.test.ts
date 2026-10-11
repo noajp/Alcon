@@ -64,6 +64,15 @@ describe('Copilot widget and Table boundaries', () => {
       ['add_widget',{p_board_id:'board',p_kind:'data-view',p_zone:'main',p_size:null,p_params:{tableId:null,view:'table'}}],
     ]);
   });
+  it('refuses a move on an unknown board before writing params', async () => {
+    let wrote = false;
+    const query = {select:() => query,eq:() => query,is:() => query,maybeSingle:async () => ({data:null,error:null})};
+    const db = {from:() => query,rpc:async () => { wrote = true; return {data:{},error:null}; }};
+    await expect(runWidgetTool(db as never,'widgetBoard',{action:'update',boardKey:`campaign:${tableId}`,widgetId:tableId,zone:'main',params:{title:'x'}})).rejects.toThrow('no saved placements');
+    expect(wrote).toBe(false);
+    await expect(runWidgetTool(db as never,'widgetBoard',{action:'create',boardKey:`campaign:${tableId}`,kind:'generated-app',zone:'main'})).rejects.toThrow('AI app');
+    expect(wrote).toBe(false);
+  });
   it('merges params without re-checking an unchanged, unavailable source binding', async () => {
     const relations: string[] = [];
     const merged: unknown[] = [];

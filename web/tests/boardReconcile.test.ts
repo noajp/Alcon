@@ -239,6 +239,12 @@ describe('applyEdit', () => {
     const twice = applyEdit(once, { op: 'params', id: 'w-b', params: (current) => ({ b: Number(current.a) + 1 }) }, defaults);
     expect(twice.main[1].params).toEqual({ a: 1, b: 2 });
     expect(applyEdit(stored, { op: 'remove', id: 'w-a' }, defaults).main.map((w) => w.id)).toEqual(['w-b']);
-    expect(applyEdit(stored, { op: 'reset' }, defaults)).toBe(defaults);
+  });
+
+  it('leaves a hidden widget on the board through a remove and a reset', () => {
+    expect(applyEdit(stored, { op: 'remove', id: 'secret' }, defaults)).toBe(stored);
+    const reset = applyEdit(stored, { op: 'reset' }, defaults);
+    expect(reset.main).toEqual(defaults.main);
+    expect(reset.rail.map((w) => w.id)).toEqual([...defaults.rail.map((w) => w.id), 'secret']);
   });
 });

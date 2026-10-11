@@ -17,7 +17,7 @@ export const WIDGET_TOOLS = [
   },
   {
     name: 'widgetBoard',
-    description: 'Read and edit widget boards under the signed-in user permissions. A board belongs to a subject and is the same for everyone who can see that subject; a widget is its own record, placed on a board, visible to whoever can see where it was created. boardKey: home:me or home:<Space UUID> (personal), campaign:<Initiative UUID>, object-overview:<UUID>, object-summary:<UUID>, domain-overview:<UUID>, element-detail:<UUID>. list: boards that have been edited, paginated. get (boardKey): board with placements {id, widget_id, zone, position, size, default_id, widget:{id,kind,params,revision}}; widget null means it was placed from somewhere you cannot see; board null means nobody has edited it and it shows the surface defaults. create (boardKey, kind, zone, optional size and params): a new widget at the end of the zone. update (widgetId): params are merged into the saved ones; zone, size and position move it and need boardKey. delete (boardKey, widgetId): takes it off the board. Read before writing and change only what was asked. Data widget kind data-view takes params {tableId,view:table|cards|bar,labelColumnId,valueColumnId,groupColumnId,columnIds,title}; use real Table/column IDs from tableData. New table structures and data stay in Tables, never inline in widget params.',
+    description: 'Read and edit widget boards under the signed-in user permissions. A board belongs to a subject and is the same for everyone who can see that subject; a widget is its own record, placed on a board, visible to whoever can see where it was created. boardKey: home:me or home:<Space UUID> (personal), campaign:<Initiative UUID>, object-overview:<UUID>, object-summary:<UUID>, domain-overview:<UUID>, element-detail:<UUID>. list: boards that have been edited, paginated. get (boardKey): board with placements {id, widget_id, zone, position, size, default_id, widget:{id,kind,params,revision}}; widget null means it was placed from somewhere you cannot see; board null means nobody has edited it and it shows the surface defaults. create (boardKey, kind, zone, optional size and params): a new widget at the end of the zone. update (widgetId): params are merged into the saved ones; zone, size and position move it and need boardKey. delete (boardKey, widgetId): takes it off the board; a widget you cannot see cannot be taken off. Read before writing and change only what was asked. Data widget kind data-view takes params {tableId,view:table|cards|bar,labelColumnId,valueColumnId,groupColumnId,columnIds,title}; use real Table/column IDs from tableData. New table structures and data stay in Tables, never inline in widget params.',
     input_schema: { type:'object',properties:{action:{type:'string',enum:actions},boardKey:{type:'string'},widgetId:{type:'string'},kind:{type:'string'},zone:{type:'string',enum:zones},size:{type:'string',enum:sizes},position:{type:'number'},params:objectSchema,offset:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:100}},required:['action'],additionalProperties:false },
   },
 ];
@@ -122,6 +122,8 @@ export async function runWidgetTool(db: SupabaseClient, name: string, input: Rec
       const target = parseBoardKey(input.boardKey);
       const kind = input.kind;
       if (typeof kind !== 'string' || !kind || kind.length > 100) throw new Error('kind is required');
+      // Kept to its author and made from the widget itself; made here it would be shared with the whole board.
+      if (kind === 'generated-app') throw new Error('An AI app is created from its own widget, not by this tool');
       if (!zones.includes(String(input.zone))) throw new Error('Invalid zone');
       if (input.size !== undefined && !sizes.includes(String(input.size))) throw new Error('Invalid widget size');
       const params = await checkedParams(db,kind,input.params ?? {});
@@ -141,6 +143,13 @@ export async function runWidgetTool(db: SupabaseClient, name: string, input: Rec
     if (input.size !== undefined) { if (!sizes.includes(String(input.size))) throw new Error('Invalid widget size'); placement.size = input.size; }
     if (input.position !== undefined) { if (typeof input.position !== 'number' || !Number.isFinite(input.position)) throw new Error('Invalid position'); placement.position = input.position; }
     if (input.params === undefined && !Object.keys(placement).length) throw new Error('Nothing to update');
+    // Everything is checked before anything is written, so a refused call changes nothing.
+    let boardId: unknown;
+    if (Object.keys(placement).length) {
+      const {board} = await findBoard(db,input.boardKey);
+      if (!board) throw new Error('Board has no saved placements; reread before retrying');
+      boardId = board.id;
+    }
     const data: Record<string,unknown> = {widgetId};
     if (input.params !== undefined) {
       const current = record(await result(db.from('widgets').select('kind,params').eq('id',widgetId).single()));
@@ -148,11 +157,7 @@ export async function runWidgetTool(db: SupabaseClient, name: string, input: Rec
       await checkedParams(db,String(current.kind),{...record(current.params ?? {}),...patch},current.params);
       data.params = await result(db.rpc('merge_widget_params',{p_widget_id:widgetId,p_patch:patch}));
     }
-    if (Object.keys(placement).length) {
-      const {board} = await findBoard(db,input.boardKey);
-      if (!board) throw new Error('Board has no saved placements; reread before retrying');
-      data.placement = await result(db.from('board_placements').update(placement).eq('board_id',board.id).eq('widget_id',widgetId).select().single());
-    }
+    if (boardId) data.placement = await result(db.from('board_placements').update(placement).eq('board_id',boardId).eq('widget_id',widgetId).select().single());
     return {ok:true,data};
   }
   const entity = String(input.entity);

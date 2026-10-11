@@ -120,8 +120,9 @@ function SortableWidget({
   );
 
   // Placed here from an origin this person cannot see. The board is theirs to
-  // arrange, so the place is shown and can be moved or cleared; the contents
-  // are not theirs, so nothing about them is.
+  // arrange, so the place is shown and can be moved. The widget is not theirs:
+  // nothing about it is shown, and taking it off the board is left to someone
+  // who can see it — its author could not find it again otherwise.
   if (instance.hidden) {
     return (
       <div
@@ -135,7 +136,6 @@ function SortableWidget({
           arranging={arranging}
           isDragging={isDragging}
           onLongPress={() => setArranging(true)}
-          onRemove={() => board.removeWidget(instance.id)}
         >
           <p className="text-xs text-muted-foreground">You don’t have access to this widget.</p>
         </WidgetFrame>

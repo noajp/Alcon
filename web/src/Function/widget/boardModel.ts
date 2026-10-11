@@ -253,12 +253,24 @@ export function movePosition(layout: BoardLayout, id: string, zone: Zone, index:
  * it.
  */
 export function applyEdit(layout: BoardLayout, edit: BoardEdit, defaults: BoardLayout): BoardLayout {
-  if (edit.op === 'reset') return defaults;
+  // A reset clears what the viewer can see; a hidden widget stays where it is.
+  if (edit.op === 'reset') {
+    const next = { ...defaults };
+    for (const zone of ZONES) {
+      const hidden = layout[zone].filter((w) => w.hidden);
+      if (hidden.length) next[zone] = [...defaults[zone], ...hidden];
+    }
+    return next;
+  }
   if (edit.op === 'add') return layout;
   const found = findInstance(layout, edit.id);
   if (!found) return layout;
   const { zone: from, instance } = found;
-  if (edit.op === 'remove') return { ...layout, [from]: layout[from].filter((w) => w.id !== edit.id) };
+  if (edit.op === 'remove') {
+    // Only someone who can see a widget may take it off the board.
+    if (instance.hidden) return layout;
+    return { ...layout, [from]: layout[from].filter((w) => w.id !== edit.id) };
+  }
   if (edit.op === 'move') {
     if (!fitsZone(instance, from, edit.zone)) return layout;
     const next = { ...layout, [from]: layout[from].filter((w) => w.id !== edit.id) };

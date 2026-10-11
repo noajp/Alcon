@@ -49,9 +49,9 @@ function check({ error }: { error: { message: string } | null }): void {
 async function persistEdit(target: BoardTarget, defaults: BoardLayout, edit: BoardEdit): Promise<void> {
   let rows = await fetchBoard(target);
   if (edit.op === 'reset') {
-    // Deleting the board takes its placements and their widgets with it,
-    // which leaves exactly the surface's defaults.
-    if (rows) check(await supabase.from('boards').delete().eq('id', rows.id));
+    // Clears every placement the caller can see and forgets what was
+    // dismissed, which leaves the surface's defaults.
+    if (rows) check(await supabase.rpc('reset_board', { p_board_id: rows.id }));
     return;
   }
   let layout = boardLayout(rows, defaults);
@@ -94,6 +94,7 @@ async function persistEdit(target: BoardTarget, defaults: BoardLayout, edit: Boa
   if (!found?.instance.placementId) return;
   const { zone, instance } = found;
   if (edit.op === 'remove') {
+    if (instance.hidden) return;
     check(await supabase.from('board_placements').delete().eq('id', instance.placementId));
   } else if (edit.op === 'move') {
     if (!fitsZone(instance, zone, edit.zone)) return;
