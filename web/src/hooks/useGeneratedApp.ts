@@ -56,20 +56,22 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
   // The shared app runs in every viewer's browser and reads Object data as
   // that viewer. Code someone else put there could read what only this viewer
   // can see and save it where its author can read it, so each viewer connects
-  // each version themselves. The built-in template is known code.
+  // each version themselves, by pressing Connect — never as a side effect of
+  // something else. The built-in template is known code.
   const current = shared.value?.current ?? null;
-  const [digest, setDigest] = useState<{ of: AppSource; value: string } | null>(null);
+  const [digest, setDigest] = useState<{ of: AppSource; value: string | null } | null>(null);
   useEffect(() => {
     if (!current) return;
     let alive = true;
-    void sourceDigest(current).then(value => { if (alive) setDigest({ of: current, value }); });
+    // No digest (no Web Crypto outside a secure context): the app still runs, unconnected.
+    void sourceDigest(current).catch(() => null).then(value => { if (alive) setDigest({ of: current, value }); });
     return () => { alive = false; };
   }, [current]);
   const currentDigest = current && digest?.of === current ? digest.value : null;
   const known = !!current && stableJson(current) === stableJson(summaryApp);
   const dataConnected = known || (!!currentDigest && own.value?.dataApproved === currentDigest);
   // Until the digest is known the answer is not "not connected" but "not yet known".
-  const identifying = !!current && !known && !currentDigest;
+  const identifying = !!current && !known && digest?.of !== current;
 
   const app: GeneratedApp | null = shared.value || own.value ? {
     current_app: shared.value?.current ?? null,
@@ -81,7 +83,7 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
   return {
     app, state: data.value ?? {}, loading: loading || identifying, dataConnected,
     connectData: () => serial(async () => {
-      if (!currentDigest) throw new Error('Load the app before connecting data.');
+      if (!currentDigest) throw new Error('Object data cannot be connected in this browser context.');
       await saveOwn({ dataApproved: currentDigest });
     }),
     error: loadError?.message ?? (ready && !userId ? 'Sign in to save your app.' : null), saving: pending > 0,
@@ -112,13 +114,9 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
       // A retry after the second write failed must not record the app as its own previous version.
       const existing = latest.current.shared?.current ?? null;
       if (!existing || stableJson(existing) !== stableJson(draft)) await setShared({ current: draft, previous: existing });
-      // Adopting your own preview lets it read as you — unless it revises an
-      // app you had not connected: a revision is built from that app's code
-      // and may keep what its author put there, so it stays unconnected and
-      // asks like any version someone else set up.
-      const trusted = !existing || stableJson(existing) === stableJson(summaryApp)
-        || latest.current.own?.dataApproved === await sourceDigest(existing);
-      await saveOwn({ draft: null, prompt: '', dataApproved: trusted ? await sourceDigest(draft) : undefined });
+      // Nothing is connected here. What a preview was built from cannot be
+      // told at this point, so every version is connected by an explicit act.
+      await saveOwn({ draft: null, prompt: '' });
     }),
     discard: () => serial(() => saveOwn({ draft: null })),
     restore: () => serial(async () => {

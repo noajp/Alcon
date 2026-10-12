@@ -271,7 +271,7 @@ Board は、Strategy・Execution・Sustainment の画面に、その対象を補
 
 Widget は Board に置く部品で、Board とは別に存在する。種類と設定と**出自**（どの対象の Board で作られたか）を持ち、出自を見られる人が見られて、編集できる。Widget を別の Board に置いても見られる人は広がらず、見られない人には中身のない枠だけが表示される。その枠は動かせるが、外せるのは Widget を見られる人だけである。
 
-Widget は業務の正本を持たない。集計や一覧は Element・Initiative・Table を読んで映し、Widget が持つのは何をどう映すかの設定である。AI で作るミニアプリのように自分の中身を持つ Widget は、その中身も Widget を見られる全員で共有する。別々の項目を同時に変えても両方が残り、ほかの人の変更は開いたままのアプリに届く。作りかけのプレビューだけは本人にしか見えず、採用したときに全員のアプリが置き換わる。Object のデータを読むアプリは見る人の権限で読むので、ほかの人が採用した版は、見る人が自分でデータの接続を承認するまで読み取りを行わない。中身を持つ Widget をボードから外すと中身も全員から消えるので、外す前に確認する。判断は [ADR 0039](../docs/adr/0039-widgets-are-shared-components-with-an-origin-and-boards-are-placements.md) と [ADR 0040](../docs/adr/0040-widget-contents-are-shared-documents-merged-by-key.md)。
+Widget は業務の正本を持たない。集計や一覧は Element・Initiative・Table を読んで映し、Widget が持つのは何をどう映すかの設定である。AI で作るミニアプリのように自分の中身を持つ Widget は、その中身も Widget を見られる全員で共有する。別々の項目を同時に変えても両方が残り、ほかの人の変更は開いたままのアプリに届く。作りかけのプレビューだけは本人にしか見えず、採用したときに全員のアプリが置き換わる。Object のデータを読むアプリは見る人の権限で読むので、採用された版は、見る人がそれぞれデータの接続を承認するまで読み取りを行わない。中身を持つ Widget をボードから外すと中身も全員から消えるので、外す前に確認する。判断は [ADR 0039](../docs/adr/0039-widgets-are-shared-components-with-an-origin-and-boards-are-placements.md) と [ADR 0040](../docs/adr/0040-widget-contents-are-shared-documents-merged-by-key.md)。
 
 ### 案件の取り込みと日常の更新
 
