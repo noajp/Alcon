@@ -32,19 +32,23 @@ export function AppRuntime({ source, state, objectId, objectName, preview, readO
   }, [sendTheme]);
   const callbacks = useRef({ onSave, onReady, readOnly, onReadContext });
   useEffect(() => { callbacks.current = { onSave, onReady, readOnly, onReadContext }; }, [onSave, onReady, readOnly, onReadContext]);
-  // What the app inside the frame believes the saved state is.
-  const base = useRef(state);
+  // The state last handed to the app, to tell whether the saved one has moved on.
+  const handed = useRef(state);
+  const latest = useRef(state);
+  const started = useRef(false);
   const saving = useRef(0);
   const pushState = useCallback((value: AppState) => {
-    base.current = value;
+    handed.current = value;
     frame.current?.contentWindow?.postMessage({ channel: document.channel, type: 'state', value }, '*');
   }, [document.channel]);
-  // Someone else saved: hand the running app the new state. Held back while a
-  // save of our own is in flight — its answer already carries their change.
-  useEffect(() => {
-    if (preview || saving.current > 0 || stableJson(state) === stableJson(base.current)) return;
-    pushState(state);
-  }, [state, preview, pushState]);
+  // Someone else saved: hand the running app the new state. Not before the app
+  // has started — it would not be listening — and not while a save of our own
+  // is in flight, whose answer already carries their change.
+  const pushIfMoved = useCallback(() => {
+    if (preview || !started.current || saving.current > 0) return;
+    if (stableJson(latest.current) !== stableJson(handed.current)) pushState(latest.current);
+  }, [preview, pushState]);
+  useEffect(() => { latest.current = state; pushIfMoved(); }, [state, pushIfMoved]);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState(preview ? 'Preview · inputs here are not saved' : 'Loading app…');
   useEffect(() => {
@@ -59,7 +63,7 @@ export function AppRuntime({ source, state, objectId, objectName, preview, readO
       if (event.source !== frame.current?.contentWindow || event.data?.channel !== document.channel) return;
       const message = event.data;
       if (message.type === 'boot') sendTheme('start');
-      if (message.type === 'ready') { setError(null); ready = true; clearTimeout(timer); callbacks.current.onReady(true); if (!preview) setStatus('Saved app'); }
+      if (message.type === 'ready') { setError(null); ready = true; clearTimeout(timer); callbacks.current.onReady(true); if (!preview) setStatus('Saved app'); started.current = true; pushIfMoved(); }
       if (message.type === 'error') { setError(String(message.message).slice(0, 400)); callbacks.current.onReady(false); }
       if (!['save', 'read-context'].includes(message.type)) return;
       if (!Number.isSafeInteger(message.id) || message.id <= lastId) return;
@@ -86,8 +90,10 @@ export function AppRuntime({ source, state, objectId, objectName, preview, readO
         const next = parseAppState(message.value);
         if (!preview) {
           setStatus('Saving…');
-          merged = await callbacks.current.onSave(next, base.current);
-          base.current = merged;
+          // Against the state the app says it started from, not one the host
+          // assumes: a save sent before the last answer arrived starts earlier.
+          merged = await callbacks.current.onSave(next, message.base === undefined ? handed.current : parseAppState(message.base));
+          handed.current = merged;
         }
         if (alive) { setError(null); setStatus(preview ? 'Preview · inputs here are not saved' : 'All changes saved'); }
       } catch (e) { failure = e instanceof Error ? e.message : 'Save failed.'; if (alive) { setError(failure); setStatus('Not saved'); } }
@@ -96,11 +102,12 @@ export function AppRuntime({ source, state, objectId, objectName, preview, readO
       frame.current?.contentWindow?.postMessage({ channel: document.channel, type: 'saved', id: message.id, value: merged, error: failure }, '*');
       // The merged state differs from what the app sent when someone else changed another key meanwhile.
       if (merged && stableJson(merged) !== stableJson(message.value)) pushState(merged);
+      pushIfMoved();
     }
     window.addEventListener('message', receive);
     sendTheme('start');
     return () => { alive = false; clearTimeout(timer); window.removeEventListener('message', receive); };
-  }, [document, preview, source.usesObjectData, sendTheme, pushState]);
+  }, [document, preview, source.usesObjectData, sendTheme, pushState, pushIfMoved]);
   return <div className="space-y-2">
     <iframe ref={frame} title={`${preview ? 'Preview: ' : ''}${source.title}`} srcDoc={document.html} onLoad={() => sendTheme('start')} sandbox="allow-scripts" referrerPolicy="no-referrer" className="h-[420px] w-full rounded-md border-0 bg-background" />
     <p role="status" className="text-xs text-muted-foreground">{status}</p>

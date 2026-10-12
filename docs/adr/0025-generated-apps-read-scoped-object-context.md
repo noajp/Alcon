@@ -1,5 +1,7 @@
 # 0025 — Generated apps read scoped Object context
 
+> 置き換え: アプリと入力は [0040](0040-widget-contents-are-shared-documents-merged-by-key.md) で共有になった。読み取りは見る人ごとに接続を承認する。読める範囲と読み取り専用の契約はそのまま。
+
 ## 背景
 
 保存したフォームや計算機を案件の実態に結び付け、転記せずにStrategyとExecutionを確認できるようにする。

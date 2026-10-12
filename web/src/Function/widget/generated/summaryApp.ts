@@ -10,6 +10,7 @@ const status=document.getElementById('context-status');
 const refresh=document.getElementById('refresh');
 const memo=document.getElementById('memo');
 memo.value=typeof alcon.state.memo==='string'?alcon.state.memo:'';
+alcon.onChange(state=>{if(document.activeElement!==memo)memo.value=typeof state.memo==='string'?state.memo:'';});
 let timer;
 memo.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(async()=>{const output=document.getElementById('save-status');try{await alcon.save({...alcon.state,memo:memo.value});output.textContent='Notes saved';}catch(e){output.textContent='Could not save: '+e.message;}},400);});
 function node(tag,text,cls){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el;}

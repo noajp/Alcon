@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { runInNewContext } from 'node:vm';
 import { appDocument } from '../src/Function/widget/generated/runtime';
+import { statePatch } from '../src/Function/widget/generated/model';
 
 describe('app data message boundary', () => {
   it('waits for the matching parent and channel before exposing a read result', async () => {
@@ -33,6 +34,8 @@ describe('app data message boundary', () => {
     dispatch(parent, { channel: 'channel', type: 'start' });
     const save = messages.find(m => m.type === 'save')!;
     expect(save.value).toEqual({ mine: 1 });
+    // The save names the state it started from, so the host need not guess it.
+    expect(save.base).toEqual({});
     // The answer carries what another person saved in the meantime.
     dispatch(parent, { channel: 'channel', type: 'saved', id: save.id, value: { mine: 1, theirs: 2 } });
     await Promise.resolve(); await Promise.resolve();
@@ -42,5 +45,22 @@ describe('app data message boundary', () => {
     expect(messages.some(m => 'seen' in m)).toBe(false);
     dispatch(parent, { channel: 'channel', type: 'state', value: { mine: 1, theirs: 3 } });
     expect(messages.find(m => 'seen' in m)?.seen).toEqual({ mine: 1, theirs: 3 });
+  });
+  it('starts a second save from what the app held, not from an answer it has not seen yet', async () => {
+    const messages: Record<string, unknown>[] = [];
+    const listeners: ((event: unknown) => void)[] = [];
+    const parent = { postMessage: (message: Record<string, unknown>) => messages.push(message) };
+    // Two fields saved back to back, each from the state the app holds at that moment.
+    const html = appDocument({ title: 'fields', html: '<p>Fields</p>', css: '', js: "alcon.save({...alcon.state,a:1});alcon.save({...alcon.state,b:2});" }, { kept: true }, { objectId: 'scope', objectName: '' }, 'channel', {});
+    const script = html.match(/<script>([\s\S]*)<\/script>/)![1];
+    runInNewContext(script, { parent, window: { addEventListener: (_: string, fn: (event: unknown) => void) => listeners.push(fn) }, document: { addEventListener: () => {} }, setTimeout: () => 1, clearTimeout: () => {} });
+    listeners.forEach(fn => fn({ source: parent, data: { channel: 'channel', type: 'start' } }));
+    const saves = messages.filter(m => m.type === 'save');
+    expect(saves.map(m => [m.value, m.base])).toEqual([
+      [{ kept: true, a: 1 }, { kept: true }],
+      [{ kept: true, b: 2 }, { kept: true }],
+    ]);
+    // Against its own base the second save changes only b; it does not unset a.
+    expect(statePatch(saves[1].base as never, saves[1].value as never)).toEqual({ set: { b: 2 }, unset: [] });
   });
 });

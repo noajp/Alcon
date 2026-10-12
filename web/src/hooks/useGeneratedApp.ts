@@ -3,12 +3,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { readGeneratedAppContext } from './generatedAppContext';
 import { useSessionUserId, useWidgetDocument, useWidgetViewerState } from './useWidgetDocument';
 import { supabase } from '@/lib/supabase';
-import { parseAppSource, parseAppState, statePatch, type AppSource, type AppState } from '@/Function/widget/generated/model';
+import { parseAppSource, parseAppState, sourceDigest, stableJson, statePatch, type AppSource, type AppState } from '@/Function/widget/generated/model';
+import { summaryApp } from '@/Function/widget/generated/summaryApp';
 
 /** The app everyone on the widget sees. */
 type SharedApp = { current: AppSource | null; previous: AppSource | null };
 /** What only the signed-in person sees until they adopt it. */
-type OwnDraft = { draft: AppSource | null; prompt: string };
+type OwnDraft = { draft: AppSource | null; prompt: string; /** Digest of the shared app this person let read Object data as them. */ dataApproved?: string };
 
 export interface GeneratedApp { current_app: AppSource | null; previous_app: AppSource | null; draft_app: AppSource | null; prompt: string }
 
@@ -23,6 +24,7 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
   const data = useWidgetDocument<AppState>(widgetId, 'data');
   const own = useWidgetViewerState<OwnDraft>(widgetId, userId);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const stateQueue = useRef<Promise<AppState | undefined>>(Promise.resolve(undefined));
   const [pending, setPending] = useState(0);
 
   const latest = useRef({ shared: shared.value, own: own.value, loaded: false });
@@ -51,6 +53,21 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
     latest.current.shared = await mergeShared(patch);
   }, [mergeShared]);
 
+  // The shared app runs in every viewer's browser and reads Object data as
+  // that viewer. Code someone else put there could read what only this viewer
+  // can see and save it where its author can read it, so each viewer connects
+  // each version themselves. The built-in template is known code.
+  const current = shared.value?.current ?? null;
+  const [digest, setDigest] = useState<{ of: AppSource; value: string } | null>(null);
+  useEffect(() => {
+    if (!current) return;
+    let alive = true;
+    void sourceDigest(current).then(value => { if (alive) setDigest({ of: current, value }); });
+    return () => { alive = false; };
+  }, [current]);
+  const currentDigest = current && digest?.of === current ? digest.value : null;
+  const dataConnected = !!current && (stableJson(current) === stableJson(summaryApp) || (!!currentDigest && own.value?.dataApproved === currentDigest));
+
   const app: GeneratedApp | null = shared.value || own.value ? {
     current_app: shared.value?.current ?? null,
     previous_app: shared.value?.previous ?? null,
@@ -59,7 +76,11 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
   } : null;
 
   return {
-    app, state: data.value ?? {}, loading,
+    app, state: data.value ?? {}, loading, dataConnected,
+    connectData: () => serial(async () => {
+      if (!currentDigest) throw new Error('Load the app before connecting data.');
+      await saveOwn({ dataApproved: currentDigest });
+    }),
     error: loadError?.message ?? (ready && !userId ? 'Sign in to save your app.' : null), saving: pending > 0,
     reload: async () => {
       const results = await Promise.all([shared.refetch(), data.refetch(), own.refetch()]);
@@ -85,8 +106,11 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
     adopt: () => serial(async () => {
       const draft = latest.current.own?.draft;
       if (!draft) throw new Error('Generate a preview first.');
-      await setShared({ current: draft, previous: latest.current.shared?.current ?? null });
-      await saveOwn({ draft: null, prompt: '' });
+      // A retry after the second write failed must not record the app as its own previous version.
+      const existing = latest.current.shared?.current ?? null;
+      if (!existing || stableJson(existing) !== stableJson(draft)) await setShared({ current: draft, previous: existing });
+      // Adopting your own preview is letting it read as you.
+      await saveOwn({ draft: null, prompt: '', dataApproved: await sourceDigest(draft) });
     }),
     discard: () => serial(() => saveOwn({ draft: null })),
     restore: () => serial(async () => {
@@ -98,7 +122,10 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
     /** Saves what the app changed since `base` and resolves to the state everyone now has. */
     saveState: (next: AppState, base: AppState): Promise<AppState> => {
       const { set, unset } = statePatch(base, parseAppState(next));
-      return data.merge(set, unset);
+      // In the order the app asked: two saves of one key must not land reversed.
+      const saved = stateQueue.current.catch(() => undefined).then(() => data.merge(set, unset));
+      stateQueue.current = saved;
+      return saved;
     },
   };
 }

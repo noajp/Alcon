@@ -18,7 +18,8 @@ const alcon={readContext:requestContext,context:${json(context)},state:${json(st
     const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Save timed out. Check your connection.'));},20000);
     // The host answers with the state everyone now has, which may carry other people's changes.
     pending.set(id,{resolve:merged=>{alcon.state=merged===undefined?value:merged;resolve();},reject,timer});
-    send('save',{id,value});
+    // The state this save started from goes with it: the host sends only what changed since then.
+    send('save',{id,value,base:alcon.state});
   });
 },onChange(fn){if(typeof fn==='function')watchers.push(fn);}};
 window.addEventListener('message',event=>{

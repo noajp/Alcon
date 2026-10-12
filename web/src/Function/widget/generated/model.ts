@@ -44,3 +44,9 @@ export function statePatch(base: AppState, next: AppState): StatePatch {
   }
   return { set, unset: Object.keys(base).filter(key => !Object.hasOwn(next, key)) };
 }
+
+/** Identifies one exact version of an app, so an approval given to it does not carry to a changed one. */
+export async function sourceDigest(source: AppSource): Promise<string> {
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableJson(source)));
+  return [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}

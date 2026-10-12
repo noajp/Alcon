@@ -45,6 +45,8 @@ export function useWidgetDocument<T extends Json>(widgetId: string, part: string
     });
     if (error) throw new Error(error.message);
     const value = (data as { value: T }).value;
+    // A read already on its way back predates this write; it must not land on top of it.
+    await qc.cancelQueries({ queryKey: ['widget-document', widgetId, part] });
     qc.setQueryData(['widget-document', widgetId, part], value);
     return value;
   }, [qc, enabled, widgetId, part]);
