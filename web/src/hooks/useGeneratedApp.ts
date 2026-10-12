@@ -66,7 +66,10 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
     return () => { alive = false; };
   }, [current]);
   const currentDigest = current && digest?.of === current ? digest.value : null;
-  const dataConnected = !!current && (stableJson(current) === stableJson(summaryApp) || (!!currentDigest && own.value?.dataApproved === currentDigest));
+  const known = !!current && stableJson(current) === stableJson(summaryApp);
+  const dataConnected = known || (!!currentDigest && own.value?.dataApproved === currentDigest);
+  // Until the digest is known the answer is not "not connected" but "not yet known".
+  const identifying = !!current && !known && !currentDigest;
 
   const app: GeneratedApp | null = shared.value || own.value ? {
     current_app: shared.value?.current ?? null,
@@ -76,7 +79,7 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
   } : null;
 
   return {
-    app, state: data.value ?? {}, loading, dataConnected,
+    app, state: data.value ?? {}, loading: loading || identifying, dataConnected,
     connectData: () => serial(async () => {
       if (!currentDigest) throw new Error('Load the app before connecting data.');
       await saveOwn({ dataApproved: currentDigest });
@@ -109,8 +112,13 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
       // A retry after the second write failed must not record the app as its own previous version.
       const existing = latest.current.shared?.current ?? null;
       if (!existing || stableJson(existing) !== stableJson(draft)) await setShared({ current: draft, previous: existing });
-      // Adopting your own preview is letting it read as you.
-      await saveOwn({ draft: null, prompt: '', dataApproved: await sourceDigest(draft) });
+      // Adopting your own preview lets it read as you — unless it revises an
+      // app you had not connected: a revision is built from that app's code
+      // and may keep what its author put there, so it stays unconnected and
+      // asks like any version someone else set up.
+      const trusted = !existing || stableJson(existing) === stableJson(summaryApp)
+        || latest.current.own?.dataApproved === await sourceDigest(existing);
+      await saveOwn({ draft: null, prompt: '', dataApproved: trusted ? await sourceDigest(draft) : undefined });
     }),
     discard: () => serial(() => saveOwn({ draft: null })),
     restore: () => serial(async () => {

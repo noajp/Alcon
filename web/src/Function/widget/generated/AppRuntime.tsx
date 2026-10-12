@@ -93,7 +93,10 @@ export function AppRuntime({ source, state, objectId, objectName, preview, readO
           // Against the state the app says it started from, not one the host
           // assumes: a save sent before the last answer arrived starts earlier.
           merged = await callbacks.current.onSave(next, message.base === undefined ? handed.current : parseAppState(message.base));
+          // Both move together: the saved state reaches `state` a tick later, and
+          // until then the pre-save value must not look like news to hand over.
           handed.current = merged;
+          latest.current = merged;
         }
         if (alive) { setError(null); setStatus(preview ? 'Preview · inputs here are not saved' : 'All changes saved'); }
       } catch (e) { failure = e instanceof Error ? e.message : 'Save failed.'; if (alive) { setError(failure); setStatus('Not saved'); } }
