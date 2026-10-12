@@ -11,14 +11,21 @@ const requestContext=()=>new Promise((resolve,reject)=>{
  const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Object data request timed out. Retry.'));},30000);
  pending.set(id,{resolve,reject,timer});send('read-context',{id});
 });
+const watchers=[];
 const alcon={readContext:requestContext,context:${json(context)},state:${json(state)},save(value){
   return new Promise((resolve,reject)=>{
     const id=++sequence;
     const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Save timed out. Check your connection.'));},20000);
-    pending.set(id,{resolve:()=>{alcon.state=value;resolve();},reject,timer});
+    // The host answers with the state everyone now has, which may carry other people's changes.
+    pending.set(id,{resolve:merged=>{alcon.state=merged===undefined?value:merged;resolve();},reject,timer});
     send('save',{id,value});
   });
-}};
+},onChange(fn){if(typeof fn==='function')watchers.push(fn);}};
+window.addEventListener('message',event=>{
+  if(event.source!==parent||event.data?.channel!==channel||event.data?.type!=='state')return;
+  alcon.state=event.data.value;
+  for(const fn of watchers){try{fn(alcon.state);}catch(error){send('error',{message:String(error?.message||error)});}}
+});
 window.addEventListener('message',event=>{
   if(event.source!==parent||event.data?.channel!==channel||!['saved','context'].includes(event.data?.type))return;
   const p=pending.get(event.data.id);if(!p)return;pending.delete(event.data.id);clearTimeout(p.timer);

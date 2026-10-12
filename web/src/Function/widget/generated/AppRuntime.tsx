@@ -1,12 +1,13 @@
 'use client';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { appDocument } from './runtime';
-import { parseAppState, type AppSource, type AppState } from './model';
+import { parseAppState, stableJson, type AppSource, type AppState } from './model';
 
 export function AppRuntime({ source, state, objectId, objectName, preview, readOnly, onSave, onReady, onReadContext }: {
   source: AppSource; state: AppState; objectId: string; objectName: string; preview: boolean; readOnly: boolean;
   onReadContext?: () => Promise<unknown>;
-  onSave: (state: AppState) => Promise<void>; onReady: (ready: boolean) => void;
+  /** Saves what changed since `base`; resolves to the state everyone now has. */
+  onSave: (state: AppState, base: AppState) => Promise<AppState>; onReady: (ready: boolean) => void;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const channelId = useId();
@@ -31,6 +32,19 @@ export function AppRuntime({ source, state, objectId, objectName, preview, readO
   }, [sendTheme]);
   const callbacks = useRef({ onSave, onReady, readOnly, onReadContext });
   useEffect(() => { callbacks.current = { onSave, onReady, readOnly, onReadContext }; }, [onSave, onReady, readOnly, onReadContext]);
+  // What the app inside the frame believes the saved state is.
+  const base = useRef(state);
+  const saving = useRef(0);
+  const pushState = useCallback((value: AppState) => {
+    base.current = value;
+    frame.current?.contentWindow?.postMessage({ channel: document.channel, type: 'state', value }, '*');
+  }, [document.channel]);
+  // Someone else saved: hand the running app the new state. Held back while a
+  // save of our own is in flight — its answer already carries their change.
+  useEffect(() => {
+    if (preview || saving.current > 0 || stableJson(state) === stableJson(base.current)) return;
+    pushState(state);
+  }, [state, preview, pushState]);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState(preview ? 'Preview · inputs here are not saved' : 'Loading app…');
   useEffect(() => {
@@ -65,18 +79,28 @@ export function AppRuntime({ source, state, objectId, objectName, preview, readO
         return;
       }
       let failure: string | undefined;
+      let merged: AppState | undefined;
+      saving.current += 1;
       try {
         if (callbacks.current.readOnly) throw new Error('This app is read-only.');
         const next = parseAppState(message.value);
-        if (!preview) { setStatus('Saving…'); await callbacks.current.onSave(next); }
+        if (!preview) {
+          setStatus('Saving…');
+          merged = await callbacks.current.onSave(next, base.current);
+          base.current = merged;
+        }
         if (alive) { setError(null); setStatus(preview ? 'Preview · inputs here are not saved' : 'All changes saved'); }
       } catch (e) { failure = e instanceof Error ? e.message : 'Save failed.'; if (alive) { setError(failure); setStatus('Not saved'); } }
-      if (alive) frame.current?.contentWindow?.postMessage({ channel: document.channel, type: 'saved', id: message.id, error: failure }, '*');
+      finally { saving.current -= 1; }
+      if (!alive) return;
+      frame.current?.contentWindow?.postMessage({ channel: document.channel, type: 'saved', id: message.id, value: merged, error: failure }, '*');
+      // The merged state differs from what the app sent when someone else changed another key meanwhile.
+      if (merged && stableJson(merged) !== stableJson(message.value)) pushState(merged);
     }
     window.addEventListener('message', receive);
     sendTheme('start');
     return () => { alive = false; clearTimeout(timer); window.removeEventListener('message', receive); };
-  }, [document, preview, source.usesObjectData, sendTheme]);
+  }, [document, preview, source.usesObjectData, sendTheme, pushState]);
   return <div className="space-y-2">
     <iframe ref={frame} title={`${preview ? 'Preview: ' : ''}${source.title}`} srcDoc={document.html} onLoad={() => sendTheme('start')} sandbox="allow-scripts" referrerPolicy="no-referrer" className="h-[420px] w-full rounded-md border-0 bg-background" />
     <p role="status" className="text-xs text-muted-foreground">{status}</p>

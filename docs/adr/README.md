@@ -69,3 +69,4 @@
 | [0037](0037-workload-rebalancing-is-computed-not-generated-and-applied-by-a-person.md) | Workload の平準化は決定的に算出し、人が適用する |
 | [0038](0038-people-skills-are-backed-by-done-elements-and-evaluations-wait-for-a-reporting-line.md) | People のスキルは完了済み Element を根拠に持ち、評価はレポートラインを待つ |
 | [0039](0039-widgets-are-shared-components-with-an-origin-and-boards-are-placements.md) | Widget は出自を持つ共有部品、ボードはその配置 |
+| [0040](0040-widget-contents-are-shared-documents-merged-by-key.md) | Widget の中身は共有の文書で、キー単位で合流する |

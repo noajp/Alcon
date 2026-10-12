@@ -50,7 +50,7 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
     {showEditor && <div className="space-y-3">
       {!app?.current_app && !app?.draft_app && <div className="space-y-1">
         <p className="text-sm font-medium">A small app for this Object</p>
-        <p className="text-xs text-muted-foreground">Create a summary of this Object’s Strategy and Execution, a calculator, checklist or form. The app and its saved inputs stay here when you return. Private to you.</p>
+        <p className="text-xs text-muted-foreground">Create a summary of this Object’s Strategy and Execution, a calculator, checklist or form. The app and its saved inputs are shared with everyone who can see this Object.</p>
       </div>}
       <form className="space-y-2" onSubmit={e => { e.preventDefault(); void run(() => store.generate(prompt)); }}>
         <TextComposer aria-label="Describe your app" placeholder="Example: Calculate an estimate from headcount, unit price and discount, then save the chosen plan." rows={3} maxLength={8000} value={prompt} disabled={locked} onChange={e => setPrompt(e.target.value)}
@@ -65,12 +65,12 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
       </div>}
     </div>}
     {app?.draft_app && <div className="flex flex-wrap items-center gap-2">
-      <p className="mr-auto text-xs text-muted-foreground">Preview · try it before replacing your saved app.</p>
+      <p className="mr-auto text-xs text-muted-foreground">Preview · only you see this until you use it. It then replaces the app for everyone.</p>
       <Button size="sm" disabled={locked || !ready || store.saving} onClick={() => void run(async () => { await store.adopt(); setEditing(false); setPrompt(''); latestPrompt.current = ''; setEpoch(n => n + 1); })}>Use this app</Button>
       <Button variant="ghost" size="sm" disabled={locked} onClick={() => void run(() => store.discard())}>Discard preview</Button>
     </div>}
     {source?.usesObjectData && <p className="text-xs text-muted-foreground">Object data connected · Reads this Object’s Elements, related Initiatives and Intents with your access permissions. Data reflects the time it was fetched.</p>}
-    {source && <AppRuntime key={`${epoch}:${app?.draft_app ? 'draft' : 'live'}:${JSON.stringify(source)}`} source={source} state={store.state} objectId={host.subject.id ?? ''} objectName={host.object?.name ?? ''} preview={!!app?.draft_app} readOnly={!!host.readOnly || !!store.error} onSave={async value => { try { await store.saveState(value); } catch (e) { setError(e instanceof Error ? e.message : 'Could not save app data.'); throw e; } }} onReadContext={source.usesObjectData ? store.readContext : undefined} onReady={setReady} />}
+    {source && <AppRuntime key={`${epoch}:${app?.draft_app ? 'draft' : 'live'}:${JSON.stringify(source)}`} source={source} state={store.state} objectId={host.subject.id ?? ''} objectName={host.object?.name ?? ''} preview={!!app?.draft_app} readOnly={!!host.readOnly || !!store.error} onSave={async (value, base) => { try { return await store.saveState(value, base); } catch (e) { setError(e instanceof Error ? e.message : 'Could not save app data.'); throw e; } }} onReadContext={source.usesObjectData ? store.readContext : undefined} onReady={setReady} />}
     {(error || store.error) && <div role="alert" className="space-y-1 text-sm text-destructive"><p>{error ?? store.error}</p><Button variant="ghost" size="sm" disabled={busy || store.saving} onClick={() => void run(async () => { const result = await store.reload(); if (result.error) throw result.error; setEpoch(n => n + 1); })}>Reload saved app</Button></div>}
     {host.readOnly && <p className="text-xs text-muted-foreground">Reconnect to edit or save this app.</p>}
   </div>;

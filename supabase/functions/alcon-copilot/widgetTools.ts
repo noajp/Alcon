@@ -122,8 +122,6 @@ export async function runWidgetTool(db: SupabaseClient, name: string, input: Rec
       const target = parseBoardKey(input.boardKey);
       const kind = input.kind;
       if (typeof kind !== 'string' || !kind || kind.length > 100) throw new Error('kind is required');
-      // Kept to its author and made from the widget itself; made here it would be shared with the whole board.
-      if (kind === 'generated-app') throw new Error('An AI app is created from its own widget, not by this tool');
       if (!zones.includes(String(input.zone))) throw new Error('Invalid zone');
       if (input.size !== undefined && !sizes.includes(String(input.size))) throw new Error('Invalid widget size');
       const params = await checkedParams(db,kind,input.params ?? {});

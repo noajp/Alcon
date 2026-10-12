@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseAppSource, parseAppState } from '../src/Function/widget/generated/model';
+import { parseAppSource, parseAppState, stableJson, statePatch } from '../src/Function/widget/generated/model';
 import { appDocument } from '../src/Function/widget/generated/runtime';
 const source = { title: 'Estimate', html: '<label>Seats<input id="seats" type="number"></label><output id="total"></output>', css: 'body { color: var(--foreground) }', js: 'document.querySelector("#total").textContent = 42;' };
 describe('generated application boundary', () => {
@@ -31,5 +31,17 @@ describe('generated application boundary', () => {
     const data = { count: 2, records: [{ note: '<b>literal</b>' }], checked: false };
     expect(parseAppState(data)).toEqual(data);
     expect(parseAppState(data)).not.toBe(data);
+  });
+  it('sends only the keys an app changed, so two people saving different keys both keep theirs', () => {
+    const base = { seats: 3, plan: { name: 'A', price: 10 }, note: 'x' };
+    expect(statePatch(base, { ...base, seats: 4 })).toEqual({ set: { seats: 4 }, unset: [] });
+    // Same content built in another key order is not a change.
+    expect(statePatch(base, { note: 'x', plan: { price: 10, name: 'A' }, seats: 3 })).toEqual({ set: {}, unset: [] });
+    expect(statePatch(base, { seats: 3, plan: { name: 'A', price: 12 }, added: null })).toEqual({ set: { plan: { name: 'A', price: 12 }, added: null }, unset: ['note'] });
+    expect(statePatch({}, { constructor: 1 })).toEqual({ set: { constructor: 1 }, unset: [] });
+  });
+  it('compares states by content, not by how they were built', () => {
+    expect(stableJson({ b: [1, { d: 1, c: 2 }], a: null })).toBe(stableJson({ a: null, b: [1, { c: 2, d: 1 }] }));
+    expect(stableJson({ a: [1, 2] })).not.toBe(stableJson({ a: [2, 1] }));
   });
 });

@@ -20,3 +20,27 @@ export function parseAppState(value: unknown): AppState {
   if (new TextEncoder().encode(text).length > 150000) throw new Error('App data is too large to save.');
   return JSON.parse(text) as AppState;
 }
+
+/** JSON with object keys in a fixed order, so two equal states compare equal however they were built. */
+export function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+export interface StatePatch { set: AppState; unset: string[] }
+/**
+ * What an app changed since the state it started from, by top-level key.
+ * An app saves its whole state; sending only this is what lets two people's
+ * saves to different keys both survive.
+ */
+export function statePatch(base: AppState, next: AppState): StatePatch {
+  const set: AppState = {};
+  for (const [key, value] of Object.entries(next)) {
+    if (!Object.hasOwn(base, key) || stableJson(base[key]) !== stableJson(value)) set[key] = value;
+  }
+  return { set, unset: Object.keys(base).filter(key => !Object.hasOwn(next, key)) };
+}
