@@ -177,8 +177,11 @@ it('invalidates widget data after external cell writes and primary-key-only boar
     qc.setQueryData(['data-tables'], []);
     applyWorkspaceDelta(qc, ctx, delta('table_cells', 'UPDATE', { row_id: 'r', column_id: 'c', value: 5 }));
     applyWorkspaceDelta(qc, ctx, delta('board_placements', 'DELETE', {}, { id: 'p' }));
+    qc.setQueryData(['widget-document', 'w', 'data'], {});
+    applyWorkspaceDelta(qc, ctx, delta('widget_documents', 'UPDATE', { widget_id: 'w', part: 'data' }));
     await vi.advanceTimersByTimeAsync(200);
     expect(qc.getQueryState(['widget-board', 'object-summary', 'a', null])?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(['widget-document', 'w', 'data'])?.isInvalidated).toBe(true);
     expect(qc.getQueryState(['widget-table-data', 'table-a'])?.isInvalidated).toBe(true);
     expect(qc.getQueryState(['data-tables'])?.isInvalidated).toBe(true);
     qc.clear();

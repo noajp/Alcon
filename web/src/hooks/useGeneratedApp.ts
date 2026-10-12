@@ -1,105 +1,137 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { readGeneratedAppContext } from './generatedAppContext';
+import { useSessionUserId, useWidgetDocument, useWidgetViewerState } from './useWidgetDocument';
 import { supabase } from '@/lib/supabase';
-import { parseAppSource, parseAppState, type AppSource, type AppState } from '@/Function/widget/generated/model';
+import { parseAppSource, parseAppState, sourceDigest, stableJson, statePatch, type AppSource, type AppState } from '@/Function/widget/generated/model';
+import { summaryApp } from '@/Function/widget/generated/summaryApp';
 
-interface AppRow { id: string; owner_id: string; object_id: string; instance_id: string; current_app: AppSource | null; previous_app: AppSource | null; draft_app: AppSource | null; prompt: string; revision: number }
-interface DataRow { app_id: string; value: AppState; revision: number }
-export function useGeneratedApp(objectId: string, instanceId: string) {
-  const [owner, setOwner] = useState<string | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-  const qc = useQueryClient();
-  const row = useRef<AppRow | null>(null);
-  const dataRow = useRef<DataRow | null>(null);
+/** The app everyone on the widget sees. */
+type SharedApp = { current: AppSource | null; previous: AppSource | null };
+/** What only the signed-in person sees until they adopt it. */
+type OwnDraft = { draft: AppSource | null; prompt: string; /** Digest of the shared app this person let read Object data as them. */ dataApproved?: string };
+
+export interface GeneratedApp { current_app: AppSource | null; previous_app: AppSource | null; draft_app: AppSource | null; prompt: string }
+
+/**
+ * A generated app and its saved inputs, kept under the widget it runs in.
+ * The app and the inputs are shared with everyone who can see the widget; a
+ * preview and the request that produced it stay with the person who asked.
+ */
+export function useGeneratedApp(objectId: string, widgetId: string) {
+  const { userId, ready } = useSessionUserId();
+  const shared = useWidgetDocument<SharedApp>(widgetId, 'app');
+  const data = useWidgetDocument<AppState>(widgetId, 'data');
+  const own = useWidgetViewerState<OwnDraft>(widgetId, userId);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
-  const stateQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const stateQueue = useRef<Promise<AppState | undefined>>(Promise.resolve(undefined));
   const [pending, setPending] = useState(0);
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => { setOwner(session?.user.id ?? null); setAuthReady(true); });
-    return () => subscription.unsubscribe();
-  }, []);
-  const key = ['generated-app', owner, objectId, instanceId];
-  const query = useQuery({ queryKey: key, enabled: !!owner && !!objectId && !!instanceId, staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: false, queryFn: async () => {
-    const result = await supabase.from('widget_apps').select('*').eq('owner_id', owner!).eq('object_id', objectId).eq('instance_id', instanceId).maybeSingle();
-    if (result.error) throw result.error;
-    let stored: DataRow | null = null;
-    if (result.data) {
-      const data = await supabase.from('widget_app_data').select('*').eq('app_id', result.data.id).maybeSingle();
-      if (data.error) throw data.error;
-      stored = data.data as DataRow | null;
-    }
-    row.current = result.data as AppRow | null;
-    dataRow.current = stored;
-    return { app: row.current, state: stored?.value ?? {} };
-  } });
-  // Every write uses the last acknowledged revision; conflicts preserve local UI.
-  async function serial<T>(fn: () => Promise<T>, stateWrite = false): Promise<T> {
-    const target = stateWrite ? stateQueue : queue;
+
+  const latest = useRef({ shared: shared.value, own: own.value, loaded: false });
+  const loading = !ready || (!!userId && (shared.loading || data.loading || own.loading));
+  const loadError = shared.error ?? data.error ?? own.error;
+  const loaded = !loading && !loadError && !!userId;
+  useEffect(() => { latest.current = { shared: shared.value, own: own.value, loaded }; }, [shared.value, own.value, loaded]);
+
+  // One write at a time, each starting from what the one before it left.
+  const serial = useCallback(async <T,>(fn: () => Promise<T>): Promise<T> => {
     setPending(n => n + 1);
-    const next = target.current.catch(() => undefined).then(fn);
-    target.current = next;
+    const next = queue.current.catch(() => undefined).then(() => {
+      if (!latest.current.loaded) throw new Error('Load the app before saving.');
+      return fn();
+    });
+    queue.current = next;
     try { return await next; } finally { setPending(n => n - 1); }
-  }
-  function publish() { qc.setQueryData(key, { app: row.current, state: dataRow.current?.value ?? {} }); }
-  async function ensure() {
-    if (!owner || !objectId || !instanceId || query.isPending || query.isFetching || query.error) throw new Error('Load the app before saving.');
-    if (row.current) {
-      if (row.current.owner_id !== owner || row.current.object_id !== objectId || row.current.instance_id !== instanceId) throw new Error('The app context changed. Reload before saving.');
-      return row.current;
-    }
-    const result = await supabase.from('widget_apps').insert({ owner_id: owner, object_id: objectId, instance_id: instanceId }).select().single();
-    if (result.error) throw result.error;
-    row.current = result.data as AppRow;
-    publish();
-    return row.current;
-  }
-  async function update(patch: Partial<Pick<AppRow, 'prompt' | 'draft_app' | 'current_app' | 'previous_app'>>) {
-    const app = await ensure();
-    const result = await supabase.from('widget_apps').update(patch).eq('id', app.id).eq('revision', app.revision).select().maybeSingle();
-    if (result.error) throw result.error;
-    if (!result.data) throw new Error('This app changed in another window. Reload before editing again.');
-    row.current = result.data as AppRow;
-    publish();
-    return row.current;
-  }
+  }, []);
+  const mergeShared = shared.merge;
+  const saveOwnValue = own.save;
+  const saveOwn = useCallback(async (patch: Partial<OwnDraft>) => {
+    const value = { draft: null, prompt: '', ...latest.current.own, ...patch };
+    latest.current.own = await saveOwnValue(value);
+  }, [saveOwnValue]);
+  const setShared = useCallback(async (patch: Partial<SharedApp>) => {
+    latest.current.shared = await mergeShared(patch);
+  }, [mergeShared]);
+
+  // The shared app runs in every viewer's browser and reads Object data as
+  // that viewer. Code someone else put there could read what only this viewer
+  // can see and save it where its author can read it, so each viewer connects
+  // each version themselves, by pressing Connect — never as a side effect of
+  // something else. The built-in template is known code.
+  const current = shared.value?.current ?? null;
+  const [digest, setDigest] = useState<{ of: AppSource; value: string | null } | null>(null);
+  useEffect(() => {
+    if (!current) return;
+    let alive = true;
+    // No digest (no Web Crypto outside a secure context): the app still runs, unconnected.
+    void sourceDigest(current).catch(() => null).then(value => { if (alive) setDigest({ of: current, value }); });
+    return () => { alive = false; };
+  }, [current]);
+  const currentDigest = current && digest?.of === current ? digest.value : null;
+  const known = !!current && stableJson(current) === stableJson(summaryApp);
+  const dataConnected = known || (!!currentDigest && own.value?.dataApproved === currentDigest);
+  // Until the digest is known the answer is not "not connected" but "not yet known".
+  const identifying = !!current && !known && digest?.of !== current;
+
+  const app: GeneratedApp | null = shared.value || own.value ? {
+    current_app: shared.value?.current ?? null,
+    previous_app: shared.value?.previous ?? null,
+    draft_app: own.value?.draft ?? null,
+    prompt: own.value?.prompt ?? '',
+  } : null;
+
   return {
-    app: query.data?.app ?? null, state: query.data?.state ?? {}, loading: !authReady || (!!owner && (query.isPending || query.isFetching)),
-    error: query.error?.message ?? (authReady && !owner ? 'Sign in to save your app.' : null), saving: pending > 0,
-    reload: query.refetch,
-    readContext: async () => {
-      if (!owner) throw new Error('Sign in before reading Object data.');
-      return readGeneratedAppContext(objectId, owner);
+    app, state: data.value ?? {}, loading: loading || identifying, dataConnected,
+    connectData: () => serial(async () => {
+      if (!currentDigest) throw new Error('Object data cannot be connected in this browser context.');
+      await saveOwn({ dataApproved: currentDigest });
+    }),
+    error: loadError?.message ?? (ready && !userId ? 'Sign in to save your app.' : null), saving: pending > 0,
+    reload: async () => {
+      const results = await Promise.all([shared.refetch(), data.refetch(), own.refetch()]);
+      return { error: results.find(result => result.error)?.error ?? null };
     },
-    useTemplate: (source: AppSource) => serial(() => update({ draft_app: parseAppSource(source) })),
-    savePrompt: (prompt: string) => serial(() => update({ prompt })),
+    readContext: async () => {
+      if (!userId) throw new Error('Sign in before reading Object data.');
+      return readGeneratedAppContext(objectId, userId);
+    },
+    useTemplate: (source: AppSource) => serial(() => saveOwn({ draft: parseAppSource(source) })),
+    savePrompt: (prompt: string) => serial(() => saveOwn({ prompt })),
     generate: (prompt: string) => serial(async () => {
-      const app = await update({ prompt });
-      const { data, error } = await supabase.functions.invoke('generate-widget-app', { body: { appId: app.id, prompt, runtimeVersion: 2 } });
+      await saveOwn({ prompt });
+      const { data: reply, error } = await supabase.functions.invoke('generate-widget-app', { body: { widgetId, prompt, runtimeVersion: 3 } });
       if (error) {
         let message = error.message;
         if ('context' in error && error.context instanceof Response) { try { message = (await error.context.json()).error ?? message; } catch { /* Keep transport error. */ } }
         throw new Error(message);
       }
-      if (data?.error) throw new Error(data.error);
-      return update({ draft_app: parseAppSource(data?.app) });
+      if (reply?.error) throw new Error(reply.error);
+      await saveOwn({ draft: parseAppSource(reply?.app) });
     }),
-    adopt: () => serial(async () => { const app = await ensure(); if (!app.draft_app) throw new Error('Generate a preview first.'); return update({ current_app: app.draft_app, previous_app: app.current_app, draft_app: null, prompt: '' }); }),
-    discard: () => serial(() => update({ draft_app: null })),
-    restore: () => serial(async () => { const app = await ensure(); if (!app.previous_app) throw new Error('No previous version.'); return update({ current_app: app.previous_app, previous_app: app.current_app, draft_app: null }); }),
-    saveState: (value: AppState) => serial(async () => {
-      const app = await ensure();
-      const parsed = parseAppState(value);
-      const current = dataRow.current;
-      if (current && current.app_id !== app.id) throw new Error('The app context changed. Reload before saving.');
-      const result = current
-        ? await supabase.from('widget_app_data').update({ value: parsed }).eq('app_id', app.id).eq('revision', current.revision).select().maybeSingle()
-        : await supabase.from('widget_app_data').insert({ app_id: app.id, value: parsed }).select().single();
-      if (result.error) throw result.error;
-      if (!result.data) throw new Error('App data changed in another window. Reload before saving again.');
-      dataRow.current = result.data as DataRow;
-      publish();
-    }, true),
+    adopt: () => serial(async () => {
+      const draft = latest.current.own?.draft;
+      if (!draft) throw new Error('Generate a preview first.');
+      // A retry after the second write failed must not record the app as its own previous version.
+      const existing = latest.current.shared?.current ?? null;
+      if (!existing || stableJson(existing) !== stableJson(draft)) await setShared({ current: draft, previous: existing });
+      // Nothing is connected here. What a preview was built from cannot be
+      // told at this point, so every version is connected by an explicit act.
+      await saveOwn({ draft: null, prompt: '' });
+    }),
+    discard: () => serial(() => saveOwn({ draft: null })),
+    restore: () => serial(async () => {
+      const previous = latest.current.shared?.previous;
+      if (!previous) throw new Error('No previous version.');
+      await setShared({ current: previous, previous: latest.current.shared?.current ?? null });
+      await saveOwn({ draft: null });
+    }),
+    /** Saves what the app changed since `base` and resolves to the state everyone now has. */
+    saveState: (next: AppState, base: AppState): Promise<AppState> => {
+      const { set, unset } = statePatch(base, parseAppState(next));
+      // In the order the app asked: two saves of one key must not land reversed.
+      const saved = stateQueue.current.catch(() => undefined).then(() => data.merge(set, unset));
+      stateQueue.current = saved;
+      return saved;
+    },
   };
 }

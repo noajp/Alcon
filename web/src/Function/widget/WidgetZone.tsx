@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useMemo } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -10,6 +10,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useBoardContext, zoneDroppableId } from './BoardContext';
+import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
 import { WidgetFrame } from './WidgetFrame';
 import { WIDGET_COMPONENTS, WIDGET_REGISTRY } from './registry';
 import { ZONE_VARIANT, type WidgetInstance, type WidgetParams, type Zone } from './types';
@@ -99,6 +100,7 @@ function SortableWidget({
 }) {
   const { board, host, arranging, setArranging } = useBoardContext();
   const def = WIDGET_REGISTRY[instance.type];
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: instance.id,
@@ -166,7 +168,7 @@ function SortableWidget({
         arranging={arranging}
         isDragging={isDragging}
         onLongPress={() => setArranging(true)}
-        onRemove={() => board.removeWidget(instance.id)}
+        onRemove={() => (def.holdsContents ? setConfirmingRemove(true) : board.removeWidget(instance.id))}
       >
         <Suspense fallback={<div className="h-16 rounded-md bg-muted/30 animate-pulse" />}>
           <Body
@@ -178,6 +180,14 @@ function SortableWidget({
           />
         </Suspense>
       </WidgetFrame>
+      <ConfirmDialog
+        open={confirmingRemove}
+        title={`Remove ${def.label}?`}
+        description="This deletes the widget and what it holds for everyone who can see it."
+        confirmLabel="Remove"
+        onConfirm={() => { setConfirmingRemove(false); board.removeWidget(instance.id); }}
+        onCancel={() => setConfirmingRemove(false)}
+      />
     </div>
   );
 }

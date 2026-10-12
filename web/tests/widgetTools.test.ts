@@ -70,8 +70,6 @@ describe('Copilot widget and Table boundaries', () => {
     const db = {from:() => query,rpc:async () => { wrote = true; return {data:{},error:null}; }};
     await expect(runWidgetTool(db as never,'widgetBoard',{action:'update',boardKey:`campaign:${tableId}`,widgetId:tableId,zone:'main',params:{title:'x'}})).rejects.toThrow('no saved placements');
     expect(wrote).toBe(false);
-    await expect(runWidgetTool(db as never,'widgetBoard',{action:'create',boardKey:`campaign:${tableId}`,kind:'generated-app',zone:'main'})).rejects.toThrow('AI app');
-    expect(wrote).toBe(false);
   });
   it('merges params without re-checking an unchanged, unavailable source binding', async () => {
     const relations: string[] = [];
