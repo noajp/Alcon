@@ -71,6 +71,21 @@ describe('Copilot widget and Table boundaries', () => {
     await expect(runWidgetTool(db as never,'widgetBoard',{action:'update',boardKey:`campaign:${tableId}`,widgetId:tableId,zone:'main',params:{title:'x'}})).rejects.toThrow('no saved placements');
     expect(wrote).toBe(false);
   });
+  it('refuses a move of a widget that is not on the board before writing params', async () => {
+    let wrote = false;
+    const relations: string[] = [];
+    const db = {
+      from:(relation: string) => {
+        relations.push(relation);
+        const query = {select:() => query,eq:() => query,is:() => query,maybeSingle:async () => ({data:relation === 'boards' ? {id:'board'} : null,error:null})};
+        return query;
+      },
+      rpc:async () => { wrote = true; return {data:{},error:null}; },
+    };
+    await expect(runWidgetTool(db as never,'widgetBoard',{action:'update',boardKey:`campaign:${tableId}`,widgetId:tableId,zone:'main',params:{title:'x'}})).rejects.toThrow('not placed on this board');
+    expect(relations).toEqual(['boards','board_placements']);
+    expect(wrote).toBe(false);
+  });
   it('merges params without re-checking an unchanged, unavailable source binding', async () => {
     const relations: string[] = [];
     const merged: unknown[] = [];
