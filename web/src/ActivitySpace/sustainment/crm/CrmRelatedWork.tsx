@@ -28,11 +28,13 @@ export function CrmRelatedWork({ crm, target, onOpenElement }: {
     (target.companyId && link.company_id === target.companyId) || (target.contactId && link.contact_id === target.contactId) || (target.dealId && link.deal_id === target.dealId));
   // A company's or contact's deals carry their next steps; those count as its work too.
   const deals = crm.allDeals.filter(deal => (target.companyId && deal.company_id === target.companyId) || (target.contactId && deal.contact_id === target.contactId));
-  const rows = [
-    ...links.map(link => ({ key: link.id, linkId: link.id, element: crm.linkedElements.find(item => item.id === link.element_id), via: null as string | null })),
+  type Row = { key: string; linkId: string | null; element: CrmLinkedElement | undefined; via: string | null };
+  const candidates: Row[] = [
+    ...links.map(link => ({ key: link.id, linkId: link.id, element: crm.linkedElements.find(item => item.id === link.element_id), via: null })),
     ...deals.filter(deal => deal.next_element_id && !links.some(link => link.element_id === deal.next_element_id))
       .map(deal => ({ key: `step:${deal.id}`, linkId: null, element: crm.nextElements.find(item => item.id === deal.next_element_id), via: `D-${deal.number} ${deal.name}` })),
-  ].filter((row): row is { key: string; linkId: string | null; element: NonNullable<typeof row.element>; via: string | null } => !!row.element)
+  ];
+  const rows = candidates.filter((row): row is Row & { element: CrmLinkedElement } => !!row.element)
     .sort((a, b) => Number(DONE.has(a.element.status)) - Number(DONE.has(b.element.status)) || (a.element.due_date ?? '9999').localeCompare(b.element.due_date ?? '9999'));
   const linked = new Set(rows.map(row => row.element.id));
 

@@ -19,6 +19,7 @@ import { StartRenewal } from './CrmToday';
 import { CrmPicker } from './CrmPicker';
 import { CustomFields, EditableText, Property } from './CrmFields';
 import { CrmRecordPage, RecordSection } from './CrmRecordPage';
+import { CrmRelatedWork } from './CrmRelatedWork';
 
 const ACTIVITY_LABEL: Record<CrmActivityType, string> = { call: 'Call', email: 'Mail', meeting: 'Meeting', note: 'Memo' };
 
@@ -126,7 +127,8 @@ export function CrmDealPage({ crm, deal, onBack, onOpenPipeline, onCapture, onOp
     setBusy(true); setError(null);
     try { await action(); } catch (cause) { setError(cause instanceof Error ? cause.message : t('Could not save. Try again.')); throw cause; } finally { setBusy(false); }
   }
-  const save = (patch: CrmDealPatch) => run(() => crm.saveDeal(deal.id, patch));
+  // A notice (the next step could not follow a new owner) shows where errors do.
+  const save = (patch: CrmDealPatch) => run(() => crm.saveDeal(deal.id, patch, { onNotice: setError }));
   const moveTo = (stage: CrmStage) => save(stageChange(deal, stage)).catch(() => {});
   async function logNote() {
     if (!note.trim()) return;
@@ -251,6 +253,7 @@ export function CrmDealPage({ crm, deal, onBack, onOpenPipeline, onCapture, onOp
 
     {open && <NextStep key={deal.id} crm={crm} deal={deal} />}
     <DealPeople crm={crm} deal={deal} onOpenContact={onOpenContact} />
+    <CrmRelatedWork crm={crm} target={{ dealId: deal.id }} onOpenElement={onOpenElement} />
     {deal.nextElement && onOpenElement && <ButtonAppearanceProvider appearance="inline">
       <Button size="sm" variant="ghost" onClick={() => onOpenElement(deal.nextElement!.id)}><ArrowUpRight size={12} />{t('Open Element')} {deal.nextElement.display_id ?? ''}</Button>
     </ButtonAppearanceProvider>}

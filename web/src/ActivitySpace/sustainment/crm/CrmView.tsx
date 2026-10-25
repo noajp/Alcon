@@ -202,12 +202,12 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
   }
   if (route.companyId) return <>
     <CrmCompanyPage key={route.companyId} crm={crm} companyId={route.companyId} onBack={closeRecord} onOpenCompanies={() => go({ view: 'companies' })}
-      onOpenDeal={openDealRecord} onOpenContact={contactId => go({ contactId, companyId: null })} />
+      onOpenDeal={openDealRecord} onOpenContact={contactId => go({ contactId, companyId: null })} onOpenElement={onOpenElement} />
     {dialogs}
   </>;
   if (route.contactId) return <>
     <CrmContactPage key={route.contactId} crm={crm} contactId={route.contactId} onBack={closeRecord} onOpenContacts={() => go({ view: 'contacts' })}
-      onOpenDeal={openDealRecord} onOpenCompany={companyId => go({ companyId, contactId: null })} />
+      onOpenDeal={openDealRecord} onOpenCompany={companyId => go({ companyId, contactId: null })} onOpenElement={onOpenElement} />
     {dialogs}
   </>;
 
