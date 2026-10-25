@@ -340,8 +340,9 @@ function WorkspaceContent({
     setCopilotOpen(next);
     try { localStorage.setItem('alcon.copilot.open', next ? '1' : '0'); } catch { /* ignore */ }
   };
-  // A Space with no Domain has nothing to show yet, so it opens on Create Domain.
-  const [createType, setCreateType] = useState<CreateType | null>(() => (domains.length === 0 ? 'domain' : null));
+  // Nothing is created up front: a Space may start from Strategy (a Vision or
+  // Portfolio) as well as from a Domain, so the person picks where to begin.
+  const [createType, setCreateType] = useState<CreateType | null>(null);
   const [pendingNewNote, setPendingNewNote] = useState(0);
   // The workspace owns the Object creation popup.
   const [objectPopupOpen, setObjectPopupOpen] = useState(false);
@@ -355,7 +356,12 @@ function WorkspaceContent({
     return () => window.removeEventListener(CREATE_DOMAIN_EVENT, handler);
   }, []);
 
-  const openObjectPopup = useCallback(() => setObjectPopupOpen(true), []);
+  // An Object lives in a Domain: with none yet, creating one starts with the Domain.
+  const hasDomains = domains.length > 0;
+  const openObjectPopup = useCallback(() => {
+    if (hasDomains) setObjectPopupOpen(true);
+    else setCreateType('domain');
+  }, [hasDomains]);
   // The sidebar's "+" in Notebook mode — the same quick-create card,
   // asking for the notebook's name.
   const [notebookPopupOpen, setNotebookPopupOpen] = useState(false);
