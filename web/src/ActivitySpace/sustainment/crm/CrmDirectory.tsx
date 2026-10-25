@@ -148,8 +148,10 @@ function DealList({ crm, deals, onOpenDeal, roles }: { crm: Crm; deals: readonly
     })}</ul></RecordSection>;
 }
 
-export function CrmCompanyPage({ crm, companyId, onBack, onOpenCompanies, onOpenDeal, onOpenContact, onOpenElement }: {
+export function CrmCompanyPage({ crm, companyId, onBack, onOpenCompanies, onOpenDeal, onOpenContact, onOpenElement, onOpenDomain }: {
   crm: Crm; companyId: string; onBack: () => void; onOpenCompanies: () => void; onOpenDeal: (deal: CrmDealRecord) => void; onOpenContact: (id: string) => void; onOpenElement?: (id: string) => void;
+  /** Opens one of the Space's Domains in Execution. */
+  onOpenDomain?: (id: string) => void;
 }) {
   const { t } = useI18n();
   const company = crm.companies.find(item => item.id === companyId);
@@ -161,6 +163,18 @@ export function CrmCompanyPage({ crm, companyId, onBack, onOpenCompanies, onOpen
     <div className="space-y-1">
       <Property label={t('Owner')}><CrmPicker label={t('Owner')} value={company.owner_worker_id} placeholder={t('Unassigned')} options={crm.people.map(person => ({ id: person.id, label: person.name }))} onChange={id => void save({ owner_worker_id: id })} /></Property>
       <Property label={t('Domain')}><CrmPicker label={t('Domain')} value={company.domain_id} placeholder={t('Whole Space')} options={crm.domains.map(domain => ({ id: domain.id, label: domain.name }))} onChange={id => void save({ domain_id: id })} /></Property>
+      {/* The same body as one of our own Domains: a sister company, a department billed internally. */}
+      <Property label={t('Is our Domain')}>
+        <div className="flex items-center gap-1">
+          {/* A Domain this reader cannot see is named as such, and left alone. */}
+          {company.own_domain_id && !crm.domains.some(domain => domain.id === company.own_domain_id)
+            ? <span className="px-1.5 text-[13px] text-muted-foreground">{t('A Domain you cannot see')}</span>
+            : <CrmPicker label={t('Is our Domain')} value={company.own_domain_id ?? null} placeholder={t('An outside organisation')}
+              options={crm.domains.map(domain => ({ id: domain.id, label: domain.name }))} onChange={id => void save({ own_domain_id: id })} />}
+          {company.own_domain_id && onOpenDomain && crm.domains.some(domain => domain.id === company.own_domain_id) &&
+            <Button variant="ghost" size="icon-xs" aria-label={t('Open Domain')} onClick={() => onOpenDomain(company.own_domain_id!)}><ArrowUpRight size={12} /></Button>}
+        </div>
+      </Property>
       <Property label={t('Website')}><EditableText label={t('Website')} value={company.domain} placeholder="example.com" onSave={value => save({ domain: value as string | null })} /></Property>
       <Property label={t('Industry')}><EditableText label={t('Industry')} value={company.industry} onSave={value => save({ industry: value as string | null })} /></Property>
       <CustomFields fields={fieldsFor(crm.fields, 'company', company.domain_id)} values={company.custom ?? {}} onSave={custom => save({ custom })} />

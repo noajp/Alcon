@@ -30,6 +30,7 @@ import { CrmCompanies, CrmCompanyPage, CrmContactPage, CrmContacts } from './Crm
 import { CrmForecast } from './CrmForecast';
 import { CrmSettings } from './CrmSettings';
 import { CrmDealPage } from './CrmDealPage';
+import { setActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
 import { CrmCapture } from './CaptureDialog';
 import { CrmPicker } from './CrmPicker';
 
@@ -168,6 +169,7 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
   const openDeal = (dealId: string) => go({ dealId, companyId: null, contactId: null });
   const openDealRecord = (deal: CrmDealRecord) => go({ dealId: deal.id, companyId: null, contactId: null });
   const openInitiative = onViewChange ? (id: string) => { onNavigate({ strategyId: id }); onViewChange('strategy'); } : undefined;
+  const openDomain = onViewChange ? (id: string) => { setActiveDomainId(id); onNavigate({ objectId: null }); onViewChange('domain-overview'); } : undefined;
   const closeRecord = () => go({ dealId: null, companyId: null, contactId: null });
   const recordLabel = pipeline?.record_label;
 
@@ -202,7 +204,7 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
   }
   if (route.companyId) return <>
     <CrmCompanyPage key={route.companyId} crm={crm} companyId={route.companyId} onBack={closeRecord} onOpenCompanies={() => go({ view: 'companies' })}
-      onOpenDeal={openDealRecord} onOpenContact={contactId => go({ contactId, companyId: null })} onOpenElement={onOpenElement} />
+      onOpenDeal={openDealRecord} onOpenContact={contactId => go({ contactId, companyId: null })} onOpenElement={onOpenElement} onOpenDomain={openDomain} />
     {dialogs}
   </>;
   if (route.contactId) return <>
