@@ -4,6 +4,7 @@ import { WORKLOAD_TRANSLATIONS } from '@/ActivitySpace/sustainment/workload/work
 import { PEOPLE_TRANSLATIONS } from '@/ActivitySpace/sustainment/team/peopleMessages';
 import { SURFACE_TRANSLATIONS } from './surfaceMessages';
 import { STRATEGY_BOARD_TRANSLATIONS } from './strategyBoardMessages';
+import { APPROACH_TRANSLATIONS } from './approachMessages';
 
 type TranslationMap = Record<string, string>;
 
@@ -1400,7 +1401,7 @@ Object.assign(fr, { 'Viewer': 'Lecteur', 'Invite as': 'Inviter comme', 'Invited 
 Object.assign(es, { 'Viewer': 'Lector', 'Invite as': 'Invitar como', 'Invited as viewer': 'Invitado como lector', 'View only': 'Solo lectura', 'Viewers': 'Lectores', 'Make viewer': 'Cambiar a lector', 'Make member': 'Cambiar a miembro', 'Viewers read everything in this Domain and change nothing.': 'Los lectores ven todo en este Domain y no cambian nada.', 'This person already works in this Domain through its Space. Invite them as a member, or change their role in the member list.': 'Esta persona ya trabaja en este Domain a través de su Space. Invítala como miembro o cambia su rol en la lista de miembros.', 'The role could not be changed. Try again.': 'No se pudo cambiar el rol. Inténtalo de nuevo.' });
 
 // Board and page surfaces — widget names, the picker, Calendar, Create
-// Domain — and the Initiative board's own (Decision Lab, Approaches).
+// Domain — and the boards' own (Decision Lab, Domain approaches).
 Object.assign(ja, SURFACE_TRANSLATIONS.ja);
 Object.assign(ko, SURFACE_TRANSLATIONS.ko);
 Object.assign(fr, SURFACE_TRANSLATIONS.fr);
@@ -1409,6 +1410,10 @@ Object.assign(ja, STRATEGY_BOARD_TRANSLATIONS.ja);
 Object.assign(ko, STRATEGY_BOARD_TRANSLATIONS.ko);
 Object.assign(fr, STRATEGY_BOARD_TRANSLATIONS.fr);
 Object.assign(es, STRATEGY_BOARD_TRANSLATIONS.es);
+Object.assign(ja, APPROACH_TRANSLATIONS.ja);
+Object.assign(ko, APPROACH_TRANSLATIONS.ko);
+Object.assign(fr, APPROACH_TRANSLATIONS.fr);
+Object.assign(es, APPROACH_TRANSLATIONS.es);
 
 // People (ActivitySpace/sustainment/team). Last, so the app name stays
 // English everywhere, like every other concept name.
