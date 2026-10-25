@@ -766,7 +766,7 @@ function TimeGridView({
   onElementClick,
   onElementContextMenu,
 }: TimeGridViewProps) {
-  const { locale } = useI18n();
+  const { t, locale } = useI18n();
   const [now, setNow] = useState(new Date());
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -781,7 +781,11 @@ function TimeGridView({
     if (!scrollRef.current) return;
     const minutes = now.getHours() * 60 + now.getMinutes();
     const startMin = GRID_START_HOUR * 60;
-    const top = ((minutes - startMin) / 60) * HOUR_HEIGHT - 120;
+    // Land on an hour line, a few hours back, with room above it: a label
+    // sits across its line, so a scroll that stops on the line cuts the
+    // first label in half under the all-day row.
+    const hour = Math.floor((minutes - startMin) / 60) - 2;
+    const top = hour * HOUR_HEIGHT - 10;
     scrollRef.current.scrollTop = Math.max(0, top);
     // Run only once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -824,14 +828,14 @@ function TimeGridView({
   return (
     <div className={`flex-1 flex flex-col min-h-0 ${days.length > 1 ? "min-w-[640px]" : "min-w-0"}`}>
       {/* Day-of-week header row */}
-      <div className="flex border-b border-border/60 bg-card/95 backdrop-blur sticky top-0 z-10">
+      <div className="flex border-b border-[var(--border-subtle)] bg-card/95 backdrop-blur sticky top-0 z-10">
         <div className="w-14 flex-shrink-0" />
         {days.map((d, i) => {
           const isTodayCol = isSameDay(d, today);
           return (
             <div
               key={i}
-              className={`${colWidthClass} px-2 py-2 text-center border-l border-border/40`}
+              className={`${colWidthClass} px-2 py-2 text-center`}
             >
               <div className="text-[10px] text-muted-foreground">
                 {weekdayLabel(locale, d.getDay())}
@@ -860,13 +864,13 @@ function TimeGridView({
         const lanes = spans.reduce((max, span) => Math.max(max, span.lane + 1), 0);
         const height = Math.max(28, 4 + lanes * MONTH_LANE_HEIGHT + 4);
         return (
-          <div className="flex border-b border-border/60 bg-card">
+          <div className="flex border-b border-[var(--border-subtle)] bg-card">
             <div className="w-14 flex-shrink-0 px-2 py-1.5 text-[10px] text-muted-foreground text-right">
-              all-day
+              {t('All day')}
             </div>
             <div className="relative flex flex-1 min-w-0" style={{ height }}>
               {days.map((_, i) => (
-                <div key={i} className={`${colWidthClass} border-l border-border/40`} />
+                <div key={i} className={`${colWidthClass} border-l border-[var(--border-subtle)]`} />
               ))}
               {spans.map(span => {
                 const el = span.entry;
@@ -920,7 +924,7 @@ function TimeGridView({
         <div className="flex" style={{ height: TOTAL_GRID_HEIGHT }}>
           {/* Hour rail */}
           <div className="w-14 flex-shrink-0 relative">
-            {hours.map(h => (
+            {hours.filter(h => h !== GRID_START_HOUR).map(h => (
               <div
                 key={h}
                 className="absolute left-0 right-0 px-1 text-right text-[10px] text-muted-foreground"
@@ -937,22 +941,14 @@ function TimeGridView({
             return (
               <div
                 key={colIdx}
-                className={`${colWidthClass} relative border-l border-border/40`}
+                className={`${colWidthClass} relative border-l border-[var(--border-subtle)]`}
               >
                 {/* Hour grid lines */}
                 {hours.map(h => (
                   <div
                     key={h}
-                    className="absolute left-0 right-0 border-t border-border/30"
+                    className="absolute left-0 right-0 border-t border-[var(--border-subtle)]"
                     style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT }}
-                  />
-                ))}
-                {/* Half-hour faint lines */}
-                {hours.map(h => (
-                  <div
-                    key={`half-${h}`}
-                    className="absolute left-0 right-0 border-t border-dashed border-border/15"
-                    style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT + HOUR_HEIGHT / 2 }}
                   />
                 ))}
 

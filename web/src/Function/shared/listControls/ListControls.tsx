@@ -59,7 +59,7 @@ import {
   MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR,
 } from '@/Function/shared/menu';
 import { DueDateFilter } from '@/Function/shared/date';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { CONTROL } from '@/shared/designTokens';
 import type { Worker } from '@/types/database';
 import {
@@ -209,6 +209,10 @@ export function ListControls({
     <div className="flex items-center gap-1.5">
       {/* Filter */}
       <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+        {/* Toolbar icons are navigation, not commands: borderless, lit by
+            background on hover and while active. Only the triggers — the
+            panels they open keep their own controls' outlines. */}
+        <ButtonAppearanceProvider appearance="navigation">
         <PopoverTrigger asChild>
           <Button
             type="button"
@@ -225,6 +229,7 @@ export function ListControls({
             )}
           </Button>
         </PopoverTrigger>
+        </ButtonAppearanceProvider>
         <MenuShell align="end" width="wide">
           <FilterPanel
             filter={state.filter}
@@ -240,6 +245,7 @@ export function ListControls({
 
       {/* Display */}
       <Popover open={displayOpen} onOpenChange={setDisplayOpen}>
+        <ButtonAppearanceProvider appearance="navigation">
         <PopoverTrigger asChild>
           <Button
             type="button"
@@ -251,6 +257,7 @@ export function ListControls({
             <Grid6Icon size={CONTROL.icon.sm} />
           </Button>
         </PopoverTrigger>
+        </ButtonAppearanceProvider>
         <MenuShell align="end" width="wide">
           <DisplayPanel
             display={state.display}

@@ -59,11 +59,6 @@ export function VisionView({ visionId, createRequested, onCreateHandled, onSelec
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
         <NavVisionIcon size={12} />
         <span className="truncate text-[12px] font-semibold text-foreground">{vision?.name ?? t('Vision')}</span>
-        <div className="flex-1" />
-        <Button variant="ghost" size="icon-xs" className="text-muted-foreground" type="button"
-          onClick={() => setLocalNew(true)} title={t('New Vision')} aria-label={t('New Vision')}>
-          <Plus size={14} />
-        </Button>
       </div>
       <div className="flex-1 overflow-y-auto">
         {loading || role.isPending ? null : !vision ? (

@@ -4,7 +4,6 @@ import { Button } from '@/ui/button';
 
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
-import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import { useQuery } from '@tanstack/react-query';
 import { fetchCustomColumnsWithValues } from '@/hooks/useSupabase';
 
@@ -111,7 +110,6 @@ interface DomainViewProps {
  */
 export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, onViewChange }: DomainViewProps) {
   const explorerData = useExplorerData();
-  const { openCreate } = useWorkspaceActions();
   const userId = useCurrentUserId();
   const domainRole = useDomainRole(activeDomainId ?? null);
   const { data: myObjectMemberships } = useMyObjectMemberships(userId);
@@ -327,16 +325,6 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
           <Plus size={14} />
         </Button>
       )}
-    </div>
-  ) : !isEmptyDomain ? (
-    <div className="ml-auto flex items-center gap-2">
-      <Button variant="ghost" size="icon-xs"
-        type="button"
-        onClick={() => openCreate('object')}
-        title="Add Object" aria-label="Add Object"
-      >
-        <Plus size={14} />
-      </Button>
     </div>
   ) : null;
 

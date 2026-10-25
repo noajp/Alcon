@@ -3,11 +3,13 @@
 import { completionOf } from '@/Function/shared/completion';
 import { ContentRow } from '@/Function/shared/ContentRow';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { WidgetProps } from '../types';
 
 export function DomainObjectsWidget({ host }: WidgetProps) {
+  const { t } = useI18n();
   const objects = host.explorerData?.objects ?? [];
-  if (!objects.length) return <p className="py-3 text-sm text-muted-foreground">No Objects in this Domain yet.</p>;
+  if (!objects.length) return <p className="py-1 text-sm text-muted-foreground">{t('No Objects in this Domain yet.')}</p>;
   return <div className="-mx-2">
     {objects.map(object => {
       const { done, total } = completionOf(object.elements ?? []);

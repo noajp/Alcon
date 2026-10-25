@@ -102,13 +102,6 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
             <NavPortfolioIcon size={12} />
             <span className="text-[12px] font-semibold text-foreground">{t('Portfolios')}</span>
             {vision && <span className="truncate text-[12px] text-muted-foreground">{vision.name}</span>}
-            <div className="flex-1" />
-            {vision && (
-              <Button variant="ghost" size="icon-xs" className="text-muted-foreground" type="button"
-                onClick={() => setLocalNew({ parentId: null })} title={t('New Portfolio')} aria-label={t('New Portfolio')}>
-                <Plus size={14} />
-              </Button>
-            )}
           </div>
           <div className="flex-1 overflow-y-auto">
             {loading ? null : !vision ? (

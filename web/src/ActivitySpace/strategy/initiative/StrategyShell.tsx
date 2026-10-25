@@ -1,12 +1,12 @@
 'use client';
 
-import { Button } from '@/ui/button';
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { PageIcon } from '@/Function/shared/PageHead';
+import { FONT } from '@/shared/designTokens';
 import { IndexList, IndexRow } from '@/Function/shared/IndexList';
 import { EmptyState } from '@/Function/shared/EmptyState';
 import { QuickCreatePopup, quickCreatePillClass } from '@/Function/shared/QuickCreatePopup';
@@ -50,6 +50,8 @@ import {
   useBoard,
   WidgetSurface,
   WidgetZone,
+  WidgetActionSlotProvider,
+  WidgetActionSlotTarget,
   INITIATIVE_BOARD,
   type WidgetHost,
   type Zone,
@@ -158,15 +160,6 @@ export function StrategyShell({
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
         <NavStrategyIcon size={12} />
         <span className="text-[12px] font-semibold text-foreground">Initiatives</span>
-        <div className="flex-1" />
-        <Button variant="ghost" size="icon-xs" className="text-muted-foreground"
-          type="button"
-          onClick={() => setNewOpen(true)}
-          title="Add Initiative"
-          aria-label="Add Initiative"
-        >
-          <Plus size={14} />
-        </Button>
       </div>
 
       <div className="flex-1 overflow-hidden">
@@ -720,6 +713,7 @@ function StrategyDetailView({
       onConfirm={() => { void handleDelete(); }}
       onCancel={() => setConfirmingDelete(false)}
     />
+    <WidgetActionSlotProvider>
     <div ref={rootRef} className="flex-1 flex flex-col overflow-hidden bg-card h-full">
       <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <button
@@ -740,15 +734,17 @@ function StrategyDetailView({
           // policy and report their own failures (ELE_STR-025).
           <span
             className="ml-1 px-1.5 py-0.5 rounded-full bg-muted/60 ring-1 ring-border/60 text-[11px] text-foreground/90"
-            title="Only the Initiative's owner can edit it"
+            title={t("Only the Initiative's owner can edit it")}
           >
-            Read-only
+            {t('Read-only')}
           </span>
         )}
         <div className="ml-auto flex min-w-0 items-center gap-2">
+          {/* "Add widget" is page chrome: it sits in the header, as on a Domain. */}
+          <WidgetActionSlotTarget className="flex items-center gap-1" />
           {(deleteError || saveError) && (
             <span role="status" className="text-[11px] text-muted-foreground truncate">
-              {deleteError ?? `${saveError} — change reverted`}
+              {deleteError ?? t('{error} — change reverted', { error: saveError ?? '' })}
             </span>
           )}
           {canEdit && (
@@ -756,7 +752,7 @@ function StrategyDetailView({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  aria-label="Initiative actions"
+                  aria-label={t('Initiative actions')}
                   className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
                 >
                   <MoreHorizontal size={14} />
@@ -764,7 +760,7 @@ function StrategyDetailView({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setConfirmingDelete(true)} disabled={deleting} className="text-destructive">
-                  <Trash2 size={13} /> Delete Initiative
+                  <Trash2 size={13} /> {t('Delete Initiative')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -798,11 +794,14 @@ function StrategyDetailView({
                   e.currentTarget.blur();
                 }
               }}
-              placeholder="Initiative name"
+              placeholder={t('Initiative name')}
               readOnly={!canEdit}
               aria-readonly={!canEdit}
               tabIndex={canEdit ? undefined : -1}
-              className="w-full text-2xl font-semibold text-foreground bg-transparent border-none resize-none leading-tight overflow-hidden tracking-normal"
+              className="w-full text-2xl text-foreground bg-transparent border-none resize-none leading-tight overflow-hidden tracking-normal"
+              // The base style resets typed text to 400, beating a utility —
+              // so the heading's weight is set inline, as on Element detail.
+              style={{ fontWeight: 600 }}
             />
           </div>
           <textarea
@@ -819,7 +818,7 @@ function StrategyDetailView({
                 e.currentTarget.blur();
               }
             }}
-            placeholder={canEdit ? 'Add description...' : ''}
+            placeholder={canEdit ? t('Add description…') : ''}
             readOnly={!canEdit}
             aria-readonly={!canEdit}
             tabIndex={canEdit ? undefined : -1}
@@ -838,15 +837,14 @@ function StrategyDetailView({
           <WidgetZone zone="main" columns={1} />
 
           <section>
-            <div className="h-px bg-border mb-3" />
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-[13px] font-medium text-foreground/90">Initiatives</h2>
+              <h2 className={`${FONT.lg} text-foreground`}>{t('Initiatives')}</h2>
               {canEdit && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    aria-label="Add nested Initiative"
+                    aria-label={t('Add nested Initiative')}
                     className="flex items-center justify-center size-5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
                   >
                     <Plus size={13} />
@@ -854,10 +852,10 @@ function StrategyDetailView({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => setChildPickerOpen(true)}>
-                    <Search size={13} className="mr-1.5" /> Add existing Initiative
+                    <Search size={13} className="mr-1.5" /> {t('Add existing Initiative')}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setNewChildOpen(true)}>
-                    <Plus size={13} className="mr-1.5" /> Create Initiative
+                    <Plus size={13} className="mr-1.5" /> {t('Create Initiative')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -905,7 +903,7 @@ function StrategyDetailView({
                   <input
                     value={childQuery}
                     onChange={(e) => setChildQuery(e.target.value)}
-                    placeholder="Search Initiatives…"
+                    placeholder={t('Search Initiatives…')}
                     className="flex-1 bg-transparent text-[13px] outline-none"
                     autoFocus
                   />
@@ -942,15 +940,14 @@ function StrategyDetailView({
           </section>
 
           <section>
-            <div className="h-px bg-border mb-3" />
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-[13px] font-medium text-foreground/90">Objects</h2>
+              <h2 className={`${FONT.lg} text-foreground`}>{t('Objects')}</h2>
               {canEdit && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    aria-label="Add Objects"
+                    aria-label={t('Add Objects')}
                     className="flex items-center justify-center size-5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
                   >
                     <Plus size={13} />
@@ -1022,7 +1019,7 @@ function StrategyDetailView({
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search Objects across Domains…"
+                    placeholder={t('Search Objects across Domains…')}
                     className="flex-1 bg-transparent text-[13px] outline-none"
                     autoFocus
                   />
@@ -1046,7 +1043,7 @@ function StrategyDetailView({
                 <input
                   value={newObjectName}
                   onChange={(e) => setNewObjectName(e.target.value)}
-                  placeholder="Object name"
+                  placeholder={t('Object name')}
                   autoFocus
                   onKeyDown={(e) => {
                     if (isCommitEnter(e)) {
@@ -1095,8 +1092,7 @@ function StrategyDetailView({
               the Initiative's current state and stay a fixed height, while this
               one grows downward as the Initiative is discussed. */}
           <section>
-            <div className="h-px bg-border mb-3" />
-            <h2 className="text-[13px] font-medium text-foreground/90 mb-2">Activity</h2>
+            <h2 className={`${FONT.lg} mb-2 text-foreground`}>{t('Activity')}</h2>
             <StrategyCommentsPanel
               strategyId={strategy.id}
               strategyName={strategy.name}
@@ -1109,6 +1105,7 @@ function StrategyDetailView({
         </div>
       </div>
     </div>
+    </WidgetActionSlotProvider>
     {newChildOpen && (
       <StrategyCreateDialog
         // A nested Initiative sits in its parent's Vision.
@@ -1144,6 +1141,7 @@ function StrategyCreateDialog({
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
+  const { t } = useI18n();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const grouped = useObjectPicker(query);
@@ -1183,9 +1181,9 @@ function StrategyCreateDialog({
         </PopoverTrigger>
         <MenuShell width="wide" align="start">
           <Command shouldFilter={false}>
-            <CommandInput value={query} onValueChange={setQuery} placeholder="Search Objects across Domains…" />
+            <CommandInput value={query} onValueChange={setQuery} placeholder={t('Search Objects across Domains…')} />
             <CommandList>
-              <CommandEmpty>No Objects match.</CommandEmpty>
+              <CommandEmpty>{t('No Objects match.')}</CommandEmpty>
               {grouped.map(([did, { domainName, objects }]) => (
                 <CommandGroup key={did} heading={domainName}>
                   {objects.map((o) => (

@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 import { differenceInDays } from 'date-fns';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
 
@@ -23,6 +24,7 @@ function Figure({ label, value, detail, alarm = false }: {
 }
 
 export function KpiCardsWidget({ elements }: Props) {
+  const { t } = useI18n();
   const { completedCount, completionRate, overdueElements, totalEstimated, totalActual } = useDashboardData(elements);
   const inProgressCount = useMemo(() => elements.filter(e => e.status === 'in_progress').length, [elements]);
   const todoCount = useMemo(() => elements.filter(e => e.status === 'todo').length, [elements]);
@@ -35,12 +37,12 @@ export function KpiCardsWidget({ elements }: Props) {
 
   return (
     <div className="grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-4">
-      <Figure label="Completion" value={`${completionRate}%`} detail={`${completedCount} done · ${todoCount} todo · ${inProgressCount} active`} />
-      <Figure label="In Progress" value={inProgressCount} detail={`${recentDone} done in the last 14 days`} />
-      <Figure label="Overdue" value={overdueElements.length} alarm={overdueElements.length > 0}
-        detail={oldest ? `Oldest ${differenceInDays(new Date(), new Date(oldest))}d ago` : 'All on track'} />
-      <Figure label="Hours" value={hoursEfficiency !== null ? `${hoursEfficiency}%` : '—'}
-        detail={hoursEfficiency !== null ? `${totalActual}h of ${totalEstimated}h estimated` : 'No hours tracked'} />
+      <Figure label={t('Completion')} value={`${completionRate}%`} detail={t('{done} done · {todo} todo · {active} active', { done: completedCount, todo: todoCount, active: inProgressCount })} />
+      <Figure label={t('In Progress')} value={inProgressCount} detail={t('{n} done in the last 14 days', { n: recentDone })} />
+      <Figure label={t('Overdue')} value={overdueElements.length} alarm={overdueElements.length > 0}
+        detail={oldest ? t('Oldest {n}d ago', { n: differenceInDays(new Date(), new Date(oldest)) }) : t('All on track')} />
+      <Figure label={t('Hours')} value={hoursEfficiency !== null ? `${hoursEfficiency}%` : '—'}
+        detail={hoursEfficiency !== null ? t('{actual}h of {estimated}h estimated', { actual: totalActual, estimated: totalEstimated }) : t('No hours tracked')} />
     </div>
   );
 }

@@ -83,6 +83,7 @@ import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { ElementTypeIcon, ObjectIcon } from '@/shell/icons';
 import { PageIcon } from '@/Function/shared/PageHead';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { StatusPicker } from './StatusPicker';
 import { ElementDirectionSection } from './ElementDirectionSection';
 import { SubelementRow } from './SubelementRow';
@@ -268,6 +269,7 @@ function ElementDetailBody({
   // A written description is read as formatted text (headings, lists, bold)
   // and turns into its source when clicked — the way a document reads until
   // you put the cursor in it. An empty one is the field straight away.
+  const { t } = useI18n();
   // Keyed by Element, so opening another one starts it formatted again.
   const [editingDescriptionFor, setEditingDescriptionFor] = useState<string | null>(null);
   const editingDescription = editingDescriptionFor === element.id;
@@ -814,13 +816,24 @@ function ElementDetailBody({
             />}
           </div>
 
-          {/* Action row — reactions, Note link, approval and Share an update,
-              all borderless inline verbs. Sits flush
-              with the title/description block (no extra horizontal
-              padding) and wraps so reaction chips line up next to the
-              affordances. */}
+          {/* One row of verbs under the description, as Linear keeps a single
+              line under an issue: reactions, the Note link, the agent hand-off
+              and approval as quiet icons, then the empty Direction,
+              Sub-elements and Dependencies as "+ verb". A section that has
+              content takes the full width under the row with its own heading.
+              Sharing an update belongs to the discussion, so it sits in the
+              Comments heading. */}
+          {/* Direction — approach / acceptance criteria / next step. Sits
+              between the linked Note and the Sub-elements so the read order
+              is intent → its breakdown → discussion. Keyed by element.id so
+              switching Elements resets the editing state. */}
+          {/* Direction, sub-elements and dependencies share one wrapping row:
+              an empty one is a single quiet "+" verb that sits beside the
+              others (Linear's "+ Add sub-issues"); a filled one takes the full
+              width with its own small heading. */}
+          <div className="-ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
           <ButtonAppearanceProvider appearance="inline">
-          <div className="-mt-4 -ml-1.5 flex items-center gap-0.5 flex-wrap">
+          <div className="flex items-center gap-0.5">
             {/* Smile button → quick-emoji popover that toggles a
                 reaction on this Element. */}
             <div className="relative">
@@ -891,7 +904,6 @@ function ElementDetailBody({
                 and record a decision (Approve / Request changes / Reject).
                 Moved here from the right rail's "Approval" island. */}
             <ElementApprovalMenu element={element} onRefresh={onRefresh} />
-            <Button variant="ghost" size="sm" onClick={() => setCheckInOpen(true)}>Share an update</Button>
 
             {/* Existing reactions as toggleable chips, aggregated by
                 emoji so two thumbs-ups read as 👍 ×2 with my own
@@ -921,30 +933,6 @@ function ElementDetailBody({
             })()}
           </div>
           </ButtonAppearanceProvider>
-          <AgentRunPanel
-            agent={agent}
-            onRunAgain={() => void agent.start({ workerId: rerunWorkerId(agent.run?.worker_id), triggeredFrom: 'detail', domainId })}
-          />
-          {checkInOpen && <CheckInDialog element={element} onClose={() => setCheckInOpen(false)}
-            onSaved={() => { setCheckInOpen(false); onRefresh?.(); }} />}
-
-          {/* Linked Note — embedded inline once chosen. */}
-          {element.note_id && (
-            <LinkedNoteEmbed
-              noteId={element.note_id}
-              onUnlink={handleUnlinkNote}
-            />
-          )}
-
-          {/* Direction — approach / acceptance criteria / next step. Sits
-              between the linked Note and the Sub-elements so the read order
-              is intent → its breakdown → discussion. Keyed by element.id so
-              switching Elements resets the editing state. */}
-          {/* Direction, sub-elements and dependencies share one wrapping row:
-              an empty one is a single quiet "+" verb that sits beside the
-              others (Linear's "+ Add sub-issues"); a filled one takes the full
-              width with its own small heading. */}
-          <div className="-ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
           <ElementDirectionSection
             key={`direction-${element.id}`}
             element={element}
@@ -1011,6 +999,22 @@ function ElementDetailBody({
             onOpenElement={onOpenElement} onChanged={onRefresh} />
           </div>
 
+          <AgentRunPanel
+            agent={agent}
+            onRunAgain={() => void agent.start({ workerId: rerunWorkerId(agent.run?.worker_id), triggeredFrom: 'detail', domainId })}
+          />
+          {checkInOpen && <CheckInDialog element={element} onClose={() => setCheckInOpen(false)}
+            onSaved={() => { setCheckInOpen(false); onRefresh?.(); }} />}
+
+          {/* Linked Note — embedded inline once chosen. */}
+          {element.note_id && (
+            <LinkedNoteEmbed
+              noteId={element.note_id}
+              onUnlink={handleUnlinkNote}
+            />
+          )}
+
+
           {/* Linked Elements */}
           {(edges.incoming.length > 0 || edges.outgoing.length > 0) && (
             <div className="space-y-1.5">
@@ -1035,14 +1039,19 @@ function ElementDetailBody({
             </div>
           )}
 
-          {layout === 'reader' && <section className="space-y-3 border-t border-border pt-5" aria-label="Activity">
+          {layout === 'reader' && <section className="space-y-3" aria-label="Activity">
             <h2 className="text-[13px] font-semibold">Activity</h2>
             <ActivityFeed entries={activityLog} compact />
           </section>}
 
           {/* The reader keeps changes next to their discussion. */}
-          <div className={layout === 'reader' ? '' : 'mt-4 border-t border-border pt-8'}>
-            <h2 className="mb-5 text-[15px] font-medium text-foreground">Comments</h2>
+          <div className={layout === 'reader' ? '' : 'mt-4'}>
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h2 className="text-[15px] font-medium text-foreground">{t('Comments')}</h2>
+              <ButtonAppearanceProvider appearance="inline">
+                <Button variant="ghost" size="sm" onClick={() => setCheckInOpen(true)}>{t('Share an update')}</Button>
+              </ButtonAppearanceProvider>
+            </div>
             <ElementCommentsPanel
               key={`comments-${element.id}`}
               refreshKey={agent.run ? `${agent.run.id}:${agent.run.status}:${agent.run.step_count}` : null}

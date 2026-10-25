@@ -1,11 +1,9 @@
 'use client';
 
-import { Button } from '@/ui/button';
 
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Plus } from 'lucide-react';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains, useElementTemplates, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
@@ -550,7 +548,6 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
           onViewChange?.('objects');
           onNavigate?.({ objectId: null });
         }}
-        onAdd={openQuickAddDomain}
       />
 
       {/* View-mode tabs — uses the shared shell `TabBar` so the look
@@ -695,11 +692,9 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
 function ElementsHierarchyHeader({
   domainName,
   onDomainClick,
-  onAdd,
 }: {
   domainName: string;
   onDomainClick?: () => void;
-  onAdd?: () => void;
 }) {
   return (
     <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
@@ -710,17 +705,6 @@ function ElementsHierarchyHeader({
       >
         {domainName}
       </button>
-      <div className="flex-1" />
-      {onAdd && (
-        <Button variant="ghost" size="icon-xs"
-          type="button"
-          onClick={onAdd}
-          title="Add Element"
-          aria-label="Add Element"
-        >
-          <Plus size={14} />
-        </Button>
-      )}
     </div>
   );
 }

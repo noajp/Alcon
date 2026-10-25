@@ -1,9 +1,9 @@
 'use client';
 
-
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { fetchMyElements, type MyElementsData } from '@/ActivitySpace/home/myElementsData';
 import { useAuthContext } from '@/providers/AuthProvider';
 import {
@@ -101,6 +101,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
     });
   }, [qc, queryKey]);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const { t } = useI18n();
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [deletedOpen, setDeletedOpen] = useState(false);
   const [controls, setControls] = useState<ListControlsState>(() => loadState('my-elements'));
@@ -305,8 +306,8 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
       {/* Plain header — no Domain breadcrumb because personal Elements are
           intentionally Domain-less. */}
       <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
-        {!embedded && <span className="text-[12px] font-semibold text-foreground">My Elements</span>}
-        <span className="text-[11px] text-muted-foreground">{elements.length}{embedded ? " Elements" : ""}</span>
+        {!embedded && <span className="text-[12px] font-semibold text-foreground">{t('My Elements')}</span>}
+        <span className="text-[11px] text-muted-foreground">{embedded ? t('{n} Elements', { n: elements.length }) : elements.length}</span>
         <div className="flex-1" />
         <ListControls
           state={controls}
@@ -323,8 +324,8 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
             type="button"
             onClick={() => setDeletedOpen(true)}
             className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-            title="Deleted Elements"
-            aria-label="Deleted Elements"
+            title={t('Deleted Elements')}
+            aria-label={t('Deleted Elements')}
           >
             <Trash2 size={14} />
           </button>
@@ -333,7 +334,8 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
           type="button"
           onClick={() => setQuickAddOpen(true)}
           className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-          title="Add personal Element"
+          title={t('Add personal Element')}
+          aria-label={t('Add personal Element')}
         >
           <Plus size={14} />
         </button>

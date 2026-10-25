@@ -26,7 +26,7 @@ Alcon の画面・ウィジェット・生成アプリに共通するデザイ�
 
 ラベルは12〜13px、アイコンとの間隔は6px、通常の左右余白は10px。長い説明をクリック候補にする場合は `Button multiline` で高さを自動にして折り返し、枠と内側の余白を保つ。アイコンだけのボタンには `aria-label` を付ける。
 
-Inboxの一覧ヘッダーと通知行のメニューボタンも枠なしのナビゲーション文脈とする。詳細側の既読・アーカイブなどラベル付き実行操作には薄枠を使う。
+Inboxの一覧ヘッダーと通知行のメニューボタンも枠なしのナビゲーション文脈とする。一覧のツールバーのアイコン（絞り込み・表示）も同じく枠なしにし、ホバーと適用中は背景で示す（`ListControls`）。詳細側の既読・アーカイブなどラベル付き実行操作には薄枠を使う。
 
 サイドバー上部の操作・ModeRail・アプリランチャーは `ButtonAppearanceProvider appearance="navigation"` で枠なしにする。選択・ホバーは背景で示す。サイドバーの外周線も付けない。アプリランチャーは影と面色で区別し、ポップアップ内の操作にも同じ枠なし文脈を引き継ぐ。サイドバー外の実行操作には通常の薄枠を使う。アイコン専用ボタンは左右の配置指定にかかわらず中央に置く。
 
@@ -48,13 +48,13 @@ ListのStatus・Priorityは名前の横に表示し、独立した列は設け�
 
 リスト行、メニュー項目、表のセル、グラフ上の選択対象はコンテンツとしての選択面を使う。これらを一律に操作ボタンの枠で囲まない。独立した実行操作を文章の見た目だけで置かない。
 
-Object・Domain・Element・Initiative等の作成は、入口を無彩色、確定操作を `Button variant="primary"` の共通ブルーにする。一覧・Board 列・ヘッダーの「+」は `ghost` のアイコンボタンとし、青はクイック作成カードの「Create」など確定の一箇所だけに出す。入口まで青いと、画面のあちこちで主要操作が競合する。青の表示色は `--accent-default`、赤は `--status-danger` を参照し、淡い背景は対応するsubtleトークンまたは同じ色の透明度で表す。
+Object・Domain・Element・Initiative等の作成は、入口を無彩色、確定操作を `Button variant="primary"` の共通ブルーにする。作成の入口はサイドバー上部の「+」（Vision・Portfolio・Initiative・Domain・Object）と、作る場所そのもの（一覧のグループ行の「+」、Element の C キー）に置き、ページヘッダーには同じ作成の「+」を重ねない。一覧・Board 列の「+」は `ghost` のアイコンボタンとし、青はクイック作成カードの「Create」など確定の一箇所だけに出す。入口まで青いと、画面のあちこちで主要操作が競合する。青の表示色は `--accent-default`、赤は `--status-danger` を参照し、淡い背景は対応するsubtleトークンまたは同じ色の透明度で表す。
 
 主要操作のアクセントは彩度を抑えたマットブルー（`--accent-default`）。破壊的操作には彩度を抑えたマットレッド（`--status-danger`）を使う。AI機能の操作に装飾のSparklesアイコンを付けず、ラベルで用途を伝える。
 
 製品の固定UIラベル・入力例・候補ボタンは `Function/i18n` の辞書を通し、選択された言語で一貫して表示する。未翻訳の文言は英語へフォールバックする。ユーザーが入力した内容や生成を依頼したアプリの言語は保持する。画面に英語リテラルを直接書かず、必ず `t()` を通す。
 
-製品の概念名（Strategy / Execution / Sustainment、Initiatives / Phase / Timeline、Domain / Objects / Elements、Inbox / Calendar / Notebook / Table / People / Team / Workload / CRM、Profile）は固有名詞として扱い、どの言語でも英語表記のまま出す。これはコードで固定するのではなく、各言語の辞書でその語を自分自身に写して実現する（`'Timeline': 'Timeline'`）。概念名を含む文も同じ（`'Open Calendar': 'Calendar を開く'`）。日付・曜日は `toLocaleDateString(locale)` で設定言語に従う。
+製品の概念名（Strategy / Execution / Sustainment、Initiatives / Phase / Timeline、Domain / Objects / Elements、Inbox / Calendar / Notebook / Table / People / Team / Workload / CRM、Profile）は固有名詞として扱い、どの言語でも英語表記のまま出す。これはコードで固定するのではなく、各言語の辞書でその語を自分自身に写して実現する（`'Timeline': 'Timeline'`）。概念名を含む文も同じ（`'Open Calendar': 'Calendar を開く'`）。日付・曜日は `toLocaleDateString(locale)` で設定言語に従う。画面に出る文言は、見出し・空の状態・プレースホルダー・`aria-label` まで `t()` を通し、英語を直書きしない。値を含む文は1つのキーに `{n}` などで埋め込み、語順を言語ごとに変えられるようにする。ウィジェットの名前と説明は全言語の訳を持つ（`tests/widgetI18n.test.ts`）。
 
 サイドバーの一覧（Domain・Strategy・Notebook・Table・CRM・Settings）は、すべて共通の `SidebarRow` で作る。行ごとに見た目を書かない。行全体がホバーと選択の対象で、選択中は `bg-sidebar-accent` と `text-foreground`、非選択は `text-muted-foreground`、ホバーとキーボードフォーカスでは `bg-sidebar-accent/50` と `text-foreground` にする。行の右端の操作（折りたたみの矢印、「…」）は `SidebarRowAction` とし、背景を持たず記号だけを濃くするので、ハイライトは行の端まで切れずにつながる。行は左から 16px のアイコン枠・名前・件数などの補足・右端の操作の順に並べ、通常は 32px、入れ子の行は 24px。一覧の見出しは `SidebarSectionLabel`。
 
