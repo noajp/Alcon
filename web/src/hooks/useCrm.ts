@@ -14,7 +14,7 @@ import { readAllPages } from '@/hooks/readAllPages';
 import {
   buildCrmWorkspace, fieldsFor, measureValue, metricKind, metricValue, normalizeCrmStages, parseActivityLog, resolveStage,
   type CrmActivityRecord, type CrmActivityType, type CrmCompanyRecord, type CrmContactRecord, type CrmDeal,
-  type CrmDealContactRecord, type CrmDealRecord, type CrmDealRole, type CrmFieldRecord, type CrmNextElement, type CrmPerson, type CrmPipelineRecord, type CrmWorkspace,
+  type CrmDealContactRecord, type CrmDealRecord, type CrmElementLinkRecord, type CrmLinkedElement, type CrmDealRole, type CrmFieldRecord, type CrmNextElement, type CrmPerson, type CrmPipelineRecord, type CrmWorkspace,
 } from '@/ActivitySpace/sustainment/crm/crmModel';
 
 const EMPTY: never[] = [];
@@ -76,6 +76,21 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     return (data ?? []) as CrmActivityRecord[];
   } });
   const fields = useQuery({ ...options, queryKey: key('fields'), queryFn: () => all<CrmFieldRecord>('fields', 'crm_fields', spaceId!, 'order_index') });
+  const elementLinks = useQuery({ ...options, queryKey: key('element-links'), queryFn: () => all<CrmElementLinkRecord>('element links', 'crm_element_links', spaceId!) });
+  // The linked Elements themselves, as far as the reader can see them.
+  const linkedIds = useMemo(() => [...new Set((elementLinks.data ?? []).map(link => link.element_id))].sort(), [elementLinks.data]);
+  const linkedElements = useQuery({
+    ...options, enabled: enabled && linkedIds.length > 0, queryKey: [...key('linked-elements'), linkedIds],
+    queryFn: async () => {
+      const rows: CrmLinkedElement[] = [];
+      for (let index = 0; index < linkedIds.length; index += 150) {
+        const { data, error } = await supabase.from('elements').select('id,title,status,due_date,display_id').in('id', linkedIds.slice(index, index + 150));
+        if (error) throw error;
+        rows.push(...(data ?? []) as CrmLinkedElement[]);
+      }
+      return rows;
+    },
+  });
   const dealContacts = useQuery({ ...options, queryKey: key('deal-contacts'), queryFn: () => all<CrmDealContactRecord>('deal contacts', 'crm_deal_contacts', spaceId!) });
   const elementIds = useMemo(() => [...new Set((deals.data ?? []).map(deal => deal.next_element_id).filter((id): id is string => !!id))].sort(), [deals.data]);
   const elements = useQuery({
@@ -257,6 +272,30 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     // Clear first: a failed note never leaves the deal half-declined and noted twice on retry.
     await saveDeal(dealId, { renewsOn: null }, { quiet: true });
     await logActivity(dealId, { type: 'note', text: note });
+  };
+
+  /** Links an Element to the company, contact or deal it is about. */
+  const linkElement = async (elementId: string, target: { companyId?: string; contactId?: string; dealId?: string }) => {
+    try {
+      const result = await supabase.from('crm_element_links').insert({
+        activity_space_id: space(), element_id: elementId,
+        company_id: target.companyId ?? null, contact_id: target.contactId ?? null, deal_id: target.dealId ?? null,
+      }).select('id').single();
+      if (result.error?.code === '23505') return;
+      check(result);
+    } finally { await invalidate(); }
+  };
+  const unlinkElement = async (linkId: string) => {
+    try { check(await supabase.from('crm_element_links').delete().eq('id', linkId).select('id').single()); } finally { await invalidate(); }
+  };
+  /** Elements to link, by title or display ID, among those the reader can see. */
+  const searchElements = async (query: string): Promise<CrmLinkedElement[]> => {
+    const term = query.trim().replace(/[%_,()"\\]/g, ' ').trim();
+    if (!term) return [];
+    const { data, error } = await supabase.from('elements').select('id,title,status,due_date,display_id')
+      .or(`title.ilike."%${term}%",display_id.ilike."%${term}%"`).order('updated_at', { ascending: false }).limit(20);
+    if (error) throw new Error(error.message);
+    return (data ?? []) as CrmLinkedElement[];
   };
 
   /** People on a deal beyond its main contact. A new name becomes a contact
@@ -479,11 +518,14 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     activities: activities.data ?? EMPTY as CrmActivityRecord[],
     fields: fields.data ?? EMPTY as CrmFieldRecord[],
     dealContacts: dealContacts.data ?? EMPTY as CrmDealContactRecord[],
+    elementLinks: elementLinks.data ?? EMPTY as CrmElementLinkRecord[],
+    linkedElements: linkedElements.data ?? EMPTY as CrmLinkedElement[],
+    nextElements: elements.data ?? EMPTY as CrmNextElement[],
     allDeals: deals.data ?? EMPTY as CrmDealRecord[],
     loading: enabled && !workspace && !error,
     error, measureError,
     refetch: invalidate,
-    saveDeal, startRenewal, declineRenewal, addDealContact, updateDealContact, removeDealContact, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
+    saveDeal, linkElement, unlinkElement, searchElements, startRenewal, declineRenewal, addDealContact, updateDealContact, removeDealContact, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
     savePipeline, deletePipeline, saveCompany, deleteCompany, saveContact, deleteContact, saveField, deleteField,
     importFromTable,
   };
