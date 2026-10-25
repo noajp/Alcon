@@ -11,7 +11,7 @@ import {
   NavPortfolioIcon,
   NavNoteIcon,
   NavSettingsIcon,
-  NavTableIcon,
+  NavTableIcon, NavSlidesIcon,
   NavTeamsIcon,
   NavDomainIcon,
   NavPhaseIcon,
@@ -46,6 +46,7 @@ export type ViewId =
   | 'domain-overview'
   | 'domains'
   | 'tables'
+  | 'slides'
   | 'team'
   | 'crm'
   | 'settings'
@@ -77,6 +78,7 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   'domain-overview': { label: 'Domain overview', icon: NavDomainIcon },
   domains:       { label: 'Domains',     icon: NavDomainIcon },
   tables:        { label: 'Table',       icon: NavTableIcon },
+  slides:        { label: 'Slides',      icon: NavSlidesIcon },
   team:          { label: 'People',      icon: NavTeamsIcon },
   crm:           { label: 'CRM',         icon: NavCrmIcon },
   settings:      { label: 'Settings',    icon: NavSettingsIcon },

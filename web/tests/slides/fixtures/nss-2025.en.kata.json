@@ -1,0 +1,704 @@
+{
+  "kata": 1,
+  "name": "NSS 2025 in brief",
+  "deck": {
+    "title": "The 2025 U.S. National Security Strategy, in brief",
+    "storyline": "pyramid",
+    "mode": "read",
+    "slides": [
+      {
+        "id": "cover",
+        "layout": "cover",
+        "title": "The 2025 U.S. National Security Strategy, in brief",
+        "content": {
+          "cover": {
+            "subtitle": "Narrower interests, the Western Hemisphere and the economy first, more burden on allies",
+            "meta": "Summary of the 33-page document published November 2025"
+          }
+        }
+      },
+      {
+        "id": "summary",
+        "layout": "summary",
+        "role": "Summary",
+        "title": "The U.S. narrows its interests, puts the Hemisphere and economy first, and shifts burdens to allies",
+        "content": {
+          "summary": {
+            "points": [
+              {
+                "head": "Stop treating everything as a national interest",
+                "body": "Rejects post-Cold War strategies as wish lists; focuses on core interests only",
+                "ref": "c1a",
+                "page": "p.5"
+              },
+              {
+                "head": "Priorities: borders, burden-shifting, economic security",
+                "body": "End of mass migration, allies paying more, reindustrialization, energy, balanced trade",
+                "ref": "c4b",
+                "page": "p.12"
+              },
+              {
+                "head": "The Hemisphere comes first; Asia is about economics and deterrence",
+                "body": "A “Trump Corollary” to the Monroe Doctrine; rebalance with China and deter along the First Island Chain",
+                "ref": "c4d",
+                "page": "p.14"
+              },
+              {
+                "head": "Allies must carry their regions; NATO is held to 5% of GDP on defense",
+                "body": "Japan and South Korea are urged to spend more and invest in First Island Chain capabilities",
+                "ref": "c5a",
+                "page": "p.18"
+              }
+            ]
+          }
+        },
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.1–29"
+      },
+      {
+        "id": "agenda",
+        "layout": "agenda",
+        "role": "Agenda",
+        "title": "We follow the document's own questions, then draw out what it asks of allies",
+        "content": {
+          "agenda": {
+            "items": [
+              {
+                "head": "What strategy is: connecting ends and means",
+                "ref": "d1",
+                "page": "p.4"
+              },
+              {
+                "head": "What the U.S. should want (ends)",
+                "ref": "d2",
+                "page": "p.6"
+              },
+              {
+                "head": "What it can use (means)",
+                "ref": "d3",
+                "page": "p.8"
+              },
+              {
+                "head": "The strategy: principles, priorities, regions",
+                "ref": "d4",
+                "page": "p.10"
+              },
+              {
+                "head": "What it asks of allies",
+                "ref": "d5",
+                "page": "p.17"
+              }
+            ],
+            "current": -1
+          }
+        }
+      },
+      {
+        "id": "d1",
+        "layout": "agenda",
+        "role": "What strategy is: connecting ends and means",
+        "title": "What strategy is: connecting ends and means",
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.1–2",
+        "content": {
+          "agenda": {
+            "items": [
+              {
+                "head": "What strategy is: connecting ends and means",
+                "ref": "d1",
+                "page": "p.4"
+              },
+              {
+                "head": "What the U.S. should want (ends)",
+                "ref": "d2",
+                "page": "p.6"
+              },
+              {
+                "head": "What it can use (means)",
+                "ref": "d3",
+                "page": "p.8"
+              },
+              {
+                "head": "The strategy: principles, priorities, regions",
+                "ref": "d4",
+                "page": "p.10"
+              },
+              {
+                "head": "What it asks of allies",
+                "ref": "d5",
+                "page": "p.17"
+              }
+            ],
+            "current": 0
+          }
+        }
+      },
+      {
+        "id": "c1a",
+        "layout": "compare",
+        "role": "What strategy is: connecting ends and means",
+        "title": "It dismisses post-Cold War strategies as wish lists and insists on choosing",
+        "content": {
+          "compare": {
+            "columns": [
+              "Post-Cold War strategy (as the document sees it)",
+              "This strategy"
+            ],
+            "rows": [
+              {
+                "label": "Scope",
+                "cells": [
+                  "Aimed at permanent domination of the whole world",
+                  "Protecting core national interests only"
+                ]
+              },
+              {
+                "label": "Priorities",
+                "cells": [
+                  "Laundry lists of wishes; never defined what we want",
+                  "Evaluate, sort and prioritize"
+                ]
+              },
+              {
+                "label": "Allies",
+                "cells": [
+                  "Let allies offload the cost of their defense",
+                  "Allies take primary responsibility for their regions"
+                ]
+              },
+              {
+                "label": "Economy",
+                "cells": [
+                  "Globalism and “free trade” hollowed out the middle class and industry",
+                  "Reindustrialization and balanced trade"
+                ]
+              },
+              {
+                "label": "Institutions",
+                "cells": [
+                  "Tied policy to institutions that erode sovereignty",
+                  "Defend sovereignty; reform institutions to serve U.S. interests"
+                ]
+              }
+            ],
+            "highlight": 1,
+            "takeaways": [
+              "Redefines strategy as a concrete plan linking ends and means",
+              "The rest follows three questions: what to want, what to use, how to connect them"
+            ]
+          }
+        },
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.1–2"
+      },
+      {
+        "id": "d2",
+        "layout": "agenda",
+        "role": "What the U.S. should want (ends)",
+        "title": "What the U.S. should want (ends)",
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.3–5",
+        "content": {
+          "agenda": {
+            "items": [
+              {
+                "head": "What strategy is: connecting ends and means",
+                "ref": "d1",
+                "page": "p.4"
+              },
+              {
+                "head": "What the U.S. should want (ends)",
+                "ref": "d2",
+                "page": "p.6"
+              },
+              {
+                "head": "What it can use (means)",
+                "ref": "d3",
+                "page": "p.8"
+              },
+              {
+                "head": "The strategy: principles, priorities, regions",
+                "ref": "d4",
+                "page": "p.10"
+              },
+              {
+                "head": "What it asks of allies",
+                "ref": "d5",
+                "page": "p.17"
+              }
+            ],
+            "current": 1
+          }
+        }
+      },
+      {
+        "id": "c2a",
+        "layout": "grid",
+        "role": "What the U.S. should want (ends)",
+        "title": "Five core interests abroad; everything else comes second",
+        "content": {
+          "grid": {
+            "cards": [
+              {
+                "head": "A stable Western Hemisphere",
+                "body": "Stable enough to prevent mass migration, cooperating against cartels, free of hostile foreign incursion or ownership of key assets"
+              },
+              {
+                "head": "The Indo-Pacific and the economy",
+                "body": "Halt damage to the U.S. economy; keep the Indo-Pacific free and open, sea lanes navigable and supply chains secure"
+              },
+              {
+                "head": "Freedom and security in Europe",
+                "body": "Support allies in Europe's security while restoring its “civilizational self-confidence” and Western identity"
+              },
+              {
+                "head": "No adversary dominating the Middle East",
+                "body": "Keep oil, gas and chokepoints out of adversarial control, while avoiding “forever wars”"
+              },
+              {
+                "head": "Technology and standards",
+                "body": "U.S. technology and standards, especially in AI, biotech and quantum, drive the world forward"
+              }
+            ]
+          }
+        },
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.5"
+      },
+      {
+        "id": "d3",
+        "layout": "agenda",
+        "role": "What it can use (means)",
+        "title": "What it can use (means)",
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.6–7",
+        "content": {
+          "agenda": {
+            "items": [
+              {
+                "head": "What strategy is: connecting ends and means",
+                "ref": "d1",
+                "page": "p.4"
+              },
+              {
+                "head": "What the U.S. should want (ends)",
+                "ref": "d2",
+                "page": "p.6"
+              },
+              {
+                "head": "What it can use (means)",
+                "ref": "d3",
+                "page": "p.8"
+              },
+              {
+                "head": "The strategy: principles, priorities, regions",
+                "ref": "d4",
+                "page": "p.10"
+              },
+              {
+                "head": "What it asks of allies",
+                "ref": "d5",
+                "page": "p.17"
+              }
+            ],
+            "current": 2
+          }
+        }
+      },
+      {
+        "id": "c3a",
+        "layout": "grid",
+        "role": "What it can use (means)",
+        "title": "The aim is to tie together America's economic, financial, technological, military and geographic advantages",
+        "content": {
+          "grid": {
+            "cards": [
+              {
+                "head": "Political system",
+                "body": "Still nimble enough to course-correct"
+              },
+              {
+                "head": "Economy",
+                "body": "The largest and most innovative; market access is leverage"
+              },
+              {
+                "head": "Finance and the dollar",
+                "body": "Leading capital markets and the dollar's reserve status"
+              },
+              {
+                "head": "Technology",
+                "body": "Underpins the economy and gives the military a qualitative edge"
+              },
+              {
+                "head": "Military",
+                "body": "The world's most powerful and capable military"
+              },
+              {
+                "head": "Alliances",
+                "body": "Treaty allies and partners in the most important regions"
+              },
+              {
+                "head": "Geography and resources",
+                "body": "Abundant resources, no rival power in the Hemisphere, oceans as buffers"
+              },
+              {
+                "head": "Soft power",
+                "body": "Unmatched cultural influence"
+              },
+              {
+                "head": "The people",
+                "body": "Courage, willpower and patriotism"
+              }
+            ]
+          }
+        },
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.6–7"
+      },
+      {
+        "id": "d4",
+        "layout": "agenda",
+        "role": "The strategy: principles, priorities, regions",
+        "title": "The strategy: principles, priorities, regions",
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.8–29",
+        "content": {
+          "agenda": {
+            "items": [
+              {
+                "head": "What strategy is: connecting ends and means",
+                "ref": "d1",
+                "page": "p.4"
+              },
+              {
+                "head": "What the U.S. should want (ends)",
+                "ref": "d2",
+                "page": "p.6"
+              },
+              {
+                "head": "What it can use (means)",
+                "ref": "d3",
+                "page": "p.8"
+              },
+              {
+                "head": "The strategy: principles, priorities, regions",
+                "ref": "d4",
+                "page": "p.10"
+              },
+              {
+                "head": "What it asks of allies",
+                "ref": "d5",
+                "page": "p.17"
+              }
+            ],
+            "current": 3
+          }
+        }
+      },
+      {
+        "id": "c4a",
+        "layout": "grid",
+        "role": "The strategy: principles, priorities, regions",
+        "title": "Ten principles guide foreign, defense and intelligence policy, anchored in “America First” realism",
+        "content": {
+          "grid": {
+            "cards": [
+              {
+                "head": "Focused national interest",
+                "body": "To focus on everything is to focus on nothing"
+              },
+              {
+                "head": "Peace through strength",
+                "body": "Strength deters, and lets the U.S. broker peace"
+              },
+              {
+                "head": "Predisposition to non-intervention",
+                "body": "A high bar for justified intervention"
+              },
+              {
+                "head": "Flexible realism",
+                "body": "Good relations even with different systems"
+              },
+              {
+                "head": "Primacy of nations",
+                "body": "The nation-state, not transnational bodies"
+              },
+              {
+                "head": "Sovereignty and respect",
+                "body": "No outside interference or censorship"
+              },
+              {
+                "head": "Balance of power",
+                "body": "No nation may dominate globally or regionally"
+              },
+              {
+                "head": "Pro-American worker",
+                "body": "Pro-worker, not just pro-growth"
+              },
+              {
+                "head": "Fairness",
+                "body": "No more free-riding or imbalances"
+              },
+              {
+                "head": "Competence and merit",
+                "body": "Competence underpins prosperity and security"
+              }
+            ]
+          }
+        },
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.8–11"
+      },
+      {
+        "id": "c4b",
+        "layout": "grid",
+        "role": "The strategy: principles, priorities, regions",
+        "title": "Five priorities: borders, rights, burden-shifting, peace deals, economic security",
+        "content": {
+          "grid": {
+            "cards": [
+              {
+                "head": "The era of mass migration is over",
+                "body": "Border security is the primary element of national security"
+              },
+              {
+                "head": "Core rights and liberties",
+                "body": "Protect free speech and religion; hold abusers of power to account"
+              },
+              {
+                "head": "Burden-sharing and burden-shifting",
+                "body": "NATO's 5%-of-GDP Hague Commitment; the U.S. as convener and supporter"
+              },
+              {
+                "head": "Realignment through peace",
+                "body": "Presidential peace deals to extend influence and open markets"
+              },
+              {
+                "head": "Economic security",
+                "body": "Six pillars: balanced trade, supply chains, reindustrialization, defense industry, energy, finance"
+              }
+            ]
+          }
+        },
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.11–15"
+      },
+      {
+        "id": "c4c",
+        "layout": "grid",
+        "role": "The strategy: principles, priorities, regions",
+        "title": "It ranks the regions openly rather than treating every one alike",
+        "content": {
+          "grid": {
+            "cards": [
+              {
+                "head": "Western Hemisphere: first",
+                "body": "A “Trump Corollary” to the Monroe Doctrine: enlist friends, expand partners"
+              },
+              {
+                "head": "Asia: economics and deterrence",
+                "body": "Win the economic future, prevent military confrontation"
+              },
+              {
+                "head": "Europe: stand on its own",
+                "body": "Restore European “greatness” and primary responsibility for defense"
+              },
+              {
+                "head": "Middle East: shift burdens",
+                "body": "Shift burdens and build peace; no longer the constant priority"
+              },
+              {
+                "head": "Africa: from aid to investment",
+                "body": "Select partners; trade, investment, energy and critical minerals"
+              }
+            ]
+          }
+        },
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.15–29"
+      },
+      {
+        "id": "c4d",
+        "layout": "claim3",
+        "role": "The strategy: principles, priorities, regions",
+        "title": "In Asia it rebalances economic ties with China while hardening deterrence along the First Island Chain",
+        "content": {
+          "claim3": {
+            "points": [
+              {
+                "head": "Rebalance the economy",
+                "body": "Reciprocity and fairness with China; grow from $30T in 2025 to $40T in the 2030s"
+              },
+              {
+                "head": "Pool allied economic power",
+                "body": "Allies add $35T to America's $30T, over half the world economy; India and the Quad matter"
+              },
+              {
+                "head": "Taiwan and the First Island Chain",
+                "body": "Keep the declaratory policy against unilateral change; press allies to spend more and open ports"
+              }
+            ]
+          }
+        },
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.19–24"
+      },
+      {
+        "id": "c4e",
+        "layout": "compare",
+        "role": "The strategy: principles, priorities, regions",
+        "title": "In Europe, the Middle East and Africa, it shifts burdens to the region and pulls back",
+        "content": {
+          "compare": {
+            "columns": [
+              "Europe",
+              "Middle East",
+              "Africa"
+            ],
+            "rows": [
+              {
+                "label": "Diagnosis",
+                "cells": [
+                  "Losing share of world GDP; warns of “civilizational erasure”",
+                  "No longer the constant irritant it once was",
+                  "Policy has focused on spreading liberal ideology through aid"
+                ]
+              },
+              {
+                "label": "What the U.S. wants",
+                "cells": [
+                  "Stand on its own feet; a swift cessation of hostilities in Ukraine",
+                  "Gulf energy, open Hormuz and Red Sea, Israel secure",
+                  "Shift to trade and investment; energy and critical minerals"
+                ]
+              },
+              {
+                "label": "Main tools",
+                "cells": [
+                  "Trade, arms sales; end the perception of NATO as ever-expanding",
+                  "Expand the Abraham Accords; no nation-building wars",
+                  "Partner with capable states; avoid long-term presence"
+                ]
+              }
+            ],
+            "highlight": 0,
+            "takeaways": [
+              "In all three, the region is expected to carry more of the load"
+            ]
+          }
+        },
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.25–29"
+      },
+      {
+        "id": "kpi",
+        "layout": "kpi",
+        "role": "The strategy: principles, priorities, regions",
+        "title": "Four numbers carry the argument: allied defense, Europe's weight, U.S. growth, sea lanes",
+        "content": {
+          "kpi": {
+            "stats": [
+              {
+                "value": "2% → 5%",
+                "label": "NATO defense spending (share of GDP)",
+                "note": "The new Hague Commitment standard allies have endorsed"
+              },
+              {
+                "value": "25% → 14%",
+                "label": "Continental Europe's share of world GDP",
+                "note": "From 1990 to today"
+              },
+              {
+                "value": "$30T → $40T",
+                "label": "Size of the U.S. economy",
+                "note": "From 2025 to the 2030s, if growth holds"
+              },
+              {
+                "value": "1/3",
+                "label": "Global shipping through the South China Sea",
+                "note": "Why deterrence over Taiwan matters to the U.S. economy"
+              }
+            ]
+          }
+        },
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.i, 20, 23, 25"
+      },
+      {
+        "id": "d5",
+        "layout": "agenda",
+        "role": "What it asks of allies",
+        "title": "What it asks of allies",
+        "content": {
+          "agenda": {
+            "items": [
+              {
+                "head": "What strategy is: connecting ends and means",
+                "ref": "d1",
+                "page": "p.4"
+              },
+              {
+                "head": "What the U.S. should want (ends)",
+                "ref": "d2",
+                "page": "p.6"
+              },
+              {
+                "head": "What it can use (means)",
+                "ref": "d3",
+                "page": "p.8"
+              },
+              {
+                "head": "The strategy: principles, priorities, regions",
+                "ref": "d4",
+                "page": "p.10"
+              },
+              {
+                "head": "What it asks of allies",
+                "ref": "d5",
+                "page": "p.17"
+              }
+            ],
+            "current": 4
+          }
+        }
+      },
+      {
+        "id": "c5a",
+        "layout": "issue",
+        "role": "What it asks of allies",
+        "title": "Allies like Japan are asked for spending, capabilities, access and economic alignment",
+        "content": {
+          "issue": {
+            "pairs": [
+              {
+                "issue": "Spend more on defense and on capabilities for the First Island Chain (Japan and South Korea named)",
+                "action": "Check the effect on defense budgets, procurement and related industries"
+              },
+              {
+                "issue": "Wider U.S. access to ports and facilities; a hardened Western Pacific posture",
+                "action": "Map the effect on infrastructure, sites and logistics"
+              },
+              {
+                "issue": "Countries that align export controls get better treatment on trade, tech and procurement",
+                "action": "Review export controls, customers and technology partnerships"
+              },
+              {
+                "issue": "Counter China's overcapacity; secure critical minerals and supply chains",
+                "action": "Diversify sourcing; plan stock and substitutes for critical inputs"
+              }
+            ]
+          }
+        },
+        "source": "Source: U.S. National Security Strategy (Nov 2025), p.12, 21–24"
+      },
+      {
+        "id": "close",
+        "layout": "closing",
+        "role": "What it asks of allies",
+        "title": "Next, narrow to the three issues that matter most and check the text by owner",
+        "content": {
+          "closing": {
+            "asks": [
+              "Have defense, trade and procurement owners read pages 12 and 21–24 together",
+              "Rank the issues by impact and timing; pick the top three",
+              "Bring options and decision deadlines for those three"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "mix": {
+    "selected": [
+      "navy"
+    ],
+    "pins": {},
+    "offset": 0
+  }
+}

@@ -1,0 +1,4 @@
+We want to hire 12 engineers next fiscal year. This year we targeted 8 and have hired only 5.
+Offer acceptance through agencies is low at 40%. We are losing to competing SaaS companies on salary. It takes 3 weeks on average from interview to offer, and candidates accept other offers in the meantime.
+We are considering three measures. First, cut interviews to two rounds and get to an offer within one week. Second, pay a ¥300,000 bonus for referral hires. Third, publish a tech blog and host a meetup once a month for engineering outreach.
+We expect a budget of 1.3x this year's, or ¥18M. What we need the board to decide is whether to raise the salary bands and whether to approve the referral bonus.

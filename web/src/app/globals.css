@@ -665,3 +665,117 @@ button, a, input, select, textarea {
 [data-menu-shell] [data-slot="dropdown-menu-checkbox-item"]:focus {
   background-color: var(--surface-strong);
 }
+
+/* ============================================
+   Slides (Kata) — the presentation editor's chrome reads Alcon's tokens
+   through its own names, so it follows the app's look and light/dark theme.
+   Slide content keeps its look tokens (--s-*), set per deck.
+   ============================================ */
+@theme inline {
+  --color-k-paper: var(--k-paper);
+  --color-k-panel: var(--k-panel);
+  --color-k-panel-2: var(--k-panel-2);
+  --color-k-hover: var(--k-hover);
+  --color-k-selected: var(--k-selected);
+  --color-k-line: var(--k-line);
+  --color-k-line-strong: var(--k-line-strong);
+  --color-k-ink: var(--k-ink);
+  --color-k-ink-2: var(--k-ink-2);
+  --color-k-ink-3: var(--k-ink-3);
+  --color-k-lime: var(--k-lime);
+  --color-k-lime-deep: var(--k-lime-deep);
+  --color-k-danger: var(--k-danger);
+  --color-k-danger-tint: var(--k-danger-tint);
+  --color-k-on-danger: var(--k-on-danger);
+  --color-k-stage: var(--k-stage);
+  --color-k-chosen: var(--k-chosen);
+  --color-k-seg: var(--k-seg);
+  --color-k-bubble: var(--k-bubble);
+  --color-k-drop: var(--k-drop);
+  --color-k-primary: var(--k-primary);
+  --color-k-on-primary: var(--k-on-primary);
+  --color-k-check: var(--k-check);
+}
+:root {
+  --k-paper: var(--background);
+  --k-panel: var(--card);
+  --k-panel-2: var(--surface-muted);
+  --k-hover: var(--muted);
+  --k-selected: var(--surface-strong);
+  --k-line: var(--border);
+  --k-line-strong: var(--border-strong);
+  --k-ink: var(--foreground);
+  --k-ink-2: var(--text-secondary);
+  --k-ink-3: var(--muted-foreground);
+  --k-lime: var(--accent-default);
+  --k-lime-deep: var(--accent-default);
+  --k-danger: var(--destructive);
+  --k-danger-tint: color-mix(in srgb, var(--destructive) 12%, transparent);
+  --k-on-danger: #ffffff;
+  --k-stage: var(--background);
+  --k-chosen: color-mix(in srgb, var(--accent-default) 12%, transparent);
+  --k-seg: var(--muted);
+  --k-bubble: var(--muted);
+  --k-drop: color-mix(in srgb, var(--accent-default) 10%, transparent);
+  --k-primary: var(--primary);
+  --k-on-primary: var(--primary-foreground);
+  --k-check: var(--primary-foreground);
+  --shadow-slide: 0 1px 2px rgba(20, 20, 15, 0.06), 0 12px 32px -12px rgba(20, 20, 15, 0.18);
+  --shadow-pop: 0 1px 2px rgba(20, 20, 15, 0.08), 0 16px 40px -16px rgba(20, 20, 15, 0.28);
+}
+.kata-root .scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--k-line-strong) transparent;
+}
+/* In-place editing inside a slide */
+[data-edit="true"] {
+  border-radius: 2px;
+  transition: background-color 120ms;
+}
+[data-edit="true"]:hover {
+  background: color-mix(in srgb, var(--s-ink) 6%, transparent);
+}
+[data-edit="true"]:focus {
+  background: color-mix(in srgb, var(--s-accent) 18%, transparent);
+  outline: none;
+}
+[data-edit="true"]:empty::before {
+  content: attr(data-placeholder);
+  color: color-mix(in srgb, var(--s-ink) 35%, transparent);
+}
+/* A page whose text does not fit even when shrunk (shown in the editor only) */
+[data-editable="true"] [data-overflow="1"] {
+  outline: 2px dashed var(--k-danger);
+  outline-offset: 6px;
+}
+@keyframes kata-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.kata-root .anim-in {
+  animation: kata-in 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes kata-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+.kata-root .dot-pulse span { animation: kata-pulse 1s infinite; }
+.kata-root .dot-pulse span:nth-child(2) { animation-delay: 0.15s; }
+.kata-root .dot-pulse span:nth-child(3) { animation-delay: 0.3s; }
+/* Measured off screen so text shrinking applies to the printed pages too */
+.print-deck {
+  position: fixed;
+  left: -100000px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+/* Printing a deck (PDF export): only its slides, 16:9, one per page */
+@media print {
+  body:has(.print-deck) * { visibility: hidden; }
+  body:has(.print-deck) .print-deck,
+  body:has(.print-deck) .print-deck * { visibility: visible; }
+  body:has(.print-deck) .print-deck { position: absolute !important; left: 0; top: 0; }
+  body:has(.print-deck) .no-print { display: none !important; }
+  .print-slide { width: 1280px; height: 720px; break-after: page; overflow: hidden; }
+}
