@@ -27,6 +27,7 @@ import { type ElementUpdate, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW
 import { ElementCell, LabelChip } from './cells';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { statusLabel } from '@/shared/designTokens';
+import { isOverdue } from '@/Function/shared/dateUtils';
 
 // Memoised element row. All props are reference-stable across the common
 // re-render trigger (an element field edit changes only that element's `el`
@@ -80,7 +81,7 @@ export const ElementRow = memo(function ElementRow({
   allCustomColumns, blockers,
 }: ElementRowProps) {
   const { t, locale } = useI18n();
-  const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
+  const overdue = isOverdue(el.due_date, el.status === 'done');
   const showsActivityColumn = visibleColumns.some((c) => c.id === 'activity');
   const rowId = displayIdOf(el);
   // One shared 30s clock for the whole table; a lapsed lease disappears from
@@ -295,7 +296,7 @@ export const ElementRow = memo(function ElementRow({
           el={el}
           elementTypes={elementTypes}
           canUpdate={canUpdate}
-          isOverdue={!!isOverdue}
+          isOverdue={overdue}
           onElementUpdate={onElementUpdate}
           onRefresh={onRefresh}
           onAddType={canAddType ? onAddType : undefined}

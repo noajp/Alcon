@@ -36,6 +36,7 @@ import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/prefer
 import type { WidgetHost } from '../types';
 import { completionOf, isOpenStatus } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { parseDateOnly, toDateOnlyString, isOverdue } from '@/Function/shared/dateUtils';
 
 // =============================================================
 // Properties — the Object's typed metadata, as a rail island.
@@ -52,16 +53,6 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 // field per widget.
 // =============================================================
 
-// Date <-> 'YYYY-MM-DD'. Built from local Y/M/D parts, not Date.parse on a
-// bare ISO date, which would shift across timezones and select the wrong day.
-const toYMD = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const parseYMD = (s?: string | null): Date | undefined => {
-  if (!s) return undefined;
-  const [y, m, d] = s.split('T')[0].split('-').map(Number);
-  return y && m && d ? new Date(y, m - 1, d) : undefined;
-};
-
 export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
   const { t } = useI18n();
   const object = host.object;
@@ -70,10 +61,7 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
   const stats = useMemo(() => {
     const { done, total, pct } = completionOf(elements);
     const inProgress = elements.filter((e) => e.status === 'in_progress').length;
-    const overdue = elements.filter((e) => {
-      if (!e.due_date || !isOpenStatus(e.status)) return false;
-      return new Date(e.due_date) < new Date();
-    }).length;
+    const overdue = elements.filter((e) => isOpenStatus(e.status) && isOverdue(e.due_date)).length;
     return { total, done, inProgress, overdue, progress: pct };
   }, [elements]);
 
@@ -323,7 +311,7 @@ function SingleDatePickerRow({
 }) {
   const { t, locale } = useI18n();
   const display = value
-    ? (parseYMD(value) ?? new Date(value)).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' })
+    ? (parseDateOnly(value) ?? new Date(value)).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' })
     : unsetLabel;
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
   return (
@@ -345,9 +333,9 @@ function SingleDatePickerRow({
           captionLayout="dropdown"
           startMonth={new Date(2020, 0)}
           endMonth={new Date(2035, 11)}
-          defaultMonth={parseYMD(value) ?? new Date()}
-          selected={parseYMD(value)}
-          onSelect={(d?: Date) => onChange(d ? toYMD(d) : null)}
+          defaultMonth={parseDateOnly(value) ?? new Date()}
+          selected={parseDateOnly(value)}
+          onSelect={(d?: Date) => onChange(d ? toDateOnlyString(d) : null)}
           weekStartsOn={weekStartsOn}
         />
         <div className="flex items-center justify-between border-t border-border px-3 py-2">
@@ -361,7 +349,7 @@ function SingleDatePickerRow({
           <Button
             type="button"
             size="xs"
-            onClick={() => onChange(toYMD(new Date()))}
+            onClick={() => onChange(toDateOnlyString(new Date()))}
           >
             {t('Today')}
           </Button>

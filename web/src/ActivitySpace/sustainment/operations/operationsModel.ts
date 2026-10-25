@@ -1,3 +1,4 @@
+import { dateOnlyFromDayIndex, dayIndexOf } from '@/Function/shared/dateUtils';
 // Shared by the browser and Copilot. Inputs contain persisted Table values;
 // this module has no browser, database, or model dependency.
 type DataTableColumnType = 'text' | 'number' | 'date' | 'select' | 'checkbox';
@@ -124,17 +125,6 @@ export interface CRMAnalysis extends AnalysisSummary {
 
 export type OperationsAnalysis = CRMAnalysis;
 
-const DAY_MS = 86_400_000;
-/** UTC date-only arithmetic avoids daylight-saving and viewer-timezone drift. */
-function dayNumber(value: unknown): number | null {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const time = Date.parse(`${value}T00:00:00.000Z`);
-  return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value ? time / DAY_MS : null;
-}
-
-function addDays(day: number, days: number): string {
-  return new Date((day + days) * DAY_MS).toISOString().slice(0, 10);
-}
 
 function signal(code: string, severity: OperationsSignal['severity'], message: string): OperationsSignal {
   return { code, severity, message };
@@ -175,7 +165,7 @@ function rowReader(schema: OperationsSchema, params: OperationsParams, rowId: st
   const date = (key: string, required = false): string | null => {
     const input = value(key);
     if (missing(input)) { if (required) issues.push(`${label(key)} is missing.`); return null; }
-    if (dayNumber(input) === null) { issues.push(`${label(key)} must be a valid YYYY-MM-DD date.`); return null; }
+    if (dayIndexOf(input) === null) { issues.push(`${label(key)} must be a valid YYYY-MM-DD date.`); return null; }
     return input as string;
   };
   const currency = (): string | null => {
@@ -209,9 +199,9 @@ function summary(rows: OperationsRow[], today: string, horizonEnd: string, issue
 
 export function analyzeOperations(schema: OperationsSchema, rawParams: OperationsParams, today: string): OperationsAnalysis {
   const params = normalizeOperationsParams(rawParams);
-  const day = dayNumber(today);
+  const day = dayIndexOf(today);
   if (day === null) throw new Error('Analysis date must be a valid YYYY-MM-DD date.');
-  const horizonEnd = addDays(day, params.horizonDays);
+  const horizonEnd = dateOnlyFromDayIndex(day + params.horizonDays);
   const issues = schemaIssues(schema, params);
   const rows = schema.rows.map((row, index): CRMRowAnalysis => {
     const read = rowReader(schema, params, row.id);
@@ -226,17 +216,17 @@ export function analyzeOperations(schema: OperationsSchema, rawParams: Operation
     const closeDate = read.date('closeDate', stage === 'open');
     const lastContact = read.date('lastContact');
     const nextActionDate = read.date('nextActionDate');
-    if (lastContact && dayNumber(lastContact)! > day) read.issues.push('Last contact cannot be in the future.');
+    if (lastContact && dayIndexOf(lastContact)! > day) read.issues.push('Last contact cannot be in the future.');
     const valid = read.issues.length === 0;
     const signals: OperationsSignal[] = [];
     const weightedAmount = valid && stage === 'open' && amount !== null && probability !== null ? amount * (probability / 100) : null;
     if (valid && stage === 'open') {
-      if (closeDate && dayNumber(closeDate)! < day) signals.push(signal('close_overdue', 'high', `Close date ${closeDate} has passed; confirm the outcome or revise the date.`));
+      if (closeDate && dayIndexOf(closeDate)! < day) signals.push(signal('close_overdue', 'high', `Close date ${closeDate} has passed; confirm the outcome or revise the date.`));
       if (!nextActionDate) signals.push(signal('next_action_missing', 'medium', 'No next action is scheduled; agree the next contact and date.'));
-      else if (dayNumber(nextActionDate)! < day) signals.push(signal('next_action_overdue', 'high', `Next action was due ${nextActionDate}; follow up and update the plan.`));
+      else if (dayIndexOf(nextActionDate)! < day) signals.push(signal('next_action_overdue', 'high', `Next action was due ${nextActionDate}; follow up and update the plan.`));
       else if (nextActionDate === today) signals.push(signal('next_action_today', 'medium', 'Next action is due today.'));
       if (!lastContact) signals.push(signal('contact_missing', 'medium', 'Last contact is missing; verify the relationship status.'));
-      else if (day - dayNumber(lastContact)! >= params.followUpDays) signals.push(signal('contact_stale', 'medium', `${day - dayNumber(lastContact)!} days since contact (threshold ${params.followUpDays}); confirm progress.`));
+      else if (day - dayIndexOf(lastContact)! >= params.followUpDays) signals.push(signal('contact_stale', 'medium', `${day - dayIndexOf(lastContact)!} days since contact (threshold ${params.followUpDays}); confirm progress.`));
     }
     return { rowId: row.id, name, account, stageId: stageValue, stage, amount, probability, weightedAmount, currency, closeDate, lastContact, nextActionDate, valid, issues: read.issues, signals, priority: priority(signals, valid) };
   });

@@ -12,7 +12,7 @@ import { CrmIcon } from '@/Function/shared/conceptIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useStrategies } from '@/ActivitySpace/strategy/initiative/strategyData';
 import type { Crm, CrmDealPatch } from '@/hooks/useCrm';
-import { ACTIVITY_TYPES, DEAL_ROLES, fieldsFor, LOST_STAGE, shiftDate, stageChange, WON_STAGE, type CrmActivityType, type CrmDeal, type CrmDealRole, type CrmStage } from './crmModel';
+import { ACTIVITY_TYPES, DEAL_ROLES, fieldsFor, LOST_STAGE, stageChange, WON_STAGE, type CrmActivityType, type CrmDeal, type CrmDealRole, type CrmStage } from './crmModel';
 import { aiBrief, aiEmail, useCrmAi, type DealBrief, type DealEmail } from './crmAi';
 import { HealthBadge, historyLine, money, relativeDay, ROLE_LABEL } from './crmFormat';
 import { StartRenewal } from './CrmToday';
@@ -20,6 +20,7 @@ import { CrmPicker } from './CrmPicker';
 import { CustomFields, EditableText, Property } from './CrmFields';
 import { CrmRecordPage, RecordSection } from './CrmRecordPage';
 import { CrmRelatedWork } from './CrmRelatedWork';
+import { shiftDateOnly } from '@/Function/shared/dateUtils';
 
 const ACTIVITY_LABEL: Record<CrmActivityType, string> = { call: 'Call', email: 'Mail', meeting: 'Meeting', note: 'Memo' };
 
@@ -88,7 +89,7 @@ function NextStep({ crm, deal }: { crm: Crm; deal: CrmDeal }) {
       {due && <span className={`text-xs ${due < today ? 'text-[var(--status-danger)]' : 'text-muted-foreground'}`}>{relativeDay(due, today, locale, t)}</span>}
       <ButtonAppearanceProvider appearance="inline">
         {[[1, 'Tomorrow'], [3, '+3 days'], [7, 'Next week']].map(([days, label]) => <Button key={label} variant="ghost" size="xs" disabled={busy}
-          onClick={() => { const next = shiftDate(today, days as number); setDue(next); if (title.trim()) void save(next); }}>{t(label as string)}</Button>)}
+          onClick={() => { const next = shiftDateOnly(today, days as number); setDue(next); if (title.trim()) void save(next); }}>{t(label as string)}</Button>)}
       </ButtonAppearanceProvider>
       {dirty && <Button size="xs" variant="primary" disabled={busy || !title.trim()} onClick={() => void save()}>{element ? t('Update next step') : t('Set next step')}</Button>}
       {(deal.nextStep || deal.nextActionDate) && !dirty && <Button size="xs" variant="ghost" disabled={busy} onClick={() => void done()}><Check size={12} />{t('Mark done')}</Button>}
@@ -270,7 +271,7 @@ export function CrmDealPage({ crm, deal, onBack, onOpenPipeline, onCapture, onOp
       {brief && <div className="max-w-2xl space-y-2 text-[13px] leading-relaxed">
         <p>{brief.summary}</p>
         {brief.nextStep && <div className="flex flex-wrap items-center gap-2"><span className="font-medium">{t('Recommended')}:</span><span>{brief.nextStep}</span>
-          {open && <Button size="xs" variant="ghost" disabled={busy} onClick={() => void run(() => crm.setNextStep(deal, { title: brief.nextStep.slice(0, 280), due: deal.nextActionDate ?? shiftDate(today, 1) })).catch(() => {})}>{t('Use as next step')}</Button>}</div>}
+          {open && <Button size="xs" variant="ghost" disabled={busy} onClick={() => void run(() => crm.setNextStep(deal, { title: brief.nextStep.slice(0, 280), due: deal.nextActionDate ?? shiftDateOnly(today, 1) })).catch(() => {})}>{t('Use as next step')}</Button>}</div>}
         {brief.risks.length > 0 && <div><p className="text-xs text-muted-foreground">{t('Risks')}</p><ul className="list-inside list-disc">{brief.risks.map(risk => <li key={risk}>{risk}</li>)}</ul></div>}
         {brief.questions.length > 0 && <div><p className="text-xs text-muted-foreground">{t('Ask the buyer')}</p><ul className="list-inside list-disc">{brief.questions.map(question => <li key={question}>{question}</li>)}</ul></div>}
       </div>}

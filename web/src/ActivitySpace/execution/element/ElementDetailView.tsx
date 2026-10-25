@@ -100,19 +100,8 @@ import { LinkedNoteEmbed } from '@/ActivitySpace/sustainment/notebook/LinkedNote
 import { logActivity, useElementActivityLog, invalidateElementActivity, mergeActivity, type ActivityKind } from './elementActivity';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
-import { formatElementDate } from '@/Function/shared/dateUtils';
+import { formatElementDate, parseDateOnly, toDateOnlyString, formatAge } from '@/Function/shared/dateUtils';
 import { ElementIcon, MessageIcon } from '@/Function/shared/conceptIcons';
-
-// Date <-> 'YYYY-MM-DD' helpers for the range picker. Built from local
-// Y/M/D parts (not Date.parse of a bare ISO date, which would shift across
-// timezones and select the wrong day).
-const toYMD = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const parseYMD = (s?: string | null): Date | undefined => {
-  if (!s) return undefined;
-  const [y, m, d] = s.split('T')[0].split('-').map(Number);
-  return y && m && d ? new Date(y, m - 1, d) : undefined;
-};
 
 interface ElementDetailViewProps {
   /** A notification reader stacks supplementary properties below the activity. */
@@ -140,8 +129,6 @@ interface ElementDetailViewProps {
   coordinationSpaceId?: string | null;
   onOpenElement?: (elementId: string) => void;
 }
-
-
 
 /** Dependencies can be followed from every detail host, including Inbox and Calendar. */
 export function ElementDetailView(props: ElementDetailViewProps) {
@@ -174,7 +161,6 @@ function ElementDetailRoute(props: ElementDetailViewProps) {
     onRefresh={() => { if (relatedId) void related.refetch(); props.onRefresh?.(); }} />;
 }
 
-
 // ============================================
 // Status & Priority options
 // ============================================
@@ -205,17 +191,6 @@ const priorityOptions = [
 // ============================================
 // Relative time formatter
 // ============================================
-function timeAgo(date: Date, t: (message: string, values?: Record<string, string | number>) => string): string {
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return t('just now');
-  if (minutes < 60) return t('{n}m ago', { n: minutes });
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return t('{n}h ago', { n: hours });
-  const days = Math.floor(hours / 24);
-  return t('{n}d ago', { n: days });
-}
 
 // ============================================
 // Main Component
@@ -1019,7 +994,6 @@ function ElementDetailBody({
             />
           )}
 
-
           {/* Linked Elements */}
           {(edges.incoming.length > 0 || edges.outgoing.length > 0) && (
             <PageSection title={t('Linked Elements')}>
@@ -1191,14 +1165,14 @@ function ElementDetailBody({
                     captionLayout="dropdown"
                     startMonth={new Date(2020, 0)}
                     endMonth={new Date(2035, 11)}
-                    defaultMonth={parseYMD(element.start_date) ?? parseYMD(element.due_date)}
+                    defaultMonth={parseDateOnly(element.start_date) ?? parseDateOnly(element.due_date)}
                     selected={{
-                      from: parseYMD(element.start_date),
-                      to: parseYMD(element.due_date),
+                      from: parseDateOnly(element.start_date),
+                      to: parseDateOnly(element.due_date),
                     }}
                     onSelect={(range: DateRange | undefined) => {
-                      handleDateChange('start_date', range?.from ? toYMD(range.from) : '');
-                      handleDateChange('due_date', range?.to ? toYMD(range.to) : '');
+                      handleDateChange('start_date', range?.from ? toDateOnlyString(range.from) : '');
+                      handleDateChange('due_date', range?.to ? toDateOnlyString(range.to) : '');
                     }}
                     weekStartsOn={weekStartsOn}
                   />
@@ -1215,7 +1189,7 @@ function ElementDetailBody({
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDateChange('start_date', toYMD(new Date()))}
+                      onClick={() => handleDateChange('start_date', toDateOnlyString(new Date()))}
                       className="text-[12px] text-primary hover:underline"
                     >
                       {t('Today')}
@@ -1750,7 +1724,7 @@ function ActivityFeed({
                   <span className="text-foreground/80">{entry.detail}</span>
                 </p>
                 <span className={compact ? 'text-[10px] text-muted-foreground' : 'text-[10.5px] text-muted-foreground'}>
-                  {entry.author} · {timeAgo(entry.createdAt, t)}
+                  {entry.author} · {formatAge(entry.createdAt, true)}
                 </span>
               </div>
             </div>

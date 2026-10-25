@@ -9,9 +9,10 @@ import { MenuShell, MENU_ROW } from '@/Function/shared/menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useCrm } from '@/hooks/useCrm';
 import { HealthBadge, money, relativeDay } from '@/ActivitySpace/sustainment/crm/crmFormat';
-import { LOST_STAGE, WON_STAGE, shiftDate, stageChange, type CrmDeal, type CrmWorkspace } from '@/ActivitySpace/sustainment/crm/crmModel';
+import { LOST_STAGE, WON_STAGE, stageChange, type CrmDeal, type CrmWorkspace } from '@/ActivitySpace/sustainment/crm/crmModel';
 import { useWidgetMeta } from '../WidgetFrame';
 import type { WidgetProps } from '../types';
+import { shiftDateOnly } from '@/Function/shared/dateUtils';
 
 function findDeal(workspaces: readonly CrmWorkspace[], dealId: string | null): { deal: CrmDeal; ws: CrmWorkspace } | null {
   for (const ws of workspaces) {
@@ -144,7 +145,7 @@ export function CrmDealWidget({ params, setParams, host }: WidgetProps) {
         <Row label={t('Owner')}>{deal.ownerName ?? '—'}</Row>
         <Row label={t('Next step')}>
           <NextStep deal={deal} disabled={!editable} placeholder={t('What happens next')}
-            onSave={(title) => void run(() => crm.setNextStep(deal, { title, due: deal.nextActionDate ?? shiftDate(ws.today, 1) }))} />
+            onSave={(title) => void run(() => crm.setNextStep(deal, { title, due: deal.nextActionDate ?? shiftDateOnly(ws.today, 1) }))} />
         </Row>
       </div>
       {notice && <p className="px-1 text-xs text-muted-foreground">{notice}</p>}

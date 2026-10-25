@@ -7,9 +7,10 @@ import { FONT } from '@/shared/designTokens';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell, MENU_ROW } from '@/Function/shared/menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { forecastFor, inList, shiftDate, todayQueue, upcoming, type CrmDeal, type CrmUrgency, type CrmWorkspace } from './crmModel';
+import { forecastFor, inList, todayQueue, upcoming, type CrmDeal, type CrmUrgency, type CrmWorkspace } from './crmModel';
 import { HealthDot, money, relativeDay } from './crmFormat';
 import type { Crm } from '@/hooks/useCrm';
+import { shiftDateOnly } from '@/Function/shared/dateUtils';
 
 const GROUPS: { id: CrmUrgency; label: string }[] = [
   { id: 'overdue', label: 'Overdue' }, { id: 'today', label: 'Today' }, { id: 'soon', label: 'This week' }, { id: 'plan', label: 'Needs a plan' },
@@ -50,7 +51,7 @@ function Snooze({ deal, crm }: { deal: CrmDeal; crm: Crm }) {
   // Moving the date moves the Element when the next step is one.
   const move = async (days: number) => {
     setSaving(true);
-    const due = shiftDate(crm.today, days);
+    const due = shiftDateOnly(crm.today, days);
     try { await (deal.nextStep ? crm.setNextStep(deal, { title: deal.nextStep, due }) : crm.saveDeal(deal.id, { nextStepOn: due })); } finally { setSaving(false); }
   };
   return <DropdownMenu>

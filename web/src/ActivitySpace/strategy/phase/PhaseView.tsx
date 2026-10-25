@@ -30,7 +30,7 @@ import {
   type PhaseReschedule,
   useDomains,
 } from '@/hooks/useSupabase';
-import { formatElementDate } from '@/Function/shared/dateUtils';
+import { formatElementDate, formatDateOnly, parseDateOnly } from '@/Function/shared/dateUtils';
 import type { PhaseStatus } from '@/types/database';
 import { PhaseCloseDialog } from './PhaseCloseDialog';
 import { seedPhaseDates, lastPhaseEndOf, todayKey } from './phaseDefaults';
@@ -55,23 +55,9 @@ import {
 
 type PhaseMembers = Awaited<ReturnType<typeof fetchPhaseCandidates>>;
 
-// 'YYYY-MM-DD' → "Jul 14" (local, no timezone drift on bare dates).
-function fmtDate(s: string | null, locale: string): string | null {
-  if (!s) return null;
-  const [y, m, d] = s.split('T')[0].split('-').map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d).toLocaleDateString(locale, { month: 'short', day: 'numeric' });
-}
-
-// 'YYYY-MM-DD' → local Date at midnight (no timezone drift on bare dates).
-function parseYMD(s: string): Date {
-  const [y, m, d] = s.split('T')[0].split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
 // "Jul\n16" — the two-line boundary label on the timeline rail.
 function railLabel(s: string, locale: string): string {
-  const d = parseYMD(s);
+  const d = parseDateOnly(s)!;
   return `${d.toLocaleDateString(locale, { month: 'short' })}\n${d.getDate()}`;
 }
 
@@ -106,7 +92,7 @@ function phaseMetrics(p: Phase, members: PhaseMembers) {
 function weekdaysLeft(end: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const endD = parseYMD(end);
+  const endD = parseDateOnly(end)!;
   let n = 0;
   for (const t = new Date(today); t <= endD; t.setDate(t.getDate() + 1)) {
     const dow = t.getDay();
@@ -503,11 +489,11 @@ function PhaseDetailView({
             </span>
             {standing === 'out_of_time' && phase.end_date && (
               <span className="text-[12px] text-[var(--status-warning)]">
-                {t('Ran past {date} without being closed', { date: fmtDate(phase.end_date, locale) ?? '' })}
+                {t('Ran past {date} without being closed', { date: formatDateOnly(phase.end_date, locale) ?? '' })}
               </span>
             )}
             {standing === 'complete' && phase.closed_at && (
-              <span className="text-[12px] text-muted-foreground">{t('Closed {date}', { date: fmtDate(phase.closed_at, locale) ?? '' })}</span>
+              <span className="text-[12px] text-muted-foreground">{t('Closed {date}', { date: formatDateOnly(phase.closed_at, locale) ?? '' })}</span>
             )}
           </div>
 
@@ -558,7 +544,7 @@ function PhaseDetailView({
                 <ObjectIcon size={13} className="text-muted-foreground shrink-0" />
                 <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{o.name}</span>
                 {o.due_date && (
-                  <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">{fmtDate(o.due_date, locale)}</span>
+                  <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">{formatDateOnly(o.due_date, locale)}</span>
                 )}
                 <button
                   type="button"
@@ -642,7 +628,7 @@ function PhaseDetailView({
                   </span>
                 )}
                 {el.due_date && (
-                  <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">{fmtDate(el.due_date, locale)}</span>
+                  <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">{formatDateOnly(el.due_date, locale)}</span>
                 )}
                 <button
                   type="button"

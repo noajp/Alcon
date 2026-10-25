@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { parseDateOnly, toDateOnlyString, fromDateOnlyString, shiftDateOnly, dayNumberOf } from '@/Function/shared/dateUtils';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { parseDateOnly, toDateOnlyString, fromDateOnlyString, shiftDateOnly, dayNumberOf, dayNumberIfDate, dayIndexOf, dateOnlyFromDayIndex, isOverdue, daysUntil, daysOverdue } from '@/Function/shared/dateUtils';
 import { STATUS, PRIORITY, STATUS_ORDER, PRIORITY_ORDER } from '@/shared/designTokens';
 import { labelForStatus, labelForPriority, priorityWeight } from '@/Function/shared/listControls/types';
 
@@ -75,5 +75,45 @@ describe('moving a calendar day', () => {
     const moved = { start: shiftDateOnly(start, shift), due: shiftDateOnly(due, shift) };
     expect(moved).toEqual({ start: '2026-09-08', due: '2026-09-29' });
     expect(dayNumberOf(moved.due) - dayNumberOf(moved.start)).toBe(dayNumberOf(due) - dayNumberOf(start));
+  });
+});
+
+describe('due dates are calendar days', () => {
+  afterEach(() => { vi.useRealTimers(); });
+  // 2026-09-10 at 15:00 local — late enough that a UTC-midnight parse of the
+  // due day would already lie in the past in any zone east of Greenwich.
+  const now = () => { vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 8, 10, 15)); };
+
+  it('is not overdue on the due day itself, and is the day after', () => {
+    now();
+    expect(isOverdue('2026-09-10')).toBe(false);
+    expect(isOverdue('2026-09-09')).toBe(true);
+    expect(isOverdue('2026-09-09', true)).toBe(false);
+    expect(isOverdue(null)).toBe(false);
+  });
+
+  it('counts whole days either side of today', () => {
+    now();
+    expect(daysUntil('2026-09-10')).toBe(0);
+    expect(daysUntil('2026-09-11')).toBe(1);
+    expect(daysOverdue('2026-09-07')).toBe(3);
+    expect(daysOverdue('2026-09-12')).toBe(0);
+  });
+});
+
+describe('strict day indexes', () => {
+  it('reads only real fixed-width days and round-trips them', () => {
+    expect(dayIndexOf('2026-02-30')).toBeNull();
+    expect(dayIndexOf('2026-2-3')).toBeNull();
+    expect(dayIndexOf('2026-09-10T00:00:00Z')).toBeNull();
+    expect(dayIndexOf(42)).toBeNull();
+    const day = dayIndexOf('2024-02-29')!;
+    expect(dateOnlyFromDayIndex(day + 1)).toBe('2024-03-01');
+    expect(day).toBe(dayNumberOf('2024-02-29'));
+  });
+
+  it('reads the date part of a timestamp when asked to', () => {
+    expect(dayNumberIfDate('2026-09-10T08:00:00Z')).toBe(dayNumberOf('2026-09-10'));
+    expect(dayNumberIfDate('soon')).toBeNull();
   });
 });

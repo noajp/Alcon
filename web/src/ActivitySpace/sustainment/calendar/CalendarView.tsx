@@ -1,6 +1,6 @@
 'use client';
 
-import { parseDateOnly, toDateOnlyString as fmtDateOnly, dayNumberOf, shiftDateOnly } from '@/Function/shared/dateUtils';
+import { toDateOnlyString as fmtDateOnly, dayNumberOf, shiftDateOnly, isSameDay, isOverdue as isDueDayPast } from '@/Function/shared/dateUtils';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { CalendarPlus, ChevronLeft, ChevronRight, ChevronDown, X } from 'lucide-react';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
@@ -29,7 +29,6 @@ interface CalendarViewProps {
 }
 
 type CalendarMode = 'day' | 'week' | 'month';
-
 
 // Soft card pair per status — the subtle ground plus the status hue, straight
 // off the STATUS table so a calendar card and a list-row mark agree.
@@ -90,14 +89,6 @@ function parseTimeToMinutes(timeStr: string | null | undefined): number | null {
   const parts = timeStr.split(':').map(Number);
   if (parts.length < 2 || parts.some(n => Number.isNaN(n))) return null;
   return parts[0] * 60 + parts[1];
-}
-
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
 }
 
 function formatHourLabel(locale: string, hour: number): string {
@@ -249,11 +240,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
     }
   };
 
-  const isOverdue = (element: CalendarEntry): boolean => {
-    const due = parseDateOnly(element.due_date, null);
-    if (!due || element.status === 'done') return false;
-    return due < new Date(new Date().setHours(0, 0, 0, 0));
-  };
+  const isOverdue = (element: CalendarEntry): boolean => isDueDayPast(element.due_date, element.status === 'done');
 
   const scheduleOn = async (element: CalendarEntry, date: Date) => {
     if (!element.element) return;
