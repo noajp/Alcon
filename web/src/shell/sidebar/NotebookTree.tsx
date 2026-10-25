@@ -172,11 +172,6 @@ export function NotebookTree({
             </div>
           );
         })}
-        {folders.length === 0 && (
-          <div className="px-2.5 py-6 text-[11px] text-muted-foreground/60 leading-relaxed">
-            {t('No notebooks yet — click + to add one.')}
-          </div>
-        )}
       </div>
     </div>
   );

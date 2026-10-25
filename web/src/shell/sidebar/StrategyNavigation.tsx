@@ -32,7 +32,7 @@ export function StrategyNavigation({ visions, activeVisionId, activeView, onSele
   }
   const { icon: VisionIcon } = VIEW_REGISTRY.vision;
   if (visions.length === 0) {
-    return <div className="px-2.5 py-6 text-[11px] leading-relaxed text-muted-foreground/60">{t('No Vision yet — click + to add one.')}</div>;
+    return null;
   }
   return <nav aria-label={t('Strategy')} className="mb-1 mt-1">
     {visions.map((vision) => {
