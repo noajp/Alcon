@@ -133,8 +133,10 @@ describe('Copilot operations diagnosis', () => {
 });
 
 describe('the model the Copilot edge function imports by path', () => {
-  it('stays free of imports, which Deno could not resolve', () => {
+  it('stays free of imports and re-exports, which Deno could not resolve', () => {
     const source = readFileSync(new URL('../src/Function/operations/operationsModel.ts', import.meta.url), 'utf8');
     expect(source).not.toMatch(/^\s*import\s/m);
+    expect(source).not.toMatch(/\bfrom\s*['"]/);
+    expect(source).not.toMatch(/\bimport\s*\(/);
   });
 });

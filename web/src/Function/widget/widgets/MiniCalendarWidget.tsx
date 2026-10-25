@@ -18,7 +18,7 @@ export function MiniCalendarWidget({ elements }: { elements: ElementWithDetails[
     const map = new Map<string, ElementWithDetails[]>();
     for (const el of elements) {
       if (!el.due_date) continue;
-      const key = format(new Date(el.due_date), 'yyyy-MM-dd');
+      const key = el.due_date.slice(0, 10);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(el);
     }

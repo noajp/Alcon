@@ -22,12 +22,9 @@ export const COLOR_ALLOWLIST = [
   'src/app/globals.css',
   'src/shared/designTokens.ts',
   'src/Function/shared/labelColor.ts',
-  'src/Function/property/builtInColumns.ts',
   'src/Function/settings/AppearanceSettings.tsx',
   // Theme-preview swatch data feeding SettingsView.tsx's theme picker.
   'src/Function/settings/appearanceOptions.ts',
-  // Random pastel for a freshly-typed Select/Status option.
-  'src/Function/property/optionColorPalette.ts',
   // Calendar's event-color picker — same shape as labelColor.ts.
   'src/ActivitySpace/sustainment/calendar/calendarColorPalette.ts',
   // CustomView.tsx's two color schemes (fixed flag-type legend + the draw

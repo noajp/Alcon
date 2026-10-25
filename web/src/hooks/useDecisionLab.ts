@@ -13,7 +13,6 @@ import type {
 } from '@/types/database';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 
-export { readAllPages as readAllPages } from '@/hooks/readAllPages';
 
 export interface DecisionLabData {
   elements: ElementWithDetails[];

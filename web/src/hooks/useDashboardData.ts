@@ -3,6 +3,7 @@ import { isBefore, addDays, startOfDay } from 'date-fns';
 import { STATUS, PRIORITY, STATUS_ORDER, PRIORITY_ORDER, priorityColor, statusColor } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
 import { completionOf } from '@/Function/shared/completion';
+import { parseDateOnly } from '@/Function/shared/dateUtils';
 
 interface StatusCount {
   status: string;
@@ -96,7 +97,8 @@ export function useDashboardData(elements: ElementWithDetails[]): DashboardData 
     for (const el of elements) {
       if (!el.due_date || el.status === 'done' || (el.status as string) === 'cancelled') continue;
 
-      const due = startOfDay(new Date(el.due_date));
+      const due = parseDateOnly(el.due_date);
+      if (!due) continue;
 
       if (isBefore(due, today)) {
         overdueElements.push(el);

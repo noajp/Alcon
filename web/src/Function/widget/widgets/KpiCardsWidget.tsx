@@ -5,6 +5,7 @@ import { useDashboardData } from '@/hooks/useDashboardData';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
+import { daysOverdue } from '@/Function/shared/dateUtils';
 
 interface Props { elements: ElementWithDetails[]; }
 
@@ -30,7 +31,7 @@ export function KpiCardsWidget({ elements }: Props) {
   const todoCount = useMemo(() => elements.filter(e => e.status === 'todo').length, [elements]);
   const recentDone = useMemo(() => elements.filter(e => {
     if (e.status !== 'done' || !e.due_date) return false;
-    return differenceInDays(new Date(), new Date(e.due_date)) <= 14;
+    return daysOverdue(e.due_date) <= 14;
   }).length, [elements]);
   const hoursEfficiency = totalEstimated > 0 ? Math.round((totalActual / totalEstimated) * 100) : null;
   const oldest = overdueElements[0]?.due_date;

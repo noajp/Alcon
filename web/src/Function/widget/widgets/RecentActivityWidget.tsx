@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { ElementWithDetails } from '@/types/database';
+import { parseDateOnly } from '@/Function/shared/dateUtils';
 
 interface Props {
   elements: ElementWithDetails[];
@@ -48,7 +49,7 @@ export function RecentActivityWidget({ elements }: Props) {
           id: `${el.id}-done`,
           kind: 'completed',
           element: el,
-          date: new Date(el.due_date),
+          date: parseDateOnly(el.due_date)!,
         });
       }
       // Treat updated_at as recent change signal

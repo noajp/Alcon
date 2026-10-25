@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { addDays } from '@/Function/shared/dateUtils';
+import { addDays, parseDateOnly } from '@/Function/shared/dateUtils';
 
 export function MiniGanttWidget({ elements }: { elements: ElementWithDetails[] }) {
   const { t } = useI18n();
@@ -18,8 +18,8 @@ export function MiniGanttWidget({ elements }: { elements: ElementWithDetails[] }
       return { start: today, end: addDays(today, 30) };
     }
     const dates = elementsWithDates.flatMap(e => [
-      new Date(e.start_date!).getTime(),
-      new Date(e.due_date!).getTime(),
+      parseDateOnly(e.start_date)!.getTime(),
+      parseDateOnly(e.due_date)!.getTime(),
     ]);
     const min = new Date(Math.min(...dates));
     const max = new Date(Math.max(...dates));
@@ -38,8 +38,8 @@ export function MiniGanttWidget({ elements }: { elements: ElementWithDetails[] }
   return (
     <div className="space-y-1 max-h-[280px] overflow-y-auto pr-2">
       {elementsWithDates.map(el => {
-        const start = new Date(el.start_date!);
-        const end = new Date(el.due_date!);
+        const start = parseDateOnly(el.start_date)!;
+        const end = parseDateOnly(el.due_date)!;
         const startPct = ((start.getTime() - dateRange.start.getTime()) / (dateRange.end.getTime() - dateRange.start.getTime())) * 100;
         const widthPct = Math.max(2, ((end.getTime() - start.getTime()) / (dateRange.end.getTime() - dateRange.start.getTime())) * 100);
         const color = SEMANTIC_COLORS.status[el.status as keyof typeof SEMANTIC_COLORS.status] || SEMANTIC_COLORS.status.todo;
