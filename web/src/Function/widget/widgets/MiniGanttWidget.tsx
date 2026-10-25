@@ -8,7 +8,11 @@ import { addDays, parseDateOnly } from '@/Function/shared/dateUtils';
 export function MiniGanttWidget({ elements }: { elements: ElementWithDetails[] }) {
   const { t } = useI18n();
   const elementsWithDates = useMemo(
-    () => elements.filter(e => e.start_date && e.due_date).slice(0, 12),
+    () => elements.flatMap((el) => {
+      const start = parseDateOnly(el.start_date);
+      const end = parseDateOnly(el.due_date);
+      return start && end ? [{ el, start, end }] : [];
+    }).slice(0, 12),
     [elements]
   );
 
@@ -17,10 +21,7 @@ export function MiniGanttWidget({ elements }: { elements: ElementWithDetails[] }
       const today = new Date();
       return { start: today, end: addDays(today, 30) };
     }
-    const dates = elementsWithDates.flatMap(e => [
-      parseDateOnly(e.start_date)!.getTime(),
-      parseDateOnly(e.due_date)!.getTime(),
-    ]);
+    const dates = elementsWithDates.flatMap(({ start, end }) => [start.getTime(), end.getTime()]);
     const min = new Date(Math.min(...dates));
     const max = new Date(Math.max(...dates));
     min.setDate(min.getDate() - 2);
@@ -37,9 +38,7 @@ export function MiniGanttWidget({ elements }: { elements: ElementWithDetails[] }
 
   return (
     <div className="space-y-1 max-h-[280px] overflow-y-auto pr-2">
-      {elementsWithDates.map(el => {
-        const start = parseDateOnly(el.start_date)!;
-        const end = parseDateOnly(el.due_date)!;
+      {elementsWithDates.map(({ el, start, end }) => {
         const startPct = ((start.getTime() - dateRange.start.getTime()) / (dateRange.end.getTime() - dateRange.start.getTime())) * 100;
         const widthPct = Math.max(2, ((end.getTime() - start.getTime()) / (dateRange.end.getTime() - dateRange.start.getTime())) * 100);
         const color = SEMANTIC_COLORS.status[el.status as keyof typeof SEMANTIC_COLORS.status] || SEMANTIC_COLORS.status.todo;

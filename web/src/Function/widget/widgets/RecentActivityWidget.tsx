@@ -44,12 +44,13 @@ export function RecentActivityWidget({ elements }: Props) {
     const entries: ActivityEntry[] = [];
     for (const el of elements) {
       // Done elements with a recent due_date count as 'completed'
-      if (el.status === 'done' && el.due_date) {
+      const due = el.status === 'done' ? parseDateOnly(el.due_date) : undefined;
+      if (due) {
         entries.push({
           id: `${el.id}-done`,
           kind: 'completed',
           element: el,
-          date: parseDateOnly(el.due_date)!,
+          date: due,
         });
       }
       // Treat updated_at as recent change signal
