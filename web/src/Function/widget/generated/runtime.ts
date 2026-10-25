@@ -73,16 +73,21 @@ if(typeof ResizeObserver==='function'&&document.body){
  let lastWidth=window.innerWidth;
  let lastContent=0;
  let sizedToFrame=false;
+ let frameOffset=0;
  const report=()=>{
   let height=__alconContentHeight();
   const viewport=window.innerHeight;
-  // A width change reflows the content, which can line up with a height change
-  // by chance; judge afresh at the new width rather than keep a stale verdict.
-  if(window.innerWidth!==lastWidth){lastWidth=window.innerWidth;sizedToFrame=false;}
+  // A width change reflows the content. Content sized to the frame keeps the
+  // same distance from the frame's bottom at any width; content that only
+  // lined up with a height change by chance does not, and is released.
+  if(window.innerWidth!==lastWidth){
+   lastWidth=window.innerWidth;
+   if(sizedToFrame&&Math.abs((height-viewport)-frameOffset)>1)sizedToFrame=false;
+  }
   // Content that grew by exactly as much as the frame just did is sized to the
   // frame (100vh), not to what it holds: asking for more would grow it forever.
   if(viewport!==lastViewport){
-   if(lastContent&&viewport>lastViewport&&Math.abs((height-lastContent)-(viewport-lastViewport))<=1)sizedToFrame=true;
+   if(lastContent&&viewport>lastViewport&&Math.abs((height-lastContent)-(viewport-lastViewport))<=1){sizedToFrame=true;frameOffset=height-viewport;}
    lastViewport=viewport;
   }
   lastContent=height;
