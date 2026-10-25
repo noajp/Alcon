@@ -9,14 +9,15 @@ export function useDeckView() {
   const file = useActiveFile();
   const current = useKata((s) => s.current);
   const looks = useLookMap();
+  const preview = useKata((s) => s.previewLook);
   return useMemo(() => {
     if (!file) return null;
     const deck = file.deck;
     const roles = effectiveRoles(deck);
-    const tokens = mixTokens(file.mix, looks);
+    const tokens = preview && looks[preview] ? looks[preview].tokens : mixTokens(file.mix, looks);
     const index = Math.max(0, Math.min(current, deck.slides.length - 1));
     // 資料の言語：スライドに刷る決まり文句はこれで選ぶ（中身の無いページでも資料全体に合わせる）
     const lang = deckLang(deck);
     return { file, deck, roles, tokens, index, slide: deck.slides[index], looks, lang };
-  }, [file, current, looks]);
+  }, [file, current, looks, preview]);
 }

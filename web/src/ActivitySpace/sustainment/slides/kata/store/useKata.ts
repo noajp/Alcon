@@ -103,6 +103,11 @@ interface KataState {
 
   // 世界観
   toggleLook: (id: string) => void;
+  /** この世界観ひとつに決める（組み合わせと固定は解く） */
+  chooseLook: (id: string) => void;
+  /** 選ぶ前に、ページをこの世界観で仮に見せる（保存しない） */
+  previewLook: string | null;
+  setPreviewLook: (id: string | null) => void;
   pinElement: (el: MixElement, lookId: string | null) => void;
   remix: () => void;
 
@@ -396,6 +401,9 @@ export const useKata = create<KataState>()(
         },
 
         toggleLook: (id) => mapActive((f) => touch(f, { mix: toggleLook(f.mix, id) })),
+        chooseLook: (id) => mapActive((f) => touch(f, { mix: { selected: [id], pins: {}, offset: 0 } })),
+        previewLook: null,
+        setPreviewLook: (id) => set({ previewLook: id }),
         pinElement: (el, lookId) =>
           mapActive((f) => {
             const pins = { ...f.mix.pins };

@@ -6,6 +6,14 @@ type Row = [ja: string, ko: string, fr: string, es: string];
 
 const KATA_MESSAGES: Record<string, Row> = {
   "Inspector": ["インスペクタ", "인스펙터", "Inspecteur", "Inspector"],
+  // Looks panel
+  "Saved the current design to My looks": ["今のデザインをマイ世界観に保存しました", "현재 디자인을 내 룩에 저장했습니다", "Design actuel enregistré dans Mes styles", "Diseño actual guardado en Mis estilos"],
+  "Save current design": ["今のデザインを保存", "현재 디자인 저장", "Enregistrer le design actuel", "Guardar el diseño actual"],
+  "Create from image / PPTX": ["画像・PPTX から作る", "이미지·PPTX에서 만들기", "Créer depuis une image / PPTX", "Crear desde imagen / PPTX"],
+  "Click to apply · Shift-click to combine": ["クリックで適用・⇧クリックで組み合わせに加える", "클릭하여 적용 · Shift-클릭하여 조합", "Cliquer pour appliquer · Maj-clic pour combiner", "Clic para aplicar · Mayús-clic para combinar"],
+  "Combine": ["組み合わせる", "조합", "Combiner", "Combinar"],
+  "Click a swatch to lock that element to its look.": ["押した要素はその世界観で固定されます。", "견본을 누르면 그 요소가 해당 룩으로 고정됩니다.", "Cliquez sur un échantillon pour fixer cet élément à son style.", "Haz clic en una muestra para fijar ese elemento a su estilo."],
+  "Shift-click more looks to mix ground, type, accent and more, element by element.": ["⇧クリックで世界観を重ねると、地・書体・強調色などを要素ごとに混ぜられます。", "Shift-클릭으로 룩을 더하면 바탕·서체·강조색 등을 요소별로 섞을 수 있습니다.", "Maj-cliquez d’autres styles pour mélanger fond, police, accent et plus, élément par élément.", "Mayús-clic en más estilos para mezclar fondo, tipografía, acento y más, elemento por elemento."],
   // Chart editor
   "What do you want to show?": ["何を見せたいか", "무엇을 보여 주고 싶나요?", "Que voulez-vous montrer ?", "¿Qué quieres mostrar?"],
   "Following Zelazny's five comparisons and the FT Visual Vocabulary, this picks the chart type.": ["ゼラズニーの5つの比較と FT Visual Vocabulary に沿って、グラフの種類が決まります。", "Zelazny의 다섯 가지 비교와 FT Visual Vocabulary에 따라 차트 종류가 정해집니다.", "Le type de graphique est choisi d’après les cinq comparaisons de Zelazny et le FT Visual Vocabulary.", "El tipo de gráfico se elige según las cinco comparaciones de Zelazny y el FT Visual Vocabulary."],
@@ -67,18 +75,10 @@ const KATA_MESSAGES: Record<string, Row> = {
   "Couldn't read a theme from this PowerPoint file.": ["この PowerPoint からテーマを読み取れませんでした。", "이 PowerPoint 파일에서 테마를 읽지 못했습니다.", "Impossible de lire un thème dans ce fichier PowerPoint.", "No se pudo leer un tema de este archivo de PowerPoint."],
   "Couldn't read this image. Try a PNG, JPEG, or .pptx.": ["この画像は読み取れませんでした。PNG か JPEG、または .pptx で試してください。", "이 이미지를 읽지 못했습니다. PNG, JPEG 또는 .pptx로 시도해 보세요.", "Impossible de lire cette image. Essayez un PNG, un JPEG ou un .pptx.", "No se pudo leer esta imagen. Prueba con PNG, JPEG o .pptx."],
   "Looks": ["世界観", "룩", "Styles", "Estilos"],
-  "Pick as many as you like": ["いくつでも選べます", "원하는 만큼 고를 수 있습니다", "Choisissez-en autant que vous voulez", "Elige tantos como quieras"],
   "Mix {n}": ["ミックス {n}", "믹스 {n}", "Mélange {n}", "Mezcla {n}"],
-  "Saved the current mix to My looks": ["今のミックスをマイ世界観に保存しました", "지금 믹스를 내 룩에 저장했습니다", "Mélange actuel enregistré dans Mes styles", "Mezcla actual guardada en Mis estilos"],
-  "Save current mix": ["今のミックスを保存", "지금 믹스 저장", "Enregistrer le mélange actuel", "Guardar la mezcla actual"],
-  "From image / PPTX": ["画像・PPTX から", "이미지 / PPTX에서", "Depuis une image / un PPTX", "Desde imagen / PPTX"],
   " · ": ["・", " · ", " · ", " · "],
-  "Selected · unused": ["選択中・未使用", "선택됨 · 미사용", "Sélectionné · non utilisé", "Seleccionado · sin usar"],
-  "Mix by element": ["要素ごとのミックス", "요소별 믹스", "Mélange par élément", "Mezcla por elemento"],
   "Remix automatically": ["おまかせで混ぜ直す", "자동으로 다시 섞기", "Remélanger automatiquement", "Volver a mezclar automáticamente"],
-  "Click to lock an element to that look. Click again to unlock.": ["押すと、その要素はその世界観で固定されます。もう一度押すと固定を外します。", "누르면 그 요소가 해당 룩으로 고정됩니다. 다시 누르면 고정이 풀립니다.", "Cliquez pour fixer un élément sur ce style. Cliquez à nouveau pour le libérer.", "Haz clic para fijar un elemento a ese estilo. Vuelve a hacer clic para soltarlo."],
   "Locked": ["固定", "고정됨", "Fixé", "Fijado"],
-  "Auto": ["おまかせ", "자동", "Auto", "Auto"],
   "{label}: {name}": ["{label}：{name}", "{label}: {name}", "{label} : {name}", "{label}: {name}"],
   // Structure panel
   "Whole deck": ["全体の構成", "전체 자료", "Toute la présentation", "Toda la presentación"],
