@@ -56,7 +56,11 @@ export function pickDeckFile() {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.json,application/json';
-  input.onchange = () => { const f = input.files?.[0]; if (f) void openDeckFile(f); };
+  input.hidden = true;
+  // In the page while the picker is open: some browsers do not report a pick on a detached input.
+  document.body.appendChild(input);
+  input.onchange = () => { const f = input.files?.[0]; input.remove(); if (f) void openDeckFile(f); };
+  input.oncancel = () => input.remove();
   input.click();
 }
 
