@@ -10,7 +10,7 @@ Next.js 16 + Supabase + Tailwind CSS + recharts。企業・軍事作戦・病院
 |---|---|---|
 | **Strategy** | 何を達成し、どう勝つか | Vision（Space が目指す姿）→ Portfolio（Initiative の束、入れ子可）→ Initiative（複数で戦略を構成）。Phase（活動を期間で区切る単位）はナビに出さない |
 | **Execution** | 実際に行動する | Domain（活動の場）→ Object（成果物）→ Element（行動の最小単位） |
-| **Sustainment** | 仕事道具 | Workload / CRM / Notebook / Table / People / Calendar |
+| **Sustainment** | 仕事道具 | Workload / CRM / Notebook / Table / Slides / People / Calendar |
 
 Initiative は目的・前提・意思決定・成功条件を持ち、担当や進捗は持たない。担当・期限・進捗・依存は Execution 側で扱う。ほかに分類を横断して使う個人向けの画面 **Home** と、Object ごとに定義して Element に値を持たせる **Property** がある。Worker は `human | ai_agent`。
 

@@ -30,6 +30,13 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     group: 'core', accepts: ['object'], zones: ['main'], defaultSize: 'full', holdsContents: true,
     load: async () => (await import('./widgets/GeneratedAppWidget')).GeneratedAppWidget,
   },
+  'deck': {
+    type: 'deck', label: 'Deck',
+    description: 'A Slides deck: its pages here, the full editor when opened full screen',
+    group: 'core', accepts: ['me', 'domain', 'object', 'initiative'], zones: ['main'], defaultSize: 'full',
+    normalizeParams: (raw) => ({ deckId: typeof raw?.deckId === 'string' && raw.deckId.length <= 64 ? raw.deckId : null }),
+    load: async () => (await import('./widgets/DeckWidget')).DeckWidget,
+  },
   'approach-references': {
     type: 'approach-references', label: 'Domain approaches', group: 'core',
     accepts: ['initiative', 'object'], zones: ['main', 'rail'], singleton: true, defaultSize: 'full',

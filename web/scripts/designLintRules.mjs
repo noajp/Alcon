@@ -35,6 +35,11 @@ export const COLOR_ALLOWLIST = [
   // for the whole 600+ line component, so the linter still watches
   // everything else in it.
   'src/ActivitySpace/execution/element/custom/customColorScheme.ts',
+  // Slides' looks: the palettes slides are drawn in (content, not the app's
+  // chrome), their custom-look defaults, and the PPTX theme written on export.
+  'src/ActivitySpace/sustainment/slides/kata/theme/looks.ts',
+  'src/ActivitySpace/sustainment/slides/kata/theme/custom.ts',
+  'src/ActivitySpace/sustainment/slides/kata/theme/pptxTheme.ts',
   // <meta name="theme-color"> — a literal string is the only thing the
   // browser-chrome API accepts; it cannot read a CSS custom property.
   'src/app/layout.tsx',
