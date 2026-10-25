@@ -522,6 +522,8 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
     dealContacts: dealContacts.data ?? EMPTY as CrmDealContactRecord[],
     allDeals: deals.data ?? EMPTY as CrmDealRecord[],
     loading: enabled && !workspace && !error,
+    /** Whether the list of pipelines this reader can see has been read at least once. */
+    pipelinesLoaded: pipelines.isFetched,
     error, measureError,
     refetch: invalidate,
     saveDeal, handOver, startRenewal, declineRenewal, addDealContact, updateDealContact, removeDealContact, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,

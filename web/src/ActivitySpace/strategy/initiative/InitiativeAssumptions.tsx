@@ -146,7 +146,7 @@ export function InitiativeAssumptions({
   // Read only when a deal is watched or the reader can add one.
   const watchesDeals = bindings.some((b) => b.target_type === 'crm_deal');
   const crm = useCrm(null, { active: watchesDeals || initiative.canEdit });
-  const crmRead: DealWatchInput['read'] = crm.error ? 'failed' : crm.loading && crm.pipelines.length > 0 ? 'loading' : 'ok';
+  const crmRead: DealWatchInput['read'] = crm.error ? 'failed' : (watchesDeals && !crm.pipelinesLoaded) || (crm.loading && crm.pipelines.length > 0) ? 'loading' : 'ok';
   const byDeal = useMemo(
     () => new Map(crm.workspaces.flatMap((workspace) => workspace.deals).map((deal) => [deal.id, deal])),
     [crm.workspaces],
