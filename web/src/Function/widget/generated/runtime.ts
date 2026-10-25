@@ -42,29 +42,50 @@ window.addEventListener('message',event=>{
  for(const [key,value] of Object.entries(event.data.theme||{})){
   if(/^--[a-zA-Z0-9_-]+$/.test(key)&&typeof value==='string')document.documentElement.style.setProperty(key,value);
  }
- if(event.data.type==='start')measure();
+ if(event.data.type==='start')__alconMeasure();
  if(event.data.type!=='start'||started)return;
  started=true;
- (async()=>{try{\n${app.js}\n;send('ready');measure();}catch(error){send('error',{message:String(error?.message||error)});}})();
+ // The app's code runs in a function of its own: whatever names it declares cannot
+ // replace the ones the host's code below relies on.
+ const __alconApp=async()=>{\n${app.js}\n};
+ (async()=>{try{await __alconApp();}catch(error){send('error',{message:String(error?.message||error)});return;}send('ready');__alconMeasure();})();
 });
 // The host sizes the frame to the content, so the app never scrolls inside the board.
 // Content is measured as the lowest edge of what the body holds, not the body
 // itself: a body stretched to the frame (height:100%) would otherwise report
 // the frame back and never shrink to its content.
-const contentHeight=()=>{
+const __alconContentHeight=()=>{
  let bottom=0;
- for(const child of document.body.children){const box=child.getBoundingClientRect();if(box.height>0||box.width>0)bottom=Math.max(bottom,box.bottom+(window.scrollY||0));}
- return Math.ceil(bottom+parseFloat(getComputedStyle(document.body).paddingBottom||'0'));
+ for(const child of document.body.children){
+  const box=child.getBoundingClientRect();
+  if(box.height>0||box.width>0)bottom=Math.max(bottom,box.bottom+(window.scrollY||0)+(parseFloat(getComputedStyle(child).marginBottom)||0));
+ }
+ return Math.ceil(bottom+(parseFloat(getComputedStyle(document.body).paddingBottom)||0));
 };
 // A report sent before the host listens is lost, so the host's start asks again.
 // The browser holds back resize callbacks while the frame is off screen, so the
 // app's own start is measured too — its first render is otherwise reported only
 // once someone scrolls to it.
-let measure=()=>{};
+let __alconMeasure=()=>{};
 if(typeof ResizeObserver==='function'&&document.body){
  let last=0;
- const report=()=>{const height=contentHeight();if(Math.abs(height-last)>1){last=height;send('size',{height});}};
- measure=()=>{last=0;report();};
+ let lastViewport=window.innerHeight;
+ let lastContent=0;
+ let sizedToFrame=false;
+ const report=()=>{
+  let height=__alconContentHeight();
+  const viewport=window.innerHeight;
+  // Content that grew by exactly as much as the frame just did is sized to the
+  // frame (100vh), not to what it holds: asking for more would grow it forever.
+  if(viewport!==lastViewport){
+   if(lastContent&&viewport>lastViewport&&Math.abs((height-lastContent)-(viewport-lastViewport))<=1)sizedToFrame=true;
+   lastViewport=viewport;
+  }
+  lastContent=height;
+  if(sizedToFrame)height=Math.min(height,viewport);
+  if(Math.abs(height-last)>1){last=height;send('size',{height});}
+ };
+ __alconMeasure=()=>{last=0;report();};
  const observer=new ResizeObserver(report);
  observer.observe(document.body);
  for(const child of document.body.children)observer.observe(child);

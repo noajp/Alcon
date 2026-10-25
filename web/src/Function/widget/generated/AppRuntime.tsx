@@ -4,8 +4,7 @@ import { appDocument } from './runtime';
 import { parseAppState, stableJson, type AppSource, type AppState } from './model';
 
 // The frame takes its content's height, within these bounds; past the upper
-// one the app scrolls inside. A page that sizes itself to the frame cannot
-// grow it without end.
+// one the app scrolls inside.
 const MIN_FRAME_HEIGHT = 120;
 const MAX_FRAME_HEIGHT = 2400;
 
@@ -56,7 +55,6 @@ export function AppRuntime({ source, state, objectId, objectName, preview, readO
   }, [preview, pushState]);
   useEffect(() => { latest.current = state; pushIfMoved(); }, [state, pushIfMoved]);
   const [height, setHeight] = useState(240);
-  const growth = useRef({ step: 0, repeats: 0 });
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState(preview ? 'Preview · inputs here are not saved' : 'Loading app…');
   useEffect(() => {
@@ -72,19 +70,10 @@ export function AppRuntime({ source, state, objectId, objectName, preview, readO
       const message = event.data;
       if (message.type === 'boot') sendTheme('start');
       if (message.type === 'ready') { setError(null); ready = true; clearTimeout(timer); callbacks.current.onReady(true); if (!preview) setStatus('Saved app'); started.current = true; pushIfMoved(); }
+      // The frame reports its content's height; one sized to the frame (100vh)
+      // stops asking for more by itself (see runtime.ts).
       if (message.type === 'size' && Number.isFinite(message.height)) {
-        const next = Math.min(MAX_FRAME_HEIGHT, Math.max(MIN_FRAME_HEIGHT, Math.ceil(message.height)));
-        setHeight(current => {
-          // Content sized to the frame (100vh) grows by the same step every
-          // time the frame grows. Three equal steps in a row is that loop, not
-          // content: stop growing and let it scroll inside.
-          const step = next - current;
-          if (step > 0) {
-            growth.current = step === growth.current.step ? { step, repeats: growth.current.repeats + 1 } : { step, repeats: 1 };
-            if (growth.current.repeats >= 3) return current;
-          } else growth.current = { step: 0, repeats: 0 };
-          return next;
-        });
+        setHeight(Math.min(MAX_FRAME_HEIGHT, Math.max(MIN_FRAME_HEIGHT, Math.ceil(message.height))));
         return;
       }
       if (message.type === 'error') { setError(String(message.message).slice(0, 400)); callbacks.current.onReady(false); }
