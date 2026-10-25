@@ -147,6 +147,10 @@ export const DEAL_ROLES = ['decision_maker', 'champion', 'influencer', 'blocker'
 export type CrmDealRole = typeof DEAL_ROLES[number];
 export interface CrmDealContactRecord { id: string; deal_id: string; contact_id: string; role: CrmDealRole; note: string | null; created_at: string }
 
+/** An Element linked to the company, contact or deal it is about. */
+export interface CrmElementLinkRecord { id: string; element_id: string; company_id: string | null; contact_id: string | null; deal_id: string | null; created_at: string }
+export interface CrmLinkedElement { id: string; title: string; status: string; due_date: string | null; display_id: string | null }
+
 export interface CrmFieldRecord {
   id: string; entity: 'deal' | 'company' | 'contact'; key: string; label: string;
   type: 'text' | 'number' | 'date' | 'select' | 'checkbox'; options: unknown; order_index: number;
