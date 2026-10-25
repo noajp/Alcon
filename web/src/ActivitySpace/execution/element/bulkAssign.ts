@@ -14,7 +14,10 @@ async function setAssignees(elementId: string, current: readonly string[], worke
   const added: string[] = [];
   for (const workerId of adding) {
     const { error } = await supabase.from('element_assignees').insert({ element_id: elementId, worker_id: workerId, role: 'assignee' });
-    if (error && error.code !== '23505') {
+    // Already on the Element as a reviewer or collaborator: they become its assignee.
+    const promoted = error?.code === '23505'
+      && !(await supabase.from('element_assignees').update({ role: 'assignee' }).eq('element_id', elementId).eq('worker_id', workerId).select('id')).error;
+    if (error && !promoted) {
       if (added.length) await supabase.from('element_assignees').delete().eq('element_id', elementId).eq('role', 'assignee').in('worker_id', added);
       return false;
     }
