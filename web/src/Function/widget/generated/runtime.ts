@@ -70,11 +70,15 @@ let __alconMeasure=()=>{};
 if(typeof ResizeObserver==='function'&&document.body){
  let last=0;
  let lastViewport=window.innerHeight;
+ let lastWidth=window.innerWidth;
  let lastContent=0;
  let sizedToFrame=false;
  const report=()=>{
   let height=__alconContentHeight();
   const viewport=window.innerHeight;
+  // A width change reflows the content, which can line up with a height change
+  // by chance; judge afresh at the new width rather than keep a stale verdict.
+  if(window.innerWidth!==lastWidth){lastWidth=window.innerWidth;sizedToFrame=false;}
   // Content that grew by exactly as much as the frame just did is sized to the
   // frame (100vh), not to what it holds: asking for more would grow it forever.
   if(viewport!==lastViewport){
