@@ -116,10 +116,10 @@ export function BulkActionBar({
   onClear,
 }: BulkActionBarProps) {
   const [assigneeQuery, setAssigneeQuery] = useState('');
-  const [notice, setNotice] = useState<string | null>(null);
-  // A notice belongs to the selection it was about; it leaves with it.
-  const [noticeFor, setNoticeFor] = useState(count);
-  if (noticeFor !== count) { setNoticeFor(count); if (count === 0 && notice) setNotice(null); }
+  // A notice belongs to the selection it was about: shown while that many
+  // Elements are selected, gone once the selection changes.
+  const [noticeState, setNoticeState] = useState<{ text: string; count: number } | null>(null);
+  const notice = noticeState && noticeState.count === count ? noticeState.text : null;
   const [overlay, setOverlay] = useState<Overlay>(null);
   const picker = overlay?.kind === 'picker' ? overlay.mode : null;
   const confirmDelete = overlay?.kind === 'confirmDelete';
@@ -304,8 +304,15 @@ export function BulkActionBar({
                   placeholder="Find a person"
                   value={assigneeQuery}
                   onChange={(e) => setAssigneeQuery(e.target.value)}
-                  // Typing stays in the field; arrows and Enter still move through the list.
-                  onKeyDown={(e) => { if (!['ArrowDown', 'ArrowUp', 'Enter', 'Escape', 'Tab'].includes(e.key)) e.stopPropagation(); }}
+                  // Typing stays in the field; ArrowDown moves into the list of people.
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      (e.currentTarget.parentElement?.querySelector('[role="menuitem"]') as HTMLElement | null)?.focus();
+                      return;
+                    }
+                    if (e.key !== 'Escape') e.stopPropagation();
+                  }}
                   className="mb-1 h-7 w-full rounded-sm bg-muted/30 px-2 text-[13px] outline-none hover:bg-muted/40 focus:bg-muted/60"
                 />
                 <div className="max-h-64 overflow-y-auto">
@@ -317,9 +324,9 @@ export function BulkActionBar({
                         onSelect={() => void wrap(async () => {
                           try {
                             const failed = await onSetAssignee(o.id);
-                            setNotice(failed ? `${failed} could not be handed to ${o.name} — still selected. They keep their assignees: ${o.name} cannot be assigned where they live.` : null);
+                            setNoticeState(failed ? { text: `${failed} not fully handed to ${o.name} — still selected. ${o.name} may not be assignable where they live.`, count: failed } : null);
                           } catch (e) {
-                            setNotice(e instanceof Error ? e.message : 'Could not set the assignee.');
+                            setNoticeState({ text: e instanceof Error ? e.message : 'Could not set the assignee.', count });
                           }
                         })()}
                         className="gap-2 text-[13px]"

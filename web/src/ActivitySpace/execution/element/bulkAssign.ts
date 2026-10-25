@@ -28,34 +28,37 @@ interface Before { elementId: string; rows: Row[] }
  * assigned (they cannot see the Element's Object, or are not in its Space),
  * nothing is removed and the Element keeps its people.
  */
-async function handTo(elementId: string, rows: readonly Row[], workerId: string): Promise<boolean> {
+async function handTo(elementId: string, rows: readonly Row[], workerId: string): Promise<'done' | 'refused' | 'partial'> {
   const mine = rows.find((row) => row.worker_id === workerId);
   if (!mine) {
     const { error } = await supabase.from('element_assignees').insert({ element_id: elementId, worker_id: workerId, role: 'assignee' });
-    if (error) return false;
+    if (error) return 'refused';
   } else if (mine.role !== 'assignee') {
     const { data, error } = await supabase.from('element_assignees').update({ role: 'assignee' }).eq('id', mine.id).select('id');
-    if (error || !data?.length) return false;
+    if (error || !data?.length) return 'refused';
   }
   const others = rows.filter((row) => row.role === 'assignee' && row.worker_id !== workerId).map((row) => row.id);
-  if (!others.length) return true;
+  if (!others.length) return 'done';
+  // The person is in; if some previous assignees could not be removed, it is half done.
   const { data, error } = await supabase.from('element_assignees').delete().in('id', others).select('id');
-  return !error && (data?.length ?? 0) === others.length;
+  return !error && (data?.length ?? 0) === others.length ? 'done' : 'partial';
 }
 
-/** Put one Element's people back as they were. */
+/** Put one Element's people back as they were — the previous people first;
+ *  the handed-to person steps back only when all of them are back, so an undo
+ *  never leaves an Element with no one (someone who has left the Space cannot
+ *  be put back, and then the new person stays). */
 async function restore(before: Before, workerId: string): Promise<boolean> {
   const now = (await peopleOn([before.elementId])).get(before.elementId) ?? [];
-  let ok = true;
-  const was = before.rows.find((row) => row.worker_id === workerId);
-  const mine = now.find((row) => row.worker_id === workerId);
-  if (mine && !was) ok = !(await supabase.from('element_assignees').delete().eq('id', mine.id)).error && ok;
-  else if (mine && was && was.role !== mine.role) ok = !(await supabase.from('element_assignees').update({ role: was.role }).eq('id', mine.id)).error && ok;
   for (const row of before.rows) {
     if (row.worker_id === workerId || now.some((current) => current.worker_id === row.worker_id)) continue;
-    ok = !(await supabase.from('element_assignees').insert({ element_id: before.elementId, worker_id: row.worker_id, role: row.role })).error && ok;
+    if ((await supabase.from('element_assignees').insert({ element_id: before.elementId, worker_id: row.worker_id, role: row.role })).error) return false;
   }
-  return ok;
+  const was = before.rows.find((row) => row.worker_id === workerId);
+  const mine = now.find((row) => row.worker_id === workerId);
+  if (mine && !was) return !(await supabase.from('element_assignees').delete().eq('id', mine.id)).error;
+  if (mine && was && was.role !== mine.role) return !(await supabase.from('element_assignees').update({ role: was.role }).eq('id', mine.id)).error;
+  return true;
 }
 
 /**
@@ -71,11 +74,12 @@ export async function bulkSetAssignee(elementIds: readonly string[], workerId: s
   for (let i = 0; i < elementIds.length; i += 5) {
     await Promise.all(elementIds.slice(i, i + 5).map(async (id) => {
       const rows = people.get(id) ?? [];
-      if (await handTo(id, rows, workerId)) changed.push({ elementId: id, rows });
-      else failed.push(id);
+      const result = await handTo(id, rows, workerId);
+      // Anything written can be undone, a half-done Element included.
+      if (result !== 'refused') changed.push({ elementId: id, rows });
+      if (result !== 'done') failed.push(id);
     }));
   }
-  await refresh?.();
   if (changed.length) {
     pushUndo({
       label: `Assign ${changed.length} Elements`,
@@ -88,5 +92,7 @@ export async function bulkSetAssignee(elementIds: readonly string[], workerId: s
       },
     });
   }
+  // The writes are done; a refresh that fails must not hide them.
+  try { await refresh?.(); } catch (e) { console.error(e); }
   return failed;
 }
