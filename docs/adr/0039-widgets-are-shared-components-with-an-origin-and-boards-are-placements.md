@@ -1,5 +1,7 @@
 # 0039 — Widget は出自を持つ共有部品、ボードはその配置
 
+> 置き換え: 定義の `personal`（作成者を出自にする Widget）は [0040](0040-widget-contents-are-shared-documents-merged-by-key.md) でなくした。ほかはそのまま。
+
 ## 背景
 
 Widget は Strategy / Execution / Sustainment の三分類を補完する情報を映す掲示板（ボード）として位置付ける。Microsoft Loop のように、同じ対象を見る人が同じボードを見て、部品を別の場所に置いても1つのものとして同期する。

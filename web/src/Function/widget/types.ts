@@ -138,10 +138,11 @@ export interface WidgetDefinition {
    */
   normalizeParams?: (raw: WidgetParams | undefined) => WidgetParams;
   /**
-   * Born on its author rather than on the board's subject, so only the author
-   * can see it — for a widget whose contents are still kept per person.
+   * Keeps contents of its own beside its settings (a generated app and what
+   * people typed into it). Taking the last placement of such a widget off a
+   * board deletes those contents for everyone, so removing it asks first.
    */
-  personal?: boolean;
+  holdsContents?: boolean;
   /**
    * Lazy component. The definition owning its own import is what removed the
    * central `renderWidget` switch — every widget now code-splits by default
