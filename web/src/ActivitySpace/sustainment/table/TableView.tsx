@@ -139,12 +139,10 @@ function TablesEmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="h-full flex flex-col items-center justify-center gap-2 px-6 select-none">
       <p className="text-[13px] text-muted-foreground">{t('No Tables yet.')}</p>
-      <ButtonAppearanceProvider appearance="inline">
-        <Button variant="ghost" size="sm" onClick={onCreate}>
-          <Plus size={14} />
-          {t('Create Table')}
-        </Button>
-      </ButtonAppearanceProvider>
+      <Button variant="primary" size="sm" className="gap-1.5" onClick={onCreate}>
+        <Plus size={14} />
+        {t('Create Table')}
+      </Button>
     </div>
   );
 }

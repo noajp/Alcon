@@ -142,7 +142,7 @@ export function ApproachEditor({ target, data, objects, open, onOpenChange, onRe
         <div className="flex flex-wrap items-center justify-end gap-2">
           {target.kind === 'condition' && !target.condition && <label className="mr-auto flex items-center gap-2 text-xs"><input type="checkbox" checked={more} disabled={saving} onChange={e => setMore(e.target.checked)} />{t('Add another')}</label>}
           <Button type="button" variant="ghost" disabled={saving} onClick={() => onOpenChange(false)}>{t('Close')}</Button>
-          <Button type="submit" disabled={saving || outdated || !data.canEdit}>{saving ? t('Saving…') : t('Save')}</Button>
+          <Button type="submit" variant="primary" disabled={saving || outdated || !data.canEdit}>{saving ? t('Saving…') : t('Save')}</Button>
         </div>
       </form>
     </DialogContent>

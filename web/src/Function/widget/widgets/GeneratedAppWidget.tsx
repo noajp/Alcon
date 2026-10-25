@@ -62,7 +62,7 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
     </div>}
     {app?.draft_app && <div className="flex flex-wrap items-center gap-2">
       <p className="mr-auto text-xs text-muted-foreground">{t('Preview · only you see this until you use it. It then replaces the app for everyone.')}</p>
-      <Button size="sm" disabled={locked || !ready || store.saving} onClick={() => void run(async () => { await store.adopt(); setEditing(false); setPrompt(''); latestPrompt.current = ''; setEpoch(n => n + 1); })}>{t('Use this app')}</Button>
+      <Button variant="primary" size="sm" disabled={locked || !ready || store.saving} onClick={() => void run(async () => { await store.adopt(); setEditing(false); setPrompt(''); latestPrompt.current = ''; setEpoch(n => n + 1); })}>{t('Use this app')}</Button>
       <Button variant="ghost" size="sm" disabled={locked} onClick={() => void run(() => store.discard())}>{t('Discard preview')}</Button>
     </div>}
     {source?.usesObjectData && (app?.draft_app || store.dataConnected

@@ -389,7 +389,7 @@ function MyElementsEmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-2 px-8 text-center">
       <p className="text-[13px] text-muted-foreground">{t("Anything that's yours alone — quick captures, personal todos, ideas — lives here.")}</p>
-      <Button variant="ghost" size="sm" onClick={onAdd}><Plus size={14} />{t('Create Element')}</Button>
+      <Button variant="primary" size="sm" className="gap-1.5" onClick={onAdd}><Plus size={14} />{t('Create Element')}</Button>
     </div>
   );
 }

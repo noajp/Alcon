@@ -51,7 +51,7 @@ export function DomainApproachesPanel({ data, objects, host, onSave }: {
     {!data.approaches.length ? <div className="space-y-3 py-4">
       <p className="text-sm">{t('How will the work in this Domain realize an Initiative?')}</p>
       <p className="max-w-2xl text-xs text-muted-foreground">{t('Describe the expected change, define what must become true, and connect the Objects that can make it happen. Assess the evidence before deciding what to continue, change or stop.')}</p>
-      {data.canEdit && <Button variant="secondary" onClick={() => edit({ kind: 'approach' })}>{t('Create the first approach')}</Button>}
+      {data.canEdit && <Button variant="primary" size="sm" onClick={() => edit({ kind: 'approach' })}>{t('Create the first approach')}</Button>}
     </div> : <>
       <section aria-label={t('Needs judgment')} className="space-y-2">
         <h3 className="text-sm font-medium">{t('Needs judgment')}</h3>
