@@ -65,10 +65,13 @@ export function CellText({ children, className = '' }: { children: React.ReactNo
  * around it; the dash keeps the column's rhythm, and the cell's hover ground
  * still shows where to click.
  */
+/** An empty cell says nothing until its row is pointed at: a column of
+ *  dashes is noise, and the row's hover is when it is worth knowing the
+ *  cell can be filled in. */
 export function EmptyCellMark() {
   return (
     <>
-      <span aria-hidden className="opacity-60">–</span>
+      <span aria-hidden className="opacity-0 transition-opacity group-hover:opacity-60">–</span>
       <span className="sr-only">Empty</span>
     </>
   );

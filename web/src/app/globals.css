@@ -100,8 +100,9 @@
   --surface-raised:  #ffffff;
   --surface-strong:  #DEDEE2;
   --surface-overlay: #ffffff;
-  /* Right-rail cards — tracks the island tone in light mode. */
-  --surface-rail:    var(--surface-raised);
+  /* Right-rail islands — a notch off the white island. The tone is all that
+     sets them apart (they draw no outline), so it cannot equal the island. */
+  --surface-rail:    #F7F7F8;
 
   /* ---- Border — Light ---- */
   --border-subtle:  rgba(20, 22, 26, 0.10);

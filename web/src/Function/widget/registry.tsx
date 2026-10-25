@@ -336,7 +336,6 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     accepts: ['object', 'me', 'initiative', 'domain'],
     zones: ['main'],
     singleton: true,
-    padded: false,
     defaultSize: 'full',
     load: async () => {
       const { KpiCardsWidget } = await import('./widgets/KpiCardsWidget');

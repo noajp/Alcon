@@ -48,7 +48,7 @@ export function WidgetZone({
 
   const { setNodeRef, isOver } = useDroppable({ id: zoneDroppableId(zone), data: { zone } });
 
-  const gapClass = zone === 'rail' ? 'space-y-4' : zone === 'band' ? 'space-y-2' : 'space-y-6';
+  const gapClass = zone === 'rail' ? 'space-y-4' : zone === 'band' ? 'space-y-2' : 'space-y-8';
 
   // Empty and idle, a zone takes no space at all — the + that fills it lives
   // on the surface. While arranging it becomes a visible drop target, so a
@@ -61,7 +61,7 @@ export function WidgetZone({
         items={items.map((w) => w.id)}
         strategy={columns === 2 ? rectSortingStrategy : verticalListSortingStrategy}
       >
-        <div className={columns === 2 ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : gapClass}>
+        <div className={columns === 2 ? 'grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-8' : gapClass}>
           {items.map((instance) => (
             <SortableWidget
               key={instance.id}

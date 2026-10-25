@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { isCancelKey, isCommitEnter, isSubmitChord } from '@/Function/shared/keyboard';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { FONT } from '@/shared/designTokens';
 
 // =============================================================
 // The shape of a concept's own page — the one Element detail has: a title,
@@ -175,15 +176,16 @@ export function PageHead({
   );
 }
 
-/** A group of rows under a small muted heading. `action` is the heading's
- *  own verb ("+ Add") and sits at its right. */
+/** A section of a concept's page: a heading and what is under it, held
+ *  together by spacing rather than a box (the same heading as a widget's).
+ *  `action` is the heading's own verb ("+ Add") and sits at its right. */
 export function PageSection({ title, action, children, className = '' }: {
   title: string; action?: ReactNode; children: ReactNode; className?: string;
 }) {
   return (
     <section className={className} aria-label={title}>
-      <div className="mb-1 flex h-7 items-center gap-2">
-        <h2 className="text-[12px] font-medium text-muted-foreground">{title}</h2>
+      <div className="mb-1 flex h-8 items-center gap-2">
+        <h2 className={`${FONT.lg} text-foreground`}>{title}</h2>
         {action && <div className="ml-auto flex items-center gap-1">{action}</div>}
       </div>
       {children}

@@ -114,7 +114,7 @@ export function TypeCell({
       disabled={!canEdit}
       className={`${CELL_TRIGGER_BASE} ${current ? '' : CELL_TRIGGER_EMPTY}`}
     >
-      <CellText>{current ?? 'Set type'}</CellText>
+      {current ? <CellText>{current}</CellText> : <EmptyCellMark />}
     </button>
   );
   // Read-only (no editor) when there's nothing to pick and no way to add.
@@ -654,7 +654,7 @@ export function ObjectCell({
     const count = obj.elements?.length ?? 0;
     return (
       <td className="table-cell px-1.5 py-2 max-w-0 overflow-hidden text-xs text-muted-foreground tabular-nums">
-        {count === 0 ? '—' : count}
+        {count === 0 ? <EmptyCellMark /> : count}
       </td>
     );
   }

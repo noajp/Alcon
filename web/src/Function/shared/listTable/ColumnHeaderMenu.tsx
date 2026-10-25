@@ -120,8 +120,6 @@ export function ColumnHeader({
           </DropdownMenu>
         )}
       </div>
-      {/* Short centered vertical divider (30px) on the column's right edge. */}
-      <span aria-hidden className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 h-[30px] w-px bg-border/60" />
       {/* Resize handle — absolute on the right edge, visible on hover.
           PointerDown captures the pointer and updates width on move; the
           stopPropagation keeps dnd-kit's drag from kicking in. */}

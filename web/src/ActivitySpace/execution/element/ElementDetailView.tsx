@@ -82,6 +82,7 @@ import { RailRow } from '@/Function/shared/RailRow';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { ElementTypeIcon, ObjectIcon } from '@/shell/icons';
 import { PageIcon } from '@/Function/shared/PageHead';
+import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { StatusPicker } from './StatusPicker';
 import { ElementDirectionSection } from './ElementDirectionSection';
 import { SubelementRow } from './SubelementRow';
@@ -264,12 +265,27 @@ function ElementDetailBody({
   // clips at min-h and scrolls inside its own tiny box instead of letting
   // the page grow, which reads as a broken nested-scroll region.
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+  // A written description is read as formatted text (headings, lists, bold)
+  // and turns into its source when clicked — the way a document reads until
+  // you put the cursor in it. An empty one is the field straight away.
+  // Keyed by Element, so opening another one starts it formatted again.
+  const [editingDescriptionFor, setEditingDescriptionFor] = useState<string | null>(null);
+  const editingDescription = editingDescriptionFor === element.id;
+  const setEditingDescription = (on: boolean) => setEditingDescriptionFor(on ? element.id : null);
+  const showDescriptionSource = editingDescription || !description.trim();
   useEffect(() => {
     const el = descriptionRef.current;
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
-  }, [description]);
+  }, [description, showDescriptionSource]);
+  useEffect(() => {
+    if (!editingDescription) return;
+    const el = descriptionRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [editingDescription]);
 
   // Readers can resize independently of the viewport (sidebar or split pane).
   useEffect(() => {
@@ -767,11 +783,23 @@ function ElementDetailBody({
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>}
-            <textarea
+            {!showDescriptionSource && (
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label="Edit description"
+                onClick={(e) => { if (!(e.target as HTMLElement).closest('a')) setEditingDescription(true); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setEditingDescription(true); } }}
+                className="min-h-[36px] cursor-text outline-none"
+              >
+                <MarkdownLite text={description} className="space-y-3 text-[14px] leading-[1.65]" />
+              </div>
+            )}
+            {showDescriptionSource && <textarea
               ref={descriptionRef}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              onBlur={handleDescriptionSave}
+              onBlur={() => { setEditingDescription(false); void handleDescriptionSave(); }}
               onKeyDown={(e) => {
                 // Multi-line: Enter is a newline; Cmd/Ctrl+Enter and
                 // Escape end the edit and save.
@@ -783,7 +811,7 @@ function ElementDetailBody({
               placeholder="Add description..."
               rows={1}
               className="w-full text-[14px] text-foreground bg-transparent border-none focus:outline-none min-h-[36px] resize-none overflow-hidden"
-            />
+            />}
           </div>
 
           {/* Action row — reactions, Note link, approval and Share an update,

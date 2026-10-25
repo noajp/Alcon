@@ -42,14 +42,14 @@ export interface DataColumn {
 // custom-field column (~120px): tag chips and date ranges land with a
 // little slack instead of truncating, while the table still reads dense.
 // Users can per-column resize from there.
-const DEFAULT_COLUMN_WIDTH = 144;
+const DEFAULT_COLUMN_WIDTH = 128;
 
 // Special width key for the Name column (not a real DataColumn — it isn't
 // toggleable or reorderable). Stored alongside data-column widths so resize
 // + persistence reuse the same code path.
 export const NAME_COL_KEY = '__name__';
 // Name can shrink on compact layouts while retaining a readable title.
-const NAME_DEFAULT_WIDTH = 520;
+const NAME_DEFAULT_WIDTH = 400;
 const NAME_MIN_WIDTH = 240;
 const NAME_MAX_WIDTH = 1200;
 
@@ -67,8 +67,8 @@ const OBJECT_BUILTIN_COLUMNS: DataColumn[] = [
   { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: false, defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'due_date', label: 'Due date', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'lead',     label: 'Lead',     kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
-  { id: 'progress', label: 'Progress', kind: 'builtin', toggleable: true,  defaultWidth: 110 },
-  { id: 'elements', label: 'Elements', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
+  { id: 'progress', label: 'Progress', kind: 'builtin', toggleable: true,  defaultWidth: 120 },
+  { id: 'elements', label: 'Elements', kind: 'builtin', toggleable: true,  defaultWidth: 112 },
 ];
 
 function builtinsFor(entity: ColumnEntity): DataColumn[] {
@@ -209,6 +209,8 @@ export interface ListColumnsState {
   allColumns: DataColumn[];
   /** Resolved width for any column id (falls back to defaultWidth). */
   widthFor: (id: ColumnId) => number;
+  /** True once the person has sized this column themselves. */
+  isSized: (id: ColumnId) => boolean;
   /** True when `id` is in the visible set. */
   isVisible: (id: ColumnId) => boolean;
   /** Toggle a column's visibility. */
@@ -367,6 +369,8 @@ export function useListColumns(
     return catalogueById.get(id)?.defaultWidth ?? DEFAULT_COLUMN_WIDTH;
   }, [widths, catalogueById]);
 
+  const isSized = useCallback((id: ColumnId) => typeof widths[id] === 'number' && widths[id] > 0, [widths]);
+
   const isVisible = useCallback(
     (id: ColumnId) => effectiveVisible.has(id),
     [effectiveVisible],
@@ -442,6 +446,7 @@ export function useListColumns(
     visibleColumns,
     allColumns,
     widthFor,
+    isSized,
     isVisible,
     toggleVisible,
     moveColumn,

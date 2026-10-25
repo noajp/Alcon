@@ -454,21 +454,28 @@ export function ListTable({
     }
   };
 
+  // Until the person sizes Name, it takes whatever the data columns leave —
+  // titles get the room, as in any list, and the data columns sit packed at
+  // the right. Once sized, Name keeps that width and the trailing column
+  // soaks up the slack instead.
+  const nameFluid = !cols.isSized(NAME_COL_KEY);
+  const packedWidth = 56 + cols.widthFor(NAME_COL_KEY) + visibleColumns.reduce((sum, c) => sum + cols.widthFor(c.id), 0) + (hasTrailingCol ? 80 : 0);
+
   return (
     <DndContext id={dndId} sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
     <div data-list-scroller className="overflow-x-auto h-full [overflow-anchor:none]">
       <table
         ref={tableRef}
         // `min-w-full` so the table fills the wrap (rows + section bands span
-        // the full width). The trailing column is given width:100% so it — and
-        // only it — soaks up the surplus on wide screens, keeping Name and the
-        // data columns at their defined widths packed flush LEFT, with empty
-        // bg-card slack on the right. (An UNSIZED trailing col does NOT absorb
-        // the surplus in fixed-table layout — the browser instead spreads it
-        // proportionally across the sized columns, stretching everything.)
-        // Resizing a data column shrinks the trailing slack instead of Name,
-        // so the dragged column's LEFT edge stays put (no left-drift).
-        style={{ width: 56 + cols.widthFor(NAME_COL_KEY) + visibleColumns.reduce((sum, c) => sum + cols.widthFor(c.id), 0) + (hasTrailingCol ? 80 : 0) }}
+        // the full width). One track is given width:100% and soaks up the
+        // surplus on wide screens: Name while it is unsized (see nameFluid),
+        // otherwise the trailing column, leaving the sized columns packed
+        // flush left. (An UNSIZED col does NOT absorb the surplus in
+        // fixed-table layout — the browser instead spreads it proportionally
+        // across the sized columns, stretching everything.)
+        style={nameFluid
+          ? { width: '100%', minWidth: packedWidth }
+          : { width: packedWidth }}
         className="group/list min-w-full table-fixed bg-card border-separate border-spacing-0 text-[13px]"
         data-has-selection={hasSelection ? '' : undefined}
       >
@@ -477,7 +484,9 @@ export function ListTable({
         <colgroup>
           <col style={{ width: 28, minWidth: 28 }} />
           <col style={{ width: 28, minWidth: 28 }} />
-          <col style={{ width: cols.widthFor(NAME_COL_KEY), minWidth: cols.widthFor(NAME_COL_KEY) }} />
+          <col style={nameFluid
+            ? { width: '100%', minWidth: cols.widthFor(NAME_COL_KEY) }
+            : { width: cols.widthFor(NAME_COL_KEY), minWidth: cols.widthFor(NAME_COL_KEY) }} />
           {visibleColumns.map((c) => {
             const w = cols.widthFor(c.id);
             // Match the data cells' `table-cell` so the column track
@@ -485,7 +494,7 @@ export function ListTable({
             // an empty gap and force horizontal scroll in narrow panels.
             return <col key={c.id} className="table-column" style={{ width: w, minWidth: w }} />;
           })}
-          {hasTrailingCol && <col className="table-column" style={{ width: '100%', minWidth: 80 }} />}
+          {hasTrailingCol && <col className="table-column" style={nameFluid ? { width: 80, minWidth: 80 } : { width: '100%', minWidth: 80 }} />}
         </colgroup>
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
@@ -498,9 +507,6 @@ export function ListTable({
             <th className="sticky top-0 left-7 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
             <th className="sticky top-0 md:left-14 z-30 relative pl-0.5 pr-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card border-b border-border/60">
               Name
-              {/* Short centered vertical divider (30px) on the column's right
-                  edge — a slim separator, not a full-header-height border. */}
-              <span aria-hidden className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 h-[30px] w-px bg-border/60" />
               {/* Name is resizable too — same handle as the data columns,
                   persisted under NAME_COL_KEY. Fixed on the Object list
                   instead (see the colgroup above), so no handle there. */}
