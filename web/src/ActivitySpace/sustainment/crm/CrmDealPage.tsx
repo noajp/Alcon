@@ -27,7 +27,8 @@ function DealPeople({ crm, deal, onOpenContact }: { crm: Crm; deal: CrmDeal; onO
   const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const run = (work: Promise<unknown>) => { setError(null); work.catch(cause => setError(cause instanceof Error ? cause.message : t('Could not save. Try again.'))); };
-  const rows = crm.dealContacts.filter(row => row.deal_id === deal.id)
+  // The main contact shows once, as the main contact.
+  const rows = crm.dealContacts.filter(row => row.deal_id === deal.id && row.contact_id !== deal.contactId)
     .map(row => ({ row, contact: crm.contacts.find(contact => contact.id === row.contact_id) }))
     .filter((item): item is { row: typeof item.row; contact: NonNullable<typeof item.contact> } => !!item.contact)
     .sort((a, b) => DEAL_ROLES.indexOf(a.row.role) - DEAL_ROLES.indexOf(b.row.role) || a.contact.name.localeCompare(b.contact.name));

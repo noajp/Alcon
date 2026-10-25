@@ -78,5 +78,5 @@ export function historyLine(kind: CrmActivityKind, body: string, stages: readonl
 
 /** A person's part in a deal's decision, as people say it. */
 export const ROLE_LABEL: Record<CrmDealRole, string> = {
-  decision_maker: 'Decision maker', champion: 'Champion', influencer: 'Influencer', blocker: 'Blocker', user: 'User', other: 'Other',
+  decision_maker: 'Decision maker', champion: 'Champion', influencer: 'Influencer', blocker: 'Blocker', user: 'End user', other: 'Other role',
 };

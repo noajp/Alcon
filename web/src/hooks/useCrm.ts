@@ -148,7 +148,8 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
   };
 
   const resolved = useRef(new Map<string, string>());
-  async function companyFor(name: string): Promise<string> {
+  /** `domainId`: the Domain of the deal's own pipeline, which a new record joins. */
+  async function companyFor(name: string, domainId: string | null = pipeline?.domain_id ?? null): Promise<string> {
     const lower = name.trim().toLowerCase();
     const known = resolved.current.get(`company:${lower}`) ?? (companies.data ?? []).find(company => company.name.trim().toLowerCase() === lower)?.id;
     if (known) return known;
@@ -157,12 +158,12 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     const match = (fresh.data ?? []).find(company => (company.name as string).trim().toLowerCase() === lower);
     if (match) { resolved.current.set(`company:${lower}`, match.id as string); return match.id as string; }
     // A company met through a Domain's pipeline belongs to that Domain.
-    const inserted = await supabase.from('crm_companies').insert({ activity_space_id: space(), name: name.trim(), owner_worker_id: me, domain_id: pipeline?.domain_id ?? null }).select('id').single();
+    const inserted = await supabase.from('crm_companies').insert({ activity_space_id: space(), name: name.trim(), owner_worker_id: me, domain_id: domainId }).select('id').single();
     const id = check(inserted).id as string;
     resolved.current.set(`company:${lower}`, id);
     return id;
   }
-  async function contactFor(name: string, email: string | null, companyId: string | null): Promise<string> {
+  async function contactFor(name: string, email: string | null, companyId: string | null, domainId: string | null = pipeline?.domain_id ?? null): Promise<string> {
     const lower = name.trim().toLowerCase();
     const cacheKey = `contact:${companyId ?? ''}:${lower}`;
     const cached = resolved.current.get(cacheKey);
@@ -173,7 +174,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
       resolved.current.set(cacheKey, existing.id);
       return existing.id;
     }
-    const id = check(await supabase.from('crm_contacts').insert({ activity_space_id: space(), name: name.trim(), email, company_id: companyId, owner_worker_id: me, domain_id: pipeline?.domain_id ?? null }).select('id').single()).id;
+    const id = check(await supabase.from('crm_contacts').insert({ activity_space_id: space(), name: name.trim(), email, company_id: companyId, owner_worker_id: me, domain_id: domainId }).select('id').single()).id;
     resolved.current.set(cacheKey, id);
     return id;
   }
@@ -203,9 +204,12 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     if (patch.nextStepOn !== undefined) row.next_step_on = patch.nextStepOn;
     if (patch.renewsOn !== undefined) row.renews_on = patch.renewsOn;
     if (patch.companyId !== undefined) row.company_id = patch.companyId;
-    if (patch.companyName) row.company_id = await companyFor(patch.companyName);
+    // New records join the Domain of the deal's own pipeline, not the one on screen.
+    const existingDeal = dealId ? deals.data?.find(item => item.id === dealId) : undefined;
+    const domainId = (existingDeal ? (pipelines.data ?? []).find(item => item.id === existingDeal.pipeline_id) : pipeline)?.domain_id ?? null;
+    if (patch.companyName) row.company_id = await companyFor(patch.companyName, domainId);
     if (patch.contactId !== undefined) row.contact_id = patch.contactId;
-    if (patch.contactName) row.contact_id = await contactFor(patch.contactName, patch.contactEmail ?? null, (row.company_id as string | undefined) ?? null);
+    if (patch.contactName) row.contact_id = await contactFor(patch.contactName, patch.contactEmail ?? null, (row.company_id as string | undefined) ?? null, domainId);
     try {
       let id = dealId;
       if (id) { if (Object.keys(row).length) check(await supabase.from('crm_deals').update(row).eq('id', id).select('id').single()); }
@@ -259,9 +263,15 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
    * at the deal's company. */
   const addDealContact = async (dealId: string, contact: { id?: string; name?: string }, role: CrmDealRole) => {
     const deal = deals.data?.find(item => item.id === dealId);
-    const contactId = contact.id ?? await contactFor(contact.name ?? '', null, deal?.company_id ?? null);
-    try { check(await supabase.from('crm_deal_contacts').insert({ activity_space_id: space(), deal_id: dealId, contact_id: contactId, role }).select('id').single()); }
-    finally { await invalidate(); }
+    const domainId = (pipelines.data ?? []).find(item => item.id === deal?.pipeline_id)?.domain_id ?? null;
+    const contactId = contact.id ?? await contactFor(contact.name ?? '', null, deal?.company_id ?? null, domainId);
+    // A name can resolve to someone already on the deal.
+    if (contactId === deal?.contact_id || (dealContacts.data ?? []).some(row => row.deal_id === dealId && row.contact_id === contactId)) throw new Error('This person is already on the deal.');
+    try {
+      const result = await supabase.from('crm_deal_contacts').insert({ activity_space_id: space(), deal_id: dealId, contact_id: contactId, role }).select('id').single();
+      if (result.error?.code === '23505') throw new Error('This person is already on the deal.');
+      check(result);
+    } finally { await invalidate(); }
   };
   const updateDealContact = async (id: string, patch: { role?: CrmDealRole; note?: string | null }) => {
     try { check(await supabase.from('crm_deal_contacts').update(patch).eq('id', id).select('id').single()); } finally { await invalidate(); }
