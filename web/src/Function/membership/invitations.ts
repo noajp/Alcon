@@ -9,7 +9,7 @@ import { translate } from '@/Function/i18n/I18nProvider';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
-import type { InvitationScope, InvitationStatus, MembershipInvitation } from '@/types/database';
+import type { InvitationRole, InvitationScope, InvitationStatus, MembershipInvitation } from '@/types/database';
 
 // Membership takes effect when the invited person accepts (ADR 0029). An
 // invitation is its own row; the membership tables only ever hold people who
@@ -40,8 +40,11 @@ function scopeColumn(scope: InvitationScope): 'activity_space_id' | 'domain_id' 
 
 /** The RPCs' refusals, in the viewer's language. */
 function invitationErrorMessage(error: unknown): string {
-  const e = error as { code?: string; message?: string } | null;
+  const e = error as { code?: string; message?: string; hint?: string } | null;
   const message = e?.message ?? '';
+  if (/viewer_reaches_through_space/.test(e?.hint ?? '')) {
+    return translate('This person already works in this Domain through its Space. Invite them as a member, or change their role in the member list.');
+  }
   if (e?.code === '42501') return translate('Only people who manage this can invite to it or cancel an invitation.');
   if (e?.code === '23505') {
     return translate(/pending/i.test(message)
@@ -69,8 +72,11 @@ function afterJoining(): void {
   notifyDomainsChanged();
 }
 
-export async function inviteMember(scope: InvitationScope, scopeId: string, userId: string): Promise<string> {
-  const { data, error } = await supabase.rpc('invite_member', { p_scope: scope, p_scope_id: scopeId, p_user: userId });
+/** Invite someone to a Space, Domain or Object. A Domain invitation may make
+ *  them a viewer, who reads everything in it and changes nothing. */
+export async function inviteMember(scope: InvitationScope, scopeId: string, userId: string, role: InvitationRole = 'member'): Promise<string> {
+  const args = { p_scope: scope, p_scope_id: scopeId, p_user: userId, ...(role === 'viewer' ? { p_role: role } : {}) };
+  const { data, error } = await supabase.rpc('invite_member', args);
   if (error) throw new Error(invitationErrorMessage(error));
   invalidateInvitations();
   return data as string;
@@ -133,6 +139,7 @@ export interface PendingInvitee {
   invitationId: string;
   userId: string;
   invitedBy: string | null;
+  role: InvitationRole;
   name: string | null;
   avatarUrl: string | null;
 }
@@ -148,12 +155,12 @@ export function useScopeInvitations(scope: InvitationScope, scopeId: string | nu
     queryFn: async (): Promise<PendingInvitee[]> => {
       const { data, error } = await supabase
         .from('membership_invitations')
-        .select('id, invitee_id, invited_by')
+        .select('id, invitee_id, invited_by, role')
         .eq(scopeColumn(scope), scopeId!)
         .eq('status', 'pending')
         .order('created_at');
       if (error) throw error;
-      const rows = (data ?? []) as { id: string; invitee_id: string; invited_by: string | null }[];
+      const rows = (data ?? []) as { id: string; invitee_id: string; invited_by: string | null; role: InvitationRole | null }[];
       if (rows.length === 0) return [];
       const { data: profiles, error: profileError } = await supabase
         .from('profiles')
@@ -165,6 +172,7 @@ export function useScopeInvitations(scope: InvitationScope, scopeId: string | nu
         invitationId: r.id,
         userId: r.invitee_id,
         invitedBy: r.invited_by,
+        role: r.role === 'viewer' ? 'viewer' : 'member',
         name: byId.get(r.invitee_id)?.display_name ?? null,
         avatarUrl: byId.get(r.invitee_id)?.avatar_url ?? null,
       }));

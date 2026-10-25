@@ -203,12 +203,15 @@ export interface ActivitySpaceMember {
 // invitation becomes one only when the invitee accepts it.
 // =====================================================
 export type MemberRole = 'owner' | 'admin' | 'member'
+// A Domain also has viewers: they read everything in it and change nothing.
+// Object membership has no viewer role.
+export type DomainMemberRole = MemberRole | 'viewer'
 
 export interface DomainMember {
   id: string
   domain_id: string
   user_id: string
-  role: MemberRole
+  role: DomainMemberRole
   created_at: string | null
 }
 
@@ -216,7 +219,7 @@ export interface DomainMemberInsert {
   id?: string
   domain_id: string
   user_id: string
-  role?: MemberRole
+  role?: DomainMemberRole
 }
 
 export interface ObjectMember {
@@ -239,6 +242,7 @@ export interface ObjectMemberInsert {
 // only by the invite_member / respond_to_invite / cancel_invite RPCs.
 export type InvitationScope = 'space' | 'domain' | 'object'
 export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'canceled'
+export type InvitationRole = 'member' | 'viewer'
 
 export interface MembershipInvitation {
   id: string
@@ -247,7 +251,8 @@ export interface MembershipInvitation {
   object_id: string | null
   invitee_id: string
   invited_by: string | null
-  role: 'member'
+  /** 'viewer' only for a Domain invitation. */
+  role: InvitationRole
   /** The Space / Domain / Object name when the invitation was sent. */
   scope_name: string
   inviter_name: string | null

@@ -40,6 +40,11 @@ import { CustomView } from '@/ActivitySpace/execution/element/custom';
 import { ObjectIcon } from '@/shell/icons';
 import { useDomains } from '@/hooks/useSupabase';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
+import { useCurrentUserId } from '@/providers/authContext';
+import { useDomainRole } from './data';
+import { useMyObjectMemberships } from '@/ActivitySpace/execution/object/useMyMemberships';
+import { isViewOnly } from '@/ActivitySpace/execution/object/objectAccess';
+import { ViewOnlyBadge } from '@/Function/shared/ViewOnlyBadge';
 
 // Per-Domain — each Domain remembers its own active tab + visible tabs (keyed
 // by Domain id). Previously these were single global keys, which made every
@@ -107,6 +112,9 @@ interface DomainViewProps {
 export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, onViewChange }: DomainViewProps) {
   const explorerData = useExplorerData();
   const { openCreate } = useWorkspaceActions();
+  const userId = useCurrentUserId();
+  const domainRole = useDomainRole(activeDomainId ?? null);
+  const { data: myObjectMemberships } = useMyObjectMemberships(userId);
   const { guestDomains } = useDomains();
   const { data: domains } = useSustainmentDomains();
   const activeDomain = useMemo(
@@ -301,10 +309,14 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
   //    action bar so the create CTA owns that area, but KEEP the TabBar
   //    visible so the user can still flip back to Overview.
   const isEmptyDomain = !selectedObject && explorerData.objects.length === 0;
+  // A Domain viewer reads; the add controls would only be refused.
+  const viewOnly = isViewOnly(domainRole.data, myObjectMemberships, selectedObject?.id);
   const isEmptyObjectElements =
     !!selectedObject && effectiveActiveType === 'elements' && (selectedObject.elements ?? []).length === 0;
   const hideTabBarChrome = isEmptyDomain;
-  const headerActions = selectedObject ? (
+  const headerActions = viewOnly ? (
+    <div className="ml-auto flex items-center gap-2 pr-2"><ViewOnlyBadge /></div>
+  ) : selectedObject ? (
     <div className="ml-auto flex items-center gap-2">
       {!isEmptyObjectElements && (
         <Button variant="ghost" size="icon-xs"

@@ -50,7 +50,7 @@ export async function updateDomain(id: string, updates: DomainUpdate): Promise<D
   return data;
 }
 
-export type DomainRole = 'owner' | 'admin' | 'member';
+export type DomainRole = 'owner' | 'admin' | 'member' | 'viewer';
 
 /** The viewer's own seat in a Domain. It answers the question RLS answers on
  *  write — owner and admin may change the Domain — so a page can show an

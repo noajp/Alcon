@@ -753,7 +753,7 @@ function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
   );
 }
 
-type DomainRole = 'owner' | 'admin' | 'member';
+type DomainRole = 'owner' | 'admin' | 'member' | 'viewer';
 
 function DomainSettingsModal({
   domain,
