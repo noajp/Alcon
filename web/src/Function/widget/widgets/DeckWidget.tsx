@@ -10,6 +10,7 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { SlideScaler, SlideView } from '@/ActivitySpace/sustainment/slides/kata/components/slides/SlideView';
 import { deckLang, effectiveRoles, setSlidePath, updateSlide } from '@/ActivitySpace/sustainment/slides/kata/model/deck';
 import { mixTokens } from '@/ActivitySpace/sustainment/slides/kata/theme/mix';
+import { useKataLocale } from '@/ActivitySpace/sustainment/slides/useKataLocale';
 import { useKata, useLookMap } from '@/ActivitySpace/sustainment/slides/kata/store/useKata';
 import { AppShell } from '@/ActivitySpace/sustainment/slides/kata/components/shell/AppShell';
 import { useSlidesSync } from '@/ActivitySpace/sustainment/slides/sync';
@@ -64,6 +65,7 @@ function FullScreenEditor({ deckId, onClose }: { deckId: string; onClose: () => 
  * remembers which deck it shows.
  */
 export function DeckWidget({ params, setParams, host }: WidgetProps) {
+  useKataLocale();
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
   const { ready, error } = useSlidesSync(spaceId);

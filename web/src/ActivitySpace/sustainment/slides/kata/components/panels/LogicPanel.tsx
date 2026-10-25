@@ -155,7 +155,7 @@ export function LogicPanel() {
           {(
             [
               ["deck", tx("全体の構成", "Whole deck")],
-              ["page", tx(`このページ（${String(view.index + 1).padStart(2, "0")}）`, `This page (${String(view.index + 1).padStart(2, "0")})`)],
+              ["page", tx("このページ（{n}）", "This page ({n})", { n: String(view.index + 1).padStart(2, "0") })],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -232,7 +232,7 @@ function DeckTab() {
                 onClick={() => {
                   if (on) return;
                   setStoryline(s.id);
-                  pushMessage({ from: "kata", text: tx(`「${s.name}」の順に組み直しました。手で付け替えた役割はそのまま残しています。`, `Reordered as “${s.name}”. Roles you set by hand are kept.`) });
+                  pushMessage({ from: "kata", text: tx("「{name}」の順に組み直しました。手で付け替えた役割はそのまま残しています。", "Reordered as “{name}”. Roles you set by hand are kept.", { name: s.name }) });
                 }}
                 className={clsx("flex flex-col gap-2 rounded-xl p-2.5 text-left", on ? "bg-k-chosen ring-2 ring-k-ink" : "ring-1 ring-k-line hover:ring-k-ink-3")}
               >
@@ -298,13 +298,13 @@ function DeckTab() {
               <GripVertical size={12} className="cursor-grab text-k-ink-3" aria-hidden="true" />
               <span className="font-mono text-[10px] text-k-ink-3">{String(i + 1).padStart(2, "0")}</span>
               <select
-                aria-label={tx(`${i + 1}枚目の役割`, `Role of slide ${i + 1}`)}
+                aria-label={tx("{n}枚目の役割", "Role of slide {n}", { n: i + 1 })}
                 title={s.role ? tx("手で決めた役割", "Role set by hand") : tx("語る順番の型から自動で決めた役割", "Role set automatically from the storyline")}
                 value={s.role ?? ""}
                 onChange={(e) => editDeck((d) => setRole(d, s.id, e.target.value || undefined))}
                 className={clsx("h-6 w-full rounded-md border px-1 text-[11px]", s.role ? "border-k-ink bg-k-panel font-semibold" : "border-k-line bg-k-panel-2 text-k-ink-2")}
               >
-                <option value="">{s.role ? tx(`自動に戻す（${auto[i]}）`, `Reset to auto (${roleLabel(auto[i])})`) : roleLabel(auto[i])}</option>
+                <option value="">{s.role ? tx("自動に戻す（{role}）", "Reset to auto ({role})", { role: roleLabel(auto[i]) }) : roleLabel(auto[i])}</option>
                 {options.map((o) => (
                   <option key={o} value={o}>
                     {roleLabel(o)}
@@ -323,11 +323,11 @@ function DeckTab() {
                 }}
                 aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
                 className="line-clamp-2 text-left text-[12px] leading-snug text-k-ink"
-                title={tx(`${s.title}（Alt + ↑↓ で並べ替え）`, `${s.title} (Alt + ↑↓ to reorder)`)}
+                title={tx("{title}（Alt + ↑↓ で並べ替え）", "{title} (Alt + ↑↓ to reorder)", { title: s.title })}
               >
                 {s.title || <span className="text-k-ink-3">{tx("（タイトル未入力）", "(Untitled)")}</span>}
               </button>
-              <button type="button" aria-label={tx(`${i + 1}枚目を削除`, `Delete slide ${i + 1}`)} onClick={() => deleteSlide(i)} className="flex h-6 w-6 items-center justify-center rounded-md text-k-ink-3 opacity-0 transition-opacity hover:bg-k-panel hover:text-k-danger focus:opacity-100 group-hover:opacity-100">
+              <button type="button" aria-label={tx("{n}枚目を削除", "Delete slide {n}", { n: i + 1 })} onClick={() => deleteSlide(i)} className="flex h-6 w-6 items-center justify-center rounded-md text-k-ink-3 opacity-0 transition-opacity hover:bg-k-panel hover:text-k-danger focus:opacity-100 group-hover:opacity-100">
                 <Trash2 size={12} />
               </button>
             </li>
@@ -368,7 +368,7 @@ function PageTab() {
             onChange={(e) => editDeck((d) => setRole(d, slide.id, e.target.value || undefined))}
             className="h-7 rounded-md border border-k-line-strong bg-k-panel px-2 text-[12px]"
           >
-            <option value="">{slide.role ? tx(`自動に戻す（${auto[index]}）`, `Reset to auto (${roleLabel(auto[index])})`) : tx(`自動：${auto[index]}`, `Auto: ${roleLabel(auto[index])}`)}</option>
+            <option value="">{slide.role ? tx("自動に戻す（{role}）", "Reset to auto ({role})", { role: roleLabel(auto[index]) }) : tx("自動：{role}", "Auto: {role}", { role: roleLabel(auto[index]) })}</option>
             {options.map((o) => (
               <option key={o} value={o}>
                 {roleLabel(o)}

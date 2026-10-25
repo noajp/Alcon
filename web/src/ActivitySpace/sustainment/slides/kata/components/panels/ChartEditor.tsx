@@ -61,7 +61,7 @@ export function ChartEditor({ slide }: { slide: Slide }) {
               <input
                 key={`s-${si}-${c.series[si]?.name ?? ""}`}
                 defaultValue={c.series[si]?.name ?? ""}
-                placeholder={c.kind === "scatter" ? (si === 0 ? tx("横軸", "X") : tx("縦軸", "Y")) : tx(`系列${si + 1}`, `Series ${si + 1}`)}
+                placeholder={c.kind === "scatter" ? (si === 0 ? tx("横軸", "X") : tx("縦軸", "Y")) : tx("系列{n}", "Series {n}", { n: si + 1 })}
                 aria-label={tx("系列の名前", "Series name")}
                 onBlur={(e) => set((x) => ({ ...x, series: x.series.map((s, j) => (j === si ? { ...s, name: e.target.value } : s)) }))}
                 className="h-6 rounded border border-transparent bg-transparent px-1 text-[10px] hover:border-k-line"
@@ -108,7 +108,7 @@ export function ChartEditor({ slide }: { slide: Slide }) {
           <button
             type="button"
             disabled={c.categories.length >= 12}
-            onClick={() => set((x) => ({ ...x, categories: [...x.categories, tx(`項目${x.categories.length + 1}`, `Item ${x.categories.length + 1}`)], series: x.series.map((s) => ({ ...s, values: [...s.values, 0] })) }))}
+            onClick={() => set((x) => ({ ...x, categories: [...x.categories, tx("項目{n}", "Item {n}", { n: x.categories.length + 1 })], series: x.series.map((s) => ({ ...s, values: [...s.values, 0] })) }))}
             className="flex h-8 items-center gap-1.5 rounded-md px-2 text-[12px] text-k-ink-2 hover:bg-k-hover hover:text-k-ink disabled:opacity-30"
           >
             <Plus size={13} /> {tx("行を足す", "Add row")}
@@ -117,7 +117,7 @@ export function ChartEditor({ slide }: { slide: Slide }) {
             <button
               type="button"
               disabled={c.series.length >= 3}
-              onClick={() => set((x) => ({ ...x, series: [...x.series, { name: tx(`系列${x.series.length + 1}`, `Series ${x.series.length + 1}`), values: x.categories.map(() => 0) }] }))}
+              onClick={() => set((x) => ({ ...x, series: [...x.series, { name: tx("系列{n}", "Series {n}", { n: x.series.length + 1 }), values: x.categories.map(() => 0) }] }))}
               className="flex h-8 items-center gap-1.5 rounded-md px-2 text-[12px] text-k-ink-2 hover:bg-k-hover hover:text-k-ink disabled:opacity-30"
             >
               <Plus size={13} /> {tx("系列を足す", "Add series")}

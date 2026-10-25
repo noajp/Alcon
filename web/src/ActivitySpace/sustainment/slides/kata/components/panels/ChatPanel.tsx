@@ -139,7 +139,7 @@ function Welcome({ canTry }: { canTry: boolean }) {
           <button
             key={x.id}
             type="button"
-            onClick={() => sendToKata("", { name: tx(`見本：${x.name}`, `Sample: ${x.name}`), body: x.text })}
+            onClick={() => sendToKata("", { name: tx("見本：{name}", "Sample: {name}", { name: x.name }), body: x.text })}
             className="group flex items-center justify-between gap-3 rounded-xl border border-k-line px-3 py-2.5 text-left hover:border-k-ink"
           >
             <span className="flex flex-col gap-0.5">

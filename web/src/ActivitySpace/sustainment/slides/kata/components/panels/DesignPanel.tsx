@@ -130,7 +130,7 @@ export function DesignPanel() {
           <button
             type="button"
             onClick={() => {
-              const id = saveLook(tx(`ミックス ${custom.length + 1}`, `Mix ${custom.length + 1}`), tokens, "mine");
+              const id = saveLook(tx("ミックス {n}", "Mix {n}", { n: custom.length + 1 }), tokens, "mine");
               useKata.getState().notify(tx("今のミックスをマイ世界観に保存しました", "Saved the current mix to My looks"));
               setEditing(id);
             }}
@@ -181,7 +181,7 @@ export function DesignPanel() {
                 {custom.some((c) => c.id === look.id) ? (
                   <button
                     type="button"
-                    aria-label={tx(`${look.name}を編集`, `Edit ${look.name}`)}
+                    aria-label={tx("{name}を編集", "Edit {name}", { name: look.name })}
                     onClick={() => setEditing(look.id)}
                     className="absolute bottom-[26px] right-2 flex h-6 w-6 items-center justify-center rounded-md text-k-ink-3 hover:bg-k-panel hover:text-k-ink"
                   >
@@ -224,7 +224,7 @@ export function DesignPanel() {
                         key={id}
                         type="button"
                         aria-pressed={active}
-                        aria-label={tx(`${el.label}：${look.name}`, `${el.label}: ${look.name}`)}
+                        aria-label={tx("{label}：{name}", "{label}: {name}", { label: el.label, name: look.name })}
                         onClick={() => pinElement(el.key, pinned && active ? null : id)}
                         className={clsx("flex h-8 items-center gap-1.5 rounded-lg border px-1.5 pr-2 text-[11px]", active ? "border-k-ink bg-k-panel text-k-ink" : "border-k-line text-k-ink-3 hover:border-k-ink-3")}
                       >

@@ -1,3 +1,4 @@
+import { translate } from '@/Function/i18n/I18nProvider';
 import type { CustomColumnOptions, CustomColumnType, Json, SelectOption } from '@/types/database';
 
 export interface FieldDraft {
@@ -8,7 +9,13 @@ export interface FieldDraft {
 
 export const CHOICE_TYPES: CustomColumnType[] = ['select', 'multi_select', 'status'];
 export const FIELD_COLORS = ['var(--text-secondary)', 'var(--accent-default)', 'var(--status-success)', 'var(--status-warning)', 'var(--status-danger)'];
-export const optionLabel = (option: SelectOption) => option.label ?? option.value;
+/** The status names the app itself writes when a Status Property is made.
+ *  They are stored in English — grouping into to-do / in progress / complete
+ *  matches them by English keyword — and shown in the viewer's language.
+ *  A name a person typed is shown as typed. */
+const DEFAULT_OPTION_NAMES = new Set(['New status', 'In progress', 'Done']);
+export const optionLabel = (option: SelectOption) =>
+  option.label ?? (DEFAULT_OPTION_NAMES.has(option.value) ? translate(option.value) : option.value);
 
 export function validateField(draft: FieldDraft): string | null {
   if (!draft.name.trim()) return 'Enter a field name.';

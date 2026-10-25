@@ -66,10 +66,10 @@ export function reviewWithSkills(deck: Deck, skills: Skill[]): Finding[] {
     for (const s of deck.slides) {
       const text = slideText(s);
       for (const t of terms) {
-        if (hasStray(text, t)) out.push({ slideId: s.id, kind: "用語", text: tx(`「${sk.name}」：「${t.from}」ではなく「${t.to}」と書く。`, `"${sk.name}": write "${t.to}", not "${t.from}".`) });
+        if (hasStray(text, t)) out.push({ slideId: s.id, kind: "用語", text: tx("「{skill}」：「{from}」ではなく「{to}」と書く。", "\"{skill}\": write \"{to}\", not \"{from}\".", { skill: sk.name, from: t.from, to: t.to }) });
       }
       for (const w of sk.banned) {
-        if (w && text.includes(w)) out.push({ slideId: s.id, kind: "語尾", text: tx(`「${sk.name}」：「${w}」は使わない。`, `"${sk.name}": don't use "${w}".`) });
+        if (w && text.includes(w)) out.push({ slideId: s.id, kind: "語尾", text: tx("「{skill}」：「{word}」は使わない。", "\"{skill}\": don't use \"{word}\".", { skill: sk.name, word: w }) });
       }
     }
   }

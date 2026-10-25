@@ -140,6 +140,11 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   'Delete this record?': ['この記録を削除しますか？', '이 기록을 삭제할까요?', 'Supprimer cet enregistrement ?', '¿Eliminar este registro?'],
   'Change scope': ['範囲を切り替える', '범위 변경', 'Changer de périmètre', 'Cambiar el ámbito'],
 
+  // ── Names the app writes ──────────────────────────────────────
+  'New status': ['新しいステータス', '새 상태', 'Nouveau statut', 'Nuevo estado'],
+  'Untitled deck': ['無題の資料', '제목 없는 자료', 'Présentation sans titre', 'Presentación sin título'],
+  'Folder': ['フォルダ', '폴더', 'Dossier', 'Carpeta'],
+
   // ── Calendar ──────────────────────────────────────────────────
   'All day': ['終日', '종일', 'Toute la journée', 'Todo el día'],
 

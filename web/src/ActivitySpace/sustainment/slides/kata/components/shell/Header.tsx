@@ -66,7 +66,6 @@ export function Header() {
             {tx("やりたいことを探す", "Search actions")}
             <kbd className="rounded border border-k-line px-1 font-mono text-[10px]">⌘K</kbd>
           </button>
-          <LangToggle />
           <div className="mr-1 hidden items-center rounded-full border border-k-line bg-k-panel text-[12px] text-k-ink-2 xl:flex">
             <button type="button" onClick={() => {
                 const st = useKata.getState();
@@ -140,7 +139,7 @@ function ExportMenu() {
               setBusy(true);
               try {
                 await exportPptx(view.deck, view.tokens, view.roles, view.file.name);
-                useKata.getState().notify(tx(`「${view.file.name}.pptx」を書き出しました`, `Exported “${view.file.name}.pptx”`));
+                useKata.getState().notify(tx("「{name}.pptx」を書き出しました", "Exported “{name}.pptx”", { name: view.file.name }));
               } finally {
                 setBusy(false);
               }
@@ -210,17 +209,3 @@ function UndoRedo({ fileId }: { fileId: string }) {
   );
 }
 
-function LangToggle() {
-  const lang = useKata((s) => s.lang);
-  return (
-    <button
-      type="button"
-      onClick={() => useKata.getState().setLangPref(lang === "en" ? "ja" : "en")}
-      aria-label={lang === "en" ? "日本語に切り替える" : "Switch to English"}
-      title={lang === "en" ? "日本語に切り替える" : "Switch to English"}
-      className="h-8 rounded-lg px-2 text-[12px] font-medium text-k-ink-2 hover:bg-k-hover hover:text-k-ink"
-    >
-      {lang === "en" ? "日本語" : "EN"}
-    </button>
-  );
-}

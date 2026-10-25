@@ -56,7 +56,7 @@ export function rowFromFile(file: KataFile, spaceId: string) {
     id: file.id,
     activity_space_id: spaceId,
     folder_id: file.folderId || null,
-    name: file.name.trim().slice(0, 200) || 'Untitled deck',
+    name: file.name.trim().slice(0, 200) || translate('Untitled deck'),
     deck: file.deck,
     mix: file.mix,
     chat: file.chat,
@@ -169,7 +169,7 @@ function start(spaceId: string): Session {
     try {
       if (diff.upsertFolders.length) {
         const { error } = await supabase.from('deck_folders').upsert(
-          diff.upsertFolders.map(({ f, i }) => ({ id: f.id, activity_space_id: spaceId, name: f.name.trim().slice(0, 200) || 'Folder', position: i })));
+          diff.upsertFolders.map(({ f, i }) => ({ id: f.id, activity_space_id: spaceId, name: f.name.trim().slice(0, 200) || translate('Folder'), position: i })));
         if (error) throw error;
       }
       const conflicts: string[] = [];

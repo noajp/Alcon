@@ -170,8 +170,14 @@ export function respondLocally(deck: Deck, current: number, text: string, skills
       current: 0,
       reply:
         tx(
-          `${next.slides.length}枚に組みました。${long ? "長い文書なので、エグゼクティブサマリーと目次のあと、章ごとに中扉を立てています。" : ""}順番は「${STORYLINE_BY_ID[next.storyline].name}」、ページの型は ${[...layouts].join("・")} を使っています。各ページの下に、元にした箇所を書いてあります。前の内容には ⌘Z で戻れます。`,
-          `Built ${next.slides.length} slides. ${long ? "It's a long document, so after the executive summary and agenda each chapter gets a divider. " : ""}Order: "${STORYLINE_BY_ID[next.storyline].name}"; page types: ${[...layouts].join(", ")}. Each page notes the source passage at the bottom. ⌘Z brings back the previous version.`,
+          "{n}枚に組みました。{long}順番は「{order}」、ページの型は {layouts} を使っています。各ページの下に、元にした箇所を書いてあります。前の内容には ⌘Z で戻れます。",
+          "Built {n} slides. {long}Order: \"{order}\"; page types: {layouts}. Each page notes the source passage at the bottom. ⌘Z brings back the previous version.",
+          {
+            n: next.slides.length,
+            long: long ? tx("長い文書なので、エグゼクティブサマリーと目次のあと、章ごとに中扉を立てています。", "It's a long document, so after the executive summary and agenda each chapter gets a divider. ") : "",
+            order: STORYLINE_BY_ID[next.storyline].name,
+            layouts: [...layouts].join(tx("・", ", ")),
+          },
         ) + lang,
     };
   }
@@ -182,12 +188,12 @@ export function respondLocally(deck: Deck, current: number, text: string, skills
   if (!addingEn && (/(用語|言葉).*(そろえ|揃え|統一)/.test(t) || /\b(align|unify|standardi[sz]e|harmoni[sz]e)\b.*\b(terms?|terminology|wording)\b/i.test(t))) {
     const r = applyTerms(deck, skills);
     if (!r.count) return { reply: tx("マイ・スキルの用語で直すところはありませんでした。決まりは左下の「マイ・スキル」で足せます。", "Nothing to change against your My Skills terms. You can add rules under My Skills at the bottom left.") };
-    return { deck: r.deck, reply: tx(`マイ・スキルの用語に ${r.count} か所そろえました。`, `Aligned ${r.count} place${r.count === 1 ? "" : "s"} to your My Skills terms.`) };
+    return { deck: r.deck, reply: (r.count === 1 ? tx("マイ・スキルの用語に {n} か所そろえました。", "Aligned {n} place to your My Skills terms.", { n: r.count }) : tx("マイ・スキルの用語に {n} か所そろえました。", "Aligned {n} places to your My Skills terms.", { n: r.count })) };
   }
 
   const issue = ISSUES.find((x) => x.askJa === t || x.askEn.toLowerCase() === t.toLowerCase());
   if (issue) {
-    return { deck: { ...deck, storyline: issue.storyline }, current: 0, reply: tx(`論点を「${issue.label}」に置き直しました。${issue.note}`, `Reframed the issue as "${issue.label}". ${issue.note}`) };
+    return { deck: { ...deck, storyline: issue.storyline }, current: 0, reply: tx("論点を「{label}」に置き直しました。{note}", "Reframed the issue as \"{label}\". {note}", { label: issue.label, note: issue.note }) };
   }
 
   if (!addingEn && (/(赤入れ|レビュー|チェック|見直)/.test(t) || /\b(review|red[- ]?pen|check|proofread|critique)\b/i.test(t))) {
@@ -197,8 +203,8 @@ export function respondLocally(deck: Deck, current: number, text: string, skills
       const i = deck.slides.findIndex((s) => s.id === x.slideId);
       return `・${i >= 0 ? no(i) + tx("　", "  ") : ""}${x.text}`;
     });
-    const more = f.length > 6 ? tx(`\nほか ${f.length - 6} 件`, `\n…and ${f.length - 6} more`) : "";
-    return { reply: `${tx(`赤入れが ${f.length} 件あります。`, `${f.length} red-pen note${f.length === 1 ? "" : "s"}:`)}\n${lines.join("\n")}${more}` };
+    const more = f.length > 6 ? tx("\nほか {n} 件", "\n…and {n} more", { n: f.length - 6 }) : "";
+    return { reply: `${(f.length === 1 ? tx("赤入れが {n} 件あります。", "{n} red-pen note:", { n: f.length }) : tx("赤入れが {n} 件あります。", "{n} red-pen notes:", { n: f.length }))}\n${lines.join("\n")}${more}` };
   }
 
   for (const [re, id] of STORY_WORDS) {
@@ -206,9 +212,9 @@ export function respondLocally(deck: Deck, current: number, text: string, skills
       const second = deck.slides[1];
       const hint =
         id === "pyramid" && second && second.layout !== "statement"
-          ? tx("この型は2枚目の結論が要です。2枚目を「一言と数字」にして、結論を一文で書くと生きます。", ` This order hinges on the answer on slide 2. Make slide 2 a "${LAYOUT_BY_ID.statement.name}" and state the answer in one sentence.`)
+          ? tx("この型は2枚目の結論が要です。2枚目を「{layout}」にして、結論を一文で書くと生きます。", " This order hinges on the answer on slide 2. Make slide 2 a \"{layout}\" and state the answer in one sentence.", { layout: LAYOUT_BY_ID.statement.name })
           : "";
-      return { deck: { ...deck, storyline: id }, reply: tx(`「${STORYLINE_BY_ID[id].name}」の順に組み直しました。手で付け替えた役割はそのまま残しています。${hint}`, `Reordered as "${STORYLINE_BY_ID[id].name}". Roles you set by hand are kept.${hint}`) };
+      return { deck: { ...deck, storyline: id }, reply: tx("「{name}」の順に組み直しました。手で付け替えた役割はそのまま残しています。{hint}", "Reordered as \"{name}\". Roles you set by hand are kept.{hint}", { name: STORYLINE_BY_ID[id].name, hint }) };
     }
   }
 
@@ -219,14 +225,14 @@ export function respondLocally(deck: Deck, current: number, text: string, skills
   if (!shrinking && !addingEn && THIS_PAGE.test(t)) {
     if (DELETE_WORDS.test(t)) {
       if (deck.slides.length <= 1) return { reply: tx("最後の1枚なので消せません。中身を書き換えるか、新しく流し直してください。", "This is the only slide, so it can't be deleted. Rewrite it, or paste new material to rebuild.") };
-      return { deck: deleteSlide(deck, current), current: Math.max(0, current - 1), reply: tx(`${no(current)} を消しました。`, `Deleted ${no(current)}.`) };
+      return { deck: deleteSlide(deck, current), current: Math.max(0, current - 1), reply: tx("{slide} を消しました。", "Deleted {slide}.", { slide: no(current) }) };
     }
     for (const [re, id] of LAYOUT_WORDS) {
       if (re.test(t)) {
         const slide = deck.slides[current];
         return {
           deck: setLayout(deck, slide.id, id),
-          reply: tx(`${no(current)} を「${LAYOUT_BY_ID[id].name}」の組み方に変えました。前の中身は残してあるので、戻せば元に戻ります。`, `Changed ${no(current)} to "${LAYOUT_BY_ID[id].name}". The previous content is kept, so switching back restores it.`),
+          reply: tx("{slide} を「{layout}」の組み方に変えました。前の中身は残してあるので、戻せば元に戻ります。", "Changed {slide} to \"{layout}\". The previous content is kept, so switching back restores it.", { slide: no(current), layout: LAYOUT_BY_ID[id].name }),
         };
       }
     }
@@ -234,11 +240,11 @@ export function respondLocally(deck: Deck, current: number, text: string, skills
 
   if (!addingEn && SUMMARY_CMD.test(t)) {
     const at = deck.slides.findIndex((x) => x.layout === "summary");
-    if (at >= 0) return { current: at, reply: tx(`サマリーはもう ${no(at)} にあります。`, `There's already a summary at ${no(at)}.`) };
+    if (at >= 0) return { current: at, reply: tx("サマリーはもう {slide} にあります。", "There's already a summary at {slide}.", { slide: no(at) }) };
     const sum = summarySlide(deck.slides);
     const next = insertSlide(deck, deck.slides[0]?.layout === "cover" ? 0 : -1, sum);
     const pos = next.slides.findIndex((x) => x.id === sum.id);
-    return { deck: next, current: pos, reply: tx(`${no(pos)} にエグゼクティブサマリーを入れました。要点のページ番号は並びを変えても追いかけます。`, `Added an executive summary as ${no(pos)}. Its page references follow the slides if you reorder.`) };
+    return { deck: next, current: pos, reply: tx("{slide} にエグゼクティブサマリーを入れました。要点のページ番号は並びを変えても追いかけます。", "Added an executive summary as {slide}. Its page references follow the slides if you reorder.", { slide: no(pos) }) };
   }
 
   if (!addingEn && CHART_CMD.test(t)) {
@@ -246,21 +252,22 @@ export function respondLocally(deck: Deck, current: number, text: string, skills
     if (!slide) return { reply: "" };
     return {
       deck: setLayout(deck, slide.id, "chart"),
-      reply: tx(`${no(current)} をグラフにしました。数の並びから種類を選んでいます。前の中身は残してあるので、戻せば元に戻ります。`, `Turned ${no(current)} into a chart, picking the type from the numbers. The previous content is kept, so switching back restores it.`),
+      reply: tx("{slide} をグラフにしました。数の並びから種類を選んでいます。前の中身は残してあるので、戻せば元に戻ります。", "Turned {slide} into a chart, picking the type from the numbers. The previous content is kept, so switching back restores it.", { slide: no(current) }),
     };
   }
 
   const count = parseCount(t);
   if (count && count >= 2 && !addingEn && (/(減ら|まとめ|圧縮|絞|にして|以内)/.test(t) || SHRINK_WORDS.test(t) || /\b(make it|keep it to|go to)\b/i.test(t))) {
-    if (count === deck.slides.length) return { reply: tx(`今もちょうど ${count} 枚です。`, `It's already exactly ${count} slides.`) };
-    if (count > deck.slides.length) return { reply: tx(`今は ${deck.slides.length} 枚なので、${count} 枚にするには増やす必要があります。足したいことを書いてください。`, `There are ${deck.slides.length} slides now, so getting to ${count} means adding some. Tell me what to add.`) };
+    if (count === deck.slides.length) return { reply: tx("今もちょうど {n} 枚です。", "It's already exactly {n} slides.", { n: count }) };
+    if (count > deck.slides.length) return { reply: tx("今は {have} 枚なので、{n} 枚にするには増やす必要があります。足したいことを書いてください。", "There are {have} slides now, so getting to {n} means adding some. Tell me what to add.", { have: deck.slides.length, n: count }) };
     const next = compressDeck(deck, count);
     return {
       deck: next,
       current: 0,
       reply: tx(
-        `${deck.slides.length} 枚から ${next.slides.length} 枚に絞りました。表紙・要約・結びは残し、本体を等間隔に残しています。消えたページは「論理構成」から戻すより、もう一度流し直すほうが早いです。`,
-        `Condensed from ${deck.slides.length} to ${next.slides.length} slides, keeping the cover, summary and close and evenly sampling the body. To bring dropped pages back, rebuilding from the source is quicker than restoring them one by one.`,
+        "{from} 枚から {to} 枚に絞りました。表紙・要約・結びは残し、本体を等間隔に残しています。消えたページは「論理構成」から戻すより、もう一度流し直すほうが早いです。",
+        "Condensed from {from} to {to} slides, keeping the cover, summary and close and evenly sampling the body. To bring dropped pages back, rebuilding from the source is quicker than restoring them one by one.",
+        { from: deck.slides.length, to: next.slides.length },
       ),
     };
   }
@@ -274,7 +281,7 @@ export function respondLocally(deck: Deck, current: number, text: string, skills
     const at = AT_END.test(t) ? (deck.slides[lastIdx]?.layout === "closing" ? lastIdx - 1 : lastIdx) : current;
     const next = insertSlide(deck, at, slide);
     const pos = next.slides.findIndex((s) => s.id === slide.id);
-    return { deck: next, current: pos, reply: tx(`${no(pos)} に「${slide.title}」を足しました。中身は画面の上で直接書き込めます。`, `Added "${slide.title}" as ${no(pos)}. You can type the content right on the slide.`) };
+    return { deck: next, current: pos, reply: tx("{slide} に「{title}」を足しました。中身は画面の上で直接書き込めます。", "Added \"{title}\" as {slide}. You can type the content right on the slide.", { slide: no(pos), title: slide.title }) };
   }
 
   return {

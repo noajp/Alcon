@@ -441,7 +441,7 @@ export function sectionToSlide(s: Section): Slide {
       const key = rows.find((r) => /(狙える|合計|全体|総額|規模)|\b(addressable|total|overall|market size|TAM|SAM)\b/i.test(r[0])) ?? rows[rows.length - 1];
       if (key?.[1] && FIGURE.test(key[1])) title = isLatin(key[0]) ? `${capFirst(key[0])} is ${key[1]}` : `${key[0]}は${key[1]}`;
     }
-    const src = sources.length ? tx(`出典：${sources.join("、")}`, `Source: ${sources.join(", ")}`) : source;
+    const src = sources.length ? tx("出典：{sources}", "Source: {sources}", { sources: sources.join(tx("、", ", ")) }) : source;
     // 値が全部数の表は、4行以上か時間の並びならグラフにする（ゼラズニー：メッセージ→比較→グラフ）
     const allNumeric = columns.length > 0 && rows.every((r) => columns.every((_, ci) => parseNumber(r[ci + 1] ?? "") !== null));
     // 列ごとに単位がそろっているときだけ（「$3M / 6 months / 200 users」は比べる表のまま）

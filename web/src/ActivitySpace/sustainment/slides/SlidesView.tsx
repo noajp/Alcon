@@ -4,6 +4,7 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { AppShell } from './kata/components/shell/AppShell';
 import { useSlidesSync } from './sync';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { useKataLocale } from './useKataLocale';
 
 /**
  * Slides: the presentation editor (formerly the Kata app) on a Space's decks.
@@ -12,6 +13,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
  */
 export function SlidesView() {
   const { t } = useI18n();
+  useKataLocale();
   const spaceId = useActiveSpaceId();
   const { ready, error } = useSlidesSync(spaceId);
   if (!spaceId) return <p className="p-6 text-sm text-muted-foreground">{t('Open a Space to work on its decks.')}</p>;
