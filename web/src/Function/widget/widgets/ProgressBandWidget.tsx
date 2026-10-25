@@ -5,6 +5,7 @@ import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import type { WidgetHost } from '../types';
 import { completionOf, isOpenStatus } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { isOverdue } from '@/Function/shared/dateUtils';
 
 /**
  * The band. One line above everything else: how much of this subject is done,
@@ -19,10 +20,7 @@ export function ProgressBandWidget({ host }: { host: WidgetHost }) {
   const stats = useMemo(() => {
     const { done, total, pct } = completionOf(host.elements);
     const inProgress = host.elements.filter((e) => e.status === 'in_progress').length;
-    const overdue = host.elements.filter((e) => {
-      if (!e.due_date || !isOpenStatus(e.status)) return false;
-      return new Date(e.due_date) < new Date();
-    }).length;
+    const overdue = host.elements.filter((e) => isOpenStatus(e.status) && isOverdue(e.due_date)).length;
     return { total, done, inProgress, overdue, pct };
   }, [host.elements]);
 

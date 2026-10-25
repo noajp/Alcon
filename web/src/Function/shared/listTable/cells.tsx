@@ -1,7 +1,7 @@
 'use client';
 
 import { parseDateOnly, toDateOnlyString as formatDateOnly } from '@/Function/shared/dateUtils';
-import { ActivitySignal } from '@/ActivitySpace/execution/element/ActivitySignal';
+import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { Button } from '@/ui/button';
 import { useCallback, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
@@ -23,8 +23,8 @@ import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/prefer
 import { CustomColumnCell, CellText, EmptyCellMark, CELL_TRIGGER_BASE, CELL_TRIGGER_EMPTY, CELL_POPOVER_RADIUS } from '@/Function/property/CustomColumnCell';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { PriorityPicker } from '@/Function/shared/PriorityPicker';
-import { StatusPicker } from '@/ActivitySpace/execution/element/StatusPicker';
-import { type DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
+import { StatusPicker } from '@/Function/shared/StatusPicker';
+import { type DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { type ElementUpdate, formatDateShort } from './shared';
 import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';

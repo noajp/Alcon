@@ -10,7 +10,7 @@ import { PageHead, PageLayout } from '@/Function/shared/PageHead';
 import { RailCard } from '@/Function/shared/RailCard';
 import { RailRow } from '@/Function/shared/RailRow';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
-import { updateDomain, useDomainRole } from './data';
+import { updateDomain, useDomainRole } from '@/hooks/domainData';
 import type { NavigationState } from '@/types/navigation';
 import { ViewOnlyBadge } from '@/Function/shared/ViewOnlyBadge';
 import { useI18n } from '@/Function/i18n/I18nProvider';

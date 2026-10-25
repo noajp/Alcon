@@ -10,7 +10,7 @@ import { NavHomeIcon } from '@/shell/sidebar/NavIcons';
 import { MyElementsView } from '@/ActivitySpace/home/MyElementsView';
 import { NowScreen } from '@/ActivitySpace/home/now/NowScreen';
 import { ProfileAI } from '@/Function/copilot/ProfileAI';
-import { useSelfWorker } from '@/ActivitySpace/sustainment/team/data';
+import { useSelfWorker } from '@/hooks/teamData';
 import { useNotes } from '@/hooks/useNotesDb';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';

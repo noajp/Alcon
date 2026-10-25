@@ -6,7 +6,7 @@ import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { CONTROL } from '@/shared/designTokens';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { fromDateOnlyString } from '@/Function/shared/dateUtils';
+import { fromDateOnlyString, daysBetween } from '@/Function/shared/dateUtils';
 import { PLAN_HORIZON_DAYS, proposalPrerequisites, type Plan, type PlanIssue, type Proposal } from './workloadRebalance';
 import { applyWorkloadProposal } from './workloadActions';
 
@@ -225,8 +225,8 @@ function ProposalCard({ proposal: p, element, name, prerequisites, applying, loc
       ? t('Move to {start} – {due}', { start: day(p.to.start), due: day(p.to.due) })
       : t('Move to {date}', { date: day(p.to.due ?? p.to.start) });
     detail = p.to.due
-      ? t('The due date moves {n} days. Nobody has room, and nothing can start earlier.', { n: daysBetween(p.from.due, p.to.due) })
-      : t('The start moves {n} days. Nobody has room on the current day.', { n: daysBetween(p.from.start, p.to.start) });
+      ? t('The due date moves {n} days. Nobody has room, and nothing can start earlier.', { n: spanDays(p.from.due, p.to.due) })
+      : t('The start moves {n} days. Nobody has room on the current day.', { n: spanDays(p.from.start, p.to.start) });
     warn = true;
   }
 
@@ -273,11 +273,10 @@ function targetDetail(target: { peakAfter: number; freeHours: number; familiarit
   return parts.join(' · ');
 }
 
-function daysBetween(from: string | null, to: string | null): number {
-  const a = from ? fromDateOnlyString(from) : null;
-  const b = to ? fromDateOnlyString(to) : null;
-  if (!a || !b) return 0;
-  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
+function spanDays(from: string | null, to: string | null): number {
+  const a = fromDateOnlyString(from);
+  const b = fromDateOnlyString(to);
+  return a && b ? daysBetween(a, b) : 0;
 }
 
 function round1(n: number): string {

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { fieldDisplayLabel } from './fieldModel';
-import type { DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
+import type { DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { MenuSectionLabel } from '@/Function/shared/menu';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 

@@ -31,7 +31,7 @@ import { CrmCompanies, CrmCompanyPage, CrmContactPage, CrmContacts } from './Crm
 import { CrmForecast } from './CrmForecast';
 import { CrmSettings } from './CrmSettings';
 import { CrmDealPage } from './CrmDealPage';
-import { setActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+import { setActiveDomainId } from '@/Function/space/domainsStore';
 import { CrmCapture } from './CaptureDialog';
 import { CrmPicker } from './CrmPicker';
 

@@ -3,7 +3,8 @@
 // the AI; the AI's reading, when it arrives, is validated by the same rules and
 // replaces only the fields it actually found. Nothing is written until the
 // person applies the proposal.
-import { ACTIVITY_TYPES, dayIndex, resolveStage, shiftDate, stageChange, stageKey, type CrmActivityType, type CrmDeal, type CrmStage } from './crmModel';
+import { ACTIVITY_TYPES, resolveStage, stageChange, stageKey, type CrmActivityType, type CrmDeal, type CrmStage } from './crmModel';
+import { dayIndexOf, shiftDateOnly } from '@/Function/shared/dateUtils';
 
 export interface CaptureFields {
   name?: string;
@@ -70,7 +71,7 @@ interface FoundDate { date: string; index: number }
 export function findDates(input: string, today: string): FoundDate[] {
   const [year, month] = today.split('-').map(Number);
   const found: FoundDate[] = [];
-  const push = (date: string | null, index: number) => { if (date && dayIndex(date) !== null) found.push({ date, index }); };
+  const push = (date: string | null, index: number) => { if (date && dayIndexOf(date) !== null) found.push({ date, index }); };
   for (const match of input.matchAll(/\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/g)) {
     push(`${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`, match.index!);
   }
@@ -81,15 +82,15 @@ export function findDates(input: string, today: string): FoundDate[] {
     // two days ago, "12/20" written on Jan 5 is last December, "1/15" in October is next year.
     const pad = (n: number) => String(n).padStart(2, '0');
     const candidate = [year - 1, year, year + 1].map(y => `${y}-${pad(m)}-${pad(d)}`)
-      .filter(value => dayIndex(value) !== null)
-      .sort((a, b) => Math.abs(dayIndex(a)! - dayIndex(today)!) - Math.abs(dayIndex(b)! - dayIndex(today)!))[0];
+      .filter(value => dayIndexOf(value) !== null)
+      .sort((a, b) => Math.abs(dayIndexOf(a)! - dayIndexOf(today)!) - Math.abs(dayIndexOf(b)! - dayIndexOf(today)!))[0];
     if (!candidate) continue;
     push(candidate, match.index!);
   }
   const relative: [RegExp, () => string][] = [
     [/\btoday\b|今日|本日/i, () => today],
-    [/\btomorrow\b|明日/i, () => shiftDate(today, 1)],
-    [/\bnext week\b|来週/i, () => shiftDate(today, 7)],
+    [/\btomorrow\b|明日/i, () => shiftDateOnly(today, 1)],
+    [/\bnext week\b|来週/i, () => shiftDateOnly(today, 7)],
     [/\bend of next month\b|来月末/i, () => lastOfMonth(year, month)],
     [/\bend of (the )?month\b|今月末|(?<![来今])月末/i, () => lastOfMonth(year, month - 1)],
     [/(?<!end of )\bnext month\b|来月(?!末)/i, () => new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10)],
@@ -104,7 +105,7 @@ export function findDates(input: string, today: string): FoundDate[] {
     const match = pattern.exec(input);
     if (!match) continue;
     const ahead = ((weekday - todayDay + 7) % 7) || 7;
-    push(shiftDate(today, ahead), match.index);
+    push(shiftDateOnly(today, ahead), match.index);
   }
   // A phrase like "来月末" also matches "来月"; keep one date per position.
   const unique = new Map<number, FoundDate>();
@@ -263,7 +264,7 @@ export function parseAiCapture(reply: string, input: string, deals: readonly Crm
   if (typeof raw.probability === 'number' && raw.probability >= 0 && raw.probability <= 100) fields.probability = Math.round(raw.probability);
   for (const key of ['closeDate', 'nextActionDate'] as const) {
     const value = clean(raw[key], 10);
-    if (value && dayIndex(value) !== null) fields[key] = value;
+    if (value && dayIndexOf(value) !== null) fields[key] = value;
   }
   const nextStep = clean(raw.nextStep); if (nextStep) fields.nextStep = nextStep;
   const dealId = typeof json.dealId === 'string' && deals.some(deal => deal.id === json.dealId) ? json.dealId : null;

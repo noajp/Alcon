@@ -3,6 +3,7 @@ import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import { completionOf, isOpenStatus } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { isOverdue } from '@/Function/shared/dateUtils';
 
 export function ObjectProgressWidget({ explorerData }: { explorerData: ExplorerData }) {
   const { t } = useI18n();
@@ -13,7 +14,7 @@ export function ObjectProgressWidget({ explorerData }: { explorerData: ExplorerD
         const els = obj.elements ?? [];
         const { done, total, pct } = completionOf(els);
         const inProg = els.filter(e => e.status === 'in_progress').length;
-        const overdue = els.filter(e => e.due_date && new Date(e.due_date) < new Date() && isOpenStatus(e.status)).length;
+        const overdue = els.filter(e => isOpenStatus(e.status) && isOverdue(e.due_date)).length;
         return (
           <div key={obj.id} className="flex items-center gap-4">
             <div className="flex-1 min-w-0">

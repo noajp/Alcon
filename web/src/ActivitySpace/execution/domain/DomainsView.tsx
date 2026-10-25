@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useDomains } from '@/hooks/useSupabase';
-import { getActiveDomainId, setActiveDomainId } from './domainsStore';
+import { getActiveDomainId, setActiveDomainId } from '@/Function/space/domainsStore';
 import { ChevronRight } from 'lucide-react';
 
 const DomainIconSvg = ({ size = 16 }: { size?: number }) => (

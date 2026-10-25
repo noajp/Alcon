@@ -20,6 +20,7 @@ import {
   usePreference, getCachedTimelineScale, getCachedTimelineMonthsBack, getCachedTimelineMonthsAhead,
   getCachedTimelineTodayMarker, getCachedTimelineProgressFill, type TimelineScale,
 } from '@/Function/settings/preferencesStore';
+import { daysBetween, startOfDay, parseDateOnly } from '@/Function/shared/dateUtils';
 
 // =============================================================
 // Timeline — Linear-Roadmap-style portfolio timeline for the
@@ -35,7 +36,6 @@ import {
 // of its Elements' dates.
 // =============================================================
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 // Pixels per day by scale (Settings > Strategy > Timeline): month ≈ 120px
 // per month, quarter ≈ 60px. The window (months back / ahead) is a
 // preference too; both are read live, so a change in Settings redraws an
@@ -158,7 +158,7 @@ export function TimelineView({
 
   const todayX = useMemo(() => {
     if (!showToday) return null;
-    const t = stripTime(new Date());
+    const t = startOfDay(new Date());
     if (t < windowStart || t > windowEnd) return null;
     return daysBetween(windowStart, t) * dayW + dayW / 2;
   }, [windowStart, windowEnd, dayW, showToday]);
@@ -593,15 +593,6 @@ function GridCell({
 // =============================================================
 // Date helpers
 // =============================================================
-function stripTime(d: Date): Date {
-  const r = new Date(d);
-  r.setHours(0, 0, 0, 0);
-  return r;
-}
-
-function daysBetween(a: Date, b: Date): number {
-  return Math.round((b.getTime() - a.getTime()) / DAY_MS);
-}
 
 function quarterOf(d: Date): number {
   return Math.floor(d.getMonth() / 3) + 1;
@@ -618,14 +609,14 @@ function quarterLabel(d: Date): string {
 /** An Object's span: its own start/due dates, falling back to the union
  *  of its Elements' dates when it has none of its own. */
 function objectRange(obj: AlconObject, elements: ElementWithDetails[]): DateRange | null {
-  const s = obj.start_date ? stripTime(new Date(obj.start_date)) : null;
-  const d = obj.due_date ? stripTime(new Date(obj.due_date)) : null;
+  const s = parseDateOnly(obj.start_date, null);
+  const d = parseDateOnly(obj.due_date, null);
   if (s || d) return { start: s ?? d!, end: d ?? s! };
   let min: Date | null = null;
   let max: Date | null = null;
   for (const el of elements) {
-    const es = el.start_date ? stripTime(new Date(el.start_date)) : null;
-    const ed = el.due_date ? stripTime(new Date(el.due_date)) : null;
+    const es = parseDateOnly(el.start_date, null);
+    const ed = parseDateOnly(el.due_date, null);
     const lo = es ?? ed;
     const hi = ed ?? es;
     if (lo && (!min || lo < min)) min = lo;

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { fetchElementDeletions, restoreElement, type ElementDeletion } from '@/ActivitySpace/execution/element/data';
+import { fetchElementDeletions, restoreElement, type ElementDeletion } from '@/hooks/elementData';
 
 /**
  * Elements deleted from this Object. Deleting keeps the Element and its

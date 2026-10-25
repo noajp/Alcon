@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import type { NavigationState } from '@/types/navigation';
-import { setActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+import { setActiveDomainId } from '@/Function/space/domainsStore';
 import { NotebookSurface } from '@/ActivitySpace/sustainment/notebook/NotebookSurface';
 import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
 

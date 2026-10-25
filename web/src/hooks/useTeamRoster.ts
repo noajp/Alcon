@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getActiveSpaceId, useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { buildTeamRoster, mergeTeamDomainMembers, type TeamElement, type TeamRosterSource } from '@/ActivitySpace/sustainment/team/teamRoster';
 import type { SpaceGuestRow } from '@/Function/space/data';
-import { updateWorker } from '@/ActivitySpace/sustainment/team/data';
+import { updateWorker } from '@/hooks/teamData';
 import { readAllIn, readAllPages, rowId, uniqueById } from '@/hooks/readAllPages';
 import { fetchSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { supabase } from '@/lib/supabase';

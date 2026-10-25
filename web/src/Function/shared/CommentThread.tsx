@@ -8,7 +8,8 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdo
 import { MenuShell, MENU_SEPARATOR } from '@/Function/shared/menu/MenuShell';
 import type { CommentAuthorKind } from '@/types/database';
 import { MarkdownLite } from './MarkdownLite';
-import { translate, useI18n } from '@/Function/i18n/I18nProvider';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { formatAge } from '@/Function/shared/dateUtils';
 
 // =============================================================
 // The parts every comment thread is made of.
@@ -31,15 +32,6 @@ export interface CommentEntryData {
 
 /** Relative age, coarse on purpose: a thread reads as a conversation, and an
  *  exact timestamp on every line makes it read as a log. */
-function formatCommentAge(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return translate('just now');
-  if (m < 60) return translate('{n}m', { n: m });
-  const h = Math.floor(m / 60);
-  if (h < 24) return translate('{n}h', { n: h });
-  return translate('{n}d', { n: Math.floor(h / 24) });
-}
 
 /** Tint @name runs so a mention is findable when skimming. Purely visual —
  *  the authoritative mention list is the row's `mentions` column. */
@@ -129,7 +121,7 @@ export function CommentEntry({
         {avatar}
         <span className="text-[13px] font-medium text-foreground truncate">{comment.author_name || t('Unknown')}</span>
         {meta}
-        <span className="text-[12px] text-muted-foreground shrink-0">{formatCommentAge(comment.created_at)}</span>
+        <span className="text-[12px] text-muted-foreground shrink-0">{formatAge(comment.created_at)}</span>
         {menu && <span className="ml-auto shrink-0">{menu}</span>}
       </div>
       {comment.author_kind === 'ai_agent' ? (

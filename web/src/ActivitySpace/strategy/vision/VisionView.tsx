@@ -20,11 +20,11 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useCurrentUserId } from '@/providers/authContext';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useInitiativeHealth } from '@/ActivitySpace/strategy/initiative/useInitiativeHealth';
-import { usePortfolios } from '@/ActivitySpace/strategy/portfolio/data';
+import { usePortfolios } from '@/hooks/portfolioData';
 import { buildPortfolioTree, groupByPortfolio, initiativesInSpace, rollupPortfolio } from '@/ActivitySpace/strategy/portfolio/portfolioGroups';
 import { NavPortfolioIcon, NavStrategyIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
 import type { StrategyWithObjects, Vision, VisionUpdate } from '@/types/database';
-import { createVision, resolveVision, setStrategyVision, updateVision, useVisions } from './data';
+import { createVision, resolveVision, setStrategyVision, updateVision, useVisions } from '@/hooks/visionData';
 import { useSpaceRoleQuery } from '@/Function/space/data';
 
 // Strategy > Vision — what the Space aims for. A Space holds any number of

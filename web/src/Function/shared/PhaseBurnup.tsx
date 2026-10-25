@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import type { Phase } from '@/hooks/useSupabase';
-import { parseYMD, phaseWindowMs } from '@/Function/shared/phaseWindow';
+import { phaseWindowMs } from '@/Function/shared/phaseWindow';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { DAY_MS, formatDateOnly, parseDateOnly } from '@/Function/shared/dateUtils';
 
 // =============================================================
 // PhaseBurnup — the plan layer's one instrument for "are we going to make
@@ -51,9 +52,9 @@ export function PhaseBurnup({
   // Weekend bands + weekly tick marks, walked day by day.
   const weekendRects: { x1: number; x2: number }[] = [];
   const ticks: { x: number; label: string }[] = [];
-  const day = 24 * 60 * 60 * 1000;
-  const startD = parseYMD(phase.start_date!);
-  ticks.push({ x: x(t0), label: fmtDate(phase.start_date, locale)! });
+  const day = DAY_MS;
+  const startD = parseDateOnly(phase.start_date)!;
+  ticks.push({ x: x(t0), label: formatDateOnly(phase.start_date, locale)! });
   for (let t = t0; t < t1; t += day) {
     const d = new Date(startD.getFullYear(), startD.getMonth(), startD.getDate() + Math.round((t - t0) / day));
     if (d.getDay() === 6) {
@@ -64,7 +65,7 @@ export function PhaseBurnup({
       ticks.push({ x: x(t), label: d.toLocaleDateString(locale, { month: 'short', day: 'numeric' }) });
     }
   }
-  ticks.push({ x: x(t1), label: fmtDate(phase.end_date, locale)! });
+  ticks.push({ x: x(t1), label: formatDateOnly(phase.end_date, locale)! });
 
   const hatchId = `phase-hatch-${phase.id}`;
   const baseline = H - padB;
@@ -167,10 +168,3 @@ export function PhaseBurnup({
   );
 }
 
-// 'YYYY-MM-DD' → "Jul 14" (local, no timezone drift on bare dates).
-function fmtDate(s: string | null, locale: string): string | null {
-  if (!s) return null;
-  const [y, m, d] = s.split('T')[0].split('-').map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d).toLocaleDateString(locale, { month: 'short', day: 'numeric' });
-}

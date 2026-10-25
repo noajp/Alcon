@@ -3,8 +3,8 @@
 import { toggleSubelementComplete } from '@/hooks/useSupabase';
 import { Check } from 'lucide-react';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
-import { displayIdOf } from './displayId';
-import { DisplayIdChip } from './DisplayIdChip';
+import { displayIdOf } from '@/Function/shared/element/displayId';
+import { DisplayIdChip } from '@/Function/shared/element/DisplayIdChip';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface SubelementRowProps {

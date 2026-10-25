@@ -7,7 +7,7 @@ import {
   updateElement,
   useDomains,
 } from '@/hooks/useSupabase';
-import { notifyDomainsChanged } from '@/ActivitySpace/execution/domain/domainsStore';
+import { notifyDomainsChanged } from '@/Function/space/domainsStore';
 import { hydrateLabelColors, setLabelColorLocal } from '@/Function/shared/labelColor';
 import {
   diffColorPatch,

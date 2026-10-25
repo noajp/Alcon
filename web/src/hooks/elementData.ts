@@ -1,7 +1,7 @@
 'use client';
 
-import type { DependencyBlocker } from '@/ActivitySpace/execution/element/dependencyReadiness';
-import { computeBlockers, upstreamIdsOf } from '@/ActivitySpace/execution/element/dependencyReadiness';
+import type { DependencyBlocker } from '@/Function/shared/element/dependencyReadiness';
+import { computeBlockers, upstreamIdsOf } from '@/Function/shared/element/dependencyReadiness';
 import { applyOptimisticExplorerPatch, invalidateElementDetail } from '@/Function/sync/explorerCache';
 import {
   insertElementIntoExplorer,

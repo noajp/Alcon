@@ -1,6 +1,6 @@
 'use client';
 
-import { ascNullsLast } from '@/ActivitySpace/strategy/initiative/strategyData';
+import { ascNullsLast } from '@/hooks/strategyData';
 import type { PhaseCloseWrite } from '@/ActivitySpace/strategy/phase/phaseClose';
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';

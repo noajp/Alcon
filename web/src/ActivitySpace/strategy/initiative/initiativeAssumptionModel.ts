@@ -32,7 +32,7 @@
 // argument so a test does not have to wait for a due date to pass.
 // =============================================================
 
-import { toDateOnlyString } from '@/Function/shared/dateUtils';
+import { toDateOnlyString, dayNumberIfDate } from '@/Function/shared/dateUtils';
 import { translate } from '@/Function/i18n/I18nProvider';
 import {
   awayDayCount,
@@ -174,13 +174,6 @@ export interface Assumption extends Omit<AssumptionInput, 'watches' | 'workers' 
 
 const BLOCKED = 'blocked';
 
-/** `yyyy-MM-dd` → whole days since the epoch. */
-function dayNumber(day: string): number | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(day);
-  if (!m) return null;
-  const ms = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return Number.isNaN(ms) ? null : Math.round(ms / 86_400_000);
-}
 
 /**
  * One Element's reading.
@@ -195,8 +188,8 @@ function dayNumber(day: string): number | null {
  */
 export function evaluateWatch(input: WatchInput, now: Date): Watch {
   const closed = !isOpenStatus(input.status);
-  const today = dayNumber(toDateOnlyString(now));
-  const due = input.dueDate ? dayNumber(input.dueDate) : null;
+  const today = dayNumberIfDate(toDateOnlyString(now));
+  const due = input.dueDate ? dayNumberIfDate(input.dueDate) : null;
   const late = !closed && today !== null && due !== null && due < today;
   return {
     ...input,

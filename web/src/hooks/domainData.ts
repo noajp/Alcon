@@ -1,6 +1,6 @@
 'use client';
 
-import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/ActivitySpace/execution/domain/domainsStore';
+import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/Function/space/domainsStore';
 import { translate } from '@/Function/i18n/I18nProvider';
 import { domainObjectsRefusal } from '@/Function/shared/objectArchive';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';

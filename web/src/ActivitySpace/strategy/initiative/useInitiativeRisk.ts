@@ -11,7 +11,7 @@ import {
   type InitiativeRiskReport,
   type RiskElement,
   type RiskObject,
-} from '@/ActivitySpace/strategy/initiative/initiativeRiskModel';
+} from '@/Function/strategy/initiativeRiskModel';
 import {
   computeBusFactor,
   type BusElement,

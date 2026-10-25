@@ -6,7 +6,7 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { ObjectIcon } from '@/shell/icons';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
-import { notifyDomainsChanged } from '@/ActivitySpace/execution/domain/domainsStore';
+import { notifyDomainsChanged } from '@/Function/space/domainsStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 

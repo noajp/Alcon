@@ -1,7 +1,7 @@
 import { createDomain, createObject, createElement } from '@/hooks/useSupabase';
-import { createVision } from '@/ActivitySpace/strategy/vision/data';
-import { createPortfolio } from '@/ActivitySpace/strategy/portfolio/data';
-import { createStrategy } from '@/ActivitySpace/strategy/initiative/strategyData';
+import { createVision } from '@/hooks/visionData';
+import { createPortfolio } from '@/hooks/portfolioData';
+import { createStrategy } from '@/hooks/strategyData';
 import type { Locale } from '@/Function/i18n/locales';
 import { starterContent } from './starterContent';
 

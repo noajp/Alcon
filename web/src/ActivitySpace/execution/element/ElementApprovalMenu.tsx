@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/ui/button';
 import { Check, X, AlertCircle, Clock, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { useAssignableWorkers } from '@/ActivitySpace/sustainment/team/data';
+import { useAssignableWorkers } from '@/hooks/teamData';
 import {
   fetchElementApprovals,
   decideApproval,
@@ -19,8 +19,7 @@ import {
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-
-type Translate = (message: string, values?: Record<string, string | number>) => string;
+import { formatAge } from '@/Function/shared/dateUtils';
 
 interface Props {
   element: ElementWithDetails;
@@ -33,17 +32,6 @@ const stateMeta: Record<ApprovalState, { label: string; icon: React.ComponentTyp
   changes_requested:  { label: 'Changes requested', icon: AlertCircle, color: 'text-[var(--accent-default)]' },
   rejected:           { label: 'Rejected',          icon: X,           color: 'text-[var(--status-danger)]' },
 };
-
-function formatRelative(iso: string, t: Translate): string {
-  const d = new Date(iso);
-  const diff = Date.now() - d.getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return t('just now');
-  if (m < 60) return t('{n}m', { n: m });
-  const h = Math.floor(m / 60);
-  if (h < 24) return t('{n}h', { n: h });
-  return t('{n}d', { n: Math.floor(h / 24) });
-}
 
 /**
  * Approval as a single header affordance: a ShieldCheck button that opens a
@@ -248,7 +236,7 @@ export function ElementApprovalMenu({ element, onRefresh }: Props) {
                         <div className="flex items-center gap-1">
                           <span className="font-medium text-foreground truncate">{a.approver_name || t('Unknown')}</span>
                           <span className="text-muted-foreground">{t(m.label)}</span>
-                          <span className="ml-auto text-[10px] text-muted-foreground">{formatRelative(a.decided_at, t)}</span>
+                          <span className="ml-auto text-[10px] text-muted-foreground">{formatAge(a.decided_at)}</span>
                         </div>
                         {a.note && <div className="text-muted-foreground/80 italic">{a.note}</div>}
                       </div>

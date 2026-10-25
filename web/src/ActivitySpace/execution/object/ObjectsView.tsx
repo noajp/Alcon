@@ -9,13 +9,14 @@ import React, { useEffect, useState } from 'react';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, Worker } from '@/hooks/useSupabase';
 import { updateObject, addDomainObjectType, fetchAllWorkers, useDomains } from '@/hooks/useSupabase';
 import { applyObjectFilter, orderObjects, DEFAULT_STATE, type ListControlsState } from '@/Function/shared/listControls';
-import { getActiveDomainId, CREATE_DOMAIN_EVENT } from '@/ActivitySpace/execution/domain/domainsStore';
+import { getActiveDomainId, CREATE_DOMAIN_EVENT } from '@/Function/space/domainsStore';
 import { hydrateLabelColors } from '@/Function/shared/labelColor';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { NavObjectsIcon } from '@/shell/sidebar/NavIcons';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { EmptyState } from '@/Function/shared/EmptyState';
-import { ListTable, type ListSection } from '@/ActivitySpace/execution/object/ListTable';
+import { ListTable } from '@/Function/shared/listTable/ListTable';
+import type { ListSection } from '@/Function/shared/listTable/shared';
 import { ArchivedObjectsSection } from '@/ActivitySpace/execution/object/ArchivedObjects';
 
 // Objects are a flat list within the Domain.

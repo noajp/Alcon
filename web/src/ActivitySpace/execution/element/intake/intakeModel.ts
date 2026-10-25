@@ -1,5 +1,6 @@
 import type { ElementStatus, Worker } from '@/types/database';
 import { translate } from '@/Function/i18n/I18nProvider';
+import { dayIndexOf } from '@/Function/shared/dateUtils';
 
 export const INTAKE_LIMIT = 100;
 export const INTAKE_TEXT_LIMIT = 500_000;
@@ -152,8 +153,7 @@ function parseIntakeDate(value: string): string | null {
   const match = value.trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
   if (!match || Number(match[1]) < 1) return null;
   const day = `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
-  const time = Date.parse(`${day}T00:00:00Z`);
-  return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === day ? day : null;
+  return dayIndexOf(day) === null ? null : day;
 }
 
 export function normalizeIntake(table: IntakeTable, columns: IntakeColumnMap, workers: readonly IntakeWorker[], assigneeMap: Readonly<Record<string, string | null>> = {}): IntakePreview {

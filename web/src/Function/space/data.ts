@@ -1,6 +1,6 @@
 'use client';
 
-import { fetchMySpaceIds, SPACE_IDS_QUERY_KEY } from '@/ActivitySpace/execution/domain/data';
+import { fetchMySpaceIds, SPACE_IDS_QUERY_KEY } from '@/hooks/domainData';
 import { translate } from '@/Function/i18n/I18nProvider';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';

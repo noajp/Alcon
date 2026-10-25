@@ -1,7 +1,7 @@
 'use client';
 
 import { useSustainmentDomains } from './useSustainmentDomains';
-import { useDomains } from '@/ActivitySpace/execution/domain/data';
+import { useDomains } from '@/hooks/domainData';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';

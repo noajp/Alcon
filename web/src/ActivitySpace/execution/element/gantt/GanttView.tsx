@@ -1,6 +1,6 @@
 'use client';
 
-import { parseDateOnly, toDateOnlyString as fmtDateOnly } from '@/Function/shared/dateUtils';
+import { parseDateOnly, toDateOnlyString as fmtDateOnly, addDays, daysBetween, startOfDay, DAY_MS } from '@/Function/shared/dateUtils';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import React, { useState, useMemo, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
@@ -54,28 +54,10 @@ type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
 // aligned (the old per-zoom "column = 1 unit" header drifted off the bars).
 const PX_PER_DAY: Record<ZoomLevel, number> = { day: 40, week: 12, month: 4.5, quarter: 2 };
 
-
 // Stable empty-array default so an omitted `phases` prop doesn't hand the
 // Phase-band memo a fresh reference (and a re-render) every render.
 const EMPTY_PHASES: Phase[] = [];
 const EMPTY_MILESTONES: ObjectMilestone[] = [];
-
-// ---- date-only helpers (local midnight, immune to TZ off-by-one) ----
-
-function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-function addDays(d: Date, n: number): Date {
-  const out = new Date(d);
-  out.setDate(out.getDate() + n);
-  return out;
-}
-
-/** Whole days from a to b — both are local-midnight dates so this is exact. */
-function daysBetween(a: Date, b: Date): number {
-  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
-}
 
 function formatDate(date: Date, format: 'short' | 'full' | 'pill', locale: string): string {
   if (format === 'full') {
@@ -751,8 +733,8 @@ export function GanttView({
               {phases.map((phase, idx) => {
                 const win = phaseWindowMs(phase);
                 if (!win) return null;
-                const left = ((win.t0 - dateRange.start.getTime()) / 86_400_000) * pxPerDay;
-                const right = ((win.t1 - dateRange.start.getTime()) / 86_400_000) * pxPerDay;
+                const left = ((win.t0 - dateRange.start.getTime()) / DAY_MS) * pxPerDay;
+                const right = ((win.t1 - dateRange.start.getTime()) / DAY_MS) * pxPerDay;
                 if (right <= 0 || left >= timelineWidth) return null;
                 const clampedLeft = Math.max(0, left);
                 const clampedWidth = Math.min(timelineWidth, right) - clampedLeft;

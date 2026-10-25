@@ -4,7 +4,7 @@ import { ArrowRight, Clock3, GitBranch, RefreshCw, Upload } from 'lucide-react';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { FONT, statusColor, statusLabel } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { displayIdOf } from '@/ActivitySpace/execution/element/displayId';
+import { displayIdOf } from '@/Function/shared/element/displayId';
 import type { ElementWithDetails } from '@/types/database';
 import { type NowItem, type NowLane, type NowScope, workAssignees, validWorkDate } from './nowModel';
 

@@ -6,7 +6,7 @@ import { Button } from '@/ui/button';
 import { FONT } from '@/shared/designTokens';
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { useStrategies } from '@/ActivitySpace/strategy/initiative/strategyData';
+import { useStrategies } from '@/hooks/strategyData';
 import { forecastFor, type CrmDeal, type CrmWorkspace } from './crmModel';
 import { money } from './crmFormat';
 import { Metric } from './CrmToday';

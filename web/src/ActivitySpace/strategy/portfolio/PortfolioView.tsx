@@ -26,8 +26,8 @@ import { useInitiativeHealth } from '@/ActivitySpace/strategy/initiative/useInit
 import type { InitiativeHealth } from '@/ActivitySpace/strategy/initiative/initiativeHealthModel';
 import { NavPortfolioIcon, NavStrategyIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
 import type { Portfolio, StrategyWithObjects } from '@/types/database';
-import { createPortfolio, deletePortfolio, movePortfolio, PortfolioMoveRefused, setStrategyPortfolio, updatePortfolio, usePortfolios } from './data';
-import { resolveVision, useVisions } from '@/ActivitySpace/strategy/vision/data';
+import { createPortfolio, deletePortfolio, movePortfolio, PortfolioMoveRefused, setStrategyPortfolio, updatePortfolio, usePortfolios } from '@/hooks/portfolioData';
+import { resolveVision, useVisions } from '@/hooks/visionData';
 import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 import {
   buildPortfolioTree, findNode, flattenTree, groupByPortfolio, initiativesInSpace, portfolioPath, rollupPortfolio, subtreeIds,

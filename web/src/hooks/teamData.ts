@@ -2,7 +2,7 @@
 
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { translate } from '@/Function/i18n/I18nProvider';
-import { addElementAssignee } from '@/ActivitySpace/execution/element/data';
+import { addElementAssignee } from '@/hooks/elementData';
 import { partitionAssignable } from '@/Function/shared/assignableWorkers';
 import type { LoadElement } from '@/Function/shared/assignmentLoad';
 import { getActiveSpaceId, useActiveSpaceId } from '@/Function/space/activeSpaceStore';

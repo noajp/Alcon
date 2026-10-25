@@ -1,6 +1,6 @@
 'use client';
 
-import { ascNullsLast } from '@/ActivitySpace/strategy/initiative/strategyData';
+import { ascNullsLast } from '@/hooks/strategyData';
 import { selectIn } from '@/hooks/chunkedIn';
 import { supabase } from '@/lib/supabase';
 import type { ObjectMilestone } from '@/types/database';

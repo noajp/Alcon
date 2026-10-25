@@ -14,7 +14,7 @@ import {
   upstreamIdsOf,
   type DependencyEdgeRow,
   type DependencyUpstreamRow,
-} from '@/ActivitySpace/execution/element/dependencyReadiness';
+} from '@/Function/shared/element/dependencyReadiness';
 
 const el = (
   id: string,

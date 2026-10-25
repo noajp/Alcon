@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { addDays } from '@/Function/shared/dateUtils';
 
 export function MiniGanttWidget({ elements }: { elements: ElementWithDetails[] }) {
   const { t } = useI18n();
@@ -14,7 +15,7 @@ export function MiniGanttWidget({ elements }: { elements: ElementWithDetails[] }
   const dateRange = useMemo(() => {
     if (elementsWithDates.length === 0) {
       const today = new Date();
-      return { start: today, end: new Date(today.getTime() + 30 * 86400000) };
+      return { start: today, end: addDays(today, 30) };
     }
     const dates = elementsWithDates.flatMap(e => [
       new Date(e.start_date!).getTime(),

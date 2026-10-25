@@ -1,3 +1,4 @@
+import { dayIndexOf, shiftDateOnly } from '@/Function/shared/dateUtils';
 // The CRM App's reading of a Space's customer records. Pure: the browser, the
 // AI layer and the tests share it. Records come from the crm_* tables; the
 // next step of a deal is an Element, so Execution and the CRM read one truth.
@@ -200,16 +201,7 @@ export function parseActivityLog(value: unknown): CrmActivity[] {
 
 // ── Dates ───────────────────────────────────────────────────────────────────
 
-const DAY_MS = 86_400_000;
-export function dayIndex(value: string | null | undefined): number | null {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const time = Date.parse(`${value}T00:00:00.000Z`);
-  return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value ? time / DAY_MS : null;
-}
-export function shiftDate(value: string, days: number): string {
-  return new Date((dayIndex(value)! + days) * DAY_MS).toISOString().slice(0, 10);
-}
-const daysBetween = (from: string, to: string) => dayIndex(to)! - dayIndex(from)!;
+const daysBetween = (from: string, to: string) => dayIndexOf(to)! - dayIndexOf(from)!;
 
 // ── Deals ───────────────────────────────────────────────────────────────────
 
@@ -400,7 +392,7 @@ export function buildCrmWorkspace(records: CrmRecords, today: string): CrmWorksp
     return { ...base, health: health(base, today, params.followUpDays), action: nextAction(base, today, params) };
   });
   const totals = new Map<string, CrmWorkspace['totals'][number]>();
-  const horizonEnd = shiftDate(today, params.horizonDays);
+  const horizonEnd = shiftDateOnly(today, params.horizonDays);
   for (const deal of deals) {
     if (!deal.valid || !deal.currency || deal.amount === null || deal.outcome === 'lost' || !deal.outcome) continue;
     const total = totals.get(deal.currency) ?? { currency: deal.currency, pipeline: 0, weightedPipeline: 0, forecast: 0, won: 0, openCount: 0 };
@@ -433,7 +425,7 @@ export function todayQueue(deals: readonly CrmDeal[]): CrmDeal[] {
 
 /** Open deals with a next action in the coming days, in date order. */
 export function upcoming(deals: readonly CrmDeal[], today: string, days = 7): CrmDeal[] {
-  const end = shiftDate(today, days);
+  const end = shiftDateOnly(today, days);
   return deals.filter(deal => deal.outcome === 'open' && deal.valid && deal.nextActionDate && deal.nextActionDate > today && deal.nextActionDate <= end)
     .sort((a, b) => a.nextActionDate!.localeCompare(b.nextActionDate!));
 }
@@ -588,7 +580,7 @@ export function inList(deal: CrmDeal, list: CrmList, today: string, horizonDays:
     case 'renewing': return deal.action?.code === 'renewal_due';
     case 'mine': return !!me && deal.ownerId === me && deal.outcome === 'open';
     case 'at-risk': return deal.health.level === 'risk';
-    case 'closing-soon': return deal.outcome === 'open' && deal.valid && !!deal.closeDate && deal.closeDate >= today && deal.closeDate <= shiftDate(today, horizonDays);
+    case 'closing-soon': return deal.outcome === 'open' && deal.valid && !!deal.closeDate && deal.closeDate >= today && deal.closeDate <= shiftDateOnly(today, horizonDays);
     case 'no-next-step': return deal.outcome === 'open' && !deal.nextActionDate;
     case 'stale': return deal.health.reasons.some(reason => reason.message === '{n} days since last contact');
     case 'won': return deal.outcome === 'won';

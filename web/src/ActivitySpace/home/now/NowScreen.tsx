@@ -5,7 +5,7 @@ import { useCurrentUserId } from '@/providers/authContext';
 import { useDomains } from '@/hooks/useSupabase';
 import { useNowWork } from '@/hooks/useNowWork';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
-import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { fetchObjectDomainIds } from '@/ActivitySpace/execution/object/data';
 import { objectDomainRoute } from '@/shell/navigationState';

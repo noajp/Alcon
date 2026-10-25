@@ -1,7 +1,8 @@
 'use client';
 
 import type { CrmActivityKind, CrmDealRole, CrmHealthLevel, CrmStage } from './crmModel';
-import { dayIndex, readChange } from './crmModel';
+import { readChange } from './crmModel';
+import { dayIndexOf } from '@/Function/shared/dateUtils';
 
 /** Currency amounts, compact when asked. Unknown codes fall back to "CODE 1,234". */
 export function money(amount: number | null | undefined, currency: string | null | undefined, locale: string, compact = false): string {
@@ -23,7 +24,7 @@ export function moneyList(values: Record<string, number>, locale: string, compac
 /** "Today", "Tomorrow", "3 days ago", or a short date. */
 export function relativeDay(value: string | null, today: string, locale: string, t: (message: string, values?: Record<string, string | number>) => string): string {
   if (!value) return '—';
-  const diff = dayIndex(value)! - dayIndex(today)!;
+  const diff = dayIndexOf(value)! - dayIndexOf(today)!;
   if (diff === 0) return t('Today');
   if (diff === 1) return t('Tomorrow');
   if (diff === -1) return t('Yesterday');

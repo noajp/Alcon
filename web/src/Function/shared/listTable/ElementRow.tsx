@@ -4,13 +4,13 @@ import { memo, useState } from 'react';
 import { Grip, Lock, Check, Trash2, Fingerprint } from 'lucide-react';
 import { BUILTIN_COLUMN_ICONS } from '@/Function/property/columnTypes';
 import type { CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
-import { scheduleElementDetailPrefetch, cancelElementDetailPrefetch } from '@/ActivitySpace/execution/element/elementDetailQueries';
+import { scheduleElementDetailPrefetch, cancelElementDetailPrefetch } from '@/hooks/elementDetailQueries';
 import { deleteElement, addElementAssignee, removeElementAssignee, fetchAssignableWorkers, noticeAssignmentFailed } from '@/hooks/useSupabase';
 import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
-import { describeBlocker, type DependencyBlocker } from '@/ActivitySpace/execution/element/dependencyReadiness';
-import { displayIdOf } from '@/ActivitySpace/execution/element/displayId';
-import { DisplayIdChip } from '@/ActivitySpace/execution/element/DisplayIdChip';
-import { liveLease, holderLabel, formatRemaining } from '@/ActivitySpace/execution/element/lease';
+import { describeBlocker, type DependencyBlocker } from '@/Function/shared/element/dependencyReadiness';
+import { displayIdOf } from '@/Function/shared/element/displayId';
+import { DisplayIdChip } from '@/Function/shared/element/DisplayIdChip';
+import { liveLease, holderLabel, formatRemaining } from '@/Function/shared/element/lease';
 import { useNow } from '@/Function/shared/useNow';
 import { useSortable } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
@@ -20,13 +20,14 @@ import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, C
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { PriorityPicker } from '@/Function/shared/PriorityPicker';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '@/shared/designTokens';
-import { ActivitySignal } from '@/ActivitySpace/execution/element/ActivitySignal';
-import { StatusPicker } from '@/ActivitySpace/execution/element/StatusPicker';
-import { type DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
+import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
+import { StatusPicker } from '@/Function/shared/StatusPicker';
+import { type DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { type ElementUpdate, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, selectionSquareClass, STICKY_TINT_SELECTED, STICKY_TINT_HOVER } from './shared';
 import { ElementCell, LabelChip } from './cells';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { statusLabel } from '@/shared/designTokens';
+import { isOverdue } from '@/Function/shared/dateUtils';
 
 // Memoised element row. All props are reference-stable across the common
 // re-render trigger (an element field edit changes only that element's `el`
@@ -80,7 +81,7 @@ export const ElementRow = memo(function ElementRow({
   allCustomColumns, blockers,
 }: ElementRowProps) {
   const { t, locale } = useI18n();
-  const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
+  const overdue = isOverdue(el.due_date, el.status === 'done');
   const showsActivityColumn = visibleColumns.some((c) => c.id === 'activity');
   const rowId = displayIdOf(el);
   // One shared 30s clock for the whole table; a lapsed lease disappears from
@@ -295,7 +296,7 @@ export const ElementRow = memo(function ElementRow({
           el={el}
           elementTypes={elementTypes}
           canUpdate={canUpdate}
-          isOverdue={!!isOverdue}
+          isOverdue={overdue}
           onElementUpdate={onElementUpdate}
           onRefresh={onRefresh}
           onAddType={canAddType ? onAddType : undefined}

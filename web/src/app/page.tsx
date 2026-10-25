@@ -23,7 +23,7 @@ import { seedNotebook } from '@/ActivitySpace/sustainment/notebook/notebookActio
 import { useNotes } from '@/hooks/useNotesDb';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
-import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/ActivitySpace/execution/domain/domainsStore';
+import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/Function/space/domainsStore';
 import { useActiveSpaceId, setActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { OnboardingCreate } from '@/Function/space/OnboardingCreate';
 import { MyInvitations } from '@/Function/membership/MyInvitations';

@@ -2,8 +2,8 @@
 
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useDomains } from '@/ActivitySpace/execution/domain/data';
-import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+import { useDomains } from '@/hooks/domainData';
+import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { addDataTableColumns, createDataTable, deleteDataTable, DATA_TABLES_QUERY_KEY, useDataTables } from '@/ActivitySpace/sustainment/table/data';
 import { OPERATIONS_FIELDS } from '@/ActivitySpace/sustainment/operations/operationsModel';

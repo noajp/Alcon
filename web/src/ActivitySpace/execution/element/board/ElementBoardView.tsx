@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 import { formatElementDate, toDateOnlyString } from '@/Function/shared/dateUtils';
 import { CardAgentControl } from '../agent';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
-import { ActivitySignal } from '../ActivitySignal';
+import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { isCancelKey, isCommitEnter, isSubmitChord } from '@/Function/shared/keyboard';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { PRIORITY, PRIORITY_ORDER } from '@/shared/designTokens';

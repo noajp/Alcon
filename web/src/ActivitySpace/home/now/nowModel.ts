@@ -1,4 +1,5 @@
 import { normalizeDirection, type ElementEdge, type ElementWithDetails } from '@/types/database';
+import { dayIndexOf } from '@/Function/shared/dateUtils';
 
 export type NowLane = 'attention' | 'ready' | 'waiting' | 'later';
 export type NowScope = 'mine' | 'team';
@@ -22,9 +23,7 @@ const priorityRank = { urgent: 0, high: 1, medium: 2, low: 3 };
 /** Calendar dates stay calendar dates; locale-dependent parsing can turn an
  * ambiguous import into a false overdue warning. */
 export function validWorkDate(value: string | null | undefined): string | null {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const time = Date.parse(`${value}T00:00:00Z`);
-  return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value ? value : null;
+  return dayIndexOf(value) === null ? null : value!;
 }
 
 export function localWorkDate(date = new Date()): string {

@@ -26,7 +26,7 @@ import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } fro
 import { assignWorkersToElement, noticeSkippedAssignees, useAssignableWorkers } from '@/hooks/useSupabase';
 import { partitionAssignable } from '@/Function/shared/assignableWorkers';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { type ListSection } from '@/ActivitySpace/execution/object/ListTable';
+import type { ListSection } from '@/Function/shared/listTable/shared';
 import { TabBar } from '@/shell/TabBar';
 import type { NavigationState } from '@/types/navigation';
 import type { Worker, ObjectTab, ObjectTabType, Json } from '@/types/database';

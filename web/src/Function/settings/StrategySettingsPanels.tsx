@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useDomains, updateDomain } from '@/hooks/useSupabase';
 import type { Domain, DomainPhaseDefaults } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { PHASE_DEFAULTS_MAX } from '@/ActivitySpace/strategy/phase/phaseDefaults';
+import { PHASE_DEFAULTS_MAX } from '@/Function/shared/phaseDefaults';
 import { SlaSettings } from './SlaSettings';
 import { SettingsSection, SettingsRow } from './SettingsSection';
 import { Group, SelectRow, SelectControl, ToggleRow } from './SettingsControls';

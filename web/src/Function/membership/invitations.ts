@@ -2,9 +2,9 @@
 
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { SPACE_IDS_QUERY_KEY } from '@/ActivitySpace/execution/domain/data';
-import { notifyDomainsChanged } from '@/ActivitySpace/execution/domain/domainsStore';
-import { invalidateWorkersCache } from '@/ActivitySpace/sustainment/team/data';
+import { SPACE_IDS_QUERY_KEY } from '@/hooks/domainData';
+import { notifyDomainsChanged } from '@/Function/space/domainsStore';
+import { invalidateWorkersCache } from '@/hooks/teamData';
 import { translate } from '@/Function/i18n/I18nProvider';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';

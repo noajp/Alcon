@@ -7,7 +7,7 @@ import { ChoiceCard } from '@/ui/choice-card';
 import { formatElementDate, parseDateOnly } from '@/Function/shared/dateUtils';
 import type { AlconObject } from '@/types/database';
 import { compareDecisionLab, type DecisionLabInput, type DecisionLabComparison, type DecisionLabScenario } from './decisionLabModel';
-import { displayIdOf } from '@/ActivitySpace/execution/element/displayId';
+import { displayIdOf } from '@/Function/shared/element/displayId';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 type Plan = 'focus' | 'defer' | 'reassign';
