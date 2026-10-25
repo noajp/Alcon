@@ -263,6 +263,57 @@ function Import({ crm }: { crm: Crm }) {
   </Section>;
 }
 
+/** When someone leaves or moves: their open deals, companies and contacts to
+ * someone else in one step, across every pipeline you can see. */
+function HandOver({ crm }: { crm: Crm }) {
+  const { t } = useI18n();
+  const [from, setFrom] = useState<string | null>(null);
+  const [to, setTo] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const name = (id: string | null) => crm.people.find(person => person.id === id)?.name ?? '';
+  const owners = new Set([...crm.allDeals, ...crm.companies, ...crm.contacts].map(row => row.owner_worker_id).filter((id): id is string => !!id));
+  const counts = from ? {
+    deals: crm.allDeals.filter(deal => deal.owner_worker_id === from && !['won', 'lost'].includes(deal.stage.toLowerCase())).length,
+    companies: crm.companies.filter(company => company.owner_worker_id === from).length,
+    contacts: crm.contacts.filter(contact => contact.owner_worker_id === from).length,
+  } : null;
+  const empty = !counts || counts.deals + counts.companies + counts.contacts === 0;
+  async function run() {
+    if (!from || !to) return;
+    setBusy(true); setError(null);
+    try {
+      const done = await crm.handOver(from, to, t('Handed over from {from} to {to}.', { from: name(from), to: name(to) }));
+      setResult(t('Moved {deals} deals, {companies} companies and {contacts} contacts to {name}.', { ...done, name: name(to) })
+        + (done.unassigned ? ` ${t('{n} next steps stay with the previous owner: {name} cannot be assigned to them.', { n: done.unassigned, name: name(to) })}` : ''));
+      setConfirming(false); setFrom(null);
+    } catch (cause) { setError(message(cause)); } finally { setBusy(false); }
+  }
+  const people = (exclude: string | null, only?: Set<string>) => crm.people.filter(person => person.id !== exclude && (!only || only.has(person.id)))
+    .map(person => ({ id: person.id, label: person.name, hint: person.type === 'ai_agent' ? t('AI agent') : null }));
+  return <Section title={t('Hand over')} description={t('When someone leaves or changes role, move their open deals — with the next steps’ Elements — and the companies and contacts they own to someone else. Won and lost deals keep who closed them.')}>
+    <div className="grid max-w-2xl grid-cols-[120px_minmax(0,1fr)] items-center gap-2">
+      <span className="text-xs text-muted-foreground">{t('Hand over: from')}</span>
+      <CrmPicker label={t('Hand over from')} value={from} placeholder={t('Choose a person')} options={people(to, owners)} onChange={id => { setFrom(id); setConfirming(false); setResult(null); }} />
+      <span className="text-xs text-muted-foreground">{t('Hand over: to')}</span>
+      <CrmPicker label={t('Hand over to')} value={to} placeholder={t('Choose a person')} options={people(from)} onChange={id => { setTo(id); setConfirming(false); setResult(null); }} />
+    </div>
+    {counts && <p className="text-xs text-muted-foreground">{t('{deals} open deals, {companies} companies and {contacts} contacts.', counts)}</p>}
+    <div className="flex flex-wrap items-center gap-2">
+      {!confirming
+        ? <Button size="sm" variant="secondary" disabled={!from || !to || empty || busy} onClick={() => setConfirming(true)}>{t('Hand over')}</Button>
+        : <>
+          <Button size="sm" variant="primary" disabled={busy} onClick={() => void run()}>{t('Move to {name}', { name: name(to) })}</Button>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirming(false)}>{t('Cancel')}</Button>
+        </>}
+      {result && <span role="status" className="text-xs text-muted-foreground">{result}</span>}
+      {error && <span role="alert" className="text-xs text-[var(--status-danger)]">{error}</span>}
+    </div>
+  </Section>;
+}
+
 /** What an organisation may shape: pipelines, stages, words, links and fields.
  * The record types and calculations stay standard. */
 export function CrmSettings({ crm, onSelectPipeline }: { crm: Crm; onSelectPipeline: (id: string) => void }) {
@@ -273,6 +324,7 @@ export function CrmSettings({ crm, onSelectPipeline }: { crm: Crm; onSelectPipel
     <Stages key={`stages:${crm.pipeline.id}:${JSON.stringify(crm.pipeline.stages)}`} crm={crm} />
     <Connections crm={crm} />
     <Fields crm={crm} />
+    <HandOver crm={crm} />
     <Import crm={crm} />
   </div>;
 }

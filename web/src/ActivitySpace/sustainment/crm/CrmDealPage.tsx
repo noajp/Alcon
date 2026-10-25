@@ -126,7 +126,8 @@ export function CrmDealPage({ crm, deal, onBack, onOpenPipeline, onCapture, onOp
     setBusy(true); setError(null);
     try { await action(); } catch (cause) { setError(cause instanceof Error ? cause.message : t('Could not save. Try again.')); throw cause; } finally { setBusy(false); }
   }
-  const save = (patch: CrmDealPatch) => run(() => crm.saveDeal(deal.id, patch));
+  // A notice (the next step could not follow a new owner) shows where errors do.
+  const save = (patch: CrmDealPatch) => run(() => crm.saveDeal(deal.id, patch, { onNotice: setError }));
   const moveTo = (stage: CrmStage) => save(stageChange(deal, stage)).catch(() => {});
   async function logNote() {
     if (!note.trim()) return;

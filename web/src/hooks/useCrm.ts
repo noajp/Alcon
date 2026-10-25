@@ -179,9 +179,40 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     return id;
   }
 
+  /** Moves an open next-step Element from one owner to another. False when the
+   * new owner could not be assigned (they cannot see the Element's Object). */
+  async function moveStep(elementId: string | null, from: string | null, to: string | null): Promise<boolean> {
+    const element = elementId ? (elements.data ?? []).find(item => item.id === elementId) : null;
+    if (!element || ['done', 'cancelled'].includes(element.status)) return true;
+    // The new owner first, so a step that cannot be reassigned keeps its old owner.
+    if (to) {
+      const { error } = await supabase.from('element_assignees').insert({ element_id: element.id, worker_id: to, role: 'assignee' });
+      if (error && error.code !== '23505') return false;
+    }
+    if (from) await supabase.from('element_assignees').delete().eq('element_id', element.id).eq('worker_id', from).eq('role', 'assignee');
+    return true;
+  }
+
+  /** Hands one person's CRM work to another — when someone leaves or moves:
+   * their open deals (with the next steps' Elements), companies and contacts.
+   * Won and lost deals keep who closed them. Each moved deal records the
+   * hand-over in its history. */
+  const handOver = async (from: string, to: string, note: string) => {
+    // One transaction in the database: deals still open now, their next steps,
+    // companies and contacts — all of it or none.
+    try {
+      const { data, error } = await supabase.rpc('crm_hand_over', {
+        p_space: space(), p_from: from, p_to: to, p_note: note, p_today: today,
+      });
+      if (error) throw new Error(error.message);
+      return data as { deals: number; companies: number; contacts: number; unassigned: number };
+    } finally { await Promise.all([invalidate(), qc.invalidateQueries({ queryKey: ['my-elements'] })]); }
+  };
+
   /** Creates or updates a deal in one row write (company / contact rows first when named). */
-  const saveDeal = async (dealId: string | null, patch: CrmDealPatch, extra?: { activity?: { type: CrmActivityType; text: string; date?: string }; quiet?: boolean }): Promise<string> => {
+  const saveDeal = async (dealId: string | null, patch: CrmDealPatch, extra?: { activity?: { type: CrmActivityType; text: string; date?: string }; quiet?: boolean; onNotice?: (notice: string) => void }): Promise<string> => {
     const row: Record<string, unknown> = {};
+    let stepKept = false;
     if (patch.name !== undefined) row.name = patch.name.trim();
     if (patch.stage !== undefined) {
       row.stage = patch.stage;
@@ -212,7 +243,15 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     if (patch.contactName) row.contact_id = await contactFor(patch.contactName, patch.contactEmail ?? null, (row.company_id as string | undefined) ?? null, domainId);
     try {
       let id = dealId;
-      if (id) { if (Object.keys(row).length) check(await supabase.from('crm_deals').update(row).eq('id', id).select('id').single()); }
+      if (id) {
+        const before = deals.data?.find(item => item.id === id);
+        if (Object.keys(row).length) check(await supabase.from('crm_deals').update(row).eq('id', id).select('id').single());
+        // A new owner takes the open next step with the deal.
+        if (patch.ownerId !== undefined && before && before.owner_worker_id !== patch.ownerId) {
+          stepKept = !(await moveStep(before.next_element_id, before.owner_worker_id, patch.ownerId));
+          void qc.invalidateQueries({ queryKey: ['my-elements'] });
+        }
+      }
       else {
         const first = normalizeCrmStages(pipeline?.stages)[0];
         const stage = (row.stage as string | undefined) ?? first.id;
@@ -223,6 +262,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
         }).select('id').single()).id;
       }
       if (extra?.activity) await logActivity(id!, extra.activity, { companyId: (row.company_id as string | null | undefined), contactId: (row.contact_id as string | null | undefined), quiet: true });
+      if (stepKept) extra?.onNotice?.('The new owner cannot see the next step’s Object, so the next step stays with the previous owner.');
       return id!;
     } finally { if (!extra?.quiet) await invalidate(); }
   };
@@ -483,7 +523,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     loading: enabled && !workspace && !error,
     error, measureError,
     refetch: invalidate,
-    saveDeal, startRenewal, declineRenewal, addDealContact, updateDealContact, removeDealContact, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
+    saveDeal, handOver, startRenewal, declineRenewal, addDealContact, updateDealContact, removeDealContact, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
     savePipeline, deletePipeline, saveCompany, deleteCompany, saveContact, deleteContact, saveField, deleteField,
     importFromTable,
   };
