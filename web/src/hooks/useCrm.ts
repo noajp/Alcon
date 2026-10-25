@@ -55,11 +55,12 @@ export interface CrmDealPatch {
 
 /** The CRM App's single source: the active Space's pipelines and records,
  * shared by every member. The sidebar and the main pane read the same queries. */
-export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: boolean } = {}) {
+export function useCrm(pipelineId?: string | null, { seed = false, active = true }: { seed?: boolean; active?: boolean } = {}) {
   const qc = useQueryClient();
   const spaceId = useActiveSpaceId();
   const userId = useCurrentUserId();
-  const enabled = !!spaceId && !!userId;
+  // `active: false` reads nothing — for a surface that may not need the CRM at all.
+  const enabled = active && !!spaceId && !!userId;
   const key = (part: string) => ['crm', spaceId, part];
   const options = { enabled, staleTime: 15_000, refetchOnWindowFocus: true };
 
@@ -564,6 +565,8 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     nextElements: elements.data ?? EMPTY as CrmNextElement[],
     allDeals: deals.data ?? EMPTY as CrmDealRecord[],
     loading: enabled && !workspace && !error,
+    /** Whether the list of pipelines this reader can see has been read at least once. */
+    pipelinesLoaded: pipelines.isFetched,
     error, measureError,
     refetch: invalidate,
     saveDeal, handOver, linkElement, unlinkElement, searchElements, startRenewal, declineRenewal, addDealContact, updateDealContact, removeDealContact, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
