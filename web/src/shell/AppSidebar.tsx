@@ -16,7 +16,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
-import { ArrowLeft, Plus, Bot, Settings, Users, Search } from 'lucide-react';
+import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
 import { domainHasObjectsMessage } from '@/ActivitySpace/execution/domain/data';
@@ -56,7 +56,7 @@ import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarSto
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
 import { CrmSidebar } from '@/ActivitySpace/sustainment/crm/CrmSidebar';
-import { SlidesSidebar, createDeckHere } from '@/ActivitySpace/sustainment/slides/SlidesSidebar';
+import { SlidesSidebar, createDeckHere, createFolderHere, pickDeckFile } from '@/ActivitySpace/sustainment/slides/SlidesSidebar';
 import { InboxList } from '@/ActivitySpace/home/InboxList';
 import { CalendarSidebar } from '@/ActivitySpace/sustainment/calendar/CalendarSidebar';
 import { WorkloadSidebar } from '@/ActivitySpace/sustainment/workload/WorkloadSidebar';
@@ -236,13 +236,12 @@ export function AppSidebar({
   // create show no "+".
   const calendarDay = useCalendarDay();
   const createLabel = ({
-    notebook: 'Add Notebook', tables: 'Add Table', slides: 'Add deck', strategy: 'Create new',
+    notebook: 'Add Notebook', tables: 'Add Table', slides: 'Create new', strategy: 'Create new',
     calendar: 'Add schedule', execution: 'Create new',
   } as Partial<Record<RailMode, string>>)[railMode ?? 'execution'];
   const openCreateMenu = () => {
     if (railMode === 'tables') { openCreate('table'); return; }
     if (railMode === 'notebook') { openCreate('notebook'); return; }
-    if (railMode === 'slides') { createDeckHere(); onViewChange('slides'); return; }
     if (railMode === 'calendar') {
       window.dispatchEvent(new CustomEvent<CreateElementDetail>(CREATE_ELEMENT_EVENT, { detail: { dueDate: calendarDay } }));
       return;
@@ -560,7 +559,29 @@ export function AppSidebar({
             className="fixed w-52 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden"
             style={{ top: createMenuPos.top, left: createMenuPos.left }}
           >
-            {railMode === 'strategy' ? (
+            {railMode === 'slides' ? (
+              <>
+                {/* Slides: a deck in the open deck's folder, a folder, or a deck from a file. */}
+                <CreateMenuItem
+                  icon={<FilePlus size={16} />}
+                  label={t('New deck')}
+                  desc={t('In the folder of the open deck')}
+                  onClick={() => { setCreateMenuOpen(false); createDeckHere(); onViewChange('slides'); }}
+                />
+                <CreateMenuItem
+                  icon={<FolderPlus size={16} />}
+                  label={t('New folder')}
+                  desc={t('A place to keep decks together')}
+                  onClick={() => { setCreateMenuOpen(false); createFolderHere(); }}
+                />
+                <CreateMenuItem
+                  icon={<FileUp size={16} />}
+                  label={t('Open a deck file')}
+                  desc={t('A .kata.json file, as a new deck')}
+                  onClick={() => { setCreateMenuOpen(false); pickDeckFile(); onViewChange('slides'); }}
+                />
+              </>
+            ) : railMode === 'strategy' ? (
               <>
                 {/* Vision → Portfolio → Initiative, the Strategy tree. Each
                     page opens its own create card once mounted; Portfolio

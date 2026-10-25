@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { BookMarked, ChevronRight, Copy, FilePlus, FileText, FileUp, Folder as FolderIcon, FolderInput, FolderPlus, Palette, Pencil, Trash2 } from 'lucide-react';
+import { BookMarked, ChevronRight, Copy, FilePlus, FileText, Folder as FolderIcon, FolderInput, Palette, Pencil, Trash2 } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
@@ -29,12 +29,35 @@ async function openDeckFile(file: File) {
   st.createFile(folderId, read.name, read.deck, read.mix);
 }
 
+// The sidebar's "+" makes decks and folders; a new one opens for naming in the list.
+const RENAME_EVENT = 'alcon:slides-rename';
+const askRename = (id: string) => window.dispatchEvent(new CustomEvent<string>(RENAME_EVENT, { detail: id }));
+
 /** A new deck where the person is: the open deck's folder, else the first, else a new one. */
 export function createDeckHere() {
   if (!slidesReady()) return null;
   const st = useKata.getState();
   const active = st.files.find((x) => x.id === st.activeFileId);
-  return st.createFile(active?.folderId ?? st.folders[0]?.id ?? st.createFolder(tx('マイ資料', 'My decks')));
+  const id = st.createFile(active?.folderId ?? st.folders[0]?.id ?? st.createFolder(tx('マイ資料', 'My decks')));
+  askRename(id);
+  return id;
+}
+
+export function createFolderHere() {
+  if (!slidesReady()) return null;
+  const id = useKata.getState().createFolder();
+  askRename(id);
+  return id;
+}
+
+/** Asks for a .kata.json file and opens it as a new deck. */
+export function pickDeckFile() {
+  if (!slidesReady()) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = () => { const f = input.files?.[0]; if (f) void openDeckFile(f); };
+  input.click();
 }
 
 /**
@@ -52,11 +75,15 @@ export function SlidesSidebar({ onOpen }: { onOpen: () => void }) {
   const skillCount = useKata((s) => s.skills.filter((k) => k.enabled).length);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [skillsOpen, setSkillsOpen] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
   // Radix hands focus back to the trigger as the menu closes; renaming after
   // that lets the field keep it.
   const startRename = (id: string) => { window.setTimeout(() => setRenaming(id), 0); };
   const st = () => useKata.getState();
+  useEffect(() => {
+    const onRename = (e: Event) => startRename((e as CustomEvent<string>).detail);
+    window.addEventListener(RENAME_EVENT, onRename);
+    return () => window.removeEventListener(RENAME_EVENT, onRename);
+  }, []);
 
   const openDeck = (id: string) => { st().selectFile(id); onOpen(); };
   const deleteFolder = async (id: string, name: string, count: number) => {
@@ -138,21 +165,8 @@ export function SlidesSidebar({ onOpen }: { onOpen: () => void }) {
       </div>
 
       <div className="mt-4 flex flex-col">
-        <SidebarRow disabled={!ready} icon={<FolderPlus size={15} />} label={t('New folder')} onClick={() => startRename(st().createFolder())} />
-        <SidebarRow disabled={!ready} icon={<FileUp size={15} />} label={t('Open a deck file')} title=".kata.json" onClick={() => fileInput.current?.click()} />
         <SidebarRow icon={<BookMarked size={15} />} label={t('My skills')} meta={skillCount} onClick={() => setSkillsOpen(true)} />
         <SidebarRow icon={<Palette size={15} />} label={t('Look library')} onClick={() => { st().setPanel('design'); onOpen(); }} />
-        <input
-          ref={fileInput}
-          type="file"
-          accept=".json,application/json"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            e.target.value = '';
-            if (f) { void openDeckFile(f); onOpen(); }
-          }}
-        />
       </div>
       {/* The dialog is the editor's own, drawn with its tokens. */}
       {skillsOpen && createPortal(<div className="kata-root"><SkillsDialog onClose={() => setSkillsOpen(false)} /></div>, document.body)}
