@@ -16,6 +16,7 @@ import {
 import type { ObjectTabType } from '@/types/database';
 import type { NavigationState } from '@/types/navigation';
 import { TabBar } from '@/shell/TabBar';
+import { bulkSetAssignee } from '@/ActivitySpace/execution/element/bulkAssign';
 import { CalendarView } from '@/ActivitySpace/sustainment/calendar/CalendarView';
 import { SummaryView } from '@/ActivitySpace/execution/object/summary/SummaryView';
 import { OverviewView } from '@/ActivitySpace/execution/object/overview/OverviewView';
@@ -282,7 +283,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
 
   // Bulk-select rows (checkbox / Shift-range / Cmd-click) — shared hook so
   // the behaviour matches the Domain Elements + My Elements lists.
-  const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
+  const { selectedRowIds, handleRowSelect, clearSelection, selectOnly } = useElementSelection();
 
   // Section "+" — every section belongs to this Object, so `object_id` is
   // fixed; what varies is the band, and the popup opens on that band's value
@@ -372,6 +373,14 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         },
       });
     }
+  };
+  // Hand the selection to one person (undoable); Elements they cannot take keep their people.
+  const assigneeOptions = useMemo(() => popupWorkers.map((w) => ({ id: w.id, name: w.name, hint: w.type === 'ai_agent' ? 'AI' : null })), [popupWorkers]);
+  const bulkAssign = async (workerId: string) => {
+    // What could not be handed over stays selected, with the bar saying why.
+    const failed = await bulkSetAssignee([...selectedRowIds], workerId, () => onRefresh?.());
+    selectOnly(failed);
+    return failed.length;
   };
   const bulkSetField = async (
     field: 'status' | 'priority' | 'due_date',
@@ -653,6 +662,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         onSetStatus={(s) => bulkSetField('status', s, `Set status of ${selectedRowIds.size} Elements`)}
         onSetPriority={(p) => bulkSetField('priority', p, `Set priority of ${selectedRowIds.size} Elements`)}
         onSetDueDate={(d) => bulkSetField('due_date', d, `Set due date of ${selectedRowIds.size} Elements`)}
+        onSetAssignee={(workerId) => bulkAssign(workerId)}
+        assigneeOptions={assigneeOptions}
         onClear={clearSelection}
       />
 
