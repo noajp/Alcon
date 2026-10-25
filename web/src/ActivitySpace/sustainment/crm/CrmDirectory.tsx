@@ -6,14 +6,15 @@ import { Button } from '@/ui/button';
 import { TextComposer } from '@/ui/text-composer';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { Crm } from '@/hooks/useCrm';
-import { ACTIVITY_TYPES, fieldsFor, normalizeCrmStages, resolveStage, type CrmActivityRecord, type CrmActivityType, type CrmDealRecord } from './crmModel';
-import { historyLine, moneyList, relativeDay } from './crmFormat';
+import { ACTIVITY_TYPES, fieldsFor, normalizeCrmStages, resolveStage, type CrmActivityRecord, type CrmActivityType, type CrmDealRecord, type CrmDealRole } from './crmModel';
+import { historyLine, moneyList, relativeDay, ROLE_LABEL } from './crmFormat';
 import { CrmPicker } from './CrmPicker';
 import { CustomFields, EditableText, Property } from './CrmFields';
 import { PageHead } from '@/Function/shared/PageHead';
 import { RailCard } from '@/Function/shared/RailCard';
 import { CrmIcon } from '@/Function/shared/conceptIcons';
 import { CrmRecordPage, RecordSection } from './CrmRecordPage';
+import { CrmRelatedWork } from './CrmRelatedWork';
 
 const ACTIVITY_LABEL: Record<CrmActivityType, string> = { call: 'Call', email: 'Mail', meeting: 'Meeting', note: 'Memo' };
 
@@ -74,7 +75,7 @@ export function CrmContacts({ crm, query, onOpen, selectedId }: { crm: Crm; quer
   const terms = query.trim().toLowerCase();
   const rows = crm.contacts.filter(contact => !terms || `${contact.name} ${contact.email ?? ''} ${contact.title ?? ''} ${companies.get(contact.company_id ?? '') ?? ''}`.toLowerCase().includes(terms))
     .map(contact => ({ contact, company: contact.company_id ? companies.get(contact.company_id) ?? null : null,
-      deals: crm.allDeals.filter(deal => deal.contact_id === contact.id).length,
+      deals: dealsOf(crm, contact.id).deals.length,
       last: lastTouch(crm.activities.filter(entry => entry.contact_id === contact.id)) }))
     .sort((a, b) => a.contact.name.localeCompare(b.contact.name));
   return <div className="space-y-4">
@@ -126,7 +127,13 @@ function Timeline({ crm, entries, onLog }: { crm: Crm; entries: readonly CrmActi
   </div></RecordSection>;
 }
 
-function DealList({ crm, deals, onOpenDeal }: { crm: Crm; deals: readonly CrmDealRecord[]; onOpenDeal: (deal: CrmDealRecord) => void }) {
+/** Deals a person is on: as the main contact, or with a part in the decision. */
+const dealsOf = (crm: Crm, contactId: string) => {
+  const roles = new Map(crm.dealContacts.filter(row => row.contact_id === contactId).map(row => [row.deal_id, row.role]));
+  return { deals: crm.allDeals.filter(deal => deal.contact_id === contactId || roles.has(deal.id)), roles };
+};
+
+function DealList({ crm, deals, onOpenDeal, roles }: { crm: Crm; deals: readonly CrmDealRecord[]; onOpenDeal: (deal: CrmDealRecord) => void; roles?: ReadonlyMap<string, CrmDealRole> }) {
   const { t } = useI18n();
   if (!deals.length) return null;
   return <RecordSection title={t('Deals')}>
@@ -135,13 +142,14 @@ function DealList({ crm, deals, onOpenDeal }: { crm: Crm; deals: readonly CrmDea
       const stage = resolveStage(deal.stage, normalizeCrmStages(pipeline?.stages));
       return <li key={deal.id}><button type="button" className="flex w-full items-center gap-2 rounded-sm text-left text-[13px] hover:bg-muted/30" onClick={() => onOpenDeal(deal)}>
         <span className="tabular-nums text-xs text-muted-foreground">D-{deal.number}</span><span className="min-w-0 flex-1 truncate">{deal.name}</span>
+        {roles?.get(deal.id) && <span className="text-xs text-muted-foreground">{t(ROLE_LABEL[roles.get(deal.id)!])}</span>}
         <span className="text-xs text-muted-foreground">{stage ? t(stage.label) : deal.stage}</span>
       </button></li>;
     })}</ul></RecordSection>;
 }
 
-export function CrmCompanyPage({ crm, companyId, onBack, onOpenCompanies, onOpenDeal, onOpenContact }: {
-  crm: Crm; companyId: string; onBack: () => void; onOpenCompanies: () => void; onOpenDeal: (deal: CrmDealRecord) => void; onOpenContact: (id: string) => void;
+export function CrmCompanyPage({ crm, companyId, onBack, onOpenCompanies, onOpenDeal, onOpenContact, onOpenElement }: {
+  crm: Crm; companyId: string; onBack: () => void; onOpenCompanies: () => void; onOpenDeal: (deal: CrmDealRecord) => void; onOpenContact: (id: string) => void; onOpenElement?: (id: string) => void;
 }) {
   const { t } = useI18n();
   const company = crm.companies.find(item => item.id === companyId);
@@ -172,12 +180,13 @@ export function CrmCompanyPage({ crm, companyId, onBack, onOpenCompanies, onOpen
       </form>
     </RecordSection>
     <DealList crm={crm} deals={crm.allDeals.filter(deal => deal.company_id === company.id)} onOpenDeal={onOpenDeal} />
+    <CrmRelatedWork crm={crm} target={{ companyId: company.id }} onOpenElement={onOpenElement} />
     <Timeline crm={crm} entries={crm.activities.filter(entry => entry.company_id === company.id)} onLog={(type, text) => crm.logRecordActivity({ companyId: company.id }, { type, text })} />
   </CrmRecordPage>;
 }
 
-export function CrmContactPage({ crm, contactId, onBack, onOpenContacts, onOpenDeal, onOpenCompany }: {
-  crm: Crm; contactId: string; onBack: () => void; onOpenContacts: () => void; onOpenDeal: (deal: CrmDealRecord) => void; onOpenCompany: (id: string) => void;
+export function CrmContactPage({ crm, contactId, onBack, onOpenContacts, onOpenDeal, onOpenCompany, onOpenElement }: {
+  crm: Crm; contactId: string; onBack: () => void; onOpenContacts: () => void; onOpenDeal: (deal: CrmDealRecord) => void; onOpenCompany: (id: string) => void; onOpenElement?: (id: string) => void;
 }) {
   const { t } = useI18n();
   const contact = crm.contacts.find(item => item.id === contactId);
@@ -205,7 +214,8 @@ export function CrmContactPage({ crm, contactId, onBack, onOpenContacts, onOpenD
     <PageHead icon={<CrmIcon size={18} />} title={contact.name} description="" canEdit
       titleLabel={t('Name')} titlePlaceholder={t('Name')} descriptionLabel="" descriptionPlaceholder=""
       onSaveTitle={name => save({ name }).then(() => {})} />
-    <DealList crm={crm} deals={crm.allDeals.filter(deal => deal.contact_id === contact.id)} onOpenDeal={onOpenDeal} />
+    <DealList crm={crm} {...dealsOf(crm, contact.id)} onOpenDeal={onOpenDeal} />
+    <CrmRelatedWork crm={crm} target={{ contactId: contact.id }} onOpenElement={onOpenElement} />
     <Timeline crm={crm} entries={crm.activities.filter(entry => entry.contact_id === contact.id)} onLog={(type, text) => crm.logRecordActivity({ contactId: contact.id, companyId: contact.company_id }, { type, text })} />
   </CrmRecordPage>;
 }

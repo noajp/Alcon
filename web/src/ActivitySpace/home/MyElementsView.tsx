@@ -18,6 +18,7 @@ import {
 import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
+import { bulkSetAssignee } from '@/ActivitySpace/execution/element/bulkAssign';
 import type {
   Worker,
 } from '@/types/database';
@@ -171,7 +172,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
 
   // Multi-select + bulk ops. Personal Elements aren't Object-homed, so the
   // bulk bar offers Delete + Duplicate only (no Move / Add-to-Object).
-  const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
+  const { selectedRowIds, handleRowSelect, clearSelection, selectOnly } = useElementSelection();
   const bulkDelete = useCallback(async () => {
     for (const id of selectedRowIds) {
       try { await deleteElement(id); } catch (e) { console.error('Delete failed', id, e); }
@@ -213,6 +214,14 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
       });
     }
   }, [userId, selectedRowIds, elements, clearSelection, fetchMine, onRefresh]);
+  // Hand the selection to one person (undoable); Elements they cannot take keep their people.
+  const assigneeOptions = useMemo(() => (spaceWorkers ?? []).map((w) => ({ id: w.id, name: w.name, hint: w.type === 'ai_agent' ? 'AI' : null })), [spaceWorkers]);
+  const bulkAssign = useCallback(async (workerId: string) => {
+    // What could not be handed over stays selected, with the bar saying why.
+    const failed = await bulkSetAssignee([...selectedRowIds], workerId, async () => { await fetchMine(); await onRefresh?.(); });
+    selectOnly(failed);
+    return failed.length;
+  }, [selectedRowIds, selectOnly, fetchMine, onRefresh]);
   const bulkSetField = useCallback(async (
     field: 'status' | 'priority' | 'due_date',
     value: unknown,
@@ -360,6 +369,8 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
         onSetStatus={(s) => bulkSetField('status', s, `Set status of ${selectedRowIds.size} Elements`)}
         onSetPriority={(p) => bulkSetField('priority', p, `Set priority of ${selectedRowIds.size} Elements`)}
         onSetDueDate={(d) => bulkSetField('due_date', d, `Set due date of ${selectedRowIds.size} Elements`)}
+        onSetAssignee={(workerId) => bulkAssign(workerId)}
+        assigneeOptions={assigneeOptions}
         onClear={clearSelection}
       />
     </div>

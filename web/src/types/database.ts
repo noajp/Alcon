@@ -1719,7 +1719,7 @@ export interface IntentUpdate {
 // Semantic edge from an Intent to a Domain/Object/Element.
 // relationship_type captures *why* the binding exists (Popper's
 // falsifiability requires this — a bare tag isn't enough).
-export type IntentBindingTarget = 'domain' | 'object' | 'element' | 'phase' | 'worker'
+export type IntentBindingTarget = 'domain' | 'object' | 'element' | 'phase' | 'worker' | 'crm_deal'
 export type IntentRelationship =
   | 'evidences'       // target supports the intent's hypothesis
   | 'measures'        // target operationalizes a dimension

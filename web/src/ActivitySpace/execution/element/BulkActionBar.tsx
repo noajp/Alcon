@@ -2,7 +2,7 @@
 
 import { STATUS, PRIORITY, STATUS_ORDER, PRIORITY_ORDER } from '@/shared/designTokens';
 import { useEffect, useRef, useState } from 'react';
-import { Trash2, Copy, CornerUpRight, Link2, X, CalendarIcon, CircleDashed } from 'lucide-react';
+import { Trash2, Copy, CornerUpRight, Link2, X, CalendarIcon, CircleDashed, UserRound } from 'lucide-react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import type { ElementStatus, ElementPriority } from '@/types/database';
@@ -40,6 +40,11 @@ interface BulkActionBarProps {
   onSetStatus?: (status: ElementStatus) => void | Promise<void>;
   onSetPriority?: (priority: ElementPriority | null) => void | Promise<void>;
   onSetDueDate?: (date: string | null) => void | Promise<void>;
+  /** Hand the selection to one person: they become each Element's assignee.
+   *  Resolves to how many Elements could not be handed over. */
+  onSetAssignee?: (workerId: string) => Promise<number>;
+  /** Who the selection can be handed to. */
+  assigneeOptions?: readonly { id: string; name: string; hint?: string | null }[];
   onClear: () => void;
 }
 
@@ -106,8 +111,16 @@ export function BulkActionBar({
   onSetStatus,
   onSetPriority,
   onSetDueDate,
+  onSetAssignee,
+  assigneeOptions = [],
   onClear,
 }: BulkActionBarProps) {
+  const [assigneeQuery, setAssigneeQuery] = useState('');
+  // A notice belongs to the selection it was about: shown while that many
+  // Elements are selected, gone once the selection changes.
+  const [noticeState, setNoticeState] = useState<{ text: string; count: number } | null>(null);
+  if (count === 0 && noticeState) setNoticeState(null);
+  const notice = noticeState && noticeState.count === count ? noticeState.text : null;
   const [overlay, setOverlay] = useState<Overlay>(null);
   const picker = overlay?.kind === 'picker' ? overlay.mode : null;
   const confirmDelete = overlay?.kind === 'confirmDelete';
@@ -165,6 +178,11 @@ export function BulkActionBar({
   return (
     <div className="fixed inset-x-0 bottom-6 z-40 flex justify-center px-4 pointer-events-none">
       <div className="pointer-events-auto relative">
+        {notice && (
+          <p role="status" className="absolute bottom-full left-1/2 mb-2 w-max max-w-[min(90vw,420px)] -translate-x-1/2 rounded-md bg-popover px-3 py-1.5 text-[12px] text-[var(--status-warning)] shadow-lg ring-1 ring-border">
+            {notice}
+          </p>
+        )}
         <div className="flex items-center gap-0.5 rounded-full bg-popover/95 backdrop-blur-md shadow-2xl ring-1 ring-border px-2 py-1.5">
           <span className="pl-2 pr-2 text-[12px] font-medium text-foreground tabular-nums whitespace-nowrap">
             {count} {noun} selected
@@ -172,7 +190,7 @@ export function BulkActionBar({
 
           {/* Bulk field edits (status / priority / due date) — Asana's
               "edit fields" cluster. Each only renders when the host wires it. */}
-          {(onSetStatus || onSetPriority || onSetDueDate) && (
+          {(onSetStatus || onSetPriority || onSetDueDate || onSetAssignee) && (
             <span className="w-px h-5 bg-border/60 mx-0.5" />
           )}
 
@@ -265,6 +283,62 @@ export function BulkActionBar({
                 </button>
               </PopoverContent>
             </Popover>
+          )}
+
+          {onSetAssignee && (
+            <DropdownMenu onOpenChange={(open) => { if (!open) setAssigneeQuery(''); }}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={busy}
+                  title="Set assignee"
+                  aria-label="Set assignee"
+                  className="flex items-center justify-center size-8 rounded-full text-foreground/80 hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-40"
+                >
+                  <UserRound size={15} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-[240px]">
+                <input
+                  autoFocus
+                  aria-label="Find a person"
+                  placeholder="Find a person"
+                  value={assigneeQuery}
+                  onChange={(e) => setAssigneeQuery(e.target.value)}
+                  // Typing stays in the field; ArrowDown moves into the list of people.
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      (e.currentTarget.parentElement?.querySelector('[role="menuitem"]') as HTMLElement | null)?.focus();
+                      return;
+                    }
+                    if (e.key !== 'Escape') e.stopPropagation();
+                  }}
+                  className="mb-1 h-7 w-full rounded-sm bg-muted/30 px-2 text-[13px] outline-none hover:bg-muted/40 focus:bg-muted/60"
+                />
+                <div className="max-h-64 overflow-y-auto">
+                  {assigneeOptions
+                    .filter((o) => !assigneeQuery.trim() || o.name.toLowerCase().includes(assigneeQuery.trim().toLowerCase()))
+                    .map((o) => (
+                      <DropdownMenuItem
+                        key={o.id}
+                        onSelect={() => void wrap(async () => {
+                          try {
+                            const failed = await onSetAssignee(o.id);
+                            setNoticeState(failed ? { text: `${failed} not fully handed to ${o.name} — still selected. ${o.name} may not be assignable where they live.`, count: failed } : null);
+                          } catch (e) {
+                            setNoticeState({ text: e instanceof Error ? e.message : 'Could not set the assignee.', count });
+                          }
+                        })()}
+                        className="gap-2 text-[13px]"
+                      >
+                        <span className="min-w-0 flex-1 truncate">{o.name}</span>
+                        {o.hint && <span className="text-[11px] text-muted-foreground">{o.hint}</span>}
+                      </DropdownMenuItem>
+                    ))}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
 
           <span className="w-px h-5 bg-border/60 mx-0.5" />
