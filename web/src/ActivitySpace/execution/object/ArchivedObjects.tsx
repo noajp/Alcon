@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Archive, ChevronRight } from 'lucide-react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
+import { Archive } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { canManageObject } from '@/Function/shared/objectArchive';
@@ -99,7 +100,7 @@ export function ArchivedObjectsSection({
         onClick={() => setOpen((v) => !v)}
         className="text-muted-foreground"
       >
-        <ChevronRight size={12} className={open ? 'rotate-90 transition-transform' : 'transition-transform'} />
+        <DisclosureTriangle open={open} />
         {t('Archived ({count})', { count: objects.length })}
       </Button>
       {open && (

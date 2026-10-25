@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   fetchStrategyElements,
@@ -425,7 +426,7 @@ function InitiativeTimelineRow({
           aria-label={isOpen ? t('Collapse Objects') : t('Expand Objects')}
           className="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
         >
-          {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          <DisclosureTriangle open={isOpen} />
         </button>
         <span className="flex-shrink-0" style={{ color }}>
           <NavStrategyIcon size={13} />

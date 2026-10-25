@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
+import { Loader2 } from 'lucide-react';
 import type { ElementWithDetails } from '@/types/database';
 import { fetchElementWithDetails } from '@/hooks/useSupabase';
 import { useCurrentUserId } from '@/providers/authContext';
@@ -287,7 +288,7 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
       <div className="space-y-2">
         <Button type="button" variant="ghost" size="sm" align="start" disabled={disabled}
           aria-expanded={nextOpen} aria-controls={`${fieldId}-next-area`} onClick={() => setNextOpen(open => !open)}>
-          {nextOpen ? <ChevronDown size={CONTROL.icon.sm} aria-hidden="true" /> : <ChevronRight size={CONTROL.icon.sm} aria-hidden="true" />}
+          <DisclosureTriangle open={nextOpen} />
           {t(draft.next !== null ? 'Next step · edited' : 'Next step')}
         </Button>
         {nextOpen && (

@@ -1,7 +1,8 @@
 'use client';
 
 import { Fragment, useCallback, useId, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Plus } from 'lucide-react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
+import { Plus } from 'lucide-react';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { reorderElements, reorderObjects, useElementCommentActivity, useElementBlockers, withCommentActivity } from '@/hooks/useSupabase';
 import { type DependencyBlocker } from '@/ActivitySpace/execution/element/dependencyReadiness';
@@ -590,10 +591,7 @@ export function ListTable({
                         className="w-full min-h-[2.625rem] flex items-center justify-center bg-muted/70 group-hover:bg-muted rounded-l-lg text-muted-foreground hover:text-foreground transition-colors"
                         aria-label={isCollapsed ? t('Expand') : t('Collapse')}
                       >
-                        <ChevronDown
-                          size={12}
-                          className={`transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-                        />
+                        <DisclosureTriangle open={!isCollapsed} />
                       </button>
                     </td>
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`sticky left-7 z-10 bg-card pr-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>

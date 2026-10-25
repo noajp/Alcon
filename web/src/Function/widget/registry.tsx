@@ -30,6 +30,12 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     group: 'core', accepts: ['object'], zones: ['main'], defaultSize: 'full', holdsContents: true,
     load: async () => (await import('./widgets/GeneratedAppWidget')).GeneratedAppWidget,
   },
+  'design': {
+    type: 'design', label: 'Design',
+    description: 'An artboard in HTML and SVG, drawn and revised with AI',
+    group: 'core', accepts: ['me', 'domain', 'object', 'initiative'], zones: ['main'], defaultSize: 'full', holdsContents: true,
+    load: async () => (await import('./widgets/DesignWidget')).DesignWidget,
+  },
   'deck': {
     type: 'deck', label: 'Deck',
     description: 'A Slides deck: its pages here, the full editor when opened full screen',
