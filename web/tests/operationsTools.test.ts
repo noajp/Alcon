@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { analyzeOperations, normalizeOperationsParams, OPERATIONS_FIELDS } from '@/ActivitySpace/sustainment/operations/operationsModel';
 const { runOperationsTool } = await import(new URL('../../supabase/functions/alcon-copilot/operationsTools.ts', import.meta.url).pathname);
@@ -128,5 +129,12 @@ describe('Copilot operations diagnosis', () => {
     await expect(runOperationsTool(f.db, { ...f.input, widgetId: 'missing' })).rejects.toThrow('widget UUID');
     f.tables.widgets[0].kind = 'data-view';
     await expect(runOperationsTool(f.db, f.input)).rejects.toThrow('Choose one');
+  });
+});
+
+describe('the model the Copilot edge function imports by path', () => {
+  it('stays free of imports, which Deno could not resolve', () => {
+    const source = readFileSync(new URL('../src/ActivitySpace/sustainment/operations/operationsModel.ts', import.meta.url), 'utf8');
+    expect(source).not.toMatch(/^\s*import\s/m);
   });
 });
