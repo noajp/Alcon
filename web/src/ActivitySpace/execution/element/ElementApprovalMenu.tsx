@@ -59,16 +59,24 @@ export function ElementApprovalMenu({ element, onRefresh }: Props) {
   // Who decides is the server's rule (user_can_decide_approval): the reviewers
   // when there are any, otherwise the Domain's owners and admins — never the
   // person doing the work. Asked again whenever the Element changes.
-  const [canDecide, setCanDecide] = useState(false);
+  // null while asking; the answer belongs to the Element and people it was asked for.
+  const [rights, setRights] = useState<{ key: string; decide: boolean; manage: boolean } | null>(null);
   const reviewers = (element.assignees ?? []).filter((a) => a.role === 'reviewer');
   const reviewerKey = reviewers.map((r) => r.worker_id).join(',');
   const assigneeKey = (element.assignees ?? []).filter((a) => a.role === 'assignee').map((a) => a.worker_id).join(',');
+  const rightsKey = `${element.id}|${reviewerKey}|${assigneeKey}`;
   useEffect(() => {
     if (!open || !element.is_approval) return;
     let live = true;
-    void supabase.rpc('user_can_decide_approval', { p_element: element.id }).then(({ data }) => { if (live) setCanDecide(data === true); });
+    void Promise.all([
+      supabase.rpc('user_can_decide_approval', { p_element: element.id }),
+      supabase.rpc('user_can_manage_approval', { p_element: element.id }),
+    ]).then(([decide, manage]) => { if (live) setRights({ key: rightsKey, decide: decide.data === true, manage: manage.data === true }); });
     return () => { live = false; };
-  }, [open, element.id, element.is_approval, reviewerKey, assigneeKey]);
+  }, [open, element.id, element.is_approval, rightsKey]);
+  const currentRights = rights && rights.key === rightsKey ? rights : null;
+  const canDecide = currentRights?.decide ?? false;
+  const canManage = currentRights?.manage ?? false;
   const { data: people } = useAssignableWorkers({ elementId: element.id }, open && !!element.is_approval);
   const candidates = people.filter((w) => w.type === 'human' && !(element.assignees ?? []).some((a) => a.worker_id === w.id));
 
@@ -159,7 +167,7 @@ export function ElementApprovalMenu({ element, onRefresh }: Props) {
                 <StateIcon size={13} />
                 {stateMeta[current].label}
               </span>
-              {canDecide && (
+              {canManage && (
                 <button
                   onClick={toggleApproval}
                   disabled={busy}
@@ -174,17 +182,19 @@ export function ElementApprovalMenu({ element, onRefresh }: Props) {
             {/* Who decides: the reviewers, or else the Domain's owners and admins. */}
             <div className="space-y-1 px-1">
               <p className="text-[11px] text-muted-foreground">
-                {reviewers.length ? 'Decided by its reviewers' : 'Decided by an owner or admin of its Domain'} — never by whoever is assigned.
+                {reviewers.length ? 'Decided by its reviewers' : 'Decided by an owner or admin of its Domain'} — never by anyone working on it.
               </p>
               <div className="flex flex-wrap items-center gap-1">
                 {reviewers.map((r) => (
                   <span key={r.id} className="inline-flex h-6 items-center gap-1 rounded-md bg-muted/40 pl-1.5 pr-0.5 text-[12px]">
                     {r.worker?.name ?? 'Reviewer'}
-                    <button type="button" aria-label={`Remove reviewer ${r.worker?.name ?? ''}`} onClick={() => void removeReviewer(r.id)}
-                      className="flex size-5 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"><X size={11} /></button>
+                    {canManage && (
+                      <button type="button" aria-label={`Remove reviewer ${r.worker?.name ?? ''}`} disabled={r.id.startsWith('temp-')} onClick={() => void removeReviewer(r.id)}
+                        className="flex size-5 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"><X size={11} /></button>
+                    )}
                   </span>
                 ))}
-                {candidates.length > 0 && (
+                {canManage && candidates.length > 0 && (
                   <select aria-label="Add a reviewer" value="" onChange={(e) => { if (e.target.value) void addReviewer(e.target.value); }}
                     className="h-6 rounded-md bg-muted/30 px-1 text-[12px] text-muted-foreground outline-none hover:bg-muted/40 focus:bg-muted/60">
                     <option value="">+ Reviewer</option>
@@ -226,7 +236,7 @@ export function ElementApprovalMenu({ element, onRefresh }: Props) {
               </button>
             </div>
 
-            {!canDecide && <p className="px-1 text-[11px] text-muted-foreground">You cannot decide this approval.</p>}
+            {currentRights && !canDecide && <p className="px-1 text-[11px] text-muted-foreground">You cannot decide this approval.</p>}
             {error && <p role="alert" className="px-1 text-[11px] text-[var(--status-danger)]">{error}</p>}
 
             {/* Compact decision history */}
