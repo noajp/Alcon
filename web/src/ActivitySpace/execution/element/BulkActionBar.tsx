@@ -119,6 +119,7 @@ export function BulkActionBar({
   // A notice belongs to the selection it was about: shown while that many
   // Elements are selected, gone once the selection changes.
   const [noticeState, setNoticeState] = useState<{ text: string; count: number } | null>(null);
+  if (count === 0 && noticeState) setNoticeState(null);
   const notice = noticeState && noticeState.count === count ? noticeState.text : null;
   const [overlay, setOverlay] = useState<Overlay>(null);
   const picker = overlay?.kind === 'picker' ? overlay.mode : null;
