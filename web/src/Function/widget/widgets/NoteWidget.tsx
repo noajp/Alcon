@@ -42,11 +42,14 @@ export function NoteWidget({ params, setParams, host }: WidgetProps) {
           {note.isError ? 'This note could not be loaded.' : 'This note is private to its author, or it was deleted.'}
         </p>
       )}
-      <Button type="button" disabled={!editable} onClick={() => setPicking(true)} className="w-full" align="start">
-        <FileText size={13} />
-        <span className="flex-1 text-left">{noteId ? 'Show another note' : 'Choose a note'}</span>
-        <Plus size={13} />
-      </Button>
+      {/* A note someone else placed is theirs to change: only an empty slot takes a pick. */}
+      {!noteId && (
+        <Button type="button" disabled={!editable} onClick={() => setPicking(true)} className="w-full" align="start">
+          <FileText size={13} />
+          <span className="flex-1 text-left">Choose a note</span>
+          <Plus size={13} />
+        </Button>
+      )}
       <NotePicker
         open={picking}
         onClose={() => setPicking(false)}
