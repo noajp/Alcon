@@ -2,8 +2,9 @@
 -- an approval is a check by someone other than the people doing the work.
 --
 -- Who manages an Element's approvals (names its reviewers, takes the step
--- off): an owner or admin of a Domain the Element lives in; for an Object in
--- no Domain, the Object's owner; for a personal Element, its owner; for an
+-- off): an owner or admin of a Domain its own Object belongs to (other
+-- Objects it is filed in do not count); for an Object in no Domain, the
+-- Object's owner; for a personal Element, its owner; for an
 -- Element with no home and no owner, anyone who can see it.
 --
 -- Who decides: the Element's reviewers when it names any, otherwise those
@@ -26,23 +27,24 @@ begin
   end if;
 
   execute $ddl$
+  -- From the Element's own home only — its Object, and the Domains that Object
+  -- belongs to. Filing it in another Object (which anyone who can see both
+  -- may do) never makes someone its manager.
   create or replace function public.user_can_manage_approval(p_element uuid) returns boolean
   language sql stable security definer set search_path = public as $fn$
-    with homes as (
+    with home as (
       select e.object_id from public.elements e where e.id = p_element and e.object_id is not null
-      union
-      select eo.object_id from public.element_objects eo where eo.element_id = p_element
     ),
     domains as (
-      select o.domain_id from homes h join public.objects o on o.id = h.object_id where o.domain_id is not null
+      select o.domain_id from home h join public.objects o on o.id = h.object_id where o.domain_id is not null
       union
-      select od.domain_id from homes h join public.object_domains od on od.object_id = h.object_id
+      select od.domain_id from home h join public.object_domains od on od.object_id = h.object_id
     )
     select auth.uid() is not null and public.user_can_see_element(p_element) and case
       when exists (select 1 from domains)
         then exists (select 1 from domains d where public.user_has_domain_role(d.domain_id, array['owner', 'admin']))
-      when exists (select 1 from homes)
-        then exists (select 1 from homes h join public.objects o on o.id = h.object_id where o.user_id = auth.uid())
+      when exists (select 1 from home)
+        then exists (select 1 from home h join public.objects o on o.id = h.object_id where o.user_id = auth.uid())
       when exists (select 1 from public.elements e where e.id = p_element and e.owner_id is not null)
         then exists (select 1 from public.elements e where e.id = p_element and e.owner_id = auth.uid())
       else true
@@ -121,8 +123,6 @@ begin
   -- over into reviewing it.
   create or replace function public.element_assignees_guard_reviewer() returns trigger
   language plpgsql security definer set search_path = public as $fn$
-  declare
-    v_element uuid := coalesce(new.element_id, old.element_id);
   begin
     if auth.uid() is null then return coalesce(new, old); end if;
     if tg_op = 'DELETE' then
@@ -145,31 +145,23 @@ begin
        and exists (select 1 from public.workers w where w.id = new.worker_id and w.user_id = auth.uid()) then
       raise exception 'Someone working on an Element cannot become its reviewer' using errcode = '42501';
     end if;
-    if (new.role = 'reviewer' or (tg_op = 'UPDATE' and old.role = 'reviewer' and new.role <> 'reviewer'))
-       and not public.user_can_manage_approval(v_element) then
+    if new.role = 'reviewer' and not public.user_can_manage_approval(new.element_id) then
+      raise exception 'Only an owner or admin of its Domain can name or change reviewers' using errcode = '42501';
+    end if;
+    -- A reviewer row changed in any way (role, person, Element) is a reviewer
+    -- removed where it was: that needs the manager there too.
+    if tg_op = 'UPDATE' and old.role = 'reviewer'
+       and (new.role <> 'reviewer' or new.worker_id is distinct from old.worker_id or new.element_id is distinct from old.element_id)
+       and not public.user_can_manage_approval(old.element_id) then
       raise exception 'Only an owner or admin of its Domain can name or change reviewers' using errcode = '42501';
     end if;
     return new;
   end $fn$;
   revoke all on function public.element_assignees_guard_reviewer() from public, anon, authenticated;
   drop trigger if exists element_assignees_guard_reviewer on public.element_assignees;
-  create trigger element_assignees_guard_reviewer before insert or update of role or delete on public.element_assignees
+  create trigger element_assignees_guard_reviewer before insert or update of role, worker_id, element_id or delete on public.element_assignees
     for each row execute function public.element_assignees_guard_reviewer();
 
-  -- Taking an approval Element out of one of its Objects is a move, too.
-  create or replace function public.element_objects_guard_approval() returns trigger
-  language plpgsql security definer set search_path = public as $fn$
-  begin
-    if auth.uid() is null then return old; end if;
-    if exists (select 1 from public.elements e where e.id = old.element_id and coalesce(e.is_approval, false))
-       and not public.user_can_manage_approval(old.element_id) then
-      raise exception 'Only an owner or admin of its Domain can move an Element that needs approval' using errcode = '42501';
-    end if;
-    return old;
-  end $fn$;
-  revoke all on function public.element_objects_guard_approval() from public, anon, authenticated;
-  drop trigger if exists element_objects_guard_approval on public.element_objects;
-  create trigger element_objects_guard_approval before delete on public.element_objects
-    for each row execute function public.element_objects_guard_approval();
+
   $ddl$;
 end $$;
