@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { QUICK_CREATE } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { isCommitEnter, isSubmitChord, useEscapeLayer } from '@/Function/shared/keyboard';
 
 export interface QuickCreateInput {
@@ -57,6 +58,8 @@ export function QuickCreatePopup({
   onSubmit,
   children,
 }: QuickCreatePopupProps) {
+  // Callers pass English labels; translate them here (a no-op when already translated).
+  const { t: tr } = useI18n();
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
   const [busy, setBusy] = useState(false);
@@ -109,7 +112,7 @@ export function QuickCreatePopup({
       onClose();
     } catch (e) {
       console.error('Quick create failed:', e);
-      setError(e instanceof Error ? e.message : 'Could not create it. Please try again.');
+      setError(e instanceof Error ? e.message : tr('Could not create it. Please try again.'));
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -118,17 +121,17 @@ export function QuickCreatePopup({
 
   return (
     <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4 pointer-events-none">
-      <div className={QUICK_CREATE.panel} role="dialog" aria-label={ariaLabel}>
+      <div className={QUICK_CREATE.panel} role="dialog" aria-label={tr(ariaLabel)}>
         <div className={QUICK_CREATE.header}>
           <span className={QUICK_CREATE.context}>
             {icon}
-            <span className="truncate max-w-[200px]">{contextLabel}</span>
+            <span className="truncate max-w-[200px]">{tr(contextLabel)}</span>
           </span>
           <div className="flex-1" />
           <button
             onClick={onClose}
             className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-            aria-label="Close"
+            aria-label={tr('Close')}
           >
             <X size={14} />
           </button>
@@ -146,8 +149,8 @@ export function QuickCreatePopup({
               void handleSubmit();
             }
           }}
-          placeholder={namePlaceholder}
-          aria-label={nameAriaLabel ?? namePlaceholder}
+          placeholder={tr(namePlaceholder)}
+          aria-label={tr(nameAriaLabel ?? namePlaceholder)}
           rows={1}
           className={QUICK_CREATE.title}
         />
@@ -164,8 +167,8 @@ export function QuickCreatePopup({
                 void handleSubmit();
               }
             }}
-            placeholder={descriptionPlaceholder}
-            aria-label="Description"
+            placeholder={tr(descriptionPlaceholder)}
+            aria-label={tr('Description')}
             rows={2}
             className={QUICK_CREATE.description}
           />
@@ -176,9 +179,9 @@ export function QuickCreatePopup({
         {error && <p role="alert" className="pt-2 text-xs text-destructive">{error}</p>}
 
         <div className={QUICK_CREATE.footer}>
-          {hint && <span className="mr-auto min-w-0 text-[11px] text-muted-foreground">{hint}</span>}
+          {hint && <span className="mr-auto min-w-0 text-[11px] text-muted-foreground">{tr(hint)}</span>}
           <Button variant="primary" onClick={() => void handleSubmit()} disabled={!canSubmit}>
-            {busy ? 'Creating…' : submitLabel}
+            {busy ? tr('Creating…') : tr(submitLabel)}
           </Button>
         </div>
       </div>

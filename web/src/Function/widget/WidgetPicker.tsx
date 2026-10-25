@@ -95,7 +95,7 @@ export function WidgetPicker({
           {t('Add widget')}
         </Button>
       </PopoverTrigger>
-      <MenuShell align="end" width="standard">
+      <MenuShell align="end" width="wide">
         {/* Verb-phrase placeholder, no ring, no border — DESIGN.md §5.3/§5.9. */}
         <input
           autoFocus
@@ -116,18 +116,22 @@ export function WidgetPicker({
           <div key={group}>
             <MenuSectionLabel>{t(GROUP_LABEL[group])}</MenuSectionLabel>
             {entries.map(({ def, zone }) => (
+              // One line per widget: its name, then what it shows, cut to the
+              // row — the whole sentence is the row's tooltip. A menu whose
+              // rows wrap to three lines reads as a page, not a list.
               <button
                 key={def.type}
                 type="button"
-                className={`${MENU_ROW} flex-col items-start gap-0.5`}
+                title={def.description ? t(def.description) : undefined}
+                className={MENU_ROW}
                 onClick={() => {
                   onAdd(zone, def.type);
                   setOpen(false);
                 }}
               >
-                <span className="text-[13px] text-foreground">{t(def.label)}</span>
+                <span className="shrink-0 text-foreground">{t(def.label)}</span>
                 {def.description && (
-                  <span className="text-[11px] text-muted-foreground">{t(def.description)}</span>
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">{t(def.description)}</span>
                 )}
               </button>
             ))}

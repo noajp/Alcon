@@ -33,6 +33,7 @@
 // =============================================================
 
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
+import { translate } from '@/Function/i18n/I18nProvider';
 import {
   awayDayCount,
   capacityOnDay,
@@ -337,17 +338,21 @@ export function countShaken(assumptions: Assumption[]): number {
  */
 export function shakenLabel(assumption: Assumption): string {
   const parts: string[] = [];
-  if (assumption.blocked > 0) parts.push(`${assumption.blocked} blocked`);
-  if (assumption.overdue > 0) parts.push(`${assumption.overdue} overdue`);
-  if (assumption.absent > 0) parts.push(`${assumption.absent} away`);
-  if (assumption.troubled > 0) parts.push(`${assumption.troubled} deal${assumption.troubled === 1 ? '' : 's'} in trouble`);
+  if (assumption.blocked > 0) parts.push(translate('{n} blocked', { n: assumption.blocked }));
+  if (assumption.overdue > 0) parts.push(translate('{n} overdue', { n: assumption.overdue }));
+  if (assumption.absent > 0) parts.push(translate('{n} away', { n: assumption.absent }));
+  if (assumption.troubled > 0) {
+    parts.push(assumption.troubled === 1
+      ? translate('1 deal in trouble')
+      : translate('{n} deals in trouble', { n: assumption.troubled }));
+  }
   return parts.join(', ');
 }
 
 /** The short state a single watched Element is in, worst first. */
 export function watchLabel(watch: Watch): string | null {
-  if (watch.blocked) return 'Blocked';
-  if (watch.overdue) return `${watch.daysOverdue}d overdue`;
+  if (watch.blocked) return translate('Blocked');
+  if (watch.overdue) return translate('{n}d overdue', { n: watch.daysOverdue ?? 0 });
   return null;
 }
 
@@ -361,5 +366,7 @@ export function watchLabel(watch: Watch): string | null {
  */
 export function workerWatchLabel(watch: WorkerWatch): string | null {
   if (watch.awayIn === null) return null;
-  return watch.awayIn === 0 ? `Away ${watch.awayDays}d` : `Away in ${watch.awayIn}d`;
+  return watch.awayIn === 0
+    ? translate('Away {n}d', { n: watch.awayDays })
+    : translate('Away in {n}d', { n: watch.awayIn });
 }

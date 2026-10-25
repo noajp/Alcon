@@ -35,6 +35,7 @@ import { Calendar as DateCalendar } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
 import type { WidgetHost } from '../types';
 import { completionOf, isOpenStatus } from '@/Function/shared/completion';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // =============================================================
 // Properties — the Object's typed metadata, as a rail island.
@@ -62,6 +63,7 @@ const parseYMD = (s?: string | null): Date | undefined => {
 };
 
 export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
+  const { t } = useI18n();
   const object = host.object;
   const elements = host.elements;
 
@@ -156,7 +158,7 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
     <>
       {/* Initiative — which portfolio(s) this Object is grouped under (a
           Initiative can span Domains, so an Object can belong to more than
-          one). A faint divider separates it from the Object's own fields
+          one). A gap, not a line, separates it from the Object's own fields
           below, since it reads more like provenance than an editable
           property. */}
       {owningStrategies.length > 0 && (
@@ -170,12 +172,12 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
             >
               <RailRow
                 icon={<NavStrategyIcon size={12} className="text-muted-foreground" />}
-                name="Initiative"
+                name={t('Initiative')}
                 label={s.name}
               />
             </button>
           ))}
-          <div className="h-px bg-border/50 mx-2 my-1" />
+          <div aria-hidden className="h-2" />
         </>
       )}
 
@@ -189,12 +191,14 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
           be set or cleared independently, and teams often know one and not
           the other. */}
       <SingleDatePickerRow
-        name="Start date"
+        name={t('Start date')}
+        unsetLabel={t('Set start date')}
         value={object.start_date}
         onChange={(start_date) => handleFieldSave({ start_date })}
       />
       <SingleDatePickerRow
-        name="Due date"
+        name={t('Due date')}
+        unsetLabel={t('Set due date')}
         value={object.due_date}
         onChange={(due_date) => handleFieldSave({ due_date })}
       />
@@ -206,7 +210,7 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
       />
 
       <RailRow
-        name="Progress"
+        name={t('Progress')}
         label={
           <span className="flex items-center gap-2 w-full">
             <SegmentedProgress value={stats.progress} className="flex-1" />
@@ -219,15 +223,15 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
 
       <RailRow
         icon={<ElementIcon size={12} className="text-muted-foreground" />}
-        name="Elements"
+        name={t('Elements')}
         label={
           <span className="tabular-nums">
-            {stats.done}/{stats.total} done
+            {t('{done}/{total} done', { done: stats.done, total: stats.total })}
             {stats.inProgress > 0 && (
-              <span className="ml-1.5 text-muted-foreground">· <span className="text-[var(--element-status-in-progress)]">{stats.inProgress} in progress</span></span>
+              <span className="ml-1.5 text-muted-foreground">· {t('{n} in progress', { n: stats.inProgress })}</span>
             )}
             {stats.overdue > 0 && (
-              <span className="ml-1.5 text-[var(--status-danger)]">· {stats.overdue} overdue</span>
+              <span className="ml-1.5 text-[var(--status-danger)]">· {t('{n} overdue', { n: stats.overdue })}</span>
             )}
           </span>
         }
@@ -266,14 +270,15 @@ function TypePickerRow({
   options: string[];
   onChange: (type: string | null) => void;
 }) {
+  const { t } = useI18n();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button type="button" className="w-full text-left">
           <RailRow
             icon={<ElementTypeIcon size={12} />}
-            name="Type"
-            label={currentType ?? 'Set type'}
+            name={t('Type')}
+            label={currentType ?? t('Set type')}
             placeholder={!currentType}
           />
         </button>
@@ -281,14 +286,14 @@ function TypePickerRow({
       <DropdownMenuContent align="start" className="min-w-[180px]">
         {options.length === 0 && (
           <div className="px-2 py-1.5 text-[12px] text-muted-foreground italic">
-            No types defined for this Domain
+            {t('No types defined for this Domain')}
           </div>
         )}
-        {options.map((t) => (
-          <DropdownMenuItem key={t} onClick={() => onChange(t)} className="gap-2">
+        {options.map((option) => (
+          <DropdownMenuItem key={option} onClick={() => onChange(option)} className="gap-2">
             <ElementTypeIcon size={12} />
-            <span className="flex-1 truncate">{t}</span>
-            {currentType === t && <Check size={13} className="shrink-0" />}
+            <span className="flex-1 truncate">{option}</span>
+            {currentType === option && <Check size={13} className="shrink-0" />}
           </DropdownMenuItem>
         ))}
         {currentType && (
@@ -296,7 +301,7 @@ function TypePickerRow({
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onChange(null)} className="text-muted-foreground gap-2">
               <X size={12} />
-              Clear
+              {t('Clear')}
             </DropdownMenuItem>
           </>
         )}
@@ -307,16 +312,19 @@ function TypePickerRow({
 
 function SingleDatePickerRow({
   name,
+  unsetLabel,
   value,
   onChange,
 }: {
   name: string;
+  unsetLabel: string;
   value: string | null;
   onChange: (next: string | null) => void;
 }) {
+  const { t, locale } = useI18n();
   const display = value
-    ? new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-    : `Set ${name.toLowerCase()}`;
+    ? (parseYMD(value) ?? new Date(value)).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' })
+    : unsetLabel;
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
   return (
     <Popover>
@@ -348,14 +356,14 @@ function SingleDatePickerRow({
             size="xs"
             onClick={() => onChange(null)}
           >
-            Clear
+            {t('Clear')}
           </Button>
           <Button
             type="button"
             size="xs"
             onClick={() => onChange(toYMD(new Date()))}
           >
-            Today
+            {t('Today')}
           </Button>
         </div>
       </PopoverContent>
@@ -372,6 +380,7 @@ function LeadPickerRow({
   workers: Worker[];
   onChange: (leadId: string | null) => void;
 }) {
+  const { t } = useI18n();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -387,14 +396,14 @@ function LeadPickerRow({
                 : <UserIcon size={12} className="text-muted-foreground" />
             }
             name="Lead"
-            label={lead?.name ?? 'Assign lead'}
+            label={lead?.name ?? t('Assign lead')}
             placeholder={!lead}
           />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-[200px]">
         {workers.length === 0 && (
-          <div className="px-2 py-1.5 text-[12px] text-muted-foreground italic">No workers</div>
+          <div className="px-2 py-1.5 text-[12px] text-muted-foreground italic">{t('No Workers')}</div>
         )}
         {workers.map((w) => (
           <DropdownMenuItem key={w.id} onClick={() => onChange(w.id)} className="gap-2">
@@ -409,7 +418,7 @@ function LeadPickerRow({
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onChange(null)} className="text-muted-foreground gap-2">
               <X size={12} />
-              Clear
+              {t('Clear')}
             </DropdownMenuItem>
           </>
         )}

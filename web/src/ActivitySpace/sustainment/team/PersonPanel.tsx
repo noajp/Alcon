@@ -36,7 +36,8 @@ function ElementLine({ element, onOpenElement, trailing, note }: {
   </>;
   return <li className="flex items-center gap-1">
     {onOpenElement
-      ? <Button variant="ghost" size="md" align="start" className="flex-1 min-w-0" onClick={() => onOpenElement(element.id)}>{content}</Button>
+      // A row of a list, not a button: borderless, the whole row lit on hover.
+      ? <button type="button" className={`${FONT.base} flex flex-1 min-w-0 items-center gap-2 h-8 px-3 rounded-md text-left text-foreground outline-none transition-colors hover:bg-muted/40 focus-visible:bg-muted/40`} onClick={() => onOpenElement(element.id)}>{content}</button>
       : <div className={`${FONT.base} flex flex-1 min-w-0 items-center gap-2 h-8 px-3`}>{content}</div>}
     {trailing}
   </li>;
@@ -214,8 +215,8 @@ export function PersonPanel({ entry, skills, objectNames, skillSuggestions, capa
       {history.length === 0 ? <p className={`${FONT.sm} text-muted-foreground`}>{t('No assignments in this Space yet.')}</p>
         : <table className={`${FONT.base} w-full`}>
           <thead className={`${FONT.xs} text-muted-foreground text-left`}>
-            <tr><th className="font-normal py-1">{t('Object')}</th><th className="font-normal py-1 text-right">{t('Done')}</th>
-              <th className="font-normal py-1 text-right">{t('Open')}</th><th className="font-normal py-1 pl-4 hidden sm:table-cell">{t('Period')}</th></tr>
+            <tr><th className="font-normal py-1">{t('Object')}</th><th className="whitespace-nowrap font-normal py-1 pl-4 text-right">{t('Done')}</th>
+              <th className="whitespace-nowrap font-normal py-1 pl-4 text-right">{t('Not done')}</th><th className="font-normal py-1 pl-4 hidden sm:table-cell">{t('Period')}</th></tr>
           </thead>
           <tbody>{history.map((row) => <tr key={row.objectId} className="border-t border-[var(--border-subtle)]">
             <td className="py-1.5 pr-2 truncate max-w-0 w-full">{row.objectName || t('Object outside this Space')}</td>

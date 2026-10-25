@@ -14,6 +14,11 @@ import { InviteUserDialog } from './InviteUserDialog';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
+import { Button } from '@/ui/button';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { FONT } from '@/shared/designTokens';
+
+const ROLE_LABEL: Record<string, string> = { owner: 'Space owner', member: 'Member' };
 
 interface SpaceMember {
   user_id: string;
@@ -36,6 +41,7 @@ function isEmoji(s: string) {
 
 export function ActivitySpaceSettings() {
   const { user } = useAuthContext();
+  const { t } = useI18n();
   const { data: spaces, refetch } = useActivitySpaces();
   const [activeId] = useState(() => getActiveSpaceId() ?? '');
   const active = spaces.find((s) => s.id === activeId) ?? spaces[0];
@@ -95,7 +101,9 @@ export function ActivitySpaceSettings() {
 
   const handleRemoveMember = async (member: SpaceMember) => {
     if (!active) return;
-    if (!await appDialog.confirm(`Remove ${member.display_name || 'this member'} from "${active.name}"?`)) return;
+    if (!await appDialog.confirm(member.display_name
+      ? t('Remove {name} from "{space}"?', { name: member.display_name, space: active.name })
+      : t('Remove this member from "{space}"?', { space: active.name }))) return;
     try {
       const { error } = await supabase
         .from('activity_space_members')
@@ -170,10 +178,10 @@ export function ActivitySpaceSettings() {
       .select('id', { count: 'exact', head: true })
       .eq('activity_space_id', active.id);
     if ((count ?? 0) > 0) {
-      await appDialog.alert(`"${active.name}" still has Domains. Move or delete them before deleting the Space.`);
+      await appDialog.alert(t('"{name}" still has Domains. Move or delete them before deleting the Space.', { name: active.name }));
       return;
     }
-    if (!await appDialog.confirm(`Delete "${active.name}"? This can't be undone.`)) return;
+    if (!await appDialog.confirm(t('Delete "{name}"? This can’t be undone.', { name: active.name }))) return;
     try {
       await deleteActivitySpace(active.id);
       window.location.reload();
@@ -201,11 +209,11 @@ export function ActivitySpaceSettings() {
 
   return (
     <>
-      <SettingsSection title="General">
-        <SettingsRow label="Logo" className="flex items-center justify-between gap-4 px-4 py-1.5">
+      <SettingsSection title={t('General')}>
+        <SettingsRow label={t('Logo')} className="flex items-center justify-between gap-4 py-1.5">
           <Popover open={logoOpen} onOpenChange={setLogoOpen}>
             <PopoverTrigger asChild>
-              <button type="button" className="block w-10 h-10 cursor-pointer hover:opacity-80 transition-opacity">
+              <button type="button" aria-label={t('Change logo')} className="block w-10 h-10 cursor-pointer hover:opacity-80 transition-opacity">
                 {logoPreview}
               </button>
             </PopoverTrigger>
@@ -216,21 +224,21 @@ export function ActivitySpaceSettings() {
                   onClick={() => fileRef.current?.click()}
                   className="flex items-center gap-1.5 px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors"
                 >
-                  <ImageIcon size={13} /> Upload image
+                  <ImageIcon size={13} /> {t('Upload image')}
                 </button>
                 <button
                   type="button"
                   onClick={handleReset}
                   className="px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors"
                 >
-                  Reset
+                  {t('Reset')}
                 </button>
               </div>
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
               <div className="border-t border-border/60 pt-2">
                 <div className="flex items-center gap-1 mb-1.5 px-1">
                   <Smile size={12} className="text-muted-foreground" />
-                  <span className="text-[11px] text-muted-foreground">Emoji</span>
+                  <span className="text-[11px] text-muted-foreground">{t('Emoji')}</span>
                 </div>
                 <div className="grid grid-cols-8 gap-0.5">
                   {EMOJI_PICKS.map((e) => (
@@ -248,13 +256,14 @@ export function ActivitySpaceSettings() {
             </PopoverContent>
           </Popover>
         </SettingsRow>
-        <SettingsRow label="Name">
+        <SettingsRow label={t('Name')}>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             onBlur={saveName}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void saveName(); } }}
-            className="w-56 px-3 py-1.5 text-[13px] rounded-md bg-muted/40 text-foreground border-none"
+            aria-label={t('Name')}
+            className="w-56 px-3 py-1.5 text-[13px] rounded-md bg-muted/40 text-foreground border-none focus:bg-muted/70"
             disabled={saving}
           />
         </SettingsRow>
@@ -262,29 +271,25 @@ export function ActivitySpaceSettings() {
 
       <div className="mb-2 mt-6 flex items-end justify-between">
         <div>
-          <h2 className="text-[15px] font-semibold text-foreground">Members ({members.length})</h2>
+          <h2 className={`${FONT.lg} text-foreground`}>{t('Members ({n})', { n: members.length })}</h2>
           <p className="text-[12px] text-muted-foreground mt-0.5">
-            Space members can see every Workspace Domain. Invite people to a single Domain instead to add them as a Guest.
+            {t('Space members can see every Workspace Domain. Invite people to a single Domain instead to add them as a Guest.')}
           </p>
         </div>
         {isOwner && (
-          <button
-            type="button"
-            onClick={() => setShowInvite(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-border text-foreground rounded-md text-[12px] font-medium hover:bg-muted/40 transition-colors shrink-0 whitespace-nowrap"
-          >
+          <Button variant="ghost" onClick={() => setShowInvite(true)}>
             <UserPlus size={12} />
-            Invite to Space
-          </button>
+            {t('Invite to Space')}
+          </Button>
         )}
       </div>
 
       <SettingsSection title="">
         {members.length === 0 ? (
-          <div className="px-4 py-6 text-[12px] text-muted-foreground">No members yet.</div>
+          <div className="py-3 text-[13px] text-muted-foreground">{t('No members yet.')}</div>
         ) : (
           members.map((m) => (
-            <div key={m.user_id} className="flex items-center gap-3 px-4 py-2.5">
+            <div key={m.user_id} className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
               <WorkerAvatar
                 worker={{ name: m.display_name, avatar_url: m.avatar_url }}
                 size={32}
@@ -292,19 +297,20 @@ export function ActivitySpaceSettings() {
               />
               <div className="flex-1 min-w-0">
                 <div className="text-[13px] font-medium text-foreground truncate">
-                  {m.display_name || 'Unnamed'}
+                  {m.display_name || t('Unnamed')}
                   {m.user_id === user?.id && (
-                    <span className="ml-1.5 text-[11px] text-muted-foreground">(you)</span>
+                    <span className="ml-1.5 text-[11px] text-muted-foreground">{t('(you)')}</span>
                   )}
                 </div>
-                <div className="text-[11px] text-muted-foreground capitalize">{m.role}</div>
+                <div className="text-[11px] text-muted-foreground">{t(ROLE_LABEL[m.role] ?? m.role)}</div>
               </div>
               {isOwner && m.role !== 'owner' && (
                 <button
                   type="button"
                   onClick={() => handleRemoveMember(m)}
                   className="p-1.5 text-muted-foreground hover:text-[var(--status-danger)] hover:bg-[var(--status-danger-subtle)] dark:hover:bg-[var(--status-danger)]/20 rounded transition-colors"
-                  title="Remove from Space"
+                  title={t('Remove from Space')}
+                  aria-label={t('Remove from Space')}
                 >
                   <Trash2 size={13} />
                 </button>
@@ -315,15 +321,11 @@ export function ActivitySpaceSettings() {
         <PendingInviteRows invitees={invitees} canCancel={(i) => isOwner || i.invitedBy === user?.id} onChanged={() => void refetchInvitees()} />
       </SettingsSection>
 
-      <SettingsSection title="Danger zone">
-        <SettingsRow label="Delete Activity space" hint="Schedule this space to be permanently deleted">
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="px-3 py-1.5 text-[12px] font-medium text-destructive border border-destructive/30 rounded-md hover:bg-destructive/10 transition-colors"
-          >
-            Delete
-          </button>
+      <SettingsSection title={t('Danger zone')}>
+        <SettingsRow label={t('Delete Activity space')} hint={t('Schedule this space to be permanently deleted')}>
+          <Button variant="danger" onClick={handleDelete}>
+            {t('Delete')}
+          </Button>
         </SettingsRow>
       </SettingsSection>
 

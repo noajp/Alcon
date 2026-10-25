@@ -82,7 +82,7 @@ export function WorkloadSidebar({ navigation, onNavigate, onOpen }: {
           icon={<Scale size={16} />}
           label={t('Rebalance plan')}
           meta={published?.proposals
-            ? <span className="rounded-full bg-[var(--accent-default)] px-1.5 py-px text-[10px] font-semibold text-white">{published.proposals}</span>
+            ? <span className="text-[11px] tabular-nums text-[var(--status-danger)]">{published.proposals}</span>
             : null}
           buttonProps={{ 'aria-pressed': planOpen, 'aria-current': undefined }}
           onClick={() => { onOpen(); setWorkloadPlanOpen(!planOpen); }}
@@ -208,7 +208,7 @@ function WorkloadDomains() {
 
 function Tick({ on }: { on: boolean }) {
   return (
-    <span className={`flex size-3.5 items-center justify-center rounded-[4px] border ${on ? 'border-[var(--accent-default)] bg-[var(--accent-default)] text-white' : 'border-[var(--border-default)]'}`} aria-hidden="true">
+    <span className={`flex size-3.5 items-center justify-center rounded-[4px] border ${on ? 'border-[var(--accent-default)] bg-[var(--accent-default)] text-primary-foreground' : 'border-[var(--border-default)]'}`} aria-hidden="true">
       {on && <Check size={10} strokeWidth={3} />}
     </span>
   );

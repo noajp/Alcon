@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { MoreHorizontal, Plus } from 'lucide-react';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import {
@@ -18,6 +18,7 @@ import { LabelPaletteRows } from '@/Function/shared/LabelPaletteRows';
 import { LABEL_PALETTE, labelColor, useLabelColors } from '@/Function/shared/labelColor';
 import { CONTROL } from '@/shared/designTokens';
 import { SettingsSection } from './SettingsSection';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useLabelCatalog, type DomainLabelState } from './useLabelCatalog';
 import {
   buildLabelCatalog,
@@ -42,6 +43,7 @@ type PendingAction =
   | { kind: 'delete'; domain: DomainLabelState; name: string; count: number };
 
 export function LabelSettings() {
+  const { t } = useI18n();
   const { domains, loading, error, busyDomains, setColor, rename, remove } = useLabelCatalog();
   const [pending, setPending] = useState<PendingAction | null>(null);
   useLabelColors();
@@ -56,18 +58,17 @@ export function LabelSettings() {
   return (
     <div className="space-y-6">
       <p className="-mt-2 text-[12px] text-muted-foreground">
-        Labels are free text on Elements; each Domain remembers a colour per name. Renaming or deleting one
-        here rewrites every Element in that Domain — an Element homed in two Domains changes in both.
+        {t('Labels are free text on Elements; each Domain remembers a colour per name. Renaming or deleting one here rewrites every Element in that Domain — an Element homed in two Domains changes in both.')}
       </p>
 
       {error && (
-        <div className="rounded-md bg-destructive/10 px-3 py-2 text-[12px] text-destructive">{error}</div>
+        <div className="text-[12px] text-destructive">{error}</div>
       )}
 
       {loading && domains.length === 0 ? (
-        <div className="px-1 text-[12px] text-muted-foreground">Loading…</div>
+        <div className="text-[13px] text-muted-foreground">{t('Loading…')}</div>
       ) : domains.length === 0 ? (
-        <div className="px-1 text-[12px] text-muted-foreground">No Domains in this Space yet.</div>
+        <div className="text-[13px] text-muted-foreground">{t('No Domains in this Space yet.')}</div>
       ) : (
         domains.map((domain) => (
           <DomainLabels
@@ -112,15 +113,18 @@ function DomainLabels({
   onRename: (from: string, to: string, entries: LabelEntry[]) => void;
   onDelete: (name: string, entries: LabelEntry[]) => void;
 }) {
+  const { t } = useI18n();
   const entries = useMemo(() => buildLabelCatalog(domain.rows, domain.colors), [domain.rows, domain.colors]);
   const [creating, setCreating] = useState(false);
 
   const unused = entries.filter((e) => e.count === 0).length;
   const description = !domain.loaded
-    ? 'Counting…'
+    ? t('Counting…')
     : entries.length === 0
-      ? 'No labels yet'
-      : `${entries.length} ${entries.length === 1 ? 'label' : 'labels'} · ${unused} unused`;
+      ? t('No labels yet')
+      : entries.length === 1
+        ? t('1 label · {unused} unused', { unused })
+        : t('{n} labels · {unused} unused', { n: entries.length, unused });
 
   return (
     <SettingsSection title={domain.name} description={description}>
@@ -145,11 +149,13 @@ function DomainLabels({
           onCancel={() => setCreating(false)}
         />
       ) : (
-        <div className="flex h-10 items-center px-2">
-          <Button variant="ghost" size="sm" onClick={() => setCreating(true)}>
-            <Plus size={CONTROL.icon.sm} />
-            New label
-          </Button>
+        <div className="flex h-10 items-center">
+          <ButtonAppearanceProvider appearance="inline">
+            <Button variant="ghost" size="sm" onClick={() => setCreating(true)}>
+              <Plus size={CONTROL.icon.sm} />
+              {t('New label')}
+            </Button>
+          </ButtonAppearanceProvider>
         </div>
       )}
     </SettingsSection>
@@ -171,6 +177,7 @@ function LabelRow({
   onRename: (to: string) => void;
   onDelete: () => void;
 }) {
+  const { t } = useI18n();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(entry.name);
   // Radix hands focus back to the "…" trigger when the menu closes, which
@@ -190,7 +197,7 @@ function LabelRow({
   };
 
   return (
-    <div className="flex h-10 items-center gap-2 px-2">
+    <div className="-mx-2 flex h-10 items-center gap-2 rounded-md px-2 transition-colors hover:bg-muted/40">
       <ColorSwatch
         label={entry.name}
         hex={labelColor(entry.name, domain.id)}
@@ -201,7 +208,7 @@ function LabelRow({
         <input
           autoFocus
           value={draft}
-          aria-label={`New name for ${entry.name}`}
+          aria-label={t('New name for {name}', { name: entry.name })}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={cancel}
           onKeyDown={(e) => {
@@ -227,7 +234,7 @@ function LabelRow({
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label={`Actions for ${entry.name}`}
+            aria-label={t('Actions for {name}', { name: entry.name })}
             disabled={busy || !domain.loaded}
           >
             <MoreHorizontal size={CONTROL.icon.xs} />
@@ -250,13 +257,13 @@ function LabelRow({
               setEditing(true);
             }}
           >
-            Rename
+            {t('Rename')}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={onDelete}
             className="text-[var(--status-danger)] focus:text-[var(--status-danger)]"
           >
-            Delete
+            {t('Delete')}
           </DropdownMenuItem>
         </MenuShell>
       </DropdownMenu>
@@ -273,6 +280,7 @@ function NewLabelRow({
   onCreate: (name: string, colorKey: string) => void;
   onCancel: () => void;
 }) {
+  const { t } = useI18n();
   const [name, setName] = useState('');
   const [colorKey, setColorKey] = useState(DEFAULT_NEW_LABEL_COLOR);
   const trimmed = normalizeLabelName(name);
@@ -284,9 +292,9 @@ function NewLabelRow({
   };
 
   return (
-    <div className="flex h-10 items-center gap-2 px-2">
+    <div className="flex h-10 items-center gap-2">
       <ColorSwatch
-        label={trimmed || 'the new label'}
+        label={trimmed || t('the new label')}
         hex={LABEL_PALETTE.find((p) => p.key === colorKey)?.hex ?? labelColor(trimmed)}
         colorKey={colorKey}
         onPick={setColorKey}
@@ -294,8 +302,8 @@ function NewLabelRow({
       <input
         autoFocus
         value={name}
-        placeholder="Label name…"
-        aria-label="New label name"
+        placeholder={t('Label name…')}
+        aria-label={t('New label name')}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
@@ -316,10 +324,10 @@ function NewLabelRow({
         <span className="shrink-0 text-[12px] text-[var(--status-danger)]">{problem}</span>
       )}
       <Button variant="ghost" size="sm" onClick={onCancel}>
-        Cancel
+        {t('Cancel')}
       </Button>
       <Button variant="secondary" size="sm" onClick={submit} disabled={problem !== null}>
-        Create
+        {t('Create')}
       </Button>
     </div>
   );
@@ -336,11 +344,12 @@ function ColorSwatch({
   colorKey: string | null;
   onPick: (colorKey: string) => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label={`Colour of ${label}`}>
+        <Button variant="ghost" size="icon-sm" aria-label={t('Colour of {name}', { name: label })}>
           <span className="size-2.5 rounded-full" style={{ backgroundColor: hex }} />
         </Button>
       </PopoverTrigger>
@@ -366,29 +375,31 @@ function ConfirmLabelDialog({
   onDismiss: () => void;
   onConfirm: () => void;
 }) {
-  const where = `in ${action.domain.name}`;
+  const { t } = useI18n();
+  const domain = action.domain.name;
   const n = action.count;
+  const count = formatElementCount(n);
 
-  const title = action.kind === 'rename' ? `Rename “${action.from}”` : `Delete “${action.name}”`;
+  const title = action.kind === 'rename' ? t('Rename “{name}”', { name: action.from }) : t('Delete “{name}”', { name: action.name });
   const body =
     action.kind === 'rename'
       ? [
           n === 0
-            ? `No Element ${where} carries “${action.from}”; only its colour entry is renamed to “${action.to}”.`
-            : `“${action.from}” becomes “${action.to}” on ${formatElementCount(n)} ${where}.`,
+            ? t('No Element in {domain} carries “{from}”; only its colour entry is renamed to “{to}”.', { domain, from: action.from, to: action.to })
+            : t('“{from}” becomes “{to}” on {count} in {domain}.', { from: action.from, to: action.to, count, domain }),
           action.merges
-            ? `“${action.to}” already exists there — the two merge, and an Element carrying both keeps one.`
+            ? t('“{name}” already exists there — the two merge, and an Element carrying both keeps one.', { name: action.to })
             : null,
         ]
           .filter(Boolean)
           .join(' ')
       : n === 0
-        ? `No Element ${where} carries “${action.name}”; its colour entry is dropped.`
-        : `Removes it from ${formatElementCount(n)} ${where} and drops its colour. This cannot be undone.`;
+        ? t('No Element in {domain} carries “{name}”; its colour entry is dropped.', { domain, name: action.name })
+        : t('Removes it from {count} in {domain} and drops its colour. This cannot be undone.', { count, domain });
   const confirmLabel =
     action.kind === 'rename'
-      ? n === 0 ? 'Rename' : `Rename ${formatElementCount(n)}`
-      : n === 0 ? 'Delete' : `Delete from ${formatElementCount(n)}`;
+      ? n === 0 ? t('Rename') : t('Rename {count}', { count })
+      : n === 0 ? t('Delete') : t('Delete from {count}', { count });
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next) onDismiss(); }}>
@@ -399,7 +410,7 @@ function ConfirmLabelDialog({
         </DialogHeader>
         <DialogFooter>
           <Button variant="ghost" size="md" onClick={onDismiss}>
-            Cancel
+            {t('Cancel')}
           </Button>
           <Button
             variant={action.kind === 'rename' ? 'primary' : 'danger'}

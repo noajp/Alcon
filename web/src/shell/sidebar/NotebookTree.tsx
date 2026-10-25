@@ -68,9 +68,9 @@ export function NotebookTree({
   const addSection = async (folderId: string) => {
     let section: { id: string } | undefined;
     try {
-      section = await createNode('section', 'New Section', folderId);
+      section = await createNode('section', t('New section'), folderId);
       // Seed a page so the new Section opens straight into the editor.
-      const page = await createNode('file', 'Untitled', section.id);
+      const page = await createNode('file', t('Untitled'), section.id);
       onViewChange('note');
       onNavigate({ noteFolderId: folderId, noteSectionId: section.id, noteId: page.id });
       startRename(section.id);
@@ -82,7 +82,7 @@ export function NotebookTree({
   };
   const addPage = async (folderId: string, sectionId: string) => {
     try {
-      const page = await createNode('file', 'Untitled', sectionId);
+      const page = await createNode('file', t('Untitled'), sectionId);
       onViewChange('note');
       onNavigate({ noteFolderId: folderId, noteSectionId: sectionId, noteId: page.id });
     } catch (e) { console.error('Failed to create note file', e); }
@@ -93,8 +93,10 @@ export function NotebookTree({
   const deleteBook = async (folder: NoteNode) => {
     const sections = sectionsInFolder(nodes, folder.id);
     const pages = sections.reduce((n, s) => n + filesInFolder(nodes, s.id).length, filesInFolder(nodes, folder.id).length);
-    const what = [sections.length > 0 ? `${sections.length} section${sections.length === 1 ? '' : 's'}` : '', pages > 0 ? `${pages} page${pages === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
-    if (!await appDialog.confirm(`Delete the notebook "${folder.name}"${what ? ` and its ${what}` : ''}? This cannot be undone.`)) return;
+    const message = sections.length > 0 || pages > 0
+      ? t('Delete the notebook “{name}” and its {sections} sections and {pages} pages? This cannot be undone.', { name: folder.name, sections: sections.length, pages })
+      : t('Delete the notebook “{name}”? This cannot be undone.', { name: folder.name });
+    if (!await appDialog.confirm(message)) return;
     try {
       await deleteNode(folder.id);
       if (activeFolderId === folder.id) onNavigate({ noteFolderId: null, noteSectionId: null, noteId: null });
@@ -102,8 +104,10 @@ export function NotebookTree({
   };
   const deleteSection = async (folderId: string, section: NoteNode) => {
     const pages = filesInFolder(nodes, section.id).length;
-    const what = pages > 0 ? ` and its ${pages} page${pages === 1 ? '' : 's'}` : '';
-    if (!await appDialog.confirm(`Delete the section "${section.name}"${what}? This cannot be undone.`)) return;
+    const message = pages > 0
+      ? t('Delete the section “{name}” and its {n} pages? This cannot be undone.', { name: section.name, n: pages })
+      : t('Delete the section “{name}”? This cannot be undone.', { name: section.name });
+    if (!await appDialog.confirm(message)) return;
     try {
       await deleteNode(section.id);
       // The pick and the open page both go if they were inside it.

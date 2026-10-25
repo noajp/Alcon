@@ -7,6 +7,7 @@ import { UserMinus, UserPlus, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { FONT } from '@/shared/designTokens';
 import { inviteMember, useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
 import { membershipErrorMessage } from '@/Function/membership/membershipErrors';
@@ -129,7 +130,7 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
               return {
                 user_id: uid,
                 worker_id: w?.id ?? null,
-                name: w?.name ?? 'Member',
+                name: w?.name ?? t('Member'),
                 avatar_url: w?.avatar_url ?? null,
               };
             }),
@@ -143,7 +144,7 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
     } finally {
       setLoading(false);
     }
-  }, [objectId, domainId]);
+  }, [objectId, domainId, t]);
 
   useEffect(() => {
     void refresh();
@@ -165,7 +166,7 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
   };
 
   const handleRemove = async (memberId: string) => {
-    if (!await appDialog.confirm('Remove this member from the Object?')) return;
+    if (!await appDialog.confirm(t('Remove this member from the Object?'))) return;
     setInviteError(null);
     // A refused delete matches no rows; the last owner is refused outright
     // unless a manager of the Domain removes them (they then take it over).
@@ -180,11 +181,11 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
       <div className="max-w-2xl mx-auto">
         <div className="mb-4 flex items-end justify-between">
           <div>
-            <h2 className="text-[15px] font-semibold text-foreground">
-              Members ({members.length})
+            <h2 className={`${FONT.lg} text-foreground`}>
+              {t('Members ({n})', { n: members.length })}
             </h2>
             <p className="text-[12px] text-muted-foreground">
-              People with access to this Object. Pulled from the Domain&apos;s members.
+              {t('People with access to this Object. Pulled from the Domain’s members.')}
             </p>
           </div>
           {managesObject && (
@@ -196,20 +197,20 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
         {inviteError && !showAdd && <p className="mb-3 text-[12px] text-[var(--status-danger)]">{inviteError}</p>}
 
         {loading ? (
-          <div className="py-8 text-center text-xs text-muted-foreground">Loading…</div>
+          <div className="py-8 text-center text-xs text-muted-foreground">{t('Loading…')}</div>
         ) : (
-          <div className="rounded-lg border border-border/60 bg-card divide-y divide-border/40">
+          <div>
             {members.length === 0 ? (
-              <div className="px-4 py-6 text-center text-xs text-muted-foreground">
-                No members yet.
-              </div>
+              <p className="px-2 py-2 text-[13px] text-muted-foreground">
+                {t('No members yet.')}
+              </p>
             ) : (
               members.map((m) => (
-                <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
-                  <WorkerAvatar worker={m.worker ?? { name: 'Member' }} size={32} className="ring-border/70" />
+                <div key={m.id} className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
+                  <WorkerAvatar worker={m.worker ?? { name: t('Member') }} size={32} className="ring-border/70" />
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium text-foreground truncate">
-                      {m.worker?.name ?? 'Member'}
+                      {m.worker?.name ?? t('Member')}
                     </div>
                     <div className="text-[11px] text-muted-foreground">{m.role}</div>
                   </div>
@@ -218,8 +219,8 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
                       type="button"
                       onClick={() => handleRemove(m.id)}
                       className="p-1.5 text-muted-foreground hover:text-[var(--status-danger)] hover:bg-[var(--status-danger-subtle)] dark:hover:bg-[var(--status-danger)]/20 rounded transition-colors"
-                      title="Remove member"
-                      aria-label="Remove member"
+                      title={t('Remove member')}
+                      aria-label={t('Remove member')}
                     >
                       <UserMinus size={14} />
                     </button>

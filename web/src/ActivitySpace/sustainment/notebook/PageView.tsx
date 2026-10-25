@@ -11,6 +11,8 @@ import {
   type BulletContextInfo,
 } from '@/ActivitySpace/sustainment/notebook/editor/NoteEditor';
 import { BulletExtractDialog } from './BulletExtractDialog';
+import { useI18n, translate } from '@/Function/i18n/I18nProvider';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 
 interface PageViewProps {
   fileId: string;
@@ -43,8 +45,9 @@ interface PageViewProps {
 // Titles we treat as "not really named yet" — the field shows the gray
 // "Document title" placeholder for these instead of the literal word, the
 // way Notion never surfaces its "Untitled" default as real text. The
-// sidebar/tree keep their own "Untitled" fallback for display.
-const PLACEHOLDER_TITLES = new Set(['', 'Untitled']);
+// sidebar/tree keep their own "Untitled" fallback for display. New pages are
+// named in the viewer's language, so its "Untitled" counts too.
+const isPlaceholderTitle = (title: string) => title === '' || title === 'Untitled' || title === translate('Untitled');
 
 export function PageView({
   title,
@@ -58,13 +61,14 @@ export function PageView({
   filesPaneOpen,
   onToggleFilesPane,
 }: PageViewProps) {
+  const { t } = useI18n();
   const explorerData = useExplorerData();
   // onObjectize / objectizing / onLinkedObjectChange are still on the props
   // (the host keeps wiring them) but currently have no UI trigger — the
   // header strip that exposed Obj化 / Note↔Object link was removed. Left in
   // place so re-adding an entry point is a one-liner.
   const [draftTitle, setDraftTitle] = useState(
-    PLACEHOLDER_TITLES.has(title.trim()) ? '' : title,
+    isPlaceholderTitle(title.trim()) ? '' : title,
   );
   const [bulletCtx, setBulletCtx] = useState<BulletContextInfo | null>(null);
   const editorRef = useRef<NoteEditorHandle | null>(null);
@@ -112,15 +116,19 @@ export function PageView({
     <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--card)]">
       <div className="relative flex items-center justify-center h-[50px] shrink-0 border-b border-border/30">
         {onToggleFilesPane && (
-          <button
-            type="button"
-            onClick={onToggleFilesPane}
-            title={filesPaneOpen ? 'Hide file list' : 'Show file list'}
-            aria-label={filesPaneOpen ? 'Hide file list' : 'Show file list'}
-            className="absolute left-2 inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-          >
-            {filesPaneOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-          </button>
+          <div className="absolute left-2">
+            <ButtonAppearanceProvider appearance="navigation">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={onToggleFilesPane}
+                title={filesPaneOpen ? t('Hide page list') : t('Show page list')}
+                aria-label={filesPaneOpen ? t('Hide page list') : t('Show page list')}
+              >
+                {filesPaneOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+              </Button>
+            </ButtonAppearanceProvider>
+          </div>
         )}
         <div ref={toolbarPortalRef} className="flex items-center justify-center" />
       </div>
@@ -129,9 +137,8 @@ export function PageView({
           {icon && (
             <div className="text-5xl mb-3 leading-none select-none">{icon}</div>
           )}
-          {/* Thin rule under the title — the border lives on this wrapper,
-              not the <input> (project rule: no frames/rings on inputs). */}
-          <div className="mb-6 pb-3 border-b border-border/50">
+          {/* The title stands on spacing alone — no rule under it. */}
+          <div className="mb-6">
             <input
               value={draftTitle}
               onChange={(e) => setDraftTitle(e.target.value)}
@@ -145,7 +152,7 @@ export function PageView({
                   (e.currentTarget as HTMLInputElement).blur();
                 }
               }}
-              placeholder="Document title"
+              placeholder={t('Document title')}
               // Box-aligned with the body (both sit at the px-12 content edge,
               // measured pixel-identical). We deliberately do NOT add a
               // negative text-indent to optically compensate the heading's

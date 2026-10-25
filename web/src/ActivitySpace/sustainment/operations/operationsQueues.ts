@@ -1,15 +1,17 @@
+import { translate } from '@/Function/i18n/I18nProvider';
 import type { OperationsAnalysis } from './operationsModel';
 
 export type OperationsQueue = 'overview' | 'attention' | 'records' | 'incomplete';
 
 export const OPERATIONS_QUEUES: readonly OperationsQueue[] = ['overview', 'attention', 'records', 'incomplete'];
 
+/** The queue's name in the reader's language (callers outside React read it too). */
 export function operationsQueueLabel(queue: OperationsQueue): string {
   switch (queue) {
-    case 'overview': return 'Overview';
-    case 'attention': return 'Follow-ups';
-    case 'records': return 'Opportunities';
-    case 'incomplete': return 'Missing details';
+    case 'overview': return translate('Overview');
+    case 'attention': return translate('Follow-ups');
+    case 'records': return translate('Opportunities');
+    case 'incomplete': return translate('Missing details');
   }
 }
 

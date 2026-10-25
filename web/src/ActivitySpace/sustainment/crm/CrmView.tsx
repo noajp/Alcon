@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Building2, Check, ChevronDown, Columns3, Filter, Layers, List, PenLine, Plus, Settings2, Users, X } from 'lucide-react';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
+import { FONT } from '@/shared/designTokens';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell, MENU_ROW } from '@/Function/shared/menu';
@@ -23,7 +24,7 @@ import { forecastFor, inList, searchDeals, type CrmDealRecord, type CrmHealthLev
 import { crmRoute, routeTo, type CrmRoute, type CrmViewId } from './crmRoute';
 import { useCrmScope } from './crmScope';
 import { HealthDot, money } from './crmFormat';
-import { CrmToday } from './CrmToday';
+import { CrmToday, Metric } from './CrmToday';
 import { CrmPipeline } from './CrmPipeline';
 import { CrmDeals } from './CrmDeals';
 import { CrmCompanies, CrmCompanyPage, CrmContactPage, CrmContacts } from './CrmDirectory';
@@ -217,9 +218,9 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
     {crm.loading && <p role="status" className="py-6 text-sm text-muted-foreground">{t('Loading your pipeline…')}</p>}
     {crm.error && <div role="alert" className="space-y-2"><p className="text-sm text-[var(--status-danger)]">{t('Could not load your pipeline.')} {crm.error instanceof Error ? crm.error.message : ''}</p>
       <Button onClick={() => void crm.refetch()}>{t('Retry')}</Button></div>}
-    {!crm.loading && !crm.error && !scoped.pipelines.length && <div className="space-y-3 py-6">
-      <p className="text-sm text-muted-foreground">{t('No pipeline in this scope yet.')}</p>
-      <Button variant="secondary" onClick={() => go({ settings: true })}><Settings2 size={14} />{t('Pipeline settings')}</Button>
+    {!crm.loading && !crm.error && !scoped.pipelines.length && <div className="space-y-2 py-6">
+      <p className={`${FONT.base} text-muted-foreground`}>{t('No pipeline in this scope yet.')}</p>
+      <ButtonAppearanceProvider appearance="inline"><Button variant="ghost" size="sm" className="-ml-2.5" onClick={() => go({ settings: true })}><Settings2 size={14} />{t('Pipeline settings')}</Button></ButtonAppearanceProvider>
     </div>}
   </>;
 
@@ -283,7 +284,7 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
     <PlacePage title={t('Forecast')} actions={headerActions}>
       {status}
       <div className="space-y-12">{scoped.workspaces.map(item => <section key={item.pipeline.id} className="space-y-4">
-        {scoped.workspaces.length > 1 && <h2 className="text-[15px] font-medium">{item.pipeline.name}</h2>}
+        {scoped.workspaces.length > 1 && <h2 className={`${FONT.lg} text-foreground`}>{item.pipeline.name}</h2>}
         <CrmForecast workspace={item} onOpenInitiative={openInitiative} />
       </section>)}</div>
     </PlacePage>
@@ -293,11 +294,11 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
   // ── Deals: a list across the scope, or one pipeline's board ─────────
   const view: 'deals' | 'board' = route.view === 'board' ? 'board' : 'deals';
   const chips = [
-    route.stage !== undefined && route.stage !== null && { key: 'stage', label: `${t('Stage')}: ${t(workspace?.stages.find(stage => stage.id === route.stage)?.label ?? route.stage)}` },
+    route.stage !== undefined && route.stage !== null && { key: 'stage', label: t('Stage: {name}', { name: t(workspace?.stages.find(stage => stage.id === route.stage)?.label ?? route.stage) }) },
     route.list && { key: 'list', label: t(LIST_LABEL[route.list]) },
-    route.account !== undefined && route.account !== null && { key: 'account', label: `${t('Company')}: ${crm.companies.find(company => company.id === route.account)?.name ?? t('No company')}` },
-    route.owner && { key: 'owner', label: `${t('Owner')}: ${crm.people.find(person => person.id === route.owner)?.name ?? ''}` },
-    route.query && { key: 'query', label: `“${route.query}”` },
+    route.account !== undefined && route.account !== null && { key: 'account', label: t('Company: {name}', { name: crm.companies.find(company => company.id === route.account)?.name ?? t('No company') }) },
+    route.owner && { key: 'owner', label: t('Owner: {name}', { name: crm.people.find(person => person.id === route.owner)?.name ?? '' }) },
+    route.query && { key: 'query', label: t('“{query}”', { query: route.query }) },
   ].filter(Boolean) as { key: 'stage' | 'list' | 'account' | 'owner' | 'query'; label: string }[];
   const boardOf = view === 'board' || !!route.pipelineId;
 
@@ -336,12 +337,12 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
       views={DEAL_TABS.map(tab => ({ ...tab, label: tab.id === 'deals' && recordLabel ? recordLabel : tab.label }))} activeView={view}
       onSelectView={id => go({ view: id as CrmViewId })}
       actions={headerActions}
-      viewControls={<div className="flex items-center gap-1">{pipelinePicker}{filterMenu}</div>}>
+      viewControls={<ButtonAppearanceProvider appearance="navigation"><div className="flex items-center gap-1">{pipelinePicker}{filterMenu}</div></ButtonAppearanceProvider>}>
       <div className="@container/crm space-y-6">
         {chips.length > 0 && <div className="flex flex-wrap items-center gap-2">
           {chips.map(chip => <Button key={chip.key} size="xs" variant="secondary" aria-label={t('Clear filter {name}', { name: chip.label })}
             onClick={() => go(chip.key === 'query' ? { query: '' } : { [chip.key]: null })}>{chip.label}<X size={12} /></Button>)}
-          <span className="text-xs text-muted-foreground">{t('{n} deals', { n: filtered.length })}</span>
+          <span className={`${FONT.sm} text-muted-foreground`}>{t('{n} deals', { n: filtered.length })}</span>
         </div>}
         {status}
         {listSource && view === 'deals' && <CrmDeals deals={filtered} today={listSource.today} onOpen={openDeal} selectedId={null}
@@ -363,18 +364,13 @@ function ScopeOverview({ workspaces, pooled, locale, onOpenPipeline, onOpenList 
   const open = pooled.deals.filter(deal => deal.outcome === 'open');
   const won = forecastFor(pooled.deals, pooled.primaryCurrency, pooled.today, 3);
   const health = HEALTH_ORDER.map(level => ({ level, count: open.filter(deal => deal.health.level === level).length }));
-  const metric = (label: string, value: string, hint?: string) => <div className="min-w-0 space-y-1">
-    <dt className="truncate text-xs text-muted-foreground">{label}</dt>
-    <dd className="truncate text-xl font-semibold tabular-nums">{value}</dd>
-    {hint && <dd className="truncate text-xs text-muted-foreground">{hint}</dd>}
-  </div>;
-  if (!pooled.deals.length) return <p className="text-sm text-muted-foreground">{t('No deals yet. Use Capture or New deal to add one.')}</p>;
+  if (!pooled.deals.length) return <p className={`${FONT.base} text-muted-foreground`}>{t('No deals yet. Use Capture or New deal to add one.')}</p>;
   return <>
     {pooled.totals.map(total => <dl key={total.currency} className="grid grid-cols-2 gap-6 @2xl/crm:grid-cols-4">
-      {metric(t('Open pipeline'), money(total.pipeline, total.currency, locale, true), t('{n} open deals', { n: total.openCount }))}
-      {metric(t('Weighted'), money(total.weightedPipeline, total.currency, locale, true), t('Weighted by likelihood'))}
-      {metric(t('Forecast · next {n} days', { n: pooled.params.horizonDays }), money(total.forecast, total.currency, locale, true))}
-      {metric(t('Won'), money(total.currency === pooled.primaryCurrency ? won.months.reduce((sum, month) => sum + month.won, 0) : total.won, total.currency, locale, true), total.currency === pooled.primaryCurrency ? t('Last 3 months') : undefined)}
+      <Metric label={t('Open pipeline')} value={money(total.pipeline, total.currency, locale, true)} hint={t('{n} open deals', { n: total.openCount })} />
+      <Metric label={t('Weighted')} value={money(total.weightedPipeline, total.currency, locale, true)} hint={t('Weighted by likelihood')} />
+      <Metric label={t('Forecast · next {n} days', { n: pooled.params.horizonDays })} value={money(total.forecast, total.currency, locale, true)} />
+      <Metric label={t('Won')} value={money(total.currency === pooled.primaryCurrency ? won.months.reduce((sum, month) => sum + month.won, 0) : total.won, total.currency, locale, true)} hint={total.currency === pooled.primaryCurrency ? t('Last 3 months') : undefined} />
     </dl>)}
 
     <PageSection title={t('Health')}>
@@ -384,7 +380,7 @@ function ScopeOverview({ workspaces, pooled, locale, onOpenPipeline, onOpenList 
         </div>
         <ul className="grid grid-cols-2 gap-1 @xl/crm:grid-cols-4">{health.map(({ level, count }) => <li key={level}>
           <button type="button" disabled={!count || (level !== 'risk' && level !== 'incomplete')} onClick={() => onOpenList(level === 'risk' ? 'at-risk' : 'incomplete')}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs enabled:hover:bg-muted/40 disabled:cursor-default">
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] enabled:hover:bg-muted/40 disabled:cursor-default">
             <HealthDot level={level} /><span className="flex-1 truncate">{t(HEALTH_LABEL[level])}</span><span className="tabular-nums text-muted-foreground">{count}</span>
           </button>
         </li>)}</ul>

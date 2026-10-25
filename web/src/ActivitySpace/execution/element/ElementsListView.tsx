@@ -15,6 +15,7 @@ import { bulkSetAssignee } from '@/ActivitySpace/execution/element/bulkAssign';
 import { ObjectIcon } from '@/shell/icons';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { EmptyState } from '@/Function/shared/EmptyState';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
@@ -52,7 +53,7 @@ const VIEW_MODE_TITLES: Partial<Record<ObjectTabType, string>> = {
   gantt: 'Gantt',
   calendar: 'Calendar',
   workers: 'Workers',
-  custom_view: 'CustomView',
+  custom_view: 'Custom view',
 };
 
 function isViewMode(t: ObjectTabType): boolean {
@@ -94,6 +95,7 @@ interface ElementsListViewProps {
  * drill-in, and the Domain-direct quick-add popup.
  */
 export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onViewChange }: ElementsListViewProps) {
+  const { t } = useI18n();
   const explorerData = useExplorerData();
   const [detailId, setDetailId] = useState<string | null>(null);
   const [visibleTabs, setVisibleTabs] = useState<ObjectTabType[]>(loadVisibleTabs);
@@ -642,11 +644,8 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
       {effectiveViewMode === 'workers' && (
         <div className="flex-1 flex items-center justify-center p-12 text-center">
           <div>
-            <p className="text-[13px] text-muted-foreground mb-1">
-              Domain-level Workers view is coming soon.
-            </p>
-            <p className="text-[12px] text-muted-foreground/70">
-              Open an Object to see its Workers tab.
+            <p className="text-[13px] text-muted-foreground">
+              {t('Domain-level Workers view is coming soon. Open an Object to see its Workers tab.')}
             </p>
           </div>
         </div>

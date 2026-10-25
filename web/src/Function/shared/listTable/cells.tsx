@@ -27,6 +27,11 @@ import { StatusPicker } from '@/ActivitySpace/execution/element/StatusPicker';
 import { type DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
 import { type ElementUpdate, formatDateShort } from './shared';
 import { completionOf } from '@/Function/shared/completion';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { fieldDisplayLabel } from '@/Function/property/fieldModel';
+import { PRIORITY, statusLabel } from '@/shared/designTokens';
+
+const PRIORITY_LABELS: Record<string, string> = Object.fromEntries(Object.entries(PRIORITY).map(([key, value]) => [key, value.label]));
 
 // Type cell — Domain-shared `type` for either an Element or an Object, shown
 // as an always-on column. Opens a chip-grid picker: every type as a pill, the
@@ -42,6 +47,7 @@ function CellClearFooter({
   onClear?: () => void;
   className?: string;
 }) {
+  const { t } = useI18n();
   return (
     <div className={className}>
       <div className="border-t border-border/60" />
@@ -53,7 +59,7 @@ function CellClearFooter({
             onClick={onClear}
             className="text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded-md hover:bg-muted/40 transition-colors"
           >
-            Clear
+            {t('Clear')}
           </button>
         )}
       </div>
@@ -87,6 +93,7 @@ export function TypeCell({
   onAddType?: (name: string) => void | Promise<void>;
   onRemoveType?: (name: string) => void | Promise<void>;
 }) {
+  const { t: tr } = useI18n();
   const current = value ?? null;
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -161,7 +168,7 @@ export function TypeCell({
                       : 'bg-transparent text-muted-foreground border-border/50 hover:text-foreground hover:border-border'
                   }`}
                 >
-                  {p.label}
+                  {tr(p.label)}
                 </button>
               ))}
             </div>
@@ -208,8 +215,8 @@ export function TypeCell({
                   <button
                     type="button"
                     onClick={() => void onRemoveType?.(t)}
-                    title={`Delete "${t}"`}
-                    aria-label={`Delete "${t}"`}
+                    title={tr('Delete “{name}”', { name: t })}
+                    aria-label={tr('Delete “{name}”', { name: t })}
                     className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-muted text-muted-foreground border border-border/60 flex items-center justify-center hover:text-foreground hover:border-border transition-colors"
                   >
                     <X size={9} strokeWidth={2.5} />
@@ -222,8 +229,8 @@ export function TypeCell({
             <button
               type="button"
               onClick={() => setAdding(true)}
-              title="Add type"
-              aria-label="Add type"
+              title={tr('Add type')}
+              aria-label={tr('Add type')}
               className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-dashed border-border/60 text-muted-foreground hover:text-foreground hover:border-border transition-colors"
             >
               <Plus size={13} />
@@ -234,7 +241,7 @@ export function TypeCell({
           <input
             autoFocus
             value={draft}
-            placeholder="New type…"
+            placeholder={tr('New type…')}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') { e.preventDefault(); void submitNew(); }
@@ -253,8 +260,8 @@ export function TypeCell({
               <button
                 type="button"
                 onClick={() => setEditing((v) => !v)}
-                title="Edit types"
-                aria-label="Edit types"
+                title={tr('Edit types')}
+                aria-label={tr('Edit types')}
                 className={`p-1 rounded-md transition-colors ${
                   editing
                     ? 'text-foreground bg-muted/60'
@@ -284,6 +291,7 @@ function DateRangeCellPopover({
   trigger: ReactElement;
   onChange: (start: string | null, due: string | null) => void | Promise<void>;
 }) {
+  const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DateRange | undefined>(undefined);
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
@@ -333,8 +341,8 @@ function DateRangeCellPopover({
         />
         <CellClearFooter
           label={draft?.from
-            ? `${formatDateShort(formatDateOnly(draft.from))} – ${draft.to ? formatDateShort(formatDateOnly(draft.to)) : '…'}`
-            : 'Pick a day, or drag a range'}
+            ? `${formatDateShort(formatDateOnly(draft.from), locale)} – ${draft.to ? formatDateShort(formatDateOnly(draft.to), locale) : '…'}`
+            : t('Pick a day, or drag a range')}
           onClear={() => { setDraft(undefined); void onChange(null, null); setOpen(false); }}
         />
       </PopoverContent>
@@ -379,6 +387,7 @@ export function ElementCell({
 }) {
   // The dataset.gripVertical class isn't strictly used — kept for a future
   // header tooltip hook. Visible cell styling is handled per-branch below.
+  const { t, locale } = useI18n();
   if (column.kind === 'custom' && column.custom) {
     const col = column.custom;
     const cellValue = col.values?.[el.id]?.value ?? null;
@@ -406,7 +415,7 @@ export function ElementCell({
     return <td className="table-cell px-2 py-1" onClick={(e) => e.stopPropagation()}><PriorityCell element={el} onElementUpdate={canUpdate ? onElementUpdate : undefined} /></td>;
   }
   if (column.id === 'status') {
-    return <td className="table-cell px-2 py-1" onClick={(e) => e.stopPropagation()}>{canUpdate ? <StatusPicker element={el} onChanged={() => { void onRefresh?.(); }} trigger={<Button variant="ghost" size="xs">{(el.status ?? 'todo').replaceAll('_', ' ')}</Button>} /> : (el.status ?? 'todo').replaceAll('_', ' ')}</td>;
+    return <td className="table-cell px-2 py-1" onClick={(e) => e.stopPropagation()}>{canUpdate ? <StatusPicker element={el} onChanged={() => { void onRefresh?.(); }} trigger={<Button variant="ghost" size="xs">{t(statusLabel(el.status ?? 'todo'))}</Button>} /> : t(statusLabel(el.status ?? 'todo'))}</td>;
   }
   if (column.id === 'type') {
     return (
@@ -417,7 +426,7 @@ export function ElementCell({
         <TypeCell
           value={el.type ?? null}
           types={elementTypes}
-          onChange={canUpdate ? (t) => onElementUpdate(el.id, { type: t }) : undefined}
+          onChange={canUpdate ? (type) => onElementUpdate(el.id, { type }) : undefined}
           onAddType={onAddType}
           onRemoveType={onRemoveType}
         />
@@ -461,7 +470,7 @@ export function ElementCell({
     // The "Due date" column shows the DUE date only — not the start→due range.
     // (start_date is still editable via the popover for the Gantt, just not
     // rendered as a range here.)
-    const display = dateString ? formatDateShort(dateString) : null;
+    const display = dateString ? formatDateShort(dateString, locale) : null;
     const trigger = (
       <button
         type="button"
@@ -513,6 +522,7 @@ function AssigneeCell({
   canUpdate: boolean;
   onRefresh?: () => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const all = el.assignees ?? [];
@@ -523,7 +533,7 @@ function AssigneeCell({
       {empty ? <EmptyCellMark /> : all.length === 1 ? (
         <>
           <WorkerAvatar worker={all[0].worker ?? null} size={16} />
-          <CellText>{all[0].worker?.name ?? 'Unknown'}</CellText>
+          <CellText>{all[0].worker?.name ?? t('Unknown')}</CellText>
         </>
       ) : (
         <WorkerAvatarStack
@@ -562,7 +572,7 @@ function AssigneeCell({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={workerTriggerLabel('Assignees', all.map((a) => a.worker ?? null).filter((w): w is NonNullable<typeof w> => !!w))}
+          aria-label={workerTriggerLabel(t('Assignees'), all.map((a) => a.worker ?? null).filter((w): w is NonNullable<typeof w> => !!w))}
           className="inline-flex items-center max-w-full text-left"
         >
           {display}
@@ -697,7 +707,8 @@ export function DueDateCell({
 }) {
   const dateString = obj.due_date ? obj.due_date.slice(0, 10) : null;
   const selected = parseDateOnly(dateString);
-  const display = dateString ? formatDateShort(dateString) : null;
+  const { locale } = useI18n();
+  const display = dateString ? formatDateShort(dateString, locale) : null;
   const canEdit = !!onObjectUpdate;
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
   const trigger = (
@@ -743,6 +754,7 @@ export function LeadCell({
   workers: Worker[];
   onObjectUpdate?: (objectId: string, updates: { lead_id?: string | null }) => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   const empty = !obj.lead_id;
   const lead = useWorkerById(obj.lead_id ?? null, workers);
   const display = (
@@ -750,7 +762,7 @@ export function LeadCell({
       {empty ? <EmptyCellMark /> : (
         <>
           <WorkerAvatar worker={lead} size={16} />
-          <CellText>{lead?.name ?? 'Unknown'}</CellText>
+          <CellText>{lead?.name ?? t('Unknown')}</CellText>
         </>
       )}
     </span>
@@ -761,7 +773,7 @@ export function LeadCell({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={workerTriggerLabel('Lead', lead)}
+          aria-label={workerTriggerLabel(fieldDisplayLabel(t, { id: 'lead', label: 'Lead' }), lead)}
           className="inline-flex items-center max-w-full text-left"
         >
           {display}
@@ -769,7 +781,7 @@ export function LeadCell({
       </DropdownMenuTrigger>
       <MenuShell as="dropdown" align="start">
         {workers.length === 0 && (
-          <div className="px-2 py-1.5 text-[12px] text-muted-foreground">No workers</div>
+          <div className="px-2 py-1.5 text-[12px] text-muted-foreground">{t('No Workers')}</div>
         )}
         {workers.map((w) => (
           <DropdownMenuItem key={w.id} onClick={() => onObjectUpdate(obj.id, { lead_id: w.id })} className="gap-2">
@@ -783,7 +795,7 @@ export function LeadCell({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onObjectUpdate(obj.id, { lead_id: null })} className="h-6 py-0 text-muted-foreground">
-              Clear
+              {t('Clear')}
             </DropdownMenuItem>
           </>
         )}
@@ -800,12 +812,13 @@ function PriorityCell({
   element: ElementWithDetails;
   onElementUpdate?: (elementId: string, updates: ElementUpdate) => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   const current = element.priority ?? null;
   const trigger = (
     <button
       type="button"
       disabled={!onElementUpdate}
-      title={current ? `Priority: ${current}` : 'Set priority'}
+      title={current ? t('Priority: {value}', { value: t(PRIORITY_LABELS[current] ?? current) }) : t('Set priority')}
       className="flex items-center justify-center rounded-md px-0.5 py-0.5 transition-colors hover:bg-muted/40"
     >
       <PriorityMark priority={current} />

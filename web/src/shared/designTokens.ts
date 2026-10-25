@@ -10,6 +10,8 @@
  * Do not hardcode hex values in components.
  */
 
+import { translate } from '@/Function/i18n/I18nProvider';
+
 // ============================================
 // Status
 //
@@ -170,8 +172,9 @@ export function priorityColor(priority?: string | null): string {
 }
 
 /** Human label for a status key, without importing the whole STATUS table. */
+/** The status's name in the viewer's language. */
 export function statusLabel(status?: string | null): string {
-  return STATUS[status as StatusKey]?.label ?? status ?? STATUS.todo.label;
+  return translate(STATUS[status as StatusKey]?.label ?? status ?? STATUS.todo.label);
 }
 
 // ============================================

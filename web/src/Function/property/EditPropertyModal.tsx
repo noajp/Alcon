@@ -6,6 +6,7 @@ import { isCancelKey, isCommitEnter, useEscapeLayer } from '@/Function/shared/ke
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import { randomOptionPastel } from './optionColorPalette';
 import { COLUMN_TYPES } from './columnTypes';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface EditPropertyModalProps {
   column: CustomColumnWithValues;
@@ -22,6 +23,7 @@ export function EditPropertyModal({
   onDelete,
   onDuplicate,
 }: EditPropertyModalProps) {
+  const { t: tr } = useI18n();
   const [name, setName] = useState(column.name);
   const [options, setOptions] = useState<{ value: string; color?: string }[]>(
     column.options?.options || []
@@ -94,7 +96,7 @@ export function EditPropertyModal({
                 <polyline points="15 18 9 12 15 6"/>
               </svg>
             </button>
-            <span className="text-sm font-medium">Edit property</span>
+            <span className="text-sm font-medium">{tr('Edit Property')}</span>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-card rounded">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -130,10 +132,10 @@ export function EditPropertyModal({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
               </svg>
-              Type
+              {tr('Type')}
             </div>
             <button className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-              {typeInfo?.label}
+              {typeInfo ? tr(typeInfo.label) : null}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="9 18 15 12 9 6"/>
               </svg>
@@ -149,7 +151,7 @@ export function EditPropertyModal({
               statusGroups.map((group, groupIdx) => (
                 <div key={groupIdx} className="border-b border-border last:border-b-0">
                   <div className="flex items-center justify-between px-3 py-2 bg-muted">
-                    <span className="text-xs text-muted-foreground">{group.label}</span>
+                    <span className="text-xs text-muted-foreground">{tr(group.label)}</span>
                     <button
                       onClick={() => {
                         const defaultValue = group.label === 'To-do' ? 'New status' : group.label === 'In progress' ? 'In progress' : 'Done';
@@ -206,7 +208,7 @@ export function EditPropertyModal({
                           </span>
                         )}
                         {realIndex === 0 && group.label === 'To-do' && (
-                          <span className="text-[10px] text-muted-foreground">DEFAULT</span>
+                          <span className="text-[10px] text-muted-foreground">{tr('DEFAULT')}</span>
                         )}
                         <button
                           onClick={() => handleDeleteOption(realIndex)}
@@ -227,7 +229,7 @@ export function EditPropertyModal({
             ) : (
               // Regular select/multi-select
               <div className="p-2">
-                <div className="text-xs text-muted-foreground px-2 py-1 mb-1">Options</div>
+                <div className="text-xs text-muted-foreground px-2 py-1 mb-1">{tr('Options')}</div>
                 {options.map((option, idx) => (
                   <div key={idx} className="flex items-center gap-2 px-2 py-1.5 hover:bg-card rounded group">
                     <button className="cursor-grab text-muted-foreground opacity-0 group-hover:opacity-100">
@@ -277,7 +279,7 @@ export function EditPropertyModal({
                     value={newOptionValue}
                     onChange={e => setNewOptionValue(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleAddOption(); }}
-                    placeholder="Add option..."
+                    placeholder={tr('Add option…')}
                     className="flex-1 text-sm bg-transparent border-none focus:outline-none"
                   />
                   <button
@@ -305,7 +307,7 @@ export function EditPropertyModal({
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
             </svg>
-            Duplicate property
+            {tr('Duplicate Property')}
           </button>
           <button
             onClick={() => {
@@ -318,7 +320,7 @@ export function EditPropertyModal({
               <polyline points="3 6 5 6 21 6"/>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
             </svg>
-            Delete property
+            {tr('Delete Property')}
           </button>
         </div>
       </div>

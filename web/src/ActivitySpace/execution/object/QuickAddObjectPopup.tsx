@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { ObjectIcon as BoxIcon, DomainIcon } from '@/Function/shared/conceptIcons';
 import { DatePopover } from '@/Function/shared/date';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -69,6 +70,7 @@ export function QuickAddObjectPopup({
   types = [],
   defaultDomainId = null,
 }: QuickAddObjectPopupProps) {
+  const { t } = useI18n();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<string | null>(null);
@@ -141,7 +143,7 @@ export function QuickAddObjectPopup({
       onClose();
     } catch (e) {
       console.error('QuickAddObject submit failed:', e);
-      setError(e instanceof Error ? e.message : 'Failed to create Object. Please try again.');
+      setError(e instanceof Error ? e.message : t('Failed to create Object. Please try again.'));
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -157,7 +159,7 @@ export function QuickAddObjectPopup({
       <div
         className={QUICK_CREATE.panel}
         role="dialog"
-        aria-label="Quick add Object"
+        aria-label={t('Quick add Object')}
       >
         {/* Header */}
         <div className={QUICK_CREATE.header}>
@@ -169,7 +171,7 @@ export function QuickAddObjectPopup({
           <button
             onClick={onClose}
             className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-            aria-label="Close"
+            aria-label={t('Close')}
           >
             <X size={14} />
           </button>
@@ -186,8 +188,8 @@ export function QuickAddObjectPopup({
               handleSubmit();
             }
           }}
-          placeholder="Object name…"
-          aria-label="Object name"
+          placeholder={t('Object name…')}
+          aria-label={t('Object name')}
           rows={1}
           className={QUICK_CREATE.title}
         />
@@ -197,8 +199,8 @@ export function QuickAddObjectPopup({
           ref={descRef}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Add description…"
-          aria-label="Description"
+          placeholder={t('Add description…')}
+          aria-label={t('Description')}
           rows={2}
           className={QUICK_CREATE.description}
         />
@@ -212,12 +214,12 @@ export function QuickAddObjectPopup({
             <DropdownMenu {...menuProps('type')}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!type)}>
-                  <span>{type ?? 'Type'}</span>
+                  <span>{type ?? t('Type')}</span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[180px]">
-                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Type</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Type')}</DropdownMenuLabel>
                 {types.map((t) => (
                   <DropdownMenuItem key={t} onSelect={() => setType(t)} className="gap-2 text-[12px]">
                     <span className="flex-1 truncate">{t}</span>
@@ -227,7 +229,7 @@ export function QuickAddObjectPopup({
                 {type && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => setType(null)} className="text-[12px] text-muted-foreground">Clear</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setType(null)} className="text-[12px] text-muted-foreground">{t('Clear')}</DropdownMenuItem>
                   </>
                 )}
               </DropdownMenuContent>
@@ -240,12 +242,12 @@ export function QuickAddObjectPopup({
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!leadWorker)}>
                   <UserIcon size={12} className="text-muted-foreground" />
-                  <span>{leadWorker?.name ?? 'Lead'}</span>
+                  <span>{leadWorker?.name ?? t('Object lead')}</span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[220px] max-h-[260px] overflow-y-auto">
-                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Lead</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Object lead')}</DropdownMenuLabel>
                 {workers.map((w) => (
                   <DropdownMenuItem key={w.id} onSelect={() => setLeadId(w.id)} className="gap-2 text-[12px]">
                     <UserIcon size={12} className="text-muted-foreground" />
@@ -256,7 +258,7 @@ export function QuickAddObjectPopup({
                 {leadWorker && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => setLeadId(null)} className="text-[12px] text-muted-foreground">Clear</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setLeadId(null)} className="text-[12px] text-muted-foreground">{t('Clear')}</DropdownMenuItem>
                   </>
                 )}
               </DropdownMenuContent>
@@ -266,9 +268,9 @@ export function QuickAddObjectPopup({
           {/* Due date — the app's calendar behind the same pill chip the Type
               and Lead pills use, so all three open the same kind of surface. */}
           <DatePopover value={dueDate} onChange={setDueDate}>
-            <button type="button" className={pillClass(!!dueDate)} aria-label="Due date">
+            <button type="button" className={pillClass(!!dueDate)} aria-label={t('Due date')}>
               <CalendarIcon size={12} className="text-muted-foreground" />
-              <span>{dueDate ?? 'Due date'}</span>
+              <span>{dueDate ?? t('Due date')}</span>
               <ChevronDown size={10} className="opacity-60" />
             </button>
           </DatePopover>
@@ -281,12 +283,12 @@ export function QuickAddObjectPopup({
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!domainPick)}>
                   <DomainIcon size={12} className="text-muted-foreground" />
-                  <span>{domainPick?.name ?? 'Domain'}{domainIds.length > 1 ? ` +${domainIds.length - 1}` : ''}</span>
+                  <span>{domainPick?.name ?? t('Domain')}{domainIds.length > 1 ? ` +${domainIds.length - 1}` : ''}</span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[220px] max-h-[260px] overflow-y-auto">
-                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Domain</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Domain')}</DropdownMenuLabel>
                 {domains.map((d) => (
                   <DropdownMenuCheckboxItem
                     key={d.id}
@@ -311,7 +313,7 @@ export function QuickAddObjectPopup({
         <div className={QUICK_CREATE.footer}>
           {hint && <span className="mr-auto min-w-0 text-[11px] text-muted-foreground">{hint}</span>}
           <Button variant="primary" onClick={handleSubmit} disabled={!canSubmit}>
-            Create
+            {t('Create')}
           </Button>
         </div>
       </div>

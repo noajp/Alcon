@@ -3,14 +3,16 @@ import { useMemo } from 'react';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, format, isToday } from 'date-fns';
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export function MiniCalendarWidget({ elements }: { elements: ElementWithDetails[] }) {
+  const { locale } = useI18n();
   const today = new Date();
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
   const start = startOfWeek(monthStart);
   const end = endOfWeek(monthEnd);
-  const days = useMemo(() => eachDayOfInterval({ start, end }), [start, end]);
+  const days = eachDayOfInterval({ start, end });
 
   const elementsByDay = useMemo(() => {
     const map = new Map<string, ElementWithDetails[]>();
@@ -25,10 +27,10 @@ export function MiniCalendarWidget({ elements }: { elements: ElementWithDetails[
 
   return (
     <div>
-      <div className="text-[12px] font-medium text-foreground mb-2">{format(today, 'MMMM yyyy')}</div>
+      <div className="text-[12px] font-medium text-foreground mb-2">{today.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}</div>
       <div className="grid grid-cols-7 gap-1">
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-          <div key={i} className="text-[10px] text-center text-muted-foreground py-1">{d}</div>
+        {days.slice(0, 7).map((d) => (
+          <div key={d.toISOString()} className="text-[10px] text-center text-muted-foreground py-1">{d.toLocaleDateString(locale, { weekday: 'narrow' })}</div>
         ))}
         {days.map(day => {
           const inMonth = isSameMonth(day, today);

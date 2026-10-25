@@ -3,6 +3,7 @@
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
+import { translate } from '@/Function/i18n/I18nProvider';
 import type { ElementComment, ElementCommentActivity, ElementCommentInsert, ElementCommentUpdate, ElementReaction, ElementReactionInsert } from '@/types/database';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
@@ -47,7 +48,7 @@ export async function deleteElementComment(id: string): Promise<void> {
   // returns no error — report it so the caller can put the comment back.
   const { data, error } = await supabase.from('element_comments').delete().eq('id', id).select('id');
   if (error) throw error;
-  if (!data?.length) throw new Error('This comment can only be deleted by its author.');
+  if (!data?.length) throw new Error(translate('This comment can only be deleted by its author.'));
 }
 
 // ============================================

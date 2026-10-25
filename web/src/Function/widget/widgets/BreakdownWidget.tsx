@@ -7,8 +7,10 @@ import {
   tallyInNaturalOrder,
   type Dimension,
   type DimensionContext,
+  NO_VALUE,
   type Tallied,
 } from '@/Function/shared/dimensions';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useWidgetEmpty, useWidgetMeta } from '../WidgetFrame';
 import { DimensionPicker } from '../DimensionPicker';
 import type { WidgetParams, WidgetProps } from '../types';
@@ -41,6 +43,7 @@ export interface BreakdownParams extends WidgetParams {
 }
 
 export function BreakdownWidget({ host, params, setParams }: WidgetProps) {
+  const { t } = useI18n();
   const { dimension, shape } = params as BreakdownParams;
   const { data: strategies } = useStrategies();
   const { data: explorer } = useObjects(null);
@@ -61,9 +64,14 @@ export function BreakdownWidget({ host, params, setParams }: WidgetProps) {
     return { objectNames, initiativesByObject };
   }, [explorer.objects, strategies]);
 
+  // Status and priority names, and the "No …" bucket, are the product's own
+  // words and follow the viewer's language; every other label is user data.
   const rows = useMemo(
-    () => tallyInNaturalOrder(host.elements, dimension, ctx),
-    [host.elements, dimension, ctx],
+    () => tallyInNaturalOrder(host.elements, dimension, ctx).map((row) =>
+      row.id === NO_VALUE || dimension === 'status' || dimension === 'priority'
+        ? { ...row, label: t(row.label) }
+        : row),
+    [host.elements, dimension, ctx, t],
   );
 
   // The parts sum to the buckets, not to the Elements: on a multi-valued
@@ -78,7 +86,7 @@ export function BreakdownWidget({ host, params, setParams }: WidgetProps) {
   return (
     <>
       <DimensionPicker value={dimension} shape={shape} onChange={setParams} />
-      <div className="px-3 py-2">
+      <div className="py-2">
         {shape === 'donut' ? (
           <BreakdownDonut rows={rows} total={total} />
         ) : (

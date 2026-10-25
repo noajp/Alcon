@@ -3,6 +3,7 @@
 import { MessageIcon } from '@/Function/shared/conceptIcons';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import type { ElementCommentActivity } from '@/types/database';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /** Comment count + how recently the thread moved, in the quiet register the
  *  list rows established: a signal, not a status. One component so the list
@@ -20,12 +21,13 @@ export function ActivitySignal({
   showRelative?: boolean;
   className?: string;
 }) {
+  const { t } = useI18n();
   if (!activity) return null;
   const relative = formatRelative(activity.lastCommentAt);
   return (
     <span
       className={`shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70 ${className}`}
-      title={`${activity.commentCount} comment${activity.commentCount === 1 ? '' : 's'} · ${relative}`}
+      title={`${t(activity.commentCount === 1 ? '{n} comment' : '{n} comments', { n: activity.commentCount })} · ${relative}`}
     >
       <MessageIcon size={12} />
       <span className="tabular-nums">{activity.commentCount}</span>

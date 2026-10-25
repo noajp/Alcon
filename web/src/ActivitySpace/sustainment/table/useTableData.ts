@@ -9,13 +9,14 @@ import {
   type DataTableSchema,
 } from '@/ActivitySpace/sustainment/table/data';
 import type { DataTable, DataTableColumnType, Json } from '@/types/database';
+import { translate } from '@/Function/i18n/I18nProvider';
 
 const TABLE_DATA_QUERY_KEY = ['widget-table-data'] as const;
 export interface TableData extends DataTableSchema { table: DataTable }
 
 function requiredName(name: string): string {
   const value = name.trim();
-  if (!value) throw new Error('Enter a name');
+  if (!value) throw new Error(translate('Enter a name'));
   return value;
 }
 
@@ -58,7 +59,7 @@ export function useTableData(tableId: string | null) {
     }) as T;
   }
   function id(): string {
-    if (!tableId) throw new Error('Choose a Table first');
+    if (!tableId) throw new Error(translate('Choose a Table first'));
     return tableId;
   }
   async function updateOrder(relation: 'table_rows' | 'table_columns', rowId: string, orderIndex: number) {

@@ -205,7 +205,7 @@ function Fields({ crm }: { crm: Crm }) {
   return <Section title={t('Your fields')} description={t('Add what your organisation tracks that the standard record does not — a contract type, a region, a regulatory ID. A field of a Domain appears only on that Domain’s records; a Space field appears everywhere.')}>
     <div role="group" aria-label={t('Record kind')} className="flex gap-1">{(['deal', 'company', 'contact'] as const).map(item =>
       <Button key={item} shape="tab" size="sm" variant={entity === item ? 'secondary' : 'ghost'} aria-pressed={entity === item} onClick={() => setEntity(item)}>{t(ENTITY_LABEL[item])}</Button>)}</div>
-    <ul className="max-w-2xl divide-y divide-[var(--border-subtle)]">{list.map(field => <li key={field.id} className="flex items-center gap-3 py-2 text-sm">
+    <ul className="max-w-2xl">{list.map(field => <li key={field.id} className="flex items-center gap-3 py-2 text-sm">
       <span className="min-w-0 flex-1 truncate">{field.label}</span>
       <span className="max-w-40 truncate text-xs text-muted-foreground">{domainName(field.domain_id)}</span>
       <span className="text-xs text-muted-foreground">{t(TYPE_LABEL[field.type])}{field.type === 'select' && ` · ${fieldOptions(field).join(', ')}`}</span>

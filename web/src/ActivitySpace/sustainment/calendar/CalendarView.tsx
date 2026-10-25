@@ -3,7 +3,7 @@
 import { parseDateOnly, toDateOnlyString as fmtDateOnly, dayNumberOf, shiftDateOnly } from '@/Function/shared/dateUtils';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { CalendarPlus, ChevronLeft, ChevronRight, ChevronDown, X } from 'lucide-react';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
@@ -281,7 +281,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
     // once that day is no longer one the Element covers, the measurement is of
     // a position nobody is looking at any more.
     if (!occursOn(entry, grabbedOn)) {
-      setDragError(`${entry.title} changed dates while you were dragging it. Nothing was moved.`);
+      setDragError(t('{title} changed dates while you were dragging it. Nothing was moved.', { title: entry.title }));
       return;
     }
     const shift = dayNumberOf(dropOn) - dayNumberOf(grabbedOn);
@@ -296,7 +296,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
       onRefresh?.();
     } catch (e) {
       console.error('Failed to move element:', e);
-      setDragError(`${entry.title} could not be moved. It is still on its original date.`);
+      setDragError(t('{title} could not be moved. It is still on its original date.', { title: entry.title }));
     }
   };
 
@@ -344,13 +344,15 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
         // where it was, which on its own looks like the drag was never taken.
         <p role="alert" className="flex items-center gap-2 px-4 py-2 text-sm text-destructive">
           {dragError}
-          <Button size="xs" variant="ghost" onClick={() => setDragError(null)}>Dismiss</Button>
+          <Button size="xs" variant="ghost" onClick={() => setDragError(null)}>{t('Dismiss')}</Button>
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[var(--border-subtle)] bg-card">
         <Button size="sm" variant="secondary" onClick={goToToday}>{t('Today')}</Button>
-        <Button size="icon-sm" variant="ghost" onClick={goToPrevious} aria-label="Previous period"><ChevronLeft size={16} /></Button>
-        <Button size="icon-sm" variant="ghost" onClick={goToNext} aria-label="Next period"><ChevronRight size={16} /></Button>
+        <ButtonAppearanceProvider appearance="navigation">
+          <Button size="icon-sm" variant="ghost" onClick={goToPrevious} aria-label={t('Previous period')}><ChevronLeft size={16} /></Button>
+          <Button size="icon-sm" variant="ghost" onClick={goToNext} aria-label={t('Next period')}><ChevronRight size={16} /></Button>
+        </ButtonAppearanceProvider>
         <h2 className="text-base font-semibold flex-1 min-w-0">{headerTitle}</h2>
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button size="sm" variant="secondary">{t({ day: 'Day', week: 'Week', month: 'Month' }[mode])}<ChevronDown size={12} /></Button></DropdownMenuTrigger>
@@ -448,8 +450,8 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                       <button
                         type="button"
                         onClick={openPicker}
-                        title="Schedule an Element on this day"
-                        aria-label={`Schedule an Element on ${day.date.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}`}
+                        title={t('Schedule an Element on this day')}
+                        aria-label={t('Schedule an Element on {date}', { date: day.date.toLocaleDateString(locale, { month: 'short', day: 'numeric' }) })}
                         className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted/40 hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
                       >
                         <CalendarPlus size={13} />
@@ -464,7 +466,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                             onClick={(e) => e.stopPropagation()}
                             className="self-start text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded-md hover:bg-muted transition-colors duration-150 cursor-pointer font-medium"
                           >
-                            +{hidden} more
+                            {t('+{n} more', { n: hidden })}
                           </button>
                         </PopoverTrigger>
                         <PopoverContent className="w-72 p-3" align="start">
@@ -480,7 +482,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                               </span>
                             </div>
                             <div className="text-[11px] text-muted-foreground mt-0.5">
-                              {dayElements.length} {dayElements.length === 1 ? 'item' : 'items'}
+                              {t(dayElements.length === 1 ? '{n} item' : '{n} items', { n: dayElements.length })}
                             </div>
                           </div>
                           <div className="space-y-0.5 max-h-[280px] overflow-y-auto -mx-1 px-1">
@@ -528,7 +530,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                                       className="text-[10px] text-muted-foreground flex-shrink-0"
                                       style={{ color: statusColor(statusKey) }}
                                     >
-                                      {statusLabel(statusKey)}
+                                      {t(statusLabel(statusKey))}
                                     </span>
                                   </div>
                                 </button>
@@ -597,7 +599,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                       left: `calc(${(span.startCol / 7) * 100}% + ${span.continuesBefore ? 0 : 6}px)`,
                       width: `calc(${(width / 7) * 100}% - ${(span.continuesBefore ? 0 : 6) + (span.continuesAfter ? 0 : 6)}px)`,
                     }}
-                    title={`${element.title}${overdue ? ' (Overdue)' : ''}\nRight-click to change color`}
+                    title={`${overdue ? t('{title} (Overdue)', { title: element.title }) : element.title}\n${t('Right-click to change color')}`}
                   >
                     <div className="flex h-full items-center gap-1.5 min-w-0">
                       {element.object && <ObjectIcon size={12} />}
@@ -657,13 +659,12 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
           >
             <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-border/60">
               <span className="text-[12px] font-semibold">
-                Schedule on{' '}
-                {dayPicker.date.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
+                {t('Schedule on {date}', { date: dayPicker.date.toLocaleDateString(locale, { month: 'short', day: 'numeric' }) })}
               </span>
               <button
                 onClick={() => setDayPicker(null)}
                 className="text-muted-foreground hover:text-foreground p-0.5 rounded-md hover:bg-muted/40 transition-colors"
-                aria-label="Close"
+                aria-label={t('Close')}
               >
                 <X size={13} />
               </button>
@@ -671,7 +672,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
             {unscheduled.length === 0 ? (
               <div className="px-1 py-3 text-[11px] text-muted-foreground flex items-center gap-1.5">
                 <CalendarPlus size={13} className="shrink-0" />
-                Every Element already has a due date.
+                {t('Every Element already has a due date.')}
               </div>
             ) : (
               <div className="max-h-56 overflow-y-auto space-y-0.5">
@@ -705,10 +706,11 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-medium text-sm">Change Color</h3>
+              <h3 className="font-medium text-sm">{t('Change color')}</h3>
               <button
                 onClick={() => setShowColorPicker(false)}
                 className="text-muted-foreground hover:text-foreground"
+                aria-label={t('Close')}
               >
                 <X size={16} />
               </button>
@@ -723,7 +725,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                     selectedElement.color === color.value ? 'ring-2 ring-primary ring-offset-2' : ''
                   }`}
                   style={{ backgroundColor: color.value }}
-                  title={color.name}
+                  title={t(color.name)}
                 />
               ))}
             </div>
@@ -731,7 +733,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
               onClick={() => handleColorChange(null)}
               className="w-full mt-3 px-3 py-2 text-xs text-muted-foreground hover:bg-muted rounded transition-colors"
             >
-              Reset to default (status-based)
+              {t('Reset to default (status-based)')}
             </button>
           </div>
         </div>

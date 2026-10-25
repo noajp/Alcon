@@ -33,7 +33,7 @@ export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDo
   const { user, profile } = useAuthContext();
   const spaceId = useActiveSpaceId();
   const [tab, setTab] = useState<ProfileTab>('elements');
-  const name = profile?.display_name || user?.email?.split('@')[0] || 'You';
+  const name = profile?.display_name || user?.email?.split('@')[0] || t('You');
   // The person's Worker id (wrk_015) is the handle other surfaces show.
   const selfWorker = useSelfWorker(user?.id);
   const handle = selfWorker?.display_id ?? user?.email?.split('@')[0] ?? null;

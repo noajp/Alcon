@@ -25,6 +25,7 @@ import {
 } from '@/hooks/useSupabase';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import type { Subelement } from '@/types/database';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface Props {
   /** When null, the modal is in "create" mode. */
@@ -39,6 +40,7 @@ interface Props {
 export function SubelementDetailModal({
   subelement, parentElement, onClose, onSaved, onDeleted,
 }: Props) {
+  const { t } = useI18n();
   const isCreate = subelement === null;
   const [title, setTitle] = useState(subelement?.title ?? '');
   const [completed, setCompleted] = useState(!!subelement?.is_completed);
@@ -81,7 +83,7 @@ export function SubelementDetailModal({
       onSaved?.();
       onClose();
     } catch (e) {
-      setError((e as Error).message || 'Failed to save');
+      setError((e as Error).message || t('Failed to save'));
     } finally {
       setBusy(false);
     }
@@ -98,7 +100,7 @@ export function SubelementDetailModal({
       setCompleted((v) => !v);
       onSaved?.();
     } catch (e) {
-      setError((e as Error).message || 'Failed to toggle');
+      setError((e as Error).message || t('Failed to toggle'));
     } finally {
       setBusy(false);
     }
@@ -106,7 +108,7 @@ export function SubelementDetailModal({
 
   const handleDelete = async () => {
     if (isCreate || !subelement) return;
-    if (!await appDialog.confirm('このサブエレメントを削除します。よろしいですか?')) return;
+    if (!await appDialog.confirm(t('Delete this sub-element?'))) return;
     setBusy(true);
     setError(null);
     try {
@@ -114,7 +116,7 @@ export function SubelementDetailModal({
       onDeleted?.();
       onClose();
     } catch (e) {
-      setError((e as Error).message || 'Failed to delete');
+      setError((e as Error).message || t('Failed to delete'));
     } finally {
       setBusy(false);
     }
@@ -128,7 +130,7 @@ export function SubelementDetailModal({
       <div
         className="pointer-events-auto w-full max-w-[560px] rounded-2xl bg-popover/95 backdrop-blur-md border border-border/60 p-4"
         role="dialog"
-        aria-label={isCreate ? 'New sub-element' : 'Sub-element'}
+        aria-label={isCreate ? t('New sub-element') : t('Sub-element')}
       >
         {/* Header — parent context chip + close */}
         <div className="flex items-center gap-2 px-1 mb-2">
@@ -137,13 +139,13 @@ export function SubelementDetailModal({
             <span className="truncate max-w-[220px]">{parentElement.title}</span>
           </span>
           <span className="text-[11px] text-muted-foreground">
-            {isCreate ? 'New sub-element' : (subelement?.display_id || 'Sub-element')}
+            {isCreate ? t('New sub-element') : (subelement?.display_id || t('Sub-element'))}
           </span>
           <div className="flex-1" />
           <button
             onClick={onClose}
             className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-            aria-label="Close"
+            aria-label={t('Close')}
           >
             <X size={14} />
           </button>
@@ -158,14 +160,14 @@ export function SubelementDetailModal({
               type="button"
               onClick={handleToggleCompletedInline}
               disabled={busy}
-              aria-label={completed ? 'Mark as todo' : 'Mark as done'}
+              aria-label={completed ? t('Mark as todo') : t('Mark as done')}
               className={`mt-2 w-4 h-4 rounded-[3px] flex items-center justify-center shrink-0 transition-colors ${
                 completed
-                  ? 'bg-emerald-500 hover:bg-emerald-600'
+                  ? 'bg-[var(--status-success)] hover:opacity-90'
                   : 'border border-muted-foreground/40 hover:border-foreground/60'
               }`}
             >
-              {completed && <Check size={11} strokeWidth={3} className="text-white" />}
+              {completed && <Check size={11} strokeWidth={3} className="text-primary-foreground" />}
             </button>
           )}
           <textarea
@@ -178,7 +180,7 @@ export function SubelementDetailModal({
                 handleSubmit();
               }
             }}
-            placeholder="Sub-element title… (Enter to save)"
+            placeholder={t('Sub-element title… (Enter to save)')}
             rows={1}
             className={`flex-1 bg-transparent px-1 py-1 text-[15px] font-medium placeholder:text-muted-foreground/60 resize-none ${
               completed ? 'line-through text-muted-foreground' : 'text-foreground'
@@ -197,7 +199,7 @@ export function SubelementDetailModal({
                 disabled={busy}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] text-muted-foreground hover:text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10 transition-colors disabled:opacity-40"
               >
-                <Trash2 size={12} /> Delete
+                <Trash2 size={12} /> {t('Delete')}
               </button>
             )}
           </div>
@@ -206,7 +208,7 @@ export function SubelementDetailModal({
             disabled={!title.trim() || busy}
           >
             <ArrowUp size={13} />
-            {isCreate ? 'Create' : 'Save'}
+            {isCreate ? t('Create') : t('Save')}
           </Button>
         </div>
       </div>

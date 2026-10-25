@@ -14,6 +14,10 @@ import { SettingsSection } from './SettingsSection';
 import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
 import { membershipErrorMessage } from '@/Function/membership/membershipErrors';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+
+const ROLE_LABEL: Record<string, string> = { owner: 'Space owner', member: 'Member' };
+const DOMAIN_ROLE_LABEL: Record<string, string> = { owner: 'Domain owner', admin: 'Domain admin', member: 'Member', viewer: 'Viewer' };
 
 // Cross-boundary read of the current ActivitySpace: every Space member (role
 // editable here) plus every Guest across the Space's Domains (a domain_member
@@ -39,6 +43,7 @@ interface Profile {
 
 export function MemberSettings() {
   const { user } = useAuthContext();
+  const { t } = useI18n();
   const { data: spaces } = useActivitySpaces();
   const [activeId] = useState(() => getActiveSpaceId() ?? '');
   const active = spaces.find((s) => s.id === activeId) ?? spaces[0];
@@ -80,11 +85,11 @@ export function MemberSettings() {
       setGuests(guestRows);
       setLoadError(null);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : 'Failed to load members');
+      setLoadError(e instanceof Error ? e.message : t('Failed to load members'));
     } finally {
       setLoading(false);
     }
-  }, [active]);
+  }, [active, t]);
 
   useEffect(() => {
     void reload();
@@ -129,19 +134,19 @@ export function MemberSettings() {
   const handleRoleChange = async (member: SpaceMemberRow, nextRole: SpaceRole) => {
     if (!active || pendingUserId) return;
     if (member.role === 'owner' && nextRole === 'member' && ownerCount <= 1) {
-      setRowErrors((prev) => ({ ...prev, [member.user_id]: 'A Space needs at least one owner' }));
+      setRowErrors((prev) => ({ ...prev, [member.user_id]: t('A Space needs at least one owner') }));
       return;
     }
     const isSelf = member.user_id === user?.id;
     if (member.role === 'owner' && nextRole === 'member') {
-      const target = profileFor(member.user_id)?.display_name || 'this member';
+      const target = profileFor(member.user_id)?.display_name || t('this member');
       const question = isSelf
-        ? "Change your own role to Member? You'll lose owner access — invites, removals, role changes, and deleting this Space — immediately."
-        : `Change ${target} from Owner to Member?`;
+        ? t("Change your own role to Member? You'll lose owner access — invites, removals, role changes, and deleting this Space — immediately.")
+        : t('Change {name} from Owner to Member?', { name: target });
       if (!await appDialog.confirm(question)) return;
     } else if (nextRole === 'owner') {
-      const target = profileFor(member.user_id)?.display_name || 'this member';
-      if (!await appDialog.confirm(`Make ${target} an Owner? They'll be able to invite, remove, and change the role of any Space member, and delete this Space.`)) return;
+      const target = profileFor(member.user_id)?.display_name || t('this member');
+      if (!await appDialog.confirm(t("Make {name} an Owner? They'll be able to invite, remove, and change the role of any Space member, and delete this Space.", { name: target }))) return;
     }
 
     setRowErrors((prev) => {
@@ -168,14 +173,14 @@ export function MemberSettings() {
       // this panel was open. Without checking this, a no-op update reads as
       // success and the optimistic state never rolls back.
       if (!data || data.length === 0) {
-        throw new Error("Couldn't update — you may no longer have owner access to this Space.");
+        throw new Error(t("Couldn't update — you may no longer have owner access to this Space."));
       }
     } catch (e) {
       // Roll back — a failed save must not keep the optimistic "saved" state.
       setMembers((list) => list.map((m) => (m.user_id === member.user_id ? { ...m, role: prevRole } : m)));
       setRowErrors((prev) => ({
         ...prev,
-        [member.user_id]: membershipErrorMessage(e, 'Failed to update role'),
+        [member.user_id]: membershipErrorMessage(e, t('Failed to update role')),
       }));
     } finally {
       setPendingUserId(null);
@@ -186,25 +191,18 @@ export function MemberSettings() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-[15px] font-semibold text-foreground">Space members ({members.length})</h2>
-        <p className="text-[12px] text-muted-foreground mt-0.5">
-          &quot;{active.name}&quot;&apos;s Space members, plus Guests invited into one of its Domains without joining
-          the Space itself (private Domains you&apos;re not a member of are the one exception). Invites and removals
-          stay on Activity space and Domain settings; this is the cross-Domain view and the place to change a Space
-          member&apos;s role.
-        </p>
-      </div>
-
       {loadError && (
-        <div className="mb-4 px-3 py-2 rounded-md bg-destructive/10 text-[12px] text-destructive">{loadError}</div>
+        <div className="mb-4 text-[12px] text-destructive">{loadError}</div>
       )}
 
-      <SettingsSection title="">
+      <SettingsSection
+        title={t('Space members ({n})', { n: members.length })}
+        description={t('Everyone in "{space}", plus Guests invited into one of its Domains (except private Domains you’re not in). Invite and remove people from Activity space and Domain settings; change a Space member’s role here.', { space: active.name })}
+      >
         {loading && members.length === 0 ? (
-          <div className="px-4 py-6 text-[12px] text-muted-foreground">Loading…</div>
+          <div className="py-3 text-[13px] text-muted-foreground">{t('Loading…')}</div>
         ) : sortedMembers.length === 0 ? (
-          <div className="px-4 py-6 text-[12px] text-muted-foreground">No Space members yet.</div>
+          <div className="py-3 text-[13px] text-muted-foreground">{t('No Space members yet.')}</div>
         ) : (
           sortedMembers.map((m) => {
             const profile = profileFor(m.user_id);
@@ -212,7 +210,7 @@ export function MemberSettings() {
             const isPending = pendingUserId === m.user_id;
             const isLastOwner = m.role === 'owner' && ownerCount <= 1;
             return (
-              <div key={m.user_id} className="px-4 py-2.5">
+              <div key={m.user_id} className="-mx-2 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
                 <div className="flex items-center gap-3">
                   <WorkerAvatar
                     worker={{ name: profile?.display_name, avatar_url: profile?.avatar_url }}
@@ -221,10 +219,10 @@ export function MemberSettings() {
                   />
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium text-foreground truncate">
-                      {profile?.display_name || 'Unnamed'}
-                      {isSelf && <span className="ml-1.5 text-[11px] text-muted-foreground">(you)</span>}
+                      {profile?.display_name || t('Unnamed')}
+                      {isSelf && <span className="ml-1.5 text-[11px] text-muted-foreground">{t('(you)')}</span>}
                     </div>
-                    <div className="text-[11px] text-muted-foreground capitalize">{m.role}</div>
+                    <div className="text-[11px] text-muted-foreground">{t(ROLE_LABEL[m.role] ?? m.role)}</div>
                   </div>
                   {isOwner && (
                     <Button
@@ -232,15 +230,15 @@ export function MemberSettings() {
                       variant="ghost"
                       size="xs"
                       disabled={isPending || isLastOwner}
-                      title={isLastOwner ? 'A Space needs at least one owner' : undefined}
+                      title={isLastOwner ? t('A Space needs at least one owner') : undefined}
                       onClick={() => handleRoleChange(m, m.role === 'owner' ? 'member' : 'owner')}
                     >
                       {isPending ? (
                         <Loader2 className="size-3.5 animate-spin" />
                       ) : m.role === 'owner' ? (
-                        'Make member'
+                        t('Make member')
                       ) : (
-                        'Make owner'
+                        t('Make owner')
                       )}
                     </Button>
                   )}
@@ -255,23 +253,19 @@ export function MemberSettings() {
         <PendingInviteRows invitees={invitees} canCancel={(i) => isOwner || i.invitedBy === user?.id} onChanged={() => void refetchInvitees()} />
       </SettingsSection>
 
-      <div className="mb-2 mt-8">
-        <h2 className="text-[15px] font-semibold text-foreground">Guests ({uniqueGuestCount})</h2>
-        <p className="text-[12px] text-muted-foreground mt-0.5">
-          Invited into a single Domain, not the Space — they see only the Domain that invited them.
-        </p>
-      </div>
-
-      <SettingsSection title="">
+      <SettingsSection
+        title={t('Guests ({n})', { n: uniqueGuestCount })}
+        description={t('Invited into a single Domain, not the Space — they see only the Domain that invited them.')}
+      >
         {loading && guests.length === 0 && members.length === 0 ? (
-          <div className="px-4 py-6 text-[12px] text-muted-foreground">Loading…</div>
+          <div className="py-3 text-[13px] text-muted-foreground">{t('Loading…')}</div>
         ) : sortedGuests.length === 0 ? (
-          <div className="px-4 py-6 text-[12px] text-muted-foreground">No Guests in this Space&apos;s Domains.</div>
+          <div className="py-3 text-[13px] text-muted-foreground">{t('No Guests in this Space’s Domains.')}</div>
         ) : (
           sortedGuests.map((g) => {
             const profile = profileFor(g.user_id);
             return (
-              <div key={`${g.domain_id}-${g.user_id}`} className="flex items-center gap-3 px-4 py-2.5">
+              <div key={`${g.domain_id}-${g.user_id}`} className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
                 <WorkerAvatar
                   worker={{ name: profile?.display_name, avatar_url: profile?.avatar_url }}
                   size={32}
@@ -279,10 +273,10 @@ export function MemberSettings() {
                 />
                 <div className="flex-1 min-w-0">
                   <div className="text-[13px] font-medium text-foreground truncate">
-                    {profile?.display_name || 'Unnamed'}
+                    {profile?.display_name || t('Unnamed')}
                   </div>
-                  <div className="text-[11px] text-muted-foreground truncate capitalize">
-                    Guest of {g.domain_name} · {g.domain_role}
+                  <div className="text-[11px] text-muted-foreground truncate">
+                    {t('Guest of {domain} · {role}', { domain: g.domain_name, role: t(DOMAIN_ROLE_LABEL[g.domain_role] ?? g.domain_role) })}
                   </div>
                 </div>
               </div>

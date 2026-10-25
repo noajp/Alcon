@@ -5,9 +5,12 @@ import { LogOut } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { SettingsSection, SettingsRow } from './SettingsSection';
+import { Button } from '@/ui/button';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export function AccountSettings() {
   const { user, signOut } = useAuthContext();
+  const { t, locale } = useI18n();
   const [resetSent, setResetSent] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +25,7 @@ export function AccountSettings() {
       if (error) throw error;
       setResetSent(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to send reset email');
+      setError(e instanceof Error ? e.message : t('Failed to send reset email'));
     } finally {
       setResetting(false);
     }
@@ -33,54 +36,50 @@ export function AccountSettings() {
     try {
       await signOut();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to sign out');
+      setError(e instanceof Error ? e.message : t('Failed to sign out'));
       setSigningOut(false);
     }
   };
 
-  const createdAt = user?.created_at ? new Date(user.created_at).toLocaleDateString() : '—';
+  const createdAt = user?.created_at ? new Date(user.created_at).toLocaleDateString(locale) : '—';
 
   return (
     <div>
-      <SettingsSection title="Account" description="Authentication and session details.">
-        <SettingsRow label="Email" hint="Your sign-in identifier. Contact support to change.">
+      <SettingsSection title={t('Account')} description={t('Authentication and session details.')}>
+        <SettingsRow label={t('Email')} hint={t('Your sign-in identifier. Contact support to change.')}>
           <span className="text-[13px] text-muted-foreground">{user?.email ?? '—'}</span>
         </SettingsRow>
 
-        <SettingsRow label="User ID" hint="Used by integrations and the Supabase Edge.">
+        <SettingsRow label={t('User ID')} hint={t('Used by integrations and the Supabase Edge.')}>
           <span className="text-[11px] font-mono text-muted-foreground select-all">
             {user?.id ?? '—'}
           </span>
         </SettingsRow>
 
-        <SettingsRow label="Member since">
+        <SettingsRow label={t('Member since')}>
           <span className="text-[13px] text-muted-foreground">{createdAt}</span>
         </SettingsRow>
 
         <SettingsRow
-          label="Password"
-          hint={resetSent ? 'Reset email sent. Check your inbox.' : 'Send a reset link to your inbox.'}
+          label={t('Password')}
+          hint={resetSent ? t('Reset email sent. Check your inbox.') : t('Send a reset link to your inbox.')}
         >
-          <button
+          <Button
+            variant="ghost"
             onClick={handleResetPassword}
             disabled={resetting || resetSent || !user?.email}
-            className="px-3 py-1.5 border border-border rounded-md text-[12px] font-medium text-foreground hover:bg-accent disabled:opacity-40 transition-colors"
           >
-            {resetting ? 'Sending…' : resetSent ? 'Sent' : 'Send reset link'}
-          </button>
+            {resetting ? t('Sending…') : resetSent ? t('Sent') : t('Send reset link')}
+          </Button>
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="Session">
-        <SettingsRow label="Sign out" hint="End your session on this device.">
-          <button
-            onClick={handleSignOut}
-            disabled={signingOut}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-[var(--status-danger)] dark:border-[var(--status-danger)] text-[var(--status-danger)] dark:text-[var(--status-danger)] rounded-md text-[12px] font-medium hover:bg-[var(--status-danger-subtle)] dark:hover:bg-[var(--status-danger)]/20 disabled:opacity-40 transition-colors"
-          >
+      <SettingsSection title={t('Session')}>
+        <SettingsRow label={t('Sign out')} hint={t('End your session on this device.')}>
+          <Button variant="danger" onClick={handleSignOut} disabled={signingOut}>
             <LogOut size={12} />
-            {signingOut ? 'Signing out…' : 'Sign out'}
-          </button>
+            {signingOut ? t('Signing out…') : t('Sign out')}
+          </Button>
         </SettingsRow>
       </SettingsSection>
 

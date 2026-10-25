@@ -4,6 +4,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useKata } from './kata/store/useKata';
 import { tx } from './kata/i18n';
+import { translate } from '@/Function/i18n/I18nProvider';
 import type { Deck, Folder, KataFile, MixState, ChatMessage } from './kata/model/types';
 
 // =============================================================
@@ -202,7 +203,7 @@ function start(spaceId: string): Session {
       for (const f of diff.upsertFiles) if (!conflicts.includes(f.id) && (!alive || current.get(f.id) === f)) dirty.delete(f.id);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save the deck.');
+      setError(e instanceof Error ? e.message : translate('Could not save the deck.'));
     }
   };
 
@@ -253,7 +254,7 @@ function start(spaceId: string): Session {
       supabase.from('decks').select(DECK_COLUMNS).eq('activity_space_id', spaceId).order('updated_at', { ascending: false }),
     ]);
     if (!alive) return;
-    if (folders.error || decks.error) { setError((folders.error ?? decks.error)!.message || 'Could not load decks.'); return; }
+    if (folders.error || decks.error) { setError((folders.error ?? decks.error)!.message || translate('Could not load decks.')); return; }
     const rows = (decks.data ?? []) as DeckRow[];
     for (const r of rows) stamps.set(r.id, r.updated_at);
     synced = {

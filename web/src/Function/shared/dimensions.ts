@@ -24,6 +24,7 @@
 import type { ElementWithDetails } from '@/types/database';
 import { PRIORITY, SEMANTIC_COLORS, STATUS, statusLabel } from '@/shared/designTokens';
 import { holderLabel } from '@/ActivitySpace/execution/element/lease';
+import { translate } from '@/Function/i18n/I18nProvider';
 
 /**
  * Every way an Element can be put into categories.
@@ -127,7 +128,7 @@ function isoWeek(date: string): string {
 }
 
 function empty(dimension: Dimension): DimensionBucket[] {
-  return [{ id: NO_VALUE, label: EMPTY_LABEL[dimension], color: null }];
+  return [{ id: NO_VALUE, label: translate(EMPTY_LABEL[dimension]), color: null }];
 }
 
 /**
@@ -146,7 +147,7 @@ export function bucketsOf(
       if (!key || !(key in STATUS)) return empty(dimension);
       return [{
         id: key,
-        label: statusLabel(key),
+        label: translate(statusLabel(key)),
         color: SEMANTIC_COLORS.status[key as keyof typeof SEMANTIC_COLORS.status] ?? null,
       }];
     }
@@ -155,7 +156,7 @@ export function bucketsOf(
       if (!key || !(key in PRIORITY)) return empty(dimension);
       return [{
         id: key,
-        label: PRIORITY[key as keyof typeof PRIORITY].label,
+        label: translate(PRIORITY[key as keyof typeof PRIORITY].label),
         color: SEMANTIC_COLORS.priority[key as keyof typeof SEMANTIC_COLORS.priority] ?? null,
       }];
     }
@@ -164,7 +165,7 @@ export function bucketsOf(
       if (list.length === 0) return empty(dimension);
       return list.map((a) => ({
         id: a.worker_id,
-        label: a.worker?.name ?? 'Unknown',
+        label: a.worker?.name ?? translate('Unknown'),
         color: null,
       }));
     }
@@ -180,7 +181,7 @@ export function bucketsOf(
     case 'date_week': {
       if (!element.due_date) return empty(dimension);
       const key = isoWeek(element.due_date);
-      return [{ id: key, label: `Week of ${key}`, color: null }];
+      return [{ id: key, label: translate('Week of {date}', { date: key }), color: null }];
     }
     case 'date_month': {
       if (!element.due_date) return empty(dimension);
@@ -190,7 +191,7 @@ export function bucketsOf(
     case 'object': {
       const id = element.object_id;
       if (!id) return empty(dimension);
-      return [{ id, label: ctx.objectNames?.get(id) ?? 'Object', color: null }];
+      return [{ id, label: ctx.objectNames?.get(id) ?? translate('Object'), color: null }];
     }
     case 'campaign': {
       // An Element reaches a Initiative through its Object, so an Object in two

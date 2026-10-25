@@ -234,13 +234,13 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
         </DialogHeader>
 
         {unavailable && (
-          <p className="rounded-lg border border-border/60 bg-[var(--status-warning-subtle)] px-3 py-2 text-[12px] text-foreground">{t(unavailable)}</p>
+          <p className="rounded-md bg-[var(--status-warning-subtle)] px-3 py-2 text-[12px] text-foreground">{t(unavailable)}</p>
         )}
         {!canEdit && !unavailable && (
           <p className="text-[12px] text-muted-foreground">{t('Only Space owners can connect or change integrations. You can see what is connected.')}</p>
         )}
         {oauth && canEdit && oauthStatus === false && (
-          <p className="rounded-lg border border-border/60 bg-[var(--status-warning-subtle)] px-3 py-2 text-[12px] text-foreground">
+          <p className="rounded-md bg-[var(--status-warning-subtle)] px-3 py-2 text-[12px] text-foreground">
             {t('Google sign-in is not set up yet. An administrator needs to register the Google OAuth client before this can be connected.')}
           </p>
         )}

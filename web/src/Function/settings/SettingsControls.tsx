@@ -6,6 +6,7 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from '@/ui/dropdown-menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { FONT } from '@/shared/designTokens';
 
 // The row primitives of a settings panel — a titled group, a label + control
 // row, a select row, a switch row. Shared by Preferences and the Strategy
@@ -14,10 +15,8 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 export function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h2 className="text-[14px] font-semibold text-foreground mb-3">{title}</h2>
-      <div className="rounded-lg border border-border/60 bg-[var(--surface-rail)]/40 px-4 divide-y divide-border/50">
-        {children}
-      </div>
+      <h2 className={`${FONT.lg} text-foreground mb-1`}>{title}</h2>
+      <div>{children}</div>
     </div>
   );
 }

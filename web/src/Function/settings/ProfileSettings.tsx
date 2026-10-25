@@ -9,6 +9,7 @@ import { SettingsSection, SettingsField } from './SettingsSection';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MyInvitations } from '@/Function/membership/MyInvitations';
+import { Button } from '@/ui/button';
 
 function initialsFor(name: string | null | undefined, fallback: string): string {
   const source = (name && name.trim()) || fallback;
@@ -120,6 +121,7 @@ const GUEST_GROUP_PREFIX = 'guest:';
 
 function DomainMembershipsSection() {
   const { user } = useAuthContext();
+  const { t } = useI18n();
   const { domains, spaceNames, role, loading, error } = useMyDomainMemberships(user?.id);
 
   const grouped = useMemo(() => {
@@ -140,22 +142,22 @@ function DomainMembershipsSection() {
   }, [domains, spaceNames]);
 
   return (
-    <SettingsSection title="Domains" description="Domains you're a member of, grouped by Space.">
+    <SettingsSection title={t('Domains')} description={t('Domains you’re a member of, grouped by Space.')}>
       {loading ? (
-        <div className="px-4 py-6 text-[12px] text-muted-foreground">Loading…</div>
+        <div className="py-3 text-[13px] text-muted-foreground">{t('Loading…')}</div>
       ) : error ? (
-        <div className="px-4 py-6 text-[12px] text-destructive">
-          Couldn&apos;t load your Domains — {error.message}
+        <div className="py-3 text-[13px] text-destructive">
+          {t('Couldn’t load your Domains — {error}', { error: error.message })}
         </div>
       ) : domains.length === 0 ? (
-        <div className="px-4 py-6 text-[12px] text-muted-foreground">
-          You&apos;re not a member of any Domain yet.
+        <div className="py-3 text-[13px] text-muted-foreground">
+          {t('You’re not a member of any Domain yet.')}
         </div>
       ) : (
         grouped.map(([spaceId, list]) => (
-          <div key={spaceId || 'unassigned'} className="px-4 py-3">
+          <div key={spaceId || 'unassigned'} className="py-3">
             <div className="text-[11px] font-semibold tracking-wide text-muted-foreground/60 mb-1.5">
-              {spaceId.startsWith(GUEST_GROUP_PREFIX) ? 'Guest access' : spaceNames.get(spaceId) ?? 'Unassigned'}
+              {spaceId.startsWith(GUEST_GROUP_PREFIX) ? t('Guest access') : spaceNames.get(spaceId) ?? t('Unassigned')}
             </div>
             <div className="space-y-1.5">
               {list.map((d) => (
@@ -189,6 +191,7 @@ function InvitationsSection() {
 
 export function ProfileSettings() {
   const { user, profile, updateProfile } = useAuthContext();
+  const { t } = useI18n();
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? '');
   const [bio, setBio] = useState(profile?.bio ?? '');
@@ -206,7 +209,7 @@ export function ProfileSettings() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be smaller than 5MB');
+      setError(t('Image must be smaller than 5MB'));
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -227,7 +230,7 @@ export function ProfileSettings() {
       await updateProfile({ avatar_url: url });
       setSavedAt(Date.now());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
+      setError(err instanceof Error ? err.message : t('Upload failed'));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -243,7 +246,7 @@ export function ProfileSettings() {
       await updateProfile({ avatar_url: null });
       setSavedAt(Date.now());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove avatar');
+      setError(err instanceof Error ? err.message : t('Failed to remove avatar'));
     } finally {
       setUploading(false);
     }
@@ -272,7 +275,7 @@ export function ProfileSettings() {
       });
       setSavedAt(Date.now());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save');
+      setError(e instanceof Error ? e.message : t('Failed to save'));
     } finally {
       setSaving(false);
     }
@@ -282,18 +285,19 @@ export function ProfileSettings() {
 
   return (
     <div>
-      <SettingsSection title="Profile" description="How your name and avatar appear across Alcon.">
-        <div className="px-4 py-4 flex items-center gap-4">
+      <SettingsSection title={t('Profile')} description={t('How your name and avatar appear across Alcon.')}>
+        <div className="py-4 flex items-center gap-4">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            title="Click to upload a new photo"
+            title={t('Click to upload a new photo')}
+            aria-label={t('Click to upload a new photo')}
             className="w-14 h-14 rounded-full bg-muted flex items-center justify-center text-foreground/70 font-semibold text-[16px] overflow-hidden ring-1 ring-border/70 hover:ring-foreground/40 transition-shadow disabled:opacity-60 shrink-0"
           >
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+              <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
             ) : (
               initials
             )}
@@ -307,73 +311,54 @@ export function ProfileSettings() {
           />
           <div className="min-w-0 flex-1">
             <div className="text-[14px] font-medium text-foreground truncate">
-              {displayName || profile?.display_name || user?.email?.split('@')[0] || 'You'}
+              {displayName || profile?.display_name || user?.email?.split('@')[0] || t('You')}
             </div>
             <div className="text-[12px] text-muted-foreground truncate">{user?.email}</div>
             <div className="mt-2 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="px-2.5 py-1 bg-muted hover:bg-accent rounded text-[12px] text-foreground disabled:opacity-50 transition-colors"
-              >
-                {uploading ? 'Uploading…' : 'Upload photo'}
-              </button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                {uploading ? t('Uploading…') : t('Upload photo')}
+              </Button>
               {avatarUrl && (
-                <button
-                  type="button"
-                  onClick={handleRemoveAvatar}
-                  disabled={uploading}
-                  className="px-2.5 py-1 hover:bg-muted rounded text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
-                >
-                  Remove
-                </button>
+                <Button type="button" variant="ghost" size="sm" onClick={handleRemoveAvatar} disabled={uploading}>
+                  {t('Remove')}
+                </Button>
               )}
             </div>
           </div>
         </div>
 
-        <SettingsField label="Display name" hint="Used in @-mentions, comments, and assignments.">
+        <SettingsField label={t('Display name')} hint={t('Used in @-mentions, comments, and assignments.')}>
           <input
             type="text"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="Your name"
-            className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
+            placeholder={t('Your name')}
+            className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:bg-muted/40 transition-colors"
           />
         </SettingsField>
-        <SettingsField label="Bio" hint="A short introduction shown on your Profile page.">
+        <SettingsField label={t('Bio')} hint={t('A short introduction shown on your Profile page.')}>
           <Textarea
             value={bio}
             onChange={(e) => setBio(e.target.value)}
-            placeholder="What you work on, what you care about…"
+            placeholder={t('What you work on, what you care about…')}
             rows={3}
             maxLength={280}
           />
         </SettingsField>
+        <div className="flex items-center justify-end gap-3 pt-2">
+          {error && <span className="text-[12px] text-[var(--status-danger)]">{error}</span>}
+          {savedAt && !dirty && !error && (
+            <span className="text-[12px] text-muted-foreground">{t('Saved.')}</span>
+          )}
+          <Button variant="primary" onClick={handleSave} disabled={!dirty || saving}>
+            {saving ? t('Saving…') : t('Save changes')}
+          </Button>
+        </div>
       </SettingsSection>
 
-      <div className="flex items-center justify-end gap-3">
-        {error && <span className="text-[12px] text-[var(--status-danger)]">{error}</span>}
-        {savedAt && !dirty && !error && (
-          <span className="text-[12px] text-muted-foreground">Saved.</span>
-        )}
-        <button
-          onClick={handleSave}
-          disabled={!dirty || saving}
-          className="px-4 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
-        >
-          {saving ? 'Saving…' : 'Save changes'}
-        </button>
-      </div>
+      <InvitationsSection />
 
-      <div className="mt-10">
-        <InvitationsSection />
-      </div>
-
-      <div className="mt-10">
-        <DomainMembershipsSection />
-      </div>
+      <DomainMembershipsSection />
     </div>
   );
 }

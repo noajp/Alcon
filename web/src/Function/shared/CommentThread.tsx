@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdo
 import { MenuShell, MENU_SEPARATOR } from '@/Function/shared/menu/MenuShell';
 import type { CommentAuthorKind } from '@/types/database';
 import { MarkdownLite } from './MarkdownLite';
+import { translate, useI18n } from '@/Function/i18n/I18nProvider';
 
 // =============================================================
 // The parts every comment thread is made of.
@@ -33,11 +34,11 @@ export interface CommentEntryData {
 export function formatCommentAge(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m`;
+  if (m < 1) return translate('just now');
+  if (m < 60) return translate('{n}m', { n: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
+  if (h < 24) return translate('{n}h', { n: h });
+  return translate('{n}d', { n: Math.floor(h / 24) });
 }
 
 /** Tint @name runs so a mention is findable when skimming. Purely visual —
@@ -121,11 +122,12 @@ export function CommentEntry({
   // same left edge, unboxed, so the body lines up with the document above it
   // whoever wrote it. Byline on one line with the avatar; the body starts
   // under the name (avatar 20px + gap 8px).
+  const { t } = useI18n();
   return (
     <div className="group min-w-0">
       <div className="flex items-center gap-2 h-6 min-w-0">
         {avatar}
-        <span className="text-[13px] font-medium text-foreground truncate">{comment.author_name || 'Unknown'}</span>
+        <span className="text-[13px] font-medium text-foreground truncate">{comment.author_name || t('Unknown')}</span>
         {meta}
         <span className="text-[12px] text-muted-foreground shrink-0">{formatCommentAge(comment.created_at)}</span>
         {menu && <span className="ml-auto shrink-0">{menu}</span>}
@@ -168,12 +170,13 @@ export function CommentMenu({
   children: (close: () => void) => React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const { t } = useI18n();
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          title="More"
+          title={t('More')}
           className={`p-0.5 rounded hover:bg-muted/60 hover:text-foreground transition-opacity ${
             open ? 'opacity-100 text-foreground' : 'opacity-0 group-hover:opacity-100'
           }`}
@@ -207,10 +210,11 @@ export function CommentMenuItem({
   onClick: () => void;
   destructive?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <DropdownMenuItem variant={destructive ? 'destructive' : 'default'} onClick={onClick} className="gap-2">
       {icon}
-      {label}
+      {t(label)}
     </DropdownMenuItem>
   );
 }
@@ -243,6 +247,7 @@ export function CommentComposer({
   children?: React.ReactNode;
 }) {
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const { t } = useI18n();
 
   // Grow to fit, capped, and shrink back when the draft is cleared on send.
   useLayoutEffect(() => {
@@ -259,7 +264,7 @@ export function CommentComposer({
           ref={taRef}
           value={value}
           onChange={onChange}
-          placeholder={placeholder}
+          placeholder={t(placeholder)}
           rows={1}
           className="flex-1 resize-none bg-transparent outline-none text-[13px] text-foreground placeholder:text-muted-foreground/70 max-h-40 no-focus-ring"
           onKeyDown={(e) => {
@@ -283,7 +288,7 @@ export function CommentComposer({
         <button
           onClick={onSubmit}
           disabled={!value.trim() || submitting}
-          aria-label="Send"
+          aria-label={t('Send')}
           className="h-7 px-2.5 flex items-center justify-center rounded-lg bg-[var(--rail-active)] text-white border border-white/20 hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
         >
           <SendIcon size={16} />

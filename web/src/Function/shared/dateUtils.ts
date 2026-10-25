@@ -1,7 +1,19 @@
 // Single source of truth for date display logic across Element views and
 // widgets. Intl-based so callers don't need date-fns for formatting.
 
+import { translate } from '@/Function/i18n/I18nProvider';
+import { LOCALE_STORAGE_KEY, resolveLocale } from '@/Function/i18n/locales';
+
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The viewer's language as a BCP 47 tag for Intl (English stays en-US). */
+function viewerDateLocale(): string {
+  if (typeof window === 'undefined') return 'en-US';
+  let saved: string | null = null;
+  try { saved = window.localStorage.getItem(LOCALE_STORAGE_KEY); } catch { /* storage may be disabled */ }
+  const locale = resolveLocale(saved, window.navigator.languages ?? [window.navigator.language]);
+  return locale === 'en' ? 'en-US' : locale;
+}
 
 export type ElementDateStyle = 'short' | 'weekday' | 'monthYear';
 
@@ -13,13 +25,14 @@ export function formatElementDate(
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return null;
+  const locale = viewerDateLocale();
   if (style === 'weekday') {
-    return date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
+    return date.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' });
   }
   if (style === 'monthYear') {
-    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    return date.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
   }
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
 
 /** Local-timezone yyyy-MM-dd, for writing date-only columns (due_date etc.). */
@@ -103,8 +116,8 @@ export function formatRelative(iso: string | null | undefined): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return '—';
   const diffMs = Date.now() - then;
-  if (diffMs < DAY_MS) return 'Today';
-  if (diffMs < 2 * DAY_MS) return 'Yesterday';
-  if (diffMs < 7 * DAY_MS) return `${Math.floor(diffMs / DAY_MS)}d ago`;
+  if (diffMs < DAY_MS) return translate('Today');
+  if (diffMs < 2 * DAY_MS) return translate('Yesterday');
+  if (diffMs < 7 * DAY_MS) return translate('{n}d ago', { n: Math.floor(diffMs / DAY_MS) });
   return formatElementDate(iso) ?? '—';
 }

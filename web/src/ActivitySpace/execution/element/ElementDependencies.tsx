@@ -10,6 +10,8 @@ import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
 import { MenuShell } from '@/Function/shared/menu';
 import { FONT, STATUS } from '@/shared/designTokens';
+import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export interface ElementDependenciesProps {
   elementId: string;
@@ -25,6 +27,7 @@ export function ElementDependencies(props: ElementDependenciesProps) {
 }
 
 function DependencyEditor({ elementId, spaceId, onOpenElement, onChanged }: ElementDependenciesProps) {
+  const { t } = useI18n();
   const { data, loading, error, refetch } = useNowWork(spaceId);
   const [open, setOpen] = useState(false);
   const [relation, setRelation] = useState<'incoming' | 'outgoing'>('incoming');
@@ -47,7 +50,7 @@ function DependencyEditor({ elementId, spaceId, onOpenElement, onChanged }: Elem
       setOpen(false); setSearch('');
       await onChanged?.();
     } catch (caught) {
-      setSaveError(caught instanceof Error ? caught.message : 'Unable to update this dependency.');
+      setSaveError(caught instanceof Error ? caught.message : t('Unable to update this dependency.'));
     } finally { setPending(false); }
   }
 
@@ -55,46 +58,48 @@ function DependencyEditor({ elementId, spaceId, onOpenElement, onChanged }: Elem
   // out of a section that is usually empty.
   if (loading) return null;
   if (error) return <div className="w-full flex items-center gap-2"><p role="alert" className={`${FONT.sm} text-muted-foreground`}>{error.message}</p>
-    {spaceId && <Button size="xs" variant="ghost" onClick={() => { void refetch().catch(() => {}); }}>Retry</Button>}</div>;
-  if (!elements.has(elementId)) return <p className={`${FONT.sm} w-full text-muted-foreground`}>Space dependencies are available for Elements in this Space’s Objects.</p>;
+    {spaceId && <Button size="xs" variant="ghost" onClick={() => { void refetch().catch(() => {}); }}>{t('Retry')}</Button>}</div>;
+  if (!elements.has(elementId)) return <p className={`${FONT.sm} w-full text-muted-foreground`}>{t('Space dependencies are available for Elements in this Space’s Objects.')}</p>;
 
   // Empty reads as one quiet affordance, like "Add sub-element" — a heading
   // and a "No dependencies recorded." line over nothing is chrome, not content.
-  return <section className={edges.length ? 'w-full space-y-2' : ''} aria-label="Dependencies">
-    {edges.length > 0 && <h2 className="text-[12px] font-medium text-muted-foreground">Dependencies</h2>}
+  return <section className={edges.length ? 'w-full space-y-2' : ''} aria-label={t('Dependencies')}>
+    {edges.length > 0 && <div className="flex h-8 items-center"><h2 className={`${FONT.lg} text-foreground`}>{t('Dependencies')}</h2></div>}
     {(['incoming', 'outgoing'] as const).map((direction) => {
       const matching = edges.filter((edge) => direction === 'incoming' ? edge.to_element === elementId : edge.from_element === elementId);
       if (!matching.length) return null;
       return <div key={direction}>
-        <p className={`${FONT.label} mb-1`}>{direction === 'incoming' ? 'Waits for' : 'Unblocks'}</p>
+        <p className={`${FONT.label} mb-1 px-2`}>{direction === 'incoming' ? t('Waits for') : t('Unblocks')}</p>
         {matching.map((edge) => {
           const targetId = direction === 'incoming' ? edge.from_element : edge.to_element;
           const target = elements.get(targetId);
-          return <div key={edge.id} className="flex min-w-0 items-center gap-1">
-            <ArrowRight className="size-3 shrink-0 text-muted-foreground" />
-            {target ? <Button variant="ghost" size="sm" align="start" className="min-w-0 flex-1" disabled={!onOpenElement} onClick={() => onOpenElement?.(targetId)}>
-              <span className="truncate">{target.title}</span>
-              <span className={`${FONT.xs} ml-auto shrink-0 text-muted-foreground`}>{target.status ? STATUS[target.status]?.label ?? 'Unspecified' : 'Unspecified'}</span>
-            </Button> : <span className={`${FONT.sm} flex-1 py-2 text-muted-foreground`}>Dependency outside this view</span>}
-            {target && <Button variant="ghost" size="icon-xs" disabled={pending} aria-label={`Remove dependency with ${target.title}`}
-              onClick={() => { void save(edge.from_element, edge.to_element, true); }}><X className="size-3" /></Button>}
+          if (!target) return <div key={edge.id} className={`${FONT.sm} flex h-8 items-center gap-2.5 px-2 text-muted-foreground`}>
+            <ArrowRight className="size-3 shrink-0" />{t('Dependency outside this view')}
           </div>;
+          const statusName = target.status ? STATUS[target.status]?.label : undefined;
+          return <ContentRow key={edge.id}
+            icon={<ArrowRight className="size-3" />}
+            name={target.title}
+            meta={<span>{statusName ? t(statusName) : t('Unspecified')}</span>}
+            onOpen={onOpenElement ? () => onOpenElement(targetId) : undefined}
+            actions={pending ? undefined : <ContentRowAction label={t('Remove dependency with {name}', { name: target.title })}
+              onClick={() => { void save(edge.from_element, edge.to_element, true); }}><X className="size-3" /></ContentRowAction>} />;
         })}
       </div>;
     })}
     <Popover open={open} onOpenChange={setOpen}>
       <ButtonAppearanceProvider appearance="inline">
-        <PopoverTrigger asChild><Button variant="ghost" size="sm" disabled={pending}><Plus size={13} strokeWidth={2.5} />Add dependency</Button></PopoverTrigger>
+        <PopoverTrigger asChild><Button variant="ghost" size="sm" disabled={pending}><Plus size={13} strokeWidth={2.5} />{t('Add dependency')}</Button></PopoverTrigger>
       </ButtonAppearanceProvider>
       <MenuShell align="start">
         <div className="flex gap-1 p-1">
-          <Button shape="tab" size="xs" variant={relation === 'incoming' ? 'secondary' : 'ghost'} aria-pressed={relation === 'incoming'} onClick={() => setRelation('incoming')}>Waits for</Button>
-          <Button shape="tab" size="xs" variant={relation === 'outgoing' ? 'secondary' : 'ghost'} aria-pressed={relation === 'outgoing'} onClick={() => setRelation('outgoing')}>Unblocks</Button>
+          <Button shape="tab" size="xs" variant={relation === 'incoming' ? 'secondary' : 'ghost'} aria-pressed={relation === 'incoming'} onClick={() => setRelation('incoming')}>{t('Waits for')}</Button>
+          <Button shape="tab" size="xs" variant={relation === 'outgoing' ? 'secondary' : 'ghost'} aria-pressed={relation === 'outgoing'} onClick={() => setRelation('outgoing')}>{t('Unblocks')}</Button>
         </div>
         <Command shouldFilter={false}>
-          <CommandInput placeholder="Find an Element…" value={search} onValueChange={setSearch} className="focus:bg-muted/40" />
+          <CommandInput placeholder={t('Find an Element…')} value={search} onValueChange={setSearch} className="focus:bg-muted/40" />
           <CommandList>
-            <CommandEmpty>No matching Elements.</CommandEmpty>
+            <CommandEmpty>{t('No matching Elements.')}</CommandEmpty>
             {candidates.slice(0, 100).map((element) => <CommandItem key={element.id} value={element.id} disabled={pending}
               onSelect={() => { void save(relation === 'incoming' ? element.id : elementId, relation === 'incoming' ? elementId : element.id); }}>
               <div className="min-w-0"><div className="truncate">{element.title}</div>
@@ -102,7 +107,7 @@ function DependencyEditor({ elementId, spaceId, onOpenElement, onChanged }: Elem
             </CommandItem>)}
           </CommandList>
         </Command>
-        {candidates.length > 100 && <p className={`${FONT.xs} p-2 text-muted-foreground`}>Showing 100 matches. Type to narrow the list.</p>}
+        {candidates.length > 100 && <p className={`${FONT.xs} p-2 text-muted-foreground`}>{t('Showing 100 matches. Type to narrow the list.')}</p>}
         {saveError && <p role="alert" className={`${FONT.sm} p-2 text-[var(--status-danger)]`}>{saveError}</p>}
       </MenuShell>
     </Popover>

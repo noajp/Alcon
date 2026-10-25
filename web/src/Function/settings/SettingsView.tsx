@@ -125,7 +125,7 @@ function PreferencesPanel() {
 
       {error && (
         <div className="text-[12px] text-destructive px-1 -mt-6">
-          {t("Couldn't save")}: {error}
+          {t("Couldn't save: {error}", { error })}
         </div>
       )}
 

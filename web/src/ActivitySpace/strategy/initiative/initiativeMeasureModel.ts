@@ -27,6 +27,7 @@
 // =============================================================
 
 import type { IntentKind, MeasureDirection } from '@/types/database';
+import { translate } from '@/Function/i18n/I18nProvider';
 
 /** What marks an `intents` row as a measure rather than a decision or an
  *  assumption. All three hang off the Initiative's root Intent and arrive in the
@@ -76,7 +77,7 @@ const STATE_LABELS: Record<MeasureState, string> = {
 };
 
 export function measureStateLabel(state: MeasureState): string {
-  return STATE_LABELS[state];
+  return translate(STATE_LABELS[state]);
 }
 
 /** Which side of the target counts. The one comparison this file exists for. */
@@ -195,7 +196,7 @@ const DIRECTION_LABELS: Record<MeasureDirection, string> = {
 };
 
 export function directionLabel(direction: MeasureDirection): string {
-  return DIRECTION_LABELS[direction];
+  return translate(DIRECTION_LABELS[direction]);
 }
 
 /** The compact form the row prints. Carries the same fact as the label in a
@@ -235,7 +236,7 @@ export function targetLabel(measure: MeasureInput): string | null {
 export function targetSentence(measure: MeasureInput): string | null {
   if (measure.target === null || !Number.isFinite(measure.target)) return null;
   if (measure.direction === null) return null;
-  return `${directionLabel(measure.direction).toLowerCase()} ${formatMeasureValue(measure.target, measure.unit)}`;
+  return translate(measure.direction === 'at_most' ? 'at most {value}' : 'at least {value}', { value: formatMeasureValue(measure.target, measure.unit) ?? '' });
 }
 
 export type ParsedValue = { ok: true; value: number | null } | { ok: false };

@@ -17,8 +17,8 @@ import {
   type WorkerAvailability,
   type WorkerAvailabilityKind,
 } from '@/hooks/useSupabase';
-import { CONTROL, SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
-import { Button } from '@/ui/button';
+import { CONTROL, FONT, SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { MenuSectionLabel, MenuShell, MENU_SEPARATOR } from '@/Function/shared/menu';
 import { DateField } from '@/Function/shared/date/DateControl';
@@ -62,7 +62,6 @@ import {
   type WorkloadRange,
 } from '@/ActivitySpace/sustainment/workload/workloadStore';
 import { WorkloadPlanPanel } from '@/ActivitySpace/sustainment/workload/WorkloadPlanPanel';
-import { LoadMeter } from '@/ActivitySpace/sustainment/workload/LoadMeter';
 
 // =============================================================
 // Resource — per-Worker daily load, and what to change about it.
@@ -288,6 +287,12 @@ export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', on
         focusName={focusName ?? null}
         onClearWorker={onClearWorker}
       />
+      {publish && !hideHeader && (
+        <div className="flex-shrink-0 px-4 pt-6 sm:px-8">
+          <h1 className={`${FONT.xl} text-foreground`}>{t(title)}</h1>
+          <p className={`${FONT.sm} mt-1 text-muted-foreground`}>{t('Who holds how much work against the hours they have, and what to change when it is too much.')}</p>
+        </div>
+      )}
       <KpiStrip
         loading={busy || failed}
         ahead={ahead}
@@ -462,19 +467,21 @@ function Header({
         ))}
       </div>
 
-      <div className="flex items-center gap-1">
-        <Button type="button" variant="ghost" size="icon-xs" onClick={() => shiftWorkloadAnchor(-step)}
-          title={t('Earlier')} aria-label={t('Earlier')}>
-          <ChevronLeft size={CONTROL.icon.xs} />
-        </Button>
-        <Button type="button" variant={anchor === 0 ? 'secondary' : 'ghost'} size="xs" onClick={() => shiftWorkloadAnchor(null)}>
-          {t('Today')}
-        </Button>
-        <Button type="button" variant="ghost" size="icon-xs" onClick={() => shiftWorkloadAnchor(step)}
-          title={t('Later')} aria-label={t('Later')}>
-          <ChevronRight size={CONTROL.icon.xs} />
-        </Button>
-      </div>
+      <ButtonAppearanceProvider appearance="navigation">
+        <div className="flex items-center gap-0.5">
+          <Button type="button" variant="ghost" size="icon-xs" onClick={() => shiftWorkloadAnchor(-step)}
+            title={t('Earlier')} aria-label={t('Earlier')}>
+            <ChevronLeft size={CONTROL.icon.xs} />
+          </Button>
+          <Button type="button" variant={anchor === 0 ? 'secondary' : 'ghost'} size="xs" onClick={() => shiftWorkloadAnchor(null)}>
+            {t('Today')}
+          </Button>
+          <Button type="button" variant="ghost" size="icon-xs" onClick={() => shiftWorkloadAnchor(step)}
+            title={t('Later')} aria-label={t('Later')}>
+            <ChevronRight size={CONTROL.icon.xs} />
+          </Button>
+        </div>
+      </ButtonAppearanceProvider>
 
       {!embedded && (
         <Button type="button" size="xs" variant={planOpen ? 'secondary' : 'ghost'} aria-pressed={planOpen}
@@ -484,7 +491,7 @@ function Header({
           <Scale size={CONTROL.icon.xs} />
           {t('Rebalance')}
           {canPlan && proposals !== null && proposals > 0 && (
-            <span className="rounded-full bg-[var(--accent-default)] px-1.5 text-[10px] font-semibold tabular-nums text-white">{proposals}</span>
+            <span className="tabular-nums text-muted-foreground">{proposals}</span>
           )}
         </Button>
       )}
@@ -515,11 +522,10 @@ function KpiStrip({
   const dash = '—';
   const util = team.utilization;
   return (
-    <div className="flex flex-shrink-0 items-stretch gap-6 overflow-x-auto border-b border-border/60 bg-card px-4 py-2.5">
+    <dl className="grid flex-shrink-0 grid-cols-2 gap-x-8 gap-y-4 bg-card px-4 pb-6 pt-5 sm:grid-cols-3 sm:px-8 lg:grid-cols-5">
       <Kpi label={t('Team load')} hint={ahead ? t('Booked hours ÷ available hours from today to the end of the view') : t('Booked hours ÷ available hours in this window')}
         value={loading || util === null ? dash : pct(util)}
-        tone={!loading && util !== null && util > 1 ? 'danger' : 'neutral'}
-        meter={loading || util === null ? null : util} />
+        tone={!loading && util !== null && util > 1 ? 'danger' : 'neutral'} />
       <Kpi label={t('Overloaded')} hint={t('People over their hours on at least one day')}
         value={loading ? dash : t('{n} people', { n: team.overloadedPeople })}
         sub={loading || team.overDays === 0 ? null : t('{n} days over', { n: team.overDays })}
@@ -529,31 +535,27 @@ function KpiStrip({
       <Kpi label={t('Unassigned')} hint={t('Work nobody holds yet')}
         value={loading ? dash : `${Math.round(unassignedHours)}h`}
         sub={loading || unassignedCount === 0 ? null : t('{n} Elements', { n: unassignedCount })}
-        tone={!loading && unassignedHours > 0 ? 'warning' : 'neutral'} />
+        tone="neutral" />
       <Kpi label={t('AI agents')} hint={t('Share of the booked hours held by AI agents')}
         value={loading || team.aiShare === null ? dash : pct(team.aiShare)}
         sub={loading ? null : t('of {h}h booked', { h: Math.round(team.hours) })} tone="neutral" />
-    </div>
+    </dl>
   );
 }
 
-function Kpi({ label, hint, value, sub, tone, meter }: {
+/** A key number: label, figure, one quiet line. Red only when it asks for action. */
+function Kpi({ label, hint, value, sub, tone }: {
   label: string;
   hint: string;
   value: React.ReactNode;
   sub?: string | null;
-  tone: 'danger' | 'warning' | 'neutral';
-  meter?: number | null;
+  tone: 'danger' | 'neutral';
 }) {
-  const color = tone === 'danger' ? 'text-[var(--status-danger)]' : tone === 'warning' ? 'text-[var(--status-warning)]' : 'text-foreground';
   return (
-    <div className="flex min-w-[96px] flex-col gap-0.5" title={hint}>
-      <span className="text-[11px] text-muted-foreground">{label}</span>
-      <span className="flex items-baseline gap-1.5">
-        <span className={`text-[18px] font-semibold leading-none tabular-nums ${color}`}>{value}</span>
-        {sub && <span className="text-[11px] text-muted-foreground">{sub}</span>}
-      </span>
-      {meter != null && <LoadMeter value={meter} className="mt-1 w-24" />}
+    <div className="min-w-0 space-y-0.5" title={hint}>
+      <dt className={`${FONT.sm} truncate text-muted-foreground`}>{label}</dt>
+      <dd className={`${FONT['2xl']} truncate tabular-nums ${tone === 'danger' ? 'text-[var(--status-danger)]' : 'text-foreground'}`}>{value}</dd>
+      {sub && <dd className={`${FONT.sm} truncate text-muted-foreground`}>{sub}</dd>}
     </div>
   );
 }
@@ -1137,6 +1139,7 @@ function AvailabilityMenu({
   onRemove: (span: WorkerAvailability) => Promise<void>;
   onElementClick?: (element: ElementWithDetails) => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [start, setStart] = useState<string | null>(null);
   const [end, setEnd] = useState<string | null>(null);
@@ -1179,7 +1182,7 @@ function AvailabilityMenu({
       });
       if (request.current === requestId) reset();
     } catch (e) {
-      if (request.current === requestId) setError(e instanceof Error ? e.message : 'Could not save this period. Try again.');
+      if (request.current === requestId) setError(e instanceof Error ? t(e.message) : t('Could not save this period. Try again.'));
     } finally {
       setSaving(false);
     }
@@ -1201,18 +1204,18 @@ function AvailabilityMenu({
           type="button"
           variant="ghost"
           size="icon-xs"
-          aria-label={`Availability for ${worker.name}`}
-          title="Availability"
+          aria-label={t('Availability for {name}', { name: worker.name })}
+          title={t('Availability')}
           className={spans.length > 0 ? 'text-[var(--text-primary)]' : undefined}
         >
           <CalendarClock size={CONTROL.icon.xs} />
         </Button>
       </PopoverTrigger>
       <MenuShell width="wide" align="start">
-        <MenuSectionLabel>Away and part-time</MenuSectionLabel>
+        <MenuSectionLabel>{t('Away and part-time')}</MenuSectionLabel>
         {spans.length === 0 ? (
           <div className="px-2 py-1.5 text-[12px] text-muted-foreground">
-            Nothing booked. {worker.name} is at full capacity throughout.
+            {t('Nothing booked. {name} is at full capacity throughout.', { name: worker.name })}
           </div>
         ) : (
           spans.map((s) => (
@@ -1221,7 +1224,7 @@ function AvailabilityMenu({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px]">{spanLabel(s)}</span>
                   <span className="block truncate text-[11px] text-muted-foreground">
-                    {spanDetail(s)}
+                    {spanDetail(s, t)}
                   </span>
                 </span>
                 <Button
@@ -1233,10 +1236,10 @@ function AvailabilityMenu({
                     const requestId = request.current;
                     setError(null);
                     void onRemove(s).catch(e => {
-                      if (request.current === requestId) setError(e instanceof Error ? e.message : 'Could not remove this period. Try again.');
+                      if (request.current === requestId) setError(e instanceof Error ? t(e.message) : t('Could not remove this period. Try again.'));
                     });
                   }}
-                  aria-label={`Remove ${spanLabel(s)}`}
+                  aria-label={t('Remove {name}', { name: spanLabel(s) })}
                 >
                   <X size={CONTROL.icon.xs} />
                 </Button>
@@ -1256,19 +1259,19 @@ function AvailabilityMenu({
           <DateField
             value={start}
             onChange={setStart}
-            placeholder="From"
+            placeholder={t('From')}
             variant="secondary"
             block
-            aria-label="Away from"
+            aria-label={t('Away from')}
           />
           <span className="text-[var(--text-tertiary)]">→</span>
           <DateField
             value={effectiveEnd}
             onChange={setEnd}
-            placeholder="To"
+            placeholder={t('To')}
             variant="secondary"
             block
-            aria-label="Away to"
+            aria-label={t('Away to')}
           />
         </div>
 
@@ -1283,13 +1286,13 @@ function AvailabilityMenu({
               aria-pressed={kind === k.id}
               onClick={() => setKind(k.id)}
             >
-              {k.label}
+              {t(k.label)}
             </Button>
           ))}
         </div>
 
         <label className="flex items-center gap-2 px-2 py-1 text-[12px] text-muted-foreground">
-          <span className="flex-1">Hours per day</span>
+          <span className="flex-1">{t('Hours per day')}</span>
           <input
             type="number"
             min={0}
@@ -1297,7 +1300,7 @@ function AvailabilityMenu({
             step={1}
             value={hours}
             onChange={(e) => setHours(e.target.value)}
-            aria-label="Hours per day while away"
+            aria-label={t('Hours per day while away')}
             className="w-14 rounded-md border-none bg-muted/40 px-2 py-1 text-right text-[13px] text-foreground tabular-nums"
           />
         </label>
@@ -1306,7 +1309,7 @@ function AvailabilityMenu({
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Add a note…"
+            placeholder={t('Add a note…')}
             className="w-full rounded-md border-none bg-muted/40 px-2 py-1 text-[13px] placeholder:text-muted-foreground/60"
           />
         </div>
@@ -1321,7 +1324,7 @@ function AvailabilityMenu({
             onClick={() => { void submit(); }}
             className="w-full"
           >
-            {saving ? 'Saving…' : 'Add period'}
+            {saving ? t('Saving…') : t('Add period')}
           </Button>
         </div>
       </MenuShell>
@@ -1350,6 +1353,7 @@ function DueInSpan({
   elements: ElementWithDetails[];
   onElementClick?: (element: ElementWithDetails) => void;
 }) {
+  const { t } = useI18n();
   const due = useMemo(() => elementsDueInSpan(span, elements), [span, elements]);
   if (due.length === 0) return null;
   const away = span.capacity_hours_per_day <= 0;
@@ -1359,8 +1363,7 @@ function DueInSpan({
   return (
     <div className="mt-1 pl-2 border-l border-[var(--border-subtle)]">
       <div className={`text-[11px] ${away ? 'text-[var(--status-danger)]' : 'text-muted-foreground'}`}>
-        {due.length} {due.length === 1 ? 'Element comes' : 'Elements come'} due
-        {away ? ' while away' : ' in this period'}
+        {away ? t('{n} Elements come due while away', { n: due.length }) : t('{n} Elements come due in this period', { n: due.length })}
       </div>
       {visible.map((el) => (
         <Button key={el.id} variant="ghost" size="xs" align="start" className="w-full gap-2 px-0" disabled={!onElementClick}
@@ -1372,7 +1375,7 @@ function DueInSpan({
         </Button>
       ))}
       {rest > 0 && (
-        <div className="text-[11px] text-muted-foreground/70">and {rest} more</div>
+        <div className="text-[11px] text-muted-foreground/70">{t('and {n} more', { n: rest })}</div>
       )}
     </div>
   );
@@ -1385,11 +1388,11 @@ function spanLabel(span: WorkerAvailability): string {
   return `${from} – ${to}`;
 }
 
-function spanDetail(span: WorkerAvailability): string {
-  const kind = AVAILABILITY_KINDS.find((k) => k.id === span.kind)?.label ?? 'Other';
+function spanDetail(span: WorkerAvailability, t: Translate): string {
+  const kind = t(AVAILABILITY_KINDS.find((k) => k.id === span.kind)?.label ?? 'Other');
   const load = span.capacity_hours_per_day > 0
-    ? `${span.capacity_hours_per_day}h/day`
-    : 'Away';
+    ? t('{h} h/day', { h: span.capacity_hours_per_day })
+    : t('Away');
   return span.note ? `${kind} · ${load} · ${span.note}` : `${kind} · ${load}`;
 }
 
@@ -1422,7 +1425,7 @@ function ElementSubRow({
   const statusColor =
     SEMANTIC_COLORS.status[element.status as keyof typeof SEMANTIC_COLORS.status]
     ?? SEMANTIC_COLORS.status.todo;
-  const statusLabel = STATUS[element.status as keyof typeof STATUS]?.label ?? element.status ?? 'Todo';
+  const statusLabel = t(STATUS[element.status as keyof typeof STATUS]?.label ?? element.status ?? 'To Do');
   const hours = elementHours(element);
 
   return (
@@ -1508,7 +1511,7 @@ function ResourceWorkerAvatar({ worker }: { worker: Worker }) {
   const mark = unreachableMarkProps(worker, worker.name);
   const bg =
     worker.type === 'ai_agent'
-      ? 'bg-[var(--accent-default)] text-white'
+      ? 'bg-[var(--accent-default)] text-primary-foreground'
       : worker.type === 'robot'
         ? 'bg-[var(--surface-raised)] text-[var(--text-tertiary)]'
         : 'bg-muted text-foreground';
@@ -1595,7 +1598,7 @@ function loadNote(subtitle: string, awayDays: number, dueAway: number, t: Transl
 function workerSubtitle(worker: Worker, elements: ElementWithDetails[], t: Translate): string {
   const count = elements.length;
   const unscheduled = elements.filter(element => !elementSpan(element)).length;
-  const role = worker.role ?? (worker.type === 'ai_agent' ? `AI · ${worker.ai_model ?? 'Agent'}` : worker.type === 'robot' ? t('Robot') : null);
+  const role = worker.role ?? (worker.type === 'ai_agent' ? (worker.ai_model ? `AI · ${worker.ai_model}` : t('AI agent')) : worker.type === 'robot' ? t('Robot') : null);
   return [role ?? t('{n} Elements', { n: count }), unscheduled > 0 ? t('{n} unscheduled', { n: unscheduled }) : null].filter(Boolean).join(' · ');
 }
 

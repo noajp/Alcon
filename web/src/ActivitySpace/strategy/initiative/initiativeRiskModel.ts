@@ -14,6 +14,7 @@
 // =============================================================
 
 import { isOpenStatus } from '@/Function/shared/completion';
+import { translate } from '@/Function/i18n/I18nProvider';
 
 /** The newest progress signal for one Element, already resolved by the caller. */
 export interface RiskElement {
@@ -412,8 +413,8 @@ export function computeInitiativeRisk(
 /** "27h" / "3d" / "12m" — the coarse age of a silence. */
 export function formatQuiet(ms: number): string {
   const minutes = Math.floor(ms / 60_000);
-  if (minutes < 60) return `${Math.max(minutes, 1)}m`;
+  if (minutes < 60) return translate('{n}m', { n: Math.max(minutes, 1) });
   const hours = Math.floor(minutes / 60);
-  if (hours < 48) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
+  if (hours < 48) return translate('{n}h', { n: hours });
+  return translate('{n}d', { n: Math.floor(hours / 24) });
 }

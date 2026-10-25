@@ -29,8 +29,7 @@ import { QuickAddElementPopup, type NewElementInput } from '@/ActivitySpace/exec
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
 import type { ColumnId, DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
 import { ELEMENT_DEFAULT_VISIBLE } from '@/Function/shared/listConfig';
-import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
-import { EmptyState } from '@/Function/shared/EmptyState';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';
 import { pushUndo } from '@/ActivitySpace/execution/element/bulkUndo';
 import {
@@ -218,7 +217,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
     }
   }, [userId, selectedRowIds, elements, clearSelection, fetchMine, onRefresh]);
   // Hand the selection to one person (undoable); Elements they cannot take keep their people.
-  const assigneeOptions = useMemo(() => (spaceWorkers ?? []).map((w) => ({ id: w.id, name: w.name, hint: w.type === 'ai_agent' ? 'AI' : null })), [spaceWorkers]);
+  const assigneeOptions = useMemo(() => (spaceWorkers ?? []).map((w) => ({ id: w.id, name: w.name, hint: w.type === 'ai_agent' ? t('AI') : null })), [spaceWorkers, t]);
   const bulkAssign = useCallback(async (workerId: string) => {
     // What could not be handed over stays selected, with the bar saying why.
     const failed = await bulkSetAssignee([...selectedRowIds], workerId, async () => { await fetchMine(); await onRefresh?.(); });
@@ -319,34 +318,24 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
           onReset={() => setControls(DEFAULT_STATE)}
           sortColumnsStorageKey="my-elements"
         />
-        {userId && (
-          <button
-            type="button"
-            onClick={() => setDeletedOpen(true)}
-            className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-            title={t('Deleted Elements')}
-            aria-label={t('Deleted Elements')}
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => setQuickAddOpen(true)}
-          className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-          title={t('Add personal Element')}
-          aria-label={t('Add personal Element')}
-        >
-          <Plus size={14} />
-        </button>
+        <ButtonAppearanceProvider appearance="navigation">
+          {userId && (
+            <Button variant="ghost" size="icon-xs" onClick={() => setDeletedOpen(true)} title={t('Deleted Elements')} aria-label={t('Deleted Elements')}>
+              <Trash2 size={14} />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon-xs" onClick={() => setQuickAddOpen(true)} title={t('Add personal Element')} aria-label={t('Add personal Element')}>
+            <Plus size={14} />
+          </Button>
+        </ButtonAppearanceProvider>
         {deletedOpen && userId && (
           <DeletedElementsDialog mine={userId} onClose={() => setDeletedOpen(false)} onRestored={() => { void fetchMine(); void onRefresh?.(); }} />
         )}
       </div>
 
       {loading ? (
-        <div className="flex-1 flex items-center justify-center text-[13px] text-muted-foreground">
-          Loading…
+        <div className="flex-1 flex items-center justify-center text-[13px] text-muted-foreground" role="status">
+          {t('Loading…')}
         </div>
       ) : elements.length === 0 ? (
         <MyElementsEmptyState onAdd={() => setQuickAddOpen(true)} />
@@ -371,7 +360,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
 
       <QuickAddElementPopup
         open={quickAddOpen}
-        contextLabel="My Elements"
+        contextLabel={t('My Elements')}
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
         types={elementTypes}
@@ -396,14 +385,11 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
 }
 
 function MyElementsEmptyState({ onAdd }: { onAdd: () => void }) {
+  const { t } = useI18n();
   return (
-    <EmptyState
-      icon={NavMyTasksIcon}
-      title="Your personal Elements"
-      description="Anything that's yours alone — quick captures, personal todos, ideas — lives here."
-      hint="You'll also see Elements from shared Domains where you're assigned."
-      cta="Create Element"
-      onCta={onAdd}
-    />
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 px-8 text-center">
+      <p className="text-[13px] text-muted-foreground">{t("Anything that's yours alone — quick captures, personal todos, ideas — lives here.")}</p>
+      <Button variant="ghost" size="sm" onClick={onAdd}><Plus size={14} />{t('Create Element')}</Button>
+    </div>
   );
 }

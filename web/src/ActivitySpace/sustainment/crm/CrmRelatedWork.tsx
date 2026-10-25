@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, Link2, X } from 'lucide-react';
-import { Button } from '@/ui/button';
+import { Link2, X } from 'lucide-react';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { Crm } from '@/hooks/useCrm';
 import type { CrmLinkedElement } from './crmModel';
@@ -61,17 +61,16 @@ export function CrmRelatedWork({ crm, target, onOpenElement }: {
 
   return <RecordSection title={t('Related work')}>
     <div className="max-w-2xl space-y-2">
-      {rows.length > 0 && <ul className="space-y-0.5">{rows.map(({ key, linkId, element, via }) => <li key={key} className="group flex items-center gap-2 text-[13px]">
-        <span className={`size-1.5 shrink-0 rounded-full ${DONE.has(element.status) ? 'bg-muted-foreground/30' : 'bg-[var(--status-info)]'}`} />
-        <button type="button" disabled={!onOpenElement} className="min-w-0 flex-1 truncate rounded-sm px-1 py-1 text-left hover:bg-muted/40 disabled:hover:bg-transparent"
+      {rows.length > 0 && <ul className="-mx-1.5">{rows.map(({ key, linkId, element, via }) => <li key={key} className="group flex items-center gap-2 rounded-md px-1.5 text-[13px] transition-colors hover:bg-muted/40 has-[:focus-visible]:bg-muted/40">
+        <span className={`size-1.5 shrink-0 rounded-full ${DONE.has(element.status) ? 'bg-muted-foreground/30' : 'bg-muted-foreground'}`} />
+        <button type="button" disabled={!onOpenElement} className="min-w-0 flex-1 truncate py-1 text-left outline-none"
           onClick={() => onOpenElement?.(element.id)}>
           {element.display_id && <span className="mr-1.5 text-xs tabular-nums text-muted-foreground">{element.display_id}</span>}
           <span className={DONE.has(element.status) ? 'text-muted-foreground line-through' : undefined}>{element.title}</span>
           {via && <span className="ml-1.5 text-xs text-muted-foreground">· {t('next step of {deal}', { deal: via })}</span>}
         </button>
         {element.due_date && <span className="shrink-0 text-xs text-muted-foreground">{relativeDay(element.due_date, crm.today, locale, t)}</span>}
-        {onOpenElement && <Button variant="ghost" size="icon-xs" aria-label={t('Open Element')} onClick={() => onOpenElement(element.id)}><ArrowUpRight size={12} /></Button>}
-        {linkId && <Button variant="ghost" size="icon-xs" aria-label={t('Unlink {title}', { title: element.title })} onClick={() => run(crm.unlinkElement(linkId))}><X size={12} /></Button>}
+        {linkId && <ButtonAppearanceProvider appearance="inline"><Button variant="ghost" size="icon-xs" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" aria-label={t('Unlink {title}', { title: element.title })} onClick={() => run(crm.unlinkElement(linkId))}><X size={12} /></Button></ButtonAppearanceProvider>}
       </li>)}</ul>}
       <label className="flex h-8 items-center gap-2 rounded-sm bg-muted/30 px-2 text-muted-foreground focus-within:bg-muted/60 hover:bg-muted/40">
         <Link2 size={14} className="shrink-0" />

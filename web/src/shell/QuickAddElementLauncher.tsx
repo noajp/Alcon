@@ -14,6 +14,8 @@ import {
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getQueryClient } from '@/lib/queryClient';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { parseDateOnly } from '@/Function/shared/dateUtils';
 
 // Last Object an Element was quick-added to — pressing C on a screen with no
 // Object context (Home, Notes, …) targets this Object again.
@@ -71,6 +73,7 @@ export function QuickAddElementLauncher({
   onRefresh,
 }: QuickAddElementLauncherProps) {
   const explorerData = useExplorerData();
+  const { t, locale } = useI18n();
   const { user } = useAuthContext();
   const userId = user?.id ?? null;
   const [open, setOpen] = useState(false);
@@ -197,7 +200,7 @@ export function QuickAddElementLauncher({
     <QuickAddElementPopup
       open={open}
       contextLabel={contextLabel}
-      hint={presetDueDate ? `Due ${presetDueDate}` : undefined}
+      hint={presetDueDate ? t('Due {date}', { date: parseDateOnly(presetDueDate)?.toLocaleDateString(locale, { month: 'short', day: 'numeric' }) ?? presetDueDate }) : undefined}
       onClose={() => setOpen(false)}
       onSubmit={handleSubmit}
       types={elementTypes}

@@ -5,10 +5,11 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
-import { PageIcon } from '@/Function/shared/PageHead';
-import { FONT } from '@/shared/designTokens';
+import { PageIcon, PageSection } from '@/Function/shared/PageHead';
 import { IndexList, IndexRow } from '@/Function/shared/IndexList';
-import { EmptyState } from '@/Function/shared/EmptyState';
+import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
+import { QuietEmpty } from '@/ActivitySpace/strategy/QuietEmpty';
 import { QuickCreatePopup, quickCreatePillClass } from '@/Function/shared/QuickCreatePopup';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/ui/command';
@@ -159,12 +160,13 @@ export function StrategyShell({
     <div className="flex flex-col h-full bg-card">
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
         <NavStrategyIcon size={12} />
-        <span className="text-[12px] font-semibold text-foreground">Initiatives</span>
+        <span className="text-[12px] font-semibold text-foreground">{t('Initiatives')}</span>
       </div>
 
       <div className="flex-1 overflow-hidden">
         {loading ? null : inVision.length === 0 && unplaced.length === 0 ? (
-          <EmptyPrompt onCreate={() => setNewOpen(true)} />
+          <QuietEmpty text={t('No Initiatives yet. An Initiative groups Objects across Domains around one outcome.')}
+            cta={t('Create Initiative')} onCta={() => setNewOpen(true)} />
         ) : (
           <div className="h-full overflow-auto">
             {inVision.length > 0 && (
@@ -196,22 +198,6 @@ export function StrategyShell({
 }
 
 // =============================================================
-// Empty / create prompt
-// =============================================================
-function EmptyPrompt({ onCreate }: { onCreate: () => void }) {
-  return (
-    <EmptyState
-      icon={NavStrategyIcon}
-      title="Add Initiatives"
-      description="An Initiative groups Objects across Domains around one outcome — what to achieve and how to win."
-      hint="Each Initiative gets its own timeline and resource view."
-      cta="Create Initiative"
-      onCta={onCreate}
-    />
-  );
-}
-
-// =============================================================
 // Root Initiative list — the entire root view. Selecting a row pushes
 // into that Initiative's detail page.
 // =============================================================
@@ -221,14 +207,15 @@ function EmptyPrompt({ onCreate }: { onCreate: () => void }) {
 // row never disagrees with the page it opens. Quiet register throughout — a
 // row is not the place to shout; the number is the signal.
 function InitiativeHealthCell({ health }: { health: InitiativeHealth | undefined }) {
+  const { t } = useI18n();
   if (!health) {
     return <span className="text-[11px] text-muted-foreground/50">…</span>;
   }
   const { risk } = health;
   const alerts: string[] = [];
-  if (risk.overdue > 0) alerts.push(`${risk.overdue} overdue`);
-  if (risk.stalled > 0) alerts.push(`${risk.stalled} stalled`);
-  if (risk.blocked > 0) alerts.push(`${risk.blocked} blocked`);
+  if (risk.overdue > 0) alerts.push(t('{n} overdue', { n: risk.overdue }));
+  if (risk.stalled > 0) alerts.push(t('{n} stalled', { n: risk.stalled }));
+  if (risk.blocked > 0) alerts.push(t('{n} blocked', { n: risk.blocked }));
   const moved = health.lastActivityAt !== null
     ? formatRelative(new Date(health.lastActivityAt).toISOString())
     : null;
@@ -236,7 +223,7 @@ function InitiativeHealthCell({ health }: { health: InitiativeHealth | undefined
   return (
     <div className="flex items-center gap-3 min-w-0 text-[11px] text-muted-foreground tabular-nums">
       {health.progressPct === null ? (
-        <span className="shrink-0 text-muted-foreground/60">No Elements</span>
+        <span className="shrink-0 text-muted-foreground/60">{t('No Elements')}</span>
       ) : (
         <span className="flex items-center gap-1.5 shrink-0 w-24">
           <SegmentedProgress value={health.progressPct} className="flex-1" />
@@ -246,8 +233,8 @@ function InitiativeHealthCell({ health }: { health: InitiativeHealth | undefined
       {/* An empty Initiative already said "No Elements"; "No activity" would
           be the same fact twice. */}
       {!(health.total === 0 && moved === null) && (
-        <span className="shrink-0 min-w-0 truncate text-muted-foreground/70" title={moved ? `Last movement ${moved}` : 'Nothing has reported yet'}>
-          {moved ?? 'No activity'}
+        <span className="shrink-0 min-w-0 truncate text-muted-foreground/70" title={moved ? t('Last movement {when}', { when: moved }) : t('Nothing has reported yet')}>
+          {moved ?? t('No activity')}
         </span>
       )}
       {alerts.length > 0 ? (
@@ -255,13 +242,13 @@ function InitiativeHealthCell({ health }: { health: InitiativeHealth | undefined
           className="min-w-0 truncate text-foreground/80"
           // The alerts take the slot, but an unmeasured schedule is still a
           // fact — it rides in the title rather than costing width.
-          title={unmeasured ? `${alerts.join(' · ')} — open Elements carry no due dates, so the schedule is unmeasured` : alerts.join(' · ')}
+          title={unmeasured ? t('{alerts} — open Elements carry no due dates, so the schedule is unmeasured', { alerts: alerts.join(' · ') }) : alerts.join(' · ')}
         >
           {alerts.join(' · ')}
         </span>
       ) : unmeasured ? (
         // 0 overdue with no dated work is not "on time" — it is unmeasured.
-        <span className="min-w-0 truncate text-muted-foreground/60" title="Open Elements carry no due dates, so the schedule is unmeasured">No dates</span>
+        <span className="min-w-0 truncate text-muted-foreground/60" title={t('Open Elements carry no due dates, so the schedule is unmeasured')}>{t('No dates')}</span>
       ) : null}
     </div>
   );
@@ -319,6 +306,7 @@ function useAllObjects(): { objects: AlconObjectWithChildren[]; refetch: () => P
 // Group the flat Object list by Domain — shared between the create dialog
 // and the detail view's Object-scope picker.
 function useObjectPicker(query: string) {
+  const { t } = useI18n();
   const { data: domains } = useDomains();
   const { objects: allObjects } = useAllObjects();
 
@@ -332,12 +320,12 @@ function useObjectPicker(query: string) {
     const m = new Map<string, { domainName: string; objects: AlconObject[] }>();
     for (const o of filtered) {
       const did = o.domain_id ?? '__none__';
-      const dname = domains.find((d) => d.id === did)?.name ?? 'No domain';
+      const dname = domains.find((d) => d.id === did)?.name ?? t('No Domain');
       if (!m.has(did)) m.set(did, { domainName: dname, objects: [] });
       m.get(did)!.objects.push(o);
     }
     return Array.from(m.entries());
-  }, [filtered, domains]);
+  }, [filtered, domains, t]);
 
   return grouped;
 }
@@ -351,11 +339,12 @@ function ObjectPickerList({
   selectedIds: Set<string>;
   onToggle: (id: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <>
       {grouped.length === 0 && (
-        <div className="px-3 py-3 text-[12px] text-muted-foreground italic">
-          No Objects match
+        <div className="px-3 py-3 text-[12px] text-muted-foreground">
+          {t('No Objects match.')}
         </div>
       )}
       {grouped.map(([did, { domainName, objects }]) => (
@@ -545,7 +534,7 @@ function StrategyDetailView({
       setChildQuery('');
     } catch (e) {
       console.error('Failed to nest Initiative:', e);
-      setSaveError('Could not nest that Initiative');
+      setSaveError(t('Could not nest that Initiative'));
     } finally {
       setLinkingChildId(null);
     }
@@ -559,7 +548,7 @@ function StrategyDetailView({
       onSaved();
     } catch (e) {
       console.error('Failed to un-nest Initiative:', e);
-      setSaveError('Could not remove that Initiative');
+      setSaveError(t('Could not remove that Initiative'));
     }
   };
 
@@ -583,7 +572,7 @@ function StrategyDetailView({
       // Nothing was written; put the row back to what the server holds and
       // say so where the eye lands, instead of a console nobody watches.
       await refetchObjects();
-      setSaveError('Could not change the Object — only its members can');
+      setSaveError(t('Could not change the Object — only its members can'));
     }
   };
 
@@ -595,7 +584,7 @@ function StrategyDetailView({
     } catch (e) {
       console.error('Failed to add Object type:', e);
       await refetchDomains();
-      setSaveError('Could not add the Type — only the Domain\'s owner or admin can');
+      setSaveError(t("Could not add the Type — only the Domain's owner or admin can"));
     }
   };
 
@@ -612,7 +601,7 @@ function StrategyDetailView({
       onBack();
     } catch (e) {
       console.error('Failed to delete Initiative:', e);
-      setDeleteError(e instanceof Error ? e.message : 'Could not delete the Initiative');
+      setDeleteError(e instanceof Error ? e.message : t('Could not delete the Initiative'));
       setDeleting(false);
       setConfirmingDelete(false);
     }
@@ -631,7 +620,7 @@ function StrategyDetailView({
     } catch (e) {
       console.error('Failed to rename Initiative:', e);
       setName(strategy.name);
-      setSaveError('Could not save the name');
+      setSaveError(t('Could not save the name'));
     }
   };
 
@@ -646,7 +635,7 @@ function StrategyDetailView({
     } catch (e) {
       console.error('Failed to save Initiative description:', e);
       setDescription(strategy.description ?? '');
-      setSaveError('Could not save the description');
+      setSaveError(t('Could not save the description'));
     }
   };
 
@@ -664,7 +653,7 @@ function StrategyDetailView({
     } catch (e) {
       console.error('Failed to update Initiative Objects:', e);
       setSelectedIds(previous);
-      setSaveError('Could not change the Objects');
+      setSaveError(t('Could not change the Objects'));
     }
   };
 
@@ -703,12 +692,41 @@ function StrategyDetailView({
     }
   };
 
+  // The two "+" menus — each opens from the section heading once the section
+  // has content, and from its inline "+ verb" while it has none.
+  const nestedMenu = (trigger: React.ReactNode) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuItem onClick={() => setChildPickerOpen(true)}>
+          <Search size={13} className="mr-1.5" /> {t('Add existing Initiative')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setNewChildOpen(true)}>
+          <Plus size={13} className="mr-1.5" /> {t('Create Initiative')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+  const objectsMenu = (trigger: React.ReactNode) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuItem onClick={() => setPickerMode('search')}>
+          <Search size={13} className="mr-1.5" /> {t('Search Objects')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setPickerMode('create')}>
+          <Plus size={13} className="mr-1.5" /> {t('Create Object')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <>
     <ConfirmDialog
       open={confirmingDelete}
-      title={`Delete "${strategy.name}"?`}
-      description="Its Intents, comments, and nesting links are deleted. Linked Objects stay. This can't be undone."
+      title={t('Delete "{name}"?', { name: strategy.name })}
+      description={t("Its Intents, comments, and nesting links are deleted. Linked Objects stay. This can't be undone.")}
       busy={deleting}
       onConfirm={() => { void handleDelete(); }}
       onCancel={() => setConfirmingDelete(false)}
@@ -721,7 +739,7 @@ function StrategyDetailView({
           onClick={onBack}
           className="px-1.5 py-0.5 rounded text-[12px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
         >
-          Initiative
+          {t('Initiative')}
         </button>
         <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
         <span className="px-1.5 py-0.5 text-[12px] font-semibold text-foreground truncate max-w-[240px]">
@@ -733,7 +751,7 @@ function StrategyDetailView({
           // is locked to match. The board's intent sections keep their own
           // policy and report their own failures (ELE_STR-025).
           <span
-            className="ml-1 px-1.5 py-0.5 rounded-full bg-muted/60 ring-1 ring-border/60 text-[11px] text-foreground/90"
+            className="ml-1 px-1.5 py-0.5 text-[11px] text-muted-foreground"
             title={t("Only the Initiative's owner can edit it")}
           >
             {t('Read-only')}
@@ -836,135 +854,94 @@ function StrategyDetailView({
               a reading of the board rather than a part of it. */}
           <WidgetZone zone="main" columns={1} />
 
-          <section>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className={`${FONT.lg} text-foreground`}>{t('Initiatives')}</h2>
-              {canEdit && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label={t('Add nested Initiative')}
-                    className="flex items-center justify-center size-5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-                  >
+          {/* Nested Initiatives. With none, the section keeps no heading — only
+              its "+ verb", like every concept page (DESIGN.md). */}
+          {childStrategies.length > 0 || childPickerOpen ? (
+            <PageSection title={t('Initiatives')} action={canEdit ? (
+              <ButtonAppearanceProvider appearance="navigation">
+                {nestedMenu(
+                  <Button variant="ghost" size="icon-xs" aria-label={t('Add nested Initiative')} className="text-muted-foreground">
                     <Plus size={13} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setChildPickerOpen(true)}>
-                    <Search size={13} className="mr-1.5" /> {t('Add existing Initiative')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setNewChildOpen(true)}>
-                    <Plus size={13} className="mr-1.5" /> {t('Create Initiative')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              )}
-            </div>
+                  </Button>,
+                )}
+              </ButtonAppearanceProvider>
+            ) : undefined}>
+              {childStrategies.map((child) => {
+                const n = countObjects(child.objectIds);
+                return (
+                  <ContentRow key={child.id} icon={<NavStrategyIcon size={13} />} name={child.name}
+                    onOpen={() => onOpenStrategy(child.id)}
+                    meta={<span>{n === 1 ? t('1 Object') : t('{n} Objects', { n })}</span>}
+                    actions={canEdit ? (
+                      <ContentRowAction label={t('Remove {name} from this Initiative', { name: child.name })} onClick={() => void unlinkChild(child.id)}>
+                        <X size={12} />
+                      </ContentRowAction>
+                    ) : undefined} />
+                );
+              })}
 
-            {childStrategies.length === 0 && childPickerOpen === false && (
-              <div className="text-[12px] text-muted-foreground/50 py-1">
-                {t('No nested Initiatives yet — group related Initiatives here.')}
-              </div>
-            )}
-
-            {childStrategies.length > 0 && (
-              <div className="mb-2 flex flex-col">
-                {childStrategies.map((child) => (
-                  <div
-                    key={child.id}
-                    className="flex items-center gap-2 px-1 py-1.5 min-h-[2.375rem] rounded-md group/row hover:bg-muted/20 transition-colors cursor-pointer"
-                    onClick={() => onOpenStrategy(child.id)}
-                  >
-                    <NavStrategyIcon size={13} className="text-muted-foreground shrink-0" />
-                    <span className="text-[13px] font-[550] text-foreground truncate flex-1 min-w-0">{child.name}</span>
-                    <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
-                      {countObjects(child.objectIds)} object{countObjects(child.objectIds) === 1 ? '' : 's'}
-                    </span>
-                    {canEdit && (
+              {childPickerOpen && (
+                <div className="mt-1">
+                  <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-1">
+                    <Search size={12} className="text-muted-foreground" />
+                    <input
+                      value={childQuery}
+                      onChange={(e) => setChildQuery(e.target.value)}
+                      placeholder={t('Search Initiatives…')}
+                      className="flex-1 bg-transparent text-[13px] outline-none"
+                      autoFocus
+                    />
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); void unlinkChild(child.id); }}
-                      aria-label={`Remove ${child.name} from this Initiative`}
-                      className="shrink-0 flex items-center justify-center size-5 rounded text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-foreground hover:bg-muted/40 transition-opacity"
+                      onClick={() => { setChildPickerOpen(false); setChildQuery(''); }}
+                      aria-label={t('Close')}
+                      className="text-muted-foreground hover:text-foreground"
                     >
                       <X size={12} />
                     </button>
-                    )}
                   </div>
-                ))}
-              </div>
-            )}
-
-            {childPickerOpen && (
-              <>
-                <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-2">
-                  <Search size={12} className="text-muted-foreground" />
-                  <input
-                    value={childQuery}
-                    onChange={(e) => setChildQuery(e.target.value)}
-                    placeholder={t('Search Initiatives…')}
-                    className="flex-1 bg-transparent text-[13px] outline-none"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => { setChildPickerOpen(false); setChildQuery(''); }}
-                    aria-label="Close"
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <X size={12} />
-                  </button>
+                  <div className="max-h-72 overflow-auto">
+                    {childCandidates.length === 0 && (
+                      <div className="px-3 py-3 text-[12px] text-muted-foreground">
+                        {t('No Initiatives match.')}
+                      </div>
+                    )}
+                    {childCandidates.map((s) => (
+                      <button
+                        type="button"
+                        key={s.id}
+                        disabled={linkingChildId === s.id}
+                        onClick={() => linkChild(s.id)}
+                        className="w-full flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] hover:bg-muted/40 text-left disabled:opacity-50"
+                      >
+                        <NavStrategyIcon size={11} />
+                        <span className="flex-1 truncate text-foreground">{s.name}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="rounded-lg border border-border/60 bg-card max-h-72 overflow-auto">
-                  {childCandidates.length === 0 && (
-                    <div className="px-3 py-3 text-[12px] text-muted-foreground italic">
-                      No Initiatives match
-                    </div>
-                  )}
-                  {childCandidates.map((s) => (
-                    <button
-                      type="button"
-                      key={s.id}
-                      disabled={linkingChildId === s.id}
-                      onClick={() => linkChild(s.id)}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-accent text-left disabled:opacity-50"
-                    >
-                      <NavStrategyIcon size={11} />
-                      <span className="flex-1 truncate text-foreground">{s.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </section>
-
-          <section>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className={`${FONT.lg} text-foreground`}>{t('Objects')}</h2>
-              {canEdit && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label={t('Add Objects')}
-                    className="flex items-center justify-center size-5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-                  >
-                    <Plus size={13} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setPickerMode('search')}>
-                    <Search size={13} className="mr-1.5" /> Search Objects
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setPickerMode('create')}>
-                    <Plus size={13} className="mr-1.5" /> Create Object
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
               )}
-            </div>
+            </PageSection>
+          ) : canEdit ? (
+            <ButtonAppearanceProvider appearance="inline">
+              {nestedMenu(
+                <Button variant="ghost" size="sm" align="start" className="-ml-2 self-start">
+                  <Plus size={13} strokeWidth={2.5} />{t('Add nested Initiative')}
+                </Button>,
+              )}
+            </ButtonAppearanceProvider>
+          ) : null}
 
+          {selectedIds.size > 0 || pickerMode !== 'closed' ? (
+            <PageSection title={t('Objects')} action={canEdit ? (
+              <ButtonAppearanceProvider appearance="navigation">
+                {objectsMenu(
+                  <Button variant="ghost" size="icon-xs" aria-label={t('Add Objects')} className="text-muted-foreground">
+                    <Plus size={13} />
+                  </Button>,
+                )}
+              </ButtonAppearanceProvider>
+            ) : undefined}>
             {selectedIds.size > 0 && (
               <div className="mb-2">
                 {Array.from(selectedIds).map((id) => {
@@ -974,7 +951,7 @@ function StrategyDetailView({
                   const progress = completionOf(obj.elements ?? []).pct;
                   const editable = canEditObject(myObjects, obj.id);
                   const canTypes = editable && canManageDomainTypes(myDomainRoles, obj.domain_id);
-                  const why = editable ? undefined : 'Only members of this Object can change it';
+                  const why = editable ? undefined : t('Only members of this Object can change it');
                   return (
                     <div
                       key={id}
@@ -982,17 +959,17 @@ function StrategyDetailView({
                       // min-h locks the row against the Lead avatar's async
                       // image swap (Fallback initial -> loaded photo mounts a
                       // fraction of a px taller and visibly nudged the row).
-                      className={`flex items-center gap-2 px-1 py-1.5 min-h-[2.375rem] rounded-md group/row hover:bg-muted/20 transition-colors ${onOpenObject ? 'cursor-pointer' : ''}`}
+                      className={`flex items-center gap-2 px-2 py-1 min-h-[2.375rem] rounded-md hover:bg-muted/40 transition-colors ${onOpenObject ? 'cursor-pointer' : ''}`}
                     >
                       <ObjectIcon size={13} className="text-muted-foreground shrink-0" />
-                      <span className="text-[13px] font-[550] text-foreground truncate flex-1 min-w-0">{obj.name}</span>
+                      <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{obj.name}</span>
                       {/* The cells already draw read-only when handed no handler;
                           membership decides whether they get one. */}
                       <div className="w-20 shrink-0" title={why} onClick={(e) => e.stopPropagation()}>
                         <TypeCell
                           value={obj.type ?? null}
                           types={domain?.object_types ?? []}
-                          onChange={editable ? (t) => handleObjectUpdate(obj.id, { type: t }) : undefined}
+                          onChange={editable ? (type) => handleObjectUpdate(obj.id, { type }) : undefined}
                           onAddType={canTypes && obj.domain_id ? (name) => handleAddType(obj.domain_id as string, name) : undefined}
                         />
                       </div>
@@ -1014,7 +991,7 @@ function StrategyDetailView({
 
             {pickerMode === 'search' && (
               <>
-                <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-2">
+                <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-1">
                   <Search size={12} className="text-muted-foreground" />
                   <input
                     value={query}
@@ -1026,20 +1003,20 @@ function StrategyDetailView({
                   <button
                     type="button"
                     onClick={closePicker}
-                    aria-label="Close"
+                    aria-label={t('Close')}
                     className="text-muted-foreground hover:text-foreground"
                   >
                     <X size={12} />
                   </button>
                 </div>
-                <div className="rounded-lg border border-border/60 bg-card max-h-[420px] overflow-auto">
+                <div className="max-h-[420px] overflow-auto">
                   <ObjectPickerList grouped={grouped} selectedIds={selectedIds} onToggle={toggleObject} />
                 </div>
               </>
             )}
 
             {pickerMode === 'create' && (
-              <div className="rounded-lg border border-border/60 bg-card p-3 space-y-2">
+              <div className="space-y-2 py-1">
                 <input
                   value={newObjectName}
                   onChange={(e) => setNewObjectName(e.target.value)}
@@ -1054,12 +1031,13 @@ function StrategyDetailView({
                       closePicker();
                     }
                   }}
-                  className="w-full bg-transparent text-[13px] outline-none border-b border-border/40 pb-1.5"
+                  className="w-full rounded-md bg-transparent px-2 py-1.5 text-[13px] outline-none transition-colors focus:bg-muted/30"
                 />
                 {domains.length > 1 && (
                   <select
                     value={newObjectDomainId ?? domains[0]?.id ?? ''}
                     onChange={(e) => setNewObjectDomainId(e.target.value || null)}
+                    aria-label={t('Domain')}
                     className="w-full bg-muted/30 rounded-md px-2 py-1.5 text-[12px] outline-none border-none"
                   >
                     {domains.map((d) => (
@@ -1068,38 +1046,37 @@ function StrategyDetailView({
                   </select>
                 )}
                 <div className="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={closePicker}
-                    className="px-2 py-1 rounded text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/30"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!newObjectName.trim() || creatingObject}
-                    onClick={handleCreateObject}
-                    className="px-2.5 py-1 rounded-md text-[12px] font-medium bg-primary text-primary-foreground disabled:opacity-40"
-                  >
-                    Create
-                  </button>
+                  <Button variant="ghost" size="sm" onClick={closePicker}>
+                    {t('Cancel')}
+                  </Button>
+                  <Button variant="primary" size="sm" disabled={!newObjectName.trim() || creatingObject} onClick={handleCreateObject}>
+                    {t('Create')}
+                  </Button>
                 </div>
               </div>
             )}
-          </section>
+            </PageSection>
+          ) : canEdit ? (
+            <ButtonAppearanceProvider appearance="inline">
+              {objectsMenu(
+                <Button variant="ghost" size="sm" align="start" className="-ml-2 self-start">
+                  <Plus size={13} strokeWidth={2.5} />{t('Add Objects')}
+                </Button>,
+              )}
+            </ButtonAppearanceProvider>
+          ) : null}
 
           {/* Activity — last, because it accumulates: the sections above are
               the Initiative's current state and stay a fixed height, while this
               one grows downward as the Initiative is discussed. */}
-          <section>
-            <h2 className={`${FONT.lg} mb-2 text-foreground`}>{t('Activity')}</h2>
+          <PageSection title={t('Activity')}>
             <StrategyCommentsPanel
               strategyId={strategy.id}
               strategyName={strategy.name}
               strategyOwnerId={strategy.created_by}
               workers={workers}
             />
-          </section>
+          </PageSection>
         </WidgetSurface>
         </InitiativeIntentProvider>
         </div>
@@ -1162,9 +1139,9 @@ function StrategyCreateDialog({
     <QuickCreatePopup
       open
       icon={<NavStrategyIcon size={12} />}
-      contextLabel="New Initiative"
-      ariaLabel="Quick add Initiative"
-      namePlaceholder="Initiative name…"
+      contextLabel={t('New Initiative')}
+      ariaLabel={t('Quick add Initiative')}
+      namePlaceholder={t('Initiative name…')}
       onClose={onClose}
       onSubmit={async ({ name, description }) => {
         const created = await createStrategy({ name, description, vision_id: visionId }, Array.from(selectedIds));
@@ -1173,9 +1150,9 @@ function StrategyCreateDialog({
     >
       <Popover>
         <PopoverTrigger asChild>
-          <button type="button" className={quickCreatePillClass(selectedCount > 0)} aria-label="Objects">
+          <button type="button" className={quickCreatePillClass(selectedCount > 0)} aria-label={t('Objects')}>
             <ObjectIcon size={12} />
-            <span>{selectedCount > 0 ? `${selectedCount} Object${selectedCount === 1 ? '' : 's'}` : 'Objects'}</span>
+            <span>{selectedCount === 0 ? t('Objects') : selectedCount === 1 ? t('1 Object') : t('{n} Objects', { n: selectedCount })}</span>
             <ChevronDown size={10} className="opacity-60" />
           </button>
         </PopoverTrigger>

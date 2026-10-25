@@ -5,6 +5,13 @@ import { PEOPLE_TRANSLATIONS } from '@/ActivitySpace/sustainment/team/peopleMess
 import { SURFACE_TRANSLATIONS } from './surfaceMessages';
 import { STRATEGY_BOARD_TRANSLATIONS } from './strategyBoardMessages';
 import { APPROACH_TRANSLATIONS } from './approachMessages';
+import { SHARED_TRANSLATIONS } from './sharedMessages';
+import { WIDGET_TRANSLATIONS } from './widgetMessages';
+import { STRATEGY_TRANSLATIONS } from './strategyMessages';
+import { EXECUTION_TRANSLATIONS } from './executionMessages';
+import { DOCUMENTS_TRANSLATIONS } from './documentsMessages';
+import { APP_TRANSLATIONS } from './appMessages';
+import { OPERATIONS_TRANSLATIONS } from '@/ActivitySpace/sustainment/operations/operationsMessages';
 
 type TranslationMap = Record<string, string>;
 
@@ -1414,6 +1421,15 @@ Object.assign(ja, APPROACH_TRANSLATIONS.ja);
 Object.assign(ko, APPROACH_TRANSLATIONS.ko);
 Object.assign(fr, APPROACH_TRANSLATIONS.fr);
 Object.assign(es, APPROACH_TRANSLATIONS.es);
+
+// Each area's own strings: the shared parts, widget bodies, Strategy,
+// Execution, Notebook/Table/Slides, the app shell and settings, Operations.
+for (const area of [SHARED_TRANSLATIONS, WIDGET_TRANSLATIONS, STRATEGY_TRANSLATIONS, EXECUTION_TRANSLATIONS, DOCUMENTS_TRANSLATIONS, APP_TRANSLATIONS, OPERATIONS_TRANSLATIONS]) {
+  Object.assign(ja, area.ja);
+  Object.assign(ko, area.ko);
+  Object.assign(fr, area.fr);
+  Object.assign(es, area.es);
+}
 
 // People (ActivitySpace/sustainment/team). Last, so the app name stays
 // English everywhere, like every other concept name.

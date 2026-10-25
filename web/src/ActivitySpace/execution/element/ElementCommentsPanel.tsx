@@ -320,7 +320,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
                       avatarUrl={authorWorker?.avatar_url}
                     />
                   }
-                  meta={c.is_pinned ? <Pin size={9} className="text-amber-400" /> : null}
+                  meta={c.is_pinned ? <Pin size={9} className="text-muted-foreground" aria-label={t('Pinned')} /> : null}
                   footer={Object.keys(counts).length > 0 ? (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {Object.entries(counts).map(([emoji, n]) => {
@@ -329,10 +329,11 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
                           <button
                             key={emoji}
                             onClick={() => onReact(c.id, emoji)}
-                            className={`text-[11px] px-1.5 py-0.5 rounded-full border transition-colors ${
+                            type="button"
+                            className={`text-[11px] px-1.5 py-0.5 rounded-full transition-colors ${
                               mine
-                                ? 'bg-primary/15 border-primary/30 text-foreground'
-                                : 'bg-muted/40 border-border hover:bg-muted'
+                                ? 'bg-primary/15 text-foreground'
+                                : 'bg-muted/40 hover:bg-muted'
                             }`}
                           >
                             <span className="mr-1">{emoji}</span>
@@ -361,14 +362,14 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
                           <div className={CommentMenuSeparator} />
                           <CommentMenuItem
                             icon={<Pin size={12} />}
-                            label={c.is_pinned ? 'Unpin' : 'Pin'}
+                            label={c.is_pinned ? t('Unpin') : t('Pin')}
                             onClick={() => { onTogglePin(c); close(); }}
                           />
                           {/* Only a comment's author may delete it (RLS). */}
                           {!!user?.id && c.author_id === user.id && (
                             <CommentMenuItem
                               icon={<Trash2 size={12} />}
-                              label="Delete"
+                              label={t('Delete')}
                               onClick={() => { onDelete(c.id); close(); }}
                               destructive
                             />
@@ -386,7 +387,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
     <div className="space-y-3">
       {/* Comment list — chat bubble style (own → right, others → left). */}
       {loading ? (
-        <div className="text-center py-4 text-muted-foreground text-[12px]">Loading…</div>
+        <div className="text-center py-4 text-muted-foreground text-[12px]">{t('Loading…')}</div>
       ) : sorted.length === 0 ? (
         null
       ) : (

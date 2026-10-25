@@ -51,10 +51,10 @@ export function CrmCompanies({ crm, query, onOpen, selectedId }: { crm: Crm; que
       <Button type="submit" variant="ghost" disabled={!name.trim()}><Plus size={14} />{t('Add')}</Button>
     </form>
     {rows.length ? <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-[13px]">
-      <thead className="text-xs text-muted-foreground"><tr>{['Company', 'Owner', 'Contacts', 'Open deals', 'Open pipeline', 'Won', 'Last contact'].map(label =>
+      <thead className="border-b border-[var(--border-subtle)] text-xs text-muted-foreground"><tr>{['Company', 'Owner', 'Contacts', 'Open deals', 'Open pipeline', 'Won', 'Last contact'].map(label =>
         <th key={label} scope="col" className="whitespace-nowrap px-2 py-2 font-medium first:pl-0">{t(label)}</th>)}</tr></thead>
       <tbody>{rows.map(row => <tr key={row.company.id} onClick={() => onOpen(row.company.id)} aria-current={row.company.id === selectedId ? 'true' : undefined}
-        className={`cursor-pointer border-t border-[var(--border-subtle)] hover:bg-muted/30 ${row.company.id === selectedId ? 'bg-muted/40' : ''}`}>
+        className={`cursor-pointer hover:bg-muted/40 ${row.company.id === selectedId ? 'bg-muted/40' : ''}`}>
         <td className="max-w-72 py-2 pr-2"><button type="button" className="block max-w-full truncate rounded-sm text-left font-medium" onClick={event => { event.stopPropagation(); onOpen(row.company.id); }}>{row.company.name}</button>
           <span className="block truncate text-xs text-muted-foreground">{[row.company.industry, row.company.domain].filter(Boolean).join(' · ') || '—'}</span></td>
         <td className="px-2 py-2 text-muted-foreground">{row.owner ?? '—'}</td>
@@ -84,10 +84,10 @@ export function CrmContacts({ crm, query, onOpen, selectedId }: { crm: Crm; quer
       <Button type="submit" variant="ghost" disabled={!name.trim()}><Plus size={14} />{t('Add')}</Button>
     </form>
     {rows.length ? <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-[13px]">
-      <thead className="text-xs text-muted-foreground"><tr>{['Contact', 'Company', 'Email', 'Phone', 'Deals', 'Last contact'].map(label =>
+      <thead className="border-b border-[var(--border-subtle)] text-xs text-muted-foreground"><tr>{['Contact', 'Company', 'Email', 'Phone', 'Deals', 'Last contact'].map(label =>
         <th key={label} scope="col" className="whitespace-nowrap px-2 py-2 font-medium first:pl-0">{t(label)}</th>)}</tr></thead>
       <tbody>{rows.map(row => <tr key={row.contact.id} onClick={() => onOpen(row.contact.id)} aria-current={row.contact.id === selectedId ? 'true' : undefined}
-        className={`cursor-pointer border-t border-[var(--border-subtle)] hover:bg-muted/30 ${row.contact.id === selectedId ? 'bg-muted/40' : ''}`}>
+        className={`cursor-pointer hover:bg-muted/40 ${row.contact.id === selectedId ? 'bg-muted/40' : ''}`}>
         <td className="max-w-64 py-2 pr-2"><button type="button" className="block max-w-full truncate rounded-sm text-left font-medium" onClick={event => { event.stopPropagation(); onOpen(row.contact.id); }}>{row.contact.name}</button>
           <span className="block truncate text-xs text-muted-foreground">{row.contact.title ?? '—'}</span></td>
         <td className="max-w-48 truncate px-2 py-2">{row.company ?? '—'}</td>

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { TYPE_META, OVERLAY_COLOR_SWATCHES, DEFAULT_OVERLAY_COLOR, type FlagType } from './customColorScheme';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 type MediaKind = 'image' | 'video';
 type Tool = 'select' | 'pin' | 'box' | 'polygon';
@@ -138,6 +139,7 @@ function newFlag(partial: Pick<CustomFlag, 'shape' | 'x' | 'y'> & Partial<Custom
 }
 
 export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewProps) {
+  const { t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const mediaUrlRef = useRef<string | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -330,21 +332,21 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
               </div>
             ))}
           </div>
-          <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add media to CustomView</h2>
+          <h2 className="text-[15px] font-semibold text-foreground mb-1.5">{t('Add media to Custom view')}</h2>
           <p className="text-[13px] text-muted-foreground text-center max-w-xs mb-2">
-            Images and videos become a full-screen annotation surface.
+            {t('Images and videos become a full-screen annotation surface.')}
           </p>
           <p className="text-[12px] text-muted-foreground/60 text-center max-w-xs mb-6">
-            Flags, boxes, areas, labels, and Element links are available from the right-click menu.
+            {t('Flags, boxes, areas, labels, and Element links are available from the right-click menu.')}
           </p>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
             className="flex items-center gap-2 px-4 py-2 rounded-full bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 transition-colors"
-            title="Upload media"
+            title={t('Upload media')}
           >
             <Plus size={14} />
-            Upload Media
+            {t('Upload media')}
           </button>
         </div>
       ) : (
@@ -439,7 +441,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                     onContextMenu={(e) => openMenu(e, { x: flag.x, y: flag.y }, flag.id)}
                     className="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 group"
                     style={{ left: `${flag.x}%`, top: `${flag.y}%` }}
-                    title={flag.label || meta.label}
+                    title={flag.label || t(meta.label)}
                   >
                     <span
                       className={`h-6 w-6 rounded-full border flex items-center justify-center shadow-lg transition-transform ${selected ? 'scale-110' : 'group-hover:scale-105'}`}
@@ -462,7 +464,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
 
       <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/55 px-2.5 py-1.5 text-[11px] text-white/75 backdrop-blur pointer-events-none">
         {media?.kind === 'video' ? <Video size={12} /> : <ImageIcon size={12} />}
-        <span>{media?.name ?? 'CustomView'}</span>
+        <span>{media?.name ?? t('Custom view')}</span>
         {scopeLabel && <span className="text-white/40">{scopeLabel}</span>}
         <span className="text-white/40">{flags.length}</span>
       </div>
@@ -477,24 +479,25 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
           <div className="flex items-center justify-between px-1.5 pb-2">
             <div className="flex min-w-0 items-center gap-2 text-[12px] font-semibold">
               <Flag size={13} />
-              <span className="truncate">CustomView</span>
+              <span className="truncate">{t('Custom view')}</span>
             </div>
             <button
               type="button"
               onClick={() => setMenu(null)}
               className="h-6 w-6 rounded text-zinc-400 hover:bg-white/10 hover:text-white inline-flex items-center justify-center"
-              title="Close"
+              title={t('Close')}
+              aria-label={t('Close')}
             >
               <X size={13} />
             </button>
           </div>
 
-          <MenuButton icon={<Upload size={13} />} label="Media" onClick={() => fileInputRef.current?.click()} />
+          <MenuButton icon={<Upload size={13} />} label={t('Media')} onClick={() => fileInputRef.current?.click()} />
 
           {menu.point && (
             <MenuButton
               icon={<MapPin size={13} />}
-              label="Add pin here"
+              label={t('Add pin here')}
               onClick={() => { addPinAt(menu.point!); setMenu(null); }}
             />
           )}
@@ -508,7 +511,8 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                 type="button"
                 onClick={() => { setTool(item.id); setPolygonPoints([]); setMenu(null); }}
                 className={`h-8 rounded-md inline-flex items-center justify-center gap-1 text-[11px] transition-colors ${tool === item.id ? 'bg-white text-black' : 'bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white'}`}
-                title={item.label}
+                title={t(item.label)}
+                aria-label={t(item.label)}
               >
                 {item.icon}
               </button>
@@ -523,7 +527,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                 className="h-8 rounded-md bg-white text-black text-[11px] font-medium inline-flex items-center justify-center gap-1"
               >
                 <Check size={13} />
-                Area {polygonPoints.length}
+                {t('Area {n}', { n: polygonPoints.length })}
               </button>
               <button
                 type="button"
@@ -531,7 +535,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                 className="h-8 rounded-md bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white text-[11px] inline-flex items-center justify-center gap-1"
               >
                 <X size={13} />
-                Cancel
+                {t('Cancel')}
               </button>
             </div>
           )}
@@ -554,7 +558,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
 
           <label className="mt-1 flex h-8 items-center gap-2 rounded-md px-1.5 text-[12px] text-zinc-300 hover:bg-white/5">
             <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
-            Labels
+            {t('Labels')}
           </label>
 
           {menuFlag && (
@@ -562,7 +566,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
               <div className="my-2 h-px bg-white/10" />
               <div className="mb-2 flex items-center gap-2 px-1.5 text-[11px] font-semibold text-zinc-400">
                 <Tag size={12} />
-                Flag settings
+                {t('Flag settings')}
                 {menuFlag.mediaTime != null && (
                   <span className="ml-auto inline-flex items-center gap-1 font-normal">
                     <Clock size={10} />
@@ -574,7 +578,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
               <input
                 value={menuFlag.label}
                 onChange={(e) => updateFlag(menuFlag.id, { label: e.target.value })}
-                placeholder="Label"
+                placeholder={t('Label')}
                 className="mb-2 h-8 w-full rounded-md bg-white/5 px-2 text-[12px] text-white outline-none border-none"
               />
 
@@ -585,7 +589,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                   className="h-8 rounded-md bg-white/5 px-2 text-[12px] text-white outline-none border-none"
                 >
                   {Object.entries(TYPE_META).map(([value, meta]) => (
-                    <option key={value} value={value}>{meta.label}</option>
+                    <option key={value} value={value}>{t(meta.label)}</option>
                   ))}
                 </select>
                 <select
@@ -594,7 +598,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                   className="h-8 rounded-md bg-white/5 px-2 text-[12px] text-white outline-none border-none"
                 >
                   {Object.entries(PRIORITY_META).map(([value, meta]) => (
-                    <option key={value} value={value}>{meta.label}</option>
+                    <option key={value} value={value}>{t(meta.label)}</option>
                   ))}
                 </select>
               </div>
@@ -605,7 +609,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                   onChange={(e) => updateFlag(menuFlag.id, { linkedElementId: e.target.value || null })}
                   className="mb-2 h-8 w-full rounded-md bg-white/5 px-2 text-[12px] text-white outline-none border-none"
                 >
-                  <option value="">No linked Element</option>
+                  <option value="">{t('No linked Element')}</option>
                   {elements.map((element) => (
                     <option key={element.id} value={element.id}>{element.title}</option>
                   ))}
@@ -615,7 +619,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
               <textarea
                 value={menuFlag.notes}
                 onChange={(e) => updateFlag(menuFlag.id, { notes: e.target.value })}
-                placeholder="Notes"
+                placeholder={t('Notes')}
                 rows={3}
                 className="mb-2 w-full resize-none rounded-md bg-white/5 px-2 py-1.5 text-[12px] text-white outline-none border-none"
               />
@@ -626,7 +630,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                 className="h-8 w-full rounded-md text-[12px] text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10 inline-flex items-center justify-center gap-1"
               >
                 <Trash2 size={13} />
-                Delete flag
+                {t('Delete flag')}
               </button>
             </>
           )}
@@ -645,8 +649,8 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                       className="flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-[11px] text-zinc-300 hover:bg-white/10 hover:text-white"
                     >
                       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: meta.color }} />
-                      <span className="truncate">{flag.label || `Flag ${index + 1}`}</span>
-                      <span className={`ml-auto ${PRIORITY_META[flag.priority].className}`}>{PRIORITY_META[flag.priority].label}</span>
+                      <span className="truncate">{flag.label || t('Flag {n}', { n: index + 1 })}</span>
+                      <span className={`ml-auto ${PRIORITY_META[flag.priority].className}`}>{t(PRIORITY_META[flag.priority].label)}</span>
                     </button>
                   );
                 })}

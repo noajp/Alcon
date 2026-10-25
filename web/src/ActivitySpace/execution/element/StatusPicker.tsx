@@ -9,6 +9,7 @@ import { updateElement } from '@/hooks/useSupabase';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { ElementStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // Linear-style status picker — opens from the progress ○ mark. Each row's
 // icon is the same ElementProgressMark used in the list itself, so the
@@ -38,6 +39,7 @@ interface StatusPickerProps {
 }
 
 export function StatusPicker({ element, size = 16, progress: progressOverride, trigger, onChanged }: StatusPickerProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
 
   // Local draft for the number input so typing feels instant. Initialised
@@ -125,7 +127,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             className="flex size-5 items-center justify-center rounded-full transition-colors hover:bg-muted/40"
-            aria-label="Change status"
+            aria-label={t('Change status')}
           >
             <ElementProgressMark
               status={element.status}
@@ -141,7 +143,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
         className="w-60 rounded-xl p-1"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-2 py-1.5 text-[11.5px] text-muted-foreground">Change status…</div>
+        <div className="px-2 py-1.5 text-[11.5px] text-muted-foreground">{t('Change status…')}</div>
         <div className="h-px bg-border mx-1 mb-1" />
         {ROWS.map((row) => {
           const isCurrent = element.status === row.status;
@@ -174,7 +176,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                   size={17}
                 />
               </span>
-              <span className="flex-1 text-left">{row.label}</span>
+              <span className="flex-1 text-left">{t(row.label)}</span>
               {row.status === 'in_progress' && (
                 // Stop bubbling on the whole input cluster so clicks /
                 // pointer events inside don't trigger applyStatus on the

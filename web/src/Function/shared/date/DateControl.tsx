@@ -53,6 +53,7 @@ import {
   matchDueDatePreset,
   type DueDateRange,
 } from './dueDatePresets';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export type { DueDateRange };
 
@@ -99,6 +100,7 @@ export function DatePopover({
   /** The trigger. Rendered `asChild`, so it must forward ref and props. */
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = React.useState(false);
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
   const selected = fromDateOnlyString(value) ?? undefined;
@@ -129,7 +131,7 @@ export function DatePopover({
             }}
             className="w-full rounded-none rounded-b-xl border-t border-border/60"
           >
-            Clear
+            {t('Clear')}
           </Button>
         ) : null}
       </PopoverContent>
@@ -158,8 +160,10 @@ export function DateField({
   className,
   'aria-label': ariaLabel,
 }: DateFieldProps) {
+  // Callers pass English; translate here (a no-op when already translated).
+  const { t } = useI18n();
   const selected = fromDateOnlyString(value) ?? undefined;
-  const label = value ? formatElementDate(selected, 'short') ?? placeholder : placeholder;
+  const label = value ? formatElementDate(selected, 'short') ?? t(placeholder) : t(placeholder);
 
   return (
     <DatePopover value={value} onChange={onChange} clearable={clearable} align={align}>
@@ -169,7 +173,7 @@ export function DateField({
         size={size}
         align="start"
         disabled={disabled}
-        aria-label={ariaLabel ?? placeholder}
+        aria-label={t(ariaLabel ?? placeholder)}
         className={cn('font-normal', block && 'w-full', !value && 'text-[var(--text-tertiary)]', className)}
       >
         <CalendarIcon size={CONTROL.icon[size]} className="shrink-0" />
@@ -195,6 +199,7 @@ export function DueDateFilter({
   value: DueDateRange;
   onChange: (next: DueDateRange) => void;
 }) {
+  const { t } = useI18n();
   const active = matchDueDatePreset(value);
   const hasRange = Boolean(value.from || value.to);
   // Custom stays open while a range is set that no preset explains, and can be
@@ -216,7 +221,7 @@ export function DueDateFilter({
           aria-pressed={active === p.id}
           className={cn(MENU_ROW, 'justify-between')}
         >
-          <span>{p.label}</span>
+          <span>{t(p.label)}</span>
           {active === p.id ? <Check size={12} className="text-foreground" /> : null}
         </button>
       ))}
@@ -227,7 +232,7 @@ export function DueDateFilter({
         aria-expanded={customOpen}
         className={cn(MENU_ROW, 'justify-between')}
       >
-        <span>Custom range…</span>
+        <span>{t('Custom range…')}</span>
         {customOpen || (hasRange && !active) ? (
           <Check size={12} className="text-foreground" />
         ) : null}
@@ -240,19 +245,19 @@ export function DueDateFilter({
             <DateField
               value={value.from}
               onChange={(from) => onChange({ ...value, from })}
-              placeholder="From"
+              placeholder={t('From')}
               variant="secondary"
               block
-              aria-label="Due date from"
+              aria-label={t('Due date from')}
             />
             <span className="text-[var(--text-tertiary)]">→</span>
             <DateField
               value={value.to}
               onChange={(to) => onChange({ ...value, to })}
-              placeholder="To"
+              placeholder={t('To')}
               variant="secondary"
               block
-              aria-label="Due date to"
+              aria-label={t('Due date to')}
             />
           </div>
         </>

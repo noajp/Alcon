@@ -11,6 +11,7 @@ import {
 } from '@/ui/dropdown-menu';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // Priority values in display order (highest → lowest). `null` = no priority.
 export const PRIORITY_OPTIONS: { value: string; label: string }[] = PRIORITY_ORDER.map((value) => ({ value, label: PRIORITY[value].label }));
@@ -39,6 +40,7 @@ interface PriorityPickerProps {
 export function PriorityPicker({
   value, onChange, trigger, open, onOpenChange, align = 'start', className,
 }: PriorityPickerProps) {
+  const { t } = useI18n();
   const controlled = open !== undefined ? { open, onOpenChange } : {};
   return (
     <DropdownMenu {...controlled}>
@@ -53,7 +55,7 @@ export function PriorityPicker({
             <span className="flex w-5 items-center justify-center">
               <PriorityMark priority={opt.value} />
             </span>
-            <span className="flex-1">{opt.label}</span>
+            <span className="flex-1">{t(opt.label)}</span>
             {value === opt.value && <Check size={12} className="text-muted-foreground" />}
           </DropdownMenuItem>
         ))}
@@ -64,7 +66,7 @@ export function PriorityPicker({
           <span className="flex w-5 items-center justify-center">
             <PriorityMark priority={null} />
           </span>
-          <span className="flex-1 text-muted-foreground">No priority</span>
+          <span className="flex-1 text-muted-foreground">{t('No priority')}</span>
           {value === null && <Check size={12} className="text-muted-foreground" />}
         </DropdownMenuItem>
       </DropdownMenuContent>

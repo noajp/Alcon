@@ -9,7 +9,7 @@ export function ViewOnlyBadge() {
   const { t } = useI18n();
   return (
     <span
-      className="flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground"
+      className="flex items-center gap-1 px-1 text-[11px] text-muted-foreground"
       title={t('Viewers read everything in this Domain and change nothing.')}
     >
       <Eye size={12} />

@@ -6,7 +6,9 @@ export type NowScope = 'mine' | 'team';
 export interface NowItem {
   element: ElementWithDetails;
   lane: NowLane;
+  /** English message key; render with `t(reason, reasonValues)`. */
   reason: string;
+  reasonValues?: Record<string, string | number>;
   blockers: ElementWithDetails[];
   unknownDependency: boolean;
   unlocks: ElementWithDetails[];
@@ -77,15 +79,17 @@ export function buildNowItems(
 
     let lane: NowLane;
     let reason: string;
+    let reasonValues: Record<string, string | number> | undefined;
     if (pending.length > 0 || element.status === 'blocked') {
       lane = 'waiting';
+      if (blockers.length > 1) reasonValues = { n: blockers.length };
       reason = unknownDependency ? 'Dependency outside this view — readiness unknown'
-        : blockers.length > 0 ? `Waiting on ${blockers.length} ${blockers.length === 1 ? 'Element' : 'Elements'}`
+        : blockers.length > 0 ? (blockers.length === 1 ? 'Waiting on 1 Element' : 'Waiting on {n} Elements')
           : 'Marked blocked — share what would let this move';
     } else if (element.status === 'backlog') {
       lane = 'later'; reason = 'Backlog — not committed to execution';
     } else if (starts && starts > today) {
-      lane = 'later'; reason = `Scheduled to start ${starts}`;
+      lane = 'later'; reason = 'Scheduled to start {date}'; reasonValues = { date: starts };
     } else if (approvalPending) {
       lane = 'attention'; reason = element.approval_state === 'changes_requested' ? 'Approval changes requested'
         : element.approval_state === 'rejected' ? 'Approval rejected — clarify the next step'
@@ -98,7 +102,7 @@ export function buildNowItems(
       lane = 'ready'; reason = element.status === 'in_progress' ? 'In progress — no recorded dependency holding it'
         : incoming.has(element.id) ? 'All recorded prerequisites are done' : 'No dependency recorded';
     }
-    rows.push({ element, lane, reason, blockers, unknownDependency, unlocks,
+    rows.push({ element, lane, reason, reasonValues, blockers, unknownDependency, unlocks,
       next: normalizeDirection(element.direction)?.next ?? null, overdue });
   }
 

@@ -16,6 +16,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { getCachedSendCommentShortcut, getCachedDisplayNames, getCachedConvertEmoticons, formatDisplayName, convertEmoticons, usePreference } from '@/Function/settings/preferencesStore';
 
 // =============================================================
@@ -46,6 +47,7 @@ export function StrategyCommentsPanel({
    *  Initiative's Objects can span Domains. */
   workers: Worker[];
 }) {
+  const { t } = useI18n();
   const { user, profile } = useAuthContext();
   const { comments, reload, setComments } = useStrategyComments(strategyId);
   const [draft, setDraft] = useState('');
@@ -178,7 +180,7 @@ export function StrategyCommentsPanel({
                       {(close) => (
                         <CommentMenuItem
                           icon={<Trash2 size={12} />}
-                          label="Delete"
+                          label={t('Delete')}
                           onClick={() => { onDelete(c.id); close(); }}
                           destructive
                         />
@@ -199,7 +201,7 @@ export function StrategyCommentsPanel({
         submitting={submitting}
         enterHeldBy={mentionOpen}
         sendShortcut={sendShortcut}
-        placeholder={`Comment on ${strategyName}…`}
+        placeholder={t('Comment on {name}…', { name: strategyName })}
         onKeyDown={(e) => {
           // Escape drops the mention list first; a second one is the
           // surrounding page's to handle.

@@ -7,7 +7,7 @@ import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
 import { MenuShell } from '@/Function/shared/menu';
 import { DatePopover } from '@/Function/shared/date';
-import { EmptyState } from '@/Function/shared/EmptyState';
+import { QuietEmpty } from '@/ActivitySpace/strategy/QuietEmpty';
 import { QuickCreatePopup } from '@/Function/shared/QuickCreatePopup';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { PageHead, PageLayout, PageSection } from '@/Function/shared/PageHead';
@@ -62,9 +62,7 @@ export function VisionView({ visionId, createRequested, onCreateHandled, onSelec
       </div>
       <div className="flex-1 overflow-y-auto">
         {loading || role.isPending ? null : !vision ? (
-          <EmptyState icon={NavVisionIcon} title={t('Add a Vision')}
-            description={t('A Vision says what this Space aims for. Portfolios and Initiatives hang under it, the way Objects and Elements hang under a Domain.')}
-            hint={t('A Space can hold several Visions.')}
+          <QuietEmpty text={t('A Vision says what this Space aims for. Portfolios and Initiatives hang under it, the way Objects and Elements hang under a Domain.')}
             cta={t('Create Vision')} onCta={() => setLocalNew(true)} />
         ) : (
           <VisionPage key={vision.id} vision={vision} canEdit={canEdit} onOpenPortfolio={onOpenPortfolio} onSelectStrategy={onSelectStrategy} />
@@ -159,7 +157,7 @@ function VisionPage({ vision, canEdit, onOpenPortfolio, onSelectStrategy }: {
           emptyDescription={t('No statement yet.')}
           onSaveTitle={(v) => save({ name: v })} onSaveDescription={(v) => save({ statement: v || null })} />
         <div className="mt-2 h-4 text-[11px] text-muted-foreground" role="status">
-          {state === 'saving' ? t('Saving…') : state === 'saved' ? t('Saved') : state === 'error' ? `${t("Couldn't save")}: ${error}` : ''}
+          {state === 'saving' ? t('Saving…') : state === 'saved' ? t('Saved') : state === 'error' ? t("Couldn't save: {error}", { error: error ?? '' }) : ''}
         </div>
       </div>
 

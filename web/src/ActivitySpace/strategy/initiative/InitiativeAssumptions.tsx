@@ -14,7 +14,8 @@ import {
 import type { IntentBinding, Worker } from '@/types/database';
 import { useCrm } from '@/hooks/useCrm';
 import type { CrmDeal } from '@/ActivitySpace/sustainment/crm/crmModel';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
+import { translate, useI18n } from '@/Function/i18n/I18nProvider';
 import { STATUS } from '@/shared/designTokens';
 import { MenuShell } from '@/Function/shared/menu';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
@@ -88,6 +89,7 @@ export function InitiativeAssumptions({
   onOpenObject?: (objectId: string, domainId: string | null) => void;
 }) {
   const { initiativeId, data, error, refetch, ensureRoot, scope, scopeError } = initiative;
+  const { t } = useI18n();
 
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const [failure, setFailure] = useState<string | null>(null);
@@ -209,7 +211,7 @@ export function InitiativeAssumptions({
       statementRef.current?.focus();
     } catch (e) {
       console.error('record assumption failed:', e);
-      setFailure('Could not record the assumption. Nothing was saved.');
+      setFailure(t('Could not record the assumption. Nothing was saved.'));
     } finally {
       setSaving(false);
     }
@@ -228,7 +230,7 @@ export function InitiativeAssumptions({
         next.delete(id);
         return next;
       });
-      setFailure('Could not delete the assumption. It is still recorded.');
+      setFailure(t('Could not delete the assumption. It is still recorded.'));
     }
   }
 
@@ -247,10 +249,10 @@ export function InitiativeAssumptions({
       console.error('bind assumption to target failed:', e);
       setFailure(
         target.type === 'worker'
-          ? 'Could not watch that Worker. Nothing was linked.'
+          ? t('Could not watch that Worker. Nothing was linked.')
           : target.type === 'deal'
-            ? 'Could not watch that deal. Nothing was linked.'
-            : 'Could not watch that Element. Nothing was linked.',
+            ? t('Could not watch that deal. Nothing was linked.')
+            : t('Could not watch that Element. Nothing was linked.'),
       );
     }
   }
@@ -272,7 +274,7 @@ export function InitiativeAssumptions({
         next.delete(bindingId);
         return next;
       });
-      setFailure('Could not unlink that. It is still watched.');
+      setFailure(t('Could not unlink that. It is still watched.'));
     }
   }
 
@@ -284,7 +286,7 @@ export function InitiativeAssumptions({
         <div className="flex items-center gap-2">
           {shakenCount > 0 && (
             <span className="text-[11px] text-[var(--status-warning)] tabular-nums">
-              {shakenCount} shaken
+              {t('{n} shaken', { n: shakenCount })}
             </span>
           )}
           {/* Held until the fetch lands, for the same reason the decisions
@@ -292,7 +294,7 @@ export function InitiativeAssumptions({
               has none, and that is not known yet. */}
           <button
             type="button"
-            aria-label="Record an assumption"
+            aria-label={t('Record an assumption')}
             disabled={!data || !initiative.canEdit}
             title={initiative.lockReason ?? undefined}
             onClick={() => {
@@ -310,14 +312,13 @@ export function InitiativeAssumptions({
 
       {error ? (
         <p className="text-[12px] text-[var(--status-danger)] py-1">
-          Could not read this Initiative&apos;s assumptions.
+          {t("Could not read this Initiative's assumptions.")}
         </p>
       ) : !data ? (
-        <p className="text-[12px] text-muted-foreground/50 py-1">Reading the record…</p>
+        <p className="text-[12px] text-muted-foreground/50 py-1">{t('Reading the record…')}</p>
       ) : assumptions.length === 0 ? (
         <p className="text-[12px] text-muted-foreground/50 py-1">
-          Nothing written down as assumed — name what this Initiative is standing on, and the
-          Elements that would tell you it stopped being true.
+          {t('Nothing written down as assumed — name what this Initiative is standing on, and the Elements that would tell you it stopped being true.')}
         </p>
       ) : (
         <div className="flex flex-col">
@@ -393,7 +394,7 @@ function toWatch(binding: IntentBinding, element: WatchSource | undefined): Watc
       bindingId: binding.id,
       elementId: binding.target_id,
       displayId: null,
-      title: 'Element outside this Initiative',
+      title: translate('Element outside this Initiative'),
       status: null,
       dueDate: null,
       objectId: null,
@@ -430,7 +431,7 @@ interface WatchSource {
 function toDealWatch(binding: IntentBinding, byDeal: ReadonlyMap<string, CrmDeal>, read: DealWatchInput['read']): DealWatchInput {
   const bound = byDeal.get(binding.target_id);
   if (!bound) {
-    const label = read === 'loading' ? 'Reading the deal…' : read === 'failed' ? 'Could not read the CRM' : 'Deal you cannot see';
+    const label = read === 'loading' ? translate('Reading the deal…') : read === 'failed' ? translate('Could not read the CRM') : translate('Deal you cannot see');
     return { bindingId: binding.id, dealId: binding.target_id, label, read: read === 'ok' ? 'hidden' : read, outcome: null, atRisk: false, closeDate: null, renewalOverdue: false };
   }
   let deal = bound;
@@ -459,7 +460,7 @@ function toWorkerWatch(
     return {
       bindingId: binding.id,
       workerId: binding.target_id,
-      name: 'Worker off this roster',
+      name: translate('Worker off this roster'),
       role: null,
       worker: null,
       spans: [],
@@ -507,10 +508,11 @@ function AssumptionRow({
   onUnwatch: (bindingId: string) => void;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
 }) {
+  const { t } = useI18n();
   const noted = formatElementDate(assumption.notedAt);
 
   return (
-    <div className="py-2 border-b border-border/40 last:border-b-0">
+    <div className="group -mx-2 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
       <div className="flex items-center gap-2">
         <span
           className="size-1.5 rounded-full shrink-0"
@@ -530,14 +532,15 @@ function AssumptionRow({
             {shakenLabel(assumption)}
           </span>
         )}
+        <ButtonAppearanceProvider appearance="navigation">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="icon-xs"
               disabled={!canEdit}
-              aria-label={`Options for ${assumption.title}`}
-              className="shrink-0"
+              aria-label={t('Options for {title}', { title: assumption.title })}
+              className="shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
             >
               <MoreHorizontal size={14} />
             </Button>
@@ -547,10 +550,11 @@ function AssumptionRow({
               onClick={onDelete}
               className="text-[var(--status-danger)] focus:text-[var(--status-danger)]"
             >
-              Delete assumption
+              {t('Delete assumption')}
             </DropdownMenuItem>
           </MenuShell>
         </DropdownMenu>
+        </ButtonAppearanceProvider>
       </div>
 
       {/* Kept visible when empty, the same way the decisions row keeps its cost
@@ -558,21 +562,21 @@ function AssumptionRow({
       <p className="text-[12px] text-muted-foreground pl-3.5 mt-0.5">
         {assumption.cost ? (
           <>
-            <span className="text-[var(--text-tertiary)]">Costs </span>
+            <span className="text-[var(--text-tertiary)]">{t('Costs')} </span>
             {assumption.cost}
           </>
         ) : (
-          <span className="text-muted-foreground/50">Nothing recorded as at stake</span>
+          <span className="text-muted-foreground/50">{t('Nothing recorded as at stake')}</span>
         )}
       </p>
 
       {(assumption.notedBy || noted) && (
         <p className="text-[11px] text-muted-foreground/70 pl-3.5 mt-0.5">
-          {[assumption.notedBy, noted ? `noted ${noted}` : null].filter(Boolean).join(' · ')}
+          {[assumption.notedBy, noted ? t('noted {date}', { date: noted }) : null].filter(Boolean).join(' · ')}
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-1 pl-3.5 mt-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-3.5 mt-1">
         {assumption.watches.map((w) => (
           <BoundTarget
             key={w.bindingId}
@@ -610,19 +614,19 @@ function AssumptionRow({
             type="deal"
             label={d.label}
             hint={null}
-            signal={d.trouble ? { text: DEAL_TROUBLE[d.trouble], tone: d.trouble === 'lost' || d.trouble === 'renewal overdue' ? 'text-[var(--status-danger)]' : 'text-[var(--status-warning)]' } : null}
+            signal={d.trouble ? { text: t(DEAL_TROUBLE[d.trouble]), tone: d.trouble === 'lost' || d.trouble === 'renewal overdue' ? 'text-[var(--status-danger)]' : 'text-[var(--status-warning)]' } : null}
             onRemove={canEdit ? () => onUnwatch(d.bindingId) : undefined}
           />
         ))}
         {canEdit && (
           <IntentTargetPicker
-            label={assumption.unwatched ? 'Watch an Element, Worker or deal' : 'Watch another'}
+            label={assumption.unwatched ? t('Watch an Element, Worker or deal') : t('Watch another')}
             targets={candidates}
             onPick={onWatch}
             empty={
               scopeError
-                ? 'Could not read this Initiative’s Elements.'
-                : 'Nothing left to watch — link Objects with work in them, add Workers, or add deals in the CRM.'
+                ? t("Could not read this Initiative's Elements.")
+                : t('Nothing left to watch — link Objects with work in them, add Workers, or add deals in the CRM.')
             }
           />
         )}
@@ -633,7 +637,7 @@ function AssumptionRow({
           empty row, for the same reason a decision with no review date says so. */}
       {assumption.unwatched && (
         <p className="text-[11px] text-muted-foreground/50 pl-3.5 mt-0.5">
-          Nothing is watching this — it cannot tell you when it stops being true.
+          {t('Nothing is watching this — it cannot tell you when it stops being true.')}
         </p>
       )}
     </div>
@@ -669,7 +673,7 @@ function workerSignalOf(
   return {
     text,
     tone: watch.awayIn === 0 ? 'text-[var(--status-danger)]' : 'text-[var(--status-warning)]',
-    title: `${watch.name} has no hours on ${watch.awayDays} of the next ${ABSENCE_WINDOW_DAYS} days`,
+    title: translate('{name} has no hours on {away} of the next {window} days', { name: watch.name, away: watch.awayDays, window: ABSENCE_WINDOW_DAYS }),
   };
 }
 
@@ -700,6 +704,7 @@ function Composer({
   onSubmit: () => void;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   // Escape closes and nothing else. The draft is the parent's, so reopening
   // hands back what was typed instead of eating it.
   const escape = (e: React.KeyboardEvent) => {
@@ -711,7 +716,7 @@ function Composer({
 
   return (
     <div
-      className="rounded-lg border border-border/60 bg-card p-3 space-y-2 mt-2"
+      className="mt-2 space-y-2 py-1"
       onKeyDown={escape}
     >
       <textarea
@@ -720,29 +725,29 @@ function Composer({
         rows={1}
         autoFocus
         onChange={(e) => onStatement(e.target.value)}
-        placeholder="What this Initiative is taking as true"
+        placeholder={t('What this Initiative is taking as true')}
         className={`${FIELD} text-[13px] leading-relaxed resize-none`}
       />
       <textarea
         value={cost}
         rows={1}
         onChange={(e) => onCost(e.target.value)}
-        placeholder="What it costs if it stops being true"
+        placeholder={t('What it costs if it stops being true')}
         className={`${FIELD} text-[13px] leading-relaxed resize-none`}
       />
       <input
         value={notedBy}
         onChange={(e) => onNotedBy(e.target.value)}
-        placeholder="Noted by"
+        placeholder={t('Noted by')}
         className={`${FIELD} text-[12px]`}
       />
       <div className="flex items-center justify-end gap-2">
-        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
+        <Button variant="ghost" size="sm" onClick={onClose}>
           <X size={14} />
-          Cancel
+          {t('Cancel')}
         </Button>
         <Button variant="primary" size="sm" disabled={!statement.trim() || saving} onClick={onSubmit}>
-          {saving ? 'Recording…' : 'Record'}
+          {saving ? t('Recording…') : t('Record')}
         </Button>
       </div>
     </div>

@@ -41,3 +41,27 @@ export function fieldValueText(value: Json, options: CustomColumnOptions = {}): 
   };
   return Array.isArray(value) ? value.map((v) => label(String(v))).join(', ') : value == null ? '' : label(String(value));
 }
+
+/** English words that mean something else elsewhere in the product ("Lead" is
+ *  a CRM lead, "Title" a job title) are translated through a context key; in
+ *  English, or when the key has no translation, the plain label stays. */
+const FIELD_CONTEXT_KEYS: Record<string, string> = {
+  lead: 'Lead (Object owner)',
+  title: 'Title (Element name)',
+};
+
+/** Display name of a field: a Property keeps the name its author gave it; a
+ *  built-in field's English label is translated. */
+export function fieldDisplayLabel(
+  t: (message: string) => string,
+  field: { id: string; label: string; kind?: string },
+): string {
+  if (field.kind === 'custom') return field.label;
+  const contextKey = FIELD_CONTEXT_KEYS[field.id];
+  if (contextKey) {
+    const translated = t(contextKey);
+    if (translated !== contextKey) return translated;
+    return field.label;
+  }
+  return t(field.label);
+}

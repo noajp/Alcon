@@ -136,6 +136,10 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   'Deleted Elements': ['削除した Element', '삭제된 Element', 'Elements supprimés', 'Elements eliminados'],
   'Add personal Element': ['個人の Element を追加', '개인 Element 추가', 'Ajouter un Element personnel', 'Añadir un Element personal'],
 
+  // ── Tool pages ────────────────────────────────────────────────
+  'Delete this record?': ['この記録を削除しますか？', '이 기록을 삭제할까요?', 'Supprimer cet enregistrement ?', '¿Eliminar este registro?'],
+  'Change scope': ['範囲を切り替える', '범위 변경', 'Changer de périmètre', 'Cambiar el ámbito'],
+
   // ── Calendar ──────────────────────────────────────────────────
   'All day': ['終日', '종일', 'Toute la journée', 'Todo el día'],
 

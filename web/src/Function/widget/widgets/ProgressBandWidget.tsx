@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import type { WidgetHost } from '../types';
 import { completionOf, isOpenStatus } from '@/Function/shared/completion';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /**
  * The band. One line above everything else: how much of this subject is done,
@@ -14,6 +15,7 @@ import { completionOf, isOpenStatus } from '@/Function/shared/completion';
  * without knowing which of those it is looking at.
  */
 export function ProgressBandWidget({ host }: { host: WidgetHost }) {
+  const { t } = useI18n();
   const stats = useMemo(() => {
     const { done, total, pct } = completionOf(host.elements);
     const inProgress = host.elements.filter((e) => e.status === 'in_progress').length;
@@ -29,9 +31,9 @@ export function ProgressBandWidget({ host }: { host: WidgetHost }) {
       <SegmentedProgress value={stats.pct} className="flex-1 min-w-0" />
       <span className="shrink-0 text-[11px] tabular-nums text-foreground/80">{stats.pct}%</span>
       <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-        {stats.done}/{stats.total} done
-        {stats.inProgress > 0 && <span className="ml-1.5 text-[var(--status-warning)]">· {stats.inProgress} active</span>}
-        {stats.overdue > 0 && <span className="ml-1.5 text-[var(--status-danger)]">· {stats.overdue} overdue</span>}
+        {t('{done}/{total} done', { done: stats.done, total: stats.total })}
+        {stats.inProgress > 0 && <span className="ml-1.5">· {t('{n} active', { n: stats.inProgress })}</span>}
+        {stats.overdue > 0 && <span className="ml-1.5 text-[var(--status-danger)]">· {t('{n} overdue', { n: stats.overdue })}</span>}
       </span>
     </div>
   );

@@ -5,6 +5,7 @@ import { Check } from 'lucide-react';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { displayIdOf } from './displayId';
 import { DisplayIdChip } from './DisplayIdChip';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface SubelementRowProps {
   subelement: {
@@ -37,6 +38,7 @@ export function SubelementRow({
   subelement, onRefresh, onOpen,
   canRowSelect = false, isSelected = false, hasSelectionRef, onRowSelect,
 }: SubelementRowProps) {
+  const { t } = useI18n();
   const subId = displayIdOf(subelement);
 
   const handleToggle = async (e: React.MouseEvent) => {
@@ -77,7 +79,7 @@ export function SubelementRow({
       {canRowSelect && (
         <button
           type="button"
-          aria-label={isSelected ? 'Deselect sub-element' : 'Select sub-element'}
+          aria-label={isSelected ? t('Deselect sub-element') : t('Select sub-element')}
           onMouseDown={(e) => e.preventDefault()}
           onClick={(e) => { e.stopPropagation(); onRowSelect?.(subelement.id, e.shiftKey ? 'range' : 'single'); }}
           className={`size-4 rounded-[5px] border flex items-center justify-center shrink-0 transition-opacity ${
@@ -99,7 +101,7 @@ export function SubelementRow({
         type="button"
         onClick={handleToggle}
         onMouseDown={(e) => e.preventDefault()}
-        aria-label={subelement.is_completed ? 'Mark as todo' : 'Mark as done'}
+        aria-label={subelement.is_completed ? t('Mark as todo') : t('Mark as done')}
         className="shrink-0 flex items-center rounded-full transition-opacity hover:opacity-80"
       >
         <ElementProgressMark status={subelement.is_completed ? 'done' : 'todo'} size={16} />

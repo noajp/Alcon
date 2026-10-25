@@ -49,7 +49,8 @@ import { PopoverContent } from '@/ui/popover';
  * its full-width trigger without asking for the trigger width by name.
  *
  * `wide` (288px) is only for panels with label + right-aligned control rows —
- * Display's Grouping/Ordering selects and Filter's date range. Nothing else.
+ * Display's Grouping/Ordering selects and Filter's date range — and for the
+ * widget picker, whose rows carry a name and a one-line description.
  */
 export const MENU_WIDTH = {
   standard: 'w-56',

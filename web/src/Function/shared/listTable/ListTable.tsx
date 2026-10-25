@@ -19,6 +19,7 @@ import { ElementRow } from './ElementRow';
 import { useUniformIdWidth } from './useUniformIdWidth';
 import { ObjectRow } from './ObjectRow';
 import { ColumnHeader, ResizeHandle, ColumnMenu } from './ColumnHeaderMenu';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // Build a type-scoped, pointer-first collision detector. Two reasons it's
 // custom:
@@ -190,6 +191,7 @@ export function ListTable({
   selectedObjectIds,
   onObjectRowSelect,
 }: ListTableProps) {
+  const { t } = useI18n();
   const dndId = useId();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   // The id column takes the width of the widest id drawn, so the status mark
@@ -506,7 +508,7 @@ export function ListTable({
             <th className="sticky top-0 left-0 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
             <th className="sticky top-0 left-7 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
             <th className="sticky top-0 md:left-14 z-30 relative pl-0.5 pr-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card border-b border-border/60">
-              Name
+              {t('Name')}
               {/* Name is resizable too — same handle as the data columns,
                   persisted under NAME_COL_KEY. Fixed on the Object list
                   instead (see the colgroup above), so no handle there. */}
@@ -548,8 +550,8 @@ export function ListTable({
                   <button
                     type="button"
                     onClick={(e) => onAddColumn(e.currentTarget.getBoundingClientRect())}
-                    title="Add field"
-                    aria-label="Add field"
+                    title={t('Add field')}
+                    aria-label={t('Add field')}
                     className="w-6 h-6 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
                   >
                     <Plus size={14} />
@@ -586,7 +588,7 @@ export function ListTable({
                         type="button"
                         onClick={(e) => { e.stopPropagation(); toggle(section.id); }}
                         className="w-full min-h-[2.625rem] flex items-center justify-center bg-muted/70 group-hover:bg-muted rounded-l-lg text-muted-foreground hover:text-foreground transition-colors"
-                        aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+                        aria-label={isCollapsed ? t('Expand') : t('Collapse')}
                       >
                         <ChevronDown
                           size={12}
@@ -599,7 +601,7 @@ export function ListTable({
                         type="button"
                         onClick={() => toggle(section.id)}
                       className="w-full min-h-[2.625rem] flex items-center min-w-0 pr-1 py-1.5 bg-muted/70 group-hover:bg-muted rounded-r-lg transition-colors text-left"
-                        aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+                        aria-label={isCollapsed ? t('Expand') : t('Collapse')}
                       >
                         {/* Icon slot — same w-7 cell width as the row's ○
                             mark below, so section icons line up vertically
@@ -627,8 +629,8 @@ export function ListTable({
                               }
                             }}
                             className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                            title={`Add element to ${section.name}`}
-                            aria-label={`Add element to ${section.name}`}
+                            title={t('Add Element to {name}', { name: section.name })}
+                            aria-label={t('Add Element to {name}', { name: section.name })}
                           >
                             <Plus size={14} />
                           </span>
@@ -723,7 +725,7 @@ export function ListTable({
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0">
                       <div className="flex items-center min-w-0 min-h-[1.625rem] text-muted-foreground">
                         <span className="text-[13px] group-hover:text-foreground transition-colors">
-                          Add Object
+                          {t('Add Object')}
                         </span>
                       </div>
                     </td>

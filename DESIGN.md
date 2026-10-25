@@ -54,7 +54,7 @@ Object・Domain・Element・Initiative等の作成は、入口を無彩色、確
 
 製品の固定UIラベル・入力例・候補ボタンは `Function/i18n` の辞書を通し、選択された言語で一貫して表示する。未翻訳の文言は英語へフォールバックする。ユーザーが入力した内容や生成を依頼したアプリの言語は保持する。画面に英語リテラルを直接書かず、必ず `t()` を通す。
 
-製品の概念名（Strategy / Execution / Sustainment、Initiatives / Phase / Timeline、Domain / Objects / Elements、Inbox / Calendar / Notebook / Table / People / Team / Workload / CRM、Profile）は固有名詞として扱い、どの言語でも英語表記のまま出す。これはコードで固定するのではなく、各言語の辞書でその語を自分自身に写して実現する（`'Timeline': 'Timeline'`）。概念名を含む文も同じ（`'Open Calendar': 'Calendar を開く'`）。日付・曜日は `toLocaleDateString(locale)` で設定言語に従う。画面に出る文言は、見出し・空の状態・プレースホルダー・`aria-label` まで `t()` を通し、英語を直書きしない。値を含む文は1つのキーに `{n}` などで埋め込み、語順を言語ごとに変えられるようにする。ウィジェットの名前と説明は全言語の訳を持つ（`tests/widgetI18n.test.ts`）。
+製品の概念名（Strategy / Execution / Sustainment、Initiatives / Phase / Timeline、Domain / Objects / Elements、Inbox / Calendar / Notebook / Table / People / Team / Workload / CRM、Profile）は固有名詞として扱い、どの言語でも英語表記のまま出す。これはコードで固定するのではなく、各言語の辞書でその語を自分自身に写して実現する（`'Timeline': 'Timeline'`）。概念名を含む文も同じ（`'Open Calendar': 'Calendar を開く'`）。日付・曜日は `toLocaleDateString(locale)` で設定言語に従う。画面に出る文言は、見出し・空の状態・プレースホルダー・`aria-label` まで `t()` を通し、英語を直書きしない。値を含む文は1つのキーに `{n}` などで埋め込み、語順を言語ごとに変えられるようにする。`t()` / `translate()` に文字列で渡したメッセージは、すべて ja・ko・fr・es の訳を持つ（`tests/i18nCoverage.test.ts`）。ウィジェットの名前と説明も同じ（`tests/widgetI18n.test.ts`）。訳は領域ごとの辞書（`Function/i18n/*Messages.ts` など）に置き、同じ英語に別の訳を付けない。意味が違うときは英語のキーを言い換える（例：CRM の Lead と Object の責任者）。
 
 サイドバーの一覧（Domain・Strategy・Notebook・Table・CRM・Settings）は、すべて共通の `SidebarRow` で作る。行ごとに見た目を書かない。行全体がホバーと選択の対象で、選択中は `bg-sidebar-accent` と `text-foreground`、非選択は `text-muted-foreground`、ホバーとキーボードフォーカスでは `bg-sidebar-accent/50` と `text-foreground` にする。行の右端の操作（折りたたみの矢印、「…」）は `SidebarRowAction` とし、背景を持たず記号だけを濃くするので、ハイライトは行の端まで切れずにつながる。行は左から 16px のアイコン枠・名前・件数などの補足・右端の操作の順に並べ、通常は 32px、入れ子の行は 24px。一覧の見出しは `SidebarSectionLabel`。
 
@@ -68,7 +68,7 @@ Sustainment の道具（CRM）のサイドバーは共通の `ToolSidebar`（`Fu
 
 コメントのスレッドは作業の記録であってチャットではない。吹き出し・背景・左右の振り分けを使わず、全員のコメントを同じ左端に揃える。アバター20px・名前・経過時間を1行に並べ、本文は13pxで名前の位置から始める。コメント同士は余白で分ける。
 
-一覧のセルで値が未設定なら何も表示せず、行にホバーしたときだけ薄いダッシュを出す。スクリーンリーダー向けには "Empty" を残す（`EmptyCellMark`）。未設定を色や「Set type」のような語で示さない。一覧の Name 列は、利用者が幅を変えるまでは残りの幅をすべて使い、データ列は右に詰めて並べる。列見出しの区切り線は常には出さず、リサイズの線はホバー中だけ出す。Board のカードでは、未設定の日付・優先度はカードにホバーしたとき、またはカード内にキーボードフォーカスがあるときだけ出す。列見出しの操作メニューも、ホバー・フォーカス・展開中だけ表示する。何も表示するものがない派生ウィジェット（Milestones など）は `useWidgetEmpty` で隠し、空の箱に説明文を入れて残さない。
+一覧のセルで値が未設定なら何も表示せず、行にホバーしたときだけ薄いダッシュを出す。スクリーンリーダー向けには "Empty" を残す（`EmptyCellMark`）。未設定を色や「Set type」のような語で示さない。一覧の Name 列は、利用者が幅を変えるまでは残りの幅をすべて使い、データ列は右に詰めて並べる。列見出しの区切り線は常には出さず、リサイズの線はホバー中だけ出す。Board のカードでは、未設定の日付・優先度はカードにホバーしたとき、またはカード内にキーボードフォーカスがあるときだけ出す。列見出しの操作メニューも、ホバー・フォーカス・展開中だけ表示する。何も表示するものがない派生ウィジェット（Milestones など）は `useWidgetEmpty` で隠し、空の箱に説明文を入れて残さない。一覧が空のときの表示（`EmptyState`）は、概念のアイコン・見出し・1〜2文・「+ 動詞」だけにし、箱入りのイラストや青い主ボタンを置かない。
 
 AIへの指示欄など独立したフォーム入力は角丸長方形とし、ボタン・タブと同じ1pxの薄枠（`--border-default`）で入力範囲を示す。Chatの入力など既に枠のあるコンポーザーやインライン編集では枠を重ねない。入力と実行操作を一組で扱う場合は共通の `TextComposer` を使う。枠内に入力領域とフッターを配置し、補足は左下、主要操作は右下。テキストとボタンは重ねず、内側の入力に枠を重ねない。入力にリングは付けない。フォーカスは背景の変化で示す。色はテーマのトークンから取得し、dark/light両方で確認する。
 

@@ -24,6 +24,8 @@ import { CardAgentControl } from '../agent';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { ActivitySignal } from '../ActivitySignal';
 import { isCancelKey, isCommitEnter, isSubmitChord } from '@/Function/shared/keyboard';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { PRIORITY } from '@/shared/designTokens';
 
 // A card title reads at most three lines — beyond that it ellipsises, and the
 // inline rename box grows to the same three lines before it scrolls. Both
@@ -37,7 +39,7 @@ const COLUMNS: { status: ElementStatus; label: string }[] = [
   { status: 'backlog', label: 'Backlog' },
   { status: 'todo', label: 'To Do' },
   { status: 'in_progress', label: 'In Progress' },
-  { status: 'review', label: 'Review' },
+  { status: 'review', label: 'In Review' },
   { status: 'done', label: 'Done' },
   { status: 'blocked', label: 'Blocked' },
   { status: 'cancelled', label: 'Cancelled' },
@@ -52,6 +54,7 @@ interface ElementCardProps {
 }
 
 function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
+  const { t } = useI18n();
   // Who can be assigned to THIS Element, read when the assignee menu opens;
   // the people already on it stay listed so they can be removed.
   const [assigneeMenuOpen, setAssigneeMenuOpen] = useState(false);
@@ -168,7 +171,7 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
         ) : (
           <p
             className="text-[13px] font-medium text-foreground leading-5 -mx-1 px-1 rounded cursor-text hover:bg-muted/30 transition-colors line-clamp-3 break-words"
-            title="Click to rename"
+            title={t('Click to rename')}
             onPointerDown={stop}
             onClick={(e) => { stop(e); setEditingTitle(true); }}
           >
@@ -193,7 +196,7 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
                   )}
                 >
                   <Calendar className="h-3 w-3" />
-                  {dueDate ? formatElementDate(dueDate) : 'Date'}
+                  {dueDate ? formatElementDate(dueDate) : t('Date')}
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0 rounded-xl" align="start" onPointerDown={stop}>
@@ -221,10 +224,10 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
                   {priority ? (
                     <>
                       <PriorityMark priority={priority} />
-                      <span>{priority.charAt(0).toUpperCase() + priority.slice(1)}</span>
+                      <span>{t(PRIORITY[priority]?.label ?? priority)}</span>
                     </>
                   ) : (
-                    <span>Priority</span>
+                    <span>{t('Priority')}</span>
                   )}
                 </button>
               </DropdownMenuTrigger>
@@ -232,7 +235,7 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
                 {PRIORITY_OPTIONS.map((p) => (
                   <DropdownMenuItem key={p} onClick={() => savePriority(p)} className="gap-2 text-[13px]">
                     <PriorityMark priority={p} />
-                    <span className="flex-1">{p.charAt(0).toUpperCase() + p.slice(1)}</span>
+                    <span className="flex-1">{t(PRIORITY[p as keyof typeof PRIORITY]?.label ?? p)}</span>
                     {priority === p && <Check size={12} className="text-muted-foreground" />}
                   </DropdownMenuItem>
                 ))}
@@ -240,7 +243,7 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => savePriority(null)} className="text-[12px] text-muted-foreground">
-                      Clear
+                      {t('Clear')}
                     </DropdownMenuItem>
                   </>
                 )}
@@ -261,8 +264,8 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
                   type="button"
                   onPointerDown={stop}
                   onClick={stop}
-                  title="Assignee"
-                  aria-label={workerTriggerLabel('Assignee', assignee)}
+                  title={t('Assignee')}
+                  aria-label={workerTriggerLabel(t('Assignee'), assignee)}
                   className="inline-flex items-center justify-center rounded-full transition-shadow hover:ring-2 hover:ring-border/60"
                 >
                   {assignee ? (
@@ -306,6 +309,7 @@ interface ElementBoardViewProps {
 }
 
 export function ElementBoardView({ elements, loading = false, onRefresh, objectId, onElementClick }: ElementBoardViewProps) {
+  const { t } = useI18n();
   const [items, setItems] = useState<ElementWithDetails[]>(elements);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // One aggregated fetch for the whole board, hung on the Elements the same
@@ -373,7 +377,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
             <div className="flex items-center justify-between px-3 py-2.5">
               <div className="flex items-center gap-2">
                 <ElementProgressMark status={col.status} size={16} />
-                <span className="text-sm font-medium">{col.label}</span>
+                <span className="text-sm font-medium">{t(col.label)}</span>
                 <span className="text-xs text-muted-foreground">{colItems.length}</span>
               </div>
               <Button variant="ghost" size="icon-xs"
@@ -381,7 +385,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
                 onClick={async () => {
                   try {
                     await createElement({
-                      title: 'Untitled',
+                      title: t('Untitled'),
                       status: col.status,
                       object_id: objectId ?? null,
                     });
@@ -390,8 +394,8 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
                     console.error('Failed to create element', err);
                   }
                 }}
-                title={`Add Element to ${col.label}`}
-                aria-label={`Add Element to ${col.label}`}
+                title={t('Add Element to {column}', { column: t(col.label) })}
+                aria-label={t('Add Element to {column}', { column: t(col.label) })}
               >
                 <Plus className="h-3.5 w-3.5" />
               </Button>

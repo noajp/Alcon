@@ -7,6 +7,7 @@ import type { CustomColumn, CustomColumnType } from '@/types/database';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR } from '@/Function/shared/menu';
 import { COLUMN_TYPES, BUILTIN_COLUMN_ICONS } from './columnTypes';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // Compact "add property" menu — shared by the Element/Object detail rail
 // (AddPropertyButton, a popover) and the list column picker (AddColumnModal).
@@ -51,6 +52,7 @@ export function AddPropertyMenu({
   deletedBuiltInColumns,
   onRestoreBuiltIn,
 }: AddPropertyMenuProps) {
+  const { t: tr } = useI18n();
   const [name, setName] = useState('');
   const [toLibrary, setToLibrary] = useState(false);
 
@@ -62,7 +64,7 @@ export function AddPropertyMenu({
   const library = libraryColumns ?? [];
 
   const create = (type: CustomColumnType) => {
-    const label = COLUMN_TYPES.find((t) => t.type === type)?.label ?? 'Field';
+    const label = tr(COLUMN_TYPES.find((t) => t.type === type)?.label ?? 'Field');
     onAdd(name.trim() || label, type, toLibrary ? { toLibrary: true } : undefined);
     setName('');
     onClose?.();
@@ -75,7 +77,7 @@ export function AddPropertyMenu({
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Property name…"
+        placeholder={tr('Property name…')}
         autoFocus
         className="w-full px-2 py-1 text-[13px] bg-muted/40 rounded-md border-none placeholder:text-muted-foreground/60"
       />
@@ -85,7 +87,7 @@ export function AddPropertyMenu({
       <div className="mt-1 max-h-72 overflow-y-auto overflow-x-hidden">
         {restorable.length > 0 && (
           <>
-            <MenuSectionLabel>Restore default property</MenuSectionLabel>
+            <MenuSectionLabel>{tr('Restore default property')}</MenuSectionLabel>
             {restorable.map((col) => (
               <button
                 key={col.id}
@@ -96,8 +98,8 @@ export function AddPropertyMenu({
                 <span className="text-muted-foreground shrink-0 [&_svg]:w-3.5 [&_svg]:h-3.5">
                   {BUILTIN_COLUMN_ICONS[col.builtinType]}
                 </span>
-                <span className="truncate flex-1">{col.name}</span>
-                <span className="text-[10px] text-muted-foreground/70 shrink-0">Built-in</span>
+                <span className="truncate flex-1">{tr(col.name)}</span>
+                <span className="text-[10px] text-muted-foreground/70 shrink-0">{tr('Built-in')}</span>
               </button>
             ))}
             <div className={`${MENU_SEPARATOR} mx-0`} />
@@ -105,7 +107,7 @@ export function AddPropertyMenu({
         )}
         {library.length > 0 && onAddExisting && (
           <>
-            <MenuSectionLabel>From library</MenuSectionLabel>
+            <MenuSectionLabel>{tr('From library')}</MenuSectionLabel>
             {library.map((col) => (
               <button
                 key={col.id}
@@ -117,13 +119,13 @@ export function AddPropertyMenu({
                   {typeIcon(col.column_type)}
                 </span>
                 <span className="truncate flex-1">{col.name}</span>
-                <span className="text-[10px] text-muted-foreground/70 shrink-0">Library</span>
+                <span className="text-[10px] text-muted-foreground/70 shrink-0">{tr('Library')}</span>
               </button>
             ))}
             <div className={`${MENU_SEPARATOR} mx-0`} />
           </>
         )}
-        <MenuSectionLabel>Select type</MenuSectionLabel>
+        <MenuSectionLabel>{tr('Select type')}</MenuSectionLabel>
         {types.map((t) => (
           <button
             key={t.type}
@@ -132,7 +134,7 @@ export function AddPropertyMenu({
             className={MENU_ROW}
           >
             <span className="text-muted-foreground shrink-0 [&_svg]:w-3.5 [&_svg]:h-3.5">{t.icon}</span>
-            <span className="truncate flex-1">{t.label}</span>
+            <span className="truncate flex-1">{tr(t.label)}</span>
           </button>
         ))}
       </div>
@@ -153,7 +155,7 @@ export function AddPropertyMenu({
             >
               {toLibrary && <Check size={8} strokeWidth={3.5} />}
             </span>
-            Save to Space library
+            {tr('Save to Space library')}
           </button>
         </>
       )}
@@ -170,11 +172,12 @@ export function AddPropertyButton({
   onAdd: (name: string, type: CustomColumnType) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { t } = useI18n();
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" size="icon-xs" variant="ghost" aria-label="Add property" title="Add property">
+        <Button type="button" size="icon-xs" variant="ghost" aria-label={t('Add Property')} title={t('Add Property')}>
           <Plus size={13} strokeWidth={2.5} />
         </Button>
       </PopoverTrigger>

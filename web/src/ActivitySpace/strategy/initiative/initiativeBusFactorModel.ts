@@ -17,6 +17,7 @@
 // =============================================================
 
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
+import { translate } from '@/Function/i18n/I18nProvider';
 import { ABSENCE_WINDOW_DAYS } from '@/ActivitySpace/strategy/initiative/initiativeAssumptionModel';
 import {
   awayDayCount,
@@ -197,5 +198,7 @@ export function computeBusFactor(
  */
 export function holderAbsenceLabel(holder: SoleHolder): string | null {
   if (holder.awayIn === null) return null;
-  return holder.awayIn === 0 ? `Away ${holder.awayDays}d` : `Away in ${holder.awayIn}d`;
+  return holder.awayIn === 0
+    ? translate('Away {n}d', { n: holder.awayDays })
+    : translate('Away in {n}d', { n: holder.awayIn });
 }

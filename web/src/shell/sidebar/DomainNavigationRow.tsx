@@ -16,7 +16,7 @@ export function DomainNavigationRow({ name, mark, active, expanded, activeView, 
     <SidebarRow active={active && activeView === 'domain-overview'} icon={mark} label={name} title={name}
       onClick={onOpen} buttonProps={dragProps}
       actions={<>
-        <SidebarRowAction label={`${t(expanded ? 'Collapse' : 'Expand')} ${name}`} aria-expanded={expanded} onClick={onToggle}>
+        <SidebarRowAction label={t(expanded ? 'Collapse {name}' : 'Expand {name}', { name })} aria-expanded={expanded} onClick={onToggle}>
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </SidebarRowAction>
         {onSettings

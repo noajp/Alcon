@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { ArrowRight, CalendarClock, UserPlus, X } from 'lucide-react';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { CONTROL } from '@/shared/designTokens';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { fromDateOnlyString } from '@/Function/shared/dateUtils';
 import { PLAN_HORIZON_DAYS, proposalPrerequisites, type Plan, type PlanIssue, type Proposal } from './workloadRebalance';
@@ -110,19 +110,21 @@ export function WorkloadPlanPanel({
               : t('Read from every Worker’s hours, absences and deadlines over the next {n} days.', { n: PLAN_HORIZON_DAYS })}
           </p>
         </div>
-        <Button type="button" variant="ghost" size="icon-xs" onClick={onClose} aria-label={t('Close')}>
-          <X size={CONTROL.icon.xs} />
-        </Button>
+        <ButtonAppearanceProvider appearance="navigation">
+          <Button type="button" variant="ghost" size="icon-xs" onClick={onClose} aria-label={t('Close')}>
+            <X size={CONTROL.icon.xs} />
+          </Button>
+        </ButtonAppearanceProvider>
       </div>
 
       {plan && (
-        <div className="border-b border-border/60 px-4 py-3">
+        <div className="px-4 pb-1 pt-3">
           <div className="flex items-baseline gap-2 text-[12px]">
             <span className="text-muted-foreground">{t('Over capacity')}</span>
             <span className="flex-1" />
             <span className={`tabular-nums ${plan.overBefore > 0 ? 'text-[var(--status-danger)]' : 'text-foreground'}`}>{round1(plan.overBefore)}h</span>
             <ArrowRight size={12} className="text-muted-foreground" aria-label={t('after the plan')} />
-            <span className={`font-semibold tabular-nums ${plan.overAfter > 0 ? 'text-[var(--status-danger)]' : 'text-[var(--status-success)]'}`}>{round1(plan.overAfter)}h</span>
+            <span className={`font-semibold tabular-nums ${plan.overAfter > 0 ? 'text-[var(--status-danger)]' : 'text-foreground'}`}>{round1(plan.overAfter)}h</span>
           </div>
           {proposals.length > 0 && (
             <Button type="button" variant="primary" size="sm" className="mt-3 w-full" disabled={applyingAll || busy.size > 0}
@@ -242,7 +244,7 @@ function ProposalCard({ proposal: p, element, name, prerequisites, applying, loc
         {element?.title ?? t('Element')}
       </button>
       <div className="mt-0.5 flex items-start gap-1.5">
-        <Icon size={13} className={`mt-[1px] flex-shrink-0 ${warn ? 'text-[var(--status-warning)]' : 'text-[var(--accent-default)]'}`} aria-hidden="true" />
+        <Icon size={13} className={`mt-[1px] flex-shrink-0 ${warn ? 'text-[var(--status-warning)]' : 'text-muted-foreground'}`} aria-hidden="true" />
         <span className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-foreground">{headline}</span>
       </div>
       {detail && <p className={`mt-0.5 pl-[19px] text-[11px] leading-snug ${warn ? 'text-[var(--status-warning)]' : 'text-muted-foreground'}`}>{detail}</p>}
@@ -252,13 +254,13 @@ function ProposalCard({ proposal: p, element, name, prerequisites, applying, loc
         </p>
       )}
       {error && <p role="alert" className="mt-1 pl-[19px] text-[11px] text-[var(--status-danger)]">{error}</p>}
-      <div className="mt-1.5 flex items-center gap-1 pl-[19px]">
+      <div className="mt-1.5 flex items-center gap-1 pl-[19px]"><ButtonAppearanceProvider appearance="inline">
         <Button type="button" size="xs" variant="secondary" disabled={locked} onClick={onApply}
           title={prerequisites > 0 ? t('Applies the {n} earlier changes this one depends on first', { n: prerequisites }) : undefined}>
           {applying ? t('Applying…') : prerequisites > 0 ? t('Apply with {n} earlier', { n: prerequisites }) : t('Apply')}
         </Button>
         <Button type="button" size="xs" variant="ghost" disabled={locked} onClick={onDismiss}>{t('Dismiss')}</Button>
-      </div>
+      </ButtonAppearanceProvider></div>
     </li>
   );
 }
