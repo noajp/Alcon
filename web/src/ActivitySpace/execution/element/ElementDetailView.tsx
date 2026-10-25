@@ -91,7 +91,7 @@ import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
-import { Smile, FileText } from 'lucide-react';
+import { Smile, FileText, FolderInput, Trash2, RotateCcw } from 'lucide-react';
 import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NotePicker } from '@/ActivitySpace/sustainment/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/sustainment/notebook/LinkedNoteEmbed';
@@ -413,8 +413,11 @@ function ElementDetailBody({
     }
   }, [agent.isActive, onRefresh]);
 
-  // Activity log — element_activity rows (status ones written by the DB
-  // trigger, the rest by log() below) plus a synthetic "created" line.
+  // Activity log — element_activity rows plus a synthetic "created" line.
+  // Changes to the Element itself (status, title, description, priority,
+  // dates, estimate, people, moves) are written by database triggers; log()
+  // below records only what the database cannot see (direction, sub-elements,
+  // reactions, Notes).
   const { data: activityEntries } = useElementActivityLog(element.id);
   const activityLog = useMemo(
     () => mergeActivity(activityEntries ?? [], element),
@@ -494,15 +497,13 @@ function ElementDetailBody({
     if (draft.title.trim() && draft.title.trim() !== sent.title) patch.title = draft.title.trim();
     if (draft.description !== sent.description) patch.description = draft.description || null;
     if (!Object.keys(patch).length) return;
-    const { author: by, onRefresh: refresh } = closeRef.current;
+    const { onRefresh: refresh } = closeRef.current;
     void updateElement(sent.id, patch)
       .then(() => {
         // The list first: the save landed, whatever happens to the rail.
         refresh?.();
-        const record = (kind: ActivityKind, detail: string) =>
-          void logActivity(sent.id, kind, detail, by).catch((e) => console.error('Failed to record activity:', e));
-        if (patch.title !== undefined) record('renamed', `Renamed to “${patch.title}”`);
-        if (patch.description !== undefined) record('description', patch.description ? 'Updated description' : 'Cleared description');
+        // The database records the rename and the description change itself.
+        void invalidateElementActivity(sent.id);
       })
       .catch((e) => console.error('Failed to save on close', e));
   }, []);
@@ -516,7 +517,7 @@ function ElementDetailBody({
       sentRef.current = { ...sentRef.current, title: title.trim() };
       try {
         await updateElement(element.id, { title: title.trim() });
-        log('renamed', `Renamed to “${title.trim()}”`);
+        void invalidateElementActivity(element.id);
         onRefresh?.();
       } catch (e) { console.error(e); }
     }
@@ -527,7 +528,7 @@ function ElementDetailBody({
       sentRef.current = { ...sentRef.current, description };
       try {
         await updateElement(element.id, { description: description || null });
-        log('description', description ? 'Updated description' : 'Cleared description');
+        void invalidateElementActivity(element.id);
         onRefresh?.();
       } catch (e) { console.error(e); }
     }
@@ -558,8 +559,7 @@ function ElementDetailBody({
   const handlePriorityChange = async (newPriority: string) => {
     try {
       await updateElement(element.id, { priority: newPriority as 'medium' });
-      const newLabel = priorityOptions.find((p) => p.priority === newPriority)?.label ?? newPriority;
-      log('priority', `Priority → ${newLabel}`);
+      void invalidateElementActivity(element.id);
       onRefresh?.();
     } catch (e) { console.error(e); }
   };
@@ -567,8 +567,7 @@ function ElementDetailBody({
   const handleDateChange = async (field: 'start_date' | 'due_date', value: string) => {
     try {
       await updateElement(element.id, { [field]: value || null });
-      const fieldName = field === 'start_date' ? 'Start date' : 'Due date';
-      log('due', value ? `${fieldName} → ${value}` : `Cleared ${fieldName.toLowerCase()}`);
+      void invalidateElementActivity(element.id);
       onRefresh?.();
     } catch (e) { console.error(e); }
   };
@@ -577,7 +576,7 @@ function ElementDetailBody({
     const numVal = value ? parseFloat(value) : null;
     try {
       await updateElement(element.id, { [field]: numVal });
-      log('estimate', numVal != null ? `Estimate → ${numVal}h` : 'Cleared estimate');
+      void invalidateElementActivity(element.id);
       onRefresh?.();
     } catch (e) { console.error(e); }
   };
@@ -599,7 +598,7 @@ function ElementDetailBody({
     try {
       const worker = allWorkers.find(w => w.id === workerId);
       await addElementAssignee({ element_id: element.id, worker_id: workerId, role: 'assignee', worker });
-      if (worker) log('assigned', `Assigned ${worker.name}`);
+      void invalidateElementActivity(element.id);
       if (worker?.user_id && worker.user_id !== user?.id) {
         await notifyAboutElement(element.id, 'assigned', workerId);
       }
@@ -610,9 +609,8 @@ function ElementDetailBody({
 
   const handleRemoveAssignee = async (assigneeId: string) => {
     try {
-      const removed = element.assignees?.find((a) => a.id === assigneeId);
       await removeElementAssignee(assigneeId);
-      if (removed?.worker?.name) log('unassigned', `Unassigned ${removed.worker.name}`);
+      void invalidateElementActivity(element.id);
       onRefresh?.();
     } catch (e) { noticeAssignmentFailed(e); }
   };
@@ -1674,6 +1672,9 @@ const ACTIVITY_ICON: Record<ActivityKind | 'created', React.ComponentType<{ size
   subelement: CheckCircle2,
   note:       FileText,
   comment:    MessageIcon,
+  moved:      FolderInput,
+  deleted:    Trash2,
+  restored:   RotateCcw,
 };
 
 function ActivityFeed({

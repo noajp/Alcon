@@ -237,15 +237,11 @@ export async function reorderElements(updates: { id: string; order_index: number
 }
 
 export async function deleteElement(id: string): Promise<void> {
-  // Optimistic — the row vanishes the instant you hit delete, instead of
-  // waiting on three sequential deletes. Restore on error.
+  // Optimistic — the row vanishes the instant you hit delete. Restore on error.
   const rollback = applyOptimisticExplorerPatch(data => removeElementFromExplorer(data, id));
   try {
-    // Delete subelements first
-    await supabase.from('subelements').delete().eq('element_id', id);
-    // Delete assignees
-    await supabase.from('element_assignees').delete().eq('element_id', id);
-    // Delete element
+    // One delete: the database keeps a snapshot of the Element and everything
+    // under it (element_deletions) before it goes, so it can be restored.
     const { error } = await supabase
       .from('elements')
       .delete()
@@ -771,4 +767,25 @@ export async function setElementIsApproval(elementId: string, isApproval: boolea
   else updates.approval_state = null;
   const { error } = await supabase.from('elements').update(updates).eq('id', elementId);
   if (error) throw error;
+}
+
+// ============================================
+// Deleted Elements
+// ============================================
+export interface ElementDeletion { id: string; element_id: string; object_id: string | null; title: string; display_id: string | null; deleted_by_name: string | null; deleted_at: string }
+
+/** Elements deleted from an Object, or — with `mine` — everything the caller deleted or owned, newest first. */
+export async function fetchElementDeletions(scope: { objectId: string } | { mine: string }, limit = 100): Promise<ElementDeletion[]> {
+  let query = supabase.from('element_deletions').select('id, element_id, object_id, title, display_id, deleted_by_name, deleted_at').order('deleted_at', { ascending: false }).limit(limit);
+  query = 'objectId' in scope ? query.eq('object_id', scope.objectId) : query.or(`deleted_by.eq.${scope.mine},owner_id.eq.${scope.mine}`);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as ElementDeletion[];
+}
+
+/** Put a deleted Element back where it was, with its history. */
+export async function restoreElement(deletionId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('restore_element', { p_deletion: deletionId });
+  if (error) throw new Error(error.message);
+  return data as string;
 }

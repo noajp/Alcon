@@ -2,11 +2,12 @@
 
 // The Activity rail's data: what happened to an Element, when, by whom.
 //
-// Backed by `element_activity`. The UI appends an entry on the changes it
-// makes (priority / assignee / due / estimate / title / description /
-// direction / subelement); status changes are written by a database trigger
-// instead, so a status set by an agent, by SQL, or by another client shows
-// up here too — that gap is what el_TRJ-005 was about. Reads go through the
+// Backed by `element_activity`. Changes to the Element itself — status,
+// title, description, priority, dates, estimate, people, moves, deletion and
+// restore — are written by database triggers, so a change made by an agent,
+// by SQL or by another client shows up here too, and none can be forged. The
+// UI appends only what the database cannot see: direction, sub-element notes,
+// reactions and Note links. Reads go through the
 // query cache like every other Element read (ADR 0018).
 
 import { useQuery } from '@tanstack/react-query';
@@ -27,7 +28,10 @@ export type ActivityKind =
   | 'estimate'
   | 'subelement'
   | 'note'
-  | 'comment';
+  | 'comment'
+  | 'moved'
+  | 'deleted'
+  | 'restored';
 
 type ActivityEntry = ElementActivity;
 
