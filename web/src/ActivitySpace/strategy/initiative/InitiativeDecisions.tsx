@@ -396,7 +396,7 @@ export function InitiativeDecisions({
     try {
       const binding = await addIntentBinding({
         intent_id: decisionId,
-        target_type: target.type,
+        target_type: target.type === 'deal' ? 'crm_deal' : target.type,
         target_id: target.id,
         relationship_type: relationshipFor(target.type),
       });

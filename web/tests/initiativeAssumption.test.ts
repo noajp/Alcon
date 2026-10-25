@@ -13,6 +13,8 @@ import {
   type AssumptionInput,
   type WatchInput,
   type WorkerWatchInput,
+  evaluateDealWatch,
+  type DealWatchInput,
 } from '@/ActivitySpace/strategy/initiative/initiativeAssumptionModel';
 
 // The whole point of the assumptions surface is one claim: "something this
@@ -471,5 +473,30 @@ describe('orderAssumptions — shaken first', () => {
   it('returns nothing for nothing', () => {
     expect(orderAssumptions([], NOW)).toEqual([]);
     expect(countShaken([])).toBe(0);
+  });
+});
+
+describe('deal watches', () => {
+  const now = new Date(2026, 9, 25);
+  const deal = (values: Partial<DealWatchInput> = {}): DealWatchInput => ({
+    bindingId: 'b', dealId: 'd', label: 'D-1 Renewal X', visible: true, outcome: 'open', atRisk: false, closeDate: '2026-11-30', renewalOverdue: false, ...values,
+  });
+
+  it('reads a lost deal, a late renewal, a deal at risk and a passed close date as trouble', () => {
+    expect(evaluateDealWatch(deal({ outcome: 'lost' }), now).trouble).toBe('lost');
+    expect(evaluateDealWatch(deal({ outcome: 'won', renewalOverdue: true }), now).trouble).toBe('renewal overdue');
+    expect(evaluateDealWatch(deal({ atRisk: true }), now).trouble).toBe('at risk');
+    expect(evaluateDealWatch(deal({ closeDate: '2026-10-01' }), now).trouble).toBe('close date passed');
+  });
+  it('a healthy open deal and a won deal are fine; a hidden one says nothing', () => {
+    expect(evaluateDealWatch(deal(), now).trouble).toBeNull();
+    expect(evaluateDealWatch(deal({ outcome: 'won', closeDate: '2026-01-01' }), now).trouble).toBeNull();
+    expect(evaluateDealWatch(deal({ visible: false, outcome: 'lost' }), now).trouble).toBeNull();
+  });
+  it('shakes the assumption and counts as watched', () => {
+    const shaken = evaluateAssumption({ id: 'a', title: 'X renews', cost: null, notedBy: null, notedAt: null, orderIndex: 0, watches: [], workers: [], deals: [deal({ outcome: 'lost' })] }, now);
+    expect(shaken.shaken).toBe(true);
+    expect(shaken.unwatched).toBe(false);
+    expect(shakenLabel(shaken)).toBe('1 deal in trouble');
   });
 });

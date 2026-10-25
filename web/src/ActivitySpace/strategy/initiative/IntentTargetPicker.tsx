@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Milestone, Plus, User, X } from 'lucide-react';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Button } from '@/ui/button';
-import { ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
+import { CrmIcon, ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
 import { MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR } from '@/Function/shared/menu';
 
 // =============================================================
@@ -34,7 +34,7 @@ import { MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR } from '@/Functio
 
 /** The kinds a binding surface offers. `intent_bindings.target_type` also takes
  *  `domain`; nothing writes one, so nothing here offers one. */
-export type PickerTargetType = 'object' | 'element' | 'worker' | 'phase';
+export type PickerTargetType = 'object' | 'element' | 'worker' | 'phase' | 'deal';
 
 export interface PickerTarget {
   type: PickerTargetType;
@@ -53,6 +53,7 @@ const GLYPH = {
   element: ElementIcon,
   worker: User,
   phase: Milestone,
+  deal: CrmIcon,
 } as const;
 
 /** Group order, and the heading each group carries. */
@@ -61,6 +62,7 @@ const GROUPS: { type: PickerTargetType; label: string }[] = [
   { type: 'element', label: 'Elements' },
   { type: 'worker', label: 'Workers' },
   { type: 'phase', label: 'Phases' },
+  { type: 'deal', label: 'Deals' },
 ];
 
 /**

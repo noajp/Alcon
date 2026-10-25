@@ -12,6 +12,8 @@ import {
   useWorkersByIds,
 } from '@/hooks/useSupabase';
 import type { IntentBinding, Worker } from '@/types/database';
+import { useCrm } from '@/hooks/useCrm';
+import type { CrmDeal } from '@/ActivitySpace/sustainment/crm/crmModel';
 import { Button } from '@/ui/button';
 import { STATUS } from '@/shared/designTokens';
 import { MenuShell } from '@/Function/shared/menu';
@@ -26,6 +28,7 @@ import {
   watchLabel,
   workerWatchLabel,
   type Assumption,
+  type DealWatchInput,
   type Watch,
   type WatchInput,
   type WorkerWatch,
@@ -73,7 +76,7 @@ const FALSIFIES = 'tests' as const;
 
 /** The two target kinds this surface writes. A `domain` binding is legal in the
  *  table and never written here. */
-const WATCHABLE = new Set(['element', 'worker']);
+const WATCHABLE = new Set(['element', 'worker', 'crm_deal']);
 
 export function InitiativeAssumptions({
   initiative,
@@ -139,6 +142,13 @@ export function InitiativeAssumptions({
     [roster, boundWorkers],
   );
 
+  // Deals, as the CRM reads them for this reader: health and renewal included.
+  const crm = useCrm();
+  const byDeal = useMemo(
+    () => new Map(crm.workspaces.flatMap((workspace) => workspace.deals).map((deal) => [deal.id, deal])),
+    [crm.workspaces],
+  );
+
   const assumptions = useMemo(() => {
     const rows = (data?.subs ?? [])
       .filter((i) => isAssumption(i.kind) && !removed.has(i.id))
@@ -159,10 +169,13 @@ export function InitiativeAssumptions({
             .map((b) =>
               toWorkerWatch(b, byWorker.get(b.target_id), availability[b.target_id] ?? []),
             ),
+          deals: mine
+            .filter((b) => b.target_type === 'crm_deal')
+            .map((b) => toDealWatch(b, byDeal.get(b.target_id))),
         };
       });
     return orderAssumptions(rows, new Date());
-  }, [data?.subs, bindings, removed, byElement, byWorker, availability]);
+  }, [data?.subs, bindings, removed, byElement, byWorker, availability, byDeal]);
 
   const shakenCount = countShaken(assumptions);
 
@@ -221,7 +234,7 @@ export function InitiativeAssumptions({
     try {
       const binding = await addIntentBinding({
         intent_id: intentId,
-        target_type: target.type,
+        target_type: target.type === 'deal' ? 'crm_deal' : target.type,
         target_id: target.id,
         relationship_type: FALSIFIES,
       });
@@ -232,7 +245,9 @@ export function InitiativeAssumptions({
       setFailure(
         target.type === 'worker'
           ? 'Could not watch that Worker. Nothing was linked.'
-          : 'Could not watch that Element. Nothing was linked.',
+          : target.type === 'deal'
+            ? 'Could not watch that deal. Nothing was linked.'
+            : 'Could not watch that Element. Nothing was linked.',
       );
     }
   }
@@ -324,6 +339,15 @@ export function InitiativeAssumptions({
                     label: w.name,
                     hint: w.role,
                   })),
+                // Deals still in play or won (a won deal can still fail to renew).
+                ...[...byDeal.values()]
+                  .filter((deal) => deal.outcome !== 'lost' && !assumption.deals.some((bound) => bound.dealId === deal.id))
+                  .map((deal) => ({
+                    type: 'deal' as const,
+                    id: deal.id,
+                    label: `D-${deal.number} ${deal.name}`,
+                    hint: deal.account,
+                  })),
               ]}
               onDelete={() => void remove(assumption.id)}
               onWatch={(target) => void watch(assumption.id, target)}
@@ -393,6 +417,24 @@ interface WatchSource {
   dueDate: string | null;
   objectId: string | null;
   domainId: string | null;
+}
+
+/** A deal the reader cannot see keeps its row and reports nothing, like a
+ *  Worker off the roster: the link is the record's, the deal is not theirs. */
+function toDealWatch(binding: IntentBinding, deal: CrmDeal | undefined): DealWatchInput {
+  if (!deal) {
+    return { bindingId: binding.id, dealId: binding.target_id, label: 'Deal you cannot see', visible: false, outcome: null, atRisk: false, closeDate: null, renewalOverdue: false };
+  }
+  return {
+    bindingId: binding.id,
+    dealId: deal.id,
+    label: `D-${deal.number} ${deal.name}`,
+    visible: true,
+    outcome: deal.outcome,
+    atRisk: deal.health.level === 'risk',
+    closeDate: deal.closeDate,
+    renewalOverdue: deal.action?.code === 'renewal_due' && deal.action.urgency === 'overdue',
+  };
 }
 
 /** A binding whose Worker has left the roster keeps its row and reports no
@@ -550,9 +592,21 @@ function AssumptionRow({
             onRemove={canEdit ? () => onUnwatch(w.bindingId) : undefined}
           />
         ))}
+        {/* Customers and counterparts, last: the same claim again, about who
+            the plan depends on outside the organisation. */}
+        {assumption.deals.map((d) => (
+          <BoundTarget
+            key={d.bindingId}
+            type="deal"
+            label={d.label}
+            hint={null}
+            signal={d.trouble ? { text: DEAL_TROUBLE[d.trouble], tone: d.trouble === 'lost' || d.trouble === 'renewal overdue' ? 'text-[var(--status-danger)]' : 'text-[var(--status-warning)]' } : null}
+            onRemove={canEdit ? () => onUnwatch(d.bindingId) : undefined}
+          />
+        ))}
         {canEdit && (
           <IntentTargetPicker
-            label={assumption.unwatched ? 'Watch an Element or Worker' : 'Watch another'}
+            label={assumption.unwatched ? 'Watch an Element, Worker or deal' : 'Watch another'}
             targets={candidates}
             onPick={onWatch}
             empty={
@@ -575,6 +629,8 @@ function AssumptionRow({
     </div>
   );
 }
+
+const DEAL_TROUBLE = { lost: 'Lost', 'renewal overdue': 'Renewal overdue', 'at risk': 'At risk', 'close date passed': 'Past close date' } as const;
 
 /** The tones the risk surface already uses for the same two readings, so a
  *  blocked Element looks the same here as it does two sections up. */
