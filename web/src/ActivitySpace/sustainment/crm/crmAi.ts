@@ -92,7 +92,10 @@ function dealContext(deal: CrmDeal, today: string): string {
     `Close date: ${deal.closeDate ?? '-'}`, `Last contact: ${deal.lastContact ?? '-'}`,
     `Next action: ${deal.nextActionDate ?? '-'} ${deal.nextStep ?? ''}`,
     `Health: ${deal.health.score ?? '-'} (${deal.health.level})`,
-    'Activity (newest first):', ...(deal.activity.length ? deal.activity.slice(0, 25).map(entry => `- ${entry.date ?? ''} ${entry.type}: ${entry.text}`) : ['- none recorded']),
+    // Conversations first: revisions are summarised by the current figures above,
+    // so a run of edits never pushes the last real contact out of the context.
+    'Activity (newest first):', ...(deal.activity.length ? [...deal.activity.filter(entry => entry.type !== 'change').slice(0, 25), ...deal.activity.filter(entry => entry.type === 'change').slice(0, 5)]
+      .map(entry => `- ${entry.date ?? ''} ${entry.type}: ${entry.text}`) : ['- none recorded']),
   ].join('\n');
 }
 

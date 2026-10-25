@@ -54,11 +54,12 @@ begin
       from public.crm_companies c join public.crm_pipelines p on p.id = new.pipeline_id
       where c.id = new.company_id and (c.domain_id is null or c.domain_id is not distinct from p.domain_id);
     select w.name into v_author from public.workers w
-      where w.user_id = auth.uid() and w.type = 'human'
-      order by (w.activity_space_id = new.activity_space_id) desc nulls last limit 1;
+      where w.user_id = auth.uid() and w.type = 'human' and w.activity_space_id = new.activity_space_id
+      order by w.created_at limit 1;
+    -- clock_timestamp keeps the rows of one write in the order they were written.
     foreach v_row slice 1 in array v_rows loop
-      insert into public.crm_activities (activity_space_id, deal_id, company_id, kind, body, occurred_on, created_by, author_name)
-      values (new.activity_space_id, new.id, v_company, v_row[1], v_row[2], current_date, auth.uid(), v_author);
+      insert into public.crm_activities (activity_space_id, deal_id, company_id, kind, body, occurred_on, created_by, author_name, created_at)
+      values (new.activity_space_id, new.id, v_company, v_row[1], v_row[2], current_date, auth.uid(), v_author, clock_timestamp());
     end loop;
     return new;
   end $fn$;
