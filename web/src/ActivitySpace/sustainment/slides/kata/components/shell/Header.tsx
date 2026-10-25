@@ -1,11 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, FileDown, FileJson, Play, Presentation, Redo2, Undo2 } from "lucide-react";
-import { IconButton } from "@/ActivitySpace/sustainment/slides/kata/components/ui/IconButton";
+import { ChevronDown, FileDown, FileJson, Play, Presentation } from "lucide-react";
 import { useKata } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
 import { useDeckView } from "@/ActivitySpace/sustainment/slides/kata/components/useDeckView";
-import { STORYLINE_BY_ID } from "@/ActivitySpace/sustainment/slides/kata/model/storyline";
 import { exportPptx } from "@/ActivitySpace/sustainment/slides/kata/export/pptx";
 import { toKataJson } from "@/ActivitySpace/sustainment/slides/kata/model/kataFile";
 import { PresentMode } from "@/ActivitySpace/sustainment/slides/kata/components/stage/PresentMode";
@@ -23,7 +21,7 @@ export function Header() {
   const folder = view ? folders.find((f) => f.id === view.file.folderId) : null;
 
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between pl-4 pr-3">
+    <header className="flex h-11 shrink-0 items-center justify-between pl-4 pr-2">
       <div className="flex min-w-0 items-center gap-3">
         {view ? (
           <div className="flex min-w-0 items-center gap-2 text-[13px]">
@@ -57,41 +55,13 @@ export function Header() {
         ) : null}
       </div>
       {view ? (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => useKata.getState().setPalette(true)}
-            className="hidden h-8 items-center gap-2 rounded-lg border border-k-line px-2.5 text-[12px] text-k-ink-3 hover:border-k-line-strong hover:text-k-ink-2 lg:flex"
-          >
-            {tx("やりたいことを探す", "Search actions")}
-            <kbd className="rounded border border-k-line px-1 font-mono text-[10px]">⌘K</kbd>
-          </button>
-          <div className="mr-1 hidden items-center rounded-full border border-k-line bg-k-panel text-[12px] text-k-ink-2 xl:flex">
-            <button type="button" onClick={() => {
-                const st = useKata.getState();
-                st.setPanel("logic");
-                st.setLogicTab("deck");
-              }}
-              title={tx("論理構成を開く", "Open structure")} className="rounded-l-full py-1 pl-3 pr-2 hover:bg-k-hover hover:text-k-ink">
-              {STORYLINE_BY_ID[view.deck.storyline].name}
-            </button>
-            <span className="h-3 w-px bg-k-line" />
-            <button type="button" onClick={() => useKata.getState().setPanel("design")} title={tx("デザインを開く", "Open design")} className="flex items-center gap-1.5 rounded-r-full py-1 pl-2 pr-3 hover:bg-k-hover hover:text-k-ink">
-              <span className="flex -space-x-1">
-                {view.file.mix.selected.slice(0, 4).map((id) => (
-                  <span key={id} className="h-3 w-3 rounded-full border border-white" style={{ background: view.looks[id]?.tokens.number.block }} />
-                ))}
-              </span>
-              <span className="max-w-[220px] truncate">{view.file.mix.selected.map((id) => view.looks[id]?.name).filter(Boolean).join(" × ")}</span>
-            </button>
-          </div>
-          <UndoRedo fileId={view.file.id} />
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => setPresenting(true)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-k-line-strong bg-k-panel px-3 text-[13px] font-medium text-k-ink hover:bg-k-hover"
+            className="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium text-k-ink-2 hover:bg-k-hover hover:text-k-ink"
           >
-            <Play size={13} strokeWidth={2.2} />
+            <Play size={12} strokeWidth={2.2} />
             {tx("発表", "Present")}
           </button>
           <ExportMenu />
@@ -123,10 +93,10 @@ function ExportMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-k-primary px-3 text-[13px] font-medium text-k-on-primary hover:opacity-90"
+        className="inline-flex h-7 items-center gap-1 rounded-md bg-k-primary px-2.5 text-[12px] font-medium text-k-on-primary hover:opacity-90"
       >
         {busy ? tx("書き出し中…", "Exporting…") : tx("書き出す", "Export")}
-        <ChevronDown size={14} />
+        <ChevronDown size={12} />
       </button>
       {open ? (
         <div role="menu" className="anim-in absolute right-0 top-10 z-50 w-64 rounded-xl border border-k-line bg-k-panel p-1.5 shadow-[var(--shadow-pop)]">
@@ -192,20 +162,3 @@ function ExportMenu() {
     </div>
   );
 }
-
-function UndoRedo({ fileId }: { fileId: string }) {
-  const h = useKata((s) => s.history[fileId]);
-  const undo = useKata((s) => s.undo);
-  const redo = useKata((s) => s.redo);
-  return (
-    <div className="mr-1 flex items-center">
-      <IconButton label={tx("取り消す（⌘Z）", "Undo (⌘Z)")} onClick={() => undo()} disabled={!h?.past.length} className="disabled:opacity-25">
-        <Undo2 size={15} />
-      </IconButton>
-      <IconButton label={tx("やり直す（⌘⇧Z）", "Redo (⌘⇧Z)")} onClick={() => redo()} disabled={!h?.future.length} className="disabled:opacity-25">
-        <Redo2 size={15} />
-      </IconButton>
-    </div>
-  );
-}
-

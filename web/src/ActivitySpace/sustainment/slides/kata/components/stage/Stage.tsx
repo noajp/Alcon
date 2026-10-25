@@ -76,7 +76,7 @@ export function Stage() {
   };
 
   return (
-    <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-k-line bg-k-stage">
+    <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-k-stage">
       <div className="flex h-11 shrink-0 items-center justify-between gap-3 whitespace-nowrap px-4">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden text-[12px]">
           {!filmstripOpen ? (

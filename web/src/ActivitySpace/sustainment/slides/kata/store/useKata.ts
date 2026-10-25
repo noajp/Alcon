@@ -204,7 +204,7 @@ export const useKata = create<KataState>()(
         files: [],
         activeFileId: null,
         current: 7,
-        panel: "chat",
+        panel: "design",
         logicTab: "deck",
         busy: false,
         theme: "light",
@@ -309,7 +309,7 @@ export const useKata = create<KataState>()(
             files: [...s.files, file],
             activeFileId: id,
             current: 0,
-            panel: "chat",
+            panel: "design",
             folders: s.folders.map((f) => (f.id === folderId ? { ...f, open: true } : f)),
           }));
           return id;

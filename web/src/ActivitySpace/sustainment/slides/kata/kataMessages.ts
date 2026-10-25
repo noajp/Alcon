@@ -5,6 +5,7 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const KATA_MESSAGES: Record<string, Row> = {
+  "Inspector": ["インスペクタ", "인스펙터", "Inspecteur", "Inspector"],
   // Chart editor
   "What do you want to show?": ["何を見せたいか", "무엇을 보여 주고 싶나요?", "Que voulez-vous montrer ?", "¿Qué quieres mostrar?"],
   "Following Zelazny's five comparisons and the FT Visual Vocabulary, this picks the chart type.": ["ゼラズニーの5つの比較と FT Visual Vocabulary に沿って、グラフの種類が決まります。", "Zelazny의 다섯 가지 비교와 FT Visual Vocabulary에 따라 차트 종류가 정해집니다.", "Le type de graphique est choisi d’après les cinq comparaisons de Zelazny et le FT Visual Vocabulary.", "El tipo de gráfico se elige según las cinco comparaciones de Zelazny y el FT Visual Vocabulary."],

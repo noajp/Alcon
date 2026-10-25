@@ -68,7 +68,6 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       out.push({ id: "pages", group: tx("パネル", "Panels"), label: st.filmstrip ? tx("ページ一覧を閉じる", "Hide slides") : tx("ページ一覧を開く", "Show slides"), run: () => st.setFilmstrip(!st.filmstrip) });
       out.push({ id: "p-design", group: tx("パネル", "Panels"), label: tx("デザインを開く", "Open design"), run: () => st.setPanel("design") });
       out.push({ id: "p-logic", group: tx("パネル", "Panels"), label: tx("論理構成を開く", "Open structure"), run: () => st.setPanel("logic") });
-      out.push({ id: "p-chat", group: tx("パネル", "Panels"), label: tx("チャットに戻る", "Back to chat"), run: () => st.setPanel("chat") });
       for (const s of STORYLINES) {
         out.push({ id: `story-${s.id}`, group: tx("語る順番", "Storyline"), label: tx("「{name}」で並べる", "Arrange as “{name}”", { name: s.name }), hint: s.desc, run: () => st.setStoryline(s.id) });
       }

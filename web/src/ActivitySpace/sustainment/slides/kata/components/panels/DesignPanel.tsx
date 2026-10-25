@@ -45,7 +45,7 @@ function Swatch({ look, el }: { look: Look; el: MixElement }) {
 function Specimen({ look }: { look: Look }) {
   const t = look.tokens;
   return (
-    <span className="relative block h-[92px] overflow-hidden rounded-md border border-black/10" style={{ background: t.ground.bg, color: t.ground.ink }}>
+    <span className="relative block h-[92px] overflow-hidden rounded-[5px] border border-black/10" style={{ background: t.ground.bg, color: t.ground.ink }}>
       <span className="absolute left-3 top-2.5 text-[26px] leading-none" style={{ fontFamily: t.type.display, fontWeight: t.type.weight, letterSpacing: t.type.tracking }}>
         Aa あ
       </span>
@@ -126,7 +126,7 @@ export function DesignPanel() {
           <h3 className="text-[12px] font-semibold">{tx("世界観", "Looks")}</h3>
           <span className="text-[11px] text-k-ink-3">{tx("いくつでも選べます", "Pick as many as you like")}</span>
         </div>
-        <div className="mb-3 grid grid-cols-2 gap-2">
+        <div className="mb-2 grid grid-cols-2 gap-1">
           <button
             type="button"
             onClick={() => {
@@ -134,11 +134,11 @@ export function DesignPanel() {
               useKata.getState().notify(tx("今のミックスをマイ世界観に保存しました", "Saved the current mix to My looks"));
               setEditing(id);
             }}
-            className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-k-line-strong text-[12px] font-medium text-k-ink-2 hover:border-k-ink-3 hover:text-k-ink"
+            className="flex h-7 items-center justify-center gap-1.5 rounded-md text-[11px] font-medium text-k-ink-3 hover:bg-k-hover hover:text-k-ink"
           >
             <Save size={13} /> {tx("今のミックスを保存", "Save current mix")}
           </button>
-          <button type="button" onClick={() => imgRef.current?.click()} className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-k-line-strong text-[12px] font-medium text-k-ink-2 hover:border-k-ink-3 hover:text-k-ink">
+          <button type="button" onClick={() => imgRef.current?.click()} className="flex h-7 items-center justify-center gap-1.5 rounded-md text-[11px] font-medium text-k-ink-3 hover:bg-k-hover hover:text-k-ink">
             <ImagePlus size={13} /> {tx("画像・PPTX から", "From image / PPTX")}
           </button>
           <input
@@ -164,7 +164,7 @@ export function DesignPanel() {
                   type="button"
                   aria-pressed={on}
                   onClick={() => toggleLook(look.id)}
-                  className={clsx("group relative flex w-full flex-col gap-1.5 rounded-xl p-1.5 text-left transition-colors", on ? "bg-k-chosen ring-2 ring-k-ink" : "ring-1 ring-k-line hover:ring-k-ink-3")}
+                  className={clsx("group relative flex w-full flex-col gap-1.5 rounded-lg p-1.5 text-left transition-colors", on ? "bg-k-chosen ring-[1.5px] ring-k-lime" : "hover:bg-k-hover")}
                 >
                   <Specimen look={look} />
                   <span className="flex items-center justify-between gap-1 px-0.5 pr-6">
