@@ -118,15 +118,15 @@ function Connections({ crm }: { crm: Crm }) {
   // The pipeline's own number fields: the ones its deals show.
   const numberFields = fieldsFor(crm.fields, 'deal', pipeline.domain_id).filter(field => field.type === 'number');
   const field = metricKind(metric) === 'field' ? numberFields.find(item => item.key === pipeline.measure_field) ?? null : null;
-  const value = !crm.workspace || (metricKind(metric) === 'field' && !field) ? null : metricValue(crm.workspace.deals, metric, pipeline.currency, crm.today, field?.key ?? null);
   const linked = measures.find(measure => measure.id === pipeline.measure_intent_id);
+  const value = !crm.workspace || (metricKind(metric) === 'field' && !field) ? null : metricValue(crm.workspace.deals, metric, pipeline.currency, crm.today, field?.key ?? null, linked?.unit);
   const written = value === null ? null : measureValue(linked?.unit, metric, pipeline.currency, value);
   const unit = readUnit(linked?.unit);
   // Why nothing would be written, in the person's terms.
   const mismatch = !linked || written !== null || value === null ? null
     : unit.kind === 'rate' ? t('“{unit}” is a rate or a per-period figure; the CRM cannot write into it.', { unit: linked.unit ?? '' })
     : unit.kind === 'unknown' ? t('Alcon cannot tell whether “{unit}” is money or a count. Use a currency (円, JPY) or a count (社, 件) as the unit.', { unit: linked.unit ?? '' })
-    : unit.kind === 'money' && metricKind(metric) === 'amount' ? t('This success condition is in {currency}; this pipeline reports in {pipeline}.', { currency: unit.currency, pipeline: pipeline.currency })
+    : unit.kind === 'money' && metricKind(metric) !== 'count' ? t('This success condition is in {currency}; this pipeline reports in {pipeline}.', { currency: unit.currency, pipeline: pipeline.currency })
     : unit.kind === 'count' ? t('This success condition counts “{unit}”. Choose a number of deals won or a field total.', { unit: linked.unit ?? '' })
     : t('This success condition is an amount. Choose an amount won or in the pipeline.');
   const [error, setError] = useState<string | null>(null);
@@ -153,7 +153,12 @@ function Connections({ crm }: { crm: Crm }) {
               : <span className="text-xs text-muted-foreground">{t('Add a number field for deals under Your fields first.')}</span>}
           </>}
         </>}
+        {metricKind(metric) === 'field' && pipeline.measure_field && !field && numberFields.length > 0 && <>
+          <span />
+          <p role="alert" className="text-xs text-[var(--status-warning)]">{t('The field this pipeline reported is gone. Choose another; nothing is written until then.')}</p>
+        </>}
       </div>
+      {pipeline.measure_intent_id && metricKind(metric) === 'field' && unit.kind === 'money' && <p className="text-xs text-muted-foreground">{t('A field reported as money is read in the pipeline’s currency, in whole units (yen, dollars), and only deals in that currency count.')}</p>}
       {pipeline.measure_intent_id && mismatch && <p role="alert" className="text-xs text-[var(--status-warning)]">{mismatch} {t('Nothing is written until they match.')}</p>}
       {pipeline.measure_intent_id && linked && written !== null && <p className="text-xs text-muted-foreground">{t('Currently reporting {value}.', { value: unit.kind === 'money' || unit.kind === 'count' ? `${written.toLocaleString(locale)} ${linked?.unit ?? ''}`.trim() : metricKind(metric) === 'amount' ? money(written, pipeline.currency, locale) : written.toLocaleString(locale) })}</p>}
       {crm.measureError && <p role="alert" className="text-xs text-[var(--status-danger)]">{t(crm.measureError)}</p>}

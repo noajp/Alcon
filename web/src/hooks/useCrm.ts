@@ -12,7 +12,7 @@ import { createElement, updateElement } from '@/ActivitySpace/execution/element/
 import { fetchDataTableSchema } from '@/ActivitySpace/sustainment/table/data';
 import { readAllPages } from '@/hooks/readAllPages';
 import {
-  buildCrmWorkspace, measureValue, metricKind, metricValue, normalizeCrmStages, parseActivityLog, resolveStage,
+  buildCrmWorkspace, fieldsFor, measureValue, metricKind, metricValue, normalizeCrmStages, parseActivityLog, resolveStage,
   type CrmActivityRecord, type CrmActivityType, type CrmCompanyRecord, type CrmContactRecord, type CrmDeal,
   type CrmDealRecord, type CrmFieldRecord, type CrmNextElement, type CrmPerson, type CrmPipelineRecord, type CrmWorkspace,
 } from '@/ActivitySpace/sustainment/crm/crmModel';
@@ -338,8 +338,9 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     const p = workspace?.pipeline;
     // One writer (the main pane), and only from fresh data, never a cached stale view.
     if (!seed || !p?.measure_intent_id || !p.measure_metric || !workspace || deals.isFetching) return;
-    // A field metric reports nothing until its field is chosen.
-    if (metricKind(p.measure_metric) === 'field' && !p.measure_field) return;
+    // A field metric reports only while its field is one of this pipeline's number fields.
+    const byField = metricKind(p.measure_metric) === 'field';
+    if (byField && !fieldsFor(fields.data ?? [], 'deal', p.domain_id).some(field => field.type === 'number' && field.key === p.measure_field)) return;
     const value = metricValue(workspace.deals, p.measure_metric, p.currency, today, p.measure_field);
     const stamp = `${p.measure_intent_id}:${p.measure_metric}:${p.measure_field ?? ''}:${value}`;
     if (reported.current === stamp) return;
@@ -349,7 +350,9 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
       if (error || !data) { setMeasureError(error?.message ?? 'The linked success condition is not visible to you.'); return; }
       // Money goes only into the pipeline's own currency, at the condition's scale
       // (万円…); counts only into count units. Anything else is not written.
-      const written = measureValue(data.unit as string | null, p.measure_metric!, p.currency, value);
+      // A field reported as money counts only deals in the pipeline's currency.
+      const figure = byField ? metricValue(workspace.deals, p.measure_metric!, p.currency, today, p.measure_field, data.unit as string | null) : value;
+      const written = measureValue(data.unit as string | null, p.measure_metric!, p.currency, figure);
       // Not written now; a later refresh tries again (the unit may have been corrected).
       if (written === null) { reported.current = null; setMeasureError(null); return; }
       if (Number(data.actual_value) === written) { setMeasureError(null); return; }
@@ -358,7 +361,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
       setMeasureError(writeError ? 'Only the Initiative’s owner can update this success condition. It updates when they open the CRM.' : null);
       if (!writeError) void qc.invalidateQueries({ queryKey: ['initiative-measures'] });
     })();
-  }, [seed, workspace, deals.isFetching, today, qc]);
+  }, [seed, workspace, deals.isFetching, today, qc, fields.data]);
 
   /** Moves a Table-based pipeline (the CRM's former store) into this Space's
    * records. Safe to run again: deals it already imported are skipped. */

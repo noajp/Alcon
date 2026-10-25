@@ -230,9 +230,15 @@ describe('field metrics', () => {
   it('reports nothing without a field', () => {
     expect(metricValue(deals, 'won_field_total', 'USD', today, null)).toBe(0);
   });
-  it('goes into counts as is, into money at its scale, never into rates', () => {
+  it('reported as money, counts only deals in the pipeline’s currency', () => {
+    expect(metricValue(deals, 'won_field_total', 'USD', today, 'arr', '円')).toBe(1700000);
+    expect(metricValue(deals, 'won_field_total', 'JPY', today, 'arr', '万円')).toBe(800000);
+    expect(metricValue(deals, 'won_field_total', 'USD', today, 'arr', '席')).toBe(2500000);
+  });
+  it('goes into counts as is, into money of the pipeline’s currency at its scale, never into rates', () => {
     expect(measureValue('席', 'won_field_total', 'USD', 120)).toBe(120);
-    expect(measureValue('億円', 'won_field_total', 'USD', 1_200_000_000)).toBe(12);
+    expect(measureValue('億円', 'won_field_total', 'JPY', 1_200_000_000)).toBe(12);
+    expect(measureValue('億円', 'won_field_total', 'USD', 1_200_000_000)).toBeNull();
     expect(measureValue('%', 'won_field_total', 'USD', 5)).toBeNull();
     expect(measureValue(null, 'won_field_total', 'USD', 5)).toBe(5);
   });

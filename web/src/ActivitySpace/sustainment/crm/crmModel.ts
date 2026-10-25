@@ -85,9 +85,13 @@ export function measureValue(unit: string | null | undefined, metric: CrmMetric,
   const read = readUnit(unit);
   if (read.kind === 'any') return value;
   if (metricKind(metric) === 'count') return read.kind === 'count' ? value : null;
-  // A number field carries no currency of its own: it goes into counts as is
-  // and into money at the condition's scale (万円, 億円); never into rates.
-  if (metricKind(metric) === 'field') return read.kind === 'count' ? value : read.kind === 'money' ? Math.round(value / read.scale * 100) / 100 : null;
+  // A number field goes into counts as is. Into money only when the condition
+  // is in the pipeline's currency: the field is read as an amount in that
+  // currency (whole units), summed over deals in that currency, then scaled.
+  if (metricKind(metric) === 'field') {
+    if (read.kind === 'count') return value;
+    return read.kind === 'money' && read.currency === currency.toUpperCase() ? Math.round(value / read.scale * 100) / 100 : null;
+  }
   if (read.kind !== 'money' || read.currency !== currency.toUpperCase()) return null;
   return Math.round(value / read.scale * 100) / 100;
 }
@@ -506,7 +510,7 @@ export function forecastFor(deals: readonly CrmDeal[], currency: string | null, 
 }
 
 /** The figure a pipeline reports into its Initiative's success condition. */
-export function metricValue(deals: readonly CrmDeal[], metric: CrmMetric, currency: string, today: string, field: string | null = null): number {
+export function metricValue(deals: readonly CrmDeal[], metric: CrmMetric, currency: string, today: string, field: string | null = null, unit?: string | null): number {
   const year = today.slice(0, 4);
   const quarter = Math.floor((Number(today.slice(5, 7)) - 1) / 3);
   const inQuarter = (date: string | null) => !!date && date.slice(0, 4) === year && Math.floor((Number(date.slice(5, 7)) - 1) / 3) === quarter;
@@ -522,10 +526,12 @@ export function metricValue(deals: readonly CrmDeal[], metric: CrmMetric, curren
     const value = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() ? Number(raw.replace(/[,\s]/g, '')) : NaN;
     return Number.isFinite(value) ? value : 0;
   };
+  // Reported as money, a field is summed over the pipeline's own currency only.
+  const wonField = readUnit(unit).kind === 'money' ? wonAll.filter(deal => deal.currency === currency) : wonAll;
   switch (metric) {
-    case 'won_field_total': return sum(wonAll, fieldValue);
-    case 'won_field_year': return sum(wonAll.filter(deal => closed(deal)?.slice(0, 4) === year), fieldValue);
-    case 'won_field_quarter': return sum(wonAll.filter(deal => inQuarter(closed(deal))), fieldValue);
+    case 'won_field_total': return sum(wonField, fieldValue);
+    case 'won_field_year': return sum(wonField.filter(deal => closed(deal)?.slice(0, 4) === year), fieldValue);
+    case 'won_field_quarter': return sum(wonField.filter(deal => inQuarter(closed(deal))), fieldValue);
     case 'won_count_total': return wonAll.length;
     case 'won_count_year': return wonAll.filter(deal => closed(deal)?.slice(0, 4) === year).length;
     case 'won_count_quarter': return wonAll.filter(deal => inQuarter(closed(deal))).length;
