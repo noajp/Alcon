@@ -5,7 +5,7 @@ import { inToolScope, resolveToolScope, SPACE_SCOPE } from '@/Function/shared/to
 const workspace = (id: string, totals: CrmWorkspace['totals'], deals: string[] = []): CrmWorkspace => ({
   today: '2026-10-06',
   pipeline: { id, name: id } as CrmWorkspace['pipeline'],
-  params: { horizonDays: 30, followUpDays: 14 },
+  params: { horizonDays: 30, followUpDays: 14, renewalDays: 90 },
   stages: [],
   deals: deals.map(name => ({ id: name, name }) as unknown as CrmWorkspace['deals'][number]),
   primaryCurrency: totals[0]?.currency ?? null,

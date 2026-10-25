@@ -30,10 +30,11 @@ function Basics({ crm }: { crm: Crm }) {
   const [currency, setCurrency] = useState(pipeline.currency);
   const [horizon, setHorizon] = useState(String(pipeline.horizon_days));
   const [followUp, setFollowUp] = useState(String(pipeline.follow_up_days));
+  const [renewal, setRenewal] = useState(String(pipeline.renewal_days ?? 90));
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const days = (value: string) => /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 3650;
-  const valid = !!name.trim() && /^[A-Za-z]{3}$/.test(currency) && days(horizon) && days(followUp) && label.trim().length <= 40;
+  const valid = !!name.trim() && /^[A-Za-z]{3}$/.test(currency) && days(horizon) && days(followUp) && days(renewal) && label.trim().length <= 40;
   return <Section title={t('Pipeline')} description={t('Each pipeline has its own stages, currency and rhythm — for example new business, renewals or partners. Records (companies, contacts) are shared across pipelines.')}>
     <div className="grid max-w-2xl gap-3 sm:grid-cols-2">
       <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Name')}</span><input className={`${INPUT} w-full text-foreground`} value={name} onChange={event => { setName(event.target.value); setSaved(false); }} /></label>
@@ -49,11 +50,18 @@ function Basics({ crm }: { crm: Crm }) {
         <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Forecast period (days)')}</span><input inputMode="numeric" className={`${INPUT} w-24 tabular-nums text-foreground`} value={horizon} onChange={event => { setHorizon(event.target.value); setSaved(false); }} /></label>
         <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Flag after days without contact')}</span><input inputMode="numeric" className={`${INPUT} w-24 tabular-nums text-foreground`} value={followUp} onChange={event => { setFollowUp(event.target.value); setSaved(false); }} /></label>
       </div>
+      <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Flag renewals this many days ahead')}</span><input inputMode="numeric" className={`${INPUT} w-24 tabular-nums text-foreground`} value={renewal} onChange={event => { setRenewal(event.target.value); setSaved(false); }} /></label>
+      <div className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Renewal deals go to')}</span>
+        <CrmPicker label={t('Renewal deals go to')} value={pipeline.renewal_pipeline_id} placeholder={t('This pipeline')}
+          options={crm.pipelines.filter(item => item.id !== pipeline.id).map(item => ({ id: item.id, label: item.name }))}
+          onChange={id => { setError(null); crm.savePipeline(pipeline.id, { renewal_pipeline_id: id }).catch(cause => setError(cause instanceof Error ? cause.message : t('Could not save. Try again.'))); }} />
+        <span className="block">{t('A won deal with a renewal date shows up in Today when its renewal is this close.')}</span>
+      </div>
     </div>
     <div className="flex items-center gap-2">
       <Button size="sm" variant="secondary" disabled={!valid} onClick={() => {
         setError(null);
-        crm.savePipeline(pipeline.id, { name: name.trim(), record_label: label.trim() || null, currency, horizon_days: Number(horizon), follow_up_days: Number(followUp) })
+        crm.savePipeline(pipeline.id, { name: name.trim(), record_label: label.trim() || null, currency, horizon_days: Number(horizon), follow_up_days: Number(followUp), renewal_days: Number(renewal) })
           .then(() => setSaved(true)).catch(cause => setError(cause instanceof Error ? cause.message : t('Could not save. Try again.')));
       }}>{t('Save')}</Button>
       {saved && <span role="status" className="text-xs text-muted-foreground">{t('Saved')}</span>}

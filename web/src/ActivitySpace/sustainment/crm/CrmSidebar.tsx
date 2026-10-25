@@ -21,7 +21,7 @@ interface SidebarProps {
 
 // Lists that act on the deals: shown with their counts. The rest fold under "More".
 const ACTION_LISTS: { id: CrmList; label: string }[] = [
-  { id: 'at-risk', label: 'At risk' }, { id: 'no-next-step', label: 'No next step' }, { id: 'incomplete', label: 'Missing details' },
+  { id: 'at-risk', label: 'At risk' }, { id: 'renewing', label: 'Renewing' }, { id: 'no-next-step', label: 'No next step' }, { id: 'incomplete', label: 'Missing details' },
 ];
 const OTHER_LISTS: { id: CrmList; label: string }[] = [
   { id: 'closing-soon', label: 'Closing soon' }, { id: 'stale', label: 'Going quiet' }, { id: 'mine', label: 'My deals' }, { id: 'won', label: 'Won' }, { id: 'lost', label: 'Lost' },
