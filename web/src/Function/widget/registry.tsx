@@ -37,6 +37,20 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     normalizeParams: (raw) => ({ deckId: typeof raw?.deckId === 'string' && raw.deckId.length <= 64 ? raw.deckId : null }),
     load: async () => (await import('./widgets/DeckWidget')).DeckWidget,
   },
+  'note': {
+    type: 'note', label: 'Note',
+    description: 'A Note from Notebook, written in place',
+    group: 'core', accepts: ['me', 'domain', 'object', 'initiative'], zones: ['main'], defaultSize: 'full', padded: false,
+    normalizeParams: (raw) => ({ noteId: typeof raw?.noteId === 'string' && raw.noteId.length <= 64 ? raw.noteId : null }),
+    load: async () => (await import('./widgets/NoteWidget')).NoteWidget,
+  },
+  'crm-deal': {
+    type: 'crm-deal', label: 'Deal',
+    description: 'A CRM deal: stage, amount, health and next step, changed in place',
+    group: 'core', accepts: ['me', 'domain', 'object', 'initiative'], zones: ['main', 'rail'], defaultSize: 'half',
+    normalizeParams: (raw) => ({ dealId: typeof raw?.dealId === 'string' && raw.dealId.length <= 64 ? raw.dealId : null }),
+    load: async () => (await import('./widgets/CrmDealWidget')).CrmDealWidget,
+  },
   'approach-references': {
     type: 'approach-references', label: 'Domain approaches', group: 'core',
     accepts: ['initiative', 'object'], zones: ['main', 'rail'], singleton: true, defaultSize: 'full',

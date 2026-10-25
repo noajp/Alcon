@@ -4,6 +4,10 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const CRM_MESSAGES: Record<string, Row> = {
+  'No deals yet. Add one in CRM.': ['まだ商談がありません。CRM で追加できます。', '아직 거래가 없습니다. CRM에서 추가하세요.', 'Aucune affaire pour l’instant. Ajoutez-en une dans le CRM.', 'Aún no hay negocios. Añade uno en el CRM.'],
+  'Could not load the CRM.': ['CRM を読み込めませんでした。', 'CRM을 불러오지 못했습니다.', 'Impossible de charger le CRM.', 'No se pudo cargar el CRM.'],
+  'This deal is not available. It may have been deleted, or it belongs to another Space.': ['この商談は表示できません。削除されたか、別の Space のものです。', '이 거래를 표시할 수 없습니다. 삭제되었거나 다른 Space의 거래입니다.', 'Cette affaire n’est pas disponible. Elle a peut-être été supprimée, ou elle appartient à un autre Space.', 'Este negocio no está disponible. Puede que se haya eliminado o que pertenezca a otro Space.'],
+  'What happens next': ['次に何をするか', '다음에 할 일', 'Ce qui se passe ensuite', 'Qué pasa después'],
   'Whole Space': ['Space 全体', 'Space 전체', 'Tout le Space', 'Todo el Space'],
   'Only people who can see the Domain see this pipeline and its deals.': ['この Domain を見られる人だけが、このパイプラインと商談を見られます。', '이 Domain을 볼 수 있는 사람만 이 파이프라인과 거래를 볼 수 있습니다.', 'Seules les personnes qui voient le Domain voient ce pipeline et ses affaires.', 'Solo quien puede ver el Domain ve este pipeline y sus negocios.'],
   'Shown in': ['表示する範囲', '표시 범위', 'Affiché dans', 'Se muestra en'],
