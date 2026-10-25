@@ -27,8 +27,6 @@ interface KataState {
   setLangPref: (l: Lang) => void;
   toast: { id: number; text: string } | null;
   notify: (text: string) => void;
-  sidebar: boolean;
-  setSidebar: (b: boolean) => void;
   /** 中央の左にあるページ一覧 */
   filmstrip: boolean;
   setFilmstrip: (b: boolean) => void;
@@ -81,6 +79,8 @@ interface KataState {
   replaceDeck: (deck: Deck) => void;
   /** merge：同じ鍵の続けての編集（矢印キーで動かすなど）は、取り消しの1回にまとめる */
   editDeck: (fn: (d: Deck) => Deck, merge?: string) => void;
+  /** 開いていない資料にも同じ扱い（取り消しの履歴つき）で手を入れる。ボードのウィジェットから使う */
+  editFile: (fileId: string, fn: (d: Deck) => Deck, merge?: string) => void;
   /** 選んでいる置きもの（保存しない） */
   selected: string | null;
   select: (id: string | null) => void;
@@ -161,9 +161,9 @@ export const useKata = create<KataState>()(
       const mapActive = (fn: (f: KataFile) => KataFile) =>
         set((s) => ({ files: s.files.map((f) => (f.id === s.activeFileId ? fn(f) : f)) }));
       let lastMerge: { key: string; at: number; fileId: string } | null = null;
-      const editDeck = (fn: (d: Deck) => Deck, merge?: string) => {
+      const editFile = (fileId: string | null, fn: (d: Deck) => Deck, merge?: string) => {
         const st = get();
-        const f = st.files.find((x) => x.id === st.activeFileId);
+        const f = st.files.find((x) => x.id === fileId);
         if (!f) return;
         const next = fn(f.deck);
         if (next === f.deck) return;
@@ -174,8 +174,9 @@ export const useKata = create<KataState>()(
         lastMerge = merge ? { key: merge, at: now, fileId: f.id } : null;
         if (!merged) set({ history: { ...st.history, [f.id]: { past: [...h.past, f.deck].slice(-60), future: [] } } });
         else set({ history: { ...st.history, [f.id]: { past: h.past, future: [] } } });
-        mapActive((x) => touch(x, { deck: next }));
+        set((s) => ({ files: s.files.map((x) => (x.id === f.id ? touch(x, { deck: next }) : x)) }));
       };
+      const editDeck = (fn: (d: Deck) => Deck, merge?: string) => editFile(get().activeFileId, fn, merge);
       const step = (dir: "undo" | "redo") => {
         const st = get();
         const f = st.files.find((x) => x.id === st.activeFileId);
@@ -216,8 +217,6 @@ export const useKata = create<KataState>()(
             if (get().toast?.id === id) set({ toast: null });
           }, 2600);
         },
-        sidebar: true,
-        setSidebar: (b) => set({ sidebar: b }),
         filmstrip: true,
         setFilmstrip: (b) => set({ filmstrip: b }),
         presenting: false,
@@ -372,6 +371,7 @@ export const useKata = create<KataState>()(
           set({ current: 0 });
         },
         editDeck,
+        editFile,
         setSlidePath: (slideId, path, value) => editDeck((d) => D.updateSlide(d, slideId, (sl) => D.setSlidePath(sl, path, value))),
         setLayout: (slideId, layout) => editDeck((d) => D.setLayout(d, slideId, layout)),
         setStoryline: (st) => editDeck((d) => ({ ...d, storyline: st })),
@@ -426,7 +426,7 @@ export const useKata = create<KataState>()(
         return { ...current, ...p, lang };
       },
       // Only this person's preferences stay in the browser; the decks are the Space's.
-      partialize: (s) => ({ lang: s.lang, sidebar: s.sidebar, filmstrip: s.filmstrip, customLooks: s.customLooks, skills: s.skills, panel: s.panel, logicTab: s.logicTab }),
+      partialize: (s) => ({ lang: s.lang, filmstrip: s.filmstrip, customLooks: s.customLooks, skills: s.skills, panel: s.panel, logicTab: s.logicTab }),
     },
   ),
 );

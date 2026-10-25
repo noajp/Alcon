@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, FileDown, FileJson, PanelLeft, Play, Presentation, Redo2, Undo2 } from "lucide-react";
+import { ChevronDown, FileDown, FileJson, Play, Presentation, Redo2, Undo2 } from "lucide-react";
 import { IconButton } from "@/ActivitySpace/sustainment/slides/kata/components/ui/IconButton";
 import { useKata } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
 import { useDeckView } from "@/ActivitySpace/sustainment/slides/kata/components/useDeckView";
@@ -10,20 +10,6 @@ import { exportPptx } from "@/ActivitySpace/sustainment/slides/kata/export/pptx"
 import { toKataJson } from "@/ActivitySpace/sustainment/slides/kata/model/kataFile";
 import { PresentMode } from "@/ActivitySpace/sustainment/slides/kata/components/stage/PresentMode";
 import { tx } from "@/ActivitySpace/sustainment/slides/kata/i18n";
-
-export function Wordmark() {
-  return (
-    <div className="flex items-center gap-2 select-none">
-      <span className="grid h-[22px] w-[22px] grid-cols-2 gap-[2px] rounded-[5px] bg-k-ink p-[4px] ring-1 ring-k-line-strong">
-        <span className="rounded-[1px] bg-k-lime" />
-        <span className="rounded-[1px] bg-white/90" />
-        <span className="rounded-[1px] bg-white/90" />
-        <span className="rounded-[1px] bg-white/35" />
-      </span>
-      <span className="text-[15px] font-bold tracking-[-0.02em]">Slides</span>
-    </div>
-  );
-}
 
 export function Header() {
   const view = useDeckView();
@@ -39,11 +25,8 @@ export function Header() {
   return (
     <header className="flex h-12 shrink-0 items-center justify-between pl-4 pr-3">
       <div className="flex min-w-0 items-center gap-3">
-        <Wordmark />
-        <SidebarToggle />
         {view ? (
           <div className="flex min-w-0 items-center gap-2 text-[13px]">
-            <span className="text-k-ink-3">/</span>
             <span className="truncate text-k-ink-3">{folder?.name}</span>
             <span className="text-k-ink-3">/</span>
             {editing ? (
@@ -239,15 +222,5 @@ function LangToggle() {
     >
       {lang === "en" ? "日本語" : "EN"}
     </button>
-  );
-}
-
-function SidebarToggle() {
-  const open = useKata((s) => s.sidebar);
-  const setSidebar = useKata((s) => s.setSidebar);
-  return (
-    <IconButton label={open ? tx("ファイル一覧を閉じる（⌘\\）", "Hide files (⌘\\)") : tx("ファイル一覧を開く（⌘\\）", "Show files (⌘\\)")} active={!open} onClick={() => setSidebar(!open)}>
-      <PanelLeft size={15} />
-    </IconButton>
   );
 }

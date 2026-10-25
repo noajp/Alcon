@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { setLang, tx } from "@/ActivitySpace/sustainment/slides/kata/i18n";
 import { Header } from "./Header";
-import { Sidebar } from "./Sidebar";
 import { Stage } from "@/ActivitySpace/sustainment/slides/kata/components/stage/Stage";
 import { RightPanel } from "@/ActivitySpace/sustainment/slides/kata/components/panels/RightPanel";
 import { PrintDeck } from "@/ActivitySpace/sustainment/slides/kata/components/stage/PrintDeck";
@@ -31,11 +30,12 @@ export function AppShell() {
   }, []);
   const view = useDeckView();
   const lang = useKata((s) => s.lang);
-  const sidebar = useKata((s) => s.sidebar);
-  useShortcuts();
+  // Alcon keeps hidden tabs mounted: a shell that is not on screen takes no keys and prints nothing.
+  const shell = useRef<HTMLDivElement>(null);
+  useShortcuts(shell);
   // ブラウザのメニューから印刷したときも、全ページを描いてから印刷する
   useEffect(() => {
-    const before = () => flushSync(() => useKata.setState({ printing: true }));
+    const before = () => { if (shown(shell.current)) flushSync(() => useKata.setState({ printing: true })); };
     const after = () => useKata.setState({ printing: false });
     window.addEventListener("beforeprint", before);
     window.addEventListener("afterprint", after);
@@ -51,10 +51,9 @@ export function AppShell() {
 
   return (
     <div key={lang} className="kata-root contents">
-      <div className="no-print flex h-full min-w-[960px] flex-col overflow-hidden bg-k-paper">
+      <div ref={shell} className="no-print flex h-full min-w-[720px] flex-col overflow-hidden bg-k-paper">
         <Header />
         <div className="flex min-h-0 flex-1 gap-2 px-2 pb-2">
-          {sidebar ? <Sidebar /> : null}
           {view ? (
             <>
               <Stage />
@@ -170,19 +169,16 @@ function handleObjectKeys(e: KeyboardEvent): boolean {
   return false;
 }
 
-function useShortcuts() {
+/** On screen: not inside a hidden tab. */
+const shown = (el: HTMLElement | null) => !!el && el.getClientRects().length > 0;
+
+function useShortcuts(shell: RefObject<HTMLDivElement | null>) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented) return;
-      if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
-        e.preventDefault();
-        const st = useKata.getState();
-        st.setSidebar(!st.sidebar);
-        return;
-      }
+      if (e.defaultPrevented || !shown(shell.current)) return;
       // ⌘K stays Alcon's search; the editor's commands open from its header.
-      // ダイアログを開いている間は、後ろのデッキを動かさない
-      if (document.querySelector('[aria-modal="true"]')) return;
+      // ダイアログを開いている間は、後ろのデッキを動かさない（エディタ自身を包むダイアログは除く）
+      if ([...document.querySelectorAll('[aria-modal="true"]')].some((d) => !d.contains(shell.current))) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
       const s = useKata.getState();
@@ -212,5 +208,5 @@ function useShortcuts() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [shell]);
 }

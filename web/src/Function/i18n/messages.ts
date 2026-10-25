@@ -1390,6 +1390,12 @@ Object.assign(ko, { 'Overview': '개요', 'Properties': '속성', 'Description':
 Object.assign(fr, { 'Overview': 'Aperçu', 'Properties': 'Propriétés', 'Description': 'Description', 'Hide this view': 'Masquer cette vue', 'Show a view': 'Afficher une vue', '{n} days': '{n} jours' });
 Object.assign(es, { 'Overview': 'Resumen', 'Properties': 'Propiedades', 'Description': 'Descripción', 'Hide this view': 'Ocultar esta vista', 'Show a view': 'Mostrar una vista', '{n} days': '{n} días' });
 
+// Slides (ActivitySpace/sustainment/slides): its sidebar. The app name stays English.
+Object.assign(ja, { 'Slides': 'Slides', 'Add deck': '資料を追加', 'New deck': '新しい資料', 'Delete folder': 'フォルダを削除', 'Duplicate': '複製', 'Move to': '移動先', 'Delete deck': '資料を削除', 'No decks yet — click + to add one.': 'まだ資料がありません。＋ から追加できます。', 'New folder': '新しいフォルダ', 'Open a deck file': '資料ファイルを開く', 'My skills': 'マイ・スキル', 'Look library': '世界観ライブラリ' });
+Object.assign(ko, { 'Slides': 'Slides', 'Add deck': '자료 추가', 'New deck': '새 자료', 'Delete folder': '폴더 삭제', 'Duplicate': '복제', 'Move to': '이동', 'Delete deck': '자료 삭제', 'No decks yet — click + to add one.': '아직 자료가 없습니다. +로 추가하세요.', 'New folder': '새 폴더', 'Open a deck file': '자료 파일 열기', 'My skills': '내 스킬', 'Look library': '룩 라이브러리' });
+Object.assign(fr, { 'Slides': 'Slides', 'Add deck': 'Ajouter une présentation', 'New deck': 'Nouvelle présentation', 'Delete folder': 'Supprimer le dossier', 'Duplicate': 'Dupliquer', 'Move to': 'Déplacer vers', 'Delete deck': 'Supprimer la présentation', 'No decks yet — click + to add one.': 'Aucune présentation — cliquez sur + pour en ajouter une.', 'New folder': 'Nouveau dossier', 'Open a deck file': 'Ouvrir un fichier de présentation', 'My skills': 'Mes compétences', 'Look library': 'Bibliothèque de styles' });
+Object.assign(es, { 'Slides': 'Slides', 'Add deck': 'Añadir presentación', 'New deck': 'Nueva presentación', 'Delete folder': 'Eliminar carpeta', 'Duplicate': 'Duplicar', 'Move to': 'Mover a', 'Delete deck': 'Eliminar presentación', 'No decks yet — click + to add one.': 'Aún no hay presentaciones: pulsa + para añadir una.', 'New folder': 'Nueva carpeta', 'Open a deck file': 'Abrir un archivo de presentación', 'My skills': 'Mis habilidades', 'Look library': 'Biblioteca de estilos' });
+
 // People (ActivitySpace/sustainment/team). Last, so the app name stays
 // English everywhere, like every other concept name.
 Object.assign(ja, PEOPLE_TRANSLATIONS.ja);

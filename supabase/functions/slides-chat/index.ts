@@ -101,11 +101,17 @@ Deno.serve(async (req) => {
   if (authError || !user) return reply({ error: 'Sign in again.' }, 401);
   if (!Deno.env.get('ANTHROPIC_API_KEY')) return reply({ error: 'AI is not configured.' }, 503);
   const text = await req.text();
-  if (text.length > 1_500_000) return reply({ error: 'Request too large.' }, 413);
-  const body = JSON.parse(text) as { deck: { title?: string; slides: unknown[] }; current: number; text: string; skills?: Skill[]; lang?: string };
-  const { deck, current } = body;
-  const say = (ja: string, en: string) => (body.lang === 'en' ? en : ja);
-  if (!deck || !Array.isArray(deck.slides) || typeof body.text !== 'string') return reply({ error: say('入力が正しくありません', 'Invalid input') }, 400);
+  // The deck's source document travels with it but is not sent to the model.
+  if (text.length > 4_000_000) return reply({ error: 'Request too large.' }, 413);
+  type Body = { deck: { title?: string; slides: unknown[]; sourceDoc?: unknown }; current: number; text: string; skills?: Skill[]; lang?: string };
+  let body: Body;
+  try { body = JSON.parse(text) as Body; } catch { return reply({ error: 'Invalid input' }, 400); }
+  const say = (ja: string, en: string) => (body?.lang === 'en' ? en : ja);
+  if (!body || !body.deck || !Array.isArray(body.deck.slides) || typeof body.text !== 'string') return reply({ error: say('入力が正しくありません', 'Invalid input') }, 400);
+  const { current } = body;
+  const deck = { ...body.deck, sourceDoc: undefined };
+  // What reaches the model: a deck and a request, not a whole document.
+  if (JSON.stringify(deck).length + body.text.length > 400_000) return reply({ error: say('資料か依頼が長すぎます', 'The deck or the request is too long') }, 413);
   const skills = Array.isArray(body.skills) ? body.skills.filter((k) => k && Array.isArray(k.terms) && Array.isArray(k.banned)) : [];
   const rules = skills
     .flatMap((k) => [
@@ -126,7 +132,7 @@ Deno.serve(async (req) => {
       system: SYSTEM,
       messages: [{
         role: 'user',
-        content: `## Current deck (slide on screen: index ${current})\n${JSON.stringify({ ...deck, sourceDoc: undefined })}\n\n${rules ? `## Writing rules from the user (must follow)\n${rules}\n\n` : ''}## User request\n${body.text}`,
+        content: `## Current deck (slide on screen: index ${current})\n${JSON.stringify(deck)}\n\n${rules ? `## Writing rules from the user (must follow)\n${rules}\n\n` : ''}## User request\n${body.text}`,
       }],
     });
     if (response.stop_reason === 'refusal') {

@@ -1,15 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useKata } from './kata/store/useKata';
+import { tx } from './kata/i18n';
 import type { Deck, Folder, KataFile, MixState, ChatMessage } from './kata/model/types';
 
 // =============================================================
-// Slides ⇄ Supabase. The editor keeps its workspace in a store; the Space
+// Slides ⇄ Supabase. The editor keeps its workspace in one store; the Space
 // keeps decks and folders as rows (docs/adr/0042). This module loads a Space's
 // rows into the store, writes back what the editor changed, and takes in what
 // other people changed — the store never has to know where it is saved.
+//
+// There is one store, so there is one sync: every surface that shows decks
+// (the Slides app, a Deck widget, the full-screen editor) shares a session for
+// the active Space, counted by who holds it. Writes and the intake of other
+// people's changes run one after another in a single queue, so neither ever
+// works from a picture the other has since changed. Each deck carries the
+// server's updated_at as we last saw it: a write only lands on that version
+// (otherwise someone else got there first), and a change that comes back with
+// that version is our own echo.
 // =============================================================
 
 export interface DeckRow {
@@ -25,6 +35,8 @@ export interface DeckRow {
 export interface FolderRow { id: string; activity_space_id: string; name: string; position: number }
 
 export interface Snapshot { folders: Folder[]; files: KataFile[] }
+
+const DECK_COLUMNS = 'id, activity_space_id, folder_id, name, deck, mix, chat, updated_at';
 
 export function fileFromRow(row: DeckRow): KataFile {
   return {
@@ -72,128 +84,264 @@ export function diffWorkspace(prev: Snapshot, next: Snapshot) {
 const isEmpty = (d: ReturnType<typeof diffWorkspace>) =>
   !d.upsertFolders.length && !d.deleteFolders.length && !d.upsertFiles.length && !d.deleteFiles.length;
 
-async function loadSpace(spaceId: string): Promise<Snapshot> {
-  const [folders, decks] = await Promise.all([
-    supabase.from('deck_folders').select('id, activity_space_id, name, position').eq('activity_space_id', spaceId).order('position'),
-    supabase.from('decks').select('id, activity_space_id, folder_id, name, deck, mix, chat, updated_at').eq('activity_space_id', spaceId).order('updated_at', { ascending: false }),
-  ]);
-  if (folders.error) throw folders.error;
-  if (decks.error) throw decks.error;
-  return {
-    folders: ((folders.data ?? []) as FolderRow[]).map((f) => ({ id: f.id, name: f.name, open: true })),
-    files: ((decks.data ?? []) as DeckRow[]).map(fileFromRow),
-  };
+/**
+ * The Space's folders as read just now, merged with this viewer's: folders
+ * made here and not yet written stay, folders deleted here and not yet
+ * written stay gone, and each keeps whether this viewer has it open.
+ */
+export function mergeFolders(remote: Folder[], local: Folder[], synced: Folder[]): Folder[] {
+  const localById = new Map(local.map((f) => [f.id, f]));
+  const syncedIds = new Set(synced.map((f) => f.id));
+  const remoteIds = new Set(remote.map((f) => f.id));
+  const kept = remote
+    .filter((f) => localById.has(f.id) || !syncedIds.has(f.id))
+    .map((f) => ({ ...f, open: localById.get(f.id)?.open ?? true }));
+  const unsaved = local.filter((f) => !syncedIds.has(f.id) && !remoteIds.has(f.id));
+  return [...kept, ...unsaved];
 }
+
+/** Postgres and Realtime spell a timestamp differently; compare what they mean. */
+export function sameStamp(a: string | undefined | null, b: string | undefined | null) {
+  if (!a || !b) return false;
+  const norm = (s: string) => s.replace(' ', 'T').replace(/(Z|\+00(:?00)?)$/, '');
+  return norm(a) === norm(b);
+}
+
+const replaceOrAdd = (files: KataFile[], file: KataFile) =>
+  files.some((f) => f.id === file.id) ? files.map((f) => (f.id === file.id ? file : f)) : [...files, file];
 
 const FLUSH_MS = 600;
 
-/**
- * Keeps the editor's store and a Space's decks in step. Returns whether the
- * Space has been read, and the last error writing to it.
- */
-export function useSlidesSync(spaceId: string | null): { ready: boolean; error: string | null } {
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+interface Status { spaceId: string | null; ready: boolean; error: string | null }
+let status: Status = { spaceId: null, ready: false, error: null };
+const listeners = new Set<() => void>();
+const publish = (next: Status) => { status = next; listeners.forEach((l) => l()); };
 
-  useEffect(() => {
-    if (!spaceId) return;
-    let alive = true;
-    let synced: Snapshot = { folders: [], files: [] };
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let writing: Promise<void> = Promise.resolve();
-    // Files edited here and not yet written: a remote copy must not replace them.
-    const dirty = new Set<string>();
+interface Session { spaceId: string; refs: number; stop: () => void }
+let session: Session | null = null;
+let pendingStop: ReturnType<typeof setTimeout> | null = null;
 
-    const flush = () => {
-      timer = null;
-      writing = writing.then(async () => {
-        const state = useKata.getState();
-        const next: Snapshot = { folders: state.folders, files: state.files };
-        const diff = diffWorkspace(synced, next);
-        if (isEmpty(diff)) return;
-        try {
-          if (diff.upsertFolders.length) {
-            const { error: e } = await supabase.from('deck_folders').upsert(
-              diff.upsertFolders.map(({ f, i }) => ({ id: f.id, activity_space_id: spaceId, name: f.name.trim().slice(0, 200) || 'Folder', position: i })));
-            if (e) throw e;
-          }
-          if (diff.upsertFiles.length) {
-            const { error: e } = await supabase.from('decks').upsert(diff.upsertFiles.map((f) => rowFromFile(f, spaceId)));
-            if (e) throw e;
-          }
-          if (diff.deleteFiles.length) {
-            const { error: e } = await supabase.from('decks').delete().in('id', diff.deleteFiles);
-            if (e) throw e;
-          }
-          if (diff.deleteFolders.length) {
-            const { error: e } = await supabase.from('deck_folders').delete().in('id', diff.deleteFolders);
-            if (e) throw e;
-          }
-          synced = next;
-          for (const f of diff.upsertFiles) dirty.delete(f.id);
-          if (alive) setError(null);
-        } catch (e) {
-          if (alive) setError(e instanceof Error ? e.message : 'Could not save the deck.');
-        }
-      });
+function start(spaceId: string): Session {
+  let alive = true;
+  let loaded = false;
+  let synced: Snapshot = { folders: [], files: [] };
+  // The server's updated_at for each deck, as we last wrote or read it.
+  const stamps = new Map<string, string>();
+  // Decks edited here and not yet written: a remote copy must not replace them.
+  const dirty = new Set<string>();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let queue: Promise<void> = Promise.resolve();
+  let unsubscribe = () => {};
+  const enqueue = (step: () => Promise<void>) => { queue = queue.then(step).catch(() => {}); };
+  const setError = (error: string | null) => { if (alive) publish({ spaceId, ready: loaded, error }); };
+  const snapshot = (): Snapshot => { const st = useKata.getState(); return { folders: st.folders, files: st.files }; };
+
+  // The deck someone else changed first: theirs is kept, and this viewer is told.
+  const takeTheirs = async (id: string, nextSynced: Snapshot): Promise<Snapshot> => {
+    const { data } = await supabase.from('decks').select(DECK_COLUMNS).eq('id', id).maybeSingle();
+    dirty.delete(id);
+    const name = useKata.getState().files.find((f) => f.id === id)?.name ?? '';
+    if (data) {
+      const row = data as DeckRow;
+      const file = fileFromRow(row);
+      stamps.set(id, row.updated_at);
+      if (alive) {
+        useKata.setState((s) => ({ files: replaceOrAdd(s.files, file) }));
+        useKata.getState().notify(tx(`「${name}」は他の人が先に変えたので、その版に合わせました`, `Someone else changed “${name}” first, so it now shows their version`));
+      }
+      return { ...nextSynced, files: replaceOrAdd(nextSynced.files, file) };
+    }
+    stamps.delete(id);
+    if (alive) {
+      useKata.setState((s) => ({ files: s.files.filter((f) => f.id !== id), activeFileId: s.activeFileId === id ? null : s.activeFileId }));
+      useKata.getState().notify(tx(`「${name}」は他の人が削除しました`, `Someone else deleted “${name}”`));
+    }
+    return { ...nextSynced, files: nextSynced.files.filter((f) => f.id !== id) };
+  };
+
+  const write = async (next: Snapshot) => {
+    const diff = diffWorkspace(synced, next);
+    if (isEmpty(diff)) return;
+    try {
+      if (diff.upsertFolders.length) {
+        const { error } = await supabase.from('deck_folders').upsert(
+          diff.upsertFolders.map(({ f, i }) => ({ id: f.id, activity_space_id: spaceId, name: f.name.trim().slice(0, 200) || 'Folder', position: i })));
+        if (error) throw error;
+      }
+      const conflicts: string[] = [];
+      const fresh = diff.upsertFiles.filter((f) => !stamps.has(f.id));
+      if (fresh.length) {
+        const { data, error } = await supabase.from('decks').insert(fresh.map((f) => rowFromFile(f, spaceId))).select('id, updated_at');
+        if (error) throw error;
+        for (const r of (data ?? []) as { id: string; updated_at: string }[]) stamps.set(r.id, r.updated_at);
+      }
+      for (const f of diff.upsertFiles.filter((x) => stamps.has(x.id) && !fresh.includes(x))) {
+        const { data, error } = await supabase.from('decks').update(rowFromFile(f, spaceId))
+          .eq('id', f.id).eq('updated_at', stamps.get(f.id)!).select('updated_at');
+        if (error) throw error;
+        if (data?.length) stamps.set(f.id, (data[0] as { updated_at: string }).updated_at);
+        else conflicts.push(f.id);
+      }
+      if (diff.deleteFiles.length) {
+        const { error } = await supabase.from('decks').delete().eq('activity_space_id', spaceId).in('id', diff.deleteFiles);
+        if (error) throw error;
+        for (const id of diff.deleteFiles) stamps.delete(id);
+      }
+      if (diff.deleteFolders.length) {
+        const { error } = await supabase.from('deck_folders').delete().eq('activity_space_id', spaceId).in('id', diff.deleteFolders);
+        if (error) throw error;
+      }
+      let nextSynced = next;
+      for (const id of conflicts) nextSynced = await takeTheirs(id, nextSynced);
+      synced = nextSynced;
+      // Written as they are now; a deck edited again meanwhile stays pending.
+      const current = new Map(useKata.getState().files.map((f) => [f.id, f]));
+      for (const f of diff.upsertFiles) if (!conflicts.includes(f.id) && (!alive || current.get(f.id) === f)) dirty.delete(f.id);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save the deck.');
+    }
+  };
+
+  const flush = () => { timer = null; enqueue(() => write(snapshot())); };
+
+  // Another viewer's change to one deck: take it unless it is our own echo, or
+  // the deck has edits here still to be written (the write will then find the
+  // version moved on and keep theirs).
+  const takeDeck = (id: string, stamp?: string) => enqueue(async () => {
+    if (!alive || dirty.has(id) || sameStamp(stamp, stamps.get(id))) return;
+    const here = useKata.getState().files.some((f) => f.id === id);
+    if (!here && synced.files.some((f) => f.id === id)) return; // deleted here, not yet written
+    const { data } = await supabase.from('decks').select(DECK_COLUMNS).eq('id', id).eq('activity_space_id', spaceId).maybeSingle();
+    if (!data || !alive || dirty.has(id)) return;
+    const row = data as DeckRow;
+    if (sameStamp(row.updated_at, stamps.get(id))) return;
+    const file = fileFromRow(row);
+    stamps.set(id, row.updated_at);
+    synced = { ...synced, files: replaceOrAdd(synced.files, file) };
+    useKata.setState((s) => ({ files: replaceOrAdd(s.files, file) }));
+  });
+
+  const dropDeck = (id: string) => enqueue(async () => {
+    if (!alive || dirty.has(id) || !stamps.has(id)) return;
+    stamps.delete(id);
+    synced = { ...synced, files: synced.files.filter((f) => f.id !== id) };
+    useKata.setState((s) => ({ files: s.files.filter((f) => f.id !== id), activeFileId: s.activeFileId === id ? null : s.activeFileId }));
+  });
+
+  const takeFolders = () => enqueue(async () => {
+    if (!alive) return;
+    const { data, error } = await supabase.from('deck_folders').select('id, activity_space_id, name, position').eq('activity_space_id', spaceId).order('position');
+    if (error || !alive) return;
+    const remote = ((data ?? []) as FolderRow[]).map((f) => ({ id: f.id, name: f.name, open: true }));
+    const folders = mergeFolders(remote, useKata.getState().folders, synced.folders);
+    synced = { ...synced, folders: remote };
+    useKata.setState({ folders });
+  });
+
+  // The store shows this Space only. Keep the deck that was open if it is here too.
+  const wanted = useKata.getState().activeFileId;
+  useKata.setState({ folders: [], files: [], activeFileId: null, current: 0, history: {} });
+  enqueue(async () => {
+    const [folders, decks] = await Promise.all([
+      supabase.from('deck_folders').select('id, activity_space_id, name, position').eq('activity_space_id', spaceId).order('position'),
+      supabase.from('decks').select(DECK_COLUMNS).eq('activity_space_id', spaceId).order('updated_at', { ascending: false }),
+    ]);
+    if (!alive) return;
+    if (folders.error || decks.error) { setError((folders.error ?? decks.error)!.message || 'Could not load decks.'); return; }
+    const rows = (decks.data ?? []) as DeckRow[];
+    for (const r of rows) stamps.set(r.id, r.updated_at);
+    synced = {
+      folders: ((folders.data ?? []) as FolderRow[]).map((f) => ({ id: f.id, name: f.name, open: true })),
+      files: rows.map(fileFromRow),
     };
+    const active = synced.files.find((f) => f.id === wanted)?.id ?? synced.files[0]?.id ?? null;
+    useKata.setState({ folders: synced.folders, files: synced.files, activeFileId: active, current: 0 });
+    unsubscribe = useKata.subscribe((s, prev) => {
+      if (s.folders === prev.folders && s.files === prev.files) return;
+      const before = new Map(prev.files.map((f) => [f.id, f]));
+      const saved = new Map(synced.files.map((f) => [f.id, f]));
+      for (const f of s.files) if (before.get(f.id) !== f && saved.get(f.id) !== f) dirty.add(f.id);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(flush, FLUSH_MS);
+    });
+    loaded = true;
+    setError(null);
+  });
 
-    let unsubscribe = () => {};
-    useKata.setState({ folders: [], files: [], activeFileId: null, current: 0, history: {} });
-    void loadSpace(spaceId).then((loaded) => {
-      if (!alive) return;
-      synced = loaded;
-      const st = useKata.getState();
-      const active = loaded.files.find((f) => f.id === st.activeFileId)?.id ?? loaded.files[0]?.id ?? null;
-      useKata.setState({ folders: loaded.folders, files: loaded.files, activeFileId: active, current: 0 });
-      unsubscribe = useKata.subscribe((s, prev) => {
-        if (s.folders === prev.folders && s.files === prev.files) return;
-        const prevFiles = new Map(prev.files.map((f) => [f.id, f]));
-        // A deck taken in from someone else is already saved; only local edits are pending.
-        const saved = new Map(synced.files.map((f) => [f.id, f]));
-        for (const f of s.files) if (prevFiles.get(f.id) !== f && saved.get(f.id) !== f) dirty.add(f.id);
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(flush, FLUSH_MS);
-      });
-      setReady(true);
-    }).catch((e) => { if (alive) setError(e instanceof Error ? e.message : 'Could not load decks.'); });
+  // Changes are filtered to this Space; deletes cannot be (Realtime sends only
+  // the key), so they are matched against the decks and folders known here.
+  const channel = supabase.channel(`slides:${spaceId}`)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'decks', filter: `activity_space_id=eq.${spaceId}` },
+      (p) => takeDeck(String((p.new as DeckRow).id), (p.new as DeckRow).updated_at))
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'decks', filter: `activity_space_id=eq.${spaceId}` },
+      (p) => takeDeck(String((p.new as DeckRow).id), (p.new as DeckRow).updated_at))
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'decks' },
+      (p) => { const id = (p.old as { id?: string }).id; if (id) dropDeck(id); })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'deck_folders', filter: `activity_space_id=eq.${spaceId}` }, () => takeFolders())
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'deck_folders', filter: `activity_space_id=eq.${spaceId}` }, () => takeFolders())
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'deck_folders' }, (p) => {
+      const id = (p.old as { id?: string }).id;
+      if (id && synced.folders.some((f) => f.id === id)) takeFolders();
+    })
+    .subscribe();
 
-    // Other people's edits: take a deck in unless it has unsaved edits here.
-    const channel = supabase.channel(`slides:${spaceId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'decks', filter: `activity_space_id=eq.${spaceId}` }, async (payload) => {
-        const id = String((payload.new as { id?: string })?.id ?? (payload.old as { id?: string })?.id ?? '');
-        if (!id || dirty.has(id)) return;
-        if (payload.eventType === 'DELETE') {
-          synced = { ...synced, files: synced.files.filter((f) => f.id !== id) };
-          useKata.setState((s) => ({ files: s.files.filter((f) => f.id !== id), activeFileId: s.activeFileId === id ? null : s.activeFileId }));
-          return;
-        }
-        const { data } = await supabase.from('decks').select('id, activity_space_id, folder_id, name, deck, mix, chat, updated_at').eq('id', id).maybeSingle();
-        if (!data || dirty.has(id) || !alive) return;
-        const file = fileFromRow(data as DeckRow);
-        const known = synced.files.find((f) => f.id === id);
-        if (known && known.updatedAt >= file.updatedAt && JSON.stringify(known.deck) === JSON.stringify(file.deck) && known.name === file.name) return;
-        synced = { ...synced, files: known ? synced.files.map((f) => (f.id === id ? file : f)) : [...synced.files, file] };
-        useKata.setState((s) => ({ files: s.files.some((f) => f.id === id) ? s.files.map((f) => (f.id === id ? file : f)) : [...s.files, file] }));
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'deck_folders', filter: `activity_space_id=eq.${spaceId}` }, async () => {
-        const loaded = await loadSpace(spaceId).catch(() => null);
-        if (!loaded || !alive) return;
-        const open = new Map(useKata.getState().folders.map((f) => [f.id, f.open]));
-        const folders = loaded.folders.map((f) => ({ ...f, open: open.get(f.id) ?? true }));
-        synced = { ...synced, folders };
-        useKata.setState({ folders });
-      })
-      .subscribe();
-
-    return () => {
+  return {
+    spaceId,
+    refs: 0,
+    stop: () => {
+      // Read the last edits now, before the next Space empties the store.
+      const last = loaded ? snapshot() : null;
+      if (timer) clearTimeout(timer);
+      timer = null;
       alive = false;
       unsubscribe();
-      if (timer) { clearTimeout(timer); flush(); }
       void supabase.removeChannel(channel);
-      setReady(false);
-    };
-  }, [spaceId]);
+      if (last) enqueue(() => write(last));
+    },
+  };
+}
 
-  return { ready: ready && !!spaceId, error };
+function acquire(spaceId: string) {
+  if (pendingStop) { clearTimeout(pendingStop); pendingStop = null; }
+  if (session && session.spaceId !== spaceId) { session.stop(); session = null; }
+  if (!session) {
+    publish({ spaceId, ready: false, error: null });
+    session = start(spaceId);
+  }
+  session.refs += 1;
+}
+
+function release(spaceId: string) {
+  const held = session;
+  if (!held || held.spaceId !== spaceId) return;
+  held.refs -= 1;
+  if (held.refs > 0) return;
+  // A surface that remounts at once (a tab switch, a widget moving) keeps the session.
+  pendingStop = setTimeout(() => {
+    pendingStop = null;
+    if (session !== held || held.refs > 0) return;
+    held.stop();
+    session = null;
+    publish({ spaceId: null, ready: false, error: null });
+  }, 0);
+}
+
+const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
+const IDLE: Status = { spaceId: null, ready: false, error: null };
+
+/**
+ * Keeps the editor's store and a Space's decks in step while any surface
+ * holds it. Returns whether the Space has been read, and the last error
+ * writing to it.
+ */
+export function useSlidesSync(spaceId: string | null): { ready: boolean; error: string | null } {
+  useEffect(() => {
+    if (!spaceId) return;
+    acquire(spaceId);
+    return () => release(spaceId);
+  }, [spaceId]);
+  const now = useSyncExternalStore(subscribe, () => status, () => IDLE);
+  const mine = !!spaceId && now.spaceId === spaceId;
+  return { ready: mine && now.ready, error: mine ? now.error : null };
 }

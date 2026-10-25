@@ -326,7 +326,7 @@ function WorkspaceContent({
   // Profile (reached from the avatar; Now / My Elements / My Notes / AI are
   // its tabs) has nothing to list, so it takes the whole width.
   // Slides brings its own deck list, so it takes the whole width too.
-  const personalMode = railModeOf(activeTab.activeView) === 'personal' || railModeOf(activeTab.activeView) === 'slides';
+  const personalMode = railModeOf(activeTab.activeView) === 'personal';
   const sidebarHidden = sidebarCollapsed || personalMode;
   const [discoverOpen, setDiscoverOpen] = useState(false);
   // Alcon Copilot pane — open state shared by the strip's PanelRight

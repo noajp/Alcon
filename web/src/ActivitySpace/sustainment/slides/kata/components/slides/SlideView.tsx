@@ -18,6 +18,8 @@ interface Props {
   role?: string;
   tokens: LookTokens;
   editable?: boolean;
+  /** 自由に置いたものも動かせるか（既定は editable と同じ。開いている資料にだけ手が届くので、ボードでは文字だけ） */
+  editObjects?: boolean;
   onEdit?: EditFn;
   onFocusText?: (key: string, size: number) => void;
   /** 資料の言語（無ければこのページの文字から決める） */
@@ -25,7 +27,7 @@ interface Props {
 }
 
 /** 1280×720 の原寸で描く。拡大縮小は外側の SlideScaler が受け持つ */
-export function SlideView({ slide, index, role, tokens, editable = false, onEdit, onFocusText, lang: deckLang }: Props) {
+export function SlideView({ slide, index, role, tokens, editable = false, editObjects = editable, onEdit, onFocusText, lang: deckLang }: Props) {
   const vars = tokensToCss(tokens) as CSSProperties;
   const [boxRef, innerRef] = useFit(slide, tokens.type);
   const isCover = slide.layout === "cover";
@@ -49,7 +51,7 @@ export function SlideView({ slide, index, role, tokens, editable = false, onEdit
           textWrap: "pretty" as never,
         }}
       >
-        <ObjectsLayer slide={slide} editable={editable} behind />
+        <ObjectsLayer slide={slide} editable={editObjects} behind />
         {isCover ? (
           <Body slide={slide} />
         ) : (
@@ -87,7 +89,7 @@ export function SlideView({ slide, index, role, tokens, editable = false, onEdit
             </div>
           </div>
         )}
-        <ObjectsLayer slide={slide} editable={editable} />
+        <ObjectsLayer slide={slide} editable={editObjects} />
       </div>
     </SlideEditContext.Provider>
   );

@@ -56,6 +56,7 @@ import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarSto
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
 import { CrmSidebar } from '@/ActivitySpace/sustainment/crm/CrmSidebar';
+import { SlidesSidebar, createDeckHere } from '@/ActivitySpace/sustainment/slides/SlidesSidebar';
 import { InboxList } from '@/ActivitySpace/home/InboxList';
 import { CalendarSidebar } from '@/ActivitySpace/sustainment/calendar/CalendarSidebar';
 import { WorkloadSidebar } from '@/ActivitySpace/sustainment/workload/WorkloadSidebar';
@@ -235,12 +236,13 @@ export function AppSidebar({
   // create show no "+".
   const calendarDay = useCalendarDay();
   const createLabel = ({
-    notebook: 'Add Notebook', tables: 'Add Table', strategy: 'Create new',
+    notebook: 'Add Notebook', tables: 'Add Table', slides: 'Add deck', strategy: 'Create new',
     calendar: 'Add schedule', execution: 'Create new',
   } as Partial<Record<RailMode, string>>)[railMode ?? 'execution'];
   const openCreateMenu = () => {
     if (railMode === 'tables') { openCreate('table'); return; }
     if (railMode === 'notebook') { openCreate('notebook'); return; }
+    if (railMode === 'slides') { createDeckHere(); onViewChange('slides'); return; }
     if (railMode === 'calendar') {
       window.dispatchEvent(new CustomEvent<CreateElementDetail>(CREATE_ELEMENT_EVENT, { detail: { dueDate: calendarDay } }));
       return;
@@ -532,6 +534,8 @@ export function AppSidebar({
           {railMode === 'calendar' && <><SidebarModeLabel label={t('Calendar')} /><CalendarSidebar /></>}
           {railMode === 'team' && <SidebarModeLabel label={t('People')} />}
           {railMode === 'crm' && <CrmSidebar navigation={navigation} onNavigate={onNavigate} />}
+          {/* ── Slides ── the Space's deck folders; the main pane edits the open deck. */}
+          {railMode === 'slides' && <SlidesSidebar onOpen={() => { if (activeView !== 'slides') onViewChange('slides'); }} />}
           </>
           )}
         </nav></ButtonAppearanceProvider>

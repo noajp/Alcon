@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffWorkspace, fileFromRow, rowFromFile } from '@/ActivitySpace/sustainment/slides/sync';
+import { diffWorkspace, fileFromRow, mergeFolders, rowFromFile, sameStamp } from '@/ActivitySpace/sustainment/slides/sync';
 import type { KataFile } from '@/ActivitySpace/sustainment/slides/kata/model/types';
 
 const file = (id: string, name = id): KataFile => ({
@@ -33,5 +33,24 @@ describe('Slides ⇄ the Space', () => {
     expect(back.chat).toEqual(f.chat);
     // A row from an older writer without every mix field still gives a complete mix.
     expect(fileFromRow({ ...row, mix: { selected: ['forest'] } as never, updated_at: 'x' }).mix).toEqual({ selected: ['forest'], pins: {}, offset: 0 });
+  });
+
+  it('merges the Space\'s folders with the ones made or deleted here and not yet written', () => {
+    const f = (id: string, open = true) => ({ id, name: id, open });
+    const synced = [f('a'), f('b')];
+    // Here: "a" closed, "b" deleted (not yet written), "n" new (not yet written).
+    const local = [f('a', false), f('n')];
+    // The Space now: a, b, and "r" someone else added.
+    const remote = [f('a'), f('b'), f('r')];
+    expect(mergeFolders(remote, local, synced)).toEqual([f('a', false), f('r'), f('n')]);
+    // A folder someone else deleted goes, and nothing is invented.
+    expect(mergeFolders([f('b')], [f('a'), f('b')], synced)).toEqual([f('b')]);
+  });
+
+  it('reads a Realtime timestamp and a Postgres one as the same moment', () => {
+    expect(sameStamp('2026-10-25T03:00:58.123456+00:00', '2026-10-25 03:00:58.123456+00')).toBe(true);
+    expect(sameStamp('2026-10-25T03:00:58.123456Z', '2026-10-25T03:00:58.123456')).toBe(true);
+    expect(sameStamp('2026-10-25T03:00:58.123456+00:00', '2026-10-25T03:00:58.123457+00:00')).toBe(false);
+    expect(sameStamp(undefined, '2026-10-25T03:00:58Z')).toBe(false);
   });
 });
