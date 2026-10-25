@@ -6,6 +6,7 @@ import { tokensToCss } from "@/ActivitySpace/sustainment/slides/kata/theme/mix";
 import { Ed, SlideEditContext, type EditFn } from "./Editable";
 import { Body } from "./layouts";
 import { ObjectsLayer } from "./Objects";
+import "@/ActivitySpace/sustainment/slides/kata/fonts";
 import { getLang, tx, roleLabel, textLang, type Lang } from "@/ActivitySpace/sustainment/slides/kata/i18n";
 
 export const SLIDE_W = 1280;

@@ -697,6 +697,11 @@ button, a, input, select, textarea {
   --color-k-check: var(--k-check);
 }
 :root {
+  /* Slides の書体（slides/kata/fonts.ts が同梱分を読み込む）。スライドの世界観がこの名前で指す */
+  --font-inter: "Inter Variable";
+  --font-noto-sans: "Noto Sans JP";
+  --font-noto-serif: "Noto Serif JP";
+  --font-plex-mono: "IBM Plex Mono";
   --k-paper: var(--background);
   --k-panel: var(--card);
   --k-panel-2: var(--surface-muted);
