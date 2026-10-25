@@ -9,7 +9,9 @@ import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { createWorker, deleteWorker, updateWorker } from '@/hooks/useSupabase';
-import type { Worker } from '@/types/database';
+import type { DomainMemberRole, Worker } from '@/types/database';
+import { setDomainMemberRole } from '@/hooks/useDomainMembers';
+import { Button } from '@/ui/button';
 import { ReachHint, WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { isUnreachableWorker } from '@/Function/shared/workerReach';
 import { SettingsSection } from './SettingsSection';
@@ -32,7 +34,12 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   // The Space a Worker added here belongs to: the Domain's, else the active one.
   const [workerSpaceId, setWorkerSpaceId] = useState<string | null>(null);
   const [memberUserIds, setMemberUserIds] = useState<Set<string>>(new Set());
-  const [myRole, setMyRole] = useState<'owner' | 'member' | null>(null);
+  const [memberRoles, setMemberRoles] = useState<Map<string, DomainMemberRole>>(new Map());
+  // Viewers are not assignable, so they are not among the Workers above; they
+  // are listed from their membership rows.
+  const [viewers, setViewers] = useState<{ userId: string; name: string | null; avatarUrl: string | null }[]>([]);
+  const [roleBusy, setRoleBusy] = useState<string | null>(null);
+  const [myRole, setMyRole] = useState<DomainMemberRole | null>(null);
   const [isSpaceOwner, setIsSpaceOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +54,11 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   // Space or Domain may change only their capacity and status.
   const isOwner = domainId ? myRole === 'owner' : false;
   const isAnyOwner = isOwner || isSpaceOwner;
+  // set_domain_member_role: owners and admins change roles; only an owner
+  // touches an owner's.
+  const canManageRoles = domainId ? myRole === 'owner' || myRole === 'admin' : false;
+  const canChangeRoleOf = (userId: string) =>
+    canManageRoles && userId !== user?.id && (memberRoles.get(userId) !== 'owner' || isOwner);
   // Connecting redirects a Worker's assignments and notifications to an
   // account. Only a human Object Worker can be connected, by an owner, to
   // someone in its Space: every account already has its own human Worker, so
@@ -80,7 +92,13 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
       ]);
       if (workersErr) throw workersErr;
       if (memberRowsResult.error) throw memberRowsResult.error;
-      const memberRows = (memberRowsResult.data ?? []) as { user_id: string; role: 'owner' | 'member' }[];
+      const memberRows = (memberRowsResult.data ?? []) as { user_id: string; role: DomainMemberRole }[];
+      const viewerIds = memberRows.filter((r) => r.role === 'viewer').map((r) => r.user_id);
+      const { data: viewerProfiles, error: viewerProfilesErr } = viewerIds.length > 0
+        ? await supabase.from('profiles').select('id, display_name, avatar_url').in('id', viewerIds)
+        : { data: [], error: null };
+      if (viewerProfilesErr) throw viewerProfilesErr;
+      const profileById = new Map(((viewerProfiles ?? []) as { id: string; display_name: string | null; avatar_url: string | null }[]).map((p) => [p.id, p]));
       const spaceId = (domainResult.data as { activity_space_id: string | null } | null)?.activity_space_id ?? activeSpaceId;
       const { data: spaceRole, error: spaceRoleErr } = spaceId && user?.id
         ? await supabase.from('activity_space_members').select('role')
@@ -91,6 +109,8 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
       setWorkerSpaceId(spaceId);
       setIsSpaceOwner((spaceRole as { role: string } | null)?.role === 'owner');
       setMemberUserIds(new Set(memberRows.map((r) => r.user_id)));
+      setMemberRoles(new Map(memberRows.map((r) => [r.user_id, r.role])));
+      setViewers(viewerIds.map((id) => ({ userId: id, name: profileById.get(id)?.display_name ?? null, avatarUrl: profileById.get(id)?.avatar_url ?? null })));
       setMyRole(memberRows.find((r) => r.user_id === user?.id)?.role ?? null);
       setError(null);
     } catch (e) {
@@ -113,6 +133,19 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
       setWorkers((prev) => prev.filter((w) => w.id !== id));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to remove member');
+    }
+  };
+
+  const handleRoleChange = async (userId: string, role: DomainMemberRole) => {
+    if (!domainId) return;
+    setRoleBusy(userId);
+    try {
+      await setDomainMemberRole(domainId, userId, role);
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to change role');
+    } finally {
+      setRoleBusy(null);
     }
   };
 
@@ -192,6 +225,11 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
               onDelete={canRemove(w) ? () => handleDelete(w.id) : undefined}
               onToggleStatus={canToggle(w) ? () => handleStatusToggle(w) : undefined}
               onConnect={canConnect(w) ? () => setConnecting(w) : undefined}
+              roleAction={w.user_id && canChangeRoleOf(w.user_id) ? {
+                label: 'Make viewer',
+                busy: roleBusy === w.user_id,
+                run: () => void handleRoleChange(w.user_id!, 'viewer'),
+              } : undefined}
             />
           ))
         )}
@@ -199,6 +237,26 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
           <PendingInviteRows invitees={invitees} canCancel={(i) => isOwner || i.invitedBy === user?.id} onChanged={() => void refetchInvitees()} />
         )}
       </SettingsSection>
+
+      {domainId && viewers.length > 0 && (
+        <SettingsSection title={`Viewers (${viewers.length})`}>
+          {viewers.map((v) => (
+            <div key={v.userId} className="flex items-center gap-3 px-4 py-2.5">
+              <WorkerAvatar worker={{ name: v.name, avatar_url: v.avatarUrl }} size={32} className="shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium text-foreground truncate">{v.name || 'Unnamed'}</div>
+                <div className="text-[11px] text-muted-foreground">View only</div>
+              </div>
+              {canChangeRoleOf(v.userId) && (
+                <Button type="button" variant="ghost" size="xs" disabled={roleBusy === v.userId}
+                  onClick={() => void handleRoleChange(v.userId, 'member')}>
+                  Make member
+                </Button>
+              )}
+            </div>
+          ))}
+        </SettingsSection>
+      )}
 
       <SettingsSection title={`AI agents (${agents.length})`}>
         {agents.length === 0 ? (
@@ -258,8 +316,11 @@ function WorkerRow({
   onDelete,
   onToggleStatus,
   onConnect,
+  roleAction,
 }: {
   worker: Worker;
+  /** Change this person's role in the Domain, for its owners and admins. */
+  roleAction?: { label: string; busy: boolean; run: () => void };
   /** Omitted when the viewer may not remove / (de)activate this Worker. */
   onDelete?: () => void;
   onToggleStatus?: () => void;
@@ -294,6 +355,11 @@ function WorkerRow({
         >
           Connect
         </button>
+      )}
+      {roleAction && (
+        <Button type="button" variant="ghost" size="xs" disabled={roleAction.busy} onClick={roleAction.run}>
+          {roleAction.label}
+        </Button>
       )}
       {onToggleStatus && <button
         onClick={onToggleStatus}

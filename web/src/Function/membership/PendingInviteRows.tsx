@@ -51,7 +51,7 @@ export function PendingInviteRows({
           />
           <div className="flex-1 min-w-0">
             <div className="text-[13px] font-medium text-muted-foreground truncate">{invitee.name || t('Unnamed')}</div>
-            <div className="text-[11px] text-muted-foreground">{t('Invited')}</div>
+            <div className="text-[11px] text-muted-foreground">{t(invitee.role === 'viewer' ? 'Invited as viewer' : 'Invited')}</div>
           </div>
           {(typeof canCancel === 'function' ? canCancel(invitee) : canCancel) && (
             <Button

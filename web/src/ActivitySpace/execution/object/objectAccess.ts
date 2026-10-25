@@ -28,3 +28,18 @@ export function canManageDomainTypes(
   const role = roles.get(domainId);
   return role === 'owner' || role === 'admin';
 }
+
+/**
+ * A viewer of a Domain reads everything in it and changes nothing there —
+ * except in an Object they belong to themselves, where Object membership lets
+ * them work. Unknown (still loading) is not view-only, by the same rule as
+ * above: RLS refuses the write either way.
+ */
+export function isViewOnly(
+  domainRole: string | null | undefined,
+  objectMemberships?: ReadonlySet<string>,
+  objectId?: string | null,
+): boolean {
+  if (domainRole !== 'viewer') return false;
+  return !(objectId && objectMemberships?.has(objectId));
+}

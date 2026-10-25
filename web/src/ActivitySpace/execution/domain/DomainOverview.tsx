@@ -12,6 +12,7 @@ import { RailRow } from '@/Function/shared/RailRow';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { updateDomain, useDomainRole } from './data';
 import type { NavigationState } from '@/types/navigation';
+import { ViewOnlyBadge } from '@/Function/shared/ViewOnlyBadge';
 
 export function DomainOverview({ domainId, onNavigate, onViewChange }: {
   domainId: string | null;
@@ -25,9 +26,11 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
   if (query.isPending) return <p role="status" className="p-8 text-sm text-muted-foreground">Loading Domain…</p>;
   if (!query.data) return <div role="alert" className="space-y-3 p-8 text-sm"><p>Unable to load this Domain.</p><Button onClick={() => void query.refetch()}>Retry</Button></div>;
   const { domain, explorer, initiatives } = query.data;
+  // A Domain viewer reads the board; its widgets suspend writes.
+  const viewOnly = role.data === 'viewer';
   const elements = [...new Map(explorer.objects.flatMap(object => object.elements ?? []).map(element => [element.id, element])).values()];
   const host: WidgetHost = {
-    subject: { kind: 'domain', id: domain.id }, elements, explorerData: explorer, readOnly: query.isError,
+    subject: { kind: 'domain', id: domain.id }, elements, explorerData: explorer, readOnly: query.isError || viewOnly,
     onRefresh: () => { void query.refetch(); },
     onNavigate: nav => {
       if (nav.objectId) { onNavigate({ objectId: nav.objectId, objectDomainId: domain.id }); onViewChange?.('objects'); }
@@ -40,6 +43,7 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
       <DomainIcon size={12} />
       <span className="truncate text-xs font-semibold">{domain.name}</span>
       <div className="flex-1" />
+      {viewOnly && <ViewOnlyBadge />}
       {/* "Add widget" is page chrome: it sits in the header, as on Element detail. */}
       <WidgetActionSlotTarget className="flex items-center gap-1" />
     </header>
