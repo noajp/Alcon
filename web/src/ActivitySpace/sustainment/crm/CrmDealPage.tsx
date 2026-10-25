@@ -19,6 +19,7 @@ import { StartRenewal } from './CrmToday';
 import { CrmPicker } from './CrmPicker';
 import { CustomFields, EditableText, Property } from './CrmFields';
 import { CrmRecordPage, RecordSection } from './CrmRecordPage';
+import { CrmRelatedWork } from './CrmRelatedWork';
 
 const ACTIVITY_LABEL: Record<CrmActivityType, string> = { call: 'Call', email: 'Mail', meeting: 'Meeting', note: 'Memo' };
 
@@ -252,6 +253,7 @@ export function CrmDealPage({ crm, deal, onBack, onOpenPipeline, onCapture, onOp
 
     {open && <NextStep key={deal.id} crm={crm} deal={deal} />}
     <DealPeople crm={crm} deal={deal} onOpenContact={onOpenContact} />
+    <CrmRelatedWork crm={crm} target={{ dealId: deal.id }} onOpenElement={onOpenElement} />
     {deal.nextElement && onOpenElement && <ButtonAppearanceProvider appearance="inline">
       <Button size="sm" variant="ghost" onClick={() => onOpenElement(deal.nextElement!.id)}><ArrowUpRight size={12} />{t('Open Element')} {deal.nextElement.display_id ?? ''}</Button>
     </ButtonAppearanceProvider>}
