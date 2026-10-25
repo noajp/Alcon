@@ -10,7 +10,8 @@
 -- managers — and never someone assigned to or collaborating on it.
 --
 -- Anyone who can edit an Element can still ask for approval (turn the step on,
--- or send it back to pending). Turning the step on always starts at pending;
+-- or send it back to pending). Managers are trusted: one who is also doing the
+-- work can step off it and decide as a manager, and the history shows it. Turning the step on always starts at pending;
 -- an Element that needs approval cannot be marked done until it is approved.
 do $$
 begin
@@ -96,6 +97,13 @@ begin
       raise exception 'Only a reviewer, or an owner or admin of its Domain who is not working on it, can decide this approval'
         using errcode = '42501';
     end if;
+    -- Moving an approval Element out of its Objects, or making it someone's
+    -- own, would change who manages it: only a manager may.
+    if coalesce(old.is_approval, false)
+       and (new.object_id is distinct from old.object_id or new.owner_id is distinct from old.owner_id)
+       and not public.user_can_manage_approval(old.id) then
+      raise exception 'Only an owner or admin of its Domain can move an Element that needs approval' using errcode = '42501';
+    end if;
     -- Done needs the approval, however the status is set.
     if new.status = 'done' and old.status is distinct from 'done'
        and coalesce(new.is_approval, false) and new.approval_state is distinct from 'approved' then
@@ -105,7 +113,7 @@ begin
   end $fn$;
   revoke all on function public.elements_guard_approval() from public, anon, authenticated;
   drop trigger if exists elements_guard_approval on public.elements;
-  create trigger elements_guard_approval before insert or update of is_approval, approval_state, status on public.elements
+  create trigger elements_guard_approval before insert or update of is_approval, approval_state, status, object_id, owner_id on public.elements
     for each row execute function public.elements_guard_approval();
 
   -- Reviewers are named by those who manage the Element's approvals; nobody
@@ -118,14 +126,23 @@ begin
   begin
     if auth.uid() is null then return coalesce(new, old); end if;
     if tg_op = 'DELETE' then
-      -- The Element itself going: its people go with it.
+      -- The Element or the Worker itself going: its rows go with it.
       if old.role = 'reviewer' and exists (select 1 from public.elements e where e.id = old.element_id)
+         and exists (select 1 from public.workers w where w.id = old.worker_id)
          and not public.user_can_manage_approval(old.element_id) then
         raise exception 'Only an owner or admin of its Domain can remove a reviewer' using errcode = '42501';
       end if;
       return old;
     end if;
-    if tg_op = 'UPDATE' and old.role in ('assignee', 'collaborator') and new.role = 'reviewer' then
+    -- Nobody steps from doing the work into reviewing it themselves.
+    if new.role = 'reviewer' and exists (select 1 from public.workers w where w.id = new.worker_id and w.user_id = auth.uid())
+       and (tg_op = 'INSERT' or old.role <> 'reviewer') and exists (
+         select 1 from public.element_assignees ea join public.workers w on w.id = ea.worker_id
+         where ea.element_id = new.element_id and w.user_id = auth.uid() and ea.role in ('assignee', 'collaborator') and ea.id <> new.id) then
+      raise exception 'Someone working on an Element cannot become its reviewer' using errcode = '42501';
+    end if;
+    if tg_op = 'UPDATE' and old.role in ('assignee', 'collaborator') and new.role = 'reviewer'
+       and exists (select 1 from public.workers w where w.id = new.worker_id and w.user_id = auth.uid()) then
       raise exception 'Someone working on an Element cannot become its reviewer' using errcode = '42501';
     end if;
     if (new.role = 'reviewer' or (tg_op = 'UPDATE' and old.role = 'reviewer' and new.role <> 'reviewer'))
@@ -138,5 +155,21 @@ begin
   drop trigger if exists element_assignees_guard_reviewer on public.element_assignees;
   create trigger element_assignees_guard_reviewer before insert or update of role or delete on public.element_assignees
     for each row execute function public.element_assignees_guard_reviewer();
+
+  -- Taking an approval Element out of one of its Objects is a move, too.
+  create or replace function public.element_objects_guard_approval() returns trigger
+  language plpgsql security definer set search_path = public as $fn$
+  begin
+    if auth.uid() is null then return old; end if;
+    if exists (select 1 from public.elements e where e.id = old.element_id and coalesce(e.is_approval, false))
+       and not public.user_can_manage_approval(old.element_id) then
+      raise exception 'Only an owner or admin of its Domain can move an Element that needs approval' using errcode = '42501';
+    end if;
+    return old;
+  end $fn$;
+  revoke all on function public.element_objects_guard_approval() from public, anon, authenticated;
+  drop trigger if exists element_objects_guard_approval on public.element_objects;
+  create trigger element_objects_guard_approval before delete on public.element_objects
+    for each row execute function public.element_objects_guard_approval();
   $ddl$;
 end $$;

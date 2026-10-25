@@ -325,7 +325,7 @@ export function BulkActionBar({
                         onSelect={() => void wrap(async () => {
                           try {
                             const failed = await onSetAssignee(o.id);
-                            setNoticeState(failed ? { text: `${failed} not fully handed to ${o.name} — still selected. ${o.name} may not be assignable where they live.`, count: failed } : null);
+                            setNoticeState(failed ? { text: `${failed} not fully handed to ${o.name} — still selected. They may not be assignable there, or the change needs the Domain's owner or admin.`, count: failed } : null);
                           } catch (e) {
                             setNoticeState({ text: e instanceof Error ? e.message : 'Could not set the assignee.', count });
                           }
