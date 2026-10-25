@@ -413,8 +413,11 @@ function ElementDetailBody({
     }
   }, [agent.isActive, onRefresh]);
 
-  // Activity log — element_activity rows (status ones written by the DB
-  // trigger, the rest by log() below) plus a synthetic "created" line.
+  // Activity log — element_activity rows plus a synthetic "created" line.
+  // Changes to the Element itself (status, title, description, priority,
+  // dates, estimate, people, moves) are written by database triggers; log()
+  // below records only what the database cannot see (direction, sub-elements,
+  // reactions, Notes).
   const { data: activityEntries } = useElementActivityLog(element.id);
   const activityLog = useMemo(
     () => mergeActivity(activityEntries ?? [], element),
@@ -516,7 +519,7 @@ function ElementDetailBody({
       sentRef.current = { ...sentRef.current, title: title.trim() };
       try {
         await updateElement(element.id, { title: title.trim() });
-        log('renamed', `Renamed to “${title.trim()}”`);
+        void invalidateElementActivity(element.id);
         onRefresh?.();
       } catch (e) { console.error(e); }
     }
@@ -527,7 +530,7 @@ function ElementDetailBody({
       sentRef.current = { ...sentRef.current, description };
       try {
         await updateElement(element.id, { description: description || null });
-        log('description', description ? 'Updated description' : 'Cleared description');
+        void invalidateElementActivity(element.id);
         onRefresh?.();
       } catch (e) { console.error(e); }
     }
@@ -558,8 +561,7 @@ function ElementDetailBody({
   const handlePriorityChange = async (newPriority: string) => {
     try {
       await updateElement(element.id, { priority: newPriority as 'medium' });
-      const newLabel = priorityOptions.find((p) => p.priority === newPriority)?.label ?? newPriority;
-      log('priority', `Priority → ${newLabel}`);
+      void invalidateElementActivity(element.id);
       onRefresh?.();
     } catch (e) { console.error(e); }
   };
@@ -567,8 +569,7 @@ function ElementDetailBody({
   const handleDateChange = async (field: 'start_date' | 'due_date', value: string) => {
     try {
       await updateElement(element.id, { [field]: value || null });
-      const fieldName = field === 'start_date' ? 'Start date' : 'Due date';
-      log('due', value ? `${fieldName} → ${value}` : `Cleared ${fieldName.toLowerCase()}`);
+      void invalidateElementActivity(element.id);
       onRefresh?.();
     } catch (e) { console.error(e); }
   };
@@ -577,7 +578,7 @@ function ElementDetailBody({
     const numVal = value ? parseFloat(value) : null;
     try {
       await updateElement(element.id, { [field]: numVal });
-      log('estimate', numVal != null ? `Estimate → ${numVal}h` : 'Cleared estimate');
+      void invalidateElementActivity(element.id);
       onRefresh?.();
     } catch (e) { console.error(e); }
   };
@@ -599,7 +600,7 @@ function ElementDetailBody({
     try {
       const worker = allWorkers.find(w => w.id === workerId);
       await addElementAssignee({ element_id: element.id, worker_id: workerId, role: 'assignee', worker });
-      if (worker) log('assigned', `Assigned ${worker.name}`);
+      void invalidateElementActivity(element.id);
       if (worker?.user_id && worker.user_id !== user?.id) {
         await notifyAboutElement(element.id, 'assigned', workerId);
       }
@@ -612,7 +613,7 @@ function ElementDetailBody({
     try {
       const removed = element.assignees?.find((a) => a.id === assigneeId);
       await removeElementAssignee(assigneeId);
-      if (removed?.worker?.name) log('unassigned', `Unassigned ${removed.worker.name}`);
+      void invalidateElementActivity(element.id);
       onRefresh?.();
     } catch (e) { noticeAssignmentFailed(e); }
   };
