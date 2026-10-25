@@ -182,7 +182,7 @@ export function ElementApprovalMenu({ element, onRefresh }: Props) {
             {/* Who decides: the reviewers, or else the Domain's owners and admins. */}
             <div className="space-y-1 px-1">
               <p className="text-[11px] text-muted-foreground">
-                {reviewers.length ? 'Decided by its reviewers' : 'Decided by an owner or admin of its Domain'} — never by anyone working on it.
+                {reviewers.length ? 'Decided by its reviewers' : 'Decided by whoever manages it — its Domain’s owners and admins, or its owner'} — never by anyone working on it.
               </p>
               <div className="flex flex-wrap items-center gap-1">
                 {reviewers.map((r) => (
