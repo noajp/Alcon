@@ -43,10 +43,14 @@ export const stageSlug = (label: string) => label.trim().toLowerCase().replace(/
 
 // ── Stored records ──────────────────────────────────────────────────────────
 
-export type CrmMetric = 'won_quarter' | 'won_year' | 'won_total' | 'weighted' | 'open' | 'won_count_quarter' | 'won_count_year' | 'won_count_total';
+export type CrmMetric = 'won_quarter' | 'won_year' | 'won_total' | 'weighted' | 'open' | 'won_count_quarter' | 'won_count_year' | 'won_count_total'
+  | 'won_field_quarter' | 'won_field_year' | 'won_field_total';
 
-/** Amount metrics report money in the pipeline's currency; count metrics report how many deals. */
-export const metricKind = (metric: CrmMetric): 'amount' | 'count' => metric.startsWith('won_count') ? 'count' : 'amount';
+/** Amount metrics report money in the pipeline's currency; count metrics report
+ * how many deals; field metrics report the sum of one of the pipeline's own
+ * number fields (ARR, seats…) over the deals won. */
+export const metricKind = (metric: CrmMetric): 'amount' | 'count' | 'field' =>
+  metric.startsWith('won_count') ? 'count' : metric.startsWith('won_field') ? 'field' : 'amount';
 
 const SYMBOLS: [RegExp, string][] = [[/^(円|¥|JPY)$/, 'JPY'], [/^(\$|US\$|ドル|USD)$/, 'USD'], [/^(€|ユーロ|EUR)$/, 'EUR'], [/^(£|ポンド|GBP)$/, 'GBP'], [/^(元|CNY|RMB)$/, 'CNY'], [/^(₩|ウォン|KRW)$/, 'KRW']];
 const SCALES: [string, number][] = [['百万', 1e6], ['千', 1e3], ['万', 1e4], ['億', 1e8]];
@@ -81,6 +85,9 @@ export function measureValue(unit: string | null | undefined, metric: CrmMetric,
   const read = readUnit(unit);
   if (read.kind === 'any') return value;
   if (metricKind(metric) === 'count') return read.kind === 'count' ? value : null;
+  // A number field carries no currency of its own: it goes into counts as is
+  // and into money at the condition's scale (万円, 億円); never into rates.
+  if (metricKind(metric) === 'field') return read.kind === 'count' ? value : read.kind === 'money' ? Math.round(value / read.scale * 100) / 100 : null;
   if (read.kind !== 'money' || read.currency !== currency.toUpperCase()) return null;
   return Math.round(value / read.scale * 100) / 100;
 }
@@ -95,6 +102,8 @@ export interface CrmPipelineRecord {
   object_id: string | null;
   measure_intent_id: string | null;
   measure_metric: CrmMetric | null;
+  /** The deal number field a field metric sums. */
+  measure_field: string | null;
   /** What this organisation calls a deal here (案件, Opportunity…); null = "Deal". */
   record_label: string | null;
   /** The Domain this pipeline belongs to; null = shared with the whole Space. */
@@ -497,7 +506,7 @@ export function forecastFor(deals: readonly CrmDeal[], currency: string | null, 
 }
 
 /** The figure a pipeline reports into its Initiative's success condition. */
-export function metricValue(deals: readonly CrmDeal[], metric: CrmMetric, currency: string, today: string): number {
+export function metricValue(deals: readonly CrmDeal[], metric: CrmMetric, currency: string, today: string, field: string | null = null): number {
   const year = today.slice(0, 4);
   const quarter = Math.floor((Number(today.slice(5, 7)) - 1) / 3);
   const inQuarter = (date: string | null) => !!date && date.slice(0, 4) === year && Math.floor((Number(date.slice(5, 7)) - 1) / 3) === quarter;
@@ -507,7 +516,16 @@ export function metricValue(deals: readonly CrmDeal[], metric: CrmMetric, curren
   // Counts include won deals in every currency and with no amount: a customer won is a customer won.
   const wonAll = deals.filter(deal => deal.outcome === 'won');
   const closed = (deal: CrmDeal) => deal.closedOn ?? deal.closeDate;
+  // A field's value as a number: written numbers, or numeric text such as "1,200".
+  const fieldValue = (deal: CrmDeal) => {
+    const raw = field ? deal.custom[field] : null;
+    const value = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() ? Number(raw.replace(/[,\s]/g, '')) : NaN;
+    return Number.isFinite(value) ? value : 0;
+  };
   switch (metric) {
+    case 'won_field_total': return sum(wonAll, fieldValue);
+    case 'won_field_year': return sum(wonAll.filter(deal => closed(deal)?.slice(0, 4) === year), fieldValue);
+    case 'won_field_quarter': return sum(wonAll.filter(deal => inQuarter(closed(deal))), fieldValue);
     case 'won_count_total': return wonAll.length;
     case 'won_count_year': return wonAll.filter(deal => closed(deal)?.slice(0, 4) === year).length;
     case 'won_count_quarter': return wonAll.filter(deal => inQuarter(closed(deal))).length;

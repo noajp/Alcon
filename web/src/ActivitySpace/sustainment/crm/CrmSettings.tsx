@@ -8,7 +8,7 @@ import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 import { useStrategies } from '@/ActivitySpace/strategy/initiative/strategyData';
 import { useInitiativeMeasures } from '@/hooks/useInitiativeMeasures';
 import type { Crm } from '@/hooks/useCrm';
-import { fieldKey, fieldOptions, measureValue, metricKind, metricValue, normalizeCrmStages, readUnit, stageSlug, type CrmFieldRecord, type CrmMetric, type CrmStage } from './crmModel';
+import { fieldKey, fieldOptions, fieldsFor, measureValue, metricKind, metricValue, normalizeCrmStages, readUnit, stageSlug, type CrmFieldRecord, type CrmMetric, type CrmStage } from './crmModel';
 import { money } from './crmFormat';
 import { CrmPicker } from './CrmPicker';
 
@@ -104,6 +104,7 @@ const METRICS: { id: CrmMetric; label: string }[] = [
   { id: 'won_count_quarter', label: 'Deals won this quarter' }, { id: 'won_count_year', label: 'Deals won this year' }, { id: 'won_count_total', label: 'Deals won to date' },
   { id: 'won_quarter', label: 'Won this quarter' }, { id: 'won_year', label: 'Won this year' }, { id: 'won_total', label: 'Won to date' },
   { id: 'weighted', label: 'Weighted pipeline' }, { id: 'open', label: 'Open pipeline' },
+  { id: 'won_field_quarter', label: 'Field total won this quarter' }, { id: 'won_field_year', label: 'Field total won this year' }, { id: 'won_field_total', label: 'Field total won to date' },
 ];
 
 function Connections({ crm }: { crm: Crm }) {
@@ -114,7 +115,10 @@ function Connections({ crm }: { crm: Crm }) {
   const { measures } = useInitiativeMeasures(strategies.data.map(item => item.id));
   const names = new Map(strategies.data.map(item => [item.id, item.name]));
   const metric = pipeline.measure_metric ?? 'won_quarter';
-  const value = crm.workspace ? metricValue(crm.workspace.deals, metric, pipeline.currency, crm.today) : null;
+  // The pipeline's own number fields: the ones its deals show.
+  const numberFields = fieldsFor(crm.fields, 'deal', pipeline.domain_id).filter(field => field.type === 'number');
+  const field = metricKind(metric) === 'field' ? numberFields.find(item => item.key === pipeline.measure_field) ?? null : null;
+  const value = !crm.workspace || (metricKind(metric) === 'field' && !field) ? null : metricValue(crm.workspace.deals, metric, pipeline.currency, crm.today, field?.key ?? null);
   const linked = measures.find(measure => measure.id === pipeline.measure_intent_id);
   const written = value === null ? null : measureValue(linked?.unit, metric, pipeline.currency, value);
   const unit = readUnit(linked?.unit);
@@ -123,7 +127,7 @@ function Connections({ crm }: { crm: Crm }) {
     : unit.kind === 'rate' ? t('“{unit}” is a rate or a per-period figure; the CRM cannot write into it.', { unit: linked.unit ?? '' })
     : unit.kind === 'unknown' ? t('Alcon cannot tell whether “{unit}” is money or a count. Use a currency (円, JPY) or a count (社, 件) as the unit.', { unit: linked.unit ?? '' })
     : unit.kind === 'money' && metricKind(metric) === 'amount' ? t('This success condition is in {currency}; this pipeline reports in {pipeline}.', { currency: unit.currency, pipeline: pipeline.currency })
-    : unit.kind === 'count' ? t('This success condition counts “{unit}”. Choose a number of deals won.', { unit: linked.unit ?? '' })
+    : unit.kind === 'count' ? t('This success condition counts “{unit}”. Choose a number of deals won or a field total.', { unit: linked.unit ?? '' })
     : t('This success condition is an amount. Choose an amount won or in the pipeline.');
   const [error, setError] = useState<string | null>(null);
   const save = (patch: Parameters<Crm['savePipeline']>[1]) => { setError(null); crm.savePipeline(pipeline.id, patch).catch(cause => setError(message(cause))); };
@@ -141,10 +145,17 @@ function Connections({ crm }: { crm: Crm }) {
           <span className="text-xs text-muted-foreground">{t('As')}</span>
           <div className="flex flex-wrap gap-1">{METRICS.map(item => <Button key={item.id} shape="tab" size="xs" variant={metric === item.id ? 'secondary' : 'ghost'} aria-pressed={metric === item.id}
             onClick={() => save({ measure_metric: item.id })}>{t(item.label)}</Button>)}</div>
+          {metricKind(metric) === 'field' && <>
+            <span className="text-xs text-muted-foreground">{t('Adds up')}</span>
+            {numberFields.length ? <CrmPicker label={t('Number field to add up')} value={field?.id ?? null} placeholder={t('Choose a number field')}
+              options={numberFields.map(item => ({ id: item.id, label: item.label }))}
+              onChange={id => save({ measure_field: numberFields.find(item => item.id === id)?.key ?? null })} />
+              : <span className="text-xs text-muted-foreground">{t('Add a number field for deals under Your fields first.')}</span>}
+          </>}
         </>}
       </div>
       {pipeline.measure_intent_id && mismatch && <p role="alert" className="text-xs text-[var(--status-warning)]">{mismatch} {t('Nothing is written until they match.')}</p>}
-      {pipeline.measure_intent_id && linked && written !== null && <p className="text-xs text-muted-foreground">{t('Currently reporting {value}.', { value: unit.kind === 'money' || unit.kind === 'count' ? `${written.toLocaleString(locale)} ${linked?.unit ?? ''}`.trim() : metricKind(metric) === 'count' ? String(written) : money(written, pipeline.currency, locale) })}</p>}
+      {pipeline.measure_intent_id && linked && written !== null && <p className="text-xs text-muted-foreground">{t('Currently reporting {value}.', { value: unit.kind === 'money' || unit.kind === 'count' ? `${written.toLocaleString(locale)} ${linked?.unit ?? ''}`.trim() : metricKind(metric) === 'amount' ? money(written, pipeline.currency, locale) : written.toLocaleString(locale) })}</p>}
       {crm.measureError && <p role="alert" className="text-xs text-[var(--status-danger)]">{t(crm.measureError)}</p>}
       {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{error}</p>}
     </div>

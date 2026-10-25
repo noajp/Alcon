@@ -12,7 +12,7 @@ import { createElement, updateElement } from '@/ActivitySpace/execution/element/
 import { fetchDataTableSchema } from '@/ActivitySpace/sustainment/table/data';
 import { readAllPages } from '@/hooks/readAllPages';
 import {
-  buildCrmWorkspace, measureValue, metricValue, normalizeCrmStages, parseActivityLog, resolveStage,
+  buildCrmWorkspace, measureValue, metricKind, metricValue, normalizeCrmStages, parseActivityLog, resolveStage,
   type CrmActivityRecord, type CrmActivityType, type CrmCompanyRecord, type CrmContactRecord, type CrmDeal,
   type CrmDealRecord, type CrmFieldRecord, type CrmNextElement, type CrmPerson, type CrmPipelineRecord, type CrmWorkspace,
 } from '@/ActivitySpace/sustainment/crm/crmModel';
@@ -338,8 +338,10 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     const p = workspace?.pipeline;
     // One writer (the main pane), and only from fresh data, never a cached stale view.
     if (!seed || !p?.measure_intent_id || !p.measure_metric || !workspace || deals.isFetching) return;
-    const value = metricValue(workspace.deals, p.measure_metric, p.currency, today);
-    const stamp = `${p.measure_intent_id}:${p.measure_metric}:${value}`;
+    // A field metric reports nothing until its field is chosen.
+    if (metricKind(p.measure_metric) === 'field' && !p.measure_field) return;
+    const value = metricValue(workspace.deals, p.measure_metric, p.currency, today, p.measure_field);
+    const stamp = `${p.measure_intent_id}:${p.measure_metric}:${p.measure_field ?? ''}:${value}`;
     if (reported.current === stamp) return;
     reported.current = stamp;
     void (async () => {
