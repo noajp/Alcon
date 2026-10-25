@@ -23,6 +23,7 @@ import { labelColor, useLabelColors } from '@/Function/shared/labelColor';
 import { ReachHint, WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { ElementPriority, ElementStatus } from '@/types/database';
 import {
   DropdownMenu,
@@ -152,6 +153,7 @@ export function QuickAddElementPopup({
   initialText = '',
   canSaveToPersonal = false,
 }: QuickAddElementPopupProps) {
+  const { t } = useI18n();
   const [text, setText] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<string | null>(defaultType);
@@ -304,7 +306,7 @@ export function QuickAddElementPopup({
   const priorityOpt = PRIORITY_OPTIONS.find((p) => p.value === priority);
   const isPersonalChoice = objectId === PERSONAL_SCOPE_ID;
   const objectOpt = isPersonalChoice
-    ? { id: PERSONAL_SCOPE_ID, name: 'My Elements' }
+    ? { id: PERSONAL_SCOPE_ID, name: t('My Elements') }
     : objectId ? objects.find((o) => o.id === objectId) ?? null : null;
   const assigneeCount = assigneeIds.size;
   const labelCount = labels.size;
@@ -315,27 +317,27 @@ export function QuickAddElementPopup({
       <div
         className={QUICK_CREATE.panel}
         role="dialog"
-        aria-label="Quick add Element"
+        aria-label={t('Quick add Element')}
       >
         {/* Header — context chip + close */}
         <div className={QUICK_CREATE.header}>
           <span className={QUICK_CREATE.context}>
             <ElementIcon size={12} />
-            <span className="truncate max-w-[200px]">{contextLabel ?? 'New Element'}</span>
+            <span className="truncate max-w-[200px]">{contextLabel ?? t('New Element')}</span>
           </span>
           {titles.length > 1 && (
-            <span className="text-[11px] text-muted-foreground">{titles.length} Elements</span>
+            <span className="text-[11px] text-muted-foreground">{t('{n} Elements', { n: titles.length })}</span>
           )}
           {createdCount > 0 && (
             <span className="text-[11px] text-muted-foreground/70">
-              {createdCount} added
+              {t('{n} added', { n: createdCount })}
             </span>
           )}
           <div className="flex-1" />
           <button
             onClick={onClose}
             className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-            aria-label="Close"
+            aria-label={t('Close')}
           >
             <X size={14} />
           </button>
@@ -353,8 +355,8 @@ export function QuickAddElementPopup({
               handleSubmit(e.metaKey || e.ctrlKey);
             }
           }}
-          placeholder="Element title…"
-          aria-label="Element title"
+          placeholder={t('Element title…')}
+          aria-label={t('Element title')}
           rows={1}
           className={QUICK_CREATE.title}
         />
@@ -364,8 +366,8 @@ export function QuickAddElementPopup({
           ref={descRef}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Add description…"
-          aria-label="Description"
+          placeholder={t('Add description…')}
+          aria-label={t('Description')}
           rows={2}
           className={QUICK_CREATE.description}
         />
@@ -381,12 +383,12 @@ export function QuickAddElementPopup({
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!templateId)}>
                   <LayoutTemplate size={11} />
-                  <span>{templates.find((t) => t.id === templateId)?.name ?? 'Template'}</span>
+                  <span>{templates.find((t) => t.id === templateId)?.name ?? t('Template')}</span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="rounded-xl min-w-[180px]">
-                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Template</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Template')}</DropdownMenuLabel>
                 {templates.map((t) => (
                   <DropdownMenuItem key={t.id} onSelect={() => applyTemplate(t)} className="gap-2 text-[12px]">
                     <span className="flex-1 truncate">{t.name}</span>
@@ -404,12 +406,12 @@ export function QuickAddElementPopup({
             <DropdownMenu {...menuProps('type')}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!type)}>
-                  <span>{type ?? 'Type'}</span>
+                  <span>{type ?? t('Type')}</span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="rounded-xl min-w-[180px]">
-                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Type</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Type')}</DropdownMenuLabel>
                 {types.map((t) => (
                   <DropdownMenuItem key={t} onSelect={() => setType(t)} className="gap-2 text-[12px]">
                     <span className="flex-1 truncate">{t}</span>
@@ -419,7 +421,7 @@ export function QuickAddElementPopup({
                 {type && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => setType(null)} className="text-[12px] text-muted-foreground">Clear</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setType(null)} className="text-[12px] text-muted-foreground">{t('Clear')}</DropdownMenuItem>
                   </>
                 )}
               </DropdownMenuContent>
@@ -432,23 +434,23 @@ export function QuickAddElementPopup({
             <DropdownMenuTrigger asChild>
               <button type="button" className={pillClass(!!statusOpt)}>
                 <ElementProgressMark status={status} size={13} />
-                <span>{statusOpt?.label ?? 'Status'}</span>
+                <span>{statusOpt ? t(statusOpt.label) : t('Status')}</span>
                 <ChevronDown size={10} className="opacity-60" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="rounded-xl min-w-[180px]">
-              <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Status</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Status')}</DropdownMenuLabel>
               {STATUS_OPTIONS.map((s) => (
                 <DropdownMenuItem key={s.value} onSelect={() => setStatus(s.value)} className="gap-2 text-[12px]">
                   <ElementProgressMark status={s.value} size={13} />
-                  <span className="flex-1">{s.label}</span>
+                  <span className="flex-1">{t(s.label)}</span>
                   {status === s.value && <Check size={12} />}
                 </DropdownMenuItem>
               ))}
               {status && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => setStatus(null)} className="text-[12px] text-muted-foreground">Clear</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setStatus(null)} className="text-[12px] text-muted-foreground">{t('Clear')}</DropdownMenuItem>
                 </>
               )}
             </DropdownMenuContent>
@@ -463,7 +465,7 @@ export function QuickAddElementPopup({
             trigger={
               <button type="button" className={pillClass(!!priorityOpt)}>
                 <PriorityMark priority={priority} />
-                <span>{priorityOpt?.label ?? 'Priority'}</span>
+                <span>{priorityOpt ? t(priorityOpt.label) : t('Priority')}</span>
                 <ChevronDown size={10} className="opacity-60" />
               </button>
             }
@@ -475,22 +477,22 @@ export function QuickAddElementPopup({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  aria-label={workerTriggerLabel('Assignee', workers.filter((w) => assigneeIds.has(w.id)))}
+                  aria-label={workerTriggerLabel(t('Assignee'), workers.filter((w) => assigneeIds.has(w.id)))}
                   className={pillClass(assigneeCount > 0)}
                 >
                   <UserIcon size={12} className="text-muted-foreground" />
                   <span>
                     {assigneeCount === 0
-                      ? 'Assignee'
+                      ? t('Assignee')
                       : assigneeCount === 1
-                      ? workers.find((w) => w.id === Array.from(assigneeIds)[0])?.name ?? '1 assignee'
-                      : `${assigneeCount} assignees`}
+                      ? workers.find((w) => w.id === Array.from(assigneeIds)[0])?.name ?? t('1 assignee')
+                      : t('{n} assignees', { n: assigneeCount })}
                   </span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="rounded-xl min-w-[220px] max-h-[260px] overflow-y-auto">
-                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Assignee</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Assignee')}</DropdownMenuLabel>
                 {workers.map((w) => {
                   const on = assigneeIds.has(w.id);
                   return (
@@ -509,7 +511,7 @@ export function QuickAddElementPopup({
                 {assigneeCount > 0 && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => setAssigneeIds(new Set())} className="text-[12px] text-muted-foreground">Clear</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setAssigneeIds(new Set())} className="text-[12px] text-muted-foreground">{t('Clear')}</DropdownMenuItem>
                   </>
                 )}
               </DropdownMenuContent>
@@ -525,17 +527,17 @@ export function QuickAddElementPopup({
                   {isPersonalChoice
                     ? <NavMyTasksIcon size={12} />
                     : <BoxIcon size={12} className="text-muted-foreground" />}
-                  <span>{objectOpt?.name ?? 'Save to'}</span>
+                  <span>{objectOpt?.name ?? t('Save to')}</span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="rounded-xl min-w-[240px] max-h-[260px] overflow-y-auto">
-                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Save to</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Save to')}</DropdownMenuLabel>
                 {canSaveToPersonal && (
                   <>
                     <DropdownMenuItem onSelect={() => setObjectId(PERSONAL_SCOPE_ID)} className="gap-2 text-[12px]">
                       <NavMyTasksIcon size={12} />
-                      <span className="flex-1 truncate">My Elements (personal)</span>
+                      <span className="flex-1 truncate">{t('My Elements (personal)')}</span>
                       {isPersonalChoice && <Check size={12} />}
                     </DropdownMenuItem>
                     {objects.length > 0 && <DropdownMenuSeparator />}
@@ -551,7 +553,7 @@ export function QuickAddElementPopup({
                 {(objectOpt && !isPersonalChoice) && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => setObjectId(null)} className="text-[12px] text-muted-foreground">Clear (Domain-direct)</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setObjectId(null)} className="text-[12px] text-muted-foreground">{t('Clear (Domain-direct)')}</DropdownMenuItem>
                   </>
                 )}
               </DropdownMenuContent>
@@ -564,12 +566,12 @@ export function QuickAddElementPopup({
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(labelCount > 0)}>
                   <TagIcon size={12} className="text-muted-foreground" />
-                  <span>{labelCount === 0 ? 'Labels' : `${labelCount} label${labelCount === 1 ? '' : 's'}`}</span>
+                  <span>{labelCount === 0 ? t('Labels') : t(labelCount === 1 ? '{n} label' : '{n} labels', { n: labelCount })}</span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="rounded-xl min-w-[220px] max-h-[260px] overflow-y-auto">
-                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Labels</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Labels')}</DropdownMenuLabel>
                 {availableLabels.map((l) => {
                   const on = labels.has(l);
                   return (
@@ -587,7 +589,7 @@ export function QuickAddElementPopup({
                 {labelCount > 0 && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => setLabels(new Set())} className="text-[12px] text-muted-foreground">Clear</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setLabels(new Set())} className="text-[12px] text-muted-foreground">{t('Clear')}</DropdownMenuItem>
                   </>
                 )}
               </DropdownMenuContent>
@@ -598,7 +600,7 @@ export function QuickAddElementPopup({
         <div className={QUICK_CREATE.footer}>
           {hint && <span className="mr-auto min-w-0 text-[11px] text-muted-foreground">{hint}</span>}
           <Button variant="primary" onClick={() => handleSubmit(false)} disabled={!canSubmit}>
-            {titles.length > 1 ? `Create ${titles.length}` : 'Create'}
+            {titles.length > 1 ? t('Create {n}', { n: titles.length }) : t('Create')}
           </Button>
         </div>
       </div>

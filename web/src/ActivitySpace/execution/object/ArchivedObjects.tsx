@@ -90,7 +90,7 @@ export function ArchivedObjectsSection({
   const [open, setOpen] = useState(false);
   if (objects.length === 0) return null;
   return (
-    <div className="border-t border-border/60 px-3 py-2">
+    <div className="mt-4 px-3 py-2">
       <Button
         variant="ghost"
         size="xs"

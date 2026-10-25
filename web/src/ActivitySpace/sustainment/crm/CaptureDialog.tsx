@@ -139,7 +139,7 @@ export function CrmCapture({ crm, initialDealId, onClose, onApplied }: {
             <span className="ml-auto text-xs text-muted-foreground">{proposal.source === 'ai' ? t('Read by AI') : reading ? t('AI is reading…') : t('Quick reading')}</span>
           </div>
           {proposal.summary && <p className="text-sm">{proposal.summary}</p>}
-          {changes.length > 0 ? <ul className="divide-y divide-[var(--border-subtle)] text-sm" aria-label={t('Changes')}>
+          {changes.length > 0 ? <ul className="text-sm" aria-label={t('Changes')}>
             {changes.map(change => <li key={change.key} className="flex items-center gap-3 py-2">
               <input type="checkbox" aria-label={t('Apply {field}', { field: t(FIELD_LABEL[change.key]) })} checked={checked(change)} disabled={saving || change.required}
                 onChange={() => setToggled(current => { const next = new Set(current); if (next.has(change.key)) next.delete(change.key); else next.add(change.key); return next; })} />

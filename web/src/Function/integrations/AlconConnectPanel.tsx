@@ -1,6 +1,7 @@
 'use client';
 
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { FONT } from '@/shared/designTokens';
 import { CopyField } from './CopyField';
 import { ConnectedApps } from './ConnectedApps';
 import { PersonalAccessTokens } from './PersonalAccessTokens';
@@ -16,14 +17,13 @@ export function AlconConnectPanel() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-[15px] font-semibold text-foreground">{t('Connect to Alcon')}</h2>
-        <p className="mt-1 text-[12px] text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           {t("Alcon is an MCP server. Point an MCP client at it and the client can read and update this board within your permissions.")}
         </p>
       </div>
 
       <section className="space-y-2">
-        <h3 className="text-[13px] font-medium text-foreground">{t('Endpoint')}</h3>
+        <h3 className={`${FONT.lg} text-foreground`}>{t('Endpoint')}</h3>
         <CopyField value={ALCON_MCP_URL} />
       </section>
 
@@ -32,7 +32,7 @@ export function AlconConnectPanel() {
       <PersonalAccessTokens />
 
       <section className="space-y-2">
-        <h3 className="text-[13px] font-medium text-foreground">Claude Code</h3>
+        <h3 className={`${FONT.lg} text-foreground`}>Claude Code</h3>
         <p className="text-[12px] text-muted-foreground">{t('Generate a token, then run this command with it in place of <token>:')}</p>
         <CopyField value={claudeMcpAddCommand('<token>')} multiline />
         <p className="text-[12px] text-muted-foreground">

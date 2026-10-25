@@ -31,8 +31,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
           <Inbox size={12} aria-hidden="true" />
           <span className="text-[12px] font-semibold text-foreground">{t('Inbox')}</span>
         </header>
-        <div className="flex flex-1 flex-col items-center justify-center gap-5 text-muted-foreground">
-          <Inbox size={88} strokeWidth={0.8} className="opacity-60" aria-hidden="true" />
+        <div className="flex flex-1 items-center justify-center text-muted-foreground">
           <p className="text-[13px]">{t('No notification selected')}</p>
         </div>
       </div>

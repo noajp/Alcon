@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { translate } from '@/Function/i18n/I18nProvider';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Shape of a Copilot conversation turn.
@@ -84,7 +85,7 @@ export function useAlconCopilot() {
 
     const url = functionsUrl();
     if (!url) {
-      setError('Supabase URL が設定されていません');
+      setError(translate('Supabase URL is not configured.'));
       return;
     }
 
@@ -109,7 +110,7 @@ export function useAlconCopilot() {
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) {
-      setError('ログインしてください');
+      setError(translate('Sign in to continue.'));
       setStreaming(false);
       return;
     }
@@ -224,7 +225,7 @@ export function useAlconCopilot() {
       } else if (evt === 'done') {
         next[i] = { ...last, done: true };
       } else if (evt === 'error') {
-        next[i] = { ...last, done: true, content: last.content + `\n\n_(エラー: ${payload.error})_` };
+        next[i] = { ...last, done: true, content: last.content + `\n\n_(${translate('Error: {error}', { error: String(payload.error ?? '') })})_` };
       }
       return next;
     });

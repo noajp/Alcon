@@ -420,6 +420,20 @@ const CRM_MESSAGES: Record<string, Row> = {
   'The people at those companies.': ['その会社の担当者。', '그 회사의 담당자.', 'Les personnes de ces entreprises.', 'Las personas de esas empresas.'],
   'What the open pipeline is expected to bring in.': ['進行中のパイプラインから見込める金額。', '진행 중인 파이프라인에서 예상되는 금액.', 'Ce que le pipeline ouvert devrait rapporter.', 'Lo que se espera que aporte el pipeline abierto.'],
   'The pipeline’s stages, currency and rhythm.': ['パイプラインのステージ・通貨・リズム。', '파이프라인의 단계, 통화, 리듬.', 'Les étapes, la devise et le rythme du pipeline.', 'Las etapas, la moneda y el ritmo del pipeline.'],
+  'No pipeline in this scope yet.': ['この範囲にはまだパイプラインがありません。', '이 범위에는 아직 파이프라인이 없습니다.', 'Aucun pipeline dans ce périmètre pour l’instant.', 'Todavía no hay ningún pipeline en este ámbito.'],
+  'Scope': ['範囲', '범위', 'Périmètre', 'Ámbito'],
+  'Everything': ['すべて', '전체', 'Tout', 'Todo'],
+  'Shared by the Space': ['Space で共有', 'Space 공유', 'Partagé dans le Space', 'Compartido en el Space'],
+  'Unknown Domain': ['不明な Domain', '알 수 없는 Domain', 'Domain inconnu', 'Domain desconocido'],
+  'Where every deal in this scope stands, pipeline by pipeline.': ['この範囲の商談の状況を、パイプラインごとに示します。', '이 범위의 모든 거래 현황을 파이프라인별로 보여 줍니다.', 'Où en est chaque affaire de ce périmètre, pipeline par pipeline.', 'En qué punto está cada negocio de este ámbito, pipeline a pipeline.'],
+  'All pipelines': ['すべてのパイプライン', '모든 파이프라인', 'Tous les pipelines', 'Todos los pipelines'],
+  'Last 3 months': ['直近 3 か月', '최근 3개월', '3 derniers mois', 'Últimos 3 meses'],
+  'No open deals': ['進行中の商談なし', '진행 중 거래 없음', 'Aucune affaire ouverte', 'Sin negocios abiertos'],
+  '{n} at risk': ['リスクあり {n}', '위험 {n}', '{n} à risque', '{n} en riesgo'],
+  'Stage: {name}': ['ステージ: {name}', '단계: {name}', 'Étape : {name}', 'Etapa: {name}'],
+  'Company: {name}': ['会社: {name}', '회사: {name}', 'Entreprise : {name}', 'Empresa: {name}'],
+  'Owner: {name}': ['担当者: {name}', '담당자: {name}', 'Responsable : {name}', 'Responsable: {name}'],
+  '“{query}”': ['「{query}」', '“{query}”', '« {query} »', '«{query}»'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(CRM_MESSAGES).map(([key, row]) => [key, row[index]]));

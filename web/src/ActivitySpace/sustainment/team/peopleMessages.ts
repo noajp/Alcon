@@ -4,6 +4,7 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const PEOPLE_MESSAGES: Record<string, Row> = {
+  'Not done': ['未完了', '미완료', 'Non terminés', 'Sin terminar'],
   'People': ['People', 'People', 'People', 'People'],
   'Who is here, what they know, and what they have worked on. People and AI agents share one roster.': ['誰がいて、何ができ、何に取り組んできたか。人と AI エージェントを同じ名簿で扱います。', '누가 있고, 무엇을 알고, 무엇을 해 왔는지. 사람과 AI 에이전트를 같은 명단에서 다룹니다.', 'Qui est là, ce qu’ils savent faire et sur quoi ils ont travaillé. Personnes et agents IA partagent une même liste.', 'Quién está, qué sabe y en qué ha trabajado. Personas y agentes de IA comparten una misma lista.'],
   'Participating Workers': ['参加している Worker', '참여 중인 Worker', 'Workers participants', 'Workers participantes'],
@@ -63,6 +64,15 @@ const PEOPLE_MESSAGES: Record<string, Row> = {
   'Keep the skill name to 60 characters.': ['スキル名は 60 文字以内にしてください。', '스킬 이름은 60자 이내로 하세요.', 'Limitez le nom à 60 caractères.', 'Limita el nombre a 60 caracteres.'],
   'Only this Worker or someone who manages them can change their skills.': ['スキルを変更できるのは本人か、この Worker を管理する人だけです。', '스킬은 본인이나 이 Worker를 관리하는 사람만 바꿀 수 있습니다.', 'Seul ce Worker ou une personne qui le gère peut modifier ses compétences.', 'Solo este Worker o quien lo gestiona puede cambiar sus habilidades.'],
   'Evidence must be a done Element assigned to this Worker, added by someone who manages them.': ['根拠にできるのは、この Worker に割り当てられた完了済みの Element で、管理する人が追加したものだけです。', '근거는 이 Worker에게 배정된 완료된 Element여야 하며, 관리하는 사람이 추가해야 합니다.', 'Une preuve doit être un Element terminé affecté à ce Worker, ajouté par une personne qui le gère.', 'La evidencia debe ser un Element terminado asignado a este Worker y la añade quien lo gestiona.'],
+  'Enter a valid capacity.': ['有効な稼働時間を入力してください。', '올바른 가용 시간을 입력하세요.', 'Saisissez une capacité valide.', 'Introduce una capacidad válida.'],
+  'Could not save capacity. Try again.': ['稼働時間を保存できませんでした。もう一度お試しください。', '가용 시간을 저장하지 못했습니다. 다시 시도하세요.', 'Impossible d’enregistrer la capacité. Réessayez.', 'No se pudo guardar la capacidad. Inténtalo de nuevo.'],
+  'Enter hours from 0 to 24, or leave blank to use the default.': ['0〜24 の時間を入力するか、空欄にして既定値を使ってください。', '0~24 사이의 시간을 입력하거나 비워 두어 기본값을 사용하세요.', 'Saisissez entre 0 et 24 heures, ou laissez vide pour la valeur par défaut.', 'Introduce de 0 a 24 horas, o déjalo en blanco para usar el valor predeterminado.'],
+  '{h} h/day': ['{h} 時間/日', '하루 {h}시간', '{h} h/jour', '{h} h/día'],
+  '{h} h/day · default': ['{h} 時間/日 · 既定', '하루 {h}시간 · 기본값', '{h} h/jour · par défaut', '{h} h/día · predeterminado'],
+  'Edit capacity for {name}: {label}': ['{name} の稼働時間を編集: {label}', '{name}의 가용 시간 편집: {label}', 'Modifier la capacité de {name} : {label}', 'Editar la capacidad de {name}: {label}'],
+  'Standing capacity': ['標準の稼働時間', '기본 가용 시간', 'Capacité habituelle', 'Capacidad habitual'],
+  'Standing hours per day': ['1 日の標準稼働時間', '하루 기본 가용 시간', 'Heures habituelles par jour', 'Horas habituales por día'],
+  '0–24 hours. Leave blank for the default.': ['0〜24 時間。空欄なら既定値です。', '0~24시간. 비워 두면 기본값입니다.', '0 à 24 heures. Laissez vide pour la valeur par défaut.', 'De 0 a 24 horas. En blanco, se usa el valor predeterminado.'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(PEOPLE_MESSAGES).map(([key, row]) => [key, row[index]]));

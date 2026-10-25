@@ -7,6 +7,7 @@ import { useCurrentUserId } from '@/providers/authContext';
 import { canEditInitiative } from './initiativeAccess';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // =============================================================
 // One read, one root, for every section hanging off a Initiative's Intent.
@@ -45,6 +46,7 @@ export interface InitiativeIntentState {
 
 export function useInitiativeIntent(initiativeId: string, initiativeName: string, createdBy?: string | null): InitiativeIntentState {
   const userId = useCurrentUserId();
+  const { t } = useI18n();
   // A surface that already holds the Initiative row passes its owner; a
   // widget that only knows the id asks once. Until either answers, nobody
   // can write — a composer that appears and then locks reads as a flicker,
@@ -64,10 +66,10 @@ export function useInitiativeIntent(initiativeId: string, initiativeName: string
   const lockReason = canEdit
     ? null
     : owner.isError
-      ? "Could not tell who owns this Initiative — reload to try again"
+      ? t("Could not tell who owns this Initiative — reload to try again")
       : resolvedOwner === undefined
         ? null
-        : "Only the Initiative's owner can change its intent";
+        : t("Only the Initiative's owner can change its intent");
   const { data, error, refetch } = useStrategyIntentBundle(initiativeId);
   const { scope, error: scopeError } = useInitiativeScope(initiativeId);
 

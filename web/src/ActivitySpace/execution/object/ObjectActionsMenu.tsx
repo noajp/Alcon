@@ -153,13 +153,13 @@ export function ObjectActionsMenu({
   return (
     <>
       <EntityActionsMenu
-        ariaLabel="Object actions"
+        ariaLabel={t('Object actions')}
         targets={targets}
         primaryId={primaryId}
         memberIds={memberIds}
-        moveLabel="Move to Domain"
-        multiHomeLabel="Multi-home to Domain"
-        targetEmptyLabel="No Domains"
+        moveLabel={t('Move to Domain')}
+        multiHomeLabel={t('Multi-home to Domain')}
+        targetEmptyLabel={t('No Domains')}
         onDuplicate={duplicate}
         onMove={move}
         onToggleMultiHome={toggleMultiHome}

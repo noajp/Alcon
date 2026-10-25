@@ -34,7 +34,6 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const view = useDeckView();
   const files = useKata((s) => s.files);
   const folders = useKata((s) => s.folders);
-  const lang = useKata((s) => s.lang);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
@@ -61,7 +60,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           st.setPresenting(true);
         },
       });
-      out.push({ id: "pptx", group: tx("発表と書き出し", "Present & export"), label: tx("PowerPoint に書き出す", "Export to PowerPoint"), run: () => void exportPptx(view.deck, view.tokens, view.roles, view.file.name).then(() => st.notify(tx(`「${view.file.name}.pptx」を書き出しました`, `Exported “${view.file.name}.pptx”`))) });
+      out.push({ id: "pptx", group: tx("発表と書き出し", "Present & export"), label: tx("PowerPoint に書き出す", "Export to PowerPoint"), run: () => void exportPptx(view.deck, view.tokens, view.roles, view.file.name).then(() => st.notify(tx("「{name}.pptx」を書き出しました", "Exported “{name}.pptx”", { name: view.file.name }))) });
       out.push({ id: "pdf", group: tx("発表と書き出し", "Present & export"), label: tx("PDF に書き出す", "Export to PDF"), hint: "⌘P", run: () => st.printDeck() });
       out.push({ id: "titles", group: tx("論理構成", "Structure"), label: tx("タイトルだけで通し読みする", "Read titles only"), run: () => st.setTitleRead(true) });
       out.push({ id: "review", group: tx("チャット", "Chat"), label: tx("赤入れする", "Review"), run: () => void sendToKata(tx("赤入れして", "Review this deck")) });
@@ -71,19 +70,18 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       out.push({ id: "p-logic", group: tx("パネル", "Panels"), label: tx("論理構成を開く", "Open structure"), run: () => st.setPanel("logic") });
       out.push({ id: "p-chat", group: tx("パネル", "Panels"), label: tx("チャットに戻る", "Back to chat"), run: () => st.setPanel("chat") });
       for (const s of STORYLINES) {
-        out.push({ id: `story-${s.id}`, group: tx("語る順番", "Storyline"), label: tx(`「${s.name}」で並べる`, `Arrange as “${s.name}”`), hint: s.desc, run: () => st.setStoryline(s.id) });
+        out.push({ id: `story-${s.id}`, group: tx("語る順番", "Storyline"), label: tx("「{name}」で並べる", "Arrange as “{name}”", { name: s.name }), hint: s.desc, run: () => st.setStoryline(s.id) });
       }
       for (const l of LAYOUTS.filter((x) => x.logic)) {
-        out.push({ id: `layout-${l.id}`, group: tx("このページの論理", "Slide logic"), label: tx(`このページを「${l.name}」にする`, `Make this slide “${l.name}”`), hint: l.desc, run: () => st.setLayout(view.slide.id, l.id) });
+        out.push({ id: `layout-${l.id}`, group: tx("このページの論理", "Slide logic"), label: tx("このページを「{name}」にする", "Make this slide “{name}”", { name: l.name }), hint: l.desc, run: () => st.setLayout(view.slide.id, l.id) });
       }
       out.push({ id: "undo", group: tx("編集", "Edit"), label: tx("取り消す", "Undo"), hint: "⌘Z", run: () => st.undo() });
       out.push({ id: "redo", group: tx("編集", "Edit"), label: tx("やり直す", "Redo"), hint: "⌘⇧Z", run: () => st.redo() });
     }
     out.push({ id: "keys", group: tx("外観", "Appearance"), label: tx("ショートカットの一覧", "Keyboard shortcuts"), hint: "?", run: () => st.setShortcuts(true) });
     out.push({ id: "theme", group: tx("外観", "Appearance"), label: st.theme === "dark" ? tx("明るい外観にする", "Light mode") : tx("暗い外観にする", "Dark mode"), run: () => st.setTheme(st.theme === "dark" ? "light" : "dark") });
-    out.push({ id: "lang", group: tx("外観", "Appearance"), label: lang === "en" ? "日本語に切り替える" : "English", run: () => st.setLangPref(lang === "en" ? "ja" : "en") });
     return out;
-  }, [files, folders, view, lang]);
+  }, [files, folders, view]);
 
   const shown = useMemo(() => {
     const t = q.trim().toLowerCase();

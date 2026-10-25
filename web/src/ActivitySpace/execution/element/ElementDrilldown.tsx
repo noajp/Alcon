@@ -12,6 +12,7 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { objectDomainRoute } from '@/shell/navigationState';
 import { useCurrentUserId } from '@/providers/authContext';
 import { Button } from '@/ui/button';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { NavigationState } from '@/types/navigation';
 
 interface Props {
@@ -33,6 +34,7 @@ export function ElementDrilldown(props: Props) {
 }
 
 function Drilldown({ label, children, onNavigate, onViewChange, domainName }: Props) {
+  const { t } = useI18n();
   const [elementId, setElementId] = useState<string | null>(null);
   const [navigationError, setNavigationError] = useState<string | null>(null);
   const { data: domains } = useSustainmentDomains();
@@ -73,11 +75,11 @@ function Drilldown({ label, children, onNavigate, onViewChange, domainName }: Pr
               void fetchObjectDomainIds(objectId).then(domainIds => {
                 if (request !== navigationRequest.current) return;
                 const domainId = objectDomainRoute(domainIds, [...domains, ...guestDomains].map(domain => domain.id), getActiveDomainId());
-                if (!domainId) throw new Error('This Object has no accessible Domain in the current Space or your shared Domains.');
+                if (!domainId) throw new Error(t('This Object has no accessible Domain in the current Space or your shared Domains.'));
                 onNavigate({ objectId, objectDomainId: domainId });
                 onViewChange('objects');
               }).catch(error => {
-                if (request === navigationRequest.current) setNavigationError(error instanceof Error ? error.message : 'Could not open this Object. Try again.');
+                if (request === navigationRequest.current) setNavigationError(error instanceof Error ? error.message : t('Could not open this Object. Try again.'));
               });
             } : undefined}
             onOpenStrategy={onNavigate && onViewChange ? (strategyId) => {
@@ -88,9 +90,9 @@ function Drilldown({ label, children, onNavigate, onViewChange, domainName }: Pr
         </>
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
-          <p role={query.error ? 'alert' : 'status'}>{query.isPending ? 'Opening Element…' : 'This Element could not be loaded.'}</p>
-          {!query.isPending && <Button size="sm" onClick={() => void query.refetch()}>Retry</Button>}
-          <Button size="sm" onClick={back}>Back to {label}</Button>
+          <p role={query.error ? 'alert' : 'status'}>{query.isPending ? t('Opening Element…') : t('This Element could not be loaded.')}</p>
+          {!query.isPending && <Button size="sm" onClick={() => void query.refetch()}>{t('Retry')}</Button>}
+          <Button size="sm" onClick={back}>{t('Back to {label}', { label })}</Button>
         </div>
       ))}
       <div className={elementId ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}>

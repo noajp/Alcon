@@ -8,6 +8,7 @@ import { Input } from '@/ui/input';
 import { ChoiceCard } from '@/ui/choice-card';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { FONT } from '@/shared/designTokens';
 import type { PersonalAccessToken, PersonalAccessTokenAccess } from '@/types/database';
 import { CopyField } from './CopyField';
 import { claudeMcpAddCommand, usePersonalAccessTokenActions, usePersonalAccessTokens, type TokenExpiryDays } from './patData';
@@ -66,7 +67,7 @@ export function PersonalAccessTokens() {
     <section className="space-y-3">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h3 className="text-[13px] font-medium text-foreground">{t('Personal access tokens')}</h3>
+          <h3 className={`${FONT.lg} text-foreground`}>{t('Personal access tokens')}</h3>
           <p className="mt-1 text-[12px] text-muted-foreground">
             {t('A token lets an MCP client or script act as you. It sees and changes only what you can. Revoke it to cut it off at once.')}
           </p>
@@ -78,15 +79,15 @@ export function PersonalAccessTokens() {
       </div>
 
       {error ? (
-        <p className="text-[12px] text-[var(--status-danger)]">{t("Couldn't load tokens")}: {error.message}</p>
+        <p className="text-[12px] text-[var(--status-danger)]">{t("Couldn't load tokens: {error}", { error: error.message })}</p>
       ) : loading ? (
         <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p>
       ) : tokens.length === 0 ? (
         <p className="text-[12px] text-muted-foreground">{t('No tokens yet.')}</p>
       ) : (
-        <div className="divide-y divide-border/40 rounded-lg border border-border/60">
+        <div>
           {tokens.map((token) => (
-            <div key={token.id} className="flex items-center gap-3 px-3 py-2.5">
+            <div key={token.id} className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate text-[13px] font-medium text-foreground">{token.name}</span>

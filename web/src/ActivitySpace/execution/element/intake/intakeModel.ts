@@ -1,4 +1,5 @@
 import type { ElementStatus, Worker } from '@/types/database';
+import { translate } from '@/Function/i18n/I18nProvider';
 
 export const INTAKE_LIMIT = 100;
 export const INTAKE_TEXT_LIMIT = 500_000;
@@ -77,12 +78,12 @@ function readDelimited(text: string, delimiter: string): { rows: string[][]; err
       endRow();
       if (char === '\r' && text[index + 1] === '\n') index += 1;
     } else if (char === '"' && !cell.trim() && !endedQuote) { cell = ''; quoted = true; }
-    else if (endedQuote && char.trim()) return { rows: [], error: 'Unexpected text after a quoted cell. Check the pasted table.' };
+    else if (endedQuote && char.trim()) return { rows: [], error: translate('Unexpected text after a quoted cell. Check the pasted table.') };
     else if (!endedQuote) cell += char;
-    if (cells.length > 256) return { rows: [], error: 'This table has too many columns. Paste only the fields for one project.' };
-    if (rows.length > INTAKE_LIMIT + 1) return { rows: [], error: `Paste at most ${INTAKE_LIMIT} Elements at a time. Nothing has been imported.` };
+    if (cells.length > 256) return { rows: [], error: translate('This table has too many columns. Paste only the fields for one project.') };
+    if (rows.length > INTAKE_LIMIT + 1) return { rows: [], error: translate('Paste at most {n} Elements at a time. Nothing has been imported.', { n: INTAKE_LIMIT }) };
   }
-  if (quoted) return { rows: [], error: 'A quoted cell is not closed. Paste the complete CSV or switch to a line list.' };
+  if (quoted) return { rows: [], error: translate('A quoted cell is not closed. Paste the complete CSV or switch to a line list.') };
   if (cell || cells.length) endRow();
   return { rows, error: null };
 }
@@ -102,7 +103,7 @@ function suggestIntakeColumns(headers: readonly string[]): IntakeColumnMap {
 export function parseIntake(text: string, options: { format?: IntakeFormat; hasHeader?: boolean } = {}): IntakeTable {
   if (text.length > INTAKE_TEXT_LIMIT) return {
     format: options.format === 'auto' || !options.format ? 'lines' : options.format,
-    headers: [], rows: [], suggestedMap: emptyMap(), errors: ['This paste is too large. Start with one project and fewer than 100 Elements.'], fingerprint: 'oversize',
+    headers: [], rows: [], suggestedMap: emptyMap(), errors: [translate('This paste is too large. Start with one project and fewer than {n} Elements.', { n: INTAKE_LIMIT })], fingerprint: 'oversize',
   };
   const cleaned = text.replace(/^\uFEFF/, '');
   const firstLine = cleaned.split(/\r?\n/, 1)[0] ?? '';
@@ -115,7 +116,7 @@ export function parseIntake(text: string, options: { format?: IntakeFormat; hasH
     }
   }
   const base: IntakeTable = { format, headers: [], rows: [], suggestedMap: emptyMap(), errors: [], fingerprint: hash(cleaned) };
-  if (!cleaned.trim()) return { ...base, errors: ['Paste a table or one Element title per line.'] };
+  if (!cleaned.trim()) return { ...base, errors: [translate('Paste a table or one Element title per line.')] };
   if (format === 'lines') {
     base.headers = ['Title'];
     base.suggestedMap.title = 0;
@@ -125,14 +126,14 @@ export function parseIntake(text: string, options: { format?: IntakeFormat; hasH
     if (parsed.error) return { ...base, errors: [parsed.error] };
     const hasHeader = options.hasHeader !== false;
     const width = Math.max(0, ...parsed.rows.map((row) => row.length));
-    if (width > 256) return { ...base, errors: ['This table has too many columns. Paste only the fields for one project.'] };
-    base.headers = Array.from({ length: width }, (_, index) => hasHeader ? parsed.rows[0]?.[index]?.trim() || `Column ${index + 1}` : `Column ${index + 1}`);
+    if (width > 256) return { ...base, errors: [translate('This table has too many columns. Paste only the fields for one project.')] };
+    base.headers = Array.from({ length: width }, (_, index) => hasHeader ? parsed.rows[0]?.[index]?.trim() || translate('Column {n}', { n: index + 1 }) : translate('Column {n}', { n: index + 1 }));
     base.rows = parsed.rows.slice(hasHeader ? 1 : 0).map((cells, index) => ({ sourceRow: index + (hasHeader ? 2 : 1), cells }));
     base.suggestedMap = suggestIntakeColumns(base.headers);
     if (!hasHeader && width === 1) base.suggestedMap.title = 0;
   }
-  if (base.rows.length > INTAKE_LIMIT) return { ...base, rows: [], errors: [`Paste at most ${INTAKE_LIMIT} Elements at a time. Nothing has been imported.`] };
-  if (!base.rows.length) base.errors.push('No Element rows found below the column names.');
+  if (base.rows.length > INTAKE_LIMIT) return { ...base, rows: [], errors: [translate('Paste at most {n} Elements at a time. Nothing has been imported.', { n: INTAKE_LIMIT })] };
+  if (!base.rows.length) base.errors.push(translate('No Element rows found below the column names.'));
   return base;
 }
 
@@ -157,28 +158,28 @@ function parseIntakeDate(value: string): string | null {
 
 export function normalizeIntake(table: IntakeTable, columns: IntakeColumnMap, workers: readonly IntakeWorker[], assigneeMap: Readonly<Record<string, string | null>> = {}): IntakePreview {
   const errors = [...table.errors];
-  if (columns.title === null) errors.push('Choose the column that contains Element titles.');
+  if (columns.title === null) errors.push(translate('Choose the column that contains Element titles.'));
   const used = Object.values(columns).filter((column): column is number => column !== null);
-  if (new Set(used).size !== used.length) errors.push('Each source column can map to only one field.');
-  if (used.some((column) => !Number.isInteger(column) || column < 0 || column >= table.headers.length)) errors.push('A selected column is no longer available. Check the column mapping.');
+  if (new Set(used).size !== used.length) errors.push(translate('Each source column can map to only one field.'));
+  if (used.some((column) => !Number.isInteger(column) || column < 0 || column >= table.headers.length)) errors.push(translate('A selected column is no longer available. Check the column mapping.'));
   if (errors.length) return { rows: [], errors };
   const rows = table.rows.map(({ sourceRow, cells }): ElementImportRow => {
     const read = (field: IntakeField) => columns[field] === null ? '' : (cells[columns[field]!] ?? '').trim();
     const warnings: IntakeWarning[] = [];
     const warn = (field: IntakeField, code: string, message: string) => warnings.push({ field, code, message });
     const title = read('title');
-    if (!title) errors.push(`Row ${sourceRow} has no title. Add a title or remove that row from the paste.`);
-    if (title.length > 500) errors.push(`Row ${sourceRow} has a title longer than 500 characters.`);
+    if (!title) errors.push(translate('Row {n} has no title. Add a title or remove that row from the paste.', { n: sourceRow }));
+    if (title.length > 500) errors.push(translate('Row {n} has a title longer than 500 characters.', { n: sourceRow }));
     const description = read('description') || null;
-    if (description && description.length > 20_000) errors.push(`Row ${sourceRow} has a description longer than 20,000 characters. Keep the original document as a link.`);
+    if (description && description.length > 20_000) errors.push(translate('Row {n} has a description longer than 20,000 characters. Keep the original document as a link.', { n: sourceRow }));
     const rawStatus = read('status');
     const statusKey = keyOf(rawStatus);
     const knownStatus = Object.prototype.hasOwnProperty.call(STATUS_MAP, statusKey);
     const status = knownStatus ? STATUS_MAP[statusKey] : 'todo';
-    if (rawStatus && !knownStatus) warn('status', 'unknown_status', `“${rawStatus}” is not recognized. It will become To do.`);
+    if (rawStatus && !knownStatus) warn('status', 'unknown_status', translate('“{value}” is not recognized. It will become To Do.', { value: rawStatus }));
     const rawDate = read('due_date');
     const due_date = rawDate ? parseIntakeDate(rawDate) : null;
-    if (rawDate && !due_date) warn('due_date', 'unparsed_date', `“${rawDate}” was not interpreted. Due date will be empty; use YYYY-MM-DD to set it.`);
+    if (rawDate && !due_date) warn('due_date', 'unparsed_date', translate('“{value}” was not interpreted. Due date will be empty; use YYYY-MM-DD to set it.', { value: rawDate }));
     const rawAssignee = read('assignee');
     let worker_id: string | null = null;
     if (rawAssignee && Object.prototype.hasOwnProperty.call(assigneeMap, rawAssignee)) {
@@ -186,7 +187,7 @@ export function normalizeIntake(table: IntakeTable, columns: IntakeColumnMap, wo
       if (chosen !== null) {
         const worker = workers.find((candidate) => candidate.id === chosen && candidate.status !== 'inactive');
         if (worker) worker_id = worker.id;
-        else warn('assignee', 'invalid_assignee_mapping', `The Worker chosen for “${rawAssignee}” is no longer available. Choose again or leave it unassigned.`);
+        else warn('assignee', 'invalid_assignee_mapping', translate('The Worker chosen for “{value}” is no longer available. Choose again or leave it unassigned.', { value: rawAssignee }));
       }
     } else if (rawAssignee) {
       const rawKey = rawAssignee.toLocaleLowerCase();
@@ -194,24 +195,24 @@ export function normalizeIntake(table: IntakeTable, columns: IntakeColumnMap, wo
       const exact = workers.filter((worker) => worker.id.toLocaleLowerCase() === rawKey || worker.email?.trim().toLocaleLowerCase() === (email ?? rawKey));
       const matches = exact.length ? exact : workers.filter((worker) => worker.name.trim().toLocaleLowerCase() === rawKey);
       if (matches.length === 1 && matches[0].status !== 'inactive') worker_id = matches[0].id;
-      else warn('assignee', matches.length > 1 ? 'ambiguous_assignee' : matches[0]?.status === 'inactive' ? 'inactive_assignee' : 'unknown_assignee', `“${rawAssignee}” cannot be matched to one active Worker. It will remain unassigned.`);
+      else warn('assignee', matches.length > 1 ? 'ambiguous_assignee' : matches[0]?.status === 'inactive' ? 'inactive_assignee' : 'unknown_assignee', translate('“{value}” cannot be matched to one active Worker. It will remain unassigned.', { value: rawAssignee }));
     }
     const originalUrl = read('source_url');
     let url: string | null = null;
     if (originalUrl) {
       try { const parsed = new URL(originalUrl); if (parsed.protocol === 'https:' || parsed.protocol === 'http:') url = originalUrl; } catch { /* Retain original text without turning it into a link. */ }
-      if (!url) warn('source_url', 'invalid_url', 'The original link is not an HTTP(S) URL. Its text will be retained without an active link.');
+      if (!url) warn('source_url', 'invalid_url', translate('The original link is not an HTTP(S) URL. Its text will be retained without an active link.'));
     }
-    if (cells.length > table.headers.length) errors.push(`Row ${sourceRow} has more cells than the column mapping.`);
+    if (cells.length > table.headers.length) errors.push(translate('Row {n} has more cells than the column mapping.', { n: sourceRow }));
     const source = { id: read('source_id') || null, url, original_url: originalUrl || null, status: rawStatus || null, assignee: rawAssignee || null, due_date: rawDate || null };
     // Leave room for PostgreSQL jsonb's spacing within its 8,000-byte bound.
-    if (new TextEncoder().encode(JSON.stringify(source)).length > 7900) errors.push(`Row ${sourceRow} has source references that are too long. Shorten the original ID or link before importing.`);
+    if (new TextEncoder().encode(JSON.stringify(source)).length > 7900) errors.push(translate('Row {n} has source references that are too long. Shorten the original ID or link before importing.', { n: sourceRow }));
     return {
       rowKey: `${table.fingerprint}:${sourceRow}`, sourceRow, title, description, status, due_date, worker_id,
       source, warnings,
     };
   });
-  if (new TextEncoder().encode(JSON.stringify(rows)).length > 1_000_000) errors.push('The reviewed import is too large to save together. Start with a smaller selection.');
+  if (new TextEncoder().encode(JSON.stringify(rows)).length > 1_000_000) errors.push(translate('The reviewed import is too large to save together. Start with a smaller selection.'));
   return { rows, errors };
 }
 
@@ -232,7 +233,7 @@ export function reconcileIntakeResult(rows: readonly ElementImportRow[], result:
     const successes = result.saved.filter((item) => item.rowKey === row.rowKey && item.elementId);
     const failure = result.failed?.find((item) => item.rowKey === row.rowKey);
     if (successes.length === 1 && !failure) saved[row.rowKey] = successes[0].elementId;
-    else failed[row.rowKey] = failure?.message || 'Could not confirm this row was saved. Retry to confirm the same import.';
+    else failed[row.rowKey] = failure?.message || translate('Could not confirm this row was saved. Retry to confirm the same import.');
   }
   return { saved, failed };
 }

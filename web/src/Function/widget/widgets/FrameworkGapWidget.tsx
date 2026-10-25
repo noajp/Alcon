@@ -11,6 +11,7 @@ import {
 } from '@/ActivitySpace/strategy/initiative/initiativeMeasureModel';
 import { useWidgetEmpty, useWidgetMeta } from '../WidgetFrame';
 import { gapRows, toMeasureInput, type GapRow } from './strategyFrameworkModel';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // =============================================================
 // Gap Analysis — the distance between the reading and the condition.
@@ -35,6 +36,7 @@ export function FrameworkGapWidget() {
   // that bundle after every write, so a reading recorded there lands here on
   // the same pass; a private fetch would leave the two disagreeing until the
   // page remounted.
+  const { t } = useI18n();
   const initiative = useInitiativeIntentContext();
   const error = initiative?.error ?? null;
   const loading = initiative ? initiative.data === null && error === null : true;
@@ -48,13 +50,13 @@ export function FrameworkGapWidget() {
   );
   const open = rows.filter((r) => r.state === 'missed').length;
 
-  useWidgetMeta(rows.length === 0 ? null : open > 0 ? `${open} short` : `${rows.length} tracked`);
+  useWidgetMeta(rows.length === 0 ? null : open > 0 ? t('{n} short', { n: open }) : t('{n} tracked', { n: rows.length }));
   useWidgetEmpty(!error && loading);
 
   if (error) {
     return (
-      <p className="px-3 py-2 text-[12px] text-[var(--status-danger)]">
-        Could not read this Initiative&apos;s conditions.
+      <p className="py-1 text-[12px] text-[var(--status-danger)]">
+        {t('Could not read this Initiative’s conditions.')}
       </p>
     );
   }
@@ -62,7 +64,7 @@ export function FrameworkGapWidget() {
 
   return (
     <div className="py-1">
-      <InitiativeMeasureEditor initiativeId={initiative.initiativeId} initiativeName={initiative.data?.master?.title ?? 'Initiative'}>
+      <InitiativeMeasureEditor initiativeId={initiative.initiativeId} initiativeName={initiative.data?.master?.title ?? t('Initiative')}>
       {rows.map((row) => (
         <GapTrack key={row.id} row={row} />
       ))}
@@ -72,17 +74,18 @@ export function FrameworkGapWidget() {
 }
 
 function GapTrack({ row }: { row: GapRow }) {
+  const { t } = useI18n();
   const target = targetLabel(row);
   const reading = formatMeasureValue(row.actual, row.unit);
   const judged = row.state === 'met' || row.state === 'missed';
 
   return (
-    <div className="px-3 py-2 space-y-1.5">
+    <div className="py-2 space-y-1.5">
       <div className="flex items-baseline gap-2">
         <span className="min-w-0 flex-1 truncate text-[12px] text-foreground/90">{row.title}</span>
         {!judged && (
-          <span className="shrink-0 text-[11px] text-[var(--status-warning)]">
-            {measureStateLabel(row.state)}
+          <span className="shrink-0 text-[11px] text-muted-foreground">
+            {t(measureStateLabel(row.state))}
           </span>
         )}
       </div>
@@ -117,8 +120,8 @@ function GapTrack({ row }: { row: GapRow }) {
       <div className="flex items-baseline gap-2 text-[11px] tabular-nums text-muted-foreground">
         {/* The state chip above already says when there is no reading, so this
             line carries the goal alone rather than repeating it. */}
-        {reading && <span>Now {reading}</span>}
-        {target && <span>{reading ? '· ' : ''}Goal {target}</span>}
+        {reading && <span>{t('Now {value}', { value: reading })}</span>}
+        {target && <span>{reading ? '· ' : ''}{t('Goal {value}', { value: target })}</span>}
         {row.distance !== null && row.distance !== 0 && (
           <span className={row.state === 'missed' ? 'text-[var(--status-danger)]' : undefined}>
             · {row.distance > 0 ? '+' : ''}

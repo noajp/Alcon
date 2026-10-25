@@ -91,11 +91,13 @@ export function SlidesSidebar({ onOpen }: { onOpen: () => void }) {
 
   const openDeck = (id: string) => { st().selectFile(id); onOpen(); };
   const deleteFolder = async (id: string, name: string, count: number) => {
-    const what = count ? ` and its ${count} deck${count === 1 ? '' : 's'}` : '';
-    if (await appDialog.confirm(`Delete the folder "${name}"${what}? This cannot be undone.`)) st().deleteFolder(id);
+    const message = count === 0 ? t('Delete the folder "{name}"? This cannot be undone.', { name })
+      : count === 1 ? t('Delete the folder "{name}" and its 1 deck? This cannot be undone.', { name })
+      : t('Delete the folder "{name}" and its {count} decks? This cannot be undone.', { name, count });
+    if (await appDialog.confirm(message)) st().deleteFolder(id);
   };
   const deleteDeck = async (id: string, name: string) => {
-    if (await appDialog.confirm(`Delete the deck "${name}"? This cannot be undone.`)) st().deleteFile(id);
+    if (await appDialog.confirm(t('Delete the deck "{name}"? This cannot be undone.', { name }))) st().deleteFile(id);
   };
   const nameOrInput = (id: string, name: string, commit: (v: string) => void, onClick: () => void, className: string) => renaming === id ? (
     <RenameInput

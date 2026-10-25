@@ -9,6 +9,7 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 import { deleteVision, updateVision } from '@/ActivitySpace/strategy/vision/data';
 import type { Vision } from '@/types/database';
 import { SettingsModal } from './SettingsModal';
+import { FONT } from '@/shared/designTokens';
 import { InitiativeJudgementSettings, PhaseDefaultsSettings, TimelineDisplaySettings } from './StrategySettingsPanels';
 
 type VisionTab = 'general' | 'initiative' | 'phase' | 'timeline';
@@ -41,7 +42,7 @@ export function StrategySettingsModal({ vision, canEdit, onClose, onDeleted }: {
       active={tab}
       onSelect={(id) => setTab(id as VisionTab)}
     >
-      <h3 className="mb-4 text-[15px] font-semibold text-foreground">{titles[tab]}</h3>
+      <h3 className={`mb-4 ${FONT.lg} text-foreground`}>{titles[tab]}</h3>
       {tab === 'general' ? <VisionGeneral key={vision.id} vision={vision} canEdit={canEdit} onDeleted={onDeleted} />
         : tab === 'initiative' ? <InitiativeJudgementSettings />
         : tab === 'phase' ? <PhaseDefaultsSettings />
@@ -75,7 +76,7 @@ function VisionGeneral({ vision, canEdit, onDeleted }: { vision: Vision; canEdit
         {!canEdit && <p className="mt-1.5 text-[11px] text-muted-foreground">{t("Only the Vision's author or a Space owner can change it.")}</p>}
       </div>
       {error && <div className="text-[11px] text-destructive">{error}</div>}
-      <div className="flex items-center justify-between gap-4 border-t border-border/60 pt-4">
+      <div className="flex items-center justify-between gap-4 pt-4">
         <div>
           <div className="text-[12px] font-semibold text-foreground">{t('Delete Vision')}</div>
           <p className="mt-0.5 text-[12px] text-muted-foreground">{t('Its Portfolios are deleted with it; its Initiatives stay, outside any Vision.')}</p>

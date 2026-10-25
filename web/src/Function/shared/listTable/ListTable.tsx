@@ -19,6 +19,7 @@ import { ElementRow } from './ElementRow';
 import { useUniformIdWidth } from './useUniformIdWidth';
 import { ObjectRow } from './ObjectRow';
 import { ColumnHeader, ResizeHandle, ColumnMenu } from './ColumnHeaderMenu';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // Build a type-scoped, pointer-first collision detector. Two reasons it's
 // custom:
@@ -190,6 +191,7 @@ export function ListTable({
   selectedObjectIds,
   onObjectRowSelect,
 }: ListTableProps) {
+  const { t } = useI18n();
   const dndId = useId();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   // The id column takes the width of the widest id drawn, so the status mark
@@ -454,21 +456,28 @@ export function ListTable({
     }
   };
 
+  // Until the person sizes Name, it takes whatever the data columns leave —
+  // titles get the room, as in any list, and the data columns sit packed at
+  // the right. Once sized, Name keeps that width and the trailing column
+  // soaks up the slack instead.
+  const nameFluid = !cols.isSized(NAME_COL_KEY);
+  const packedWidth = 56 + cols.widthFor(NAME_COL_KEY) + visibleColumns.reduce((sum, c) => sum + cols.widthFor(c.id), 0) + (hasTrailingCol ? 80 : 0);
+
   return (
     <DndContext id={dndId} sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
     <div data-list-scroller className="overflow-x-auto h-full [overflow-anchor:none]">
       <table
         ref={tableRef}
         // `min-w-full` so the table fills the wrap (rows + section bands span
-        // the full width). The trailing column is given width:100% so it — and
-        // only it — soaks up the surplus on wide screens, keeping Name and the
-        // data columns at their defined widths packed flush LEFT, with empty
-        // bg-card slack on the right. (An UNSIZED trailing col does NOT absorb
-        // the surplus in fixed-table layout — the browser instead spreads it
-        // proportionally across the sized columns, stretching everything.)
-        // Resizing a data column shrinks the trailing slack instead of Name,
-        // so the dragged column's LEFT edge stays put (no left-drift).
-        style={{ width: 56 + cols.widthFor(NAME_COL_KEY) + visibleColumns.reduce((sum, c) => sum + cols.widthFor(c.id), 0) + (hasTrailingCol ? 80 : 0) }}
+        // the full width). One track is given width:100% and soaks up the
+        // surplus on wide screens: Name while it is unsized (see nameFluid),
+        // otherwise the trailing column, leaving the sized columns packed
+        // flush left. (An UNSIZED col does NOT absorb the surplus in
+        // fixed-table layout — the browser instead spreads it proportionally
+        // across the sized columns, stretching everything.)
+        style={nameFluid
+          ? { width: '100%', minWidth: packedWidth }
+          : { width: packedWidth }}
         className="group/list min-w-full table-fixed bg-card border-separate border-spacing-0 text-[13px]"
         data-has-selection={hasSelection ? '' : undefined}
       >
@@ -477,7 +486,9 @@ export function ListTable({
         <colgroup>
           <col style={{ width: 28, minWidth: 28 }} />
           <col style={{ width: 28, minWidth: 28 }} />
-          <col style={{ width: cols.widthFor(NAME_COL_KEY), minWidth: cols.widthFor(NAME_COL_KEY) }} />
+          <col style={nameFluid
+            ? { width: '100%', minWidth: cols.widthFor(NAME_COL_KEY) }
+            : { width: cols.widthFor(NAME_COL_KEY), minWidth: cols.widthFor(NAME_COL_KEY) }} />
           {visibleColumns.map((c) => {
             const w = cols.widthFor(c.id);
             // Match the data cells' `table-cell` so the column track
@@ -485,7 +496,7 @@ export function ListTable({
             // an empty gap and force horizontal scroll in narrow panels.
             return <col key={c.id} className="table-column" style={{ width: w, minWidth: w }} />;
           })}
-          {hasTrailingCol && <col className="table-column" style={{ width: '100%', minWidth: 80 }} />}
+          {hasTrailingCol && <col className="table-column" style={nameFluid ? { width: 80, minWidth: 80 } : { width: '100%', minWidth: 80 }} />}
         </colgroup>
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
@@ -497,10 +508,7 @@ export function ListTable({
             <th className="sticky top-0 left-0 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
             <th className="sticky top-0 left-7 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
             <th className="sticky top-0 md:left-14 z-30 relative pl-0.5 pr-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card border-b border-border/60">
-              Name
-              {/* Short centered vertical divider (30px) on the column's right
-                  edge — a slim separator, not a full-header-height border. */}
-              <span aria-hidden className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 h-[30px] w-px bg-border/60" />
+              {t('Name')}
               {/* Name is resizable too — same handle as the data columns,
                   persisted under NAME_COL_KEY. Fixed on the Object list
                   instead (see the colgroup above), so no handle there. */}
@@ -542,8 +550,8 @@ export function ListTable({
                   <button
                     type="button"
                     onClick={(e) => onAddColumn(e.currentTarget.getBoundingClientRect())}
-                    title="Add field"
-                    aria-label="Add field"
+                    title={t('Add field')}
+                    aria-label={t('Add field')}
                     className="w-6 h-6 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
                   >
                     <Plus size={14} />
@@ -580,7 +588,7 @@ export function ListTable({
                         type="button"
                         onClick={(e) => { e.stopPropagation(); toggle(section.id); }}
                         className="w-full min-h-[2.625rem] flex items-center justify-center bg-muted/70 group-hover:bg-muted rounded-l-lg text-muted-foreground hover:text-foreground transition-colors"
-                        aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+                        aria-label={isCollapsed ? t('Expand') : t('Collapse')}
                       >
                         <ChevronDown
                           size={12}
@@ -593,7 +601,7 @@ export function ListTable({
                         type="button"
                         onClick={() => toggle(section.id)}
                       className="w-full min-h-[2.625rem] flex items-center min-w-0 pr-1 py-1.5 bg-muted/70 group-hover:bg-muted rounded-r-lg transition-colors text-left"
-                        aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+                        aria-label={isCollapsed ? t('Expand') : t('Collapse')}
                       >
                         {/* Icon slot — same w-7 cell width as the row's ○
                             mark below, so section icons line up vertically
@@ -621,8 +629,8 @@ export function ListTable({
                               }
                             }}
                             className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                            title={`Add element to ${section.name}`}
-                            aria-label={`Add element to ${section.name}`}
+                            title={t('Add Element to {name}', { name: section.name })}
+                            aria-label={t('Add Element to {name}', { name: section.name })}
                           >
                             <Plus size={14} />
                           </span>
@@ -717,7 +725,7 @@ export function ListTable({
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0">
                       <div className="flex items-center min-w-0 min-h-[1.625rem] text-muted-foreground">
                         <span className="text-[13px] group-hover:text-foreground transition-colors">
-                          Add Object
+                          {t('Add Object')}
                         </span>
                       </div>
                     </td>

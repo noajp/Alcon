@@ -6,7 +6,7 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { ElementDependencies } from './ElementDependencies';
 import { CheckInDialog } from '../../home/now/CheckInDialog';
-import { STATUS, PRIORITY } from '@/shared/designTokens';
+import { STATUS, PRIORITY, FONT } from '@/shared/designTokens';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle, Tag,
@@ -81,7 +81,9 @@ const ELEMENT_ZONES: Zone[] = ['rail'];
 import { RailRow } from '@/Function/shared/RailRow';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { ElementTypeIcon, ObjectIcon } from '@/shell/icons';
-import { PageIcon } from '@/Function/shared/PageHead';
+import { PageIcon, PageSection } from '@/Function/shared/PageHead';
+import { MarkdownLite } from '@/Function/shared/MarkdownLite';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { StatusPicker } from './StatusPicker';
 import { ElementDirectionSection } from './ElementDirectionSection';
 import { SubelementRow } from './SubelementRow';
@@ -157,10 +159,11 @@ function ElementDetailRoute(props: ElementDetailViewProps) {
     queryKey: ['coordination-element', userId, props.coordinationSpaceId, relatedId],
     queryFn: () => fetchElementWithDetails(relatedId!), enabled: !!relatedId,
   });
+  const { t } = useI18n();
   const back = () => setTrail(current => current.slice(0, -1));
   if (relatedId && (related.isPending || !related.data || related.error)) return <div className="p-6">
-    <p role="status" className="text-[13px] text-muted-foreground">{related.isPending ? 'Loading Element…' : 'This Element is unavailable.'}</p>
-    <Button className="mt-3" onClick={back}>Back</Button>
+    <p role="status" className="text-[13px] text-muted-foreground">{related.isPending ? t('Loading Element…') : t('This Element is unavailable.')}</p>
+    <Button className="mt-3" onClick={back}>{t('Back')}</Button>
   </div>;
   const element = relatedId ? related.data! : props.element;
   return <ElementDetailBody {...props} key={element.id} element={element}
@@ -202,16 +205,16 @@ const priorityOptions = [
 // ============================================
 // Relative time formatter
 // ============================================
-function timeAgo(date: Date): string {
+function timeAgo(date: Date, t: (message: string, values?: Record<string, string | number>) => string): string {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return t('just now');
+  if (minutes < 60) return t('{n}m ago', { n: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t('{n}h ago', { n: hours });
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return t('{n}d ago', { n: days });
 }
 
 // ============================================
@@ -264,12 +267,28 @@ function ElementDetailBody({
   // clips at min-h and scrolls inside its own tiny box instead of letting
   // the page grow, which reads as a broken nested-scroll region.
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+  // A written description is read as formatted text (headings, lists, bold)
+  // and turns into its source when clicked — the way a document reads until
+  // you put the cursor in it. An empty one is the field straight away.
+  const { t } = useI18n();
+  // Keyed by Element, so opening another one starts it formatted again.
+  const [editingDescriptionFor, setEditingDescriptionFor] = useState<string | null>(null);
+  const editingDescription = editingDescriptionFor === element.id;
+  const setEditingDescription = (on: boolean) => setEditingDescriptionFor(on ? element.id : null);
+  const showDescriptionSource = editingDescription || !description.trim();
   useEffect(() => {
     const el = descriptionRef.current;
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
-  }, [description]);
+  }, [description, showDescriptionSource]);
+  useEffect(() => {
+    if (!editingDescription) return;
+    const el = descriptionRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [editingDescription]);
 
   // Readers can resize independently of the viewport (sidebar or split pane).
   useEffect(() => {
@@ -679,8 +698,8 @@ function ElementDetailBody({
     <button
       type="button"
       onClick={onNavigateRoot}
-      aria-label="Back"
-      title="Back"
+      aria-label={t('Back')}
+      title={t('Back')}
       className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
     >
       <ChevronLeft size={13} />
@@ -753,25 +772,37 @@ function ElementDetailBody({
                 }}
                 className="text-2xl text-foreground bg-transparent border-none focus:outline-none flex-1 min-w-0 resize-none leading-tight overflow-hidden"
                 style={{ fontWeight: 600 }}
-                placeholder="Element title"
+                placeholder={t('Element title')}
               />
             </div>
             {layout === 'reader' && <div className="mb-5 flex flex-wrap items-center gap-2">
               <StatusPicker element={element} onChanged={handleStatusChange} trigger={
-                <Button variant="secondary"><ElementProgressMark status={element.status} progress={getElementProgress(element, customColumns)} size={14} />{currentStatus.label}</Button>
+                <Button variant="secondary"><ElementProgressMark status={element.status} progress={getElementProgress(element, customColumns)} size={14} />{t(currentStatus.label)}</Button>
               } />
               <DropdownMenu>
-                <DropdownMenuTrigger asChild><Button variant="secondary"><PriorityMark priority={element.priority} />{currentPriority.label}</Button></DropdownMenuTrigger>
+                <DropdownMenuTrigger asChild><Button variant="secondary"><PriorityMark priority={element.priority} />{t(currentPriority.label)}</Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                  {priorityOptions.map(opt => <DropdownMenuItem key={opt.priority} onClick={() => handlePriorityChange(opt.priority)} className="gap-2"><PriorityMark priority={opt.priority} />{opt.label}</DropdownMenuItem>)}
+                  {priorityOptions.map(opt => <DropdownMenuItem key={opt.priority} onClick={() => handlePriorityChange(opt.priority)} className="gap-2"><PriorityMark priority={opt.priority} />{t(opt.label)}</DropdownMenuItem>)}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>}
-            <textarea
+            {!showDescriptionSource && (
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label={t('Edit description')}
+                onClick={(e) => { if (!(e.target as HTMLElement).closest('a')) setEditingDescription(true); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setEditingDescription(true); } }}
+                className="min-h-[36px] cursor-text outline-none"
+              >
+                <MarkdownLite text={description} className="space-y-3 text-[14px] leading-[1.65]" />
+              </div>
+            )}
+            {showDescriptionSource && <textarea
               ref={descriptionRef}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              onBlur={handleDescriptionSave}
+              onBlur={() => { setEditingDescription(false); void handleDescriptionSave(); }}
               onKeyDown={(e) => {
                 // Multi-line: Enter is a newline; Cmd/Ctrl+Enter and
                 // Escape end the edit and save.
@@ -780,19 +811,30 @@ function ElementDetailBody({
                   e.currentTarget.blur();
                 }
               }}
-              placeholder="Add description..."
+              placeholder={t('Add description…')}
               rows={1}
               className="w-full text-[14px] text-foreground bg-transparent border-none focus:outline-none min-h-[36px] resize-none overflow-hidden"
-            />
+            />}
           </div>
 
-          {/* Action row — reactions, Note link, approval and Share an update,
-              all borderless inline verbs. Sits flush
-              with the title/description block (no extra horizontal
-              padding) and wraps so reaction chips line up next to the
-              affordances. */}
+          {/* One row of verbs under the description, as Linear keeps a single
+              line under an issue: reactions, the Note link, the agent hand-off
+              and approval as quiet icons, then the empty Direction,
+              Sub-elements and Dependencies as "+ verb". A section that has
+              content takes the full width under the row with its own heading.
+              Sharing an update belongs to the discussion, so it sits in the
+              Comments heading. */}
+          {/* Direction — approach / acceptance criteria / next step. Sits
+              between the linked Note and the Sub-elements so the read order
+              is intent → its breakdown → discussion. Keyed by element.id so
+              switching Elements resets the editing state. */}
+          {/* Direction, sub-elements and dependencies share one wrapping row:
+              an empty one is a single quiet "+" verb that sits beside the
+              others (Linear's "+ Add sub-issues"); a filled one takes the full
+              width with its own small heading. */}
+          <div className="-ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
           <ButtonAppearanceProvider appearance="inline">
-          <div className="-mt-4 -ml-1.5 flex items-center gap-0.5 flex-wrap">
+          <div className="flex items-center gap-0.5">
             {/* Smile button → quick-emoji popover that toggles a
                 reaction on this Element. */}
             <div className="relative">
@@ -800,7 +842,8 @@ function ElementDetailBody({
                 type="button"
                 onClick={() => setEmojiPickerOpen((o) => !o)}
                 className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-                title="Add reaction"
+                title={t('Add reaction')}
+                aria-label={t('Add reaction')}
               >
                 <Smile size={15} />
               </button>
@@ -834,7 +877,8 @@ function ElementDetailBody({
                   type="button"
                   onClick={() => setNotePickerOpen(true)}
                   className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-                  title="Link a Note"
+                  title={t('Link a Note')}
+                  aria-label={t('Link a Note')}
                 >
                   <FileText size={15} />
                 </button>
@@ -863,7 +907,6 @@ function ElementDetailBody({
                 and record a decision (Approve / Request changes / Reject).
                 Moved here from the right rail's "Approval" island. */}
             <ElementApprovalMenu element={element} onRefresh={onRefresh} />
-            <Button variant="ghost" size="sm" onClick={() => setCheckInOpen(true)}>Share an update</Button>
 
             {/* Existing reactions as toggleable chips, aggregated by
                 emoji so two thumbs-ups read as 👍 ×2 with my own
@@ -880,10 +923,10 @@ function ElementDetailBody({
                   type="button"
                   onClick={() => handleEmojiPick(emoji)}
                   className={
-                    'text-[11px] px-1.5 h-7 inline-flex items-center gap-1 rounded-full border transition-colors ' +
+                    'text-[11px] px-1.5 h-7 inline-flex items-center gap-1 rounded-full transition-colors ' +
                     (mine.has(emoji)
-                      ? 'bg-primary/15 border-primary/30 text-foreground'
-                      : 'bg-muted/40 border-border hover:bg-muted text-foreground/80')
+                      ? 'bg-primary/15 text-foreground'
+                      : 'hover:bg-muted text-foreground/80')
                   }
                 >
                   <span>{emoji}</span>
@@ -893,30 +936,6 @@ function ElementDetailBody({
             })()}
           </div>
           </ButtonAppearanceProvider>
-          <AgentRunPanel
-            agent={agent}
-            onRunAgain={() => void agent.start({ workerId: rerunWorkerId(agent.run?.worker_id), triggeredFrom: 'detail', domainId })}
-          />
-          {checkInOpen && <CheckInDialog element={element} onClose={() => setCheckInOpen(false)}
-            onSaved={() => { setCheckInOpen(false); onRefresh?.(); }} />}
-
-          {/* Linked Note — embedded inline once chosen. */}
-          {element.note_id && (
-            <LinkedNoteEmbed
-              noteId={element.note_id}
-              onUnlink={handleUnlinkNote}
-            />
-          )}
-
-          {/* Direction — approach / acceptance criteria / next step. Sits
-              between the linked Note and the Sub-elements so the read order
-              is intent → its breakdown → discussion. Keyed by element.id so
-              switching Elements resets the editing state. */}
-          {/* Direction, sub-elements and dependencies share one wrapping row:
-              an empty one is a single quiet "+" verb that sits beside the
-              others (Linear's "+ Add sub-issues"); a filled one takes the full
-              width with its own small heading. */}
-          <div className="-ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
           <ElementDirectionSection
             key={`direction-${element.id}`}
             element={element}
@@ -930,16 +949,18 @@ function ElementDetailBody({
               the only entry point is a small "+" at the right end of the
               header. Empty state still shows a labelled "Add sub-element"
               link so the affordance is obvious. */}
-          <div className={totalSubs > 0 ? 'w-full space-y-1.5' : ''}>
+          <div className={totalSubs > 0 ? 'w-full' : ''}>
             {totalSubs > 0 && (
-              <div className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
-                <span>Sub-elements</span>
-                <span className="tabular-nums">{completedSubs}/{totalSubs}</span>
+              <div className="mb-1 flex h-8 items-center gap-2">
+                <h2 className={`${FONT.lg} text-foreground`}>{t('Sub-elements')}</h2>
+                <span className="text-[12px] tabular-nums text-muted-foreground">{completedSubs}/{totalSubs}</span>
                 <div className="flex-1" />
                 <button
+                  type="button"
                   onClick={() => setSubModal({ mode: 'create' })}
-                  className="p-1 -m-1 text-muted-foreground hover:text-foreground transition-colors"
-                  title="New sub-element"
+                  className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
+                  title={t('New sub-element')}
+                  aria-label={t('New sub-element')}
                 >
                   <Plus size={13} strokeWidth={2.5} />
                 </button>
@@ -964,7 +985,7 @@ function ElementDetailBody({
               {totalSubs === 0 && (
                 <ButtonAppearanceProvider appearance="inline">
                   <Button variant="ghost" size="sm" onClick={() => setSubModal({ mode: 'create' })}>
-                    <Plus size={13} strokeWidth={2.5} />Add sub-element
+                    <Plus size={13} strokeWidth={2.5} />{t('Add sub-element')}
                   </Button>
                 </ButtonAppearanceProvider>
               )}
@@ -983,38 +1004,57 @@ function ElementDetailBody({
             onOpenElement={onOpenElement} onChanged={onRefresh} />
           </div>
 
+          <AgentRunPanel
+            agent={agent}
+            onRunAgain={() => void agent.start({ workerId: rerunWorkerId(agent.run?.worker_id), triggeredFrom: 'detail', domainId })}
+          />
+          {checkInOpen && <CheckInDialog element={element} onClose={() => setCheckInOpen(false)}
+            onSaved={() => { setCheckInOpen(false); onRefresh?.(); }} />}
+
+          {/* Linked Note — embedded inline once chosen. */}
+          {element.note_id && (
+            <LinkedNoteEmbed
+              noteId={element.note_id}
+              onUnlink={handleUnlinkNote}
+            />
+          )}
+
+
           {/* Linked Elements */}
           {(edges.incoming.length > 0 || edges.outgoing.length > 0) && (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <Link2 size={12} className="text-muted-foreground" />
-                <span className="text-[12px] font-medium text-muted-foreground">Linked elements</span>
-              </div>
-              <div className="space-y-1">
+            <PageSection title={t('Linked Elements')}>
+              <div>
                 {edges.outgoing.map(edge => (
-                  <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1">
-                    <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')}</span>
-                    <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
+                  <div key={edge.id} className="flex h-8 items-center gap-2.5 px-2 text-[13px]">
+                    <Link2 size={13} className="shrink-0 text-muted-foreground" />
+                    <span className="truncate font-medium text-foreground">{edge.related_element?.title || t('Unknown')}</span>
+                    <span className="shrink-0 text-[12px] text-muted-foreground">{edge.edge_type.replace('_', ' ')}</span>
                   </div>
                 ))}
                 {edges.incoming.map(edge => (
-                  <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1">
-                    <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
-                    <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')} this</span>
+                  <div key={edge.id} className="flex h-8 items-center gap-2.5 px-2 text-[13px]">
+                    <Link2 size={13} className="shrink-0 text-muted-foreground" />
+                    <span className="truncate font-medium text-foreground">{edge.related_element?.title || t('Unknown')}</span>
+                    <span className="shrink-0 text-[12px] text-muted-foreground">{t('{relation} this', { relation: edge.edge_type.replace('_', ' ') })}</span>
                   </div>
                 ))}
               </div>
-            </div>
+            </PageSection>
           )}
 
-          {layout === 'reader' && <section className="space-y-3 border-t border-border pt-5" aria-label="Activity">
-            <h2 className="text-[13px] font-semibold">Activity</h2>
+          {layout === 'reader' && <section className="space-y-3" aria-label={t('Activity')}>
+            <h2 className={`${FONT.lg} text-foreground`}>{t('Activity')}</h2>
             <ActivityFeed entries={activityLog} compact />
           </section>}
 
           {/* The reader keeps changes next to their discussion. */}
-          <div className={layout === 'reader' ? '' : 'mt-4 border-t border-border pt-8'}>
-            <h2 className="mb-5 text-[15px] font-medium text-foreground">Comments</h2>
+          <div className={layout === 'reader' ? '' : 'mt-4'}>
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h2 className={`${FONT.lg} text-foreground`}>{t('Comments')}</h2>
+              <ButtonAppearanceProvider appearance="inline">
+                <Button variant="ghost" size="sm" onClick={() => setCheckInOpen(true)}>{t('Share an update')}</Button>
+              </ButtonAppearanceProvider>
+            </div>
             <ElementCommentsPanel
               key={`comments-${element.id}`}
               refreshKey={agent.run ? `${agent.run.id}:${agent.run.status}:${agent.run.step_count}` : null}
@@ -1044,7 +1084,7 @@ function ElementDetailBody({
             {/* Properties — required type + built-in structured fields. The
                 "+ add property" affordance lives in the header (top-right),
                 matching the Label island. */}
-            <RailCard title="Properties">
+            <RailCard title={t('Properties')}>
               {/* Object membership — which Object(s) this Element belongs to
                   (object_id primary + element_objects multi-homing). Lives at
                   the very top of Properties (was its own island); each row is
@@ -1052,14 +1092,14 @@ function ElementDetailBody({
               {memberObjects.length === 0 ? (
                 <RailRow
                   icon={<span className="text-muted-foreground"><ObjectIcon size={14} /></span>}
-                  name="Object"
-                  label="Not in any Object"
+                  name={t('Object')}
+                  label={t('Not in any Object')}
                   placeholder
                   dense
                 />
               ) : (
                 memberObjects.map((o, i) => {
-                  const rowName = i === 0 ? (memberObjects.length > 1 ? 'Objects' : 'Object') : '';
+                  const rowName = i === 0 ? (memberObjects.length > 1 ? t('Objects') : t('Object')) : '';
                   const row = (
                     <RailRow
                       icon={<span className="text-muted-foreground"><ObjectIcon size={14} /></span>}
@@ -1094,8 +1134,8 @@ function ElementDetailBody({
                   <button className="w-full">
                     <RailRow
                       icon={<ElementProgressMark status={element.status} progress={getElementProgress(element, customColumns)} size={14} />}
-                      name="Status"
-                      label={currentStatus.label}
+                      name={t('Status')}
+                      label={t(currentStatus.label)}
                       dense
                     />
                   </button>
@@ -1108,8 +1148,8 @@ function ElementDetailBody({
                   <button className="w-full">
                     <RailRow
                       icon={<PriorityMark priority={element.priority} />}
-                      name="Priority"
-                      label={element.priority ? currentPriority.label : 'Set priority'}
+                      name={t('Priority')}
+                      label={element.priority ? t(currentPriority.label) : t('Set priority')}
                       placeholder={!element.priority}
                       dense
                     />
@@ -1121,7 +1161,7 @@ function ElementDetailBody({
                       <span className="flex w-5 items-center justify-center">
                         <PriorityMark priority={opt.priority} />
                       </span>
-                      {opt.label}
+                      {t(opt.label)}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
@@ -1133,11 +1173,11 @@ function ElementDetailBody({
                   <button className="w-full">
                     <RailRow
                       icon={<Calendar className="size-3.5 text-muted-foreground" />}
-                      name="Date"
+                      name={t('Date')}
                       label={
                         element.start_date || element.due_date
                           ? `${formatElementDate(element.start_date) ?? '—'} → ${formatElementDate(element.due_date) ?? '—'}`
-                          : 'Start date → Target date'
+                          : t('Start date → Target date')
                       }
                       placeholder={!element.start_date && !element.due_date}
                       dense
@@ -1171,14 +1211,14 @@ function ElementDetailBody({
                       }}
                       className="text-[12px] text-muted-foreground hover:text-foreground"
                     >
-                      Clear
+                      {t('Clear')}
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDateChange('start_date', toYMD(new Date()))}
                       className="text-[12px] text-primary hover:underline"
                     >
-                      Today
+                      {t('Today')}
                     </button>
                   </div>
                 </PopoverContent>
@@ -1189,7 +1229,7 @@ function ElementDetailBody({
                 <DropdownMenuTrigger asChild>
                   <button
                     className="w-full"
-                    aria-label={workerTriggerLabel('Assignee', element.assignees?.map((a) => a.worker ?? null).filter((w): w is NonNullable<typeof w> => !!w) ?? [])}
+                    aria-label={workerTriggerLabel(t('Assignee'), element.assignees?.map((a) => a.worker ?? null).filter((w): w is NonNullable<typeof w> => !!w) ?? [])}
                   >
                     <RailRow
                       icon={
@@ -1197,10 +1237,10 @@ function ElementDetailBody({
                           ? <WorkerAvatarStack workers={element.assignees.map(a => a.worker)} size={16} />
                           : <User className="size-3.5 text-muted-foreground" />
                       }
-                      name="Assignee"
+                      name={t('Assignee')}
                       label={element.assignees?.length
                         ? element.assignees.map(a => a.worker?.name || '?').join(', ')
-                        : 'Assign'}
+                        : t('Assign')}
                       placeholder={!element.assignees?.length}
                     />
                   </button>
@@ -1220,7 +1260,7 @@ function ElementDetailBody({
               {lease && (
                 <RailRow
                   icon={<Fingerprint className="size-3.5 text-muted-foreground" />}
-                  name="Lease"
+                  name={t('Lease')}
                   label={
                     // The rail is the long form the row chip defers to, so it
                     // must read without hover: holder and time on one line,
@@ -1228,14 +1268,14 @@ function ElementDetailBody({
                     <span className="flex flex-col gap-0.5 min-w-0">
                       <span className="flex items-center gap-2 min-w-0">
                         <span className="truncate" title={lease.holder}>{holderLabel(lease.holder)}</span>
-                        <span className="shrink-0 tabular-nums text-muted-foreground">{formatRemaining(lease.remainingMs)} left</span>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">{t('{time} left', { time: formatRemaining(lease.remainingMs) })}</span>
                       </span>
                       {lease.branch && (
                         <button
                           type="button"
                           onClick={() => copyBranch(lease.branch!)}
-                          title={branchCopied ? 'Copied' : `Copy ${lease.branch}`}
-                          aria-label={branchCopied ? 'Branch copied' : `Copy branch ${lease.branch}`}
+                          title={branchCopied ? t('Copied') : t('Copy {value}', { value: lease.branch })}
+                          aria-label={branchCopied ? t('Branch copied') : t('Copy branch {branch}', { branch: lease.branch })}
                           className="flex items-center gap-1 min-w-0 self-start rounded px-1 -mx-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 focus-visible:bg-muted/60 transition-colors"
                         >
                           <span className="truncate tabular-nums">{lease.branch}</span>
@@ -1251,8 +1291,8 @@ function ElementDetailBody({
               <label className="block w-full cursor-pointer">
                 <RailRow
                   icon={<Timer className="size-3.5 text-muted-foreground" />}
-                  name="Estimate"
-                  label={estimatedHours ? `${estimatedHours}h` : 'Set estimate'}
+                  name={t('Estimate')}
+                  label={estimatedHours ? t('{n}h', { n: estimatedHours }) : t('Set estimate')}
                   placeholder={!estimatedHours}
                 />
                 <input
@@ -1270,7 +1310,7 @@ function ElementDetailBody({
                   are built-in fields and sit with the others above; this
                   heading only appears when the Object defines fields of its own. */}
               {customColumns.length > 0 && (
-                <div className="px-2 pt-4 pb-1 text-[12px] font-medium text-muted-foreground">Custom fields</div>
+                <div className="px-2 pt-4 pb-1 text-[12px] font-medium text-muted-foreground">{t('Custom fields')}</div>
               )}
               {customColumns.map((col) => (
                 <div key={col.id} className="flex items-center gap-2 px-2 min-h-8">
@@ -1292,13 +1332,13 @@ function ElementDetailBody({
                 the card header (top-right); an empty state reads "No label
                 yet…" instead of a blank body. */}
             <RailCard
-              title="Label"
+              title={t('Label')}
               action={
                 <LabelAddButton labels={element.labels ?? []} onChange={handleLabelsChange} objectId={element.object_id} />
               }
             >
               {(element.labels?.length ?? 0) === 0 ? (
-                <div className="px-2 h-8 flex items-center text-[13px] text-muted-foreground">No labels</div>
+                <div className="px-2 h-8 flex items-center text-[13px] text-muted-foreground">{t('No labels')}</div>
               ) : (
                 <div className="px-2 py-1.5">
                   <LabelEditor labels={element.labels ?? []} />
@@ -1317,7 +1357,7 @@ function ElementDetailBody({
             {/* Activity — moved off the main column. Lives in the rail
                 as its own island so the body stays focused on title /
                 description / sub-elements / comments. */}
-            {layout !== 'reader' && <RailCard title={`Activity${activityLog.length ? ` · ${activityLog.length}` : ''}`} padded>
+            {layout !== 'reader' && <RailCard title={activityLog.length ? t('Activity · {n}', { n: activityLog.length }) : t('Activity')} padded>
               <ActivityFeed entries={activityLog} compact />
             </RailCard>}
             {/* The standalone "Objects" island was folded into the top of the
@@ -1359,6 +1399,7 @@ function TypePicker({
   onSelect: (type: string | null) => void;
   onCreate: (name: string) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1391,9 +1432,9 @@ function TypePicker({
       <PopoverTrigger asChild>
         <button className="w-full">
           <RailRow
-            name="Elements Type"
+            name={t('Type')}
             icon={<ElementTypeIcon className="size-3.5 text-muted-foreground shrink-0" />}
-            label={value ?? 'Set type'}
+            label={value ?? t('Set type')}
             placeholder={!value}
             dense
           />
@@ -1404,7 +1445,7 @@ function TypePicker({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && canCreate) create(); }}
-          placeholder="Search or add type…"
+          placeholder={t('Search or add type…')}
           className="w-full px-2 py-1.5 mb-1 text-[13px] bg-muted/50 rounded-md placeholder:text-muted-foreground/60 border-none"
           autoFocus
         />
@@ -1429,12 +1470,12 @@ function TypePicker({
               className="w-full flex items-center gap-2 px-2 py-1.5 text-[13px] text-foreground/90 rounded-md hover:bg-muted/60 text-left transition-colors disabled:opacity-50"
             >
               <Plus className="size-3.5 text-muted-foreground shrink-0" />
-              <span className="truncate">Add &ldquo;{normalized}&rdquo;</span>
+              <span className="truncate">{t('Add “{name}”', { name: normalized })}</span>
             </button>
           )}
           {filtered.length === 0 && !canCreate && (
             <div className="px-2 py-2 text-[12px] text-muted-foreground text-center">
-              {options.length === 0 ? 'Type a name to add the first one' : 'No match'}
+              {options.length === 0 ? t('Type a name to add the first one') : t('No match')}
             </div>
           )}
         </div>
@@ -1446,7 +1487,7 @@ function TypePicker({
               onClick={() => pick(null)}
               className="w-full px-2 py-1.5 text-[12px] text-muted-foreground rounded-md hover:bg-muted/60 text-left transition-colors"
             >
-              Clear type
+              {t('Clear type')}
             </button>
           </>
         )}
@@ -1481,6 +1522,7 @@ function LabelEditor({
 // A label chip whose coloured Tag mark opens a colour picker
 // ("Pick a color for label"). Colours are Domain-wide.
 function EditableLabelChip({ label }: { label: string }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const pick = async (colorKey: string) => {
     setOpen(false);
@@ -1500,7 +1542,7 @@ function EditableLabelChip({ label }: { label: string }) {
     >
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" aria-label="Label color" className="shrink-0 inline-flex items-center justify-center rounded hover:bg-muted/60 transition-colors">
+          <button type="button" aria-label={t('Label color')} className="shrink-0 inline-flex items-center justify-center rounded hover:bg-muted/60 transition-colors">
             <Tag size={10} style={{ color: labelColor(label) }} />
           </button>
         </PopoverTrigger>
@@ -1525,6 +1567,7 @@ function LabelAddButton({
   onChange: (labels: string[]) => void;
   objectId?: string | null;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [pool, setPool] = useState<string[]>([]);
@@ -1583,7 +1626,7 @@ function LabelAddButton({
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label="Add label"
+          aria-label={t('Add label')}
           className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
         >
           <Plus size={13} strokeWidth={2.5} />
@@ -1598,12 +1641,12 @@ function LabelAddButton({
                 type="button"
                 onClick={() => setPending(null)}
                 className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-                aria-label="Back"
+                aria-label={t('Back')}
               >
                 <ChevronLeft size={13} />
               </button>
               <span className="text-[12px] text-muted-foreground truncate">
-                Pick a colour · <span className="text-foreground/80">{pending}</span>
+                {t('Pick a colour')} · <span className="text-foreground/80">{pending}</span>
               </span>
             </div>
             <div className="max-h-56 overflow-auto">
@@ -1616,7 +1659,7 @@ function LabelAddButton({
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Add labels…"
+              placeholder={t('Add labels…')}
               className="w-full px-2 py-1 text-[13px] bg-muted/40 rounded-md placeholder:text-muted-foreground/60 border-none"
               autoFocus
             />
@@ -1640,12 +1683,12 @@ function LabelAddButton({
                   className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left text-muted-foreground"
                 >
                   <Plus size={12} className="shrink-0" />
-                  <span className="truncate flex-1">Create new label</span>
+                  <span className="truncate flex-1">{t('Create new label')}</span>
                   <span className="text-foreground/70 truncate">“{draft.trim()}”</span>
                 </button>
               )}
               {suggestions.length === 0 && !q && (
-                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/60">No labels yet</div>
+                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/60">{t('No labels yet')}</div>
               )}
             </div>
           </>
@@ -1683,11 +1726,12 @@ function ActivityFeed({
   entries: { id: string; kind: ActivityKind | 'created'; detail: string; author: string; createdAt: Date }[];
   compact?: boolean;
 }) {
+  const { t } = useI18n();
   if (entries.length === 0) {
     return (
-      <div className={`text-center text-muted-foreground ${compact ? 'text-[12px] py-3' : 'rounded-xl bg-muted/30 p-6 text-[13px]'}`}>
-        No activity yet
-      </div>
+      <p className={`text-muted-foreground ${compact ? 'text-center text-[12px] py-3' : 'text-[13px]'}`}>
+        {t('No activity yet')}
+      </p>
     );
   }
   return (
@@ -1706,7 +1750,7 @@ function ActivityFeed({
                   <span className="text-foreground/80">{entry.detail}</span>
                 </p>
                 <span className={compact ? 'text-[10px] text-muted-foreground' : 'text-[10.5px] text-muted-foreground'}>
-                  {entry.author} · {timeAgo(entry.createdAt)}
+                  {entry.author} · {timeAgo(entry.createdAt, t)}
                 </span>
               </div>
             </div>

@@ -1,3 +1,4 @@
+import { translate } from '@/Function/i18n/I18nProvider';
 import type { CustomColumnOptions, CustomColumnType, Json, SelectOption } from '@/types/database';
 
 export interface FieldDraft {
@@ -8,7 +9,13 @@ export interface FieldDraft {
 
 export const CHOICE_TYPES: CustomColumnType[] = ['select', 'multi_select', 'status'];
 export const FIELD_COLORS = ['var(--text-secondary)', 'var(--accent-default)', 'var(--status-success)', 'var(--status-warning)', 'var(--status-danger)'];
-export const optionLabel = (option: SelectOption) => option.label ?? option.value;
+/** The status names the app itself writes when a Status Property is made.
+ *  They are stored in English — grouping into to-do / in progress / complete
+ *  matches them by English keyword — and shown in the viewer's language.
+ *  A name a person typed is shown as typed. */
+const DEFAULT_OPTION_NAMES = new Set(['New status', 'In progress', 'Done']);
+export const optionLabel = (option: SelectOption) =>
+  option.label ?? (DEFAULT_OPTION_NAMES.has(option.value) ? translate(option.value) : option.value);
 
 export function validateField(draft: FieldDraft): string | null {
   if (!draft.name.trim()) return 'Enter a field name.';
@@ -40,4 +47,28 @@ export function fieldValueText(value: Json, options: CustomColumnOptions = {}): 
     return option ? optionLabel(option) : v;
   };
   return Array.isArray(value) ? value.map((v) => label(String(v))).join(', ') : value == null ? '' : label(String(value));
+}
+
+/** English words that mean something else elsewhere in the product ("Lead" is
+ *  a CRM lead, "Title" a job title) are translated through a context key; in
+ *  English, or when the key has no translation, the plain label stays. */
+const FIELD_CONTEXT_KEYS: Record<string, string> = {
+  lead: 'Lead (Object owner)',
+  title: 'Title (Element name)',
+};
+
+/** Display name of a field: a Property keeps the name its author gave it; a
+ *  built-in field's English label is translated. */
+export function fieldDisplayLabel(
+  t: (message: string) => string,
+  field: { id: string; label: string; kind?: string },
+): string {
+  if (field.kind === 'custom') return field.label;
+  const contextKey = FIELD_CONTEXT_KEYS[field.id];
+  if (contextKey) {
+    const translated = t(contextKey);
+    if (translated !== contextKey) return translated;
+    return field.label;
+  }
+  return t(field.label);
 }

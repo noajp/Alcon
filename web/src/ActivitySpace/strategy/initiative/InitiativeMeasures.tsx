@@ -10,7 +10,8 @@ import {
   type IntentBundle,
 } from "@/hooks/useSupabase";
 import type { Intent, IntentUpdate, MeasureDirection } from "@/types/database";
-import { Button } from "@/ui/button";
+import { Button, ButtonAppearanceProvider } from "@/ui/button";
+import { useI18n } from "@/Function/i18n/I18nProvider";
 import { MenuShell, MENU_ROW } from "@/Function/shared/menu";
 import {
   DropdownMenu,
@@ -59,6 +60,7 @@ function InitiativeMeasuresContent({
   inlineHeader: boolean;
 }) {
   const { initiativeId, data, error, refetch, ensureRoot } = initiative;
+  const { t } = useI18n();
   const qc = useQueryClient();
   const [failure, setFailure] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
@@ -206,7 +208,7 @@ function InitiativeMeasuresContent({
     } catch (e) {
       console.error("save measure failed:", e);
       setFailure(
-        "Could not save the condition. Your draft is kept; try saving again.",
+        t("Could not save the condition. Your draft is kept; try saving again."),
       );
     } finally {
       pending.current = false;
@@ -215,7 +217,7 @@ function InitiativeMeasuresContent({
   }
   async function setReadingOn(id: string, value: number | null) {
     if (pending.current)
-      throw new Error("A change is still saving. Try again when it finishes.");
+      throw new Error(t("A change is still saving. Try again when it finishes."));
     pending.current = true;
     setSaving(true);
     setFailure(null);
@@ -242,7 +244,7 @@ function InitiativeMeasuresContent({
       setDeleting(null);
     } catch (e) {
       console.error("delete measure failed:", e);
-      setFailure("Could not delete the condition. Try again.");
+      setFailure(t("Could not delete the condition. Try again."));
     } finally {
       pending.current = false;
       setSaving(false);
@@ -254,28 +256,29 @@ function InitiativeMeasuresContent({
         <span
           className={`text-xs tabular-nums ${tallyTone(tally.missed, tally.met, tally.total)}`}
         >
-          {tally.met}/{tally.total} met
+          {t("{met}/{total} met", { met: tally.met, total: tally.total })}
         </span>
       )}
-      <Button
-        type="button"
-        variant="ghost"
-        size="xs"
-        aria-label="Add condition"
-        disabled={!data || saving || composing || !initiative.canEdit}
-        title={initiative.lockReason ?? undefined}
-        onClick={openCreate}
-      >
-        <Plus size={12} />
-        Add condition
-      </Button>
+      <ButtonAppearanceProvider appearance="inline">
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          disabled={!data || saving || composing || !initiative.canEdit}
+          title={initiative.lockReason ?? undefined}
+          onClick={openCreate}
+        >
+          <Plus size={12} />
+          {t("Add condition")}
+        </Button>
+      </ButtonAppearanceProvider>
     </div>
   );
   return (
     <>
       {inlineHeader ? (
         <div className="flex items-center justify-between py-2">
-          <span className="text-sm font-medium">Conditions</span>
+          <span className="text-sm font-medium">{t("Conditions")}</span>
           {header}
         </div>
       ) : (
@@ -288,19 +291,18 @@ function InitiativeMeasuresContent({
       )}
       {error ? (
         <p role="alert" className="py-1 text-xs text-[var(--status-danger)]">
-          Could not read this Initiative&apos;s conditions.
+          {t("Could not read this Initiative's conditions.")}
           <Button variant="ghost" size="xs" onClick={refetch}>
-            Retry
+            {t("Retry")}
           </Button>
         </p>
       ) : !data ? (
         <p role="status" className="py-1 text-xs text-muted-foreground">
-          Loading conditions…
+          {t("Loading conditions…")}
         </p>
       ) : measures.length === 0 ? (
         <p className="py-1 text-xs text-muted-foreground">
-          Add a condition with a target, unit and reading to track this
-          Initiative&apos;s success.
+          {t("Add a condition with a target, unit and reading to track this Initiative's success.")}
         </p>
       ) : (
         <div className="flex flex-col">
@@ -321,7 +323,7 @@ function InitiativeMeasuresContent({
       )}
       {deleting && (
         <div
-          className="space-y-2 bg-muted/40 p-3"
+          className="mt-2 space-y-2 py-1"
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.stopPropagation();
@@ -329,7 +331,7 @@ function InitiativeMeasuresContent({
             }
           }}
         >
-          <p className="text-sm">Delete “{deleting.title}” and its reading?</p>
+          <p className="text-sm">{t("Delete “{title}” and its reading?", { title: deleting.title })}</p>
           <div className="flex gap-2">
             <Button
               variant="danger"
@@ -337,7 +339,7 @@ function InitiativeMeasuresContent({
               disabled={saving}
               onClick={() => void remove()}
             >
-              {saving ? "Deleting…" : "Delete condition"}
+              {saving ? t("Deleting…") : t("Delete condition")}
             </Button>
             <Button
               variant="secondary"
@@ -345,7 +347,7 @@ function InitiativeMeasuresContent({
               disabled={saving}
               onClick={() => setDeleting(null)}
             >
-              Cancel
+              {t("Cancel")}
             </Button>
           </div>
         </div>
@@ -395,11 +397,15 @@ function MeasureRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useI18n();
   const required = targetLabel(measure);
   const requires = targetSentence(measure);
   const measured = formatElementDate(measure.measuredAt);
+  // A flat row: the whole row is the hover target, and its two controls
+  // appear with it instead of standing on every line.
+  const reveal = "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100";
   return (
-    <div className="border-b border-[var(--border-subtle)] py-2 last:border-b-0">
+    <div className="group -mx-2 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
       <div className="flex items-start gap-2">
         <span
           className="mt-2 size-2 shrink-0 rounded-full"
@@ -414,14 +420,16 @@ function MeasureRow({
             {measureStateLabel(measure.state)}
           </span>
         )}
+        <ButtonAppearanceProvider appearance="navigation">
         <Button
           variant="ghost"
           size="xs"
           disabled={disabled}
           onClick={onEdit}
-          aria-label={`Edit ${measure.title}`}
+          aria-label={t("Edit {title}", { title: measure.title })}
+          className={reveal}
         >
-          Edit
+          {t("Edit")}
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -429,7 +437,8 @@ function MeasureRow({
               variant="ghost"
               size="icon-xs"
               disabled={disabled}
-              aria-label={`Options for ${measure.title}`}
+              aria-label={t("Options for {title}", { title: measure.title })}
+              className={reveal}
             >
               <MoreHorizontal size={12} />
             </Button>
@@ -439,14 +448,15 @@ function MeasureRow({
               onSelect={onDelete}
               className={`${MENU_ROW} text-[var(--status-danger)]`}
             >
-              Delete condition
+              {t("Delete condition")}
             </DropdownMenuItem>
           </MenuShell>
         </DropdownMenu>
+        </ButtonAppearanceProvider>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 pl-4 text-xs">
         <span className="flex min-w-0 flex-wrap items-center gap-1">
-          <span className="text-muted-foreground">Reading</span>
+          <span className="text-muted-foreground">{t("Reading")}</span>
           <ReadingField
             measure={measure}
             disabled={disabled}
@@ -461,18 +471,18 @@ function MeasureRow({
         <span
           className="min-w-0 break-words text-muted-foreground"
           title={
-            requires ? `Requires ${requires}` : "This condition names no number"
+            requires ? t("Requires {target}", { target: requires }) : t("This condition names no number")
           }
         >
-          Target <span className="tabular-nums">{required ?? "—"}</span>
+          {t("Target")} <span className="tabular-nums">{required ?? "—"}</span>
         </span>
       </div>
       <p className="mt-1 pl-4 text-xs text-muted-foreground">
         {measure.state === "unstated"
-          ? "Set a target and direction to evaluate this condition."
+          ? t("Set a target and direction to evaluate this condition.")
           : measured
-            ? `Measured ${measured}`
-            : "No reading yet"}
+            ? t("Measured {date}", { date: measured })
+            : t("No reading yet")}
       </p>
     </div>
   );
@@ -487,6 +497,7 @@ function ReadingField({
   disabled: boolean;
   onCommit: (value: number | null) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -497,7 +508,7 @@ function ReadingField({
     if (draft === null || pending.current) return;
     const parsed = parseMeasureValue(draft);
     if (!parsed.ok) {
-      setFailure("Enter a finite number.");
+      setFailure(t("Enter a finite number."));
       return;
     }
     if (parsed.value === measure.actual) {
@@ -513,7 +524,7 @@ function ReadingField({
       setDraft(null);
     } catch (e) {
       setFailure(
-        e instanceof Error ? e.message : "Could not save. Your draft is kept.",
+        e instanceof Error ? e.message : t("Could not save. Your draft is kept."),
       );
     } finally {
       pending.current = false;
@@ -526,7 +537,7 @@ function ReadingField({
         value={draft ?? stored}
         inputMode="decimal"
         placeholder="—"
-        aria-label={`Reading for ${measure.title}`}
+        aria-label={t("Reading for {title}", { title: measure.title })}
         aria-invalid={!!failure}
         disabled={disabled || saving}
         onChange={(e) => setDraft(e.target.value)}
@@ -554,7 +565,7 @@ function ReadingField({
       />
       {saving && (
         <span role="status" className="text-xs text-muted-foreground">
-          Saving…
+          {t("Saving…")}
         </span>
       )}
       {failure && (
@@ -566,7 +577,7 @@ function ReadingField({
             disabled={disabled || saving}
             onClick={() => void commit()}
           >
-            Retry
+            {t("Retry")}
           </Button>
         </span>
       )}
@@ -609,11 +620,12 @@ function Composer({
   onSubmit: () => void;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const targetResult = parseMeasureValue(target);
   const readingResult = parseMeasureValue(reading);
   return (
     <form
-      className="mt-2 space-y-3 bg-muted/40 p-3"
+      className="mt-2 space-y-3 py-1"
       onSubmit={(e) => {
         e.preventDefault();
         onSubmit();
@@ -626,10 +638,10 @@ function Composer({
       }}
     >
       <p className="text-sm font-medium">
-        {editing ? "Edit condition" : "Add condition"}
+        {editing ? t("Edit condition") : t("Add condition")}
       </p>
       <label className="block text-xs text-muted-foreground">
-        Condition
+        {t("Condition")}
         <textarea
           ref={titleRef}
           value={title}
@@ -637,12 +649,12 @@ function Composer({
           autoFocus
           disabled={saving}
           onChange={(e) => onTitle(e.target.value)}
-          placeholder="What this Initiative is held to"
+          placeholder={t("What this Initiative is held to")}
           className={`${FIELD} h-auto resize-none py-2`}
         />
       </label>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">Direction</span>
+        <span className="text-xs text-muted-foreground">{t("Direction")}</span>
         {MEASURE_DIRECTIONS.map((d) => (
           <Button
             key={d}
@@ -659,45 +671,45 @@ function Composer({
       </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <label className="min-w-0 text-xs text-muted-foreground">
-          Target
+          {t("Target")}
           <input
             value={target}
             inputMode="decimal"
             disabled={saving}
             onChange={(e) => onTarget(e.target.value)}
-            aria-label="Target"
+            aria-label={t("Target")}
             aria-invalid={!targetResult.ok}
             className={`${FIELD} tabular-nums`}
           />
         </label>
         <label className="min-w-0 text-xs text-muted-foreground">
-          Unit
+          {t("Unit")}
           <input
             value={unit}
             disabled={saving}
             onChange={(e) => onUnit(e.target.value)}
-            aria-label="Unit"
-            placeholder="Optional"
+            aria-label={t("Unit")}
+            placeholder={t("Optional")}
             className={FIELD}
           />
         </label>
       </div>
       <label className="block text-xs text-muted-foreground">
-        Reading
+        {t("Reading")}
         <input
           value={reading}
           inputMode="decimal"
           disabled={saving}
           onChange={(e) => onReading(e.target.value)}
-          placeholder="Not measured yet"
-          aria-label="Reading"
+          placeholder={t("Not measured yet")}
+          aria-label={t("Reading")}
           aria-invalid={!readingResult.ok}
           className={`${FIELD} tabular-nums`}
         />
       </label>
       {(!targetResult.ok || !readingResult.ok) && (
         <p role="alert" className="text-xs text-[var(--status-danger)]">
-          Use finite numbers for the target and reading.
+          {t("Use finite numbers for the target and reading.")}
         </p>
       )}
       <div className="flex items-center justify-end gap-2">
@@ -709,7 +721,7 @@ function Composer({
           onClick={onClose}
         >
           <X size={14} />
-          Cancel
+          {t("Cancel")}
         </Button>
         <Button
           type="submit"
@@ -717,7 +729,7 @@ function Composer({
           size="sm"
           disabled={!submittable || saving}
         >
-          {saving ? "Saving…" : editing ? "Save condition" : "Add condition"}
+          {saving ? t("Saving…") : editing ? t("Save condition") : t("Add condition")}
         </Button>
       </div>
     </form>

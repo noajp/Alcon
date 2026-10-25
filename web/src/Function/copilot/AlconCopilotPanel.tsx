@@ -8,6 +8,7 @@ import { useAlconCopilot, type CopilotContext, type ToolEvent } from './useAlcon
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 const WIDTH_KEY = 'alcon.copilot.width';
 const MIN_WIDTH = 320;
@@ -32,6 +33,7 @@ export interface AlconCopilotPanelProps {
  * for future work but disabled.
  */
 export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps) {
+  const { t } = useI18n();
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [hydrated, setHydrated] = useState(false);
   const [input, setInput] = useState('');
@@ -148,16 +150,16 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
               HierarchyHeader / list / overview headers in the main island
               so a single horizontal divider runs across both panes. */}
           <div className="h-[50px] flex items-center gap-2 px-3 border-b border-border/60 bg-card flex-shrink-0">
-            <span className="text-[13px] font-semibold text-foreground">AI</span>
+            <span className="text-[13px] font-semibold text-foreground">{t('AI')}</span>
             <div className="flex-1" />
             {messages.length > 0 && (
               <Button size="sm"
                 type="button"
+                variant="ghost"
                 onClick={reset}
-                title="会話をクリア"
-                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                title={t('Clear the conversation')}
               >
-                Clear
+                {t('New conversation')}
               </Button>
             )}
             {/* Close lives on the strip's PanelRight toggle (and ⌘L);
@@ -171,7 +173,7 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
               <MessageBubble key={i} role={m.role} content={m.content} toolEvents={m.toolEvents} streaming={streaming && i === messages.length - 1 && !m.done} />
             ))}
             {error && (
-              <div className="rounded-md bg-rose-500/10 border border-rose-500/20 px-2.5 py-2 text-[11.5px] text-rose-400">
+              <div role="alert" className="text-[11.5px] text-[var(--status-danger)]">
                 {error}
               </div>
             )}
@@ -196,7 +198,8 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
                   }
                 }}
                 rows={1}
-                placeholder={streaming ? '…' : 'type anything'}
+                placeholder={streaming ? '…' : t('Type anything')}
+                aria-label={t('Message AI')}
                 disabled={streaming}
                 className="flex-1 resize-none bg-transparent text-[12.5px] leading-[1.5] py-1.5 max-h-32 min-h-[24px] disabled:opacity-60"
                 style={{ fontWeight: 400 }}
@@ -205,8 +208,8 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
                 <Button size="icon-sm"
                   type="button"
                   onClick={cancel}
-                  title="停止"
-                  aria-label="Stop"
+                  title={t('Stop')}
+                  aria-label={t('Stop')}
                   variant="ghost"
                 >
                   <X size={14} />
@@ -215,8 +218,8 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
                 <Button size="icon-sm"
                   type="submit"
                   disabled={!input.trim()}
-                  title="送信 (Enter)"
-                  aria-label="Send"
+                  title={t('Send (Enter)')}
+                  aria-label={t('Send')}
                   variant="primary"
                 >
                   <SendIcon size={16} />
@@ -246,7 +249,7 @@ function MessageBubble({
     <div className="space-y-1.5">
       {toolEvents && toolEvents.length > 0 && (
         <div className="space-y-1">
-          {toolEvents.map((t, i) => <ToolChip key={i} event={t} />)}
+          {toolEvents.map((event, i) => <ToolChip key={i} event={event} />)}
         </div>
       )}
       <div className="whitespace-pre-wrap break-words text-foreground/95">
@@ -257,19 +260,20 @@ function MessageBubble({
 }
 
 function ToolChip({ event }: { event: ToolEvent }) {
+  const { t } = useI18n();
   const status: 'running' | 'ok' | 'error' =
     !event.result ? 'running' : event.result.ok ? 'ok' : 'error';
   const Icon = status === 'running' ? Loader2 : status === 'ok' ? CheckCircle2 : AlertCircle;
   const tone =
     status === 'running' ? 'text-muted-foreground' :
-    status === 'ok'      ? 'text-emerald-500' :
-                           'text-rose-500';
+    status === 'ok'      ? 'text-[var(--status-success)]' :
+                           'text-[var(--status-danger)]';
   const summary = event.result?.ok
-    ? (event.result.rows != null ? `${event.result.rows} 件` : 'ok')
+    ? (event.result.rows != null ? t('{n} rows', { n: event.result.rows }) : t('OK'))
     : (event.result?.error ?? '');
 
   return (
-    <div className={`inline-flex items-center gap-1.5 max-w-full text-[11px] px-1.5 py-0.5 rounded-md bg-muted/30 border border-border/60 ${tone}`}>
+    <div className={`inline-flex items-center gap-1.5 max-w-full text-[11px] px-1.5 py-0.5 rounded-md bg-muted/40 ${tone}`}>
       <Wrench size={10} className="opacity-70 shrink-0" />
       <span className="font-mono opacity-90 truncate">{event.name}</span>
       <ChevronRight size={10} className="opacity-50 shrink-0" />

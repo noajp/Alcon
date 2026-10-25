@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Minus } from 'lucide-react';
-import { CARD } from '@/shared/designTokens';
+import { CARD, FONT } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 import { RailCard } from '@/Function/shared/RailCard';
 import type { FrameVariant } from './types';
@@ -250,22 +250,17 @@ export function WidgetFrame({
         )}
 
         {variant === 'section' && (
-          // The frame closes over the title: one box per widget, with its
-          // name inside it. A heading floating above an unrelated box reads
-          // as two things, which is wrong the moment the box can be picked up
-          // and moved.
+          // A section of the page, not a box on it: the main column is
+          // already one island, and a bordered box inside it is a card in a
+          // card. The heading and its body are one block, held together by
+          // spacing; arrange mode's dashed outline shows the block's edge
+          // when it can be picked up and moved.
           <section className="relative">
-            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-              {/* The title row is a plain heading inside the box — no tinted
-                  band. The hairline under it is `--border-subtle` (a divider
-                  inside one surface) so a full-bleed body (a table) does not
-                  start flush against the title. */}
-              <div className="flex items-center justify-between h-10 px-4 border-b border-[var(--border-subtle)]">
-                <h2 className="min-w-0 truncate text-[13px] font-medium text-foreground/90">{title}</h2>
-                {headerNode}
-              </div>
-              <div className={padded ? 'px-4 py-3' : ''}>{body}</div>
+            <div className="flex h-8 items-center justify-between gap-3">
+              <h2 className={`${FONT.lg} min-w-0 truncate text-foreground`}>{title}</h2>
+              {headerNode}
             </div>
+            <div className={padded ? 'pt-2' : 'pt-1'}>{body}</div>
           </section>
         )}
 

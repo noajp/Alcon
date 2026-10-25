@@ -16,6 +16,7 @@ import {
 } from '@/hooks/useSupabase';
 import { EntityActionsMenu, type ActionTarget } from '@/Function/shared/EntityActionsMenu';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /**
  * "⋯" menu for an Element, wired to the breadcrumb in ElementDetailView.
@@ -67,6 +68,7 @@ export function ElementActionsMenu({
   /** Navigate away after the Element is deleted (usually onBack). */
   onDeleted?: () => void;
 }) {
+  const { t } = useI18n();
   const qc = useQueryClient();
   const primaryId = element.object_id ?? null;
   const { data: fetchedTargets } = useQuery({
@@ -95,7 +97,7 @@ export function ElementActionsMenu({
     if (!element.object_id) return;
     try {
       await createElement({
-        title: `${element.title} (copy)`,
+        title: t('{title} (copy)', { title: element.title }),
         object_id: element.object_id,
         description: element.description ?? null,
         status: element.status ?? undefined,
@@ -126,7 +128,7 @@ export function ElementActionsMenu({
   };
 
   const del = async () => {
-    if (!await appDialog.confirm(`Delete "${element.title}"? This can't be undone.`)) return;
+    if (!await appDialog.confirm(t('Delete “{name}”? This can’t be undone.', { name: element.title }))) return;
     try {
       await deleteElement(element.id);
       onDeleted?.();
@@ -136,13 +138,13 @@ export function ElementActionsMenu({
 
   return (
     <EntityActionsMenu
-      ariaLabel="Element actions"
+      ariaLabel={t('Element actions')}
       targets={targets}
       primaryId={element.object_id ?? null}
       memberIds={memberIds}
-      moveLabel="Move to Object"
-      multiHomeLabel="Multi-home to Object"
-      targetEmptyLabel="No other Objects in this Domain"
+      moveLabel={t('Move to Object')}
+      multiHomeLabel={t('Multi-home to Object')}
+      targetEmptyLabel={t('No other Objects in this Domain')}
       onDuplicate={duplicate}
       onMove={move}
       onToggleMultiHome={toggleMultiHome}

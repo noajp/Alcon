@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Button } from '@/ui/button';
+import { FONT } from '@/shared/designTokens';
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useStrategies } from '@/ActivitySpace/strategy/initiative/strategyData';
@@ -29,10 +30,10 @@ function Breakdown({ title, rows, currency, onOpen }: { title: string; rows: { i
     won: sum(row.deals.filter(deal => deal.outcome === 'won'), deal => deal.amount ?? 0) }))
     .filter(row => row.open || row.won).sort((a, b) => b.weighted + b.won - (a.weighted + a.won));
   if (!data.length) return null;
-  return <section className="space-y-2"><h2 className="text-sm font-medium">{title}</h2>
+  return <section className="space-y-1"><h2 className={`${FONT.lg} text-foreground`}>{title}</h2>
     <div className="overflow-x-auto"><table className="w-full min-w-[480px] text-left text-[13px] tabular-nums">
-      <thead className="text-xs text-muted-foreground"><tr>{['', 'Open pipeline', 'Weighted', 'Won'].map(item => <th key={item} scope="col" className="px-2 py-2 font-medium first:pl-0">{item && t(item)}</th>)}</tr></thead>
-      <tbody>{data.map(row => <tr key={row.id} className="border-t border-[var(--border-subtle)]">
+      <thead className="border-b border-[var(--border-subtle)] text-xs text-muted-foreground"><tr>{['', 'Open pipeline', 'Weighted', 'Won'].map(item => <th key={item} scope="col" className="px-2 py-2 font-medium first:pl-0">{item && t(item)}</th>)}</tr></thead>
+      <tbody>{data.map(row => <tr key={row.id}>
         <td className="max-w-64 truncate py-2 pr-2">{onOpen && row.id ? <button type="button" className="truncate rounded-sm text-left hover:underline" onClick={() => onOpen(row.id)}>{row.label}</button> : row.label}</td>
         {[row.open, row.weighted, row.won].map((value, index) => <td key={index} className="px-2 py-2">{money(value, currency, locale, true)}</td>)}
       </tr>)}</tbody>
@@ -68,7 +69,7 @@ export function CrmForecast({ workspace, onOpenInitiative }: { workspace: CrmWor
     </dl>
     <section aria-label={t('Forecast by close month')} className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <h2 className="mr-auto text-sm font-medium text-foreground">{t('By expected close month')}</h2>
+        <h2 className={`${FONT.lg} mr-auto text-foreground`}>{t('By expected close month')}</h2>
         {SERIES.map(series => <span key={series.key} className="inline-flex items-center gap-1.5"><span className="size-2 rounded-sm" style={{ background: series.color }} />{t(series.label)}</span>)}
       </div>
       <div className="h-64">
@@ -94,8 +95,8 @@ export function CrmForecast({ workspace, onOpenInitiative }: { workspace: CrmWor
     </div>
     <div className="overflow-x-auto">
       <table className="w-full min-w-[560px] text-left text-[13px] tabular-nums">
-        <thead className="text-xs text-muted-foreground"><tr>{['Month', 'Deals', 'Won', 'Commit', 'Weighted', 'Best case'].map(item => <th key={item} scope="col" className="px-2 py-2 font-medium first:pl-0">{t(item)}</th>)}</tr></thead>
-        <tbody>{forecast.months.map(month => <tr key={month.month} className="border-t border-[var(--border-subtle)]">
+        <thead className="border-b border-[var(--border-subtle)] text-xs text-muted-foreground"><tr>{['Month', 'Deals', 'Won', 'Commit', 'Weighted', 'Best case'].map(item => <th key={item} scope="col" className="px-2 py-2 font-medium first:pl-0">{t(item)}</th>)}</tr></thead>
+        <tbody>{forecast.months.map(month => <tr key={month.month}>
           <td className="py-2 pr-2">{label(month.month)}</td><td className="px-2 py-2">{month.count}</td>
           {[month.won, month.commit, month.weighted, month.bestCase].map((value, index) => <td key={index} className="px-2 py-2">{money(value, currency, locale, true)}</td>)}
         </tr>)}</tbody>

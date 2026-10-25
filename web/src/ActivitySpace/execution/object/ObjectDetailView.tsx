@@ -30,6 +30,7 @@ import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } fro
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
 import { pushUndo } from '@/ActivitySpace/execution/element/bulkUndo';
 import { Button } from '@/ui/button';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { Trash2 } from 'lucide-react';
 import { ObjectMembersPanel } from '@/ActivitySpace/execution/object/ObjectMembersPanel';
@@ -71,6 +72,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
    *  tab's "Initiative" property row, which jumps out to the Strategy surface. */
   onViewChange?: (view: string) => void;
 }) {
+  const { t } = useI18n();
   const explorerData = useExplorerData();
 
   // Domain-shared Element types — option list for the Elements tab's `type` column.
@@ -477,7 +479,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
               onTabReorder={reorderingTabs ? undefined : ids => {
                 setReorderingTabs(true);
                 void reorderObjectTabs(object.id, ids).catch(error => {
-                  void appDialog.alert(error instanceof Error ? error.message : 'Could not reorder tabs');
+                  void appDialog.alert(error instanceof Error ? error.message : t('Could not reorder tabs'));
                 }).finally(async () => {
                   try { await refetchTabs(); }
                   finally { setReorderingTabs(false); }
@@ -682,7 +684,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
               onClick={() => { setDeleteTarget({ id: breadcrumbCtx.id, name: breadcrumbCtx.name }); setBreadcrumbCtx(null); }}
             >
               <Trash2 size={12} />
-              Delete
+              {t('Delete')}
             </button>
           </div>
         </>
@@ -692,13 +694,13 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <DialogContent className="sm:max-w-[340px] p-6" showCloseButton={false}>
           <div className="text-center">
-            <DialogTitle className="text-[15px] font-semibold mb-1">Delete &apos;{deleteTarget?.name}&apos;?</DialogTitle>
-            <p className="text-[13px] text-muted-foreground mb-5">This action cannot be undone.</p>
+            <DialogTitle className="text-[15px] font-semibold mb-1">{t('Delete “{name}”?', { name: deleteTarget?.name ?? '' })}</DialogTitle>
+            <p className="text-[13px] text-muted-foreground mb-5">{t('This action cannot be undone.')}</p>
             <div className="flex flex-col gap-2">
               <Button variant="danger" size="md" onClick={handleDeleteObjectConfirm} disabled={isDeleting} className="w-full">
-                {isDeleting ? 'Deleting...' : 'Delete'}
+                {isDeleting ? t('Deleting…') : t('Delete')}
               </Button>
-              <Button variant="secondary" size="md" onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="w-full">Cancel</Button>
+              <Button variant="secondary" size="md" onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="w-full">{t('Cancel')}</Button>
             </div>
           </div>
         </DialogContent>

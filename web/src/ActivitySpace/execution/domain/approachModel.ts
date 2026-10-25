@@ -29,6 +29,14 @@ export interface ApproachData {
 }
 export const RESULT_LABELS = { met: 'Met', not_met: 'Not met', unverified: 'Unverified', refuted: 'Premise refuted', stale: 'Reassessment needed' } as const;
 export const ROLE_LABELS = { primary: 'Primary', alternative: 'Alternative', supporting: 'Supporting' } as const;
+// Labels are English message keys; translate them at render time with t().
+export const KIND_LABELS = { outcome: 'Outcome', readiness: 'Readiness', learning: 'Learning question' } as const;
+const REASON_PREFIXES: readonly string[] = ['Premise refuted', 'Condition review due', ...Object.values(RESULT_LABELS)];
+/** Renders an approachAttention() reason in the viewer's language; "Label: title" keeps the title as written. */
+export function translateAttentionReason(reason: string, t: (message: string, values?: Record<string, string | number>) => string) {
+  const prefix = REASON_PREFIXES.find(p => reason.startsWith(`${p}: `));
+  return prefix ? t('{reason}: {title}', { reason: t(prefix), title: reason.slice(prefix.length + 2) }) : t(reason);
+}
 function latestRecord<T extends { id: string; created_at: string }>(records: readonly T[]): T | undefined {
   return records.reduce<T | undefined>((latest, row) => !latest || row.created_at > latest.created_at || (row.created_at === latest.created_at && row.id > latest.id) ? row : latest, undefined);
 }

@@ -2,6 +2,7 @@
 
 import { NavNoteIcon } from '@/shell/sidebar/NavIcons';
 import { QuickCreatePopup } from '@/Function/shared/QuickCreatePopup';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /**
  * The sidebar's "+" in Notebook mode: the same quick-create card Objects and
@@ -17,15 +18,16 @@ export function QuickAddNotebookPopup({
   onClose: () => void;
   onSubmit: (name: string) => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   return (
     <QuickCreatePopup
       open={open}
       icon={<NavNoteIcon size={12} />}
-      contextLabel="New Notebook"
-      ariaLabel="Quick add Notebook"
-      namePlaceholder="Notebook name…"
+      contextLabel={t('New Notebook')}
+      ariaLabel={t('Quick add Notebook')}
+      namePlaceholder={t('Notebook name…')}
       description={false}
-      hint="Starts with one Section and an empty page"
+      hint={t('Starts with one Section and an empty page')}
       onClose={onClose}
       onSubmit={({ name }) => onSubmit(name)}
     />

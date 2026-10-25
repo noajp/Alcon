@@ -22,9 +22,9 @@ export const STATUS_OPTIONS: { value: ElementWithDetails['status']; label: strin
 
 export type ElementUpdate = Partial<Pick<ElementWithDetails, 'status' | 'priority' | 'start_date' | 'due_date' | 'title' | 'type'>>;
 
-export function formatDateShort(value: string): string {
+export function formatDateShort(value: string, locale?: string): string {
   const d = parseDateOnly(value);
-  return d ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : value;
+  return d ? d.toLocaleDateString(locale, { month: 'short', day: 'numeric' }) : value;
 }
 
 export interface ListSection {

@@ -13,6 +13,7 @@
 // argument so a test does not have to wait until Tuesday to see a horizon pass.
 // =============================================================
 
+import { translate } from '@/Function/i18n/I18nProvider';
 /** Mirrors the `intents.status` check constraint. */
 export type DecisionStatus = 'on_track' | 'at_risk' | 'off_track' | 'done';
 
@@ -77,7 +78,7 @@ export interface Decision extends Omit<DecisionInput, 'status'> {
 }
 
 export function decisionStatusLabel(status: DecisionStatus): string {
-  return STATUS_LABELS[status];
+  return translate(STATUS_LABELS[status]);
 }
 
 /** Unknown and missing both mean the column default, which is `on_track`. */
@@ -216,14 +217,14 @@ function decidedRank(decision: Decision): number {
 export function reviewLabel(decision: Decision): string {
   switch (decision.review) {
     case 'unset':
-      return 'No review date';
+      return translate('No review date');
     case 'today':
-      return 'Review today';
+      return translate('Review today');
     case 'overdue':
-      return `Review ${Math.abs(decision.daysToReview ?? 0)}d overdue`;
+      return translate('Review {n}d overdue', { n: Math.abs(decision.daysToReview ?? 0) });
     case 'reviewed':
-      return 'Reviewed';
+      return translate('Reviewed');
     default:
-      return `Review in ${decision.daysToReview}d`;
+      return translate('Review in {n}d', { n: decision.daysToReview ?? 0 });
   }
 }

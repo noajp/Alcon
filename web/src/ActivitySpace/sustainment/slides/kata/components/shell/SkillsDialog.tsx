@@ -59,8 +59,8 @@ export function SkillsDialog({ onClose: close }: { onClose: () => void }) {
                 {k.name}
               </span>
               <span className="pl-3.5 text-[11px] text-k-ink-3">
-                {tx(`用語 ${k.terms.length} ・ 禁止 ${k.banned.length}`, `${k.terms.length} terms · ${k.banned.length} banned`)}
-                {k.maxTitle ? tx(` ・ ${k.maxTitle}字`, ` · ${k.maxTitle} chars`) : ""}
+                {tx("用語 {terms} ・ 禁止 {banned}", "{terms} terms · {banned} banned", { terms: k.terms.length, banned: k.banned.length })}
+                {k.maxTitle ? tx(" ・ {n}字", " · {n} chars", { n: k.maxTitle }) : ""}
               </span>
             </button>
           ))}
@@ -168,7 +168,7 @@ export function SkillsDialog({ onClose: close }: { onClose: () => void }) {
                         n = r.count;
                         return r.deck;
                       });
-                      setNote(n ? tx(`${n} か所そろえました（⌘Z で戻せます）`, `Fixed ${n} ${n === 1 ? "place" : "places"} (⌘Z to undo)`) : tx("直すところはありません", "Nothing to fix"));
+                      setNote(n ? (n === 1 ? tx("{n} か所そろえました（⌘Z で戻せます）", "Fixed {n} place (⌘Z to undo)", { n }) : tx("{n} か所そろえました（⌘Z で戻せます）", "Fixed {n} places (⌘Z to undo)", { n })) : tx("直すところはありません", "Nothing to fix"));
                     }}
                     className="h-9 rounded-lg bg-k-primary px-4 text-[12px] font-medium text-k-on-primary disabled:opacity-30"
                   >

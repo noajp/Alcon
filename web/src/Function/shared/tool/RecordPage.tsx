@@ -5,7 +5,7 @@ import { ChevronRight, MoreHorizontal, Trash2 } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
-import { PageLayout } from '@/Function/shared/PageHead';
+import { PageLayout, PageSection } from '@/Function/shared/PageHead';
 import { useEscapeLayer } from '@/Function/shared/keyboard/useEscapeLayer';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
@@ -73,13 +73,8 @@ export function RecordPage({ icon: Icon, crumbs, actions, menu, onBack, onDelete
   </div>;
 }
 
-/** A section of the record's document: a quiet heading, then its rows. */
+/** A section of a record's page — the same heading as every concept page's
+ *  (PageSection), so a deal reads like an Element or a Domain. */
 export function RecordSection({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
-  return <section aria-label={title} className="space-y-2">
-    <div className="flex h-7 items-center gap-2">
-      <h2 className="text-[12px] font-medium text-muted-foreground">{title}</h2>
-      {action && <div className="ml-auto flex items-center gap-1">{action}</div>}
-    </div>
-    {children}
-  </section>;
+  return <PageSection title={title} action={action}>{children}</PageSection>;
 }

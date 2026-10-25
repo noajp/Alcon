@@ -2,6 +2,7 @@
 
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
+import { translate } from '@/Function/i18n/I18nProvider';
 import type { ElementTemplate, ElementTemplateInsert, ElementTemplateUpdate } from '@/types/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
@@ -79,7 +80,7 @@ export async function updateElementTemplate(id: string, updates: ElementTemplate
   // error, when the row exists but the actor isn't an owner/admin of its
   // Domain — a Settings page must not read that as saved.
   if (!data || data.length === 0) {
-    throw new Error("Couldn't save — you may not have owner/admin access to this Domain.");
+    throw new Error(translate('Couldn’t save — you may not have owner/admin access to this Domain.'));
   }
   notifyElementTemplatesChanged();
   return parseElementTemplate(data[0] as Record<string, unknown>);
@@ -93,7 +94,7 @@ export async function deleteElementTemplate(id: string): Promise<void> {
     .select('id');
   if (error) throw error;
   if (!data || data.length === 0) {
-    throw new Error("Couldn't delete — you may not have owner/admin access to this Domain.");
+    throw new Error(translate('Couldn’t delete — you may not have owner/admin access to this Domain.'));
   }
   notifyElementTemplatesChanged();
 }

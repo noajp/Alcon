@@ -15,6 +15,7 @@ import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/prefer
 import { clampProgress } from '@/Function/shared/ElementProgressMark';
 import { ReachHint, WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import {
   DropdownMenu,
   DropdownMenuItem,
@@ -65,11 +66,15 @@ export function CellText({ children, className = '' }: { children: React.ReactNo
  * around it; the dash keeps the column's rhythm, and the cell's hover ground
  * still shows where to click.
  */
+/** An empty cell says nothing until its row is pointed at: a column of
+ *  dashes is noise, and the row's hover is when it is worth knowing the
+ *  cell can be filled in. */
 export function EmptyCellMark() {
+  const { t } = useI18n();
   return (
     <>
-      <span aria-hidden className="opacity-60">–</span>
-      <span className="sr-only">Empty</span>
+      <span aria-hidden className="opacity-0 transition-opacity group-hover:opacity-60">–</span>
+      <span className="sr-only">{t('Empty')}</span>
     </>
   );
 }
@@ -77,11 +82,11 @@ export function EmptyCellMark() {
 const TRIGGER_BASE = CELL_TRIGGER_BASE;
 const TRIGGER_EMPTY = CELL_TRIGGER_EMPTY;
 
-function formatDate(value: string | null): string {
+function formatDate(value: string | null, locale: string): string {
   if (!value) return '';
   const d = parseDateOnly(value);
   if (!d) return value;
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
 
 export function CustomColumnCell(props: CustomColumnCellProps) {
@@ -107,6 +112,7 @@ function CustomColumnCellBody({
   // Hoisted above every column_type branch below (several return early) —
   // hooks can't follow a conditional return.
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
+  const { t, locale } = useI18n();
   const renderWithLabel = (content: React.ReactNode) => {
     if (displayMode === 'pill') {
       return (
@@ -149,7 +155,7 @@ function CustomColumnCellBody({
             type="button"
             className={`${TRIGGER_BASE} gap-1 ${dateString ? '' : TRIGGER_EMPTY}`}
           >
-            {dateString ? <><CalendarIcon size={11} className="opacity-60" />{formatDate(dateString)}</> : <EmptyCellMark />}
+            {dateString ? <><CalendarIcon size={11} className="opacity-60" />{formatDate(dateString, locale)}</> : <EmptyCellMark />}
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0 rounded-xl" align="start">
@@ -170,7 +176,7 @@ function CustomColumnCellBody({
     const multiple = column.column_type === 'multi_select';
     const selected = Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : typeof value === 'string' && value ? [value] : [];
     return renderWithLabel(<DropdownMenu>
-      <DropdownMenuTrigger asChild><button type="button" aria-label={`Edit ${column.name}`} className={`${TRIGGER_BASE} gap-1 ${selected.length ? '' : TRIGGER_EMPTY}`}>
+      <DropdownMenuTrigger asChild><button type="button" aria-label={t('Edit {name}', { name: column.name })} className={`${TRIGGER_BASE} gap-1 ${selected.length ? '' : TRIGGER_EMPTY}`}>
         {selected.length ? selected.map((v) => {
           const option = options.find((o) => o.value === v);
           return <span key={v} className="inline-flex items-center gap-1 min-w-0"><span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: option?.color ?? 'var(--text-secondary)' }} /><CellText>{option ? optionLabel(option) : v}</CellText></span>;
@@ -181,8 +187,8 @@ function CustomColumnCellBody({
           if (multiple) { e.preventDefault(); onChange(selected.includes(opt.value) ? selected.filter((v) => v !== opt.value) : [...selected, opt.value]); }
           else onChange(opt.value);
         }}><span className="size-2 rounded-full" style={{ backgroundColor: opt.color ?? 'var(--text-secondary)' }} /><span className="flex-1">{optionLabel(opt)}</span>{selected.includes(opt.value) && <Check size={12} />}</DropdownMenuItem>)}
-        {options.every((opt) => opt.archived) && <p className="p-2 text-sm text-muted-foreground">No active options</p>}
-        {!!selected.length && <DropdownMenuItem onSelect={() => onChange(multiple ? [] : null)}>Clear</DropdownMenuItem>}
+        {options.every((opt) => opt.archived) && <p className="p-2 text-sm text-muted-foreground">{t('No active options')}</p>}
+        {!!selected.length && <DropdownMenuItem onSelect={() => onChange(multiple ? [] : null)}>{t('Clear')}</DropdownMenuItem>}
       </MenuShell>
     </DropdownMenu>);
   }
@@ -234,6 +240,7 @@ function PersonCell({
   columnLabel: string;
   elementId: string | null;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const { data: spaceWorkers } = useWorkers();
   const { data: elementWorkers, loading } = useAssignableWorkers({ elementId }, !!elementId && open);
@@ -257,7 +264,7 @@ function PersonCell({
         <div className="max-h-64 overflow-auto">
           {workers.length === 0 && !(elementId && loading) && (
             <div className="px-2 py-1.5 text-[12px] text-muted-foreground">
-              No workers yet
+              {t('No Workers yet')}
             </div>
           )}
           {workers.map((w) => {
@@ -282,7 +289,7 @@ function PersonCell({
               onClick={() => onChange(null)}
               className="w-full px-2 py-1.5 mt-1 rounded-md hover:bg-muted text-left text-[12px] text-muted-foreground"
             >
-              Clear
+              {t('Clear')}
             </button>
           )}
         </div>
@@ -304,6 +311,7 @@ function TextCell({
   onChange: (v: Json) => void;
   renderWithLabel: (c: React.ReactNode) => React.ReactNode;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(typeof value === 'string' ? value : '');
   useEffect(() => {
@@ -337,7 +345,7 @@ function TextCell({
           }}
           rows={4}
           autoFocus
-          placeholder="Add note…"
+          placeholder={t('Add note…')}
           className="w-full text-[13px] bg-transparent resize-none p-1 leading-snug"
         />
         <div className="flex justify-end gap-2 pt-1">
@@ -346,14 +354,14 @@ function TextCell({
             onClick={() => setOpen(false)}
             className="text-[12px] text-muted-foreground hover:text-foreground px-2 py-1 rounded-md"
           >
-            Cancel
+            {t('Cancel')}
           </button>
           <button
             type="button"
             onClick={commit}
             className="text-[12px] bg-foreground text-background px-2 py-1 rounded-md hover:opacity-90"
           >
-            Save
+            {t('Save')}
           </button>
         </div>
       </PopoverContent>
@@ -433,6 +441,7 @@ function ProgressCell({
   onChange: (v: Json) => void;
   renderWithLabel: (c: React.ReactNode) => React.ReactNode;
 }) {
+  const { t } = useI18n();
   const current = clampProgress(value);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(String(current ?? 0));
@@ -473,7 +482,7 @@ function ProgressCell({
       </PopoverTrigger>
       <PopoverContent align="start" className="w-56 p-3 rounded-xl">
         <div className="flex items-center justify-between pb-2">
-          <span className="text-[12px] font-medium text-muted-foreground">Progress</span>
+          <span className="text-[12px] font-medium text-muted-foreground">{t('Progress')}</span>
           <div className="flex items-center gap-1">
             <input
               type="number"

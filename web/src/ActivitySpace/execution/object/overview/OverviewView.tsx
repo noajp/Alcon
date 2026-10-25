@@ -9,6 +9,7 @@ import type { ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSup
 import { updateObject } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
 import { PageIcon } from '@/Function/shared/PageHead';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import {
   useBoard,
   WidgetSurface,
@@ -84,6 +85,7 @@ export function OverviewView({
   onNavigate,
   onViewChange,
 }: OverviewViewProps) {
+  const { t } = useI18n();
   const explorerData = useExplorerData();
   // Name + description as always-editable seamless textareas, mirroring
   // ElementDetailView's inline header (transparent, no border/ring,
@@ -178,7 +180,7 @@ export function OverviewView({
                   }}
                   className="w-full text-2xl text-foreground bg-transparent border-none resize-none leading-tight overflow-hidden tracking-normal"
                   style={{ fontWeight: 600 }}
-                  placeholder="Object name"
+                  placeholder={t('Object name')}
                 />
               </div>
 
@@ -189,7 +191,7 @@ export function OverviewView({
                   rows={1}
                   onChange={(e) => setDescription(e.target.value)}
                   onBlur={handleDescriptionSave}
-                  placeholder="Add description..."
+                  placeholder={t('Add description…')}
                   className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
                 />
               </section>

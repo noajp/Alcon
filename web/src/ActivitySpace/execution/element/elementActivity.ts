@@ -13,6 +13,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
+import { translate } from '@/Function/i18n/I18nProvider';
 import type { ElementActivity } from '@/types/database';
 
 export type ActivityKind =
@@ -108,8 +109,8 @@ export function mergeActivity(
     rows.push({
       id: 'created',
       kind: 'created',
-      detail: `Created “${element.title}”`,
-      author: 'System',
+      detail: translate('Created “{title}”', { title: element.title }),
+      author: translate('System'),
       createdAt: new Date(element.created_at),
     });
   }

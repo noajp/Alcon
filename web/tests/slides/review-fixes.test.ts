@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { detectLang, langFromPersisted, setLang } from "@/ActivitySpace/sustainment/slides/kata/i18n";
+import { getLang, setLang, setUiLocale, tx } from "@/ActivitySpace/sustainment/slides/kata/i18n";
 import { consistentUnit, guessKind, looksLikeBridge, unitOf, waterfallSteps } from "@/ActivitySpace/sustainment/slides/kata/model/chart";
 import { looksLikeDocument, respondLocally } from "@/ActivitySpace/sustainment/slides/kata/model/chat";
 import { moveSlide, summaryPage } from "@/ActivitySpace/sustainment/slides/kata/model/deck";
@@ -61,17 +61,25 @@ describe("2. mixed units stay a comparison", () => {
   });
 });
 
-describe("5. language defaults", () => {
-  it("first launch follows navigator.language", () => {
-    expect(detectLang("ja-JP")).toBe("ja");
-    expect(detectLang("ja")).toBe("ja");
-    expect(detectLang("en-US")).toBe("en");
-    expect(detectLang(undefined)).toBe("en");
+describe("5. language follows the app", () => {
+  it("Japanese and English read their own line", () => {
+    setUiLocale("ja");
+    expect(tx("保存しました", "Saved")).toBe("保存しました");
+    expect(getLang()).toBe("ja");
+    setUiLocale("en");
+    expect(tx("保存しました", "Saved")).toBe("Saved");
+    expect(getLang()).toBe("en");
   });
-  it("old saves without lang stay Japanese; fresh installs keep the detected default", () => {
-    expect(langFromPersisted({}, "en")).toBe("ja");
-    expect(langFromPersisted({ lang: "en" }, "ja")).toBe("en");
-    expect(langFromPersisted(undefined, "en")).toBe("en");
+  it("other languages make decks in English and fall back to it on screen", () => {
+    setUiLocale("fr");
+    expect(getLang()).toBe("en");
+    expect(tx("見本にない文", "A line no dictionary has")).toBe("A line no dictionary has");
+  });
+  it("fills values into either line", () => {
+    setUiLocale("ja");
+    expect(tx("{n} 枚", "{n} slides", { n: 3 })).toBe("3 枚");
+    setUiLocale("en");
+    expect(tx("{n} 枚", "{n} slides", { n: 3 })).toBe("3 slides");
   });
 });
 

@@ -18,6 +18,7 @@ import { buildNowItems, localWorkDate, type NowScope } from './nowModel';
 import { NowView } from './NowView';
 import { WorkImportFlow } from './WorkImportFlow';
 import { CheckInDialog } from './CheckInDialog';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface NowScreenProps {
   spaceId: string | null;
@@ -31,6 +32,7 @@ export function NowScreen(props: NowScreenProps) {
 }
 
 function NowSession({ spaceId, onNavigate, onViewChange }: NowScreenProps) {
+  const { t } = useI18n();
   const userId = useCurrentUserId();
   const { data, loading, refreshing, error, refetch } = useNowWork(spaceId);
   const { data: allDomains, guestDomains } = useDomains();
@@ -59,17 +61,17 @@ function NowSession({ spaceId, onNavigate, onViewChange }: NowScreenProps) {
     void fetchObjectDomainIds(objectId).then(domainIds => {
       if (request !== navigationRequest.current || getActiveSpaceId() !== spaceId) return;
       const domainId = objectDomainRoute(domainIds, visibleDomains.map(domain => domain.id), getActiveDomainId());
-      if (!domainId) throw new Error('This Object has no accessible Domain in the current Space or your shared Domains.');
+      if (!domainId) throw new Error(t('This Object has no accessible Domain in the current Space or your shared Domains.'));
       onNavigate({ objectId, objectDomainId: domainId });
       onViewChange?.('objects');
     }).catch(error => {
       if (request === navigationRequest.current && getActiveSpaceId() === spaceId) {
-        setNavigationError(error instanceof Error ? error.message : 'Could not open this Object. Try again.');
+        setNavigationError(error instanceof Error ? error.message : t('Could not open this Object. Try again.'));
       }
     });
   };
 
-  if (loading) return <div role="status" className="flex-1 p-8 text-[13px] text-muted-foreground">Loading current work…</div>;
+  if (loading) return <div role="status" className="flex-1 p-8 text-[13px] text-muted-foreground">{t('Loading current work…')}</div>;
 
   return <>
     {navigationError && <p role="alert" className="px-4 py-2 text-sm text-destructive">{navigationError}</p>}
@@ -78,8 +80,8 @@ function NowSession({ spaceId, onNavigate, onViewChange }: NowScreenProps) {
       onBack={() => openDetail(null)} onNavigateRoot={() => openDetail(null)} onRefresh={refresh}
       onOpenElement={openDetail} onNavigateObject={openObject}
       onOpenStrategy={strategyId => { navigationRequest.current += 1; onNavigate({ strategyId }); onViewChange?.('strategy'); }} />
-      : detailId ? <div className="p-8"><p role="alert" className="text-[13px] text-muted-foreground">This Element is no longer available in this Space.</p>
-        <Button className="mt-3" onClick={() => openDetail(null)}>Back to Now</Button></div>
+      : detailId ? <div className="p-8"><p role="alert" className="text-[13px] text-muted-foreground">{t('This Element is no longer available in this Space.')}</p>
+        <Button className="mt-3" onClick={() => openDetail(null)}>{t('Back to Now')}</Button></div>
         : <NowView items={items} scope={scope} onScopeChange={setScope} readAt={data.readAt} refreshing={refreshing}
           error={error?.message ?? null} onRefresh={refresh} onImport={() => setImportOpen(true)}
           onOpenElement={element => openDetail(element.id)} onCheckIn={setEditing}
@@ -89,8 +91,8 @@ function NowSession({ spaceId, onNavigate, onViewChange }: NowScreenProps) {
     {importOpen && spaceId && <Dialog open>
       <DialogContent showCloseButton={false} className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl"
         onPointerDownOutside={event => event.preventDefault()} onEscapeKeyDown={event => event.preventDefault()}>
-        <DialogTitle>Bring existing work</DialogTitle>
-        <DialogDescription>Start with one project. Review its data and bring it into the team’s daily work.</DialogDescription>
+        <DialogTitle>{t('Bring existing work')}</DialogTitle>
+        <DialogDescription>{t('Start with one project. Review its data and bring it into the team’s daily work.')}</DialogDescription>
         <WorkImportFlow spaceId={spaceId} data={data} domains={domains} onCancel={() => setImportOpen(false)}
           onDone={() => { setImportOpen(false); setScope('team'); refresh(); }} />
       </DialogContent>

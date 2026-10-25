@@ -6,7 +6,8 @@ import { SortableContext, useSortable, horizontalListSortingStrategy, sortableKe
 import { CSS } from '@dnd-kit/utilities';
 import { constrainTabDrag } from './tabDrag';
 import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, FileText, Flag } from 'lucide-react';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
 
 interface TabBarProps {
@@ -40,7 +41,7 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
   workers:     { title: 'Workers',    Icon: Users },
   resource:    { title: 'Resource',   Icon: BarChart3 },
   board:       { title: 'Board',      Icon: Kanban },
-  custom_view: { title: 'CustomView', Icon: Flag },
+  custom_view: { title: 'Custom view', Icon: Flag },
   note:        { title: 'Note',       Icon: FileText },
 };
 
@@ -60,6 +61,7 @@ interface ContextMenu {
 }
 
 export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate, rightSlot, createOptions, onTabReorder }: TabBarProps) {
+  const { t } = useI18n();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
   const visibleCreateOptions = (createOptions
     ? CREATE_TAB_ORDER.filter((t) => createOptions.includes(t))
@@ -125,14 +127,18 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
 
       {/* Add Tab Button */}
       <div className="relative flex items-center flex-shrink-0">
-        <Button
-          type="button"
-          size="icon-sm"
-          aria-label="Add tab"
-          onClick={() => setShowCreateMenu(!showCreateMenu)}
-        >
-          <Plus size={14} />
-        </Button>
+        <ButtonAppearanceProvider appearance="navigation">
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            aria-label={t('Add tab')}
+            title={t('Add tab')}
+            onClick={() => setShowCreateMenu(!showCreateMenu)}
+          >
+            <Plus size={14} />
+          </Button>
+        </ButtonAppearanceProvider>
 
         {showCreateMenu && (
           <>
@@ -148,7 +154,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
                   >
                     <span className="text-muted-foreground"><OptionIcon size={16} /></span>
-                    {meta.title}
+                    {t(meta.title)}
                   </button>
                 );
               })}
@@ -181,11 +187,11 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <Trash2 size={14} />
-                Delete tab
+                {t('Delete tab')}
               </button>
             ) : (
               <div className="px-3 py-2 text-[12px] text-muted-foreground">
-                List tab cannot be deleted
+                {t('The List tab cannot be deleted')}
               </div>
             )}
           </div>
@@ -200,12 +206,13 @@ function SortableViewTab({ tab, active, sortable, onSelect, onContextMenu }: {
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id, disabled: !sortable });
+  const { t } = useI18n();
   const Icon = OBJECT_TAB_META[tab.tab_type].Icon;
   return <Button ref={setNodeRef} type="button" shape="tab" variant={active ? 'secondary' : 'ghost'}
     {...attributes} {...listeners} aria-pressed={active} onClick={onSelect} onContextMenu={onContextMenu}
     style={{ transform: CSS.Transform.toString(transform), transition }}
     className={sortable ? `touch-none ${isDragging ? 'relative z-10 opacity-70' : ''}` : undefined}>
     <span className={active ? 'text-foreground' : 'text-muted-foreground'}><Icon size={14}/></span>
-    <span className="text-xs font-semibold">{tab.title}</span>
+    <span className="text-xs font-semibold">{t(tab.title)}</span>
   </Button>;
 }

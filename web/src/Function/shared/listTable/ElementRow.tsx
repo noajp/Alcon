@@ -24,6 +24,8 @@ import { StatusPicker } from '@/ActivitySpace/execution/element/StatusPicker';
 import { type DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
 import { STATUS_OPTIONS, type ElementUpdate, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, selectionSquareClass, STICKY_TINT_SELECTED, STICKY_TINT_HOVER } from './shared';
 import { ElementCell, LabelChip } from './cells';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { statusLabel } from '@/shared/designTokens';
 
 // Memoised element row. All props are reference-stable across the common
 // re-render trigger (an element field edit changes only that element's `el`
@@ -76,6 +78,7 @@ export const ElementRow = memo(function ElementRow({
   onElementUpdate, onRefresh, onSelectElement, onRowSelect, onCustomColumnValueChange,
   allCustomColumns, blockers,
 }: ElementRowProps) {
+  const { t, locale } = useI18n();
   const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
   const showsActivityColumn = visibleColumns.some((c) => c.id === 'activity');
   const rowId = displayIdOf(el);
@@ -161,7 +164,7 @@ export const ElementRow = memo(function ElementRow({
         {canRowSelect && (
           <button
             type="button"
-            aria-label={isSelected ? 'Deselect element' : 'Select element'}
+            aria-label={isSelected ? t('Deselect Element') : t('Select Element')}
             // preventDefault on mousedown stops the click from focusing the
             // button (no stray focus ring on mouse-click) and stops Shift-
             // click from starting a browser text selection. Keyboard Tab
@@ -191,7 +194,7 @@ export const ElementRow = memo(function ElementRow({
             trigger={
               <button
                 type="button"
-                title={el.priority ? `Priority: ${el.priority}` : 'Set priority'}
+                title={el.priority ? t('Priority: {value}', { value: t(PRIORITY_OPTIONS.find((o) => o.value === el.priority)?.label ?? el.priority) }) : t('Set priority')}
                 className="flex w-full items-center justify-end rounded-md py-0.5 transition-colors hover:bg-muted/40"
               >
                 <PriorityMark priority={el.priority ?? null} />
@@ -221,7 +224,7 @@ export const ElementRow = memo(function ElementRow({
                 trigger={
                   <button
                     type="button"
-                    title={`Status: ${(el.status ?? 'todo').replaceAll('_', ' ')}`}
+                    title={t('Status: {value}', { value: t(statusLabel(el.status ?? 'todo')) })}
                     className="flex size-4 items-center justify-center rounded-md transition-colors hover:bg-muted/40"
                   >
                     <ElementProgressMark status={el.status} progress={getElementProgress(el, allCustomColumns)} size={16} />
@@ -252,8 +255,10 @@ export const ElementRow = memo(function ElementRow({
               // flex-1 title has basis 0, so the row never overflows and
               // shrink never fires; review measured the title at 24px.
               className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70 max-w-32"
-              title={`Held by ${lease.holder}${lease.branch ? ` on ${lease.branch}` : ''} · ${formatRemaining(lease.remainingMs)} left`}
-              aria-label={`Held by ${lease.holder}`}
+              title={lease.branch
+                ? t('Held by {holder} on {branch} · {time} left', { holder: lease.holder, branch: lease.branch, time: formatRemaining(lease.remainingMs) })
+                : t('Held by {holder} · {time} left', { holder: lease.holder, time: formatRemaining(lease.remainingMs) })}
+              aria-label={t('Held by {holder}', { holder: lease.holder })}
             >
               <Fingerprint size={11} className="shrink-0" />
               <span className="hidden @[28rem]:inline truncate">{holderLabel(lease.holder)}</span>
@@ -272,8 +277,8 @@ export const ElementRow = memo(function ElementRow({
             // status hue the mark already carries.
             <span
               className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70"
-              title={`Waiting on ${blockers.map(describeBlocker).join(', ')}`}
-              aria-label={`Waiting on ${blockers.length} unfinished ${blockers.length === 1 ? 'Element' : 'Elements'}`}
+              title={t('Waiting on {list}', { list: blockers.map(describeBlocker).join(', ') })}
+              aria-label={blockers.length === 1 ? t('Waiting on 1 unfinished Element') : t('Waiting on {n} unfinished Elements', { n: blockers.length })}
             >
               <Lock size={11} />
               <span className="tabular-nums">{blockers.length}</span>
@@ -307,7 +312,7 @@ export const ElementRow = memo(function ElementRow({
         <ContextMenuSub {...subProps('status')}>
           <ContextMenuSubTrigger className="gap-2" onPointerEnter={() => setOpenSub('status')}>
             {BUILTIN_COLUMN_ICONS.status}
-            Status
+            {t('Status')}
           </ContextMenuSubTrigger>
           <ContextMenuSubContent className="min-w-[170px]">
             {STATUS_OPTIONS.map((o) => (
@@ -317,7 +322,7 @@ export const ElementRow = memo(function ElementRow({
                 onClick={() => onElementUpdate(el.id, { status: o.value })}
               >
                 <ElementProgressMark status={o.value} size={14} />
-                <span className="flex-1">{o.label}</span>
+                <span className="flex-1">{t(o.label)}</span>
                 {el.status === o.value && <Check className="size-3.5" />}
               </ContextMenuItem>
             ))}
@@ -326,7 +331,7 @@ export const ElementRow = memo(function ElementRow({
         <ContextMenuSub {...subProps('priority')}>
           <ContextMenuSubTrigger className="gap-2" onPointerEnter={() => setOpenSub('priority')}>
             {BUILTIN_COLUMN_ICONS.priority}
-            Priority
+            {t('Priority')}
           </ContextMenuSubTrigger>
           <ContextMenuSubContent className="min-w-[150px]">
             {PRIORITY_OPTIONS.map((o) => (
@@ -336,7 +341,7 @@ export const ElementRow = memo(function ElementRow({
                 onClick={() => onElementUpdate(el.id, { priority: o.value as ElementWithDetails['priority'] })}
               >
                 <PriorityMark priority={o.value} />
-                <span className="flex-1">{o.label}</span>
+                <span className="flex-1">{t(o.label)}</span>
                 {(el.priority ?? 'medium') === o.value && <Check className="size-3.5" />}
               </ContextMenuItem>
             ))}
@@ -353,16 +358,16 @@ export const ElementRow = memo(function ElementRow({
         <ContextMenuSub {...subProps('due')}>
           <ContextMenuSubTrigger className="gap-2" onPointerEnter={() => setOpenSub('due')}>
             {BUILTIN_COLUMN_ICONS.due_date}
-            Due date
+            {t('Due date')}
           </ContextMenuSubTrigger>
           <ContextMenuSubContent className="min-w-[160px]">
-            {dueDatePresets().map((p) => (
+            {dueDatePresets(locale).map((p) => (
               <ContextMenuItem
                 key={p.label}
                 className="gap-2"
                 onClick={() => onElementUpdate(el.id, { due_date: p.value })}
               >
-                <span className="flex-1">{p.label}</span>
+                <span className="flex-1">{t(p.label)}</span>
                 <span className="text-[11px] text-muted-foreground">{p.hint}</span>
               </ContextMenuItem>
             ))}
@@ -373,7 +378,7 @@ export const ElementRow = memo(function ElementRow({
                   className="text-muted-foreground"
                   onClick={() => onElementUpdate(el.id, { due_date: null })}
                 >
-                  Clear
+                  {t('Clear')}
                 </ContextMenuItem>
               </>
             )}
@@ -383,7 +388,7 @@ export const ElementRow = memo(function ElementRow({
           <ContextMenuSub {...subProps('more')}>
             <ContextMenuSubTrigger className="gap-2" onPointerEnter={() => setOpenSub('more')}>
               <Grip className="size-4" />
-              More properties
+              {t('More properties')}
             </ContextMenuSubTrigger>
             <ContextMenuSubContent className="min-w-[190px] max-h-80 overflow-auto">
               {elementScopedColumns(allCustomColumns).map((col) => (
@@ -408,7 +413,7 @@ export const ElementRow = memo(function ElementRow({
           onPointerEnter={() => setOpenSub(null)}
           onClick={() => { void deleteElement(el.id); }}
         >
-          <Trash2 className="size-3.5" /> Delete
+          <Trash2 className="size-3.5" /> {t('Delete')}
         </ContextMenuItem>
       </ContextMenuContent>
       )}
@@ -426,14 +431,14 @@ function elementScopedColumns(cols: CustomColumnWithValues[]): CustomColumnWithV
 
 // Quick-set presets for the Due date submenu; a precise date is a cell /
 // detail-panel edit.
-function dueDatePresets(): { label: string; hint: string; value: string }[] {
+function dueDatePresets(locale: string): { label: string; hint: string; value: string }[] {
   const fmt = (d: Date) => {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
   };
-  const short = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const short = (d: Date) => d.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
   const today = new Date();
   const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
   const nextWeek = new Date(today); nextWeek.setDate(today.getDate() + 7);
@@ -457,6 +462,7 @@ function AssigneeContextSub({
   onOpenChange: (open: boolean) => void;
   onTriggerEnter: () => void;
 }) {
+  const { t } = useI18n();
   const [candidates, setCandidates] = useState<Worker[]>([]);
   const load = () => {
     if (candidates.length === 0) {
@@ -485,11 +491,11 @@ function AssigneeContextSub({
         onFocus={load}
       >
         {BUILTIN_COLUMN_ICONS.assignees}
-        Assignee
+        {t('Assignee')}
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="min-w-[190px] max-h-72 overflow-auto">
         {workers.length === 0 ? (
-          <div className="px-2 py-1.5 text-[12px] text-muted-foreground">Loading…</div>
+          <div className="px-2 py-1.5 text-[12px] text-muted-foreground">{t('Loading…')}</div>
         ) : (
           workers.map((w) => (
             <ContextMenuItem
@@ -524,6 +530,7 @@ function PropertyContextSub({
   onTriggerEnter: () => void;
   onFlatEnter: () => void;
 }) {
+  const { t } = useI18n();
   const raw = col.values?.[el.id]?.value ?? null;
 
   if (col.column_type === 'select' || col.column_type === 'status') {
@@ -545,7 +552,7 @@ function PropertyContextSub({
           ))}
           {current && (
             <ContextMenuItem className="text-muted-foreground" onClick={() => void onChange(null)}>
-              Clear
+              {t('Clear')}
             </ContextMenuItem>
           )}
         </ContextMenuSubContent>
@@ -592,7 +599,7 @@ function PropertyContextSub({
   }
 
   const display = raw == null || raw === ''
-    ? 'Empty'
+    ? t('Empty')
     : typeof raw === 'object' ? '…' : String(raw);
   return (
     <ContextMenuItem className="gap-2" onPointerEnter={onFlatEnter} onClick={onOpenDetail}>

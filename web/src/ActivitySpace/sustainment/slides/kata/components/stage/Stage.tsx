@@ -210,7 +210,7 @@ function Filmstrip({ onClose }: { onClose: () => void }) {
               }
             }}
             aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
-            aria-label={tx(`${i + 1}枚目：${s.title}`, `Slide ${i + 1}: ${s.title}`)}
+            aria-label={tx("{n}枚目：{title}", "Slide {n}: {title}", { n: i + 1, title: s.title })}
             aria-current={i === view.index ? "true" : undefined}
             style={{ animationDelay: `${Math.min(i, 14) * 35}ms` }}
             className={clsx("anim-in group flex shrink-0 items-start gap-2 text-left", drag === i && "opacity-40")}
@@ -287,11 +287,11 @@ function ItemControls() {
     <div className="mr-2 flex items-center gap-1.5">
       {axes.map((axis) => (
         <div key={axis} className="flex h-7 items-center rounded-md border border-k-line-strong bg-k-panel">
-          <button type="button" aria-label={tx(`${axisLabel(axis)}を減らす`, `Fewer ${axisLabel(axis).toLowerCase()}`)} disabled={!canChange(slide, axis, -1)} onClick={() => change(axis, -1)} className="flex h-full w-6 items-center justify-center text-k-ink-2 hover:text-k-ink disabled:opacity-25">
+          <button type="button" aria-label={tx("{axis}を減らす", "Fewer {axis}", { axis: axisLabel(axis).toLowerCase() })} disabled={!canChange(slide, axis, -1)} onClick={() => change(axis, -1)} className="flex h-full w-6 items-center justify-center text-k-ink-2 hover:text-k-ink disabled:opacity-25">
             <Minus size={12} />
           </button>
           <span className="px-1 text-[11px] text-k-ink-2">{axisLabel(axis)}</span>
-          <button type="button" aria-label={tx(`${axisLabel(axis)}を足す`, `More ${axisLabel(axis).toLowerCase()}`)} disabled={!canChange(slide, axis, 1)} onClick={() => change(axis, 1)} className="flex h-full w-6 items-center justify-center text-k-ink-2 hover:text-k-ink disabled:opacity-25">
+          <button type="button" aria-label={tx("{axis}を足す", "More {axis}", { axis: axisLabel(axis).toLowerCase() })} disabled={!canChange(slide, axis, 1)} onClick={() => change(axis, 1)} className="flex h-full w-6 items-center justify-center text-k-ink-2 hover:text-k-ink disabled:opacity-25">
             <Plus size={12} />
           </button>
         </div>
@@ -304,7 +304,7 @@ function ItemControls() {
               key={i}
               type="button"
               aria-pressed={cmp.highlight === i}
-              title={col || tx(`${i + 1}列目`, `Column ${i + 1}`)}
+              title={col || tx("{n}列目", "Column {n}", { n: i + 1 })}
               onClick={() => editDeck((dk) => updateSlide(dk, slide.id, (x) => setHighlight(x, i)))}
               className={clsx("h-5 min-w-5 rounded px-1 font-mono text-[10px]", cmp.highlight === i ? "bg-k-primary text-k-check" : "text-k-ink-2 hover:bg-k-hover")}
             >

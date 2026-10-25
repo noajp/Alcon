@@ -8,6 +8,8 @@ import { updateElement } from '@/hooks/useSupabase';
 import { normalizeDirection, type AcceptanceLine, type ElementDirection } from '@/types/database';
 import { mergeAcceptance, sameAcceptance } from './directionMerge';
 import { isCancelKey, isCommitEnter } from '@/Function/shared/keyboard';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { FONT } from '@/shared/designTokens';
 
 // Direction — "how this Element should be driven" as a first-class block:
 // approach (prose), acceptance criteria (declarative statements — NOT a
@@ -83,6 +85,7 @@ interface ElementDirectionSectionProps {
 export function ElementDirectionSection({ element, onSaved }: ElementDirectionSectionProps) {
   // Seed all local state once from the prop; afterwards this component owns
   // its editing session (see the key note above).
+  const { t } = useI18n();
   const [initial] = useState<ElementDirection>(() => normalizeDirection(element.direction) ?? EMPTY_DIRECTION);
   const [expanded, setExpanded] = useState(() => hasContent(initial));
   const [manuallyExpanded, setManuallyExpanded] = useState(false);
@@ -341,7 +344,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     return (
       <ButtonAppearanceProvider appearance="inline">
         <Button variant="ghost" size="sm" onClick={() => { setExpanded(true); setManuallyExpanded(true); }}>
-          <Plus size={13} strokeWidth={2.5} />Set direction
+          <Plus size={13} strokeWidth={2.5} />{t('Set direction')}
         </Button>
       </ButtonAppearanceProvider>
     );
@@ -349,13 +352,13 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
 
   return (
     <div className="w-full space-y-2">
-      <div className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
-        <span>Direction</span>
+      <div className="flex h-8 items-center">
+        <h2 className={`${FONT.lg} text-foreground`}>{t('Working direction')}</h2>
       </div>
 
       {/* Approach — free prose; newlines allowed, saved on blur. */}
       <div>
-        <div className="text-[11px] font-medium text-muted-foreground/70">Approach</div>
+        <div className="text-[11px] font-medium text-muted-foreground/70">{t('Approach')}</div>
         <textarea
           ref={approachRef}
           value={approach}
@@ -370,14 +373,14 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
               e.currentTarget.blur();
             }
           }}
-          placeholder="Add approach..."
+          placeholder={t('Add approach…')}
           className="w-full text-[13px] text-foreground bg-transparent border-none focus:outline-none resize-none overflow-hidden py-0.5"
         />
       </div>
 
       {/* Acceptance criteria — declarative statements, one per row. */}
       <div>
-        <div className="text-[11px] font-medium text-muted-foreground/70">Acceptance criteria</div>
+        <div className="text-[11px] font-medium text-muted-foreground/70">{t('Acceptance criteria')}</div>
         <div>
           {rows.map((row, index) => (
             <div key={row.key} className="flex items-center gap-2">
@@ -392,23 +395,24 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
                 onFocus={() => handleRowFocus(row)}
                 onKeyDown={(e) => handleRowKeyDown(e, index)}
                 onBlur={() => handleRowBlur(index)}
-                placeholder="Done when..."
+                placeholder={t('Done when…')}
                 className="flex-1 min-w-0 text-[13px] text-foreground bg-transparent border-none focus:outline-none py-0.5"
               />
             </div>
           ))}
         </div>
         <button
+          type="button"
           onClick={addRow}
           className="flex items-center gap-1.5 text-[12px] text-muted-foreground/70 hover:text-foreground py-0.5 transition-colors"
         >
-          <Plus size={12} /> Add criterion
+          <Plus size={12} /> {t('Add criterion')}
         </button>
       </div>
 
       {/* Next step — a single concrete move, saved on blur / Enter. */}
       <div>
-        <div className="text-[11px] font-medium text-muted-foreground/70">Next step</div>
+        <div className="text-[11px] font-medium text-muted-foreground/70">{t('Next step')}</div>
         <input
           value={next}
           onChange={(e) => setNext(e.target.value)}
@@ -420,7 +424,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
               e.currentTarget.blur();
             }
           }}
-          placeholder="Add next step..."
+          placeholder={t('Add next step…')}
           className="w-full text-[13px] text-foreground bg-transparent border-none focus:outline-none py-0.5"
         />
       </div>

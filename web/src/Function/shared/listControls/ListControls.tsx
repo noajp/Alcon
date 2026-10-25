@@ -59,7 +59,7 @@ import {
   MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR,
 } from '@/Function/shared/menu';
 import { DueDateFilter } from '@/Function/shared/date';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { CONTROL } from '@/shared/designTokens';
 import type { Worker } from '@/types/database';
 import {
@@ -80,6 +80,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { FieldVisibility } from '@/Function/property/FieldVisibility';
+import { fieldDisplayLabel } from '@/Function/property/fieldModel';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { useListColumns, type ColumnId } from '@/ActivitySpace/execution/object/useListColumns';
 
@@ -199,6 +200,7 @@ export function ListControls({
   const [filterOpen, setFilterOpen] = useState(false);
   const [displayOpen, setDisplayOpen] = useState(false);
   const filterActive = hasActiveFilter(state.filter);
+  const { t } = useI18n();
 
   const setFilter = (patch: Partial<ListFilter>) =>
     onChange({ ...state, filter: { ...state.filter, ...patch } });
@@ -209,6 +211,10 @@ export function ListControls({
     <div className="flex items-center gap-1.5">
       {/* Filter */}
       <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+        {/* Toolbar icons are navigation, not commands: borderless, lit by
+            background on hover and while active. Only the triggers — the
+            panels they open keep their own controls' outlines. */}
+        <ButtonAppearanceProvider appearance="navigation">
         <PopoverTrigger asChild>
           <Button
             type="button"
@@ -216,8 +222,8 @@ export function ListControls({
             size="icon-sm"
             aria-pressed={filterActive}
             className={`relative ${filterActive ? 'bg-[var(--surface-strong)] text-[var(--text-primary)]' : ''}`}
-            title="Filter"
-            aria-label="Filter"
+            title={t('Filter')}
+            aria-label={t('Filter')}
           >
             <FilterBarsIcon size={CONTROL.icon.sm} />
             {filterActive && (
@@ -225,6 +231,7 @@ export function ListControls({
             )}
           </Button>
         </PopoverTrigger>
+        </ButtonAppearanceProvider>
         <MenuShell align="end" width="wide">
           <FilterPanel
             filter={state.filter}
@@ -240,17 +247,19 @@ export function ListControls({
 
       {/* Display */}
       <Popover open={displayOpen} onOpenChange={setDisplayOpen}>
+        <ButtonAppearanceProvider appearance="navigation">
         <PopoverTrigger asChild>
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
-            title="Display options"
-            aria-label="Display options"
+            title={t('Display options')}
+            aria-label={t('Display options')}
           >
             <Grid6Icon size={CONTROL.icon.sm} />
           </Button>
         </PopoverTrigger>
+        </ButtonAppearanceProvider>
         <MenuShell align="end" width="wide">
           <DisplayPanel
             display={state.display}
@@ -287,6 +296,7 @@ function FilterPanel({
   objectOptions?: { id: string; name: string }[];
   showOwnerFilter?: boolean;
 }) {
+  const { t } = useI18n();
   const [query, setQuery] = useState(filter.query ?? '');
   useEffect(() => setQuery(filter.query ?? ''), [filter.query]);
 
@@ -298,8 +308,8 @@ function FilterPanel({
           <input
             type="text"
             value={query}
-            placeholder="Search title…"
-            aria-label="Search title"
+            placeholder={t('Search title…')}
+            aria-label={t('Search title')}
             onChange={(e) => setQuery(e.target.value)}
             onBlur={() => setFilter({ query })}
             onKeyDown={(e) => { if (e.key === 'Enter') setFilter({ query }); }}
@@ -310,7 +320,7 @@ function FilterPanel({
               type="button"
               onClick={() => { setQuery(''); setFilter({ query: '' }); }}
               className="text-muted-foreground hover:text-foreground"
-              title="Clear"
+              title={t('Clear')}
             >
               <X size={11} />
             </button>
@@ -324,7 +334,7 @@ function FilterPanel({
           return (
             <MenuCheckRow
               key={s}
-              icon={<ElementProgressMark status={s} size={15} />} label={labelForStatus(s)}
+              icon={<ElementProgressMark status={s} size={15} />} label={t(labelForStatus(s))}
               checked={checked}
               onClick={() => {
                 const next = new Set(filter.status ?? []);
@@ -342,7 +352,7 @@ function FilterPanel({
           return (
             <MenuCheckRow
               key={p}
-              icon={<PriorityMark priority={p} />} label={labelForPriority(p)}
+              icon={<PriorityMark priority={p} />} label={t(labelForPriority(p))}
               checked={checked}
               onClick={() => {
                 const next = new Set(filter.priority ?? []);
@@ -356,16 +366,16 @@ function FilterPanel({
 
       {typeOptions && typeOptions.length > 0 && (
         <Submenu icon={<Shapes size={15} />} label="Type" count={filter.types?.length ?? 0}>
-          {typeOptions.map((t) => {
-            const checked = (filter.types ?? []).includes(t);
+          {typeOptions.map((type) => {
+            const checked = (filter.types ?? []).includes(type);
             return (
               <MenuCheckRow
-                key={t}
-                label={t}
+                key={type}
+                label={type}
                 checked={checked}
                 onClick={() => {
                   const next = new Set(filter.types ?? []);
-                  if (checked) next.delete(t); else next.add(t);
+                  if (checked) next.delete(type); else next.add(type);
                   setFilter({ types: next.size > 0 ? Array.from(next) : undefined });
                 }}
               />
@@ -401,7 +411,7 @@ function FilterPanel({
             return (
               <MenuCheckRow
                 key={w.id}
-                label={w.name ?? 'Unknown'}
+                label={w.name ?? t('Unknown')}
                 checked={checked}
                 onClick={() => {
                   const next = new Set(filter.assigneeWorkerIds ?? []);
@@ -447,9 +457,9 @@ function FilterPanel({
         onClick={() => setFilter({ readyOnly: !filter.readyOnly })}
         aria-pressed={Boolean(filter.readyOnly)}
         className={`${MENU_ROW} justify-between`}
-        title="Hide Elements still waiting on an unfinished dependency"
+        title={t('Hide Elements still waiting on an unfinished dependency')}
       >
-        <Play size={15} className="text-muted-foreground" /><span className="flex-1">Ready to start</span>
+        <Play size={15} className="text-muted-foreground" /><span className="flex-1">{t('Ready to start')}</span>
         {filter.readyOnly && <Check size={12} className="text-foreground" />}
       </button>
 
@@ -460,7 +470,7 @@ function FilterPanel({
           aria-pressed={Boolean(filter.ownerOnly)}
           className={`${MENU_ROW} justify-between`}
         >
-          <UserRound size={15} className="text-muted-foreground" /><span className="flex-1">Owned by me only</span>
+          <UserRound size={15} className="text-muted-foreground" /><span className="flex-1">{t('Owned by me only')}</span>
           {filter.ownerOnly && <Check size={12} className="text-foreground" />}
         </button>
       )}
@@ -477,7 +487,7 @@ function FilterPanel({
             }}
             className={`${MENU_ROW} justify-center text-destructive hover:bg-destructive/10`}
           >
-            Clear filters
+            {t('Clear filters')}
           </button>
         </>
       )}
@@ -524,7 +534,7 @@ function DisplayPanel({
       />
       {propertiesStorageKey ? <OrderingControl storageKey={propertiesStorageKey} customColumns={propertiesCustom ?? EMPTY_CUSTOM} display={display} setDisplay={setDisplay} /> :
         <LabeledSelect icon={<ArrowDownWideNarrow size={15} />} label="Ordering" value={display.orderBy}
-          options={ORDER_OPTIONS.map(option => ({ ...option, label: t(option.label) }))} onSelect={(id) => setDisplay({ orderBy: id })} />}
+          options={ORDER_OPTIONS.map(option => ({ ...option, label: fieldDisplayLabel(t, option) }))} onSelect={(id) => setDisplay({ orderBy: id })} />}
 
 
       {/* Properties — which data columns show. Driven by the same shared
@@ -539,7 +549,7 @@ function DisplayPanel({
       ) : displayProperties && displayProperties.options.length > 0 ? (
         <>
           <div className={MENU_SEPARATOR} />
-          <MenuSectionLabel>Properties</MenuSectionLabel>
+          <MenuSectionLabel>{t('Properties')}</MenuSectionLabel>
           <div className="px-2 pb-2 flex flex-wrap gap-1.5">
             {displayProperties.options.map((opt) => {
               const active = displayProperties.active.has(opt.id);
@@ -554,7 +564,7 @@ function DisplayPanel({
                       : 'bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground'
                   }`}
                 >
-                  {opt.label}
+                  {t(opt.label)}
                 </button>
               );
             })}
@@ -570,7 +580,7 @@ function DisplayPanel({
             onClick={() => { orderingColumns.setSort(null); onReset(); }}
             className={`${MENU_ROW} text-muted-foreground hover:text-foreground`}
           >
-            <RotateCcw size={14} />Reset to defaults
+            <RotateCcw size={14} />{t('Reset to defaults')}
           </button>
         </>
       )}
@@ -629,12 +639,13 @@ function PropertiesSection({
   customColumns: CustomColumnWithValues[];
   onAddColumn?: () => void;
 }) {
+  const { t } = useI18n();
   const cols = useListColumns(storageKey, customColumns, { entity: storageKey === 'domain' ? 'object' : 'element' });
   return (
     <>
       <div className={MENU_SEPARATOR} />
       <FieldVisibility compact columns={cols.allColumns} isVisible={cols.isVisible} onToggle={cols.toggleVisible} />
-      {onAddColumn && <Button type="button" variant="ghost" size="sm" onClick={onAddColumn}><Plus size={14} />Add field</Button>}
+      {onAddColumn && <Button type="button" variant="ghost" size="sm" onClick={onAddColumn}><Plus size={14} />{t('Add field')}</Button>}
     </>
   );
 }
@@ -693,12 +704,12 @@ function OrderingControl({ storageKey, customColumns, display, setDisplay }: {
   const legacyDirection = display.orderBy === 'priority' ? (display.orderDir === 'asc' ? 'desc' : 'asc') : display.orderDir;
   const active = cols.sort ?? (legacyId ? { id: legacyId, direction: legacyDirection } : null);
   const candidates = [
-    ...SORTABLE_ELEMENT_FIELDS.map(field => ({ ...field, label: t(field.label) })),
+    ...SORTABLE_ELEMENT_FIELDS.map(field => ({ ...field, label: fieldDisplayLabel(t, field) })),
     ...cols.visibleColumns.filter(c => c.kind === 'custom').map(c => ({ id: c.id, label: c.label })),
   ];
   // Header sorting may name another visible built-in (e.g. Object progress).
   const activeColumn = cols.allColumns.find(c => c.id === active?.id);
-  if (activeColumn && !candidates.some(c => c.id === activeColumn.id)) candidates.push({ id: activeColumn.id, label: activeColumn.label });
+  if (activeColumn && !candidates.some(c => c.id === activeColumn.id)) candidates.push({ id: activeColumn.id, label: fieldDisplayLabel(t, activeColumn) });
   const choose = (id: string, direction: 'asc' | 'desc') => {
     cols.setSort(id === 'manual' ? null : { id, direction });
     setDisplay({ orderBy: 'manual', orderDir: direction });

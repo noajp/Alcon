@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { NoteNode } from './types';
 import { RenameInput } from './RenameInput';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -41,6 +42,7 @@ export function NotesSidebar({
   onDeleteNode,
   onRenameNode,
 }: NotesSidebarProps) {
+  const { t } = useI18n();
   // Folders are the root nodes (scoped to the Activity Space); their files live
   // in the middle pane (FilesPane), not here. Flat, alpha-sorted list. Folder +
   // file creation lives in the bottom "+ Create new" menu, so there's no header
@@ -53,12 +55,7 @@ export function NotesSidebar({
   return (
     <aside className="flex flex-col flex-1 min-h-0 overflow-hidden">
       <div className="flex-1 overflow-auto pb-3">
-        {folders.length === 0 ? (
-          <div className="px-3 py-4 text-[11px] text-muted-foreground/60 text-center">
-            No folders yet — click + to create one
-          </div>
-        ) : (
-          folders.map((f) => (
+        {folders.map((f) => (
             <FolderRow
               key={f.id}
               folder={f}
@@ -66,13 +63,12 @@ export function NotesSidebar({
               onSelect={() => onSelectFolder(f.id)}
               onRenameNode={onRenameNode}
               onDelete={onDeleteNode ? async () => {
-                if (await appDialog.confirm(`"${f.name}" を削除しますか?\n中のファイルも削除されます。`)) {
+                if (await appDialog.confirm(t('Delete the folder "{name}" and its pages? This cannot be undone.', { name: f.name }))) {
                   onDeleteNode(f.id);
                 }
               } : undefined}
             />
-          ))
-        )}
+          ))}
       </div>
     </aside>
   );
@@ -96,6 +92,7 @@ function FolderRow({
   onRenameNode?: (id: string, name: string) => void;
   onDelete?: () => void;
 }) {
+  const { t } = useI18n();
   const [renaming, setRenaming] = useState(false);
   return (
     <ContextMenu>
@@ -134,14 +131,14 @@ function FolderRow({
       <ContextMenuContent className="min-w-[170px]">
         {onRenameNode && (
           <ContextMenuItem className="gap-2" onSelect={() => setRenaming(true)}>
-            <Pencil size={13} /> Rename
+            <Pencil size={13} /> {t('Rename')}
           </ContextMenuItem>
         )}
         {onDelete && (
           <>
             {onRenameNode && <ContextMenuSeparator />}
             <ContextMenuItem className="gap-2 text-destructive focus:text-destructive" onSelect={onDelete}>
-              <Trash2 size={13} /> Delete folder
+              <Trash2 size={13} /> {t('Delete folder')}
             </ContextMenuItem>
           </>
         )}
@@ -158,14 +155,10 @@ function FolderRow({
  *  files exist at all). Kept here for back-compat with the MainContent
  *  import; the OneNote layout reduces how often it's actually visible. */
 export function BriefsEmptyState() {
+  const { t } = useI18n();
   return (
     <div className="flex-1 flex items-center justify-center text-center px-8 py-12">
-      <div className="max-w-sm">
-        <p className="text-[13px] text-muted-foreground mb-1">No file selected</p>
-        <p className="text-[12px] text-muted-foreground/70">
-          Pick a folder on the left and a file in the middle pane to start writing.
-        </p>
-      </div>
+      <p className="text-[13px] text-muted-foreground">{t('Select a page to start writing.')}</p>
     </div>
   );
 }

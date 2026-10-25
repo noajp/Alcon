@@ -8,6 +8,8 @@
 // and plans the writes that keep them together when a label is renamed or
 // deleted. Nothing here touches the network, so the arithmetic is testable.
 
+import { translate } from '@/Function/i18n/I18nProvider';
+
 export interface LabelUsageRow {
   id: string;
   labels: string[];
@@ -196,16 +198,16 @@ export function diffColorPatch(
  * blocked.
  */
 export function newLabelProblem(name: string, entries: readonly LabelEntry[]): string | null {
-  if (!name) return 'Give the label a name.';
-  if (entries.some((e) => e.name.toLowerCase() === name.toLowerCase())) return `“${name}” already exists.`;
+  if (!name) return translate('Give the label a name.');
+  if (entries.some((e) => e.name.toLowerCase() === name.toLowerCase())) return translate('“{name}” already exists.', { name });
   return null;
 }
 
 export function formatElementCount(count: number): string {
-  return count === 1 ? '1 Element' : `${count} Elements`;
+  return count === 1 ? translate('1 Element') : translate('{n} Elements', { n: count });
 }
 
 /** The usage cell of a catalogue row. */
 export function formatLabelCount(count: number): string {
-  return count === 0 ? 'Unused' : formatElementCount(count);
+  return count === 0 ? translate('Unused') : formatElementCount(count);
 }

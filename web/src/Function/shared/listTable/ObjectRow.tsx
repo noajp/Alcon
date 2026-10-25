@@ -9,6 +9,7 @@ import { ObjectIcon } from '@/shell/icons';
 import { type DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
 import { OBJECT_DRAG_PREFIX, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, ROW_ROUND_TO_LAST, selectionSquareClass, selectionSquareClassToLast } from './shared';
 import { ObjectCell } from './cells';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // Object row — sortable + selectable, mirrors ElementRow at the structural
 // level. The checkbox affordance, hover/selected bg, and sticky-left
@@ -39,6 +40,7 @@ export const ObjectRow = memo(function ObjectRow({
   elementTypes, canRowSelect, onAddType, onRemoveType, dropEdge, selPrev, selNext, onSelectObject, onRowSelect,
   onObjectUpdate, objectWorkers, onObjectCustomColumnValueChange,
 }: ObjectRowProps) {
+  const { t } = useI18n();
   const dragId = OBJECT_DRAG_PREFIX + obj.id;
   // No sortable transform — rows stay static; the DragOverlay card and blue
   // drop line carry the feedback (see ElementRow for the rationale).
@@ -92,7 +94,7 @@ export const ObjectRow = memo(function ObjectRow({
         {canRowSelect && (
           <button
             type="button"
-            aria-label={isSelected ? 'Deselect object' : 'Select object'}
+            aria-label={isSelected ? t('Deselect Object') : t('Select Object')}
             onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => onRowSelect(obj.id, e.shiftKey ? 'range' : 'single')}
             className={`size-4 rounded-[5px] border flex items-center justify-center mx-auto transition-opacity ${

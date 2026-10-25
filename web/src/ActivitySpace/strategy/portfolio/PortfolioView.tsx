@@ -7,7 +7,7 @@ import { Popover, PopoverAnchor, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '@/ui/context-menu';
 import { MenuShell } from '@/Function/shared/menu';
-import { EmptyState } from '@/Function/shared/EmptyState';
+import { QuietEmpty } from '@/ActivitySpace/strategy/QuietEmpty';
 import { QuickCreatePopup } from '@/Function/shared/QuickCreatePopup';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { PageHead, PageLayout, PageSection } from '@/Function/shared/PageHead';
@@ -75,8 +75,8 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
   const roots = useMemo(() => strategies.filter((s) => s.parentIds.length === 0), [strategies]);
   const { byId: healthById } = useInitiativeHealth(roots);
 
-  // Creating: the sidebar "+" or the header "+" makes a top-level Portfolio;
-  // a row's menu (or the detail page) makes one nested inside.
+  // Creating: the sidebar "+" (or the empty page's "+ Create Portfolio") makes
+  // a top-level Portfolio; a row's menu or the detail page makes one inside.
   const [localNew, setLocalNew] = useState<{ parentId: string | null } | null>(null);
   const newParent = localNew ? localNew.parentId : createRequested ? null : undefined;
   const closeNew = () => { setLocalNew(null); if (createRequested) onCreateHandled(); };
@@ -102,24 +102,13 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
             <NavPortfolioIcon size={12} />
             <span className="text-[12px] font-semibold text-foreground">{t('Portfolios')}</span>
             {vision && <span className="truncate text-[12px] text-muted-foreground">{vision.name}</span>}
-            <div className="flex-1" />
-            {vision && (
-              <Button variant="ghost" size="icon-xs" className="text-muted-foreground" type="button"
-                onClick={() => setLocalNew({ parentId: null })} title={t('New Portfolio')} aria-label={t('New Portfolio')}>
-                <Plus size={14} />
-              </Button>
-            )}
           </div>
           <div className="flex-1 overflow-y-auto">
             {loading ? null : !vision ? (
-              <EmptyState icon={NavPortfolioIcon} title={t('Add a Vision first')}
-                description={t('Portfolios belong to a Vision, the way Objects belong to a Domain.')}
-                hint={t('A Space can hold several Visions.')}
+              <QuietEmpty text={t('Portfolios belong to a Vision, the way Objects belong to a Domain. Add a Vision first.')}
                 cta={t('Create Vision')} onCta={onRequestVision} />
             ) : portfolios.length === 0 && unassigned.length === 0 ? (
-              <EmptyState icon={NavPortfolioIcon} title={t('Add Portfolios')}
-                description={t('A Portfolio bundles Initiatives that serve one part of the Vision, so the Strategy reads as a few bets instead of a long list.')}
-                hint={t('Portfolios nest, and an Initiative belongs to at most one Portfolio.')}
+              <QuietEmpty text={t('A Portfolio bundles Initiatives that serve one part of the Vision, so the Strategy reads as a few bets instead of a long list.')}
                 cta={t('Create Portfolio')} onCta={() => setLocalNew({ parentId: null })} />
             ) : (
               <div className="h-full overflow-auto">
@@ -171,7 +160,7 @@ function useGuardedWrite() {
   const { t } = useI18n();
   return async (write: () => Promise<unknown>) => {
     try { await write(); }
-    catch (e) { await appDialog.alert(`${t("Couldn't save")}: ${e instanceof Error ? e.message : String(e)}`); }
+    catch (e) { await appDialog.alert(t("Couldn't save: {error}", { error: e instanceof Error ? e.message : String(e) })); }
   };
 }
 
@@ -221,7 +210,7 @@ function PortfolioTreeRow({ node, tree, gutter, rollup, open, onToggle, onOpen, 
           lead={hasChildren ? (
             <button type="button" onClick={onToggle}
               className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground"
-              aria-label={`${t(open ? 'Collapse' : 'Expand')} ${portfolio.name}`} aria-expanded={open}>
+              aria-label={open ? t('Collapse {name}', { name: portfolio.name }) : t('Expand {name}', { name: portfolio.name })} aria-expanded={open}>
               {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             </button>
           ) : gutter ? <span aria-hidden className="size-6 shrink-0" /> : undefined}
@@ -426,9 +415,6 @@ function PortfolioDetail({ node, visionName, portfolios, byPortfolio, healthById
             )}
           </span>
         ))}
-        <div className="flex-1" />
-        <Button variant="ghost" size="icon-xs" className="text-muted-foreground" onClick={onNewInside}
-          title={t('New Portfolio inside')} aria-label={t('New Portfolio inside')}><FolderPlus size={14} /></Button>
       </div>
       <div className="flex-1 overflow-y-auto">
         <PageLayout rail={
@@ -461,14 +447,27 @@ function PortfolioDetail({ node, visionName, portfolios, byPortfolio, healthById
             onSaveTitle={(name) => void updatePortfolio(portfolio.id, { name })}
             onSaveDescription={(description) => void updatePortfolio(portfolio.id, { description: description || null })} />
 
-          {node.children.length > 0 && (
-            <PageSection title={t('Portfolios inside')}>
+          {/* Nesting is made where it lands: a "+" on the section once it has
+              Portfolios, and only the "+ verb" while it has none. */}
+          {node.children.length > 0 ? (
+            <PageSection title={t('Portfolios inside')} action={
+              <ButtonAppearanceProvider appearance="navigation">
+                <Button variant="ghost" size="icon-xs" className="text-muted-foreground" onClick={onNewInside}
+                  title={t('New Portfolio inside')} aria-label={t('New Portfolio inside')}><Plus size={13} /></Button>
+              </ButtonAppearanceProvider>
+            }>
               {node.children.map((child) => (
                 <ContentRow key={child.portfolio.id} icon={<NavPortfolioIcon size={16} />} name={child.portfolio.name}
                   onOpen={() => onOpenPortfolio(child.portfolio.id)}
                   meta={<RollupFigures rollup={rollupPortfolio(child, byPortfolio, healthById)} />} />
               ))}
             </PageSection>
+          ) : (
+            <ButtonAppearanceProvider appearance="inline">
+              <Button variant="ghost" size="sm" align="start" className="-ml-2 self-start text-muted-foreground" onClick={onNewInside}>
+                <Plus size={13} strokeWidth={2.5} />{t('New Portfolio inside')}
+              </Button>
+            </ButtonAppearanceProvider>
           )}
 
           <PageSection title={t('Initiatives')}>

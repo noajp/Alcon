@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/ui/button';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { FONT } from '@/shared/designTokens';
 import type { ConnectedApp, OAuthAccess } from '@/Function/oauth/connectedApps';
 import { useConnectedAppActions, useConnectedApps } from '@/Function/oauth/oauthData';
 
@@ -34,7 +35,7 @@ export function ConnectedApps() {
   return (
     <section className="space-y-3">
       <div className="min-w-0">
-        <h3 className="text-[13px] font-medium text-foreground">{t('Connected apps')}</h3>
+        <h3 className={`${FONT.lg} text-foreground`}>{t('Connected apps')}</h3>
         <p className="mt-1 text-[12px] text-muted-foreground">
           {t('Apps you approved by signing in, such as claude.ai or ChatGPT. Add the endpoint above as a custom connector, sign in, and choose what it may do.')}
         </p>
@@ -47,9 +48,9 @@ export function ConnectedApps() {
       ) : apps.length === 0 ? (
         <p className="text-[12px] text-muted-foreground">{t('No apps connected.')}</p>
       ) : (
-        <div className="divide-y divide-border/40 rounded-lg border border-border/60">
+        <div>
           {apps.map((app) => (
-            <div key={app.clientId} className="flex items-center gap-3 px-3 py-2.5">
+            <div key={app.clientId} className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13px] font-medium text-foreground">{app.name}</div>
                 <div className="truncate text-[12px] text-muted-foreground">

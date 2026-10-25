@@ -6,7 +6,7 @@ import { Check, ChevronDown, ExternalLink, LayoutGrid, List, Search } from 'luci
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
-import { CARD, CARD_HOVER } from '@/shared/designTokens';
+import { CARD, CARD_HOVER, FONT } from '@/shared/designTokens';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
@@ -79,7 +79,7 @@ function ExternalServicesPanel() {
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h2 className="text-[15px] font-semibold text-foreground">{t('Connect apps')}</h2>
+          <h2 className={`${FONT.lg} text-foreground`}>{t('Connect apps')}</h2>
           <p className="mt-1 text-[12px] text-muted-foreground">
             {t('Connect external services and AI agents can use them while working on Elements. Writes to an external service wait for your approval every time by default.')}
           </p>
@@ -93,7 +93,7 @@ function ExternalServicesPanel() {
       </div>
 
       {oauthOutcome && (
-        <div role="status" className={cn('flex items-start justify-between gap-3 rounded-lg border border-border/60 px-3 py-2 text-[12px] text-foreground',
+        <div role="status" className={cn('flex items-start justify-between gap-3 rounded-md px-3 py-2 text-[12px] text-foreground',
           oauthOutcome.status === 'ok' ? 'bg-[var(--status-success-subtle)]' : oauthOutcome.status === 'error' ? 'bg-[var(--status-danger-subtle)]' : 'bg-[var(--surface-strong)]')}>
           <span>
             {oauthOutcome.status === 'pending'
@@ -116,7 +116,7 @@ function ExternalServicesPanel() {
 
       {!filtering && (
         <section className="space-y-3">
-          <h3 className="text-[13px] font-medium text-foreground">{t('Featured')}</h3>
+          <h3 className={`${FONT.lg} text-foreground`}>{t('Featured')}</h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
             {featured.map((p, i) => (
               <PresetCard key={p.id} preset={p} installed={installed.has(p.id)} featured
@@ -145,28 +145,28 @@ function ExternalServicesPanel() {
         </div>
 
         {visible.length === 0 ? (
-          <p className="py-8 text-center text-[12px] text-muted-foreground">{t('No integrations match.')}</p>
+          <p className="py-3 text-[13px] text-muted-foreground">{t('No integrations match.')}</p>
         ) : layout === 'grid' ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {visible.map((p) => <PresetCard key={p.id} preset={p} installed={installed.has(p.id)} onOpen={() => openPreset(p)} />)}
           </div>
         ) : (
-          <div className="divide-y divide-border/40 rounded-lg border border-border/60">
+          <div>
             {visible.map((p) => <PresetRow key={p.id} preset={p} installed={installed.has(p.id)} onOpen={() => openPreset(p)} />)}
           </div>
         )}
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-[13px] font-medium text-foreground">{t('Connected')}</h3>
+        <h3 className={`${FONT.lg} text-foreground`}>{t('Connected')}</h3>
         {error ? (
-          <p className="text-[12px] text-[var(--status-danger)]">{t("Couldn't load integrations")}: {error.message}</p>
+          <p className="text-[12px] text-[var(--status-danger)]">{t("Couldn't load integrations: {error}", { error: error.message })}</p>
         ) : loading ? (
           <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p>
         ) : integrations.length === 0 ? (
           <p className="text-[12px] text-muted-foreground">{t('Nothing is connected to this Space yet.')}</p>
         ) : (
-          <div className="divide-y divide-border/40 rounded-lg border border-border/60">
+          <div>
             {integrations.map((i) => <ConnectedRow key={i.id} integration={i} onOpen={() => openIntegration(i)} />)}
           </div>
         )}
@@ -252,7 +252,7 @@ function PresetRow({ preset, installed, onOpen }: { preset: IntegrationPreset; i
   const { t } = useI18n();
   return (
     <button type="button" onClick={onOpen}
-      className="flex w-full items-center gap-3 px-3 py-2.5 text-left outline-none transition-colors hover:bg-[var(--surface-strong)] focus-visible:bg-[var(--surface-strong)]">
+      className="-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-md px-2 py-2 text-left outline-none transition-colors hover:bg-[var(--surface-strong)] focus-visible:bg-[var(--surface-strong)]">
       <IntegrationIcon name={preset.name} icon={preset.icon} size={24} />
       <div className="min-w-0 flex-1">
         <div className="text-[13px] font-medium text-foreground">{t(preset.name)}</div>
@@ -269,7 +269,7 @@ function ConnectedRow({ integration, onOpen }: { integration: Integration; onOpe
   const last = readLastTest(integration.last_test);
   return (
     <button type="button" onClick={onOpen}
-      className="flex w-full items-center gap-3 px-3 py-2.5 text-left outline-none transition-colors hover:bg-[var(--surface-strong)] focus-visible:bg-[var(--surface-strong)]">
+      className="-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-md px-2 py-2 text-left outline-none transition-colors hover:bg-[var(--surface-strong)] focus-visible:bg-[var(--surface-strong)]">
       <IntegrationIcon name={integration.name} icon={integration.icon} size={24} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -278,7 +278,7 @@ function ConnectedRow({ integration, onOpen }: { integration: Integration; onOpe
         </div>
         <div className="truncate text-[12px] text-muted-foreground">
           {[
-            KIND_LABELS[integration.kind],
+            t(KIND_LABELS[integration.kind]),
             integration.delegation === 'full_delegation' ? t('Full delegation') : t('Approve each time'),
             last?.toolCount != null ? t('{count} tools', { count: last.toolCount }) : null,
           ].filter(Boolean).join(' · ')}

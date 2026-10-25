@@ -7,6 +7,7 @@ import { updateWorker } from '@/hooks/useSupabase';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import type { Worker } from '@/types/database';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // The other half of ELE_QLT-008's mark: an account-less human Worker
 // (`workers.user_id IS NULL`) can be assigned and planned around while
@@ -54,6 +55,7 @@ export function ConnectWorkerAccountDialog({
   onClose,
   onConnected,
 }: ConnectWorkerAccountDialogProps) {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ProfileRow[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -94,12 +96,14 @@ export function ConnectWorkerAccountDialog({
       const code = (e as { code?: string } | null)?.code;
       setError(
         code === '23505'
-          ? `${profile.display_name || 'That account'} is already connected to a different Worker.`
+          ? (profile.display_name
+            ? t('{name} is already connected to a different Worker.', { name: profile.display_name })
+            : t('That account is already connected to a different Worker.'))
           : code === '42501'
-            ? 'You can connect this Worker only as an owner of its Object\'s Space or Domain, and only to someone in that Space.'
+            ? t('You can connect this Worker only as an owner of its Object’s Space or Domain, and only to someone in that Space.')
             : e instanceof Error
             ? e.message
-            : 'Failed to connect',
+            : t('Failed to connect'),
       );
     } finally {
       setBusyId(null);
@@ -117,16 +121,16 @@ export function ConnectWorkerAccountDialog({
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div>
-            <h3 className="text-[14px] font-semibold text-foreground">Connect to an account</h3>
+            <h3 className="text-[14px] font-semibold text-foreground">{t('Connect to an account')}</h3>
             <p className="text-[12px] text-muted-foreground mt-0.5">
-              {worker.name} has no account — assignments and notifications don&apos;t reach them.
+              {t('{name} has no account — assignments and notifications don’t reach them.', { name: worker.name })}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="p-1 text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors shrink-0"
-            aria-label="Close"
+            aria-label={t('Close')}
           >
             <X size={14} />
           </button>
@@ -143,19 +147,19 @@ export function ConnectWorkerAccountDialog({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
-              placeholder="Search by display name…"
-              className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
+              placeholder={t('Search by display name…')}
+              className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:bg-muted/40 transition-colors"
             />
           </div>
           {error && <p className="mt-2 text-[12px] text-[var(--status-danger)]">{error}</p>}
         </div>
 
-        <div className="max-h-[320px] overflow-y-auto divide-y divide-border/40 mt-3">
+        <div className="max-h-[320px] overflow-y-auto mt-3">
           {loading ? (
-            <div className="px-5 py-8 text-center text-xs text-muted-foreground">Searching…</div>
+            <div className="px-5 py-8 text-center text-xs text-muted-foreground">{t('Searching…')}</div>
           ) : results.length === 0 ? (
             <div className="px-5 py-8 text-center text-xs text-muted-foreground">
-              {query.trim() ? 'No users matched.' : 'Start typing to search users.'}
+              {t(query.trim() ? 'No users matched.' : 'Start typing to search users.')}
             </div>
           ) : (
             results.map((p) => {
@@ -180,11 +184,11 @@ export function ConnectWorkerAccountDialog({
                   />
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium text-foreground truncate">
-                      {p.display_name || 'Unnamed'}
+                      {p.display_name || t('Unnamed')}
                     </div>
                   </div>
                   <span className="text-[12px] text-muted-foreground">
-                    {isBusy ? 'Connecting…' : 'Connect'}
+                    {isBusy ? t('Connecting…') : t('Connect')}
                   </span>
                 </button>
               );

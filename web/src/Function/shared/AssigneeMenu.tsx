@@ -17,6 +17,7 @@ import {
   type LoadElement,
 } from '@/Function/shared/assignmentLoad';
 import { ReachHint, WorkerAvatar, type WorkerAvatarSubject } from './WorkerAvatar';
+import { translate, useI18n } from '@/Function/i18n/I18nProvider';
 
 // Single source of truth for the assignee picker dropdown CONTENT. Triggers
 // legitimately differ per view (avatar stack in table rows, RailRow in the
@@ -75,6 +76,7 @@ export function AssigneeMenuContent({
   variant = 'add-remove',
   ...contentProps
 }: AssigneeMenuContentProps) {
+  const { t } = useI18n();
   const current = assignees ?? [];
   const assigneeWorkerId = (a: AssigneeEntry) => a.worker_id ?? a.worker?.id;
   const readings = useAssignmentReadings(element, workers);
@@ -83,7 +85,7 @@ export function AssigneeMenuContent({
     return (
       <DropdownMenuContent {...contentProps}>
         {workers.length === 0 && (
-          <div className="px-2 py-1.5 text-[12px] text-muted-foreground">No workers</div>
+          <div className="px-2 py-1.5 text-[12px] text-muted-foreground">{t('No Workers')}</div>
         )}
         {workers.map((w) => {
           const existing = current.find((a) => assigneeWorkerId(a) === w.id);
@@ -148,9 +150,9 @@ export function AssigneeMenuContent({
           </DropdownMenuItem>
         ))
       ) : workers.length === 0 ? (
-        <div className="px-3 py-2 text-[12px] text-muted-foreground">Loading...</div>
+        <div className="px-3 py-2 text-[12px] text-muted-foreground">{t('Loading…')}</div>
       ) : (
-        <div className="px-3 py-2 text-[12px] text-muted-foreground">All assigned</div>
+        <div className="px-3 py-2 text-[12px] text-muted-foreground">{t('All assigned')}</div>
       )}
     </DropdownMenuContent>
   );
@@ -193,24 +195,24 @@ function LoadHint({
  *  joins it only when it reaches past the absence. */
 function hintLabel(reading: AssignmentReading): string | null {
   const { awayDays, overDays } = reading;
-  if (awayDays > 0 && overDays > awayDays) return `Away ${awayDays}d · over ${overDays}d`;
-  if (awayDays > 0) return `Away ${awayDays}d`;
-  if (overDays > 0) return `Over ${overDays}d`;
+  if (awayDays > 0 && overDays > awayDays) return translate('Away {away}d · over {over}d', { away: awayDays, over: overDays });
+  if (awayDays > 0) return translate('Away {n}d', { n: awayDays });
+  if (overDays > 0) return translate('Over {n}d', { n: overDays });
   return null;
 }
 
 function hintDetail(reading: AssignmentReading, name?: string | null): string {
-  const who = name ?? 'This Worker';
-  const parts = [`${who} · ${rangeLabel(reading.span)} · adds ${hours(reading.perDay)}h a day`];
-  for (const run of reading.awayRuns) parts.push(`no hours ${rangeLabel(run)}`);
+  const who = name ?? translate('This Worker');
+  const parts = [translate('{who} · {range} · adds {h}h a day', { who, range: rangeLabel(reading.span), h: hours(reading.perDay) })];
+  for (const run of reading.awayRuns) parts.push(translate('no hours {range}', { range: rangeLabel(run) }));
   if (reading.overDays > 0) {
+    const over = reading.overDays === 1
+      ? translate('over capacity on 1 day')
+      : translate('over capacity on {n} days', { n: reading.overDays });
     const already = reading.overDaysBefore > 0
-      ? `, ${reading.overDaysBefore} of them already over`
-      : '';
-    parts.push(
-      `over capacity on ${reading.overDays} ${dayWord(reading.overDays)}${already}`
-      + ` · worst day ${hours(reading.worstOver)}h past`,
-    );
+      ? translate('{text}, {n} of them already over', { text: over, n: reading.overDaysBefore })
+      : over;
+    parts.push(translate('{text} · worst day {h}h past', { text: already, h: hours(reading.worstOver) }));
   }
   return parts.join(' · ');
 }
@@ -220,10 +222,6 @@ function rangeLabel(span: DaySpan): string {
   if (span.start === span.end) return from;
   const to = formatElementDate(fromDateOnlyString(span.end), 'short') ?? span.end;
   return `${from} – ${to}`;
-}
-
-function dayWord(n: number): string {
-  return n === 1 ? 'day' : 'days';
 }
 
 /** One decimal, and none when the number is whole — `4h` rather than `4.0h`. */

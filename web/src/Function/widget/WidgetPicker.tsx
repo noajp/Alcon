@@ -5,6 +5,7 @@ import { Plus, LayoutGrid } from 'lucide-react';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Button } from '@/ui/button';
 import { MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR } from '@/Function/shared/menu';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { WIDGET_REGISTRY } from './registry';
 import type { SubjectKind, WidgetDefinition, WidgetGroup, Zone } from './types';
 
@@ -47,6 +48,7 @@ export function WidgetPicker({
   onAdd: (zone: Zone, type: string) => void;
   onArrange: () => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -61,11 +63,13 @@ export function WidgetPicker({
       const zone = def.zones.find((z) => availableZones.includes(z));
       if (!zone) continue;
       if (def.singleton && placedTypes.has(def.type)) continue;
-      if (q && !def.label.toLowerCase().includes(q) && !(def.description?.toLowerCase().includes(q) ?? false)) continue;
+      // Found by what it is called on screen, in either language.
+      const names = [def.label, t(def.label), def.description ?? '', def.description ? t(def.description) : ''];
+      if (q && !names.some((name) => name.toLowerCase().includes(q))) continue;
       entries.push({ def, zone });
     }
     return entries;
-  }, [query, subjectKind, availableZones, placedTypes]);
+  }, [query, subjectKind, availableZones, placedTypes, t]);
 
   const grouped = useMemo(() => {
     const map = new Map<WidgetGroup, { def: WidgetDefinition; zone: Zone }[]>();
@@ -88,42 +92,46 @@ export function WidgetPicker({
       <PopoverTrigger asChild>
         <Button disabled={disabled} variant="ghost" size="sm">
           <Plus size={14} />
-          Add widget
+          {t('Add widget')}
         </Button>
       </PopoverTrigger>
-      <MenuShell align="end" width="standard">
+      <MenuShell align="end" width="wide">
         {/* Verb-phrase placeholder, no ring, no border — DESIGN.md §5.3/§5.9. */}
         <input
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Find a widget…"
+          placeholder={t('Find a widget…')}
           className="w-full px-2 py-1 text-[13px] bg-muted/40 rounded-md border-none placeholder:text-muted-foreground/60"
         />
         <div className={MENU_SEPARATOR} />
 
         {grouped.length === 0 && (
           <div className="px-2 py-1.5 text-[12px] text-muted-foreground italic">
-            Nothing else fits here.
+            {t('Nothing else fits here.')}
           </div>
         )}
 
         {grouped.map(([group, entries]) => (
           <div key={group}>
-            <MenuSectionLabel>{GROUP_LABEL[group]}</MenuSectionLabel>
+            <MenuSectionLabel>{t(GROUP_LABEL[group])}</MenuSectionLabel>
             {entries.map(({ def, zone }) => (
+              // One line per widget: its name, then what it shows, cut to the
+              // row — the whole sentence is the row's tooltip. A menu whose
+              // rows wrap to three lines reads as a page, not a list.
               <button
                 key={def.type}
                 type="button"
-                className={`${MENU_ROW} flex-col items-start gap-0.5`}
+                title={def.description ? t(def.description) : undefined}
+                className={MENU_ROW}
                 onClick={() => {
                   onAdd(zone, def.type);
                   setOpen(false);
                 }}
               >
-                <span className="text-[13px] text-foreground">{def.label}</span>
+                <span className="shrink-0 text-foreground">{t(def.label)}</span>
                 {def.description && (
-                  <span className="text-[11px] text-muted-foreground">{def.description}</span>
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">{t(def.description)}</span>
                 )}
               </button>
             ))}
@@ -145,8 +153,8 @@ export function WidgetPicker({
               }}
             >
               <LayoutGrid size={14} className="text-muted-foreground" />
-              <span className="flex-1">Arrange widgets</span>
-              <span className="text-[11px] text-muted-foreground">Hold</span>
+              <span className="flex-1">{t('Arrange widgets')}</span>
+              <span className="text-[11px] text-muted-foreground">{t('Hold')}</span>
             </button>
           </>
         )}

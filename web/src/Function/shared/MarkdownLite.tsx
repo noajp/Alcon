@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useMemo } from 'react';
+import { cn } from '@/lib/utils';
 import { parseMarkdown, type Block, type Inline } from './markdownParse';
 
 // Renders agent-written Markdown (reports, deliverables) as React elements.
@@ -55,7 +56,7 @@ function BlockNode({ b }: { b: Block }) {
 export function MarkdownLite({ text, className }: { text: string; className?: string }) {
   const blocks = useMemo(() => parseMarkdown(text), [text]);
   return (
-    <div className={`space-y-2 text-[13px] leading-relaxed text-foreground ${className ?? ''}`}>
+    <div className={cn('space-y-2 text-[13px] leading-relaxed text-foreground', className)}>
       {blocks.map((b, i) => <BlockNode key={i} b={b} />)}
     </div>
   );

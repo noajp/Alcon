@@ -160,13 +160,13 @@ export function InviteUserDialog({
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
               placeholder={t('Search by display name…')}
-              className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
+              className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:bg-muted/40 transition-colors"
             />
           </div>
           {error && <p className="mt-2 text-[12px] text-[var(--status-danger)]">{error}</p>}
         </div>
 
-        <div className="max-h-[320px] overflow-y-auto divide-y divide-border/40 mt-3">
+        <div className="max-h-[320px] overflow-y-auto mt-3">
           {loading ? (
             <div className="px-5 py-8 text-center text-xs text-muted-foreground">{t('Searching…')}</div>
           ) : results.length === 0 ? (

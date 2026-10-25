@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { BuiltInColumn } from './builtInColumns';
 import { isCancelKey, isCommitEnter, useEscapeLayer } from '@/Function/shared/keyboard';
 import { statusColor, statusLabel } from '@/shared/designTokens';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface EditBuiltInPropertyModalProps {
   column: BuiltInColumn;
@@ -16,6 +17,7 @@ export function EditBuiltInPropertyModal({
   onClose,
   onUpdate,
 }: EditBuiltInPropertyModalProps) {
+  const { t } = useI18n();
   const [name, setName] = useState(column.name);
   const [options, setOptions] = useState<{ value: string; color?: string }[]>(column.options || []);
   const [editingOptionIndex, setEditingOptionIndex] = useState<number | null>(null);
@@ -87,7 +89,7 @@ export function EditBuiltInPropertyModal({
                 <polyline points="15 18 9 12 15 6"/>
               </svg>
             </button>
-            <span className="text-sm font-medium">Edit property</span>
+            <span className="text-sm font-medium">{t('Edit Property')}</span>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-card rounded">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -118,9 +120,9 @@ export function EditBuiltInPropertyModal({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
               </svg>
-              Type
+              {t('Type')}
             </div>
-            <span className="text-sm text-muted-foreground">{getTypeLabel()}</span>
+            <span className="text-sm text-muted-foreground">{t(getTypeLabel())}</span>
           </div>
         </div>
 
@@ -132,7 +134,7 @@ export function EditBuiltInPropertyModal({
               <>
                 <div className="border-b border-border">
                   <div className="flex items-center justify-between px-3 py-2 bg-muted">
-                    <span className="text-xs text-muted-foreground">To-do</span>
+                    <span className="text-xs text-muted-foreground">{t('To-do')}</span>
                   </div>
                   {options.filter(o => o.value === 'todo').map((option, idx) => {
                     const realIndex = options.findIndex(o => o.value === option.value);
@@ -153,33 +155,33 @@ export function EditBuiltInPropertyModal({
                           />
                         ) : (
                           <span className="flex-1 text-sm cursor-pointer" onClick={() => setEditingOptionIndex(realIndex)}>
-                            {statusLabel(option.value)}
+                            {t(statusLabel(option.value))}
                           </span>
                         )}
-                        <span className="text-[10px] text-muted-foreground">DEFAULT</span>
+                        <span className="text-[10px] text-muted-foreground">{t('DEFAULT')}</span>
                       </div>
                     );
                   })}
                 </div>
                 <div className="border-b border-border">
                   <div className="flex items-center justify-between px-3 py-2 bg-muted">
-                    <span className="text-xs text-muted-foreground">In progress</span>
+                    <span className="text-xs text-muted-foreground">{t('In progress')}</span>
                   </div>
                   {options.filter(o => ['in_progress', 'review'].includes(o.value)).map((option, idx) => (
                     <div key={idx} className="flex items-center gap-2 px-3 py-1.5 hover:bg-card group">
                       <span className="w-2 h-2 rounded-full" style={{ backgroundColor: statusColor(option.value) }} />
-                      <span className="flex-1 text-sm">{statusLabel(option.value)}</span>
+                      <span className="flex-1 text-sm">{t(statusLabel(option.value))}</span>
                     </div>
                   ))}
                 </div>
                 <div>
                   <div className="flex items-center justify-between px-3 py-2 bg-muted">
-                    <span className="text-xs text-muted-foreground">Complete</span>
+                    <span className="text-xs text-muted-foreground">{t('Complete')}</span>
                   </div>
                   {options.filter(o => ['done', 'blocked'].includes(o.value)).map((option, idx) => (
                     <div key={idx} className="flex items-center gap-2 px-3 py-1.5 hover:bg-card group">
                       <span className="w-2 h-2 rounded-full" style={{ backgroundColor: statusColor(option.value) }} />
-                      <span className="flex-1 text-sm">{statusLabel(option.value)}</span>
+                      <span className="flex-1 text-sm">{t(statusLabel(option.value))}</span>
                     </div>
                   ))}
                 </div>
@@ -187,14 +189,14 @@ export function EditBuiltInPropertyModal({
             ) : (
               // Priority options
               <div className="p-2">
-                <div className="text-xs text-muted-foreground px-2 py-1 mb-1">Options</div>
+                <div className="text-xs text-muted-foreground px-2 py-1 mb-1">{t('Options')}</div>
                 {options.map((option, idx) => (
                   <div key={idx} className="flex items-center gap-2 px-2 py-1.5 hover:bg-card rounded group">
                     <span
                       className="px-2 py-0.5 rounded text-xs"
                       style={{ backgroundColor: option.color || 'var(--surface-raised)' }}
                     >
-                      {getPriorityLabel(option.value)}
+                      {t(getPriorityLabel(option.value))}
                     </span>
                   </div>
                 ))}
@@ -207,8 +209,8 @@ export function EditBuiltInPropertyModal({
         {(column.builtinType === 'assignees' || column.builtinType === 'due_date') && (
           <div className="p-4 text-sm text-muted-foreground">
             {column.builtinType === 'assignees'
-              ? 'Assign team members to elements. Click on the cell to add or remove assignees.'
-              : 'Set due dates for elements. Click on the cell to pick a date.'}
+              ? t('Assign team members to Elements. Click the cell to add or remove assignees.')
+              : t('Set due dates for Elements. Click the cell to pick a date.')}
           </div>
         )}
       </div>

@@ -49,7 +49,7 @@ export async function sendToKata(text: string, attachment?: { name: string; body
     const ask = last.length <= 60 && !/^[#|\-*]/.test(last) && lines.length > 3 ? last : "";
     pastedAsk = ask;
     const firstLine = lines.find((l) => l.trim())?.replace(/^#+\s*/, "").slice(0, 28) ?? tx("貼り付けた文書", "Pasted document");
-    st.pushMessage({ from: "me", text: ask, attachment: tx(`${firstLine}（${text.length.toLocaleString()}字）`, `${firstLine} (${text.length.toLocaleString()} chars)`) });
+    st.pushMessage({ from: "me", text: ask, attachment: tx("{title}（{n}字）", "{title} ({n} chars)", { title: firstLine, n: text.length.toLocaleString() }) });
   } else {
     st.pushMessage({ from: "me", text, attachment: attachment?.name });
   }

@@ -13,7 +13,7 @@ export function PendingInviteRows({
   invitees,
   canCancel,
   onChanged,
-  className = 'flex items-center gap-3 px-4 py-2.5',
+  className = '-mx-2 flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40',
 }: {
   invitees: PendingInvitee[];
   /** The people who manage the scope may cancel any invitation; the
@@ -66,7 +66,7 @@ export function PendingInviteRows({
           )}
         </div>
       ))}
-      {error && <div className="px-4 pb-2 text-[11px] text-[var(--status-danger)]">{error}</div>}
+      {error && <div className="pb-2 text-[11px] text-[var(--status-danger)]">{error}</div>}
     </>
   );
 }

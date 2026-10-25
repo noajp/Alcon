@@ -25,15 +25,15 @@ interface Props {
 
 type ProfileTab = 'now' | 'elements' | 'notes' | 'ai';
 
-// The Profile page is the person's own home: a header (cover, avatar, name,
-// id, bio, Edit profile) and, under a rule, the personal surfaces as tabs.
+// The Profile page is the person's own home: a header (avatar, name, id,
+// bio, Edit profile) and, under a rule, the personal surfaces as tabs.
 // It has no sidebar — the tabs are its navigation.
 export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDomainId }: Props) {
   const { t } = useI18n();
   const { user, profile } = useAuthContext();
   const spaceId = useActiveSpaceId();
   const [tab, setTab] = useState<ProfileTab>('elements');
-  const name = profile?.display_name || user?.email?.split('@')[0] || 'You';
+  const name = profile?.display_name || user?.email?.split('@')[0] || t('You');
   // The person's Worker id (wrk_015) is the handle other surfaces show.
   const selfWorker = useSelfWorker(user?.id);
   const handle = selfWorker?.display_id ?? user?.email?.split('@')[0] ?? null;
@@ -57,25 +57,23 @@ export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDo
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-card">
-      <header className="shrink-0">
-        <div className="h-28 bg-[var(--surface-strong)]" aria-hidden="true" />
-        <div className="px-6">
-          <div className="flex items-end justify-between">
-            <div className="-mt-10 rounded-full bg-card p-1">
-              <WorkerAvatar worker={{ name, avatar_url: profile?.avatar_url }} size={80} className="ring-0" />
-            </div>
-            <Button variant="secondary" onClick={onOpenSettings} className="mb-1"><Pencil size={14} />{t('Edit profile')}</Button>
+      {/* One line of identity — avatar, name, handle — and the way to
+          change it; no cover band. The tabs sit under it on the same rule as
+          every other page's views. */}
+      <header className="shrink-0 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-3 px-6 pt-6">
+          <WorkerAvatar worker={{ name, avatar_url: profile?.avatar_url }} size={40} className="ring-0" />
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-[17px] font-semibold leading-6 text-foreground">{name}</h1>
+            {handle && <p className="truncate text-[12px] text-muted-foreground">@{handle}</p>}
           </div>
-          <div className="mt-2 min-w-0">
-            <h1 className="truncate text-xl font-semibold text-foreground">{name}</h1>
-            {handle && <p className="truncate text-[13px] text-muted-foreground">@{handle}</p>}
-          </div>
-          {profile?.bio && <p className="mt-3 max-w-2xl whitespace-pre-wrap text-[14px] leading-6 text-foreground/90">{profile.bio}</p>}
+          <Button variant="ghost" size="sm" onClick={onOpenSettings}><Pencil size={14} />{t('Edit profile')}</Button>
         </div>
-        <nav className="mt-4 flex gap-1 border-b border-border px-6" aria-label={t('Profile sections')}>
+        {profile?.bio && <p className="mt-3 max-w-2xl whitespace-pre-wrap px-6 text-[14px] leading-6 text-foreground/90">{profile.bio}</p>}
+        <nav className="mt-4 flex gap-1 px-6 pb-2" aria-label={t('Profile sections')}>
           {tabs.map(({ id, label, icon: Icon }) => (
-            <Button key={id} shape="tab" variant={tab === id ? 'secondary' : 'ghost'} aria-pressed={tab === id} onClick={() => setTab(id)} className="mb-1.5">
-              <Icon size={16} />{t(label)}
+            <Button key={id} shape="tab" size="sm" variant={tab === id ? 'secondary' : 'ghost'} aria-pressed={tab === id} onClick={() => setTab(id)}>
+              <Icon size={14} />{t(label)}
             </Button>
           ))}
         </nav>

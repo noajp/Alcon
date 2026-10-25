@@ -8,7 +8,9 @@ import { newId } from "@/ActivitySpace/sustainment/slides/kata/model/id";
 import type { ChatMessage, Deck, Folder, KataFile, LayoutId, Look, LookTokens, MixElement, MixState, StorylineId } from "@/ActivitySpace/sustainment/slides/kata/model/types";
 import * as D from "@/ActivitySpace/sustainment/slides/kata/model/deck";
 import { DEFAULT_SKILL, type Skill } from "@/ActivitySpace/sustainment/slides/kata/model/skill";
-import { detectLang, langFromPersisted, setLang, tx, type Lang } from "@/ActivitySpace/sustainment/slides/kata/i18n";
+import { setUiLocale, tx, type Lang } from "@/ActivitySpace/sustainment/slides/kata/i18n";
+import type { Locale } from "@/Function/i18n/locales";
+import { MESSAGES } from "@/Function/i18n/messages";
 import { toggleLook } from "@/ActivitySpace/sustainment/slides/kata/theme/mix";
 
 export type Panel = "chat" | "design" | "logic";
@@ -23,8 +25,11 @@ interface KataState {
   logicTab: LogicTab;
   busy: boolean;
   theme: "light" | "dark";
+  /** The language decks, AI replies and exports are made in — from the app's. */
   lang: Lang;
-  setLangPref: (l: Lang) => void;
+  /** The app's language, which the editor's screen follows. */
+  locale: Locale;
+  setLocale: (locale: Locale) => void;
   toast: { id: number; text: string } | null;
   notify: (text: string) => void;
   /** 中央の左にあるページ一覧 */
@@ -109,7 +114,9 @@ interface KataState {
 
 /** 既定のファイル名（今の言語）。どちらの言語の既定名も「まだ名付けていない」とみなす */
 const defaultFileName = () => tx("無題の資料", "Untitled deck");
-const isDefaultFileName = (n: string) => n === "無題の資料" || n === "Untitled deck";
+// A deck still wearing the name it was made with, in whichever language that was.
+const DEFAULT_FILE_NAMES = new Set(["無題の資料", "Untitled deck", ...(["ko", "fr", "es"] as const).map((l) => MESSAGES[l]["Untitled deck"]).filter(Boolean)]);
+const isDefaultFileName = (n: string) => DEFAULT_FILE_NAMES.has(n);
 
 // 保存先がいっぱいでも画面は止めない。保存できなかったことだけを一度知らせる
 let warned = false;
@@ -143,9 +150,6 @@ const safeStorage: Storage = {
     }
   },
 };
-// 初めての人はブラウザの言語に合わせる。見本の資料もその言語で用意する
-// （tx への反映は、読み込み時の merge と AppShell が行う。ここでは書き換えない）
-const initialLang: Lang = detectLang(typeof navigator === "undefined" ? undefined : navigator.language);
 
 const touch = (f: KataFile, patch: Partial<KataFile>): KataFile => ({ ...f, ...patch, updatedAt: Date.now() });
 
@@ -204,10 +208,11 @@ export const useKata = create<KataState>()(
         logicTab: "deck",
         busy: false,
         theme: "light",
-        lang: initialLang,
-        setLangPref: (l) => {
-          setLang(l);
-          set({ lang: l });
+        lang: "ja",
+        locale: "ja",
+        setLocale: (locale) => {
+          setUiLocale(locale);
+          set({ locale, lang: locale === "ja" ? "ja" : "en" });
         },
         toast: null,
         notify: (text) => {
@@ -334,7 +339,7 @@ export const useKata = create<KataState>()(
           // ページの id を付け直し、サマリー・目次が指す先も付け直す
           const map = new Map(src.deck.slides.map((s) => [s.id, newId("s")]));
           const slides = D.remapRefs(src.deck.slides.map((s) => ({ ...s, id: map.get(s.id)! })), map);
-          const copy: KataFile = { ...src, id: newId("d"), name: tx(`${src.name} のコピー`, `${src.name} (copy)`), chat: [], updatedAt: Date.now(), deck: { ...src.deck, slides } };
+          const copy: KataFile = { ...src, id: newId("d"), name: tx("{name} のコピー", "{name} (copy)", { name: src.name }), chat: [], updatedAt: Date.now(), deck: { ...src.deck, slides } };
           set((s) => {
             const at = s.files.findIndex((f) => f.id === id);
             const files = s.files.slice();
@@ -417,16 +422,15 @@ export const useKata = create<KataState>()(
     {
       name: "alcon-slides-prefs-v1",
       storage: createJSONStorage(() => safeStorage),
-      // 読み込んだ言語を、子の描画や ?try= の見本選びより先に tx へ反映する
+      // The language is the app's, never a saved preference: an old save's
+      // `lang` is dropped so it cannot override the app.
       merge: (persisted, current) => {
-        const p = persisted as Partial<KataState> | undefined;
-        const lang = langFromPersisted(p, current.lang);
-        // 保存があるときだけ反映する（初めての人は AppShell が描く前にそろえる）
-        if (p) setLang(lang);
-        return { ...current, ...p, lang };
+        const p = { ...(persisted as Partial<KataState> | undefined) };
+        delete p.lang;
+        return { ...current, ...p };
       },
       // Only this person's preferences stay in the browser; the decks are the Space's.
-      partialize: (s) => ({ lang: s.lang, filmstrip: s.filmstrip, customLooks: s.customLooks, skills: s.skills, panel: s.panel, logicTab: s.logicTab }),
+      partialize: (s) => ({ filmstrip: s.filmstrip, customLooks: s.customLooks, skills: s.skills, panel: s.panel, logicTab: s.logicTab }),
     },
   ),
 );

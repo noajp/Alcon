@@ -64,9 +64,9 @@ export function reviewSlide(s: Slide, maxTitle = 60): Finding[] {
   if (/(です|ます|でしょう|ください)[。]?$/.test(t)) out.push({ slideId: s.id, kind: "語尾", text: tx("タイトルが「です・ます」で終わっている。言い切りの形にする。", "The title ends in polite form. Make it a firm statement.") });
   if (en) {
     const words = wordsOf(t).length;
-    if (words > 16 && s.layout !== "agenda") out.push({ slideId: s.id, kind: "長さ", text: tx(`タイトルが ${words} 語。16 語以内に削り、1つのことだけを言う。`, `The title is ${words} words. Cut it to 16 or fewer and say one thing.`) });
+    if (words > 16 && s.layout !== "agenda") out.push({ slideId: s.id, kind: "長さ", text: tx("タイトルが {n} 語。16 語以内に削り、1つのことだけを言う。", "The title is {n} words. Cut it to 16 or fewer and say one thing.", { n: words }) });
   } else if (t.length > maxTitle) {
-    out.push({ slideId: s.id, kind: "長さ", text: tx(`タイトルが ${t.length} 字。${maxTitle} 字以内に削り、1つのことだけを言う。`, `The title is ${t.length} characters. Cut it to ${maxTitle} or fewer and say one thing.`) });
+    out.push({ slideId: s.id, kind: "長さ", text: tx("タイトルが {n} 字。{max} 字以内に削り、1つのことだけを言う。", "The title is {n} characters. Cut it to {max} or fewer and say one thing.", { n: t.length, max: maxTitle }) });
   }
   const headingLeft = !!t && (s.source === `元：${t}` || s.source === `Source: ${t}`);
   // 目次・中扉のタイトルは章の名前なので、言い切りの決まりは当てない
@@ -88,12 +88,12 @@ export function reviewSlide(s: Slide, maxTitle = 60): Finding[] {
   const atoms = atomsOf(s);
   const empty = atoms.filter((a) => !a.head.trim() && !a.body.trim()).length;
   if (s.layout !== "cover" && atoms.length && empty === atoms.length) out.push({ slideId: s.id, kind: "空欄", text: tx("中身がまだ空。根拠か事実を入れる。", "The body is still empty. Add evidence or facts.") });
-  else if (empty > 0 && s.layout !== "cover") out.push({ slideId: s.id, kind: "空欄", text: tx(`空いている欄が ${empty} か所ある。埋めるか、欄を減らす。`, `${empty} field${empty === 1 ? " is" : "s are"} empty. Fill ${empty === 1 ? "it" : "them"} or remove ${empty === 1 ? "it" : "them"}.`) });
+  else if (empty > 0 && s.layout !== "cover") out.push({ slideId: s.id, kind: "空欄", text: (empty === 1 ? tx("空いている欄が {n} か所ある。埋めるか、欄を減らす。", "{n} field is empty. Fill it or remove it.", { n: empty }) : tx("空いている欄が {n} か所ある。埋めるか、欄を減らす。", "{n} fields are empty. Fill them or remove them.", { n: empty })) });
   const n = countClaim(t);
   if (n !== null) {
     const items = s.layout === "premise" ? (s.content.premise?.premises ?? []).map((p) => ({ head: "", body: p })) : atoms;
     const have = items.filter((a) => a.head.trim() || a.body.trim()).length;
-    if (have && have !== n) out.push({ slideId: s.id, kind: "数", text: tx(`タイトルは「${n}」と言っているが、中身は ${have} つ。数をそろえる。`, `The title says ${n}, but the body has ${have}. Make the counts match.`) });
+    if (have && have !== n) out.push({ slideId: s.id, kind: "数", text: tx("タイトルは「{n}」と言っているが、中身は {have} つ。数をそろえる。", "The title says {n}, but the body has {have}. Make the counts match.", { n, have }) });
   }
   return out;
 }
@@ -117,16 +117,15 @@ export function reviewChartsAndVolume(deck: Deck): Finding[] {
     // 英語は語、日本語は字で数える。同じ議事録の日英の見本で、1語 ≒ 2.4字だったので上限もその比にそろえる
     const limit = ascii ? (read ? 200 : 100) : read ? 480 : 240;
     // 単位は表示言語ではなく、数えたもの（語か字か）で書く
-    const ja = `${size}${ascii ? "語" : "字"}`;
-    const en = `${size} ${ascii ? "words" : "characters"}`;
-    const lim = tx(`${limit}${ascii ? "語" : "字"}`, `${limit} ${ascii ? "words" : "characters"}`);
+    const amount = ascii ? tx("{n}語", "{n} words", { n: size }) : tx("{n}字", "{n} characters", { n: size });
+    const lim = ascii ? tx("{n}語", "{n} words", { n: limit }) : tx("{n}字", "{n} characters", { n: limit });
     if (size > limit) {
       out.push({
         slideId: s.id,
         kind: "量",
         text: read
-          ? tx(`文字が多い（${ja}）。読む資料でも${lim}までに削るか、2枚に分ける。`, `Too much text (${en}). Even for a read-ahead deck, cut to ${lim} or split the page.`)
-          : tx(`話す資料にしては文字が多い（${ja}）。${lim}までに削るか、読む資料に切り替える。`, `Too much text for a presented deck (${en}). Cut to ${lim} or switch to a read-ahead deck.`),
+          ? tx("文字が多い（{size}）。読む資料でも{lim}までに削るか、2枚に分ける。", "Too much text ({size}). Even for a read-ahead deck, cut to {lim} or split the page.", { size: amount, lim })
+          : tx("話す資料にしては文字が多い（{size}）。{lim}までに削るか、読む資料に切り替える。", "Too much text for a presented deck ({size}). Cut to {lim} or switch to a read-ahead deck.", { size: amount, lim }),
       });
     }
   }
@@ -140,7 +139,7 @@ export function reviewDeck(deck: Deck, maxTitle = 60): Finding[] {
     const used = group.filter((w) => all.includes(w));
     if (used.length > 1) {
       const where = deck.slides.find((s) => textOf(s).includes(used[1]));
-      out.push({ slideId: where?.id, kind: "用語", text: tx(`「${used.join("」と「")}」が混ざっている。1資料1用語にそろえる。`, `"${used.join('" and "')}" are mixed. Use one term per deck.`) });
+      out.push({ slideId: where?.id, kind: "用語", text: tx("「{terms}」が混ざっている。1資料1用語にそろえる。", "\"{terms}\" are mixed. Use one term per deck.", { terms: used.join(tx("」と「", '" and "')) }) });
     }
   }
   const seen = new Map<string, string>();

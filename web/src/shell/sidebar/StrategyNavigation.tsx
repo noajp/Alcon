@@ -43,7 +43,7 @@ export function StrategyNavigation({ visions, activeVisionId, activeView, onSele
         <SidebarRow active={rootActive} icon={VisionIcon && <VisionIcon size={16} />} label={vision.name} title={vision.name}
           onClick={() => onSelect(vision.id, 'vision')}
           actions={<>
-            <SidebarRowAction label={`${t(expanded ? 'Collapse' : 'Expand')} ${vision.name}`} aria-expanded={expanded}
+            <SidebarRowAction label={t(expanded ? 'Collapse {name}' : 'Expand {name}', { name: vision.name })} aria-expanded={expanded}
               onClick={() => setFolded((prev) => { const n = new Set(prev); if (n.has(vision.id)) n.delete(vision.id); else n.add(vision.id); return n; })}>
               {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             </SidebarRowAction>

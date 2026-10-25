@@ -93,7 +93,7 @@ describe('InitiativeSituation', () => {
     ];
     await draw([object('o1', els)], ['o1']);
 
-    expect(screen.getByText(/スコープに 12 件届かない/)).toBeTruthy();
+    expect(screen.getByText(/12 short of scope/)).toBeTruthy();
   });
 
   it('counts a multi-homed Element once across the Initiative\'s Objects', async () => {
@@ -123,8 +123,8 @@ describe('InitiativeSituation', () => {
     ];
     await draw([object('o1', els)], ['o1']);
 
-    expect(screen.getByText(/経過 1 営業日ではペースを測れない/)).toBeTruthy();
-    expect(screen.queryByText(/期限前にスコープを完了/)).toBeNull();
+    expect(screen.getByText(/1 business days elapsed is too few to measure a pace/)).toBeTruthy();
+    expect(screen.queryByText(/scope completes before the end date/)).toBeNull();
   });
 
   it('reports a rate of zero as a shortfall, not as missing data', async () => {
@@ -138,7 +138,7 @@ describe('InitiativeSituation', () => {
     );
 
     expect(screen.queryByText(/まだ営業日が経っていない/)).toBeNull();
-    expect(screen.getByText(/スコープに 3 件届かない/)).toBeTruthy();
+    expect(screen.getByText(/3 short of scope/)).toBeTruthy();
   });
 
   it('says so when unfinished work sits outside every Phase', async () => {
@@ -150,7 +150,7 @@ describe('InitiativeSituation', () => {
       ['o1'],
     );
 
-    expect(screen.getByText(/Phase の外に未完了 2 件/)).toBeTruthy();
+    expect(screen.getByText(/2 open outside any Phase/)).toBeTruthy();
   });
 
   it('reports the shortfall plainly once the end date has passed', async () => {
@@ -160,6 +160,6 @@ describe('InitiativeSituation', () => {
       ['o1'],
     );
 
-    expect(screen.getByText(/期限を過ぎて残り 2 件/)).toBeTruthy();
+    expect(screen.getByText(/Past the end date with 2 left/)).toBeTruthy();
   });
 });

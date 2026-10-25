@@ -25,6 +25,7 @@ interface TeamViewProps {
 type SaveCapacity = (workerId: string, hours: number | null) => Promise<Worker>;
 
 function CapacityField({ worker, canManage, onSave }: { worker: Worker; canManage: boolean; onSave: SaveCapacity }) {
+  const { t } = useI18n();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState(false);
@@ -43,7 +44,7 @@ function CapacityField({ worker, canManage, onSave }: { worker: Worker; canManag
     let hours: number | null;
     try { hours = parseCapacityDraft(draft); }
     catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Enter a valid capacity.');
+      setError(cause instanceof Error ? t(cause.message) : t('Enter a valid capacity.'));
       return;
     }
     if (hours === worker.capacity_hours_per_day) { setEditing(false); return; }
@@ -54,7 +55,7 @@ function CapacityField({ worker, canManage, onSave }: { worker: Worker; canManag
       await onSave(worker.id, hours);
       if (mounted.current) setEditing(false);
     } catch (cause) {
-      if (mounted.current) setError(cause instanceof Error ? cause.message : 'Could not save capacity. Try again.');
+      if (mounted.current) setError(cause instanceof Error ? t(cause.message) : t('Could not save capacity. Try again.'));
     } finally {
       saving.current = false;
       if (mounted.current) setPending(false);
@@ -62,19 +63,21 @@ function CapacityField({ worker, canManage, onSave }: { worker: Worker; canManag
   };
 
   if (!editing) {
-    const label = `${standingCapacity(worker)} h/day${worker.capacity_hours_per_day === null ? ' · default' : ''}`;
+    const label = worker.capacity_hours_per_day === null
+      ? t('{h} h/day · default', { h: standingCapacity(worker) })
+      : t('{h} h/day', { h: standingCapacity(worker) });
     return canManage ? (
-      <Button variant="ghost" size="sm" aria-label={`Edit capacity for ${worker.name}: ${label}`} onClick={() => {
+      <Button variant="ghost" size="sm" aria-label={t('Edit capacity for {name}: {label}', { name: worker.name, label })} onClick={() => {
         setDraft(worker.capacity_hours_per_day === null ? '' : String(worker.capacity_hours_per_day));
         setError(null);
         setEditing(true);
       }}>{label}</Button>
-    ) : <span className={`${FONT.sm} px-2 text-muted-foreground tabular-nums`} title="Standing capacity">{label}</span>;
+    ) : <span className={`${FONT.sm} px-2 text-muted-foreground tabular-nums`} title={t('Standing capacity')}>{label}</span>;
   }
 
   return (
     <form className="flex flex-col gap-2 w-full sm:w-72" aria-busy={pending} onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <label htmlFor={inputId} className={`${FONT.sm} text-muted-foreground`}>Standing hours per day</label>
+      <label htmlFor={inputId} className={`${FONT.sm} text-muted-foreground`}>{t('Standing hours per day')}</label>
       <div className="flex items-center gap-2">
         <input
           id={inputId} type="text" inputMode="decimal" autoFocus disabled={pending}
@@ -83,10 +86,10 @@ function CapacityField({ worker, canManage, onSave }: { worker: Worker; canManag
           placeholder={String(standingCapacity({ ...worker, capacity_hours_per_day: null }))}
           aria-invalid={Boolean(error)} aria-describedby={`${inputId}-hint${error ? ` ${inputId}-error` : ''}`}
         />
-        <Button type="submit" size="sm" disabled={pending}>{pending ? <><LoaderCircle size={12} className="animate-spin" />Saving…</> : 'Save'}</Button>
-        <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => setEditing(false)}>Cancel</Button>
+        <Button type="submit" size="sm" disabled={pending}>{pending ? <><LoaderCircle size={12} className="animate-spin" />{t('Saving…')}</> : t('Save')}</Button>
+        <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => setEditing(false)}>{t('Cancel')}</Button>
       </div>
-      <span id={`${inputId}-hint`} className={`${FONT.xs} text-muted-foreground`}>0–24 hours. Leave blank for the default.</span>
+      <span id={`${inputId}-hint`} className={`${FONT.xs} text-muted-foreground`}>{t('0–24 hours. Leave blank for the default.')}</span>
       {error && <p id={`${inputId}-error`} role="alert" className={`${FONT.sm} text-[var(--status-danger)]`}>{error}</p>}
     </form>
   );

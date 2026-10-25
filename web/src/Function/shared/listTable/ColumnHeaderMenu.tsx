@@ -11,6 +11,8 @@ import { MenuShell } from '@/Function/shared/menu';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { type ColumnId, type ColumnSort, type DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
 import { HEADER_DRAG_PREFIX } from './shared';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { fieldDisplayLabel } from '@/Function/property/fieldModel';
 
 // Header cell for a single data column. The entire `<th>` is the drag
 // surface for reorder (no grab cursor — dnd-kit's distance constraint
@@ -36,6 +38,9 @@ export function ColumnHeader({
   onMoveLeft?: () => void;
   onMoveRight?: () => void;
 }) {
+  const { t } = useI18n();
+  // Built-in column names are English keys; a Property's name is the user's own.
+  const label = fieldDisplayLabel(t, column);
   const dragId = HEADER_DRAG_PREFIX + column.id;
   const {
     setNodeRef, attributes, listeners, transform, transition,
@@ -74,16 +79,16 @@ export function ColumnHeader({
           type="button"
           onClick={(e) => { e.stopPropagation(); onToggleSort(); }}
           title={
-            sort === 'asc' ? `Sort by ${column.label} (asc) — click for desc` :
-            sort === 'desc' ? `Sort by ${column.label} (desc) — click to clear` :
-            `Sort by ${column.label}`
+            sort === 'asc' ? t('Sort by {name} (asc) — click for desc', { name: label }) :
+            sort === 'desc' ? t('Sort by {name} (desc) — click to clear', { name: label }) :
+            t('Sort by {name}', { name: label })
           }
           // px-1.5 mirrors the body trigger's inner padding (CELL_TRIGGER_BASE),
           // so the header text starts at the same x as the cell text below.
           // Without it the label sits 6px left of the body content.
           className="flex-1 min-w-0 flex items-center justify-start gap-1 px-1.5 text-left text-muted-foreground/80 hover:text-foreground transition-colors focus:outline-none"
         >
-          <span className="truncate">{column.label}</span>
+          <span className="truncate">{label}</span>
           <SortIcon
             size={11}
             className={`shrink-0 transition-opacity ${
@@ -101,7 +106,7 @@ export function ColumnHeader({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                aria-label={`${column.label} options`}
+                aria-label={t('{name} options', { name: label })}
                 className="shrink-0 w-5 h-4 inline-flex items-center justify-center rounded text-muted-foreground opacity-0 group-hover/col:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 hover:bg-muted hover:text-foreground transition-[opacity,color,background-color]"
                 onPointerDown={(e) => e.stopPropagation()}
               >
@@ -109,19 +114,17 @@ export function ColumnHeader({
               </button>
             </DropdownMenuTrigger>
             <MenuShell as="dropdown" align="end">
-              {onEdit && <DropdownMenuItem onSelect={onEdit}><Pencil size={12} />Edit field</DropdownMenuItem>}
-              <DropdownMenuItem disabled={!onMoveLeft} onSelect={onMoveLeft}><ArrowLeft size={12} />Move left</DropdownMenuItem>
-              <DropdownMenuItem disabled={!onMoveRight} onSelect={onMoveRight}><ArrowRight size={12} />Move right</DropdownMenuItem>
+              {onEdit && <DropdownMenuItem onSelect={onEdit}><Pencil size={12} />{t('Edit field')}</DropdownMenuItem>}
+              <DropdownMenuItem disabled={!onMoveLeft} onSelect={onMoveLeft}><ArrowLeft size={12} />{t('Move left')}</DropdownMenuItem>
+              <DropdownMenuItem disabled={!onMoveRight} onSelect={onMoveRight}><ArrowRight size={12} />{t('Move right')}</DropdownMenuItem>
               <DropdownMenuItem onSelect={onHide} className="gap-2">
                 <EyeOff size={12} className="text-muted-foreground" />
-                <span>Hide column</span>
+                <span>{t('Hide column')}</span>
               </DropdownMenuItem>
             </MenuShell>
           </DropdownMenu>
         )}
       </div>
-      {/* Short centered vertical divider (30px) on the column's right edge. */}
-      <span aria-hidden className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 h-[30px] w-px bg-border/60" />
       {/* Resize handle — absolute on the right edge, visible on hover.
           PointerDown captures the pointer and updates width on move; the
           stopPropagation keeps dnd-kit's drag from kicking in. */}
@@ -136,12 +139,13 @@ export function ResizeHandle({
   width: number;
   onResize: (w: number) => void;
 }) {
+  const { t } = useI18n();
   const startRef = useRef<{ x: number; w: number; left: number; header: HTMLTableCellElement | null } | null>(null);
   return (
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize column"
+      aria-label={t('Resize column')}
       tabIndex={0}
       aria-valuenow={width}
       aria-valuemin={0}
@@ -200,8 +204,9 @@ export function ColumnMenu({
   isVisible: (id: ColumnId) => boolean;
   onToggle: (id: ColumnId) => void;
 }) {
+  const { t } = useI18n();
   return <Popover>
-    <PopoverTrigger asChild><Button type="button" variant="ghost" size="icon-sm" aria-label="Configure fields" title="Configure fields"><Settings2 size={14} /></Button></PopoverTrigger>
+    <PopoverTrigger asChild><Button type="button" variant="ghost" size="icon-sm" aria-label={t('Configure fields')} title={t('Configure fields')}><Settings2 size={14} /></Button></PopoverTrigger>
     <MenuShell align="end" width="wide">
       <FieldVisibility columns={allColumns} isVisible={isVisible} onToggle={onToggle} />
     </MenuShell>

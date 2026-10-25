@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from './htmlSanitizer';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export interface NoteEditorProps {
   initialHtml?: string;
@@ -73,6 +74,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   elementStatusById,
   toolbarPortalRef,
 }, handleRef) {
+  const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
   const [toolbar, setToolbar] = useState<{ x: number; y: number } | null>(null);
   // Right-click menu for table cells — anchored at the click point. The
@@ -829,10 +831,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     const originalBody = editor?.innerHTML;
     const selection = window.getSelection();
     const range = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
-    const url = await appDialog.prompt('リンク先 URL', 'https://');
+    const url = await appDialog.prompt(t('Link URL'), 'https://');
     if (!url) return;
     if (!/^(https?:\/\/|mailto:)/i.test(url)) {
-      await appDialog.alert('http(s):// または mailto: で始まる URL を入力してください');
+      await appDialog.alert(t('Enter a URL that starts with http(s):// or mailto:.'));
       return;
     }
     if (!editor || ref.current !== editor || editor.innerHTML !== originalBody || !range || !editor.contains(range.commonAncestorContainer)) return;
@@ -840,7 +842,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     editor.focus();
     selection?.removeAllRanges(); selection?.addRange(range);
     exec('createLink', url);
-  }, [exec, restoreSelection]);
+  }, [exec, restoreSelection, t]);
 
   // Block-level toggle: applies `tag` if the current block isn't
   // already that tag, otherwise reverts to <p>. Used by the floating
@@ -880,7 +882,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           onKeyDown={handleKeyDown}
           onContextMenu={handleContextMenu}
           spellCheck={false}
-          data-placeholder="Start writing…"
+          data-placeholder={t('Start writing…')}
           className="note-editor no-focus-ring outline-none min-h-[300px] text-[15px] leading-[1.65] text-foreground"
         />
         {editable && tableHandles && (
@@ -1463,6 +1465,7 @@ function TableInsertHandles({
   onInsertRow: (table: HTMLTableElement, rowIndex: number) => void;
   onResizeStart: (e: React.MouseEvent, table: HTMLTableElement, leftColIndex: number) => void;
 }) {
+  const { t } = useI18n();
   const dot =
     'pointer-events-auto absolute w-[18px] h-[18px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-card border border-border text-muted-foreground shadow-sm flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all z-10';
   return (
@@ -1482,7 +1485,7 @@ function TableInsertHandles({
       {geom.bottomBar && (
         <button
           type="button"
-          title="Add row"
+          title={t('Add row')}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onInsertRow(geom.table, geom.bottomBar!.rowIndex)}
           className="pointer-events-auto absolute h-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
@@ -1502,7 +1505,7 @@ function TableInsertHandles({
         >
           <button
             type="button"
-            title="Add column"
+            title={t('Add column')}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onInsertCol(geom.table, geom.rightBar!.colIndex)}
             className="ml-1 w-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
@@ -1514,7 +1517,7 @@ function TableInsertHandles({
       {geom.col && (
         <button
           type="button"
-          title="Add column"
+          title={t('Add column')}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onInsertCol(geom.table, geom.col!.index)}
           className={dot}
@@ -1526,7 +1529,7 @@ function TableInsertHandles({
       {geom.rowBetween && (
         <button
           type="button"
-          title="Add row"
+          title={t('Add row')}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onInsertRow(geom.table, geom.rowBetween!.rowIndex)}
           className={dot}
@@ -1541,6 +1544,7 @@ function TableInsertHandles({
 
 // A row of buttons in the table context menu.
 function TblMenuItem({ label, onSelect, danger }: { label: string; onSelect: () => void; danger?: boolean }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
@@ -1550,7 +1554,7 @@ function TblMenuItem({ label, onSelect, danger }: { label: string; onSelect: () 
         danger ? 'text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10' : 'text-foreground/80 hover:bg-accent hover:text-foreground',
       ].join(' ')}
     >
-      {label}
+      {t(label)}
     </button>
   );
 }
@@ -1644,21 +1648,21 @@ function FloatingToolbar({
     >
       <TbStyleDropdown onToggleBlock={onToggleBlock} />
       <TbDivider />
-      <TbBtn icon={Bold} title="太字 (⌘B)" onClick={() => onCommand('bold')} />
-      <TbBtn icon={Italic} title="斜体 (⌘I)" onClick={() => onCommand('italic')} />
-      <TbBtn icon={UnderlineIcon} title="下線 (⌘U)" onClick={() => onCommand('underline')} />
-      <TbBtn icon={Strikethrough} title="取り消し線" onClick={() => onCommand('strikeThrough')} />
+      <TbBtn icon={Bold} title="Bold (⌘B)" onClick={() => onCommand('bold')} />
+      <TbBtn icon={Italic} title="Italic (⌘I)" onClick={() => onCommand('italic')} />
+      <TbBtn icon={UnderlineIcon} title="Underline (⌘U)" onClick={() => onCommand('underline')} />
+      <TbBtn icon={Strikethrough} title="Strikethrough" onClick={() => onCommand('strikeThrough')} />
       <TbDivider />
-      <TbBtn icon={AlignLeft} title="左揃え" onClick={() => onCommand('justifyLeft')} />
-      <TbBtn icon={AlignCenter} title="中央揃え" onClick={() => onCommand('justifyCenter')} />
-      <TbBtn icon={AlignRight} title="右揃え" onClick={() => onCommand('justifyRight')} />
+      <TbBtn icon={AlignLeft} title="Align left" onClick={() => onCommand('justifyLeft')} />
+      <TbBtn icon={AlignCenter} title="Align center" onClick={() => onCommand('justifyCenter')} />
+      <TbBtn icon={AlignRight} title="Align right" onClick={() => onCommand('justifyRight')} />
       <TbDivider />
-      <TbBtn icon={List} title="箇条書き" onClick={() => onCommand('insertUnorderedList')} />
-      <TbBtn icon={ListOrdered} title="番号付き" onClick={() => onCommand('insertOrderedList')} />
-      <TbBtn icon={ElementIcon} title="チェックリスト" onClick={onChecklist} />
+      <TbBtn icon={List} title="Bulleted list" onClick={() => onCommand('insertUnorderedList')} />
+      <TbBtn icon={ListOrdered} title="Numbered list" onClick={() => onCommand('insertOrderedList')} />
+      <TbBtn icon={ElementIcon} title="Checklist" onClick={onChecklist} />
       <TbDivider />
-      <TbBtn icon={Quote} title="引用" onClick={() => onToggleBlock('BLOCKQUOTE')} />
-      <TbBtn icon={LinkIcon} title="リンク" onClick={onLink} />
+      <TbBtn icon={Quote} title="Quote" onClick={() => onToggleBlock('BLOCKQUOTE')} />
+      <TbBtn icon={LinkIcon} title="Link" onClick={onLink} />
     </div>
   );
 }
@@ -1682,28 +1686,28 @@ function HeaderToolbar({
 }) {
   return (
     <div
-      className="flex items-center gap-0.5 bg-card border border-border/60 shadow-xs rounded-2xl px-1 py-0.5"
+      className="flex items-center gap-0.5 px-1 py-0.5"
       onMouseDownCapture={onCaptureSelection}
       onMouseDown={(e) => e.preventDefault()}
     >
       <TbStyleDropdown onToggleBlock={onToggleBlock} />
       <TbDivider />
-      <TbBtn icon={Bold} title="太字 (⌘B)" onClick={() => onCommand('bold')} />
-      <TbBtn icon={Italic} title="斜体 (⌘I)" onClick={() => onCommand('italic')} />
-      <TbBtn icon={UnderlineIcon} title="下線 (⌘U)" onClick={() => onCommand('underline')} />
-      <TbBtn icon={Strikethrough} title="取り消し線" onClick={() => onCommand('strikeThrough')} />
+      <TbBtn icon={Bold} title="Bold (⌘B)" onClick={() => onCommand('bold')} />
+      <TbBtn icon={Italic} title="Italic (⌘I)" onClick={() => onCommand('italic')} />
+      <TbBtn icon={UnderlineIcon} title="Underline (⌘U)" onClick={() => onCommand('underline')} />
+      <TbBtn icon={Strikethrough} title="Strikethrough" onClick={() => onCommand('strikeThrough')} />
       <TbDivider />
-      <TbBtn icon={AlignLeft} title="左揃え" onClick={() => onCommand('justifyLeft')} />
-      <TbBtn icon={AlignCenter} title="中央揃え" onClick={() => onCommand('justifyCenter')} />
-      <TbBtn icon={AlignRight} title="右揃え" onClick={() => onCommand('justifyRight')} />
+      <TbBtn icon={AlignLeft} title="Align left" onClick={() => onCommand('justifyLeft')} />
+      <TbBtn icon={AlignCenter} title="Align center" onClick={() => onCommand('justifyCenter')} />
+      <TbBtn icon={AlignRight} title="Align right" onClick={() => onCommand('justifyRight')} />
       <TbDivider />
-      <TbBtn icon={List} title="箇条書き" onClick={() => onCommand('insertUnorderedList')} />
-      <TbBtn icon={ListOrdered} title="番号付き" onClick={() => onCommand('insertOrderedList')} />
-      <TbBtn icon={ElementIcon} title="チェックリスト" onClick={onChecklist} />
+      <TbBtn icon={List} title="Bulleted list" onClick={() => onCommand('insertUnorderedList')} />
+      <TbBtn icon={ListOrdered} title="Numbered list" onClick={() => onCommand('insertOrderedList')} />
+      <TbBtn icon={ElementIcon} title="Checklist" onClick={onChecklist} />
       <TbDivider />
-      <TbBtn icon={Quote} title="引用" onClick={() => onToggleBlock('BLOCKQUOTE')} />
-      <TbBtn icon={TableIcon} title="表" onClick={onInsertTable} />
-      <TbBtn icon={LinkIcon} title="リンク" onClick={onLink} />
+      <TbBtn icon={Quote} title="Quote" onClick={() => onToggleBlock('BLOCKQUOTE')} />
+      <TbBtn icon={TableIcon} title="Insert table" onClick={onInsertTable} />
+      <TbBtn icon={LinkIcon} title="Link" onClick={onLink} />
     </div>
   );
 }
@@ -1717,10 +1721,12 @@ function TbBtn({
   title: string;
   onClick: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
-      title={title}
+      title={t(title)}
+      aria-label={t(title)}
       onClick={onClick}
       className="inline-flex items-center justify-center h-7 w-7 rounded hover:bg-accent text-foreground/80 hover:text-foreground"
     >
@@ -1749,6 +1755,7 @@ function TbStyleDropdown({
 }: {
   onToggleBlock: (tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -1765,7 +1772,8 @@ function TbStyleDropdown({
     <div ref={ref} className="relative">
       <button
         type="button"
-        title="Text style"
+        title={t('Text style')}
+        aria-label={t('Text style')}
         onClick={() => setOpen((v) => !v)}
         className="inline-flex items-center justify-center gap-0.5 h-7 px-1.5 rounded hover:bg-accent text-foreground/80 hover:text-foreground"
       >
@@ -1781,7 +1789,7 @@ function TbStyleDropdown({
               onClick={() => { onToggleBlock(opt.tag); setOpen(false); }}
               className={`w-full flex items-center px-3 py-1.5 text-foreground hover:bg-accent transition-colors ${opt.className}`}
             >
-              {opt.label}
+              {t(opt.label)}
             </button>
           ))}
         </div>

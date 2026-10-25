@@ -2,8 +2,10 @@
 import { useMemo } from 'react';
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export function MiniGanttWidget({ elements }: { elements: ElementWithDetails[] }) {
+  const { t } = useI18n();
   const elementsWithDates = useMemo(
     () => elements.filter(e => e.start_date && e.due_date).slice(0, 12),
     [elements]
@@ -29,7 +31,7 @@ export function MiniGanttWidget({ elements }: { elements: ElementWithDetails[] }
   const todayPct = ((today.getTime() - dateRange.start.getTime()) / (dateRange.end.getTime() - dateRange.start.getTime())) * 100;
 
   if (elementsWithDates.length === 0) {
-    return <div className="py-8 text-center text-sm text-muted-foreground">No scheduled items</div>;
+    return <p className="py-1 text-sm text-muted-foreground">{t('No scheduled Elements.')}</p>;
   }
 
   return (

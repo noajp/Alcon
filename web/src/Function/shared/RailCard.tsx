@@ -5,10 +5,11 @@ import { ChevronDown } from 'lucide-react';
 
 // A right-rail island — and, through WidgetFrame, the frame every rail widget
 // wears. The rail is the concept's facts beside its document (Properties,
-// Labels, Activity), so each group is a card of its own: a raised surface with
-// a quiet heading, rows inside it, and room around them. No tinted header band
-// — the heading is plain text on the card. The chevron shows on hover and
-// while collapsed.
+// Labels, Activity), so each group is an island of its own: a surface a notch
+// off the page, with a quiet heading, rows inside it, and room around them.
+// The tone alone sets it apart — no outline, no shadow — so a page with three
+// islands does not read as three boxes. The chevron shows on hover and while
+// collapsed.
 export function RailCard({
   title, children, padded = false, icon, action,
 }: {
@@ -23,7 +24,7 @@ export function RailCard({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   return (
-    <section className="group/rail rounded-lg border border-border/30 bg-[var(--surface-rail)] shadow-[var(--shadow-island)]">
+    <section className="group/rail rounded-lg bg-[var(--surface-rail)]">
       {/* Height is declared, not left to padding, so the heading is the same
           40px whether the card is open or shut. */}
       <div className="flex h-10 items-center pl-2.5 pr-2">

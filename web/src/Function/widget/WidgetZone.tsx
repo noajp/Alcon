@@ -11,6 +11,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useBoardContext, zoneDroppableId } from './BoardContext';
 import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { WidgetFrame } from './WidgetFrame';
 import { WIDGET_COMPONENTS, WIDGET_REGISTRY } from './registry';
 import { ZONE_VARIANT, type WidgetInstance, type WidgetParams, type Zone } from './types';
@@ -48,7 +49,7 @@ export function WidgetZone({
 
   const { setNodeRef, isOver } = useDroppable({ id: zoneDroppableId(zone), data: { zone } });
 
-  const gapClass = zone === 'rail' ? 'space-y-4' : zone === 'band' ? 'space-y-2' : 'space-y-6';
+  const gapClass = zone === 'rail' ? 'space-y-4' : zone === 'band' ? 'space-y-2' : 'space-y-8';
 
   // Empty and idle, a zone takes no space at all — the + that fills it lives
   // on the surface. While arranging it becomes a visible drop target, so a
@@ -61,7 +62,7 @@ export function WidgetZone({
         items={items.map((w) => w.id)}
         strategy={columns === 2 ? rectSortingStrategy : verticalListSortingStrategy}
       >
-        <div className={columns === 2 ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : gapClass}>
+        <div className={columns === 2 ? 'grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-8' : gapClass}>
           {items.map((instance) => (
             <SortableWidget
               key={instance.id}
@@ -99,6 +100,7 @@ function SortableWidget({
   columns: 1 | 2;
 }) {
   const { board, host, arranging, setArranging } = useBoardContext();
+  const { t } = useI18n();
   const def = WIDGET_REGISTRY[instance.type];
   const [confirmingRemove, setConfirmingRemove] = useState(false);
 
@@ -134,12 +136,12 @@ function SortableWidget({
       >
         <WidgetFrame
           variant={ZONE_VARIANT[zone]}
-          title="Private widget"
+          title={t('Private widget')}
           arranging={arranging}
           isDragging={isDragging}
           onLongPress={() => setArranging(true)}
         >
-          <p className="text-xs text-muted-foreground">You don’t have access to this widget.</p>
+          <p className="text-xs text-muted-foreground">{t('You don’t have access to this widget.')}</p>
         </WidgetFrame>
       </div>
     );
@@ -163,7 +165,9 @@ function SortableWidget({
     >
       <WidgetFrame
         variant={ZONE_VARIANT[zone]}
-        title={typeof params.title === 'string' && params.title.trim() ? params.title : def.label}
+        // A title someone typed is theirs and shown as written; the default
+        // is the widget's name, in the viewer's language.
+        title={typeof params.title === 'string' && params.title.trim() ? params.title : t(def.label)}
         padded={def.padded ?? true}
         arranging={arranging}
         isDragging={isDragging}

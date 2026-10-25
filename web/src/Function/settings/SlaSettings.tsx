@@ -6,6 +6,7 @@ import { getQueryClient } from '@/lib/queryClient';
 import type { Domain, DomainRiskThresholds } from '@/types/database';
 import { RISK_THRESHOLD_DEFAULTS, RISK_THRESHOLD_MAX } from '@/ActivitySpace/strategy/initiative/initiativeRiskModel';
 import { SettingsSection, SettingsRow } from './SettingsSection';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // Settings > Elements > SLAs. An SLA here is not another due date — it is the
 // threshold policy the Initiative cross-section (initiativeRiskModel) judges a
@@ -42,6 +43,7 @@ function thresholdsOf(d: Domain): DomainRiskThresholds {
 }
 
 export function SlaSettings() {
+  const { t } = useI18n();
   const { data: domains, loading } = useDomains();
 
   // Optimistic overrides on top of the fetched rows, keyed by Domain. What the
@@ -108,7 +110,7 @@ export function SlaSettings() {
           setOverrides((prev) => ({ ...prev, [domain.id]: before }));
           setErrors((prev) => ({
             ...prev,
-            [domain.id]: e instanceof Error ? e.message : "Couldn't save",
+            [domain.id]: e instanceof Error ? e.message : t("Couldn't save"),
           }));
         }
       })
@@ -123,12 +125,12 @@ export function SlaSettings() {
         });
       });
     chains.current.set(domain.id, run);
-  }, [overrides]);
+  }, [overrides, t]);
 
   if (!loading && domains.length === 0) {
     return (
       <p className="text-[12px] text-muted-foreground">
-        No Domains in this Space yet. Thresholds are set per Domain, so there is nothing to configure until one exists.
+        {t('No Domains in this Space yet. Thresholds are set per Domain, so there is nothing to configure until one exists.')}
       </p>
     );
   }
@@ -136,8 +138,7 @@ export function SlaSettings() {
   return (
     <div className="space-y-6">
       <p className="text-[12px] text-muted-foreground -mt-2">
-        How the Initiative cross-section judges each Domain&apos;s work. Leave a field blank to use the default shown.
-        Changes take effect the next time a Initiative&apos;s risk is computed.
+        {t('How the Initiative cross-section judges each Domain’s work. Leave a field blank to use the default shown. Changes take effect the next time an Initiative’s risk is computed.')}
       </p>
 
       {domains.map((domain) => {
@@ -145,7 +146,7 @@ export function SlaSettings() {
         return (
           <SettingsSection key={domain.id} title={domain.name}>
             {FIELDS.map((f) => (
-              <SettingsRow key={f.key} label={f.label} hint={f.hint}>
+              <SettingsRow key={f.key} label={t(f.label)} hint={t(f.hint)}>
                 <ThresholdInput
                   // Remount whenever the saved value changes (commit, rollback,
                   // refetch), so the draft is always seeded from the truth and
@@ -154,14 +155,14 @@ export function SlaSettings() {
                   value={current[f.key]}
                   placeholder={RISK_THRESHOLD_DEFAULTS[f.key]}
                   max={RISK_THRESHOLD_MAX[f.key]}
-                  unit={f.unit}
+                  unit={t(f.unit)}
                   disabled={pending.has(`${domain.id}:${f.key}`)}
                   onCommit={(v) => save(domain, f.key, v)}
                 />
               </SettingsRow>
             ))}
             {errors[domain.id] && (
-              <div className="px-4 py-2 text-[11px] text-destructive">{errors[domain.id]}</div>
+              <div className="py-2 text-[11px] text-destructive">{errors[domain.id]}</div>
             )}
           </SettingsSection>
         );

@@ -40,13 +40,13 @@ function DealPeople({ crm, deal, onOpenContact }: { crm: Crm; deal: CrmDeal; onO
   const roles = DEAL_ROLES.map(role => ({ id: role, label: t(ROLE_LABEL[role]) }));
   return <RecordSection title={t('People involved')}>
     <div className="max-w-xl space-y-1">
-      {rows.map(({ row, contact }) => <div key={row.id} className="group flex items-center gap-2">
-        <button type="button" className="min-w-0 flex-1 truncate rounded-sm px-1.5 py-1 text-left text-[13px] hover:bg-muted/40" onClick={() => onOpenContact(contact.id)}>
+      {rows.map(({ row, contact }) => <div key={row.id} className="group flex items-center gap-2 rounded-md transition-colors hover:bg-muted/40">
+        <button type="button" className="min-w-0 flex-1 truncate px-1.5 py-1 text-left text-[13px] outline-none" onClick={() => onOpenContact(contact.id)}>
           {contact.name}{contact.title && <span className="text-muted-foreground"> · {contact.title}</span>}
         </button>
         <CrmPicker label={t('Role of {name}', { name: contact.name })} value={row.role} clearable={false} options={roles}
           onChange={role => role && run(crm.updateDealContact(row.id, { role: role as CrmDealRole }))} />
-        <Button variant="ghost" size="icon-xs" aria-label={t('Remove {name} from this deal', { name: contact.name })} onClick={() => run(crm.removeDealContact(row.id))}><X size={12} /></Button>
+        <ButtonAppearanceProvider appearance="inline"><Button variant="ghost" size="icon-xs" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" aria-label={t('Remove {name} from this deal', { name: contact.name })} onClick={() => run(crm.removeDealContact(row.id))}><X size={12} /></Button></ButtonAppearanceProvider>
       </div>)}
       <CrmPicker label={t('Add a person')} value={null} placeholder={t('Add a person')}
         options={candidates.map(contact => ({ id: contact.id, label: contact.name, hint: contact.title ?? crm.companies.find(company => company.id === contact.company_id)?.name ?? null }))}
@@ -161,7 +161,7 @@ export function CrmDealPage({ crm, deal, onBack, onOpenPipeline, onCapture, onOp
       <div className="space-y-1">
         <Property label={t('Stage')}>
           <div className="flex flex-wrap gap-1 py-0.5">
-            {deal.outcome === 'won' ? <span className="px-1.5 text-[13px] text-[var(--status-success)]">{t('Won')}</span>
+            {deal.outcome === 'won' ? <span className="px-1.5 text-[13px] text-foreground">{t('Won')}</span>
               : deal.outcome === 'lost' ? <span className="px-1.5 text-[13px] text-muted-foreground">{t('Lost')}</span>
               : <CrmPicker label={t('Stage')} value={deal.stage?.id ?? null} clearable={false} options={stages.map(stage => ({ id: stage.id, label: t(stage.label), hint: `${stage.probability}%` }))}
                 onChange={id => { const stage = stages.find(item => item.id === id); if (stage) void moveTo(stage); }} />}
@@ -193,7 +193,7 @@ export function CrmDealPage({ crm, deal, onBack, onOpenPipeline, onCapture, onOp
             {initiative && onOpenInitiative && <Button variant="ghost" size="icon-xs" aria-label={t('Open Initiative')} onClick={() => onOpenInitiative(initiative.id)}><ArrowUpRight size={12} /></Button>}
           </div>
         </Property>
-        <div className="mx-1 my-2 h-px bg-[var(--border-subtle)]" />
+        <div className="h-3" aria-hidden />
         <Property label={t('Amount')}><EditableText numeric label={t('Amount')} value={deal.amount} onSave={value => save({ amount: value as number | null })} /></Property>
         <Property label={t('Currency')}><EditableText label={t('Currency')} value={deal.currency} placeholder="JPY" onSave={value => {
           const code = typeof value === 'string' ? value.toUpperCase() : '';
@@ -245,7 +245,7 @@ export function CrmDealPage({ crm, deal, onBack, onOpenPipeline, onCapture, onOp
         {open && deal.stage && <span>{t(deal.stage.label)}</span>}
       </div>
       {error && <p role="alert" className="mt-2 text-sm text-[var(--status-danger)]">{t(error)}</p>}
-      {!deal.valid && <div role="status" className="mt-3 max-w-xl space-y-1 rounded-md bg-[var(--status-warning-subtle)] p-3 text-xs">
+      {!deal.valid && <div role="status" className="mt-3 max-w-xl space-y-1 text-xs">
         <p className="font-medium">{t('Complete these details to include this deal in the forecast')}</p>
         <ul className="list-inside list-disc text-muted-foreground">{deal.issues.map(issue => <li key={issue.message}>{t(issue.message, issue.values)}</li>)}</ul>
       </div>}

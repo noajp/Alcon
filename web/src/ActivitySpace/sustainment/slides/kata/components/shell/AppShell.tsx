@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { flushSync } from "react-dom";
-import { setLang, tx } from "@/ActivitySpace/sustainment/slides/kata/i18n";
+import { setUiLocale, tx } from "@/ActivitySpace/sustainment/slides/kata/i18n";
 import { Header } from "./Header";
 import { Stage } from "@/ActivitySpace/sustainment/slides/kata/components/stage/Stage";
 import { RightPanel } from "@/ActivitySpace/sustainment/slides/kata/components/panels/RightPanel";
@@ -24,12 +24,12 @@ export function AppShell() {
   // the decks come from the Space through slides/sync.ts before this mounts.
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    const done = () => { setLang(useKata.getState().lang); setReady(true); };
+    const done = () => setReady(true);
     if (useKata.persist.hasHydrated()) done();
     return useKata.persist.onFinishHydration(done);
   }, []);
   const view = useDeckView();
-  const lang = useKata((s) => s.lang);
+  const locale = useKata((s) => s.locale);
   // Alcon keeps hidden tabs mounted: a shell that is not on screen takes no keys and prints nothing.
   const shell = useRef<HTMLDivElement>(null);
   useShortcuts(shell);
@@ -46,11 +46,11 @@ export function AppShell() {
   }, []);
 
   if (!ready) return <div className="kata-root h-full bg-k-paper" />;
-  // 子の描画より先に表示言語をそろえる（切り替えたら key で全体を描き直す）
-  setLang(lang);
+  // 子の描画より先に表示言語をそろえる（アプリの言語が変わったら key で全体を描き直す）
+  setUiLocale(locale);
 
   return (
-    <div key={lang} className="kata-root contents">
+    <div key={locale} className="kata-root contents">
       <div ref={shell} className="no-print flex h-full min-w-[720px] flex-col overflow-hidden bg-k-paper">
         <Header />
         <div className="flex min-h-0 flex-1 gap-2 px-2 pb-2">
@@ -150,7 +150,7 @@ function handleObjectKeys(e: KeyboardEvent): boolean {
       return true;
     }
     s.deleteSlide(s.current);
-    s.notify(tx(`${s.current + 1}枚目を消しました（⌘Z で戻す）`, `Deleted slide ${s.current + 1} (⌘Z to undo)`));
+    s.notify(tx("{n}枚目を消しました（⌘Z で戻す）", "Deleted slide {n} (⌘Z to undo)", { n: s.current + 1 }));
     return true;
   }
   if (e.key.toLowerCase() === "n" && !mod && !e.altKey) {

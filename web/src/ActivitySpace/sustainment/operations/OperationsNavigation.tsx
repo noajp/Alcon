@@ -3,6 +3,7 @@
 import { createContext } from 'react';
 import { LayoutDashboard, List, ListChecks, CircleAlert } from 'lucide-react';
 import { Button } from '@/ui/button';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { OPERATIONS_QUEUES, operationsQueueLabel, type OperationsQueue } from './operationsQueues';
 
 interface OperationsNavigationState {
@@ -19,7 +20,8 @@ export function OperationsNavigation({ queue, onSelect, sidebar = false, counts 
   sidebar?: boolean;
   counts?: Partial<Record<OperationsQueue, number>>;
 }) {
-  return <div role="group" aria-label="Pipeline views" className={sidebar ? 'mt-3 space-y-1' : 'flex flex-wrap items-center gap-1'}>
+  const { t } = useI18n();
+  return <div role="group" aria-label={t('Pipeline views')} className={sidebar ? 'mt-3 space-y-1' : 'flex flex-wrap items-center gap-1'}>
     {sidebar && <p className="px-2 py-1 text-xs font-medium text-muted-foreground">CRM</p>}
     {OPERATIONS_QUEUES.map(id => {
       const Icon = ICONS[id];

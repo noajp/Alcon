@@ -12,6 +12,7 @@ import {
 } from '@/Function/sync/explorerPatch';
 import { selectIn } from '@/hooks/chunkedIn';
 import { supabase } from '@/lib/supabase';
+import { translate } from '@/Function/i18n/I18nProvider';
 import type {
   ApprovalState,
   EdgeType,
@@ -465,7 +466,7 @@ export async function removeElementAssignee(id: string): Promise<void> {
     if (error) throw error;
     // RLS turns a refused delete into "no rows" (the Element is no longer
     // visible); say so rather than leave the chip gone until the next read.
-    if (!data?.length) throw new Error('This assignee could not be removed.');
+    if (!data?.length) throw new Error(translate('This assignee could not be removed.'));
   } catch (err) {
     rollback();
     throw err;

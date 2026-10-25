@@ -1,6 +1,8 @@
 'use client';
 
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
+import { Input } from '@/ui/input';
+import { FONT } from '@/shared/designTokens';
 
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { StrategyNavigation } from './sidebar/StrategyNavigation';
@@ -877,7 +879,7 @@ function DomainGeneralSettings({
       else await leaveDomain(domain.id);
       onDeleted();
     } catch (e) {
-      setError(e instanceof Error ? e.message : `Failed to ${confirming} Domain`);
+      setError(e instanceof Error ? e.message : t(confirming === 'delete' ? 'The Domain could not be deleted. Try again.' : 'Could not leave the Domain. Try again.'));
       setBusy(false);
       setConfirming(null);
     }
@@ -895,7 +897,7 @@ function DomainGeneralSettings({
       });
       onUpdated(updated);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update Domain');
+      setError(e instanceof Error ? e.message : t('Could not update the Domain. Try again.'));
     } finally {
       setSaving(false);
     }
@@ -904,36 +906,27 @@ function DomainGeneralSettings({
   return (
     <div className="max-w-xl">
       <div className="mb-5">
-        <h3 className="text-[15px] font-semibold text-foreground">General</h3>
+        <h3 className={`${FONT.lg} text-foreground`}>{t('General')}</h3>
         <p className="mt-1 text-[12px] text-muted-foreground">
-          {canEdit
-            ? 'Configure this Domain\u2019s name, identifier, and access mode.'
-            : 'You were invited to this Domain. Only its owner or admin can change these settings.'}
+          {t(canEdit
+            ? 'Configure this Domain’s name, identifier, and access mode.'
+            : 'You were invited to this Domain. Only its owner or admin can change these settings.')}
         </p>
       </div>
 
       <fieldset disabled={!canEdit} className="space-y-5">
         <div>
-          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Name</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-md bg-muted/40 px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:bg-[var(--accent-subtle)]"
-          />
+          <label htmlFor="domain-settings-name" className="mb-1.5 block text-[12px] font-semibold text-foreground">{t('Name')}</label>
+          <Input id="domain-settings-name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
 
         <div>
-          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Identifier</label>
-          <input
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            placeholder="e.g. ALCON"
-            className="w-full rounded-md bg-muted/40 px-3 py-2 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:bg-[var(--accent-subtle)]"
-          />
+          <label htmlFor="domain-settings-identifier" className="mb-1.5 block text-[12px] font-semibold text-foreground">{t('Identifier')}</label>
+          <Input id="domain-settings-identifier" value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder={t('e.g. MKT')} />
         </div>
 
         <div>
-          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Privacy</label>
+          <div className="mb-1.5 text-[12px] font-semibold text-foreground">{t('Privacy')}</div>
           <div className="grid grid-cols-2 gap-2">
             {([
               ['workspace', 'Workspace'],
@@ -948,72 +941,55 @@ function DomainGeneralSettings({
                 onClick={() => setPrivacy(value)}
                 className="min-w-0 w-full truncate"
               >
-                {label}
+                {t(label)}
               </Button>
             ))}
           </div>
         </div>
 
         {error && (
-          <div className="rounded-md border border-[var(--status-danger)]/30 bg-[var(--status-danger)]/10 px-3 py-2 text-[12px] text-[var(--status-danger)]">
-            {error}
-          </div>
+          <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>
         )}
 
         {canEdit && (
-          <div className="flex justify-end border-t border-border pt-4">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!canSave || saving}
-              className="rounded-md bg-foreground px-3 py-1.5 text-[12px] font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-40"
-            >
-              {saving ? 'Saving...' : 'Save changes'}
-            </button>
+          <div className="flex justify-end">
+            <Button variant="primary" onClick={handleSave} disabled={!canSave || saving}>
+              {t(saving ? 'Saving…' : 'Save changes')}
+            </Button>
           </div>
         )}
       </fieldset>
 
       {/* Outside the fieldset: a guest's one available action must stay enabled. */}
       {isOwner ? (
-        <div className="mt-5 flex items-center justify-between gap-4">
+        <div className="mt-8 flex items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="text-[12px] font-semibold text-foreground">{t('Delete Domain')}</div>
             <p className="mt-0.5 text-[12px] text-muted-foreground">
               {t('Permanently delete this Domain for every member. Move or delete its Objects first.')}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => { void askDelete(); }}
-            disabled={busy}
-            className="shrink-0 rounded-md bg-destructive/10 px-3 py-1.5 text-[12px] font-semibold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
-          >
-            Delete
-          </button>
+          <Button variant="danger" className="shrink-0" onClick={() => { void askDelete(); }} disabled={busy}>
+            {t('Delete')}
+          </Button>
         </div>
       ) : role ? (
-        <div className="mt-5 flex items-center justify-between gap-4 border-t border-border pt-4">
+        <div className="mt-8 flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-[12px] font-semibold text-foreground">Leave Domain</div>
+            <div className="text-[12px] font-semibold text-foreground">{t('Leave Domain')}</div>
             <p className="mt-0.5 text-[12px] text-muted-foreground">
-              Remove yourself. The Domain and your past work stay as they are.
+              {t('Remove yourself. The Domain and your past work stay as they are.')}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setConfirming('leave')}
-            disabled={busy}
-            className="shrink-0 rounded-md bg-destructive/10 px-3 py-1.5 text-[12px] font-semibold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
-          >
-            Leave
-          </button>
+          <Button variant="danger" className="shrink-0" onClick={() => setConfirming('leave')} disabled={busy}>
+            {t('Leave Domain')}
+          </Button>
         </div>
       ) : null}
 
       <ConfirmDialog
         open={confirming === 'delete'}
-        title={`Delete "${domain.name}"?`}
+        title={t('Delete “{name}”?', { name: domain.name })}
         description={t('Its members, Phases, and templates are deleted. Tables stay but are no longer in any Domain. This can’t be undone.')}
         busy={busy}
         onConfirm={() => { void runConfirmed(); }}
@@ -1021,9 +997,9 @@ function DomainGeneralSettings({
       />
       <ConfirmDialog
         open={confirming === 'leave'}
-        title={`Leave "${domain.name}"?`}
-        description="You lose access to this Domain until someone invites you again."
-        confirmLabel="Leave"
+        title={t('Leave “{name}”?', { name: domain.name })}
+        description={t('You lose access to this Domain until someone invites you again.')}
+        confirmLabel={t('Leave Domain')}
         busy={busy}
         onConfirm={() => { void runConfirmed(); }}
         onCancel={() => setConfirming(null)}

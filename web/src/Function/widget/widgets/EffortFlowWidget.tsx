@@ -3,9 +3,10 @@
 import { useMemo } from 'react';
 import { useObjects, useStrategies } from '@/hooks/useSupabase';
 import { useWidgetEmpty, useWidgetMeta } from '../WidgetFrame';
-import { effortFlow, flowTitle, isFoldedNode, type FlowNode } from './effortFlowModel';
+import { effortFlow, isFoldedNode, type FlowNode } from './effortFlowModel';
 import { DimensionPicker } from '../DimensionPicker';
-import type { Dimension, DimensionContext } from '@/Function/shared/dimensions';
+import { DIMENSION_LABEL, type Dimension, type DimensionContext } from '@/Function/shared/dimensions';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { WidgetParams, WidgetProps } from '../types';
 
 // =============================================================
@@ -37,6 +38,7 @@ export interface FlowParams {
 }
 
 export function EffortFlowWidget({ host, params, setParams }: WidgetProps) {
+  const { t } = useI18n();
   const { dimensions } = params as unknown as FlowParams;
   const { data: strategies } = useStrategies();
   // Object and Initiative buckets are uuids; the names come from the explorer,
@@ -69,11 +71,12 @@ export function EffortFlowWidget({ host, params, setParams }: WidgetProps) {
 
   const flow = useMemo(() => effortFlow(open, dimensions, ctx), [open, dimensions, ctx]);
 
-  useWidgetMeta(flow.total === 0 ? null : `${flow.total} open`);
+  useWidgetMeta(flow.total === 0 ? null : t('{n} open', { n: flow.total }));
   useWidgetEmpty(flow.total === 0 || flow.columns.length < 2);
   if (flow.total === 0 || flow.columns.length < 2) return null;
 
   const cols = flow.columns.length;
+  const title = flow.columns.map((d) => t(DIMENSION_LABEL[d])).join(' → ');
   const colX = (i: number) => 0.06 + (i / (cols - 1)) * 0.62;
 
   const open_ = (node: FlowNode) => {
@@ -96,8 +99,8 @@ export function EffortFlowWidget({ host, params, setParams }: WidgetProps) {
   return (
     <>
       <FlowDimensionPicker dimensions={dimensions} onChange={setParams} />
-      <div className="px-3 py-2">
-        <div className="mb-1.5 text-[11px] text-muted-foreground">{flowTitle(flow.columns)}</div>
+      <div className="py-2">
+        <div className="mb-1.5 text-[11px] text-muted-foreground">{title}</div>
 
         <svg
           viewBox={`0 0 100 ${HEIGHT}`}
@@ -105,7 +108,7 @@ export function EffortFlowWidget({ host, params, setParams }: WidgetProps) {
           className="w-full"
           style={{ height: HEIGHT }}
           role="img"
-          aria-label={`${flow.total} Elements, ${flowTitle(flow.columns)}`}
+          aria-label={t('{n} Elements, {title}', { n: flow.total, title })}
         >
           {/* Ribbons first, so a node box always sits on top of what it joins. */}
           {flow.links.map((link) => {

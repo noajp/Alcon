@@ -2,6 +2,16 @@ import type { Locale } from './locales';
 import { CRM_TRANSLATIONS } from '@/ActivitySpace/sustainment/crm/crmMessages';
 import { WORKLOAD_TRANSLATIONS } from '@/ActivitySpace/sustainment/workload/workloadMessages';
 import { PEOPLE_TRANSLATIONS } from '@/ActivitySpace/sustainment/team/peopleMessages';
+import { SURFACE_TRANSLATIONS } from './surfaceMessages';
+import { STRATEGY_BOARD_TRANSLATIONS } from './strategyBoardMessages';
+import { APPROACH_TRANSLATIONS } from './approachMessages';
+import { SHARED_TRANSLATIONS } from './sharedMessages';
+import { WIDGET_TRANSLATIONS } from './widgetMessages';
+import { STRATEGY_TRANSLATIONS } from './strategyMessages';
+import { EXECUTION_TRANSLATIONS } from './executionMessages';
+import { DOCUMENTS_TRANSLATIONS } from './documentsMessages';
+import { APP_TRANSLATIONS } from './appMessages';
+import { OPERATIONS_TRANSLATIONS } from '@/ActivitySpace/sustainment/operations/operationsMessages';
 
 type TranslationMap = Record<string, string>;
 
@@ -1396,6 +1406,30 @@ Object.assign(ja, { 'Viewer': '閲覧者', 'Invite as': '招待する役割', 'I
 Object.assign(ko, { 'Viewer': '뷰어', 'Invite as': '초대 역할', 'Invited as viewer': '뷰어로 초대됨', 'View only': '보기 전용', 'Viewers': '뷰어', 'Make viewer': '뷰어로 변경', 'Make member': '멤버로 변경', 'Viewers read everything in this Domain and change nothing.': '뷰어는 이 Domain의 모든 것을 볼 수 있지만 아무것도 변경할 수 없습니다.', 'This person already works in this Domain through its Space. Invite them as a member, or change their role in the member list.': '이 사람은 Space를 통해 이미 이 Domain에서 작업할 수 있습니다. 멤버로 초대하거나 멤버 목록에서 역할을 변경하세요.', 'The role could not be changed. Try again.': '역할을 변경하지 못했습니다. 다시 시도하세요.' });
 Object.assign(fr, { 'Viewer': 'Lecteur', 'Invite as': 'Inviter comme', 'Invited as viewer': 'Invité comme lecteur', 'View only': 'Lecture seule', 'Viewers': 'Lecteurs', 'Make viewer': 'Passer en lecteur', 'Make member': 'Passer en membre', 'Viewers read everything in this Domain and change nothing.': 'Les lecteurs voient tout dans ce Domain et ne modifient rien.', 'This person already works in this Domain through its Space. Invite them as a member, or change their role in the member list.': 'Cette personne travaille déjà dans ce Domain via son Space. Invitez-la comme membre, ou changez son rôle dans la liste des membres.', 'The role could not be changed. Try again.': "Le rôle n'a pas pu être modifié. Réessayez." });
 Object.assign(es, { 'Viewer': 'Lector', 'Invite as': 'Invitar como', 'Invited as viewer': 'Invitado como lector', 'View only': 'Solo lectura', 'Viewers': 'Lectores', 'Make viewer': 'Cambiar a lector', 'Make member': 'Cambiar a miembro', 'Viewers read everything in this Domain and change nothing.': 'Los lectores ven todo en este Domain y no cambian nada.', 'This person already works in this Domain through its Space. Invite them as a member, or change their role in the member list.': 'Esta persona ya trabaja en este Domain a través de su Space. Invítala como miembro o cambia su rol en la lista de miembros.', 'The role could not be changed. Try again.': 'No se pudo cambiar el rol. Inténtalo de nuevo.' });
+
+// Board and page surfaces — widget names, the picker, Calendar, Create
+// Domain — and the boards' own (Decision Lab, Domain approaches).
+Object.assign(ja, SURFACE_TRANSLATIONS.ja);
+Object.assign(ko, SURFACE_TRANSLATIONS.ko);
+Object.assign(fr, SURFACE_TRANSLATIONS.fr);
+Object.assign(es, SURFACE_TRANSLATIONS.es);
+Object.assign(ja, STRATEGY_BOARD_TRANSLATIONS.ja);
+Object.assign(ko, STRATEGY_BOARD_TRANSLATIONS.ko);
+Object.assign(fr, STRATEGY_BOARD_TRANSLATIONS.fr);
+Object.assign(es, STRATEGY_BOARD_TRANSLATIONS.es);
+Object.assign(ja, APPROACH_TRANSLATIONS.ja);
+Object.assign(ko, APPROACH_TRANSLATIONS.ko);
+Object.assign(fr, APPROACH_TRANSLATIONS.fr);
+Object.assign(es, APPROACH_TRANSLATIONS.es);
+
+// Each area's own strings: the shared parts, widget bodies, Strategy,
+// Execution, Notebook/Table/Slides, the app shell and settings, Operations.
+for (const area of [SHARED_TRANSLATIONS, WIDGET_TRANSLATIONS, STRATEGY_TRANSLATIONS, EXECUTION_TRANSLATIONS, DOCUMENTS_TRANSLATIONS, APP_TRANSLATIONS, OPERATIONS_TRANSLATIONS]) {
+  Object.assign(ja, area.ja);
+  Object.assign(ko, area.ko);
+  Object.assign(fr, area.fr);
+  Object.assign(es, area.es);
+}
 
 // People (ActivitySpace/sustainment/team). Last, so the app name stays
 // English everywhere, like every other concept name.

@@ -18,6 +18,7 @@
 // =============================================================
 
 import type { DecisionStatus } from '@/ActivitySpace/strategy/initiative/initiativeDecisionModel';
+import { translate } from '@/Function/i18n/I18nProvider';
 
 /** The three ways looking again can land. */
 export type ReviewOutcome = 'reversed' | 'upheld' | 'amended';
@@ -31,7 +32,7 @@ const OUTCOME_LABELS: Record<ReviewOutcome, string> = {
 };
 
 export function reviewOutcomeLabel(outcome: ReviewOutcome): string {
-  return OUTCOME_LABELS[outcome];
+  return translate(OUTCOME_LABELS[outcome]);
 }
 
 /**
