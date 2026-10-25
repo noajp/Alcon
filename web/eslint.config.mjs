@@ -24,7 +24,6 @@ const eslintConfig = defineConfig([
     ignores: ["src/ActivitySpace/sustainment/slides/**"],
     rules: {
       "no-restricted-imports": ["error", {
-        paths: [{ name: "@/lib/supabase", importNames: ["supabase"], message: "Surfaces go through hooks/ for data. Add the query there." }],
         patterns: [{ group: ["**/lib/supabase"], importNames: ["supabase"], message: "Surfaces go through hooks/ for data. Add the query there." }],
       }],
     },

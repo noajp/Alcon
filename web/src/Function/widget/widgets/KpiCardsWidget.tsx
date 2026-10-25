@@ -1,6 +1,5 @@
 'use client';
 import { useMemo } from 'react';
-import { differenceInDays } from 'date-fns';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
@@ -41,7 +40,7 @@ export function KpiCardsWidget({ elements }: Props) {
       <Figure label={t('Completion')} value={`${completionRate}%`} detail={t('{done} done · {todo} todo · {active} active', { done: completedCount, todo: todoCount, active: inProgressCount })} />
       <Figure label={t('In Progress')} value={inProgressCount} detail={t('{n} done in the last 14 days', { n: recentDone })} />
       <Figure label={t('Overdue')} value={overdueElements.length} alarm={overdueElements.length > 0}
-        detail={oldest ? t('Oldest {n}d ago', { n: differenceInDays(new Date(), new Date(oldest)) }) : t('All on track')} />
+        detail={oldest ? t('Oldest {n}d ago', { n: daysOverdue(oldest) }) : t('All on track')} />
       <Figure label={t('Hours')} value={hoursEfficiency !== null ? `${hoursEfficiency}%` : '—'}
         detail={hoursEfficiency !== null ? t('{actual}h of {estimated}h estimated', { actual: totalActual, estimated: totalEstimated }) : t('No hours tracked')} />
     </div>
