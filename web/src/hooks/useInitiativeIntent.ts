@@ -2,9 +2,9 @@
 
 import { useCallback, useRef } from 'react';
 import { createIntent, useStrategyIntentBundle, type IntentBundle } from '@/hooks/useSupabase';
-import { useInitiativeScope, type InitiativeScope } from '@/ActivitySpace/strategy/initiative/useInitiativeScope';
+import { useInitiativeScope, type InitiativeScope } from '@/hooks/useInitiativeScope';
 import { useCurrentUserId } from '@/providers/authContext';
-import { canEditInitiative } from './initiativeAccess';
+import { canEditInitiative } from '@/Function/strategy/initiativeAccess';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/Function/i18n/I18nProvider';

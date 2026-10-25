@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { fetchMyElements, type MyElementsData } from '@/ActivitySpace/home/myElementsData';
+import { fetchMyElements, type MyElementsData } from '@/hooks/myElementsData';
 import { useAuthContext } from '@/providers/AuthProvider';
 import {
   assignWorkersToElement,
@@ -19,7 +19,7 @@ import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
 import { DeletedElementsDialog } from '@/ActivitySpace/execution/object/DeletedElementsDialog';
-import { bulkSetAssignee } from '@/ActivitySpace/execution/element/bulkAssign';
+import { bulkSetAssignee } from '@/hooks/bulkAssign';
 import type {
   Worker,
 } from '@/types/database';
@@ -31,7 +31,7 @@ import type { ColumnId, DataColumn } from '@/Function/shared/listTable/useListCo
 import { ELEMENT_DEFAULT_VISIBLE } from '@/Function/shared/listConfig';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';
-import { pushUndo } from '@/ActivitySpace/execution/element/bulkUndo';
+import { pushUndo } from '@/Function/shared/element/bulkUndo';
 import {
   ListControls,
   loadState,

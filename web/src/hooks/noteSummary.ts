@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { extractPlainText } from './contentUtils';
+import { extractPlainText } from '@/Function/notebook/contentUtils';
 import type { BriefStructured } from '@/types/notes';
 
 // Calls the summarize-note Edge Function and returns a Loop-style

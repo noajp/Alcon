@@ -10,7 +10,7 @@ import {
   bulkInsertDataTableRows,
   type DataTable, type DataTableColumn, type DataTableColumnType,
 } from '@/hooks/useSupabase';
-import { useTableData } from './useTableData';
+import { useTableData } from '@/hooks/useTableData';
 import type { Json } from '@/types/database';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';

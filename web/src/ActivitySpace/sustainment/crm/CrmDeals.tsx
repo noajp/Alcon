@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import type { CrmDeal } from './crmModel';
+import type { CrmDeal } from '@/Function/crm/crmModel';
 import { HealthDot, money, relativeDay } from './crmFormat';
 
 type SortKey = 'name' | 'stage' | 'owner' | 'amount' | 'probability' | 'closeDate' | 'nextActionDate' | 'lastContact' | 'health';

@@ -20,11 +20,9 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
 import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp } from 'lucide-react';
-import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
-import { domainHasObjectsMessage } from '@/hooks/domainData';
+import { domainHasObjectsMessage, useDomainRole, type DomainRole } from '@/hooks/domainData';
 import { countDomainObjects } from '@/hooks/useObjectArchive';
-import { supabase } from '@/lib/supabase';
 import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
 import {
   DndContext,
@@ -751,7 +749,6 @@ function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
   );
 }
 
-type DomainRole = 'owner' | 'admin' | 'member' | 'viewer';
 
 function DomainSettingsModal({
   domain,
@@ -770,20 +767,7 @@ function DomainSettingsModal({
   // The viewer's own seat, read once for every tab. It answers the same
   // question RLS answers on write: owner/admin may change the Domain, only
   // an owner may delete it, and anyone else is a guest who can only leave.
-  const { user } = useAuthContext();
-  const [role, setRole] = useState<DomainRole | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    if (!user) return;
-    void supabase
-      .from('domain_members')
-      .select('role')
-      .eq('domain_id', domain.id)
-      .eq('user_id', user.id)
-      .maybeSingle()
-      .then(({ data }) => { if (!cancelled) setRole((data?.role as DomainRole | undefined) ?? null); });
-    return () => { cancelled = true; };
-  }, [domain.id, user]);
+  const role = useDomainRole(domain.id).data ?? null;
   const canEdit = role === 'owner' || role === 'admin';
 
   return (

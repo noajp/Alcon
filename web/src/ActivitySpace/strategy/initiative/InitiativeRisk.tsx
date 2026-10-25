@@ -9,12 +9,12 @@ import {
   type ObjectRisk,
   type RiskReason,
 } from '@/Function/strategy/initiativeRiskModel';
-import { ABSENCE_WINDOW_DAYS } from '@/ActivitySpace/strategy/initiative/initiativeAssumptionModel';
+import { ABSENCE_WINDOW_DAYS } from '@/Function/strategy/initiativeAssumptionModel';
 import {
   holderAbsenceLabel,
   type InitiativeBusFactor,
   type SoleHolder,
-} from '@/ActivitySpace/strategy/initiative/initiativeBusFactorModel';
+} from '@/Function/strategy/initiativeBusFactorModel';
 
 // =============================================================
 // InitiativeRisk — the Initiative's cross-section.

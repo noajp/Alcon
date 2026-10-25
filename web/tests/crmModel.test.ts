@@ -3,7 +3,7 @@ import {
   accountsOf, buildCrmWorkspace, fieldsFor, measureValue, readChange, readUnit, fieldKey, fieldOptions, forecastFor, inList, metricValue, normalizeCrmStages, parseActivityLog,
   pipelineColumns, searchDeals, stageChange, todayQueue, upcoming, DEFAULT_CRM_STAGES,
   type CrmDealRecord, type CrmNextElement, type CrmPipelineRecord, type CrmRecords,
-} from '@/ActivitySpace/sustainment/crm/crmModel';
+} from '@/Function/crm/crmModel';
 
 const today = '2026-10-03';
 const pipeline: CrmPipelineRecord = {

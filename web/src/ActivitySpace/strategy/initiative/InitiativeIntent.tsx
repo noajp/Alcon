@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext } from 'react';
-import { useInitiativeIntent, type InitiativeIntentState } from '@/ActivitySpace/strategy/initiative/useInitiativeIntent';
+import { useInitiativeIntent, type InitiativeIntentState } from '@/hooks/useInitiativeIntent';
 
 // =============================================================
 // One read, one root, shared by every Intent widget on a Initiative.

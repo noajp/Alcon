@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { fetchElementWithDetails } from '@/hooks/elementData';
-import { fetchObjectDomainIds } from '@/ActivitySpace/execution/object/data';
+import { fetchObjectDomainIds } from '@/hooks/objectData';
 import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { useDomains } from '@/hooks/domainData';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';

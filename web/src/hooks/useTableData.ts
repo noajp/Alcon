@@ -7,7 +7,7 @@ import {
   addDataTableColumn, addDataTableRow, createDataTable, deleteDataTable,
   fetchDataTableSchema, setDataTableCell, updateDataTable, DATA_TABLES_QUERY_KEY,
   type DataTableSchema,
-} from '@/ActivitySpace/sustainment/table/data';
+} from '@/hooks/tableData';
 import type { DataTable, DataTableColumnType, Json } from '@/types/database';
 import { translate } from '@/Function/i18n/I18nProvider';
 

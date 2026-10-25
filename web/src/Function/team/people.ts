@@ -1,5 +1,5 @@
 import type { WorkerSkill, WorkerSkillEvidence, WorkerSkillLevel } from '@/types/database';
-import type { TeamElement, TeamRosterEntry } from '@/ActivitySpace/sustainment/team/teamRoster';
+import type { TeamElement, TeamRosterEntry } from '@/Function/team/teamRoster';
 
 export const SKILL_LEVELS: readonly { level: WorkerSkillLevel; label: string }[] = [
   { level: 1, label: 'Learning' },

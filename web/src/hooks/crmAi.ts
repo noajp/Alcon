@@ -6,8 +6,8 @@
 // the model touch the board. Every answer is a proposal the person applies.
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { extractJson, captureInstruction, parseAiCapture, type CaptureProposal } from './crmCapture';
-import type { CrmDeal, CrmStage } from './crmModel';
+import { extractJson, captureInstruction, parseAiCapture, type CaptureProposal } from '@/Function/crm/crmCapture';
+import type { CrmDeal, CrmStage } from '@/Function/crm/crmModel';
 
 async function request(body: object, signal?: AbortSignal): Promise<Response> {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();

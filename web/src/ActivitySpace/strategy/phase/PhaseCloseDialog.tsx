@@ -32,7 +32,7 @@ import {
   unfinishedIn,
   type CloseDestination,
   type PhaseElementRow,
-} from './phaseClose';
+} from '@/Function/strategy/phaseClose';
 
 /** Mounted only while the dialog is open, so every field starts fresh. */
 export function PhaseCloseDialog({

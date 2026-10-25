@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { DateField } from '@/Function/shared/date';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { fieldOptions, type CrmFieldRecord } from './crmModel';
+import { fieldOptions, type CrmFieldRecord } from '@/Function/crm/crmModel';
 import { CrmPicker } from './CrmPicker';
 
 const FIELD_INPUT = 'h-7 w-full min-w-0 rounded-sm bg-transparent px-1.5 text-[13px] hover:bg-muted/40 focus:bg-muted/60 outline-none';

@@ -9,7 +9,7 @@ import { canManageObject } from '@/Function/shared/objectArchive';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useCurrentUserId } from '@/providers/authContext';
 import { restoreObject, useArchivedObjects } from '@/hooks/useObjectArchive';
-import { useMyDomainRoles, useMyObjectRoles } from './useMyMemberships';
+import { useMyDomainRoles, useMyObjectRoles } from '@/hooks/useMyMemberships';
 
 /** Whether the viewer manages a given Object (may archive / restore it). */
 export function useManagesObject(): (object: { id: string; domain_id: string | null }) => boolean {

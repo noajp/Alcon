@@ -9,13 +9,13 @@ import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { useWorkers } from '@/hooks/teamData';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { createElement, updateElement } from '@/hooks/elementData';
-import { fetchDataTableSchema } from '@/ActivitySpace/sustainment/table/data';
+import { fetchDataTableSchema } from '@/hooks/tableData';
 import { readAllPages } from '@/hooks/readAllPages';
 import {
   buildCrmWorkspace, fieldsFor, measureValue, metricKind, metricValue, normalizeCrmStages, parseActivityLog, resolveStage,
   type CrmActivityRecord, type CrmActivityType, type CrmCompanyRecord, type CrmContactRecord, type CrmDeal,
   type CrmDealContactRecord, type CrmDealRecord, type CrmElementLinkRecord, type CrmLinkedElement, type CrmDealRole, type CrmFieldRecord, type CrmNextElement, type CrmPerson, type CrmPipelineRecord, type CrmWorkspace,
-} from '@/ActivitySpace/sustainment/crm/crmModel';
+} from '@/Function/crm/crmModel';
 
 const EMPTY: never[] = [];
 const ACTIVITY_WINDOW = 3000;

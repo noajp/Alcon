@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import { fetchExplorerData } from '@/Function/sync/explorerData';
-import { initiativesForObjects, domainsForObjects, type InitiativeRelation } from '@/ActivitySpace/execution/domain/domainRelations';
+import { initiativesForObjects, domainsForObjects, type InitiativeRelation } from '@/Function/domain/domainRelations';
 import { readAllIn, readAllPages } from './readAllPages';
 import type { AlconObject, Domain } from '@/types/database';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';

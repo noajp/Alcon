@@ -15,7 +15,7 @@ import {
   type WorkerWatchInput,
   evaluateDealWatch,
   type DealWatchInput,
-} from '@/ActivitySpace/strategy/initiative/initiativeAssumptionModel';
+} from '@/Function/strategy/initiativeAssumptionModel';
 
 // The whole point of the assumptions surface is one claim: "something this
 // assumption depends on has stopped moving". Everything below tests that claim

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildCrmWorkspace, DEFAULT_CRM_STAGES, type CrmDealRecord } from '@/ActivitySpace/sustainment/crm/crmModel';
+import { buildCrmWorkspace, DEFAULT_CRM_STAGES, type CrmDealRecord } from '@/Function/crm/crmModel';
 import {
   captureChanges, extractJson, findDates, parseAiCapture, parseAmount, readCapture, reviewRows, reviewValues,
-} from '@/ActivitySpace/sustainment/crm/crmCapture';
+} from '@/Function/crm/crmCapture';
 
 const today = '2026-10-03'; // a Saturday
 const record = (values: Partial<CrmDealRecord>): CrmDealRecord => ({

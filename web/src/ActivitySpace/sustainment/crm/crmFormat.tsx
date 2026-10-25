@@ -1,7 +1,7 @@
 'use client';
 
-import type { CrmActivityKind, CrmDealRole, CrmHealthLevel, CrmStage } from './crmModel';
-import { readChange } from './crmModel';
+import type { CrmActivityKind, CrmDealRole, CrmHealthLevel, CrmStage } from '@/Function/crm/crmModel';
+import { readChange } from '@/Function/crm/crmModel';
 import { dayIndexOf } from '@/Function/shared/dateUtils';
 
 /** Currency amounts, compact when asked. Unknown codes fall back to "CODE 1,234". */

@@ -18,7 +18,7 @@
 
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { translate } from '@/Function/i18n/I18nProvider';
-import { ABSENCE_WINDOW_DAYS } from '@/ActivitySpace/strategy/initiative/initiativeAssumptionModel';
+import { ABSENCE_WINDOW_DAYS } from '@/Function/strategy/initiativeAssumptionModel';
 import {
   awayDayCount,
   dailyCapacity,

@@ -5,7 +5,7 @@ import { Link2, X } from 'lucide-react';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { Crm } from '@/hooks/useCrm';
-import type { CrmLinkedElement } from './crmModel';
+import type { CrmLinkedElement } from '@/Function/crm/crmModel';
 import { RecordSection } from './CrmRecordPage';
 import { relativeDay } from './crmFormat';
 

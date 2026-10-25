@@ -1,4 +1,4 @@
-import type { CrmRoute } from '@/ActivitySpace/sustainment/crm/crmRoute';
+import type { CrmRoute } from '@/Function/crm/crmRoute';
 
 export interface NavigationState {
   /** The CRM App's view, filters and open deal within this window tab. */

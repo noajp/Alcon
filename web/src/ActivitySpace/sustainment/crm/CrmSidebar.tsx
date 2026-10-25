@@ -6,8 +6,8 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ToolSidebar, type ToolNavItem } from '@/Function/shared/tool/ToolSidebar';
 import type { NavigationState } from '@/types/navigation';
 import { useCrm } from '@/hooks/useCrm';
-import { inList, todayQueue, type CrmList } from './crmModel';
-import { crmRoute, routeTo, type CrmRoute } from './crmRoute';
+import { inList, todayQueue, type CrmList } from '@/Function/crm/crmModel';
+import { crmRoute, routeTo, type CrmRoute } from '@/Function/crm/crmRoute';
 import { useCrmScope } from './crmScope';
 
 // The CRM sidebar, on the shared ToolSidebar: the scope (whose records), Today

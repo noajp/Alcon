@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/ui/button';
 import { useCurrentUserId } from '@/providers/authContext';
 import { ElementIntake } from '@/ActivitySpace/execution/element/intake/ElementIntake';
-import { ElementImportRejectedError, intakeTextFromRows, type ElementImportRow } from '@/ActivitySpace/execution/element/intake/intakeModel';
+import { ElementImportRejectedError, intakeTextFromRows, type ElementImportRow } from '@/Function/shared/element/intakeModel';
 import { clearPendingWorkImport, importExistingWork, readPendingWorkImport, rememberPendingWorkImport, resolveExistingWork, type PendingWorkImport } from '@/hooks/importExistingWork';
 import type { NowWorkData } from '@/hooks/coordinationData';
 import type { Domain } from '@/types/database';

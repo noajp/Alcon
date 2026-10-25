@@ -7,7 +7,7 @@ import {
   ElementImportRejectedError, INTAKE_FIELDS, INTAKE_LIMIT, INTAKE_TEXT_LIMIT, normalizeIntake, parseIntake, reconcileIntakeResult,
   type ElementImportResult, type ElementImportRow, type IntakeColumnMap, type IntakeFormat,
   type IntakeTable, type IntakeWorker,
-} from './intakeModel';
+} from '@/Function/shared/element/intakeModel';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export interface ElementIntakeProps {

@@ -17,7 +17,7 @@ import {
   type BusElement,
   type BusWorkerInput,
   type InitiativeBusFactor,
-} from '@/ActivitySpace/strategy/initiative/initiativeBusFactorModel';
+} from '@/Function/strategy/initiativeBusFactorModel';
 import type { AlconObject, ElementWithDetails } from '@/types/database';
 import type { CapacitySpan } from '@/Function/shared/workerCapacity';
 

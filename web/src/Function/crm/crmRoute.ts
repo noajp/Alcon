@@ -1,4 +1,4 @@
-import type { CrmList } from './crmModel';
+import type { CrmList } from '@/Function/crm/crmModel';
 
 // Where the CRM App is, kept per window tab in NavigationState.
 //

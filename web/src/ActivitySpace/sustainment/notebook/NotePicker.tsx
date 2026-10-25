@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Plus, Search, X } from 'lucide-react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
-import { supabase } from '@/lib/supabase';
-import { ensureNoteHome } from '@/hooks/useNotesDb';
+import { createNoteFile, fetchNoteFiles, type NoteFileSummary } from '@/hooks/useNotesDb';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // NotePicker — popover that lets the caller pick an existing Note
@@ -21,12 +20,6 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 // The component owns its own data fetch (small list, fresh on each
 // open) so callers don't have to thread useNotes() through.
 
-interface NoteFile {
-  id: string;
-  name: string;
-  parent_id: string | null;
-  updated_at: string;
-}
 
 interface NotePickerProps {
   open: boolean;
@@ -44,7 +37,7 @@ export function NotePicker({
   anchorClassName = 'absolute top-full right-0 mt-1',
 }: NotePickerProps) {
   const { t } = useI18n();
-  const [notes, setNotes] = useState<NoteFile[]>([]);
+  const [notes, setNotes] = useState<NoteFileSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
@@ -56,16 +49,10 @@ export function NotePicker({
     if (!open) return;
     let cancelled = false;
     setLoading(true);
-    (async () => {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('id, name, parent_id, updated_at')
-        .eq('type', 'file')
-        .order('updated_at', { ascending: false });
-      if (cancelled) return;
-      if (!error && data) setNotes(data as NoteFile[]);
-      setLoading(false);
-    })();
+    fetchNoteFiles()
+      .then((files) => { if (!cancelled) setNotes(files); })
+      .catch(() => undefined)
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => {
       cancelled = true;
     };
@@ -103,18 +90,7 @@ export function NotePicker({
     setCreating(true);
     const desiredName = query.trim() || t('Untitled note');
     try {
-      // Files require a non-null parent (DB CHECK) — resolve into a Section
-      // rather than a bare Folder, so the new note isn't hidden the moment
-      // that Folder has (or gains) Sections.
-      const { sectionId } = await ensureNoteHome();
-      const { data, error } = await supabase
-        .from('notes')
-        .insert({ type: 'file', name: desiredName, parent_id: sectionId })
-        .select('id, name, parent_id, updated_at')
-        .single();
-      if (error || !data) throw error ?? new Error('Failed to create note');
-      // Seed an empty content row so the editor can upsert later.
-      await supabase.from('note_contents').insert({ note_id: data.id, html: '' });
+      const data = await createNoteFile(desiredName);
       onPick(data.id, { isNew: true, name: data.name });
     } catch (error) {
       console.warn('[NotePicker] create failed', error);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeActivity } from '../src/ActivitySpace/execution/element/elementActivity';
+import { mergeActivity } from '@/hooks/elementActivity';
 import type { ElementActivity as ActivityEntry } from '../src/types/database';
 
 const e = (o: Partial<ActivityEntry> & { id: string; created_at: string }): ActivityEntry => ({

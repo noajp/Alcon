@@ -8,7 +8,7 @@ import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 import { useStrategies } from '@/hooks/strategyData';
 import { useInitiativeMeasures } from '@/hooks/useInitiativeMeasures';
 import type { Crm } from '@/hooks/useCrm';
-import { fieldKey, fieldOptions, fieldsFor, measureValue, metricKind, metricValue, normalizeCrmStages, readUnit, stageSlug, type CrmFieldRecord, type CrmMetric, type CrmStage } from './crmModel';
+import { fieldKey, fieldOptions, fieldsFor, measureValue, metricKind, metricValue, normalizeCrmStages, readUnit, stageSlug, type CrmFieldRecord, type CrmMetric, type CrmStage } from '@/Function/crm/crmModel';
 import { money } from './crmFormat';
 import { CrmPicker } from './CrmPicker';
 

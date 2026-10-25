@@ -44,7 +44,7 @@ vi.mock('@/lib/supabase', () => {
 });
 
 import { fetchTeamRoster } from '@/hooks/useTeamRoster';
-import { buildTeamRoster } from '@/ActivitySpace/sustainment/team/teamRoster';
+import { buildTeamRoster } from '@/Function/team/teamRoster';
 
 const RPC = 'get_space_guest_domain_members';
 const worker = (id: string, userId: string) => ({

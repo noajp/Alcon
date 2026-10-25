@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
-import { createNoteContentStore, EMPTY_NOTE_CONTENT } from '@/ActivitySpace/sustainment/notebook/noteContentStore';
+import { createNoteContentStore, EMPTY_NOTE_CONTENT } from '@/Function/notebook/noteContentStore';
 import type {
   NoteNode,
   NoteNodeType,
@@ -136,7 +137,7 @@ export async function ensureAppGuideNotes(): Promise<void> {
  * files), so parenting straight under a Folder that already has Sections
  * would leave the new file unreachable in the UI.
  */
-export async function ensureNoteHome(): Promise<{
+async function ensureNoteHome(): Promise<{
   sectionId: string;
   createdFolder: NoteNode | null;
   createdSection: NoteNode | null;
@@ -439,4 +440,51 @@ export function useNoteContent(noteId: string | null) {
     retry,
     save,
   };
+}
+
+/** One Note's id and name, or null when the viewer cannot see it (Notes are
+ *  their author's own). Shared by every embed of the same Note. */
+export function useNoteHeader(noteId: string | null) {
+  return useQuery({
+    queryKey: ['note-header', noteId],
+    enabled: !!noteId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('notes').select('id, name').eq('id', noteId!).maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as { id: string; name: string } | null;
+    },
+  });
+}
+
+export interface NoteFileSummary {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  updated_at: string;
+}
+
+/** Every Note file the viewer can see, most recently edited first. */
+export async function fetchNoteFiles(): Promise<NoteFileSummary[]> {
+  const { data, error } = await supabase
+    .from('notes')
+    .select('id, name, parent_id, updated_at')
+    .eq('type', 'file')
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as NoteFileSummary[];
+}
+
+/** A new, empty Note file. Files need a parent (DB CHECK), so it goes into a
+ *  Section rather than a bare Folder — a Folder that has (or gains) Sections
+ *  would hide it. The empty content row lets the editor upsert later. */
+export async function createNoteFile(name: string): Promise<NoteFileSummary> {
+  const { sectionId } = await ensureNoteHome();
+  const { data, error } = await supabase
+    .from('notes')
+    .insert({ type: 'file', name, parent_id: sectionId })
+    .select('id, name, parent_id, updated_at')
+    .single();
+  if (error || !data) throw error ?? new Error('Failed to create note');
+  await supabase.from('note_contents').insert({ note_id: data.id, html: '' });
+  return data as NoteFileSummary;
 }

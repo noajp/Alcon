@@ -36,14 +36,14 @@ import {
   type DecisionReview,
   type ReviewOutcome,
 } from '@/ActivitySpace/strategy/initiative/initiativeReviewModel';
-import { isAssumption } from '@/ActivitySpace/strategy/initiative/initiativeAssumptionModel';
+import { isAssumption } from '@/Function/strategy/initiativeAssumptionModel';
 import { isMeasure } from '@/ActivitySpace/strategy/initiative/initiativeMeasureModel';
 import {
   BoundTarget,
   IntentTargetPicker,
   type PickerTarget,
 } from '@/ActivitySpace/strategy/initiative/IntentTargetPicker';
-import type { InitiativeIntentState } from '@/ActivitySpace/strategy/initiative/useInitiativeIntent';
+import type { InitiativeIntentState } from '@/hooks/useInitiativeIntent';
 import { WidgetHeaderAction } from '@/Function/widget';
 
 // =============================================================

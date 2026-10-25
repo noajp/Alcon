@@ -10,9 +10,9 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { AlconObject, Element, ElementAssignee, ElementWithDetails, Worker } from '@/types/database';
-import { resolveWorkloadScope, selectWorkloadElements, workloadDomainIds, type WorkloadScope, type WorkloadSelection } from './workloadModel';
-import { setWorkloadDomainChoice, useWorkloadDomainChoice } from './workloadStore';
-export type { WorkloadScope } from './workloadModel';
+import { resolveWorkloadScope, selectWorkloadElements, workloadDomainIds, type WorkloadScope, type WorkloadSelection } from '@/Function/workload/workloadModel';
+import { setWorkloadDomainChoice, useWorkloadDomainChoice } from '@/Function/workload/workloadStore';
+export type { WorkloadScope } from '@/Function/workload/workloadModel';
 
 
 /** An explicit Object detail scope is authorized by that Object's RLS. It

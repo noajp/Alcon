@@ -13,7 +13,7 @@ import {
 } from '@/hooks/useSupabase';
 import type { IntentBinding, Worker } from '@/types/database';
 import { useCrm } from '@/hooks/useCrm';
-import type { CrmDeal } from '@/ActivitySpace/sustainment/crm/crmModel';
+import type { CrmDeal } from '@/Function/crm/crmModel';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { translate, useI18n } from '@/Function/i18n/I18nProvider';
 import { STATUS } from '@/shared/designTokens';
@@ -34,13 +34,13 @@ import {
   type WatchInput,
   type WorkerWatch,
   type WorkerWatchInput,
-} from '@/ActivitySpace/strategy/initiative/initiativeAssumptionModel';
+} from '@/Function/strategy/initiativeAssumptionModel';
 import {
   BoundTarget,
   IntentTargetPicker,
   type PickerTarget,
 } from '@/ActivitySpace/strategy/initiative/IntentTargetPicker';
-import type { InitiativeIntentState } from '@/ActivitySpace/strategy/initiative/useInitiativeIntent';
+import type { InitiativeIntentState } from '@/hooks/useInitiativeIntent';
 import { WidgetHeaderAction } from '@/Function/widget';
 
 // =============================================================

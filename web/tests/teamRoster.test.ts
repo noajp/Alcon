@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTeamRoster, mergeTeamDomainMembers, parseCapacityDraft, type TeamRosterSource } from '@/ActivitySpace/sustainment/team/teamRoster';
+import { buildTeamRoster, mergeTeamDomainMembers, parseCapacityDraft, type TeamRosterSource } from '@/Function/team/teamRoster';
 import type { Worker } from '@/types/database';
 
 function worker(id: string, overrides: Partial<Worker> = {}): Worker {

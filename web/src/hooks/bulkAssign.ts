@@ -1,7 +1,7 @@
 'use client';
 
 import { supabase } from '@/lib/supabase';
-import { pushUndo } from '@/ActivitySpace/execution/element/bulkUndo';
+import { pushUndo } from '@/Function/shared/element/bulkUndo';
 
 type Role = 'assignee' | 'reviewer' | 'collaborator';
 interface Row { id: string; element_id: string; worker_id: string; role: Role }
