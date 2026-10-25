@@ -12,6 +12,7 @@ import { EXECUTION_TRANSLATIONS } from './executionMessages';
 import { DOCUMENTS_TRANSLATIONS } from './documentsMessages';
 import { APP_TRANSLATIONS } from './appMessages';
 import { OPERATIONS_TRANSLATIONS } from '@/ActivitySpace/sustainment/operations/operationsMessages';
+import { DESIGN_TRANSLATIONS } from './designMessages';
 
 type TranslationMap = Record<string, string>;
 
@@ -1423,8 +1424,9 @@ Object.assign(fr, APPROACH_TRANSLATIONS.fr);
 Object.assign(es, APPROACH_TRANSLATIONS.es);
 
 // Each area's own strings: the shared parts, widget bodies, Strategy,
-// Execution, Notebook/Table/Slides, the app shell and settings, Operations.
-for (const area of [SHARED_TRANSLATIONS, WIDGET_TRANSLATIONS, STRATEGY_TRANSLATIONS, EXECUTION_TRANSLATIONS, DOCUMENTS_TRANSLATIONS, APP_TRANSLATIONS, OPERATIONS_TRANSLATIONS]) {
+// Execution, Notebook/Table/Slides, the app shell and settings, Operations,
+// the Design widget.
+for (const area of [SHARED_TRANSLATIONS, WIDGET_TRANSLATIONS, STRATEGY_TRANSLATIONS, EXECUTION_TRANSLATIONS, DOCUMENTS_TRANSLATIONS, APP_TRANSLATIONS, OPERATIONS_TRANSLATIONS, DESIGN_TRANSLATIONS]) {
   Object.assign(ja, area.ja);
   Object.assign(ko, area.ko);
   Object.assign(fr, area.fr);
