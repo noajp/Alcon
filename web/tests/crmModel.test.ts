@@ -8,7 +8,7 @@ import {
 const today = '2026-10-03';
 const pipeline: CrmPipelineRecord = {
   id: 'p', name: 'Sales', stages: DEFAULT_CRM_STAGES, currency: 'USD', horizon_days: 30, follow_up_days: 14,
-  object_id: null, measure_intent_id: null, measure_metric: null, record_label: null, domain_id: null, order_index: 0,
+  object_id: null, measure_intent_id: null, measure_metric: null, measure_field: null, record_label: null, domain_id: null, order_index: 0,
   renewal_days: 90, renewal_pipeline_id: null,
 };
 let seq = 0;
@@ -239,5 +239,39 @@ describe('readChange', () => {
   it('ignores lines that are not revisions', () => {
     expect(readChange('lead → qualified')).toBeNull();
     expect(readChange('name: a → b')).toBeNull();
+  });
+});
+
+describe('field metrics', () => {
+  const build = (deals: CrmDealRecord[]) => buildCrmWorkspace({
+    pipeline, deals, companies: [], contacts: [], activities: [], elements: [], people: [],
+  }, today).deals;
+  const deals = build([
+    deal({ stage: 'won', closed_on: '2026-08-10', custom: { arr: 1200000 } }),
+    deal({ stage: 'won', closed_on: '2026-10-01', custom: { arr: '800,000' }, currency: 'JPY' }),
+    deal({ stage: 'won', closed_on: '2025-12-01', custom: { arr: 500000 } }),
+    deal({ stage: 'won', closed_on: '2026-10-02', custom: {} }),
+    deal({ stage: 'proposal', custom: { arr: 9999999 } }),
+  ]);
+
+  it('adds up a number field over won deals in every currency', () => {
+    expect(metricValue(deals, 'won_field_total', 'USD', today, 'arr')).toBe(2500000);
+    expect(metricValue(deals, 'won_field_year', 'USD', today, 'arr')).toBe(2000000);
+    expect(metricValue(deals, 'won_field_quarter', 'USD', today, 'arr')).toBe(800000);
+  });
+  it('reports nothing without a field', () => {
+    expect(metricValue(deals, 'won_field_total', 'USD', today, null)).toBe(0);
+  });
+  it('reported as money, counts only deals in the pipeline’s currency', () => {
+    expect(metricValue(deals, 'won_field_total', 'USD', today, 'arr', '円')).toBe(1700000);
+    expect(metricValue(deals, 'won_field_total', 'JPY', today, 'arr', '万円')).toBe(800000);
+    expect(metricValue(deals, 'won_field_total', 'USD', today, 'arr', '席')).toBe(2500000);
+  });
+  it('goes into counts as is, into money of the pipeline’s currency at its scale, never into rates', () => {
+    expect(measureValue('席', 'won_field_total', 'USD', 120)).toBe(120);
+    expect(measureValue('億円', 'won_field_total', 'JPY', 1_200_000_000)).toBe(12);
+    expect(measureValue('億円', 'won_field_total', 'USD', 1_200_000_000)).toBeNull();
+    expect(measureValue('%', 'won_field_total', 'USD', 5)).toBeNull();
+    expect(measureValue(null, 'won_field_total', 'USD', 5)).toBe(5);
   });
 });
