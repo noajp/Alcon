@@ -308,6 +308,7 @@ const CRM_MESSAGES: Record<string, Row> = {
   'This pipeline': ['このパイプライン', '이 파이프라인', 'Ce pipeline', 'Este pipeline'],
   'A won deal with a renewal date shows up in Today when its renewal is this close.': ['更新日のある受注済みの商談は、更新日がこの日数以内になると Today に出ます。', '갱신일이 있는 수주 거래는 갱신일이 이 기간 안에 들어오면 Today에 표시됩니다.', 'Une affaire gagnée avec une date de renouvellement apparaît dans Aujourd’hui à cette échéance.', 'Un negocio ganado con fecha de renovación aparece en Hoy cuando la renovación está así de cerca.'],
   'Every open deal has a scheduled next step and recent contact, and no contract is up for renewal.': ['進行中の商談はすべて次の一手と最近の連絡があり、更新を迎える契約もありません。', '진행 중인 모든 거래에 다음 단계와 최근 연락이 있고, 갱신을 앞둔 계약도 없습니다.', 'Chaque affaire ouverte a une prochaine étape et un contact récent, et aucun contrat n’arrive à renouvellement.', 'Cada negocio abierto tiene un próximo paso y contacto reciente, y ningún contrato está por renovarse.'],
+  'Change': ['変更', '변경', 'Modification', 'Cambio'],
   'Stage name': ['ステージ名', '단계 이름', 'Nom de l’étape', 'Nombre de la etapa'],
   'Stages': ['ステージ', '단계', 'Étapes', 'Etapas'],
   'Start by capturing a deal you are working on. Paste the notes from your last call — Alcon fills in the account, amount, dates and next step for you to confirm.': [

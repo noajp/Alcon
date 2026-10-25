@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  accountsOf, buildCrmWorkspace, fieldsFor, measureValue, readUnit, fieldKey, fieldOptions, forecastFor, inList, metricValue, normalizeCrmStages, parseActivityLog,
+  accountsOf, buildCrmWorkspace, fieldsFor, measureValue, readChange, readUnit, fieldKey, fieldOptions, forecastFor, inList, metricValue, normalizeCrmStages, parseActivityLog,
   pipelineColumns, searchDeals, stageChange, todayQueue, upcoming, DEFAULT_CRM_STAGES,
   type CrmDealRecord, type CrmNextElement, type CrmPipelineRecord, type CrmRecords,
 } from '@/ActivitySpace/sustainment/crm/crmModel';
@@ -222,5 +222,21 @@ describe('renewals', () => {
   it('leaves open and lost deals to their usual actions', () => {
     expect(build([deal({ stage: 'lost', renews_on: '2026-10-10' })])[0].action).toBeNull();
     expect(build([deal({ renews_on: '2026-10-10' })])[0].action?.code).not.toBe('renewal_due');
+  });
+});
+
+describe('readChange', () => {
+  it('reads an amount revision with its currency', () => {
+    expect(readChange('amount: 48000000 JPY → 45600000 JPY')).toEqual({
+      field: 'amount', from: { value: '48000000', currency: 'JPY' }, to: { value: '45600000', currency: 'JPY' },
+    });
+  });
+  it('reads a missing side as null', () => {
+    expect(readChange('close_date: — → 2026-12-15')).toEqual({ field: 'close_date', from: null, to: { value: '2026-12-15', currency: null } });
+    expect(readChange('probability: 40 → —')).toEqual({ field: 'probability', from: { value: '40', currency: null }, to: null });
+  });
+  it('ignores lines that are not revisions', () => {
+    expect(readChange('lead → qualified')).toBeNull();
+    expect(readChange('name: a → b')).toBeNull();
   });
 });

@@ -124,7 +124,7 @@ export interface CrmDealRecord {
   /** The deal this one renews. */
   renewal_of: string | null;
 }
-export type CrmActivityKind = 'call' | 'email' | 'meeting' | 'note' | 'stage';
+export type CrmActivityKind = 'call' | 'email' | 'meeting' | 'note' | 'stage' | 'change';
 export interface CrmActivityRecord {
   id: string; deal_id: string | null; company_id: string | null; contact_id: string | null; kind: CrmActivityKind;
   body: string; occurred_on: string; created_by: string | null; author_name: string | null; created_at: string;
@@ -141,7 +141,26 @@ export interface CrmPerson { id: string; name: string; type: string; user_id: st
 
 export const ACTIVITY_TYPES = ['call', 'email', 'meeting', 'note'] as const;
 export type CrmActivityType = typeof ACTIVITY_TYPES[number];
-export interface CrmActivity { id?: string; date: string | null; type: CrmActivityType | 'stage'; text: string; author?: string | null }
+export interface CrmActivity { id?: string; date: string | null; type: CrmActivityKind; text: string; author?: string | null }
+
+/** A revision the database wrote to a deal's history: "amount: 48000000 JPY → 45600000 JPY". */
+export interface CrmChange {
+  field: 'amount' | 'probability' | 'close_date';
+  from: { value: string; currency: string | null } | null;
+  to: { value: string; currency: string | null } | null;
+}
+const CHANGE_LINE = /^(amount|probability|close_date): (.+?) → (.+)$/;
+export function readChange(body: string): CrmChange | null {
+  const match = CHANGE_LINE.exec(body.trim());
+  if (!match) return null;
+  const side = (raw: string) => {
+    const value = raw.trim();
+    if (!value || value === '—') return null;
+    const [amount, currency] = value.split(/\s+/);
+    return match[1] === 'amount' ? { value: amount, currency: currency || null } : { value, currency: null };
+  };
+  return { field: match[1] as CrmChange['field'], from: side(match[2]), to: side(match[3]) };
+}
 
 // A Table-era activity log line: "2026-10-03 · call · text". Read when importing.
 const ACTIVITY_LINE = /^(\d{4}-\d{2}-\d{2})\s*[·|]\s*([a-z]+)\s*[·|]\s*(.*)$/i;
