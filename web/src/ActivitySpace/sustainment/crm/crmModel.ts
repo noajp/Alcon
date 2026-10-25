@@ -113,6 +113,10 @@ export interface CrmPipelineRecord {
   /** The Domain this pipeline belongs to; null = shared with the whole Space. */
   domain_id: string | null;
   order_index: number;
+  /** How many days before a contract renews it needs attention. */
+  renewal_days: number;
+  /** Where renewal deals go; null = this pipeline. */
+  renewal_pipeline_id: string | null;
 }
 export interface CrmCompanyRecord {
   id: string; name: string; domain: string | null; industry: string | null; owner_worker_id: string | null;
@@ -128,6 +132,10 @@ export interface CrmDealRecord {
   close_date: string | null; last_contact_on: string | null; next_step: string | null; next_step_on: string | null;
   next_element_id: string | null; initiative_id: string | null; source: string | null; lost_reason: string | null;
   closed_on: string | null; custom: Record<string, unknown>; created_at: string;
+  /** The day the contract renews or ends. */
+  renews_on: string | null;
+  /** The deal this one renews. */
+  renewal_of: string | null;
 }
 export type CrmActivityKind = 'call' | 'email' | 'meeting' | 'note' | 'stage' | 'change';
 export interface CrmActivityRecord {
@@ -229,6 +237,10 @@ export interface CrmDeal {
   initiativeId: string | null;
   source: string | null;
   lostReason: string | null;
+  renewsOn: string | null;
+  renewalOf: string | null;
+  /** The deal that renews this one, in any pipeline. */
+  renewedBy: string | null;
   custom: Record<string, unknown>;
   activity: CrmActivity[];
   createdAt: string | null;
@@ -240,7 +252,7 @@ export interface CrmDeal {
 
 export interface CrmBoardColumn { stage: CrmStage; deals: CrmDeal[]; totals: Record<string, number>; closed: boolean }
 
-export interface CrmSettings { horizonDays: number; followUpDays: number }
+export interface CrmSettings { horizonDays: number; followUpDays: number; renewalDays: number }
 
 export interface CrmWorkspace {
   today: string;
@@ -285,8 +297,20 @@ function health(deal: Omit<CrmDeal, 'health' | 'action'>, today: string, followU
   return { score, level: score >= 70 ? 'healthy' : score >= 40 ? 'watch' : 'risk', reasons };
 }
 
-/** The one thing to do next for an open deal, if anything is due. */
-function nextAction(deal: Omit<CrmDeal, 'health' | 'action'>, today: string, followUpDays: number): CrmAction | null {
+/** A won deal whose contract renews within the window and has no renewal deal yet. */
+function renewalAction(deal: Pick<CrmDeal, 'outcome' | 'renewsOn' | 'renewedBy'>, today: string, renewalDays: number): CrmAction | null {
+  if (deal.outcome !== 'won' || !deal.renewsOn || deal.renewedBy) return null;
+  const days = daysBetween(today, deal.renewsOn);
+  if (deal.renewsOn < today) return { code: 'renewal_due', urgency: 'overdue', message: 'Contract renewed or ended {date} — start the renewal', values: { date: deal.renewsOn } };
+  if (days > renewalDays) return null;
+  return { code: 'renewal_due', urgency: days === 0 ? 'today' : days <= 30 ? 'soon' : 'plan', message: 'Renews {date} — start the renewal', values: { date: deal.renewsOn } };
+}
+
+/** The one thing to do next for a deal, if anything is due: a renewal for a
+ * won deal, the next step for an open one. */
+function nextAction(deal: Omit<CrmDeal, 'health' | 'action'>, today: string, params: CrmSettings): CrmAction | null {
+  const followUpDays = params.followUpDays;
+  if (deal.outcome === 'won') return renewalAction(deal, today, params.renewalDays);
   if (!deal.valid || deal.outcome !== 'open') return null;
   const step = deal.nextStep ?? null;
   if (deal.closeDate && deal.closeDate < today) return { code: 'close_overdue', urgency: 'overdue', message: 'Confirm the outcome or move the close date' };
@@ -321,7 +345,8 @@ const toNumber = (value: number | string | null) => value === null || value === 
 export function buildCrmWorkspace(records: CrmRecords, today: string): CrmWorkspace {
   const { pipeline } = records;
   const stages = normalizeCrmStages(pipeline.stages);
-  const params: CrmSettings = { horizonDays: pipeline.horizon_days, followUpDays: pipeline.follow_up_days };
+  const params: CrmSettings = { horizonDays: pipeline.horizon_days, followUpDays: pipeline.follow_up_days, renewalDays: pipeline.renewal_days ?? 90 };
+  const renewals = new Map(records.deals.filter(deal => deal.renewal_of).map(deal => [deal.renewal_of!, deal.id]));
   const companies = new Map(records.companies.map(company => [company.id, company]));
   const contacts = new Map(records.contacts.map(contact => [contact.id, contact]));
   const people = new Map(records.people.map(person => [person.id, person]));
@@ -357,10 +382,11 @@ export function buildCrmWorkspace(records: CrmRecords, today: string): CrmWorksp
       nextActionDate: element ? elementOpen ? element.due_date : null : row.next_step_on,
       nextStep: element ? elementOpen ? element.title : null : row.next_step,
       nextElement: element, initiativeId: row.initiative_id, source: row.source, lostReason: row.lost_reason,
+      renewsOn: row.renews_on ?? null, renewalOf: row.renewal_of ?? null, renewedBy: renewals.get(row.id) ?? null,
       custom: row.custom ?? {}, activity: history.get(row.id) ?? [], createdAt: row.created_at,
       valid: issues.length === 0, issues,
     };
-    return { ...base, health: health(base, today, params.followUpDays), action: nextAction(base, today, params.followUpDays) };
+    return { ...base, health: health(base, today, params.followUpDays), action: nextAction(base, today, params) };
   });
   const totals = new Map<string, CrmWorkspace['totals'][number]>();
   const horizonEnd = shiftDate(today, params.horizonDays);
@@ -543,10 +569,12 @@ export function metricValue(deals: readonly CrmDeal[], metric: CrmMetric, curren
   }
 }
 
-export type CrmList = 'mine' | 'at-risk' | 'closing-soon' | 'no-next-step' | 'stale' | 'won' | 'lost' | 'incomplete';
+export type CrmList = 'mine' | 'at-risk' | 'closing-soon' | 'renewing' | 'no-next-step' | 'stale' | 'won' | 'lost' | 'incomplete';
 
 export function inList(deal: CrmDeal, list: CrmList, today: string, horizonDays: number, me: string | null = null): boolean {
   switch (list) {
+    // Each pipeline's own renewal window decided the action already.
+    case 'renewing': return deal.action?.code === 'renewal_due';
     case 'mine': return !!me && deal.ownerId === me && deal.outcome === 'open';
     case 'at-risk': return deal.health.level === 'risk';
     case 'closing-soon': return deal.outcome === 'open' && deal.valid && !!deal.closeDate && deal.closeDate >= today && deal.closeDate <= shiftDate(today, horizonDays);

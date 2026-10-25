@@ -49,6 +49,8 @@ export interface CrmDealPatch {
   /** Next step without an Element (no Object to file it in). */
   nextStep?: string | null;
   nextStepOn?: string | null;
+  /** The day the contract renews or ends. */
+  renewsOn?: string | null;
 }
 
 /** The CRM App's single source: the active Space's pipelines and records,
@@ -198,6 +200,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     if (patch.custom !== undefined) row.custom = patch.custom;
     if (patch.nextStep !== undefined) row.next_step = patch.nextStep;
     if (patch.nextStepOn !== undefined) row.next_step_on = patch.nextStepOn;
+    if (patch.renewsOn !== undefined) row.renews_on = patch.renewsOn;
     if (patch.companyId !== undefined) row.company_id = patch.companyId;
     if (patch.companyName) row.company_id = await companyFor(patch.companyName);
     if (patch.contactId !== undefined) row.contact_id = patch.contactId;
@@ -217,6 +220,38 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
       if (extra?.activity) await logActivity(id!, extra.activity, { companyId: (row.company_id as string | null | undefined), contactId: (row.contact_id as string | null | undefined), quiet: true });
       return id!;
     } finally { if (!extra?.quiet) await invalidate(); }
+  };
+
+  /** Open the renewal of a won deal: a new deal in the pipeline renewals go
+   * to, for the same customer and owner, due on the renewal date. */
+  const startRenewal = async (dealId: string, name: string): Promise<{ id: string; pipelineId: string }> => {
+    const source = deals.data?.find(item => item.id === dealId);
+    if (!source) throw new Error('Deal not found');
+    const from = (pipelines.data ?? []).find(item => item.id === source.pipeline_id);
+    const target = from?.renewal_pipeline_id ? (pipelines.data ?? []).find(item => item.id === from.renewal_pipeline_id) : from;
+    // Never fall back to another pipeline: the renewal would land where nobody expects it.
+    if (!target) throw new Error('Renewals from this pipeline go to a pipeline you cannot see. Ask someone in its Domain to start it.');
+    const stages = normalizeCrmStages(target.stages);
+    try {
+      const result = await supabase.from('crm_deals').insert({
+        activity_space_id: space(), pipeline_id: target.id, name: name.trim().slice(0, 200), stage: stages[0].id, probability: stages[0].probability,
+        amount: source.amount, currency: source.currency, company_id: source.company_id, contact_id: source.contact_id,
+        owner_worker_id: source.owner_worker_id ?? me, initiative_id: source.initiative_id, renewal_of: source.id,
+        // A renewal already late is due now, not in the past.
+        close_date: source.renews_on && source.renews_on > today ? source.renews_on : today,
+      }).select('id').single();
+      // One renewal per deal: someone got there first, maybe where this reader cannot see.
+      if (result.error?.code === '23505') throw new Error('This deal already has a renewal deal, perhaps in a pipeline you cannot see.');
+      return { id: check(result).id as string, pipelineId: target.id };
+    } finally { await invalidate(); }
+  };
+
+  /** A customer who will not renew: the deal leaves the renewal queue, and its
+   * history keeps the date it would have renewed. */
+  const declineRenewal = async (dealId: string, note: string) => {
+    // Clear first: a failed note never leaves the deal half-declined and noted twice on retry.
+    await saveDeal(dealId, { renewsOn: null }, { quiet: true });
+    await logActivity(dealId, { type: 'note', text: note });
   };
 
   const logActivity = async (dealId: string, entry: { type: CrmActivityType; text: string; date?: string },
@@ -421,7 +456,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     loading: enabled && !workspace && !error,
     error, measureError,
     refetch: invalidate,
-    saveDeal, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
+    saveDeal, startRenewal, declineRenewal, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
     savePipeline, deletePipeline, saveCompany, deleteCompany, saveContact, deleteContact, saveField, deleteField,
     importFromTable,
   };

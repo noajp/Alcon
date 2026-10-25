@@ -9,13 +9,14 @@ const today = '2026-10-03';
 const pipeline: CrmPipelineRecord = {
   id: 'p', name: 'Sales', stages: DEFAULT_CRM_STAGES, currency: 'USD', horizon_days: 30, follow_up_days: 14,
   object_id: null, measure_intent_id: null, measure_metric: null, measure_field: null, record_label: null, domain_id: null, order_index: 0,
+  renewal_days: 90, renewal_pipeline_id: null,
 };
 let seq = 0;
 const deal = (values: Partial<CrmDealRecord> = {}): CrmDealRecord => ({
   id: `d${++seq}`, pipeline_id: 'p', number: seq, name: 'Renewal', company_id: 'acme', contact_id: null, owner_worker_id: 'w1',
   stage: 'proposal', amount: 1000, currency: 'USD', probability: 50, close_date: '2026-10-20', last_contact_on: '2026-10-01',
   next_step: 'Send quote', next_step_on: '2026-10-06', next_element_id: null, initiative_id: null, source: null, lost_reason: null,
-  closed_on: null, custom: {}, created_at: '2026-09-01T00:00:00Z', ...values,
+  closed_on: null, custom: {}, created_at: '2026-09-01T00:00:00Z', renews_on: null, renewal_of: null, ...values,
 });
 function workspace(deals: CrmDealRecord[], extra: Partial<CrmRecords> = {}) {
   return buildCrmWorkspace({
@@ -191,6 +192,37 @@ describe('CRM fields and import', () => {
     expect(parseActivityLog('2026-10-02 · call · Budget\ntyped by hand')).toEqual([
       { date: '2026-10-02', type: 'call', text: 'Budget' }, { date: null, type: 'note', text: 'typed by hand' },
     ]);
+  });
+});
+
+describe('renewals', () => {
+  const won = (values: Partial<CrmDealRecord>) => deal({ stage: 'won', closed_on: '2026-04-01', ...values });
+  const build = (deals: CrmDealRecord[], renewalDays = 90) => buildCrmWorkspace({
+    pipeline: { ...pipeline, renewal_days: renewalDays }, deals, companies: [], contacts: [], activities: [], elements: [], people: [],
+  }, today).deals;
+
+  it('asks for the renewal of a won deal inside the window', () => {
+    const [d] = build([won({ id: 'a', renews_on: '2026-12-01' })]);
+    expect(d.action).toMatchObject({ code: 'renewal_due', urgency: 'plan' });
+    expect(inList(d, 'renewing', today, 30)).toBe(true);
+  });
+  it('is soon within 30 days and overdue once the date has passed', () => {
+    expect(build([won({ renews_on: '2026-10-20' })])[0].action?.urgency).toBe('soon');
+    expect(build([won({ renews_on: '2026-09-30' })])[0].action?.urgency).toBe('overdue');
+    expect(build([won({ renews_on: today })])[0].action?.urgency).toBe('today');
+  });
+  it('stays quiet outside the pipeline’s window', () => {
+    expect(build([won({ renews_on: '2027-03-01' })])[0].action).toBeNull();
+    expect(build([won({ renews_on: '2026-12-01' })], 30)[0].action).toBeNull();
+  });
+  it('stays quiet once a renewal deal exists, in any pipeline', () => {
+    const deals = build([won({ id: 'a', renews_on: '2026-12-01' }), deal({ id: 'b', pipeline_id: 'other', renewal_of: 'a' })]);
+    expect(deals[0].renewedBy).toBe('b');
+    expect(deals[0].action).toBeNull();
+  });
+  it('leaves open and lost deals to their usual actions', () => {
+    expect(build([deal({ stage: 'lost', renews_on: '2026-10-10' })])[0].action).toBeNull();
+    expect(build([deal({ renews_on: '2026-10-10' })])[0].action?.code).not.toBe('renewal_due');
   });
 });
 
