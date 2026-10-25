@@ -6,8 +6,8 @@ import { tx } from "@/ActivitySpace/sustainment/slides/kata/i18n";
 // 型の上に自由に置くもの（文字・図形・線・画像）と、文字の見た目の上書き。
 // 色は世界観の色の名前で持つ。世界観を混ぜ直しても、置いたものが浮かない。
 
-export const SLIDE_W = 1280;
-export const SLIDE_H = 720;
+const SLIDE_W = 1280;
+const SLIDE_H = 720;
 
 export const COLOR_REFS: Exclude<ColorRef, `#${string}`>[] = ["ink", "sub", "accent", "tint", "block", "num", "bg", "line", "none"];
 
@@ -57,7 +57,7 @@ export const FONT_REFS: FontRef[] = ["display", "body", "sans", "serif", "mono"]
 export const fontLabel = (f: FontRef): string =>
   ({ display: tx("見出し", "Heading"), body: tx("本文", "Body"), sans: "Sans", serif: tx("明朝", "Serif"), mono: "Mono" })[f];
 
-export function cssFont(f: FontRef | undefined): string | undefined {
+function cssFont(f: FontRef | undefined): string | undefined {
   switch (f) {
     case "display":
       return "var(--s-display)";
@@ -264,7 +264,7 @@ export function snapMove(o: SlideObject, others: SlideObject[], threshold = 6): 
 }
 
 /** 置きものが占める四角（線は端点から） */
-export function bounds(o: SlideObject): { x: number; y: number; w: number; h: number } {
+function bounds(o: SlideObject): { x: number; y: number; w: number; h: number } {
   if (!isLineKind(o.kind)) return { x: o.x, y: o.y, w: o.w, h: o.h };
   return { x: Math.min(o.x, o.x + o.w), y: Math.min(o.y, o.y + o.h), w: Math.abs(o.w), h: Math.abs(o.h) };
 }

@@ -24,7 +24,8 @@ import { usePortfolios } from '@/ActivitySpace/strategy/portfolio/data';
 import { buildPortfolioTree, groupByPortfolio, initiativesInSpace, rollupPortfolio } from '@/ActivitySpace/strategy/portfolio/portfolioGroups';
 import { NavPortfolioIcon, NavStrategyIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
 import type { StrategyWithObjects, Vision, VisionUpdate } from '@/types/database';
-import { createVision, resolveVision, setStrategyVision, updateVision, useSpaceRoleQuery, useVisions } from './data';
+import { createVision, resolveVision, setStrategyVision, updateVision, useVisions } from './data';
+import { useSpaceRoleQuery } from '@/Function/space/data';
 
 // Strategy > Vision — what the Space aims for. A Space holds any number of
 // Visions, the way it holds Domains: each one has a name, the aim in one

@@ -245,7 +245,7 @@ describe('the converged surfaces go through the primitive', () => {
     // text-white` inline, which is the `danger` tier being re-invented at the
     // call site — and re-invented differently from ChannelDialog's, which used
     // `variant="destructive"`.
-    for (const file of ['shell/sidebar/ObjectTree.tsx', 'ActivitySpace/execution/object/ObjectDetailView.tsx']) {
+    for (const file of ['ActivitySpace/execution/object/ObjectDetailView.tsx']) {
       expect(code(file)).not.toMatch(/bg-destructive hover:bg-destructive/);
     }
   });

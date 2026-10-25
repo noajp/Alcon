@@ -36,7 +36,8 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-import { fetchDecisionLabData, readDecisionLabPages } from '@/hooks/useDecisionLab';
+import { fetchDecisionLabData } from '@/hooks/useDecisionLab';
+import { readAllPages as readDecisionLabPages } from '@/hooks/readAllPages';
 
 describe('complete Decision Lab reads', () => {
   it('advances by returned rows when the server cap is smaller than the requested page', async () => {

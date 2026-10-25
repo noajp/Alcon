@@ -12,7 +12,7 @@ import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
 import { CommandPalette } from '@/shell/CommandPalette';
 import { QuickAddElementLauncher } from '@/shell/QuickAddElementLauncher';
-import { AlconCopilotPanel } from '@/Function/copilot';
+import { AlconCopilotPanel } from '@/Function/copilot/AlconCopilotPanel';
 import type { AppTab } from '@/shell/appTab';
 import { mergeNavigation, navigationAfterDomainChange } from '@/shell/navigationState';
 import type { NavigationState } from '@/types/navigation';

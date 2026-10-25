@@ -13,7 +13,6 @@ import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
-import { PRIORITY_OPTIONS } from '@/Function/shared/listControls/types';
 import { Plus, Calendar, User, Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as CalendarPicker } from '@/ui/calendar';
@@ -25,7 +24,7 @@ import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { ActivitySignal } from '../ActivitySignal';
 import { isCancelKey, isCommitEnter, isSubmitChord } from '@/Function/shared/keyboard';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { PRIORITY } from '@/shared/designTokens';
+import { PRIORITY, PRIORITY_ORDER } from '@/shared/designTokens';
 
 // A card title reads at most three lines — beyond that it ellipsises, and the
 // inline rename box grows to the same three lines before it scrolls. Both
@@ -232,7 +231,7 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[140px]" onPointerDown={stop}>
-                {PRIORITY_OPTIONS.map((p) => (
+                {PRIORITY_ORDER.map((p) => (
                   <DropdownMenuItem key={p} onClick={() => savePriority(p)} className="gap-2 text-[13px]">
                     <PriorityMark priority={p} />
                     <span className="flex-1">{t(PRIORITY[p as keyof typeof PRIORITY]?.label ?? p)}</span>

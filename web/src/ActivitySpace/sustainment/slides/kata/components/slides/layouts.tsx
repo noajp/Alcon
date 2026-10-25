@@ -338,7 +338,7 @@ function Agenda({ slide }: { slide: Slide }) {
 }
 
 /** 一覧の列の数：4つまでは横一列、6つまで3列、7〜8は4列、9は3列、10以上は4列 */
-export function gridCols(n: number): number {
+function gridCols(n: number): number {
   return n <= 4 ? Math.max(2, n) : n <= 6 ? 3 : n <= 8 ? 4 : n === 9 ? 3 : 4;
 }
 

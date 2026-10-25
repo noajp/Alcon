@@ -2,7 +2,7 @@
 // Elements, Domain Elements, Domain Objects). Persisted per-view in
 // localStorage under `list-controls:<scope>`.
 
-import { STATUS, PRIORITY, STATUS_ORDER, PRIORITY_ORDER } from '@/shared/designTokens';
+import { STATUS, PRIORITY } from '@/shared/designTokens';
 import type { ElementPriority, ElementStatus } from '@/types/database';
 
 export interface ListFilter {
@@ -78,7 +78,7 @@ export const DEFAULT_FILTER: ListFilter = {
   query: '',
 };
 
-export const DEFAULT_DISPLAY: ListDisplay = {
+const DEFAULT_DISPLAY: ListDisplay = {
   // Elements default to grouping under their parent Object (Linear's
   // "group by Project"). "No grouping" flattens to a single list.
   groupBy: 'object',
@@ -91,8 +91,6 @@ export const DEFAULT_STATE: ListControlsState = {
   display: DEFAULT_DISPLAY,
 };
 
-export const STATUS_OPTIONS: ElementStatus[] = [...STATUS_ORDER];
-export const PRIORITY_OPTIONS: ElementPriority[] = [...PRIORITY_ORDER];
 export const labelForStatus = (s: ElementStatus): string => STATUS[s]?.label;
 export const labelForPriority = (p: ElementPriority): string => PRIORITY[p]?.label;
 

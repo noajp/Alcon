@@ -696,7 +696,7 @@ export function planDeck(text: string, storyline: StorylineId = "scr", budget?: 
 }
 
 /** サマリーの要点：本体から3つ（前・中・後ろ）拾い、指すページを id で持つ */
-export function summaryPoints(body: Slide[]): SummaryContent["points"] {
+function summaryPoints(body: Slide[]): SummaryContent["points"] {
   const pick = [0.25, 0.6, 0.95].map((f) => body[Math.min(body.length - 1, Math.floor(f * (body.length - 1)))]).filter((x, i, a) => x && a.indexOf(x) === i);
   return pick.map((x) => ({ head: x.title, body: "", page: "", ref: x.id }));
 }

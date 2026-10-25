@@ -20,7 +20,7 @@ import { ArchivedObjectsSection } from '@/ActivitySpace/execution/object/Archive
 
 // Objects are a flat list within the Domain.
 
-export function findObjectById(objects: AlconObjectWithChildren[], objectId: string): AlconObjectWithChildren | null {
+function findObjectById(objects: AlconObjectWithChildren[], objectId: string): AlconObjectWithChildren | null {
   return objects.find(o => o.id === objectId) ?? null;
 }
 

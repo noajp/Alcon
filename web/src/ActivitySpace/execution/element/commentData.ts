@@ -251,7 +251,7 @@ export async function fetchCommentReactions(commentIds: string[]): Promise<Eleme
   ) as ElementReaction[];
 }
 
-export async function addReaction(input: ElementReactionInsert): Promise<ElementReaction> {
+async function addReaction(input: ElementReactionInsert): Promise<ElementReaction> {
   const { data, error } = await supabase
     .from('element_reactions')
     .insert(input)
@@ -261,7 +261,7 @@ export async function addReaction(input: ElementReactionInsert): Promise<Element
   return data as ElementReaction;
 }
 
-export async function removeReaction(reactionId: string): Promise<void> {
+async function removeReaction(reactionId: string): Promise<void> {
   const { error } = await supabase.from('element_reactions').delete().eq('id', reactionId);
   if (error) throw error;
 }

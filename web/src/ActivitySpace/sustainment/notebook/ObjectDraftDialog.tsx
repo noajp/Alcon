@@ -5,7 +5,7 @@ import { Button } from '@/ui/button';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from './objectDraft';
-import type { Brief } from './types';
+import type { Brief } from '@/types/notes';
 import { useDomains } from '@/hooks/useSupabase';
 import { ChevronDown } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';

@@ -4,7 +4,7 @@ import { suggestObjectPrefix } from '@/ActivitySpace/execution/object/objectPref
 import { applyOptimisticExplorerPatch } from '@/Function/sync/explorerCache';
 import { translate } from '@/Function/i18n/I18nProvider';
 import { supabase } from '@/lib/supabase';
-import type { AlconObject, ObjectTab, ObjectTabInsert, ObjectTabUpdate } from '@/types/database';
+import type { AlconObject, ObjectTab, ObjectTabInsert } from '@/types/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
@@ -407,7 +407,7 @@ export async function moveObject(
 // ============================================
 
 // Fetch all tabs for an object
-export async function fetchObjectTabs(objectId: string): Promise<ObjectTab[]> {
+async function fetchObjectTabs(objectId: string): Promise<ObjectTab[]> {
   const { data, error } = await supabase
     .from('object_tabs')
     .select('*')
@@ -436,19 +436,6 @@ export async function createObjectTab(tab: ObjectTabInsert): Promise<ObjectTab> 
       ...tab,
       order_index: tab.order_index ?? maxOrder + 1,
     })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-// Update a tab
-export async function updateObjectTab(tabId: string, updates: ObjectTabUpdate): Promise<ObjectTab> {
-  const { data, error } = await supabase
-    .from('object_tabs')
-    .update(updates)
-    .eq('id', tabId)
     .select()
     .single();
 

@@ -4,7 +4,8 @@ import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { fieldValueText } from '@/Function/property/fieldModel';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { ELEMENT_DEFAULT_VISIBLE, OBJECT_DEFAULT_VISIBLE } from '@/Function/shared/listConfig';
-import { priorityWeight, STATUS_OPTIONS } from '@/Function/shared/listControls/types';
+import { priorityWeight } from '@/Function/shared/listControls/types';
+import { STATUS_ORDER } from '@/shared/designTokens';
 import type { ElementCommentActivity, ElementPriority, ElementStatus } from '@/types/database';
 
 export type ColumnEntity = 'element' | 'object';
@@ -84,8 +85,8 @@ const DEFAULT_VISIBLE: ColumnId[] = ELEMENT_DEFAULT_VISIBLE;
 // Floor matches the default width so columns never resize below their
 // natural readable size — labels stay fully visible and tags/chips don't
 // truncate from a drag-down.
-export const COLUMN_MIN_WIDTH = 110;
-export const COLUMN_MAX_WIDTH = 600;
+const COLUMN_MIN_WIDTH = 110;
+const COLUMN_MAX_WIDTH = 600;
 
 /** Active sort applied to every section's elements. `null` means natural
  *  order (whatever the data layer returned — usually elements.order_index). */
@@ -457,7 +458,6 @@ export function useListColumns(
   };
 }
 
-export { customId as customColumnId };
 
 // ─── Sort helpers ──────────────────────────────────────────────────────────
 // Apply a ColumnSort to a list of Elements. Nulls always sort last regardless
@@ -480,12 +480,12 @@ export type ElementLike = {
 };
 
 // Workflow-order index for Status — earlier pipeline stages sort first.
-// Reuses the same canonical order the Status filter list (STATUS_OPTIONS)
+// Reuses the same canonical order the Status filter list (STATUS_ORDER)
 // and the design tokens (shared/designTokens.ts STATUS) already declare, so
 // sorting never contradicts what the Filter menu or status badges imply.
 function statusWeight(s: ElementStatus | null | undefined): number | null {
   if (!s) return null;
-  const idx = STATUS_OPTIONS.indexOf(s);
+  const idx = (STATUS_ORDER as readonly string[]).indexOf(s);
   return idx === -1 ? null : idx;
 }
 

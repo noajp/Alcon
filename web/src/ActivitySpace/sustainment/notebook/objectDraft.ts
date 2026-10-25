@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Brief } from './types';
+import type { Brief } from '@/types/notes';
 
 export type ObjectDraftElementPriority = 'low' | 'medium' | 'high' | 'urgent';
 

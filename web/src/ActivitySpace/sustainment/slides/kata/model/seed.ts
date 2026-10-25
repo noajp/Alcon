@@ -143,7 +143,7 @@ export const SAMPLE_DECK: Deck = {
   ],
 };
 
-export const SAMPLE_MINUTES_NAME = "sukima_議事録_20261017.md";
+const SAMPLE_MINUTES_NAME = "sukima_議事録_20261017.md";
 
 /** SAMPLE_DECK の英語版。id・型・組み立ては同じ */
 export const SAMPLE_DECK_EN: Deck = {
@@ -287,7 +287,7 @@ export const SAMPLE_DECK_EN: Deck = {
   ],
 };
 
-export const SAMPLE_MINUTES_NAME_EN = "sukima_minutes_20261017.md";
+const SAMPLE_MINUTES_NAME_EN = "sukima_minutes_20261017.md";
 
 export function seedWorkspace(now: number, lang: Lang = "ja"): { folders: Folder[]; files: KataFile[] } {
   const en = lang === "en";

@@ -118,9 +118,9 @@ export interface InitiativeRiskOptions {
 }
 
 export const DEFAULT_STALL_MINUTES = 25;
-export const DEFAULT_IDLE_HOURS = 24;
-export const DEFAULT_DUE_SOON_DAYS = 3;
-export const DEFAULT_CONCENTRATION = 0.5;
+const DEFAULT_IDLE_HOURS = 24;
+const DEFAULT_DUE_SOON_DAYS = 3;
+const DEFAULT_CONCENTRATION = 0.5;
 
 /** The defaults keyed the way `domains.risk_thresholds` stores them, so the
  *  Settings surface can show "what you get if you leave this blank" without
@@ -170,7 +170,7 @@ export function parseRiskThresholds(raw: unknown): InitiativeRiskOptions {
 const UNSTARTED = new Set(['backlog', 'todo']);
 
 /** Not done, not cancelled — the work still on the Initiative's plate. */
-export function isOpen(el: RiskElement): boolean {
+function isOpen(el: RiskElement): boolean {
   return isOpenStatus(el.status);
 }
 
@@ -222,7 +222,7 @@ export function dateKeyPlus(now: number, days: number): string {
   return dateKey(d.getTime());
 }
 
-export function isOverdue(el: RiskElement, today: string): boolean {
+function isOverdue(el: RiskElement, today: string): boolean {
   return isOpen(el) && el.due_date !== null && el.due_date < today;
 }
 

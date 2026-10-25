@@ -7,8 +7,7 @@ import type { Json } from '@/types/database';
 import { Button } from '@/ui/button';
 import { ObjectFieldDialog } from './ObjectFieldDialog';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { CHOICE_TYPES, type FieldDraft } from './fieldModel';
-export const SELECT_TYPES = CHOICE_TYPES;
+import { type FieldDraft } from './fieldModel';
 export type ColumnScope = { kind: 'object'; objectId: string };
 
 /** Definitions belong to an Object; visibility belongs to the current view. */

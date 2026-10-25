@@ -110,3 +110,28 @@ export function useActivitySpaces() {
     refetch,
   };
 }
+
+/** The viewer's seat in a Space ('owner' | 'member'), or null while unknown.
+ *  An owner may change any Vision; `pending` lets a page wait instead of
+ *  flashing its read-only form. */
+export function useSpaceRole(spaceId: string | null): 'owner' | 'member' | null {
+  return useSpaceRoleQuery(spaceId).data ?? null;
+}
+
+export function useSpaceRoleQuery(spaceId: string | null) {
+  const userId = useCurrentUserId();
+  return useQuery({
+    queryKey: ['space-role', spaceId, userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('activity_space_members')
+        .select('role')
+        .eq('activity_space_id', spaceId!)
+        .eq('user_id', userId!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.role as 'owner' | 'member' | undefined) ?? null;
+    },
+    enabled: !!spaceId && !!userId,
+  });
+}

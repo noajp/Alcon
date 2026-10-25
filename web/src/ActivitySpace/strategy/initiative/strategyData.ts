@@ -16,11 +16,9 @@ import type {
   IntentBinding,
   IntentBindingInsert,
   IntentEscalation,
-  IntentEscalationStatus,
   IntentInsert,
   IntentLineage,
   IntentNextAction,
-  IntentNextActionStatus,
   IntentPrediction,
   IntentResource,
   IntentUpdate,
@@ -38,7 +36,6 @@ import type {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
-
 
 // ============================================
 // Strategy: aggregate elements across multiple Domains and/or Objects
@@ -294,7 +291,7 @@ export async function removeStrategyChild(parentStrategyId: string, childStrateg
 // comment written over the API has to notify too, and that is the only place
 // both paths pass through.
 
-export async function fetchStrategyComments(strategyId: string): Promise<StrategyComment[]> {
+async function fetchStrategyComments(strategyId: string): Promise<StrategyComment[]> {
   const { data, error } = await supabase
     .from('strategy_comments')
     .select('*')
@@ -577,45 +574,6 @@ export async function removeIntentBinding(id: string): Promise<void> {
   if (error) throw error
 }
 
-// Predictions — anonymous vote (archive + insert) ─────────────────────
-//
-// Voter identity is hashed at the call site so even RLS-bypassing
-// service roles can't deanonymize. Per-intent uniqueness on the active
-// row enforces "one open vote per voter"; superseded votes stay around
-// for the trend chart with archived_at set.
-
-export async function castIntentPrediction(args: {
-  intentId: string
-  voterHash: string
-  probability: number
-  roleGroup?: IntentPrediction['role_group']
-  officialReport?: number | null
-}): Promise<IntentPrediction> {
-  // Archive any active row for this voter on this intent first. We can't
-  // rely on ON CONFLICT because the unique index is partial (archived_at
-  // IS NULL), so the upsert path doesn't see prior rows.
-  await supabase
-    .from('intent_predictions')
-    .update({ archived_at: new Date().toISOString() })
-    .eq('intent_id', args.intentId)
-    .eq('voter_hash', args.voterHash)
-    .is('archived_at', null)
-
-  const { data, error } = await supabase
-    .from('intent_predictions')
-    .insert({
-      intent_id: args.intentId,
-      voter_hash: args.voterHash,
-      probability: args.probability,
-      role_group: args.roleGroup ?? null,
-      official_report: args.officialReport ?? null,
-    })
-    .select()
-    .single()
-  if (error) throw error
-  return data as IntentPrediction
-}
-
 // Lineage — manual entries (LLM-summarized ones land via Edge Function) ─
 
 export async function addIntentLineage(input: Omit<IntentLineage, 'id' | 'created_at' | 'created_by'>): Promise<IntentLineage> {
@@ -627,44 +585,4 @@ export async function addIntentLineage(input: Omit<IntentLineage, 'id' | 'create
     .single()
   if (error) throw error
   return data as IntentLineage
-}
-
-// Escalation decisions — CEO picks Maintain / Revise / Retire ─────────
-
-export async function decideIntentEscalation(
-  id: string,
-  status: Exclude<IntentEscalationStatus, 'awaiting'>,
-  decisionNote: string | null = null,
-): Promise<IntentEscalation> {
-  const userId = await getCurrentUserId()
-  const { data, error } = await supabase
-    .from('intent_escalations')
-    .update({
-      status,
-      decision_note: decisionNote,
-      decided_at: new Date().toISOString(),
-      decided_by: userId ?? null,
-    })
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw error
-  return data as IntentEscalation
-}
-
-// Next Actions — accept / reject / convert to Element ─────────────────
-
-export async function updateIntentNextActionStatus(
-  id: string,
-  status: IntentNextActionStatus,
-  convertedElementId?: string | null,
-): Promise<IntentNextAction> {
-  const { data, error } = await supabase
-    .from('intent_next_actions')
-    .update({ status, ...(convertedElementId !== undefined ? { converted_element_id: convertedElementId } : {}) })
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw error
-  return data as IntentNextAction
 }

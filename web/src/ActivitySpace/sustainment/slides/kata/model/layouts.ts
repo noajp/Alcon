@@ -185,10 +185,6 @@ export function switchLayout(slide: Slide, to: LayoutId): Slide {
   return { ...slide, layout: to, content };
 }
 
-export function emptyContent(layout: LayoutId): SlideContent {
-  return buildContent(layout, []);
-}
-
 /** 外から来たスライド（AI の出力など）の数の食い違いを直す。足りない項目は空欄で埋め、多すぎれば上限で切る */
 export function normalizeSlide(slide: Slide): Slide {
   const c = { ...slide.content };

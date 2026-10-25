@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 // ============================================
 // Notifications (Inbox)
 // ============================================
-export async function fetchNotifications(opts: {
+async function fetchNotifications(opts: {
   recipientId: string;
   unreadOnly?: boolean;
   limit?: number;

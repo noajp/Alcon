@@ -31,7 +31,7 @@ export interface CommentEntryData {
 
 /** Relative age, coarse on purpose: a thread reads as a conversation, and an
  *  exact timestamp on every line makes it read as a log. */
-export function formatCommentAge(iso: string): string {
+function formatCommentAge(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
   if (m < 1) return translate('just now');
@@ -43,7 +43,7 @@ export function formatCommentAge(iso: string): string {
 
 /** Tint @name runs so a mention is findable when skimming. Purely visual —
  *  the authoritative mention list is the row's `mentions` column. */
-export function renderWithMentions(text: string): React.ReactNode {
+function renderWithMentions(text: string): React.ReactNode {
   const parts = text.split(/(@[\w.\-]+(?:\s\w+)?)/g);
   return parts.map((p, i) =>
     p.startsWith('@')

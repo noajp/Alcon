@@ -77,9 +77,7 @@ const CONVERGED = [
   'Function/shared/PriorityMark.tsx',
   'ActivitySpace/execution/element/gantt/GanttView.tsx',
   'ActivitySpace/sustainment/calendar/CalendarView.tsx',
-  'Function/property/EditBuiltInPropertyModal.tsx',
   'Function/widget/widgets/KpiCardsWidget.tsx',
-  'shell/sidebar/ObjectTree.tsx',
   'hooks/useDashboardData.ts',
 ];
 

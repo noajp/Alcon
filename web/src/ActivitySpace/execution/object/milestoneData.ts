@@ -3,9 +3,8 @@
 import { ascNullsLast } from '@/ActivitySpace/strategy/initiative/strategyData';
 import { selectIn } from '@/hooks/chunkedIn';
 import { supabase } from '@/lib/supabase';
-import type { ObjectMilestone, ObjectMilestoneInsert, ObjectMilestoneUpdate } from '@/types/database';
+import type { ObjectMilestone } from '@/types/database';
 import { useQuery } from '@tanstack/react-query';
-
 
 // ============================================
 // Object Milestones — ◇ markers on the Timeline
@@ -13,7 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 
 /** Bulk-fetch milestones for a set of Objects. Used by the Strategy
  *  Timeline view to render diamonds above each Object's band. */
-export async function fetchObjectMilestones(objectIds: string[]): Promise<ObjectMilestone[]> {
+async function fetchObjectMilestones(objectIds: string[]): Promise<ObjectMilestone[]> {
   return await selectIn(
     objectIds,
     chunk =>
@@ -24,35 +23,6 @@ export async function fetchObjectMilestones(objectIds: string[]): Promise<Object
         .order('date', { ascending: true }),
     { compare: (a, b) => ascNullsLast(a.date, b.date) },
   ) as ObjectMilestone[];
-}
-
-export async function createObjectMilestone(input: ObjectMilestoneInsert): Promise<ObjectMilestone> {
-  const { data, error } = await supabase
-    .from('object_milestones')
-    .insert(input)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as ObjectMilestone;
-}
-
-export async function updateObjectMilestone(
-  id: string,
-  updates: ObjectMilestoneUpdate,
-): Promise<ObjectMilestone> {
-  const { data, error } = await supabase
-    .from('object_milestones')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as ObjectMilestone;
-}
-
-export async function deleteObjectMilestone(id: string): Promise<void> {
-  const { error } = await supabase.from('object_milestones').delete().eq('id', id);
-  if (error) throw error;
 }
 
 const OBJECT_MILESTONES_QUERY_PREFIX = ['object-milestones'] as const;

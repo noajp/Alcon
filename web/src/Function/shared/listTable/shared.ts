@@ -1,6 +1,5 @@
 'use client';
 
-import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
 import { parseDateOnly } from '@/Function/shared/dateUtils';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import type { SectionGroup } from '@/Function/shared/listControls/sectionGroup';
@@ -17,8 +16,6 @@ export const EMPTY_ELEMENT_TYPES: string[] = [];
 export const EMPTY_WORKERS: Worker[] = [];
 
 export const EMPTY_ELEMENT_IDS: string[] = [];
-
-export const STATUS_OPTIONS: { value: ElementWithDetails['status']; label: string }[] = STATUS_ORDER.map((value) => ({ value, label: STATUS[value].label }));
 
 export type ElementUpdate = Partial<Pick<ElementWithDetails, 'status' | 'priority' | 'start_date' | 'due_date' | 'title' | 'type'>>;
 
