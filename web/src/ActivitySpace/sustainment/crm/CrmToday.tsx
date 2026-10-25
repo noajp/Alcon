@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CheckCircle2, ChevronDown, PenLine } from 'lucide-react';
+import { CheckCircle2, ChevronDown, PenLine, RefreshCw } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell, MENU_ROW } from '@/Function/shared/menu';
@@ -20,6 +20,26 @@ export function Metric({ label, value, hint, tone }: { label: string; value: str
     <dd className={`truncate text-xl font-semibold tabular-nums ${tone === 'danger' ? 'text-[var(--status-danger)]' : ''}`}>{value}</dd>
     {hint && <dd className="truncate text-xs text-muted-foreground">{hint}</dd>}
   </div>;
+}
+
+/** A won deal coming up for renewal: open its renewal deal in one step. */
+export function StartRenewal({ deal, crm, onOpen, size = 'xs' }: { deal: CrmDeal; crm: Crm; onOpen: (dealId: string) => void; size?: 'xs' | 'sm' }) {
+  const { t } = useI18n();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async (work: () => Promise<void>) => {
+    setSaving(true); setError(null);
+    try { await work(); }
+    catch (cause) { setError(cause instanceof Error ? t(cause.message) : String(cause)); }
+    finally { setSaving(false); }
+  };
+  const start = () => run(async () => onOpen((await crm.startRenewal(deal.id, t('{name} — renewal', { name: deal.name }))).id));
+  const decline = () => run(() => crm.declineRenewal(deal.id, t('Won’t renew — the contract renewing on {date} ends.', { date: deal.renewsOn ?? '' })));
+  return <span className="inline-flex flex-wrap items-center gap-1">
+    <Button size={size} variant="secondary" disabled={saving} onClick={() => void start()}><RefreshCw size={12} />{t('Start renewal')}</Button>
+    <Button size={size} variant="ghost" disabled={saving} onClick={() => void decline()}>{t('Won’t renew')}</Button>
+    {error && <span role="alert" className="text-xs text-[var(--status-danger)]">{error}</span>}
+  </span>;
 }
 
 function Snooze({ deal, crm }: { deal: CrmDeal; crm: Crm }) {
@@ -81,7 +101,7 @@ export function CrmToday({ crm, workspace, onOpen, onCapture, onList, pipelineDe
         <div className="space-y-1"><h2 className="text-lg font-semibold">{t('Next best actions')}</h2>
           <p className="text-xs text-muted-foreground">{t('Ranked by urgency, then by weighted value. Work from the top.')}</p></div>
         {!queue.length && <div className="flex gap-3 py-4"><CheckCircle2 size={20} className="shrink-0 text-[var(--status-success)]" />
-          <div className="space-y-1"><p className="text-sm font-medium">{t('You are clear for today')}</p><p className="text-xs text-muted-foreground">{t('Every open deal has a scheduled next step and recent contact.')}</p></div></div>}
+          <div className="space-y-1"><p className="text-sm font-medium">{t('You are clear for today')}</p><p className="text-xs text-muted-foreground">{t('Every open deal has a scheduled next step and recent contact, and no contract is up for renewal.')}</p></div></div>}
         {GROUPS.map(group => {
           const items = queue.filter(deal => deal.action!.urgency === group.id);
           if (!items.length) return null;
@@ -95,7 +115,7 @@ export function CrmToday({ crm, workspace, onOpen, onCapture, onList, pipelineDe
               </button>
               <span className="hidden shrink-0 text-right text-xs tabular-nums @lg/crm:block">{money(deal.amount, deal.currency, locale, true)}<span className="block text-muted-foreground">{deal.probability ?? '—'}%</span></span>
               <div className="hidden shrink-0 gap-1 @xl/crm:flex">
-                <Snooze deal={deal} crm={crm} />
+                {deal.action!.code === 'renewal_due' ? <StartRenewal deal={deal} crm={crm} onOpen={onOpen} /> : <Snooze deal={deal} crm={crm} />}
                 <Button size="xs" variant="ghost" onClick={() => onOpen(deal.id)}>{t('Open')}</Button>
               </div>
             </li>)}</ul>

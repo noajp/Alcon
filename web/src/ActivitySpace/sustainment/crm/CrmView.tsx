@@ -39,7 +39,7 @@ import { CrmPicker } from './CrmPicker';
 // contact opens as a page of its own.
 
 const LIST_LABEL: Record<CrmList, string> = {
-  mine: 'My deals', 'at-risk': 'At risk', 'closing-soon': 'Closing soon', 'no-next-step': 'No next step', stale: 'Going quiet', won: 'Won', lost: 'Lost', incomplete: 'Missing details',
+  mine: 'My deals', 'at-risk': 'At risk', 'closing-soon': 'Closing soon', renewing: 'Renewing', 'no-next-step': 'No next step', stale: 'Going quiet', won: 'Won', lost: 'Lost', incomplete: 'Missing details',
 };
 const LISTS = Object.keys(LIST_LABEL) as CrmList[];
 const HEALTH_ORDER: CrmHealthLevel[] = ['risk', 'watch', 'healthy', 'incomplete'];
@@ -196,7 +196,7 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
       <CrmDealPage key={selected.id} crm={crm} deal={selected} onBack={closeRecord}
         onOpenPipeline={() => go({ dealId: null, view: 'board', pipelineId: selected.pipelineId })}
         onCapture={dealId => setCaptureFor(dealId)} onOpenElement={onOpenElement} onOpenInitiative={openInitiative}
-        onOpenCompany={companyId => go({ companyId, dealId: null })} onOpenContact={contactId => go({ contactId, dealId: null })} />
+        onOpenCompany={companyId => go({ companyId, dealId: null })} onOpenContact={contactId => go({ contactId, dealId: null })} onOpenDeal={openDeal} />
       {dialogs}
     </>;
   }

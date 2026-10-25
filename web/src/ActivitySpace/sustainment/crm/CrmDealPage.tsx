@@ -15,6 +15,7 @@ import type { Crm, CrmDealPatch } from '@/hooks/useCrm';
 import { ACTIVITY_TYPES, fieldsFor, LOST_STAGE, shiftDate, stageChange, WON_STAGE, type CrmActivityType, type CrmDeal, type CrmStage } from './crmModel';
 import { aiBrief, aiEmail, useCrmAi, type DealBrief, type DealEmail } from './crmAi';
 import { HealthBadge, historyLine, money, relativeDay } from './crmFormat';
+import { StartRenewal } from './CrmToday';
 import { CrmPicker } from './CrmPicker';
 import { CustomFields, EditableText, Property } from './CrmFields';
 import { CrmRecordPage, RecordSection } from './CrmRecordPage';
@@ -64,8 +65,8 @@ function NextStep({ crm, deal }: { crm: Crm; deal: CrmDeal }) {
   </RecordSection>;
 }
 
-export function CrmDealPage({ crm, deal, onBack, onOpenPipeline, onCapture, onOpenElement, onOpenInitiative, onOpenCompany, onOpenContact }: {
-  crm: Crm; deal: CrmDeal; onBack: () => void; onOpenPipeline: () => void; onCapture: (dealId: string) => void;
+export function CrmDealPage({ crm, deal, onBack, onOpenPipeline, onCapture, onOpenElement, onOpenInitiative, onOpenCompany, onOpenContact, onOpenDeal }: {
+  crm: Crm; deal: CrmDeal; onBack: () => void; onOpenPipeline: () => void; onCapture: (dealId: string) => void; onOpenDeal: (id: string) => void;
   onOpenElement?: (id: string) => void; onOpenInitiative?: (id: string) => void; onOpenCompany: (id: string) => void; onOpenContact: (id: string) => void;
 }) {
   const { t, locale } = useI18n();
@@ -164,6 +165,12 @@ export function CrmDealPage({ crm, deal, onBack, onOpenPipeline, onCapture, onOp
         }} /></Property>
         <Property label={t('Probability')}><EditableText numeric label={t('Probability (%)')} value={deal.probability} onSave={value => save({ probability: value as number | null })} /></Property>
         <Property label={t('Close date')}><DateField aria-label={t('Close date')} value={deal.closeDate} onChange={value => void save({ closeDate: value }).catch(() => {})} placeholder={t('Set date')} /></Property>
+        <Property label={t('Renews on')}><DateField aria-label={t('Renews on')} value={deal.renewsOn} onChange={value => void save({ renewsOn: value }).catch(() => {})} placeholder={t('Set date')} /></Property>
+        {[[t('Renewal of'), deal.renewalOf], [t('Renewed by'), deal.renewedBy]].map(([title, id]) => {
+          const linked = id ? crm.allDeals.find(item => item.id === id) : null;
+          return linked ? <Property key={title} label={title!}><button type="button" className="truncate rounded-sm px-1.5 text-left text-[13px] hover:bg-muted/40" onClick={() => onOpenDeal(linked.id)}>#{linked.number} {linked.name}</button></Property> : null;
+        })}
+        {deal.action?.code === 'renewal_due' && <div className="px-1.5 py-1"><StartRenewal deal={deal} crm={crm} onOpen={onOpenDeal} /></div>}
         <Property label={t('Last contact')}><span className="px-1.5 text-[13px] text-muted-foreground">{relativeDay(deal.lastContact, today, locale, t)}</span></Property>
         <Property label={t('Source')}><EditableText label={t('Source')} value={deal.source} placeholder={t('e.g. Referral, Website')} onSave={value => save({ source: value as string | null })} /></Property>
         {deal.outcome === 'lost' && <Property label={t('Lost reason')}><EditableText label={t('Lost reason')} value={deal.lostReason} placeholder={t('Why was it lost?')} onSave={value => save({ lostReason: value as string | null })} /></Property>}
