@@ -13,8 +13,7 @@ import {
   deleteElementTemplate,
 } from '@/hooks/useSupabase';
 import type { Domain, ElementTemplate, ElementStatus, ElementPriority } from '@/types/database';
-import { PRIORITY_OPTIONS } from '@/Function/shared/PriorityPicker';
-import { STATUS_OPTIONS as STATUS_VALUES } from '@/Function/shared/listControls/types';
+import { PRIORITY_OPTIONS, STATUS_ORDER } from '@/shared/designTokens';
 import { domainLabelNames, hydrateLabelColors, labelColor, useLabelColors } from '@/Function/shared/labelColor';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
@@ -269,7 +268,7 @@ function TemplateDialog({
                 className="w-full text-[13px] bg-muted/40 rounded-md px-2 py-1.5 border border-border/60 outline-none focus:bg-muted/70"
               >
                 <option value="">—</option>
-                {STATUS_VALUES.map((s) => <option key={s} value={s}>{t(statusLabel(s))}</option>)}
+                {STATUS_ORDER.map((s) => <option key={s} value={s}>{t(statusLabel(s))}</option>)}
               </select>
             </Field>
             <Field label={t('Priority')}>

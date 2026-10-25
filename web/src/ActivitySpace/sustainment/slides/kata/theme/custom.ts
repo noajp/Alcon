@@ -1,4 +1,4 @@
-import type { Look, LookTokens } from "@/ActivitySpace/sustainment/slides/kata/model/types";
+import type { LookTokens } from "@/ActivitySpace/sustainment/slides/kata/model/types";
 import { tx } from "@/ActivitySpace/sustainment/slides/kata/i18n";
 import { contrast } from "./mix";
 
@@ -85,8 +85,4 @@ export function deriveTokens(t: LookTokens): LookTokens {
     ground: { ...t.ground, sub: mixHex(ink, bg, 0.38), line: mixHex(ink, bg, 0.82), dark: contrast(bg, "#000000") < contrast(bg, "#FFFFFF") },
     accent: { ...t.accent, tint: mixHex(t.accent.accent, bg, 0.82), onAccent: contrast("#111111", t.accent.accent) > contrast("#FFFFFF", t.accent.accent) ? "#111111" : "#FFFFFF" },
   };
-}
-
-export function makeLook(id: string, name: string, tokens: LookTokens, source: Look["source"] = "mine"): Look {
-  return { id, name, source, tags: [source === "import" ? tx("取り込み", "Imported") : tx("マイ", "Mine")], tokens };
 }

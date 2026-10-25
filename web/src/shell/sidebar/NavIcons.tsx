@@ -2,9 +2,19 @@
 
 import {
   Presentation,
-  House, Table2, Settings, Inbox, Calendar,
-  LayoutDashboard, Notebook, BarChart3,
-  ChartArea, ChartGantt, Users, Share2, Search, Workflow, Compass, Milestone, Telescope, Folder,
+  House,
+  Table2,
+  Settings,
+  Inbox,
+  Calendar,
+  Notebook,
+  ChartArea,
+  ChartGantt,
+  Users,
+  Compass,
+  Milestone,
+  Telescope,
+  Folder,
 } from 'lucide-react';
 import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon } from '@/Function/shared/conceptIcons';
 
@@ -25,12 +35,8 @@ export const NavSettingsIcon = ({ size = 20 }: { size?: number }) => <Settings s
 export const NavMyTasksIcon = ElementIcon;
 export const NavInboxIcon = ({ size = 20 }: { size?: number }) => <Inbox size={size} strokeWidth={2} />;
 export const NavCalendarIcon = ({ size = 20 }: { size?: number }) => <Calendar size={size} strokeWidth={2} />;
-export const NavOverviewIcon = ({ size = 20 }: { size?: number }) => <LayoutDashboard size={size} strokeWidth={2} />;
 export const NavNoteIcon = ({ size = 20 }: { size?: number }) => <Notebook size={size} strokeWidth={2} />;
-export const NavDashboardIcon = ({ size = 20 }: { size?: number }) => <LayoutDashboard size={size} strokeWidth={2} />;
-export const NavAnalysisIcon = ({ size = 20 }: { size?: number }) => <BarChart3 size={size} strokeWidth={2} />;
 export const NavDomainIcon = DomainIcon;
-export const NavSystemIcon = NavDomainIcon;
 export const NavStrategyIcon = ({ size = 20, className }: { size?: number; className?: string }) => (
   <Compass size={size} strokeWidth={2} className={className} />
 );
@@ -40,9 +46,6 @@ export const NavWorkloadIcon = ({ size = 20 }: { size?: number }) => <ChartArea 
 // the glyph inside its box keeps the row layout and evens the optical size.
 export const NavTimelineIcon = ({ size = 20 }: { size?: number }) => <ChartGantt size={size} strokeWidth={2} className="scale-110" />;
 export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => <Users size={size} strokeWidth={2} />;
-export const NavGraphIcon = ({ size = 20 }: { size?: number }) => <Share2 size={size} strokeWidth={2} />;
-export const NavSearchIcon = ({ size = 20 }: { size?: number }) => <Search size={size} strokeWidth={2} />;
-export const NavDiagramIcon = ({ size = 20 }: { size?: number }) => <Workflow size={size} strokeWidth={2} />;
 // ModeRail layer marks: direction, forward action, and continuity.
 // Geometry matches the approved website marks; currentColor follows the theme.
 export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => (

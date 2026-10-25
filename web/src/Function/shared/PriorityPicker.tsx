@@ -1,6 +1,6 @@
 'use client';
 
-import { PRIORITY, PRIORITY_ORDER } from '@/shared/designTokens';
+import { PRIORITY_OPTIONS } from '@/shared/designTokens';
 import type { ReactNode } from 'react';
 import { Check } from 'lucide-react';
 import {
@@ -14,7 +14,6 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // Priority values in display order (highest → lowest). `null` = no priority.
-export const PRIORITY_OPTIONS: { value: string; label: string }[] = PRIORITY_ORDER.map((value) => ({ value, label: PRIORITY[value].label }));
 
 interface PriorityPickerProps {
   /** Current priority; null renders the "No priority" row as selected. */

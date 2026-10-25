@@ -38,9 +38,7 @@ const TeamView = dynamic(() => import('@/ActivitySpace/sustainment/team/TeamView
 const MyCalendarView = dynamic(() => import('@/ActivitySpace/home/MyCalendarView').then(m => m.MyCalendarView), { ssr: false, loading: viewLoading });
 const ProfileView = dynamic(() => import('@/ActivitySpace/home/ProfileView').then(m => m.ProfileView), { ssr: false, loading: viewLoading });
 const SettingsView = dynamic(() => import('@/Function/settings/SettingsView').then(m => m.SettingsView), { ssr: false, loading: viewLoading });
-import { IslandCard } from '@/shell/IslandCard';
 
-export { IslandCard };
 
 interface MainContentProps {
   activeActivity: string;

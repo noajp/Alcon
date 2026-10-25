@@ -52,7 +52,7 @@ import {
   useElementMemberObjects,
   useElementCustomColumns,
 } from '@/ActivitySpace/execution/element/elementDetailQueries';
-import { CustomColumnCell } from '@/Function/property';
+import { CustomColumnCell } from '@/Function/property/CustomColumnCell';
 import type { Subelement, Json } from '@/types/database';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';

@@ -5,8 +5,7 @@ import { useQueries, type UseQueryResult } from '@tanstack/react-query';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { fetchExplorerData } from '@/Function/sync/explorerData';
 import type { ExplorerData } from '@/Function/sync/explorerPatch';
-import { readAllPages, type CountedRows } from '@/hooks/readAllPages';
-import { selectIn } from '@/hooks/chunkedIn';
+import { readAllIn, readAllPages, rowId } from '@/hooks/readAllPages';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
@@ -15,18 +14,6 @@ import { resolveWorkloadScope, selectWorkloadElements, workloadDomainIds, type W
 import { setWorkloadDomainChoice, useWorkloadDomainChoice } from './workloadStore';
 export type { WorkloadScope } from './workloadModel';
 
-function readIds<Row>(
-  label: string,
-  ids: readonly string[],
-  run: (chunk: string[], from: number, to: number) => PromiseLike<CountedRows<Row>>,
-  identity: (row: Row) => string,
-): Promise<Row[]> {
-  return selectIn(ids, async chunk => ({
-    data: await readAllPages(label, (from, to) => run(chunk, from, to), identity), error: null,
-  }));
-}
-
-const rowId = (row: { id: string }) => row.id;
 
 /** An explicit Object detail scope is authorized by that Object's RLS. It
  * does not require its Domain to be visible and never reads sibling Objects.
@@ -47,14 +34,14 @@ export async function fetchWorkloadObject(objectId: string, signal?: AbortSignal
       .order('element_id').range(from, to).abortSignal(abort), row => row.element_id),
   ]);
   const directIds = new Set(directElements.map(row => row.id));
-  const linkedElements = await readIds<Element>('Linked Object Elements', homes.map(row => row.element_id).filter(id => !directIds.has(id)),
+  const linkedElements = await readAllIn<Element>('Linked Object Elements', homes.map(row => row.element_id).filter(id => !directIds.has(id)),
     (chunk, from, to) => supabase.from('elements').select('*', { count: 'exact' }).in('id', chunk)
       .order('id').range(from, to).abortSignal(abort), rowId);
   const elements = [...directElements, ...linkedElements];
-  const assignees = await readIds<ElementAssignee>('Object assignments', elements.map(row => row.id),
+  const assignees = await readAllIn<ElementAssignee>('Object assignments', elements.map(row => row.id),
     (chunk, from, to) => supabase.from('element_assignees').select('*', { count: 'exact' }).in('element_id', chunk)
       .order('id').range(from, to).abortSignal(abort), rowId);
-  const workers = await readIds<Worker>('Assigned Workers', assignees.map(row => row.worker_id),
+  const workers = await readAllIn<Worker>('Assigned Workers', assignees.map(row => row.worker_id),
     (chunk, from, to) => supabase.from('workers').select('*', { count: 'exact' }).in('id', chunk)
       .order('id').range(from, to).abortSignal(abort), rowId);
   const workerById = new Map(workers.map(worker => [worker.id, worker]));

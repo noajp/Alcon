@@ -168,7 +168,7 @@ interface ShapeProps {
 }
 
 /** 置きもの1つ。画面・サムネイル・発表・印刷で同じ見た目 */
-export function ObjectShape({ o, interactive, editingText, onPointerDown, onDoubleClick, onCommitText }: ShapeProps) {
+function ObjectShape({ o, interactive, editingText, onPointerDown, onDoubleClick, onCommitText }: ShapeProps) {
   const pe: CSSProperties = interactive ? { pointerEvents: "auto", cursor: editingText ? "text" : "move", touchAction: "none" } : {};
   const common = interactive ? { "data-obj": o.id, onPointerDown, onDoubleClick } : {};
   if (isLineKind(o.kind)) {

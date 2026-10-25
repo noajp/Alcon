@@ -51,7 +51,7 @@ export function pushUndo(entry: UndoEntry): void {
 }
 
 /** Run the pending undo (also invoked by Cmd/Ctrl+Z). No-op when empty. */
-export async function runUndo(): Promise<void> {
+async function runUndo(): Promise<void> {
   if (!current || running) return;
   const entry = current;
   current = null;
@@ -63,9 +63,4 @@ export async function runUndo(): Promise<void> {
   } finally {
     running = false;
   }
-}
-
-/** Drop the pending undo without running it. */
-export function clearUndo(): void {
-  current = null;
 }

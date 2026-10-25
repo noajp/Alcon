@@ -73,7 +73,7 @@ export type MenuWidth = keyof typeof MENU_WIDTH;
  * keyed on the `data-menu-shell` attribute this component stamps below. Do not
  * "restore" it as a Tailwind variant; it renders nothing.
  */
-export const MENU_SHELL_BASE = [
+const MENU_SHELL_BASE = [
   'rounded-md',
   'p-1',
   // Cancels the `min-w-[8rem]` DropdownMenuContent ships with, so the width

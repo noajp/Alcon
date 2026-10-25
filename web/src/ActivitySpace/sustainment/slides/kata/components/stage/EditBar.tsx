@@ -504,7 +504,7 @@ export function InsertMenu({ onNewPage }: { onNewPage: () => void }) {
 }
 
 /** 画像は保存先（ブラウザ）を圧迫しないよう、長い辺 1600px に縮めてから持つ */
-export async function shrinkImage(file: File): Promise<{ src: string; w: number; h: number }> {
+async function shrinkImage(file: File): Promise<{ src: string; w: number; h: number }> {
   const url = await new Promise<string>((res, rej) => {
     const r = new FileReader();
     r.onload = () => res(String(r.result));

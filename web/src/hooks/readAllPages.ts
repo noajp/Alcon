@@ -1,3 +1,5 @@
+import { selectIn } from '@/hooks/chunkedIn';
+
 export interface CountedRows<Row> {
   data: Row[] | null;
   error: { message: string } | null;
@@ -47,3 +49,19 @@ export async function readAllPages<Row>(
   return rows;
 }
 
+/** `readAllPages` over a long id list: chunked so the `.in()` filter stays
+ *  under the request-line limit, every chunk read to its last page. */
+export function readAllIn<Row>(
+  label: string,
+  ids: readonly string[],
+  run: (chunk: string[], from: number, to: number) => PromiseLike<CountedRows<Row>>,
+  identity: (row: Row) => string,
+): Promise<Row[]> {
+  return selectIn<Row>(ids, async (chunk) => ({
+    data: await readAllPages(label, (from, to) => run(chunk, from, to), identity),
+    error: null,
+  }));
+}
+
+export const rowId = (row: { id: string }) => row.id;
+export const uniqueById = <Row extends { id: string }>(rows: Row[]) => [...new Map(rows.map((row) => [row.id, row])).values()];

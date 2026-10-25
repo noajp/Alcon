@@ -20,11 +20,8 @@ import {
   folderDisplayName,
 } from '@/ActivitySpace/sustainment/notebook/noteTree';
 
-import {
-  PageView,
-  BriefsEmptyState,
-  ObjectDraftDialog,
-} from '@/ActivitySpace/sustainment/notebook';
+import { PageView } from '@/ActivitySpace/sustainment/notebook/PageView';
+import { ObjectDraftDialog } from '@/ActivitySpace/sustainment/notebook/ObjectDraftDialog';
 import { summarizeNoteContent } from '@/ActivitySpace/sustainment/notebook/aiSummary';
 import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from '@/ActivitySpace/sustainment/notebook/objectDraft';
 import type { Brief } from '@/types/notes';
@@ -268,7 +265,9 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
               ) : selectedFile ? (
                 !contentError && <div role="status" className="flex-1 flex items-center justify-center text-sm text-muted-foreground">{t('Loading Note…')}</div>
               ) : (
-                <BriefsEmptyState />
+                <div className="flex-1 flex items-center justify-center text-center px-8 py-12">
+                  <p className="text-[13px] text-muted-foreground">{t('Select a page to start writing.')}</p>
+                </div>
               )}
               </div>
               <Dialog

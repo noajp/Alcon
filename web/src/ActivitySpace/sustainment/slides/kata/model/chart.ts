@@ -19,9 +19,6 @@ export const CHART_PURPOSES: ChartPurpose[] = [
   { kind: "scatter", get label() { return tx("相関（2つの関係）", "Correlation"); }, get hint() { return tx("2つの量が連動しているか", "Do two measures move together"); }, basis: "Zelazny: correlation / FT: correlation" },
   { kind: "waterfall", get label() { return tx("増減（要因の分解）", "Deviation & bridge"); }, get hint() { return tx("始まりから終わりまで、何が足し引きしたか", "What added and subtracted from start to end"); }, basis: "FT: deviation / consulting waterfall" },
 ];
-
-export const PURPOSE_BY_KIND = Object.fromEntries(CHART_PURPOSES.map((p) => [p.kind, p])) as Record<ChartKind, ChartPurpose>;
-
 /** 「3.8万」「1,200」「62%」「$1.2M」などを数に読む */
 export function parseNumber(raw: string): number | null {
   const t = raw.replace(/[,，\s]/g, "").replace(/[０-９．]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 0xfee0));

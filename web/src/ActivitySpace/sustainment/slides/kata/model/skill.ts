@@ -45,7 +45,7 @@ function slideText(s: Slide): string {
 const escapeRe = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** 使える用語の組（左右とも空でなく、同じでないもの） */
-export function activeTerms(skills: Skill[]): { from: string; to: string }[] {
+function activeTerms(skills: Skill[]): { from: string; to: string }[] {
   return skills
     .filter((s) => s.enabled)
     .flatMap((s) => s.terms)

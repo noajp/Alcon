@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { extractPlainText } from './contentUtils';
-import type { BriefStructured } from './types';
+import type { BriefStructured } from '@/types/notes';
 
 // Calls the summarize-note Edge Function and returns a Loop-style
 // structured recap. The caller passes the note body (HTML, legacy

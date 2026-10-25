@@ -15,22 +15,18 @@ import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
 import type {
   ApprovalState,
-  EdgeType,
   Element,
   ElementApproval,
   ElementApprovalInsert,
   ElementAssignee,
   ElementAssigneeWithWorker,
-  ElementEdge,
   ElementEdgeWithElement,
-  ElementObject,
   ElementWithDetails,
   Subelement,
   Worker,
 } from '@/types/database';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-
 
 // ============================================
 // Element CRUD
@@ -473,72 +469,9 @@ export async function removeElementAssignee(id: string): Promise<void> {
   }
 }
 
-export async function getElementAssignees(elementId: string): Promise<ElementAssigneeWithWorker[]> {
-  const { data: assignees, error: assigneesError } = await supabase
-    .from('element_assignees')
-    .select('*')
-    .eq('element_id', elementId);
-
-  if (assigneesError) throw assigneesError;
-
-  if (!assignees || assignees.length === 0) return [];
-
-  const workerIds = assignees.map(a => a.worker_id);
-  const { data: workers, error: workersError } = await supabase
-    .from('workers')
-    .select('*')
-    .in('id', workerIds);
-
-  if (workersError) throw workersError;
-
-  return assignees.map(a => ({
-    ...a,
-    worker: workers?.find(w => w.id === a.worker_id),
-  }));
-}
-
 // ============================================
-// Element Edge CRUD (Dependencies)
+// Element Edges (Dependencies)
 // ============================================
-
-export async function createElementEdge(edge: {
-  from_element: string;
-  to_element: string;
-  edge_type: EdgeType;
-  created_by?: string | null;
-}): Promise<ElementEdge> {
-  const { data, error } = await supabase
-    .from('element_edges')
-    .insert({
-      from_element: edge.from_element,
-      to_element: edge.to_element,
-      edge_type: edge.edge_type,
-      created_by: edge.created_by || null,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  // Both ends' Dependencies islands now show a different edge list.
-  invalidateElementDetail(edge.from_element);
-  invalidateElementDetail(edge.to_element);
-  return data;
-}
-
-export async function deleteElementEdge(id: string): Promise<void> {
-  const { data, error } = await supabase
-    .from('element_edges')
-    .delete()
-    .eq('id', id)
-    .select('from_element, to_element')
-    .maybeSingle();
-
-  if (error) throw error;
-  if (data) {
-    invalidateElementDetail(data.from_element as string);
-    invalidateElementDetail(data.to_element as string);
-  }
-}
 
 export async function getElementEdges(elementId: string): Promise<{
   incoming: ElementEdgeWithElement[];
@@ -588,9 +521,7 @@ export async function getElementEdges(elementId: string): Promise<{
  * The judgment itself is `computeBlockers` — a pure rule shared with the row
  * marker and the Ready filter, so this function only fetches.
  *
- * Not exported — its only callers, canElementStart and useElementBlockers,
- * live in this same file. Making it public API when nothing outside this
- * file has ever needed it was the actual defect unwired-lint caught.
+ * Not exported — its only caller, useElementBlockers, lives in this file.
  */
 async function fetchElementBlockers(
   elementIds: string[],
@@ -636,21 +567,8 @@ function shareBlockerEntries(
   return shared;
 }
 
-// Check if element can start (all depends_on are done)
-export async function canElementStart(elementId: string): Promise<{
-  can_start: boolean;
-  blocking: DependencyBlocker[];
-}> {
-  const blocking = (await fetchElementBlockers([elementId]))[elementId] ?? [];
-  return {
-    can_start: blocking.length === 0,
-    blocking,
-  };
-}
-
 /**
- * Dependency blockers for a whole visible list in ONE pair of queries — the
- * list counterpart to `canElementStart`, which costs a round-trip per row.
+ * Dependency blockers for a whole visible list in ONE pair of queries.
  * Entries whose blocker set didn't change keep their previous array
  * reference (shareBlockerEntries), so a memoised row re-renders only when
  * its own upstreams moved.
@@ -725,16 +643,6 @@ export async function removeElementFromObject(elementId: string, objectId: strin
     }
   }
   invalidateElementDetail(elementId);
-}
-
-export async function getElementObjects(elementId: string): Promise<ElementObject[]> {
-  const { data, error } = await supabase
-    .from('element_objects')
-    .select('*')
-    .eq('element_id', elementId)
-    .order('is_primary', { ascending: false });
-  if (error) throw error;
-  return data || [];
 }
 
 // ============================================

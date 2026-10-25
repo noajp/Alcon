@@ -60,13 +60,10 @@ import {
 } from '@/Function/shared/menu';
 import { DueDateFilter } from '@/Function/shared/date';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
-import { CONTROL } from '@/shared/designTokens';
+import { CONTROL, PRIORITY_ORDER, STATUS_ORDER } from '@/shared/designTokens';
 import type { Worker } from '@/types/database';
 import {
   DEFAULT_FILTER,
-  DEFAULT_DISPLAY,
-  PRIORITY_OPTIONS,
-  STATUS_OPTIONS,
   hasActiveFilter,
   labelForPriority,
   labelForStatus,
@@ -329,7 +326,7 @@ function FilterPanel({
       </div>
 
       <Submenu icon={<CircleDashed size={15} />} label="Status" count={filter.status?.length ?? 0}>
-        {STATUS_OPTIONS.map((s) => {
+        {STATUS_ORDER.map((s) => {
           const checked = (filter.status ?? []).includes(s);
           return (
             <MenuCheckRow
@@ -347,7 +344,7 @@ function FilterPanel({
       </Submenu>
 
       <Submenu icon={<Flag size={15} />} label="Priority" count={filter.priority?.length ?? 0}>
-        {PRIORITY_OPTIONS.map((p) => {
+        {PRIORITY_ORDER.map((p) => {
           const checked = (filter.priority ?? []).includes(p);
           return (
             <MenuCheckRow
@@ -723,7 +720,3 @@ function OrderingControl({ storageKey, customColumns, display, setDisplay }: {
       onSelect={(direction) => choose(active.id, direction)} />}
   </>;
 }
-
-// Re-export for convenience.
-export { DEFAULT_DISPLAY, DEFAULT_FILTER };
-export type { ListControlsState, ListDisplay, ListFilter, ListGroupBy, ListOrderBy };

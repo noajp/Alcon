@@ -8,7 +8,7 @@ import { firstSentence, governingThought, pickClaim, pickFigure, sectionToSlide,
 
 const isLatin = (s: string) => /[A-Za-z]/.test(s) && !/[぀-ヿ㐀-鿿]/.test(s);
 const FRONT = /^(?:foreword|preface|introduction letter|letter|前書き|はじめに|序文)$/i;
-export const GRID_MAX = 12;
+const GRID_MAX = 12;
 
 export function isLongOutline(sections: Section[]): boolean {
   const chapters = sections.filter((s) => s.level === 2 && !FRONT.test(s.heading));

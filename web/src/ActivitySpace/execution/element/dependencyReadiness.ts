@@ -1,8 +1,8 @@
 // Readiness = "every `depends_on` upstream of this Element is done".
 //
-// The rule lives here, apart from the fetch, because three surfaces ask the
-// same question and must never answer it differently: the row marker, the
-// Ready filter, and the single-Element `canElementStart`. Everything below is
+// The rule lives here, apart from the fetch, because two surfaces ask the
+// same question and must never answer it differently: the row marker and the
+// Ready filter. Everything below is
 // pure — it takes edge rows and upstream statuses and returns which Elements
 // are still waiting.
 

@@ -28,7 +28,7 @@ import {
   type ListControlsState,
 } from '@/Function/shared/listControls';
 import { DomainOverview } from './DomainOverview';
-import { HomeView } from '@/ActivitySpace/home';
+import { HomeView } from '@/ActivitySpace/home/HomeView';
 import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/Function/widget';
 import { GanttView } from '@/ActivitySpace/execution/element/gantt';
 import { CalendarView } from '@/ActivitySpace/sustainment/calendar/CalendarView';

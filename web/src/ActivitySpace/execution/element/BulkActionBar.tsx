@@ -1,6 +1,6 @@
 'use client';
 
-import { STATUS, PRIORITY, STATUS_ORDER, PRIORITY_ORDER } from '@/shared/designTokens';
+import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '@/shared/designTokens';
 import { useEffect, useRef, useState } from 'react';
 import { Trash2, Copy, CornerUpRight, Link2, X, CalendarIcon, CircleDashed, UserRound } from 'lucide-react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
@@ -19,8 +19,6 @@ import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
-const STATUS_OPTIONS: { value: ElementStatus; label: string }[] = STATUS_ORDER.map((value) => ({ value, label: STATUS[value].label }));
-const PRIORITY_OPTIONS: { value: ElementPriority; label: string }[] = PRIORITY_ORDER.map((value) => ({ value, label: PRIORITY[value].label }));
 
 interface BulkActionBarProps {
   count: number;

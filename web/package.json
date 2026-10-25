@@ -45,7 +45,6 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
-    "framer-motion": "^12.38.0",
     "idb-keyval": "^6.2.4",
     "jszip": "^3.10.2",
     "lucide-react": "^0.562.0",
@@ -59,7 +58,6 @@
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.4.0",
     "unpdf": "^1.9.1",
-    "zod": "^4.6.7",
     "zustand": "^5.0.16"
   },
   "devDependencies": {

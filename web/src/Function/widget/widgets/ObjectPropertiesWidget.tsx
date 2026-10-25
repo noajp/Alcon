@@ -17,7 +17,7 @@ import {
 import type { Domain, Json, Worker } from '@/types/database';
 import { ElementTypeIcon } from '@/shell/icons';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
-import { CustomColumnCell } from '@/Function/property';
+import { CustomColumnCell } from '@/Function/property/CustomColumnCell';
 import { RailRow } from '@/Function/shared/RailRow';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';

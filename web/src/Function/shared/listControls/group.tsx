@@ -21,6 +21,10 @@ import { bucketsOf } from '@/Function/shared/dimensions';
 import { applyFilter } from './filter';
 import { effectiveGroupBy } from './autoGroup';
 import { NO_VALUE_BUCKET, type SectionGroup, type SectionGroupField } from './sectionGroup';
+import { PRIORITY_ORDER, STATUS_ORDER } from '@/shared/designTokens';
+
+const STATUS_RANK: readonly string[] = STATUS_ORDER;
+const PRIORITY_RANK: readonly string[] = PRIORITY_ORDER;
 
 type Bucket = { id: string; name: string; icon?: React.ReactNode; elements: ElementWithDetails[] };
 
@@ -79,14 +83,8 @@ function bucketize(elements: ElementWithDetails[], groupBy: ListGroupBy): Bucket
     // "No X" always last.
     if (a.id === NO_VALUE_BUCKET) return 1;
     if (b.id === NO_VALUE_BUCKET) return -1;
-    if (groupBy === 'status') {
-      const order = ['backlog', 'todo', 'in_progress', 'review', 'blocked', 'done', 'cancelled'];
-      return order.indexOf(a.id) - order.indexOf(b.id);
-    }
-    if (groupBy === 'priority') {
-      const order = ['urgent', 'high', 'medium', 'low'];
-      return order.indexOf(a.id) - order.indexOf(b.id);
-    }
+    if (groupBy === 'status') return STATUS_RANK.indexOf(a.id) - STATUS_RANK.indexOf(b.id);
+    if (groupBy === 'priority') return PRIORITY_RANK.indexOf(a.id) - PRIORITY_RANK.indexOf(b.id);
     return a.name.localeCompare(b.name);
   });
   return buckets;
@@ -123,7 +121,7 @@ function compareElements(a: ElementWithDetails, b: ElementWithDetails, display: 
 // Order a flat element list per the display's orderBy/orderDir. Used by the
 // 'object' grouping path, which keeps the caller's per-Object partition but
 // still wants the chosen ordering applied within each Object band.
-export function orderElements(
+function orderElements(
   elements: ElementWithDetails[],
   display: ListDisplay,
 ): ElementWithDetails[] {

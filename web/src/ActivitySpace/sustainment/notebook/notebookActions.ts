@@ -1,4 +1,4 @@
-import type { NoteNodeType, NoteNode } from './types';
+import type { NoteNodeType, NoteNode } from '@/types/notes';
 import { translate } from '@/Function/i18n/I18nProvider';
 
 type CreateNode = (type: NoteNodeType, name: string, parentId: string | null) => Promise<NoteNode>;

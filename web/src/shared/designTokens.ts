@@ -51,6 +51,9 @@ export const PRIORITY = {
 // Element status and priority display order; priorities run highest to lowest.
 export const STATUS_ORDER = ['backlog', 'todo', 'in_progress', 'review', 'done', 'blocked', 'cancelled'] as const satisfies readonly (keyof typeof STATUS)[];
 export const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low'] as const satisfies readonly (keyof typeof PRIORITY)[];
+// Picker rows in display order; labels are untranslated (callers pass them through t()).
+export const STATUS_OPTIONS: { value: (typeof STATUS_ORDER)[number]; label: string }[] = STATUS_ORDER.map((value) => ({ value, label: STATUS[value].label }));
+export const PRIORITY_OPTIONS: { value: (typeof PRIORITY_ORDER)[number]; label: string }[] = PRIORITY_ORDER.map((value) => ({ value, label: PRIORITY[value].label }));
 
 // ============================================
 // Typography scale
@@ -187,10 +190,6 @@ export const CARD =
 
 export const CARD_HOVER =
   'hover:border-[var(--border-strong)] transition-colors duration-[120ms]';
-
-export const CARD_DRAG =
-  'ring-2 ring-[var(--accent-default)] border-[var(--accent-default)]';
-
 /** Shared geometry for Object and Element quick creation. */
 export const QUICK_CREATE = {
   panel: 'pointer-events-auto w-full max-w-[760px] max-h-[calc(100dvh-48px)] overflow-y-auto rounded-2xl bg-popover/95 backdrop-blur-md border border-border p-4',

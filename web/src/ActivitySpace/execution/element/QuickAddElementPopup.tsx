@@ -4,7 +4,7 @@ import { QUICK_CREATE } from '@/shared/designTokens';
 import { quickCreatePillClass as pillClass } from '@/Function/shared/QuickCreatePopup';
 import { Button } from '@/ui/button';
 
-import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
+import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '@/shared/designTokens';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import {
@@ -18,7 +18,7 @@ import {
 import { ElementIcon, ObjectIcon as BoxIcon } from '@/Function/shared/conceptIcons';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
-import { PriorityPicker, PRIORITY_OPTIONS } from '@/Function/shared/PriorityPicker';
+import { PriorityPicker } from '@/Function/shared/PriorityPicker';
 import { labelColor, useLabelColors } from '@/Function/shared/labelColor';
 import { ReachHint, WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
@@ -37,7 +37,7 @@ import {
 // Sentinel used in the Object pill for the "My Elements (personal)" entry.
 // Callers receive `personal: true` in the submit payload and translate that
 // into an Element with `owner_id = me` + `object_id = null`.
-export const PERSONAL_SCOPE_ID = '__personal__';
+const PERSONAL_SCOPE_ID = '__personal__';
 
 // One submit payload entry — produced for every non-empty title line.
 // Shared fields (description / status / priority / assignees / object /
@@ -122,7 +122,6 @@ interface QuickAddElementPopupProps {
   canSaveToPersonal?: boolean;
 }
 
-const STATUS_OPTIONS: { value: ElementStatus; label: string }[] = STATUS_ORDER.map((value) => ({ value, label: STATUS[value].label }));
 
 /**
  * Floating bottom-center popup for adding one or many Elements with rich
