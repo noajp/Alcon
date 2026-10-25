@@ -342,7 +342,9 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     const byField = metricKind(p.measure_metric) === 'field';
     if (byField && !fieldsFor(fields.data ?? [], 'deal', p.domain_id).some(field => field.type === 'number' && field.key === p.measure_field)) return;
     const value = metricValue(workspace.deals, p.measure_metric, p.currency, today, p.measure_field);
-    const stamp = `${p.measure_intent_id}:${p.measure_metric}:${p.measure_field ?? ''}:${value}`;
+    // A field total reported as money depends on which currencies the won deals are in.
+    const currencies = byField ? workspace.deals.filter(deal => deal.outcome === 'won').map(deal => `${deal.id}=${deal.currency}`).join(',') : '';
+    const stamp = `${p.measure_intent_id}:${p.measure_metric}:${p.measure_field ?? ''}:${value}:${currencies}`;
     if (reported.current === stamp) return;
     reported.current = stamp;
     void (async () => {
