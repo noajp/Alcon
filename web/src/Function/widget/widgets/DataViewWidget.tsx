@@ -18,8 +18,8 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { MenuShell, MENU_ROW } from "@/Function/shared/menu";
-import { useDataTables } from "@/ActivitySpace/sustainment/table/data";
-import { useWidgetTableData } from "@/hooks/useWidgetTableData";
+import { useDataTables } from "@/hooks/tableData";
+import { useTableData } from "@/hooks/useTableData";
 import type { DataTableColumn, DataTableColumnType } from "@/types/database";
 import { WidgetHeaderAction, useWidgetMeta } from "../WidgetFrame";
 import type { WidgetProps } from "../types";
@@ -195,7 +195,7 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
   const { t } = useI18n();
   const params = normalizeDataViewParams(rawParams);
   const tables = useDataTables();
-  const source = useWidgetTableData(params.tableId);
+  const source = useTableData(params.tableId);
   const [configure, setConfigure] = useState(!params.tableId);
   const [editData, setEditData] = useState(false);
   const [newTable, setNewTable] = useState("");

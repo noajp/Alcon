@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canEditInitiative } from '../src/ActivitySpace/strategy/initiative/initiativeAccess';
+import { canEditInitiative } from '@/Function/strategy/initiativeAccess';
 
 describe('canEditInitiative', () => {
   it('only the creator edits', () => {

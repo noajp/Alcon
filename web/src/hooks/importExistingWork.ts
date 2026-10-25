@@ -3,7 +3,7 @@
 import { getCurrentUserId, supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
 import { notifyDomainsChanged } from '@/Function/space/domainsStore';
-import { ElementImportRejectedError, INTAKE_LIMIT, type ElementImportRow, type ElementImportResult } from '@/ActivitySpace/execution/element/intake/intakeModel';
+import { ElementImportRejectedError, INTAKE_LIMIT, type ElementImportRow, type ElementImportResult } from '@/Function/shared/element/intakeModel';
 
 export interface WorkImportTarget {
   userId: string;

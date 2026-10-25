@@ -42,7 +42,7 @@ import {
   phaseStanding,
   todayYMD,
   type PhaseStanding,
-} from './phaseClose';
+} from '@/Function/strategy/phaseClose';
 
 // =============================================================
 // PhaseView — the Strategy layer's "Phase" app: Linear-Cycle-style

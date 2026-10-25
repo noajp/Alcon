@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { InitiativeRiskView } from '@/ActivitySpace/strategy/initiative/InitiativeRisk';
-import { useInitiativeRisk } from '@/ActivitySpace/strategy/initiative/useInitiativeRisk';
+import { useInitiativeRisk } from '@/hooks/useInitiativeRisk';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { STATUS } from '@/shared/designTokens';

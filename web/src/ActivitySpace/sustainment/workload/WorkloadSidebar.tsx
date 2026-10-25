@@ -17,7 +17,7 @@ import {
   useWorkloadPlanOpen,
   useWorkloadPublished,
   type WorkloadPerson,
-} from './workloadStore';
+} from '@/Function/workload/workloadStore';
 
 /**
  * Workload navigation: how loaded the team is, the plan that fixes it, every

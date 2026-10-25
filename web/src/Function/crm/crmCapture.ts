@@ -3,7 +3,7 @@
 // the AI; the AI's reading, when it arrives, is validated by the same rules and
 // replaces only the fields it actually found. Nothing is written until the
 // person applies the proposal.
-import { ACTIVITY_TYPES, resolveStage, stageChange, stageKey, type CrmActivityType, type CrmDeal, type CrmStage } from './crmModel';
+import { ACTIVITY_TYPES, resolveStage, stageChange, stageKey, type CrmActivityType, type CrmDeal, type CrmStage } from '@/Function/crm/crmModel';
 import { dayIndexOf, shiftDateOnly } from '@/Function/shared/dateUtils';
 
 export interface CaptureFields {

@@ -12,7 +12,7 @@ import {
   ChevronDown, Quote, Link as LinkIcon, Table as TableIcon, Plus,
 } from 'lucide-react';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
-import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from './htmlSanitizer';
+import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from '@/Function/notebook/htmlSanitizer';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export interface NoteEditorProps {

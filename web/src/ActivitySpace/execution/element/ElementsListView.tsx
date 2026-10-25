@@ -10,8 +10,8 @@ import { updateElement, createElement, deleteElement, addElementToObject, remove
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
-import { pushUndo } from '@/ActivitySpace/execution/element/bulkUndo';
-import { bulkSetAssignee } from '@/ActivitySpace/execution/element/bulkAssign';
+import { pushUndo } from '@/Function/shared/element/bulkUndo';
+import { bulkSetAssignee } from '@/hooks/bulkAssign';
 import { ObjectIcon } from '@/shell/icons';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { EmptyState } from '@/Function/shared/EmptyState';

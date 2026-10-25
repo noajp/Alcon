@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { supabase } from '@/lib/supabase';
+import { useNoteHeader } from '@/hooks/useNotesDb';
 import { NotePicker } from '@/ActivitySpace/sustainment/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/sustainment/notebook/LinkedNoteEmbed';
 import { useWidgetMeta } from '../WidgetFrame';
@@ -21,15 +20,7 @@ export function NoteWidget({ params, setParams, host }: WidgetProps) {
   const { t } = useI18n();
   const noteId = typeof params.noteId === 'string' ? params.noteId : null;
   const [picking, setPicking] = useState(false);
-  const note = useQuery({
-    queryKey: ['widget-note', noteId],
-    enabled: !!noteId,
-    queryFn: async () => {
-      const { data, error } = await supabase.from('notes').select('id, name').eq('id', noteId!).maybeSingle();
-      if (error) throw error;
-      return (data ?? null) as { id: string; name: string } | null;
-    },
-  });
+  const note = useNoteHeader(noteId);
   useWidgetMeta(note.data?.name ?? t('Note'));
   const editable = !host.readOnly;
 

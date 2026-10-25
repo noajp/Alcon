@@ -22,8 +22,8 @@ import {
 
 import { PageView } from '@/ActivitySpace/sustainment/notebook/PageView';
 import { ObjectDraftDialog } from '@/ActivitySpace/sustainment/notebook/ObjectDraftDialog';
-import { summarizeNoteContent } from '@/ActivitySpace/sustainment/notebook/aiSummary';
-import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from '@/ActivitySpace/sustainment/notebook/objectDraft';
+import { summarizeNoteContent } from '@/hooks/noteSummary';
+import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from '@/hooks/objectDraft';
 import type { Brief } from '@/types/notes';
 
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';

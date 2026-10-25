@@ -41,7 +41,7 @@ import { useDomains } from '@/hooks/useSupabase';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { useCurrentUserId } from '@/providers/authContext';
 import { useDomainRole } from '@/hooks/domainData';
-import { useMyObjectMemberships } from '@/ActivitySpace/execution/object/useMyMemberships';
+import { useMyObjectMemberships } from '@/hooks/useMyMemberships';
 import { isViewOnly } from '@/ActivitySpace/execution/object/objectAccess';
 import { ViewOnlyBadge } from '@/Function/shared/ViewOnlyBadge';
 

@@ -8,7 +8,7 @@ import { ChoiceCard } from '@/ui/choice-card';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { createDomain } from '@/hooks/useSupabase';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { suggestObjectPrefix } from '@/ActivitySpace/execution/object/objectPrefix';
+import { suggestObjectPrefix } from '@/Function/shared/objectPrefix';
 import { Globe, Lock } from 'lucide-react';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { useAuthContext } from '@/providers/AuthProvider';

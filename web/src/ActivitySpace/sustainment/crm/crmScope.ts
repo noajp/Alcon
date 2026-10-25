@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { inToolScope, SPACE_SCOPE, useToolScope, type ToolScope } from '@/Function/shared/tool/toolScope';
 import type { Crm } from '@/hooks/useCrm';
-import { scopeWorkspace, type CrmWorkspace } from './crmModel';
+import { scopeWorkspace, type CrmWorkspace } from '@/Function/crm/crmModel';
 
 /** What the CRM shows in its scope: the pipelines, their pooled deals, the
  *  companies and contacts — read the same way by the sidebar and the pages. */

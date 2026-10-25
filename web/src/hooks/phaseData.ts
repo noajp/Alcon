@@ -1,7 +1,7 @@
 'use client';
 
 import { ascNullsLast } from '@/hooks/strategyData';
-import type { PhaseCloseWrite } from '@/ActivitySpace/strategy/phase/phaseClose';
+import type { PhaseCloseWrite } from '@/Function/strategy/phaseClose';
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
@@ -270,4 +270,15 @@ export async function fetchPhaseCandidates(domainId: string): Promise<{
     objects: (objects || []) as Pick<AlconObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[],
     elements: elements as PhaseCandidateElement[],
   };
+}
+
+/** These Phases, earliest first. Unreadable or missing ids are simply absent. */
+export async function fetchPhasesByIds(ids: string[]): Promise<Phase[]> {
+  if (!ids.length) return [];
+  const { data } = await supabase
+    .from('phases')
+    .select('*')
+    .in('id', ids)
+    .order('start_date', { ascending: true, nullsFirst: false });
+  return (data ?? []) as Phase[];
 }

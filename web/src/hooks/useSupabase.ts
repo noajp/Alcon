@@ -49,7 +49,7 @@ export {
   setObjectDomains,
   updateObject,
   useObjectTabs,
-} from '@/ActivitySpace/execution/object/data';
+} from '@/hooks/objectData';
 
 export {
   addElementAssignee,
@@ -133,7 +133,7 @@ export {
   bulkInsertDataTableRows,
   createDataTable,
   useDataTables,
-} from '@/ActivitySpace/sustainment/table/data';
+} from '@/hooks/tableData';
 
 export {
   archiveNotification,
@@ -141,14 +141,14 @@ export {
   markNotificationRead,
   notifyAboutElement,
   useNotifications,
-} from '@/ActivitySpace/execution/element/notificationData';
+} from '@/hooks/notificationData';
 
 export {
   createElementTemplate,
   deleteElementTemplate,
   updateElementTemplate,
   useElementTemplates,
-} from '@/ActivitySpace/execution/element/templateData';
+} from '@/hooks/templateData';
 
 export {
   CARRY_OVER_REASON_PREFIX,
@@ -163,7 +163,7 @@ export {
   useElementCommentActivity,
   withCommentActivity,
   useElementComments,
-} from '@/ActivitySpace/execution/element/commentData';
+} from '@/hooks/commentData';
 
 export { globalSearch, type SearchResult } from '@/Function/shared/searchData';
 
@@ -206,8 +206,8 @@ export {
   usePhaseReschedules,
   usePhases,
   type PhaseReschedule,
-} from '@/ActivitySpace/strategy/phase/data';
+} from '@/hooks/phaseData';
 
 export {
   useObjectMilestones,
-} from '@/ActivitySpace/execution/object/milestoneData';
+} from '@/hooks/milestoneData';

@@ -4,7 +4,6 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
 import {
   createElement,
   deleteElement,
@@ -15,8 +14,8 @@ import {
   invalidateElementDetail,
 } from '@/hooks/useSupabase';
 import { EntityActionsMenu, type ActionTarget } from '@/Function/shared/EntityActionsMenu';
-import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { fetchElementMoveTargets, fetchElementObjectIds } from '@/hooks/elementData';
 
 /**
  * "⋯" menu for an Element, wired to the breadcrumb in ElementDetailView.
@@ -27,36 +26,6 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 const NO_TARGETS: ActionTarget[] = [];
 const NO_IDS: string[] = [];
 
-// Move / multi-home targets: the sibling Objects of the primary Object's
-// Domain. Keyed by the primary Object (not the Element) so every Element in a
-// Domain shares one list, and kept short-lived — a whole Objects list per
-// visited Element is not worth persisting.
-async function fetchActionTargets(primaryId: string | null): Promise<ActionTarget[]> {
-  let domainId: string | null = null;
-  if (primaryId) {
-    const { data: primaryObj } = await supabase
-      .from('objects')
-      .select('domain_id')
-      .eq('id', primaryId)
-      .single();
-    domainId = (primaryObj?.domain_id as string | null) ?? null;
-  }
-  // Archived Objects are not move / multi-home targets.
-  const objQuery = onlyActiveObjects(supabase.from('objects').select('id, name, domain_id')).order('order_index');
-  const { data: objs } = domainId ? await objQuery.eq('domain_id', domainId) : await objQuery;
-  return (objs ?? []).map((o) => ({ id: o.id as string, name: o.name as string }));
-}
-
-// Current memberships (primary + multi-homed) from the junction, falling
-// back to the primary FK if the junction has no rows yet.
-async function fetchMemberIds(elementId: string, primaryId: string | null): Promise<string[]> {
-  const { data: mem } = await supabase
-    .from('element_objects')
-    .select('object_id')
-    .eq('element_id', elementId);
-  const ids = (mem ?? []).map((m) => m.object_id as string);
-  return ids.length > 0 ? ids : primaryId ? [primaryId] : [];
-}
 
 export function ElementActionsMenu({
   element,
@@ -73,7 +42,7 @@ export function ElementActionsMenu({
   const primaryId = element.object_id ?? null;
   const { data: fetchedTargets } = useQuery({
     queryKey: ['action-targets', primaryId ?? 'all'],
-    queryFn: () => fetchActionTargets(primaryId),
+    queryFn: () => fetchElementMoveTargets(primaryId),
     gcTime: 5 * 60_000,
   });
   const membersKey = useMemo(
@@ -82,7 +51,7 @@ export function ElementActionsMenu({
   );
   const { data: fetchedMemberIds } = useQuery({
     queryKey: membersKey,
-    queryFn: () => fetchMemberIds(element.id, primaryId),
+    queryFn: () => fetchElementObjectIds(element.id, primaryId),
   });
   const targets = fetchedTargets ?? NO_TARGETS;
   const memberIds = fetchedMemberIds ?? NO_IDS;

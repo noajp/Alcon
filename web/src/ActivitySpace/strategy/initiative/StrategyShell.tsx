@@ -40,9 +40,9 @@ import { InitiativeIntentProvider } from '@/ActivitySpace/strategy/initiative/In
 import { StrategyCommentsPanel } from '@/ActivitySpace/strategy/initiative/StrategyCommentsPanel';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { canEditInitiative } from './initiativeAccess';
+import { canEditInitiative } from '@/Function/strategy/initiativeAccess';
 import { canEditObject, canManageDomainTypes } from '@/ActivitySpace/execution/object/objectAccess';
-import { useMyDomainRoles, useMyObjectMemberships } from '@/ActivitySpace/execution/object/useMyMemberships';
+import { useMyDomainRoles, useMyObjectMemberships } from '@/hooks/useMyMemberships';
 import { useInitiativeHealth } from './useInitiativeHealth';
 import type { InitiativeHealth } from './initiativeHealthModel';
 import { useNow } from '@/Function/shared/useNow';

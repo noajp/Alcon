@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { analyzeOperations, normalizeOperationsParams, OPERATIONS_FIELDS } from '@/ActivitySpace/sustainment/operations/operationsModel';
+import { analyzeOperations, normalizeOperationsParams, OPERATIONS_FIELDS } from '@/Function/operations/operationsModel';
 const { runOperationsTool } = await import(new URL('../../supabase/functions/alcon-copilot/operationsTools.ts', import.meta.url).pathname);
 
 const uuid = (n: number) => `aaaaaaaa-aaaa-aaaa-aaaa-${String(n).padStart(12, '0')}`;
@@ -134,7 +134,7 @@ describe('Copilot operations diagnosis', () => {
 
 describe('the model the Copilot edge function imports by path', () => {
   it('stays free of imports, which Deno could not resolve', () => {
-    const source = readFileSync(new URL('../src/ActivitySpace/sustainment/operations/operationsModel.ts', import.meta.url), 'utf8');
+    const source = readFileSync(new URL('../src/Function/operations/operationsModel.ts', import.meta.url), 'utf8');
     expect(source).not.toMatch(/^\s*import\s/m);
   });
 });

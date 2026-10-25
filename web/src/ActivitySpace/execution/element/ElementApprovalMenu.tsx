@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/ui/button';
 import { Check, X, AlertCircle, Clock, ShieldCheck } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import { useAssignableWorkers } from '@/hooks/teamData';
 import {
   fetchElementApprovals,
@@ -20,6 +19,7 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { formatAge } from '@/Function/shared/dateUtils';
+import { fetchApprovalRights } from '@/hooks/elementData';
 
 interface Props {
   element: ElementWithDetails;
@@ -61,10 +61,7 @@ export function ElementApprovalMenu({ element, onRefresh }: Props) {
   useEffect(() => {
     if (!open || !element.is_approval) return;
     let live = true;
-    void Promise.all([
-      supabase.rpc('user_can_decide_approval', { p_element: element.id }),
-      supabase.rpc('user_can_manage_approval', { p_element: element.id }),
-    ]).then(([decide, manage]) => { if (live) setRights({ key: rightsKey, decide: decide.data === true, manage: manage.data === true }); });
+    void fetchApprovalRights(element.id).then((r) => { if (live) setRights({ key: rightsKey, ...r }); });
     return () => { live = false; };
   }, [open, element.id, element.is_approval, rightsKey]);
   const currentRights = rights && rights.key === rightsKey ? rights : null;

@@ -1,10 +1,7 @@
 'use client';
-
-import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { FileText, ExternalLink, Unlink } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { useNoteContent } from '@/hooks/useNotesDb';
+import { useNoteContent, useNoteHeader } from '@/hooks/useNotesDb';
 import { NoteContentStatus } from './NoteContentStatus';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
@@ -41,29 +38,14 @@ export function LinkedNoteEmbed({
 }: LinkedNoteEmbedProps) {
   const { t } = useI18n();
   const { html, loading, saving, error, errorKind, retry, save } = useNoteContent(noteId);
-  const [name, setName] = useState<{ noteId: string; value: string } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from('notes')
-        .select('name')
-        .eq('id', noteId)
-        .maybeSingle();
-      if (!cancelled && data) setName({ noteId, value: (data as { name: string }).name });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [noteId]);
+  const name = useNoteHeader(noteId).data?.name;
 
   return (
     <div>
       <div className="flex items-center gap-2 h-8">
         <FileText size={13} className="text-muted-foreground shrink-0" />
         <span className="text-[12px] font-semibold text-foreground truncate flex-1 min-w-0">
-          {(name?.noteId === noteId && name.value) || t('Untitled note')}
+          {name || t('Untitled note')}
         </span>
         <ButtonAppearanceProvider appearance="navigation">
           {onOpenInNotes && (

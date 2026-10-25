@@ -16,7 +16,7 @@ import {
 import type { ObjectTabType } from '@/types/database';
 import type { NavigationState } from '@/types/navigation';
 import { TabBar } from '@/shell/TabBar';
-import { bulkSetAssignee } from '@/ActivitySpace/execution/element/bulkAssign';
+import { bulkSetAssignee } from '@/hooks/bulkAssign';
 import { CalendarView } from '@/ActivitySpace/sustainment/calendar/CalendarView';
 import { SummaryView } from '@/ActivitySpace/execution/object/summary/SummaryView';
 import { OverviewView } from '@/ActivitySpace/execution/object/overview/OverviewView';
@@ -28,7 +28,7 @@ import { useCustomColumns } from '@/Function/property/useCustomColumns';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
-import { pushUndo } from '@/ActivitySpace/execution/element/bulkUndo';
+import { pushUndo } from '@/Function/shared/element/bulkUndo';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';

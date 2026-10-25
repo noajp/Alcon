@@ -40,7 +40,7 @@ import {
   elementsDueInSpan,
   hoursPerDay,
 } from '@/Function/shared/assignmentLoad';
-import { useWorkloadData } from '@/ActivitySpace/sustainment/workload/useWorkloadData';
+import { useWorkloadData } from '@/hooks/useWorkloadData';
 import {
   summarizeWorkload,
   workloadBar,
@@ -49,7 +49,7 @@ import {
   workloadOverDays,
   workloadUtilization,
   type WorkloadTeamSummary,
-} from '@/ActivitySpace/sustainment/workload/workloadModel';
+} from '@/Function/workload/workloadModel';
 import { applyProposals, planRebalance, proposalWorkers, type Proposal } from '@/ActivitySpace/sustainment/workload/workloadRebalance';
 import {
   WORKLOAD_RANGES,
@@ -60,7 +60,7 @@ import {
   useWorkloadPlanOpen,
   useWorkloadRange,
   type WorkloadRange,
-} from '@/ActivitySpace/sustainment/workload/workloadStore';
+} from '@/Function/workload/workloadStore';
 import { WorkloadPlanPanel } from '@/ActivitySpace/sustainment/workload/WorkloadPlanPanel';
 
 // =============================================================

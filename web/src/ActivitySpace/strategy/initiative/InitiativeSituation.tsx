@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import type { AlconObjectWithChildren, Phase } from '@/hooks/useSupabase';
 import { PhaseBurnup } from '@/Function/shared/PhaseBurnup';
 import { phaseElapsedRemaining } from '@/Function/shared/phaseWindow';
 import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { fetchPhasesByIds } from '@/hooks/phaseData';
 
 // =============================================================
 // InitiativeSituation — what a Initiative is doing, derived rather than written.
@@ -63,14 +63,7 @@ function usePhasesOfElements(phaseIds: string[]): Phase[] {
     // `key` itself (see the guard below).
     if (!ids.length) return;
     let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from('phases')
-        .select('*')
-        .in('id', ids)
-        .order('start_date', { ascending: true, nullsFirst: false });
-      if (!cancelled) setPhases((data || []) as Phase[]);
-    })();
+    void fetchPhasesByIds(ids).then((rows) => { if (!cancelled) setPhases(rows); });
     return () => {
       cancelled = true;
     };

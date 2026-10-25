@@ -12,7 +12,7 @@ import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrill
 import { NavCalendarIcon } from '@/shell/sidebar/NavIcons';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { fetchExplorerData } from '@/Function/sync/explorerData';
-import { fetchMyElements } from '@/ActivitySpace/home/myElementsData';
+import { fetchMyElements } from '@/hooks/myElementsData';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { Button } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';

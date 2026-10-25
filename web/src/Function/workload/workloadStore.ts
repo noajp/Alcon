@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 import type { Worker } from '@/types/database';
-import type { WorkloadTeamSummary } from './workloadModel';
+import type { WorkloadTeamSummary } from '@/Function/workload/workloadModel';
 
 // The Workload sidebar (who, and in which Domains) and the main surface (the
 // chart and the plan) do not share a parent below the shell, so what they both

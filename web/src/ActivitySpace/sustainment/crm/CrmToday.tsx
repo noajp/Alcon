@@ -7,7 +7,7 @@ import { FONT } from '@/shared/designTokens';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell, MENU_ROW } from '@/Function/shared/menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { forecastFor, inList, todayQueue, upcoming, type CrmDeal, type CrmUrgency, type CrmWorkspace } from './crmModel';
+import { forecastFor, inList, todayQueue, upcoming, type CrmDeal, type CrmUrgency, type CrmWorkspace } from '@/Function/crm/crmModel';
 import { HealthDot, money, relativeDay } from './crmFormat';
 import type { Crm } from '@/hooks/useCrm';
 import { shiftDateOnly } from '@/Function/shared/dateUtils';

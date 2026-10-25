@@ -8,9 +8,9 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdo
 import { MenuShell, MENU_ROW } from '@/Function/shared/menu';
 import { Textarea } from '@/ui/textarea';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { ACTIVITY_TYPES, resolveStage, type CrmActivityType } from './crmModel';
-import { readCapture, reviewRows, reviewValues, type CaptureFields, type CaptureProposal, type ReviewRow } from './crmCapture';
-import { aiCapture, useCrmAi } from './crmAi';
+import { ACTIVITY_TYPES, resolveStage, type CrmActivityType } from '@/Function/crm/crmModel';
+import { readCapture, reviewRows, reviewValues, type CaptureFields, type CaptureProposal, type ReviewRow } from '@/Function/crm/crmCapture';
+import { aiCapture, useCrmAi } from '@/hooks/crmAi';
 import { money } from './crmFormat';
 import type { Crm, CrmDealPatch } from '@/hooks/useCrm';
 

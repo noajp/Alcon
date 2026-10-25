@@ -63,14 +63,14 @@ UI を変更したら `npm run design-lint`（変更ファイル限定のラチ�
 
 ## ディレクトリ
 
-`web/src/` の下に、`shell/`（外殻 — ModeRail / AppSidebar / CommandPalette / MainContent / viewRegistry）、`ActivitySpace/`（盤面の面 — `home/` `strategy/` `execution/` `sustainment/`）、`Function/`（盤面を成立させる仕組み — `widget/` `property/` `copilot/` `settings/` `space/` `strategy/` `sync/` `shared/`）、`hooks/`（Supabase の CRUD は全部ここ）、`shared/designTokens.ts`、`lib/` `providers/` `auth/` `types/` `ui/`。`app/` は layout / page / globals.css だけ。
+`web/src/` の下に、`shell/`（外殻 — ModeRail / AppSidebar / CommandPalette / MainContent / viewRegistry）、`ActivitySpace/`（盤面の面 — `home/` `strategy/` `execution/` `sustainment/`）、`Function/`（盤面を成立させる仕組みと画面をまたぐモデル — `widget/` `property/` `settings/` `space/` `sync/` `shared/`、`strategy/` `crm/` `team/` など概念ごと）、`hooks/`（Supabase の CRUD は全部ここ）、`shared/designTokens.ts`、`lib/` `providers/` `auth/` `types/` `ui/`。`app/` は layout / page / globals.css だけ。
 
 root 直下は `supabase/`（migrations と functions）、`ops/`（自走ループの配管）、`docs/`（adr / friction-risk-register.md）、`website/`（LP）。
 
 ## 実装ルール
 
 1. 変更後は必ず `npx tsc --noEmit` と `npm test`
-2. 新規ファイルは、盤面の画面なら `ActivitySpace/<分類>/<概念>/`、それを支える仕組みなら `Function/<concept>/`。横断 UI は `Function/shared/`、外殻は `shell/`。`Function/` から `ActivitySpace/` を import しない（画面の一部を盤面に置く `widget/widgets/` だけ例外。ESLint が検査する）。画面と仕組みの両方が使うものは `Function/` か `hooks/` に置く
+2. 新規ファイルは、盤面の画面なら `ActivitySpace/<分類>/<概念>/`、それを支える仕組みなら `Function/<concept>/`。横断 UI は `Function/shared/`、外殻は `shell/`。依存は `ActivitySpace/` → `Function/` / `hooks/` の一方向。`Function/` `hooks/` から `ActivitySpace/` を import せず（画面の一部を盤面に置く `widget/widgets/` だけ例外）、画面は `supabase` を直接使わず `hooks/` を通す（Kata 由来の Slides だけ例外）。どちらも ESLint が検査する
 3. **新 view**：`viewRegistry.ts`（label/icon の単一情報源）→ `MainContent` 分岐 → `railApps.ts` の `MODE_META`。新モードを App にするなら `RailMode` / `APP_GROUPS` も
 4. **新 Widget**：本体を `Function/widget/widgets/` に、定義を `registry.tsx` に1つ（`accepts` / `zones` / `load()` の動的 import）、既定配置は `defaults.ts`。既存ウィジェットを別の Subject でも使う場合は、`accepts` に対象を追加する。Home 以外のボードは対象を見られる全員が共有するので、ウィジェットの中身は `useWidgetDocument`（全員で共有）に置き、本人だけに見せる下書きは `useWidgetViewerState` に置く
 5. **グラフの集計軸を固定しない** — 集計軸は `Function/shared/dimensions.ts` の `Dimension` から選択できるようにし、`WidgetInstance.params` に保存する。軸の違いだけで別のウィジェットを作らない

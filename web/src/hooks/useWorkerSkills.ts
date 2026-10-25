@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { selectIn } from '@/hooks/chunkedIn';
 import { supabase } from '@/lib/supabase';
 import type { WorkerSkill, WorkerSkillEvidence, WorkerSkillLevel } from '@/types/database';
-import { parseSkillName } from '@/ActivitySpace/sustainment/team/people';
+import { parseSkillName } from '@/Function/team/people';
 
 export interface WorkerSkillsData {
   skills: WorkerSkill[];

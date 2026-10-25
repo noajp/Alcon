@@ -11,6 +11,7 @@ import {
   removeElementFromExplorer,
 } from '@/Function/sync/explorerPatch';
 import { selectIn } from '@/hooks/chunkedIn';
+import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
 import type {
@@ -697,4 +698,44 @@ export async function restoreElement(deletionId: string): Promise<string> {
   const { data, error } = await supabase.rpc('restore_element', { p_deletion: deletionId });
   if (error) throw new Error(error.message);
   return data as string;
+}
+
+// Move / multi-home targets: the sibling Objects of the primary Object's
+// Domain. Keyed by the primary Object (not the Element) so every Element in a
+// Domain shares one list, and kept short-lived — a whole Objects list per
+// visited Element is not worth persisting.
+export async function fetchElementMoveTargets(primaryId: string | null): Promise<{ id: string; name: string }[]> {
+  let domainId: string | null = null;
+  if (primaryId) {
+    const { data: primaryObj } = await supabase
+      .from('objects')
+      .select('domain_id')
+      .eq('id', primaryId)
+      .single();
+    domainId = (primaryObj?.domain_id as string | null) ?? null;
+  }
+  // Archived Objects are not move / multi-home targets.
+  const objQuery = onlyActiveObjects(supabase.from('objects').select('id, name, domain_id')).order('order_index');
+  const { data: objs } = domainId ? await objQuery.eq('domain_id', domainId) : await objQuery;
+  return (objs ?? []).map((o) => ({ id: o.id as string, name: o.name as string }));
+}
+
+// Current memberships (primary + multi-homed) from the junction, falling
+// back to the primary FK if the junction has no rows yet.
+export async function fetchElementObjectIds(elementId: string, primaryId: string | null): Promise<string[]> {
+  const { data: mem } = await supabase
+    .from('element_objects')
+    .select('object_id')
+    .eq('element_id', elementId);
+  const ids = (mem ?? []).map((m) => m.object_id as string);
+  return ids.length > 0 ? ids : primaryId ? [primaryId] : [];
+}
+
+/** What the viewer may do with an approval Element: decide it, and manage its reviewers. */
+export async function fetchApprovalRights(elementId: string): Promise<{ decide: boolean; manage: boolean }> {
+  const [decide, manage] = await Promise.all([
+    supabase.rpc('user_can_decide_approval', { p_element: elementId }),
+    supabase.rpc('user_can_manage_approval', { p_element: elementId }),
+  ]);
+  return { decide: decide.data === true, manage: manage.data === true };
 }

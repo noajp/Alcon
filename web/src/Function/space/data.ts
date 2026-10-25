@@ -135,3 +135,13 @@ export function useSpaceRoleQuery(spaceId: string | null) {
     enabled: !!spaceId && !!userId,
   });
 }
+
+/** How many Domains the Space still holds (a Space with Domains cannot be deleted). */
+export async function countSpaceDomains(spaceId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('domains')
+    .select('id', { count: 'exact', head: true })
+    .eq('activity_space_id', spaceId);
+  if (error) throw error;
+  return count ?? 0;
+}

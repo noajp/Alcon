@@ -9,7 +9,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { FONT } from '@/shared/designTokens';
 import { useOperationsTemplate } from '@/hooks/useOperationsTemplate';
 import type { DataTableColumn } from '@/types/database';
-import { OPERATIONS_FIELDS, type OperationsParams } from './operationsModel';
+import { OPERATIONS_FIELDS, type OperationsParams } from '@/Function/operations/operationsModel';
 
 export const OPERATIONS_INPUT = 'h-8 min-w-0 w-full rounded-sm bg-transparent px-2 text-sm hover:bg-muted/40 focus:bg-muted/60 disabled:opacity-50';
 

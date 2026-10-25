@@ -3,10 +3,10 @@ import { createElement, type ReactNode } from 'react';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DataTableSchema } from '@/ActivitySpace/sustainment/table/data';
+import type { DataTableSchema } from '@/hooks/tableData';
 
 const mocks = vi.hoisted(() => ({ read: vi.fn(), setCell: vi.fn() }));
-vi.mock('@/ActivitySpace/sustainment/table/data', () => ({
+vi.mock('@/hooks/tableData', () => ({
   DATA_TABLES_QUERY_KEY: ['data-tables'],
   fetchDataTableSchema: mocks.read,
   setDataTableCell: mocks.setCell,
@@ -25,8 +25,7 @@ vi.mock('@/lib/supabase', () => ({
   } },
 }));
 
-import { useTableData } from '@/ActivitySpace/sustainment/table/useTableData';
-import { useWidgetTableData } from '@/hooks/useWidgetTableData';
+import { useTableData } from '@/hooks/useTableData';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -50,7 +49,7 @@ describe('shared Table data', () => {
     mocks.read.mockImplementation(async () => schema(value));
     mocks.setCell.mockImplementation(async (_row, _column, next) => { value = next; });
     const { wrapper } = setup();
-    const { result } = renderHook(() => ({ app: useTableData('a'), widget: useWidgetTableData('a') }), { wrapper });
+    const { result } = renderHook(() => ({ app: useTableData('a'), widget: useTableData('a') }), { wrapper });
     await waitFor(() => expect(result.current.app.data).toBeDefined());
     expect(mocks.read).toHaveBeenCalledTimes(1);
     expect(result.current.app.data).toBe(result.current.widget.data);
@@ -79,7 +78,7 @@ describe('shared Table data', () => {
     mocks.setCell.mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(async (_row, _column, next) => { value = next; });
     const { wrapper } = setup();
-    const { result } = renderHook(() => ({ app: useTableData('a'), widget: useWidgetTableData('a') }), { wrapper });
+    const { result } = renderHook(() => ({ app: useTableData('a'), widget: useTableData('a') }), { wrapper });
     await waitFor(() => expect(result.current.app.data).toBeDefined());
     let failed!: Promise<unknown>;
     let queued!: Promise<void>;
@@ -102,7 +101,7 @@ describe('shared Table data', () => {
     mocks.setCell.mockImplementation(async () => { await write.promise; valueA = 'after'; });
     const { wrapper, client } = setup();
     const { result, rerender } = renderHook(({ id }) => useTableData(id), { wrapper, initialProps: { id: 'a' } });
-    const observer = renderHook(() => useWidgetTableData('a'), { wrapper });
+    const observer = renderHook(() => useTableData('a'), { wrapper });
     await waitFor(() => expect(result.current.data).toBeDefined());
     let saved!: Promise<void>;
     act(() => { saved = result.current.setCell('row', 'column', 'after'); });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approachAttention, conditionAssessment, sharedApproachObjects, type ApproachData, type DomainApproach, type ApproachAssessment, type ApproachCondition, type ApproachReview } from '../src/ActivitySpace/execution/domain/approachModel';
+import { approachAttention, conditionAssessment, sharedApproachObjects, type ApproachData, type DomainApproach, type ApproachAssessment, type ApproachCondition, type ApproachReview } from '@/Function/domain/approachModel';
 const a: DomainApproach = { id: 'a', domain_id: 'd', strategy_id: 's', measure_id: null, title: 'Demand', expected_change: 'Learn', hypothesis: 'A demonstration yields feedback', assumptions: '', review_trigger: '', review_date: '2026-09-10', revision: 4, plan_revision: 2, created_by: 'u', created_at: '2026-09-01', updated_at: '2026-09-03' };
 const c: ApproachCondition = { id: 'c', approach_id: 'a', title: 'Comprehension', kind: 'learning', required: true, success_criteria: 'Visitors explain value', review_date: null, created_at: '2026-09-01' };
 const assessment: ApproachAssessment = { id: 'e', approach_id: 'a', condition_id: 'c', plan_revision: 2, result: 'met', observation: 'They explain it', evidence_source: 'Notes', observed_on: '2026-09-02', reasoning: 'They understood', author_id: 'u', created_at: '2026-09-02' };

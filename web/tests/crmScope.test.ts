@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scopeWorkspace, type CrmWorkspace } from '@/ActivitySpace/sustainment/crm/crmModel';
+import { scopeWorkspace, type CrmWorkspace } from '@/Function/crm/crmModel';
 import { inToolScope, resolveToolScope, SPACE_SCOPE } from '@/Function/shared/tool/toolScope';
 
 const workspace = (id: string, totals: CrmWorkspace['totals'], deals: string[] = []): CrmWorkspace => ({

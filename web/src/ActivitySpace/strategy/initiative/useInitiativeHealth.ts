@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { fetchStrategyElements } from '@/hooks/useSupabase';
-import { fetchDomainThresholds, fetchLastProgressAt, toRiskElements, toRiskObjects } from './useInitiativeRisk';
+import { fetchDomainThresholds, fetchLastProgressAt, toRiskElements, toRiskObjects } from '@/hooks/useInitiativeRisk';
 import { computeInitiativeHealth, type InitiativeHealth } from './initiativeHealthModel';
 import type { StrategyWithObjects } from '@/types/database';
 

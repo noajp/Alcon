@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ElementImportRejectedError, parseIntake, normalizeIntake } from '@/ActivitySpace/execution/element/intake/intakeModel';
+import { ElementImportRejectedError, parseIntake, normalizeIntake } from '@/Function/shared/element/intakeModel';
 
 const server = vi.hoisted(() => ({ userId: '00000000-0000-0000-0000-000000000001' as string | null, rpc: vi.fn(), changed: vi.fn(), invalidate: vi.fn() }));
 vi.mock('@/lib/supabase', () => ({ getCurrentUserId: async () => server.userId, supabase: { rpc: server.rpc } }));

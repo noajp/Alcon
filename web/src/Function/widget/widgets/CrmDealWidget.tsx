@@ -9,7 +9,7 @@ import { MenuShell, MENU_ROW } from '@/Function/shared/menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useCrm } from '@/hooks/useCrm';
 import { HealthBadge, money, relativeDay } from '@/ActivitySpace/sustainment/crm/crmFormat';
-import { LOST_STAGE, WON_STAGE, stageChange, type CrmDeal, type CrmWorkspace } from '@/ActivitySpace/sustainment/crm/crmModel';
+import { LOST_STAGE, WON_STAGE, stageChange, type CrmDeal, type CrmWorkspace } from '@/Function/crm/crmModel';
 import { useWidgetMeta } from '../WidgetFrame';
 import type { WidgetProps } from '../types';
 import { shiftDateOnly } from '@/Function/shared/dateUtils';

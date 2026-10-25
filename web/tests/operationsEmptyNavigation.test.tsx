@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useState, type ReactNode } from 'react';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { OperationsNavigation, OperationsNavigationContext } from '@/ActivitySpace/sustainment/operations/OperationsNavigation';
-import { normalizeOperationsParams, OPERATIONS_FIELDS } from '@/ActivitySpace/sustainment/operations/operationsModel';
+import { normalizeOperationsParams, OPERATIONS_FIELDS } from '@/Function/operations/operationsModel';
 import type { OperationsQueue } from '@/ActivitySpace/sustainment/operations/operationsQueues';
 import type { WidgetProps } from '@/Function/widget/types';
 
@@ -11,7 +11,7 @@ vi.mock('@/hooks/useOperationsTemplate', () => ({
   useOperationsTables: () => ({ data: [{ id: 'empty', name: 'Empty pipeline' }], loading: false, error: null }),
   useOperationsTemplate: () => ({ creating: false, create: vi.fn() }),
 }));
-vi.mock('@/hooks/useWidgetTableData', () => ({ useWidgetTableData: (id: string | null) => ({
+vi.mock('@/hooks/useTableData', () => ({ useTableData: (id: string | null) => ({
   data: id ? { table: { id, name: 'Empty pipeline' }, rows: [], cellsByRow: {},
     columns: OPERATIONS_FIELDS.map(field => ({ id: field.key, name: field.label, type: field.type })) } : null,
   loading: false, error: null, refetch: vi.fn(),

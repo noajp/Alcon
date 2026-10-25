@@ -5,8 +5,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useDomains } from '@/hooks/domainData';
 import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { addDataTableColumns, createDataTable, deleteDataTable, DATA_TABLES_QUERY_KEY, useDataTables } from '@/ActivitySpace/sustainment/table/data';
-import { OPERATIONS_FIELDS } from '@/ActivitySpace/sustainment/operations/operationsModel';
+import { addDataTableColumns, createDataTable, deleteDataTable, DATA_TABLES_QUERY_KEY, useDataTables } from '@/hooks/tableData';
+import { OPERATIONS_FIELDS } from '@/Function/operations/operationsModel';
 
 /** Domain-scoped tables stay in their Space; unscoped personal tables are portable. */
 export function useOperationsTables() {

@@ -14,8 +14,8 @@ import {
   holderAbsenceLabel,
   type BusElement,
   type BusWorkerInput,
-} from '@/ActivitySpace/strategy/initiative/initiativeBusFactorModel';
-import { ABSENCE_WINDOW_DAYS } from '@/ActivitySpace/strategy/initiative/initiativeAssumptionModel';
+} from '@/Function/strategy/initiativeBusFactorModel';
+import { ABSENCE_WINDOW_DAYS } from '@/Function/strategy/initiativeAssumptionModel';
 import type { CapacitySpan } from '@/Function/shared/workerCapacity';
 
 // Local noon, so nothing in the window walk can be shifted a day by a timezone.

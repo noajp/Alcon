@@ -8,7 +8,7 @@ import { WidgetHeaderAction, useWidgetMeta } from '@/Function/widget/WidgetFrame
 import type { WidgetHost } from '@/Function/widget/types';
 import type { ApproachCommand, DomainApproachData } from '@/hooks/useDomainApproaches';
 import { ApproachEditor, type ApproachEditorTarget } from './ApproachEditor';
-import { approachAttention, approachReview, effectiveReviewDate, conditionAssessment, sharedApproachObjects, translateAttentionReason, RESULT_LABELS, ROLE_LABELS, KIND_LABELS, type DomainApproach, type ApproachAssessment } from './approachModel';
+import { approachAttention, approachReview, effectiveReviewDate, conditionAssessment, sharedApproachObjects, translateAttentionReason, RESULT_LABELS, ROLE_LABELS, KIND_LABELS, type DomainApproach, type ApproachAssessment } from '@/Function/domain/approachModel';
 
 export function DomainApproachesPanel({ data, objects, host, onSave }: {
   data: DomainApproachData; objects: { id: string; name: string }[]; host: WidgetHost;

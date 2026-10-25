@@ -1,10 +1,10 @@
 import { operationsQueues } from '@/ActivitySpace/sustainment/operations/operationsQueues';
 import { describe, expect, it } from 'vitest';
-import type { DataTableSchema } from '@/ActivitySpace/sustainment/table/data';
+import type { DataTableSchema } from '@/hooks/tableData';
 import type { Json } from '@/types/database';
 import {
   analyzeOperations, normalizeOperationsParams, OPERATIONS_FIELDS, type OperationsParams,
-} from '@/ActivitySpace/sustainment/operations/operationsModel';
+} from '@/Function/operations/operationsModel';
 
 const today = '2026-09-07';
 

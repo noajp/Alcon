@@ -4,7 +4,7 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { UserMinus, UserPlus, X } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { fetchObjectMemberAccess, removeObjectMember, type ObjectMemberCandidate, type ObjectMemberRow } from '@/hooks/objectData';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { FONT } from '@/shared/designTokens';
@@ -14,7 +14,7 @@ import { membershipErrorMessage } from '@/Function/membership/membershipErrors';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { Button } from '@/ui/button';
-import { useMyDomainRoles } from './useMyMemberships';
+import { useMyDomainRoles } from '@/hooks/useMyMemberships';
 
 // "Who has access to this Object" panel — backs the Object-detail Members
 // tab (rendered when tab_type === 'workers' so we don't need a schema/enum
@@ -23,23 +23,7 @@ import { useMyDomainRoles } from './useMyMemberships';
 // aren't here yet (they join when they accept, ADR 0029), and remove anyone
 // except themselves.
 
-interface ObjectMemberRow {
-  id: string;
-  user_id: string;
-  role: string;
-  worker?: {
-    id: string;
-    name: string;
-    avatar_url: string | null;
-  };
-}
-
-interface DomainCandidate {
-  user_id: string;
-  worker_id: string | null;
-  name: string;
-  avatar_url: string | null;
-}
+type DomainCandidate = ObjectMemberCandidate & { name: string };
 
 interface ObjectMembersPanelProps {
   objectId: string;
@@ -70,77 +54,9 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Members of this Object.
-      const { data: memberRows } = await supabase
-        .from('object_members')
-        .select('id, user_id, role')
-        .eq('object_id', objectId)
-        .order('created_at');
-      const memberUserIds = (memberRows ?? []).map((r) => r.user_id);
-
-      // 2. Worker info for those users (name + avatar). One worker per user
-      // is the norm (via ensureSelfWorker); if multiple exist we just pick
-      // the first.
-      const workerByUserId = new Map<string, { id: string; name: string; avatar_url: string | null }>();
-      if (memberUserIds.length > 0) {
-        const { data: workers } = await supabase
-          .from('workers')
-          .select('id, name, avatar_url, user_id')
-          .in('user_id', memberUserIds);
-        for (const w of workers ?? []) {
-          if (w.user_id && !workerByUserId.has(w.user_id)) {
-            workerByUserId.set(w.user_id, { id: w.id, name: w.name, avatar_url: w.avatar_url });
-          }
-        }
-      }
-      setMembers(
-        (memberRows ?? []).map((m) => ({
-          id: m.id,
-          user_id: m.user_id,
-          role: m.role,
-          worker: workerByUserId.get(m.user_id),
-        })),
-      );
-
-      // 3. Candidates — Domain members who aren't yet Object members. Drives
-      // the Add picker; constraint enforced at the UI level (object_members ⊆
-      // domain_members).
-      if (domainId) {
-        const { data: domMembers } = await supabase
-          .from('domain_members')
-          .select('user_id')
-          .eq('domain_id', domainId);
-        const objMemberSet = new Set(memberUserIds);
-        const candidateUserIds = (domMembers ?? [])
-          .map((r) => r.user_id)
-          .filter((uid) => !objMemberSet.has(uid));
-
-        if (candidateUserIds.length > 0) {
-          const { data: candWorkers } = await supabase
-            .from('workers')
-            .select('id, name, avatar_url, user_id')
-            .in('user_id', candidateUserIds);
-          const byUid = new Map<string, { id: string; name: string; avatar_url: string | null }>();
-          for (const w of candWorkers ?? []) {
-            if (w.user_id) byUid.set(w.user_id, { id: w.id, name: w.name, avatar_url: w.avatar_url });
-          }
-          setCandidates(
-            candidateUserIds.map((uid) => {
-              const w = byUid.get(uid);
-              return {
-                user_id: uid,
-                worker_id: w?.id ?? null,
-                name: w?.name ?? t('Member'),
-                avatar_url: w?.avatar_url ?? null,
-              };
-            }),
-          );
-        } else {
-          setCandidates([]);
-        }
-      } else {
-        setCandidates([]);
-      }
+      const access = await fetchObjectMemberAccess(objectId, domainId);
+      setMembers(access.members);
+      setCandidates(access.candidates.map((c) => ({ ...c, name: c.name ?? t('Member') })));
     } finally {
       setLoading(false);
     }
@@ -170,9 +86,9 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
     setInviteError(null);
     // A refused delete matches no rows; the last owner is refused outright
     // unless a manager of the Domain removes them (they then take it over).
-    const { data, error } = await supabase.from('object_members').delete().eq('id', memberId).select('id');
+    const { error, removed } = await removeObjectMember(memberId);
     if (error) setInviteError(membershipErrorMessage(error, t('The member could not be removed. Try again.')));
-    else if (!data?.length) setInviteError(t('The member could not be removed. Try again.'));
+    else if (!removed) setInviteError(t('The member could not be removed. Try again.'));
     await refresh();
   };
 

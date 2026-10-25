@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { assignmentHistory, evidenceCandidates, parseSkillName, skillIndex, skillKey } from '@/ActivitySpace/sustainment/team/people';
-import type { TeamElement } from '@/ActivitySpace/sustainment/team/teamRoster';
+import { assignmentHistory, evidenceCandidates, parseSkillName, skillIndex, skillKey } from '@/Function/team/people';
+import type { TeamElement } from '@/Function/team/teamRoster';
 import type { WorkerSkill } from '@/types/database';
 
 const element = (id: string, overrides: Partial<TeamElement> = {}): TeamElement => ({

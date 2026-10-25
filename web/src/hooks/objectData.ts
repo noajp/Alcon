@@ -1,6 +1,6 @@
 'use client';
 
-import { suggestObjectPrefix } from '@/ActivitySpace/execution/object/objectPrefix';
+import { suggestObjectPrefix } from '@/Function/shared/objectPrefix';
 import { applyOptimisticExplorerPatch } from '@/Function/sync/explorerCache';
 import { translate } from '@/Function/i18n/I18nProvider';
 import { supabase } from '@/lib/supabase';
@@ -502,4 +502,65 @@ export async function fetchObjectLabels(objectId: string): Promise<string[]> {
     }
   }
   return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+export interface ObjectMemberRow {
+  id: string;
+  user_id: string;
+  role: string;
+  worker?: { id: string; name: string; avatar_url: string | null };
+}
+
+/** A member of the Object's Domain who is not on the Object yet. */
+export interface ObjectMemberCandidate {
+  user_id: string;
+  worker_id: string | null;
+  name: string | null;
+  avatar_url: string | null;
+}
+
+/** Who is on the Object, and which Domain members could be invited to it
+ *  (object_members ⊆ domain_members is kept by the UI). One Worker per user
+ *  is the norm; when there are several, the first is shown. */
+export async function fetchObjectMemberAccess(
+  objectId: string,
+  domainId: string | null,
+): Promise<{ members: ObjectMemberRow[]; candidates: ObjectMemberCandidate[] }> {
+  const { data: memberRows } = await supabase
+    .from('object_members')
+    .select('id, user_id, role')
+    .eq('object_id', objectId)
+    .order('created_at');
+  const memberUserIds = (memberRows ?? []).map((r) => r.user_id as string);
+  const workersOf = async (userIds: string[]) => {
+    const byUser = new Map<string, { id: string; name: string; avatar_url: string | null }>();
+    if (!userIds.length) return byUser;
+    const { data } = await supabase.from('workers').select('id, name, avatar_url, user_id').in('user_id', userIds);
+    for (const w of data ?? []) {
+      if (w.user_id && !byUser.has(w.user_id)) byUser.set(w.user_id, { id: w.id, name: w.name, avatar_url: w.avatar_url });
+    }
+    return byUser;
+  };
+  const memberWorkers = await workersOf(memberUserIds);
+  const members = (memberRows ?? []).map((m) => ({ id: m.id, user_id: m.user_id, role: m.role, worker: memberWorkers.get(m.user_id) }));
+  if (!domainId) return { members, candidates: [] };
+
+  const { data: domMembers } = await supabase.from('domain_members').select('user_id').eq('domain_id', domainId);
+  const onObject = new Set(memberUserIds);
+  const candidateIds = (domMembers ?? []).map((r) => r.user_id as string).filter((uid) => !onObject.has(uid));
+  const candidateWorkers = await workersOf(candidateIds);
+  return {
+    members,
+    candidates: candidateIds.map((uid) => {
+      const w = candidateWorkers.get(uid);
+      return { user_id: uid, worker_id: w?.id ?? null, name: w?.name ?? null, avatar_url: w?.avatar_url ?? null };
+    }),
+  };
+}
+
+/** A refused delete matches no rows, so `removed` is false without an error:
+ *  the last owner stays unless a manager of the Domain removes them. */
+export async function removeObjectMember(memberId: string) {
+  const { data, error } = await supabase.from('object_members').delete().eq('id', memberId).select('id');
+  return { error, removed: !!data?.length };
 }

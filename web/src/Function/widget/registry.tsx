@@ -1,7 +1,7 @@
 'use client';
 
 import { lazy } from 'react';
-import { normalizeOperationsParams } from '@/ActivitySpace/sustainment/operations/operationsModel';
+import { normalizeOperationsParams } from '@/Function/operations/operationsModel';
 import { normalizeDataViewParams } from './widgets/dataViewModel';
 import { DIMENSIONS, type Dimension } from '@/Function/shared/dimensions';
 import type { WidgetComponent, WidgetDefinition, WidgetHost } from './types';

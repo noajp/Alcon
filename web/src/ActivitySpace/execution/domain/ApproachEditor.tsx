@@ -5,8 +5,8 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/ui/dial
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { ApproachCommand, DomainApproachData } from '@/hooks/useDomainApproaches';
-import { conditionAssessment, RESULT_LABELS } from './approachModel';
-import type { ApproachCondition, ApproachContribution, DomainApproach } from './approachModel';
+import { conditionAssessment, RESULT_LABELS } from '@/Function/domain/approachModel';
+import type { ApproachCondition, ApproachContribution, DomainApproach } from '@/Function/domain/approachModel';
 
 export type ApproachEditorTarget =
   | { kind: 'approach'; approach?: DomainApproach }

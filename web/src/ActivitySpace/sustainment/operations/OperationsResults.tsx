@@ -8,7 +8,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { operationsQueues, type OperationsQueue } from './operationsQueues';
 import { OperationsAction } from './OperationsAction';
 import { operationsText } from './operationsText';
-import type { OperationsAnalysis, OperationsParams, CRMRowAnalysis } from './operationsModel';
+import type { OperationsAnalysis, OperationsParams, CRMRowAnalysis } from '@/Function/operations/operationsModel';
 
 type Translate = (message: string, values?: Record<string, string | number>) => string;
 

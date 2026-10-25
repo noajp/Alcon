@@ -6,7 +6,7 @@ import { Button } from '@/ui/button';
 import { TextComposer } from '@/ui/text-composer';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { Crm } from '@/hooks/useCrm';
-import { ACTIVITY_TYPES, fieldsFor, normalizeCrmStages, resolveStage, type CrmActivityRecord, type CrmActivityType, type CrmDealRecord, type CrmDealRole } from './crmModel';
+import { ACTIVITY_TYPES, fieldsFor, normalizeCrmStages, resolveStage, type CrmActivityRecord, type CrmActivityType, type CrmDealRecord, type CrmDealRole } from '@/Function/crm/crmModel';
 import { historyLine, moneyList, relativeDay, ROLE_LABEL } from './crmFormat';
 import { CrmPicker } from './CrmPicker';
 import { CustomFields, EditableText, Property } from './CrmFields';

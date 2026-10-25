@@ -32,7 +32,7 @@ import {
   type Measure,
   type MeasureState,
 } from "@/ActivitySpace/strategy/initiative/initiativeMeasureModel";
-import type { InitiativeIntentState } from "@/ActivitySpace/strategy/initiative/useInitiativeIntent";
+import type { InitiativeIntentState } from "@/hooks/useInitiativeIntent";
 import { WidgetHeaderAction } from "@/Function/widget";
 
 /** Conditions and readings are editable Intent data shared by Measures, OKR and Gap. */

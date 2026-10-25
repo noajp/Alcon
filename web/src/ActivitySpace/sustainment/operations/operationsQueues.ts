@@ -1,5 +1,5 @@
 import { translate } from '@/Function/i18n/I18nProvider';
-import type { OperationsAnalysis } from './operationsModel';
+import type { OperationsAnalysis } from '@/Function/operations/operationsModel';
 
 export type OperationsQueue = 'overview' | 'attention' | 'records' | 'incomplete';
 

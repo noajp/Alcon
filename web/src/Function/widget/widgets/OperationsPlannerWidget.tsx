@@ -5,14 +5,14 @@ import { ArrowUpRight, Plus, RefreshCw, Settings2, SlidersHorizontal } from 'luc
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
 import { useOperationsTables } from '@/hooks/useOperationsTemplate';
-import { useWidgetTableData } from '@/hooks/useWidgetTableData';
+import { useTableData } from '@/hooks/useTableData';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { OperationsSetup, OPERATIONS_INPUT } from '@/ActivitySpace/sustainment/operations/OperationsSetup';
 import { OperationsNavigation, OperationsNavigationContext } from '@/ActivitySpace/sustainment/operations/OperationsNavigation';
 import { operationsQueues, operationsQueueLabel, type OperationsQueue } from '@/ActivitySpace/sustainment/operations/operationsQueues';
 import { OperationsResults } from '@/ActivitySpace/sustainment/operations/OperationsResults';
 import { OperationsRecords } from '@/ActivitySpace/sustainment/operations/OperationsRecords';
-import { analyzeOperations, normalizeOperationsParams, OPERATIONS_FIELDS, type OperationsParams } from '@/ActivitySpace/sustainment/operations/operationsModel';
+import { analyzeOperations, normalizeOperationsParams, OPERATIONS_FIELDS, type OperationsParams } from '@/Function/operations/operationsModel';
 import { WidgetHeaderAction, useWidgetMeta } from '../WidgetFrame';
 import type { WidgetProps } from '../types';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -58,7 +58,7 @@ function Planner({ params, setParams, host }: Omit<WidgetProps, 'params'> & { pa
   const { t } = useI18n();
   const tables = useOperationsTables();
   const eligible = !!params.tableId && tables.data.some(table => table.id === params.tableId);
-  const source = useWidgetTableData(!tables.loading && !tables.error && eligible ? params.tableId : null);
+  const source = useTableData(!tables.loading && !tables.error && eligible ? params.tableId : null);
   const [configureQueue, setConfigureQueue] = useState<OperationsQueue | null>(null);
   const [scenario, setScenario] = useState(false);
   // The receipt belongs to this Table session, even when a view is closed.

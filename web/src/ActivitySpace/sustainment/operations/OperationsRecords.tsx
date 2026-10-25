@@ -5,15 +5,15 @@ import { X } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
 import { DateField } from '@/Function/shared/date';
-import type { useWidgetTableData, WidgetTableData } from '@/hooks/useWidgetTableData';
+import type { useTableData, TableData } from '@/hooks/useTableData';
 import { displayCell, parseCell } from '@/Function/widget/widgets/dataViewModel';
 import type { Json } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { FONT } from '@/shared/designTokens';
-import { OPERATIONS_FIELDS, type OperationsParams } from './operationsModel';
+import { OPERATIONS_FIELDS, type OperationsParams } from '@/Function/operations/operationsModel';
 import { OPERATIONS_INPUT, OperationsChoice } from './OperationsSetup';
 
-type Source = ReturnType<typeof useWidgetTableData>;
+type Source = ReturnType<typeof useTableData>;
 
 /** A stage as people read it: the three outcomes in the reader's language, anything else as written. */
 function stageText(stage: string, t: (message: string) => string): string {
@@ -29,7 +29,7 @@ const EDITOR_SECTIONS = [
 
 /** Drafts survive a failed write; a partially created row is reused on retry. */
 function RecordEditor({ data, source, params, rowId, onClose, onNext }: {
-  data: WidgetTableData; source: Source; params: OperationsParams; rowId: string | null;
+  data: TableData; source: Source; params: OperationsParams; rowId: string | null;
   onClose: () => void; onNext: () => void;
 }) {
   const { t } = useI18n();
@@ -148,7 +148,7 @@ function RecordEditor({ data, source, params, rowId, onClose, onNext }: {
 }
 
 export function OperationsRecords({ data, source, params, selectedRow, onSelect, showList = true }: {
-  data: WidgetTableData; source: Source; params: OperationsParams;
+  data: TableData; source: Source; params: OperationsParams;
   selectedRow: string | null | undefined; onSelect: (row: string | null | undefined) => void;
   showList?: boolean;
 }) {
