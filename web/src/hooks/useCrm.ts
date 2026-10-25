@@ -228,17 +228,29 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     const source = deals.data?.find(item => item.id === dealId);
     if (!source) throw new Error('Deal not found');
     const from = (pipelines.data ?? []).find(item => item.id === source.pipeline_id);
-    const target = (pipelines.data ?? []).find(item => item.id === from?.renewal_pipeline_id) ?? from;
-    if (!target) throw new Error('Pipeline not found');
+    const target = from?.renewal_pipeline_id ? (pipelines.data ?? []).find(item => item.id === from.renewal_pipeline_id) : from;
+    // Never fall back to another pipeline: the renewal would land where nobody expects it.
+    if (!target) throw new Error('Renewals from this pipeline go to a pipeline you cannot see. Ask someone in its Domain to start it.');
     const stages = normalizeCrmStages(target.stages);
     try {
-      const id = check(await supabase.from('crm_deals').insert({
+      const result = await supabase.from('crm_deals').insert({
         activity_space_id: space(), pipeline_id: target.id, name: name.trim().slice(0, 200), stage: stages[0].id, probability: stages[0].probability,
         amount: source.amount, currency: source.currency, company_id: source.company_id, contact_id: source.contact_id,
-        owner_worker_id: source.owner_worker_id ?? me, initiative_id: source.initiative_id, close_date: source.renews_on, renewal_of: source.id,
-      }).select('id').single()).id as string;
-      return { id, pipelineId: target.id };
+        owner_worker_id: source.owner_worker_id ?? me, initiative_id: source.initiative_id, renewal_of: source.id,
+        // A renewal already late is due now, not in the past.
+        close_date: source.renews_on && source.renews_on > today ? source.renews_on : today,
+      }).select('id').single();
+      // One renewal per deal: someone got there first, maybe where this reader cannot see.
+      if (result.error?.code === '23505') throw new Error('This deal already has a renewal deal, perhaps in a pipeline you cannot see.');
+      return { id: check(result).id as string, pipelineId: target.id };
     } finally { await invalidate(); }
+  };
+
+  /** A customer who will not renew: the deal leaves the renewal queue, and its
+   * history keeps the date it would have renewed. */
+  const declineRenewal = async (dealId: string, note: string) => {
+    await logActivity(dealId, { type: 'note', text: note }, { quiet: true });
+    await saveDeal(dealId, { renewsOn: null });
   };
 
   const logActivity = async (dealId: string, entry: { type: CrmActivityType; text: string; date?: string },
@@ -436,7 +448,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     loading: enabled && !workspace && !error,
     error, measureError,
     refetch: invalidate,
-    saveDeal, startRenewal, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
+    saveDeal, startRenewal, declineRenewal, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
     savePipeline, deletePipeline, saveCompany, deleteCompany, saveContact, deleteContact, saveField, deleteField,
     importFromTable,
   };

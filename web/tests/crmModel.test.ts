@@ -209,6 +209,7 @@ describe('renewals', () => {
   it('is soon within 30 days and overdue once the date has passed', () => {
     expect(build([won({ renews_on: '2026-10-20' })])[0].action?.urgency).toBe('soon');
     expect(build([won({ renews_on: '2026-09-30' })])[0].action?.urgency).toBe('overdue');
+    expect(build([won({ renews_on: today })])[0].action?.urgency).toBe('today');
   });
   it('stays quiet outside the pipeline’s window', () => {
     expect(build([won({ renews_on: '2027-03-01' })])[0].action).toBeNull();

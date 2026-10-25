@@ -290,7 +290,7 @@ export function renewalAction(deal: Pick<CrmDeal, 'outcome' | 'renewsOn' | 'rene
   const days = daysBetween(today, deal.renewsOn);
   if (deal.renewsOn < today) return { code: 'renewal_due', urgency: 'overdue', message: 'Contract renewed or ended {date} — start the renewal', values: { date: deal.renewsOn } };
   if (days > renewalDays) return null;
-  return { code: 'renewal_due', urgency: days <= 30 ? 'soon' : 'plan', message: 'Renews {date} — start the renewal', values: { date: deal.renewsOn } };
+  return { code: 'renewal_due', urgency: days === 0 ? 'today' : days <= 30 ? 'soon' : 'plan', message: 'Renews {date} — start the renewal', values: { date: deal.renewsOn } };
 }
 
 /** The one thing to do next for a deal, if anything is due: a renewal for a

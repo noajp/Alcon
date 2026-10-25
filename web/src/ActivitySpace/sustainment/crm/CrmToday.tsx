@@ -27,14 +27,17 @@ export function StartRenewal({ deal, crm, onOpen, size = 'xs' }: { deal: CrmDeal
   const { t } = useI18n();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const start = async () => {
+  const run = async (work: () => Promise<void>) => {
     setSaving(true); setError(null);
-    try { onOpen((await crm.startRenewal(deal.id, t('{name} — renewal', { name: deal.name }))).id); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    try { await work(); }
+    catch (cause) { setError(cause instanceof Error ? t(cause.message) : String(cause)); }
     finally { setSaving(false); }
   };
-  return <span className="inline-flex items-center gap-2">
+  const start = () => run(async () => onOpen((await crm.startRenewal(deal.id, t('{name} — renewal', { name: deal.name }))).id));
+  const decline = () => run(() => crm.declineRenewal(deal.id, t('Won’t renew — the contract renewing on {date} ends.', { date: deal.renewsOn ?? '' })));
+  return <span className="inline-flex flex-wrap items-center gap-1">
     <Button size={size} variant="secondary" disabled={saving} onClick={() => void start()}><RefreshCw size={12} />{t('Start renewal')}</Button>
+    <Button size={size} variant="ghost" disabled={saving} onClick={() => void decline()}>{t('Won’t renew')}</Button>
     {error && <span role="alert" className="text-xs text-[var(--status-danger)]">{error}</span>}
   </span>;
 }

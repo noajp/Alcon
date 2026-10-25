@@ -52,7 +52,8 @@ function Basics({ crm }: { crm: Crm }) {
       </div>
       <label className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Flag renewals this many days ahead')}</span><input inputMode="numeric" className={`${INPUT} w-24 tabular-nums text-foreground`} value={renewal} onChange={event => { setRenewal(event.target.value); setSaved(false); }} /></label>
       <div className="space-y-1 text-xs text-muted-foreground"><span className="block">{t('Renewal deals go to')}</span>
-        <CrmPicker label={t('Renewal deals go to')} value={pipeline.renewal_pipeline_id} placeholder={t('This pipeline')}
+        <CrmPicker label={t('Renewal deals go to')} value={pipeline.renewal_pipeline_id}
+          placeholder={pipeline.renewal_pipeline_id && !crm.pipelines.some(item => item.id === pipeline.renewal_pipeline_id) ? t('A pipeline you cannot see') : t('This pipeline')}
           options={crm.pipelines.filter(item => item.id !== pipeline.id).map(item => ({ id: item.id, label: item.name }))}
           onChange={id => { setError(null); crm.savePipeline(pipeline.id, { renewal_pipeline_id: id }).catch(cause => setError(cause instanceof Error ? cause.message : t('Could not save. Try again.'))); }} />
         <span className="block">{t('A won deal with a renewal date shows up in Today when its renewal is this close.')}</span>

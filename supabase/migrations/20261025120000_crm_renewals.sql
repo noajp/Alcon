@@ -2,7 +2,8 @@
 -- its contract renews or ends (renews_on); a renewal deal points back at the
 -- deal it renews (renewal_of). A pipeline says how far ahead a renewal needs
 -- attention (renewal_days) and which pipeline renewal deals go to
--- (renewal_pipeline_id; none means the same pipeline).
+-- (renewal_pipeline_id; none means the same pipeline). A deal has at most one
+-- renewal deal.
 do $$
 begin
   if to_regclass('public.crm_deals') is null or to_regclass('public.crm_pipelines') is null
@@ -24,7 +25,9 @@ begin
       alter table public.crm_deals add constraint crm_deals_renewal_not_self check (renewal_of is null or renewal_of <> id);
     end if;
   end $inner$;
-  create index if not exists crm_deals_renewal_of on public.crm_deals (renewal_of) where renewal_of is not null;
+  -- One renewal per deal, even when two people start it at once or one of
+  -- them cannot see the renewal already made.
+  create unique index if not exists crm_deals_one_renewal on public.crm_deals (renewal_of) where renewal_of is not null;
   create index if not exists crm_deals_renews_on on public.crm_deals (activity_space_id, renews_on) where renews_on is not null;
 
   alter table public.crm_pipelines add column if not exists renewal_days integer not null default 90;
@@ -58,6 +61,7 @@ begin
     end if;
     return new;
   end $fn$;
+  revoke all on function public.crm_check_deal_links() from public, anon, authenticated;
   drop trigger if exists crm_deals_links on public.crm_deals;
   create trigger crm_deals_links before insert or update of company_id, contact_id, renewal_of on public.crm_deals
     for each row execute function public.crm_check_deal_links();
