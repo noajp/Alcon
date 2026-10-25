@@ -13,6 +13,7 @@ import {
 } from '@dnd-kit/core';
 import { Button } from '@/ui/button';
 import { WidgetPicker } from './WidgetPicker';
+import { BoardPresence } from './BoardPresence';
 import { useWidgetActionSlot } from './WidgetActionSlot';
 import type { Board } from './useBoard';
 import { ZONES, type WidgetHost, type Zone } from './types';
@@ -135,6 +136,15 @@ export function WidgetSurface({
     />
   );
 
+  // Who else is here sits beside the one +: the board is shared, and this is
+  // where that shows.
+  const chrome = (
+    <div className="flex items-center gap-2">
+      <BoardPresence subject={host.subject} />
+      {picker}
+    </div>
+  );
+
   return (
     <BoardContext.Provider value={value}>
       {(board.loading || board.saving || board.error) && (
@@ -147,8 +157,8 @@ export function WidgetSurface({
           is nothing to choose before choosing the widget. It renders in the
           chrome when a target is mounted, and in place when not. */}
       {actionSlot
-        ? createPortal(picker, actionSlot)
-        : <div className="flex justify-end">{picker}</div>}
+        ? createPortal(chrome, actionSlot)
+        : <div className="flex justify-end">{chrome}</div>}
 
       {/* Text selection is suppressed while arranging: a press-and-drag that
           started as a long press would otherwise paint a selection across the

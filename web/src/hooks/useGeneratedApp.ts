@@ -95,7 +95,11 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
       if (!userId) throw new Error('Sign in before reading Object data.');
       return readGeneratedAppContext(objectId, userId);
     },
-    useTemplate: (source: AppSource) => serial(() => saveOwn({ draft: parseAppSource(source) })),
+    /** A built-in template is known code: it becomes the shared app at once, no preview. */
+    useTemplate: (source: AppSource) => serial(async () => {
+      await setShared({ current: parseAppSource(source), previous: latest.current.shared?.current ?? null });
+      await saveOwn({ draft: null, prompt: '' });
+    }),
     savePrompt: (prompt: string) => serial(() => saveOwn({ prompt })),
     generate: (prompt: string) => serial(async () => {
       await saveOwn({ prompt });

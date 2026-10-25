@@ -3,6 +3,11 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { appDocument } from './runtime';
 import { parseAppState, stableJson, type AppSource, type AppState } from './model';
 
+// The frame takes its content's height, within these bounds; past the upper
+// one the app scrolls inside.
+const MIN_FRAME_HEIGHT = 120;
+const MAX_FRAME_HEIGHT = 2400;
+
 export function AppRuntime({ source, state, objectId, objectName, preview, readOnly, onSave, onReady, onReadContext }: {
   source: AppSource; state: AppState; objectId: string; objectName: string; preview: boolean; readOnly: boolean;
   onReadContext?: () => Promise<unknown>;
@@ -49,6 +54,7 @@ export function AppRuntime({ source, state, objectId, objectName, preview, readO
     if (stableJson(latest.current) !== stableJson(handed.current)) pushState(latest.current);
   }, [preview, pushState]);
   useEffect(() => { latest.current = state; pushIfMoved(); }, [state, pushIfMoved]);
+  const [height, setHeight] = useState(240);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState(preview ? 'Preview · inputs here are not saved' : 'Loading app…');
   useEffect(() => {
@@ -64,6 +70,12 @@ export function AppRuntime({ source, state, objectId, objectName, preview, readO
       const message = event.data;
       if (message.type === 'boot') sendTheme('start');
       if (message.type === 'ready') { setError(null); ready = true; clearTimeout(timer); callbacks.current.onReady(true); if (!preview) setStatus('Saved app'); started.current = true; pushIfMoved(); }
+      // The frame reports its content's height; one sized to the frame (100vh)
+      // stops asking for more by itself (see runtime.ts).
+      if (message.type === 'size' && Number.isFinite(message.height)) {
+        setHeight(Math.min(MAX_FRAME_HEIGHT, Math.max(MIN_FRAME_HEIGHT, Math.ceil(message.height))));
+        return;
+      }
       if (message.type === 'error') { setError(String(message.message).slice(0, 400)); callbacks.current.onReady(false); }
       if (!['save', 'read-context'].includes(message.type)) return;
       if (!Number.isSafeInteger(message.id) || message.id <= lastId) return;
@@ -112,7 +124,7 @@ export function AppRuntime({ source, state, objectId, objectName, preview, readO
     return () => { alive = false; clearTimeout(timer); window.removeEventListener('message', receive); };
   }, [document, preview, source.usesObjectData, sendTheme, pushState, pushIfMoved]);
   return <div className="space-y-2">
-    <iframe ref={frame} title={`${preview ? 'Preview: ' : ''}${source.title}`} srcDoc={document.html} onLoad={() => sendTheme('start')} sandbox="allow-scripts" referrerPolicy="no-referrer" className="h-[420px] w-full rounded-md border-0 bg-background" />
+    <iframe ref={frame} title={`${preview ? 'Preview: ' : ''}${source.title}`} srcDoc={document.html} onLoad={() => sendTheme('start')} sandbox="allow-scripts" referrerPolicy="no-referrer" style={{ height }} className="w-full rounded-md border-0 bg-background" />
     <p role="status" className="text-xs text-muted-foreground">{status}</p>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
   </div>;

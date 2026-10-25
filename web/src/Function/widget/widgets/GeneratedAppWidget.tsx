@@ -48,10 +48,7 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
       {app?.current_app && <Button variant="ghost" size="sm" disabled={locked} onClick={() => setEditing(v => !v)}>{showEditor ? 'Close editor' : 'Edit with AI'}</Button>}
     </WidgetHeaderAction>
     {showEditor && <div className="space-y-3">
-      {!app?.current_app && !app?.draft_app && <div className="space-y-1">
-        <p className="text-sm font-medium">A small app for this Object</p>
-        <p className="text-xs text-muted-foreground">Create a summary of this Object’s Strategy and Execution, a calculator, checklist or form. The app and its saved inputs are shared with everyone who can see this Object.</p>
-      </div>}
+      {!app?.current_app && !app?.draft_app && <p className="text-xs text-muted-foreground">Describe a calculator, checklist or summary for this Object. Everyone who can see it uses the same app and its saved inputs.</p>}
       <form className="space-y-2" onSubmit={e => { e.preventDefault(); void run(() => store.generate(prompt)); }}>
         <TextComposer aria-label="Describe your app" placeholder="Example: Calculate an estimate from headcount, unit price and discount, then save the chosen plan." rows={3} maxLength={8000} value={prompt} disabled={locked} onChange={e => setPrompt(e.target.value)}
           hint="Uses AI when you generate"
@@ -59,10 +56,7 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
           secondaryAction={app?.previous_app && <Button type="button" variant="ghost" size="sm" disabled={locked} onClick={() => void run(async () => { await store.restore(); setEpoch(n => n + 1); })}><RotateCcw size={13} />Previous version</Button>}
         />
       </form>
-      {!source && <Button variant="secondary" size="sm" disabled={locked} onClick={() => void run(() => store.useTemplate(summaryApp))}>Start with a project summary</Button>}
-      {!source && <div className="flex flex-wrap gap-1">
-        {['Summarize this Object’s Elements and related Initiatives', 'Calculate estimates and save plans', 'Create a delivery checklist', 'Track agendas and decisions'].map(example => <Button key={example} variant="ghost" size="sm" multiline disabled={locked} onClick={() => setPrompt(example)}>{example}</Button>)}
-      </div>}
+      {!source && <Button variant="secondary" size="sm" disabled={locked} onClick={() => void run(async () => { await store.useTemplate(summaryApp); setPrompt(''); latestPrompt.current = ''; })}>Use the project summary</Button>}
     </div>}
     {app?.draft_app && <div className="flex flex-wrap items-center gap-2">
       <p className="mr-auto text-xs text-muted-foreground">Preview · only you see this until you use it. It then replaces the app for everyone.</p>
