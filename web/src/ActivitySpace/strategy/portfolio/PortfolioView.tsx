@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, CornerDownRight, FolderInput, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
+import { ChevronRight, CornerDownRight, FolderInput, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverAnchor, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
@@ -211,7 +212,7 @@ function PortfolioTreeRow({ node, tree, gutter, rollup, open, onToggle, onOpen, 
             <button type="button" onClick={onToggle}
               className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground"
               aria-label={open ? t('Collapse {name}', { name: portfolio.name }) : t('Expand {name}', { name: portfolio.name })} aria-expanded={open}>
-              {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              <DisclosureTriangle open={open} />
             </button>
           ) : gutter ? <span aria-hidden className="size-6 shrink-0" /> : undefined}
           renameField={renaming ? (

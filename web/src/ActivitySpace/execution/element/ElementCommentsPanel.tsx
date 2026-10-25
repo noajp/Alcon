@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, ChevronRight, Pin, Trash2 } from 'lucide-react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
+import { Bot, Pin, Trash2 } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { agentMention, foldAgentRuns, plainFirstLine } from './agent/commentAgent';
 import { CommentAvatar, CommentComposer, CommentEntry, CommentMenu, CommentMenuItem, CommentMenuSeparator } from '@/Function/shared/CommentThread';
@@ -403,7 +404,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
                   onClick={() => setOpenFolds(prev => { const next = new Set(prev); if (next.has(seg.key)) next.delete(seg.key); else next.add(seg.key); return next; })}
                   className="mb-3 flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left text-[12px] text-muted-foreground hover:bg-muted/40 hover:text-foreground"
                 >
-                  <ChevronRight size={13} className={`shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+                  <DisclosureTriangle open={open} />
                   <span className="shrink-0">{t('AI conversation · {n} messages', { n: seg.hidden.length + 1 })}</span>
                   <span className="truncate">{t('Latest: {s}', { s: plainFirstLine(seg.last.content) })}</span>
                 </button>
