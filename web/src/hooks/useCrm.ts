@@ -392,7 +392,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
           nextStep: text(cell(row.id, 'nextStep')), nextStepOn: date(cell(row.id, 'nextActionDate')),
         }, { quiet: true });
         for (const entry of [...parseActivityLog(cell(row.id, 'activity'))].reverse()) {
-          if (entry.type !== 'stage') await logActivity(dealId, { type: entry.type, text: entry.text, date: entry.date ?? today }, { companyId, contactId, quiet: true });
+          if (entry.type !== 'stage' && entry.type !== 'change') await logActivity(dealId, { type: entry.type, text: entry.text, date: entry.date ?? today }, { companyId, contactId, quiet: true });
         }
         const last = date(cell(row.id, 'lastContact'));
         if (last) check(await supabase.from('crm_deals').update({ last_contact_on: last }).eq('id', dealId).select('id').single());

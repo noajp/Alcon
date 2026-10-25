@@ -12,14 +12,14 @@ import { CrmIcon } from '@/Function/shared/conceptIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useStrategies } from '@/ActivitySpace/strategy/initiative/strategyData';
 import type { Crm, CrmDealPatch } from '@/hooks/useCrm';
-import { ACTIVITY_TYPES, fieldsFor, LOST_STAGE, shiftDate, stageChange, WON_STAGE, type CrmActivity, type CrmActivityType, type CrmDeal, type CrmStage } from './crmModel';
+import { ACTIVITY_TYPES, fieldsFor, LOST_STAGE, shiftDate, stageChange, WON_STAGE, type CrmActivityType, type CrmDeal, type CrmStage } from './crmModel';
 import { aiBrief, aiEmail, useCrmAi, type DealBrief, type DealEmail } from './crmAi';
-import { HealthBadge, money, relativeDay } from './crmFormat';
+import { HealthBadge, historyLine, money, relativeDay } from './crmFormat';
 import { CrmPicker } from './CrmPicker';
 import { CustomFields, EditableText, Property } from './CrmFields';
 import { CrmRecordPage, RecordSection } from './CrmRecordPage';
 
-const ACTIVITY_LABEL: Record<CrmActivity['type'], string> = { call: 'Call', email: 'Mail', meeting: 'Meeting', note: 'Memo', stage: 'Stage' };
+const ACTIVITY_LABEL: Record<CrmActivityType, string> = { call: 'Call', email: 'Mail', meeting: 'Meeting', note: 'Memo' };
 
 function NextStep({ crm, deal }: { crm: Crm; deal: CrmDeal }) {
   const { t, locale } = useI18n();
@@ -252,14 +252,17 @@ export function CrmDealPage({ crm, deal, onBack, onOpenPipeline, onCapture, onOp
           hint={<span className="flex flex-wrap gap-1">{ACTIVITY_TYPES.map(type => <Button key={type} shape="tab" size="xs" variant={noteType === type ? 'secondary' : 'ghost'} aria-pressed={noteType === type} onClick={() => setNoteType(type)}>{t(ACTIVITY_LABEL[type])}</Button>)}</span>}
           action={<Button size="xs" variant="primary" disabled={busy || !note.trim()} onClick={() => void logNote()}>{t('Log')}</Button>} />
         {deal.activity.length > 0 ? <ol className="space-y-3">{deal.activity.map((entry, index) => <li key={entry.id ?? index} className="space-y-0.5">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">{t(ACTIVITY_LABEL[entry.type])}</span>
-            {entry.date && <span>{relativeDay(entry.date, today, locale, t)}</span>}
-            {entry.author && <span>· {entry.author}</span>}
-          </div>
-          <p className={`whitespace-pre-wrap break-words text-[13px] leading-relaxed ${entry.type === 'stage' ? 'text-muted-foreground' : ''}`}>
-            {entry.type === 'stage' ? entry.text.split(' → ').map(part => t(workspace.stages.find(stage => stage.id === part)?.label ?? (part === 'won' ? 'Won' : part === 'lost' ? 'Lost' : part))).join(' → ') : entry.text}
-          </p>
+          {(() => {
+            const line = historyLine(entry.type, entry.text, workspace.stages, locale, t);
+            return <>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{line.label}</span>
+                {entry.date && <span>{relativeDay(entry.date, today, locale, t)}</span>}
+                {entry.author && <span>· {entry.author}</span>}
+              </div>
+              <p className={`whitespace-pre-wrap break-words text-[13px] leading-relaxed ${line.quiet ? 'text-muted-foreground' : ''}`}>{line.text}</p>
+            </>;
+          })()}
         </li>)}</ol> : <p className="text-xs text-muted-foreground">{t('No activity yet.')}</p>}
       </div>
     </RecordSection>

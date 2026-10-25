@@ -7,7 +7,7 @@ import { TextComposer } from '@/ui/text-composer';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { Crm } from '@/hooks/useCrm';
 import { ACTIVITY_TYPES, fieldsFor, normalizeCrmStages, resolveStage, type CrmActivityRecord, type CrmActivityType, type CrmDealRecord } from './crmModel';
-import { moneyList, relativeDay } from './crmFormat';
+import { historyLine, moneyList, relativeDay } from './crmFormat';
 import { CrmPicker } from './CrmPicker';
 import { CustomFields, EditableText, Property } from './CrmFields';
 import { PageHead } from '@/Function/shared/PageHead';
@@ -15,7 +15,7 @@ import { RailCard } from '@/Function/shared/RailCard';
 import { CrmIcon } from '@/Function/shared/conceptIcons';
 import { CrmRecordPage, RecordSection } from './CrmRecordPage';
 
-const ACTIVITY_LABEL: Record<CrmActivityRecord['kind'], string> = { call: 'Call', email: 'Mail', meeting: 'Meeting', note: 'Memo', stage: 'Stage' };
+const ACTIVITY_LABEL: Record<CrmActivityType, string> = { call: 'Call', email: 'Mail', meeting: 'Meeting', note: 'Memo' };
 
 /** Deal totals per company or contact across every pipeline; currencies kept apart. */
 function rollup(deals: readonly CrmDealRecord[]) {
@@ -30,7 +30,7 @@ function rollup(deals: readonly CrmDealRecord[]) {
   return { open, won, openCount };
 }
 
-const lastTouch = (activities: readonly CrmActivityRecord[]) => activities.filter(entry => entry.kind !== 'stage').reduce<string | null>((latest, entry) => !latest || entry.occurred_on > latest ? entry.occurred_on : latest, null);
+const lastTouch = (activities: readonly CrmActivityRecord[]) => activities.filter(entry => entry.kind !== 'stage' && entry.kind !== 'change').reduce<string | null>((latest, entry) => !latest || entry.occurred_on > latest ? entry.occurred_on : latest, null);
 
 export function CrmCompanies({ crm, query, onOpen, selectedId }: { crm: Crm; query: string; onOpen: (id: string) => void; selectedId: string | null }) {
   const { t, locale } = useI18n();
@@ -112,9 +112,16 @@ function Timeline({ crm, entries, onLog }: { crm: Crm; entries: readonly CrmActi
       hint={<span className="flex flex-wrap gap-1">{ACTIVITY_TYPES.map(item => <Button key={item} shape="tab" size="xs" variant={type === item ? 'secondary' : 'ghost'} aria-pressed={type === item} onClick={() => setType(item)}>{t(ACTIVITY_LABEL[item])}</Button>)}</span>}
       action={<Button size="xs" variant="primary" disabled={busy || !note.trim()} onClick={() => void log()}>{t('Log')}</Button>} />
     {sorted.length ? <ol className="space-y-3">{sorted.map(entry => <li key={entry.id} className="space-y-0.5">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">{t(ACTIVITY_LABEL[entry.kind])}</span><span>{relativeDay(entry.occurred_on, crm.today, locale, t)}</span>
-        {entry.deal_id && <span className="truncate">· {crm.allDeals.find(deal => deal.id === entry.deal_id)?.name}</span>}</div>
-      <p className={`whitespace-pre-wrap break-words text-[13px] leading-relaxed ${entry.kind === 'stage' ? 'text-muted-foreground' : ''}`}>{entry.body}</p>
+      {(() => {
+        const deal = entry.deal_id ? crm.allDeals.find(item => item.id === entry.deal_id) : undefined;
+        const stages = normalizeCrmStages(crm.pipelines.find(pipeline => pipeline.id === deal?.pipeline_id)?.stages);
+        const line = historyLine(entry.kind, entry.body, stages, locale, t);
+        return <>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">{line.label}</span><span>{relativeDay(entry.occurred_on, crm.today, locale, t)}</span>
+            {deal && <span className="truncate">· {deal.name}</span>}{entry.author_name && <span className="truncate">· {entry.author_name}</span>}</div>
+          <p className={`whitespace-pre-wrap break-words text-[13px] leading-relaxed ${line.quiet ? 'text-muted-foreground' : ''}`}>{line.text}</p>
+        </>;
+      })()}
     </li>)}</ol> : <p className="text-xs text-muted-foreground">{t('No activity yet.')}</p>}
   </div></RecordSection>;
 }
