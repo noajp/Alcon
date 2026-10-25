@@ -249,8 +249,9 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
   /** A customer who will not renew: the deal leaves the renewal queue, and its
    * history keeps the date it would have renewed. */
   const declineRenewal = async (dealId: string, note: string) => {
-    await logActivity(dealId, { type: 'note', text: note }, { quiet: true });
-    await saveDeal(dealId, { renewsOn: null });
+    // Clear first: a failed note never leaves the deal half-declined and noted twice on retry.
+    await saveDeal(dealId, { renewsOn: null }, { quiet: true });
+    await logActivity(dealId, { type: 'note', text: note });
   };
 
   const logActivity = async (dealId: string, entry: { type: CrmActivityType; text: string; date?: string },
