@@ -16,7 +16,7 @@ import { useKata } from './kata/store/useKata';
 import { SkillsDialog } from './kata/components/shell/SkillsDialog';
 import { fromKataJson } from './kata/model/kataFile';
 import { tx } from './kata/i18n';
-import { useSlidesSync } from './sync';
+import { slidesReady, useSlidesSync } from './sync';
 
 /** Opens a .kata.json file as a new deck, in the open deck's folder or the first one. */
 async function openDeckFile(file: File) {
@@ -31,6 +31,7 @@ async function openDeckFile(file: File) {
 
 /** A new deck where the person is: the open deck's folder, else the first, else a new one. */
 export function createDeckHere() {
+  if (!slidesReady()) return null;
   const st = useKata.getState();
   const active = st.files.find((x) => x.id === st.activeFileId);
   return st.createFile(active?.folderId ?? st.folders[0]?.id ?? st.createFolder(tx('マイ資料', 'My decks')));
@@ -137,8 +138,8 @@ export function SlidesSidebar({ onOpen }: { onOpen: () => void }) {
       </div>
 
       <div className="mt-4 flex flex-col">
-        <SidebarRow icon={<FolderPlus size={15} />} label={t('New folder')} onClick={() => startRename(st().createFolder())} />
-        <SidebarRow icon={<FileUp size={15} />} label={t('Open a deck file')} title=".kata.json" onClick={() => fileInput.current?.click()} />
+        <SidebarRow disabled={!ready} icon={<FolderPlus size={15} />} label={t('New folder')} onClick={() => startRename(st().createFolder())} />
+        <SidebarRow disabled={!ready} icon={<FileUp size={15} />} label={t('Open a deck file')} title=".kata.json" onClick={() => fileInput.current?.click()} />
         <SidebarRow icon={<BookMarked size={15} />} label={t('My skills')} meta={skillCount} onClick={() => setSkillsOpen(true)} />
         <SidebarRow icon={<Palette size={15} />} label={t('Look library')} onClick={() => { st().setPanel('design'); onOpen(); }} />
         <input

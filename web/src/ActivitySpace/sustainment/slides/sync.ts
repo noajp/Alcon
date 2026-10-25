@@ -145,6 +145,8 @@ function start(spaceId: string): Session {
       const row = data as DeckRow;
       const file = fileFromRow(row);
       stamps.set(id, row.updated_at);
+      // Saved before the store sees it, so the store's listener does not take theirs for an edit here.
+      synced = { ...synced, files: replaceOrAdd(synced.files, file) };
       if (alive) {
         useKata.setState((s) => ({ files: replaceOrAdd(s.files, file) }));
         useKata.getState().notify(tx(`「${name}」は他の人が先に変えたので、その版に合わせました`, `Someone else changed “${name}” first, so it now shows their version`));
@@ -152,6 +154,7 @@ function start(spaceId: string): Session {
       return { ...nextSynced, files: replaceOrAdd(nextSynced.files, file) };
     }
     stamps.delete(id);
+    synced = { ...synced, files: synced.files.filter((f) => f.id !== id) };
     if (alive) {
       useKata.setState((s) => ({ files: s.files.filter((f) => f.id !== id), activeFileId: s.activeFileId === id ? null : s.activeFileId }));
       useKata.getState().notify(tx(`「${name}」は他の人が削除しました`, `Someone else deleted “${name}”`));
@@ -203,7 +206,9 @@ function start(spaceId: string): Session {
     }
   };
 
-  const flush = () => { timer = null; enqueue(() => write(snapshot())); };
+  // Read when the step runs, so it writes the latest; a step still queued when
+  // the session stops must not read a store that now holds the next Space.
+  const flush = () => { timer = null; enqueue(async () => { if (alive) await write(snapshot()); }); };
 
   // Another viewer's change to one deck: take it unless it is our own echo, or
   // the deck has edits here still to be written (the write will then find the
@@ -326,6 +331,9 @@ function release(spaceId: string) {
     publish({ spaceId: null, ready: false, error: null });
   }, 0);
 }
+
+/** Whether the store holds the active Space's decks yet: before that, anything made in it would be replaced by the load. */
+export const slidesReady = () => status.ready;
 
 const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
 const IDLE: Status = { spaceId: null, ready: false, error: null };
