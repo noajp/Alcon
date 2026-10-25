@@ -52,7 +52,7 @@ describe('app data message boundary', () => {
     let observe: (() => void) | null = null;
     let contentBottom = 300;
     const resizers: (() => void)[] = [];
-    const win = { innerHeight: 240, scrollY: 0, addEventListener: (type: string, fn: () => void) => { if (type === 'resize') resizers.push(fn); } };
+    const win = { innerHeight: 240, innerWidth: 600, scrollY: 0, addEventListener: (type: string, fn: () => void) => { if (type === 'resize') resizers.push(fn); } };
     const resize = (height: number) => { win.innerHeight = height; resizers.forEach(fn => fn()); };
     class FakeResizeObserver { constructor(fn: () => void) { observe = fn; } observe() {} }
     const child = { getBoundingClientRect: () => ({ height: contentBottom, width: 100, bottom: contentBottom }) };
@@ -74,6 +74,13 @@ describe('app data message boundary', () => {
     // The host applies what was asked; content tracking the frame grows with it.
     contentBottom += asked - win.innerHeight; resize(asked);
     expect(sizes()).toEqual([asked]);
+    // Still sized to the frame at other widths: dragging the window does not grow it.
+    for (const width of [598, 596, 594, 592]) { win.innerWidth = width; observe!(); }
+    expect(sizes()).toEqual([asked]);
+    // Content that only looked frame-sized is released once a width change reflows it:
+    // it is taller than the frame by a different amount, and asks for its own height.
+    win.innerWidth = 500; contentBottom = win.innerHeight + 100; observe!();
+    expect(sizes()).toEqual([asked, win.innerHeight + 116]);
   });
   it('keeps an app from replacing the names the host relies on', () => {
     const messages: Record<string, unknown>[] = [];
