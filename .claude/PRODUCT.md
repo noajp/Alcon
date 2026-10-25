@@ -206,6 +206,8 @@ Object は Element をまとめる単位で、Object 同士はネストしない
 
 使わなくなった Object はアーカイブする（`objects.archived_at`）。データは残り、一覧・ピッカー・My Elements・Now・Calendar / Workload の範囲・ボードツールから外れ、リンクと検索からは開ける。所属 Object がすべてアーカイブ済みの Element も実行中の一覧から外れる。アーカイブと復元はその Object を管理する人（主 Domain の owner・admin）だけができ、Domain の Objects 一覧の下の「Archived」から開いて元に戻せる。Object が残っている Domain（アーカイブ済みを含む）は削除できず、先に Object を移すか削除する。判断は [ADR 0030](../docs/adr/0030-unused-objects-are-archived-and-domains-with-objects-stay.md)。
 
+Element を消しても記録は残る。削除の直前に DB が Element とそれに付くもの（サブ Element・担当・所属・コメント・リアクション・履歴・承認・独自の値・依存・CRM のリンク）をまとめて `element_deletions` に保存し、Object の「⋯」の「Deleted Elements」から同じ Element（同じ id・同じ表示 ID）を履歴ごと戻せる。保存したものは消さない。Element の変更履歴は画面の自己申告ではなく DB のトリガが書く（状態・タイトル・説明・優先度・開始日と期日・見積・担当の追加と解除・別の Object への移動・削除と復元）。これらの種類はアプリから書き足せない。アプリが書くのは DB から見えないもの（方針・サブ Element のメモ・リアクション・Note のリンク）だけ。
+
 **Domain の実現構想** — 期間の限られた複数のプロジェクトをどう組み合わせて Initiative を実現するかを記す。Domain は継続する活動の場であり、複数の構想を持てる。構想は Initiative と任意の既存成功条件（measure）を参照し、期待する変化・仮説・前提・見直し条件を持つ。成立条件に Object の貢献と役割・順序の理由を結び、進捗とは独立に、観測事実・出典・観測日・解釈を記録する。構想の変更後は以前の評価を再評価対象にする。継続・変更・停止の判断は判断者と当時の構想・根拠を保存し、対象 Object と Initiative へ戻れる。書き込みは Domain の owner/admin、閲覧は Domain と Initiative の両方にアクセスできる人。同じ Domain 内で共有する Object の役割を比較できる。Domain の既定画面は判断が必要な事項を先頭に置く。
 
 ### Sustainment（兵站）：横断的維持活動

@@ -91,7 +91,7 @@ import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
-import { Smile, FileText } from 'lucide-react';
+import { Smile, FileText, FolderInput, Trash2, RotateCcw } from 'lucide-react';
 import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NotePicker } from '@/ActivitySpace/sustainment/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/sustainment/notebook/LinkedNoteEmbed';
@@ -497,15 +497,13 @@ function ElementDetailBody({
     if (draft.title.trim() && draft.title.trim() !== sent.title) patch.title = draft.title.trim();
     if (draft.description !== sent.description) patch.description = draft.description || null;
     if (!Object.keys(patch).length) return;
-    const { author: by, onRefresh: refresh } = closeRef.current;
+    const { onRefresh: refresh } = closeRef.current;
     void updateElement(sent.id, patch)
       .then(() => {
         // The list first: the save landed, whatever happens to the rail.
         refresh?.();
-        const record = (kind: ActivityKind, detail: string) =>
-          void logActivity(sent.id, kind, detail, by).catch((e) => console.error('Failed to record activity:', e));
-        if (patch.title !== undefined) record('renamed', `Renamed to “${patch.title}”`);
-        if (patch.description !== undefined) record('description', patch.description ? 'Updated description' : 'Cleared description');
+        // The database records the rename and the description change itself.
+        void invalidateElementActivity(sent.id);
       })
       .catch((e) => console.error('Failed to save on close', e));
   }, []);
@@ -611,7 +609,6 @@ function ElementDetailBody({
 
   const handleRemoveAssignee = async (assigneeId: string) => {
     try {
-      const removed = element.assignees?.find((a) => a.id === assigneeId);
       await removeElementAssignee(assigneeId);
       void invalidateElementActivity(element.id);
       onRefresh?.();
@@ -1675,6 +1672,9 @@ const ACTIVITY_ICON: Record<ActivityKind | 'created', React.ComponentType<{ size
   subelement: CheckCircle2,
   note:       FileText,
   comment:    MessageIcon,
+  moved:      FolderInput,
+  deleted:    Trash2,
+  restored:   RotateCcw,
 };
 
 function ActivityFeed({

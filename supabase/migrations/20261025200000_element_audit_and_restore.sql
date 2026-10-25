@@ -133,11 +133,12 @@ begin
       end;
     end loop;
     select nullif(btrim(p.display_name), '') into v_name from public.profiles p where p.id = auth.uid();
-    insert into public.element_activity (element_id, kind, detail, author, actor_id)
-    values (v_del.element_id, 'deleted', 'Deleted' || coalesce(' by ' || v_del.deleted_by_name, ''), coalesce(v_del.deleted_by_name, 'System'), v_del.deleted_by);
+    -- The deletion at the time it happened, then the restore now.
+    insert into public.element_activity (element_id, kind, detail, author, actor_id, created_at)
+    values (v_del.element_id, 'deleted', 'Deleted' || coalesce(' by ' || v_del.deleted_by_name, ''), coalesce(v_del.deleted_by_name, 'System'), v_del.deleted_by, v_del.deleted_at);
     perform set_config('alcon.restoring', '', true);
-    insert into public.element_activity (element_id, kind, detail, author, actor_id)
-    values (v_del.element_id, 'restored', 'Restored', coalesce(v_name, 'Member'), auth.uid());
+    insert into public.element_activity (element_id, kind, detail, author, actor_id, created_at)
+    values (v_del.element_id, 'restored', 'Restored', coalesce(v_name, 'Member'), auth.uid(), clock_timestamp());
     delete from public.element_deletions where id = p_deletion;
     return v_del.element_id;
   end $fn$;
@@ -299,5 +300,81 @@ begin
       return new;
     end
   $fn$;
+
+
+  -- The approval guards let a restore put an Element's own rows back as they were.
+  create or replace function public.elements_guard_approval() returns trigger
+  language plpgsql security definer set search_path = public as $fn$
+  begin
+    if auth.uid() is null or public.alcon_restoring() then return new; end if;
+    if tg_op = 'INSERT' then
+      -- A new Element can ask for approval, not arrive approved.
+      new.approval_state := case when new.is_approval then 'pending' end;
+      return new;
+    end if;
+    -- Turning the step on starts over; turning it off takes the state with it.
+    if coalesce(new.is_approval, false) and not coalesce(old.is_approval, false) then
+      new.approval_state := 'pending';
+    elsif not coalesce(new.is_approval, false) then
+      if coalesce(old.is_approval, false) and not public.user_can_manage_approval(new.id) then
+        raise exception 'Only an owner or admin of its Domain can take the approval step off' using errcode = '42501';
+      end if;
+      new.approval_state := null;
+    elsif new.approval_state is distinct from old.approval_state and coalesce(new.approval_state, 'pending') <> 'pending'
+          and not public.user_can_decide_approval(new.id) then
+      raise exception 'Only a reviewer, or an owner or admin of its Domain who is not working on it, can decide this approval'
+        using errcode = '42501';
+    end if;
+    -- Moving an approval Element out of its Objects, or making it someone's
+    -- own, would change who manages it: only a manager may.
+    if coalesce(old.is_approval, false)
+       and (new.object_id is distinct from old.object_id or new.owner_id is distinct from old.owner_id)
+       and not public.user_can_manage_approval(old.id) then
+      raise exception 'Only an owner or admin of its Domain can move an Element that needs approval' using errcode = '42501';
+    end if;
+    -- Done needs the approval, however the status is set.
+    if new.status = 'done' and old.status is distinct from 'done'
+       and coalesce(new.is_approval, false) and new.approval_state is distinct from 'approved' then
+      raise exception 'This Element needs approval before it can be marked done.' using errcode = '22023';
+    end if;
+    return new;
+  end $fn$;
+
+  create or replace function public.element_assignees_guard_reviewer() returns trigger
+  language plpgsql security definer set search_path = public as $fn$
+  begin
+    if auth.uid() is null or public.alcon_restoring() then return coalesce(new, old); end if;
+    if tg_op = 'DELETE' then
+      -- The Element or the Worker itself going: its rows go with it.
+      if old.role = 'reviewer' and exists (select 1 from public.elements e where e.id = old.element_id)
+         and exists (select 1 from public.workers w where w.id = old.worker_id)
+         and not public.user_can_manage_approval(old.element_id) then
+        raise exception 'Only an owner or admin of its Domain can remove a reviewer' using errcode = '42501';
+      end if;
+      return old;
+    end if;
+    -- Nobody steps from doing the work into reviewing it themselves.
+    if new.role = 'reviewer' and exists (select 1 from public.workers w where w.id = new.worker_id and w.user_id = auth.uid())
+       and (tg_op = 'INSERT' or old.role <> 'reviewer') and exists (
+         select 1 from public.element_assignees ea join public.workers w on w.id = ea.worker_id
+         where ea.element_id = new.element_id and w.user_id = auth.uid() and ea.role in ('assignee', 'collaborator') and ea.id <> new.id) then
+      raise exception 'Someone working on an Element cannot become its reviewer' using errcode = '42501';
+    end if;
+    if tg_op = 'UPDATE' and old.role in ('assignee', 'collaborator') and new.role = 'reviewer'
+       and exists (select 1 from public.workers w where w.id = new.worker_id and w.user_id = auth.uid()) then
+      raise exception 'Someone working on an Element cannot become its reviewer' using errcode = '42501';
+    end if;
+    if new.role = 'reviewer' and not public.user_can_manage_approval(new.element_id) then
+      raise exception 'Only an owner or admin of its Domain can name or change reviewers' using errcode = '42501';
+    end if;
+    -- A reviewer row changed in any way (role, person, Element) is a reviewer
+    -- removed where it was: that needs the manager there too.
+    if tg_op = 'UPDATE' and old.role = 'reviewer'
+       and (new.role <> 'reviewer' or new.worker_id is distinct from old.worker_id or new.element_id is distinct from old.element_id)
+       and not public.user_can_manage_approval(old.element_id) then
+      raise exception 'Only an owner or admin of its Domain can name or change reviewers' using errcode = '42501';
+    end if;
+    return new;
+  end $fn$;
   $ddl$;
 end $$;
