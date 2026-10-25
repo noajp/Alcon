@@ -52,9 +52,10 @@ describe('app data message boundary', () => {
     let observe: (() => void) | null = null;
     let height = 300;
     class FakeResizeObserver { constructor(fn: () => void) { observe = fn; } observe() {} }
+    const child = { getBoundingClientRect: () => ({ height, width: 100, bottom: height }) };
     const html = appDocument({ title: 'tall', html: '<p>Tall</p>', css: '', js: '' }, {}, { objectId: 'scope', objectName: '' }, 'channel', {});
     const script = html.match(/<script>([\s\S]*)<\/script>/)![1];
-    runInNewContext(script, { parent, ResizeObserver: FakeResizeObserver, window: { addEventListener: () => {} }, document: { addEventListener: () => {}, body: { getBoundingClientRect: () => ({ height }) } }, setTimeout: () => 1, clearTimeout: () => {} });
+    runInNewContext(script, { parent, ResizeObserver: FakeResizeObserver, window: { addEventListener: () => {} }, document: { addEventListener: () => {}, body: { children: [child] } }, getComputedStyle: () => ({ paddingBottom: '0' }), setTimeout: () => 1, clearTimeout: () => {} });
     observe!();
     height = 300.4;
     observe!();

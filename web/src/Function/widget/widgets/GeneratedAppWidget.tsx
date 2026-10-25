@@ -56,7 +56,7 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
           secondaryAction={app?.previous_app && <Button type="button" variant="ghost" size="sm" disabled={locked} onClick={() => void run(async () => { await store.restore(); setEpoch(n => n + 1); })}><RotateCcw size={13} />Previous version</Button>}
         />
       </form>
-      {!source && <Button variant="secondary" size="sm" disabled={locked} onClick={() => void run(() => store.useTemplate(summaryApp))}>Use the project summary</Button>}
+      {!source && <Button variant="secondary" size="sm" disabled={locked} onClick={() => void run(async () => { await store.useTemplate(summaryApp); setPrompt(''); latestPrompt.current = ''; })}>Use the project summary</Button>}
     </div>}
     {app?.draft_app && <div className="flex flex-wrap items-center gap-2">
       <p className="mr-auto text-xs text-muted-foreground">Preview · only you see this until you use it. It then replaces the app for everyone.</p>

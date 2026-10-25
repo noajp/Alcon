@@ -26,7 +26,7 @@ export function useBoardPresence(kind: SubjectKind, subjectId: string | null): B
     // The name teammates already see on assignments, then the profile's.
     queryFn: async () => {
       const [worker, profile] = await Promise.all([
-        supabase.from('workers').select('name').eq('user_id', userId!).eq('type', 'human').limit(1),
+        supabase.from('workers').select('name').eq('user_id', userId!).eq('type', 'human').order('created_at').limit(1),
         supabase.from('profiles').select('display_name').eq('id', userId!).limit(1),
       ]);
       const name = (worker.data?.[0]?.name as string | null | undefined) || (profile.data?.[0]?.display_name as string | null | undefined);

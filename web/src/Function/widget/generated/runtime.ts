@@ -42,14 +42,34 @@ window.addEventListener('message',event=>{
  for(const [key,value] of Object.entries(event.data.theme||{})){
   if(/^--[a-zA-Z0-9_-]+$/.test(key)&&typeof value==='string')document.documentElement.style.setProperty(key,value);
  }
+ if(event.data.type==='start')measure();
  if(event.data.type!=='start'||started)return;
  started=true;
- (async()=>{try{\n${app.js}\n;send('ready');}catch(error){send('error',{message:String(error?.message||error)});}})();
+ (async()=>{try{\n${app.js}\n;send('ready');measure();}catch(error){send('error',{message:String(error?.message||error)});}})();
 });
 // The host sizes the frame to the content, so the app never scrolls inside the board.
+// Content is measured as the lowest edge of what the body holds, not the body
+// itself: a body stretched to the frame (height:100%) would otherwise report
+// the frame back and never shrink to its content.
+const contentHeight=()=>{
+ let bottom=0;
+ for(const child of document.body.children){const box=child.getBoundingClientRect();if(box.height>0||box.width>0)bottom=Math.max(bottom,box.bottom+(window.scrollY||0));}
+ return Math.ceil(bottom+parseFloat(getComputedStyle(document.body).paddingBottom||'0'));
+};
+// A report sent before the host listens is lost, so the host's start asks again.
+// The browser holds back resize callbacks while the frame is off screen, so the
+// app's own start is measured too — its first render is otherwise reported only
+// once someone scrolls to it.
+let measure=()=>{};
 if(typeof ResizeObserver==='function'&&document.body){
  let last=0;
- new ResizeObserver(()=>{const height=Math.ceil(document.body.getBoundingClientRect().height);if(Math.abs(height-last)>1){last=height;send('size',{height});}}).observe(document.body);
+ const report=()=>{const height=contentHeight();if(Math.abs(height-last)>1){last=height;send('size',{height});}};
+ measure=()=>{last=0;report();};
+ const observer=new ResizeObserver(report);
+ observer.observe(document.body);
+ for(const child of document.body.children)observer.observe(child);
+ // Top-level elements an app adds later are measured too.
+ if(typeof MutationObserver==='function')new MutationObserver(()=>{for(const child of document.body.children)observer.observe(child);report();}).observe(document.body,{childList:true});
 }
 send('boot');`;
   // Sandboxed opaque origin, no credentials, external resources or child frames.

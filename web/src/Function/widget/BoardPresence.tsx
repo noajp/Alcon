@@ -10,7 +10,7 @@ export function BoardPresence({ subject }: { subject: WidgetSubject }) {
   if (!viewers.length) return null;
   const names = viewers.map((viewer) => viewer.name).join(', ');
   return (
-    <span className="flex items-center" title={`Also here: ${names}`} aria-label={`Also viewing this board: ${names}`}>
+    <span role="group" className="flex items-center" title={`Also here: ${names}`} aria-label={`Also viewing this board: ${names}`}>
       <WorkerAvatarStack workers={viewers.map((viewer) => ({ name: viewer.name }))} max={4} size={20} />
     </span>
   );
