@@ -121,6 +121,8 @@ export interface CrmPipelineRecord {
 export interface CrmCompanyRecord {
   id: string; name: string; domain: string | null; industry: string | null; owner_worker_id: string | null;
   notes: string | null; custom: Record<string, unknown>; created_at: string; domain_id: string | null;
+  /** When this counterpart is part of the organisation: the Space's own Domain it is. */
+  own_domain_id?: string | null;
 }
 export interface CrmContactRecord {
   id: string; company_id: string | null; name: string; title: string | null; email: string | null; phone: string | null;
