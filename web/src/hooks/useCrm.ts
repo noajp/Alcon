@@ -202,7 +202,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     // companies and contacts — all of it or none.
     try {
       const { data, error } = await supabase.rpc('crm_hand_over', {
-        p_space: space(), p_from: from, p_to: to, p_note: note, p_author: people.find(person => person.id === me)?.name ?? null,
+        p_space: space(), p_from: from, p_to: to, p_note: note, p_today: today,
       });
       if (error) throw new Error(error.message);
       return data as { deals: number; companies: number; contacts: number; unassigned: number };

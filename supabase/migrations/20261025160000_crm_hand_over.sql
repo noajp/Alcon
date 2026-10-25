@@ -12,7 +12,7 @@ begin
   end if;
 
   execute $ddl$
-  create or replace function public.crm_hand_over(p_space uuid, p_from uuid, p_to uuid, p_note text, p_author text)
+  create or replace function public.crm_hand_over(p_space uuid, p_from uuid, p_to uuid, p_note text, p_today date)
   returns jsonb language plpgsql security invoker set search_path = public as $fn$
   declare
     v_deal record;
@@ -20,18 +20,21 @@ begin
     v_unassigned int := 0;
     v_companies int;
     v_contacts int;
+    v_author text;
   begin
     if p_from is null or p_to is null or p_from = p_to then
       raise exception 'Choose two different people' using errcode = '22023';
     end if;
+    -- The caller's own name, and the day in the caller's calendar.
+    select w.name into v_author from public.workers w where w.user_id = auth.uid() and w.type = 'human' and w.object_id is null limit 1;
     for v_deal in
       update public.crm_deals set owner_worker_id = p_to
       where activity_space_id = p_space and owner_worker_id = p_from and lower(stage) not in ('won', 'lost')
       returning id, next_element_id
     loop
       v_deals := v_deals + 1;
-      insert into public.crm_activities (activity_space_id, deal_id, kind, body, author_name)
-      values (p_space, v_deal.id, 'note', left(p_note, 8000), p_author);
+      insert into public.crm_activities (activity_space_id, deal_id, kind, body, author_name, occurred_on)
+      values (p_space, v_deal.id, 'note', left(p_note, 8000), v_author, coalesce(p_today, current_date));
       if v_deal.next_element_id is not null and exists (
         select 1 from public.elements e where e.id = v_deal.next_element_id and e.status not in ('done', 'cancelled')
       ) then
@@ -53,7 +56,7 @@ begin
     get diagnostics v_contacts = row_count;
     return jsonb_build_object('deals', v_deals, 'companies', v_companies, 'contacts', v_contacts, 'unassigned', v_unassigned);
   end $fn$;
-  revoke all on function public.crm_hand_over(uuid, uuid, uuid, text, text) from public, anon;
-  grant execute on function public.crm_hand_over(uuid, uuid, uuid, text, text) to authenticated;
+  revoke all on function public.crm_hand_over(uuid, uuid, uuid, text, date) from public, anon;
+  grant execute on function public.crm_hand_over(uuid, uuid, uuid, text, date) to authenticated;
   $ddl$;
 end $$;
