@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Presentation,
   House, Table2, Settings, Inbox, Calendar,
   LayoutDashboard, Notebook, BarChart3,
   ChartArea, ChartGantt, Users, Share2, Search, Workflow, Compass, Milestone, Telescope, Folder,
@@ -18,6 +19,7 @@ import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon } from '@/Function/shared/
 // the concept↔icon pairing lives in exactly one place.
 export const NavHomeIcon = ({ size = 20 }: { size?: number }) => <House size={size} strokeWidth={2} />;
 export const NavTableIcon = ({ size = 20 }: { size?: number }) => <Table2 size={size} strokeWidth={2} />;
+export const NavSlidesIcon = ({ size = 20 }: { size?: number }) => <Presentation size={size} strokeWidth={2} />;
 export const NavObjectsIcon = ObjectIcon;
 export const NavSettingsIcon = ({ size = 20 }: { size?: number }) => <Settings size={size} strokeWidth={2} />;
 export const NavMyTasksIcon = ElementIcon;

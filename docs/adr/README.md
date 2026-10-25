@@ -71,3 +71,4 @@
 | [0039](0039-widgets-are-shared-components-with-an-origin-and-boards-are-placements.md) | Widget は出自を持つ共有部品、ボードはその配置 |
 | [0040](0040-widget-contents-are-shared-documents-merged-by-key.md) | Widget の中身は共有の文書で、キー単位で合流する |
 | [0041](0041-board-presence-rides-a-private-channel-scoped-to-the-subject.md) | ボードの在席は、対象を見られる人だけが入れる非公開チャンネルで伝える |
+| [0042](0042-slides-is-the-kata-editor-on-space-decks.md) | Slides は Kata の編集画面を Space の資料の上で動かす |

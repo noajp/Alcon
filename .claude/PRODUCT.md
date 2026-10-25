@@ -127,7 +127,7 @@ AIによる変更も、バージョンと適用範囲を持つ業務設定とし
 |---|---|---|---|
 | **Strategy** | 戦略 | 何を達成し、どう勝つか | Vision（Space が目指す姿）→ Portfolio（Initiative の束）→ Initiative。複数の Initiative で戦略を構成する |
 | **Execution** | 戦闘 | 実際に行動する | Domain（活動の場）→ Object（成果物の束）→ Element（最小単位） |
-| **Sustainment** | 兵站 | 仕事道具 | Workload / CRM / Notebook / Table / People / Calendar |
+| **Sustainment** | 兵站 | 仕事道具 | Workload / CRM / Notebook / Table / Slides / People / Calendar |
 
 ### Activity Space — 組織活動の文脈と信頼境界
 
@@ -143,7 +143,7 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ║ │  実際に行動する。活動・仕事・労働                             │ ║
 ║ ├──────────────────────────────────────────────────────────┤ ║
 ║ │  Sustainment（兵站）— Workload / CRM                      │ ║
-║ │                       / Notebook / Table / People / Calendar │ ║
+║ │       / Notebook / Table / Slides / People / Calendar      │ ║
 ║ │  行動を支える仕事道具                                        │ ║
 ║ └──────────────────────────────────────────────────────────┘ ║
 ║   ＋ Home（横断）  — Now / Inbox / Calendar / My Elements      ║
@@ -151,7 +151,7 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
-ModeRail の固定セレクタは Inbox / Calendar / Strategy / Execution。Strategy と Execution がこの構造に対応し、Inbox と Calendar は毎日の入口として常設する。レール最下部のアバターは Profile を開き、Now / My Elements / My Notes / AI は Profile のタブとして並ぶ。Sustainment のその他の道具は Apps ランチャーから各自がレールに追加する。カタログは Tools（Notebook / Table / People）と Sustainment（Workload / CRM / SCM）の2グループで表示し、概念上はどちらも Sustainment に属する。
+ModeRail の固定セレクタは Inbox / Calendar / Strategy / Execution。Strategy と Execution がこの構造に対応し、Inbox と Calendar は毎日の入口として常設する。レール最下部のアバターは Profile を開き、Now / My Elements / My Notes / AI は Profile のタブとして並ぶ。Sustainment のその他の道具は Apps ランチャーから各自がレールに追加する。カタログは Tools（Notebook / Table / Slides / People）と Sustainment（Workload / CRM）の2グループで表示し、概念上はどちらも Sustainment に属する。
 
 ### Strategy と Execution の分離
 
@@ -218,6 +218,7 @@ Object は Element をまとめる単位で、Object 同士はネストしない
 | **CRM** | 今日動かすべき商談を示し、記録の手間なく商談を前に進める | Space か Domain に属する会社・担当者・商談・活動履歴（`crm_*`）。Today / Pipeline / Deals / Companies / Contacts / Forecast、メモやメールから更新する Capture、健全度と次の一手、AI の要約・メール下書き |
 | **Notebook** | 思考・記録のドキュメント（議事録 / メモ） | 独自 HTML エディタ（`AppleNoteEditor` + `htmlSanitizer`）。**Folder → File の 2 階層**ツリー（`notes` + `note_contents.html`） |
 | **Table** | 任意の表 | `tables` + `table_columns` / `table_rows` / `table_cells`。所有者限定の RLS |
+| **Slides** | 議事録や文章から、論点・語る順番・ページの型・世界観の通った資料を組み、発表し、PowerPoint / PDF に書き出す | Space の資料（`decks`）とフォルダ（`deck_folders`）。Space のメンバーが読み書きする。編集画面は資料一覧・ページ・チャット/デザイン/論理構成の3ペインで、AI（Edge Function `slides-chat`）はデッキの JSON だけを返し、描画は型ごとの部品と世界観が担う。AI が使えないときは手元のプランナーが組む。ボードには Deck ウィジェットで置き、全画面で同じ編集画面を開く。判断は [ADR 0042](../docs/adr/0042-slides-is-the-kata-editor-on-space-decks.md) |
 | **People** | 誰がいて、何ができ、何に取り組んできたかを示し、次の仕事を誰に渡すかを決める | `workers`（human \| ai_agent）の所属・通常稼働時間、スキル（`worker_skills`）とその根拠（`worker_skill_evidence` — 本人が担当した完了済み Element）。アサイン履歴は `element_assignees` から導出し、入力させない |
 | **Calendar** | Domain を横断して Element の予定を調整 | レールの Calendar から開く。初期表示は自分の予定で、ヘッダの範囲選択で Domain / Object の予定へ広げる。サイドバーに今日の日付・ミニ月・表示する人の選択を置き、同じ日 / 週 / 月ビューと保存先を使う。月表示と週/日表示の終日行では、期間を持つ Element を開始日から終了日まで続く帯で描き、表示範囲をまたぐ帯は行ごとに切って同じ段に揃える（左端は直線）。日のセルへの予定登録はホバーで出る「＋」か右クリックから行い、素のクリックでは何も開かない |
 
@@ -326,8 +327,8 @@ Execution が Domain → Object → Element の順に並ぶのは、上位ほど
 
 ### レイアウト哲学
 - **常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス** の 3 列構成。ブラウザのタブがあるので画面内にタブ列は置かない。サイドバーの表示切替と AI ペインの開閉は、アイランドの下の帯の右端に置く。サイドバー最上部の Space 行は固定ヘッダーで、メイン領域のヘッダーと同じ高さ・位置に揃え、その下だけがスクロールする。Settings は同じ画面で開き、その固定ヘッダーの「Back」で元の画面へ戻る
-- **ModeRail**（46px）は分類セレクタ：固定の Inbox / Calendar / Strategy / Execution ＋ Apps ランチャーから追加した App ＋ 最下部のアバター（Profile）。Inbox のアイコンには未読数のバッジを出す。カタログは Tools（Notebook / Table / People）と Sustainment（Workload / CRM / SCM）の 2 グループで、すべて Sustainment の道具
-- **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋「＋」。「＋」はモードごとに対象が変わる（Notebook＝ノートブック / Table＝テーブル / Strategy＝Vision・Portfolio・Initiative のメニュー / Calendar＝表示中の日を期日にした Element / Execution＝Domain・Object のメニュー）。どれも Object / Element と同じクイック作成カード（画面下の角丸カードに名前・説明・プロパティのピル・Create）で作る。作るものが無いモードでは出さない。見出し横に別の「＋」を置かない。本体は現在のモードに応じて切替（Inbox＝通知の一覧 / Calendar＝今日・ミニ月・表示する人 / Strategy＝Vision ごとの行の下に Portfolio・Initiative / Execution＝Domain ツリー / Notebook＝ノートブック一覧 / App 各種＝モード名ラベルのみ）。アバターから開く Profile ではサイドバーを出さない
+- **ModeRail**（46px）は分類セレクタ：固定の Inbox / Calendar / Strategy / Execution ＋ Apps ランチャーから追加した App ＋ 最下部のアバター（Profile）。Inbox のアイコンには未読数のバッジを出す。カタログは Tools（Notebook / Table / Slides / People）と Sustainment（Workload / CRM）の 2 グループで、すべて Sustainment の道具
+- **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋「＋」。「＋」はモードごとに対象が変わる（Notebook＝ノートブック / Table＝テーブル / Strategy＝Vision・Portfolio・Initiative のメニュー / Calendar＝表示中の日を期日にした Element / Execution＝Domain・Object のメニュー）。どれも Object / Element と同じクイック作成カード（画面下の角丸カードに名前・説明・プロパティのピル・Create）で作る。作るものが無いモードでは出さない。見出し横に別の「＋」を置かない。本体は現在のモードに応じて切替（Inbox＝通知の一覧 / Calendar＝今日・ミニ月・表示する人 / Strategy＝Vision ごとの行の下に Portfolio・Initiative / Execution＝Domain ツリー / Notebook＝ノートブック一覧 / App 各種＝モード名ラベルのみ）。アバターから開く Profile と、自分の資料一覧を持つ Slides ではサイドバーを出さない
 - **Notebook** はサイドバーに Book（ノートブック）と配下の Section をツリーで並べ、メイン領域の左列は選んだ Section のページ一覧だけを示す。Book / Section の右クリックで New section / New page / Rename / Delete（削除は確認を経る）、ページは右クリックで Rename / Delete、一覧末尾の「New page」で追加する。新しい Book はサイドバー上部の「＋」
 - view→モードの対応は `shell/railApps.ts` の `MODE_META.views` / `railModeOf`、view id→ラベル / アイコンは `shell/viewRegistry.ts` が単一情報源
 
