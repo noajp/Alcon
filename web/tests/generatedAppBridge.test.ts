@@ -46,6 +46,22 @@ describe('app data message boundary', () => {
     dispatch(parent, { channel: 'channel', type: 'state', value: { mine: 1, theirs: 3 } });
     expect(messages.find(m => 'seen' in m)?.seen).toEqual({ mine: 1, theirs: 3 });
   });
+  it('reports the content height so the host can size the frame', () => {
+    const messages: Record<string, unknown>[] = [];
+    const parent = { postMessage: (message: Record<string, unknown>) => messages.push(message) };
+    let observe: (() => void) | null = null;
+    let height = 300;
+    class FakeResizeObserver { constructor(fn: () => void) { observe = fn; } observe() {} }
+    const html = appDocument({ title: 'tall', html: '<p>Tall</p>', css: '', js: '' }, {}, { objectId: 'scope', objectName: '' }, 'channel', {});
+    const script = html.match(/<script>([\s\S]*)<\/script>/)![1];
+    runInNewContext(script, { parent, ResizeObserver: FakeResizeObserver, window: { addEventListener: () => {} }, document: { addEventListener: () => {}, body: { getBoundingClientRect: () => ({ height }) } }, setTimeout: () => 1, clearTimeout: () => {} });
+    observe!();
+    height = 300.4;
+    observe!();
+    height = 512;
+    observe!();
+    expect(messages.filter(m => m.type === 'size').map(m => m.height)).toEqual([300, 512]);
+  });
   it('starts a second save from what the app held, not from an answer it has not seen yet', async () => {
     const messages: Record<string, unknown>[] = [];
     const listeners: ((event: unknown) => void)[] = [];

@@ -46,6 +46,11 @@ window.addEventListener('message',event=>{
  started=true;
  (async()=>{try{\n${app.js}\n;send('ready');}catch(error){send('error',{message:String(error?.message||error)});}})();
 });
+// The host sizes the frame to the content, so the app never scrolls inside the board.
+if(typeof ResizeObserver==='function'&&document.body){
+ let last=0;
+ new ResizeObserver(()=>{const height=Math.ceil(document.body.getBoundingClientRect().height);if(Math.abs(height-last)>1){last=height;send('size',{height});}}).observe(document.body);
+}
 send('boot');`;
   // Sandboxed opaque origin, no credentials, external resources or child frames.
   // The host authorizes scoped Object reads; iframe code never receives credentials.
