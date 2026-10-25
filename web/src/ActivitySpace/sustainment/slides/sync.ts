@@ -338,6 +338,11 @@ export const slidesReady = () => status.ready;
 const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
 const IDLE: Status = { spaceId: null, ready: false, error: null };
 
+/** Whether the active Space's decks are loaded, for controls that make decks without holding the sync themselves. */
+export function useSlidesReady() {
+  return useSyncExternalStore(subscribe, () => status.ready, () => false);
+}
+
 /**
  * Keeps the editor's store and a Space's decks in step while any surface
  * holds it. Returns whether the Space has been read, and the last error
