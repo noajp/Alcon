@@ -6,7 +6,7 @@ import type { AlconObjectWithChildren, Worker } from '@/hooks/useSupabase';
 import { useSortable } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
-import { type DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
+import { type DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { OBJECT_DRAG_PREFIX, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, ROW_ROUND_TO_LAST, selectionSquareClass, selectionSquareClassToLast } from './shared';
 import { ObjectCell } from './cells';
 import { useI18n } from '@/Function/i18n/I18nProvider';

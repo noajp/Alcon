@@ -7,7 +7,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { parseDateOnly, toDateOnlyString } from '@/Function/shared/dateUtils';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
-import { useWorkersByIds } from '@/ActivitySpace/sustainment/team/data';
+import { useWorkersByIds } from '@/hooks/teamData';
 import { miniMonthDays, monthOf, shiftMonth } from './schedule';
 import {
   setCalendarDay, setCalendarWorkerHidden, showAllCalendarWorkers,

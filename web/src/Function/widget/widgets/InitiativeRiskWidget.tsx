@@ -12,7 +12,7 @@ import { ContentRow } from '@/Function/shared/ContentRow';
 import { useI18n, translate } from '@/Function/i18n/I18nProvider';
 import { WidgetHeaderAction, useWidgetMeta } from '../WidgetFrame';
 import type { WidgetHost } from '../types';
-import { displayIdOf } from '@/ActivitySpace/execution/element/displayId';
+import { displayIdOf } from '@/Function/shared/element/displayId';
 
 const ElementDetailView = dynamic(() => import('@/ActivitySpace/execution/element/ElementDetailView').then((m) => m.ElementDetailView), {
   loading: () => <p className="p-4 text-sm text-muted-foreground">{translate('Loading Element…')}</p>,

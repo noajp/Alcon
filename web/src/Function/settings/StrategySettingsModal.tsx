@@ -6,7 +6,7 @@ import { Button } from '@/ui/button';
 import { NavStrategyIcon, NavPhaseIcon, NavTimelineIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
-import { deleteVision, updateVision } from '@/ActivitySpace/strategy/vision/data';
+import { deleteVision, updateVision } from '@/hooks/visionData';
 import type { Vision } from '@/types/database';
 import { SettingsModal } from './SettingsModal';
 import { FONT } from '@/shared/designTokens';

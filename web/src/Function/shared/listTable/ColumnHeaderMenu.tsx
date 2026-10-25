@@ -9,7 +9,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
 import { Popover, PopoverTrigger } from '@/ui/popover';
-import { type ColumnId, type ColumnSort, type DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
+import { type ColumnId, type ColumnSort, type DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { HEADER_DRAG_PREFIX } from './shared';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { fieldDisplayLabel } from '@/Function/property/fieldModel';

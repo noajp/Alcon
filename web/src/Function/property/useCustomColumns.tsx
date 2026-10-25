@@ -2,7 +2,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createCustomColumn, updateCustomColumn, deleteCustomColumn, setCustomColumnValue, fetchCustomColumnsWithValues, isPropertyWriteRefused, noticePropertyValueFailed, type CustomColumnWithValues } from '@/hooks/useSupabase';
-import { revealCustomColumn } from '@/ActivitySpace/execution/object/useListColumns';
+import { revealCustomColumn } from '@/Function/shared/listTable/useListColumns';
 import type { Json } from '@/types/database';
 import { Button } from '@/ui/button';
 import { ObjectFieldDialog } from './ObjectFieldDialog';

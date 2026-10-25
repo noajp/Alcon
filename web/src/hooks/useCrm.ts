@@ -6,9 +6,9 @@ import { supabase } from '@/lib/supabase';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useCurrentUserId } from '@/providers/authContext';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
-import { useWorkers } from '@/ActivitySpace/sustainment/team/data';
+import { useWorkers } from '@/hooks/teamData';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
-import { createElement, updateElement } from '@/ActivitySpace/execution/element/data';
+import { createElement, updateElement } from '@/hooks/elementData';
 import { fetchDataTableSchema } from '@/ActivitySpace/sustainment/table/data';
 import { readAllPages } from '@/hooks/readAllPages';
 import {

@@ -70,7 +70,7 @@ export {
   updateElement,
   updateSubelement,
   useElementBlockers,
-} from '@/ActivitySpace/execution/element/data';
+} from '@/hooks/elementData';
 
 export {
   createCustomColumn,
@@ -101,7 +101,7 @@ export {
   useWorkerCommitments,
   useWorkers,
   useWorkersByIds,
-} from '@/ActivitySpace/sustainment/team/data';
+} from '@/hooks/teamData';
 
 export {
   addDomainElementType,
@@ -116,7 +116,7 @@ export {
   setDomainLabelColor,
   updateDomain,
   useDomains,
-} from '@/ActivitySpace/execution/domain/data';
+} from '@/hooks/domainData';
 
 export {
   createActivitySpace,
@@ -194,7 +194,7 @@ export {
   useStrategyComments,
   useStrategyIntentBundle,
   type IntentBundle,
-} from '@/ActivitySpace/strategy/initiative/strategyData';
+} from '@/hooks/strategyData';
 
 export {
   closePhase,

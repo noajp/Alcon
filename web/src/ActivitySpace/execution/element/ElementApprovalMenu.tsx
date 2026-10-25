@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Check, X, AlertCircle, Clock, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { useAssignableWorkers } from '@/ActivitySpace/sustainment/team/data';
+import { useAssignableWorkers } from '@/hooks/teamData';
 import {
   fetchElementApprovals,
   decideApproval,

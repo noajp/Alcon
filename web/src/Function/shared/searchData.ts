@@ -1,7 +1,7 @@
 'use client';
 
 import { supabase } from '@/lib/supabase';
-import { displayIdOf } from '@/ActivitySpace/execution/element/displayId';
+import { displayIdOf } from '@/Function/shared/element/displayId';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 
 

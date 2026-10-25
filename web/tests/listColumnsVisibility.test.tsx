@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
-import { revealCustomColumn, useListColumns } from '@/ActivitySpace/execution/object/useListColumns';
+import { revealCustomColumn, useListColumns } from '@/Function/shared/listTable/useListColumns';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 afterEach(cleanup);
 const empty: CustomColumnWithValues[] = [];

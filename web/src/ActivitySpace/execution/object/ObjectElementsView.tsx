@@ -6,7 +6,8 @@ import { updateElement } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import type { ListControlsState } from '@/Function/shared/listControls';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
-import { ListTable, type ListSection } from '@/ActivitySpace/execution/object/ListTable';
+import { ListTable } from '@/Function/shared/listTable/ListTable';
+import type { ListSection } from '@/Function/shared/listTable/shared';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { EmptyState } from '@/Function/shared/EmptyState';
 

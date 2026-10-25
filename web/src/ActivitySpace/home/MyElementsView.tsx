@@ -27,7 +27,7 @@ import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { QuickAddElementPopup, type NewElementInput } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
-import type { ColumnId, DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
+import type { ColumnId, DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { ELEMENT_DEFAULT_VISIBLE } from '@/Function/shared/listConfig';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';

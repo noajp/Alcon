@@ -1,7 +1,7 @@
 import type { Locale } from './locales';
-import { CRM_TRANSLATIONS } from '@/ActivitySpace/sustainment/crm/crmMessages';
-import { WORKLOAD_TRANSLATIONS } from '@/ActivitySpace/sustainment/workload/workloadMessages';
-import { PEOPLE_TRANSLATIONS } from '@/ActivitySpace/sustainment/team/peopleMessages';
+import { CRM_TRANSLATIONS } from '@/Function/i18n/crmMessages';
+import { WORKLOAD_TRANSLATIONS } from '@/Function/i18n/workloadMessages';
+import { PEOPLE_TRANSLATIONS } from '@/Function/i18n/peopleMessages';
 import { SURFACE_TRANSLATIONS } from './surfaceMessages';
 import { STRATEGY_BOARD_TRANSLATIONS } from './strategyBoardMessages';
 import { APPROACH_TRANSLATIONS } from './approachMessages';
@@ -11,7 +11,7 @@ import { STRATEGY_TRANSLATIONS } from './strategyMessages';
 import { EXECUTION_TRANSLATIONS } from './executionMessages';
 import { DOCUMENTS_TRANSLATIONS } from './documentsMessages';
 import { APP_TRANSLATIONS } from './appMessages';
-import { OPERATIONS_TRANSLATIONS } from '@/ActivitySpace/sustainment/operations/operationsMessages';
+import { OPERATIONS_TRANSLATIONS } from '@/Function/i18n/operationsMessages';
 import { DESIGN_TRANSLATIONS } from './designMessages';
 
 type TranslationMap = Record<string, string>;

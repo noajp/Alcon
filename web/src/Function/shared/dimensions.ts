@@ -23,7 +23,7 @@
 
 import type { ElementWithDetails } from '@/types/database';
 import { PRIORITY, SEMANTIC_COLORS, STATUS, statusLabel } from '@/shared/designTokens';
-import { holderLabel } from '@/ActivitySpace/execution/element/lease';
+import { holderLabel } from '@/Function/shared/element/lease';
 import { translate } from '@/Function/i18n/I18nProvider';
 
 /**
@@ -51,7 +51,7 @@ export type Dimension =
   // Who holds the lease (elements.claimed_by, el_TRJ-012). Bucketed by the
   // token as stored, expired or not: this file has no clock on purpose — a
   // bucket is a property of the row — so "is it still live" is answered by
-  // the row chip and the Properties rail (ActivitySpace/execution/element/lease.ts), not here.
+  // the row chip and the Properties rail (Function/shared/element/lease.ts), not here.
   | 'holder';
 
 export const DIMENSIONS: Dimension[] = [

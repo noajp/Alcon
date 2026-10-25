@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 // (e.g. which view a brand-new tab opens to). `user_preferences` in Supabase
 // stays the source of truth — this is a read-through cache, refreshed
 // whenever useUserPreferences loads or saves a value. Mirrors the sync-store
-// pattern in ActivitySpace/execution/domain/domainsStore.ts.
+// pattern in Function/space/domainsStore.ts.
 //
 // Unlike domainsStore's list, a preference's *own* getCached* read has no
 // natural refetch point of its own — nothing calls it again once a component

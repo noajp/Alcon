@@ -1,6 +1,6 @@
 'use client';
 
-import { assembleStrategies } from '@/ActivitySpace/strategy/initiative/initiativeObjects';
+import { assembleStrategies } from '@/hooks/initiativeObjects';
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
 import { getCurrentUserId, supabase } from '@/lib/supabase';

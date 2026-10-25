@@ -6,7 +6,7 @@ import { Bot, X } from 'lucide-react';
 import { ReachHint, WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { formatElementDate, toDateOnlyString } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { displayIdOf } from '@/ActivitySpace/execution/element/displayId';
+import { displayIdOf } from '@/Function/shared/element/displayId';
 import { assignmentHistory, evidenceCandidates, SKILL_LEVELS, skillKey, skillLevelLabel } from '@/ActivitySpace/sustainment/team/people';
 import type { TeamElement, TeamRosterEntry } from '@/ActivitySpace/sustainment/team/teamRoster';
 import type { useWorkerSkills } from '@/hooks/useWorkerSkills';

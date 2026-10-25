@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { seedPhaseDates, lastPhaseEndOf } from '../src/ActivitySpace/strategy/phase/phaseDefaults';
+import { seedPhaseDates, lastPhaseEndOf } from '@/Function/shared/phaseDefaults';
 
 describe('seedPhaseDates', () => {
   it('leaves the dates empty without a default length', () => {

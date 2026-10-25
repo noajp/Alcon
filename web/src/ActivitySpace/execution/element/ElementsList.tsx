@@ -3,8 +3,9 @@
 import { useMemo } from 'react';
 import type { ElementWithDetails, Worker, CustomColumnWithValues } from '@/hooks/useSupabase';
 import { updateElement, useElementBlockers } from '@/hooks/useSupabase';
-import { ListTable, type ListSection } from '@/ActivitySpace/execution/object/ListTable';
-import type { ColumnId, DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
+import { ListTable } from '@/Function/shared/listTable/ListTable';
+import type { ListSection } from '@/Function/shared/listTable/shared';
+import type { ColumnId, DataColumn } from '@/Function/shared/listTable/useListColumns';
 import type { ElementUpdate, Json } from '@/types/database';
 import {
   buildSections,

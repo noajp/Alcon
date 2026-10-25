@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUserId } from '@/providers/authContext';
 import { useSustainmentDomains } from './useSustainmentDomains';
-import { useDomains } from '@/ActivitySpace/execution/domain/data';
+import { useDomains } from '@/hooks/domainData';
 import { supabase } from '@/lib/supabase';
 import { readAllPages } from './readAllPages';
 import { chunkIds } from './chunkedIn';

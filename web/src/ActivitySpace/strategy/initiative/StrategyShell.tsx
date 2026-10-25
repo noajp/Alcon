@@ -57,7 +57,7 @@ import {
   type WidgetHost,
   type Zone,
 } from '@/Function/widget';
-import { DueDateCell, LeadCell, TypeCell } from '@/ActivitySpace/execution/object/ListTable';
+import { DueDateCell, LeadCell, TypeCell } from '@/Function/shared/listTable/cells';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,7 +67,7 @@ import {
 import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { resolveVision, useVisions } from '@/ActivitySpace/strategy/vision/data';
+import { resolveVision, useVisions } from '@/hooks/visionData';
 import { initiativesOfVision } from '@/ActivitySpace/strategy/portfolio/portfolioGroups';
 import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { setActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+import { setActiveDomainId } from '@/Function/space/domainsStore';
 
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 

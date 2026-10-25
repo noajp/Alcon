@@ -7,7 +7,7 @@ import { SendIcon } from '@/Function/shared/SendIcon';
 import { useAlconCopilot, type CopilotContext, type ToolEvent } from './useAlconCopilot';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
-import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 const WIDTH_KEY = 'alcon.copilot.width';

@@ -7,7 +7,7 @@
 // are still waiting.
 
 import type { EdgeType } from '@/types/database';
-import { displayIdOf } from './displayId';
+import { displayIdOf } from '@/Function/shared/element/displayId';
 
 /** One unresolved upstream — what a waiting Element is waiting on. */
 export interface DependencyBlocker {

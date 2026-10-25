@@ -9,8 +9,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { displayIdOf } from '@/ActivitySpace/execution/element/displayId';
-import { describeBlocker } from '@/ActivitySpace/execution/element/dependencyReadiness';
+import { displayIdOf } from '@/Function/shared/element/displayId';
+import { describeBlocker } from '@/Function/shared/element/dependencyReadiness';
 
 describe('displayIdOf', () => {
   it('drops the entity prefix, which names nothing the surface does not', () => {

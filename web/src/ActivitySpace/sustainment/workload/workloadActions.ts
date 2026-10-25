@@ -1,7 +1,7 @@
 'use client';
 
-import { removeElementAssignee, updateElement } from '@/ActivitySpace/execution/element/data';
-import { assignWorkersToElement } from '@/ActivitySpace/sustainment/team/data';
+import { removeElementAssignee, updateElement } from '@/hooks/elementData';
+import { assignWorkersToElement } from '@/hooks/teamData';
 import { translate } from '@/Function/i18n/I18nProvider';
 import type { Proposal } from './workloadRebalance';
 

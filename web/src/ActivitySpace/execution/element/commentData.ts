@@ -123,7 +123,7 @@ export function useCarryOverReasons(elementIds: string[]) {
 const NO_COMMENTS: ElementComment[] = [];
 
 /** Comments for one Element through the query cache (key shared with the
- *  detail prefetch in ActivitySpace/execution/element/elementDetailQueries). `setComments`
+ *  detail prefetch in hooks/elementDetailQueries). `setComments`
  *  keeps the optimistic-update call shape and writes into the cache. */
 export function useElementComments(elementId: string | null) {
   const qc = useQueryClient();

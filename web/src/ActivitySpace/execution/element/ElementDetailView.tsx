@@ -51,14 +51,14 @@ import {
   useElementEdges,
   useElementMemberObjects,
   useElementCustomColumns,
-} from '@/ActivitySpace/execution/element/elementDetailQueries';
+} from '@/hooks/elementDetailQueries';
 import { CustomColumnCell } from '@/Function/property/CustomColumnCell';
 import type { Subelement, Json } from '@/types/database';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
-import { liveLease, holderLabel, formatRemaining } from './lease';
+import { liveLease, holderLabel, formatRemaining } from '@/Function/shared/element/lease';
 import { useNow } from '@/Function/shared/useNow';
 import { Fingerprint, Copy } from 'lucide-react';
 import { labelColor, labelColorKey, domainLabelNames, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/Function/shared/labelColor';
@@ -84,7 +84,7 @@ import { ElementTypeIcon, ObjectIcon } from '@/shell/icons';
 import { PageIcon, PageSection } from '@/Function/shared/PageHead';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { StatusPicker } from './StatusPicker';
+import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { ElementDirectionSection } from './ElementDirectionSection';
 import { SubelementRow } from './SubelementRow';
 import { SubelementBulkBar } from './SubelementBulkBar';
@@ -99,7 +99,7 @@ import { NotePicker } from '@/ActivitySpace/sustainment/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/sustainment/notebook/LinkedNoteEmbed';
 import { logActivity, useElementActivityLog, invalidateElementActivity, mergeActivity, type ActivityKind } from './elementActivity';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { formatElementDate, parseDateOnly, toDateOnlyString, formatAge } from '@/Function/shared/dateUtils';
 import { ElementIcon, MessageIcon } from '@/Function/shared/conceptIcons';
 

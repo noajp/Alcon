@@ -63,20 +63,20 @@ UI を変更したら `npm run design-lint`（変更ファイル限定のラチ�
 
 ## ディレクトリ
 
-`web/src/` の下に、`shell/`（外殻 — ModeRail / AppSidebar / CommandPalette / MainContent / viewRegistry）、`ActivitySpace/`（盤面の面 — `home/` `strategy/` `execution/` `sustainment/`）、`Function/`（盤面を成立させる仕組み — `widget/` `property/` `copilot/` `settings/` `space/` `sync/` `shared/`）、`hooks/`（Supabase の CRUD は全部ここ）、`shared/designTokens.ts`、`lib/` `providers/` `auth/` `types/` `ui/`。`app/` は layout / page / globals.css だけ。
+`web/src/` の下に、`shell/`（外殻 — ModeRail / AppSidebar / CommandPalette / MainContent / viewRegistry）、`ActivitySpace/`（盤面の面 — `home/` `strategy/` `execution/` `sustainment/`）、`Function/`（盤面を成立させる仕組み — `widget/` `property/` `copilot/` `settings/` `space/` `strategy/` `sync/` `shared/`）、`hooks/`（Supabase の CRUD は全部ここ）、`shared/designTokens.ts`、`lib/` `providers/` `auth/` `types/` `ui/`。`app/` は layout / page / globals.css だけ。
 
 root 直下は `supabase/`（migrations と functions）、`ops/`（自走ループの配管）、`docs/`（adr / friction-risk-register.md）、`website/`（LP）。
 
 ## 実装ルール
 
 1. 変更後は必ず `npx tsc --noEmit` と `npm test`
-2. 新規ファイルは、盤面の画面なら `ActivitySpace/<分類>/<概念>/`、それを支える仕組みなら `Function/<concept>/`。横断 UI は `Function/shared/`、外殻は `shell/`
+2. 新規ファイルは、盤面の画面なら `ActivitySpace/<分類>/<概念>/`、それを支える仕組みなら `Function/<concept>/`。横断 UI は `Function/shared/`、外殻は `shell/`。`Function/` から `ActivitySpace/` を import しない（画面の一部を盤面に置く `widget/widgets/` だけ例外。ESLint が検査する）。画面と仕組みの両方が使うものは `Function/` か `hooks/` に置く
 3. **新 view**：`viewRegistry.ts`（label/icon の単一情報源）→ `MainContent` 分岐 → `railApps.ts` の `MODE_META`。新モードを App にするなら `RailMode` / `APP_GROUPS` も
 4. **新 Widget**：本体を `Function/widget/widgets/` に、定義を `registry.tsx` に1つ（`accepts` / `zones` / `load()` の動的 import）、既定配置は `defaults.ts`。既存ウィジェットを別の Subject でも使う場合は、`accepts` に対象を追加する。Home 以外のボードは対象を見られる全員が共有するので、ウィジェットの中身は `useWidgetDocument`（全員で共有）に置き、本人だけに見せる下書きは `useWidgetViewerState` に置く
 5. **グラフの集計軸を固定しない** — 集計軸は `Function/shared/dimensions.ts` の `Dimension` から選択できるようにし、`WidgetInstance.params` に保存する。軸の違いだけで別のウィジェットを作らない
 6. **フレームワークは永続データの見せ方にする** — OKR / Gap は `intents` の measure の読み替え、任意の分類による分析には Table を使い、文章は Note に保存する。業界固有のデータや分析結果をコンポーネントや配置パラメータへ直書きしない
 7. **Object のネスト禁止**。Element の multi-homing は `object_id` + `element_objects` の二重書き
-8. Phase の期間には **`end_date` 当日を含める**。日付を扱う処理は `Function/shared/phaseWindow.ts` を通す
+8. Phase の期間には **`end_date` 当日を含める**（`Function/shared/phaseWindow.ts`）。日付の解釈・計算・表示は `Function/shared/dateUtils.ts` を通す。日付列は暦日なので `new Date('yyyy-MM-dd')`（UTC 0時になり、日がずれる）で読まない
 9. Note エディタは独自 `AppleNoteEditor`（HTML + `htmlSanitizer`）。BlockNote は使わない
 
 ## Supabase

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assembleStrategies } from '@/ActivitySpace/strategy/initiative/initiativeObjects';
+import { assembleStrategies } from '@/hooks/initiativeObjects';
 import type { Strategy, StrategyChild, StrategyObject } from '@/types/database';
 
 // assembleStrategies is the one path that turns rows into a Initiative's

@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
-import { useStrategies } from '@/ActivitySpace/strategy/initiative/strategyData';
+import { useStrategies } from '@/hooks/strategyData';
 import { useInitiativeMeasures } from '@/hooks/useInitiativeMeasures';
 import type { Crm } from '@/hooks/useCrm';
 import { fieldKey, fieldOptions, fieldsFor, measureValue, metricKind, metricValue, normalizeCrmStages, readUnit, stageSlug, type CrmFieldRecord, type CrmMetric, type CrmStage } from './crmModel';

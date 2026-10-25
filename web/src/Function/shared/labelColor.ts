@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+import { getActiveDomainId } from '@/Function/space/domainsStore';
 
 // Named palette shown in the "Pick a color for label" picker. Keys are stored
 // in domains.label_colors (name -> key); hex is what we actually render.

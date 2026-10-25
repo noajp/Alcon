@@ -79,7 +79,7 @@ import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { FieldVisibility } from '@/Function/property/FieldVisibility';
 import { fieldDisplayLabel } from '@/Function/property/fieldModel';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
-import { useListColumns, type ColumnId } from '@/ActivitySpace/execution/object/useListColumns';
+import { useListColumns, type ColumnId } from '@/Function/shared/listTable/useListColumns';
 
 // Two pill buttons at the top of a list view. The Filter button opens a
 // menu of filter facets; the Display button opens grouping / ordering /

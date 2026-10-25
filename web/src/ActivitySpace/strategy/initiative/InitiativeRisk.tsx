@@ -8,7 +8,7 @@ import {
   type InitiativeRiskReport,
   type ObjectRisk,
   type RiskReason,
-} from '@/ActivitySpace/strategy/initiative/initiativeRiskModel';
+} from '@/Function/strategy/initiativeRiskModel';
 import { ABSENCE_WINDOW_DAYS } from '@/ActivitySpace/strategy/initiative/initiativeAssumptionModel';
 import {
   holderAbsenceLabel,

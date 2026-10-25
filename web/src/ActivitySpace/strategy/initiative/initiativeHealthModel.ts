@@ -20,7 +20,7 @@ import {
   type InitiativeRiskReport,
   type RiskElement,
   type RiskObject,
-} from './initiativeRiskModel';
+} from '@/Function/strategy/initiativeRiskModel';
 import { completionOf } from '@/Function/shared/completion';
 
 export interface InitiativeHealth {

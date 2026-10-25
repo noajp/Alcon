@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useDomains, updateDomain } from '@/hooks/useSupabase';
 import { getQueryClient } from '@/lib/queryClient';
 import type { Domain, DomainRiskThresholds } from '@/types/database';
-import { RISK_THRESHOLD_DEFAULTS, RISK_THRESHOLD_MAX } from '@/ActivitySpace/strategy/initiative/initiativeRiskModel';
+import { RISK_THRESHOLD_DEFAULTS, RISK_THRESHOLD_MAX } from '@/Function/strategy/initiativeRiskModel';
 import { SettingsSection, SettingsRow } from './SettingsSection';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { liveLease, holderLabel, formatRemaining } from '../src/ActivitySpace/execution/element/lease';
+import { liveLease, holderLabel, formatRemaining } from '@/Function/shared/element/lease';
 import { bucketsOf, DIMENSIONS, DIMENSION_LABEL } from '../src/Function/shared/dimensions';
 import type { ElementWithDetails } from '../src/types/database';
 

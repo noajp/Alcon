@@ -10,7 +10,7 @@ import { PageHead } from '@/Function/shared/PageHead';
 import { RailCard } from '@/Function/shared/RailCard';
 import { CrmIcon } from '@/Function/shared/conceptIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { useStrategies } from '@/ActivitySpace/strategy/initiative/strategyData';
+import { useStrategies } from '@/hooks/strategyData';
 import type { Crm, CrmDealPatch } from '@/hooks/useCrm';
 import { ACTIVITY_TYPES, DEAL_ROLES, fieldsFor, LOST_STAGE, stageChange, WON_STAGE, type CrmActivityType, type CrmDeal, type CrmDealRole, type CrmStage } from './crmModel';
 import { aiBrief, aiEmail, useCrmAi, type DealBrief, type DealEmail } from './crmAi';

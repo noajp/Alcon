@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { selectIn } from '@/hooks/chunkedIn';
 import { fetchStrategyElements } from '@/hooks/useSupabase';
 import type { Phase } from '@/types/database';
-import { displayIdOf } from '@/ActivitySpace/execution/element/displayId';
+import { displayIdOf } from '@/Function/shared/element/displayId';
 
 // =============================================================
 // What a Initiative can point at.

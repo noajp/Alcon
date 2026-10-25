@@ -35,7 +35,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { Trash2 } from 'lucide-react';
 import { ObjectMembersPanel } from '@/ActivitySpace/execution/object/ObjectMembersPanel';
 import { ObjectElementsView } from '@/ActivitySpace/execution/object/ObjectElementsView';
-import type { ListSection } from '@/ActivitySpace/execution/object/ListTable';
+import type { ListSection } from '@/Function/shared/listTable/shared';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { sectionGroupValues, type ListControlsState, type SectionGroup } from '@/Function/shared/listControls';
 import { partitionAssignable } from '@/Function/shared/assignableWorkers';

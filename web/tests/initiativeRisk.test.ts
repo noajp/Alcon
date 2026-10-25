@@ -13,7 +13,7 @@ import {
   parseRiskThresholds,
   type RiskElement,
   type RiskObject,
-} from '../src/ActivitySpace/strategy/initiative/initiativeRiskModel';
+} from '@/Function/strategy/initiativeRiskModel';
 
 // A fixed clock. Every threshold in this module is relative, so the tests are
 // written as offsets from here rather than as wall-clock dates.

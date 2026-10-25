@@ -29,7 +29,7 @@ export interface DomainAIConfig {
 
 // Per-Domain thresholds for the Initiative risk cross-section, stored in
 // domains.risk_thresholds (jsonb). Every key optional; absent = the default
-// in ActivitySpace/strategy/initiative/initiativeRiskModel.ts. Edited from Settings >
+// in Function/strategy/initiativeRiskModel.ts. Edited from Settings >
 // Elements > SLAs.
 /** Settings > Strategy > Phase: how a new Phase's dates are seeded. Every
  *  key optional; absent = the create dialog starts with empty dates. */
