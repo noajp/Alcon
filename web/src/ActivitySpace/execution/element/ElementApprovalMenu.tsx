@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Button } from '@/ui/button';
 import { Check, X, AlertCircle, Clock, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAssignableWorkers } from '@/ActivitySpace/sustainment/team/data';
@@ -217,29 +218,18 @@ export function ElementApprovalMenu({ element, onRefresh }: Props) {
               className="w-full text-[12px] bg-muted/30 rounded-md px-2 py-1.5 resize-none min-h-[36px] border-none"
             />
 
-            {/* Decisions — the menu's selectable actions */}
-            <div className="space-y-0.5">
-              <button
-                onClick={() => decide('approved')}
-                disabled={busy || !canDecide}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] text-left text-foreground hover:bg-muted/40 transition-colors disabled:opacity-50"
-              >
+            {/* Decisions — approving is the decisive one, so it is the accent-blue
+                primary button; asking for changes and rejecting sit beside it. */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Button variant="primary" size="sm" className="gap-1.5" onClick={() => decide('approved')} disabled={busy || !canDecide}>
                 <Check size={13} /> {t('Approve')}
-              </button>
-              <button
-                onClick={() => decide('changes_requested')}
-                disabled={busy || !canDecide}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] text-left text-[var(--accent-default)] hover:bg-[var(--accent-default)]/10 transition-colors disabled:opacity-50"
-              >
+              </Button>
+              <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => decide('changes_requested')} disabled={busy || !canDecide}>
                 <AlertCircle size={13} /> {t('Request changes')}
-              </button>
-              <button
-                onClick={() => decide('rejected')}
-                disabled={busy || !canDecide}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] text-left text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10 transition-colors disabled:opacity-50"
-              >
+              </Button>
+              <Button variant="ghost" size="sm" className="gap-1.5 text-[var(--status-danger)]" onClick={() => decide('rejected')} disabled={busy || !canDecide}>
                 <X size={13} /> {t('Reject')}
-              </button>
+              </Button>
             </div>
 
             {currentRights && !canDecide && <p className="px-1 text-[11px] text-muted-foreground">{t('You cannot decide this approval.')}</p>}

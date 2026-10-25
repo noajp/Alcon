@@ -345,7 +345,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
                     placeholder={integration && !hasSecret ? t('Not set') : ''} aria-label={t(preset.credentialLabel)} className="h-8 text-[13px] md:text-[13px]" />
                   {integration && (
                     <>
-                      <Button variant="secondary" size="sm" onClick={saveSecret} disabled={busy || !secretInput.trim()}>{t('Save')}</Button>
+                      <Button variant="primary" size="sm" onClick={saveSecret} disabled={busy || !secretInput.trim()}>{t('Save')}</Button>
                       {editingSecret && <Button variant="ghost" size="sm" onClick={() => { setEditingSecret(false); setSecretInput(''); }}>{t('Cancel')}</Button>}
                     </>
                   )}

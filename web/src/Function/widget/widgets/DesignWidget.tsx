@@ -84,7 +84,7 @@ export function DesignWidget({ host, instanceId }: WidgetProps) {
 
     {store.draft && <div className="flex flex-wrap items-center gap-2">
       <p className="mr-auto text-xs text-muted-foreground">{t('Preview · only you see this until you use it. It then replaces the design for everyone.')}</p>
-      <Button size="sm" disabled={locked} onClick={() => void run(async () => { await store.adopt(); setEditing(false); setPrompt(''); lastSaved.current = ''; })}>{t('Use this design')}</Button>
+      <Button variant="primary" size="sm" disabled={locked} onClick={() => void run(async () => { await store.adopt(); setEditing(false); setPrompt(''); lastSaved.current = ''; })}>{t('Use this design')}</Button>
       <Button variant="ghost" size="sm" disabled={locked} onClick={() => void run(() => store.discard())}>{t('Discard preview')}</Button>
     </div>}
 

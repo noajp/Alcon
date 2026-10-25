@@ -255,7 +255,7 @@ function ProposalCard({ proposal: p, element, name, prerequisites, applying, loc
       )}
       {error && <p role="alert" className="mt-1 pl-[19px] text-[11px] text-[var(--status-danger)]">{error}</p>}
       <div className="mt-1.5 flex items-center gap-1 pl-[19px]"><ButtonAppearanceProvider appearance="inline">
-        <Button type="button" size="xs" variant="secondary" disabled={locked} onClick={onApply}
+        <Button type="button" size="xs" variant="primary" disabled={locked} onClick={onApply}
           title={prerequisites > 0 ? t('Applies the {n} earlier changes this one depends on first', { n: prerequisites }) : undefined}>
           {applying ? t('Applying…') : prerequisites > 0 ? t('Apply with {n} earlier', { n: prerequisites }) : t('Apply')}
         </Button>

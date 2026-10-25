@@ -102,7 +102,7 @@ function Stages({ crm }: { crm: Crm }) {
     {!valid && <p role="alert" className="text-xs text-[var(--status-danger)]">{t('Each stage needs a unique name other than Won or Lost.')}</p>}
     <div className="flex flex-wrap items-center gap-2">
       <Button variant="ghost" size="sm" disabled={draft.length >= 12} onClick={() => { setSaved(false); setDraft(current => [...current, { id: `stage-${current.length + 1}`, label: t('New stage'), probability: 50 }]); }}><Plus size={14} />{t('Add stage')}</Button>
-      <Button variant="secondary" size="sm" disabled={!valid} onClick={() => { const stages = normalizeCrmStages(draft); setError(null); crm.savePipeline(pipeline.id, { stages }).then(() => { setDraft(stages); setSaved(true); }).catch(cause => setError(message(cause))); }}>{t('Save stages')}</Button>
+      <Button variant="primary" size="sm" disabled={!valid} onClick={() => { const stages = normalizeCrmStages(draft); setError(null); crm.savePipeline(pipeline.id, { stages }).then(() => { setDraft(stages); setSaved(true); }).catch(cause => setError(message(cause))); }}>{t('Save stages')}</Button>
       {saved && <span role="status" className="text-xs text-muted-foreground">{t('Saved')}</span>}
       {error && <span role="alert" className="text-xs text-[var(--status-danger)]">{error}</span>}
     </div>
