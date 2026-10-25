@@ -177,6 +177,37 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     return id;
   }
 
+  /** Moves an open next-step Element from one owner to another. False when the
+   * new owner could not be assigned (they cannot see the Element's Object). */
+  async function moveStep(elementId: string | null, from: string | null, to: string | null): Promise<boolean> {
+    const element = elementId ? (elements.data ?? []).find(item => item.id === elementId) : null;
+    if (!element || ['done', 'cancelled'].includes(element.status)) return true;
+    if (from) await supabase.from('element_assignees').delete().eq('element_id', element.id).eq('worker_id', from).eq('role', 'assignee');
+    if (!to) return true;
+    const { error } = await supabase.from('element_assignees').insert({ element_id: element.id, worker_id: to, role: 'assignee' });
+    return !error || error.code === '23505';
+  }
+
+  /** Hands one person's CRM work to another — when someone leaves or moves:
+   * their open deals (with the next steps' Elements), companies and contacts.
+   * Won and lost deals keep who closed them. Each moved deal records the
+   * hand-over in its history. */
+  const handOver = async (from: string, to: string, note: string) => {
+    const open = (deals.data ?? []).filter(deal => deal.owner_worker_id === from && !['won', 'lost'].includes(deal.stage.toLowerCase()));
+    let unassigned = 0;
+    try {
+      if (open.length) check(await supabase.from('crm_deals').update({ owner_worker_id: to }).in('id', open.map(deal => deal.id)).select('id'));
+      for (const deal of open) if (!(await moveStep(deal.next_element_id, from, to))) unassigned += 1;
+      const companiesMoved = check(await supabase.from('crm_companies').update({ owner_worker_id: to }).eq('activity_space_id', space()).eq('owner_worker_id', from).select('id')).length;
+      const contactsMoved = check(await supabase.from('crm_contacts').update({ owner_worker_id: to }).eq('activity_space_id', space()).eq('owner_worker_id', from).select('id')).length;
+      const author = people.find(person => person.id === me)?.name ?? null;
+      if (open.length) check(await supabase.from('crm_activities').insert(open.map(deal => ({
+        activity_space_id: space(), deal_id: deal.id, kind: 'note', body: note.slice(0, 8000), occurred_on: today, author_name: author,
+      }))).select('id'));
+      return { deals: open.length, companies: companiesMoved, contacts: contactsMoved, unassigned };
+    } finally { await Promise.all([invalidate(), qc.invalidateQueries({ queryKey: ['my-elements'] })]); }
+  };
+
   /** Creates or updates a deal in one row write (company / contact rows first when named). */
   const saveDeal = async (dealId: string | null, patch: CrmDealPatch, extra?: { activity?: { type: CrmActivityType; text: string; date?: string }; quiet?: boolean }): Promise<string> => {
     const row: Record<string, unknown> = {};
@@ -207,7 +238,12 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     if (patch.contactName) row.contact_id = await contactFor(patch.contactName, patch.contactEmail ?? null, (row.company_id as string | undefined) ?? null);
     try {
       let id = dealId;
-      if (id) { if (Object.keys(row).length) check(await supabase.from('crm_deals').update(row).eq('id', id).select('id').single()); }
+      if (id) {
+        const before = deals.data?.find(item => item.id === id);
+        if (Object.keys(row).length) check(await supabase.from('crm_deals').update(row).eq('id', id).select('id').single());
+        // A new owner takes the open next step with the deal.
+        if (patch.ownerId !== undefined && before && before.owner_worker_id !== patch.ownerId) await moveStep(before.next_element_id, before.owner_worker_id, patch.ownerId);
+      }
       else {
         const first = normalizeCrmStages(pipeline?.stages)[0];
         const stage = (row.stage as string | undefined) ?? first.id;
@@ -456,7 +492,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     loading: enabled && !workspace && !error,
     error, measureError,
     refetch: invalidate,
-    saveDeal, startRenewal, declineRenewal, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
+    saveDeal, handOver, startRenewal, declineRenewal, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
     savePipeline, deletePipeline, saveCompany, deleteCompany, saveContact, deleteContact, saveField, deleteField,
     importFromTable,
   };
