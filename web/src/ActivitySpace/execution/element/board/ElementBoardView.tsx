@@ -18,7 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as CalendarPicker } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
 import { cn } from '@/lib/utils';
-import { formatElementDate, toDateOnlyString } from '@/Function/shared/dateUtils';
+import { formatElementDate, toDateOnlyString, parseDateOnly } from '@/Function/shared/dateUtils';
 import { CardAgentControl } from '../agent';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
@@ -67,7 +67,7 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
 
   const assignee = element.assignees?.[0]?.worker;
-  const dueDate = element.due_date ? new Date(element.due_date) : null;
+  const dueDate = parseDateOnly(element.due_date, null);
   const priority = element.priority;
 
   // Inline editing on the card: title (click to rename) + due date (click to

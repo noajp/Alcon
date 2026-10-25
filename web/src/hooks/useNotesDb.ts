@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { getQueryClient } from '@/lib/queryClient';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import { createNoteContentStore, EMPTY_NOTE_CONTENT } from '@/Function/notebook/noteContentStore';
@@ -319,6 +320,7 @@ export function useNotes() {
     // Re-sync from the DB on failure — otherwise the optimistic update sticks
     // in local state even though the write never landed.
     if (error) { void reload(); throw error; }
+    void getQueryClient().invalidateQueries({ queryKey: ['note-header', id] });
   }, [reload]);
 
   const deleteNode = useCallback(async (id: string) => {
@@ -342,15 +344,6 @@ export function useNotes() {
     if (error) { void reload(); throw error; }
   }, [reload]);
 
-  /** Move a Note (folder or file) under a new parent. `parentId === null`
-   *  promotes it to the tree root. Used by the NotesSidebar DnD + the
-   *  "Move to folder…" context menu. */
-  const moveNode = useCallback(async (id: string, parentId: string | null) => {
-    updateNodes((prev) => prev.map((n) => (n.id === id ? { ...n, parentId } : n)));
-    const { error } = await supabase.from('notes').update({ parent_id: parentId }).eq('id', id);
-    if (error) { void reload(); throw error; }
-  }, [reload]);
-
   /** Persist the Note's link to an Object (or clear it with null). The
    *  PageView header surfaces this so users can hook a Note to an
    *  Object/Domain when extracting bullets into Elements. */
@@ -371,7 +364,6 @@ export function useNotes() {
     createNode,
     renameNode,
     deleteNode,
-    moveNode,
     setLinkedObject,
   };
 }

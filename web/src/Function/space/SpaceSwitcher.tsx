@@ -51,7 +51,14 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
 
   const remove = async () => {
     if (!active) return;
-    if (await countSpaceDomains(active.id) > 0) {
+    let domainCount: number;
+    try {
+      domainCount = await countSpaceDomains(active.id);
+    } catch (e) {
+      await appDialog.alert(e instanceof Error && e.message ? e.message : 'Could not check the Space for Domains. Try again.');
+      return;
+    }
+    if (domainCount > 0) {
       await appDialog.alert(`"${active.name}" still has Domains. Move or delete them before deleting the Space.`);
       return;
     }
