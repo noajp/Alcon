@@ -85,6 +85,9 @@ export async function aiCapture(input: string, today: string, deals: readonly Cr
 }
 
 function dealContext(deal: CrmDeal, today: string): string {
+  const line = (entry: CrmDeal['activity'][number]) => `- ${entry.date ?? ''} ${entry.type}: ${entry.text}`;
+  const conversations = deal.activity.filter(entry => entry.type !== 'change');
+  const revisions = deal.activity.filter(entry => entry.type === 'change');
   return [
     `Today: ${today}`,
     `Deal: ${deal.name}`, `Account: ${deal.account ?? '-'}`, `Contact: ${deal.contact ?? '-'} ${deal.email ? `<${deal.email}>` : ''}`,
@@ -92,10 +95,10 @@ function dealContext(deal: CrmDeal, today: string): string {
     `Close date: ${deal.closeDate ?? '-'}`, `Last contact: ${deal.lastContact ?? '-'}`,
     `Next action: ${deal.nextActionDate ?? '-'} ${deal.nextStep ?? ''}`,
     `Health: ${deal.health.score ?? '-'} (${deal.health.level})`,
-    // Conversations first: revisions are summarised by the current figures above,
-    // so a run of edits never pushes the last real contact out of the context.
-    'Activity (newest first):', ...(deal.activity.length ? [...deal.activity.filter(entry => entry.type !== 'change').slice(0, 25), ...deal.activity.filter(entry => entry.type === 'change').slice(0, 5)]
-      .map(entry => `- ${entry.date ?? ''} ${entry.type}: ${entry.text}`) : ['- none recorded']),
+    // Conversations and revisions apart, so a run of edits never pushes the
+    // last real contact out of the context.
+    'Activity (newest first):', ...(conversations.length ? conversations.slice(0, 25).map(line) : ['- none recorded']),
+    ...(revisions.length ? ['Recent revisions (newest first):', ...revisions.slice(0, 5).map(line)] : []),
   ].join('\n');
 }
 

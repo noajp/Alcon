@@ -53,9 +53,10 @@ begin
     select c.id into v_company
       from public.crm_companies c join public.crm_pipelines p on p.id = new.pipeline_id
       where c.id = new.company_id and (c.domain_id is null or c.domain_id is not distinct from p.domain_id);
+    -- A person's own human Worker (one per person, not tied to a Space) names them.
     select w.name into v_author from public.workers w
-      where w.user_id = auth.uid() and w.type = 'human' and w.activity_space_id = new.activity_space_id
-      order by w.created_at limit 1;
+      where w.user_id = auth.uid() and w.type = 'human' and w.object_id is null
+      limit 1;
     -- clock_timestamp keeps the rows of one write in the order they were written.
     foreach v_row slice 1 in array v_rows loop
       insert into public.crm_activities (activity_space_id, deal_id, company_id, kind, body, occurred_on, created_by, author_name, created_at)
