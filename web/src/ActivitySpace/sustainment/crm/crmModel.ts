@@ -285,7 +285,7 @@ function health(deal: Omit<CrmDeal, 'health' | 'action'>, today: string, followU
 }
 
 /** A won deal whose contract renews within the window and has no renewal deal yet. */
-export function renewalAction(deal: Pick<CrmDeal, 'outcome' | 'renewsOn' | 'renewedBy'>, today: string, renewalDays: number): CrmAction | null {
+function renewalAction(deal: Pick<CrmDeal, 'outcome' | 'renewsOn' | 'renewedBy'>, today: string, renewalDays: number): CrmAction | null {
   if (deal.outcome !== 'won' || !deal.renewsOn || deal.renewedBy) return null;
   const days = daysBetween(today, deal.renewsOn);
   if (deal.renewsOn < today) return { code: 'renewal_due', urgency: 'overdue', message: 'Contract renewed or ended {date} — start the renewal', values: { date: deal.renewsOn } };
