@@ -86,6 +86,10 @@ if(typeof ResizeObserver==='function'&&document.body){
   if(Math.abs(height-last)>1){last=height;send('size',{height});}
  };
  __alconMeasure=()=>{last=0;report();};
+ // The frame itself resizing changes nothing inside it for ordinary content, so
+ // no observer fires; reading it here keeps the comparison above against the
+ // frame the content was actually laid out in.
+ window.addEventListener('resize',report);
  const observer=new ResizeObserver(report);
  observer.observe(document.body);
  for(const child of document.body.children)observer.observe(child);

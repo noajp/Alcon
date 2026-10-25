@@ -51,7 +51,9 @@ describe('app data message boundary', () => {
     const parent = { postMessage: (message: Record<string, unknown>) => messages.push(message) };
     let observe: (() => void) | null = null;
     let contentBottom = 300;
-    const win = { innerHeight: 240, scrollY: 0, addEventListener: () => {} };
+    const resizers: (() => void)[] = [];
+    const win = { innerHeight: 240, scrollY: 0, addEventListener: (type: string, fn: () => void) => { if (type === 'resize') resizers.push(fn); } };
+    const resize = (height: number) => { win.innerHeight = height; resizers.forEach(fn => fn()); };
     class FakeResizeObserver { constructor(fn: () => void) { observe = fn; } observe() {} }
     const child = { getBoundingClientRect: () => ({ height: contentBottom, width: 100, bottom: contentBottom }) };
     const html = appDocument({ title: 'tall', html: '<p>Tall</p>', css: '', js: '' }, {}, { objectId: 'scope', objectName: '' }, 'channel', {});
@@ -60,16 +62,18 @@ describe('app data message boundary', () => {
     const sizes = () => messages.filter(m => m.type === 'size').map(m => m.height);
     observe!();
     expect(sizes()).toEqual([316]);
-    // Real content: the host grows the frame, the content stays; then rows are added one by one.
-    win.innerHeight = 316; observe!();
-    for (const bottom of [337, 374, 411, 448]) { contentBottom = bottom; observe!(); win.innerHeight = bottom + 16; observe!(); }
+    // Real content: the host grows the frame (only the resize event fires, nothing
+    // inside changes size), then rows are added one at a time, each the same height.
+    resize(316);
+    for (const bottom of [337, 374, 411, 448]) { contentBottom = bottom; observe!(); resize(bottom + 16); }
     expect(sizes()).toEqual([316, 353, 390, 427, 464]);
-    // Content sized to the frame: it grows exactly as much as the frame did, so the frame stops there.
+    // Content sized to the frame: it grows with the frame in the same layout, so it stops there.
     messages.length = 0;
-    contentBottom = win.innerHeight; win.innerHeight += 0; observe!();
-    win.innerHeight += 32; contentBottom += 32; observe!();
-    win.innerHeight += 32; contentBottom += 32; observe!();
-    expect(sizes().every(h => (h as number) <= win.innerHeight)).toBe(true);
+    contentBottom = win.innerHeight + 16; observe!();
+    const asked = sizes()[0] as number;
+    // The host applies what was asked; content tracking the frame grows with it.
+    contentBottom += asked - win.innerHeight; resize(asked);
+    expect(sizes()).toEqual([asked]);
   });
   it('keeps an app from replacing the names the host relies on', () => {
     const messages: Record<string, unknown>[] = [];
