@@ -356,7 +356,12 @@ function WorkspaceContent({
     return () => window.removeEventListener(CREATE_DOMAIN_EVENT, handler);
   }, []);
 
-  const openObjectPopup = useCallback(() => setObjectPopupOpen(true), []);
+  // An Object lives in a Domain: with none yet, creating one starts with the Domain.
+  const hasDomains = domains.length > 0;
+  const openObjectPopup = useCallback(() => {
+    if (hasDomains) setObjectPopupOpen(true);
+    else setCreateType('domain');
+  }, [hasDomains]);
   // The sidebar's "+" in Notebook mode — the same quick-create card,
   // asking for the notebook's name.
   const [notebookPopupOpen, setNotebookPopupOpen] = useState(false);
