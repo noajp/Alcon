@@ -172,7 +172,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
 
   // Multi-select + bulk ops. Personal Elements aren't Object-homed, so the
   // bulk bar offers Delete + Duplicate only (no Move / Add-to-Object).
-  const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
+  const { selectedRowIds, handleRowSelect, clearSelection, selectOnly } = useElementSelection();
   const bulkDelete = useCallback(async () => {
     for (const id of selectedRowIds) {
       try { await deleteElement(id); } catch (e) { console.error('Delete failed', id, e); }
@@ -217,10 +217,11 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
   // Hand the selection to one person (undoable); Elements they cannot take keep their people.
   const assigneeOptions = useMemo(() => (spaceWorkers ?? []).map((w) => ({ id: w.id, name: w.name, hint: w.type === 'ai_agent' ? 'AI' : null })), [spaceWorkers]);
   const bulkAssign = useCallback(async (workerId: string) => {
+    // What could not be handed over stays selected, with the bar saying why.
     const failed = await bulkSetAssignee([...selectedRowIds], workerId, async () => { await fetchMine(); await onRefresh?.(); });
-    clearSelection();
-    return failed;
-  }, [selectedRowIds, clearSelection, fetchMine, onRefresh]);
+    selectOnly(failed);
+    return failed.length;
+  }, [selectedRowIds, selectOnly, fetchMine, onRefresh]);
   const bulkSetField = useCallback(async (
     field: 'status' | 'priority' | 'due_date',
     value: unknown,

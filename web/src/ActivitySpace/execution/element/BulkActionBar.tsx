@@ -117,6 +117,9 @@ export function BulkActionBar({
 }: BulkActionBarProps) {
   const [assigneeQuery, setAssigneeQuery] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
+  // A notice belongs to the selection it was about; it leaves with it.
+  const [noticeFor, setNoticeFor] = useState(count);
+  if (noticeFor !== count) { setNoticeFor(count); if (count === 0 && notice) setNotice(null); }
   const [overlay, setOverlay] = useState<Overlay>(null);
   const picker = overlay?.kind === 'picker' ? overlay.mode : null;
   const confirmDelete = overlay?.kind === 'confirmDelete';
@@ -296,11 +299,13 @@ export function BulkActionBar({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-[240px]">
                 <input
+                  autoFocus
                   aria-label="Find a person"
                   placeholder="Find a person"
                   value={assigneeQuery}
                   onChange={(e) => setAssigneeQuery(e.target.value)}
-                  onKeyDown={(e) => e.stopPropagation()}
+                  // Typing stays in the field; arrows and Enter still move through the list.
+                  onKeyDown={(e) => { if (!['ArrowDown', 'ArrowUp', 'Enter', 'Escape', 'Tab'].includes(e.key)) e.stopPropagation(); }}
                   className="mb-1 h-7 w-full rounded-sm bg-muted/30 px-2 text-[13px] outline-none hover:bg-muted/40 focus:bg-muted/60"
                 />
                 <div className="max-h-64 overflow-y-auto">
@@ -310,8 +315,12 @@ export function BulkActionBar({
                       <DropdownMenuItem
                         key={o.id}
                         onSelect={() => void wrap(async () => {
-                          const failed = await onSetAssignee(o.id);
-                          setNotice(failed ? `${failed} could not be handed to ${o.name}: they cannot see where those Elements live. They keep their assignees.` : null);
+                          try {
+                            const failed = await onSetAssignee(o.id);
+                            setNotice(failed ? `${failed} could not be handed to ${o.name} — still selected. They keep their assignees: ${o.name} cannot be assigned where they live.` : null);
+                          } catch (e) {
+                            setNotice(e instanceof Error ? e.message : 'Could not set the assignee.');
+                          }
                         })()}
                         className="gap-2 text-[13px]"
                       >

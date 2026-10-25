@@ -267,7 +267,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   );
 
   // Multi-select + bulk operations (shared with the other element lists).
-  const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
+  const { selectedRowIds, handleRowSelect, clearSelection, selectOnly } = useElementSelection();
   const bulkDelete = async () => {
     for (const id of selectedRowIds) {
       try { await deleteElement(id); } catch (e) { console.error('Delete failed', id, e); }
@@ -345,9 +345,10 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   // Hand the selection to one person (undoable); Elements they cannot take keep their people.
   const assigneeOptions = useMemo(() => popupWorkers.map((w) => ({ id: w.id, name: w.name, hint: w.type === 'ai_agent' ? 'AI' : null })), [popupWorkers]);
   const bulkAssign = async (workerId: string) => {
+    // What could not be handed over stays selected, with the bar saying why.
     const failed = await bulkSetAssignee([...selectedRowIds], workerId, () => onRefresh?.());
-    clearSelection();
-    return failed;
+    selectOnly(failed);
+    return failed.length;
   };
   // Generic bulk field edit (status / priority / due_date) with undo. Captures
   // each element's prior value so Ctrl+Z restores it exactly.

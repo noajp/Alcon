@@ -283,7 +283,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
 
   // Bulk-select rows (checkbox / Shift-range / Cmd-click) — shared hook so
   // the behaviour matches the Domain Elements + My Elements lists.
-  const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
+  const { selectedRowIds, handleRowSelect, clearSelection, selectOnly } = useElementSelection();
 
   // Section "+" — every section belongs to this Object, so `object_id` is
   // fixed; what varies is the band, and the popup opens on that band's value
@@ -377,9 +377,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
   // Hand the selection to one person (undoable); Elements they cannot take keep their people.
   const assigneeOptions = useMemo(() => popupWorkers.map((w) => ({ id: w.id, name: w.name, hint: w.type === 'ai_agent' ? 'AI' : null })), [popupWorkers]);
   const bulkAssign = async (workerId: string) => {
+    // What could not be handed over stays selected, with the bar saying why.
     const failed = await bulkSetAssignee([...selectedRowIds], workerId, () => onRefresh?.());
-    clearSelection();
-    return failed;
+    selectOnly(failed);
+    return failed.length;
   };
   const bulkSetField = async (
     field: 'status' | 'priority' | 'due_date',

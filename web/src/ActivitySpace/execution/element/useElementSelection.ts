@@ -53,6 +53,12 @@ export function useElementSelection() {
     setSelectionAnchor(null);
   };
 
+  /** Keep only these selected — what a bulk action could not do, left in hand. */
+  const selectOnly = (ids: readonly string[]) => {
+    setSelectedRowIds(new Set(ids));
+    setSelectionAnchor(null);
+  };
+
   // Escape clears the whole selection — the standard "get me out" gesture,
   // alongside the bulk bar's ✕ and toggling individual checkboxes. A layer,
   // so the bulk bar's own pickers take the key first while they are open.
@@ -61,5 +67,5 @@ export function useElementSelection() {
     setSelectionAnchor(null);
   });
 
-  return { selectedRowIds, handleRowSelect, clearSelection };
+  return { selectedRowIds, handleRowSelect, clearSelection, selectOnly };
 }
