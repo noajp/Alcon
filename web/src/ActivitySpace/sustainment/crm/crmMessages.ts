@@ -294,6 +294,7 @@ const CRM_MESSAGES: Record<string, Row> = {
   'Set date': ['日付を設定', '날짜 설정', 'Définir une date', 'Fijar fecha'],
   'Show {n} more': ['さらに {n} 件表示', '{n}개 더 보기', 'Afficher {n} de plus', 'Mostrar {n} más'],
   'Stage': ['ステージ', '단계', 'Étape', 'Etapa'],
+  'This Element is not in this Space, or you cannot see this record.': ['この Element はこの Space にないか、この記録を見る権限がありません。', '이 Element가 이 Space에 없거나 이 기록을 볼 수 없습니다.', 'Cet Element n’est pas dans cet Espace, ou vous ne voyez pas cette fiche.', 'Este Element no está en este Espacio o no puedes ver este registro.'],
   'Related work': ['関係する仕事', '관련 작업', 'Travail lié', 'Trabajo relacionado'],
   'next step of {deal}': ['{deal} の次のステップ', '{deal}의 다음 단계', 'prochaine étape de {deal}', 'próximo paso de {deal}'],
   'Unlink {title}': ['{title} のリンクを外す', '{title} 연결 해제', 'Délier {title}', 'Desvincular {title}'],

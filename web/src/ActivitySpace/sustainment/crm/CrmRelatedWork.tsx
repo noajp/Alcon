@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Link2, X } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -27,25 +27,34 @@ export function CrmRelatedWork({ crm, target, onOpenElement }: {
   const links = crm.elementLinks.filter(link =>
     (target.companyId && link.company_id === target.companyId) || (target.contactId && link.contact_id === target.contactId) || (target.dealId && link.deal_id === target.dealId));
   // A company's or contact's deals carry their next steps; those count as its work too.
-  const deals = crm.allDeals.filter(deal => (target.companyId && deal.company_id === target.companyId) || (target.contactId && deal.contact_id === target.contactId));
+  // A contact's deals include those they are involved in, not only as main contact.
+  const involved = new Set(target.contactId ? crm.dealContacts.filter(row => row.contact_id === target.contactId).map(row => row.deal_id) : []);
+  const deals = crm.allDeals.filter(deal => (target.companyId && deal.company_id === target.companyId)
+    || (target.contactId && (deal.contact_id === target.contactId || involved.has(deal.id))));
   type Row = { key: string; linkId: string | null; element: CrmLinkedElement | undefined; via: string | null };
   const candidates: Row[] = [
     ...links.map(link => ({ key: link.id, linkId: link.id, element: crm.linkedElements.find(item => item.id === link.element_id), via: null })),
     ...deals.filter(deal => deal.next_element_id && !links.some(link => link.element_id === deal.next_element_id))
       .map(deal => ({ key: `step:${deal.id}`, linkId: null, element: crm.nextElements.find(item => item.id === deal.next_element_id), via: `D-${deal.number} ${deal.name}` })),
   ];
-  const rows = candidates.filter((row): row is Row & { element: CrmLinkedElement } => !!row.element)
+  // One row per Element: two deals can share a next step, and a step can also be linked.
+  const seen = new Set<string>();
+  const rows = candidates.filter((row): row is Row & { element: CrmLinkedElement } => !!row.element && !seen.has(row.element.id) && !!seen.add(row.element.id))
     .sort((a, b) => Number(DONE.has(a.element.status)) - Number(DONE.has(b.element.status)) || (a.element.due_date ?? '9999').localeCompare(b.element.due_date ?? '9999'));
   const linked = new Set(rows.map(row => row.element.id));
 
+  // The search function is new on every render; the latest one is read at call time.
+  const search = useRef(crm.searchElements);
+  useEffect(() => { search.current = crm.searchElements; });
   useEffect(() => {
     if (!query.trim()) return;
     let live = true;
     const timer = setTimeout(() => {
-      crm.searchElements(query).then(found => { if (live) setResults(found); }).catch(cause => { if (live) setError(cause instanceof Error ? cause.message : String(cause)); });
+      search.current(query).then(found => { if (live) { setResults(found); setError(null); } })
+        .catch(cause => { if (live) setError(cause instanceof Error ? cause.message : String(cause)); });
     }, 200);
     return () => { live = false; clearTimeout(timer); };
-  }, [query, crm]);
+  }, [query]);
 
   const run = (work: Promise<unknown>) => { setError(null); work.catch(cause => setError(cause instanceof Error ? cause.message : t('Could not save. Try again.'))); };
   const choices = query.trim() ? results.filter(item => !linked.has(item.id)) : [];

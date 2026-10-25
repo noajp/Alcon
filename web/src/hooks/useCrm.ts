@@ -322,21 +322,22 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
         company_id: target.companyId ?? null, contact_id: target.contactId ?? null, deal_id: target.dealId ?? null,
       }).select('id').single();
       if (result.error?.code === '23505') return;
+      if (result.error?.code === '42501') throw new Error('This Element is not in this Space, or you cannot see this record.');
       check(result);
     } finally { await invalidate(); }
   };
   const unlinkElement = async (linkId: string) => {
     try { check(await supabase.from('crm_element_links').delete().eq('id', linkId).select('id').single()); } finally { await invalidate(); }
   };
-  /** Elements to link, by title or display ID, among those the reader can see. */
+  /** Elements to link, by title or display ID, among those the reader can see in this Space. */
   const searchElements = async (query: string): Promise<CrmLinkedElement[]> => {
-    const term = query.trim().replace(/[%_,()"\\]/g, ' ').trim();
+    const term = query.trim();
     if (!term) return [];
-    const { data, error } = await supabase.from('elements').select('id,title,status,due_date,display_id')
-      .or(`title.ilike."%${term}%",display_id.ilike."%${term}%"`).order('updated_at', { ascending: false }).limit(20);
+    const { data, error } = await supabase.rpc('crm_search_elements', { p_space: space(), p_query: term });
     if (error) throw new Error(error.message);
     return (data ?? []) as CrmLinkedElement[];
   };
+
 
   /** People on a deal beyond its main contact. A new name becomes a contact
    * at the deal's company. */
