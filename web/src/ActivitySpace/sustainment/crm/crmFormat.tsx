@@ -1,6 +1,6 @@
 'use client';
 
-import type { CrmActivityKind, CrmHealthLevel, CrmStage } from './crmModel';
+import type { CrmActivityKind, CrmDealRole, CrmHealthLevel, CrmStage } from './crmModel';
 import { dayIndex, readChange } from './crmModel';
 
 /** Currency amounts, compact when asked. Unknown codes fall back to "CODE 1,234". */
@@ -75,3 +75,8 @@ export function historyLine(kind: CrmActivityKind, body: string, stages: readonl
   }
   return { label: t(KIND_LABEL[kind]), text: body, quiet: false };
 }
+
+/** A person's part in a deal's decision, as people say it. */
+export const ROLE_LABEL: Record<CrmDealRole, string> = {
+  decision_maker: 'Decision maker', champion: 'Champion', influencer: 'Influencer', blocker: 'Blocker', user: 'User', other: 'Other',
+};

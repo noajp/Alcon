@@ -14,7 +14,7 @@ import { readAllPages } from '@/hooks/readAllPages';
 import {
   buildCrmWorkspace, fieldsFor, measureValue, metricKind, metricValue, normalizeCrmStages, parseActivityLog, resolveStage,
   type CrmActivityRecord, type CrmActivityType, type CrmCompanyRecord, type CrmContactRecord, type CrmDeal,
-  type CrmDealRecord, type CrmFieldRecord, type CrmNextElement, type CrmPerson, type CrmPipelineRecord, type CrmWorkspace,
+  type CrmDealContactRecord, type CrmDealRecord, type CrmDealRole, type CrmFieldRecord, type CrmNextElement, type CrmPerson, type CrmPipelineRecord, type CrmWorkspace,
 } from '@/ActivitySpace/sustainment/crm/crmModel';
 
 const EMPTY: never[] = [];
@@ -76,6 +76,7 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     return (data ?? []) as CrmActivityRecord[];
   } });
   const fields = useQuery({ ...options, queryKey: key('fields'), queryFn: () => all<CrmFieldRecord>('fields', 'crm_fields', spaceId!, 'order_index') });
+  const dealContacts = useQuery({ ...options, queryKey: key('deal-contacts'), queryFn: () => all<CrmDealContactRecord>('deal contacts', 'crm_deal_contacts', spaceId!) });
   const elementIds = useMemo(() => [...new Set((deals.data ?? []).map(deal => deal.next_element_id).filter((id): id is string => !!id))].sort(), [deals.data]);
   const elements = useQuery({
     ...options, enabled: enabled && elementIds.length > 0, queryKey: [...key('elements'), elementIds],
@@ -252,6 +253,21 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     // Clear first: a failed note never leaves the deal half-declined and noted twice on retry.
     await saveDeal(dealId, { renewsOn: null }, { quiet: true });
     await logActivity(dealId, { type: 'note', text: note });
+  };
+
+  /** People on a deal beyond its main contact. A new name becomes a contact
+   * at the deal's company. */
+  const addDealContact = async (dealId: string, contact: { id?: string; name?: string }, role: CrmDealRole) => {
+    const deal = deals.data?.find(item => item.id === dealId);
+    const contactId = contact.id ?? await contactFor(contact.name ?? '', null, deal?.company_id ?? null);
+    try { check(await supabase.from('crm_deal_contacts').insert({ activity_space_id: space(), deal_id: dealId, contact_id: contactId, role }).select('id').single()); }
+    finally { await invalidate(); }
+  };
+  const updateDealContact = async (id: string, patch: { role?: CrmDealRole; note?: string | null }) => {
+    try { check(await supabase.from('crm_deal_contacts').update(patch).eq('id', id).select('id').single()); } finally { await invalidate(); }
+  };
+  const removeDealContact = async (id: string) => {
+    try { check(await supabase.from('crm_deal_contacts').delete().eq('id', id).select('id').single()); } finally { await invalidate(); }
   };
 
   const logActivity = async (dealId: string, entry: { type: CrmActivityType; text: string; date?: string },
@@ -452,11 +468,12 @@ export function useCrm(pipelineId?: string | null, { seed = false }: { seed?: bo
     contacts: contacts.data ?? EMPTY as CrmContactRecord[],
     activities: activities.data ?? EMPTY as CrmActivityRecord[],
     fields: fields.data ?? EMPTY as CrmFieldRecord[],
+    dealContacts: dealContacts.data ?? EMPTY as CrmDealContactRecord[],
     allDeals: deals.data ?? EMPTY as CrmDealRecord[],
     loading: enabled && !workspace && !error,
     error, measureError,
     refetch: invalidate,
-    saveDeal, startRenewal, declineRenewal, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
+    saveDeal, startRenewal, declineRenewal, addDealContact, updateDealContact, removeDealContact, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
     savePipeline, deletePipeline, saveCompany, deleteCompany, saveContact, deleteContact, saveField, deleteField,
     importFromTable,
   };

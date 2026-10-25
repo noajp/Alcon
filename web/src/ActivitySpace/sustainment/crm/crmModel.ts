@@ -142,6 +142,11 @@ export interface CrmActivityRecord {
   id: string; deal_id: string | null; company_id: string | null; contact_id: string | null; kind: CrmActivityKind;
   body: string; occurred_on: string; created_by: string | null; author_name: string | null; created_at: string;
 }
+/** Someone on the buying side of a deal, and their part in the decision. */
+export const DEAL_ROLES = ['decision_maker', 'champion', 'influencer', 'blocker', 'user', 'other'] as const;
+export type CrmDealRole = typeof DEAL_ROLES[number];
+export interface CrmDealContactRecord { id: string; deal_id: string; contact_id: string; role: CrmDealRole; note: string | null; created_at: string }
+
 export interface CrmFieldRecord {
   id: string; entity: 'deal' | 'company' | 'contact'; key: string; label: string;
   type: 'text' | 'number' | 'date' | 'select' | 'checkbox'; options: unknown; order_index: number;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, Check, Copy, Mail, PenLine } from 'lucide-react';
+import { ArrowUpRight, Check, Copy, Mail, PenLine, X } from 'lucide-react';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { TextComposer } from '@/ui/text-composer';
 import { Textarea } from '@/ui/textarea';
@@ -12,15 +12,49 @@ import { CrmIcon } from '@/Function/shared/conceptIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useStrategies } from '@/ActivitySpace/strategy/initiative/strategyData';
 import type { Crm, CrmDealPatch } from '@/hooks/useCrm';
-import { ACTIVITY_TYPES, fieldsFor, LOST_STAGE, shiftDate, stageChange, WON_STAGE, type CrmActivityType, type CrmDeal, type CrmStage } from './crmModel';
+import { ACTIVITY_TYPES, DEAL_ROLES, fieldsFor, LOST_STAGE, shiftDate, stageChange, WON_STAGE, type CrmActivityType, type CrmDeal, type CrmDealRole, type CrmStage } from './crmModel';
 import { aiBrief, aiEmail, useCrmAi, type DealBrief, type DealEmail } from './crmAi';
-import { HealthBadge, historyLine, money, relativeDay } from './crmFormat';
+import { HealthBadge, historyLine, money, relativeDay, ROLE_LABEL } from './crmFormat';
 import { StartRenewal } from './CrmToday';
 import { CrmPicker } from './CrmPicker';
 import { CustomFields, EditableText, Property } from './CrmFields';
 import { CrmRecordPage, RecordSection } from './CrmRecordPage';
 
 const ACTIVITY_LABEL: Record<CrmActivityType, string> = { call: 'Call', email: 'Mail', meeting: 'Meeting', note: 'Memo' };
+
+/** Everyone on the buying side beyond the main contact, with their part in the decision. */
+function DealPeople({ crm, deal, onOpenContact }: { crm: Crm; deal: CrmDeal; onOpenContact: (id: string) => void }) {
+  const { t } = useI18n();
+  const [error, setError] = useState<string | null>(null);
+  const run = (work: Promise<unknown>) => { setError(null); work.catch(cause => setError(cause instanceof Error ? cause.message : t('Could not save. Try again.'))); };
+  const rows = crm.dealContacts.filter(row => row.deal_id === deal.id)
+    .map(row => ({ row, contact: crm.contacts.find(contact => contact.id === row.contact_id) }))
+    .filter((item): item is { row: typeof item.row; contact: NonNullable<typeof item.contact> } => !!item.contact)
+    .sort((a, b) => DEAL_ROLES.indexOf(a.row.role) - DEAL_ROLES.indexOf(b.row.role) || a.contact.name.localeCompare(b.contact.name));
+  const taken = new Set([deal.contactId, ...rows.map(item => item.contact.id)]);
+  // The deal's company first: that is where the buying group usually is.
+  const candidates = crm.contacts.filter(contact => !taken.has(contact.id))
+    .sort((a, b) => Number(b.company_id === deal.companyId) - Number(a.company_id === deal.companyId) || a.name.localeCompare(b.name));
+  const roles = DEAL_ROLES.map(role => ({ id: role, label: t(ROLE_LABEL[role]) }));
+  return <RecordSection title={t('People involved')}>
+    <div className="max-w-xl space-y-1">
+      {rows.map(({ row, contact }) => <div key={row.id} className="group flex items-center gap-2">
+        <button type="button" className="min-w-0 flex-1 truncate rounded-sm px-1.5 py-1 text-left text-[13px] hover:bg-muted/40" onClick={() => onOpenContact(contact.id)}>
+          {contact.name}{contact.title && <span className="text-muted-foreground"> · {contact.title}</span>}
+        </button>
+        <CrmPicker label={t('Role of {name}', { name: contact.name })} value={row.role} clearable={false} options={roles}
+          onChange={role => role && run(crm.updateDealContact(row.id, { role: role as CrmDealRole }))} />
+        <Button variant="ghost" size="icon-xs" aria-label={t('Remove {name} from this deal', { name: contact.name })} onClick={() => run(crm.removeDealContact(row.id))}><X size={12} /></Button>
+      </div>)}
+      <CrmPicker label={t('Add a person')} value={null} placeholder={t('Add a person')}
+        options={candidates.map(contact => ({ id: contact.id, label: contact.name, hint: contact.title ?? crm.companies.find(company => company.id === contact.company_id)?.name ?? null }))}
+        onChange={id => id && run(crm.addDealContact(deal.id, { id }, 'influencer'))}
+        onCreate={name => run(crm.addDealContact(deal.id, { name }, 'influencer'))} />
+      {!rows.length && <p className="px-1.5 text-xs text-muted-foreground">{t('Who decides, who champions it, who could block it — beyond the main contact.')}</p>}
+      {error && <p role="alert" className="px-1.5 text-xs text-[var(--status-danger)]">{t(error)}</p>}
+    </div>
+  </RecordSection>;
+}
 
 function NextStep({ crm, deal }: { crm: Crm; deal: CrmDeal }) {
   const { t, locale } = useI18n();
@@ -215,6 +249,7 @@ export function CrmDealPage({ crm, deal, onBack, onOpenPipeline, onCapture, onOp
     </div>
 
     {open && <NextStep key={deal.id} crm={crm} deal={deal} />}
+    <DealPeople crm={crm} deal={deal} onOpenContact={onOpenContact} />
     {deal.nextElement && onOpenElement && <ButtonAppearanceProvider appearance="inline">
       <Button size="sm" variant="ghost" onClick={() => onOpenElement(deal.nextElement!.id)}><ArrowUpRight size={12} />{t('Open Element')} {deal.nextElement.display_id ?? ''}</Button>
     </ButtonAppearanceProvider>}
