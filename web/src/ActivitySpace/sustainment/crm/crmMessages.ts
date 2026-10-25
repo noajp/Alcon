@@ -296,6 +296,7 @@ const CRM_MESSAGES: Record<string, Row> = {
   'Set date': ['日付を設定', '날짜 설정', 'Définir une date', 'Fijar fecha'],
   'Show {n} more': ['さらに {n} 件表示', '{n}개 더 보기', 'Afficher {n} de plus', 'Mostrar {n} más'],
   'Stage': ['ステージ', '단계', 'Étape', 'Etapa'],
+  'Change': ['変更', '변경', 'Modification', 'Cambio'],
   'Stage name': ['ステージ名', '단계 이름', 'Nom de l’étape', 'Nombre de la etapa'],
   'Stages': ['ステージ', '단계', 'Étapes', 'Etapas'],
   'Start by capturing a deal you are working on. Paste the notes from your last call — Alcon fills in the account, amount, dates and next step for you to confirm.': [

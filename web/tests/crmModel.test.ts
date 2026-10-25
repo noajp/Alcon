@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  accountsOf, buildCrmWorkspace, fieldsFor, measureValue, readUnit, fieldKey, fieldOptions, forecastFor, inList, metricValue, normalizeCrmStages, parseActivityLog,
+  accountsOf, buildCrmWorkspace, fieldsFor, measureValue, readChange, readUnit, fieldKey, fieldOptions, forecastFor, inList, metricValue, normalizeCrmStages, parseActivityLog,
   pipelineColumns, searchDeals, stageChange, todayQueue, upcoming, DEFAULT_CRM_STAGES,
   type CrmDealRecord, type CrmNextElement, type CrmPipelineRecord, type CrmRecords,
 } from '@/ActivitySpace/sustainment/crm/crmModel';
@@ -191,5 +191,21 @@ describe('CRM fields and import', () => {
     expect(parseActivityLog('2026-10-02 · call · Budget\ntyped by hand')).toEqual([
       { date: '2026-10-02', type: 'call', text: 'Budget' }, { date: null, type: 'note', text: 'typed by hand' },
     ]);
+  });
+});
+
+describe('readChange', () => {
+  it('reads an amount revision with its currency', () => {
+    expect(readChange('amount: 48000000 JPY → 45600000 JPY')).toEqual({
+      field: 'amount', from: { value: '48000000', currency: 'JPY' }, to: { value: '45600000', currency: 'JPY' },
+    });
+  });
+  it('reads a missing side as null', () => {
+    expect(readChange('close_date: — → 2026-12-15')).toEqual({ field: 'close_date', from: null, to: { value: '2026-12-15', currency: null } });
+    expect(readChange('probability: 40 → —')).toEqual({ field: 'probability', from: { value: '40', currency: null }, to: null });
+  });
+  it('ignores lines that are not revisions', () => {
+    expect(readChange('lead → qualified')).toBeNull();
+    expect(readChange('name: a → b')).toBeNull();
   });
 });
