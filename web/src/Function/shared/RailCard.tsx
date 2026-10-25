@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 
 // A right-rail island — and, through WidgetFrame, the frame every rail widget
 // wears. The rail is the concept's facts beside its document (Properties,
@@ -36,11 +36,9 @@ export function RailCard({
         >
           {icon}
           <span className="truncate">{title}</span>
-          <ChevronDown
-            size={12}
-            className={`shrink-0 transition-[transform,opacity] ${
-              collapsed ? '-rotate-90 opacity-100' : 'opacity-0 group-hover/rail:opacity-100'
-            }`}
+          <DisclosureTriangle
+            open={!collapsed}
+            className={collapsed ? 'opacity-100' : 'opacity-0 group-hover/rail:opacity-100'}
           />
         </button>
         <div className="flex-1" />

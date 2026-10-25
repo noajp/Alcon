@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
+import { MoreHorizontal } from 'lucide-react';
 import { VIEW_REGISTRY } from '@/shell/viewRegistry';
 import { SidebarRow, SidebarRowAction } from '@/Function/shared/SidebarRow';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -45,7 +46,7 @@ export function StrategyNavigation({ visions, activeVisionId, activeView, onSele
           actions={<>
             <SidebarRowAction label={t(expanded ? 'Collapse {name}' : 'Expand {name}', { name: vision.name })} aria-expanded={expanded}
               onClick={() => setFolded((prev) => { const n = new Set(prev); if (n.has(vision.id)) n.delete(vision.id); else n.add(vision.id); return n; })}>
-              {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              <DisclosureTriangle open={expanded} />
             </SidebarRowAction>
             <SidebarRowAction label={`${vision.name} — ${t('Vision settings')}`} onClick={() => onOpenSettings(vision.id)}><MoreHorizontal size={12} /></SidebarRowAction>
           </>} />

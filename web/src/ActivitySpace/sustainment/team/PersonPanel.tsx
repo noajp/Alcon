@@ -1,7 +1,8 @@
 'use client';
 
 import { useId, useMemo, useState } from 'react';
-import { Bot, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
+import { Bot, X } from 'lucide-react';
 import { ReachHint, WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { formatElementDate, toDateOnlyString } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -92,7 +93,7 @@ function SkillRow({ skill, entry, evidenceIds, skills, onOpenElement, onError }:
         </select>
         : <span className={`${FONT.sm} text-muted-foreground px-2`}>{t(skillLevelLabel(skill.level))}</span>}
       <Button variant="ghost" size="sm" aria-expanded={open} aria-controls={listId} onClick={() => setOpen((value) => !value)}>
-        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <DisclosureTriangle open={open} />
         {t('{n} evidence', { n: evidenceIds.length })}
       </Button>
       {entry.canManage && <Button variant="ghost" size="icon-sm" aria-label={t('Remove {name}', { name: skill.name })} disabled={busy}

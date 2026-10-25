@@ -1,7 +1,8 @@
 'use client';
 
 import type { ComponentProps, ReactNode } from 'react';
-import { ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
+import { MoreHorizontal } from 'lucide-react';
 import { VIEW_REGISTRY } from '@/shell/viewRegistry';
 import { SidebarRow, SidebarRowAction } from '@/Function/shared/SidebarRow';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -17,7 +18,7 @@ export function DomainNavigationRow({ name, mark, active, expanded, activeView, 
       onClick={onOpen} buttonProps={dragProps}
       actions={<>
         <SidebarRowAction label={t(expanded ? 'Collapse {name}' : 'Expand {name}', { name })} aria-expanded={expanded} onClick={onToggle}>
-          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          <DisclosureTriangle open={expanded} />
         </SidebarRowAction>
         {onSettings
           ? <SidebarRowAction label={`${name} settings`} onClick={onSettings}><MoreHorizontal size={12} /></SidebarRowAction>

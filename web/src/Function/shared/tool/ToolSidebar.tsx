@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, type ComponentType, type ReactNode } from 'react';
-import { Check, ChevronDown, ChevronRight } from 'lucide-react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
+import { Check, ChevronDown } from 'lucide-react';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
 import { SidebarRow, SidebarRowAction, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
@@ -59,13 +60,13 @@ function NavRow({ item, nested = false }: { item: ToolNavItem; nested?: boolean 
     <SidebarRow size={nested ? 'sm' : 'md'} active={item.active} icon={Icon && <Icon size={nested ? 14 : 16} />} label={item.label} title={item.title}
       meta={<Count value={item.count} />} onClick={item.onClick}
       actions={hasChildren && !nested ? <SidebarRowAction label={t(open ? 'Collapse' : 'Expand')} aria-expanded={open} onClick={() => setOpen(v => !v)}>
-        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <DisclosureTriangle open={open} />
       </SidebarRowAction> : undefined} />
     {open && hasChildren && <div className="mt-0.5 pl-7">
       {item.children?.map(child => <NavRow key={child.id} item={child} nested />)}
       {!!item.more?.length && <>
         <SidebarRow size="sm" label={<span className="text-muted-foreground">{t(moreOpen ? 'Fewer' : 'More')}</span>}
-          icon={moreOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />} onClick={() => setMoreOpen(v => !v)} />
+          icon={<DisclosureTriangle open={moreOpen} />} onClick={() => setMoreOpen(v => !v)} />
         {moreOpen && item.more.map(child => <NavRow key={child.id} item={child} nested />)}
       </>}
     </div>}

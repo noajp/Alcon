@@ -1,11 +1,12 @@
 'use client';
 
 import { parseDateOnly, toDateOnlyString as fmtDateOnly } from '@/Function/shared/dateUtils';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import React, { useState, useMemo, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { AlconObjectWithChildren, Phase, ObjectMilestone } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
-import { ChevronRight, ChevronDown, CalendarDays, ZoomIn, ZoomOut } from 'lucide-react';
+import { CalendarDays, ZoomIn, ZoomOut } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
@@ -613,7 +614,7 @@ export function GanttView({
                       </span>
                       <span className="text-[12px] font-medium text-foreground truncate flex-1">{name}</span>
                       <span className="w-3.5 h-3.5 flex items-center justify-center text-muted-foreground/70 group-hover:text-foreground transition-colors">
-                        {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                        <DisclosureTriangle open={!isCollapsed} />
                       </span>
                     </button>
                   )}
