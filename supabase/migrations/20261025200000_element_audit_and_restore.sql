@@ -57,6 +57,11 @@ begin
   -- Readable by whoever could see it where it lived, its owner, or who deleted it.
   create policy element_deletions_read on public.element_deletions for select to authenticated
     using (deleted_by = auth.uid() or owner_id = auth.uid() or (object_id is not null and public.user_can_see_object(object_id)));
+  -- The list shows what was deleted, when and by whom; the snapshot itself —
+  -- which holds rows its readers may not all have seen — is read only by restore.
+  revoke all on public.element_deletions from anon, authenticated;
+  grant select (id, element_id, object_id, owner_id, title, display_id, deleted_by, deleted_by_name, deleted_at)
+    on public.element_deletions to authenticated;
 
   create or replace function public.snapshot_element_before_delete() returns trigger
   language plpgsql security definer set search_path = public as $fn$
@@ -100,21 +105,32 @@ begin
     v_table text;
     v_name text;
     v_row jsonb;
+    v_home boolean;
   begin
     select * into v_del from public.element_deletions where id = p_deletion;
-    if not found or auth.uid() is null
-       or not (v_del.deleted_by = auth.uid() or v_del.owner_id = auth.uid()
-               or (v_del.object_id is not null and public.user_can_see_object(v_del.object_id))) then
+    if not found or auth.uid() is null then
+      raise exception 'This deleted Element is not yours to restore' using errcode = '42501';
+    end if;
+    v_home := v_del.object_id is not null and exists (select 1 from public.objects where id = v_del.object_id);
+    -- Back into its Object: whoever can see that Object now. Its Object gone
+    -- (or none): whoever deleted it or owned it, as their own Element.
+    if (v_home and not public.user_can_see_object(v_del.object_id))
+       or (not v_home and not (coalesce(v_del.deleted_by = auth.uid(), false) or coalesce(v_del.owner_id = auth.uid(), false))) then
       raise exception 'This deleted Element is not yours to restore' using errcode = '42501';
     end if;
     if exists (select 1 from public.elements where id = v_del.element_id) then
       raise exception 'This Element is already back' using errcode = '23505';
     end if;
-    if v_del.object_id is not null and not exists (select 1 from public.objects where id = v_del.object_id) then
-      raise exception 'Its Object no longer exists, so it cannot go back there' using errcode = '23503';
-    end if;
     perform set_config('alcon.restoring', 'on', true);
     v_el := jsonb_populate_record(null::public.elements, v_del.snapshot->'element');
+    if not v_home then
+      v_el.object_id := null;
+      v_el.owner_id := auth.uid();
+    end if;
+    -- Its number was given to a newer Element meanwhile: it takes the next one.
+    if exists (select 1 from public.elements e where e.object_id is not distinct from v_el.object_id and e.seq_number = v_el.seq_number) then
+      v_el.seq_number := null;
+    end if;
     insert into public.elements select v_el.*;
     foreach v_table in array array['subelements', 'element_objects', 'element_assignees', 'element_comments', 'element_reactions',
                                    'element_activity', 'element_approvals', 'custom_column_values', 'element_edges', 'crm_element_links'] loop
@@ -181,7 +197,7 @@ begin
     select nullif(btrim(p.display_name), '') into v_author from public.profiles p where p.id = auth.uid();
     foreach v_row slice 1 in array v_rows loop
       insert into public.element_activity (element_id, kind, detail, author, actor_id, created_at)
-      values (new.id, v_row[1], v_row[2], coalesce(v_author, new.claimed_by, 'System'), auth.uid(), clock_timestamp());
+      values (new.id, v_row[1], v_row[2], coalesce(v_author, 'System'), auth.uid(), clock_timestamp());
     end loop;
     return new;
   end $fn$;
@@ -376,5 +392,39 @@ begin
     end if;
     return new;
   end $fn$;
+
+  -- A restored history row keeps who wrote it.
+  create or replace function public.stamp_element_activity() returns trigger
+  language plpgsql security definer set search_path = public as $fn$
+    declare
+      v_actor uuid := auth.uid();
+      v_name text;
+    begin
+      if public.alcon_restoring() then return new; end if;
+      if v_actor is not null then
+        new.actor_id := v_actor;
+        select p.display_name into v_name from profiles p where p.id = v_actor;
+        if nullif(v_name, '') is not null then
+          new.author := v_name;
+        end if;
+      end if;
+      return new;
+    end
+  $fn$;
+
+  -- A restored comment does not revive the lease of the session that wrote it.
+  create or replace function public.extend_element_lease_on_comment() returns trigger
+  language plpgsql security definer set search_path = public as $fn$
+    begin
+      if new.holder is null or public.alcon_restoring() then
+        return new;
+      end if;
+      update elements
+         set claim_expires_at = now() + element_lease_ttl()
+       where id = new.element_id
+         and claimed_by = new.holder;
+      return new;
+    end
+  $fn$;
   $ddl$;
 end $$;

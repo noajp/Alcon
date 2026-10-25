@@ -10,9 +10,12 @@ import { fetchElementDeletions, restoreElement, type ElementDeletion } from '@/A
  * history (element_deletions); restoring brings back the same Element — same
  * id, same display id — with its people, comments and history.
  */
-export function DeletedElementsDialog({ objectId, objectName, onClose, onRestored }: {
-  objectId: string;
-  objectName: string;
+export function DeletedElementsDialog({ objectId, objectName, mine, onClose, onRestored }: {
+  /** Deleted from this Object… */
+  objectId?: string;
+  objectName?: string;
+  /** …or everything this user deleted or owned, Objects since deleted included. */
+  mine?: string;
   onClose: () => void;
   onRestored: () => void;
 }) {
@@ -22,11 +25,11 @@ export function DeletedElementsDialog({ objectId, objectName, onClose, onRestore
 
   useEffect(() => {
     let live = true;
-    fetchElementDeletions(objectId)
+    fetchElementDeletions(objectId ? { objectId } : { mine: mine ?? '' })
       .then((found) => { if (live) setRows(found); })
       .catch((e) => { if (live) setError(e instanceof Error ? e.message : 'Could not read deleted Elements.'); });
     return () => { live = false; };
-  }, [objectId]);
+  }, [objectId, mine]);
 
   const restore = async (row: ElementDeletion) => {
     setBusy(row.id); setError(null);
@@ -43,9 +46,9 @@ export function DeletedElementsDialog({ objectId, objectName, onClose, onRestore
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Deleted from {objectName}</DialogTitle>
+          <DialogTitle>{objectName ? `Deleted from ${objectName}` : 'Deleted Elements'}</DialogTitle>
         </DialogHeader>
-        <p className="text-[12px] text-muted-foreground">Deleted Elements are kept with their history. Restoring brings the same Element back, with its people, comments and history.</p>
+        <p className="text-[12px] text-muted-foreground">Deleted Elements are kept with their history. Restoring brings the same Element back, with its people, comments and history. One whose Object no longer exists comes back as your own Element.</p>
         {rows === null && !error && <p className="py-4 text-[13px] text-muted-foreground">Reading…</p>}
         {rows !== null && rows.length === 0 && <p className="py-4 text-[13px] text-muted-foreground">Nothing has been deleted here.</p>}
         {rows !== null && rows.length > 0 && (

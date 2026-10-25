@@ -774,10 +774,10 @@ export async function setElementIsApproval(elementId: string, isApproval: boolea
 // ============================================
 export interface ElementDeletion { id: string; element_id: string; object_id: string | null; title: string; display_id: string | null; deleted_by_name: string | null; deleted_at: string }
 
-/** Elements deleted from an Object (or, with no Object, the caller's own), newest first. */
-export async function fetchElementDeletions(objectId: string | null, limit = 50): Promise<ElementDeletion[]> {
+/** Elements deleted from an Object, or — with `mine` — everything the caller deleted or owned, newest first. */
+export async function fetchElementDeletions(scope: { objectId: string } | { mine: string }, limit = 100): Promise<ElementDeletion[]> {
   let query = supabase.from('element_deletions').select('id, element_id, object_id, title, display_id, deleted_by_name, deleted_at').order('deleted_at', { ascending: false }).limit(limit);
-  query = objectId ? query.eq('object_id', objectId) : query.is('object_id', null);
+  query = 'objectId' in scope ? query.eq('object_id', scope.objectId) : query.or(`deleted_by.eq.${scope.mine},owner_id.eq.${scope.mine}`);
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as ElementDeletion[];

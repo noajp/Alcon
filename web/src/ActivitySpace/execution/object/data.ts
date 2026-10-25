@@ -333,7 +333,6 @@ export async function deleteObject(id: string): Promise<void> {
         await supabase.from('element_objects').delete()
           .eq('element_id', rel.element_id).eq('object_id', id);
       } else {
-        await supabase.from('subelements').delete().eq('element_id', rel.element_id);
         await supabase.from('elements').delete().eq('id', rel.element_id);
       }
     }

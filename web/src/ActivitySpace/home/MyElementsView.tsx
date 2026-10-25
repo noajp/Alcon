@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { fetchMyElements, type MyElementsData } from '@/ActivitySpace/home/myElementsData';
 import { useAuthContext } from '@/providers/AuthProvider';
 import {
@@ -18,6 +18,7 @@ import {
 import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
+import { DeletedElementsDialog } from '@/ActivitySpace/execution/object/DeletedElementsDialog';
 import { bulkSetAssignee } from '@/ActivitySpace/execution/element/bulkAssign';
 import type {
   Worker,
@@ -101,6 +102,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
   }, [qc, queryKey]);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [deletedOpen, setDeletedOpen] = useState(false);
   const [controls, setControls] = useState<ListControlsState>(() => loadState('my-elements'));
   useEffect(() => { saveState('my-elements', controls); }, [controls]);
 
@@ -316,6 +318,17 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
           onReset={() => setControls(DEFAULT_STATE)}
           sortColumnsStorageKey="my-elements"
         />
+        {userId && (
+          <button
+            type="button"
+            onClick={() => setDeletedOpen(true)}
+            className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+            title="Deleted Elements"
+            aria-label="Deleted Elements"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setQuickAddOpen(true)}
@@ -324,6 +337,9 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
         >
           <Plus size={14} />
         </button>
+        {deletedOpen && userId && (
+          <DeletedElementsDialog mine={userId} onClose={() => setDeletedOpen(false)} onRestored={() => { void fetchMine(); void onRefresh?.(); }} />
+        )}
       </div>
 
       {loading ? (
