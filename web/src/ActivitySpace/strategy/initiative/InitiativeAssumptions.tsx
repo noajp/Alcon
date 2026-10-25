@@ -74,8 +74,8 @@ import { WidgetHeaderAction } from '@/Function/widget';
  *  is the same sentence. */
 const FALSIFIES = 'tests' as const;
 
-/** The two target kinds this surface writes. A `domain` binding is legal in the
- *  table and never written here. */
+/** The target kinds this surface writes: Elements, Workers and CRM deals. A
+ *  `domain` binding is legal in the table and never written here. */
 const WATCHABLE = new Set(['element', 'worker', 'crm_deal']);
 
 export function InitiativeAssumptions({
@@ -143,7 +143,10 @@ export function InitiativeAssumptions({
   );
 
   // Deals, as the CRM reads them for this reader: health and renewal included.
-  const crm = useCrm();
+  // Read only when a deal is watched or the reader can add one.
+  const watchesDeals = bindings.some((b) => b.target_type === 'crm_deal');
+  const crm = useCrm(null, { active: watchesDeals || initiative.canEdit });
+  const crmRead: DealWatchInput['read'] = crm.error ? 'failed' : crm.loading && crm.pipelines.length > 0 ? 'loading' : 'ok';
   const byDeal = useMemo(
     () => new Map(crm.workspaces.flatMap((workspace) => workspace.deals).map((deal) => [deal.id, deal])),
     [crm.workspaces],
@@ -171,11 +174,11 @@ export function InitiativeAssumptions({
             ),
           deals: mine
             .filter((b) => b.target_type === 'crm_deal')
-            .map((b) => toDealWatch(b, byDeal.get(b.target_id))),
+            .map((b) => toDealWatch(b, byDeal, crmRead)),
         };
       });
     return orderAssumptions(rows, new Date());
-  }, [data?.subs, bindings, removed, byElement, byWorker, availability, byDeal]);
+  }, [data?.subs, bindings, removed, byElement, byWorker, availability, byDeal, crmRead]);
 
   const shakenCount = countShaken(assumptions);
 
@@ -420,16 +423,23 @@ interface WatchSource {
 }
 
 /** A deal the reader cannot see keeps its row and reports nothing, like a
- *  Worker off the roster: the link is the record's, the deal is not theirs. */
-function toDealWatch(binding: IntentBinding, deal: CrmDeal | undefined): DealWatchInput {
-  if (!deal) {
-    return { bindingId: binding.id, dealId: binding.target_id, label: 'Deal you cannot see', visible: false, outcome: null, atRisk: false, closeDate: null, renewalOverdue: false };
+ *  Worker off the roster: the link is the record's, the deal is not theirs.
+ *  While the CRM is still loading, or failed, the row says so instead. A won
+ *  deal that has been renewed is read through its renewal: "the customer
+ *  renews" holds or fails with the renewal deal, not the old contract. */
+function toDealWatch(binding: IntentBinding, byDeal: ReadonlyMap<string, CrmDeal>, read: DealWatchInput['read']): DealWatchInput {
+  const bound = byDeal.get(binding.target_id);
+  if (!bound) {
+    const label = read === 'loading' ? 'Reading the deal…' : read === 'failed' ? 'Could not read the CRM' : 'Deal you cannot see';
+    return { bindingId: binding.id, dealId: binding.target_id, label, read: read === 'ok' ? 'hidden' : read, outcome: null, atRisk: false, closeDate: null, renewalOverdue: false };
   }
+  let deal = bound;
+  for (let hops = 0; hops < 10 && deal.outcome === 'won' && deal.renewedBy && byDeal.has(deal.renewedBy); hops += 1) deal = byDeal.get(deal.renewedBy)!;
   return {
     bindingId: binding.id,
-    dealId: deal.id,
-    label: `D-${deal.number} ${deal.name}`,
-    visible: true,
+    dealId: bound.id,
+    label: deal === bound ? `D-${bound.number} ${bound.name}` : `D-${bound.number} ${bound.name} → D-${deal.number}`,
+    read: 'ok',
     outcome: deal.outcome,
     atRisk: deal.health.level === 'risk',
     closeDate: deal.closeDate,
@@ -612,7 +622,7 @@ function AssumptionRow({
             empty={
               scopeError
                 ? 'Could not read this Initiative’s Elements.'
-                : 'Nothing left to watch — link Objects with work in them, or add Workers.'
+                : 'Nothing left to watch — link Objects with work in them, add Workers, or add deals in the CRM.'
             }
           />
         )}

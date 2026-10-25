@@ -115,13 +115,14 @@ export interface WorkerWatch extends WorkerWatchInput {
 }
 
 /** A CRM deal bound to an assumption whose subject is a customer or a
- *  counterpart: "the large customer renews". Read with the reader's rights —
- *  `visible` is false when the deal is hidden from them. */
+ *  counterpart: "the large customer renews". Read with the reader's rights.
+ *  `read` says whether the deal could be read: not yet, not at all (the CRM
+ *  failed), or not by this reader — none of which is "fine". */
 export interface DealWatchInput {
   bindingId: string;
   dealId: string;
   label: string;
-  visible: boolean;
+  read: 'ok' | 'loading' | 'failed' | 'hidden';
   outcome: 'open' | 'won' | 'lost' | null;
   /** The CRM's own reading of the deal. */
   atRisk: boolean;
@@ -250,7 +251,7 @@ export function evaluateWorkerWatch(input: WorkerWatchInput, now: Date): WorkerW
  * off the roster does.
  */
 export function evaluateDealWatch(input: DealWatchInput, now: Date): DealWatch {
-  if (!input.visible) return { ...input, trouble: null };
+  if (input.read !== 'ok') return { ...input, trouble: null };
   const today = toDateOnlyString(now);
   const trouble = input.outcome === 'lost' ? 'lost'
     : input.renewalOverdue ? 'renewal overdue'

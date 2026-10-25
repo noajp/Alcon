@@ -479,7 +479,7 @@ describe('orderAssumptions — shaken first', () => {
 describe('deal watches', () => {
   const now = new Date(2026, 9, 25);
   const deal = (values: Partial<DealWatchInput> = {}): DealWatchInput => ({
-    bindingId: 'b', dealId: 'd', label: 'D-1 Renewal X', visible: true, outcome: 'open', atRisk: false, closeDate: '2026-11-30', renewalOverdue: false, ...values,
+    bindingId: 'b', dealId: 'd', label: 'D-1 Renewal X', read: 'ok', outcome: 'open', atRisk: false, closeDate: '2026-11-30', renewalOverdue: false, ...values,
   });
 
   it('reads a lost deal, a late renewal, a deal at risk and a passed close date as trouble', () => {
@@ -491,7 +491,9 @@ describe('deal watches', () => {
   it('a healthy open deal and a won deal are fine; a hidden one says nothing', () => {
     expect(evaluateDealWatch(deal(), now).trouble).toBeNull();
     expect(evaluateDealWatch(deal({ outcome: 'won', closeDate: '2026-01-01' }), now).trouble).toBeNull();
-    expect(evaluateDealWatch(deal({ visible: false, outcome: 'lost' }), now).trouble).toBeNull();
+    expect(evaluateDealWatch(deal({ read: 'hidden', outcome: 'lost' }), now).trouble).toBeNull();
+    expect(evaluateDealWatch(deal({ read: 'loading', outcome: 'lost' }), now).trouble).toBeNull();
+    expect(evaluateDealWatch(deal({ read: 'failed', outcome: 'lost' }), now).trouble).toBeNull();
   });
   it('shakes the assumption and counts as watched', () => {
     const shaken = evaluateAssumption({ id: 'a', title: 'X renews', cost: null, notedBy: null, notedAt: null, orderIndex: 0, watches: [], workers: [], deals: [deal({ outcome: 'lost' })] }, now);
