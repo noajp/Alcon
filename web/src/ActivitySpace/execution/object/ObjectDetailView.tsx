@@ -16,6 +16,7 @@ import {
 import type { ObjectTabType } from '@/types/database';
 import type { NavigationState } from '@/types/navigation';
 import { TabBar } from '@/shell/TabBar';
+import { bulkSetAssignee } from '@/ActivitySpace/execution/element/bulkAssign';
 import { CalendarView } from '@/ActivitySpace/sustainment/calendar/CalendarView';
 import { SummaryView } from '@/ActivitySpace/execution/object/summary/SummaryView';
 import { OverviewView } from '@/ActivitySpace/execution/object/overview/OverviewView';
@@ -373,6 +374,13 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
       });
     }
   };
+  // Hand the selection to one person (undoable); Elements they cannot take keep their people.
+  const assigneeOptions = useMemo(() => popupWorkers.map((w) => ({ id: w.id, name: w.name, hint: w.type === 'ai_agent' ? 'AI' : null })), [popupWorkers]);
+  const bulkAssign = async (workerId: string) => {
+    const failed = await bulkSetAssignee([...selectedRowIds], workerId, () => onRefresh?.());
+    clearSelection();
+    return failed;
+  };
   const bulkSetField = async (
     field: 'status' | 'priority' | 'due_date',
     value: ElementWithDetails['status'] | ElementWithDetails['priority'] | string | null,
@@ -653,6 +661,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         onSetStatus={(s) => bulkSetField('status', s, `Set status of ${selectedRowIds.size} Elements`)}
         onSetPriority={(p) => bulkSetField('priority', p, `Set priority of ${selectedRowIds.size} Elements`)}
         onSetDueDate={(d) => bulkSetField('due_date', d, `Set due date of ${selectedRowIds.size} Elements`)}
+        onSetAssignee={(workerId) => bulkAssign(workerId)}
+        assigneeOptions={assigneeOptions}
         onClear={clearSelection}
       />
 

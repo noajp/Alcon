@@ -13,6 +13,7 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
 import { pushUndo } from '@/ActivitySpace/execution/element/bulkUndo';
+import { bulkSetAssignee } from '@/ActivitySpace/execution/element/bulkAssign';
 import { ObjectIcon } from '@/shell/icons';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { EmptyState } from '@/Function/shared/EmptyState';
@@ -340,6 +341,13 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
         },
       });
     }
+  };
+  // Hand the selection to one person (undoable); Elements they cannot take keep their people.
+  const assigneeOptions = useMemo(() => popupWorkers.map((w) => ({ id: w.id, name: w.name, hint: w.type === 'ai_agent' ? 'AI' : null })), [popupWorkers]);
+  const bulkAssign = async (workerId: string) => {
+    const failed = await bulkSetAssignee([...selectedRowIds], workerId, () => onRefresh?.());
+    clearSelection();
+    return failed;
   };
   // Generic bulk field edit (status / priority / due_date) with undo. Captures
   // each element's prior value so Ctrl+Z restores it exactly.
@@ -674,6 +682,8 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
         onSetStatus={(s) => bulkSetField('status', s, `Set status of ${selectedRowIds.size} Elements`)}
         onSetPriority={(p) => bulkSetField('priority', p, `Set priority of ${selectedRowIds.size} Elements`)}
         onSetDueDate={(d) => bulkSetField('due_date', d, `Set due date of ${selectedRowIds.size} Elements`)}
+        onSetAssignee={(workerId) => bulkAssign(workerId)}
+        assigneeOptions={assigneeOptions}
         onClear={clearSelection}
       />
     </div>
