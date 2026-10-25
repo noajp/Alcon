@@ -22,11 +22,11 @@ begin
     if new.own_domain_id is null or (tg_op = 'UPDATE' and new.own_domain_id is not distinct from old.own_domain_id) then
       return new;
     end if;
-    if not exists (select 1 from public.domains d where d.id = new.own_domain_id and d.activity_space_id = new.activity_space_id) then
-      raise exception 'The Domain must be in this Space' using errcode = '23514';
-    end if;
-    if auth.uid() is not null and not public.user_can_see_domain(new.own_domain_id) then
-      raise exception 'This Domain is not visible to you' using errcode = '42501';
+    -- One answer for "not in this Space" and "not yours to see": the error
+    -- never tells whether a Domain exists.
+    if not exists (select 1 from public.domains d where d.id = new.own_domain_id and d.activity_space_id = new.activity_space_id)
+       or (auth.uid() is not null and not public.user_can_see_domain(new.own_domain_id)) then
+      raise exception 'Choose a Domain of this Space that you can see' using errcode = '42501';
     end if;
     return new;
   end $fn$;

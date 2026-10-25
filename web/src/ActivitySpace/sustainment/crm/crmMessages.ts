@@ -297,6 +297,7 @@ const CRM_MESSAGES: Record<string, Row> = {
   'Is our Domain': ['自組織の Domain', '우리 Domain', 'Notre Domain', 'Nuestro Domain'],
   'An outside organisation': ['外部の組織', '외부 조직', 'Une organisation externe', 'Una organización externa'],
   'Open Domain': ['Domain を開く', 'Domain 열기', 'Ouvrir le Domain', 'Abrir Domain'],
+  'A Domain you cannot see': ['見る権限のない Domain', '볼 수 없는 Domain', 'Un Domain que vous ne voyez pas', 'Un Domain que no puedes ver'],
   'This Element is not in this Space, or you cannot see this record.': ['この Element はこの Space にないか、この記録を見る権限がありません。', '이 Element가 이 Space에 없거나 이 기록을 볼 수 없습니다.', 'Cet Element n’est pas dans cet Espace, ou vous ne voyez pas cette fiche.', 'Este Element no está en este Espacio o no puedes ver este registro.'],
   'Related work': ['関係する仕事', '관련 작업', 'Travail lié', 'Trabajo relacionado'],
   'next step of {deal}': ['{deal} の次のステップ', '{deal}의 다음 단계', 'prochaine étape de {deal}', 'próximo paso de {deal}'],

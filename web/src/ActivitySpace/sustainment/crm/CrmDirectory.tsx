@@ -166,8 +166,11 @@ export function CrmCompanyPage({ crm, companyId, onBack, onOpenCompanies, onOpen
       {/* The same body as one of our own Domains: a sister company, a department billed internally. */}
       <Property label={t('Is our Domain')}>
         <div className="flex items-center gap-1">
-          <CrmPicker label={t('Is our Domain')} value={company.own_domain_id ?? null} placeholder={t('An outside organisation')}
-            options={crm.domains.map(domain => ({ id: domain.id, label: domain.name }))} onChange={id => void save({ own_domain_id: id })} />
+          {/* A Domain this reader cannot see is named as such, and left alone. */}
+          {company.own_domain_id && !crm.domains.some(domain => domain.id === company.own_domain_id)
+            ? <span className="px-1.5 text-[13px] text-muted-foreground">{t('A Domain you cannot see')}</span>
+            : <CrmPicker label={t('Is our Domain')} value={company.own_domain_id ?? null} placeholder={t('An outside organisation')}
+              options={crm.domains.map(domain => ({ id: domain.id, label: domain.name }))} onChange={id => void save({ own_domain_id: id })} />}
           {company.own_domain_id && onOpenDomain && crm.domains.some(domain => domain.id === company.own_domain_id) &&
             <Button variant="ghost" size="icon-xs" aria-label={t('Open Domain')} onClick={() => onOpenDomain(company.own_domain_id!)}><ArrowUpRight size={12} /></Button>}
         </div>
