@@ -1,0 +1,10 @@
+[
+  { "folder": "inter", "package": "@fontsource-variable/inter", "family": "Inter", "kind": "sans" },
+  { "folder": "noto-sans-jp", "package": "@fontsource-variable/noto-sans-jp", "family": "Noto Sans JP", "kind": "sans" },
+  { "folder": "noto-serif-jp", "package": "@fontsource-variable/noto-serif-jp", "family": "Noto Serif JP", "kind": "serif" },
+  { "folder": "dm-sans", "package": "@fontsource-variable/dm-sans", "family": "DM Sans", "kind": "sans" },
+  { "folder": "space-grotesk", "package": "@fontsource-variable/space-grotesk", "family": "Space Grotesk", "kind": "sans" },
+  { "folder": "playfair-display", "package": "@fontsource-variable/playfair-display", "family": "Playfair Display", "kind": "serif" },
+  { "folder": "source-serif-4", "package": "@fontsource-variable/source-serif-4", "family": "Source Serif 4", "kind": "serif" },
+  { "folder": "jetbrains-mono", "package": "@fontsource-variable/jetbrains-mono", "family": "JetBrains Mono", "kind": "mono" }
+]
