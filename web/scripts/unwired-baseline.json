@@ -4,5 +4,7 @@
     "src/Function/widget/widgets/": "ウィジェット本体。WIDGET_REGISTRY の load() が動的 import で解決するのが設計そのもの（定義がモジュール名を持つことでコード分割が既定になる）。静的 import の走査からは構造的に見えない",
     "src/ActivitySpace/sustainment/slides/kata/": "Kata（プレゼン編集アプリ）から移した編集画面一式（ADR 0042）。純粋な模型の関数は tests/slides/ が直接検証しており、編集画面の部品は Kata 側の構成のまま残している。export を個別に配線させず、Kata の単位で扱う"
   },
-  "accepted": {}
+  "accepted": {
+    "src/ActivitySpace/sustainment/slides/SlidesAssistant.tsx#SlidesAssistant": "AI パネル（AlconCopilotPanel）が Slides のときだけ next/dynamic で読み込む。動的 import は静的な走査から見えない"
+  }
 }

@@ -51,9 +51,11 @@ export function AppShell() {
 
   return (
     <div key={locale} className="kata-root contents">
-      <div ref={shell} className="no-print flex h-full min-w-[720px] flex-col overflow-hidden bg-k-paper">
+      <div ref={shell} className="no-print flex h-full min-w-[720px] flex-col overflow-hidden bg-k-panel">
         <Header />
-        <div className="flex min-h-0 flex-1 gap-2 px-2 pb-2">
+        {/* Like a design tool: the canvas runs edge to edge and the panels beside it
+            are divided by a hairline, not set in boxes of their own. */}
+        <div className="flex min-h-0 flex-1 border-t border-k-line">
           {view ? (
             <>
               <Stage />
@@ -176,7 +178,7 @@ function useShortcuts(shell: RefObject<HTMLDivElement | null>) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || !shown(shell.current)) return;
-      // ⌘K stays Alcon's search; the editor's commands open from its header.
+      // ⌘K stays Alcon's search; the editor's commands open with "/".
       // ダイアログを開いている間は、後ろのデッキを動かさない（エディタ自身を包むダイアログは除く）
       if ([...document.querySelectorAll('[aria-modal="true"]')].some((d) => !d.contains(shell.current))) return;
       const t = e.target as HTMLElement | null;
@@ -191,6 +193,12 @@ function useShortcuts(shell: RefObject<HTMLDivElement | null>) {
       if (e.key === "?") {
         e.preventDefault();
         s.setShortcuts(true);
+        return;
+      }
+      // The editor's own commands (layouts, pages, looks); ⌘K stays Alcon's search.
+      if (e.key === "/" && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        s.setPalette(true);
         return;
       }
       if (handleObjectKeys(e)) return;

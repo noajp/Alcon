@@ -1,4 +1,5 @@
 'use client';
+import dynamic from 'next/dynamic';
 import { Button } from '@/ui/button';
 
 import { useEffect, useRef, useState } from 'react';
@@ -9,6 +10,8 @@ import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+
+const SlidesAssistant = dynamic(() => import('@/ActivitySpace/sustainment/slides/SlidesAssistant').then((m) => m.SlidesAssistant), { ssr: false });
 
 const WIDTH_KEY = 'alcon.copilot.width';
 const MIN_WIDTH = 320;
@@ -22,6 +25,9 @@ export interface AlconCopilotPanelProps {
    *  re-attached and a single click flips state twice). */
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** What the screen is about, when the panel should speak to it rather than
+   *  to Alcon at large — 'slides' makes it the open deck's assistant. */
+  subject?: 'slides' | null;
 }
 
 /**
@@ -32,7 +38,7 @@ export interface AlconCopilotPanelProps {
  * the deliverable-creating Code / Terminal tabs are stubbed at the bottom
  * for future work but disabled.
  */
-export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps) {
+export function AlconCopilotPanel({ open, onOpenChange, subject = null }: AlconCopilotPanelProps) {
   const { t } = useI18n();
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [hydrated, setHydrated] = useState(false);
@@ -151,8 +157,9 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
               so a single horizontal divider runs across both panes. */}
           <div className="h-[50px] flex items-center gap-2 px-3 border-b border-border/60 bg-card flex-shrink-0">
             <span className="text-[13px] font-semibold text-foreground">{t('AI')}</span>
+            {subject === 'slides' && <span className="text-[12px] text-muted-foreground">· Slides</span>}
             <div className="flex-1" />
-            {messages.length > 0 && (
+            {subject !== 'slides' && messages.length > 0 && (
               <Button size="sm"
                 type="button"
                 variant="ghost"
@@ -166,6 +173,9 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
                 a header X would just duplicate that affordance. */}
           </div>
 
+          {/* One AI panel across the app: on Slides it is the open deck's
+              assistant (its conversation and composer), elsewhere Alcon's. */}
+          {subject === 'slides' ? <SlidesAssistant /> : <>
           {/* Conversation — empty state is intentionally blank; the placeholder
               in the composer is the only nudge. */}
           <div ref={listRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-3 text-[12.5px] leading-relaxed">
@@ -227,6 +237,7 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
               )}
             </form>
           </div>
+          </>}
         </aside>
       )}
     </>

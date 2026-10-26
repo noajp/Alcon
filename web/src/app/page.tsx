@@ -340,6 +340,14 @@ function WorkspaceContent({
     setCopilotOpen(next);
     try { localStorage.setItem('alcon.copilot.open', next ? '1' : '0'); } catch { /* ignore */ }
   };
+  // A deck is made by talking to it: the first time Slides opens in a session,
+  // the AI panel — the deck's assistant there — opens with it. Closing it after
+  // that is respected.
+  const [slidesSeen, setSlidesSeen] = useState(false);
+  if (activeTab.activeView === 'slides' && !slidesSeen) {
+    setSlidesSeen(true);
+    if (!copilotOpen) setCopilotOpen(true);
+  }
   // Nothing is created up front: a Space may start from Strategy (a Vision or
   // Portfolio) as well as from a Domain, so the person picks where to begin.
   const [createType, setCreateType] = useState<CreateType | null>(null);
@@ -575,7 +583,7 @@ function WorkspaceContent({
               })
             )}
           </div>
-          <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} />
+          <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} subject={activeTab.activeView === 'slides' ? 'slides' : null} />
         </div>
         {/* The strip under the islands: the page-level toggles sit at its
             right end — the sidebar (omitted while it has nothing to show, on

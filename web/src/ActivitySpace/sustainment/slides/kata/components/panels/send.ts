@@ -41,7 +41,6 @@ export async function sendToKata(text: string, attachment?: { name: string; body
   if (!file || st.busy) return;
   // 貼った文書の最後の短い一文は、本文ではなく頼み（「12枚で」など）として扱う
   let pastedAsk = "";
-  st.setPanel("chat");
   // 長い貼り付けは全文を吹き出しにせず、文書のカードにする。末尾の短い一文は依頼として残す
   if (!attachment && looksLikeDocument(text)) {
     const lines = text.trimEnd().split("\n");
