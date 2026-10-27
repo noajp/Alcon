@@ -10,47 +10,52 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { useWorkersByIds } from '@/hooks/teamData';
 import { addDays } from '@/Function/shared/dateUtils';
 import type {
-  WorkflowDeploymentRecord, WorkflowRunRecord, WorkflowStepRecord, WorkflowTemplateRecord,
+  ChainStep, LedgerRun, StepEvent, WorkflowDeploymentRecord, WorkflowStepRecord, WorkflowTemplateRecord,
 } from '@/Function/audit/auditModel';
 
-/** How far back the Audit app reads runs. Older runs stay in the ledger. */
+/** How far back the Audit app reads runs. Older runs stay in the ledger; an
+ *  older run still waiting on something is always read. */
 export const AUDIT_WINDOW_DAYS = 30;
+/** The most recent runs read at once; past it the app says it shows the latest. */
+export const AUDIT_RUN_LIMIT = 5000;
+/** The latest links of a deployment's chain the integrity check reads. */
+export const AUDIT_CHAIN_LIMIT = 2000;
 
 const EMPTY: never[] = [];
 
 interface AuditLedger {
   templates: WorkflowTemplateRecord[];
   deployments: WorkflowDeploymentRecord[];
-  runs: WorkflowRunRecord[];
-  steps: WorkflowStepRecord[];
+  runs: LedgerRun[];
+  /** More runs started in the window than AUDIT_RUN_LIMIT. */
+  truncated: boolean;
 }
 
 async function loadLedger(spaceId: string, since: string, signal: AbortSignal): Promise<AuditLedger> {
   const deployments = await readAllPages<WorkflowDeploymentRecord>('deployments', (from, to) =>
     supabase.from('workflow_deployments').select('*', { count: 'exact' }).eq('activity_space_id', spaceId)
       .order('created_at').order('id').range(from, to).abortSignal(signal) as never, row => row.id);
-  if (!deployments.length) return { templates: [], deployments, runs: [], steps: [] };
+  if (!deployments.length) return { templates: [], deployments, runs: [], truncated: false };
   const templateIds = [...new Set(deployments.map(d => d.template_id))];
-  const [templates, runs, steps] = await Promise.all([
+  const [templates, runs] = await Promise.all([
     supabase.from('workflow_templates').select('*').in('id', templateIds).abortSignal(signal).then(({ data, error }) => {
       if (error) throw new Error(`Unable to read templates: ${error.message}`);
       return (data ?? []) as WorkflowTemplateRecord[];
     }),
-    readAllPages<WorkflowRunRecord>('runs', (from, to) =>
-      supabase.from('workflow_runs').select('id,deployment_id,external_id,template_version,subject_ref,subject_digest,started_at', { count: 'exact' })
-        .eq('activity_space_id', spaceId).gte('started_at', since)
-        .order('started_at', { ascending: false }).order('id').range(from, to).abortSignal(signal) as never, row => row.id),
-    // A run's steps all happen after it starts, so the same window holds them.
-    readAllPages<WorkflowStepRecord>('run steps', (from, to) =>
-      supabase.from('workflow_run_steps').select('*', { count: 'exact' })
-        .eq('activity_space_id', spaceId).gte('occurred_at', since)
-        .order('seq').order('id').range(from, to).abortSignal(signal) as never, row => row.id),
+    // One call, one snapshot: the gateway keeps appending while this reads,
+    // so the runs and their steps are taken together rather than page by page.
+    supabase.rpc('audit_ledger_runs', { _space_id: spaceId, _since: since, _limit: AUDIT_RUN_LIMIT }).abortSignal(signal).then(({ data, error }) => {
+      if (error) throw new Error(`Unable to read runs: ${error.message}`);
+      return ((data ?? []) as (Omit<LedgerRun, 'steps'> & { steps: StepEvent[] | null })[]).map(run => ({ ...run, steps: run.steps ?? [] }));
+    }),
   ]);
-  return { templates, deployments, runs, steps };
+  const recent = runs.filter(run => run.started_at >= since).length;
+  return { templates, deployments, runs, truncated: recent >= AUDIT_RUN_LIMIT };
 }
 
-/** The active Space's audit ledger: its deployments, and the runs of the last
- *  AUDIT_WINDOW_DAYS with their steps. Read-only — the ingest function writes. */
+/** The active Space's audit ledger: its deployments, the runs of the last
+ *  AUDIT_WINDOW_DAYS and every older run still open, each with its steps.
+ *  Read-only — the ingest function writes. */
 export function useAudit() {
   const userId = useCurrentUserId();
   const spaceId = useActiveSpaceId();
@@ -67,28 +72,23 @@ export function useAudit() {
   const deployments = ledger?.deployments ?? EMPTY;
   const workers = useWorkersByIds(useMemo(() => deployments.flatMap(d => d.worker_id ? [d.worker_id] : []), [deployments]));
 
-  const stepsByRun = useMemo(() => {
-    const map = new Map<string, WorkflowStepRecord[]>();
-    for (const step of ledger?.steps ?? EMPTY) {
-      const list = map.get(step.run_id);
-      if (list) list.push(step); else map.set(step.run_id, [step]);
-    }
-    return map;
-  }, [ledger?.steps]);
+  const runs = ledger?.runs ?? EMPTY;
+  const stepsByRun = useMemo(() => new Map<string, StepEvent[]>(runs.map(run => [run.id, run.steps])), [runs]);
   const runsByDeployment = useMemo(() => {
-    const map = new Map<string, WorkflowRunRecord[]>();
-    for (const run of ledger?.runs ?? EMPTY) {
+    const map = new Map<string, LedgerRun[]>();
+    for (const run of runs) {
       const list = map.get(run.deployment_id);
       if (list) list.push(run); else map.set(run.deployment_id, [run]);
     }
     return map;
-  }, [ledger?.runs]);
+  }, [runs]);
 
   return {
     spaceId,
     templates: ledger?.templates ?? EMPTY,
     deployments,
-    runs: ledger?.runs ?? EMPTY,
+    runs,
+    truncated: ledger?.truncated ?? false,
     stepsByRun,
     runsByDeployment,
     domains: domains.data,
@@ -100,3 +100,38 @@ export function useAudit() {
 }
 
 export type Audit = ReturnType<typeof useAudit>;
+
+/** One run's steps in full (who, when, how long), for the run's own page. */
+export function useAuditRunSteps(runId: string | null) {
+  const userId = useCurrentUserId();
+  const query = useQuery({
+    queryKey: ['audit-run-steps', userId, runId],
+    queryFn: async ({ signal }) => {
+      const { data, error } = await supabase.from('workflow_run_steps').select('*').eq('run_id', runId!).order('seq').abortSignal(signal);
+      if (error) throw new Error(`Unable to read the run's steps: ${error.message}`);
+      return (data ?? []) as WorkflowStepRecord[];
+    },
+    enabled: Boolean(userId && runId),
+    staleTime: 15_000,
+  });
+  return { steps: query.data ?? EMPTY, loading: query.isPending && Boolean(runId), error: query.error };
+}
+
+/** The latest links of a deployment's chain with their runs — a contiguous
+ *  seq range, read in one request — for the integrity check. */
+export function useAuditChain(deploymentId: string | null) {
+  const userId = useCurrentUserId();
+  const query = useQuery({
+    queryKey: ['audit-chain', userId, deploymentId],
+    queryFn: async ({ signal }) => {
+      const { data, error } = await supabase.from('workflow_run_steps')
+        .select('*, run:workflow_runs!inner(external_id,subject_ref,subject_digest,started_at)')
+        .eq('deployment_id', deploymentId!).order('seq', { ascending: false }).limit(AUDIT_CHAIN_LIMIT).abortSignal(signal);
+      if (error) throw new Error(`Unable to read the record chain: ${error.message}`);
+      return (data ?? []) as ChainStep[];
+    },
+    enabled: Boolean(userId && deploymentId),
+    staleTime: 15_000,
+  });
+  return { steps: query.data ?? EMPTY, loading: query.isPending && Boolean(deploymentId), error: query.error };
+}

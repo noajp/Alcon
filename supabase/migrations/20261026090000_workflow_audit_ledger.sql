@@ -13,10 +13,12 @@
 --                         connector, which operation, the result), as events
 --
 -- Runs and steps are append-only for everyone, the service role included:
--- an UPDATE or DELETE raises, except the cascade that removes a whole Space.
--- Steps form one hash chain per deployment, computed here on insert, so a
+-- UPDATE, DELETE and TRUNCATE are revoked and refused by triggers, except the
+-- cascade that removes a whole Space. Steps form one hash chain per
+-- deployment, computed here on insert over the step and its run, so a
 -- removed or altered event shows as a break no matter who wrote the row.
--- Rows are written by the ingest function (service role); the app only reads.
+-- Rows are written by the ingest function (service role); the app reads the
+-- runs through audit_ledger_runs, one snapshot per call.
 -- Guarded for preview replay: every block checks its dependencies first.
 do $$
 begin
@@ -52,13 +54,17 @@ begin
   execute 'create policy workflow_templates_read on public.workflow_templates for select to authenticated using (true)';
 
   -- ── deployments ────────────────────────────────────────────────────────
+  -- The Domain is the deployment's reading boundary, so a Domain that still
+  -- holds deployments cannot be deleted out from under them (NO ACTION is
+  -- checked at the end of the statement, so removing the whole Space, which
+  -- takes both, still goes through).
   execute $ddl$
     create table if not exists public.workflow_deployments (
       id uuid primary key default gen_random_uuid(),
       activity_space_id uuid not null references public.activity_spaces(id) on delete cascade,
       template_id uuid not null references public.workflow_templates(id) on delete restrict,
       name text not null,
-      domain_id uuid references public.domains(id) on delete set null,
+      domain_id uuid references public.domains(id) on delete no action,
       object_id uuid references public.objects(id) on delete set null,
       worker_id uuid references public.workers(id) on delete set null,
       state text not null default 'trial' check (state in ('trial', 'live', 'paused')),
@@ -69,6 +75,7 @@ begin
     )
   $ddl$;
   execute 'create index if not exists workflow_deployments_space_idx on public.workflow_deployments (activity_space_id)';
+  execute 'create index if not exists workflow_deployments_domain_idx on public.workflow_deployments (domain_id)';
   execute 'alter table public.workflow_deployments enable row level security';
 
   -- Whether the caller may read a deployment and its records: a member of
@@ -98,6 +105,44 @@ begin
   execute 'create policy workflow_deployments_owner_insert on public.workflow_deployments for insert to authenticated with check (public.is_activity_space_owner(activity_space_id))';
   execute 'drop policy if exists workflow_deployments_owner_update on public.workflow_deployments';
   execute 'create policy workflow_deployments_owner_update on public.workflow_deployments for update to authenticated using (public.is_activity_space_owner(activity_space_id)) with check (public.is_activity_space_owner(activity_space_id))';
+
+  -- A deployment stays in its Space, and what it points at is in that Space
+  -- too: its Domain, its Object (through the Object's Domain) and its Worker
+  -- (a Worker with no Space, such as a shared AI agent, may serve any). Its
+  -- template moves only to another version of the same process.
+  execute $fn$
+    create or replace function public.workflow_deployment_guard()
+    returns trigger language plpgsql security definer set search_path = public as $b$
+    begin
+      if tg_op = 'UPDATE' then
+        new.activity_space_id := old.activity_space_id;
+        new.created_by := old.created_by;
+        new.updated_at := now();
+        if new.template_id <> old.template_id and (select key from workflow_templates where id = new.template_id)
+            is distinct from (select key from workflow_templates where id = old.template_id) then
+          raise exception 'workflow deployment: a template may only move to another version of the same process';
+        end if;
+      end if;
+      if new.domain_id is not null and not exists (
+        select 1 from domains where id = new.domain_id and activity_space_id = new.activity_space_id) then
+        raise exception 'workflow deployment: Domain % is not in this Space', new.domain_id;
+      end if;
+      if new.object_id is not null and not exists (
+        select 1 from objects o join domains d on d.id = o.domain_id
+        where o.id = new.object_id and d.activity_space_id = new.activity_space_id) then
+        raise exception 'workflow deployment: Object % is not in this Space', new.object_id;
+      end if;
+      if new.worker_id is not null and not exists (
+        select 1 from workers where id = new.worker_id
+          and (activity_space_id is null or activity_space_id = new.activity_space_id)) then
+        raise exception 'workflow deployment: Worker % is not in this Space', new.worker_id;
+      end if;
+      return new;
+    end;
+    $b$
+  $fn$;
+  execute 'drop trigger if exists workflow_deployment_guard on public.workflow_deployments';
+  execute 'create trigger workflow_deployment_guard before insert or update on public.workflow_deployments for each row execute function public.workflow_deployment_guard()';
 
   -- ── runs ───────────────────────────────────────────────────────────────
   execute $ddl$
@@ -144,6 +189,7 @@ begin
     )
   $ddl$;
   execute 'create index if not exists workflow_run_steps_run_idx on public.workflow_run_steps (run_id, seq)';
+  execute 'create index if not exists workflow_run_steps_end_idx on public.workflow_run_steps (run_id) where kind = ''end''';
   execute 'alter table public.workflow_run_steps enable row level security';
   execute 'drop policy if exists workflow_run_steps_read on public.workflow_run_steps';
   execute 'create policy workflow_run_steps_read on public.workflow_run_steps for select to authenticated using (public.user_can_see_deployment(deployment_id))';
@@ -165,36 +211,54 @@ begin
   execute 'drop trigger if exists workflow_run_stamp on public.workflow_runs';
   execute 'create trigger workflow_run_stamp before insert on public.workflow_runs for each row execute function public.workflow_run_stamp()';
 
+  -- One field of the hashed text: its length in bytes, a colon, the value.
+  -- The length makes the boundaries unambiguous ('a|b','' and 'a','b' differ).
+  execute $fn$
+    create or replace function public.workflow_chain_field(_value text)
+    returns text language sql immutable set search_path = public as $b$
+      select octet_length(coalesce(_value, ''))::text || ':' || coalesce(_value, '');
+    $b$
+  $fn$;
+
   -- A step takes its run's deployment and Space, and the next link of the
   -- deployment's chain. Locking the deployment row serialises concurrent
   -- writers, so two steps never claim the same seq or the same prev_hash.
-  -- The hashed text is fixed field by field (Function/audit/auditModel.ts
-  -- `stepChainText` reads it the same way, for verification).
+  -- The hash covers the step and the run it belongs to (which document),
+  -- field by field (Function/audit/auditModel.ts `stepChainText` reads it
+  -- the same way, for verification).
   execute $fn$
     create or replace function public.workflow_step_chain()
     returns trigger language plpgsql security definer set search_path = public, extensions as $b$
     declare
+      run workflow_runs%rowtype;
       last_seq bigint;
       last_hash text;
+      stamp constant text := 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"';
     begin
-      select r.deployment_id, r.activity_space_id into new.deployment_id, new.activity_space_id
-      from workflow_runs r where r.id = new.run_id;
-      if new.deployment_id is null then
+      select * into run from workflow_runs r where r.id = new.run_id;
+      if run.id is null then
         raise exception 'workflow step: unknown run %', new.run_id;
       end if;
+      new.deployment_id := run.deployment_id;
+      new.activity_space_id := run.activity_space_id;
       perform 1 from workflow_deployments where id = new.deployment_id for update;
       select s.seq, s.hash into last_seq, last_hash
       from workflow_run_steps s where s.deployment_id = new.deployment_id
       order by s.seq desc limit 1;
       new.seq := coalesce(last_seq, 0) + 1;
       new.prev_hash := coalesce(last_hash, repeat('0', 64));
-      new.hash := encode(extensions.digest(concat_ws('|',
-        new.prev_hash, new.seq::text, new.run_id::text, new.step_key, new.kind,
-        coalesce(new.connector, ''), new.operation, new.result, new.actor_kind,
-        coalesce(new.actor_name, ''), coalesce(new.reason, ''),
-        to_char(new.occurred_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
-        coalesce(new.duration_ms::text, '')
-      ), 'sha256'), 'hex');
+      new.hash := encode(extensions.digest(
+        workflow_chain_field(new.prev_hash) || workflow_chain_field(new.seq::text) ||
+        workflow_chain_field(new.run_id::text) || workflow_chain_field(run.external_id) ||
+        workflow_chain_field(run.subject_ref) || workflow_chain_field(run.subject_digest) ||
+        workflow_chain_field(to_char(run.started_at at time zone 'UTC', stamp)) ||
+        workflow_chain_field(new.step_key) || workflow_chain_field(new.kind) ||
+        workflow_chain_field(new.connector) || workflow_chain_field(new.operation) ||
+        workflow_chain_field(new.result) || workflow_chain_field(new.actor_kind) ||
+        workflow_chain_field(new.actor_name) || workflow_chain_field(new.reason) ||
+        workflow_chain_field(to_char(new.occurred_at at time zone 'UTC', stamp)) ||
+        workflow_chain_field(new.duration_ms::text),
+      'sha256'), 'hex');
       return new;
     end;
     $b$
@@ -204,7 +268,8 @@ begin
 
   -- Append-only. A cascade (removing the Space, and with it the deployment)
   -- arrives from a referential-integrity trigger, one level deeper than a
-  -- statement aimed at the table itself.
+  -- statement aimed at the table itself. TRUNCATE skips row triggers, so it
+  -- is refused by a statement trigger and its privilege is revoked.
   execute $fn$
     create or replace function public.workflow_records_append_only()
     returns trigger language plpgsql as $b$
@@ -224,18 +289,69 @@ begin
   -- Space's own removal may.
   execute 'drop trigger if exists workflow_deployments_kept on public.workflow_deployments';
   execute 'create trigger workflow_deployments_kept before delete on public.workflow_deployments for each row execute function public.workflow_records_append_only()';
+  execute 'drop trigger if exists workflow_runs_no_truncate on public.workflow_runs';
+  execute 'create trigger workflow_runs_no_truncate before truncate on public.workflow_runs for each statement execute function public.workflow_records_append_only()';
+  execute 'drop trigger if exists workflow_run_steps_no_truncate on public.workflow_run_steps';
+  execute 'create trigger workflow_run_steps_no_truncate before truncate on public.workflow_run_steps for each statement execute function public.workflow_records_append_only()';
+  execute 'drop trigger if exists workflow_deployments_no_truncate on public.workflow_deployments';
+  execute 'create trigger workflow_deployments_no_truncate before truncate on public.workflow_deployments for each statement execute function public.workflow_records_append_only()';
 
+  -- No role edits the records by statement; the deployment's owner edits a
+  -- deployment through its policy. Writers keep only what writing needs.
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke all on public.workflow_runs, public.workflow_run_steps, public.workflow_deployments, public.workflow_templates from anon';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'revoke all on public.workflow_runs, public.workflow_run_steps, public.workflow_deployments, public.workflow_templates from authenticated';
+    execute 'grant select on public.workflow_runs, public.workflow_run_steps, public.workflow_templates to authenticated';
+    execute 'grant select, insert, update on public.workflow_deployments to authenticated';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    execute 'revoke update, delete, truncate on public.workflow_runs, public.workflow_run_steps from service_role';
+    execute 'revoke delete, truncate on public.workflow_deployments from service_role';
+  end if;
+
+  -- ── reading ────────────────────────────────────────────────────────────
+  -- The runs the Audit app shows, in one snapshot: those started since
+  -- _since (newest first, at most _limit), and every run still waiting on
+  -- something however old (no end step). Each carries its steps in chain
+  -- order, without the per-step detail the run's own page reads. Access is
+  -- decided once per deployment rather than once per row.
   execute $fn$
-    create or replace function public.workflow_deployment_touch()
-    returns trigger language plpgsql as $b$
-    begin
-      new.updated_at := now();
-      new.activity_space_id := old.activity_space_id;
-      new.template_id := old.template_id;
-      return new;
-    end;
+    create or replace function public.audit_ledger_runs(_space_id uuid, _since timestamptz, _limit integer default 5000)
+    returns table (
+      id uuid, deployment_id uuid, external_id text, template_version integer,
+      subject_ref text, subject_digest text, started_at timestamptz, steps jsonb
+    )
+    language sql stable security definer set search_path = public as $b$
+      with visible as (
+        select d.id from workflow_deployments d
+        where d.activity_space_id = _space_id and public.user_can_see_deployment(d.id)
+      ), recent as (
+        select r.* from workflow_runs r join visible v on v.id = r.deployment_id
+        where r.started_at >= _since
+        order by r.started_at desc, r.id
+        limit greatest(coalesce(_limit, 5000), 1)
+      ), open_older as (
+        select r.* from workflow_runs r join visible v on v.id = r.deployment_id
+        where r.started_at < _since
+          and not exists (select 1 from workflow_run_steps s where s.run_id = r.id and s.kind = 'end')
+        order by r.started_at desc, r.id
+        limit greatest(coalesce(_limit, 5000), 1)
+      ), picked as (
+        select * from recent union all select * from open_older
+      )
+      select p.id, p.deployment_id, p.external_id, p.template_version, p.subject_ref, p.subject_digest, p.started_at,
+        coalesce((
+          select jsonb_agg(jsonb_build_object(
+            'seq', s.seq, 'step_key', s.step_key, 'kind', s.kind, 'connector', s.connector,
+            'operation', s.operation, 'result', s.result, 'reason', s.reason) order by s.seq)
+          from workflow_run_steps s where s.run_id = p.id
+        ), '[]'::jsonb)
+      from picked p
+      order by p.started_at desc, p.id;
     $b$
   $fn$;
-  execute 'drop trigger if exists workflow_deployment_touch on public.workflow_deployments';
-  execute 'create trigger workflow_deployment_touch before update on public.workflow_deployments for each row execute function public.workflow_deployment_touch()';
+  execute 'revoke all on function public.audit_ledger_runs(uuid, timestamptz, integer) from public';
+  execute 'grant execute on function public.audit_ledger_runs(uuid, timestamptz, integer) to authenticated';
 end $$;

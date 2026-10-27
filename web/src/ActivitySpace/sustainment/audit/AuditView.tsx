@@ -4,17 +4,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { RefreshCw, ScrollText, Workflow, X } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { FONT } from '@/shared/designTokens';
+import { addDays } from '@/Function/shared/dateUtils';
 import { PageSection } from '@/Function/shared/PageHead';
 import { ToolPage, type ToolView } from '@/Function/shared/tool/ToolPage';
 import { NavAuditIcon } from '@/shell/sidebar/NavIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { NavigationState } from '@/types/navigation';
-import { useAudit, AUDIT_WINDOW_DAYS, type Audit } from '@/hooks/useAudit';
+import { useAudit, useAuditChain, useAuditRunSteps, AUDIT_CHAIN_LIMIT, AUDIT_RUN_LIMIT, AUDIT_WINDOW_DAYS, type Audit } from '@/hooks/useAudit';
 import { auditRoute, type AuditRoute, type AuditViewId } from '@/Function/audit/auditRoute';
 import {
-  exceptionReason, flowObservation, inChainOrder, runOutcome, templateSteps, verifyChain,
+  exceptionReason, flowObservation, runOutcome, templateSteps, verifyChain,
   type ChainBreak, type DeploymentState, type DeploymentSummary, type RunOutcome, type StepResult,
-  type WorkflowDeploymentRecord, type WorkflowRunRecord, type WorkflowStepRecord,
+  type ChainStep, type LedgerRun, type WorkflowDeploymentRecord,
 } from '@/Function/audit/auditModel';
 import { useAuditScope } from './auditScope';
 
@@ -25,7 +26,7 @@ import { useAuditScope } from './auditScope';
 
 const VIEWS: readonly ToolView[] = [
   { id: 'workflows', label: 'Workflows', icon: Workflow, description: 'Each AI workflow running in this Space: where it runs, who runs it, and how its runs end.' },
-  { id: 'log', label: 'Audit log', icon: ScrollText, description: 'Every run of the last {n} days, newest first. Records hold document numbers, never their contents.' },
+  { id: 'log', label: 'Audit log', icon: ScrollText, description: 'Every run of the last {n} days and every older run still open, newest first. Records hold document numbers, never their contents.' },
 ];
 
 const OUTCOME_LABEL: Record<RunOutcome, string> = {
@@ -73,6 +74,7 @@ export function AuditView({ navigation, onNavigate }: {
   const status = audit.error
     ? <p role="alert" className={`${FONT.base} rounded-md bg-[var(--status-danger-subtle)] p-3 text-foreground`}>{t('Could not read the audit ledger.')} {audit.error.message}</p>
     : audit.loading ? <p className={`${FONT.base} text-muted-foreground`}>{t('Loading the audit ledger…')}</p> : null;
+  const partial = audit.truncated && <p className={`${FONT.sm} text-muted-foreground`}>{t('Showing the latest {n} runs of the last {d} days.', { n: AUDIT_RUN_LIMIT.toLocaleString(), d: AUDIT_WINDOW_DAYS })}</p>;
 
   return (
     <ToolPage icon={NavAuditIcon} tool={t('Audit')} crumb={deployment?.name ?? scoped.scopeName} storageKey="audit" home="workflows"
@@ -85,8 +87,9 @@ export function AuditView({ navigation, onNavigate }: {
       panel={route.view === 'log' && run ? <RunPanel audit={audit} run={run} deployment={scoped.deploymentOf.get(run.deployment_id) ?? null} onClose={() => go({ runId: null })} /> : undefined}>
       <div className="space-y-6">
         {status}
+        {!status && partial}
         {!status && route.view === 'workflows' && <Ledger audit={audit} deployments={scoped.deployments} summaries={scoped.summaries} onOpen={id => go({ deploymentId: id })} />}
-        {!status && route.view === 'log' && <RunLog audit={audit} runs={route.attention ? scoped.attention : scoped.runs}
+        {!status && route.view === 'log' && <RunLog runs={route.attention ? scoped.attention : scoped.runs}
           deploymentOf={scoped.deploymentOf} selectedId={route.runId ?? null} attention={!!route.attention}
           onOpen={id => go({ runId: id })} onClearAttention={() => go({ attention: false })} />}
       </div>
@@ -149,15 +152,11 @@ function Stat({ label, value, hint, danger }: { label: string; value: string; hi
   </div>;
 }
 
-/** The deployment's steps, in chain order, across the runs read. */
-function deploymentSteps(audit: Audit, deploymentId: string): WorkflowStepRecord[] {
-  return inChainOrder((audit.runsByDeployment.get(deploymentId) ?? []).flatMap(run => audit.stepsByRun.get(run.id) ?? []));
-}
-
-/** The chain check for these steps; null while it runs. A result is kept with
- *  the steps it checked, so a newer read never shows an older verdict. */
-function useChain(steps: WorkflowStepRecord[]) {
-  const [state, setState] = useState<{ steps: WorkflowStepRecord[]; breaks: ChainBreak[] } | null>(null);
+/** The chain check over the deployment's latest links; null while it runs.
+ *  A result is kept with the steps it checked, so a newer read never shows
+ *  an older verdict. */
+function useChain(steps: ChainStep[]) {
+  const [state, setState] = useState<{ steps: ChainStep[]; breaks: ChainBreak[] } | null>(null);
   useEffect(() => {
     let live = true;
     if (steps.length) verifyChain(steps, sha256Hex).then(breaks => { if (live) setState({ steps, breaks }); }, () => {});
@@ -171,10 +170,13 @@ function DeploymentPage({ audit, deployment, summary, onBack, onOpenRun }: {
 }) {
   const { t, locale } = useI18n();
   const template = audit.templates.find(tp => tp.id === deployment.template_id);
-  const steps = useMemo(() => deploymentSteps(audit, deployment.id), [audit, deployment.id]);
-  const flow = useMemo(() => flowObservation(templateSteps(template?.steps), steps), [template?.steps, steps]);
-  const chain = useChain(steps);
-  const runs = audit.runsByDeployment.get(deployment.id) ?? [];
+  const runs = useMemo(() => audit.runsByDeployment.get(deployment.id) ?? [], [audit.runsByDeployment, deployment.id]);
+  const flow = useMemo(() => flowObservation(templateSteps(template?.steps), runs.flatMap(run => run.steps)), [template?.steps, runs]);
+  // Older runs still open are read too; the count is of the window alone.
+  const [since] = useState(() => addDays(new Date(), -AUDIT_WINDOW_DAYS).toISOString());
+  const recentRuns = runs.filter(run => run.started_at >= since).length;
+  const links = useAuditChain(deployment.id);
+  const chain = useChain(links.steps);
   const domain = deployment.domain_id ? audit.domains.find(d => d.id === deployment.domain_id)?.name ?? t('Unknown Domain') : t('Shared by the Space');
   const agent = deployment.worker_id ? audit.workers.find(w => w.id === deployment.worker_id)?.name ?? '—' : '—';
   // Hours saved is an estimate: the minutes a person spent per item, assumed
@@ -193,7 +195,7 @@ function DeploymentPage({ audit, deployment, summary, onBack, onOpenRun }: {
       </div>
 
       <dl className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-        <Stat label={t('Runs in {n} days', { n: AUDIT_WINDOW_DAYS })} value={String(summary?.runs ?? 0)} />
+        <Stat label={t('Runs in {n} days', { n: AUDIT_WINDOW_DAYS })} value={String(recentRuns)} />
         <Stat label={t('Completed by AI')} value={pct(summary?.autoRate ?? null)} hint={t('Of the runs that finished')} />
         <Stat label={t('Returned by a person')} value={pct(summary?.returnRate ?? null)} hint={t('Of the runs a person reviewed')} />
         <Stat label={t('Needs a person')} value={String(summary?.needsPerson ?? 0)} danger={!!summary?.needsPerson}
@@ -241,24 +243,27 @@ function DeploymentPage({ audit, deployment, summary, onBack, onOpenRun }: {
 
       <PageSection title={t('Record integrity')}>
         <p className={`${FONT.base} ${chain?.breaks.length ? 'text-[var(--status-danger)]' : 'text-muted-foreground'}`}>
-          {!steps.length ? t('No records to check yet.')
+          {links.error ? t('Could not read the record chain.')
+            : links.loading ? t('Checking the records…')
+            : !links.steps.length ? t('No records to check yet.')
             : !chain ? t('Checking the records…')
             : chain.breaks.length ? t('The record chain breaks at #{seq}. A record may have been removed or altered.', { seq: chain.breaks[0].seq })
+            : links.steps.length >= AUDIT_CHAIN_LIMIT ? t('The latest {n} records link to the one before them and match their contents.', { n: chain.checked })
             : t('All {n} records link to the one before them and match their contents.', { n: chain.checked })}
         </p>
       </PageSection>
 
       <PageSection title={t('Recent runs')}>
         {!runs.length ? <Empty>{t('No runs in the last {n} days.', { n: AUDIT_WINDOW_DAYS })}</Empty> : (
-          <RunRows audit={audit} runs={runs.slice(0, 20)} selectedId={null} onOpen={onOpenRun} />
+          <RunRows runs={runs.slice(0, 20)} selectedId={null} onOpen={onOpenRun} />
         )}
       </PageSection>
     </div>
   );
 }
 
-function RunLog({ audit, runs, deploymentOf, selectedId, attention, onOpen, onClearAttention }: {
-  audit: Audit; runs: WorkflowRunRecord[]; deploymentOf: Map<string, WorkflowDeploymentRecord>; selectedId: string | null;
+function RunLog({ runs, deploymentOf, selectedId, attention, onOpen, onClearAttention }: {
+  runs: LedgerRun[]; deploymentOf: Map<string, WorkflowDeploymentRecord>; selectedId: string | null;
   attention: boolean; onOpen: (id: string) => void; onClearAttention: () => void;
 }) {
   const { t } = useI18n();
@@ -269,20 +274,19 @@ function RunLog({ audit, runs, deploymentOf, selectedId, attention, onOpen, onCl
     </div>}
     {!runs.length
       ? <Empty>{attention ? t('Nothing needs a person right now.') : t('No runs in the last {n} days.', { n: AUDIT_WINDOW_DAYS })}</Empty>
-      : <RunRows audit={audit} runs={runs} deploymentOf={deploymentOf} selectedId={selectedId} onOpen={onOpen} />}
+      : <RunRows runs={runs} deploymentOf={deploymentOf} selectedId={selectedId} onOpen={onOpen} />}
   </div>;
 }
 
-function RunRows({ audit, runs, deploymentOf, selectedId, onOpen }: {
-  audit: Audit; runs: WorkflowRunRecord[]; deploymentOf?: Map<string, WorkflowDeploymentRecord>; selectedId: string | null; onOpen: (id: string) => void;
+function RunRows({ runs, deploymentOf, selectedId, onOpen }: {
+  runs: LedgerRun[]; deploymentOf?: Map<string, WorkflowDeploymentRecord>; selectedId: string | null; onOpen: (id: string) => void;
 }) {
   const { t, locale } = useI18n();
   const [limit, setLimit] = useState(100);
   return <div className="space-y-0.5">
     {runs.slice(0, limit).map(run => {
-      const steps = audit.stepsByRun.get(run.id) ?? [];
-      const outcome = runOutcome(steps);
-      const reason = exceptionReason(steps);
+      const outcome = runOutcome(run.steps);
+      const reason = exceptionReason(run.steps);
       return (
         <button key={run.id} type="button" onClick={() => onOpen(run.id)} aria-pressed={selectedId === run.id}
           className={`grid w-full grid-cols-[132px_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-muted/40 ${selectedId === run.id ? 'bg-muted/50' : ''}`}>
@@ -301,13 +305,14 @@ function RunRows({ audit, runs, deploymentOf, selectedId, onOpen }: {
 }
 
 function RunPanel({ audit, run, deployment, onClose }: {
-  audit: Audit; run: WorkflowRunRecord; deployment: WorkflowDeploymentRecord | null; onClose: () => void;
+  audit: Audit; run: LedgerRun; deployment: WorkflowDeploymentRecord | null; onClose: () => void;
 }) {
   const { t, locale } = useI18n();
-  const steps = useMemo(() => inChainOrder(audit.stepsByRun.get(run.id) ?? []), [audit.stepsByRun, run.id]);
+  const detail = useAuditRunSteps(run.id);
+  const steps = detail.steps;
   const template = deployment ? audit.templates.find(tp => tp.id === deployment.template_id) : undefined;
   const labels = useMemo(() => new Map(templateSteps(template?.steps).map(s => [s.key, s.label])), [template?.steps]);
-  const outcome = runOutcome(steps);
+  const outcome = runOutcome(run.steps);
   const time = (iso: string) => new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   return (
     <aside className="flex w-[380px] flex-shrink-0 flex-col overflow-y-auto border-l border-border/60 bg-card" aria-label={t('Run')}>
@@ -324,6 +329,8 @@ function RunPanel({ audit, run, deployment, onClose }: {
         <dt>{t('Run ID')}</dt><dd className={`${FONT.mono} truncate`}>{run.external_id}</dd>
         {run.subject_digest && <><dt>{t('Document digest')}</dt><dd className={`${FONT.mono} truncate`} title={run.subject_digest}>{run.subject_digest.slice(0, 16)}…</dd></>}
       </dl>
+      {detail.error && <p role="alert" className={`${FONT.sm} mx-4 mb-3 rounded-md bg-[var(--status-danger-subtle)] p-2 text-foreground`}>{t("Could not read the run's steps.")}</p>}
+      {detail.loading && <p className={`${FONT.sm} px-4 text-muted-foreground`}>{t('Loading the steps…')}</p>}
       <ol className="space-y-0.5 px-2 pb-4">
         {steps.map(step => (
           <li key={step.id} className="rounded-md px-2 py-2 hover:bg-muted/30">

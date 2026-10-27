@@ -74,6 +74,15 @@ export interface WorkflowStepRecord {
   hash: string;
 }
 
+/** What reading a run needs of each step — what the ledger list carries.
+ *  The run's own page reads the full rows. */
+export type StepEvent = Pick<WorkflowStepRecord, 'seq' | 'step_key' | 'kind' | 'connector' | 'operation' | 'result' | 'reason'>;
+
+/** A run as the ledger list carries it: with its steps, in chain order. */
+export interface LedgerRun extends WorkflowRunRecord {
+  steps: StepEvent[];
+}
+
 /** How a run ended, or where it stands. */
 export type RunOutcome =
   | 'auto'       // finished without a person
@@ -91,7 +100,7 @@ const RUN_OUTCOMES: readonly RunOutcome[] = ['auto', 'approved', 'returned', 'ex
 export const NEEDS_PERSON: ReadonlySet<RunOutcome> = new Set(['exception', 'deviation', 'stopped', 'waiting']);
 
 /** Steps in chain order: the gateway's order, not the clock's. */
-export function inChainOrder(steps: readonly WorkflowStepRecord[]): WorkflowStepRecord[] {
+function inChainOrder<T extends { seq: number }>(steps: readonly T[]): T[] {
   return [...steps].sort((a, b) => a.seq - b.seq);
 }
 
@@ -101,7 +110,7 @@ export function inChainOrder(steps: readonly WorkflowStepRecord[]): WorkflowStep
  * then a finished run says how it finished, and an unfinished one says
  * what it is waiting on.
  */
-export function runOutcome(steps: readonly WorkflowStepRecord[]): RunOutcome {
+export function runOutcome(steps: readonly StepEvent[]): RunOutcome {
   const ordered = inChainOrder(steps);
   if (ordered.some(s => s.result === 'blocked')) return 'deviation';
   const end = ordered.find(s => s.kind === 'end');
@@ -119,7 +128,7 @@ export function runOutcome(steps: readonly WorkflowStepRecord[]): RunOutcome {
 }
 
 /** Why the agent handed a run to a person — the first exception's reason. */
-export function exceptionReason(steps: readonly WorkflowStepRecord[]): string | null {
+export function exceptionReason(steps: readonly StepEvent[]): string | null {
   return inChainOrder(steps).find(s => s.kind === 'exception')?.reason ?? null;
 }
 
@@ -151,7 +160,7 @@ const zeroOutcomes = (): Record<RunOutcome, number> =>
   Object.fromEntries(RUN_OUTCOMES.map(o => [o, 0])) as Record<RunOutcome, number>;
 
 /** What a deployment's runs add up to. Rates are null when nothing is in the denominator. */
-export function summarizeDeployment(runs: readonly WorkflowRunRecord[], stepsByRun: ReadonlyMap<string, readonly WorkflowStepRecord[]>): DeploymentSummary {
+export function summarizeDeployment(runs: readonly WorkflowRunRecord[], stepsByRun: ReadonlyMap<string, readonly StepEvent[]>): DeploymentSummary {
   const outcomes = zeroOutcomes();
   const connectors = new Map<string, { calls: number; failed: number; blocked: number }>();
   let lastRunAt: string | null = null;
@@ -200,7 +209,7 @@ export interface FlowStep {
  * events; a step the template does not name is kept, after the declared
  * ones, so a route outside the design is visible rather than dropped.
  */
-export function flowObservation(declared: readonly WorkflowTemplateStep[], steps: readonly WorkflowStepRecord[]): FlowStep[] {
+export function flowObservation(declared: readonly WorkflowTemplateStep[], steps: readonly StepEvent[]): FlowStep[] {
   const flow = new Map<string, FlowStep & { connectorSet: Set<string> }>();
   for (const step of declared) flow.set(step.key, { ...step, declared: true, events: 0, failed: 0, blocked: 0, waiting: 0, connectors: [], connectorSet: new Set() });
   for (const step of inChainOrder(steps)) {
@@ -223,11 +232,19 @@ export function flowObservation(declared: readonly WorkflowTemplateStep[], steps
 
 // ── The hash chain ─────────────────────────────────────────────────────────
 // The database links each step to the one before it in its deployment
-// (workflow_step_chain in the migration). The text it hashes is fixed field
-// by field; this reads it the same way, so anyone holding the rows can
-// check that none was removed or altered.
+// (workflow_step_chain in the migration), hashing the step together with the
+// run it belongs to. Each field is written as its length in bytes, a colon
+// and the value, so no two different rows read as the same text; this reads
+// it the same way, so anyone holding the rows can check that none was
+// removed or altered.
 
 const GENESIS_HASH = '0'.repeat(64);
+
+/** The run fields a step's link covers: which document it worked on. */
+export type ChainRun = Pick<WorkflowRunRecord, 'external_id' | 'subject_ref' | 'subject_digest' | 'started_at'>;
+
+/** A step with its run, as the chain check reads it. */
+export type ChainStep = WorkflowStepRecord & { run: ChainRun };
 
 /** Postgres `to_char(... 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')` in UTC: microseconds, always six digits. */
 function chainTimestamp(iso: string): string {
@@ -241,26 +258,30 @@ function chainTimestamp(iso: string): string {
   return `${utc.toISOString().slice(0, 19)}.${micros}Z`;
 }
 
-function stepChainText(step: Pick<WorkflowStepRecord,
-  'prev_hash' | 'seq' | 'run_id' | 'step_key' | 'kind' | 'connector' | 'operation' | 'result' | 'actor_kind' | 'actor_name' | 'reason' | 'occurred_at' | 'duration_ms'>): string {
+const encoder = new TextEncoder();
+const field = (value: string | number | null) => {
+  const text = value === null ? '' : String(value);
+  return `${encoder.encode(text).length}:${text}`;
+};
+
+function stepChainText(step: ChainStep): string {
   return [
-    step.prev_hash, String(step.seq), step.run_id, step.step_key, step.kind,
-    step.connector ?? '', step.operation, step.result, step.actor_kind,
-    step.actor_name ?? '', step.reason ?? '', chainTimestamp(step.occurred_at),
-    step.duration_ms === null ? '' : String(step.duration_ms),
-  ].join('|');
+    step.prev_hash, step.seq, step.run_id, step.run.external_id, step.run.subject_ref, step.run.subject_digest,
+    chainTimestamp(step.run.started_at), step.step_key, step.kind, step.connector, step.operation, step.result,
+    step.actor_kind, step.actor_name, step.reason, chainTimestamp(step.occurred_at), step.duration_ms,
+  ].map(field).join('');
 }
 
 export type ChainBreak = { seq: number; kind: 'gap' | 'link' | 'hash' };
 
 /**
- * Where a deployment's chain breaks, given its steps and a SHA-256 hex
- * function. `gap` — a seq is missing; `link` — a step does not point at the
- * one before it; `hash` — a step's fields no longer produce its hash.
- * Checks from the first step held, so a page that starts mid-chain is read
- * from its own first link.
+ * Where a deployment's chain breaks, given a contiguous run of its steps (a
+ * seq range) and a SHA-256 hex function. `gap` — a seq is missing; `link` —
+ * a step does not point at the one before it; `hash` — a step's fields no
+ * longer produce its hash. Checks from the first step held, so a range that
+ * starts mid-chain is read from its own first link.
  */
-export async function verifyChain(steps: readonly WorkflowStepRecord[], sha256Hex: (text: string) => Promise<string>): Promise<ChainBreak[]> {
+export async function verifyChain(steps: readonly ChainStep[], sha256Hex: (text: string) => Promise<string>): Promise<ChainBreak[]> {
   const ordered = inChainOrder(steps);
   const breaks: ChainBreak[] = [];
   for (let i = 0; i < ordered.length; i++) {

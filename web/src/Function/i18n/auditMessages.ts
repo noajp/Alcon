@@ -17,12 +17,17 @@ const AUDIT_MESSAGES: Record<string, Row> = {
     'Chaque workflow d’IA de ce Space : où il tourne, qui le fait tourner et comment ses exécutions se terminent.',
     'Cada flujo de IA de este Space: dónde se ejecuta, quién lo ejecuta y cómo terminan sus ejecuciones.',
   ],
-  'Every run of the last {n} days, newest first. Records hold document numbers, never their contents.': [
-    '直近 {n} 日のすべての実行（新しい順）。記録には書類の番号だけが残り、中身は残りません。',
-    '최근 {n}일의 모든 실행(최신순). 기록에는 문서 번호만 남고 내용은 남지 않습니다.',
-    'Toutes les exécutions des {n} derniers jours, les plus récentes d’abord. Les enregistrements gardent le numéro des documents, jamais leur contenu.',
-    'Todas las ejecuciones de los últimos {n} días, de la más reciente a la más antigua. Los registros guardan el número de los documentos, nunca su contenido.',
+  'Every run of the last {n} days and every older run still open, newest first. Records hold document numbers, never their contents.': [
+    '直近 {n} 日のすべての実行と、それより前でまだ終わっていない実行（新しい順）。記録には書類の番号だけが残り、中身は残りません。',
+    '최근 {n}일의 모든 실행과 그 이전에 시작해 아직 끝나지 않은 실행(최신순). 기록에는 문서 번호만 남고 내용은 남지 않습니다.',
+    'Toutes les exécutions des {n} derniers jours et toutes les exécutions plus anciennes encore ouvertes, les plus récentes d’abord. Les enregistrements gardent le numéro des documents, jamais leur contenu.',
+    'Todas las ejecuciones de los últimos {n} días y todas las anteriores que siguen abiertas, de la más reciente a la más antigua. Los registros guardan el número de los documentos, nunca su contenido.',
   ],
+  'Showing the latest {n} runs of the last {d} days.': ['直近 {d} 日のうち、新しい {n} 件の実行を表示しています。', '최근 {d}일 중 최신 실행 {n}건을 표시합니다.', 'Affichage des {n} exécutions les plus récentes des {d} derniers jours.', 'Se muestran las {n} ejecuciones más recientes de los últimos {d} días.'],
+  'Could not read the record chain.': ['記録の鎖を読み込めませんでした。', '기록 체인을 불러오지 못했습니다.', 'Impossible de lire la chaîne d’enregistrements.', 'No se pudo leer la cadena de registros.'],
+  'The latest {n} records link to the one before them and match their contents.': ['新しい {n} 件の記録すべてが直前の記録とつながり、内容とも一致しています。', '최신 기록 {n}건 모두 직전 기록과 이어지며 내용과도 일치합니다.', 'Les {n} enregistrements les plus récents se rattachent tous au précédent et correspondent à leur contenu.', 'Los {n} registros más recientes enlazan con el anterior y coinciden con su contenido.'],
+  "Could not read the run's steps.": ['実行の手順を読み込めませんでした。', '실행 단계를 불러오지 못했습니다.', 'Impossible de lire les étapes de l’exécution.', 'No se pudieron leer los pasos de la ejecución.'],
+  'Loading the steps…': ['手順を読み込み中…', '단계를 불러오는 중…', 'Chargement des étapes…', 'Cargando los pasos…'],
   'Could not read the audit ledger.': ['監査の記録を読み込めませんでした。', '감사 기록을 불러오지 못했습니다.', 'Impossible de lire le registre d’audit.', 'No se pudo leer el registro de auditoría.'],
   'Loading the audit ledger…': ['監査の記録を読み込み中…', '감사 기록을 불러오는 중…', 'Chargement du registre d’audit…', 'Cargando el registro de auditoría…'],
   'No AI workflows are registered in this Space yet. A workflow appears here when its gateway is connected and starts reporting.': [

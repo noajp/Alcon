@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import {
   exceptionReason, flowObservation, runOutcome, summarizeDeployment, templateSteps, verifyChain,
-  type WorkflowRunRecord, type WorkflowStepRecord,
+  type ChainStep, type WorkflowRunRecord, type WorkflowStepRecord,
 } from '@/Function/audit/auditModel';
 
 const sha = async (text: string) => createHash('sha256').update(text).digest('hex');
@@ -106,15 +106,19 @@ const GENESIS_HASH = '0'.repeat(64);
 
 describe('the hash chain', () => {
   // Produced by the migration's workflow_step_chain trigger on Postgres 16.
-  const first: WorkflowStepRecord = {
-    id: 'x', run_id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', deployment_id: 'd', step_key: 'a', kind: 'step', connector: null,
-    operation: 'none', result: 'ok', actor_kind: 'ai_agent', actor_name: null, reason: null,
+  // Multi-byte text (the document number, the agent's name) checks that a
+  // field's length is counted in bytes on both sides.
+  const run = { external_id: 'r1', subject_ref: '注文書 No.1', subject_digest: 'ab12', started_at: '2026-10-26T01:00:00.25+00:00' };
+  const first: ChainStep = {
+    id: 'x', run_id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', deployment_id: 'd', step_key: 'read', kind: 'step', connector: null,
+    operation: 'none', result: 'ok', actor_kind: 'ai_agent', actor_name: '受注エージェント', reason: null,
     occurred_at: '2026-10-26T01:02:03.5+00:00', duration_ms: 120, seq: 1, prev_hash: GENESIS_HASH,
-    hash: '68eba72a1d3347ac628c9aece5445bc9a4b8ad27e2d97789c087829004d52f4f',
+    hash: '7225e56d3ef43c5afda3a837bf468548d41b9d9a2927ed3f829c6cd2450f1efe', run,
   };
-  const second: WorkflowStepRecord = {
-    ...first, id: 'y', step_key: 'b', seq: 2, prev_hash: first.hash,
-    hash: 'd9b1a4cda73931856e9444dae3e2f06c5d4245dce2ac9a1b8188a00e647fc9b1',
+  const second: ChainStep = {
+    ...first, id: 'y', step_key: 'enter', connector: '販売管理', operation: 'draft', actor_name: null,
+    occurred_at: '2026-10-26T01:02:04+00:00', duration_ms: null, seq: 2, prev_hash: first.hash,
+    hash: '21b94d34748d41b7154025aa9b58be36a8457386f6ef7ea53bd6bf7c3ee83e32',
   };
 
   it('hashes the same text the database hashed', async () => {
@@ -129,9 +133,15 @@ describe('the hash chain', () => {
     expect(await verifyChain([{ ...first, occurred_at: '2026-10-26T01:02:03Z' }], sha)).toEqual([{ seq: 1, kind: 'hash' }]);
   });
 
-  it('finds an altered step, a broken link and a missing one', async () => {
+  it('finds an altered step, an altered run, a broken link and a missing one', async () => {
     expect(await verifyChain([first, { ...second, result: 'failed' }], sha)).toEqual([{ seq: 2, kind: 'hash' }]);
+    expect(await verifyChain([first, { ...second, run: { ...run, subject_ref: '注文書 No.2' } }], sha)).toEqual([{ seq: 2, kind: 'hash' }]);
     expect(await verifyChain([first, { ...second, prev_hash: GENESIS_HASH }], sha)).toEqual([{ seq: 2, kind: 'link' }, { seq: 2, kind: 'hash' }]);
     expect(await verifyChain([first, { ...second, seq: 3 }], sha)).toEqual([{ seq: 3, kind: 'gap' }, { seq: 3, kind: 'hash' }]);
+  });
+
+  it('keeps field boundaries: moving text between neighbours changes the hash', async () => {
+    expect(await verifyChain([{ ...first, actor_name: '受注エージェント|', reason: null }], sha)).toEqual([{ seq: 1, kind: 'hash' }]);
+    expect(await verifyChain([{ ...first, actor_name: '受注', reason: 'エージェント' }], sha)).toEqual([{ seq: 1, kind: 'hash' }]);
   });
 });
