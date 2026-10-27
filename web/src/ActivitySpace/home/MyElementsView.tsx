@@ -259,7 +259,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
         const created = await createElement({
           title: input.title,
           object_id: input.objectId ?? null,
-          owner_id: userId,
+          owner_id: input.objectId ? null : userId,
           description: input.description ?? null,
           type: input.type ?? null,
           labels: input.labels ?? [],

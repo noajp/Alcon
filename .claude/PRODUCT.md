@@ -200,7 +200,7 @@ Initiative を開くと、意図・状況・前提・決定・指標・リスク
 |------|------|-----------|
 | **Domain** | Objectの集合、活動の場 | Space内の活動をまとめる。activeなDomainはlocalStorage永続 |
 | **Object** | 成果や案件としてElementを束ねる単位 | 必ずDomainに置き、Domain直下のフラットな集合。multi-homingは `object_domains`。使わなくなったらアーカイブする |
-| **Element** | 行動の最小単位 | 個人の仕事、またはObjectに所属する仕事。multi-homing可（`object_id` + `element_objects` junction） |
+| **Element** | 行動の最小単位 | 個人の仕事（`owner_id`）、またはObjectに所属する仕事（`object_id`）。どちらか一方だけを持つ（DB が強制）。multi-homing可（`object_id` + `element_objects` junction） |
 
 Object は Element をまとめる単位で、Object 同士はネストしない。一つの Element は複数の Object に所属できる。Object 詳細は貢献先 Initiative を常に表示し、Strategy へ一クリックで戻れる。
 
@@ -371,7 +371,7 @@ Workers / Resource / Calendar / Gantt は Sustainment の道具を Object 単位
 
 組織の信頼境界は **ActivitySpace**。Strategy / Execution / Sustainment / Home / Property は、選択中の ActivitySpace を組織活動の文脈として使う（詳細は前述の [Activity Space — 組織活動の文脈と信頼境界](#activity-space--組織活動の文脈と信頼境界)）。組織データは Linear 型の二層メンバーシップでアクセスを管理し、個人の道具は所有者の権限で管理する。
 
-- **二層の所属** — Space メンバー（`activity_space_members`：owner/member）＝組織の正規メンバー。Domain メンバー（`domain_members`：owner/admin/member/viewer）＝その Domain だけに招かれて承諾した人。Object メンバー（`object_members`）はさらに細かい Object 限定の同席者（通常 domain_members の部分集合、Object 限定ゲストも可）。
+- **二層の所属** — Space メンバー（`activity_space_members`：owner/member）＝組織の正規メンバー。Domain メンバー（`domain_members`：owner/admin/member/viewer）＝その Domain だけに招かれて承諾した人。Object メンバー（`object_members`）はさらに細かい Object 限定の同席者（通常 domain_members の部分集合、Object 限定ゲストも可）。Space から外れると、その Space の Domain と Object の所属も外れる。外れた人が最後の owner だった Domain・Object は、外した Space の owner（いなければ最も古い Space の owner）が引き継ぐ。
 - **Guest** — `domain_members` だが Space 非メンバーの人。招かれた Domain しか見えず、組織の他 Domain 構造は一切露出しない。他組織の人を招いても相手の Space は混ざらない（Domain は `activity_space_id` で1つの Space に属したまま、相手には「Shared with me」として現れる）。Domain を作れるのは自分が参加している Space の中だけで、Domain を別の Space へ移せるのは移動元と移動先の両方の Space のオーナーだけ。Object は必ず Domain に置き、作れるのは自分が見られる Domain の中だけ。Object を Domain の外に出すことはできない（別の Domain へ移すだけ）。Object が残っている Domain は削除できない。
 - **Viewer（閲覧者）** — Domain の viewer は、その Domain の Object・Element・コメント・履歴・CRM・Phase・Board をメンバーと同じだけ読み、何も変えない。Element の追加・編集・コメント・リアクション・担当・承認・チェックイン・取り込み・依存の設定・Widget の編集も、Object・Phase・CRM の記録の作成も拒まれる。担当の候補にもならない。viewer の行は制限であって、Space のメンバーであっても workspace の Domain でその人を viewer にとどめる。そのため、workspace の Domain の viewer が同じ Space のメンバーなら、自分で行を外せず（外すと Space 経由で作業できてしまう）、Domain の owner・admin が外すか役割を変える。private の Domain の viewer は自分で抜けられる。Object のメンバーに加わった Object では、Object のメンバーとして作業できる。公開リンクはない。
 - **Domain 可視性 `domains.privacy`** — `workspace`＝同じ Space のメンバー全員が閲覧可。`private`＝`domain_members` のみ。
@@ -391,8 +391,6 @@ Claude API を Supabase Edge Functions 経由で利用：
 - `run-agent`：エージェント実行
 - `draft-object`：Object 自動生成
 - `summarize-note`：Note 要約
-- `analyze-change`：変更分析
-- `validate-task`：Element 検証
 
 外部の AI は `alcon-mcp`（MCP サーバー）から、スクリプトやノーコードツールは `alcon-api`（REST API）から、本人として盤面を読み書きする。どちらも同じ許可リストのツールを呼ぶので、外から削除や一括変更はできない（[ADR 0033](../docs/adr/0033-the-rest-api-is-the-mcp-tool-layer-over-http.md)）。資格情報は、claude.ai や ChatGPT のコネクタなら OAuth のサインインと同意（`/oauth/consent`）、スクリプトなら本人が Settings › Integrations で発行する個人用アクセストークン。どちらも読み取りのみを選べ、いつでも取り消せる。OAuth のトークンで盤面に届くのは Alcon の関数を通したときだけ（[ADR 0034](../docs/adr/0034-mcp-clients-sign-in-through-supabase-oauth-and-their-tokens-only-work-through-alcon.md)）。関数がそれを本人の短命な JWT に交換するので、アプリと同じ RLS が効き、書き込みの記録にはどのトークン経由かが残る（[ADR 0032](../docs/adr/0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)）。
 
