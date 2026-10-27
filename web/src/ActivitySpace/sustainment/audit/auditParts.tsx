@@ -18,7 +18,7 @@ import { useChainLinks, useRunSteps, sha256Hex, type AuditSource } from './audit
 
 const OUTCOME_LABEL: Record<RunOutcome, string> = {
   auto: 'Completed by AI', approved: 'Approved', returned: 'Returned', exception: 'Handed to a person',
-  deviation: 'Blocked operation', stopped: 'Stopped', waiting: 'Waiting for approval', running: 'Running',
+  deviation: 'Outside the grants', stopped: 'Stopped', waiting: 'Waiting for approval', running: 'Running',
 };
 const OUTCOME_TONE: Record<RunOutcome, string> = {
   auto: 'text-[var(--status-success)]', approved: 'text-[var(--status-success)]', returned: 'text-[var(--status-warning)]',
@@ -132,6 +132,9 @@ export function RunPanel({ source, run, deployment, onClose }: {
               <span className={`${FONT.base} min-w-0 flex-1 truncate text-foreground`}>{labels.get(step.step_key) ?? step.step_key}</span>
               <span className={`${FONT.sm} shrink-0 ${RESULT_TONE[step.result] ?? 'text-muted-foreground'}`}>{t(RESULT_LABEL[step.result])}</span>
             </div>
+            {step.outside_grant && <p className={`${FONT.sm} ml-12 text-[var(--status-danger)]`}>
+              {step.grants_version === null ? t('Outside the grants: the gateway held none') : t('Outside the grants of version {n}', { n: step.grants_version })}
+            </p>}
             <div className={`${FONT.sm} ml-12 flex flex-wrap gap-x-2 text-muted-foreground`}>
               <span>{time(step.occurred_at)}</span>
               {step.connector && <span>{step.connector}{OPERATION_LABEL[step.operation] ? ` · ${t(OPERATION_LABEL[step.operation])}` : ''}</span>}

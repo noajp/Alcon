@@ -13,7 +13,7 @@ function event(overrides: Record<string, unknown> = {}) {
   return {
     deployment_id: DEP, event_id: 'ev-1', run_external_id: 'PO-1042', step_key: 'read_order', kind: 'start',
     connector: 'mail', operation: 'read', result: 'ok', actor_kind: 'ai_agent', actor_name: 'Order clerk', reason: null,
-    occurred_at: '2026-10-27T01:02:03.123456Z', duration_ms: 420, prev_digest: intake.GENESIS_DIGEST, ...overrides,
+    occurred_at: '2026-10-27T01:02:03.123456Z', duration_ms: 420, grants_version: 1, prev_digest: intake.GENESIS_DIGEST, ...overrides,
   };
 }
 
@@ -58,6 +58,10 @@ describe('parseBatch', () => {
     const paired = await sealed([event({ reason: '絵文字 😀 は通る' })]);
     expect(intake.parseBatch({ batch_id: 'b-1', steps: paired }).ok).toBe(true);
     expect(intake.parseBatch({ batch_id: 'b-1', runs: [{ ...run, template_version: 2 ** 31 }] }).error).toMatch(/template_version/);
+    const negative = await sealed([event({ grants_version: -1 })]);
+    expect(intake.parseBatch({ batch_id: 'b-1', steps: negative }).error).toMatch(/grants_version/);
+    const none = await sealed([event({ grants_version: null })]);
+    expect(intake.parseBatch({ batch_id: 'b-1', steps: none }).ok).toBe(true);
   });
 
   it('refuses values the ledger would refuse', async () => {
@@ -98,6 +102,12 @@ describe('batchChainProblem', () => {
     const a = await intake.eventDigest(event({ actor_name: 'ab', reason: 'c' }));
     const b = await intake.eventDigest(event({ actor_name: 'a', reason: 'bc' }));
     expect(a).not.toBe(b);
+  });
+
+  it('seals the grants version the gateway held, so it cannot be swapped later', async () => {
+    const steps = await sealed([event()]);
+    steps[0] = { ...steps[0], grants_version: 2 };
+    expect(await intake.batchChainProblem(steps)).toMatch(/ev-1: digest/);
   });
 });
 

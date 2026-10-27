@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Activity, Bot, Box, CalendarDays, CircleDot, GitBranch, Layers, ListOrdered, RefreshCw, ShieldCheck, Timer, Workflow } from 'lucide-react';
+import { Activity, Bot, Box, CalendarDays, CircleDot, GitBranch, KeyRound, Layers, ListOrdered, RefreshCw, ShieldCheck, Timer, Workflow } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { FONT } from '@/shared/designTokens';
 import { PageHead, PageSection } from '@/Function/shared/PageHead';
@@ -15,17 +15,19 @@ import { AUDIT_WINDOW_DAYS } from '@/hooks/useAudit';
 import { flowObservation, NEEDS_PERSON, runOutcome, templateSteps, type DeploymentSummary, type WorkflowDeploymentRecord } from '@/Function/audit/auditModel';
 import type { WorkflowTab } from '@/Function/audit/auditRoute';
 import type { AuditSource } from './auditSource';
+import { AuditGrants } from './AuditGrants';
 import { Empty, RunPanel, RunRows, SampleBadge, SampleNotice, Stat, STATE_LABEL, pct, useIntegrity } from './auditParts';
 
 // One workflow, opened the way an Object is: its name and purpose with the
 // Properties beside them, and tabs that read it — how it goes, its runs,
-// the flow it was designed for against the one the gateway saw, and whether
-// its records are whole.
+// the flow it was designed for against the one the gateway saw, what it may
+// do, and whether its records are whole.
 
 const TABS: readonly ToolView[] = [
   { id: 'overview', label: 'Overview', icon: CircleDot },
   { id: 'runs', label: 'Runs', icon: ListOrdered, description: 'Every run of this workflow in the last {n} days and every older one still open, newest first.' },
   { id: 'flow', label: 'Flow', icon: GitBranch, description: 'The steps the template declares, with what the gateway saw at each one. A step outside the template is shown after them.' },
+  { id: 'grants', label: 'Grants', icon: KeyRound, description: 'What this workflow may do on each connection. The gateway enforces it; whatever a run did outside it is counted here.' },
   { id: 'integrity', label: 'Record integrity', icon: ShieldCheck, description: 'Each record carries the hash of the one before it. A removed or altered record breaks the chain here.' },
 ];
 
@@ -139,6 +141,8 @@ export function AuditWorkflowPage({ source, deployment, summary, tab, runId, onT
             ))}
           </ol>
         ))}
+
+        {tab === 'grants' && <AuditGrants source={source} deployment={deployment} runs={runs} />}
 
         {tab === 'integrity' && (
           <div className={`flex items-start gap-3 rounded-lg p-4 ${integrity.state === 'broken' ? 'bg-[var(--status-danger-subtle)]' : integrity.state === 'intact' ? 'bg-[var(--status-success-subtle)]' : 'bg-muted/30'}`}>

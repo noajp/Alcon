@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useAudit, useAuditChain, useAuditRunSteps, type Audit } from '@/hooks/useAudit';
-import { sealChain, type ChainStep, type LedgerRun, type StepEvent, type WorkflowStepRecord } from '@/Function/audit/auditModel';
+import { sealChain, type ChainStep, type GrantVersionRecord, type LedgerRun, type StepEvent, type WorkflowStepRecord } from '@/Function/audit/auditModel';
 import { buildAuditSample } from '@/Function/audit/auditSample';
 
 // What the Audit app reads: the Space's ledger, or — while the Space has no
@@ -22,6 +22,8 @@ export interface AuditSource extends Audit {
   sample: boolean;
   /** The sample's steps in full, sealed into their chains. */
   sampleSteps: ChainStep[] | null;
+  /** The sample's grants, one version per deployment. */
+  sampleGrants: GrantVersionRecord[] | null;
 }
 
 const EMPTY: never[] = [];
@@ -50,7 +52,7 @@ export function useAuditSource(): AuditSource {
     return map;
   }, [data]);
 
-  if (!data) return { ...audit, loading: audit.loading || (empty && sample.isPending), sample: false, sampleSteps: null };
+  if (!data) return { ...audit, loading: audit.loading || (empty && sample.isPending), sample: false, sampleSteps: null, sampleGrants: null };
   return {
     ...audit,
     templates: data.templates,
@@ -64,6 +66,7 @@ export function useAuditSource(): AuditSource {
     workers: data.workers as unknown as Audit['workers'],
     sample: true,
     sampleSteps: data.steps,
+    sampleGrants: data.grants,
   };
 }
 

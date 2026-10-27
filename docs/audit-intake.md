@@ -26,7 +26,7 @@ Content-Type: application/json
     { "deployment_id": "<uuid>", "event_id": "ev-0001", "run_external_id": "PO-1042",
       "step_key": "read_order", "kind": "start", "connector": "mail", "operation": "read", "result": "ok",
       "actor_kind": "ai_agent", "actor_name": "受注係", "reason": null,
-      "occurred_at": "2026-10-27T01:02:03.123456Z", "duration_ms": 420,
+      "occurred_at": "2026-10-27T01:02:03.123456Z", "duration_ms": 420, "grants_version": 3,
       "prev_digest": "<前の記録の digest。導入の最初は 0 が64個>", "digest": "<この記録の digest>" }
   ]
 }
@@ -35,8 +35,9 @@ Content-Type: application/json
 - 時刻は `YYYY-MM-DDTHH:MM:SS.ffffffZ`（UTC・マイクロ秒6桁）で、実在する時刻だけを受け付ける（`24:00`・`:60`・2月30日は拒否）
 - 文字列に NUL（`\u0000`）と対になっていないサロゲートは入れられない
 - `kind` は start / step / approval / exception / end、`operation` は read / draft / send / money / none、`result` は ok / failed / blocked / waiting / approved / returned、`actor_kind` は ai_agent / human / system
+- `grants_version` は、その操作を判断したときに持っていた権限表の版（[audit-grants](audit-grants.md)）。表を持っていなければ null。受け口はこの版で、操作が権限の外だったかを判定する
 - `steps` は導入ごとに鎖の順に並べる。手順が指す実行は、同じまとめの `runs` か、前に送ったまとめに含める
-- `digest` は、次のフィールドをこの順に「UTF-8 のバイト長 + `:` + 値」（null は空文字）で連結した文字列の SHA-256（小文字16進）：`prev_digest, deployment_id, event_id, run_external_id, step_key, kind, connector, operation, result, actor_kind, actor_name, reason, occurred_at, duration_ms`。参照実装は `supabase/functions/_shared/auditIntake.ts` の `eventDigest`
+- `digest` は、次のフィールドをこの順に「UTF-8 のバイト長 + `:` + 値」（null は空文字）で連結した文字列の SHA-256（小文字16進）：`prev_digest, deployment_id, event_id, run_external_id, step_key, kind, connector, operation, result, actor_kind, actor_name, reason, occurred_at, duration_ms, grants_version`。参照実装は `supabase/functions/_shared/auditIntake.ts` の `eventDigest`
 - 1回のまとめは 1000 件・1MB まで
 
 ## 返事

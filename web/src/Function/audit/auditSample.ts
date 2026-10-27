@@ -11,7 +11,7 @@
 // =============================================================
 
 import type {
-  ChainStep, LedgerRun, StepActor, StepKind, StepOperation, StepResult,
+  ChainStep, DeploymentGrant, GrantOperation, GrantVersionRecord, LedgerRun, StepActor, StepKind, StepOperation, StepResult,
   WorkflowDeploymentRecord, WorkflowRunRecord, WorkflowTemplateRecord,
 } from './auditModel';
 
@@ -24,6 +24,9 @@ export interface AuditSample {
   /** Every step in full, in chain order per deployment (seq counts from 1
    *  in each), not yet sealed. */
   steps: ChainStep[];
+  /** Each deployment's grants, one version each: what its runs did, except
+   *  the operation its gateway blocked. */
+  grants: GrantVersionRecord[];
   domains: { id: string; name: string }[];
   workers: { id: string; name: string }[];
 }
@@ -55,7 +58,7 @@ function orderRuns(): Step[][] {
     if (i === 11) { runs.push([receiveOrder(via), ...ORDER_DONE, ['approve', 'approval', 'Slack', 'none', 'returned', 'human', null], end()]); continue; }
     if (i === 15) { runs.push([receiveOrder(via), ...ORDER_DONE.slice(0, 2), ['enter', 'step', 'Sales system', 'draft', 'failed', 'ai_agent', null]]); continue; }
     if (i === 19) { runs.push([receiveOrder(via), ...ORDER_DONE.slice(0, 1), ['read', 'exception', 'OCR', 'none', 'ok', 'ai_agent', 'low_confidence']]); continue; }
-    if (i === 22) { runs.push([receiveOrder(via), ...ORDER_DONE, ['bulk-send', 'step', 'Gmail', 'send', 'blocked', 'ai_agent', null]]); continue; }
+    if (i === 22) { runs.push([receiveOrder(via), ...ORDER_DONE, ['send-direct', 'step', 'Sales system', 'send', 'blocked', 'ai_agent', null]]); continue; }
     if (i === 25) { runs.push([receiveOrder(via), ...ORDER_DONE, ['approve', 'approval', 'Slack', 'none', 'waiting', 'ai_agent', null]]); continue; }
     // Every fourth reply goes to a person before it is sent.
     runs.push(i % 4 === 1
@@ -111,9 +114,25 @@ export function buildAuditSample(now: Date, t: Translate): AuditSample {
     { id: INVOICES, activity_space_id: SPACE, template_id: 'sample-template-invoices', name: t('Invoice intake (accounting)'), domain_id: accounting.id, object_id: null, worker_id: invoiceAgent.id, state: 'trial', minutes_per_item: 6, created_at: minutesAgo(60 * 24 * 12) },
   ];
 
+  // Granted: what the runs did, but never what a gateway blocked.
+  const grantVersions: GrantVersionRecord[] = [];
+  const grantsOf = (deploymentId: string, plan: Step[][], grantsVersion: number) => {
+    const seen = new Map<string, DeploymentGrant>();
+    for (const [, , connector, operation, result] of plan.flat()) {
+      if (!connector || operation === 'none' || result === 'blocked') continue;
+      const grant = { connector: t(connector), operation: operation as GrantOperation };
+      seen.set(`${grant.connector}/${grant.operation}`, grant);
+    }
+    const grants = [...seen.values()].sort((a, b) => a.connector.localeCompare(b.connector) || a.operation.localeCompare(b.operation));
+    grantVersions.push({ deployment_id: deploymentId, version: grantsVersion, grants, changed_by: null, created_at: minutesAgo(60 * 24 * 20) });
+    return (connector: string | null, operation: StepOperation) =>
+      operation !== 'none' && !grants.some(g => g.connector === connector && g.operation === operation);
+  };
+
   const runs: LedgerRun[] = [];
   const steps: ChainStep[] = [];
-  const add = (deploymentId: string, prefix: string, version: number, plan: Step[][], spacing: number) => {
+  const add = (deploymentId: string, prefix: string, version: number, plan: Step[][], spacing: number, grantsVersion: number) => {
+    const outside = grantsOf(deploymentId, plan, grantsVersion);
     let seq = 0;
     plan.forEach((list, index) => {
       const startedMinutesAgo = (plan.length - index) * spacing + 7;
@@ -128,14 +147,15 @@ export function buildAuditSample(now: Date, t: Translate): AuditSample {
         actor_name: actor_kind === 'human' ? t('Sales desk') : actor_kind === 'ai_agent' ? (deploymentId === ORDERS ? orderAgent.name : invoiceAgent.name) : null,
         reason, occurred_at: minutesAgo(startedMinutesAgo - i * 0.4), duration_ms: 300 + ((index * 7 + i * 13) % 9) * 110,
         seq: ++seq, prev_hash: '', hash: '',
+        grants_version: operation === 'none' ? null : grantsVersion, outside_grant: outside(connector && t(connector), operation),
         run: { external_id: run.external_id, subject_ref: run.subject_ref, subject_digest: run.subject_digest, started_at: run.started_at },
       }));
-      runs.push({ ...run, steps: runSteps.map(({ seq, step_key, kind, connector, operation, result, reason }) => ({ seq, step_key, kind, connector, operation, result, reason })) });
+      runs.push({ ...run, steps: runSteps.map(({ seq, step_key, kind, connector, operation, result, reason, outside_grant }) => ({ seq, step_key, kind, connector, operation, result, reason, outside_grant })) });
       steps.push(...runSteps);
     });
   };
-  add(ORDERS, 'PO', 4, orderRuns(), 13 * 60);
-  add(INVOICES, 'INV', 2, invoiceRuns(), 26 * 60);
+  add(ORDERS, 'PO', 4, orderRuns(), 13 * 60, 1);
+  add(INVOICES, 'INV', 2, invoiceRuns(), 26 * 60, 1);
   runs.sort((a, b) => b.started_at.localeCompare(a.started_at));
-  return { templates, deployments, runs, steps, domains: [salesDesk, accounting], workers: [orderAgent, invoiceAgent] };
+  return { templates, deployments, runs, steps, grants: grantVersions, domains: [salesDesk, accounting], workers: [orderAgent, invoiceAgent] };
 }
