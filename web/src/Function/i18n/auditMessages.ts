@@ -267,6 +267,7 @@ const AUDIT_MESSAGES: Record<string, Row> = {
     'La pasarela solo puede usar esta aprobación una vez, y solo para enviar contenido con esta huella. Si el contenido cambia, tiene que volver a pedirla.',
   ],
   'This approval is no longer available.': ['この承認はもうありません。', '이 승인은 더 이상 없습니다.', 'Cette approbation n’existe plus.', 'Esta aprobación ya no está disponible.'],
+  'Your decision was not recorded: this request was already decided or has expired.': ['判断は記録されませんでした。この依頼はすでに判断されたか、期限が切れています。', '결정이 기록되지 않았습니다. 이 요청은 이미 결정되었거나 만료되었습니다.', 'Votre décision n’a pas été enregistrée : cette demande a déjà été tranchée ou a expiré.', 'Tu decisión no se registró: esta solicitud ya se decidió o caducó.'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(AUDIT_MESSAGES).map(([key, row]) => [key, row[index]]));

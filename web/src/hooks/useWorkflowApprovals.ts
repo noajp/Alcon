@@ -30,8 +30,12 @@ export function useWorkflowApproval(approvalId: string | null) {
   });
   const mutation = useMutation({
     mutationFn: async ({ approve, note }: { approve: boolean; note?: string }) => {
-      const { error } = await supabase.rpc('decide_workflow_approval', { _approval_id: approvalId!, _approve: approve, _note: note?.trim() || null });
+      const { data, error } = await supabase.rpc('decide_workflow_approval', { _approval_id: approvalId!, _approve: approve, _note: note?.trim() || null });
       if (error) throw new Error(`Unable to decide the approval: ${error.message}`);
+      // Decided by someone else first, or expired while the card was open:
+      // nothing changed, and the card says so after it reads the row again.
+      const outcome = data as { status: string; changed: boolean } | null;
+      return { changed: outcome?.changed === true, status: outcome?.status ?? null };
     },
     onSettled: () => Promise.all([
       qc.invalidateQueries({ queryKey: key }),

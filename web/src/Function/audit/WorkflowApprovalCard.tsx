@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, ShieldCheck, X } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { Textarea } from '@/ui/textarea';
@@ -25,8 +25,13 @@ export function WorkflowApprovalCard({ approvalId, compact = false }: { approval
   const { t, locale } = useI18n();
   const { approval, workflow, canDecide, loading, error, decide, deciding } = useWorkflowApproval(approvalId);
   const [note, setNote] = useState('');
-  const [failed, setFailed] = useState(false);
-  const [now] = useState(() => Date.now());
+  const [failed, setFailed] = useState<'error' | 'unchanged' | null>(null);
+  // The clock the card reads expiry by, kept current while it is open.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   if (error) return <p role="alert" className={`${FONT.sm} text-[var(--status-danger)]`}>{t('Could not read the approval.')}</p>;
   if (loading) return <p className={`${FONT.sm} text-muted-foreground`}>{t('Opening…')}</p>;
@@ -41,8 +46,14 @@ export function WorkflowApprovalCard({ approvalId, compact = false }: { approval
     : t('Expired without being used');
 
   const run = async (approve: boolean) => {
-    setFailed(false);
-    try { await decide({ approve, note }); } catch { setFailed(true); }
+    setFailed(null);
+    try {
+      const outcome = await decide({ approve, note });
+      setNow(Date.now());
+      if (!outcome.changed) setFailed('unchanged');
+    } catch {
+      setFailed('error');
+    }
   };
 
   return (
@@ -74,9 +85,10 @@ export function WorkflowApprovalCard({ approvalId, compact = false }: { approval
             <Button size="sm" variant="primary" disabled={deciding} onClick={() => void run(true)}><Check size={14} />{t('Approve')}</Button>
             <Button size="sm" variant="secondary" disabled={deciding} onClick={() => void run(false)}><X size={14} />{t('Reject')}</Button>
           </div>
-          {failed && <p role="alert" className={`${FONT.sm} text-[var(--status-danger)]`}>{t('Could not record the decision.')}</p>}
+          {failed === 'error' && <p role="alert" className={`${FONT.sm} text-[var(--status-danger)]`}>{t('Could not record the decision.')}</p>}
         </div>
       ) : <p className={`${FONT.sm} text-muted-foreground`}>{t("Only the Space's owner can decide this approval.")}</p>)}
+      {state !== 'pending' && failed === 'unchanged' && <p role="status" className={`${FONT.sm} text-muted-foreground`}>{t('Your decision was not recorded: this request was already decided or has expired.')}</p>}
     </section>
   );
 }

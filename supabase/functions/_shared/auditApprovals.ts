@@ -120,12 +120,12 @@ export function buildApprovalProof(redeemed: Redeemed, signingKey: string): Appr
 /**
  * The proof a gateway received, if it is Alcon's signature under the pinned
  * key, for the approval the gateway redeemed, for exactly the content it is
- * about to send, and not expired. Anything else and the gateway does not
- * send.
+ * about to send — and the deployment, connector and operation it is about to
+ * use — and not expired. Anything else and the gateway does not send.
  */
 export async function readApprovalProof(
   pinnedKey: string, signature: string, body: Uint8Array,
-  expect: { approvalId: string; inputHash: string; nowMs: number },
+  expect: { approvalId: string; inputHash: string; deploymentId: string; connector: string; operation: string; nowMs: number },
 ): Promise<ApprovalProof | null> {
   if (!(await verifySignature(pinnedKey, signature, body))) return null;
   let proof: ApprovalProof;
@@ -135,6 +135,7 @@ export async function readApprovalProof(
     return null;
   }
   if (proof?.kind !== "alcon.approval" || proof.approval_id !== expect.approvalId || proof.input_hash !== expect.inputHash) return null;
+  if (proof.deployment_id !== expect.deploymentId || proof.connector !== expect.connector || proof.operation !== expect.operation) return null;
   if (!(Date.parse(proof.expires_at) > expect.nowMs)) return null;
   return proof;
 }

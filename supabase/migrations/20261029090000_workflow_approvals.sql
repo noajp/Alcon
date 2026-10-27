@@ -176,7 +176,9 @@ begin
   -- ── the gateway uses it, once ──────────────────────────────────────────
   -- With the hash of what it is about to send. Spent only when approved,
   -- unexpired, unused and the hash matches; otherwise says why and spends
-  -- nothing. A second redemption is refused even with the right hash.
+  -- nothing. A second redemption is refused even with the right hash. Only
+  -- the key that asked may redeem: another gateway of the same Space cannot
+  -- spend it.
   execute 'drop function if exists public.workflow_approval_redeem(uuid, uuid, text)';
   execute $fn$
     create function public.workflow_approval_redeem(_key_id uuid, _approval_id uuid, _input_hash text)
@@ -190,7 +192,7 @@ begin
       if key_space is null then
         return jsonb_build_object('status', 'refused', 'reason', 'unknown or revoked key', 'key_revoked', true);
       end if;
-      select * into held from workflow_approvals where id = _approval_id and activity_space_id = key_space for update;
+      select * into held from workflow_approvals where id = _approval_id and gateway_key_id = _key_id for update;
       if held.id is null then return jsonb_build_object('status', 'refused', 'reason', 'no such approval'); end if;
       if held.status = 'rejected' then return jsonb_build_object('status', 'rejected', 'note', held.decision_note); end if;
       if held.consumed_at is not null then return jsonb_build_object('status', 'used', 'used_at', held.consumed_at); end if;

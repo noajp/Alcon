@@ -23,7 +23,7 @@ x-alcon-signature:   <生の本文バイト列への Ed25519 署名、base64url>
 - `input_hash` は、ゲートウェイが実際に送るバイト列の SHA-256。内容が1バイトでも変われば別の承認が要る
 - `summary` は判断する人が読む文（2000字まで）。書類の中身は入れない
 - `valid_minutes` は判断と使用の期限（5〜1440分、省略時は1440）
-- 同じ `request_id` を送り直すと、同じ依頼が返る（`held`）。同じ id で中身が違えば拒否される
+- 同じ `request_id` を送り直すと、同じ依頼が返る（`held`）。同じ id で中身が違えば拒否される。新しく依頼し直すとき（`mismatch`・`used`・`expired`・応答の取りこぼしのあと）は、新しい `request_id` を使う
 - 依頼は Space のオーナーの Inbox に届く
 
 ### 2. 引き換える（送る直前）
@@ -40,10 +40,10 @@ x-alcon-signature:   <生の本文バイト列への Ed25519 署名、base64url>
 | 409 `mismatch` | 送ろうとしている内容が承認された内容と違う。消費していない | 送らない。新しく依頼する |
 | 409 `used` | もう使われた | 送らない |
 | 409 `expired` | 期限切れ | 送らない。新しく依頼する |
-| 409 `refused` | 承認が鍵の Space にない、など | 送らない |
+| 409 `refused` | 承認がない、または別の鍵が依頼したもの | 送らない |
 | 400 / 401 / 413 / 503 | 本文の形が違う / 鍵か署名が違う / 16KB を超えた / 何も決めていない | 直す / 鍵を確かめる / 縮める / 引き換え直す |
 
-証明は消費した時に1回だけ発行される。応答を受け取れなかったときは、その承認はもう使えないので、新しく依頼する。
+証明は消費した時に1回だけ発行される。応答を受け取れなかったときは、その承認はもう使えないので、新しい `request_id` で依頼し直す。引き換えられるのは依頼した鍵だけ。
 
 ```json
 { "kind": "alcon.approval", "approval_id": "<uuid>", "space_id": "<uuid>", "deployment_id": "<uuid>",
@@ -55,7 +55,7 @@ x-alcon-signature:   <生の本文バイト列への Ed25519 署名、base64url>
 ## ゲートウェイが守ること
 
 - 証明の署名を、導入時に固定した Alcon の公開鍵で確かめる（権限表と同じ鍵。`kind` が `alcon.approval` でないものは証明ではない）
-- `approval_id`・`input_hash` が、引き換えたものとこれから送る内容と一致し、`expires_at` 前であることを確かめてから送る（参照実装は `supabase/functions/_shared/auditApprovals.ts` の `readApprovalProof`）
+- `approval_id`・`input_hash`・`deployment_id`・`connector`・`operation` が、引き換えたものとこれから行う操作と一致し、`expires_at` 前であることを確かめてから送る（参照実装は `supabase/functions/_shared/auditApprovals.ts` の `readApprovalProof`）
 - 承認の結果は、記録（[audit-intake](audit-intake.md)）の `kind: "approval"` の手順として残す
 
 ## デプロイ

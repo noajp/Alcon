@@ -53,12 +53,15 @@ describe('the proof', () => {
     const body = new TextEncoder().encode(JSON.stringify(approvals.buildApprovalProof(redeemed, pinned)));
     const signature = grants.base64UrlEncode(await crypto.subtle.sign({ name: 'Ed25519' }, pair.privateKey, body));
     const now = Date.parse('2026-10-28T09:06:00Z');
-    const expect_ = { approvalId: APPROVAL, inputHash: HASH, nowMs: now };
+    const expect_ = { approvalId: APPROVAL, inputHash: HASH, deploymentId: DEP, connector: 'Gmail', operation: 'send', nowMs: now };
 
     expect((await approvals.readApprovalProof(pinned, signature, body, expect_))?.approved_by).toBe('Owner');
     expect(await approvals.readApprovalProof(pinned, signature, body, { ...expect_, inputHash: 'b'.repeat(64) })).toBeNull();
     expect(await approvals.readApprovalProof(pinned, signature, body, { ...expect_, approvalId: DEP })).toBeNull();
     expect(await approvals.readApprovalProof(pinned, signature, body, { ...expect_, nowMs: now + 10 * 60_000 })).toBeNull();
+    expect(await approvals.readApprovalProof(pinned, signature, body, { ...expect_, operation: 'money' })).toBeNull();
+    expect(await approvals.readApprovalProof(pinned, signature, body, { ...expect_, connector: 'Slack' })).toBeNull();
+    expect(await approvals.readApprovalProof(pinned, signature, body, { ...expect_, deploymentId: APPROVAL })).toBeNull();
     const swapped = new TextEncoder().encode(new TextDecoder().decode(body).replace(HASH, 'b'.repeat(64)));
     expect(await approvals.readApprovalProof(pinned, signature, swapped, { ...expect_, inputHash: 'b'.repeat(64) })).toBeNull();
     // A grants table signed by the same key is not a proof.
