@@ -134,6 +134,9 @@ function Button({
       data-size={size}
       data-shape={shape}
       className={cn(buttonVariants({ variant, size, align: resolvedAlign, shape, multiline, className }),
+        // A tab reads as a button even when it is not the selected one: it
+        // keeps its fine outline where a ghost action drops it.
+        appearance === 'control' && shape === 'tab' && 'border-[var(--border-default)] hover:border-[var(--border-strong)]',
         appearance !== 'control' && 'rounded-[var(--control-tab-radius)] border-transparent hover:border-transparent aria-pressed:border-transparent aria-selected:border-transparent',
         appearance === 'inline' && variant === 'ghost' && 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] font-normal'
       )}
