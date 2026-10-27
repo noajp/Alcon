@@ -1172,6 +1172,8 @@ export interface Notification {
   brief_id: string | null
   /** The membership invitation an 'invite' notification is about. */
   invitation_id?: string | null
+  /** The gateway's approval request an 'approval_requested' notification is about. */
+  workflow_approval_id?: string | null
   title: string
   body: string | null
   is_read: boolean

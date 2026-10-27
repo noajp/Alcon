@@ -10,7 +10,7 @@ const KIND_HINT: Partial<Record<string, string>> = {
   assigned: "You're assigned to an Element",
   comment: 'A new comment on an Element you own or are assigned to',
   status_change: "An Element you're involved with changes status, or an agent run you started finishes or fails",
-  approval_requested: 'Your approval is requested on an Element',
+  approval_requested: 'Your approval is requested on an Element or by an AI workflow',
   approval_decided: 'A decision is recorded on an approval you requested',
   due_soon: "An Element you're involved with is due soon",
   invite: 'Someone invites you to a Space, Domain or Object. Invitations also wait in Settings > Profile',

@@ -4,6 +4,7 @@ import { Archive, Check, Inbox } from 'lucide-react';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { InvitationCard } from '@/Function/membership/InvitationCard';
+import { WorkflowApprovalCard } from '@/Function/audit/WorkflowApprovalCard';
 import { useInvitation } from '@/Function/membership/invitations';
 import { Button } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';
@@ -62,6 +63,10 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
           <p>{t(detail ? 'This Element is no longer available.' : 'Opening…')}</p>
           {detail && <Button variant="ghost" onClick={refresh}>{t('Retry')}</Button>}
         </div>
+      ) : selected.workflow_approval_id ? (
+        <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">
+          <WorkflowApprovalCard key={selected.workflow_approval_id} approvalId={selected.workflow_approval_id} />
+        </article>
       ) : selected.kind === 'invite' ? (
         <InvitationNotice key={selected.id} invitationId={selected.invitation_id ?? null} title={selected.title} />
       ) : (
