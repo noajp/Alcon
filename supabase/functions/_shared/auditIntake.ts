@@ -54,6 +54,9 @@ export interface IntakeStep {
   reason: string | null;
   occurred_at: string;
   duration_ms: number | null;
+  /** The version of the deployment's grants (ADR 0046) the gateway held when
+   * it decided this event's operation; null when it held none. */
+  grants_version: number | null;
   prev_digest: string;
   digest: string;
 }
@@ -114,6 +117,7 @@ function parseStep(raw: unknown, i: number): Parsed<IntakeStep> {
   const actor_name = optionalText(raw, "actor_name", 200);
   const reason = optionalText(raw, "reason", 2000);
   const duration = raw.duration_ms;
+  const grants = raw.grants_version;
   if (!deployment_id || !UUID.test(deployment_id)) return { ok: false, error: `${at}.deployment_id is not a uuid` };
   if (!event_id || !ID.test(event_id)) return { ok: false, error: `${at}.event_id is missing or malformed` };
   if (!run_external_id || !ID.test(run_external_id)) return { ok: false, error: `${at}.run_external_id is missing or malformed` };
@@ -129,11 +133,15 @@ function parseStep(raw: unknown, i: number): Parsed<IntakeStep> {
   if (duration !== undefined && duration !== null && !(Number.isInteger(duration) && (duration as number) >= 0 && (duration as number) <= MAX_INT)) {
     return { ok: false, error: `${at}.duration_ms is not a non-negative integer` };
   }
+  if (grants !== undefined && grants !== null && !(Number.isInteger(grants) && (grants as number) >= 0 && (grants as number) <= MAX_INT)) {
+    return { ok: false, error: `${at}.grants_version is not a non-negative integer` };
+  }
   return {
     ok: true,
     value: {
       deployment_id, event_id, run_external_id, step_key, kind, connector, operation, result, actor_kind, actor_name, reason,
-      occurred_at, duration_ms: (duration as number | null | undefined) ?? null, prev_digest, digest,
+      occurred_at, duration_ms: (duration as number | null | undefined) ?? null,
+      grants_version: (grants as number | null | undefined) ?? null, prev_digest, digest,
     },
   };
 }
@@ -188,7 +196,7 @@ export function eventDigestText(step: Omit<IntakeStep, "digest">): string {
   return [
     step.prev_digest, step.deployment_id, step.event_id, step.run_external_id, step.step_key, step.kind,
     step.connector, step.operation, step.result, step.actor_kind, step.actor_name, step.reason,
-    step.occurred_at, step.duration_ms,
+    step.occurred_at, step.duration_ms, step.grants_version,
   ].map(field).join("");
 }
 

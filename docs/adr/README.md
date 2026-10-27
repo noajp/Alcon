@@ -75,3 +75,4 @@
 | [0043](0043-designs-are-static-html-and-svg-drawn-in-a-scriptless-frame.md) | デザインは静的な HTML と SVG で持ち、スクリプトの動かない枠で描く |
 | [0044](0044-the-ai-audit-ledger-keeps-records-without-documents.md) | AI の監査台帳は書類を持たずに記録を持ち、鎖で改ざんを示す |
 | [0045](0045-the-audit-intake-takes-signed-batches-that-continue-the-gateways-chain.md) | 記録の受け口は、署名されたまとめ送りを受け、ゲートウェイの鎖が続いているかを確かめる |
+| [0046](0046-grants-are-decided-in-alcon-and-handed-to-the-gateway-signed.md) | 権限は Alcon で決め、署名した版つきの表としてゲートウェイに渡す |

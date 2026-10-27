@@ -2,7 +2,7 @@
 //
 //   overview   what needs a person, how much is handed to AI, the workflows
 //   workflow   one deployment, through its tabs (overview, runs, flow,
-//              record integrity)
+//              grants, record integrity)
 //   log        every run, newest first; `attention` narrows it to the runs
 //              that ask something of a person
 // A run id opens the run's steps beside the log or the workflow's runs.
@@ -10,7 +10,7 @@
 const AUDIT_VIEWS = ['overview', 'workflow', 'log'] as const;
 export type AuditViewId = typeof AUDIT_VIEWS[number];
 
-export type WorkflowTab = 'overview' | 'runs' | 'flow' | 'integrity';
+export type WorkflowTab = 'overview' | 'runs' | 'flow' | 'grants' | 'integrity';
 
 export interface AuditRoute {
   view: AuditViewId;

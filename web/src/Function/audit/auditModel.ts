@@ -72,11 +72,54 @@ export interface WorkflowStepRecord {
   seq: number;
   prev_hash: string;
   hash: string;
+  /** The version of the deployment's grants the gateway held (ADR 0046). */
+  grants_version: number | null;
+  /** The operation was outside that version: done anyway, or blocked. */
+  outside_grant: boolean;
 }
 
 /** What reading a run needs of each step — what the ledger list carries.
  *  The run's own page reads the full rows. */
-export type StepEvent = Pick<WorkflowStepRecord, 'seq' | 'step_key' | 'kind' | 'connector' | 'operation' | 'result' | 'reason'>;
+export type StepEvent = Pick<WorkflowStepRecord, 'seq' | 'step_key' | 'kind' | 'connector' | 'operation' | 'result' | 'reason' | 'outside_grant'>;
+
+// ── Grants (ADR 0046) ────────────────────────────────────────────────────
+// What a deployment may do: a connector and an operation per grant. The
+// grants in force are rows the Space's owner adds and removes; every change
+// leaves a numbered version, which the gateway is handed and its records
+// name.
+
+export const GRANT_OPERATIONS = ['read', 'draft', 'send', 'money'] as const;
+export type GrantOperation = typeof GRANT_OPERATIONS[number];
+
+export interface DeploymentGrant {
+  connector: string;
+  operation: GrantOperation;
+}
+
+export interface GrantVersionRecord {
+  deployment_id: string;
+  version: number;
+  grants: DeploymentGrant[];
+  changed_by: string | null;
+  created_at: string;
+}
+
+const grantKey = (g: DeploymentGrant) => `${g.connector}\u0000${g.operation}`;
+
+/** The connectors a deployment's grants page lists: those granted anything,
+ *  then those its runs called without a grant, each once, in that order. */
+export function grantConnectors(grants: readonly DeploymentGrant[], called: readonly string[]): string[] {
+  const granted = [...new Set(grants.map(g => g.connector))].sort((a, b) => a.localeCompare(b));
+  const rest = [...new Set(called)].filter(c => !granted.includes(c)).sort((a, b) => a.localeCompare(b));
+  return [...granted, ...rest];
+}
+
+/** What a version added and removed against the one before it. */
+export function grantChanges(before: readonly DeploymentGrant[], after: readonly DeploymentGrant[]): { added: DeploymentGrant[]; removed: DeploymentGrant[] } {
+  const was = new Set(before.map(grantKey));
+  const now = new Set(after.map(grantKey));
+  return { added: after.filter(g => !was.has(grantKey(g))), removed: before.filter(g => !now.has(grantKey(g))) };
+}
 
 /** A run as the ledger list carries it: with its steps, in chain order. */
 export interface LedgerRun extends WorkflowRunRecord {
@@ -89,7 +132,7 @@ export type RunOutcome =
   | 'approved'   // finished after a person approved
   | 'returned'   // a person sent it back
   | 'exception'  // the agent stopped and handed it to a person
-  | 'deviation'  // the gateway blocked an operation outside the grants
+  | 'deviation'  // an operation outside the grants, blocked or not
   | 'stopped'    // a joint failed and the run did not finish
   | 'waiting'    // waiting for a person's approval
   | 'running';
@@ -105,14 +148,15 @@ function inChainOrder<T extends { seq: number }>(steps: readonly T[]): T[] {
 }
 
 /**
- * A run's outcome, read from its steps. A blocked operation outweighs
- * everything — it is the one thing an audit must never let pass unseen —
+ * A run's outcome, read from its steps. An operation outside the grants,
+ * or one the gateway blocked, outweighs everything — it is the one thing an
+ * audit must never let pass unseen —
  * then a finished run says how it finished, and an unfinished one says
  * what it is waiting on.
  */
 export function runOutcome(steps: readonly StepEvent[]): RunOutcome {
   const ordered = inChainOrder(steps);
-  if (ordered.some(s => s.result === 'blocked')) return 'deviation';
+  if (ordered.some(s => s.result === 'blocked' || s.outside_grant)) return 'deviation';
   const end = ordered.find(s => s.kind === 'end');
   if (end) {
     if (end.result === 'failed') return 'stopped';

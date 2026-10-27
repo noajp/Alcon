@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import {
-  exceptionReason, flowObservation, runOutcome, sealChain, summarizeDeployment, templateSteps, verifyChain,
+  exceptionReason, flowObservation, grantChanges, grantConnectors, runOutcome, sealChain, summarizeDeployment, templateSteps, verifyChain,
   type ChainStep, type WorkflowRunRecord, type WorkflowStepRecord,
 } from '@/Function/audit/auditModel';
 import { buildAuditSample } from '@/Function/audit/auditSample';
@@ -14,7 +14,7 @@ function step(patch: Partial<WorkflowStepRecord>): WorkflowStepRecord {
   return {
     id: `s${seq}`, run_id: 'r1', deployment_id: 'd1', step_key: `k${seq}`, kind: 'step', connector: null,
     operation: 'none', result: 'ok', actor_kind: 'ai_agent', actor_name: null, reason: null,
-    occurred_at: '2026-10-26T01:00:00Z', duration_ms: null, seq, prev_hash: '', hash: '', ...patch,
+    occurred_at: '2026-10-26T01:00:00Z', duration_ms: null, seq, prev_hash: '', hash: '', grants_version: null, outside_grant: false, ...patch,
   };
 }
 
@@ -28,6 +28,10 @@ describe('runOutcome', () => {
 
   it('lets a blocked operation outweigh a clean finish', () => {
     expect(runOutcome([step({ result: 'blocked', operation: 'send' }), step({ kind: 'end' })])).toBe('deviation');
+  });
+
+  it('reads an operation carried out outside the grants as a deviation too', () => {
+    expect(runOutcome([step({ operation: 'send', connector: 'gmail', outside_grant: true }), step({ kind: 'end' })])).toBe('deviation');
   });
 
   it('says what an unfinished run is waiting on', () => {
@@ -114,7 +118,7 @@ describe('the hash chain', () => {
     id: 'x', run_id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', deployment_id: 'd', step_key: 'read', kind: 'step', connector: null,
     operation: 'none', result: 'ok', actor_kind: 'ai_agent', actor_name: '受注エージェント', reason: null,
     occurred_at: '2026-10-26T01:02:03.5+00:00', duration_ms: 120, seq: 1, prev_hash: GENESIS_HASH,
-    hash: '7225e56d3ef43c5afda3a837bf468548d41b9d9a2927ed3f829c6cd2450f1efe', run,
+    hash: '7225e56d3ef43c5afda3a837bf468548d41b9d9a2927ed3f829c6cd2450f1efe', grants_version: null, outside_grant: false, run,
   };
   const second: ChainStep = {
     ...first, id: 'y', step_key: 'enter', connector: '販売管理', operation: 'draft', actor_name: null,
@@ -153,6 +157,19 @@ describe('the hash chain', () => {
   });
 });
 
+describe('grants', () => {
+  it('lists granted connections first, then those runs called without a grant', () => {
+    const grants = [{ connector: 'gmail', operation: 'send' as const }, { connector: 'erp', operation: 'draft' as const }, { connector: 'gmail', operation: 'read' as const }];
+    expect(grantConnectors(grants, ['slack', 'gmail', 'bank', 'slack'])).toEqual(['erp', 'gmail', 'bank', 'slack']);
+  });
+
+  it('says what a version added and removed', () => {
+    const before = [{ connector: 'gmail', operation: 'read' as const }, { connector: 'erp', operation: 'draft' as const }];
+    const after = [{ connector: 'gmail', operation: 'read' as const }, { connector: 'gmail', operation: 'send' as const }];
+    expect(grantChanges(before, after)).toEqual({ added: [{ connector: 'gmail', operation: 'send' }], removed: [{ connector: 'erp', operation: 'draft' }] });
+  });
+});
+
 describe('the sample', () => {
   const now = new Date('2026-10-27T09:00:00Z');
   const sample = buildAuditSample(now, (m) => m);
@@ -162,6 +179,16 @@ describe('the sample', () => {
     for (const outcome of ['auto', 'approved', 'returned', 'exception', 'deviation', 'stopped', 'waiting'] as const) expect(outcomes).toContain(outcome);
     const since = new Date(now.getTime() - 30 * 86_400_000).toISOString();
     expect(sample.runs.every(run => run.started_at >= since && run.started_at <= now.toISOString())).toBe(true);
+  });
+
+  it('marks only what its grants leave out — the blocked attempt — as outside them', () => {
+    const outside = sample.steps.filter(s => s.outside_grant);
+    expect(outside.length).toBeGreaterThan(0);
+    expect(outside.every(s => s.result === 'blocked')).toBe(true);
+    for (const s of sample.steps.filter(x => x.operation !== 'none')) {
+      const version = sample.grants.find(v => v.deployment_id === s.deployment_id)!;
+      expect(s.grants_version).toBe(version.version);
+    }
   });
 
   it('seals into a chain per deployment that verifies like a real one', async () => {
