@@ -100,8 +100,10 @@ begin
   -- gets its next version — the grants now in force, sorted — unless they
   -- are what the latest version already says. The deployment's row is
   -- locked first, so two owners changing grants at once get two versions in
-  -- order, never one number twice. A deployment removed with its Space gets
-  -- none.
+  -- order, never one number twice. The lock is FOR NO KEY UPDATE: each
+  -- inserting statement already holds FOR KEY SHARE on the row (the foreign
+  -- key check), which FOR UPDATE would wait on and deadlock against. A
+  -- deployment removed with its Space gets none.
   execute $fn$
     create or replace function public.deployment_grants_version()
     returns trigger language plpgsql security definer set search_path = public as $b$
@@ -113,7 +115,7 @@ begin
       latest_version integer;
     begin
       for dep in select distinct deployment_id from changed order by 1 loop
-        select activity_space_id into space from workflow_deployments where id = dep for update;
+        select activity_space_id into space from workflow_deployments where id = dep for no key update;
         continue when space is null;
         select coalesce(jsonb_agg(jsonb_build_object('connector', g.connector, 'operation', g.operation)
                  order by g.connector, g.operation), '[]'::jsonb)

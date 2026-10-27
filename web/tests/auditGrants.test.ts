@@ -71,10 +71,16 @@ describe('requests and signatures', () => {
 
     const body = new TextEncoder().encode(JSON.stringify({ ...table(), signing_key: loaded.publicKey }));
     const signature = grants.base64UrlEncode(await crypto.subtle.sign({ name: 'Ed25519' }, loaded.key, body));
-    expect((await grants.readGrantsTable(pinned, signature, body))?.deployments).toHaveLength(2);
-    expect(await grants.readGrantsTable(otherKey, signature, body)).toBeNull();
+    const fresh = { keyId: 'key', held: null };
+    expect((await grants.readGrantsTable(pinned, signature, body, fresh))?.deployments).toHaveLength(2);
+    expect(await grants.readGrantsTable(otherKey, signature, body, fresh)).toBeNull();
+    expect(await grants.readGrantsTable(pinned, signature, body, { keyId: 'another key', held: null })).toBeNull();
+    const newer = table(NOW + 60_000);
+    expect(await grants.readGrantsTable(pinned, signature, body, { keyId: 'key', held: newer })).toBeNull();
+    expect(await grants.readGrantsTable(pinned, signature, body, { keyId: 'key', held: { ...newer, space_id: 'other' } })).toBeNull();
+    expect(await grants.readGrantsTable(pinned, signature, body, { keyId: 'key', held: table(NOW - 60_000) })).not.toBeNull();
     const widened = new TextEncoder().encode(new TextDecoder().decode(body).replace('"draft"', '"money"'));
-    expect(await grants.readGrantsTable(pinned, signature, widened)).toBeNull();
+    expect(await grants.readGrantsTable(pinned, signature, widened, fresh)).toBeNull();
     expect(await grants.loadSigningKey('not a key')).toBeNull();
   });
 });

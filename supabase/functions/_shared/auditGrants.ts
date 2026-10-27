@@ -93,17 +93,27 @@ export function buildGrantsTable(input: {
 
 /**
  * The table a gateway received, if `signature` is Alcon's signature of
- * `body` under the key the gateway pinned. The gateway pins Alcon's public
- * key when it is set up, and never takes it from the table itself.
+ * `body` under the key the gateway pinned, the table is for this gateway's
+ * key, and it is not older than the one the gateway already holds — so an
+ * old signed table replayed at the gateway cannot roll its grants back. The
+ * gateway pins Alcon's public key when it is set up, and never takes it from
+ * the table itself.
  */
-export async function readGrantsTable(pinnedKey: string, signature: string, body: Uint8Array): Promise<GrantsTable | null> {
+export async function readGrantsTable(
+  pinnedKey: string, signature: string, body: Uint8Array, expect: { keyId: string; held: GrantsTable | null },
+): Promise<GrantsTable | null> {
   if (!(await verifySignature(pinnedKey, signature, body))) return null;
+  let table: GrantsTable;
   try {
-    const table = JSON.parse(new TextDecoder().decode(body)) as GrantsTable;
-    return table?.kind === "alcon.grants" && Array.isArray(table.deployments) ? table : null;
+    table = JSON.parse(new TextDecoder().decode(body)) as GrantsTable;
   } catch {
     return null;
   }
+  if (table?.kind !== "alcon.grants" || !Array.isArray(table.deployments) || table.key_id !== expect.keyId) return null;
+  const issued = Date.parse(table.issued_at);
+  if (Number.isNaN(issued)) return null;
+  if (expect.held && (table.space_id !== expect.held.space_id || issued < Date.parse(expect.held.issued_at))) return null;
+  return table;
 }
 
 export type Decision =
@@ -115,8 +125,10 @@ export type Decision =
  * holds. The safe side wins: no table, an unknown deployment or a paused one
  * allow nothing; an expired table still allows read and draft but not send
  * or money. The version goes on the step the gateway records, allowed or not
- * — a refused attempt is recorded as blocked, and the intake marks it
- * outside the grants.
+ * — a refused attempt is recorded as blocked. The intake marks a step
+ * outside the grants only when that version leaves the operation out; a
+ * refusal for a paused deployment or an expired table is blocked but inside
+ * them.
  */
 export function decideOperation(table: GrantsTable | null, nowMs: number, deploymentId: string, connector: string | null, operation: Operation): Decision {
   const deployment = table?.deployments.find((d) => d.deployment_id === deploymentId);
