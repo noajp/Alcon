@@ -460,6 +460,10 @@ textarea.quick-create-title {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+/* The sidebar scrolls without a bar: a permanent rail beside the navigation
+   is chrome the list does not need — the wheel and trackpad still scroll it. */
+.app-sidebar * { scrollbar-width: none; }
+.app-sidebar *::-webkit-scrollbar { display: none; }
 
 /* ---- Focus rings ----
  * No automatic focus outline anywhere. Nothing acquires a ring just by being a

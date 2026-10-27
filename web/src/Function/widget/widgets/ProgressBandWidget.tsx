@@ -26,9 +26,9 @@ export function ProgressBandWidget({ host }: { host: WidgetHost }) {
 
   return (
     <div className="flex items-center gap-3">
-      <SegmentedProgress value={stats.pct} className="w-40 shrink-0" />
+      <SegmentedProgress value={stats.pct} className="w-40 min-w-12 shrink" />
       <span className="shrink-0 text-[12px] font-medium tabular-nums text-foreground">{stats.pct}%</span>
-      <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
+      <span className="min-w-0 truncate text-[12px] tabular-nums text-muted-foreground">
         {t('{done}/{total} done', { done: stats.done, total: stats.total })}
         {stats.inProgress > 0 && <span className="ml-1.5">· {t('{n} active', { n: stats.inProgress })}</span>}
         {stats.overdue > 0 && <span className="ml-1.5 text-[var(--status-danger)]">· {t('{n} overdue', { n: stats.overdue })}</span>}

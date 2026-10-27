@@ -8,6 +8,7 @@ import { constrainTabDrag } from './tabDrag';
 import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, FileText, Flag } from 'lucide-react';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { CollapsingTabs } from '@/Function/shared/CollapsingTabs';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
 
 interface TabBarProps {
@@ -108,62 +109,69 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
 
   return (
     <div className="flex items-center gap-1.5 px-4 py-2 bg-transparent">
-      {/* Tabs — outlined rectangles */}
-      <DndContext sensors={sensors} modifiers={[constrainTabDrag]} collisionDetection={closestCenter} onDragEnd={({ active, over }) => {
-        if (!onTabReorder || !over || active.id === over.id) return;
-        const from = tabs.findIndex(t => t.id === active.id);
-        const to = tabs.findIndex(t => t.id === over.id);
-        if (from >= 0 && to >= 0) onTabReorder(arrayMove(tabs.map(t => t.id), from, to));
-      }}>
-        <SortableContext items={tabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
-          <div className="min-w-0 overflow-x-auto">
-            <div className="flex w-max items-center gap-1.5">
-            {tabs.map(tab => <SortableViewTab key={tab.id} tab={tab} active={tab.id === activeTabId}
-              sortable={!!onTabReorder} onSelect={() => onTabSelect(tab.id)} onContextMenu={e => handleContextMenu(e, tab)} />)}
+      {/* Tabs — outlined rectangles, folded into one menu when they do not fit */}
+      <CollapsingTabs
+        menuLabel={t('Views')}
+        items={tabs.map((tab) => ({ id: tab.id, label: t(tab.title), icon: OBJECT_TAB_META[tab.tab_type].Icon }))}
+        activeId={activeTabId ?? tabs[0]?.id ?? ''}
+        onSelect={onTabSelect}
+        strip={(
+        <DndContext sensors={sensors} modifiers={[constrainTabDrag]} collisionDetection={closestCenter} onDragEnd={({ active, over }) => {
+          if (!onTabReorder || !over || active.id === over.id) return;
+          const from = tabs.findIndex(t => t.id === active.id);
+          const to = tabs.findIndex(t => t.id === over.id);
+          if (from >= 0 && to >= 0) onTabReorder(arrayMove(tabs.map(t => t.id), from, to));
+        }}>
+          <SortableContext items={tabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
+            <div className="min-w-0 overflow-x-auto">
+              <div className="flex w-max items-center gap-1.5">
+              {tabs.map(tab => <SortableViewTab key={tab.id} tab={tab} active={tab.id === activeTabId}
+                sortable={!!onTabReorder} onSelect={() => onTabSelect(tab.id)} onContextMenu={e => handleContextMenu(e, tab)} />)}
+              </div>
             </div>
-          </div>
-        </SortableContext>
-      </DndContext>
-
-      {/* Add Tab Button */}
-      <div className="relative flex items-center flex-shrink-0">
-        <ButtonAppearanceProvider appearance="navigation">
-          <Button
-            type="button"
-            size="icon-sm"
-            variant="ghost"
-            aria-label={t('Add tab')}
-            title={t('Add tab')}
-            onClick={() => setShowCreateMenu(!showCreateMenu)}
-          >
-            <Plus size={14} />
-          </Button>
-        </ButtonAppearanceProvider>
-
-        {showCreateMenu && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setShowCreateMenu(false)} />
-            <div className="absolute top-full left-0 mt-1 py-1 bg-popover border border-border rounded-lg shadow-xl z-50 min-w-[150px]">
-              {visibleCreateOptions.map((type) => {
-                const meta = OBJECT_TAB_META[type];
-                const OptionIcon = meta.Icon;
-                return (
-                  <button
-                    key={type}
-                    onClick={() => handleCreate(type)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
-                  >
-                    <span className="text-muted-foreground"><OptionIcon size={16} /></span>
-                    {t(meta.title)}
-                  </button>
-                );
-              })}
-            </div>
-          </>
+          </SortableContext>
+        </DndContext>
         )}
-      </div>
+        trailing={(
+        <div className="relative flex items-center flex-shrink-0">
+          <ButtonAppearanceProvider appearance="navigation">
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              aria-label={t('Add tab')}
+              title={t('Add tab')}
+              onClick={() => setShowCreateMenu(!showCreateMenu)}
+            >
+              <Plus size={14} />
+            </Button>
+          </ButtonAppearanceProvider>
 
-      <div className="flex-1" />
+          {showCreateMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowCreateMenu(false)} />
+              <div className="absolute top-full left-0 mt-1 py-1 bg-popover border border-border rounded-lg shadow-xl z-50 min-w-[150px]">
+                {visibleCreateOptions.map((type) => {
+                  const meta = OBJECT_TAB_META[type];
+                  const OptionIcon = meta.Icon;
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => handleCreate(type)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+                    >
+                      <span className="text-muted-foreground"><OptionIcon size={16} /></span>
+                      {t(meta.title)}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+        )}
+      />
+
       {rightSlot}
 
       {/* Right-click context menu */}

@@ -1397,10 +1397,10 @@ Object.assign(es, {
 });
 
 // Tool pages (CRM): the tab strip and the subject's head.
-Object.assign(ja, { 'Overview': '概要', 'Properties': 'プロパティ', 'Description': '説明', 'Hide this view': 'このビューを隠す', 'Show a view': 'ビューを表示', '{n} days': '{n} 日' });
-Object.assign(ko, { 'Overview': '개요', 'Properties': '속성', 'Description': '설명', 'Hide this view': '이 보기 숨기기', 'Show a view': '보기 표시', '{n} days': '{n}일' });
-Object.assign(fr, { 'Overview': 'Aperçu', 'Properties': 'Propriétés', 'Description': 'Description', 'Hide this view': 'Masquer cette vue', 'Show a view': 'Afficher une vue', '{n} days': '{n} jours' });
-Object.assign(es, { 'Overview': 'Resumen', 'Properties': 'Propiedades', 'Description': 'Descripción', 'Hide this view': 'Ocultar esta vista', 'Show a view': 'Mostrar una vista', '{n} days': '{n} días' });
+Object.assign(ja, { 'Views': 'ビュー', 'Overview': '概要', 'Properties': 'プロパティ', 'Description': '説明', 'Hide this view': 'このビューを隠す', 'Show a view': 'ビューを表示', '{n} days': '{n} 日' });
+Object.assign(ko, { 'Views': '보기', 'Overview': '개요', 'Properties': '속성', 'Description': '설명', 'Hide this view': '이 보기 숨기기', 'Show a view': '보기 표시', '{n} days': '{n}일' });
+Object.assign(fr, { 'Views': 'Vues', 'Overview': 'Aperçu', 'Properties': 'Propriétés', 'Description': 'Description', 'Hide this view': 'Masquer cette vue', 'Show a view': 'Afficher une vue', '{n} days': '{n} jours' });
+Object.assign(es, { 'Views': 'Vistas', 'Overview': 'Resumen', 'Properties': 'Propiedades', 'Description': 'Descripción', 'Hide this view': 'Ocultar esta vista', 'Show a view': 'Mostrar una vista', '{n} days': '{n} días' });
 
 // Slides (ActivitySpace/sustainment/slides): its sidebar. The app name stays English.
 Object.assign(ja, { 'In the open deck’s folder, or the first one': '開いている資料のフォルダ（なければ最初のフォルダ）に', 'A place to keep decks together': '資料をまとめて置く場所', 'A .kata.json file, as a new deck': '.kata.json ファイルを新しい資料として', 'Slides': 'Slides', 'New deck': '新しい資料', 'Delete folder': 'フォルダを削除', 'Duplicate': '複製', 'Move to': '移動先', 'Delete deck': '資料を削除', 'New folder': '新しいフォルダ', 'Open a deck file': '資料ファイルを開く', 'My skills': 'マイ・スキル', 'Look library': '世界観ライブラリ' });
