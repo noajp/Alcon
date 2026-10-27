@@ -213,6 +213,6 @@ function SortableViewTab({ tab, active, sortable, onSelect, onContextMenu }: {
     style={{ transform: CSS.Transform.toString(transform), transition }}
     className={sortable ? `touch-none ${isDragging ? 'relative z-10 opacity-70' : ''}` : undefined}>
     <span className={active ? 'text-foreground' : 'text-muted-foreground'}><Icon size={14}/></span>
-    <span className="text-xs font-semibold">{t(tab.title)}</span>
+    {t(tab.title)}
   </Button>;
 }

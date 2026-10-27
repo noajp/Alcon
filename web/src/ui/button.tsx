@@ -135,6 +135,9 @@ function Button({
       data-shape={shape}
       className={cn(buttonVariants({ variant, size, align: resolvedAlign, shape, multiline, className }),
         appearance !== 'control' && 'rounded-[var(--control-tab-radius)] border-transparent hover:border-transparent aria-pressed:border-transparent aria-selected:border-transparent',
+        // A bare glyph (a list's "+", a "…") is not a capsule: no outline, the
+        // hover ground alone shows it can be pressed.
+        variant === 'ghost' && size?.startsWith('icon-') && 'rounded-md border-transparent hover:border-transparent',
         appearance === 'inline' && variant === 'ghost' && 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] font-normal'
       )}
       {...props}

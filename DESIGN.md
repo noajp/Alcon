@@ -18,11 +18,11 @@ Alcon の画面・ウィジェット・生成アプリに共通するデザイ�
 | --- | --- | --- | --- |
 | 実行・追加・保存・キャンセル・メニューを開く | 両端が丸い端子型（カプセル型） | 常時1pxの実線 | 通常28px、補助24px、強調32px |
 | 表示を切り替えるタブ | 角丸長方形、角丸6px | 常時1pxの実線 | 通常28px |
-| アイコンだけの操作 | 同じ端子型（正方形では円） | 同じ薄い枠線 | 同じ高さの正方形 |
+| アイコンだけの操作（ghost。一覧の「+」「…」など） | 角丸6pxの正方形 | なし。ホバーの面色だけで押せることを示す | 同じ高さの正方形 |
 
 枠線の色はChat・Widget等の面でも使う `--border-default`。CSSの `--border` も同じ色を指す。独自の白・黒・透明度を部品ごとに足さない。ホバー・選択時は `--border-strong`。線の太さは変えず、レイアウトが動かないようにする。
 
-操作ボタンには共通の `Button` を使う。独立した単行入力には `Input`、複数行入力には `Textarea` を使い、枠・フォーカスは `FIELD` トークンに集約する。角丸の実値は `globals.css` の `--control-action-radius` / `--control-tab-radius` / `--control-field-radius` に置く。生成アプリにもこれらのトークンを渡す。`ghost` は背景が透明なボタンであり、通常は枠線と読めるラベルを持つ（本文内の `appearance="inline"` では枠を持たない。下記）。`primary` は主要操作、`secondary` は通常操作、`danger` は破壊的操作。主要操作は一つの操作グループに一つ。タブには `shape="tab"` を指定し、選択状態を属性と背景で表す。
+操作ボタンには共通の `Button` を使う。独立した単行入力には `Input`、複数行入力には `Textarea` を使い、枠・フォーカスは `FIELD` トークンに集約する。角丸の実値は `globals.css` の `--control-action-radius` / `--control-tab-radius` / `--control-field-radius` に置く。生成アプリにもこれらのトークンを渡す。`ghost` は背景が透明なボタンであり、通常は枠線と読めるラベルを持つ（本文内の `appearance="inline"` では枠を持たない。下記）。`primary` は主要操作、`secondary` は通常操作、`danger` は破壊的操作。主要操作は一つの操作グループに一つ。タブには `shape="tab"` を指定し、選択状態を属性と背景で表す。タブのラベルはほかの操作と同じ大きさ・太さ（`size` の既定）にし、個別に上書きしない。
 
 ```tsx
 <Button variant="primary">Generate app</Button>
@@ -66,7 +66,7 @@ Object・Domain・Element・Initiative等の作成は、入口を無彩色、確
 
 製品の概念名（Strategy / Execution / Sustainment、Initiatives / Phase / Timeline、Domain / Objects / Elements、Inbox / Calendar / Notebook / Table / People / Team / Workload / CRM / Audit、Profile）は固有名詞として扱い、どの言語でも英語表記のまま出す。これはコードで固定するのではなく、各言語の辞書でその語を自分自身に写して実現する（`'Timeline': 'Timeline'`）。概念名を含む文も同じ（`'Open Calendar': 'Calendar を開く'`）。日付・曜日は `toLocaleDateString(locale)` で設定言語に従う。画面に出る文言は、見出し・空の状態・プレースホルダー・`aria-label` まで `t()` を通し、英語を直書きしない。値を含む文は1つのキーに `{n}` などで埋め込み、語順を言語ごとに変えられるようにする。`t()` / `translate()` に文字列で渡したメッセージは、すべて ja・ko・fr・es の訳を持つ（`tests/i18nCoverage.test.ts`）。ウィジェットの名前と説明も同じ（`tests/widgetI18n.test.ts`）。訳は領域ごとの辞書（`Function/i18n/*Messages.ts` など）に置き、同じ英語に別の訳を付けない。意味が違うときは英語のキーを言い換える（例：CRM の Lead と Object の責任者）。Slides エディタも独自の言語切り替えを持たず、アプリの言語に従う。文は `tx("日本語", "English")` で書き、韓国語・フランス語・スペイン語は英語の文をキーに Slides の辞書（`kata/kataMessages.ts`）から引く（`tests/slides/kataI18n.test.ts`）。アプリが保存する既定の名前（Status の初期値など）は英語のまま保存し、表示するときに訳す。
 
-サイドバーの一覧（Domain・Strategy・Notebook・Table・CRM・Settings）は、すべて共通の `SidebarRow` で作る。行ごとに見た目を書かない。行全体がホバーと選択の対象で、選択中は `bg-sidebar-accent` と `text-foreground`、非選択は `text-muted-foreground`、ホバーとキーボードフォーカスでは `bg-sidebar-accent/50` と `text-foreground` にする。行の右端の操作（折りたたみの三角、「…」）は `SidebarRowAction` とし、背景を持たず記号だけを濃くするので、ハイライトは行の端まで切れずにつながる。行は左から 16px のアイコン枠・名前・件数などの補足・右端の操作の順に並べ、高さは 28px、文字は 13px。通常の行は medium、入れ子の行は regular にする。一覧の見出しは `SidebarSectionLabel`（12px・medium・淡色）。
+サイドバーの一覧（Domain・Strategy・Notebook・Table・CRM・Settings）は、すべて共通の `SidebarRow` で作る。行ごとに見た目を書かない。行全体がホバーと選択の対象で、選択中は `bg-sidebar-accent` と `text-foreground`、非選択は `text-muted-foreground`、ホバーとキーボードフォーカスでは `bg-sidebar-accent/50` と `text-foreground` にする。行の右端の操作（折りたたみの三角、「…」）は `SidebarRowAction` とし、背景を持たず記号だけを濃くするので、ハイライトは行の端まで切れずにつながる。行は左から 16px のアイコン枠・名前・件数などの補足・右端の操作の順に並べ、高さは 32px、文字は 13px。通常の行は medium、入れ子の行は regular にする。一覧の見出しは `SidebarSectionLabel`（12px・medium・淡色）で、前のまとまりとの間を 20px 空ける。
 
 ## 入力と面
 

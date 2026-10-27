@@ -193,7 +193,7 @@ function ViewTab({ view, active, pinned, onSelect, onHide }: {
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={pinned ? undefined : `touch-none ${isDragging ? 'relative z-10 opacity-70' : ''}`}>
       <span className={active ? 'text-foreground' : 'text-muted-foreground'}><view.icon size={14} /></span>
-      <span className="text-xs font-semibold">{t(view.label)}</span>
+      <span>{t(view.label)}</span>
       {view.badge !== undefined && view.badge !== null && view.badge !== false && (
         <span className="text-[11px] font-normal tabular-nums text-muted-foreground">{view.badge}</span>
       )}
