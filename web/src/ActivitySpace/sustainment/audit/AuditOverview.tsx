@@ -75,7 +75,7 @@ export function AuditOverview({ source, scoped, status, onOpenWorkflow, onOpenRu
           </RailCard>
           <RailCard title={t('How Audit works')} padded>
             <ol className={`${FONT.sm} space-y-2 text-muted-foreground`}>
-              {[t('A workflow is registered: which work, in which department, by which agent, with which permissions.'),
+              {[t('A workflow is registered: which work, in which Domain, by which agent, with which permissions.'),
                 t('Every time the agent touches a system, the gateway records what it did — never the document itself.'),
                 t('Audit links the records so none can be removed or altered unseen, and shows where a person is needed.')]
                 .map((line, i) => <li key={i} className="flex gap-2"><span className="tabular-nums text-foreground">{i + 1}</span><span>{line}</span></li>)}
@@ -105,7 +105,7 @@ export function AuditOverview({ source, scoped, status, onOpenWorkflow, onOpenRu
 
               <PageSection title={t('Workflows')}>
                 {!scoped.deployments.length ? <Empty>{t('No AI workflows are registered in this Space yet. A workflow appears here when its gateway is connected and starts reporting.')}</Empty> : (
-                  <IndexList headers={[t('Workflow'), t('Completed by AI'), t('Runs')]}>
+                  <IndexList headers={[t('Workflow'), t('Completed by AI'), t('Runs in {n} days', { n: AUDIT_WINDOW_DAYS })]}>
                     {scoped.deployments.map(d => {
                       const s = scoped.summaries.get(d.id);
                       const rate = s?.autoRate ?? null;
@@ -116,7 +116,7 @@ export function AuditOverview({ source, scoped, status, onOpenWorkflow, onOpenRu
                             : <span className="flex w-28 shrink-0 items-center gap-1.5"><SegmentedProgress value={Math.round(rate * 100)} className="flex-1" /><span className="w-8 text-right">{pct(rate)}</span></span>}
                           {!!s?.needsPerson && <span className="text-[var(--status-danger)]">{t('{n} need a person', { n: s.needsPerson })}</span>}
                         </div>}
-                        count={s?.runs ?? 0} onOpen={() => onOpenWorkflow(d.id)} />;
+                        count={(source.runsByDeployment.get(d.id) ?? []).filter(run => run.started_at >= since).length} onOpen={() => onOpenWorkflow(d.id)} />;
                     })}
                   </IndexList>
                 )}

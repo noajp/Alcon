@@ -103,17 +103,16 @@ const AUDIT_MESSAGES: Record<string, Row> = {
   '{n} ms': ['{n} ミリ秒', '{n}ms', '{n} ms', '{n} ms'],
   // The Audit pages
   'All runs': ['すべての実行', '모든 실행', 'Toutes les exécutions', 'Todas las ejecuciones'],
-  'All departments': ['すべての部署', '모든 부서', 'Tous les services', 'Todos los departamentos'],
   'Agents': ['エージェント', '에이전트', 'Agents', 'Agentes'],
   'Last {n} days': ['直近 {n} 日', '최근 {n}일', '{n} derniers jours', 'Últimos {n} días'],
   'Kept': ['残すもの', '남기는 것', 'Conservé', 'Se guarda'],
   'Document numbers only': ['書類の番号だけ', '문서 번호만', 'Numéros des documents seulement', 'Solo números de documento'],
   'How Audit works': ['Audit のしくみ', 'Audit의 작동 방식', 'Comment fonctionne Audit', 'Cómo funciona Audit'],
-  'A workflow is registered: which work, in which department, by which agent, with which permissions.': [
-    'ワークフローを登録する：どの業務を、どの部署で、どのエージェントが、どの権限で行うか。',
-    '워크플로를 등록합니다: 어떤 업무를, 어느 부서에서, 어떤 에이전트가, 어떤 권한으로 하는지.',
-    'Un workflow est enregistré : quel travail, dans quel service, par quel agent, avec quelles autorisations.',
-    'Se registra un flujo: qué trabajo, en qué departamento, con qué agente y con qué permisos.',
+  'A workflow is registered: which work, in which Domain, by which agent, with which permissions.': [
+    'ワークフローを登録する：どの業務を、どの Domain で、どのエージェントが、どの権限で行うか。',
+    '워크플로를 등록합니다: 어떤 업무를, 어느 Domain에서, 어떤 에이전트가, 어떤 권한으로 하는지.',
+    'Un workflow est enregistré : quel travail, dans quel Domain, par quel agent, avec quelles autorisations.',
+    'Se registra un flujo: qué trabajo, en qué Domain, con qué agente y con qué permisos.',
   ],
   'Every time the agent touches a system, the gateway records what it did — never the document itself.': [
     'エージェントがシステムに触れるたびに、ゲートウェイが何をしたかを記録する。書類そのものは残さない。',
@@ -170,11 +169,11 @@ const AUDIT_MESSAGES: Record<string, Row> = {
   // The on-screen sample
   'Sample': ['サンプル', '샘플', 'Exemple', 'Ejemplo'],
   'You are looking at sample data': ['サンプルのデータを表示しています', '샘플 데이터를 보고 있습니다', 'Vous regardez des données d’exemple', 'Estás viendo datos de ejemplo'],
-  'This Space has no AI workflow yet, so Audit shows two made-up ones. The sample is not saved anywhere and disappears when the first real workflow reports.': [
-    'この Space にはまだ AI のワークフローがないので、架空の2つを表示しています。サンプルはどこにも保存されず、最初の本物のワークフローが記録を送ると消えます。',
-    '이 Space에는 아직 AI 워크플로가 없어 가상의 두 개를 보여 줍니다. 샘플은 어디에도 저장되지 않으며 첫 실제 워크플로가 기록을 보내면 사라집니다.',
-    'Ce Space n’a pas encore de workflow d’IA : Audit en montre deux inventés. L’exemple n’est enregistré nulle part et disparaît dès que le premier vrai workflow rend compte.',
-    'Este Space aún no tiene flujos de IA, así que Audit muestra dos inventados. El ejemplo no se guarda en ningún sitio y desaparece cuando informa el primer flujo real.',
+  'There is no AI workflow in this Space that you can see yet, so Audit shows two made-up ones. The sample is not saved anywhere and disappears as soon as a workflow you can see is registered.': [
+    'この Space には、あなたが見られる AI のワークフローがまだないので、架空の2つを表示しています。サンプルはどこにも保存されず、見られるワークフローが登録されるとすぐに消えます。',
+    '이 Space에는 아직 볼 수 있는 AI 워크플로가 없어 가상의 두 개를 보여 줍니다. 샘플은 어디에도 저장되지 않으며 볼 수 있는 워크플로가 등록되면 바로 사라집니다.',
+    'Aucun workflow d’IA de ce Space ne vous est encore visible : Audit en montre deux inventés. L’exemple n’est enregistré nulle part et disparaît dès qu’un workflow visible pour vous est enregistré.',
+    'Aún no hay en este Space ningún flujo de IA que puedas ver, así que Audit muestra dos inventados. El ejemplo no se guarda en ningún sitio y desaparece en cuanto se registra un flujo que puedas ver.',
   ],
   'Sales desk': ['営業事務', '영업 사무', 'Administration des ventes', 'Administración de ventas'],
   'Accounting': ['経理', '경리', 'Comptabilité', 'Contabilidad'],

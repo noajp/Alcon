@@ -59,7 +59,7 @@ export function SampleNotice() {
     <FlaskConical size={16} className="mt-0.5 shrink-0 text-[var(--status-info)]" />
     <div className="min-w-0 space-y-0.5">
       <p className={`${FONT.base} font-medium text-foreground`}>{t('You are looking at sample data')}</p>
-      <p className={`${FONT.sm} text-muted-foreground`}>{t('This Space has no AI workflow yet, so Audit shows two made-up ones. The sample is not saved anywhere and disappears when the first real workflow reports.')}</p>
+      <p className={`${FONT.sm} text-muted-foreground`}>{t('There is no AI workflow in this Space that you can see yet, so Audit shows two made-up ones. The sample is not saved anywhere and disappears as soon as a workflow you can see is registered.')}</p>
     </div>
   </div>;
 }

@@ -9,7 +9,7 @@ import { useAuditScope } from './auditScope';
 import { useAuditSource } from './auditSource';
 
 // The Audit sidebar, on the shared ToolSidebar, and the App's only
-// navigation: the overview (its ▾ narrows every page to one department),
+// navigation: the overview (its ▾ narrows every page to one Domain),
 // what needs a person now, each workflow, and the log.
 
 export function AuditSidebar({ navigation, onNavigate }: {
@@ -26,7 +26,8 @@ export function AuditSidebar({ navigation, onNavigate }: {
     title={source.sample ? `${t('Audit')} · ${t('Sample')}` : t('Audit')}
     scope={{
       value: scoped.scope, options: scoped.options, label: scoped.scope === null ? t('Overview') : scoped.scopeName, icon: LayoutDashboard,
-      active: route.view === 'overview',
+      // A workflow that cannot be shown (not read yet, or no longer there) falls back to the overview.
+      active: route.view === 'overview' || (route.view === 'workflow' && !scoped.deploymentOf.has(route.deploymentId ?? '')),
       onOpen: () => go({ view: 'overview' }),
       onChange: next => { scoped.setScope(next); go({ view: 'overview' }); },
     }}

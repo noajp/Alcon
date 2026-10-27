@@ -12,7 +12,7 @@ export function useAuditScope(audit: AuditSource) {
   const { t } = useI18n();
   const domainIds = useMemo(() => [...new Set(audit.deployments.flatMap(d => d.domain_id ? [d.domain_id] : []))], [audit.deployments]);
   const [scope, setScope] = useToolScope('audit', domainIds);
-  const name = (id: ToolScope) => id === null ? t('All departments') : id === SPACE_SCOPE ? t('Shared by the Space') : audit.domains.find(domain => domain.id === id)?.name ?? t('Unknown Domain');
+  const name = (id: ToolScope) => id === null ? t('All Domains') : id === SPACE_SCOPE ? t('Shared by the Space') : audit.domains.find(domain => domain.id === id)?.name ?? t('Unknown Domain');
   const options = domainIds.length ? [null, SPACE_SCOPE, ...[...domainIds].sort((a, b) => name(a).localeCompare(name(b)))].map(id => ({ id, name: name(id) })) : [];
 
   const deployments = useMemo(() => audit.deployments.filter(d => inToolScope(scope, d.domain_id)), [audit.deployments, scope]);
