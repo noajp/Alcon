@@ -16,6 +16,7 @@ import { flowObservation, NEEDS_PERSON, runOutcome, templateSteps, type Deployme
 import type { WorkflowTab } from '@/Function/audit/auditRoute';
 import type { AuditSource } from './auditSource';
 import { AuditGrants } from './AuditGrants';
+import { AuditApprovals } from './AuditApprovals';
 import { Empty, RunPanel, RunRows, SampleBadge, SampleNotice, Stat, STATE_LABEL, pct, useIntegrity } from './auditParts';
 
 // One workflow, opened the way an Object is: its name and purpose with the
@@ -101,6 +102,7 @@ export function AuditWorkflowPage({ source, deployment, summary, tab, runId, onT
               onOpen={id => { onTab('runs'); onOpenRun(id); }} limitStep={5} />
               : <Empty>{t('Nothing needs a person right now.')}</Empty>}
           </PageSection>
+          {!source.sample && <AuditApprovals deploymentId={deployment.id} />}
           <PageSection title={t('Connections used')}>
             {!summary?.connectors.length ? <Empty>{t('No connection has been called yet.')}</Empty> : (
               <ul className="space-y-1">

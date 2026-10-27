@@ -104,6 +104,40 @@ export interface GrantVersionRecord {
   created_at: string;
 }
 
+// ── Approvals (ADR 0047) ─────────────────────────────────────────────────
+// A gateway asks a person before an operation, bound to the hash of the
+// exact content; the Space's owner decides; the gateway uses it once.
+
+export interface WorkflowApprovalRecord {
+  id: string;
+  activity_space_id: string;
+  deployment_id: string;
+  request_id: string;
+  run_external_id: string;
+  connector: string;
+  operation: GrantOperation;
+  input_hash: string;
+  summary: string;
+  requested_at: string;
+  expires_at: string;
+  status: 'pending' | 'approved' | 'rejected';
+  decided_by_name: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  consumed_at: string | null;
+}
+
+export type ApprovalState = 'pending' | 'approved' | 'rejected' | 'used' | 'expired';
+
+/** Where an approval stands now. Used outweighs expiry (it was used in
+ *  time); an undecided or unused approval past its time is expired. */
+export function approvalState(approval: Pick<WorkflowApprovalRecord, 'status' | 'expires_at' | 'consumed_at'>, nowMs: number): ApprovalState {
+  if (approval.status === 'rejected') return 'rejected';
+  if (approval.consumed_at) return 'used';
+  if (Date.parse(approval.expires_at) <= nowMs) return 'expired';
+  return approval.status;
+}
+
 const grantKey = (g: DeploymentGrant) => `${g.connector}\u0000${g.operation}`;
 
 /** The connectors a deployment's grants page lists: those granted anything,
