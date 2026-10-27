@@ -242,7 +242,7 @@ export function IntentTargetPicker({
         </PopoverTrigger>
       </ButtonAppearanceProvider>
       <MenuShell align="start" className="p-0">
-        {/* No ring, no border, no ground (DESIGN.md §5.3). The field is the only
+        {/* No ring, no border, no ground. The field is the only
             thing above the divider, so where the caret is was never in doubt. */}
         <input
           value={query}

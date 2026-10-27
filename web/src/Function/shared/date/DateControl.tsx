@@ -144,7 +144,7 @@ export function DatePopover({
  *
  * The trigger is a `Button` with `align="start"`: it opens something rather
  * than doing something, and Primer distinguishes the two by where the label
- * sits (DESIGN.md §5.2). Its height, padding, type and radius come from
+ * sits. Its height, padding, type and radius come from
  * `CONTROL`, so a date field standing next to any other control lines up.
  */
 export function DateField({

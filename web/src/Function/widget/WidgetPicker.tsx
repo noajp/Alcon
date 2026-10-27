@@ -96,7 +96,7 @@ export function WidgetPicker({
         </Button>
       </PopoverTrigger>
       <MenuShell align="end" width="wide">
-        {/* Verb-phrase placeholder, no ring, no border — DESIGN.md §5.3/§5.9. */}
+        {/* Verb-phrase placeholder, no ring, no border. */}
         <input
           autoFocus
           value={query}

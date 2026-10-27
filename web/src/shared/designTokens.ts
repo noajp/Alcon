@@ -82,7 +82,7 @@ export const FONT = {
 } as const;
 
 // ============================================
-// Control geometry and fine outlines — see /DESIGN.md.
+// Control geometry and fine outlines.
 export const CONTROL = {
   /** Height of a control with a label. */
   height: { xs: 'h-6', sm: 'h-7', md: 'h-8', lg: 'h-11' },

@@ -855,7 +855,7 @@ function StrategyDetailView({
           <WidgetZone zone="main" columns={1} />
 
           {/* Nested Initiatives. With none, the section keeps no heading — only
-              its "+ verb", like every concept page (DESIGN.md). */}
+              its "+ verb", like every concept page. */}
           {childStrategies.length > 0 || childPickerOpen ? (
             <PageSection title={t('Initiatives')} action={canEdit ? (
               <ButtonAppearanceProvider appearance="navigation">

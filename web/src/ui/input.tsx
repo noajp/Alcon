@@ -1,4 +1,4 @@
-// Standalone fields share the fine frame in DESIGN.md; focus uses a background tint.
+// Standalone fields share one fine frame; focus uses a background tint.
 import * as React from "react"
 
 import { FIELD } from "@/shared/designTokens"

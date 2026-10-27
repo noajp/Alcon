@@ -631,7 +631,7 @@ function toLanding(
 }
 
 /** The one field style, shared by both composers. No ring, no border, no
- *  outline (DESIGN.md §5.3) — the focused field is the one carrying a ground,
+ *  outline — the focused field is the one carrying a ground,
  *  and the negative margin keeps that ground from shifting the text sideways
  *  when it appears. */
 const FIELD = [
@@ -1117,7 +1117,7 @@ function statusVar(status: DecisionStatus): string {
  *  The hover tone is pinned to the resting one because the chip is pressable:
  *  the ghost variant would otherwise pull an overdue chip back to the ordinary
  *  text colour under the cursor, dropping the warning at the moment the reader
- *  is reaching for it. The hover feedback is the ground (DESIGN.md §5.1). */
+ *  is reaching for it. The hover feedback is the ground. */
 function reviewTone(decision: Decision): string {
   if (!isDueForReview(decision)) {
     return 'text-muted-foreground/60 hover:text-muted-foreground';

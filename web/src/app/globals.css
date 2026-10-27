@@ -12,7 +12,7 @@
    ============================================= */
 
 :root {
-  --control-action-radius: 9999px;
+  --control-action-radius: 6px;
   --control-tab-radius: 6px;
   --control-field-radius: 6px;
   /* ---- Accent (Blue — single accent) ---- */
@@ -138,8 +138,7 @@
   --shadow-1: lch(0 0 0 / 0.02) 0px 2px 3px -1px, lch(0 0 0 / 0.04) 0px 1px 1px 0px;
   --shadow-island: var(--shadow-1);
   /* A colored CTA button's own lift (e.g. the Copilot send button) — stronger
-     than --shadow-island, which is reserved for cards per DESIGN.md §"カードの
-     微かな持ち上げ". Same value in both themes: the button's own background
+     than --shadow-island, which is reserved for cards. Same value in both themes: the button's own background
      color carries the theme, not this shadow. */
   --shadow-button: 0 1px 4px rgba(0, 0, 0, 0.35);
 

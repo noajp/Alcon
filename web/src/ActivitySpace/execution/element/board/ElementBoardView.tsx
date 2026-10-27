@@ -250,11 +250,8 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
             </DropdownMenu>
           </div>
           <div className="flex items-center gap-1">
-            {/* Same signal the list rows and the Activity column show. The
-                relative time is dropped here: the footer is already carrying
-                a date, a priority and an assignee, and the count is what
-                separates a discussed card from a silent one. */}
-            <ActivitySignal activity={element.activity} showRelative={false} className="mr-1" />
+            {/* Same signal the list rows and the Activity column show. */}
+            <ActivitySignal activity={element.activity} className="mr-1" />
             <CardAgentControl elementId={element.id} onFinished={onRefresh} />
             {/* Assignee — click to assign / change. */}
             <DropdownMenu open={assigneeMenuOpen} onOpenChange={setAssigneeMenuOpen}>

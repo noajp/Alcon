@@ -5,20 +5,16 @@ import { formatRelative } from '@/Function/shared/dateUtils';
 import type { ElementCommentActivity } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
-/** Comment count + how recently the thread moved, in the quiet register the
- *  list rows established: a signal, not a status. One component so the list
- *  row, the Activity column and the Board card cannot drift apart in what
+/** Comment count, in the quiet register the list rows established: a signal,
+ *  not a status. How recently the thread moved is in the tooltip — a detail
+ *  of the thread, not something every row should carry. One component so the
+ *  list row, the Activity column and the Board card cannot drift apart in what
  *  "active" looks like. Renders nothing when the Element has no comments. */
 export function ActivitySignal({
   activity,
-  showRelative = true,
   className = '',
 }: {
   activity: ElementCommentActivity | undefined;
-  /** Off where space is tight (a Board card footer) — the count alone still
-   *  separates a discussed Element from a silent one, and the tooltip keeps
-   *  the timing. */
-  showRelative?: boolean;
   className?: string;
 }) {
   const { t } = useI18n();
@@ -31,7 +27,6 @@ export function ActivitySignal({
     >
       <MessageIcon size={12} />
       <span className="tabular-nums">{activity.commentCount}</span>
-      {showRelative && <span className="text-muted-foreground/50">{relative}</span>}
     </span>
   );
 }
