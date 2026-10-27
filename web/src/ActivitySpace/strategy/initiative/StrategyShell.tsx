@@ -5,7 +5,7 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
-import { PageIcon, PageSection } from '@/Function/shared/PageHead';
+import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { IndexList, IndexRow } from '@/Function/shared/IndexList';
 import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
@@ -792,7 +792,6 @@ function StrategyDetailView({
             three sections that use it must share one — see InitiativeIntent. */}
         <InitiativeIntentProvider key={strategy.id} initiativeId={strategy.id} initiativeName={strategy.name} createdBy={strategy.created_by}>
         <WidgetSurface board={board} host={host} zones={INITIATIVE_ZONES} className="space-y-5">
-          <WidgetZone zone="band" className="mb-4" />
           <div>
             <PageIcon><NavStrategyIcon size={18} /></PageIcon>
             <textarea
@@ -816,11 +815,12 @@ function StrategyDetailView({
               readOnly={!canEdit}
               aria-readonly={!canEdit}
               tabIndex={canEdit ? undefined : -1}
-              className="w-full text-2xl text-foreground bg-transparent border-none resize-none leading-tight overflow-hidden tracking-normal"
-              // The base style resets typed text to 400, beating a utility —
-              // so the heading's weight is set inline, as on Element detail.
-              style={{ fontWeight: 600 }}
+              className={`w-full bg-transparent border-none resize-none overflow-hidden ${PAGE_TITLE}`}
+              style={PAGE_TITLE_WEIGHT}
             />
+            {/* Band — how it is going, right under the name (a progress line
+                by default), before the sections below are read. */}
+            <WidgetZone zone="band" className="mt-3" />
           </div>
           <textarea
             ref={descriptionRef}
@@ -840,7 +840,7 @@ function StrategyDetailView({
             readOnly={!canEdit}
             aria-readonly={!canEdit}
             tabIndex={canEdit ? undefined : -1}
-            className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
+            className="w-full text-[14px] text-[var(--text-secondary)] leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
           />
 
           {/* The board. Everything a Initiative says about itself that is not

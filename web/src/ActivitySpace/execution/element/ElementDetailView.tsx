@@ -81,7 +81,7 @@ const ELEMENT_ZONES: Zone[] = ['rail'];
 import { RailRow } from '@/Function/shared/RailRow';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { ElementTypeIcon, ObjectIcon } from '@/shell/icons';
-import { PageIcon, PageSection } from '@/Function/shared/PageHead';
+import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
@@ -745,8 +745,8 @@ function ElementDetailBody({
                     e.currentTarget.blur();
                   }
                 }}
-                className="text-2xl text-foreground bg-transparent border-none focus:outline-none flex-1 min-w-0 resize-none leading-tight overflow-hidden"
-                style={{ fontWeight: 600 }}
+                className={`bg-transparent border-none focus:outline-none flex-1 min-w-0 resize-none overflow-hidden ${PAGE_TITLE}`}
+                style={PAGE_TITLE_WEIGHT}
                 placeholder={t('Element title')}
               />
             </div>

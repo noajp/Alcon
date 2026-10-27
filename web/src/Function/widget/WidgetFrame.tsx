@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Minus } from 'lucide-react';
-import { CARD, FONT } from '@/shared/designTokens';
+import { FONT } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 import { RailCard } from '@/Function/shared/RailCard';
 import type { FrameVariant } from './types';
@@ -265,12 +265,11 @@ export function WidgetFrame({
         )}
 
         {variant === 'band' && (
-          <div className="relative">
-            <div className={`${CARD} h-10 px-4 flex items-center gap-3 overflow-hidden`}>
-              <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{title}</span>
-              <div className="flex-1 min-w-0">{body}</div>
-              {headerNode}
-            </div>
+          // A line of the page under its title, like the properties line on a
+          // document — no box and no heading: what it shows says what it is.
+          <div className="relative flex h-7 items-center gap-3 overflow-hidden" aria-label={title} role="group">
+            <div className="flex-1 min-w-0">{body}</div>
+            {headerNode}
           </div>
         )}
       </div>

@@ -5,7 +5,7 @@ import { Check, ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, 
 import { isCommitEnter, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NavPhaseIcon } from '@/shell/sidebar/NavIcons';
 import { QuietEmpty } from '@/ActivitySpace/strategy/QuietEmpty';
-import { PageIcon, PageSection } from '@/Function/shared/PageHead';
+import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
@@ -471,7 +471,8 @@ function PhaseDetailView({
               onChange={(e) => setName(e.target.value)}
               onBlur={() => void saveName()}
               placeholder={t('Phase name')}
-              className="w-full text-2xl font-semibold text-foreground bg-transparent border-none outline-none leading-tight tracking-normal"
+              className={`w-full bg-transparent border-none outline-none ${PAGE_TITLE}`}
+              style={PAGE_TITLE_WEIGHT}
             />
           </div>
 
