@@ -465,10 +465,10 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   const quickAddDefaults = sectionGroupValues(quickAddGroup);
 
   const handleQuickAddSubmit = async (inputs: NewElementInput[]) => {
-    // Three save scopes the popup can produce:
-    //   - personal (My Elements): owner_id = me, object_id = null
+    // Two save scopes the popup can produce:
     //   - Object:                  object_id = input.objectId
-    //   - Domain-direct:           object_id = null
+    //   - personal (My Elements): owner_id = me, object_id = null — also when
+    //     no Object is named, since an Element always has exactly one home
     // Fallback for objectId-undefined: the per-section target the user opened
     // the popup from.
     // Per-Element failures stay non-fatal — one bad row in a pasted batch
@@ -482,12 +482,13 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
 
     for (const input of inputs) {
       try {
+        const objectId = input.personal
+          ? null
+          : (input.objectId !== undefined ? input.objectId : quickAddTargetObjectId);
         const created = await createElement({
           title: input.title,
-          object_id: input.personal
-            ? null
-            : (input.objectId !== undefined ? input.objectId : quickAddTargetObjectId),
-          owner_id: input.personal ? userId : null,
+          object_id: objectId,
+          owner_id: objectId ? null : userId,
           description: input.description ?? null,
           type: input.type ?? null,
           labels: input.labels ?? [],
