@@ -272,6 +272,24 @@ function stepChainText(step: ChainStep): string {
   ].map(field).join('');
 }
 
+/**
+ * Links steps the way the database does on insert: in the order given, each
+ * gets the next seq, the hash before it, and its own hash. Used for records
+ * the database never held (the Audit app's sample), so they verify with the
+ * same `verifyChain` as real ones.
+ */
+export async function sealChain(steps: readonly ChainStep[], sha256Hex: (text: string) => Promise<string>): Promise<ChainStep[]> {
+  const sealed: ChainStep[] = [];
+  let prev = GENESIS_HASH;
+  for (const [i, step] of steps.entries()) {
+    const linked = { ...step, seq: i + 1, prev_hash: prev };
+    linked.hash = await sha256Hex(stepChainText(linked));
+    sealed.push(linked);
+    prev = linked.hash;
+  }
+  return sealed;
+}
+
 export type ChainBreak = { seq: number; kind: 'gap' | 'link' | 'hash' };
 
 /**
