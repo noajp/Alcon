@@ -1,5 +1,6 @@
 import type React from 'react';
 import {
+  NavAuditIcon,
   NavCrmIcon,
   NavHomeIcon,
   NavInboxIcon,
@@ -49,6 +50,7 @@ export type ViewId =
   | 'slides'
   | 'team'
   | 'crm'
+  | 'audit'
   | 'settings'
   | 'profile'
   | 'account';
@@ -81,6 +83,7 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   slides:        { label: 'Slides',      icon: NavSlidesIcon },
   team:          { label: 'People',      icon: NavTeamsIcon },
   crm:           { label: 'CRM',         icon: NavCrmIcon },
+  audit:         { label: 'Audit',       icon: NavAuditIcon },
   settings:      { label: 'Settings',    icon: NavSettingsIcon },
   profile:       { label: 'Profile', icon: NavTeamsIcon },
   account:       { label: 'Account' },

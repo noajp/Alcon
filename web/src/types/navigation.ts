@@ -1,8 +1,11 @@
 import type { CrmRoute } from '@/Function/crm/crmRoute';
+import type { AuditRoute } from '@/Function/audit/auditRoute';
 
 export interface NavigationState {
   /** The CRM App's view, filters and open deal within this window tab. */
   crm?: CrmRoute;
+  /** The Audit App's view and open deployment or run within this window tab. */
+  audit?: AuditRoute;
   objectId: string | null;
   /** Domain accompanying an explicit Object route. Keeps the destination
    * Object selected while the shell changes its active Domain. */

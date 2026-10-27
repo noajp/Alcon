@@ -3,6 +3,7 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import type React from 'react';
 import {
+  NavAuditIcon,
   NavCrmIcon,
   NavInboxIcon,
   NavTeamsIcon as NavPersonalIcon,
@@ -21,7 +22,7 @@ import type { ViewId } from '@/shell/viewRegistry';
 //
 // Inbox / Calendar / Strategy / Execution are permanent rail entries.
 // Personal pages are reached through the avatar; other tools use the launcher.
-export type RailMode = 'personal' | 'inbox' | 'strategy' | 'execution' | 'workload' | 'notebook' | 'tables' | 'slides' | 'team' | 'calendar' | 'crm';
+export type RailMode = 'personal' | 'inbox' | 'strategy' | 'execution' | 'workload' | 'notebook' | 'tables' | 'slides' | 'team' | 'calendar' | 'crm' | 'audit';
 
 export interface ModeMeta {
   label: string;
@@ -44,6 +45,7 @@ export const MODE_META: Record<RailMode, ModeMeta> = {
   team:      { label: 'People',    icon: NavTeamsIcon, defaultView: 'team', views: ['team'] },
   calendar:  { label: 'Calendar',  icon: NavCalendarIcon, defaultView: 'calendar', views: ['calendar', 'schedule'] },
   crm:       { label: 'CRM',       icon: NavCrmIcon, defaultView: 'crm', views: ['crm'] },
+  audit:     { label: 'Audit',     icon: NavAuditIcon, defaultView: 'audit', views: ['audit'] },
 };
 
 /** Navigation, highlighting and the launcher read the same mode definitions. */
@@ -59,7 +61,7 @@ export const CORE_MODES: RailMode[] = ['inbox', 'calendar', 'strategy', 'executi
 // are a display split only: Tools serve any surface, Workload watches capacity.
 export const APP_GROUPS: { title: string; apps: RailMode[] }[] = [
   { title: 'Tools', apps: ['notebook', 'tables', 'slides', 'team'] },
-  { title: 'Sustainment', apps: ['workload', 'crm'] },
+  { title: 'Sustainment', apps: ['workload', 'crm', 'audit'] },
 ];
 
 const APP_MODES: RailMode[] = APP_GROUPS.flatMap((g) => g.apps);
