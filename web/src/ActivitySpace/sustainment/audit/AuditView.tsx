@@ -10,7 +10,7 @@ import { ToolPage, type ToolView } from '@/Function/shared/tool/ToolPage';
 import { NavAuditIcon } from '@/shell/sidebar/NavIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { NavigationState } from '@/types/navigation';
-import { useAudit, useAuditChain, useAuditRunSteps, AUDIT_CHAIN_LIMIT, AUDIT_RUN_LIMIT, AUDIT_WINDOW_DAYS, type Audit } from '@/hooks/useAudit';
+import { useAudit, useAuditChain, useAuditRunSteps, AUDIT_RUN_LIMIT, AUDIT_WINDOW_DAYS, type Audit } from '@/hooks/useAudit';
 import { auditRoute, type AuditRoute, type AuditViewId } from '@/Function/audit/auditRoute';
 import {
   exceptionReason, flowObservation, runOutcome, templateSteps, verifyChain,
@@ -248,7 +248,7 @@ function DeploymentPage({ audit, deployment, summary, onBack, onOpenRun }: {
             : !links.steps.length ? t('No records to check yet.')
             : !chain ? t('Checking the records…')
             : chain.breaks.length ? t('The record chain breaks at #{seq}. A record may have been removed or altered.', { seq: chain.breaks[0].seq })
-            : links.steps.length >= AUDIT_CHAIN_LIMIT ? t('The latest {n} records link to the one before them and match their contents.', { n: chain.checked })
+            : links.total > chain.checked ? t('The latest {n} of {total} records link to the one before them and match their contents.', { n: chain.checked, total: links.total })
             : t('All {n} records link to the one before them and match their contents.', { n: chain.checked })}
         </p>
       </PageSection>

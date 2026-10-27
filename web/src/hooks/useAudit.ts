@@ -18,8 +18,9 @@ import type {
 export const AUDIT_WINDOW_DAYS = 30;
 /** The most recent runs read at once; past it the app says it shows the latest. */
 export const AUDIT_RUN_LIMIT = 5000;
-/** The latest links of a deployment's chain the integrity check reads. */
-export const AUDIT_CHAIN_LIMIT = 2000;
+/** The latest links of a deployment's chain the integrity check reads (the
+ *  API's default row cap; the exact count says when there are more). */
+const AUDIT_CHAIN_LIMIT = 1000;
 
 const EMPTY: never[] = [];
 
@@ -42,15 +43,17 @@ async function loadLedger(spaceId: string, since: string, signal: AbortSignal): 
       if (error) throw new Error(`Unable to read templates: ${error.message}`);
       return (data ?? []) as WorkflowTemplateRecord[];
     }),
-    // One call, one snapshot: the gateway keeps appending while this reads,
-    // so the runs and their steps are taken together rather than page by page.
+    // One call, one snapshot, one JSON value: the gateway keeps appending
+    // while this reads, and a set of rows could be cut at the API's row cap
+    // without a word. The function says itself when the window held more.
     supabase.rpc('audit_ledger_runs', { _space_id: spaceId, _since: since, _limit: AUDIT_RUN_LIMIT }).abortSignal(signal).then(({ data, error }) => {
       if (error) throw new Error(`Unable to read runs: ${error.message}`);
-      return ((data ?? []) as (Omit<LedgerRun, 'steps'> & { steps: StepEvent[] | null })[]).map(run => ({ ...run, steps: run.steps ?? [] }));
+      const value = data as { runs?: (Omit<LedgerRun, 'steps'> & { steps: StepEvent[] | null })[]; truncated?: boolean } | null;
+      if (!value || !Array.isArray(value.runs)) throw new Error('Unable to read runs: the ledger answered in an unknown shape.');
+      return { runs: value.runs.map(run => ({ ...run, steps: run.steps ?? [] })), truncated: value.truncated === true };
     }),
   ]);
-  const recent = runs.filter(run => run.started_at >= since).length;
-  return { templates, deployments, runs, truncated: recent >= AUDIT_RUN_LIMIT };
+  return { templates, deployments, runs: runs.runs, truncated: runs.truncated };
 }
 
 /** The active Space's audit ledger: its deployments, the runs of the last
@@ -124,14 +127,23 @@ export function useAuditChain(deploymentId: string | null) {
   const query = useQuery({
     queryKey: ['audit-chain', userId, deploymentId],
     queryFn: async ({ signal }) => {
-      const { data, error } = await supabase.from('workflow_run_steps')
-        .select('*, run:workflow_runs!inner(external_id,subject_ref,subject_digest,started_at)')
+      // The exact count rides on the same request, so whether these are all
+      // of the deployment's records is known, not guessed from a row cap.
+      const { data, error, count } = await supabase.from('workflow_run_steps')
+        .select('*, run:workflow_runs!inner(external_id,subject_ref,subject_digest,started_at)', { count: 'exact' })
         .eq('deployment_id', deploymentId!).order('seq', { ascending: false }).limit(AUDIT_CHAIN_LIMIT).abortSignal(signal);
       if (error) throw new Error(`Unable to read the record chain: ${error.message}`);
-      return (data ?? []) as ChainStep[];
+      if (count === null) throw new Error('Unable to read the record chain: its size is unknown.');
+      return { steps: (data ?? []) as ChainStep[], total: count };
     },
     enabled: Boolean(userId && deploymentId),
     staleTime: 15_000,
   });
-  return { steps: query.data ?? EMPTY, loading: query.isPending && Boolean(deploymentId), error: query.error };
+  return {
+    steps: query.data?.steps ?? EMPTY,
+    /** All of the deployment's records, of which `steps` are the latest. */
+    total: query.data?.total ?? 0,
+    loading: query.isPending && Boolean(deploymentId),
+    error: query.error,
+  };
 }

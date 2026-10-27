@@ -18,7 +18,7 @@
 -- deployment, computed here on insert over the step and its run, so a
 -- removed or altered event shows as a break no matter who wrote the row.
 -- Rows are written by the ingest function (service role); the app reads the
--- runs through audit_ledger_runs, one snapshot per call.
+-- runs through audit_ledger_runs, one snapshot and one JSON value per call.
 -- Guarded for preview replay: every block checks its dependencies first.
 do $$
 begin
@@ -94,7 +94,7 @@ begin
       );
     $b$
   $fn$;
-  execute 'revoke all on function public.user_can_see_deployment(uuid) from public';
+  execute 'revoke all on function public.user_can_see_deployment(uuid) from public, anon';
   execute 'grant execute on function public.user_can_see_deployment(uuid) to authenticated';
 
   execute 'drop policy if exists workflow_deployments_read on public.workflow_deployments';
@@ -312,18 +312,23 @@ begin
   end if;
 
   -- ── reading ────────────────────────────────────────────────────────────
-  -- The runs the Audit app shows, in one snapshot: those started since
-  -- _since (newest first, at most _limit), and every run still waiting on
-  -- something however old (no end step). Each carries its steps in chain
-  -- order, without the per-step detail the run's own page reads. Access is
-  -- decided once per deployment rather than once per row.
+  -- The runs the Audit app shows, as one JSON value — a scalar cannot be cut
+  -- short by PostgREST's row cap, so the app never reads a partial ledger as
+  -- whole. It holds the runs started since _since (newest first, at most
+  -- _limit, which is capped), every run still waiting on something however
+  -- old (no end step; listed apart so the cap never drops them), whether the
+  -- window held more than _limit, and each run's steps in chain order without
+  -- the per-step detail the run's own page reads. Access is decided once per
+  -- deployment rather than once per row.
+  execute 'drop function if exists public.audit_ledger_runs(uuid, timestamptz, integer)';
   execute $fn$
-    create or replace function public.audit_ledger_runs(_space_id uuid, _since timestamptz, _limit integer default 5000)
-    returns table (
-      id uuid, deployment_id uuid, external_id text, template_version integer,
-      subject_ref text, subject_digest text, started_at timestamptz, steps jsonb
-    )
-    language sql stable security definer set search_path = public as $b$
+    create function public.audit_ledger_runs(_space_id uuid, _since timestamptz, _limit integer default 5000)
+    returns jsonb
+    language plpgsql stable security definer set search_path = public as $b$
+    declare
+      cap constant integer := least(greatest(coalesce(_limit, 5000), 1), 5000);
+      result jsonb;
+    begin
       with visible as (
         select d.id from workflow_deployments d
         where d.activity_space_id = _space_id and public.user_can_see_deployment(d.id)
@@ -331,27 +336,40 @@ begin
         select r.* from workflow_runs r join visible v on v.id = r.deployment_id
         where r.started_at >= _since
         order by r.started_at desc, r.id
-        limit greatest(coalesce(_limit, 5000), 1)
+        limit cap + 1
       ), open_older as (
         select r.* from workflow_runs r join visible v on v.id = r.deployment_id
         where r.started_at < _since
           and not exists (select 1 from workflow_run_steps s where s.run_id = r.id and s.kind = 'end')
-        order by r.started_at desc, r.id
-        limit greatest(coalesce(_limit, 5000), 1)
       ), picked as (
-        select * from recent union all select * from open_older
+        select * from (select * from recent order by started_at desc, id limit cap) kept
+        union all select * from open_older
       )
-      select p.id, p.deployment_id, p.external_id, p.template_version, p.subject_ref, p.subject_digest, p.started_at,
-        coalesce((
+      select jsonb_build_object(
+        'runs', coalesce((
           select jsonb_agg(jsonb_build_object(
-            'seq', s.seq, 'step_key', s.step_key, 'kind', s.kind, 'connector', s.connector,
-            'operation', s.operation, 'result', s.result, 'reason', s.reason) order by s.seq)
-          from workflow_run_steps s where s.run_id = p.id
-        ), '[]'::jsonb)
-      from picked p
-      order by p.started_at desc, p.id;
+            'id', p.id, 'deployment_id', p.deployment_id, 'external_id', p.external_id,
+            'template_version', p.template_version, 'subject_ref', p.subject_ref,
+            'subject_digest', p.subject_digest, 'started_at', p.started_at,
+            'steps', coalesce((
+              select jsonb_agg(jsonb_build_object(
+                'seq', s.seq, 'step_key', s.step_key, 'kind', s.kind, 'connector', s.connector,
+                'operation', s.operation, 'result', s.result, 'reason', s.reason) order by s.seq)
+              from workflow_run_steps s where s.run_id = p.id
+            ), '[]'::jsonb)
+          ) order by p.started_at desc, p.id)
+          from picked p
+        ), '[]'::jsonb),
+        'truncated', (select count(*) from recent) > cap,
+        'readAt', statement_timestamp()
+      ) into result;
+      if octet_length(result::text) > 25000000 then
+        raise exception using errcode = '54000', message = 'This Space exceeds the Audit response limit.';
+      end if;
+      return result;
+    end;
     $b$
   $fn$;
-  execute 'revoke all on function public.audit_ledger_runs(uuid, timestamptz, integer) from public';
+  execute 'revoke all on function public.audit_ledger_runs(uuid, timestamptz, integer) from public, anon';
   execute 'grant execute on function public.audit_ledger_runs(uuid, timestamptz, integer) to authenticated';
 end $$;
