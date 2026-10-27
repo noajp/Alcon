@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Minus } from 'lucide-react';
-import { CARD, FONT } from '@/shared/designTokens';
+import { FONT } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 import { RailCard } from '@/Function/shared/RailCard';
 import type { FrameVariant } from './types';
@@ -106,8 +106,8 @@ function RemoveBadge({ title, onRemove }: { title: string; onRemove: () => void 
       variant="secondary"
       size="icon-xs"
       aria-label={`Remove ${title}`}
-      // Pill on something pressable is normally wrong (DESIGN.md §5.7 reserves
-      // it for badges) — this is the exception the rule describes: a badge
+      // Pill on something pressable is normally wrong (pills are for badges)
+      // — this is the exception: a badge
       // overlaid on a corner, not a control in a row. Neutral rather than
       // danger, because it removes a block from a layout, not data.
       className="animate-fade-in absolute -top-2 -left-2 z-20 rounded-full border border-[var(--border-strong)] shadow-[var(--shadow-island)]"
@@ -191,8 +191,7 @@ export function WidgetFrame({
   };
 
   // Arrange mode is shown, not animated. A looping wobble is the one kind of
-  // motion this app does not do (DESIGN.md §7: motion is functional and
-  // short) — and at the size of a full-width band it reads as the page
+  // motion this app does not do (motion is functional and short) — and at the size of a full-width band it reads as the page
   // shaking rather than the widget being loose. A dashed outline says
   // "detached, draggable" and then holds still.
   const arrangeChrome = arranging
@@ -265,12 +264,11 @@ export function WidgetFrame({
         )}
 
         {variant === 'band' && (
-          <div className="relative">
-            <div className={`${CARD} h-10 px-4 flex items-center gap-3 overflow-hidden`}>
-              <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{title}</span>
-              <div className="flex-1 min-w-0">{body}</div>
-              {headerNode}
-            </div>
+          // A line of the page under its title, like the properties line on a
+          // document — no box and no heading: what it shows says what it is.
+          <div className="relative flex h-7 items-center gap-3 overflow-hidden" aria-label={title} role="group">
+            <div className="flex-1 min-w-0">{body}</div>
+            {headerNode}
           </div>
         )}
       </div>

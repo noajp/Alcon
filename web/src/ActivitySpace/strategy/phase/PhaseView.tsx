@@ -5,7 +5,7 @@ import { Check, ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, 
 import { isCommitEnter, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NavPhaseIcon } from '@/shell/sidebar/NavIcons';
 import { QuietEmpty } from '@/ActivitySpace/strategy/QuietEmpty';
-import { PageIcon, PageSection } from '@/Function/shared/PageHead';
+import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
@@ -171,8 +171,8 @@ export function PhaseView({
   return (
     <div className="flex flex-col h-full bg-card">
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-        <NavPhaseIcon size={12} />
-        <span className="text-[12px] font-semibold text-foreground">{t('Phase')}</span>
+        <NavPhaseIcon size={14} />
+        <span className="text-[13px] font-medium text-foreground">{t('Phase')}</span>
         <div className="flex-1" />
         <button
           type="button"
@@ -442,12 +442,12 @@ function PhaseDetailView({
         <button
           type="button"
           onClick={onBack}
-          className="px-1.5 py-0.5 rounded text-[12px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+          className="px-1.5 py-0.5 rounded text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
         >
           {t('Phase')}
         </button>
         <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
-        <span className="px-1.5 py-0.5 text-[12px] font-semibold text-foreground truncate max-w-[240px]">
+        <span className="px-1.5 py-0.5 text-[13px] font-medium text-foreground truncate max-w-[240px]">
           {phase.name}
         </span>
         <div className="flex-1" />
@@ -471,7 +471,8 @@ function PhaseDetailView({
               onChange={(e) => setName(e.target.value)}
               onBlur={() => void saveName()}
               placeholder={t('Phase name')}
-              className="w-full text-2xl font-semibold text-foreground bg-transparent border-none outline-none leading-tight tracking-normal"
+              className={`w-full bg-transparent border-none outline-none ${PAGE_TITLE}`}
+              style={PAGE_TITLE_WEIGHT}
             />
           </div>
 

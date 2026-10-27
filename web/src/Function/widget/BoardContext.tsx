@@ -69,7 +69,7 @@ export function WidgetSurface({
   const setArranging = useCallback((next: boolean) => setArrangingState(next), []);
   const actionSlot = useWidgetActionSlot();
 
-  // Esc leaves arrange mode — and only that. DESIGN.md §8: Esc closes one
+  // Esc leaves arrange mode — and only that. Esc closes one
   // layer, so this yields to any layer above it: an open popover (the widget
   // picker is reachable from the chrome while arranging) owns the key, and
   // arrange mode is what the next Esc closes.

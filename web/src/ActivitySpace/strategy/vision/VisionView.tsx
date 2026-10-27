@@ -58,8 +58,8 @@ export function VisionView({ visionId, createRequested, onCreateHandled, onSelec
   return (
     <div className="flex flex-col h-full bg-card">
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-        <NavVisionIcon size={12} />
-        <span className="truncate text-[12px] font-semibold text-foreground">{vision?.name ?? t('Vision')}</span>
+        <NavVisionIcon size={14} />
+        <span className="truncate text-[13px] font-medium text-foreground">{vision?.name ?? t('Vision')}</span>
       </div>
       <div className="flex-1 overflow-y-auto">
         {loading || role.isPending ? null : !vision ? (

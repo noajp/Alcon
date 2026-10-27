@@ -112,7 +112,7 @@ send('boot');`;
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{${variables}}*{box-sizing:border-box}body{margin:0;padding:16px;font:14px system-ui;color:var(--foreground);background:var(--background)}input,button,select,textarea{font:inherit}button{cursor:pointer;color:inherit}input,textarea,select{max-width:100%}:focus-visible{outline:none;background:var(--muted)}${app.css.replace(/</g, '\\3c ')}
 /* Host control geometry applies to saved apps as well as new generations. */
 ::selection{background:var(--selection-background,var(--accent-default));color:var(--selection-foreground,var(--primary-foreground))}
-button,[role=tab]{box-sizing:border-box!important;border:1px solid var(--border)!important;border-radius:var(--control-action-radius,9999px)!important;min-height:28px;padding:4px 10px;line-height:1.4;font-size:12px;font-weight:500}
+button,[role=tab]{box-sizing:border-box!important;border:1px solid var(--border)!important;border-radius:var(--control-action-radius,6px)!important;min-height:28px;padding:4px 10px;line-height:1.4;font-size:12px;font-weight:500}
 [role=tab]{border-radius:var(--control-tab-radius,6px)!important}
 button:hover,[role=tab]:hover{border-color:var(--border-strong,var(--border))!important}
 [role=tab][aria-selected=true]{background:var(--muted);border-color:var(--border-strong,var(--border))!important;font-weight:600}

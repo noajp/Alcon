@@ -113,7 +113,7 @@ export function ToolSidebar({ title, scope, queue, sections, footer }: {
     {queue && queue.length > 0 && <div className="mt-1 space-y-px">{queue.map(item => <NavRow key={item.id} item={item} />)}</div>}
 
     {sections.map(section => <div key={section.id}>
-      {section.label && <SidebarSectionLabel className="mt-4">{section.label}</SidebarSectionLabel>}
+      {section.label && <SidebarSectionLabel>{section.label}</SidebarSectionLabel>}
       <div className={`${section.label ? 'mt-1' : 'mt-3'} space-y-px`}>{section.items.map(item => <NavRow key={item.id} item={item} />)}</div>
     </div>)}
 

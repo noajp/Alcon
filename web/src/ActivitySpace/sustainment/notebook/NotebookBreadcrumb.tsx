@@ -26,7 +26,7 @@ export function NotebookBreadcrumb({
       <button
         type="button"
         onClick={onBack}
-        className="px-1.5 py-0.5 rounded text-[12px] font-semibold text-foreground hover:bg-muted/40 transition-colors shrink-0 truncate max-w-[240px]"
+        className="px-1.5 py-0.5 rounded text-[13px] font-medium text-foreground hover:bg-muted/40 transition-colors shrink-0 truncate max-w-[240px]"
       >
         {folderName ?? t('Notebook')}
       </button>

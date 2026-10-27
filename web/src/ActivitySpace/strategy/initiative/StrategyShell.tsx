@@ -5,7 +5,7 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
-import { PageIcon, PageSection } from '@/Function/shared/PageHead';
+import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { IndexList, IndexRow } from '@/Function/shared/IndexList';
 import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
@@ -159,8 +159,8 @@ export function StrategyShell({
   return (
     <div className="flex flex-col h-full bg-card">
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-        <NavStrategyIcon size={12} />
-        <span className="text-[12px] font-semibold text-foreground">{t('Initiatives')}</span>
+        <NavStrategyIcon size={14} />
+        <span className="text-[13px] font-medium text-foreground">{t('Initiatives')}</span>
       </div>
 
       <div className="flex-1 overflow-hidden">
@@ -174,7 +174,7 @@ export function StrategyShell({
             )}
             {unplaced.length > 0 && (
               <>
-                <div className="px-6 pt-4 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Not in a Vision')}</div>
+                <div className="px-6 pt-4 text-[12px] font-medium text-muted-foreground/80">{t('Not in a Vision')}</div>
                 <StrategyListView strategies={unplaced} onSelectStrategy={(s) => setOpenStrategyId(s.id)} showHeader={inVision.length === 0} />
               </>
             )}
@@ -349,7 +349,7 @@ function ObjectPickerList({
       )}
       {grouped.map(([did, { domainName, objects }]) => (
         <div key={did}>
-          <div className="px-3 py-1 text-[10px] tracking-wide text-muted-foreground bg-muted/20 sticky top-0">
+          <div className="px-3 py-1 text-[11px] text-muted-foreground bg-muted/20 sticky top-0">
             {domainName}
           </div>
           {objects.map((o) => {
@@ -737,12 +737,12 @@ function StrategyDetailView({
         <button
           type="button"
           onClick={onBack}
-          className="px-1.5 py-0.5 rounded text-[12px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+          className="px-1.5 py-0.5 rounded text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
         >
           {t('Initiative')}
         </button>
         <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
-        <span className="px-1.5 py-0.5 text-[12px] font-semibold text-foreground truncate max-w-[240px]">
+        <span className="px-1.5 py-0.5 text-[13px] font-medium text-foreground truncate max-w-[240px]">
           {strategy.name}
         </span>
         {!canEdit && (
@@ -792,7 +792,6 @@ function StrategyDetailView({
             three sections that use it must share one — see InitiativeIntent. */}
         <InitiativeIntentProvider key={strategy.id} initiativeId={strategy.id} initiativeName={strategy.name} createdBy={strategy.created_by}>
         <WidgetSurface board={board} host={host} zones={INITIATIVE_ZONES} className="space-y-5">
-          <WidgetZone zone="band" className="mb-4" />
           <div>
             <PageIcon><NavStrategyIcon size={18} /></PageIcon>
             <textarea
@@ -816,11 +815,12 @@ function StrategyDetailView({
               readOnly={!canEdit}
               aria-readonly={!canEdit}
               tabIndex={canEdit ? undefined : -1}
-              className="w-full text-2xl text-foreground bg-transparent border-none resize-none leading-tight overflow-hidden tracking-normal"
-              // The base style resets typed text to 400, beating a utility —
-              // so the heading's weight is set inline, as on Element detail.
-              style={{ fontWeight: 600 }}
+              className={`w-full bg-transparent border-none resize-none overflow-hidden ${PAGE_TITLE}`}
+              style={PAGE_TITLE_WEIGHT}
             />
+            {/* Band — how it is going, right under the name (a progress line
+                by default), before the sections below are read. */}
+            <WidgetZone zone="band" className="mt-3" />
           </div>
           <textarea
             ref={descriptionRef}
@@ -840,7 +840,7 @@ function StrategyDetailView({
             readOnly={!canEdit}
             aria-readonly={!canEdit}
             tabIndex={canEdit ? undefined : -1}
-            className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
+            className="w-full text-[14px] text-[var(--text-secondary)] leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
           />
 
           {/* The board. Everything a Initiative says about itself that is not
@@ -855,7 +855,7 @@ function StrategyDetailView({
           <WidgetZone zone="main" columns={1} />
 
           {/* Nested Initiatives. With none, the section keeps no heading — only
-              its "+ verb", like every concept page (DESIGN.md). */}
+              its "+ verb", like every concept page. */}
           {childStrategies.length > 0 || childPickerOpen ? (
             <PageSection title={t('Initiatives')} action={canEdit ? (
               <ButtonAppearanceProvider appearance="navigation">

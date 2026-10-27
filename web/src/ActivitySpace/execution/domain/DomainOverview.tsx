@@ -42,7 +42,7 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
   };
   return <WidgetActionSlotProvider><div className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
     <header className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
-      <DomainIcon size={12} />
+      <DomainIcon size={14} />
       <span className="truncate text-xs font-semibold">{domain.name}</span>
       <div className="flex-1" />
       {viewOnly && <ViewOnlyBadge />}

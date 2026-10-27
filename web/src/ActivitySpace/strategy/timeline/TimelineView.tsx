@@ -232,8 +232,8 @@ export function TimelineView({
     <div className="flex flex-col h-full bg-card">
       {/* Top bar — mirrors the other Strategy-layer surfaces */}
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-        <NavTimelineIcon size={12} />
-        <span className="text-[12px] font-semibold text-foreground">{t('Timeline')}</span>
+        <NavTimelineIcon size={14} />
+        <span className="text-[13px] font-medium text-foreground">{t('Timeline')}</span>
         <span className="text-[11px] text-muted-foreground ml-1">
           {loading ? t('Loading…') : rootStrategies.length === 1 ? t('1 Initiative') : t('{n} Initiatives', { n: rootStrategies.length })}
         </span>

@@ -305,7 +305,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
       {/* Plain header — no Domain breadcrumb because personal Elements are
           intentionally Domain-less. */}
       <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
-        {!embedded && <span className="text-[12px] font-semibold text-foreground">{t('My Elements')}</span>}
+        {!embedded && <span className="text-[13px] font-medium text-foreground">{t('My Elements')}</span>}
         <span className="text-[11px] text-muted-foreground">{embedded ? t('{n} Elements', { n: elements.length }) : elements.length}</span>
         <div className="flex-1" />
         <ListControls

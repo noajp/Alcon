@@ -330,24 +330,19 @@ function WorkspaceContent({
   const sidebarHidden = sidebarCollapsed || personalMode;
   const [discoverOpen, setDiscoverOpen] = useState(false);
   // Alcon Copilot pane — open state shared by the strip's PanelRight
-  // toggle, ⌘L, and the panel's own close button. localStorage round-trips
-  // it across reloads.
-  const [copilotOpen, setCopilotOpen] = useState(false);
-  useEffect(() => {
-    try { if (localStorage.getItem('alcon.copilot.open') === '1') setCopilotOpen(true); } catch { /* SSR */ }
-  }, []);
+  // toggle, ⌘L, and the panel's own close button. It is kept per kind of
+  // screen: elsewhere the AI panel starts closed, so the work has the whole
+  // width until someone asks for it; on Slides it is the deck's assistant —
+  // a deck is made by talking to it — so it starts open there. Neither is
+  // carried across reloads.
+  const [copilotOpenElsewhere, setCopilotOpenElsewhere] = useState(false);
+  const [copilotOpenOnSlides, setCopilotOpenOnSlides] = useState(true);
+  const onSlides = activeTab.activeView === 'slides';
+  const copilotOpen = onSlides ? copilotOpenOnSlides : copilotOpenElsewhere;
   const handleCopilotOpenChange = (next: boolean) => {
-    setCopilotOpen(next);
-    try { localStorage.setItem('alcon.copilot.open', next ? '1' : '0'); } catch { /* ignore */ }
+    if (onSlides) setCopilotOpenOnSlides(next);
+    else setCopilotOpenElsewhere(next);
   };
-  // A deck is made by talking to it: the first time Slides opens in a session,
-  // the AI panel — the deck's assistant there — opens with it. Closing it after
-  // that is respected.
-  const [slidesSeen, setSlidesSeen] = useState(false);
-  if (activeTab.activeView === 'slides' && !slidesSeen) {
-    setSlidesSeen(true);
-    if (!copilotOpen) setCopilotOpen(true);
-  }
   // Nothing is created up front: a Space may start from Strategy (a Vision or
   // Portfolio) as well as from a Domain, so the person picks where to begin.
   const [createType, setCreateType] = useState<CreateType | null>(null);
@@ -583,7 +578,7 @@ function WorkspaceContent({
               })
             )}
           </div>
-          <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} subject={activeTab.activeView === 'slides' ? 'slides' : null} />
+          <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} subject={onSlides ? 'slides' : null} />
         </div>
         {/* The strip under the islands: the page-level toggles sit at its
             right end — the sidebar (omitted while it has nothing to show, on

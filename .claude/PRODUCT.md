@@ -327,38 +327,6 @@ web/src/
 
 Execution が Domain → Object → Element の順に並ぶのは、上位ほど活動の範囲が広く、下位ほど行動が具体的になるため。Sustainment の各道具は ModeRail の Apps ランチャーに1対1で対応する。
 
-## UI デザイン原則
-
-### レイアウト哲学
-- **常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス** の 3 列構成。ブラウザのタブがあるので画面内にタブ列は置かない。サイドバーの表示切替と AI ペインの開閉は、アイランドの下の帯の右端に置く。サイドバー最上部の Space 行は固定ヘッダーで、メイン領域のヘッダーと同じ高さ・位置に揃え、その下だけがスクロールする。Settings は同じ画面で開き、その固定ヘッダーの「Back」で元の画面へ戻る
-- **ModeRail**（46px）は分類セレクタ：固定の Inbox / Calendar / Strategy / Execution ＋ Apps ランチャーから追加した App ＋ 最下部のアバター（Profile）。Inbox のアイコンには未読数のバッジを出す。カタログは Tools（Notebook / Table / Slides / People）と Sustainment（Workload / CRM / Audit）の 2 グループで、すべて Sustainment の道具
-- **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋「＋」。「＋」はモードごとに対象が変わる（Notebook＝ノートブック / Table＝テーブル / Strategy＝Vision・Portfolio・Initiative のメニュー / Calendar＝表示中の日を期日にした Element / Execution＝Domain・Object のメニュー）。どれも Object / Element と同じクイック作成カード（画面下の角丸カードに名前・説明・プロパティのピル・Create）で作る。作るものが無いモードでは出さない。見出し横に別の「＋」を置かない。本体は現在のモードに応じて切替（Inbox＝通知の一覧 / Calendar＝今日・ミニ月・表示する人 / Strategy＝Vision ごとの行の下に Portfolio・Initiative / Execution＝Domain ツリー / Notebook＝ノートブック一覧 / App 各種＝モード名ラベルのみ）。アバターから開く Profile と、自分の資料一覧を持つ Slides ではサイドバーを出さない
-- **Notebook** はサイドバーに Book（ノートブック）と配下の Section をツリーで並べ、メイン領域の左列は選んだ Section のページ一覧だけを示す。Book / Section の右クリックで New section / New page / Rename / Delete（削除は確認を経る）、ページは右クリックで Rename / Delete、一覧末尾の「New page」で追加する。新しい Book はサイドバー上部の「＋」
-- view→モードの対応は `shell/railApps.ts` の `MODE_META.views` / `railModeOf`、view id→ラベル / アイコンは `shell/viewRegistry.ts` が単一情報源
-
-Domain の概要は、その Domain の Objects と実行状況、Object を介して関連する Initiatives を示す。Initiative 側には現在 Space と招待された Guest の関連 Domains を示し、相互に移動できる。関係は両端が可視の Object 所属から導出し、multi-homing を含む。Domain 集計は所属 Object の Element を重複なく数える。Phase / Timeline のナビゲーション上の配置は、Phase の Domain スコープを変えない。
-
-### ビジュアル原則
-- 入力フィールドにボーダー/リングを付けない。背景色の差だけでフィールドを示す
-- メイン領域を角丸のカードで囲み、背景から区別する
-- ミニマルで静かな UI。装飾よりも情報密度を優先
-- CommandPalette (⌘K) で検索・移動できるようにし、マウス操作を減らす
-
-### Object Detail（TabBar 内ビュー群）
-| タブ | 機能 |
-|------|------|
-| Dashboard | Object 固有の KPI / Widget |
-| List | Element 一覧（フィルタ / ソート / グルーピング） |
-| Overview | Object のメタ情報・説明 |
-| Gantt | Element の期間を Gantt チャート表示 |
-| Calendar | Element を日/週/月カレンダー表示 |
-| Workers | Object 内の Worker 一覧・アサイン管理 |
-| Resource | Worker × 日次負荷の面グラフ |
-| Board | Kanban ボード |
-| Note | Object 固有の Notes |
-
-Workers / Resource / Calendar / Gantt は Sustainment の道具を Object 単位で提供している。
-
 ## データ設計原則
 
 - **RLS everywhere** — 全テーブルに Row Level Security

@@ -100,9 +100,9 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
       ) : (
         <>
           <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-            <NavPortfolioIcon size={12} />
-            <span className="text-[12px] font-semibold text-foreground">{t('Portfolios')}</span>
-            {vision && <span className="truncate text-[12px] text-muted-foreground">{vision.name}</span>}
+            <NavPortfolioIcon size={14} />
+            <span className="text-[13px] font-medium text-foreground">{t('Portfolios')}</span>
+            {vision && <span className="truncate text-[13px] text-muted-foreground">{vision.name}</span>}
           </div>
           <div className="flex-1 overflow-y-auto">
             {loading ? null : !vision ? (
@@ -119,7 +119,7 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
                 </IndexList>
                 {unassigned.length > 0 && (
                   <>
-                    <div className="px-6 pt-4 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Not in a Portfolio')}</div>
+                    <div className="px-6 pt-4 text-[12px] font-medium text-muted-foreground/80">{t('Not in a Portfolio')}</div>
                     <IndexList headers={[t('Name'), t('Health'), t('Objects')]} showHeader={false}>
                       {unassigned.map((s) => (
                         <InitiativeIndexRow key={s.id} strategy={s} health={healthById.get(s.id)} onOpen={() => onSelectStrategy(s.id)} />
@@ -402,14 +402,14 @@ function PortfolioDetail({ node, visionName, portfolios, byPortfolio, healthById
     <>
       <div className="h-[50px] flex items-center gap-1 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
         <button type="button" onClick={() => onOpenPortfolio(null)}
-          className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">
-          <NavPortfolioIcon size={12} />{t('Portfolio')}
+          className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">
+          <NavPortfolioIcon size={14} />{t('Portfolio')}
         </button>
         {path.map((p) => (
           <span key={p.id} className="flex min-w-0 items-center gap-1">
             <ChevronRight size={12} className="shrink-0 text-muted-foreground/60" />
             {p.id === portfolio.id ? (
-              <span className="truncate px-1.5 text-[12px] font-semibold text-foreground">{p.name}</span>
+              <span className="truncate px-1.5 text-[13px] font-medium text-foreground">{p.name}</span>
             ) : (
               <button type="button" onClick={() => onOpenPortfolio(p.id)}
                 className="truncate rounded px-1.5 py-0.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">{p.name}</button>

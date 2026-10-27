@@ -239,9 +239,6 @@ export const ElementRow = memo(function ElementRow({
           </span>
           <div className="flex flex-1 min-w-0 items-center gap-2">
             <span className="text-[13px] font-medium truncate flex-1 min-w-0 text-foreground">{el.title}</span>
-            {!!el.labels?.length && <span className="hidden @[26rem]:flex max-w-[35%] shrink-0 items-center gap-1 overflow-hidden" title={el.labels.join(', ')}>
-              {el.labels.map(label => <LabelChip key={label} label={label} />)}
-            </span>}
           </div>
           {lease && (
             // Who holds this right now. Only a live lease is shown — a lapsed
@@ -266,8 +263,8 @@ export const ElementRow = memo(function ElementRow({
               <span className="hidden @[28rem]:inline truncate">{holderLabel(lease.holder)}</span>
             </span>
           )}
-          {/* Quiet activity signal — comment count + how recently the thread
-              moved, so active vs stalled Elements read at a glance without
+          {/* Quiet activity signal — the comment count, so discussed and
+              silent Elements read at a glance without
               opening the detail panel. It is a stand-in for the Activity
               column, so it steps aside when that column is on: the same
               number twice on one row reads as two different facts. */}
@@ -287,6 +284,11 @@ export const ElementRow = memo(function ElementRow({
             </span>
           )}
 
+          {/* Labels last, so they line up at the cell's right edge whatever
+              signals a row carries before them. */}
+          {!!el.labels?.length && <span className="hidden @[26rem]:flex max-w-[35%] shrink-0 items-center justify-end gap-1 overflow-hidden" title={el.labels.join(', ')}>
+            {el.labels.map(label => <LabelChip key={label} label={label} />)}
+          </span>}
         </div>
       </td>
       {visibleColumns.map((col) => (

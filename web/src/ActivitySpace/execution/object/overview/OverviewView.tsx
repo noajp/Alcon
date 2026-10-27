@@ -8,7 +8,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { updateObject } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
-import { PageIcon } from '@/Function/shared/PageHead';
+import { PageIcon, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import {
   useBoard,
@@ -151,9 +151,6 @@ export function OverviewView({
     <div className="h-full overflow-y-auto bg-card">
       <div className="max-w-7xl mx-auto px-8 py-8">
         <WidgetSurface board={board} host={host} zones={SURFACE_ZONES}>
-          {/* Band — full width, above everything. Empty by default. */}
-          <WidgetZone zone="band" className="mb-4" />
-
           {/* items-start: don't let the (often taller) rail stretch the main
               column. A stretched block column was the layout that made the
               title/description textareas mis-measure and balloon. */}
@@ -161,7 +158,7 @@ export function OverviewView({
             {/* ───────────── Main column ───────────── */}
             {/* pl-6: indent the editorial content off the left rail so it
                 reads as a document rather than flush against the sidebar. */}
-            <div className="space-y-6 min-w-0 pl-6">
+            <div className="space-y-6 min-w-0">
               {/* Icon stacked above the name; the name sits flush with the
                   column's left edge so it lines up with the description. */}
               <div>
@@ -178,10 +175,13 @@ export function OverviewView({
                       (e.currentTarget as HTMLTextAreaElement).blur();
                     }
                   }}
-                  className="w-full text-2xl text-foreground bg-transparent border-none resize-none leading-tight overflow-hidden tracking-normal"
-                  style={{ fontWeight: 600 }}
+                  className={`w-full bg-transparent border-none resize-none overflow-hidden ${PAGE_TITLE}`}
+                  style={PAGE_TITLE_WEIGHT}
                   placeholder={t('Object name')}
                 />
+                {/* Band — how it is going, right under the name (a progress
+                    line by default), before anything is read. */}
+                <WidgetZone zone="band" className="mt-3" />
               </div>
 
               <section>
@@ -192,7 +192,7 @@ export function OverviewView({
                   onChange={(e) => setDescription(e.target.value)}
                   onBlur={handleDescriptionSave}
                   placeholder={t('Add description…')}
-                  className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
+                  className="w-full text-[14px] text-[var(--text-secondary)] leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
                 />
               </section>
 

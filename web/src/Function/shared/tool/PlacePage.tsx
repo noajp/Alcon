@@ -17,7 +17,7 @@ export function PlacePage({ icon: Icon, title, actions, children, container }: {
 }) {
   return <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
     <header className="flex h-[50px] flex-shrink-0 items-center gap-1.5 border-b border-border/60 bg-card pl-4 pr-2">
-      <Icon size={12} /><span className="text-[12px] font-semibold text-foreground">{title}</span>
+      <Icon size={12} /><span className="text-[13px] font-medium text-foreground">{title}</span>
       <div className="flex-1" />
       {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
     </header>

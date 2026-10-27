@@ -147,9 +147,9 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
         if (!(e.target instanceof Node) || !e.currentTarget.contains(e.target)) return;
         onOpen?.(element);
       }}
-      className="group/card rounded-xl border border-border bg-card hover:border-[var(--border-strong)] transition-colors cursor-grab active:cursor-grabbing"
+      className="group/card rounded-lg border border-[var(--border-subtle)] bg-card dark:bg-muted shadow-[var(--shadow-island)] hover:border-[var(--border-default)] transition-colors cursor-grab active:cursor-grabbing"
     >
-      <div className="p-4">
+      <div className="px-3 py-2.5">
         {editingTitle ? (
           <textarea
             autoFocus
@@ -178,7 +178,7 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
           </p>
         )}
 
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
             {/* Due date — click to pick / change. Unset, it appears only while
                 the card is hovered or has keyboard focus inside it: a column
@@ -250,11 +250,8 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
             </DropdownMenu>
           </div>
           <div className="flex items-center gap-1">
-            {/* Same signal the list rows and the Activity column show. The
-                relative time is dropped here: the footer is already carrying
-                a date, a priority and an assignee, and the count is what
-                separates a discussed card from a silent one. */}
-            <ActivitySignal activity={element.activity} showRelative={false} className="mr-1" />
+            {/* Same signal the list rows and the Activity column show. */}
+            <ActivitySignal activity={element.activity} className="mr-1" />
             <CardAgentControl elementId={element.id} onFinished={onRefresh} />
             {/* Assignee — click to assign / change. */}
             <DropdownMenu open={assigneeMenuOpen} onOpenChange={setAssigneeMenuOpen}>
@@ -348,12 +345,12 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
     return (
       <div className="flex gap-3 p-4 h-full">
         {COLUMNS.map((col) => (
-          <div key={col.status} className="w-72 flex-shrink-0 rounded-xl bg-muted">
+          <div key={col.status} className="w-72 flex-shrink-0 rounded-lg bg-muted/60 dark:bg-muted/30">
             <div className="px-3 py-2.5 border-b border-border/40">
               <Skeleton className="h-4 w-20" />
             </div>
             <div className="p-2 space-y-2">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
             </div>
           </div>
         ))}
@@ -368,16 +365,16 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
         return (
           <div
             key={col.status}
-            className="w-72 flex-shrink-0 flex flex-col rounded-xl bg-muted"
+            className="w-72 flex-shrink-0 flex flex-col rounded-lg bg-muted/60 dark:bg-muted/30"
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop(col.status)}
           >
             {/* Column header */}
-            <div className="flex items-center justify-between px-3 py-2.5">
+            <div className="flex h-10 items-center justify-between px-3">
               <div className="flex items-center gap-2">
-                <ElementProgressMark status={col.status} size={16} />
-                <span className="text-sm font-medium">{t(col.label)}</span>
-                <span className="text-xs text-muted-foreground">{colItems.length}</span>
+                <ElementProgressMark status={col.status} size={14} />
+                <span className="text-[13px] font-medium">{t(col.label)}</span>
+                <span className="text-[12px] tabular-nums text-muted-foreground">{colItems.length}</span>
               </div>
               <Button variant="ghost" size="icon-xs"
                 type="button"
@@ -401,7 +398,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
             </div>
 
             {/* Cards */}
-            <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2 min-h-[80px]">
+            <div className="flex-1 overflow-y-auto px-1.5 pb-1.5 space-y-1.5 min-h-[80px]">
               {colItems.map((el) => (
                 <div
                   key={el.id}

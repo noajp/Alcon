@@ -66,7 +66,7 @@ export function ColumnHeader({
       style={dragStyle}
       {...attributes}
       {...listeners}
-      className="table-cell group/col relative px-1.5 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card whitespace-nowrap select-none border-b border-border/60"
+      className="table-cell group/col relative px-1.5 py-2.5 text-left text-[12px] font-normal text-muted-foreground bg-card whitespace-nowrap select-none border-b border-border/60"
     >
       <div className="flex items-center gap-1 min-w-0">
         {/* Sort toggle — click cycles none → asc → desc → none. We do NOT

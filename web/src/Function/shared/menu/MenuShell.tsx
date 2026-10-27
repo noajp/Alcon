@@ -98,7 +98,7 @@ const MENU_SHELL_BASE = [
  * design-lint-ignore
  * `#ffffff`: `hover:bg-accent` — and Radix's own `focus:bg-accent` — paints the
  * surface colour onto the surface and shows nothing at all. `--surface-strong`
- * is the token whose documented job (DESIGN.md §1.4) is to differ from the
+ * is the token whose job is to differ from the
  * background, with the theme deciding whether that means lighter or darker.
  * `globals.css` re-points the Radix items inside a MenuShell at the same token,
  * so hovering a hand-rolled row and hovering a Radix row look identical.

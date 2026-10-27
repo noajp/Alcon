@@ -2,7 +2,7 @@
 //
 // `ui/input.tsx` and `ui/calendar.tsx` are shadcn-generated files that were
 // hand-diverged from upstream to obey the house rule "入力フィールドに枠・リング・
-// アウトライン禁止" (.claude/CLAUDE.md, DESIGN.md §5.3). Re-running the generator
+// アウトライン禁止". Re-running the generator
 // silently restores the upstream focus ring — a header comment asks people not
 // to, but nothing enforced it.
 //

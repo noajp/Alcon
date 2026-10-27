@@ -12,7 +12,7 @@
    ============================================= */
 
 :root {
-  --control-action-radius: 9999px;
+  --control-action-radius: 6px;
   --control-tab-radius: 6px;
   --control-field-radius: 6px;
   /* ---- Accent (Blue — single accent) ---- */
@@ -138,8 +138,7 @@
   --shadow-1: lch(0 0 0 / 0.02) 0px 2px 3px -1px, lch(0 0 0 / 0.04) 0px 1px 1px 0px;
   --shadow-island: var(--shadow-1);
   /* A colored CTA button's own lift (e.g. the Copilot send button) — stronger
-     than --shadow-island, which is reserved for cards per DESIGN.md §"カードの
-     微かな持ち上げ". Same value in both themes: the button's own background
+     than --shadow-island, which is reserved for cards. Same value in both themes: the button's own background
      color carries the theme, not this shadow. */
   --shadow-button: 0 1px 4px rgba(0, 0, 0, 0.35);
 
@@ -217,25 +216,27 @@
   /* Neutral grays (R≈G≈B) — the previous ramp leaned cool/blue. Backdrop/
      sidebar (--surface-bg) and island (--surface-raised) sit a notch darker;
      the lightness steps are preserved, only the blue cast is removed. */
-  --surface-bg:      #1a1a1a;
-  --surface-raised:  #1e1e1e;
-  --surface-strong:  #2a2a2a;
-  --surface-muted:   #272727;
-  --surface-overlay: #252525;
-  /* Right-rail cards keep the pre-darkening island tone so they lift a notch
-     off the now-darker main island. */
-  --surface-rail:    #222222;
+  --surface-bg:      #101011;
+  --surface-raised:  #161617;
+  --surface-strong:  #252527;
+  --surface-muted:   #1e1e20;
+  --surface-overlay: #1c1c1e;
+  /* Right-rail cards lift a notch off the main island. */
+  --surface-rail:    #1b1b1d;
 
   /* ---- Border — Dark ---- */
   --border-subtle:  rgba(255, 255, 255, 0.055);
   --border-default: rgba(255, 255, 255, 0.095);
   --border-strong:  rgba(255, 255, 255, 0.145);
 
-  /* ---- Text — Dark (per design spec) ---- */
-  --text-primary:   #f4f4f5;
-  --text-secondary: #c3c5ca;
-  --text-tertiary:  #8d9098;
-  --text-disabled:  #5f626b;
+  /* ---- Text — Dark ----
+     Four steps, and the steps do the work: a title is the brightest thing on
+     the screen, the body under it a clear notch down, metadata quieter still.
+     Hierarchy comes from these, not from making text heavier. */
+  --text-primary:   #f7f8f8;
+  --text-secondary: #d0d3d9;
+  --text-tertiary:  #8a8f98;
+  --text-disabled:  #62666d;
 
   /* ---- Shadcn/UI token mapping — Dark ---- */
   --background:           var(--surface-bg);
@@ -270,7 +271,7 @@
   /* Sidebar row highlight goes DARKER than sidebar bg (lch 19) — settles
      toward black rather than lifting up. Active uses full opacity; hover
      classes blend at /50 for a barely-there "you're hovering" hint. */
-  --sidebar-accent:           #2a2a2a;
+  --sidebar-accent:           #222224;
   --sidebar-accent-foreground: var(--text-primary);
   --sidebar-border:           var(--border-subtle);
   --sidebar-ring:             var(--accent-hover);
@@ -285,14 +286,15 @@
    "Dark" itself is the neutral-gray base above (the plain `.dark` class).
    ============================================ */
 .theme-midnight {
-  /* Cooler, navy-tinted — blue channel sits a few points above red/green. */
-  --surface-bg:      #181a20;
-  --surface-raised:  #1c1e26;
-  --surface-strong:  #282b35;
-  --surface-muted:   #25272f;
-  --surface-overlay: #23252d;
-  --surface-rail:    #20232c;
-  --sidebar-accent:  #282b35;
+  /* Cool — a trace of blue in a near-black, not a navy. Kept low: a strong
+     tint reads dated, and surfaces this close must differ in lightness, not hue. */
+  --surface-bg:      #0e0f12;
+  --surface-raised:  #15161a;
+  --surface-strong:  #24262c;
+  --surface-muted:   #1c1d22;
+  --surface-overlay: #1b1c21;
+  --surface-rail:    #1a1b20;
+  --sidebar-accent:  #212228;
 }
 .theme-carbon {
   /* Deep near-black neutral (OLED-friendly). */
@@ -432,9 +434,11 @@ body {
   font-family: var(--font-sans);
   font-size: 13px;          /* keep UI density; spec base 16px applies to long-form text */
   line-height: 1.45;
-  /* Slightly heavier UI weight overall; user-typed content (inputs /
-     textareas / contenteditable) drops back to 400 via the rule below. */
-  font-weight: 510;
+  /* Regular by default. Weight is kept for what leads — titles, the selected
+     row, a button label — so it means something where it appears. Japanese
+     falls back to Hiragino, whose next face up is a visibly bolder one, so a
+     heavier body weight turns every Japanese line semi-bold. */
+  font-weight: 400;
   letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -456,6 +460,10 @@ textarea.quick-create-title {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+/* The sidebar scrolls without a bar: a permanent rail beside the navigation
+   is chrome the list does not need — the wheel and trackpad still scroll it. */
+.app-sidebar * { scrollbar-width: none; }
+.app-sidebar *::-webkit-scrollbar { display: none; }
 
 /* ---- Focus rings ----
  * No automatic focus outline anywhere. Nothing acquires a ring just by being a
@@ -599,8 +607,8 @@ button, a, input, select, textarea {
 }
 :is(.dark, .theme-midnight, .theme-carbon, .theme-graphite) .app-sidebar {
   --foreground:           var(--text-primary);   /* pure white: lch(100) */
-  --muted-foreground:     #989A9C;               /* inactive gray */
-  --sidebar-foreground:   #989A9C;
+  --muted-foreground:     #9a9ea6;               /* inactive gray */
+  --sidebar-foreground:   #9a9ea6;
 }
 
 :root {

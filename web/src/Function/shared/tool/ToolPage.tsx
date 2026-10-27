@@ -10,6 +10,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } 
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
 import { PageLayout } from '@/Function/shared/PageHead';
+import { CollapsingTabs } from '@/Function/shared/CollapsingTabs';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { constrainTabDrag } from '@/shell/tabDrag';
 import { arrangeViews, nextViewTabState, parseViewTabState, type ViewTabState } from './viewTabs';
@@ -116,45 +117,53 @@ export function ToolPage({
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
       <header className="flex h-[50px] flex-shrink-0 items-center gap-1.5 border-b border-border/60 bg-card pl-4 pr-2">
         <Icon size={12} />
-        <span className="text-[12px] font-semibold text-foreground">{tool}</span>
-        {crumb && <><ChevronRight size={12} className="shrink-0 text-muted-foreground/60" /><span className="min-w-0 truncate text-[12px] text-muted-foreground">{crumb}</span></>}
+        <span className="text-[13px] font-medium text-foreground">{tool}</span>
+        {crumb && <><ChevronRight size={12} className="shrink-0 text-muted-foreground/60" /><span className="min-w-0 truncate text-[13px] text-muted-foreground">{crumb}</span></>}
         <div className="flex-1" />
         {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
       </header>
 
       <div className="flex flex-shrink-0 items-center gap-1.5 px-4 py-2">
-        <DndContext sensors={sensors} modifiers={[constrainTabDrag]} collisionDetection={closestCenter} onDragEnd={({ active: dragged, over }) => {
-          if (!over || dragged.id === over.id) return;
-          const from = movable.indexOf(String(dragged.id));
-          const to = movable.indexOf(String(over.id));
-          if (from >= 0 && to >= 0) tabs.change({ reorder: [home, ...arrayMove(movable, from, to)] });
-        }}>
-          <SortableContext items={movable} strategy={horizontalListSortingStrategy}>
-            <div className="min-w-0 overflow-x-auto">
-              <div className="flex w-max items-center gap-1.5">
-                {strip.map((view) => (
-                  <ViewTab key={view.id} view={view} active={view.id === active.id} pinned={view.id === home}
-                    onSelect={() => onSelectView(view.id)} onHide={() => { tabs.change({ hide: view.id }); if (view.id === active.id) onSelectView(home); }} />
-                ))}
+        <CollapsingTabs
+          menuLabel={t('Views')}
+          items={strip.map((view) => ({ id: view.id, label: t(view.label), icon: view.icon, badge: view.badge !== undefined && view.badge !== null && view.badge !== false
+            ? <span className="text-[11px] font-normal tabular-nums text-muted-foreground">{view.badge}</span> : undefined }))}
+          activeId={active.id}
+          onSelect={onSelectView}
+          strip={(
+          <DndContext sensors={sensors} modifiers={[constrainTabDrag]} collisionDetection={closestCenter} onDragEnd={({ active: dragged, over }) => {
+            if (!over || dragged.id === over.id) return;
+            const from = movable.indexOf(String(dragged.id));
+            const to = movable.indexOf(String(over.id));
+            if (from >= 0 && to >= 0) tabs.change({ reorder: [home, ...arrayMove(movable, from, to)] });
+          }}>
+            <SortableContext items={movable} strategy={horizontalListSortingStrategy}>
+              <div className="min-w-0 overflow-x-auto">
+                <div className="flex w-max items-center gap-1.5">
+                  {strip.map((view) => (
+                    <ViewTab key={view.id} view={view} active={view.id === active.id} pinned={view.id === home}
+                      onSelect={() => onSelectView(view.id)} onHide={() => { tabs.change({ hide: view.id }); if (view.id === active.id) onSelectView(home); }} />
+                  ))}
+                </div>
               </div>
-            </div>
-          </SortableContext>
-        </DndContext>
-        {tabs.hidden.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" size="icon-sm" aria-label={t('Show a view')} title={t('Show a view')}><Plus size={14} /></Button>
-            </DropdownMenuTrigger>
-            <MenuShell as="dropdown" align="start">
-              {tabs.hidden.map((view) => (
-                <DropdownMenuItem key={view.id} onSelect={() => { tabs.change({ show: view.id }); onSelectView(view.id); }} className="gap-2">
-                  <view.icon size={14} />{t(view.label)}
-                </DropdownMenuItem>
-              ))}
-            </MenuShell>
-          </DropdownMenu>
-        )}
-        <div className="flex-1" />
+            </SortableContext>
+          </DndContext>
+          )}
+          trailing={tabs.hidden.length > 0 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" size="icon-sm" aria-label={t('Show a view')} title={t('Show a view')}><Plus size={14} /></Button>
+              </DropdownMenuTrigger>
+              <MenuShell as="dropdown" align="start">
+                {tabs.hidden.map((view) => (
+                  <DropdownMenuItem key={view.id} onSelect={() => { tabs.change({ show: view.id }); onSelectView(view.id); }} className="gap-2">
+                    <view.icon size={14} />{t(view.label)}
+                  </DropdownMenuItem>
+                ))}
+              </MenuShell>
+            </DropdownMenu>
+          ) : undefined}
+        />
         {viewControls}
       </div>
 
@@ -193,7 +202,7 @@ function ViewTab({ view, active, pinned, onSelect, onHide }: {
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={pinned ? undefined : `touch-none ${isDragging ? 'relative z-10 opacity-70' : ''}`}>
       <span className={active ? 'text-foreground' : 'text-muted-foreground'}><view.icon size={14} /></span>
-      <span className="text-xs font-semibold">{t(view.label)}</span>
+      <span>{t(view.label)}</span>
       {view.badge !== undefined && view.badge !== null && view.badge !== false && (
         <span className="text-[11px] font-normal tabular-nums text-muted-foreground">{view.badge}</span>
       )}

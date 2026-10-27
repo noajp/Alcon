@@ -435,7 +435,7 @@ function HierarchyHeader({
       <button
         type="button"
         onClick={onDomainClick}
-        className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[12px] font-semibold truncate max-w-[220px] transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/40"
+        className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[13px] font-medium truncate max-w-[220px] transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/40"
       >
         <span className="truncate">{domainName}</span>
       </button>

@@ -151,7 +151,7 @@ export function WorkloadPlanPanel({
           </div>
         ) : groups.map((g) => (
           <section key={g.issue} className="mb-2">
-            <h3 className="flex h-7 items-center px-2 text-[11px] font-semibold tracking-wide text-muted-foreground/70">
+            <h3 className="flex h-7 items-center px-2 text-[12px] font-medium text-muted-foreground/80">
               {t(ISSUE_LABEL[g.issue])} <span className="ml-1.5 tabular-nums">{g.items.length}</span>
             </h3>
             <ul className="space-y-1">

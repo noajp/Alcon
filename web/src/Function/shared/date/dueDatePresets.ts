@@ -5,7 +5,7 @@
 // day, but almost every filter a person actually wants is relative — overdue,
 // this week, the next 30 days. Linear's date filter leads with relative quick
 // values ("N days" / Month / Quarter / Half-year / Year) and keeps the
-// absolute picker behind an explicit choice. DESIGN.md §5.11.6 adopts that.
+// absolute picker behind an explicit choice, and so does this.
 //
 // Pure on purpose — no React, no Date.now() baked in. `today` is a parameter so
 // the ranges are testable without freezing the clock.

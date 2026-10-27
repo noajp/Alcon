@@ -23,13 +23,21 @@ import { FONT } from '@/shared/designTokens';
  *  place: icon, then title, then description. */
 export function PageIcon({ children }: { children: ReactNode }) {
   return (
-    <span className="mb-4 -ml-2 flex size-9 items-center justify-center rounded-lg bg-muted/40 text-foreground/70">{children}</span>
+    <span className="mb-3 flex h-6 items-center text-muted-foreground">{children}</span>
   );
 }
 
 /** The page frame: centred, one width and one set of margins for every
  *  concept page. */
 const PAGE_BODY = 'mx-auto w-full max-w-7xl px-8 py-8';
+
+/** A concept page's title type — the one place its size, tracking and colour
+ *  are set. Pages that edit their title in a field of their own (Element,
+ *  Object, Initiative, Phase) use it too, so every title sits the same. The
+ *  weight is set inline (`PAGE_TITLE_WEIGHT`): the base resets typed content
+ *  to 400, which beats a utility. */
+export const PAGE_TITLE = 'text-2xl leading-tight tracking-[-0.012em] text-foreground';
+export const PAGE_TITLE_WEIGHT = { fontWeight: 600 } as const;
 
 /**
  * Every concept page's layout: the document on the left (icon, title,
@@ -141,9 +149,9 @@ export function PageHead({
     return (
       <div>
         {icon && <PageIcon>{icon}</PageIcon>}
-        <h1 className="text-2xl leading-tight text-foreground" style={{ fontWeight: 600 }}>{title}</h1>
+        <h1 className={PAGE_TITLE} style={PAGE_TITLE_WEIGHT}>{title}</h1>
         {description
-          ? <p className="mt-4 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-foreground">{description}</p>
+          ? <p className="mt-4 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-[var(--text-secondary)]">{description}</p>
           : emptyDescription && <p className="mt-4 text-[14px] leading-relaxed text-muted-foreground">{emptyDescription}</p>}
       </div>
     );
@@ -159,8 +167,8 @@ export function PageHead({
           // Enter, ⌘Enter and Escape end the edit, which saves it.
           if (isCommitEnter(e) || isSubmitChord(e) || isCancelKey(e)) { e.preventDefault(); e.currentTarget.blur(); }
         }}
-        className="w-full resize-none overflow-hidden border-none bg-transparent text-2xl leading-tight text-foreground focus:outline-none"
-        style={{ fontWeight: 600 }} />
+        className={`w-full resize-none overflow-hidden border-none bg-transparent focus:outline-none ${PAGE_TITLE}`}
+        style={PAGE_TITLE_WEIGHT} />
       {!onSaveDescription ? (
         description && <p className="mt-3 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-muted-foreground">{description}</p>
       ) : <div className="mt-3">
@@ -169,7 +177,7 @@ export function PageHead({
             // Enter is a newline; ⌘Enter and Escape end the edit, which saves it.
             if (isSubmitChord(e) || isCancelKey(e)) { e.preventDefault(); e.currentTarget.blur(); }
           }}
-          className="min-h-[36px] w-full resize-none overflow-hidden border-none bg-transparent text-[14px] leading-relaxed text-foreground focus:outline-none" />
+          className="min-h-[36px] w-full resize-none overflow-hidden border-none bg-transparent text-[14px] leading-relaxed text-[var(--text-secondary)] focus:outline-none" />
       </div>}
       {error && <div role="alert" className="text-[11px] text-destructive">{error}</div>}
     </div>

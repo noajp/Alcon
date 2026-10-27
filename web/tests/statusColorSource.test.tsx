@@ -14,7 +14,7 @@
 // Not five copies of one value that drifted in the last digit — five different
 // hues. `in_progress` was orange in the Gantt, purple in every list row and
 // blue on the calendar, and `blocked` was yellow in the row and red everywhere
-// else. designTokens.ts was the declared source of truth (DESIGN.md §1.3) and
+// else. designTokens.ts was the declared source of truth and
 // described none of the surfaces a user actually looks at.
 //
 // The mark won: it is the most-seen status surface in the app (~10 call sites,

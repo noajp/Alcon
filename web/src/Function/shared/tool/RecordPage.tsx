@@ -40,7 +40,7 @@ export function RecordPage({ icon: Icon, crumbs, actions, menu, onBack, onDelete
     onBack();
   });
   return <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
-    <header className="flex h-[50px] flex-shrink-0 items-center gap-1 border-b border-border/60 bg-card pl-4 pr-2 text-[12px] font-semibold">
+    <header className="flex h-[50px] flex-shrink-0 items-center gap-1 border-b border-border/60 bg-card pl-4 pr-2 text-[13px] font-medium">
       <Icon size={12} />
       {crumbs.map((crumb, index) => {
         const last = index === crumbs.length - 1;

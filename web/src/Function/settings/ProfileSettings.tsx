@@ -156,7 +156,7 @@ function DomainMembershipsSection() {
       ) : (
         grouped.map(([spaceId, list]) => (
           <div key={spaceId || 'unassigned'} className="py-3">
-            <div className="text-[11px] font-semibold tracking-wide text-muted-foreground/60 mb-1.5">
+            <div className="text-[12px] font-medium text-muted-foreground/80 mb-1.5">
               {spaceId.startsWith(GUEST_GROUP_PREFIX) ? t('Guest access') : spaceNames.get(spaceId) ?? t('Unassigned')}
             </div>
             <div className="space-y-1.5">
