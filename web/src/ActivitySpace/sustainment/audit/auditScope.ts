@@ -4,15 +4,15 @@ import { useMemo } from 'react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { inToolScope, SPACE_SCOPE, useToolScope, type ToolScope } from '@/Function/shared/tool/toolScope';
 import { NEEDS_PERSON, runOutcome, summarizeDeployment, type DeploymentSummary, type WorkflowDeploymentRecord } from '@/Function/audit/auditModel';
-import type { Audit } from '@/hooks/useAudit';
+import type { AuditSource } from './auditSource';
 
 /** What the Audit App shows in its scope (the Domain a deployment serves),
  *  read the same way by the sidebar and the pages. */
-export function useAuditScope(audit: Audit) {
+export function useAuditScope(audit: AuditSource) {
   const { t } = useI18n();
   const domainIds = useMemo(() => [...new Set(audit.deployments.flatMap(d => d.domain_id ? [d.domain_id] : []))], [audit.deployments]);
   const [scope, setScope] = useToolScope('audit', domainIds);
-  const name = (id: ToolScope) => id === null ? t('Everything') : id === SPACE_SCOPE ? t('Shared by the Space') : audit.domains.find(domain => domain.id === id)?.name ?? t('Unknown Domain');
+  const name = (id: ToolScope) => id === null ? t('All Domains') : id === SPACE_SCOPE ? t('Shared by the Space') : audit.domains.find(domain => domain.id === id)?.name ?? t('Unknown Domain');
   const options = domainIds.length ? [null, SPACE_SCOPE, ...[...domainIds].sort((a, b) => name(a).localeCompare(name(b)))].map(id => ({ id, name: name(id) })) : [];
 
   const deployments = useMemo(() => audit.deployments.filter(d => inToolScope(scope, d.domain_id)), [audit.deployments, scope]);

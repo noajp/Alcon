@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import {
-  exceptionReason, flowObservation, runOutcome, summarizeDeployment, templateSteps, verifyChain,
+  exceptionReason, flowObservation, runOutcome, sealChain, summarizeDeployment, templateSteps, verifyChain,
   type ChainStep, type WorkflowRunRecord, type WorkflowStepRecord,
 } from '@/Function/audit/auditModel';
+import { buildAuditSample } from '@/Function/audit/auditSample';
 
 const sha = async (text: string) => createHash('sha256').update(text).digest('hex');
 
@@ -140,8 +141,40 @@ describe('the hash chain', () => {
     expect(await verifyChain([first, { ...second, seq: 3 }], sha)).toEqual([{ seq: 3, kind: 'gap' }, { seq: 3, kind: 'hash' }]);
   });
 
+  it('seals steps into the same chain the database builds', async () => {
+    const sealed = await sealChain([{ ...first, seq: 0, prev_hash: '', hash: '' }, { ...second, seq: 0, prev_hash: '', hash: '' }], sha);
+    expect(sealed.map(s => [s.seq, s.hash])).toEqual([[1, first.hash], [2, second.hash]]);
+    expect(await verifyChain(sealed, sha)).toEqual([]);
+  });
+
   it('keeps field boundaries: moving text between neighbours changes the hash', async () => {
     expect(await verifyChain([{ ...first, actor_name: '受注エージェント|', reason: null }], sha)).toEqual([{ seq: 1, kind: 'hash' }]);
     expect(await verifyChain([{ ...first, actor_name: '受注', reason: 'エージェント' }], sha)).toEqual([{ seq: 1, kind: 'hash' }]);
+  });
+});
+
+describe('the sample', () => {
+  const now = new Date('2026-10-27T09:00:00Z');
+  const sample = buildAuditSample(now, (m) => m);
+
+  it('shows every way a run can end, within the window', () => {
+    const outcomes = new Set(sample.runs.map(run => runOutcome(run.steps)));
+    for (const outcome of ['auto', 'approved', 'returned', 'exception', 'deviation', 'stopped', 'waiting'] as const) expect(outcomes).toContain(outcome);
+    const since = new Date(now.getTime() - 30 * 86_400_000).toISOString();
+    expect(sample.runs.every(run => run.started_at >= since && run.started_at <= now.toISOString())).toBe(true);
+  });
+
+  it('seals into a chain per deployment that verifies like a real one', async () => {
+    for (const deployment of sample.deployments) {
+      const sealed = await sealChain(sample.steps.filter(s => s.deployment_id === deployment.id), sha);
+      expect(await verifyChain(sealed, sha)).toEqual([]);
+    }
+  });
+
+  it('keeps each run in step with its full steps', () => {
+    for (const run of sample.runs) {
+      const full = sample.steps.filter(s => s.run_id === run.id);
+      expect(run.steps.map(s => [s.seq, s.result])).toEqual(full.map(s => [s.seq, s.result]));
+    }
   });
 });

@@ -1,16 +1,16 @@
 'use client';
 
-import { CircleAlert, Layers, ScrollText, Workflow } from 'lucide-react';
+import { CircleAlert, LayoutDashboard, ScrollText, Workflow } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ToolSidebar } from '@/Function/shared/tool/ToolSidebar';
 import type { NavigationState } from '@/types/navigation';
-import { useAudit } from '@/hooks/useAudit';
 import { auditRoute, type AuditRoute } from '@/Function/audit/auditRoute';
 import { useAuditScope } from './auditScope';
+import { useAuditSource } from './auditSource';
 
-// The Audit sidebar, on the shared ToolSidebar: the scope (which Domain's
-// deployments), what needs a person now, the ledger with each deployment,
-// and the log of runs.
+// The Audit sidebar, on the shared ToolSidebar, and the App's only
+// navigation: the overview (its ▾ narrows every page to one Domain),
+// what needs a person now, each workflow, and the log.
 
 export function AuditSidebar({ navigation, onNavigate }: {
   navigation: NavigationState;
@@ -18,35 +18,34 @@ export function AuditSidebar({ navigation, onNavigate }: {
 }) {
   const { t } = useI18n();
   const route = auditRoute(navigation.audit);
-  const audit = useAudit();
-  const scoped = useAuditScope(audit);
+  const source = useAuditSource();
+  const scoped = useAuditScope(source);
   const go = (next: AuditRoute) => onNavigate({ audit: next });
 
   return <ToolSidebar
-    title={t('Audit')}
+    title={source.sample ? `${t('Audit')} · ${t('Sample')}` : t('Audit')}
     scope={{
-      value: scoped.scope, options: scoped.options, label: scoped.scopeName, icon: Layers,
-      active: route.view === 'workflows' && !route.deploymentId,
-      onOpen: () => go({ view: 'workflows' }),
-      onChange: next => { scoped.setScope(next); go({ view: 'workflows' }); },
+      value: scoped.scope, options: scoped.options, label: scoped.scope === null ? t('Overview') : scoped.scopeName, icon: LayoutDashboard,
+      // A workflow that cannot be shown (not read yet, or no longer there) falls back to the overview.
+      active: route.view === 'overview' || (route.view === 'workflow' && !scoped.deploymentOf.has(route.deploymentId ?? '')),
+      onOpen: () => go({ view: 'overview' }),
+      onChange: next => { scoped.setScope(next); go({ view: 'overview' }); },
     }}
     queue={[{
       id: 'attention', label: t('Needs a person'), icon: CircleAlert, count: scoped.attention.length,
       active: route.view === 'log' && !!route.attention,
       onClick: () => go({ view: 'log', attention: true }),
     }]}
-    sections={[{ id: 'ledger', items: [
-      {
-        id: 'workflows', label: t('Workflows'), icon: Workflow,
-        active: route.view === 'workflows' && !route.deploymentId,
-        onClick: () => go({ view: 'workflows' }),
-        children: scoped.deployments.map(d => ({
-          id: `deployment:${d.id}`, label: d.name, active: route.view === 'workflows' && route.deploymentId === d.id,
-          count: scoped.summaries.get(d.id)?.needsPerson ?? null,
-          onClick: () => go({ view: 'workflows', deploymentId: d.id }),
-        })),
-      },
-      { id: 'log', label: t('Audit log'), icon: ScrollText, active: route.view === 'log' && !route.attention, onClick: () => go({ view: 'log' }) },
-    ] }]}
+    sections={[
+      { id: 'workflows', label: t('Workflows'), items: scoped.deployments.map(d => ({
+        id: `deployment:${d.id}`, label: d.name, icon: Workflow,
+        active: route.view === 'workflow' && route.deploymentId === d.id,
+        count: scoped.summaries.get(d.id)?.needsPerson ?? null,
+        onClick: () => go({ view: 'workflow', deploymentId: d.id, tab: 'overview' }),
+      })) },
+      { id: 'records', label: t('Records'), items: [
+        { id: 'log', label: t('Audit log'), icon: ScrollText, active: route.view === 'log' && !route.attention, onClick: () => go({ view: 'log' }) },
+      ] },
+    ]}
   />;
 }
