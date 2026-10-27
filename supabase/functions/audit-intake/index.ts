@@ -22,6 +22,7 @@ import {
   MAX_BODY_BYTES, batchChainProblem, parseBatch, sha256Hex, verifySignature,
 } from "../_shared/auditIntake.ts";
 
+const BATCH_ID = /^[A-Za-z0-9._:-]{1,200}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 function json(body: unknown, status = 200) {
@@ -82,9 +83,10 @@ Deno.serve(async (req) => {
     return reject("(unreadable)", "body is not JSON");
   }
   const parsed = parseBatch(raw);
-  const batchId = typeof (raw as { batch_id?: unknown })?.batch_id === "string"
-    ? String((raw as { batch_id: string }).batch_id).slice(0, 200)
-    : "(unreadable)";
+  // The id is kept only if it is one the batch could have carried, so the
+  // rejection itself always fits in the database.
+  const sentId = (raw as { batch_id?: unknown } | null)?.batch_id;
+  const batchId = typeof sentId === "string" && BATCH_ID.test(sentId) ? sentId : "(unreadable)";
   if (!parsed.ok) return reject(batchId, parsed.error);
 
   const chainProblem = await batchChainProblem(parsed.value.steps);
