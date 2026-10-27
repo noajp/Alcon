@@ -73,3 +73,4 @@
 | [0041](0041-board-presence-rides-a-private-channel-scoped-to-the-subject.md) | ボードの在席は、対象を見られる人だけが入れる非公開チャンネルで伝える |
 | [0042](0042-slides-is-the-kata-editor-on-space-decks.md) | Slides は Kata の編集画面を Space の資料の上で動かす |
 | [0043](0043-designs-are-static-html-and-svg-drawn-in-a-scriptless-frame.md) | デザインは静的な HTML と SVG で持ち、スクリプトの動かない枠で描く |
+| [0044](0044-the-ai-audit-ledger-keeps-records-without-documents.md) | AI の監査台帳は書類を持たずに記録を持ち、鎖で改ざんを示す |

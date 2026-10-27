@@ -1,6 +1,7 @@
 import type { Locale } from './locales';
 import { CRM_TRANSLATIONS } from '@/Function/i18n/crmMessages';
 import { WORKLOAD_TRANSLATIONS } from '@/Function/i18n/workloadMessages';
+import { AUDIT_TRANSLATIONS } from '@/Function/i18n/auditMessages';
 import { PEOPLE_TRANSLATIONS } from '@/Function/i18n/peopleMessages';
 import { SURFACE_TRANSLATIONS } from './surfaceMessages';
 import { STRATEGY_BOARD_TRANSLATIONS } from './strategyBoardMessages';
@@ -1180,6 +1181,11 @@ Object.assign(ja, WORKLOAD_TRANSLATIONS.ja);
 Object.assign(ko, WORKLOAD_TRANSLATIONS.ko);
 Object.assign(fr, WORKLOAD_TRANSLATIONS.fr);
 Object.assign(es, WORKLOAD_TRANSLATIONS.es);
+
+Object.assign(ja, AUDIT_TRANSLATIONS.ja);
+Object.assign(ko, AUDIT_TRANSLATIONS.ko);
+Object.assign(fr, AUDIT_TRANSLATIONS.fr);
+Object.assign(es, AUDIT_TRANSLATIONS.es);
 
 // Settings › Integrations: Google sign-in (OAuth) for Google Drive.
 Object.assign(ja, {

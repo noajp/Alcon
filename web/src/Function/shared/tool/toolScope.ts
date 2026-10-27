@@ -17,7 +17,7 @@ import { useCallback, useSyncExternalStore } from 'react';
 // kept per tool in localStorage, shared by the tool's sidebar and pages.
 // =============================================================
 
-export type ToolApp = 'crm';
+export type ToolApp = 'crm' | 'audit';
 export type ToolScope = string | null;
 export const SPACE_SCOPE = 'space';
 

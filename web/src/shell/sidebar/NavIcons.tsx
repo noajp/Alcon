@@ -2,6 +2,7 @@
 
 import {
   Presentation,
+  ShieldCheck,
   House,
   Table2,
   Settings,
@@ -70,3 +71,5 @@ export const NavPortfolioIcon = ({ size = 20 }: { size?: number }) => <Folder si
 export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} className="scale-110" />;
 
 export const NavCrmIcon = CrmIcon;
+// Audit — what an AI did, checked.
+export const NavAuditIcon = ({ size = 20 }: { size?: number }) => <ShieldCheck size={size} strokeWidth={2} />;

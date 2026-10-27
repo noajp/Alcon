@@ -105,6 +105,8 @@ AIによる変更も、バージョンと適用範囲を持つ業務設定とし
 
 この診断はCRMに限る。初期対象である案件引き継ぎへの適合や、任意の業務の最適化を証明するものではない。現状の読み取りは単一トランザクションのスナップショットではなく、Copilotの会話もメモリ保持である。継続試行の台帳、設定版と実行の厳密な対応、イベントを受けて開始し、中断後も再開できる実行の仕組み、成果の自動観測、外部連携の補償処理は未提供であり、その能力を前提に委任させない。実装状況と次の作業は盤面で管理する。
 
+Sustainment の Audit は、外部の実行基盤で動く AI の業務（導入）ごとに、実行と手順の記録を書類の中身を持たずに読む。記録は追記のみで、導入ごとのハッシュの鎖を DB が計算する（[ADR 0044](../docs/adr/0044-the-ai-audit-ledger-keeps-records-without-documents.md)）。記録を受け取る口、権限表の配布、承認の証明は未提供であり、現時点では記録を読む画面だけを持つ。
+
 ### 事業としての成立条件
 
 「AIでアプリが作れる」「エージェントが動く」は既存製品にもある。2026年9月の公式資料では、[Airtable Omni](https://support.airtable.com/articles/1744327578-using-omni-ai-in-airtable) はアプリ構築とレコード操作を、[Notion Custom Agents](https://www.notion.com/help/custom-agents) は権限・トリガー・履歴を伴う反復業務を提供している。柔軟な基盤という分類だけを差別化の証拠にしない。
@@ -127,7 +129,7 @@ AIによる変更も、バージョンと適用範囲を持つ業務設定とし
 |---|---|---|---|
 | **Strategy** | 戦略 | 何を達成し、どう勝つか | Vision（Space が目指す姿）→ Portfolio（Initiative の束）→ Initiative。複数の Initiative で戦略を構成する |
 | **Execution** | 戦闘 | 実際に行動する | Domain（活動の場）→ Object（成果物の束）→ Element（最小単位） |
-| **Sustainment** | 兵站 | 仕事道具 | Workload / CRM / Notebook / Table / Slides / People / Calendar |
+| **Sustainment** | 兵站 | 仕事道具 | Workload / CRM / Audit / Notebook / Table / Slides / People / Calendar |
 
 ### Activity Space — 組織活動の文脈と信頼境界
 
@@ -142,7 +144,7 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ║ │  Execution（戦闘）— Domain → Object → Element             │ ║
 ║ │  実際に行動する。活動・仕事・労働                             │ ║
 ║ ├──────────────────────────────────────────────────────────┤ ║
-║ │  Sustainment（兵站）— Workload / CRM                      │ ║
+║ │  Sustainment（兵站）— Workload / CRM / Audit              │ ║
 ║ │       / Notebook / Table / Slides / People / Calendar      │ ║
 ║ │  行動を支える仕事道具                                        │ ║
 ║ └──────────────────────────────────────────────────────────┘ ║
@@ -151,7 +153,7 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
-ModeRail の固定セレクタは Inbox / Calendar / Strategy / Execution。Strategy と Execution がこの構造に対応し、Inbox と Calendar は毎日の入口として常設する。レール最下部のアバターは Profile を開き、Now / My Elements / My Notes / AI は Profile のタブとして並ぶ。Sustainment のその他の道具は Apps ランチャーから各自がレールに追加する。カタログは Tools（Notebook / Table / Slides / People）と Sustainment（Workload / CRM）の2グループで表示し、概念上はどちらも Sustainment に属する。
+ModeRail の固定セレクタは Inbox / Calendar / Strategy / Execution。Strategy と Execution がこの構造に対応し、Inbox と Calendar は毎日の入口として常設する。レール最下部のアバターは Profile を開き、Now / My Elements / My Notes / AI は Profile のタブとして並ぶ。Sustainment のその他の道具は Apps ランチャーから各自がレールに追加する。カタログは Tools（Notebook / Table / Slides / People）と Sustainment（Workload / CRM / Audit）の2グループで表示し、概念上はどちらも Sustainment に属する。
 
 ### Strategy と Execution の分離
 
@@ -329,7 +331,7 @@ Execution が Domain → Object → Element の順に並ぶのは、上位ほど
 
 ### レイアウト哲学
 - **常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス** の 3 列構成。ブラウザのタブがあるので画面内にタブ列は置かない。サイドバーの表示切替と AI ペインの開閉は、アイランドの下の帯の右端に置く。サイドバー最上部の Space 行は固定ヘッダーで、メイン領域のヘッダーと同じ高さ・位置に揃え、その下だけがスクロールする。Settings は同じ画面で開き、その固定ヘッダーの「Back」で元の画面へ戻る
-- **ModeRail**（46px）は分類セレクタ：固定の Inbox / Calendar / Strategy / Execution ＋ Apps ランチャーから追加した App ＋ 最下部のアバター（Profile）。Inbox のアイコンには未読数のバッジを出す。カタログは Tools（Notebook / Table / Slides / People）と Sustainment（Workload / CRM）の 2 グループで、すべて Sustainment の道具
+- **ModeRail**（46px）は分類セレクタ：固定の Inbox / Calendar / Strategy / Execution ＋ Apps ランチャーから追加した App ＋ 最下部のアバター（Profile）。Inbox のアイコンには未読数のバッジを出す。カタログは Tools（Notebook / Table / Slides / People）と Sustainment（Workload / CRM / Audit）の 2 グループで、すべて Sustainment の道具
 - **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋「＋」。「＋」はモードごとに対象が変わる（Notebook＝ノートブック / Table＝テーブル / Strategy＝Vision・Portfolio・Initiative のメニュー / Calendar＝表示中の日を期日にした Element / Execution＝Domain・Object のメニュー）。どれも Object / Element と同じクイック作成カード（画面下の角丸カードに名前・説明・プロパティのピル・Create）で作る。作るものが無いモードでは出さない。見出し横に別の「＋」を置かない。本体は現在のモードに応じて切替（Inbox＝通知の一覧 / Calendar＝今日・ミニ月・表示する人 / Strategy＝Vision ごとの行の下に Portfolio・Initiative / Execution＝Domain ツリー / Notebook＝ノートブック一覧 / App 各種＝モード名ラベルのみ）。アバターから開く Profile と、自分の資料一覧を持つ Slides ではサイドバーを出さない
 - **Notebook** はサイドバーに Book（ノートブック）と配下の Section をツリーで並べ、メイン領域の左列は選んだ Section のページ一覧だけを示す。Book / Section の右クリックで New section / New page / Rename / Delete（削除は確認を経る）、ページは右クリックで Rename / Delete、一覧末尾の「New page」で追加する。新しい Book はサイドバー上部の「＋」
 - view→モードの対応は `shell/railApps.ts` の `MODE_META.views` / `railModeOf`、view id→ラベル / アイコンは `shell/viewRegistry.ts` が単一情報源

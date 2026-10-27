@@ -33,6 +33,7 @@ import { DomainView } from '@/ActivitySpace/execution/domain/DomainView'; // eag
 const DomainsView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
 const TableView = dynamic(() => import('@/ActivitySpace/sustainment/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
 const SlidesView = dynamic(() => import('@/ActivitySpace/sustainment/slides').then(m => m.SlidesView), { ssr: false, loading: viewLoading });
+const AuditView = dynamic(() => import('@/ActivitySpace/sustainment/audit/AuditView').then(m => m.AuditView), { ssr: false, loading: viewLoading });
 const CrmView = dynamic(() => import('@/ActivitySpace/sustainment/crm/CrmView').then(m => m.CrmView), { ssr: false, loading: viewLoading });
 const TeamView = dynamic(() => import('@/ActivitySpace/sustainment/team/TeamView').then(m => m.TeamView), { ssr: false, loading: viewLoading });
 const MyCalendarView = dynamic(() => import('@/ActivitySpace/home/MyCalendarView').then(m => m.MyCalendarView), { ssr: false, loading: viewLoading });
@@ -241,6 +242,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
+
+          {activeActivity === 'audit' && (
+            <div className="flex-1 flex flex-col overflow-hidden bg-card">
+              <AuditView navigation={navigation} onNavigate={onNavigate} />
+            </div>
+          )}
 
           {activeActivity === 'team' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
