@@ -73,9 +73,9 @@ export const FONT = {
   base: 'text-[13px] leading-[20px] font-normal',
   /** Sub-text / icon labels */
   sm:   'text-[12px] leading-[16px] font-normal',
-  /** Uppercase section labels / meta */
+  /** Small counts / meta */
   xs:   'text-[11px] leading-[16px] font-medium',
-  /** Uppercase section headers (KEY DECISIONS etc.) */
+  /** Section headers over a group of fields */
   label: 'text-[12px] leading-[16px] font-medium text-[var(--text-tertiary)]',
   /** Monospace for IDs, codes, shortcuts */
   mono: 'text-[12px] font-mono text-[var(--text-tertiary)]',

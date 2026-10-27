@@ -107,7 +107,7 @@ function isEmojiIcon(s: string) {
 // of every mode, no affordance of its own.
 function SidebarModeLabel({ label }: { label: string }) {
   return (
-    <div className="px-2 h-6 mt-3 flex items-center text-[11px] font-semibold tracking-wide text-muted-foreground/60">
+    <div className="px-2.5 h-7 mt-3 flex items-center text-[12px] font-medium text-muted-foreground/80">
       {label}
     </div>
   );

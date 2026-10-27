@@ -228,8 +228,8 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
   if (route.view === 'home') return <>
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
       <header className="flex h-[50px] flex-shrink-0 items-center gap-1.5 border-b border-border/60 bg-card pl-4 pr-2">
-        <CrmIcon size={12} /><span className="text-[12px] font-semibold text-foreground">{t('CRM')}</span>
-        <span className="min-w-0 truncate text-[12px] text-muted-foreground">{scoped.scopeName}</span>
+        <CrmIcon size={14} /><span className="text-[13px] font-medium text-foreground">{t('CRM')}</span>
+        <span className="min-w-0 truncate text-[13px] text-muted-foreground">{scoped.scopeName}</span>
         <div className="flex-1" />
         {headerActions && <div className="flex shrink-0 items-center gap-1.5">{headerActions}</div>}
       </header>

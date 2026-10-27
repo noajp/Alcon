@@ -26,7 +26,7 @@ export function IndexList({ headers, showHeader = true, children }: {
   return (
     <div className="px-2 pb-2 pt-2">
       {showHeader && (
-        <div className={`sticky top-0 z-10 grid ${COLUMNS} gap-3 bg-card px-4 py-2 text-[11px] font-medium tracking-wide text-muted-foreground/70`}>
+        <div className={`sticky top-0 z-10 grid ${COLUMNS} gap-3 bg-card px-4 py-2 text-[12px] font-normal text-muted-foreground`}>
           <span>{headers[0]}</span>
           <span>{headers[1]}</span>
           <span className="text-right">{headers[2]}</span>

@@ -57,8 +57,8 @@ export function AuditOverview({ source, scoped, status, onOpenWorkflow, onOpenRu
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
       <header className="flex h-[50px] flex-shrink-0 items-center gap-1.5 border-b border-border/60 bg-card pl-4 pr-2">
-        <NavAuditIcon size={12} /><span className="text-[12px] font-semibold text-foreground">{t('Audit')}</span>
-        <span className="min-w-0 truncate text-[12px] text-muted-foreground">{scoped.scopeName}</span>
+        <NavAuditIcon size={14} /><span className="text-[13px] font-medium text-foreground">{t('Audit')}</span>
+        <span className="min-w-0 truncate text-[13px] text-muted-foreground">{scoped.scopeName}</span>
         {source.sample && <SampleBadge />}
         <div className="flex-1" />
         <Button size="icon-sm" variant="ghost" onClick={() => void source.refetch()} aria-label={t('Refresh')} title={t('Refresh')}><RefreshCw size={14} /></Button>

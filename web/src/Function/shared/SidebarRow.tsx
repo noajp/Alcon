@@ -45,7 +45,7 @@ export function SidebarRow({
   meta?: ReactNode;
   /** Trailing controls, outside the button (use SidebarRowAction). */
   actions?: ReactNode;
-  /** md: a list entry (32px, semibold). sm: an entry nested under one (24px).
+  /** md: a list entry (28px, medium). sm: an entry nested under one (28px, regular).
    *  tall: an entry with a second line (a SKU under a name) — 32px or more. */
   size?: 'md' | 'sm' | 'tall';
   title?: string;
@@ -59,9 +59,9 @@ export function SidebarRow({
   className?: string;
   ref?: Ref<HTMLDivElement>;
 } & Omit<ComponentProps<'div'>, 'children' | 'title' | 'onClick' | 'ref'>) {
-  const type = size === 'sm' ? 'h-6 text-[12px] font-medium'
-    : size === 'tall' ? 'min-h-8 py-1.5 text-[12px] font-semibold'
-    : 'h-8 text-[12px] font-semibold';
+  const type = size === 'sm' ? 'h-7 text-[13px] font-normal'
+    : size === 'tall' ? 'min-h-8 py-1.5 text-[13px] font-medium'
+    : 'h-7 text-[13px] font-medium';
   const body = (
     <>
       {icon && <span className="flex w-4 shrink-0 items-center justify-center">{icon}</span>}
@@ -123,7 +123,7 @@ export function SidebarRowAction({ label, onClick, children, ...rest }: {
 /** The small heading over a sidebar list ("Table", "Locations"). */
 export function SidebarSectionLabel({ children, className = 'mt-3' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`flex h-6 items-center px-2 text-[11px] font-semibold tracking-wide text-muted-foreground/60 ${className}`}>
+    <div className={`flex h-7 items-center px-2.5 text-[12px] font-medium text-muted-foreground/80 ${className}`}>
       {children}
     </div>
   );

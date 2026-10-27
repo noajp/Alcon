@@ -2,6 +2,16 @@
 
 Alcon の画面・ウィジェット・生成アプリに共通するデザイン規約。操作部品の形と枠線はこの文書を基準とし、実装値は `web/src/shared/designTokens.ts` と `web/src/app/globals.css` に置く。
 
+## 文字と面
+
+階層は文字の太さではなく、文字色の明るさと大きさの差で作る。
+
+- **太さ**：本文は regular（400）。medium（510）はナビゲーションの行・一覧の行の名前・ヘッダーのタイトル・ボタン、semibold（590〜600）はページのタイトルにだけ使う。日本語は太さの段がそのまま一段太い書体に切り替わるので、本文を medium にすると全文が太字に見える。
+- **文字色**：4段。`--text-primary`（タイトル・名前）、`--text-secondary`（説明・本文）、`--text-tertiary` = `--muted-foreground`（補足・項目名・列見出し）、`--text-disabled`（未設定・無効）。
+- **大きさ**：一覧の行・サイドバー・ヘッダーのタイトルは 13px、補足と列見出しは 12px、11px は件数などの小さな数字だけ。ページのタイトルは 24px で字間を詰める（-0.012em）。小見出しに字間を空けない・大文字にしない。
+- **面（ダーク）**：無彩色に近い暗い面を明るさの段差で分ける。背景・サイドバー（`--surface-bg`）→ メインのアイランド（`--surface-raised`）→ 浮かせる面（`--surface-muted` / `--surface-rail`）の順に明るくする。色味（青み・暖かみ）はテーマごとにごく僅かに付けるだけにし、段差は色相ではなく明るさで作る。
+- **ヘッダー帯**：各画面の上端の 50px の帯は、14px のアイコンと 13px・medium のタイトル、続く場所は 13px の淡色で並べる。
+
 ## ボタンとタブ
 
 | 用途 | 形 | 枠線 | 高さ |
@@ -56,7 +66,7 @@ Object・Domain・Element・Initiative等の作成は、入口を無彩色、確
 
 製品の概念名（Strategy / Execution / Sustainment、Initiatives / Phase / Timeline、Domain / Objects / Elements、Inbox / Calendar / Notebook / Table / People / Team / Workload / CRM / Audit、Profile）は固有名詞として扱い、どの言語でも英語表記のまま出す。これはコードで固定するのではなく、各言語の辞書でその語を自分自身に写して実現する（`'Timeline': 'Timeline'`）。概念名を含む文も同じ（`'Open Calendar': 'Calendar を開く'`）。日付・曜日は `toLocaleDateString(locale)` で設定言語に従う。画面に出る文言は、見出し・空の状態・プレースホルダー・`aria-label` まで `t()` を通し、英語を直書きしない。値を含む文は1つのキーに `{n}` などで埋め込み、語順を言語ごとに変えられるようにする。`t()` / `translate()` に文字列で渡したメッセージは、すべて ja・ko・fr・es の訳を持つ（`tests/i18nCoverage.test.ts`）。ウィジェットの名前と説明も同じ（`tests/widgetI18n.test.ts`）。訳は領域ごとの辞書（`Function/i18n/*Messages.ts` など）に置き、同じ英語に別の訳を付けない。意味が違うときは英語のキーを言い換える（例：CRM の Lead と Object の責任者）。Slides エディタも独自の言語切り替えを持たず、アプリの言語に従う。文は `tx("日本語", "English")` で書き、韓国語・フランス語・スペイン語は英語の文をキーに Slides の辞書（`kata/kataMessages.ts`）から引く（`tests/slides/kataI18n.test.ts`）。アプリが保存する既定の名前（Status の初期値など）は英語のまま保存し、表示するときに訳す。
 
-サイドバーの一覧（Domain・Strategy・Notebook・Table・CRM・Settings）は、すべて共通の `SidebarRow` で作る。行ごとに見た目を書かない。行全体がホバーと選択の対象で、選択中は `bg-sidebar-accent` と `text-foreground`、非選択は `text-muted-foreground`、ホバーとキーボードフォーカスでは `bg-sidebar-accent/50` と `text-foreground` にする。行の右端の操作（折りたたみの三角、「…」）は `SidebarRowAction` とし、背景を持たず記号だけを濃くするので、ハイライトは行の端まで切れずにつながる。行は左から 16px のアイコン枠・名前・件数などの補足・右端の操作の順に並べ、通常は 32px、入れ子の行は 24px。一覧の見出しは `SidebarSectionLabel`。
+サイドバーの一覧（Domain・Strategy・Notebook・Table・CRM・Settings）は、すべて共通の `SidebarRow` で作る。行ごとに見た目を書かない。行全体がホバーと選択の対象で、選択中は `bg-sidebar-accent` と `text-foreground`、非選択は `text-muted-foreground`、ホバーとキーボードフォーカスでは `bg-sidebar-accent/50` と `text-foreground` にする。行の右端の操作（折りたたみの三角、「…」）は `SidebarRowAction` とし、背景を持たず記号だけを濃くするので、ハイライトは行の端まで切れずにつながる。行は左から 16px のアイコン枠・名前・件数などの補足・右端の操作の順に並べ、高さは 28px、文字は 13px。通常の行は medium、入れ子の行は regular にする。一覧の見出しは `SidebarSectionLabel`（12px・medium・淡色）。
 
 ## 入力と面
 

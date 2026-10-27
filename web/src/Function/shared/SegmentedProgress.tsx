@@ -2,11 +2,12 @@
 
 import { useLayoutEffect, useRef, useState } from 'react';
 
-// Fixed tick geometry — 5px-wide, 10px-tall rounded pills with a 3px gap,
-// packed to fill whatever width the parent gives the bar.
-const SEG_W = 5;
-const SEG_H = 10;
-const SEG_GAP = 3;
+// Fixed tick geometry — fine 3px-wide, 8px-tall rounded ticks with a 2px gap,
+// packed to fill whatever width the parent gives the bar. Fine enough to read
+// as one bar from a distance and as ticks up close.
+const SEG_W = 3;
+const SEG_H = 8;
+const SEG_GAP = 2;
 
 /**
  * Segmented progress bar — a row of small vertical pills, the leading share
@@ -49,7 +50,7 @@ export function SegmentedProgress({ value, className = '' }: { value: number; cl
       {Array.from({ length: count }, (_, i) => (
         <span
           key={i}
-          className={`shrink-0 rounded-full ${i < filled ? 'bg-foreground/70' : 'bg-muted-foreground/25'}`}
+          className={`shrink-0 rounded-full ${i < filled ? 'bg-foreground/75' : 'bg-muted-foreground/20'}`}
           style={{ width: SEG_W, height: SEG_H }}
         />
       ))}

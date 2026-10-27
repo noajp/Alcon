@@ -159,8 +159,8 @@ export function StrategyShell({
   return (
     <div className="flex flex-col h-full bg-card">
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-        <NavStrategyIcon size={12} />
-        <span className="text-[12px] font-semibold text-foreground">{t('Initiatives')}</span>
+        <NavStrategyIcon size={14} />
+        <span className="text-[13px] font-medium text-foreground">{t('Initiatives')}</span>
       </div>
 
       <div className="flex-1 overflow-hidden">
@@ -174,7 +174,7 @@ export function StrategyShell({
             )}
             {unplaced.length > 0 && (
               <>
-                <div className="px-6 pt-4 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Not in a Vision')}</div>
+                <div className="px-6 pt-4 text-[12px] font-medium text-muted-foreground/80">{t('Not in a Vision')}</div>
                 <StrategyListView strategies={unplaced} onSelectStrategy={(s) => setOpenStrategyId(s.id)} showHeader={inVision.length === 0} />
               </>
             )}
@@ -349,7 +349,7 @@ function ObjectPickerList({
       )}
       {grouped.map(([did, { domainName, objects }]) => (
         <div key={did}>
-          <div className="px-3 py-1 text-[10px] tracking-wide text-muted-foreground bg-muted/20 sticky top-0">
+          <div className="px-3 py-1 text-[11px] text-muted-foreground bg-muted/20 sticky top-0">
             {domainName}
           </div>
           {objects.map((o) => {
@@ -737,12 +737,12 @@ function StrategyDetailView({
         <button
           type="button"
           onClick={onBack}
-          className="px-1.5 py-0.5 rounded text-[12px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+          className="px-1.5 py-0.5 rounded text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
         >
           {t('Initiative')}
         </button>
         <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
-        <span className="px-1.5 py-0.5 text-[12px] font-semibold text-foreground truncate max-w-[240px]">
+        <span className="px-1.5 py-0.5 text-[13px] font-medium text-foreground truncate max-w-[240px]">
           {strategy.name}
         </span>
         {!canEdit && (

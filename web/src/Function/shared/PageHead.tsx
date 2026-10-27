@@ -141,9 +141,9 @@ export function PageHead({
     return (
       <div>
         {icon && <PageIcon>{icon}</PageIcon>}
-        <h1 className="text-2xl leading-tight text-foreground" style={{ fontWeight: 600 }}>{title}</h1>
+        <h1 className="text-2xl leading-tight tracking-[-0.012em] text-foreground" style={{ fontWeight: 600 }}>{title}</h1>
         {description
-          ? <p className="mt-4 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-foreground">{description}</p>
+          ? <p className="mt-4 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-[var(--text-secondary)]">{description}</p>
           : emptyDescription && <p className="mt-4 text-[14px] leading-relaxed text-muted-foreground">{emptyDescription}</p>}
       </div>
     );
@@ -159,7 +159,7 @@ export function PageHead({
           // Enter, ⌘Enter and Escape end the edit, which saves it.
           if (isCommitEnter(e) || isSubmitChord(e) || isCancelKey(e)) { e.preventDefault(); e.currentTarget.blur(); }
         }}
-        className="w-full resize-none overflow-hidden border-none bg-transparent text-2xl leading-tight text-foreground focus:outline-none"
+        className="w-full resize-none overflow-hidden border-none bg-transparent text-2xl leading-tight tracking-[-0.012em] text-foreground focus:outline-none"
         style={{ fontWeight: 600 }} />
       {!onSaveDescription ? (
         description && <p className="mt-3 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-muted-foreground">{description}</p>
@@ -169,7 +169,7 @@ export function PageHead({
             // Enter is a newline; ⌘Enter and Escape end the edit, which saves it.
             if (isSubmitChord(e) || isCancelKey(e)) { e.preventDefault(); e.currentTarget.blur(); }
           }}
-          className="min-h-[36px] w-full resize-none overflow-hidden border-none bg-transparent text-[14px] leading-relaxed text-foreground focus:outline-none" />
+          className="min-h-[36px] w-full resize-none overflow-hidden border-none bg-transparent text-[14px] leading-relaxed text-[var(--text-secondary)] focus:outline-none" />
       </div>}
       {error && <div role="alert" className="text-[11px] text-destructive">{error}</div>}
     </div>

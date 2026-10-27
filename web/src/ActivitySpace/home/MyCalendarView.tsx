@@ -73,8 +73,8 @@ function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: My
     <ElementDrilldown label="Calendar" onNavigate={onNavigate} onViewChange={onViewChange}>
       {openElement => <div className="flex min-h-0 flex-1 flex-col bg-card">
       <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
-        <NavCalendarIcon size={12} />
-        <span className="text-[12px] font-semibold text-foreground">{t('Calendar')}</span>
+        <NavCalendarIcon size={14} />
+        <span className="text-[13px] font-medium text-foreground">{t('Calendar')}</span>
         <div className="flex-1" />
         <CalendarScopePicker domains={domains} objects={scoped.availableObjects} selection={{ ...selection, domainIds }} onChange={setSelection} />
       </div>

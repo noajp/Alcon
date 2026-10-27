@@ -50,7 +50,7 @@ export function InboxList({ onNavigate, onViewChange, onOpen }: InboxListProps) 
   return (
     <section aria-label={t('Notifications')} className="mt-3">
       <header className="flex h-6 items-center gap-1 px-2">
-        <h2 className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Inbox')}</h2>
+        <h2 className="text-[12px] font-medium text-muted-foreground/80">{t('Inbox')}</h2>
         {inbox.unreadCount > 0 && <span className="text-[11px] tabular-nums text-muted-foreground">{inbox.unreadCount}</span>}
         <div className="flex-1" />
         <ButtonAppearanceProvider appearance="navigation">
