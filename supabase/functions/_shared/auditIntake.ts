@@ -14,6 +14,17 @@ const HEX64 = /^[0-9a-f]{64}$/;
 // timestamp happened to be written.
 const STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
 const ID = /^[A-Za-z0-9._:-]{1,200}$/;
+const MAX_INT = 2_147_483_647;
+// Text the database cannot hold as jsonb: NUL, and a surrogate without its pair.
+const UNSTORABLE = /\u0000|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+
+/** A STAMP that names a real instant (no 24:00, :60 or 30 February), so the
+ * database stores the same text the digest was computed over. */
+function isStamp(value: string): boolean {
+  if (!STAMP.test(value)) return false;
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 19) === value.slice(0, 19);
+}
 
 const KINDS = new Set(["start", "step", "approval", "exception", "end"]);
 const OPERATIONS = new Set(["read", "draft", "send", "money", "none"]);
@@ -59,13 +70,13 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 
 function text(o: Record<string, unknown>, k: string, max = 500): string | undefined {
   const v = o[k];
-  return typeof v === "string" && v.length > 0 && v.length <= max ? v : undefined;
+  return typeof v === "string" && v.length > 0 && v.length <= max && !UNSTORABLE.test(v) ? v : undefined;
 }
 
 function optionalText(o: Record<string, unknown>, k: string, max = 500): string | null | undefined {
   const v = o[k];
   if (v === undefined || v === null) return null;
-  return typeof v === "string" && v.length <= max ? v : undefined;
+  return typeof v === "string" && v.length <= max && !UNSTORABLE.test(v) ? v : undefined;
 }
 
 function parseRun(raw: unknown, i: number): Parsed<IntakeRun> {
@@ -79,8 +90,8 @@ function parseRun(raw: unknown, i: number): Parsed<IntakeRun> {
   const template_version = raw.template_version;
   if (!deployment_id || !UUID.test(deployment_id)) return { ok: false, error: `${at}.deployment_id is not a uuid` };
   if (!external_id || !ID.test(external_id)) return { ok: false, error: `${at}.external_id is missing or malformed` };
-  if (!Number.isInteger(template_version) || (template_version as number) < 1) return { ok: false, error: `${at}.template_version is not a positive integer` };
-  if (!started_at || !STAMP.test(started_at)) return { ok: false, error: `${at}.started_at is not YYYY-MM-DDTHH:MM:SS.ffffffZ` };
+  if (!Number.isInteger(template_version) || (template_version as number) < 1 || (template_version as number) > MAX_INT) return { ok: false, error: `${at}.template_version is not a positive integer` };
+  if (!started_at || !isStamp(started_at)) return { ok: false, error: `${at}.started_at is not YYYY-MM-DDTHH:MM:SS.ffffffZ` };
   if (subject_ref === undefined || subject_digest === undefined) return { ok: false, error: `${at} subject fields are malformed` };
   return { ok: true, value: { deployment_id, external_id, template_version: template_version as number, subject_ref, subject_digest, started_at } };
 }
@@ -111,11 +122,11 @@ function parseStep(raw: unknown, i: number): Parsed<IntakeStep> {
   if (!OPERATIONS.has(operation)) return { ok: false, error: `${at}.operation is not one of ${[...OPERATIONS].join(", ")}` };
   if (!result || !RESULTS.has(result)) return { ok: false, error: `${at}.result is not one of ${[...RESULTS].join(", ")}` };
   if (!actor_kind || !ACTORS.has(actor_kind)) return { ok: false, error: `${at}.actor_kind is not one of ${[...ACTORS].join(", ")}` };
-  if (!occurred_at || !STAMP.test(occurred_at)) return { ok: false, error: `${at}.occurred_at is not YYYY-MM-DDTHH:MM:SS.ffffffZ` };
+  if (!occurred_at || !isStamp(occurred_at)) return { ok: false, error: `${at}.occurred_at is not YYYY-MM-DDTHH:MM:SS.ffffffZ` };
   if (!prev_digest || !HEX64.test(prev_digest)) return { ok: false, error: `${at}.prev_digest is not 64 lowercase hex` };
   if (!digest || !HEX64.test(digest)) return { ok: false, error: `${at}.digest is not 64 lowercase hex` };
   if (connector === undefined || actor_name === undefined || reason === undefined) return { ok: false, error: `${at} optional text fields are malformed` };
-  if (duration !== undefined && duration !== null && !(Number.isInteger(duration) && (duration as number) >= 0 && (duration as number) <= 2_147_483_647)) {
+  if (duration !== undefined && duration !== null && !(Number.isInteger(duration) && (duration as number) >= 0 && (duration as number) <= MAX_INT)) {
     return { ok: false, error: `${at}.duration_ms is not a non-negative integer` };
   }
   return {

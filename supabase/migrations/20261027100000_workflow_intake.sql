@@ -82,7 +82,10 @@ begin
   -- ── the gateway's link on each step ─────────────────────────────────────
   execute 'alter table public.workflow_run_steps add column if not exists event_id text';
   execute 'alter table public.workflow_run_steps add column if not exists gateway_digest text';
-  execute 'alter table public.workflow_run_steps add column if not exists gateway_key_id uuid references public.workflow_gateway_keys(id)';
+  -- The key's steps go when the key goes, and a key goes only with its
+  -- Space (the guard refuses anything else), so removing a Space still takes
+  -- its whole ledger. SET NULL would be an UPDATE, which the ledger refuses.
+  execute 'alter table public.workflow_run_steps add column if not exists gateway_key_id uuid references public.workflow_gateway_keys(id) on delete cascade';
   execute 'create unique index if not exists workflow_run_steps_event_idx on public.workflow_run_steps (deployment_id, event_id) where event_id is not null';
 
   -- ── batches ────────────────────────────────────────────────────────────
@@ -91,7 +94,7 @@ begin
   execute $ddl$
     create table if not exists public.workflow_intake_batches (
       id uuid primary key default gen_random_uuid(),
-      gateway_key_id uuid not null references public.workflow_gateway_keys(id),
+      gateway_key_id uuid not null references public.workflow_gateway_keys(id) on delete cascade,
       activity_space_id uuid not null references public.activity_spaces(id) on delete cascade,
       batch_id text not null,
       body_digest text not null,
@@ -142,7 +145,7 @@ begin
       select activity_space_id into key_space from workflow_gateway_keys
       where id = _key_id and revoked_at is null;
       if key_space is null then
-        return jsonb_build_object('status', 'rejected', 'reason', 'unknown or revoked key');
+        return jsonb_build_object('status', 'rejected', 'reason', 'unknown or revoked key', 'key_revoked', true);
       end if;
 
       -- The same batch arriving twice at once: the second waits here.
@@ -167,6 +170,16 @@ begin
         limit 1;
       end if;
 
+      -- Every deployment named is locked, in one order, before anything is
+      -- compared: a concurrent batch for the same deployment waits here, and
+      -- sees what this one wrote.
+      if problem is null then
+        perform 1 from workflow_deployments where id in (
+          select (e->>'deployment_id')::uuid from jsonb_array_elements(_runs) e
+          union select (e->>'deployment_id')::uuid from jsonb_array_elements(_steps) e
+        ) order by id for update;
+      end if;
+
       -- A run already held must be the same run.
       if problem is null then
         for r in select * from jsonb_array_elements(_runs) loop
@@ -186,12 +199,10 @@ begin
       -- Each deployment's events continue its chain: events already held
       -- (a resend) must match what was stored and come first; the first new
       -- one links to the last stored digest; the rest link to each other.
-      -- Locking the deployments here holds the tails still until we write.
       if problem is null then
         for dep in
           select distinct (e->>'deployment_id')::uuid from jsonb_array_elements(_steps) e order by 1
         loop
-          perform 1 from workflow_deployments where id = dep for update;
           select gateway_digest into tail from workflow_run_steps
           where deployment_id = dep order by seq desc limit 1;
           tail := coalesce(tail, genesis);
@@ -253,6 +264,11 @@ begin
           steps_added := steps_added + 1;
         end loop;
       exception when others then
+        -- A deadlock or serialization failure says nothing about the batch:
+        -- let it fail, and the gateway sends the same batch again.
+        if sqlstate like '40%' or sqlstate = '55P03' then
+          raise;
+        end if;
         -- Everything this block wrote is undone; only the rejection stays.
         problem := sqlerrm;
         insert into workflow_intake_batches (gateway_key_id, activity_space_id, batch_id, body_digest, status, reason)

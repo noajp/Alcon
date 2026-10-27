@@ -10,8 +10,10 @@
 //           x-alcon-gateway-key: <workflow_gateway_keys.id>
 //           x-alcon-signature:   <base64url Ed25519 signature of the raw body>
 // Response: 200 { status: accepted | duplicate, runs_added, steps_added }
-//           409 { status: rejected, reason }  — nothing from the batch was written
-//           400 / 401 / 413 for a request that is not a readable, signed batch
+//           409 { status: rejected, reason }  — nothing from the batch was written,
+//               and the rejection is kept for the Space's owner
+//           401 no valid key or signature · 413 too large
+//           503 nothing written, nothing decided — send the same batch again
 //
 // Deployed without JWT verification: the signature is the authentication.
 
@@ -61,12 +63,15 @@ Deno.serve(async (req) => {
   // From here the sender is a registered gateway, so every rejection is kept
   // where the Space's owner can read it.
   const bodyDigest = await sha256Hex(body);
+  // A rejection that could not be kept is answered as a passing failure, so
+  // the gateway sends the batch again rather than dropping it unrecorded.
   const reject = async (batchId: string, reason: string) => {
-    await fetch(`${url}/rest/v1/rpc/workflow_intake_reject`, {
+    const logged = await fetch(`${url}/rest/v1/rpc/workflow_intake_reject`, {
       method: "POST",
       headers,
       body: JSON.stringify({ _key_id: keyId, _batch_id: batchId, _body_digest: bodyDigest, _reason: reason }),
     });
+    if (!logged.ok) return json({ error: "try again" }, 503);
     return json({ status: "rejected", reason }, 409);
   };
 
@@ -96,7 +101,12 @@ Deno.serve(async (req) => {
       _steps: parsed.value.steps,
     }),
   });
-  if (!res.ok) return json({ error: `intake failed: ${await res.text()}` }, 502);
-  const outcome = await res.json() as { status: string; reason?: string };
+  // The batch was checked before it got here, so what fails inside is the
+  // database being busy (a deadlock, a lock timeout), not the batch.
+  if (!res.ok) return json({ error: "try again" }, 503);
+  const outcome = await res.json() as { status: string; reason?: string; key_revoked?: boolean };
+  // Revoked between the lookup above and the intake: the same answer as a
+  // revoked key, and nothing kept.
+  if (outcome.key_revoked) return json({ error: "unauthorized" }, 401);
   return json(outcome, outcome.status === "rejected" ? 409 : 200);
 });

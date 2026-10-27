@@ -43,6 +43,23 @@ describe('parseBatch', () => {
     expect(intake.parseBatch({ batch_id: 'b-1', runs: [{ ...run, started_at: '2026-10-27T01:02:03Z' }] }).error).toMatch(/started_at/);
   });
 
+  it('refuses instants that do not exist, which the database would move', async () => {
+    for (const occurred_at of ['2026-10-27T24:00:00.000000Z', '2026-10-27T23:59:60.000000Z', '2026-02-30T01:00:00.000000Z']) {
+      const steps = await sealed([event({ occurred_at })]);
+      expect(intake.parseBatch({ batch_id: 'b-1', steps }).error).toMatch(/occurred_at/);
+    }
+  });
+
+  it('refuses text jsonb cannot hold, and versions past the integer range', async () => {
+    for (const reason of ['a\u0000b', 'lone \ud800 high', 'lone \udc00 low']) {
+      const steps = await sealed([event({ reason })]);
+      expect(intake.parseBatch({ batch_id: 'b-1', steps }).ok).toBe(false);
+    }
+    const paired = await sealed([event({ reason: '絵文字 😀 は通る' })]);
+    expect(intake.parseBatch({ batch_id: 'b-1', steps: paired }).ok).toBe(true);
+    expect(intake.parseBatch({ batch_id: 'b-1', runs: [{ ...run, template_version: 2 ** 31 }] }).error).toMatch(/template_version/);
+  });
+
   it('refuses values the ledger would refuse', async () => {
     const steps = await sealed([event({ kind: 'finish' })]);
     expect(intake.parseBatch({ batch_id: 'b-1', steps }).error).toMatch(/kind/);

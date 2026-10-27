@@ -32,7 +32,8 @@ Content-Type: application/json
 }
 ```
 
-- 時刻は `YYYY-MM-DDTHH:MM:SS.ffffffZ`（UTC・マイクロ秒6桁）だけを受け付ける
+- 時刻は `YYYY-MM-DDTHH:MM:SS.ffffffZ`（UTC・マイクロ秒6桁）で、実在する時刻だけを受け付ける（`24:00`・`:60`・2月30日は拒否）
+- 文字列に NUL（`\u0000`）と対になっていないサロゲートは入れられない
 - `kind` は start / step / approval / exception / end、`operation` は read / draft / send / money / none、`result` は ok / failed / blocked / waiting / approved / returned、`actor_kind` は ai_agent / human / system
 - `steps` は導入ごとに鎖の順に並べる。手順が指す実行は、同じまとめの `runs` か、前に送ったまとめに含める
 - `digest` は、次のフィールドをこの順に「UTF-8 のバイト長 + `:` + 値」（null は空文字）で連結した文字列の SHA-256（小文字16進）：`prev_digest, deployment_id, event_id, run_external_id, step_key, kind, connector, operation, result, actor_kind, actor_name, reason, occurred_at, duration_ms`。参照実装は `supabase/functions/_shared/auditIntake.ts` の `eventDigest`
@@ -46,9 +47,10 @@ Content-Type: application/json
 | 200 `duplicate` | 同じまとめを受け入れ済み。何も書いていない | 箱から消す |
 | 409 `rejected` | 何も書いていない。`reason` に理由 | 送り直しても通らない。鎖の切れ目なら、抜けた記録から送り直す |
 | 401 | 鍵が未登録・失効済み、または署名が違う | 鍵を確かめる |
-| 400 / 413 / 502 | 読めない要求・大きすぎる・一時的な失敗 | 502 は同じ `batch_id` で送り直す |
+| 413 | 1MB を超えた | 分けて送る |
+| 503 | 何も書かず、何も決めていない（DB の混雑など） | 同じ `batch_id` で送り直す |
 
-署名の通ったまとめは、受け入れも拒否も `workflow_intake_batches` に残る。
+有効な鍵で署名の通ったまとめは、受け入れ（200）も拒否（409）も `workflow_intake_batches` に残る。
 
 ## デプロイ
 
