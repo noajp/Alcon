@@ -1,5 +1,6 @@
 'use client';
 
+import { useActiveSpaceScope } from '@/Function/space/data';
 import dynamic from 'next/dynamic';
 import type { NavigationState } from '@/types/navigation';
 import { setActiveDomainId } from '@/Function/space/domainsStore';
@@ -55,6 +56,7 @@ interface MainContentProps {
 }
 
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId }: MainContentProps) {
+  const scope = useActiveSpaceScope();
 
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
@@ -251,12 +253,14 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'team' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <ElementDrilldown label="People" onNavigate={onNavigate} onViewChange={onViewChange}>
+              {/* An audit Space (ADR 0048) shows its people without opening
+                  their Elements or Workload. */}
+              {scope === 'audit' ? <TeamView /> : <ElementDrilldown label="People" onNavigate={onNavigate} onViewChange={onViewChange}>
                 {openElement => <TeamView onOpenElement={openElement} onOpenWorkload={(workerId) => {
                   onNavigate({ workerId: workerId ?? null });
                   onViewChange?.('workload');
                 }} />}
-              </ElementDrilldown>
+              </ElementDrilldown>}
             </div>
           )}
 

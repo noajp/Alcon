@@ -388,6 +388,7 @@ const APP_MESSAGES: Record<string, Row> = {
   'Adds Strategy, Execution and every tool. Whatever the Space already holds appears as it is.': ['Strategy・Execution とすべてのツールが加わります。Space にある内容はそのまま表示されます。', 'Strategy, Execution과 모든 도구가 추가됩니다. Space에 있는 내용은 그대로 표시됩니다.', 'Ajoute la Stratégie, l’Exécution et tous les outils. Ce que le Space contient déjà apparaît tel quel.', 'Añade Estrategia, Ejecución y todas las herramientas. Lo que el Space ya contiene aparece tal cual.'],
   "Only the Space's owner can change what it shows.": ['表示範囲を変更できるのは Space のオーナーだけです。', '표시 범위는 Space 소유자만 변경할 수 있습니다.', 'Seul le propriétaire du Space peut changer ce qu’il affiche.', 'Solo el propietario del Space puede cambiar lo que muestra.'],
   'Could not change what the Space shows.': ['表示範囲を変更できませんでした。', '표시 범위를 변경하지 못했습니다.', 'Impossible de changer ce que le Space affiche.', 'No se pudo cambiar lo que muestra el Space.'],
+  'This Space shows the AI audit only. Elements open once its owner switches it to full in Settings.': ['この Space は AI の監査だけを表示しています。Element は、オーナーが設定でフルに切り替えると開けます。', '이 Space는 AI 감사만 표시합니다. Element는 소유자가 설정에서 전체로 전환하면 열 수 있습니다.', 'Ce Space n’affiche que l’audit de l’IA. Les Elements s’ouvrent une fois que son propriétaire le passe en complet dans les paramètres.', 'Este Space solo muestra la auditoría de IA. Los Elements se abren cuando su propietario lo cambia a completo en Ajustes.'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(APP_MESSAGES).map(([key, row]) => [key, row[index]]));

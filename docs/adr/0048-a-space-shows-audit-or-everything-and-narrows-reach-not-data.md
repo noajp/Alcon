@@ -15,8 +15,8 @@ AI の監査（ADR 0044〜0047）を入口に Alcon を使い始める顧客は�
 2 を採る。
 
 - `activity_spaces.scope` は `audit` か `full`（既定は `full`）。変えられるのは Space のオーナーだけ（既存の更新ポリシー）で、委任された呼び出し（個人アクセストークン・OAuth）からは変えられない（トリガで拒否）
-- audit の Space で辿れる画面は Audit・People・Inbox・Profile・Settings だけ（`Function/space/spaceScope.ts` が正本）。Inbox は承認の依頼（ADR 0047）が届くので含める
-- 画面の切り替えはすべて `page.tsx` の `updateTab` を通り、範囲外の画面は Audit に置き換える。表示する画面も同じ判定を通すので、範囲外の画面が一瞬でも描かれることはない。レールは Inbox・People・Audit だけを出し、アプリの追加はできない。⌘K は範囲内の移動だけを出し、Element・Object・Note・記録の検索と作成を出さない。C キーの Element 作成と Domain 作成も止める。設定は Space・メンバー・連携・People・個人の項目だけを出す
+- audit の Space で辿れる画面は Audit・People・Inbox・Profile・Settings だけ（`Function/space/spaceScope.ts` が正本）。Inbox は承認の依頼（ADR 0047）が届くので含める。これらの画面に埋め込まれた Execution の表面も閉じる：Profile は AI のタブだけを出し（Now・My Elements・My Notes を出さない）、People は人の一覧と各人の未完了の件数・名前を読み取り専用で出して Element と Workload を開かない。Inbox は Element の通知を開かず、フルに切り替えれば開けると伝える
+- 画面の切り替えはすべて `page.tsx` の `updateTab` を通り、範囲外の画面は Audit に置き換える。表示する画面も同じ判定を通すので、範囲外の画面が一瞬でも描かれることはない。audit の間に切り替えなかったタブは元の画面を覚えていて、full に戻すとその画面に戻る。レールは Inbox・People・Audit と Profile だけを出し、アプリの追加はできない。サイドバーの Domain・Object の探索（Discover）も出さない。⌘K は範囲内の移動だけを出し、Element・Object・Note・記録の検索と作成を出さない。C キーの Element 作成と Domain 作成も止める。設定は Space・メンバー・連携・People・個人の項目だけを出す
 - 切り替えは設定 → Activity space の「プランと表示範囲」で行う。絞るのは辿れる範囲だけで、データは動かさない。full に戻すと、Space にあるものがそのまま出る
 
 ## 根拠
@@ -29,4 +29,5 @@ AI の監査（ADR 0044〜0047）を入口に Alcon を使い始める顧客は�
 
 - audit と full の間の段階が要る場合（例：Execution だけ開く）→ `scope` に値を足し、`spaceScope.ts` の判定を増やす。自由な組み合わせにはしない
 - 表示範囲を課金のプランと結びつける場合 → 変更をオーナーの操作から請求の状態に移し、DB 側でプランと範囲の整合を確かめる
+- AI パネル（Copilot）は audit でも使え、その道具は利用者の RLS の範囲で動き、表示範囲では絞っていない。AI パネルから Element や Initiative を作れることが問題になる場合 → 道具の一覧を表示範囲で絞る
 - 範囲外のデータを API（MCP・委任トークン）から読めることが問題になる場合 → 表示だけでなく RLS で範囲外の表を閉じる（今は表示の範囲で、読み取りの権限は変えていない）

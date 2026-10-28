@@ -46,7 +46,8 @@ export function SettingsView() {
   const scope = useActiveSpaceScope();
   const stored = useActiveSettingsSection();
   const active = settingsInScope(stored, scope) ? stored : 'workspace';
-  const tab = useActiveSettingsTab();
+  const storedTab = useActiveSettingsTab();
+  const tab = active === stored ? storedTab : null;
   const { t } = useI18n();
 
   return (

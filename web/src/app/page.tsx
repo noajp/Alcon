@@ -539,7 +539,7 @@ function WorkspaceContent({
           collapsed={sidebarCollapsed}
           overlay={sidebarCollapsed && sidebarOverlay}
           onCreateNew={handleSidebarCreateNew}
-          onSearch={() => setDiscoverOpen(true)}
+          onSearch={scope === 'full' ? () => setDiscoverOpen(true) : undefined}
         />}
 
         {!personalMode && sidebarCollapsed && sidebarOverlay && (
@@ -616,7 +616,7 @@ function WorkspaceContent({
 
       {/* Global ⌘K command palette */}
       <CommandPalette scope={scope} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} />
-      <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />
+      {scope === 'full' && <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />}
 
       {/* Global C → quick-add Element popup. Context Object = the one open in
           the active tab (objects view only — other views keep a stale
