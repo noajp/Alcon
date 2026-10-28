@@ -19,8 +19,11 @@ import { Popover, PopoverTrigger } from '@/ui/popover';
 import { MenuShell, MenuSectionLabel } from '@/Function/shared/menu';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { viewInScope, type SpaceScope } from '@/Function/space/spaceScope';
 
 export type { RailMode };
+
+const AUDIT_RAIL_APPS: RailMode[] = ['team', 'audit'];
 
 // The ModeRail is the thin, always-visible column at the far left. It groups
 // every activity view into a handful of top-level modes; picking one swaps the
@@ -108,9 +111,11 @@ function ProfileRailButton({
 }
 
 export function ModeRail({
+  scope,
   activeView,
   onViewChange,
 }: {
+  scope: SpaceScope;
   activeView: string;
   onViewChange: (view: string) => void;
 }) {
@@ -123,8 +128,13 @@ export function ModeRail({
 
   // An app opened without being added still shows while you're inside it, so
   // the rail never leaves you without a marker for where you are.
-  const railApps =
-    activeMode && isAppMode(activeMode) && !apps.includes(activeMode)
+  // An audit Space (ADR 0048) keeps People and Audit on the rail and offers
+  // nothing else to add.
+  const audit = scope === 'audit';
+  const coreModes = CORE_MODES.filter((mode) => viewInScope(MODE_META[mode].defaultView, scope));
+  const railApps = audit
+    ? AUDIT_RAIL_APPS
+    : activeMode && isAppMode(activeMode) && !apps.includes(activeMode)
       ? [...apps, activeMode]
       : apps;
 
@@ -137,7 +147,7 @@ export function ModeRail({
   return (
     <ButtonAppearanceProvider appearance="navigation"><Popover open={launcherOpen} onOpenChange={setLauncherOpen}>
     <div className="flex w-[46px] shrink-0 border-r border-border flex-col items-center gap-1 bg-background py-2">
-      {CORE_MODES.map((mode) => (
+      {coreModes.map((mode) => (
         <RailButton
           key={mode}
           unreadCount={mode === 'inbox' ? unreadCount : 0}
@@ -162,7 +172,7 @@ export function ModeRail({
         />
       ))}
 
-      <PopoverTrigger asChild>
+      {!audit && <PopoverTrigger asChild>
       <Button
         variant="ghost"
         size="icon-md"
@@ -177,7 +187,7 @@ export function ModeRail({
       >
         <NavSustainmentModeIcon size={18} />
       </Button>
-      </PopoverTrigger>
+      </PopoverTrigger>}
 
       {/* Pinned to the foot of the spine regardless of how many modes/apps
           sit above — the one personal entry point on an otherwise all-work

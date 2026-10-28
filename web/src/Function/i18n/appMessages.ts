@@ -380,6 +380,14 @@ const APP_MESSAGES: Record<string, Row> = {
   'Workers': ['Workers', 'Workers', 'Workers', 'Workers'],
   'Resource': ['リソース', '리소스', 'Ressources', 'Recursos'],
   'Custom view': ['カスタムビュー', '사용자 지정 보기', 'Vue personnalisée', 'Vista personalizada'],
+  'Plan and scope': ['プランと表示範囲', '플랜과 표시 범위', 'Offre et périmètre', 'Plan y alcance'],
+  'What this Space shows. Switching changes what can be reached, never what is stored.': ['この Space に何を表示するか。切り替えで変わるのは辿れる範囲だけで、保存されている内容は変わりません。', '이 Space에 무엇을 표시할지. 전환하면 접근할 수 있는 범위만 바뀌고, 저장된 내용은 바뀌지 않습니다.', 'Ce que ce Space affiche. Changer modifie ce qui est accessible, jamais ce qui est enregistré.', 'Lo que muestra este Space. Cambiarlo modifica lo que se puede alcanzar, nunca lo que está guardado.'],
+  'AI audit': ['AI の監査', 'AI 감사', 'Audit de l’IA', 'Auditoría de IA'],
+  'The Space, its People and Audit only: what AI did in your work, who approved it, and whether the records are whole.': ['Space・People・Audit だけ。AI が業務で何をしたか、誰が承認したか、記録が欠けていないかを確かめます。', 'Space, People, Audit만. AI가 업무에서 무엇을 했는지, 누가 승인했는지, 기록이 온전한지 확인합니다.', 'Le Space, ses personnes et l’Audit seulement : ce que l’IA a fait dans votre travail, qui l’a approuvé et si les enregistrements sont complets.', 'Solo el Space, su gente y la Auditoría: qué hizo la IA en tu trabajo, quién lo aprobó y si los registros están completos.'],
+  'Full': ['フル', '전체', 'Complet', 'Completo'],
+  'Adds Strategy, Execution and every tool. Whatever the Space already holds appears as it is.': ['Strategy・Execution とすべてのツールが加わります。Space にある内容はそのまま表示されます。', 'Strategy, Execution과 모든 도구가 추가됩니다. Space에 있는 내용은 그대로 표시됩니다.', 'Ajoute la Stratégie, l’Exécution et tous les outils. Ce que le Space contient déjà apparaît tel quel.', 'Añade Estrategia, Ejecución y todas las herramientas. Lo que el Space ya contiene aparece tal cual.'],
+  "Only the Space's owner can change what it shows.": ['表示範囲を変更できるのは Space のオーナーだけです。', '표시 범위는 Space 소유자만 변경할 수 있습니다.', 'Seul le propriétaire du Space peut changer ce qu’il affiche.', 'Solo el propietario del Space puede cambiar lo que muestra.'],
+  'Could not change what the Space shows.': ['表示範囲を変更できませんでした。', '표시 범위를 변경하지 못했습니다.', 'Impossible de changer ce que le Space affiche.', 'No se pudo cambiar lo que muestra el Space.'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(APP_MESSAGES).map(([key, row]) => [key, row[index]]));

@@ -167,6 +167,8 @@ export interface ActivitySpace {
   created_by: string | null
   created_at: string | null
   updated_at: string | null
+  /** What the Space shows: everything, or only the Space, People and Audit (ADR 0048). */
+  scope?: 'audit' | 'full'
 }
 
 export interface ActivitySpaceInsert {
@@ -184,6 +186,7 @@ export interface ActivitySpaceUpdate {
   color?: string | null
   logo?: string | null
   order_index?: number | null
+  scope?: 'audit' | 'full'
 }
 
 export interface ActivitySpaceMember {

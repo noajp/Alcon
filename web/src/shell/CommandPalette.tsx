@@ -25,8 +25,12 @@ import type { ViewId } from '@/shell/viewRegistry';
 import { CREATE_ELEMENT_EVENT } from '@/shell/QuickAddElementLauncher';
 import { filterCreateCommands, type CreateCommandId } from '@/shell/paletteCreateCommands';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { viewInScope, type SpaceScope } from '@/Function/space/spaceScope';
 
 interface CommandPaletteProps {
+  /** An audit Space (ADR 0048) offers only the views it shows: no search
+   *  into Elements, Objects, Notes or records, and nothing to create. */
+  scope: SpaceScope;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
   /** Settings opens in its own tab rather than overwriting the active
@@ -67,7 +71,8 @@ function createCommandIcon(id: CreateCommandId): React.ComponentType<{ size?: nu
   }
 }
 
-export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: CommandPaletteProps) {
+export function CommandPalette({ scope, onNavigate, onViewChange, onOpenSettings }: CommandPaletteProps) {
+  const full = scope === 'full';
   const { t } = useI18n();
   const { openCreate } = useWorkspaceActions();
   const [open, setOpen] = useState(false);
@@ -91,7 +96,7 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
   // Debounced search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query.trim()) { setResults([]); setSearching(false); return; }
+    if (!query.trim() || !full) { setResults([]); setSearching(false); return; }
     setSearching(true);
     debounceRef.current = window.setTimeout(async () => {
       try {
@@ -105,7 +110,7 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query]);
+  }, [query, full]);
 
   const close = () => { setOpen(false); setQuery(''); setResults([]); };
 
@@ -145,7 +150,8 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
   // A CRM record opens its page in the CRM, as its sidebar row would.
   const openRecord = (r: SearchResult) => handleNav('crm', { crm: routeTo(crmRoute(undefined), r.kind === 'deal' ? { view: 'deals', dealId: r.id } : r.kind === 'company' ? { view: 'companies', companyId: r.id } : { view: 'contacts', contactId: r.id }) });
   const RECORD_KIND: Partial<Record<SearchResult['kind'], string>> = { deal: 'Deal', company: 'Company', contact: 'Contact' };
-  const visibleCreateCommands = filterCreateCommands(query);
+  const visibleCreateCommands = full ? filterCreateCommands(query) : [];
+  const navCommands = NAV_COMMANDS.filter(c => viewInScope(c.view, scope));
 
   return (
     <CommandDialog
@@ -292,7 +298,7 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
 
         <CommandSeparator />
         <CommandGroup heading={t('Navigation')}>
-          {NAV_COMMANDS.map(c => (
+          {navCommands.map(c => (
             <CommandItem
               key={c.id}
               value={`nav-${c.label}-${t(c.label)}`}
