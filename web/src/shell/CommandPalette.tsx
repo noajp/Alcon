@@ -157,17 +157,17 @@ export function CommandPalette({ scope, onNavigate, onViewChange, onOpenSettings
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
-      title={t('Search')}
-      description={t('Search elements, objects, notes and records. Press ⌘K to open.')}
+      title={t(full ? 'Search' : 'Go to')}
+      description={t(full ? 'Search elements, objects, notes and records. Press ⌘K to open.' : 'Go to Inbox, People, Audit or Settings. Press ⌘K to open.')}
     >
       <CommandInput
-        placeholder={t('Search elements, objects, notes, records…')}
+        placeholder={t(full ? 'Search elements, objects, notes, records…' : 'Go to Inbox, People, Audit or Settings…')}
         value={query}
         onValueChange={setQuery}
       />
       <CommandList>
         <CommandEmpty>
-          {t(searching ? 'Searching…' : query ? 'No results.' : 'Type to search.')}
+          {t(searching ? 'Searching…' : query ? 'No results.' : full ? 'Type to search.' : 'Type to filter.')}
         </CommandEmpty>
 
         {visibleCreateCommands.length > 0 && (
