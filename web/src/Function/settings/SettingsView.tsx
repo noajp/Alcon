@@ -14,6 +14,8 @@ import { SlaSettings } from './SlaSettings';
 import { LabelSettings } from './LabelSettings';
 import { ElementTemplateSettings } from './ElementTemplateSettings';
 import { IntegrationsSettings } from '@/Function/integrations/IntegrationsSettings';
+import { useActiveSpaceScope } from '@/Function/space/data';
+import { settingsInScope } from '@/Function/space/spaceScope';
 import { useActiveSettingsSection, useActiveSettingsTab, setActiveSettingsSection, SETTINGS_ITEMS, SETTINGS_ITEM_TITLES } from './settingsNav';
 import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 import { LanguageSelect } from '@/Function/i18n/LanguageSelect';
@@ -39,8 +41,13 @@ import { InitiativeJudgementSettings, PhaseDefaultsSettings, TimelineDisplaySett
 // =============================================================
 
 export function SettingsView() {
-  const active = useActiveSettingsSection();
-  const tab = useActiveSettingsTab();
+  // An audit Space (ADR 0048) shows only its own pages; a page it hides
+  // reads as the Space's own.
+  const scope = useActiveSpaceScope();
+  const stored = useActiveSettingsSection();
+  const active = settingsInScope(stored, scope) ? stored : 'workspace';
+  const storedTab = useActiveSettingsTab();
+  const tab = active === stored ? storedTab : null;
   const { t } = useI18n();
 
   return (

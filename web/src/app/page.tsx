@@ -25,6 +25,8 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/Function/space/domainsStore';
 import { useActiveSpaceId, setActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { useActiveSpaceScope } from '@/Function/space/data';
+import { scopedView, viewInScope } from '@/Function/space/spaceScope';
 import { OnboardingCreate } from '@/Function/space/OnboardingCreate';
 import { MyInvitations } from '@/Function/membership/MyInvitations';
 import { getCachedHomeViewId } from '@/Function/settings/preferencesStore';
@@ -257,6 +259,10 @@ function WorkspaceContent({
   onActiveDomainChange: (id: string) => void;
 }) {
   const { t } = useI18n();
+  // An audit Space shows only the Space, People and Audit (ADR 0048): every
+  // way to a view passes through updateTab, which turns a view outside the
+  // scope into the Audit home.
+  const scope = useActiveSpaceScope();
   // The shell's view + navigation. Kept as a list of tabs so a surface's
   // internal state (Domain tab selection, expand state, scroll position …)
   // survives while another view is shown; the page shows one at a time and
@@ -267,13 +273,18 @@ function WorkspaceContent({
   const [tabs, setTabs] = useState<AppTab[]>(() => [initialTabRef.current!]);
   const [activeTabId] = useState<string>(() => initialTabRef.current!.id);
 
-  const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0];
+  const storedTab = tabs.find(t => t.id === activeTabId) ?? tabs[0];
+  // A tab opened on a view the Space does not show (it was switched to
+  // audit, or the default home view is outside it) reads as Audit; the view
+  // it held comes back if the Space returns to full.
+  const activeTab = viewInScope(storedTab.activeView, scope) ? storedTab : { ...storedTab, activeView: scopedView(storedTab.activeView, scope) };
 
   // Per-tab updaters — operate on the tab id that's passed in, not whichever
   // tab happens to be active. Each tab's MainContent gets a stable handler
   // bound to its own id so background tabs can keep their state correctly.
   const updateTab = (id: string, partial: Partial<Omit<AppTab, 'id'>>) => {
-    setTabs(prev => prev.map(t => (t.id === id ? { ...t, ...partial } : t)));
+    const next = partial.activeView === undefined ? partial : { ...partial, activeView: scopedView(partial.activeView, scope) };
+    setTabs(prev => prev.map(t => (t.id === id ? { ...t, ...next } : t)));
   };
   const updateTabNavigation = (id: string, partial: Partial<NavigationState>) => {
     if (partial.objectId && partial.objectDomainId && partial.objectDomainId !== activeDomainId) {
@@ -354,10 +365,11 @@ function WorkspaceContent({
   const previousDomainIdRef = useRef(activeDomainId);
 
   useEffect(() => {
+    if (scope === 'audit') return;
     const handler = () => setCreateType('domain');
     window.addEventListener(CREATE_DOMAIN_EVENT, handler);
     return () => window.removeEventListener(CREATE_DOMAIN_EVENT, handler);
-  }, []);
+  }, [scope]);
 
   // An Object lives in a Domain: with none yet, creating one starts with the Domain.
   const hasDomains = domains.length > 0;
@@ -511,6 +523,7 @@ function WorkspaceContent({
     >
       <div className="relative flex-1 flex overflow-hidden">
         <ModeRail
+          scope={scope}
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
         />
@@ -526,7 +539,7 @@ function WorkspaceContent({
           collapsed={sidebarCollapsed}
           overlay={sidebarCollapsed && sidebarOverlay}
           onCreateNew={handleSidebarCreateNew}
-          onSearch={() => setDiscoverOpen(true)}
+          onSearch={scope === 'full' ? () => setDiscoverOpen(true) : undefined}
         />}
 
         {!personalMode && sidebarCollapsed && sidebarOverlay && (
@@ -564,7 +577,7 @@ function WorkspaceContent({
                     <MainContent
                       activeSpaceId={activeSpaceId}
                       onOpenSettings={handleOpenSettings}
-                      activeActivity={tab.activeView}
+                      activeActivity={scopedView(tab.activeView, scope)}
                       navigation={tab.navigation}
                       onNavigate={(nav) => updateTabNavigation(tab.id, nav)}
                       onViewChange={(view) => updateTab(tab.id, { activeView: view })}
@@ -602,17 +615,17 @@ function WorkspaceContent({
       </div>
 
       {/* Global ⌘K command palette */}
-      <CommandPalette onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} />
-      <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />
+      <CommandPalette scope={scope} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} />
+      {scope === 'full' && <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />}
 
       {/* Global C → quick-add Element popup. Context Object = the one open in
           the active tab (objects view only — other views keep a stale
           navigation.objectId around). */}
-      <QuickAddElementLauncher
+      {scope === 'full' && <QuickAddElementLauncher
         activeDomainId={activeDomainId}
         contextObjectId={activeTab.activeView === 'objects' ? activeTab.navigation.objectId ?? null : null}
         onRefresh={refetch}
-      />
+      />}
 
       {/* Quick-create cards — one shape for every "+": the Notebook card and
           the Object card here (Linear-style, no full-page form); Initiative

@@ -77,3 +77,4 @@
 | [0045](0045-the-audit-intake-takes-signed-batches-that-continue-the-gateways-chain.md) | 記録の受け口は、署名されたまとめ送りを受け、ゲートウェイの鎖が続いているかを確かめる |
 | [0046](0046-grants-are-decided-in-alcon-and-handed-to-the-gateway-signed.md) | 権限は Alcon で決め、署名した版つきの表としてゲートウェイに渡す |
 | [0047](0047-approvals-are-bound-to-the-content-and-spent-once-when-the-proof-is-issued.md) | 承認は内容のハッシュに結び、証明を発行する時に1回だけ消費する |
+| [0048](0048-a-space-shows-audit-or-everything-and-narrows-reach-not-data.md) | Space の表示範囲は audit か full で、絞るのは辿れる範囲だけにする |
