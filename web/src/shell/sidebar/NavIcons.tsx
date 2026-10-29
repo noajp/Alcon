@@ -17,6 +17,7 @@ import {
   Telescope,
   Folder,
   Stone,
+  MessageCircle,
   Blocks,
 } from 'lucide-react';
 import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon } from '@/Function/shared/conceptIcons';
@@ -64,5 +65,7 @@ export const NavPortfolioIcon = ({ size = 20 }: { size?: number }) => <Folder si
 export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} className="scale-110" />;
 
 export const NavCrmIcon = CrmIcon;
+// AI — the conversation, as a pop-up or a screen of its own.
+export const NavAiIcon = ({ size = 20 }: { size?: number }) => <MessageCircle size={size} strokeWidth={2} />;
 // Audit — what an AI did, checked.
 export const NavAuditIcon = ({ size = 20 }: { size?: number }) => <ShieldCheck size={size} strokeWidth={2} />;

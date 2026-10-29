@@ -1,5 +1,6 @@
 import type React from 'react';
 import {
+  NavAiIcon,
   NavAuditIcon,
   NavCrmIcon,
   NavHomeIcon,
@@ -53,7 +54,8 @@ export type ViewId =
   | 'audit'
   | 'settings'
   | 'profile'
-  | 'account';
+  | 'account'
+  | 'ai';
 
 export interface ViewMeta {
   /** Sidebar / tab display label. */
@@ -87,5 +89,6 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   settings:      { label: 'Settings',    icon: NavSettingsIcon },
   profile:       { label: 'Profile', icon: NavTeamsIcon },
   account:       { label: 'Account' },
+  ai:            { label: 'AI',          icon: NavAiIcon },
 };
 
