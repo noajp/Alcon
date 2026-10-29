@@ -78,7 +78,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
   const [hydrated, setHydrated] = useState(false);
   const [input, setInput] = useState('');
   const [activeDomainId, setActiveDomainId] = useState<string | null>(null);
-  const { messages, streaming, error, send, cancel, reset } = useCopilotConversation();
+  const { messages, streaming, error, send, cancel, newConversation } = useCopilotConversation();
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const boxRef = useRef<HTMLElement>(null);
@@ -259,7 +259,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
         {subject === 'slides' && <span className="text-[12px] text-muted-foreground">· Slides</span>}
         <div className="flex-1" />
         {subject !== 'slides' && messages.length > 0 && (
-          <Button size="sm" type="button" variant="ghost" onClick={reset} title={t('Clear the conversation')}>
+          <Button size="sm" type="button" variant="ghost" onClick={() => newConversation()} title={t('Start a new conversation')}>
             {t('New conversation')}
           </Button>
         )}

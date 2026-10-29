@@ -55,9 +55,8 @@ function functionsUrl(): string | null {
 }
 
 /**
- * Drives the SSE conversation with the alcon-copilot Edge Function. State is
- * held in memory (Phase 1) — persistence to a copilot_threads table is a
- * follow-up.
+ * Drives the SSE conversation with the alcon-copilot Edge Function. The
+ * conversation lives here while it is open; CopilotProvider keeps it.
  */
 export function useAlconCopilot() {
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
@@ -69,6 +68,15 @@ export function useAlconCopilot() {
     abortRef.current?.abort();
     abortRef.current = null;
     setMessages([]);
+    setError(null);
+    setStreaming(false);
+  }, []);
+
+  /** Shows a kept conversation, to go on from where it stopped. */
+  const load = useCallback((kept: CopilotMessage[]) => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setMessages(kept.map((m) => ({ ...m, done: true })));
     setError(null);
     setStreaming(false);
   }, []);
@@ -231,5 +239,5 @@ export function useAlconCopilot() {
     });
   }
 
-  return { messages, streaming, error, send, cancel, reset };
+  return { messages, streaming, error, send, cancel, reset, load };
 }

@@ -309,7 +309,6 @@ const APP_MESSAGES: Record<string, Row> = {
   'Send message': ['メッセージを送信', '메시지 보내기', 'Envoyer le message', 'Enviar mensaje'],
   '{name} · Complete': ['{name} · 完了', '{name} · 완료', '{name} · Terminé', '{name} · Completado'],
   '{name} · Failed': ['{name} · 失敗', '{name} · 실패', '{name} · Échec', '{name} · Error'],
-  'Clear the conversation': ['会話をクリア', '대화 지우기', 'Effacer la conversation', 'Borrar la conversación'],
   'Type anything': ['なんでも入力', '무엇이든 입력', 'Écrivez ce que vous voulez', 'Escribe lo que quieras'],
   'Send (Enter)': ['送信（Enter）', '보내기 (Enter)', 'Envoyer (Entrée)', 'Enviar (Intro)'],
   'Send': ['送信', '보내기', 'Envoyer', 'Enviar'],

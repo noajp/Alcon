@@ -58,6 +58,7 @@ import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
 import { CrmSidebar } from '@/ActivitySpace/sustainment/crm/CrmSidebar';
 import { AuditSidebar } from '@/ActivitySpace/sustainment/audit/AuditSidebar';
+import { AiSidebar } from '@/ActivitySpace/home/ai/AiSidebar';
 import { SlidesSidebar, createDeckHere, createFolderHere, pickDeckFile } from '@/ActivitySpace/sustainment/slides/SlidesSidebar';
 import { useSlidesReady } from '@/ActivitySpace/sustainment/slides/sync';
 import { InboxList } from '@/ActivitySpace/home/InboxList';
@@ -538,6 +539,8 @@ export function AppSidebar({
           {railMode === 'crm' && <CrmSidebar navigation={navigation} onNavigate={onNavigate} />}
           {/* ── Audit ── what needs a person, the workflows, and the log. */}
           {railMode === 'audit' && <AuditSidebar navigation={navigation} onNavigate={onNavigate} />}
+          {/* ── AI ── this person's conversations, in folders. */}
+          {railMode === 'ai' && <AiSidebar onOpen={() => { if (activeView !== 'ai') onViewChange('ai'); }} />}
           {/* ── Slides ── the Space's deck folders; the main pane edits the open deck. */}
           {railMode === 'slides' && <SlidesSidebar onOpen={() => { if (activeView !== 'slides') onViewChange('slides'); }} />}
           </>
