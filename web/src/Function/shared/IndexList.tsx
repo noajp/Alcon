@@ -26,7 +26,7 @@ export function IndexList({ headers, showHeader = true, children }: {
   return (
     <div className="px-2 pb-2 pt-2">
       {showHeader && (
-        <div className={`sticky top-0 z-10 grid ${COLUMNS} gap-3 bg-card px-4 py-2 text-[12px] font-normal text-muted-foreground`}>
+        <div className={`sticky top-0 z-10 grid ${COLUMNS} gap-3 bg-card px-4 py-2 text-[13px] font-normal text-muted-foreground`}>
           <span>{headers[0]}</span>
           <span>{headers[1]}</span>
           <span className="text-right">{headers[2]}</span>
@@ -59,13 +59,13 @@ export function IndexRow({ icon, name, description, health, count, onOpen, inden
         <span className="shrink-0 text-muted-foreground">{icon}</span>
         {renameField ?? (
           <>
-            <span className="truncate text-[13px] font-medium text-foreground">{name}</span>
-            {description && <span className="hidden min-w-0 truncate text-[12px] font-normal text-muted-foreground sm:inline">{description}</span>}
+            <span className="truncate text-[14px] font-medium text-foreground">{name}</span>
+            {description && <span className="hidden min-w-0 truncate text-[13px] font-normal text-muted-foreground sm:inline">{description}</span>}
           </>
         )}
       </div>
       {health}
-      <span className="text-right text-[12px] tabular-nums text-muted-foreground">{count}</span>
+      <span className="text-right text-[13px] tabular-nums text-muted-foreground">{count}</span>
     </>
   );
   return (

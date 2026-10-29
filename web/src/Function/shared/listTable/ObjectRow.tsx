@@ -114,7 +114,7 @@ export const ObjectRow = memo(function ObjectRow({
       </td>
       <td className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         <div className="flex items-center min-w-0 min-h-[1.625rem]">
-          <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
+          <span className="text-[14px] font-medium text-foreground truncate flex-1 min-w-0">
             {obj.name}
           </span>
         </div>

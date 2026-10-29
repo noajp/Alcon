@@ -479,7 +479,7 @@ export function ListTable({
         style={nameFluid
           ? { width: '100%', minWidth: packedWidth }
           : { width: packedWidth }}
-        className="group/list min-w-full table-fixed bg-card border-separate border-spacing-0 text-[13px]"
+        className="group/list min-w-full table-fixed bg-card border-separate border-spacing-0 text-[14px]"
         data-has-selection={hasSelection ? '' : undefined}
       >
         {/* Fixed tracks retain their saved widths; the trailing percentage
@@ -508,7 +508,7 @@ export function ListTable({
                 above any data column header that scrolls under. */}
             <th className="sticky top-0 left-0 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
             <th className="sticky top-0 left-7 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
-            <th className="sticky top-0 md:left-14 z-30 relative pl-0.5 pr-3 py-2.5 text-left text-[12px] font-normal text-muted-foreground bg-card border-b border-border/60">
+            <th className="sticky top-0 md:left-14 z-30 relative pl-0.5 pr-3 py-2.5 text-left text-[13px] font-normal text-muted-foreground bg-card border-b border-border/60">
               {t('Name')}
               {/* Name is resizable too — same handle as the data columns,
                   persisted under NAME_COL_KEY. Fixed on the Object list
@@ -607,10 +607,10 @@ export function ListTable({
                         <span className="w-7 shrink-0 flex items-center justify-center text-foreground/70">
                           {section.icon}
                         </span>
-                        <span className="text-[13px] font-medium text-foreground min-w-0 truncate">
+                        <span className="text-[14px] font-medium text-foreground min-w-0 truncate">
                           {section.name}
                         </span>
-                        <span className="text-muted-foreground/60 font-normal tabular-nums text-[13px] ml-2">
+                        <span className="text-muted-foreground/60 font-normal tabular-nums text-[14px] ml-2">
                           {itemCount}
                         </span>
                         <span className="flex-1" />
