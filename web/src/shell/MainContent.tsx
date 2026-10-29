@@ -1,5 +1,6 @@
 'use client';
 
+import { AlconCopilotPanel } from '@/Function/copilot/AlconCopilotPanel';
 import { useActiveSpaceScope } from '@/Function/space/data';
 import dynamic from 'next/dynamic';
 import type { NavigationState } from '@/types/navigation';
@@ -53,9 +54,11 @@ interface MainContentProps {
   onNewNoteHandled?: () => void;
   activeDomainId?: string | null;
   activeSpaceId?: string | null;
+  /** The AI screen's shrink button: back to the pop-up. */
+  onMinimizeAi?: () => void;
 }
 
-export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId }: MainContentProps) {
+export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId, onMinimizeAi }: MainContentProps) {
   const scope = useActiveSpaceScope();
 
   return (
@@ -263,6 +266,9 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               </ElementDrilldown>}
             </div>
           )}
+
+          {/* The AI on a screen of its own — the same conversation as the pop-up. */}
+          {activeActivity === 'ai' && <AlconCopilotPanel variant="page" open onOpenChange={() => {}} onMinimize={onMinimizeAi} />}
 
           {activeActivity === 'profile' && <ProfileView onOpenSettings={onOpenSettings} onNavigate={onNavigate} onViewChange={onViewChange} activeDomainId={activeDomainId} />}
 

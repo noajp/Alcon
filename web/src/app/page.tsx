@@ -13,6 +13,7 @@ import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateVi
 import { CommandPalette } from '@/shell/CommandPalette';
 import { QuickAddElementLauncher } from '@/shell/QuickAddElementLauncher';
 import { AlconCopilotPanel } from '@/Function/copilot/AlconCopilotPanel';
+import { CopilotProvider } from '@/Function/copilot/CopilotProvider';
 import type { AppTab } from '@/shell/appTab';
 import { mergeNavigation, navigationAfterDomainChange } from '@/shell/navigationState';
 import type { NavigationState } from '@/types/navigation';
@@ -36,10 +37,10 @@ import { finishIntegrationOAuth } from '@/Function/integrations/data';
 import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { seedStarterSpace } from '@/Function/space/seedStarterSpace';
-import { Button, ButtonAppearanceProvider } from '@/ui/button';
+import { Button } from '@/ui/button';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -338,7 +339,10 @@ function WorkspaceContent({
   // its tabs) has nothing to list, so it takes the whole width.
   // Slides brings its own deck list, so it takes the whole width too.
   const personalMode = railModeOf(activeTab.activeView) === 'personal';
-  const sidebarHidden = sidebarCollapsed || personalMode;
+  // The AI screen is one conversation; it has nothing to list either.
+  const aiScreen = activeTab.activeView === 'ai';
+  const noSidebar = personalMode || aiScreen;
+  const sidebarHidden = sidebarCollapsed || noSidebar;
   const [discoverOpen, setDiscoverOpen] = useState(false);
   // Alcon Copilot pane — open state shared by the strip's PanelRight
   // toggle, ⌘L, and the panel's own close button. It is kept per kind of
@@ -353,6 +357,21 @@ function WorkspaceContent({
   const handleCopilotOpenChange = (next: boolean) => {
     if (onSlides) setCopilotOpenOnSlides(next);
     else setCopilotOpenElsewhere(next);
+  };
+  // The pop-up's expand button opens the AI screen; the screen's shrink
+  // button goes back to where the person was, with the pop-up open.
+  const lastViewRef = useRef('home');
+  useEffect(() => {
+    if (activeTab.activeView !== 'ai') lastViewRef.current = activeTab.activeView;
+  }, [activeTab.activeView]);
+  const handleExpandAi = () => {
+    setCopilotOpenElsewhere(false);
+    setActiveView('ai');
+  };
+  const handleMinimizeAi = () => {
+    setActiveView(lastViewRef.current);
+    if (lastViewRef.current === 'slides') setCopilotOpenOnSlides(true);
+    else setCopilotOpenElsewhere(true);
   };
   // Nothing is created up front: a Space may start from Strategy (a Vision or
   // Portfolio) as well as from a Domain, so the person picks where to begin.
@@ -512,6 +531,7 @@ function WorkspaceContent({
   return (
     <ExplorerDataProvider value={explorerData}>
     <WorkspaceActionsProvider onOpenCreateObject={openObjectPopup} onOpenCreateNotebook={openNotebookPopup}>
+    <CopilotProvider>
     <div
       className="h-dvh flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground"
       style={{
@@ -526,8 +546,9 @@ function WorkspaceContent({
           scope={scope}
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
+          onShowSidebar={!noSidebar && sidebarHidden && !sidebarOverlay ? handleSidebarToggle : undefined}
         />
-        {!personalMode && <AppSidebar
+        {!noSidebar && <AppSidebar
           navigation={activeTab.navigation}
           onNavigate={handleSidebarNavigate}
           activeView={activeTab.activeView}
@@ -540,9 +561,10 @@ function WorkspaceContent({
           overlay={sidebarCollapsed && sidebarOverlay}
           onCreateNew={handleSidebarCreateNew}
           onSearch={scope === 'full' ? () => setDiscoverOpen(true) : undefined}
+          onHide={handleSidebarToggle}
         />}
 
-        {!personalMode && sidebarCollapsed && sidebarOverlay && (
+        {!noSidebar && sidebarCollapsed && sidebarOverlay && (
           <div
             className="absolute inset-0 z-40 bg-black/45"
             onClick={() => setSidebarOverlay(false)}
@@ -550,7 +572,7 @@ function WorkspaceContent({
           />
         )}
 
-        <div className={`flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5 pb-1.5 ${sidebarHidden ? 'pl-1.5' : 'pl-0'}`}>
+        <div className={`relative flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5 pb-1.5 ${sidebarHidden ? 'pl-1.5' : 'pl-0'}`}>
         {/* MainContent + Copilot live side-by-side as two islands. When the
             Copilot is open it claims its own width on the right; otherwise
             MainContent fills the row. */}
@@ -585,32 +607,28 @@ function WorkspaceContent({
                       pendingNewNote={isActive ? pendingNewNote : 0}
                       onNewNoteHandled={() => setPendingNewNote(0)}
                       activeDomainId={activeDomainId}
+                      onMinimizeAi={handleMinimizeAi}
                     />
                   </div>
                 );
               })
             )}
           </div>
-          <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} subject={onSlides ? 'slides' : null} />
-        </div>
-        {/* The strip under the islands: the page-level toggles sit at its
-            right end — the sidebar (omitted while it has nothing to show, on
-            Profile) and the AI pane. ⌘L and the pane's own close flip the
-            same boolean. */}
-        <ButtonAppearanceProvider appearance="navigation">
-        <div className="flex h-7 shrink-0 items-center justify-end pt-0.5">
-          {!personalMode && (
-            <Button size="icon-xs" variant="ghost" onClick={handleSidebarToggle} className="text-muted-foreground"
-              title={t(sidebarHidden ? 'Show sidebar' : 'Hide sidebar')} aria-label={t(sidebarHidden ? 'Show sidebar' : 'Hide sidebar')}>
-              {sidebarHidden ? <PanelLeftOpen size={12} /> : <PanelLeftClose size={12} />}
-            </Button>
+          {!aiScreen && (
+            <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} subject={onSlides ? 'slides' : null}
+              variant={onSlides ? 'docked' : 'floating'} onExpand={handleExpandAi} />
           )}
-          <Button size="icon-xs" variant="ghost" onClick={() => handleCopilotOpenChange(!copilotOpen)} className={copilotOpen ? 'text-foreground' : 'text-muted-foreground'}
-            aria-pressed={copilotOpen} title={`${t(copilotOpen ? 'Hide AI' : 'Show AI')} (⌘L)`} aria-label={t(copilotOpen ? 'Hide AI' : 'Show AI')}>
-            {copilotOpen ? <PanelRightOpen size={12} /> : <PanelRightClose size={12} />}
-          </Button>
         </div>
-        </ButtonAppearanceProvider>
+        {/* The AI: a button at the bottom-right corner, and the conversation
+            pops up above it. On Slides the panel is the deck's assistant and
+            sits beside the deck instead, closed from its own header. */}
+        {!aiScreen && !(onSlides && copilotOpen) && (
+          <Button size="sm" variant="secondary" onClick={() => handleCopilotOpenChange(!copilotOpen)}
+            aria-pressed={copilotOpen} title={`${t(copilotOpen ? 'Hide AI' : 'Show AI')} (⌘L)`}
+            className="absolute bottom-4 right-4 z-40 bg-card shadow-[var(--shadow-island)]">
+            <MessageCircle size={14} />{t('AI')}
+          </Button>
+        )}
         </div>
       </div>
 
@@ -660,6 +678,7 @@ function WorkspaceContent({
         }}
       />
     </div>
+    </CopilotProvider>
     </WorkspaceActionsProvider>
     </ExplorerDataProvider>
   );

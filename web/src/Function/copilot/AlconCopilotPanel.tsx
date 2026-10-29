@@ -3,9 +3,10 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/ui/button';
 
 import { useEffect, useRef, useState } from 'react';
-import { X, ChevronRight, Loader2, Wrench, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { X, ChevronRight, Loader2, Wrench, AlertCircle, CheckCircle2, Maximize2, Minimize2 } from 'lucide-react';
 import { SendIcon } from '@/Function/shared/SendIcon';
-import { useAlconCopilot, type CopilotContext, type ToolEvent } from './useAlconCopilot';
+import { type CopilotContext, type ToolEvent } from './useAlconCopilot';
+import { useCopilotConversation } from './CopilotProvider';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { getActiveDomainId } from '@/Function/space/domainsStore';
@@ -14,46 +15,82 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 const SlidesAssistant = dynamic(() => import('@/ActivitySpace/sustainment/slides/SlidesAssistant').then((m) => m.SlidesAssistant), { ssr: false });
 
 const WIDTH_KEY = 'alcon.copilot.width';
+const FLOAT_KEY = 'alcon.copilot.float';
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 640;
 const DEFAULT_WIDTH = 340;
+const FLOAT_MIN_W = 320;
+const FLOAT_MIN_H = 280;
+
+/** The pop-up's place, measured from the bottom-right corner of the page so
+ *  it stays in that corner when the window changes size. */
+interface FloatRect { right: number; bottom: number; width: number; height: number }
+type Edge = 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se';
+
+const EDGE_CLASS: Record<Edge, string> = {
+  n: 'left-3 right-3 top-0 h-2 cursor-ns-resize',
+  s: 'left-3 right-3 bottom-0 h-2 cursor-ns-resize',
+  w: 'top-3 bottom-3 left-0 w-2 cursor-ew-resize',
+  e: 'top-3 bottom-3 right-0 w-2 cursor-ew-resize',
+  nw: 'left-0 top-0 h-4 w-4 cursor-nwse-resize',
+  se: 'right-0 bottom-0 h-4 w-4 cursor-nwse-resize',
+  ne: 'right-0 top-0 h-4 w-4 cursor-nesw-resize',
+  sw: 'left-0 bottom-0 h-4 w-4 cursor-nesw-resize',
+};
+
+function readFloatRect(): FloatRect | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(FLOAT_KEY) ?? 'null');
+    if (v && [v.right, v.bottom, v.width, v.height].every((n: unknown) => typeof n === 'number' && Number.isFinite(n))) return v;
+  } catch { /* private mode */ }
+  return null;
+}
 
 export interface AlconCopilotPanelProps {
-  /** Open state is owned by the page so the strip's PanelRight
-   *  toggle and the ⌘L shortcut both flip the same boolean — sharing via a
-   *  CustomEvent is fragile under React 18 StrictMode (the listener gets
-   *  re-attached and a single click flips state twice). */
+  /** Open state is owned by the page so the corner button, ⌘L and the
+   *  panel's own close all flip the same boolean. Ignored on the AI screen. */
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** What the screen is about, when the panel should speak to it rather than
    *  to Alcon at large — 'slides' makes it the open deck's assistant. */
   subject?: 'slides' | null;
+  /** docked: an island beside the page (Slides). floating: a pop-up above the
+   *  corner button, moved by its title bar and sized from any edge. page: the
+   *  AI screen, the whole island. */
+  variant?: 'docked' | 'floating' | 'page';
+  /** The pop-up's expand button: open the AI screen. */
+  onExpand?: () => void;
+  /** The AI screen's shrink button: back to the pop-up. */
+  onMinimize?: () => void;
 }
 
 /**
- * Right-edge floating Copilot pane. Open state lives in the parent (toggled
- * with Cmd/Ctrl+L globally, by the strip's PanelRight button, or by
- * the panel's own close button). Width is user-resizable from a left-side
- * drag handle and persisted via localStorage. Phase 1 ships read-only tools;
- * the deliverable-creating Code / Terminal tabs are stubbed at the bottom
- * for future work but disabled.
+ * The AI. One conversation (CopilotProvider) shown as a pop-up, an island
+ * beside Slides, or a screen of its own. Phase 1 ships read-only tools.
  */
-export function AlconCopilotPanel({ open, onOpenChange, subject = null }: AlconCopilotPanelProps) {
+export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant = 'docked', onExpand, onMinimize }: AlconCopilotPanelProps) {
   const { t } = useI18n();
+  const floating = variant === 'floating';
+  const page = variant === 'page';
+  const shown = page || open;
   const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const [rect, setRect] = useState<FloatRect | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [input, setInput] = useState('');
   const [activeDomainId, setActiveDomainId] = useState<string | null>(null);
-  const { messages, streaming, error, send, cancel, reset } = useAlconCopilot();
+  const { messages, streaming, error, send, cancel, reset } = useCopilotConversation();
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const boxRef = useRef<HTMLElement>(null);
 
   // Hydrate persisted UI prefs once.
   useEffect(() => {
     try {
       const w = Number(localStorage.getItem(WIDTH_KEY));
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of stored prefs after mount
       if (Number.isFinite(w) && w >= MIN_WIDTH && w <= MAX_WIDTH) setWidth(w);
     } catch { /* SSR / private mode */ }
+    setRect(readFloatRect());
     setHydrated(true);
   }, []);
 
@@ -64,57 +101,109 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null }: AlconC
     sync();
     window.addEventListener('storage', sync);
     return () => window.removeEventListener('storage', sync);
-  }, [open]);
+  }, [shown]);
 
-  // Cmd/Ctrl+L toggles the panel. Cmd+L collides with Chrome's address-bar
-  // focus; that's acceptable inside a SPA where the address bar is rarely
-  // the target.
+  // Cmd/Ctrl+L toggles the panel; Esc closes the pop-up. The AI screen is
+  // left by the rail, so it listens to neither. Cmd+L collides with Chrome's
+  // address-bar focus; that's acceptable inside a SPA.
   useEffect(() => {
+    if (page) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && (e.key === 'l' || e.key === 'L')) {
         e.preventDefault();
         onOpenChange(!open);
+      } else if (floating && open && e.key === 'Escape' && !e.defaultPrevented) {
+        onOpenChange(false);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, floating, page]);
 
   // Auto-scroll to bottom on new content while streaming.
   useEffect(() => {
     if (!listRef.current) return;
     listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [messages, streaming]);
+  }, [messages, streaming, shown]);
 
   // Auto-focus the input when the panel opens.
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 60);
-  }, [open]);
+    if (shown) setTimeout(() => inputRef.current?.focus(), 60);
+  }, [shown]);
 
-
-  // ── Drag-to-resize from the left edge ──────────────────────────────────
+  // ── Docked: drag-to-resize from the left edge ──────────────────────────
   const startResize = (e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
     const startW = width;
     const onMove = (ev: MouseEvent) => {
-      const next = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startW + (startX - ev.clientX)));
-      setWidth(next);
+      setWidth(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startW + (startX - ev.clientX))));
     };
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
-      try { localStorage.setItem(WIDTH_KEY, String(width)); } catch { /* ignore */ }
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   };
 
-  // Persist final width on the next render after a drag completes.
   useEffect(() => {
     if (!hydrated) return;
     try { localStorage.setItem(WIDTH_KEY, String(width)); } catch { /* ignore */ }
   }, [width, hydrated]);
+
+  // ── Floating: move by the title bar, size from any edge ────────────────
+  // Both work in the page's coordinates (the pop-up's offset parent) and
+  // keep the whole pop-up inside it.
+  const startFloat = (e: React.PointerEvent, edge: Edge | 'move') => {
+    const box = boxRef.current;
+    const parent = box?.offsetParent as HTMLElement | null;
+    if (!box || !parent || e.button !== 0) return;
+    e.preventDefault();
+    const pw = parent.clientWidth;
+    const ph = parent.clientHeight;
+    const start: FloatRect = {
+      right: pw - box.offsetLeft - box.offsetWidth,
+      bottom: ph - box.offsetTop - box.offsetHeight,
+      width: box.offsetWidth,
+      height: box.offsetHeight,
+    };
+    const sx = e.clientX;
+    const sy = e.clientY;
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+    let last = start;
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - sx;
+      const dy = ev.clientY - sy;
+      const next = { ...start };
+      if (edge === 'move') {
+        next.right = clamp(start.right - dx, 0, pw - start.width);
+        next.bottom = clamp(start.bottom - dy, 0, ph - start.height);
+      } else {
+        if (edge.includes('w')) next.width = clamp(start.width - dx, FLOAT_MIN_W, pw - start.right);
+        if (edge.includes('e')) {
+          next.width = clamp(start.width + dx, FLOAT_MIN_W, start.width + start.right);
+          next.right = start.right - (next.width - start.width);
+        }
+        if (edge.includes('n')) next.height = clamp(start.height - dy, FLOAT_MIN_H, ph - start.bottom);
+        if (edge.includes('s')) {
+          next.height = clamp(start.height + dy, FLOAT_MIN_H, start.height + start.bottom);
+          next.bottom = start.bottom - (next.height - start.height);
+        }
+      }
+      last = next;
+      setRect(next);
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      try { localStorage.setItem(FLOAT_KEY, JSON.stringify(last)); } catch { /* ignore */ }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
+  const startEdge = (e: React.PointerEvent<HTMLDivElement>) => startFloat(e, e.currentTarget.dataset.edge as Edge);
 
   const submit = () => {
     const text = input.trim();
@@ -130,117 +219,124 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null }: AlconC
   };
 
   // Render nothing until hydration finishes so the initial CSR matches the
-  // SSR'd HTML (avoids a flash of an open panel when localStorage said open).
-  if (!hydrated) return null;
+  // SSR'd HTML.
+  if (!hydrated || !shown) return null;
+
+  const boxClass = page
+    ? 'flex flex-1 flex-col overflow-hidden bg-card'
+    : floating
+      ? `absolute z-40 flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl ${rect ? '' : 'bottom-14 right-4 h-[min(600px,calc(100%-5rem))] w-[400px] max-w-[calc(100%-2rem)]'}`
+      : 'relative flex flex-col bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)] overflow-hidden flex-shrink-0';
+  const boxStyle = page ? undefined
+    : floating ? (rect ?? undefined)
+    : { width };
+  // The conversation and composer keep a readable measure on the AI screen.
+  const column = page ? 'mx-auto w-full max-w-3xl' : '';
 
   return (
-    <>
-      {/* Open / close is driven by the strip's PanelRight button
-          (and ⌘L), so the panel itself renders nothing in the closed state.
-          Mouse re-entry: the user clicks the same toggle in the strip under the islands. */}
-      {open && (
-        <aside
-          style={{ width }}
-          className="relative flex flex-col bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)] overflow-hidden flex-shrink-0"
-        >
-          {/* Left-edge drag handle to resize. Now lives just outside the
-              rounded island so it sits between the two cards rather than
-              on top of the conversation. */}
-          <div
-            onMouseDown={startResize}
-            className="absolute -left-1 top-0 bottom-0 w-2 cursor-col-resize hover:bg-foreground/10 transition-colors z-10"
-            aria-hidden
-          />
-
-          {/* Header — h-[50px] + border-border/60 to line up with the
-              HierarchyHeader / list / overview headers in the main island
-              so a single horizontal divider runs across both panes. */}
-          <div className="h-[50px] flex items-center gap-2 px-3 border-b border-border/60 bg-card flex-shrink-0">
-            <span className="text-[13px] font-semibold text-foreground">{t('AI')}</span>
-            {subject === 'slides' && <span className="text-[12px] text-muted-foreground">· Slides</span>}
-            <div className="flex-1" />
-            {subject !== 'slides' && messages.length > 0 && (
-              <Button size="sm"
-                type="button"
-                variant="ghost"
-                onClick={reset}
-                title={t('Clear the conversation')}
-              >
-                {t('New conversation')}
-              </Button>
-            )}
-            {/* Close lives on the strip's PanelRight toggle (and ⌘L);
-                a header X would just duplicate that affordance. */}
-          </div>
-
-          {/* One AI panel across the app: on Slides it is the open deck's
-              assistant (its conversation and composer), elsewhere Alcon's. */}
-          {subject === 'slides' ? <SlidesAssistant /> : <>
-          {/* Conversation — empty state is intentionally blank; the placeholder
-              in the composer is the only nudge. */}
-          <div ref={listRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-3 text-[12.5px] leading-relaxed">
-            {messages.map((m, i) => (
-              <MessageBubble key={i} role={m.role} content={m.content} toolEvents={m.toolEvents} streaming={streaming && i === messages.length - 1 && !m.done} />
-            ))}
-            {error && (
-              <div role="alert" className="text-[11.5px] text-[var(--status-danger)]">
-                {error}
-              </div>
-            )}
-          </div>
-
-          {/* Composer — pill-shaped "terminal" floating inside the island.
-              No section divider above it; the soft border + small shadow do
-              the lifting. The conversation list breathes above. */}
-          <div className="px-3 pb-3 pt-1">
-            <form
-              onSubmit={(e) => { e.preventDefault(); submit(); }}
-              className="flex items-end gap-2 rounded-lg bg-[var(--surface-rail)] border border-border/30 shadow-[var(--shadow-island)] px-3 py-2"
-            >
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    submit();
-                  }
-                }}
-                rows={1}
-                placeholder={streaming ? '…' : t('Type anything')}
-                aria-label={t('Message AI')}
-                disabled={streaming}
-                className="flex-1 resize-none bg-transparent text-[12.5px] leading-[1.5] py-1.5 max-h-32 min-h-[24px] disabled:opacity-60"
-                style={{ fontWeight: 400 }}
-              />
-              {streaming ? (
-                <Button size="icon-sm"
-                  type="button"
-                  onClick={cancel}
-                  title={t('Stop')}
-                  aria-label={t('Stop')}
-                  variant="ghost"
-                >
-                  <X size={14} />
-                </Button>
-              ) : (
-                <Button size="icon-sm"
-                  type="submit"
-                  disabled={!input.trim()}
-                  title={t('Send (Enter)')}
-                  aria-label={t('Send')}
-                  variant="primary"
-                >
-                  <SendIcon size={16} />
-                </Button>
-              )}
-            </form>
-          </div>
-          </>}
-        </aside>
+    <aside ref={boxRef} style={boxStyle} className={boxClass}>
+      {variant === 'docked' && (
+        // The left edge drags to resize; it sits just outside the rounded
+        // island, between the two cards.
+        <div
+          onMouseDown={startResize}
+          className="absolute -left-1 top-0 bottom-0 w-2 cursor-col-resize hover:bg-foreground/10 transition-colors z-10"
+          aria-hidden
+        />
       )}
-    </>
+      {floating && (Object.keys(EDGE_CLASS) as Edge[]).map((edge) => (
+        <div key={edge} data-edge={edge} onPointerDown={startEdge} className={`absolute z-10 ${EDGE_CLASS[edge]}`} aria-hidden />
+      ))}
+
+      {/* Header. Beside the page and on the AI screen it is h-[50px] so one
+          divider runs across the islands; as a pop-up it is a title bar that
+          moves it. */}
+      <div
+        onPointerDown={floating ? (e) => { if (!(e.target as HTMLElement).closest('button')) startFloat(e, 'move'); } : undefined}
+        className={`flex flex-shrink-0 items-center gap-2 bg-card ${floating ? 'h-12 cursor-grab pl-4 pr-2 active:cursor-grabbing' : 'h-[50px] px-3 border-b border-border/60'}`}
+      >
+        <span className="text-[13px] font-semibold text-foreground">{t('AI')}</span>
+        {subject === 'slides' && <span className="text-[12px] text-muted-foreground">· Slides</span>}
+        <div className="flex-1" />
+        {subject !== 'slides' && messages.length > 0 && (
+          <Button size="sm" type="button" variant="ghost" onClick={reset} title={t('Clear the conversation')}>
+            {t('New conversation')}
+          </Button>
+        )}
+        {floating && onExpand && (
+          <Button size="icon-sm" type="button" variant="ghost" onClick={onExpand}
+            title={t('Open the AI screen')} aria-label={t('Open the AI screen')} className="text-muted-foreground">
+            <Maximize2 size={14} />
+          </Button>
+        )}
+        {page && onMinimize && (
+          <Button size="icon-sm" type="button" variant="ghost" onClick={onMinimize}
+            title={t('Shrink to a pop-up')} aria-label={t('Shrink to a pop-up')} className="text-muted-foreground">
+            <Minimize2 size={14} />
+          </Button>
+        )}
+        {!page && (
+          <Button size="icon-sm" type="button" variant="ghost" onClick={() => onOpenChange(false)}
+            title={`${t('Hide AI')} (⌘L)`} aria-label={t('Hide AI')} className="text-muted-foreground">
+            <X size={14} />
+          </Button>
+        )}
+      </div>
+
+      {/* One AI panel across the app: on Slides it is the open deck's
+          assistant (its conversation and composer), elsewhere Alcon's. */}
+      {subject === 'slides' ? <SlidesAssistant /> : <>
+      {/* Conversation — empty state is intentionally blank; the placeholder
+          in the composer is the only nudge. */}
+      <div ref={listRef} className={`flex-1 overflow-y-auto py-3 text-[12.5px] leading-relaxed ${page ? 'px-8' : 'px-3'}`}>
+        <div className={`space-y-3 ${column}`}>
+          {messages.map((m, i) => (
+            <MessageBubble key={i} role={m.role} content={m.content} toolEvents={m.toolEvents} streaming={streaming && i === messages.length - 1 && !m.done} />
+          ))}
+          {error && (
+            <div role="alert" className="text-[11.5px] text-[var(--status-danger)]">
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Composer — a soft-bordered box floating at the foot. */}
+      <div className={`pb-3 pt-1 ${page ? 'px-8 pb-6' : 'px-3'}`}>
+        <form
+          onSubmit={(e) => { e.preventDefault(); submit(); }}
+          className={`flex items-end gap-2 rounded-lg bg-[var(--surface-rail)] border border-border/30 shadow-[var(--shadow-island)] px-3 py-2 ${column}`}
+        >
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            rows={1}
+            placeholder={streaming ? '…' : t('Type anything')}
+            aria-label={t('Message AI')}
+            disabled={streaming}
+            className="flex-1 resize-none bg-transparent text-[12.5px] leading-[1.5] py-1.5 max-h-32 min-h-[24px] disabled:opacity-60"
+            style={{ fontWeight: 400 }}
+          />
+          {streaming ? (
+            <Button size="icon-sm" type="button" onClick={cancel} title={t('Stop')} aria-label={t('Stop')} variant="ghost">
+              <X size={14} />
+            </Button>
+          ) : (
+            <Button size="icon-sm" type="submit" disabled={!input.trim()} title={t('Send (Enter)')} aria-label={t('Send')} variant="primary">
+              <SendIcon size={16} />
+            </Button>
+          )}
+        </form>
+      </div>
+      </>}
+    </aside>
   );
 }
 

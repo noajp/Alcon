@@ -218,7 +218,7 @@ export function ChatComposer() {
 
   return (
     <div
-      className={clsx("shrink-0 border-t border-k-line p-3", dragOver && "bg-k-drop")}
+      className={clsx("shrink-0 p-3", dragOver && "bg-k-drop")}
       onDragOver={(e) => {
         e.preventDefault();
         setDragOver(true);
@@ -291,7 +291,6 @@ export function ChatComposer() {
           <ArrowUp size={16} strokeWidth={2.4} />
         </button>
       </div>
-      <div className="mt-1.5 px-1 text-[10px] text-k-ink-3">{tx("Enter で送信 ・ Shift + Enter で改行 ・ ファイルはここに落とせます", "Enter to send · Shift + Enter for a new line · Drop files here")}</div>
     </div>
   );
 }

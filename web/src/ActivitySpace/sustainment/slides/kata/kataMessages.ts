@@ -70,7 +70,6 @@ const KATA_MESSAGES: Record<string, Row> = {
   "Message Slides": ["チャットに書く", "Slides에 메시지 보내기", "Écrire à Slides", "Escribir a Slides"],
   "What kind of deck? (optional)": ["どんな資料にしたいか（任意）", "어떤 자료로 만들까요? (선택)", "Quel type de présentation ? (facultatif)", "¿Qué tipo de presentación? (opcional)"],
   "Paste notes, or try “Make this page a comparison”": ["議事録を貼る／「このページを比較にして」", "회의록을 붙여 넣거나 “Make this page a comparison”을 입력해 보세요", "Collez des notes, ou essayez « Make this page a comparison »", "Pega notas o prueba “Make this page a comparison”"],
-  "Enter to send · Shift + Enter for a new line · Drop files here": ["Enter で送信 ・ Shift + Enter で改行 ・ ファイルはここに落とせます", "Enter로 보내기 · Shift + Enter로 줄 바꿈 · 파일은 여기에 끌어다 놓기", "Entrée pour envoyer · Maj + Entrée pour aller à la ligne · Déposez des fichiers ici", "Intro para enviar · Mayús + Intro para nueva línea · Suelta archivos aquí"],
   // Design panel
   "Couldn't read a theme from this PowerPoint file.": ["この PowerPoint からテーマを読み取れませんでした。", "이 PowerPoint 파일에서 테마를 읽지 못했습니다.", "Impossible de lire un thème dans ce fichier PowerPoint.", "No se pudo leer un tema de este archivo de PowerPoint."],
   "Couldn't read this image. Try a PNG, JPEG, or .pptx.": ["この画像は読み取れませんでした。PNG か JPEG、または .pptx で試してください。", "이 이미지를 읽지 못했습니다. PNG, JPEG 또는 .pptx로 시도해 보세요.", "Impossible de lire cette image. Essayez un PNG, un JPEG ou un .pptx.", "No se pudo leer esta imagen. Prueba con PNG, JPEG o .pptx."],
