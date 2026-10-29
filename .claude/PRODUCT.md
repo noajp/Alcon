@@ -396,6 +396,7 @@ Claude API を Supabase Edge Functions 経由で利用：
 - `summarize-note`：Note 要約
 - `analyze-change`：変更分析
 - `validate-task`：Element 検証
+- `asset-relay`：ローカルのアプリ・AI の名乗りと出来事の受け口（ADR 0036）
 
 外部の AI は `alcon-mcp`（MCP サーバー）から、スクリプトやノーコードツールは `alcon-api`（REST API）から、本人として盤面を読み書きする。どちらも同じ許可リストのツールを呼ぶので、外から削除や一括変更はできない（[ADR 0033](../docs/adr/0033-the-rest-api-is-the-mcp-tool-layer-over-http.md)）。資格情報は、claude.ai や ChatGPT のコネクタなら OAuth のサインインと同意（`/oauth/consent`）、スクリプトなら本人が Settings › Integrations で発行する個人用アクセストークン。どちらも読み取りのみを選べ、いつでも取り消せる。OAuth のトークンで盤面に届くのは Alcon の関数を通したときだけ（[ADR 0034](../docs/adr/0034-mcp-clients-sign-in-through-supabase-oauth-and-their-tokens-only-work-through-alcon.md)）。関数がそれを本人の短命な JWT に交換するので、アプリと同じ RLS が効き、書き込みの記録にはどのトークン経由かが残る（[ADR 0032](../docs/adr/0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)）。
 
@@ -446,7 +447,9 @@ AI によって、誰もが自分の業務アプリとエージェントを作�
 
 **完全な把握とは、資産台帳・行動記録・接続の地図が一つの監査記録として辿れること。** 完全性は網羅と確認状況を意味し、報告が正しいことの保証ではない。自己申告・Alcon が確かめたこと・未確認を常に区別する。
 
-置き場は Sustainment の資産台帳。物理の装備・設備と、ソフトウェアの道具・ローカル AI を同じ台帳に置く。行動する AI を Worker とし、道具として呼ばれる AI を資産とするかは、盤面の Decisions で判断する。最小の実装は、`alcon-api` に `POST /assets/hello`（未認証の名乗り）と `POST /assets/{id}/events`（行動の記録）を足し、Node 向けの一行ミドルウェアを1つ作ること。作る時期は、初期顧客の反復業務で正規のシステムの外に散った記録の負担が確認できてから決める。
+受け口は Edge Function `asset-relay`（[ADR 0036](../docs/adr/0036-shadow-apps-join-a-space-by-announcing-through-the-asset-relay.md)、仕様は [docs/asset-relay.md](../docs/asset-relay.md)）。`POST /hello` が認証なしの名乗りを受けて資産トークンを一度だけ返し、`POST /events` が出来事を記録する。資産は `assets` / `asset_events` に置き、Space のメンバーが読み、オーナーが Settings › Integrations › Connected assets で承諾・取り消しする。一行の SDK は `sdk/node/alcon.mjs` と `sdk/python/alcon.py`。
+
+置き場は Sustainment の資産台帳。物理の装備・設備と、ソフトウェアの道具・ローカル AI を同じ台帳に置く。行動する AI を Worker とし、道具として呼ばれる AI を資産とするかは、盤面の Decisions で判断する。基盤が能動的に連結しにいく部分と、一行を入れたアプリを Alcon のエージェントの道具として呼ぶ部分は、初期顧客の反復業務で正規のシステムの外に散った記録の負担が確認できてから作る。
 
 ### 業務単位の展開
 

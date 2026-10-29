@@ -67,3 +67,4 @@
 | [0033](0033-the-rest-api-is-the-mcp-tool-layer-over-http.md) | REST API は MCP と同じツール層を HTTP の形で出す |
 | [0034](0034-mcp-clients-sign-in-through-supabase-oauth-and-their-tokens-only-work-through-alcon.md) | MCP クライアントは Supabase の OAuth でサインインし、そのトークンは Alcon の関数でだけ使える |
 | [0035](0035-oauth-integrations-sign-in-through-an-edge-function-and-keep-tokens-in-vault.md) | OAuth の連携は Edge Function でサインインし、トークンは Vault にだけ置く |
+| [0036](0036-shadow-apps-join-a-space-by-announcing-through-the-asset-relay.md) | シャドウアプリは受け口に名乗り出て Space に加わり、オーナーの承諾で資産になる |
