@@ -37,7 +37,7 @@ import { finishIntegrationOAuth } from '@/Function/integrations/data';
 import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
-import { MessageCircle } from 'lucide-react';
+import { NavAiIcon } from '@/shell/sidebar/NavIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { seedStarterSpace } from '@/Function/space/seedStarterSpace';
 import { Button } from '@/ui/button';
@@ -626,7 +626,7 @@ function WorkspaceContent({
           <Button size="sm" variant="secondary" onClick={() => handleCopilotOpenChange(!copilotOpen)}
             aria-pressed={copilotOpen} title={`${t(copilotOpen ? 'Hide AI' : 'Show AI')} (⌘L)`}
             className="absolute bottom-4 right-4 z-40 bg-card shadow-[var(--shadow-island)]">
-            <MessageCircle size={14} />{t('AI')}
+            <NavAiIcon size={14} />{t('AI')}
           </Button>
         )}
         </div>
