@@ -214,7 +214,7 @@ export const ElementRow = memo(function ElementRow({
             show from this cell's own width, not the viewport's — the Name
             column is user-resizable and shares the row with the sidebar. */}
         <div className="@container flex items-center gap-2 min-w-0 min-h-[1.625rem]">
-          <DisplayIdChip id={rowId} size="xs" fit="column" />
+          <DisplayIdChip id={rowId} size="sm" fit="column" />
           {/* Status — between the id and the title, so Priority · id · Status
               read as one leading cluster: how urgent, which row, how far
               along. Status and Priority live here rather than in duplicate columns. */}

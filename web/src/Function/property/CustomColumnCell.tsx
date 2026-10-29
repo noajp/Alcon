@@ -42,8 +42,9 @@ interface CustomColumnCellProps {
 export const CELL_TRIGGER_BASE =
   // A disabled trigger is a read-only cell: no pointer, no hover, and no hit
   // target of its own, so the wrapper's `title` (the reason it is locked)
-  // is what the browser shows on hover in every engine.
-  'inline-flex items-center max-w-full text-[13px] font-normal leading-5 text-foreground hover:bg-muted px-2 py-1 rounded-md transition-colors cursor-pointer truncate disabled:cursor-default disabled:pointer-events-none disabled:hover:bg-transparent';
+  // is what the browser shows on hover in every engine. Values read 13px;
+  // a list table raises them to 14px through --cell-text.
+  'inline-flex items-center max-w-full [font-size:calc(var(--cell-text,13px)*var(--fs))] font-normal leading-5 text-foreground hover:bg-muted px-2 py-1 rounded-md transition-colors cursor-pointer truncate disabled:cursor-default disabled:pointer-events-none disabled:hover:bg-transparent';
 export const CELL_TRIGGER_EMPTY = 'text-muted-foreground';
 export const CELL_POPOVER_RADIUS = 'rounded-xl';
 

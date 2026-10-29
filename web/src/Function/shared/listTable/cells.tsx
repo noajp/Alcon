@@ -663,7 +663,7 @@ export function ObjectCell({
   if (column.id === 'elements') {
     const count = obj.elements?.length ?? 0;
     return (
-      <td className="table-cell px-1.5 py-2 max-w-0 overflow-hidden text-xs text-muted-foreground tabular-nums">
+      <td className="table-cell px-1.5 py-2 max-w-0 overflow-hidden text-[13px] text-muted-foreground tabular-nums">
         {count === 0 ? <EmptyCellMark /> : count}
       </td>
     );
@@ -675,7 +675,7 @@ export function ObjectCell({
       <td className="table-cell px-1.5 py-2 max-w-0 overflow-hidden">
         <div className="flex items-center gap-2">
           <SegmentedProgress value={pct} className="flex-1" />
-          <span className="text-[10px] text-muted-foreground w-7 text-right tabular-nums shrink-0">{pct}%</span>
+          <span className="text-[12px] text-muted-foreground w-8 text-right tabular-nums shrink-0">{pct}%</span>
         </div>
       </td>
     );
