@@ -11,11 +11,11 @@ import {
   BookOpen,
   ChartNoAxesColumn,
   ChartGantt,
-  Infinity as InfinityIcon,
-  Compass,
+  Grip,
+  Target,
   Milestone,
-  Telescope,
-  Folder,
+  Mountain,
+  Briefcase,
   Stone,
   Blocks,
 } from 'lucide-react';
@@ -41,10 +41,10 @@ export const NavCalendarIcon = ({ size = 20 }: { size?: number }) => <Calendar s
 export const NavNoteIcon = ({ size = 20 }: { size?: number }) => <BookOpen size={size} strokeWidth={2} />;
 export const NavDomainIcon = DomainIcon;
 export const NavStrategyIcon = ({ size = 20, className }: { size?: number; className?: string }) => (
-  <Compass size={size} strokeWidth={2} className={className} />
+  <Target size={size} strokeWidth={2} className={className} />
 );
 export const NavWorkloadIcon = ({ size = 20 }: { size?: number }) => <ChartNoAxesColumn size={size} strokeWidth={2} />;
-// Milestone and ChartGantt ink only 18 of Lucide's 24 units where Compass,
+// Milestone and ChartGantt ink only 18 of Lucide's 24 units where Target,
 // Layers and Box ink 20, so next to them they read a size smaller. Scaling
 // the glyph inside its box keeps the row layout and evens the optical size.
 export const NavTimelineIcon = ({ size = 20 }: { size?: number }) => <ChartGantt size={size} strokeWidth={2} className="scale-110" />;
@@ -59,10 +59,10 @@ export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => (
 // ModeRail layer marks.
 export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => <Stone size={size} strokeWidth={2} />;
 export const NavExecutionModeIcon = ({ size = 20 }: { size?: number }) => <Blocks size={size} strokeWidth={2} />;
-export const NavSustainmentModeIcon = ({ size = 20 }: { size?: number }) => <InfinityIcon size={size} strokeWidth={2} />;
+export const NavSustainmentModeIcon = ({ size = 20 }: { size?: number }) => <Grip size={size} strokeWidth={2} />;
 // Strategy's units: the Vision above, its Portfolios of Initiatives below.
-export const NavVisionIcon = ({ size = 20 }: { size?: number }) => <Telescope size={size} strokeWidth={2} />;
-export const NavPortfolioIcon = ({ size = 20 }: { size?: number }) => <Folder size={size} strokeWidth={2} />;
+export const NavVisionIcon = ({ size = 20 }: { size?: number }) => <Mountain size={size} strokeWidth={2} />;
+export const NavPortfolioIcon = ({ size = 20 }: { size?: number }) => <Briefcase size={size} strokeWidth={2} />;
 // Phase — a Domain's period, reachable from an Initiative rather than the nav.
 export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} className="scale-110" />;
 
