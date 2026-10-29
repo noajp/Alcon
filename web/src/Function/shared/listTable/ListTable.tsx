@@ -479,7 +479,7 @@ export function ListTable({
         style={nameFluid
           ? { width: '100%', minWidth: packedWidth }
           : { width: packedWidth }}
-        className="group/list min-w-full table-fixed bg-card border-separate border-spacing-0 text-[14px]"
+        className="group/list min-w-full table-fixed bg-card border-separate border-spacing-0 text-[14px] [--cell-text:14px]"
         data-has-selection={hasSelection ? '' : undefined}
       >
         {/* Fixed tracks retain their saved widths; the trailing percentage
