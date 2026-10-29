@@ -28,6 +28,8 @@ export interface AlconCopilotPanelProps {
   /** What the screen is about, when the panel should speak to it rather than
    *  to Alcon at large — 'slides' makes it the open deck's assistant. */
   subject?: 'slides' | null;
+  /** Pops up over the page, above the AI button, instead of standing beside it. */
+  floating?: boolean;
 }
 
 /**
@@ -38,7 +40,7 @@ export interface AlconCopilotPanelProps {
  * the deliverable-creating Code / Terminal tabs are stubbed at the bottom
  * for future work but disabled.
  */
-export function AlconCopilotPanel({ open, onOpenChange, subject = null }: AlconCopilotPanelProps) {
+export function AlconCopilotPanel({ open, onOpenChange, subject = null, floating = false }: AlconCopilotPanelProps) {
   const { t } = useI18n();
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [hydrated, setHydrated] = useState(false);
@@ -74,11 +76,13 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null }: AlconC
       if ((e.metaKey || e.ctrlKey) && (e.key === 'l' || e.key === 'L')) {
         e.preventDefault();
         onOpenChange(!open);
+      } else if (floating && open && e.key === 'Escape' && !e.defaultPrevented) {
+        onOpenChange(false);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, floating]);
 
   // Auto-scroll to bottom on new content while streaming.
   useEffect(() => {
@@ -140,22 +144,24 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null }: AlconC
           Mouse re-entry: the user clicks the same toggle in the strip under the islands. */}
       {open && (
         <aside
-          style={{ width }}
-          className="relative flex flex-col bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)] overflow-hidden flex-shrink-0"
+          style={floating ? undefined : { width }}
+          className={floating
+            ? 'absolute bottom-14 right-4 z-40 flex h-[min(600px,calc(100%-5rem))] w-[400px] max-w-[calc(100%-2rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl'
+            : 'relative flex flex-col bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)] overflow-hidden flex-shrink-0'}
         >
-          {/* Left-edge drag handle to resize. Now lives just outside the
-              rounded island so it sits between the two cards rather than
-              on top of the conversation. */}
-          <div
-            onMouseDown={startResize}
-            className="absolute -left-1 top-0 bottom-0 w-2 cursor-col-resize hover:bg-foreground/10 transition-colors z-10"
-            aria-hidden
-          />
+          {/* Beside the page, the left edge drags to resize; it sits just
+              outside the rounded island, between the two cards. */}
+          {!floating && (
+            <div
+              onMouseDown={startResize}
+              className="absolute -left-1 top-0 bottom-0 w-2 cursor-col-resize hover:bg-foreground/10 transition-colors z-10"
+              aria-hidden
+            />
+          )}
 
-          {/* Header — h-[50px] + border-border/60 to line up with the
-              HierarchyHeader / list / overview headers in the main island
-              so a single horizontal divider runs across both panes. */}
-          <div className="h-[50px] flex items-center gap-2 px-3 border-b border-border/60 bg-card flex-shrink-0">
+          {/* Header. Beside the page it is h-[50px] so one divider runs
+              across both islands; as a pop-up it is a plain title bar. */}
+          <div className={`flex flex-shrink-0 items-center gap-2 bg-card ${floating ? 'h-12 pl-4 pr-2' : 'h-[50px] px-3 border-b border-border/60'}`}>
             <span className="text-[13px] font-semibold text-foreground">{t('AI')}</span>
             {subject === 'slides' && <span className="text-[12px] text-muted-foreground">· Slides</span>}
             <div className="flex-1" />
@@ -169,8 +175,10 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null }: AlconC
                 {t('New conversation')}
               </Button>
             )}
-            {/* Close lives on the strip's PanelRight toggle (and ⌘L);
-                a header X would just duplicate that affordance. */}
+            <Button size="icon-sm" type="button" variant="ghost" onClick={() => onOpenChange(false)}
+              title={`${t('Hide AI')} (⌘L)`} aria-label={t('Hide AI')} className="text-muted-foreground">
+              <X size={14} />
+            </Button>
           </div>
 
           {/* One AI panel across the app: on Slides it is the open deck's

@@ -36,10 +36,10 @@ import { finishIntegrationOAuth } from '@/Function/integrations/data';
 import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { seedStarterSpace } from '@/Function/space/seedStarterSpace';
-import { Button, ButtonAppearanceProvider } from '@/ui/button';
+import { Button } from '@/ui/button';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -526,6 +526,7 @@ function WorkspaceContent({
           scope={scope}
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
+          onShowSidebar={!personalMode && sidebarHidden && !sidebarOverlay ? handleSidebarToggle : undefined}
         />
         {!personalMode && <AppSidebar
           navigation={activeTab.navigation}
@@ -540,6 +541,7 @@ function WorkspaceContent({
           overlay={sidebarCollapsed && sidebarOverlay}
           onCreateNew={handleSidebarCreateNew}
           onSearch={scope === 'full' ? () => setDiscoverOpen(true) : undefined}
+          onHide={handleSidebarToggle}
         />}
 
         {!personalMode && sidebarCollapsed && sidebarOverlay && (
@@ -550,7 +552,7 @@ function WorkspaceContent({
           />
         )}
 
-        <div className={`flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5 pb-1.5 ${sidebarHidden ? 'pl-1.5' : 'pl-0'}`}>
+        <div className={`relative flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5 pb-1.5 ${sidebarHidden ? 'pl-1.5' : 'pl-0'}`}>
         {/* MainContent + Copilot live side-by-side as two islands. When the
             Copilot is open it claims its own width on the right; otherwise
             MainContent fills the row. */}
@@ -591,26 +593,18 @@ function WorkspaceContent({
               })
             )}
           </div>
-          <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} subject={onSlides ? 'slides' : null} />
+          <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} subject={onSlides ? 'slides' : null} floating={!onSlides} />
         </div>
-        {/* The strip under the islands: the page-level toggles sit at its
-            right end — the sidebar (omitted while it has nothing to show, on
-            Profile) and the AI pane. ⌘L and the pane's own close flip the
-            same boolean. */}
-        <ButtonAppearanceProvider appearance="navigation">
-        <div className="flex h-7 shrink-0 items-center justify-end pt-0.5">
-          {!personalMode && (
-            <Button size="icon-xs" variant="ghost" onClick={handleSidebarToggle} className="text-muted-foreground"
-              title={t(sidebarHidden ? 'Show sidebar' : 'Hide sidebar')} aria-label={t(sidebarHidden ? 'Show sidebar' : 'Hide sidebar')}>
-              {sidebarHidden ? <PanelLeftOpen size={12} /> : <PanelLeftClose size={12} />}
-            </Button>
-          )}
-          <Button size="icon-xs" variant="ghost" onClick={() => handleCopilotOpenChange(!copilotOpen)} className={copilotOpen ? 'text-foreground' : 'text-muted-foreground'}
-            aria-pressed={copilotOpen} title={`${t(copilotOpen ? 'Hide AI' : 'Show AI')} (⌘L)`} aria-label={t(copilotOpen ? 'Hide AI' : 'Show AI')}>
-            {copilotOpen ? <PanelRightOpen size={12} /> : <PanelRightClose size={12} />}
+        {/* The AI: a button at the bottom-right corner, and the conversation
+            pops up above it. On Slides the panel is the deck's assistant and
+            sits beside the deck instead, closed from its own header. */}
+        {!(onSlides && copilotOpen) && (
+          <Button size="sm" variant="secondary" onClick={() => handleCopilotOpenChange(!copilotOpen)}
+            aria-pressed={copilotOpen} title={`${t(copilotOpen ? 'Hide AI' : 'Show AI')} (⌘L)`}
+            className="absolute bottom-4 right-4 z-40 bg-card shadow-[var(--shadow-island)]">
+            <MessageCircle size={14} />{t('AI')}
           </Button>
-        </div>
-        </ButtonAppearanceProvider>
+        )}
         </div>
       </div>
 

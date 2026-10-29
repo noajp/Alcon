@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, PanelLeftOpen } from 'lucide-react';
 import { NavSustainmentModeIcon } from '@/shell/sidebar/NavIcons';
 import {
   APP_GROUPS,
@@ -114,10 +114,13 @@ export function ModeRail({
   scope,
   activeView,
   onViewChange,
+  onShowSidebar,
 }: {
   scope: SpaceScope;
   activeView: string;
   onViewChange: (view: string) => void;
+  /** Present while the sidebar is hidden: brings it back. */
+  onShowSidebar?: () => void;
 }) {
   const { t } = useI18n();
   const activeMode = railModeOf(activeView);
@@ -193,6 +196,12 @@ export function ModeRail({
           sit above — the one personal entry point on an otherwise all-work
           rail. */}
       <div className="mt-auto flex flex-col items-center gap-1">
+        {onShowSidebar && (
+          <Button variant="ghost" size="icon-md" onClick={onShowSidebar} title={t('Show sidebar')} aria-label={t('Show sidebar')}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground/70 hover:bg-sidebar-accent/50 hover:text-foreground">
+            <PanelLeftOpen size={16} />
+          </Button>
+        )}
         <div className="my-1 h-px w-5 bg-border" />
         <ProfileRailButton active={activeMode === 'personal'} onClick={() => onViewChange('profile')} />
       </div>
