@@ -238,7 +238,7 @@ export const ElementRow = memo(function ElementRow({
             )}
           </span>
           <div className="flex flex-1 min-w-0 items-center gap-2">
-            <span className="text-[13px] font-medium truncate flex-1 min-w-0 text-foreground">{el.title}</span>
+            <span className="text-[14px] font-medium truncate flex-1 min-w-0 text-foreground">{el.title}</span>
           </div>
           {lease && (
             // Who holds this right now. Only a live lease is shown — a lapsed
