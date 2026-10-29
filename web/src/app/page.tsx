@@ -343,20 +343,11 @@ function WorkspaceContent({
   const noSidebar = personalMode;
   const sidebarHidden = sidebarCollapsed || noSidebar;
   const [discoverOpen, setDiscoverOpen] = useState(false);
-  // Alcon Copilot pane — open state shared by the strip's PanelRight
-  // toggle, ⌘L, and the panel's own close button. It is kept per kind of
-  // screen: elsewhere the AI panel starts closed, so the work has the whole
-  // width until someone asks for it; on Slides it is the deck's assistant —
-  // a deck is made by talking to it — so it starts open there. Neither is
-  // carried across reloads.
-  const [copilotOpenElsewhere, setCopilotOpenElsewhere] = useState(false);
-  const [copilotOpenOnSlides, setCopilotOpenOnSlides] = useState(true);
+  // The AI pop-up — open state shared by the corner button, ⌘L and the
+  // pop-up's own close. It starts closed, so the work has the whole page
+  // until someone asks for it. On Slides it is the open deck's assistant.
+  const [copilotOpen, handleCopilotOpenChange] = useState(false);
   const onSlides = activeTab.activeView === 'slides';
-  const copilotOpen = onSlides ? copilotOpenOnSlides : copilotOpenElsewhere;
-  const handleCopilotOpenChange = (next: boolean) => {
-    if (onSlides) setCopilotOpenOnSlides(next);
-    else setCopilotOpenElsewhere(next);
-  };
   // The pop-up's expand button opens the AI screen; the screen's shrink
   // button goes back to where the person was, with the pop-up open.
   const lastViewRef = useRef('home');
@@ -364,13 +355,12 @@ function WorkspaceContent({
     if (activeTab.activeView !== 'ai') lastViewRef.current = activeTab.activeView;
   }, [activeTab.activeView]);
   const handleExpandAi = () => {
-    setCopilotOpenElsewhere(false);
+    handleCopilotOpenChange(false);
     setActiveView('ai');
   };
   const handleMinimizeAi = () => {
     setActiveView(lastViewRef.current);
-    if (lastViewRef.current === 'slides') setCopilotOpenOnSlides(true);
-    else setCopilotOpenElsewhere(true);
+    handleCopilotOpenChange(true);
   };
   // Nothing is created up front: a Space may start from Strategy (a Vision or
   // Portfolio) as well as from a Domain, so the person picks where to begin.
@@ -615,13 +605,12 @@ function WorkspaceContent({
           </div>
           {!aiScreen && (
             <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} subject={onSlides ? 'slides' : null}
-              variant={onSlides ? 'docked' : 'floating'} onExpand={handleExpandAi} />
+              variant="floating" onExpand={onSlides ? undefined : handleExpandAi} />
           )}
         </div>
         {/* The AI: a button at the bottom-right corner, and the conversation
-            pops up above it. On Slides the panel is the deck's assistant and
-            sits beside the deck instead, closed from its own header. */}
-        {!aiScreen && !(onSlides && copilotOpen) && (
+            pops up above it. */}
+        {!aiScreen && (
           <Button size="sm" variant="secondary" onClick={() => handleCopilotOpenChange(!copilotOpen)}
             aria-pressed={copilotOpen} title={`${t(copilotOpen ? 'Hide AI' : 'Show AI')} (⌘L)`}
             className="absolute bottom-4 right-4 z-40 bg-card shadow-[var(--shadow-island)]">

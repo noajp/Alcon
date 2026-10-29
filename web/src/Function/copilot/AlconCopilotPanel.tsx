@@ -14,11 +14,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 
 const SlidesAssistant = dynamic(() => import('@/ActivitySpace/sustainment/slides/SlidesAssistant').then((m) => m.SlidesAssistant), { ssr: false });
 
-const WIDTH_KEY = 'alcon.copilot.width';
 const FLOAT_KEY = 'alcon.copilot.float';
-const MIN_WIDTH = 320;
-const MAX_WIDTH = 640;
-const DEFAULT_WIDTH = 340;
 const FLOAT_MIN_W = 320;
 const FLOAT_MIN_H = 280;
 
@@ -54,10 +50,9 @@ export interface AlconCopilotPanelProps {
   /** What the screen is about, when the panel should speak to it rather than
    *  to Alcon at large — 'slides' makes it the open deck's assistant. */
   subject?: 'slides' | null;
-  /** docked: an island beside the page (Slides). floating: a pop-up above the
-   *  corner button, moved by its title bar and sized from any edge. page: the
-   *  AI screen, the whole island. */
-  variant?: 'docked' | 'floating' | 'page';
+  /** floating: a pop-up above the corner button, moved by its title bar and
+   *  sized from any edge. page: the AI screen, the whole island. */
+  variant?: 'floating' | 'page';
   /** The pop-up's expand button: open the AI screen. */
   onExpand?: () => void;
   /** The AI screen's shrink button: back to the pop-up. */
@@ -65,15 +60,15 @@ export interface AlconCopilotPanelProps {
 }
 
 /**
- * The AI. One conversation (CopilotProvider) shown as a pop-up, an island
- * beside Slides, or a screen of its own. Phase 1 ships read-only tools.
+ * The AI. One conversation (CopilotProvider) shown as a pop-up or a screen of
+ * its own; on Slides the pop-up is the open deck's assistant. Phase 1 ships
+ * read-only tools.
  */
-export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant = 'docked', onExpand, onMinimize }: AlconCopilotPanelProps) {
+export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant = 'floating', onExpand, onMinimize }: AlconCopilotPanelProps) {
   const { t } = useI18n();
   const floating = variant === 'floating';
   const page = variant === 'page';
   const shown = page || open;
-  const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [rect, setRect] = useState<FloatRect | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [input, setInput] = useState('');
@@ -83,13 +78,9 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const boxRef = useRef<HTMLElement>(null);
 
-  // Hydrate persisted UI prefs once.
+  // Hydrate the pop-up's kept place once.
   useEffect(() => {
-    try {
-      const w = Number(localStorage.getItem(WIDTH_KEY));
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of stored prefs after mount
-      if (Number.isFinite(w) && w >= MIN_WIDTH && w <= MAX_WIDTH) setWidth(w);
-    } catch { /* SSR / private mode */ }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of stored prefs after mount
     setRect(readFloatRect());
     setHydrated(true);
   }, []);
@@ -130,27 +121,6 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
   useEffect(() => {
     if (shown) setTimeout(() => inputRef.current?.focus(), 60);
   }, [shown]);
-
-  // ── Docked: drag-to-resize from the left edge ──────────────────────────
-  const startResize = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startW = width;
-    const onMove = (ev: MouseEvent) => {
-      setWidth(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startW + (startX - ev.clientX))));
-    };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  };
-
-  useEffect(() => {
-    if (!hydrated) return;
-    try { localStorage.setItem(WIDTH_KEY, String(width)); } catch { /* ignore */ }
-  }, [width, hydrated]);
 
   // ── Floating: move by the title bar, size from any edge ────────────────
   // Both work in the page's coordinates (the pop-up's offset parent) and
@@ -224,33 +194,19 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
 
   const boxClass = page
     ? 'flex flex-1 flex-col overflow-hidden bg-card'
-    : floating
-      ? `absolute z-40 flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl ${rect ? '' : 'bottom-14 right-4 h-[min(600px,calc(100%-5rem))] w-[400px] max-w-[calc(100%-2rem)]'}`
-      : 'relative flex flex-col bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)] overflow-hidden flex-shrink-0';
-  const boxStyle = page ? undefined
-    : floating ? (rect ?? undefined)
-    : { width };
+    : `absolute z-40 flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl ${rect ? '' : 'bottom-14 right-4 h-[min(600px,calc(100%-5rem))] w-[400px] max-w-[calc(100%-2rem)]'}`;
+  const boxStyle = page ? undefined : (rect ?? undefined);
   // The conversation and composer keep a readable measure on the AI screen.
   const column = page ? 'mx-auto w-full max-w-3xl' : '';
 
   return (
     <aside ref={boxRef} style={boxStyle} className={boxClass}>
-      {variant === 'docked' && (
-        // The left edge drags to resize; it sits just outside the rounded
-        // island, between the two cards.
-        <div
-          onMouseDown={startResize}
-          className="absolute -left-1 top-0 bottom-0 w-2 cursor-col-resize hover:bg-foreground/10 transition-colors z-10"
-          aria-hidden
-        />
-      )}
       {floating && (Object.keys(EDGE_CLASS) as Edge[]).map((edge) => (
         <div key={edge} data-edge={edge} onPointerDown={startEdge} className={`absolute z-10 ${EDGE_CLASS[edge]}`} aria-hidden />
       ))}
 
-      {/* Header. Beside the page and on the AI screen it is h-[50px] so one
-          divider runs across the islands; as a pop-up it is a title bar that
-          moves it. */}
+      {/* Header. On the AI screen it is h-[50px], like every page's header;
+          as a pop-up it is a title bar that moves it. */}
       <div
         onPointerDown={floating ? (e) => { if (!(e.target as HTMLElement).closest('button')) startFloat(e, 'move'); } : undefined}
         className={`flex flex-shrink-0 items-center gap-2 bg-card ${floating ? 'h-12 cursor-grab pl-4 pr-2 active:cursor-grabbing' : 'h-[50px] px-3 border-b border-border/60'}`}
