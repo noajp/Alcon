@@ -9,9 +9,8 @@ import {
   Inbox,
   Calendar,
   BookOpen,
-  Gauge,
+  ChartNoAxesColumn,
   ChartGantt,
-  UsersRound,
   Infinity as InfinityIcon,
   Compass,
   Milestone,
@@ -45,12 +44,19 @@ export const NavDomainIcon = DomainIcon;
 export const NavStrategyIcon = ({ size = 20, className }: { size?: number; className?: string }) => (
   <Compass size={size} strokeWidth={2} className={className} />
 );
-export const NavWorkloadIcon = ({ size = 20 }: { size?: number }) => <Gauge size={size} strokeWidth={2} />;
+export const NavWorkloadIcon = ({ size = 20 }: { size?: number }) => <ChartNoAxesColumn size={size} strokeWidth={2} />;
 // Milestone and ChartGantt ink only 18 of Lucide's 24 units where Compass,
 // Layers and Box ink 20, so next to them they read a size smaller. Scaling
 // the glyph inside its box keeps the row layout and evens the optical size.
 export const NavTimelineIcon = ({ size = 20 }: { size?: number }) => <ChartGantt size={size} strokeWidth={2} className="scale-110" />;
-export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => <UsersRound size={size} strokeWidth={2} />;
+// Lucide's user-group, which arrived after the lucide-react version pinned
+// here; the paths are Lucide's own (ISC).
+export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M17 21v-1a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v1M19 10h1a2 2 0 0 1 2 2v1M5 10H4a2 2 0 0 0-2 2v1" />
+    <circle cx="12" cy="11" r="3" /><circle cx="18" cy="4" r="2" /><circle cx="6" cy="4" r="2" />
+  </svg>
+);
 // ModeRail layer marks.
 export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => <Stone size={size} strokeWidth={2} />;
 export const NavExecutionModeIcon = ({ size = 20 }: { size?: number }) => <Blocks size={size} strokeWidth={2} />;
