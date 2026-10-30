@@ -1,6 +1,6 @@
 # 承認の依頼と証明（audit-approvals）
 
-ゲートウェイ（Metaxy の実行基盤）が、人の判断が要る操作の前に承認を求め、送る直前にその承認を1回だけ使うための口。設計の判断は [ADR 0047](adr/0047-approvals-are-bound-to-the-content-and-spent-once-when-the-proof-is-issued.md)。鍵と署名は [audit-intake](audit-intake.md)、Alcon の公開鍵は [audit-grants](audit-grants.md) と同じ。
+ゲートウェイ（Metaxy の実行基盤）が、人の判断が要る操作の前に承認を求め、送る直前にその承認を1回だけ使うための口。設計の判断は [ADR 0047](architecture.md)。鍵と署名は [audit-intake](audit-intake.md)、Alcon の公開鍵は [audit-grants](audit-grants.md) と同じ。
 
 ## 送り方
 

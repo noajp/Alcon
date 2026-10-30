@@ -58,7 +58,7 @@ function FullScreenEditor({ deckId, onClose }: { deckId: string; onClose: () => 
 }
 
 /**
- * A Slides deck on a board (docs/adr/0042): its pages one at a time, with the
+ * A Slides deck on a board (ADR 0042 in docs/architecture.md): its pages one at a time, with the
  * text editable in place, and the same editor as the Slides app when opened
  * full screen. The deck stays the Space's and is shared through the same sync
  * as the app, so an edit here is the deck's edit everywhere; the widget only

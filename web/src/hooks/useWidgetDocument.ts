@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
-// What a widget holds of its own (docs/adr/0040). A document part is shared by
+// What a widget holds of its own (ADR 0040 in docs/architecture.md). A document part is shared by
 // everyone who can see the widget and merged key by key on the server; viewer
 // state is the signed-in person's alone.
 
