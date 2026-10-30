@@ -6,7 +6,9 @@ import { SortableContext, useSortable, horizontalListSortingStrategy, sortableKe
 import { CSS } from '@dnd-kit/utilities';
 import { constrainTabDrag } from './tabDrag';
 import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, FileText, Flag } from 'lucide-react';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { CollapsingTabs } from '@/Function/shared/CollapsingTabs';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
 
 interface TabBarProps {
@@ -40,7 +42,7 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
   workers:     { title: 'Workers',    Icon: Users },
   resource:    { title: 'Resource',   Icon: BarChart3 },
   board:       { title: 'Board',      Icon: Kanban },
-  custom_view: { title: 'CustomView', Icon: Flag },
+  custom_view: { title: 'Custom view', Icon: Flag },
   note:        { title: 'Note',       Icon: FileText },
 };
 
@@ -60,6 +62,7 @@ interface ContextMenu {
 }
 
 export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate, rightSlot, createOptions, onTabReorder }: TabBarProps) {
+  const { t } = useI18n();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
   const visibleCreateOptions = (createOptions
     ? CREATE_TAB_ORDER.filter((t) => createOptions.includes(t))
@@ -106,58 +109,69 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
 
   return (
     <div className="flex items-center gap-1.5 px-4 py-2 bg-transparent">
-      {/* Tabs — outlined rectangles */}
-      <DndContext sensors={sensors} modifiers={[constrainTabDrag]} collisionDetection={closestCenter} onDragEnd={({ active, over }) => {
-        if (!onTabReorder || !over || active.id === over.id) return;
-        const from = tabs.findIndex(t => t.id === active.id);
-        const to = tabs.findIndex(t => t.id === over.id);
-        if (from >= 0 && to >= 0) onTabReorder(arrayMove(tabs.map(t => t.id), from, to));
-      }}>
-        <SortableContext items={tabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
-          <div className="min-w-0 overflow-x-auto">
-            <div className="flex w-max items-center gap-1.5">
-            {tabs.map(tab => <SortableViewTab key={tab.id} tab={tab} active={tab.id === activeTabId}
-              sortable={!!onTabReorder} onSelect={() => onTabSelect(tab.id)} onContextMenu={e => handleContextMenu(e, tab)} />)}
+      {/* Tabs — outlined rectangles, folded into one menu when they do not fit */}
+      <CollapsingTabs
+        menuLabel={t('Views')}
+        items={tabs.map((tab) => ({ id: tab.id, label: t(tab.title), icon: OBJECT_TAB_META[tab.tab_type].Icon }))}
+        activeId={activeTabId ?? tabs[0]?.id ?? ''}
+        onSelect={onTabSelect}
+        strip={(
+        <DndContext sensors={sensors} modifiers={[constrainTabDrag]} collisionDetection={closestCenter} onDragEnd={({ active, over }) => {
+          if (!onTabReorder || !over || active.id === over.id) return;
+          const from = tabs.findIndex(t => t.id === active.id);
+          const to = tabs.findIndex(t => t.id === over.id);
+          if (from >= 0 && to >= 0) onTabReorder(arrayMove(tabs.map(t => t.id), from, to));
+        }}>
+          <SortableContext items={tabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
+            <div className="min-w-0 overflow-x-auto">
+              <div className="flex w-max items-center gap-1.5">
+              {tabs.map(tab => <SortableViewTab key={tab.id} tab={tab} active={tab.id === activeTabId}
+                sortable={!!onTabReorder} onSelect={() => onTabSelect(tab.id)} onContextMenu={e => handleContextMenu(e, tab)} />)}
+              </div>
             </div>
-          </div>
-        </SortableContext>
-      </DndContext>
-
-      {/* Add Tab Button */}
-      <div className="relative flex items-center flex-shrink-0">
-        <Button
-          type="button"
-          size="icon-sm"
-          aria-label="Add tab"
-          onClick={() => setShowCreateMenu(!showCreateMenu)}
-        >
-          <Plus size={14} />
-        </Button>
-
-        {showCreateMenu && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setShowCreateMenu(false)} />
-            <div className="absolute top-full left-0 mt-1 py-1 bg-popover border border-border rounded-lg shadow-xl z-50 min-w-[150px]">
-              {visibleCreateOptions.map((type) => {
-                const meta = OBJECT_TAB_META[type];
-                const OptionIcon = meta.Icon;
-                return (
-                  <button
-                    key={type}
-                    onClick={() => handleCreate(type)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
-                  >
-                    <span className="text-muted-foreground"><OptionIcon size={16} /></span>
-                    {meta.title}
-                  </button>
-                );
-              })}
-            </div>
-          </>
+          </SortableContext>
+        </DndContext>
         )}
-      </div>
+        trailing={(
+        <div className="relative flex items-center flex-shrink-0">
+          <ButtonAppearanceProvider appearance="navigation">
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              aria-label={t('Add tab')}
+              title={t('Add tab')}
+              onClick={() => setShowCreateMenu(!showCreateMenu)}
+            >
+              <Plus size={14} />
+            </Button>
+          </ButtonAppearanceProvider>
 
-      <div className="flex-1" />
+          {showCreateMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowCreateMenu(false)} />
+              <div className="absolute top-full left-0 mt-1 py-1 bg-popover border border-border rounded-lg shadow-xl z-50 min-w-[150px]">
+                {visibleCreateOptions.map((type) => {
+                  const meta = OBJECT_TAB_META[type];
+                  const OptionIcon = meta.Icon;
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => handleCreate(type)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+                    >
+                      <span className="text-muted-foreground"><OptionIcon size={16} /></span>
+                      {t(meta.title)}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+        )}
+      />
+
       {rightSlot}
 
       {/* Right-click context menu */}
@@ -181,11 +195,11 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <Trash2 size={14} />
-                Delete tab
+                {t('Delete tab')}
               </button>
             ) : (
               <div className="px-3 py-2 text-[12px] text-muted-foreground">
-                List tab cannot be deleted
+                {t('The List tab cannot be deleted')}
               </div>
             )}
           </div>
@@ -200,12 +214,13 @@ function SortableViewTab({ tab, active, sortable, onSelect, onContextMenu }: {
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id, disabled: !sortable });
+  const { t } = useI18n();
   const Icon = OBJECT_TAB_META[tab.tab_type].Icon;
   return <Button ref={setNodeRef} type="button" shape="tab" variant={active ? 'secondary' : 'ghost'}
     {...attributes} {...listeners} aria-pressed={active} onClick={onSelect} onContextMenu={onContextMenu}
     style={{ transform: CSS.Transform.toString(transform), transition }}
     className={sortable ? `touch-none ${isDragging ? 'relative z-10 opacity-70' : ''}` : undefined}>
     <span className={active ? 'text-foreground' : 'text-muted-foreground'}><Icon size={14}/></span>
-    <span className="text-xs font-semibold">{tab.title}</span>
+    {t(tab.title)}
   </Button>;
 }

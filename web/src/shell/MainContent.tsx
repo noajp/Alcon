@@ -1,8 +1,10 @@
 'use client';
 
+import { AlconCopilotPanel } from '@/Function/copilot/AlconCopilotPanel';
+import { useActiveSpaceScope } from '@/Function/space/data';
 import dynamic from 'next/dynamic';
 import type { NavigationState } from '@/types/navigation';
-import { setActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+import { setActiveDomainId } from '@/Function/space/domainsStore';
 import { NotebookSurface } from '@/ActivitySpace/sustainment/notebook/NotebookSurface';
 import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
 
@@ -32,15 +34,14 @@ import { DomainOverview } from '@/ActivitySpace/execution/domain/DomainOverview'
 import { DomainView } from '@/ActivitySpace/execution/domain/DomainView'; // eager — default landing view
 const DomainsView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
 const TableView = dynamic(() => import('@/ActivitySpace/sustainment/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
-const ScmView = dynamic(() => import('@/ActivitySpace/sustainment/scm/ScmView').then(m => m.ScmView), { ssr: false, loading: viewLoading });
+const SlidesView = dynamic(() => import('@/ActivitySpace/sustainment/slides').then(m => m.SlidesView), { ssr: false, loading: viewLoading });
+const AuditView = dynamic(() => import('@/ActivitySpace/sustainment/audit/AuditView').then(m => m.AuditView), { ssr: false, loading: viewLoading });
 const CrmView = dynamic(() => import('@/ActivitySpace/sustainment/crm/CrmView').then(m => m.CrmView), { ssr: false, loading: viewLoading });
 const TeamView = dynamic(() => import('@/ActivitySpace/sustainment/team/TeamView').then(m => m.TeamView), { ssr: false, loading: viewLoading });
 const MyCalendarView = dynamic(() => import('@/ActivitySpace/home/MyCalendarView').then(m => m.MyCalendarView), { ssr: false, loading: viewLoading });
 const ProfileView = dynamic(() => import('@/ActivitySpace/home/ProfileView').then(m => m.ProfileView), { ssr: false, loading: viewLoading });
 const SettingsView = dynamic(() => import('@/Function/settings/SettingsView').then(m => m.SettingsView), { ssr: false, loading: viewLoading });
-import { IslandCard } from '@/shell/IslandCard';
 
-export { IslandCard };
 
 interface MainContentProps {
   activeActivity: string;
@@ -53,9 +54,12 @@ interface MainContentProps {
   onNewNoteHandled?: () => void;
   activeDomainId?: string | null;
   activeSpaceId?: string | null;
+  /** The AI screen's shrink button: back to the pop-up. */
+  onMinimizeAi?: () => void;
 }
 
-export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId }: MainContentProps) {
+export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId, onMinimizeAi }: MainContentProps) {
+  const scope = useActiveSpaceScope();
 
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
@@ -87,13 +91,24 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'vision' && (
             <div className="flex-1 overflow-hidden bg-card">
-              <VisionView />
+              <VisionView
+                visionId={navigation.visionId ?? null}
+                createRequested={!!navigation.visionCreate}
+                onCreateHandled={() => onNavigate({ visionCreate: null })}
+                onSelectVision={(id) => onNavigate({ visionId: id })}
+                onOpenPortfolio={(id) => { onNavigate({ portfolioId: id }); onViewChange?.('portfolio'); }}
+                onSelectStrategy={(id) => { onNavigate({ strategyId: id }); onViewChange?.('strategy'); }}
+              />
             </div>
           )}
 
           {activeActivity === 'portfolio' && (
             <div className="flex-1 overflow-hidden bg-card">
               <PortfolioView
+                visionId={navigation.visionId ?? null}
+                onRequestVision={() => { onNavigate({ visionCreate: true }); onViewChange?.('vision'); }}
+                activePortfolioId={navigation.portfolioId ?? null}
+                onSelectPortfolio={(id) => onNavigate({ portfolioId: id })}
                 createRequested={!!navigation.portfolioCreate}
                 onCreateHandled={() => onNavigate({ portfolioCreate: null })}
                 onSelectStrategy={(id) => {
@@ -107,6 +122,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {activeActivity === 'strategy' && (
             <div className="flex-1 overflow-hidden bg-card">
               <StrategyShell
+                visionId={navigation.visionId ?? null}
                 activeStrategyId={navigation.strategyId ?? null}
                 createRequested={!!navigation.strategyCreate}
                 onCreateHandled={() => onNavigate({ strategyCreate: null })}
@@ -217,22 +233,42 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
-          {activeActivity === 'crm' && (
-            <CrmView navigation={navigation} onNavigate={onNavigate} onViewChange={onViewChange} />
+          {activeActivity === 'slides' && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <SlidesView />
+            </div>
           )}
 
-          {activeActivity === 'scm' && <ScmView navigation={navigation} onNavigate={onNavigate} />}
+          {activeActivity === 'crm' && (
+            <div className="flex-1 flex flex-col overflow-hidden bg-card">
+              <ElementDrilldown label="CRM" onNavigate={onNavigate} onViewChange={onViewChange}>
+                {openElement => <CrmView navigation={navigation} onNavigate={onNavigate} onViewChange={onViewChange} onOpenElement={openElement} />}
+              </ElementDrilldown>
+            </div>
+          )}
+
+
+          {activeActivity === 'audit' && (
+            <div className="flex-1 flex flex-col overflow-hidden bg-card">
+              <AuditView navigation={navigation} onNavigate={onNavigate} />
+            </div>
+          )}
 
           {activeActivity === 'team' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <ElementDrilldown label="Team" onNavigate={onNavigate} onViewChange={onViewChange}>
+              {/* An audit Space (ADR 0048) shows its people without opening
+                  their Elements or Workload. */}
+              {scope === 'audit' ? <TeamView /> : <ElementDrilldown label="People" onNavigate={onNavigate} onViewChange={onViewChange}>
                 {openElement => <TeamView onOpenElement={openElement} onOpenWorkload={(workerId) => {
                   onNavigate({ workerId: workerId ?? null });
                   onViewChange?.('workload');
                 }} />}
-              </ElementDrilldown>
+              </ElementDrilldown>}
             </div>
           )}
+
+          {/* The AI on a screen of its own — the same conversation as the pop-up. */}
+          {activeActivity === 'ai' && <AlconCopilotPanel variant="page" open onOpenChange={() => {}} onMinimize={onMinimizeAi} />}
 
           {activeActivity === 'profile' && <ProfileView onOpenSettings={onOpenSettings} onNavigate={onNavigate} onViewChange={onViewChange} activeDomainId={activeDomainId} />}
 

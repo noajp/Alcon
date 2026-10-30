@@ -1,9 +1,9 @@
 'use client';
 
-import { parseDateOnly, toDateOnlyString as fmtDateOnly, dayNumberOf, shiftDateOnly } from '@/Function/shared/dateUtils';
+import { toDateOnlyString as fmtDateOnly, dayNumberOf, shiftDateOnly, isSameDay, isOverdue as isDueDayPast } from '@/Function/shared/dateUtils';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { CalendarPlus, ChevronLeft, ChevronRight, ChevronDown, X } from 'lucide-react';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
@@ -29,7 +29,6 @@ interface CalendarViewProps {
 }
 
 type CalendarMode = 'day' | 'week' | 'month';
-
 
 // Soft card pair per status — the subtle ground plus the status hue, straight
 // off the STATUS table so a calendar card and a list-row mark agree.
@@ -90,14 +89,6 @@ function parseTimeToMinutes(timeStr: string | null | undefined): number | null {
   const parts = timeStr.split(':').map(Number);
   if (parts.length < 2 || parts.some(n => Number.isNaN(n))) return null;
   return parts[0] * 60 + parts[1];
-}
-
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
 }
 
 function formatHourLabel(locale: string, hour: number): string {
@@ -249,11 +240,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
     }
   };
 
-  const isOverdue = (element: CalendarEntry): boolean => {
-    const due = parseDateOnly(element.due_date, null);
-    if (!due || element.status === 'done') return false;
-    return due < new Date(new Date().setHours(0, 0, 0, 0));
-  };
+  const isOverdue = (element: CalendarEntry): boolean => isDueDayPast(element.due_date, element.status === 'done');
 
   const scheduleOn = async (element: CalendarEntry, date: Date) => {
     if (!element.element) return;
@@ -281,7 +268,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
     // once that day is no longer one the Element covers, the measurement is of
     // a position nobody is looking at any more.
     if (!occursOn(entry, grabbedOn)) {
-      setDragError(`${entry.title} changed dates while you were dragging it. Nothing was moved.`);
+      setDragError(t('{title} changed dates while you were dragging it. Nothing was moved.', { title: entry.title }));
       return;
     }
     const shift = dayNumberOf(dropOn) - dayNumberOf(grabbedOn);
@@ -296,7 +283,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
       onRefresh?.();
     } catch (e) {
       console.error('Failed to move element:', e);
-      setDragError(`${entry.title} could not be moved. It is still on its original date.`);
+      setDragError(t('{title} could not be moved. It is still on its original date.', { title: entry.title }));
     }
   };
 
@@ -344,13 +331,15 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
         // where it was, which on its own looks like the drag was never taken.
         <p role="alert" className="flex items-center gap-2 px-4 py-2 text-sm text-destructive">
           {dragError}
-          <Button size="xs" variant="ghost" onClick={() => setDragError(null)}>Dismiss</Button>
+          <Button size="xs" variant="ghost" onClick={() => setDragError(null)}>{t('Dismiss')}</Button>
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[var(--border-subtle)] bg-card">
         <Button size="sm" variant="secondary" onClick={goToToday}>{t('Today')}</Button>
-        <Button size="icon-sm" variant="ghost" onClick={goToPrevious} aria-label="Previous period"><ChevronLeft size={16} /></Button>
-        <Button size="icon-sm" variant="ghost" onClick={goToNext} aria-label="Next period"><ChevronRight size={16} /></Button>
+        <ButtonAppearanceProvider appearance="navigation">
+          <Button size="icon-sm" variant="ghost" onClick={goToPrevious} aria-label={t('Previous period')}><ChevronLeft size={16} /></Button>
+          <Button size="icon-sm" variant="ghost" onClick={goToNext} aria-label={t('Next period')}><ChevronRight size={16} /></Button>
+        </ButtonAppearanceProvider>
         <h2 className="text-base font-semibold flex-1 min-w-0">{headerTitle}</h2>
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button size="sm" variant="secondary">{t({ day: 'Day', week: 'Week', month: 'Month' }[mode])}<ChevronDown size={12} /></Button></DropdownMenuTrigger>
@@ -448,8 +437,8 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                       <button
                         type="button"
                         onClick={openPicker}
-                        title="Schedule an Element on this day"
-                        aria-label={`Schedule an Element on ${day.date.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}`}
+                        title={t('Schedule an Element on this day')}
+                        aria-label={t('Schedule an Element on {date}', { date: day.date.toLocaleDateString(locale, { month: 'short', day: 'numeric' }) })}
                         className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted/40 hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
                       >
                         <CalendarPlus size={13} />
@@ -464,7 +453,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                             onClick={(e) => e.stopPropagation()}
                             className="self-start text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded-md hover:bg-muted transition-colors duration-150 cursor-pointer font-medium"
                           >
-                            +{hidden} more
+                            {t('+{n} more', { n: hidden })}
                           </button>
                         </PopoverTrigger>
                         <PopoverContent className="w-72 p-3" align="start">
@@ -480,7 +469,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                               </span>
                             </div>
                             <div className="text-[11px] text-muted-foreground mt-0.5">
-                              {dayElements.length} {dayElements.length === 1 ? 'item' : 'items'}
+                              {t(dayElements.length === 1 ? '{n} item' : '{n} items', { n: dayElements.length })}
                             </div>
                           </div>
                           <div className="space-y-0.5 max-h-[280px] overflow-y-auto -mx-1 px-1">
@@ -528,7 +517,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                                       className="text-[10px] text-muted-foreground flex-shrink-0"
                                       style={{ color: statusColor(statusKey) }}
                                     >
-                                      {statusLabel(statusKey)}
+                                      {t(statusLabel(statusKey))}
                                     </span>
                                   </div>
                                 </button>
@@ -597,7 +586,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                       left: `calc(${(span.startCol / 7) * 100}% + ${span.continuesBefore ? 0 : 6}px)`,
                       width: `calc(${(width / 7) * 100}% - ${(span.continuesBefore ? 0 : 6) + (span.continuesAfter ? 0 : 6)}px)`,
                     }}
-                    title={`${element.title}${overdue ? ' (Overdue)' : ''}\nRight-click to change color`}
+                    title={`${overdue ? t('{title} (Overdue)', { title: element.title }) : element.title}\n${t('Right-click to change color')}`}
                   >
                     <div className="flex h-full items-center gap-1.5 min-w-0">
                       {element.object && <ObjectIcon size={12} />}
@@ -657,13 +646,12 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
           >
             <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-border/60">
               <span className="text-[12px] font-semibold">
-                Schedule on{' '}
-                {dayPicker.date.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
+                {t('Schedule on {date}', { date: dayPicker.date.toLocaleDateString(locale, { month: 'short', day: 'numeric' }) })}
               </span>
               <button
                 onClick={() => setDayPicker(null)}
                 className="text-muted-foreground hover:text-foreground p-0.5 rounded-md hover:bg-muted/40 transition-colors"
-                aria-label="Close"
+                aria-label={t('Close')}
               >
                 <X size={13} />
               </button>
@@ -671,7 +659,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
             {unscheduled.length === 0 ? (
               <div className="px-1 py-3 text-[11px] text-muted-foreground flex items-center gap-1.5">
                 <CalendarPlus size={13} className="shrink-0" />
-                Every Element already has a due date.
+                {t('Every Element already has a due date.')}
               </div>
             ) : (
               <div className="max-h-56 overflow-y-auto space-y-0.5">
@@ -705,10 +693,11 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-medium text-sm">Change Color</h3>
+              <h3 className="font-medium text-sm">{t('Change color')}</h3>
               <button
                 onClick={() => setShowColorPicker(false)}
                 className="text-muted-foreground hover:text-foreground"
+                aria-label={t('Close')}
               >
                 <X size={16} />
               </button>
@@ -723,7 +712,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                     selectedElement.color === color.value ? 'ring-2 ring-primary ring-offset-2' : ''
                   }`}
                   style={{ backgroundColor: color.value }}
-                  title={color.name}
+                  title={t(color.name)}
                 />
               ))}
             </div>
@@ -731,7 +720,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
               onClick={() => handleColorChange(null)}
               className="w-full mt-3 px-3 py-2 text-xs text-muted-foreground hover:bg-muted rounded transition-colors"
             >
-              Reset to default (status-based)
+              {t('Reset to default (status-based)')}
             </button>
           </div>
         </div>
@@ -766,7 +755,7 @@ function TimeGridView({
   onElementClick,
   onElementContextMenu,
 }: TimeGridViewProps) {
-  const { locale } = useI18n();
+  const { t, locale } = useI18n();
   const [now, setNow] = useState(new Date());
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -781,7 +770,11 @@ function TimeGridView({
     if (!scrollRef.current) return;
     const minutes = now.getHours() * 60 + now.getMinutes();
     const startMin = GRID_START_HOUR * 60;
-    const top = ((minutes - startMin) / 60) * HOUR_HEIGHT - 120;
+    // Land on an hour line, a few hours back, with room above it: a label
+    // sits across its line, so a scroll that stops on the line cuts the
+    // first label in half under the all-day row.
+    const hour = Math.floor((minutes - startMin) / 60) - 2;
+    const top = hour * HOUR_HEIGHT - 10;
     scrollRef.current.scrollTop = Math.max(0, top);
     // Run only once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -824,14 +817,14 @@ function TimeGridView({
   return (
     <div className={`flex-1 flex flex-col min-h-0 ${days.length > 1 ? "min-w-[640px]" : "min-w-0"}`}>
       {/* Day-of-week header row */}
-      <div className="flex border-b border-border/60 bg-card/95 backdrop-blur sticky top-0 z-10">
+      <div className="flex border-b border-[var(--border-subtle)] bg-card/95 backdrop-blur sticky top-0 z-10">
         <div className="w-14 flex-shrink-0" />
         {days.map((d, i) => {
           const isTodayCol = isSameDay(d, today);
           return (
             <div
               key={i}
-              className={`${colWidthClass} px-2 py-2 text-center border-l border-border/40`}
+              className={`${colWidthClass} px-2 py-2 text-center`}
             >
               <div className="text-[10px] text-muted-foreground">
                 {weekdayLabel(locale, d.getDay())}
@@ -860,13 +853,13 @@ function TimeGridView({
         const lanes = spans.reduce((max, span) => Math.max(max, span.lane + 1), 0);
         const height = Math.max(28, 4 + lanes * MONTH_LANE_HEIGHT + 4);
         return (
-          <div className="flex border-b border-border/60 bg-card">
+          <div className="flex border-b border-[var(--border-subtle)] bg-card">
             <div className="w-14 flex-shrink-0 px-2 py-1.5 text-[10px] text-muted-foreground text-right">
-              all-day
+              {t('All day')}
             </div>
             <div className="relative flex flex-1 min-w-0" style={{ height }}>
               {days.map((_, i) => (
-                <div key={i} className={`${colWidthClass} border-l border-border/40`} />
+                <div key={i} className={`${colWidthClass} border-l border-[var(--border-subtle)]`} />
               ))}
               {spans.map(span => {
                 const el = span.entry;
@@ -920,7 +913,7 @@ function TimeGridView({
         <div className="flex" style={{ height: TOTAL_GRID_HEIGHT }}>
           {/* Hour rail */}
           <div className="w-14 flex-shrink-0 relative">
-            {hours.map(h => (
+            {hours.filter(h => h !== GRID_START_HOUR).map(h => (
               <div
                 key={h}
                 className="absolute left-0 right-0 px-1 text-right text-[10px] text-muted-foreground"
@@ -937,22 +930,14 @@ function TimeGridView({
             return (
               <div
                 key={colIdx}
-                className={`${colWidthClass} relative border-l border-border/40`}
+                className={`${colWidthClass} relative border-l border-[var(--border-subtle)]`}
               >
                 {/* Hour grid lines */}
                 {hours.map(h => (
                   <div
                     key={h}
-                    className="absolute left-0 right-0 border-t border-border/30"
+                    className="absolute left-0 right-0 border-t border-[var(--border-subtle)]"
                     style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT }}
-                  />
-                ))}
-                {/* Half-hour faint lines */}
-                {hours.map(h => (
-                  <div
-                    key={`half-${h}`}
-                    className="absolute left-0 right-0 border-t border-dashed border-border/15"
-                    style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT + HOUR_HEIGHT / 2 }}
                   />
                 ))}
 

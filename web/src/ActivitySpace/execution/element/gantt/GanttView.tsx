@@ -1,11 +1,12 @@
 'use client';
 
-import { parseDateOnly, toDateOnlyString as fmtDateOnly } from '@/Function/shared/dateUtils';
+import { parseDateOnly, toDateOnlyString as fmtDateOnly, addDays, daysBetween, startOfDay, DAY_MS } from '@/Function/shared/dateUtils';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import React, { useState, useMemo, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { AlconObjectWithChildren, Phase, ObjectMilestone } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
-import { ChevronRight, ChevronDown, CalendarDays, ZoomIn, ZoomOut } from 'lucide-react';
+import { CalendarDays, ZoomIn, ZoomOut } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
@@ -13,6 +14,7 @@ import { getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
 import { phaseWindowMs } from '@/Function/shared/phaseWindow';
 import { MilestoneDiamond } from '@/Function/shared/MilestoneDiamond';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /** Pre-grouped band (e.g. ElementsListView's Domain / per-Object
  *  sections). When provided it wins over the legacy `object`-tree grouping. */
@@ -52,38 +54,16 @@ type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
 // aligned (the old per-zoom "column = 1 unit" header drifted off the bars).
 const PX_PER_DAY: Record<ZoomLevel, number> = { day: 40, week: 12, month: 4.5, quarter: 2 };
 
-const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
 // Stable empty-array default so an omitted `phases` prop doesn't hand the
 // Phase-band memo a fresh reference (and a re-render) every render.
 const EMPTY_PHASES: Phase[] = [];
 const EMPTY_MILESTONES: ObjectMilestone[] = [];
 
-// ---- date-only helpers (local midnight, immune to TZ off-by-one) ----
-
-function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-function addDays(d: Date, n: number): Date {
-  const out = new Date(d);
-  out.setDate(out.getDate() + n);
-  return out;
-}
-
-/** Whole days from a to b — both are local-midnight dates so this is exact. */
-function daysBetween(a: Date, b: Date): number {
-  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
-}
-
-function formatDate(date: Date, format: 'short' | 'full' | 'pill' = 'short'): string {
+function formatDate(date: Date, format: 'short' | 'full' | 'pill', locale: string): string {
   if (format === 'full') {
-    return date.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    return date.toLocaleDateString(locale, { year: 'numeric', month: '2-digit', day: '2-digit' });
   }
-  if (format === 'pill') {
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
-  return date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
 
 // Visible horizon per zoom — the range is data-driven but never narrower
@@ -134,7 +114,7 @@ interface HeaderUnit {
 }
 
 /** Tier 1 — context band. Months for day/week zoom, years for month/quarter. */
-function buildHeaderSpans(start: Date, totalDays: number, zoom: ZoomLevel): HeaderSpan[] {
+function buildHeaderSpans(start: Date, totalDays: number, zoom: ZoomLevel, locale: string): HeaderSpan[] {
   const spans: HeaderSpan[] = [];
   let cursor = 0;
   while (cursor < totalDays) {
@@ -143,7 +123,7 @@ function buildHeaderSpans(start: Date, totalDays: number, zoom: ZoomLevel): Head
     let label: string;
     if (zoom === 'day' || zoom === 'week') {
       next = new Date(date.getFullYear(), date.getMonth() + 1, 1);
-      label = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      label = date.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
     } else {
       next = new Date(date.getFullYear() + 1, 0, 1);
       label = String(date.getFullYear());
@@ -156,7 +136,7 @@ function buildHeaderSpans(start: Date, totalDays: number, zoom: ZoomLevel): Head
 }
 
 /** Tier 2 — unit cells. Day numbers / week starts / months / quarters. */
-function buildHeaderUnits(start: Date, totalDays: number, zoom: ZoomLevel): HeaderUnit[] {
+function buildHeaderUnits(start: Date, totalDays: number, zoom: ZoomLevel, locale: string): HeaderUnit[] {
   const units: HeaderUnit[] = [];
   const today = startOfDay(new Date());
   let cursor = 0;
@@ -165,7 +145,7 @@ function buildHeaderUnits(start: Date, totalDays: number, zoom: ZoomLevel): Head
     if (zoom === 'day') {
       units.push({
         label: String(date.getDate()),
-        sub: WEEKDAY_INITIALS[date.getDay()],
+        sub: date.toLocaleDateString(locale, { weekday: 'narrow' }),
         days: 1,
         startDay: cursor,
         isWeekend: date.getDay() === 0 || date.getDay() === 6,
@@ -174,13 +154,13 @@ function buildHeaderUnits(start: Date, totalDays: number, zoom: ZoomLevel): Head
       cursor += 1;
     } else if (zoom === 'week') {
       const days = Math.min(7, totalDays - cursor);
-      units.push({ label: formatDate(date, 'pill'), days, startDay: cursor });
+      units.push({ label: formatDate(date, 'pill', locale), days, startDay: cursor });
       cursor += days;
     } else if (zoom === 'month') {
       const next = new Date(date.getFullYear(), date.getMonth() + 1, 1);
       const days = Math.min(daysBetween(date, next), totalDays - cursor);
       units.push({
-        label: date.toLocaleDateString('en-US', { month: 'short' }),
+        label: date.toLocaleDateString(locale, { month: 'short' }),
         days,
         startDay: cursor,
       });
@@ -223,6 +203,7 @@ export function GanttView({
   // updateObject so dragging an Object bar writes objects.start_date /
   // objects.due_date. Wrapped in useCallback so the drag effects' deps stay
   // stable (otherwise every parent render would re-attach window listeners).
+  const { t, locale } = useI18n();
   const persistDates = useCallback(
     (id: string, u: { start_date?: string | null; due_date?: string | null }) =>
       onItemUpdate ? onItemUpdate(id, u) : updateElement(id, u),
@@ -253,12 +234,12 @@ export function GanttView({
   const timelineWidth = totalDays * pxPerDay;
 
   const headerSpans = useMemo(
-    () => buildHeaderSpans(dateRange.start, totalDays, zoom),
-    [dateRange.start, totalDays, zoom]
+    () => buildHeaderSpans(dateRange.start, totalDays, zoom, locale),
+    [dateRange.start, totalDays, zoom, locale]
   );
   const headerUnits = useMemo(
-    () => buildHeaderUnits(dateRange.start, totalDays, zoom),
-    [dateRange.start, totalDays, zoom]
+    () => buildHeaderUnits(dateRange.start, totalDays, zoom, locale),
+    [dateRange.start, totalDays, zoom, locale]
   );
 
   // The current Object supplies the fallback section's name.
@@ -499,15 +480,15 @@ export function GanttView({
     setCollapsedSections(next);
   };
 
-  const todayStr = formatDate(new Date(), 'pill');
+  const todayStr = formatDate(new Date(), 'pill', locale);
 
   /** Compact "Jun 8 – Jun 19" range text for the left row (— when undated). */
   const rowDateLabel = (el: ElementWithDetails): string | null => {
     const s = parseDateOnly(el.start_date, null);
     const d = parseDateOnly(el.due_date, null);
     if (!s && !d) return null;
-    if (s && d && daysBetween(s, d) !== 0) return `${formatDate(s, 'pill')} – ${formatDate(d, 'pill')}`;
-    return formatDate((d ?? s)!, 'pill');
+    if (s && d && daysBetween(s, d) !== 0) return `${formatDate(s, 'pill', locale)} – ${formatDate(d, 'pill', locale)}`;
+    return formatDate((d ?? s)!, 'pill', locale);
   };
 
   return (
@@ -515,7 +496,7 @@ export function GanttView({
       {/* Sticky Toolbar */}
       <div className="sticky top-0 z-30 flex items-center justify-between px-4 py-2.5 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold text-foreground">Timeline</span>
+          <span className="text-sm font-semibold text-foreground">{t('Timeline')}</span>
           {object?.name && (
             <span className="text-xs text-muted-foreground">{object.name}</span>
           )}
@@ -526,15 +507,16 @@ export function GanttView({
             <button
               onClick={() => zoomBy(1 / ZOOM_STEP)}
               disabled={zoomScale <= ZOOM_MIN + 1e-6}
-              title="Zoom out"
-              aria-label="Zoom out"
+              title={t('Zoom out')}
+              aria-label={t('Zoom out')}
               className="w-7 h-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 disabled:pointer-events-none transition-colors"
             >
               <ZoomOut size={14} />
             </button>
             <button
               onClick={() => setZoomScale(1)}
-              title="Reset zoom"
+              title={t('Reset zoom')}
+              aria-label={t('Reset zoom')}
               className="px-1.5 h-6 inline-flex items-center justify-center text-[10px] font-medium tabular-nums text-muted-foreground hover:text-foreground rounded transition-colors min-w-[34px]"
             >
               {Math.round(zoomScale * 100)}%
@@ -542,8 +524,8 @@ export function GanttView({
             <button
               onClick={() => zoomBy(ZOOM_STEP)}
               disabled={zoomScale >= ZOOM_MAX - 1e-6}
-              title="Zoom in"
-              aria-label="Zoom in"
+              title={t('Zoom in')}
+              aria-label={t('Zoom in')}
               className="w-7 h-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 disabled:pointer-events-none transition-colors"
             >
               <ZoomIn size={14} />
@@ -561,7 +543,7 @@ export function GanttView({
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {z === 'day' ? 'Day' : z === 'week' ? 'Week' : z === 'month' ? 'Month' : 'Quarter'}
+                {z === 'day' ? t('Day') : z === 'week' ? t('Week') : z === 'month' ? t('Month') : t('Quarter')}
               </button>
             ))}
           </div>
@@ -570,7 +552,7 @@ export function GanttView({
             className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium text-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors"
           >
             <CalendarDays size={13} />
-            Today
+            {t('Today')}
           </button>
         </div>
       </div>
@@ -581,7 +563,7 @@ export function GanttView({
         <div className="w-64 min-w-64 border-r border-border flex flex-col bg-card">
           {/* Header */}
           <div className="flex items-center px-3 border-b border-border bg-muted/20" style={{ height: HEADER_TIER1_H + HEADER_TIER2_H }}>
-            <span className="text-[11px] font-semibold text-muted-foreground">{leftHeaderLabel}</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">{t(leftHeaderLabel)}</span>
           </div>
 
           {/* Element list — vertical scroll kept in lock-step with the
@@ -607,14 +589,14 @@ export function GanttView({
                     <button
                       onClick={() => toggleSection(key)}
                       className="w-full flex items-center gap-1.5 px-2.5 h-8 text-left bg-muted/40 hover:bg-muted/60 border-b border-border/60 transition-colors group"
-                      title={isCollapsed ? 'Expand' : 'Collapse'}
+                      title={isCollapsed ? t('Expand') : t('Collapse')}
                     >
                       <span className="w-3.5 h-3.5 flex items-center justify-center text-muted-foreground shrink-0">
                         {icon ?? <ObjectIcon size={12} />}
                       </span>
                       <span className="text-[12px] font-medium text-foreground truncate flex-1">{name}</span>
                       <span className="w-3.5 h-3.5 flex items-center justify-center text-muted-foreground/70 group-hover:text-foreground transition-colors">
-                        {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                        <DisclosureTriangle open={!isCollapsed} />
                       </span>
                     </button>
                   )}
@@ -751,8 +733,8 @@ export function GanttView({
               {phases.map((phase, idx) => {
                 const win = phaseWindowMs(phase);
                 if (!win) return null;
-                const left = ((win.t0 - dateRange.start.getTime()) / 86_400_000) * pxPerDay;
-                const right = ((win.t1 - dateRange.start.getTime()) / 86_400_000) * pxPerDay;
+                const left = ((win.t0 - dateRange.start.getTime()) / DAY_MS) * pxPerDay;
+                const right = ((win.t1 - dateRange.start.getTime()) / DAY_MS) * pxPerDay;
                 if (right <= 0 || left >= timelineWidth) return null;
                 const clampedLeft = Math.max(0, left);
                 const clampedWidth = Math.min(timelineWidth, right) - clampedLeft;
@@ -853,7 +835,7 @@ export function GanttView({
                         <div
                           className="absolute cursor-crosshair hover:bg-muted/20 transition-colors"
                           style={{ left: 0, width: timelineWidth, top, height: ROW_H }}
-                          title="Drag to schedule"
+                          title={t('Drag to schedule')}
                           onMouseDown={(e) => {
                             e.preventDefault();
                             const rect = e.currentTarget.getBoundingClientRect();
@@ -947,7 +929,7 @@ export function GanttView({
                           </span>
                           {showDueDate && element.due_date && (
                             <span className="text-[10px] text-white/80 flex-shrink-0 tabular-nums">
-                              {formatDate(parseDateOnly(element.due_date, null)!, 'pill')}
+                              {formatDate(parseDateOnly(element.due_date, null)!, 'pill', locale)}
                             </span>
                           )}
                         </div>
@@ -1042,16 +1024,16 @@ export function GanttView({
               className="inline-block w-2 h-2 rounded-full"
               style={{ backgroundColor: statusColor(tooltip.element.status) }}
             />
-            <span>{statusLabel(tooltip.element.status)}</span>
+            <span>{t(statusLabel(tooltip.element.status))}</span>
           </div>
           <div className="text-[11px] text-muted-foreground mt-1">
             {tooltip.element.start_date
-              ? formatDate(parseDateOnly(tooltip.element.start_date, null)!, 'full')
-              : '(no start)'}
+              ? formatDate(parseDateOnly(tooltip.element.start_date, null)!, 'full', locale)
+              : t('(no start)')}
             {' → '}
             {tooltip.element.due_date
-              ? formatDate(parseDateOnly(tooltip.element.due_date, null)!, 'full')
-              : '(no due date)'}
+              ? formatDate(parseDateOnly(tooltip.element.due_date, null)!, 'full', locale)
+              : t('(no due date)')}
           </div>
         </div>
       )}

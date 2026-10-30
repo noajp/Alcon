@@ -29,7 +29,7 @@ export interface DomainAIConfig {
 
 // Per-Domain thresholds for the Initiative risk cross-section, stored in
 // domains.risk_thresholds (jsonb). Every key optional; absent = the default
-// in ActivitySpace/strategy/initiative/initiativeRiskModel.ts. Edited from Settings >
+// in Function/strategy/initiativeRiskModel.ts. Edited from Settings >
 // Elements > SLAs.
 /** Settings > Strategy > Phase: how a new Phase's dates are seeded. Every
  *  key optional; absent = the create dialog starts with empty dates. */
@@ -163,11 +163,12 @@ export interface ActivitySpace {
   identifier: string | null  // optional short slug
   color: string | null
   logo: string | null
-  vision: string | null      // Strategy > Vision — what the Space aims for
   order_index: number | null
   created_by: string | null
   created_at: string | null
   updated_at: string | null
+  /** What the Space shows: everything, or only the Space, People and Audit (ADR 0048). */
+  scope?: 'audit' | 'full'
 }
 
 export interface ActivitySpaceInsert {
@@ -185,7 +186,7 @@ export interface ActivitySpaceUpdate {
   color?: string | null
   logo?: string | null
   order_index?: number | null
-  vision?: string | null
+  scope?: 'audit' | 'full'
 }
 
 export interface ActivitySpaceMember {
@@ -205,12 +206,15 @@ export interface ActivitySpaceMember {
 // invitation becomes one only when the invitee accepts it.
 // =====================================================
 export type MemberRole = 'owner' | 'admin' | 'member'
+// A Domain also has viewers: they read everything in it and change nothing.
+// Object membership has no viewer role.
+export type DomainMemberRole = MemberRole | 'viewer'
 
 export interface DomainMember {
   id: string
   domain_id: string
   user_id: string
-  role: MemberRole
+  role: DomainMemberRole
   created_at: string | null
 }
 
@@ -218,7 +222,7 @@ export interface DomainMemberInsert {
   id?: string
   domain_id: string
   user_id: string
-  role?: MemberRole
+  role?: DomainMemberRole
 }
 
 export interface ObjectMember {
@@ -241,6 +245,7 @@ export interface ObjectMemberInsert {
 // only by the invite_member / respond_to_invite / cancel_invite RPCs.
 export type InvitationScope = 'space' | 'domain' | 'object'
 export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'canceled'
+export type InvitationRole = 'member' | 'viewer'
 
 export interface MembershipInvitation {
   id: string
@@ -249,7 +254,8 @@ export interface MembershipInvitation {
   object_id: string | null
   invitee_id: string
   invited_by: string | null
-  role: 'member'
+  /** 'viewer' only for a Domain invitation. */
+  role: InvitationRole
   /** The Space / Domain / Object name when the invitation was sent. */
   scope_name: string
   inviter_name: string | null
@@ -600,6 +606,31 @@ export interface WorkerAvailabilityUpdate {
   capacity_hours_per_day?: number
   note?: string | null
   updated_at?: string
+}
+
+// =====================================================
+// Worker skills — what a Worker (human or AI agent) knows, at a declared
+// level, backed by their own done Elements as evidence. A skill is as visible
+// as its Worker; an evidence row only to those who can see its Element.
+// =====================================================
+
+/** 1 Learning · 2 Capable · 3 Proficient · 4 Expert */
+export type WorkerSkillLevel = 1 | 2 | 3 | 4
+
+export interface WorkerSkill {
+  id: string
+  worker_id: string
+  name: string
+  level: WorkerSkillLevel
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkerSkillEvidence {
+  skill_id: string
+  element_id: string
+  created_at: string
 }
 
 export interface WorkerInsert {
@@ -1145,6 +1176,8 @@ export interface Notification {
   brief_id: string | null
   /** The membership invitation an 'invite' notification is about. */
   invitation_id?: string | null
+  /** The gateway's approval request an 'approval_requested' notification is about. */
+  workflow_approval_id?: string | null
   title: string
   body: string | null
   is_read: boolean
@@ -1418,16 +1451,52 @@ export interface Strategy {
   color: string | null
   icon: string | null
   portfolio_id: string | null  // Strategy > Portfolio the Initiative belongs to (at most one)
+  vision_id: string | null     // Strategy > Vision the Initiative works toward
   created_by: string | null
   created_at: string
   updated_at: string
 }
 
-// Strategy > Portfolio — a named bundle of Initiatives within an Activity
-// Space. An Initiative belongs to at most one Portfolio (strategies.portfolio_id).
+// Strategy > Vision — what a Space aims for. A Space holds any number of
+// Visions; Portfolios and Initiatives hang under one, the way Objects and
+// Elements hang under a Domain.
+export interface Vision {
+  id: string
+  activity_space_id: string
+  name: string
+  statement: string | null    // the aim, in one statement
+  horizon: string | null      // 'YYYY-MM-DD' — by when
+  narrative: string | null    // why this, and what changes
+  conditions: string[]        // how the Space will know it got there
+  order_index: number
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+export interface VisionInsert {
+  id?: string
+  activity_space_id: string
+  name: string
+  statement?: string | null
+  order_index?: number
+}
+export interface VisionUpdate {
+  name?: string
+  statement?: string | null
+  horizon?: string | null
+  narrative?: string | null
+  conditions?: string[]
+  order_index?: number
+}
+
+// Strategy > Portfolio — a named bundle of Initiatives under a Vision;
+// Portfolios nest. An Initiative belongs to at most one Portfolio
+// (strategies.portfolio_id).
 export interface Portfolio {
   id: string
   activity_space_id: string
+  vision_id: string | null   // the Vision it works toward
+  parent_id: string | null   // the Portfolio this one nests in; null = top level
   name: string
   description: string | null
   order_index: number
@@ -1438,11 +1507,14 @@ export interface Portfolio {
 export interface PortfolioInsert {
   id?: string
   activity_space_id: string
+  vision_id?: string | null
+  parent_id?: string | null
   name: string
   description?: string | null
   order_index?: number
 }
 export interface PortfolioUpdate {
+  parent_id?: string | null
   name?: string
   description?: string | null
   order_index?: number
@@ -1457,6 +1529,7 @@ export interface StrategyInsert {
   color?: string | null
   icon?: string | null
   portfolio_id?: string | null
+  vision_id?: string | null
   created_by?: string | null
 }
 
@@ -1468,6 +1541,7 @@ export interface StrategyUpdate {
   color?: string | null
   icon?: string | null
   portfolio_id?: string | null
+  vision_id?: string | null
   updated_at?: string
 }
 
@@ -1691,7 +1765,7 @@ export interface IntentUpdate {
 // Semantic edge from an Intent to a Domain/Object/Element.
 // relationship_type captures *why* the binding exists (Popper's
 // falsifiability requires this — a bare tag isn't enough).
-export type IntentBindingTarget = 'domain' | 'object' | 'element' | 'phase' | 'worker'
+export type IntentBindingTarget = 'domain' | 'object' | 'element' | 'phase' | 'worker' | 'crm_deal'
 export type IntentRelationship =
   | 'evidences'       // target supports the intent's hypothesis
   | 'measures'        // target operationalizes a dimension
@@ -2045,6 +2119,11 @@ export interface Database {
         Row: Strategy
         Insert: StrategyInsert
         Update: StrategyUpdate
+      }
+      visions: {
+        Row: Vision
+        Insert: VisionInsert
+        Update: VisionUpdate
       }
       portfolios: {
         Row: Portfolio

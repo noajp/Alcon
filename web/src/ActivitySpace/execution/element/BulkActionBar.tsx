@@ -1,8 +1,8 @@
 'use client';
 
-import { STATUS, PRIORITY, STATUS_ORDER, PRIORITY_ORDER } from '@/shared/designTokens';
+import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '@/shared/designTokens';
 import { useEffect, useRef, useState } from 'react';
-import { Trash2, Copy, CornerUpRight, Link2, X, CalendarIcon, CircleDashed } from 'lucide-react';
+import { Trash2, Copy, CornerUpRight, Link2, X, CalendarIcon, CircleDashed, UserRound } from 'lucide-react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import type { ElementStatus, ElementPriority } from '@/types/database';
@@ -17,9 +17,8 @@ import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/prefer
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
-const STATUS_OPTIONS: { value: ElementStatus; label: string }[] = STATUS_ORDER.map((value) => ({ value, label: STATUS[value].label }));
-const PRIORITY_OPTIONS: { value: ElementPriority; label: string }[] = PRIORITY_ORDER.map((value) => ({ value, label: PRIORITY[value].label }));
 
 interface BulkActionBarProps {
   count: number;
@@ -40,6 +39,11 @@ interface BulkActionBarProps {
   onSetStatus?: (status: ElementStatus) => void | Promise<void>;
   onSetPriority?: (priority: ElementPriority | null) => void | Promise<void>;
   onSetDueDate?: (date: string | null) => void | Promise<void>;
+  /** Hand the selection to one person: they become each Element's assignee.
+   *  Resolves to how many Elements could not be handed over. */
+  onSetAssignee?: (workerId: string) => Promise<number>;
+  /** Who the selection can be handed to. */
+  assigneeOptions?: readonly { id: string; name: string; hint?: string | null }[];
   onClear: () => void;
 }
 
@@ -106,8 +110,17 @@ export function BulkActionBar({
   onSetStatus,
   onSetPriority,
   onSetDueDate,
+  onSetAssignee,
+  assigneeOptions = [],
   onClear,
 }: BulkActionBarProps) {
+  const { t } = useI18n();
+  const [assigneeQuery, setAssigneeQuery] = useState('');
+  // A notice belongs to the selection it was about: shown while that many
+  // Elements are selected, gone once the selection changes.
+  const [noticeState, setNoticeState] = useState<{ text: string; count: number } | null>(null);
+  if (count === 0 && noticeState) setNoticeState(null);
+  const notice = noticeState && noticeState.count === count ? noticeState.text : null;
   const [overlay, setOverlay] = useState<Overlay>(null);
   const picker = overlay?.kind === 'picker' ? overlay.mode : null;
   const confirmDelete = overlay?.kind === 'confirmDelete';
@@ -158,21 +171,25 @@ export function BulkActionBar({
   };
 
   const visibleObjects = pickerObjects.filter(o => o.id !== excludeObjectId);
-  const noun = count === 1 ? 'Element' : 'Elements';
 
   if (count === 0) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-6 z-40 flex justify-center px-4 pointer-events-none">
       <div className="pointer-events-auto relative">
+        {notice && (
+          <p role="status" className="absolute bottom-full left-1/2 mb-2 w-max max-w-[min(90vw,420px)] -translate-x-1/2 rounded-md bg-popover px-3 py-1.5 text-[12px] text-[var(--status-warning)] shadow-lg ring-1 ring-border">
+            {notice}
+          </p>
+        )}
         <div className="flex items-center gap-0.5 rounded-full bg-popover/95 backdrop-blur-md shadow-2xl ring-1 ring-border px-2 py-1.5">
           <span className="pl-2 pr-2 text-[12px] font-medium text-foreground tabular-nums whitespace-nowrap">
-            {count} {noun} selected
+            {t(count === 1 ? '{n} Element selected' : '{n} Elements selected', { n: count })}
           </span>
 
           {/* Bulk field edits (status / priority / due date) — Asana's
               "edit fields" cluster. Each only renders when the host wires it. */}
-          {(onSetStatus || onSetPriority || onSetDueDate) && (
+          {(onSetStatus || onSetPriority || onSetDueDate || onSetAssignee) && (
             <span className="w-px h-5 bg-border/60 mx-0.5" />
           )}
 
@@ -182,8 +199,8 @@ export function BulkActionBar({
                 <button
                   type="button"
                   disabled={busy}
-                  title="Set status"
-                  aria-label="Set status"
+                  title={t('Set status')}
+                  aria-label={t('Set status')}
                   className="flex items-center justify-center size-8 rounded-full text-foreground/80 hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-40"
                 >
                   <CircleDashed size={15} />
@@ -197,7 +214,7 @@ export function BulkActionBar({
                     className="gap-2 text-[13px]"
                   >
                     <ElementProgressMark status={o.value} size={14} />
-                    <span>{o.label}</span>
+                    <span>{t(o.label)}</span>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -210,8 +227,8 @@ export function BulkActionBar({
                 <button
                   type="button"
                   disabled={busy}
-                  title="Set priority"
-                  aria-label="Set priority"
+                  title={t('Set priority')}
+                  aria-label={t('Set priority')}
                   className="flex items-center justify-center size-8 rounded-full text-foreground/80 hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-40"
                 >
                   <PriorityMark priority="high" />
@@ -225,12 +242,12 @@ export function BulkActionBar({
                     className="gap-2 text-[13px]"
                   >
                     <span className="flex w-5 items-center justify-center"><PriorityMark priority={o.value} /></span>
-                    <span>{o.label}</span>
+                    <span>{t(o.label)}</span>
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuItem onSelect={() => onSetPriority(null)} className="gap-2 text-[13px]">
                   <span className="flex w-5 items-center justify-center"><PriorityMark priority={null} /></span>
-                  <span className="text-muted-foreground">No priority</span>
+                  <span className="text-muted-foreground">{t('No priority')}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -242,8 +259,8 @@ export function BulkActionBar({
                 <button
                   type="button"
                   disabled={busy}
-                  title="Set due date"
-                  aria-label="Set due date"
+                  title={t('Set due date')}
+                  aria-label={t('Set due date')}
                   className="flex items-center justify-center size-8 rounded-full text-foreground/80 hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-40"
                 >
                   <CalendarIcon size={15} />
@@ -261,17 +278,73 @@ export function BulkActionBar({
                   onClick={() => onSetDueDate(null)}
                   className="w-full px-3 py-2 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 border-t border-border/60 transition-colors"
                 >
-                  Clear due date
+                  {t('Clear due date')}
                 </button>
               </PopoverContent>
             </Popover>
+          )}
+
+          {onSetAssignee && (
+            <DropdownMenu onOpenChange={(open) => { if (!open) setAssigneeQuery(''); }}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={busy}
+                  title={t('Set assignee')}
+                  aria-label={t('Set assignee')}
+                  className="flex items-center justify-center size-8 rounded-full text-foreground/80 hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-40"
+                >
+                  <UserRound size={15} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-[240px]">
+                <input
+                  autoFocus
+                  aria-label={t('Find a person')}
+                  placeholder={t('Find a person')}
+                  value={assigneeQuery}
+                  onChange={(e) => setAssigneeQuery(e.target.value)}
+                  // Typing stays in the field; ArrowDown moves into the list of people.
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      (e.currentTarget.parentElement?.querySelector('[role="menuitem"]') as HTMLElement | null)?.focus();
+                      return;
+                    }
+                    if (e.key !== 'Escape') e.stopPropagation();
+                  }}
+                  className="mb-1 h-7 w-full rounded-sm bg-muted/30 px-2 text-[13px] outline-none hover:bg-muted/40 focus:bg-muted/60"
+                />
+                <div className="max-h-64 overflow-y-auto">
+                  {assigneeOptions
+                    .filter((o) => !assigneeQuery.trim() || o.name.toLowerCase().includes(assigneeQuery.trim().toLowerCase()))
+                    .map((o) => (
+                      <DropdownMenuItem
+                        key={o.id}
+                        onSelect={() => void wrap(async () => {
+                          try {
+                            const failed = await onSetAssignee(o.id);
+                            setNoticeState(failed ? { text: t('{n} not fully handed to {name} — still selected. They may not be assignable there, or the change needs the Domain’s owner or admin.', { n: failed, name: o.name }), count: failed } : null);
+                          } catch (e) {
+                            setNoticeState({ text: e instanceof Error ? e.message : t('Could not set the assignee.'), count });
+                          }
+                        })()}
+                        className="gap-2 text-[13px]"
+                      >
+                        <span className="min-w-0 flex-1 truncate">{o.name}</span>
+                        {o.hint && <span className="text-[11px] text-muted-foreground">{o.hint}</span>}
+                      </DropdownMenuItem>
+                    ))}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
 
           <span className="w-px h-5 bg-border/60 mx-0.5" />
 
           <BarButton
             icon={<Copy size={15} />}
-            label="Duplicate"
+            label={t('Duplicate')}
             onClick={wrap(onDuplicate)}
             disabled={busy}
           />
@@ -279,7 +352,7 @@ export function BulkActionBar({
           {onMove && (
             <BarButton
               icon={<CornerUpRight size={15} />}
-              label="Move to another Object"
+              label={t('Move to another Object')}
               onClick={() => setOverlay(picker === 'move' ? null : { kind: 'picker', mode: 'move' })}
               disabled={busy}
               active={picker === 'move'}
@@ -289,7 +362,7 @@ export function BulkActionBar({
           {onAddToObject && (
             <BarButton
               icon={<Link2 size={15} />}
-              label="Add to another Object (multi-home)"
+              label={t('Add to another Object (multi-home)')}
               onClick={() => setOverlay(picker === 'add' ? null : { kind: 'picker', mode: 'add' })}
               disabled={busy}
               active={picker === 'add'}
@@ -298,7 +371,7 @@ export function BulkActionBar({
 
           <BarButton
             icon={<Trash2 size={15} />}
-            label="Delete"
+            label={t('Delete')}
             onClick={() => setOverlay(confirmDelete ? null : { kind: 'confirmDelete' })}
             disabled={busy}
             danger
@@ -310,7 +383,7 @@ export function BulkActionBar({
           {/* Borderless ✕ at the far right — same "deselect all" intent as Esc. */}
           <BarButton
             icon={<X size={15} />}
-            label="Clear selection (Esc)"
+            label={t('Clear selection (Esc)')}
             onClick={onClear}
           />
         </div>
@@ -322,11 +395,11 @@ export function BulkActionBar({
             className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-[280px] max-h-[320px] overflow-y-auto rounded-xl bg-popover shadow-2xl ring-1 ring-border/40 py-1"
           >
             <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground">
-              {picker === 'move' ? 'Move to Object' : 'Add to Object (multi-home)'}
+              {picker === 'move' ? t('Move to Object') : t('Add to Object (multi-home)')}
             </div>
             {visibleObjects.length === 0 ? (
               <div className="px-3 py-3 text-[12px] text-muted-foreground/70">
-                No other Objects in this Domain
+                {t('No other Objects in this Domain')}
               </div>
             ) : (
               visibleObjects.map(o => (
@@ -354,10 +427,10 @@ export function BulkActionBar({
             className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-[260px] rounded-xl bg-popover shadow-2xl ring-1 ring-border/40 p-3"
           >
             <div className="text-[13px] font-semibold text-foreground mb-1">
-              Delete {count} {noun}?
+              {t(count === 1 ? 'Delete {n} Element?' : 'Delete {n} Elements?', { n: count })}
             </div>
             <div className="text-[12px] text-muted-foreground mb-3">
-              This permanently removes {count === 1 ? 'it' : 'them'} and can’t be undone.
+              {count === 1 ? t('This permanently removes it and can’t be undone.') : t('This permanently removes them and can’t be undone.')}
             </div>
             <div className="flex items-center justify-end gap-2">
               <button
@@ -366,7 +439,7 @@ export function BulkActionBar({
                 disabled={busy}
                 className="px-3 py-1.5 text-[12px] rounded-md text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
               >
-                Cancel
+                {t('Cancel')}
               </button>
               <button
                 type="button"
@@ -374,7 +447,7 @@ export function BulkActionBar({
                 disabled={busy}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] rounded-md bg-[var(--status-danger)] text-white hover:bg-[var(--status-danger)] transition-colors disabled:opacity-50"
               >
-                <Trash2 size={12} /> Delete
+                <Trash2 size={12} /> {t('Delete')}
               </button>
             </div>
           </div>

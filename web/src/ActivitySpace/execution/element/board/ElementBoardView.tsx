@@ -13,17 +13,18 @@ import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
-import { PRIORITY_OPTIONS } from '@/Function/shared/listControls/types';
 import { Plus, Calendar, User, Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as CalendarPicker } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
 import { cn } from '@/lib/utils';
-import { formatElementDate, toDateOnlyString } from '@/Function/shared/dateUtils';
+import { formatElementDate, toDateOnlyString, parseDateOnly } from '@/Function/shared/dateUtils';
 import { CardAgentControl } from '../agent';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
-import { ActivitySignal } from '../ActivitySignal';
+import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { isCancelKey, isCommitEnter, isSubmitChord } from '@/Function/shared/keyboard';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { PRIORITY, PRIORITY_ORDER } from '@/shared/designTokens';
 
 // A card title reads at most three lines — beyond that it ellipsises, and the
 // inline rename box grows to the same three lines before it scrolls. Both
@@ -37,7 +38,7 @@ const COLUMNS: { status: ElementStatus; label: string }[] = [
   { status: 'backlog', label: 'Backlog' },
   { status: 'todo', label: 'To Do' },
   { status: 'in_progress', label: 'In Progress' },
-  { status: 'review', label: 'Review' },
+  { status: 'review', label: 'In Review' },
   { status: 'done', label: 'Done' },
   { status: 'blocked', label: 'Blocked' },
   { status: 'cancelled', label: 'Cancelled' },
@@ -52,6 +53,7 @@ interface ElementCardProps {
 }
 
 function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
+  const { t } = useI18n();
   // Who can be assigned to THIS Element, read when the assignee menu opens;
   // the people already on it stay listed so they can be removed.
   const [assigneeMenuOpen, setAssigneeMenuOpen] = useState(false);
@@ -65,7 +67,7 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
 
   const assignee = element.assignees?.[0]?.worker;
-  const dueDate = element.due_date ? new Date(element.due_date) : null;
+  const dueDate = parseDateOnly(element.due_date, null);
   const priority = element.priority;
 
   // Inline editing on the card: title (click to rename) + due date (click to
@@ -145,9 +147,9 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
         if (!(e.target instanceof Node) || !e.currentTarget.contains(e.target)) return;
         onOpen?.(element);
       }}
-      className="group/card rounded-xl border border-border bg-card hover:border-[var(--border-strong)] transition-colors cursor-grab active:cursor-grabbing"
+      className="group/card rounded-lg border border-[var(--border-subtle)] bg-card dark:bg-muted shadow-[var(--shadow-island)] hover:border-[var(--border-default)] transition-colors cursor-grab active:cursor-grabbing"
     >
-      <div className="p-4">
+      <div className="px-3 py-2.5">
         {editingTitle ? (
           <textarea
             autoFocus
@@ -168,7 +170,7 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
         ) : (
           <p
             className="text-[13px] font-medium text-foreground leading-5 -mx-1 px-1 rounded cursor-text hover:bg-muted/30 transition-colors line-clamp-3 break-words"
-            title="Click to rename"
+            title={t('Click to rename')}
             onPointerDown={stop}
             onClick={(e) => { stop(e); setEditingTitle(true); }}
           >
@@ -176,7 +178,7 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
           </p>
         )}
 
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
             {/* Due date — click to pick / change. Unset, it appears only while
                 the card is hovered or has keyboard focus inside it: a column
@@ -193,7 +195,7 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
                   )}
                 >
                   <Calendar className="h-3 w-3" />
-                  {dueDate ? formatElementDate(dueDate) : 'Date'}
+                  {dueDate ? formatElementDate(dueDate) : t('Date')}
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0 rounded-xl" align="start" onPointerDown={stop}>
@@ -221,18 +223,18 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
                   {priority ? (
                     <>
                       <PriorityMark priority={priority} />
-                      <span>{priority.charAt(0).toUpperCase() + priority.slice(1)}</span>
+                      <span>{t(PRIORITY[priority]?.label ?? priority)}</span>
                     </>
                   ) : (
-                    <span>Priority</span>
+                    <span>{t('Priority')}</span>
                   )}
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[140px]" onPointerDown={stop}>
-                {PRIORITY_OPTIONS.map((p) => (
+                {PRIORITY_ORDER.map((p) => (
                   <DropdownMenuItem key={p} onClick={() => savePriority(p)} className="gap-2 text-[13px]">
                     <PriorityMark priority={p} />
-                    <span className="flex-1">{p.charAt(0).toUpperCase() + p.slice(1)}</span>
+                    <span className="flex-1">{t(PRIORITY[p as keyof typeof PRIORITY]?.label ?? p)}</span>
                     {priority === p && <Check size={12} className="text-muted-foreground" />}
                   </DropdownMenuItem>
                 ))}
@@ -240,7 +242,7 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => savePriority(null)} className="text-[12px] text-muted-foreground">
-                      Clear
+                      {t('Clear')}
                     </DropdownMenuItem>
                   </>
                 )}
@@ -248,11 +250,8 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
             </DropdownMenu>
           </div>
           <div className="flex items-center gap-1">
-            {/* Same signal the list rows and the Activity column show. The
-                relative time is dropped here: the footer is already carrying
-                a date, a priority and an assignee, and the count is what
-                separates a discussed card from a silent one. */}
-            <ActivitySignal activity={element.activity} showRelative={false} className="mr-1" />
+            {/* Same signal the list rows and the Activity column show. */}
+            <ActivitySignal activity={element.activity} className="mr-1" />
             <CardAgentControl elementId={element.id} onFinished={onRefresh} />
             {/* Assignee — click to assign / change. */}
             <DropdownMenu open={assigneeMenuOpen} onOpenChange={setAssigneeMenuOpen}>
@@ -261,8 +260,8 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
                   type="button"
                   onPointerDown={stop}
                   onClick={stop}
-                  title="Assignee"
-                  aria-label={workerTriggerLabel('Assignee', assignee)}
+                  title={t('Assignee')}
+                  aria-label={workerTriggerLabel(t('Assignee'), assignee)}
                   className="inline-flex items-center justify-center rounded-full transition-shadow hover:ring-2 hover:ring-border/60"
                 >
                   {assignee ? (
@@ -306,6 +305,7 @@ interface ElementBoardViewProps {
 }
 
 export function ElementBoardView({ elements, loading = false, onRefresh, objectId, onElementClick }: ElementBoardViewProps) {
+  const { t } = useI18n();
   const [items, setItems] = useState<ElementWithDetails[]>(elements);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // One aggregated fetch for the whole board, hung on the Elements the same
@@ -345,12 +345,12 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
     return (
       <div className="flex gap-3 p-4 h-full">
         {COLUMNS.map((col) => (
-          <div key={col.status} className="w-72 flex-shrink-0 rounded-xl bg-muted">
+          <div key={col.status} className="w-72 flex-shrink-0 rounded-lg bg-muted/60 dark:bg-muted/30">
             <div className="px-3 py-2.5 border-b border-border/40">
               <Skeleton className="h-4 w-20" />
             </div>
             <div className="p-2 space-y-2">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
             </div>
           </div>
         ))}
@@ -365,23 +365,23 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
         return (
           <div
             key={col.status}
-            className="w-72 flex-shrink-0 flex flex-col rounded-xl bg-muted"
+            className="w-72 flex-shrink-0 flex flex-col rounded-lg bg-muted/60 dark:bg-muted/30"
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop(col.status)}
           >
             {/* Column header */}
-            <div className="flex items-center justify-between px-3 py-2.5">
+            <div className="flex h-10 items-center justify-between px-3">
               <div className="flex items-center gap-2">
-                <ElementProgressMark status={col.status} size={16} />
-                <span className="text-sm font-medium">{col.label}</span>
-                <span className="text-xs text-muted-foreground">{colItems.length}</span>
+                <ElementProgressMark status={col.status} size={14} />
+                <span className="text-[13px] font-medium">{t(col.label)}</span>
+                <span className="text-[12px] tabular-nums text-muted-foreground">{colItems.length}</span>
               </div>
               <Button variant="ghost" size="icon-xs"
                 type="button"
                 onClick={async () => {
                   try {
                     await createElement({
-                      title: 'Untitled',
+                      title: t('Untitled'),
                       status: col.status,
                       object_id: objectId ?? null,
                     });
@@ -390,15 +390,15 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
                     console.error('Failed to create element', err);
                   }
                 }}
-                title={`Add Element to ${col.label}`}
-                aria-label={`Add Element to ${col.label}`}
+                title={t('Add Element to {column}', { column: t(col.label) })}
+                aria-label={t('Add Element to {column}', { column: t(col.label) })}
               >
                 <Plus className="h-3.5 w-3.5" />
               </Button>
             </div>
 
             {/* Cards */}
-            <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2 min-h-[80px]">
+            <div className="flex-1 overflow-y-auto px-1.5 pb-1.5 space-y-1.5 min-h-[80px]">
               {colItems.map((el) => (
                 <div
                   key={el.id}

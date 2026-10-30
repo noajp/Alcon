@@ -9,17 +9,19 @@ import React, { useEffect, useState } from 'react';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, Worker } from '@/hooks/useSupabase';
 import { updateObject, addDomainObjectType, fetchAllWorkers, useDomains } from '@/hooks/useSupabase';
 import { applyObjectFilter, orderObjects, DEFAULT_STATE, type ListControlsState } from '@/Function/shared/listControls';
-import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+import { getActiveDomainId, CREATE_DOMAIN_EVENT } from '@/Function/space/domainsStore';
 import { hydrateLabelColors } from '@/Function/shared/labelColor';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { NavObjectsIcon } from '@/shell/sidebar/NavIcons';
+import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { EmptyState } from '@/Function/shared/EmptyState';
-import { ListTable, type ListSection } from '@/ActivitySpace/execution/object/ListTable';
+import { ListTable } from '@/Function/shared/listTable/ListTable';
+import type { ListSection } from '@/Function/shared/listTable/shared';
 import { ArchivedObjectsSection } from '@/ActivitySpace/execution/object/ArchivedObjects';
 
 // Objects are a flat list within the Domain.
 
-export function findObjectById(objects: AlconObjectWithChildren[], objectId: string): AlconObjectWithChildren | null {
+function findObjectById(objects: AlconObjectWithChildren[], objectId: string): AlconObjectWithChildren | null {
   return objects.find(o => o.id === objectId) ?? null;
 }
 
@@ -61,7 +63,9 @@ export function ObjListView({
   // id-based multi-select with Shift-range and Esc-to-clear, doesn't care
   // whether the ids belong to Elements or Objects.
   const { selectedRowIds: selectedObjectIds, handleRowSelect: handleObjectRowSelect } = useElementSelection();
-  const { data: domains } = useDomains();
+  const { data: domains, guestDomains, loading: domainsLoading } = useDomains();
+  // An Object needs a Domain to live in, so a Space without one asks for that first.
+  const noDomains = !domainsLoading && domains.length === 0 && guestDomains.length === 0;
   // Object (Project-level) Type catalog — its OWN list, never the Element
   // Element-level one, so it cannot show up as an Object Type.
   const objectTypes = React.useMemo<string[]>(
@@ -88,7 +92,7 @@ export function ObjListView({
     return (
       <div className="h-full flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0">
-          <ObjectsEmptyState />
+          {noDomains ? <NoDomainEmptyState /> : <ObjectsEmptyState />}
         </div>
         <ArchivedObjectsSection domainId={domainId} onOpen={onSelect} />
       </div>
@@ -149,6 +153,19 @@ function ObjectsEmptyState() {
       hint="Objects live directly under a Domain (no nesting) and can be shared across multiple Domains."
       cta="Create Object"
       onCta={() => openCreate('object')}
+    />
+  );
+}
+
+function NoDomainEmptyState() {
+  return (
+    <EmptyState
+      icon={DomainIcon}
+      title="Create your first Domain"
+      description="A Domain is where work happens — a company, a department, or a project portfolio. Objects and Elements live inside it."
+      hint="You can add more Domains later and share Objects across them."
+      cta="Create Domain"
+      onCta={() => { window.dispatchEvent(new CustomEvent(CREATE_DOMAIN_EVENT)); }}
     />
   );
 }

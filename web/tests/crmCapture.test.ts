@@ -1,20 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { OPERATIONS_FIELDS } from '@/ActivitySpace/sustainment/operations/operationsModel';
-import { buildCrmWorkspace, DEFAULT_CRM_STAGES } from '@/ActivitySpace/sustainment/crm/crmModel';
+import { buildCrmWorkspace, DEFAULT_CRM_STAGES, type CrmDealRecord } from '@/Function/crm/crmModel';
 import {
   captureChanges, extractJson, findDates, parseAiCapture, parseAmount, readCapture, reviewRows, reviewValues,
-} from '@/ActivitySpace/sustainment/crm/crmCapture';
+} from '@/Function/crm/crmCapture';
 
 const today = '2026-10-03'; // a Saturday
-const fields = Object.fromEntries(OPERATIONS_FIELDS.map(field => [field.key, field.key]));
+const record = (values: Partial<CrmDealRecord>): CrmDealRecord => ({
+  id: 'x', pipeline_id: 'p', number: 1, name: '', company_id: null, contact_id: null, owner_worker_id: null, stage: 'proposal',
+  amount: null, currency: 'USD', probability: null, close_date: null, last_contact_on: null, next_step: null, next_step_on: null,
+  next_element_id: null, initiative_id: null, source: null, lost_reason: null, closed_on: null, custom: {}, created_at: '', renews_on: null, renewal_of: null, ...values,
+});
 const { deals } = buildCrmWorkspace({
-  columns: OPERATIONS_FIELDS.map(field => ({ id: field.key, type: field.type })),
-  rows: [{ id: 'acme' }, { id: 'beta' }],
-  cellsByRow: {
-    acme: { name: 'Acme rollout', account: 'Acme', stage: 'proposal', amount: 1000, probability: 50, currency: 'USD', closeDate: '2026-11-01' },
-    beta: { name: 'Beta pilot', account: 'Beta Corp', stage: 'won', amount: 10, currency: 'USD' },
-  },
-}, { kind: 'crm', tableId: 't', fields }, today);
+  pipeline: { id: 'p', name: 'Sales', stages: DEFAULT_CRM_STAGES, currency: 'USD', horizon_days: 30, follow_up_days: 14, object_id: null, measure_intent_id: null, measure_metric: null, measure_field: null, record_label: null, domain_id: null, order_index: 0, renewal_days: 90, renewal_pipeline_id: null },
+  deals: [
+    record({ id: 'acme', number: 1, name: 'Acme rollout', company_id: 'c-acme', stage: 'proposal', amount: 1000, probability: 50, close_date: '2026-11-01' }),
+    record({ id: 'beta', number: 2, name: 'Beta pilot', company_id: 'c-beta', stage: 'won', amount: 10 }),
+  ],
+  companies: [
+    { id: 'c-acme', name: 'Acme', domain: null, industry: null, owner_worker_id: null, notes: null, custom: {}, created_at: '', domain_id: null },
+    { id: 'c-beta', name: 'Beta Corp', domain: null, industry: null, owner_worker_id: null, notes: null, custom: {}, created_at: '', domain_id: null },
+  ],
+  contacts: [], activities: [], elements: [], people: [],
+}, today);
 
 describe('amounts', () => {
   it.each([

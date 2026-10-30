@@ -16,6 +16,7 @@ import {
 import type { ObjectTabType } from '@/types/database';
 import type { NavigationState } from '@/types/navigation';
 import { TabBar } from '@/shell/TabBar';
+import { bulkSetAssignee } from '@/hooks/bulkAssign';
 import { CalendarView } from '@/ActivitySpace/sustainment/calendar/CalendarView';
 import { SummaryView } from '@/ActivitySpace/execution/object/summary/SummaryView';
 import { OverviewView } from '@/ActivitySpace/execution/object/overview/OverviewView';
@@ -23,17 +24,18 @@ import { GanttView } from '@/ActivitySpace/execution/element/gantt';
 import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
 import { ResourceView } from '@/ActivitySpace/sustainment/workload/ResourceView';
 import { CustomView } from '@/ActivitySpace/execution/element/custom';
-import { useCustomColumns } from '@/Function/property';
-import { ElementDetailView } from '@/ActivitySpace/execution/element';
+import { useCustomColumns } from '@/Function/property/useCustomColumns';
+import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
-import { pushUndo } from '@/ActivitySpace/execution/element/bulkUndo';
+import { pushUndo } from '@/Function/shared/element/bulkUndo';
 import { Button } from '@/ui/button';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { Trash2 } from 'lucide-react';
 import { ObjectMembersPanel } from '@/ActivitySpace/execution/object/ObjectMembersPanel';
 import { ObjectElementsView } from '@/ActivitySpace/execution/object/ObjectElementsView';
-import type { ListSection } from '@/ActivitySpace/execution/object/ListTable';
+import type { ListSection } from '@/Function/shared/listTable/shared';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { sectionGroupValues, type ListControlsState, type SectionGroup } from '@/Function/shared/listControls';
 import { partitionAssignable } from '@/Function/shared/assignableWorkers';
@@ -70,6 +72,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
    *  tab's "Initiative" property row, which jumps out to the Strategy surface. */
   onViewChange?: (view: string) => void;
 }) {
+  const { t } = useI18n();
   const explorerData = useExplorerData();
 
   // Domain-shared Element types — option list for the Elements tab's `type` column.
@@ -282,7 +285,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
 
   // Bulk-select rows (checkbox / Shift-range / Cmd-click) — shared hook so
   // the behaviour matches the Domain Elements + My Elements lists.
-  const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
+  const { selectedRowIds, handleRowSelect, clearSelection, selectOnly } = useElementSelection();
 
   // Section "+" — every section belongs to this Object, so `object_id` is
   // fixed; what varies is the band, and the popup opens on that band's value
@@ -372,6 +375,14 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         },
       });
     }
+  };
+  // Hand the selection to one person (undoable); Elements they cannot take keep their people.
+  const assigneeOptions = useMemo(() => popupWorkers.map((w) => ({ id: w.id, name: w.name, hint: w.type === 'ai_agent' ? 'AI' : null })), [popupWorkers]);
+  const bulkAssign = async (workerId: string) => {
+    // What could not be handed over stays selected, with the bar saying why.
+    const failed = await bulkSetAssignee([...selectedRowIds], workerId, () => onRefresh?.());
+    selectOnly(failed);
+    return failed.length;
   };
   const bulkSetField = async (
     field: 'status' | 'priority' | 'due_date',
@@ -468,7 +479,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
               onTabReorder={reorderingTabs ? undefined : ids => {
                 setReorderingTabs(true);
                 void reorderObjectTabs(object.id, ids).catch(error => {
-                  void appDialog.alert(error instanceof Error ? error.message : 'Could not reorder tabs');
+                  void appDialog.alert(error instanceof Error ? error.message : t('Could not reorder tabs'));
                 }).finally(async () => {
                   try { await refetchTabs(); }
                   finally { setReorderingTabs(false); }
@@ -653,6 +664,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         onSetStatus={(s) => bulkSetField('status', s, `Set status of ${selectedRowIds.size} Elements`)}
         onSetPriority={(p) => bulkSetField('priority', p, `Set priority of ${selectedRowIds.size} Elements`)}
         onSetDueDate={(d) => bulkSetField('due_date', d, `Set due date of ${selectedRowIds.size} Elements`)}
+        onSetAssignee={(workerId) => bulkAssign(workerId)}
+        assigneeOptions={assigneeOptions}
         onClear={clearSelection}
       />
 
@@ -671,7 +684,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
               onClick={() => { setDeleteTarget({ id: breadcrumbCtx.id, name: breadcrumbCtx.name }); setBreadcrumbCtx(null); }}
             >
               <Trash2 size={12} />
-              Delete
+              {t('Delete')}
             </button>
           </div>
         </>
@@ -681,13 +694,13 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <DialogContent className="sm:max-w-[340px] p-6" showCloseButton={false}>
           <div className="text-center">
-            <DialogTitle className="text-[15px] font-semibold mb-1">Delete &apos;{deleteTarget?.name}&apos;?</DialogTitle>
-            <p className="text-[13px] text-muted-foreground mb-5">This action cannot be undone.</p>
+            <DialogTitle className="text-[15px] font-semibold mb-1">{t('Delete “{name}”?', { name: deleteTarget?.name ?? '' })}</DialogTitle>
+            <p className="text-[13px] text-muted-foreground mb-5">{t('This action cannot be undone.')}</p>
             <div className="flex flex-col gap-2">
               <Button variant="danger" size="md" onClick={handleDeleteObjectConfirm} disabled={isDeleting} className="w-full">
-                {isDeleting ? 'Deleting...' : 'Delete'}
+                {isDeleting ? t('Deleting…') : t('Delete')}
               </Button>
-              <Button variant="secondary" size="md" onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="w-full">Cancel</Button>
+              <Button variant="secondary" size="md" onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="w-full">{t('Cancel')}</Button>
             </div>
           </div>
         </DialogContent>

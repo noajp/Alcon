@@ -4,14 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, X } from 'lucide-react';
 import { isCommitEnter, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NavPhaseIcon } from '@/shell/sidebar/NavIcons';
-import { EmptyState } from '@/Function/shared/EmptyState';
+import { QuietEmpty } from '@/ActivitySpace/strategy/QuietEmpty';
+import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { PhaseBurnup } from '@/Function/shared/PhaseBurnup';
 import { DateField as SharedDateField } from '@/Function/shared/date';
 import { MenuShell } from '@/Function/shared/menu';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import {
   createPhase,
@@ -28,10 +30,10 @@ import {
   type PhaseReschedule,
   useDomains,
 } from '@/hooks/useSupabase';
-import { formatElementDate } from '@/Function/shared/dateUtils';
+import { formatElementDate, formatDateOnly, parseDateOnly } from '@/Function/shared/dateUtils';
 import type { PhaseStatus } from '@/types/database';
 import { PhaseCloseDialog } from './PhaseCloseDialog';
-import { seedPhaseDates, lastPhaseEndOf, todayKey } from './phaseDefaults';
+import { seedPhaseDates, lastPhaseEndOf, todayKey } from '@/Function/shared/phaseDefaults';
 import {
   PHASE_STANDING_LABEL,
   PHASE_STATUS_LABEL,
@@ -40,7 +42,7 @@ import {
   phaseStanding,
   todayYMD,
   type PhaseStanding,
-} from './phaseClose';
+} from '@/Function/strategy/phaseClose';
 
 // =============================================================
 // PhaseView — the Strategy layer's "Phase" app: Linear-Cycle-style
@@ -53,33 +55,19 @@ import {
 
 type PhaseMembers = Awaited<ReturnType<typeof fetchPhaseCandidates>>;
 
-// 'YYYY-MM-DD' → "Jul 14" (local, no timezone drift on bare dates).
-function fmtDate(s: string | null): string | null {
-  if (!s) return null;
-  const [y, m, d] = s.split('T')[0].split('-').map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-// 'YYYY-MM-DD' → local Date at midnight (no timezone drift on bare dates).
-function parseYMD(s: string): Date {
-  const [y, m, d] = s.split('T')[0].split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
 // "Jul\n16" — the two-line boundary label on the timeline rail.
-function railLabel(s: string): string {
-  const d = parseYMD(s);
-  return `${d.toLocaleDateString(undefined, { month: 'short' })}\n${d.getDate()}`;
+function railLabel(s: string, locale: string): string {
+  const d = parseDateOnly(s)!;
+  return `${d.toLocaleDateString(locale, { month: 'short' })}\n${d.getDate()}`;
 }
 
-// The badge ground for each standing. Out of time is the only one that argues
-// — it is the state nobody chose.
-const STANDING_BADGE: Record<PhaseStanding, string> = {
-  planned: 'bg-muted/60 text-muted-foreground',
-  active: 'bg-muted/60 text-muted-foreground',
-  out_of_time: 'bg-[var(--status-warning-subtle)] text-[var(--status-warning)]',
-  complete: 'bg-[var(--status-success-subtle)] text-[var(--status-success)]',
+// The tone of each standing's label. Out of time is the only one that argues
+// — it is the state nobody chose, and the only one that asks for action.
+const STANDING_TONE: Record<PhaseStanding, string> = {
+  planned: 'text-muted-foreground',
+  active: 'text-muted-foreground',
+  out_of_time: 'text-[var(--status-warning)]',
+  complete: 'text-muted-foreground',
 };
 
 const STANDING_DOT: Record<PhaseStanding, string> = {
@@ -104,7 +92,7 @@ function phaseMetrics(p: Phase, members: PhaseMembers) {
 function weekdaysLeft(end: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const endD = parseYMD(end);
+  const endD = parseDateOnly(end)!;
   let n = 0;
   for (const t = new Date(today); t <= endD; t.setDate(t.getDate() + 1)) {
     const dow = t.getDay();
@@ -124,7 +112,7 @@ function ProgressRing({ value }: { value: number }) {
       {v > 0 && (
         <circle
           cx={7} cy={7} r={r} fill="none"
-          stroke="var(--status-success)" strokeWidth={2}
+          stroke="var(--text-secondary)" strokeWidth={2}
           strokeDasharray={`${c * v} ${c}`} strokeLinecap="round"
         />
       )}
@@ -143,6 +131,7 @@ export function PhaseView({
   /** Jump to the Initiative a decision was recorded under. */
   onOpenInitiative?: (strategyId: string) => void;
 }) {
+  const { t } = useI18n();
   const { data: phases, loading, refetch } = usePhases(activeDomainId);
   // The create dialog seeds its dates from the Domain's defaults and the
   // last Phase, once, on open — so it waits for both to be loaded.
@@ -182,14 +171,14 @@ export function PhaseView({
   return (
     <div className="flex flex-col h-full bg-card">
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-        <NavPhaseIcon size={12} />
-        <span className="text-[12px] font-semibold text-foreground">Phase</span>
+        <NavPhaseIcon size={14} />
+        <span className="text-[13px] font-medium text-foreground">{t('Phase')}</span>
         <div className="flex-1" />
         <button
           type="button"
           onClick={() => setNewOpen(true)}
-          title="Add Phase"
-          aria-label="Add Phase"
+          title={t('Add Phase')}
+          aria-label={t('Add Phase')}
           className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
         >
           <Plus size={14} />
@@ -198,11 +187,10 @@ export function PhaseView({
 
       <div className="flex-1 overflow-hidden">
         {loading ? null : !activeDomainId ? (
-          <div className="h-full flex items-center justify-center text-[13px] text-muted-foreground px-6">
-            Select a Domain to plan its Phases.
-          </div>
+          <QuietEmpty text={t('Select a Domain to plan its Phases.')} />
         ) : phases.length === 0 ? (
-          <EmptyPrompt onCreate={() => setNewOpen(true)} />
+          <QuietEmpty text={t('No Phases yet. A Phase time-boxes a stage of work — requirements, design, build.')}
+            cta={t('Create Phase')} onCta={() => setNewOpen(true)} />
         ) : (
           <PhaseTimeline phases={phases} members={members} onOpen={setOpenPhaseId} />
         )}
@@ -223,19 +211,6 @@ export function PhaseView({
   );
 }
 
-function EmptyPrompt({ onCreate }: { onCreate: () => void }) {
-  return (
-    <EmptyState
-      icon={NavPhaseIcon}
-      title="Add Phases"
-      description="A Phase time-boxes a stage of work — requirements, design, build."
-      hint="Assign Objects and Elements to it and track what each period covers."
-      cta="Create Phase"
-      onCta={onCreate}
-    />
-  );
-}
-
 // =============================================================
 // Timeline list — Linear's Cycles page: a vertical date rail on the left
 // (dot + "Jul 16" label at each Phase boundary, filled dot on the current
@@ -251,6 +226,7 @@ function PhaseTimeline({
   members: PhaseMembers;
   onOpen: (id: string) => void;
 }) {
+  const { t, locale } = useI18n();
   // Newest first (upcoming → current → completed); undated phases sink.
   const sorted = useMemo(
     () => [...phases].sort((a, b) => (b.start_date ?? '').localeCompare(a.start_date ?? '')),
@@ -271,7 +247,7 @@ function PhaseTimeline({
         const donePct = m.total > 0 ? Math.round((m.done / m.total) * 100) : 0;
         const isCurrent = standing === 'active';
         return (
-          <div key={p.id} className="relative border-b border-border/40">
+          <div key={p.id} className="relative">
             {/* Rail — the segment of the vertical date line this row owns. */}
             <span
               aria-hidden
@@ -283,7 +259,7 @@ function PhaseTimeline({
               <>
                 <span aria-hidden className="absolute left-[3.5rem] top-0 -translate-x-1/2 -translate-y-1/2 size-2 rounded-full bg-card border border-muted-foreground/50" />
                 <span className="absolute left-2 top-0 -translate-y-1/2 w-9 text-right text-[10px] leading-[1.15] text-muted-foreground whitespace-pre">
-                  {railLabel(p.end_date)}
+                  {railLabel(p.end_date, locale)}
                 </span>
               </>
             )}
@@ -298,7 +274,7 @@ function PhaseTimeline({
                   }`}
                 />
                 <span className="absolute left-2 bottom-0 translate-y-1/2 w-9 text-right text-[10px] leading-[1.15] text-muted-foreground whitespace-pre">
-                  {railLabel(p.start_date)}
+                  {railLabel(p.start_date, locale)}
                 </span>
               </>
             )}
@@ -307,30 +283,21 @@ function PhaseTimeline({
               <button
                 type="button"
                 onClick={() => onOpen(p.id)}
-                className="w-full flex items-center gap-3 py-5 text-left rounded-md transition-colors hover:bg-muted/10"
+                className="w-full flex items-center gap-3 px-2 py-5 text-left rounded-md transition-colors hover:bg-muted/40"
               >
                 <CirclePlay size={16} className={isCurrent ? 'text-foreground shrink-0' : 'text-muted-foreground shrink-0'} />
                 <span className="text-[13px] font-semibold text-foreground flex-1 truncate">{p.name}</span>
-                <span className={`px-2 py-0.5 rounded text-[11px] shrink-0 ${STANDING_BADGE[standing]}`}>
-                  {PHASE_STANDING_LABEL[standing]}
+                <span className={`text-[11px] shrink-0 ${STANDING_TONE[standing]}`}>
+                  {t(PHASE_STANDING_LABEL[standing])}
                 </span>
-                <span className="flex items-center gap-3 text-[12px] shrink-0">
+                <span className="flex items-center gap-3 text-[12px] text-foreground tabular-nums shrink-0">
                   <span className="flex items-center gap-1.5">
                     <ProgressRing value={m.total > 0 ? m.done / m.total : 0} />
-                    <span className="text-foreground font-medium tabular-nums">{donePct}%</span>
-                    <span className="text-muted-foreground">done</span>
+                    {t('{pct}% done', { pct: donePct })}
                   </span>
-                  {standing === 'active' && p.end_date ? (
-                    <>
-                      <span className="text-foreground font-medium tabular-nums">{weekdaysLeft(p.end_date)}</span>
-                      <span className="text-muted-foreground -ml-2">weekdays left</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-foreground font-medium tabular-nums">{m.done}/{m.total}</span>
-                      <span className="text-muted-foreground -ml-2">Elements</span>
-                    </>
-                  )}
+                  {standing === 'active' && p.end_date
+                    ? <span>{t('{n} weekdays left', { n: weekdaysLeft(p.end_date) })}</span>
+                    : <span>{t('{done}/{total} Elements', { done: m.done, total: m.total })}</span>}
                 </span>
               </button>
 
@@ -392,6 +359,7 @@ function PhaseDetailView({
   onOpenObject?: (objectId: string, domainId: string | null) => void;
   onOpenInitiative?: (strategyId: string) => void;
 }) {
+  const { t, locale } = useI18n();
   const [name, setName] = useState(phase.name);
   const [pickerFor, setPickerFor] = useState<'objects' | 'elements' | null>(null);
   const [query, setQuery] = useState('');
@@ -474,20 +442,20 @@ function PhaseDetailView({
         <button
           type="button"
           onClick={onBack}
-          className="px-1.5 py-0.5 rounded text-[12px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+          className="px-1.5 py-0.5 rounded text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
         >
-          Phase
+          {t('Phase')}
         </button>
         <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
-        <span className="px-1.5 py-0.5 text-[12px] font-semibold text-foreground truncate max-w-[240px]">
+        <span className="px-1.5 py-0.5 text-[13px] font-medium text-foreground truncate max-w-[240px]">
           {phase.name}
         </span>
         <div className="flex-1" />
         <button
           type="button"
           onClick={() => void handleDelete()}
-          title="Delete Phase"
-          aria-label="Delete Phase"
+          title={t('Delete Phase')}
+          aria-label={t('Delete Phase')}
           className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-[var(--status-danger)] hover:bg-muted rounded-md transition-colors"
         >
           <X size={13} />
@@ -497,15 +465,14 @@ function PhaseDetailView({
       <div className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto px-8 py-8 space-y-5">
           <div>
-            <span className="w-9 h-9 -ml-2 rounded-lg bg-muted/40 flex items-center justify-center text-foreground/70 mb-3">
-              <NavPhaseIcon size={18} />
-            </span>
+            <PageIcon><NavPhaseIcon size={18} /></PageIcon>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               onBlur={() => void saveName()}
-              placeholder="Phase name"
-              className="w-full text-2xl font-semibold text-foreground bg-transparent border-none outline-none leading-tight tracking-normal"
+              placeholder={t('Phase name')}
+              className={`w-full bg-transparent border-none outline-none ${PAGE_TITLE}`}
+              style={PAGE_TITLE_WEIGHT}
             />
           </div>
 
@@ -518,24 +485,24 @@ function PhaseDetailView({
             />
             <span className="text-[12px] text-muted-foreground">
               {rollup.total === 0
-                ? 'No Elements in this Phase'
-                : `${rollup.done} of ${rollup.total} Elements done`}
+                ? t('No Elements in this Phase')
+                : t('{done} of {total} Elements done', { done: rollup.done, total: rollup.total })}
             </span>
             {standing === 'out_of_time' && phase.end_date && (
               <span className="text-[12px] text-[var(--status-warning)]">
-                Ran past {fmtDate(phase.end_date)} without being closed
+                {t('Ran past {date} without being closed', { date: formatDateOnly(phase.end_date, locale) ?? '' })}
               </span>
             )}
             {standing === 'complete' && phase.closed_at && (
-              <span className="text-[12px] text-muted-foreground">Closed {fmtDate(phase.closed_at)}</span>
+              <span className="text-[12px] text-muted-foreground">{t('Closed {date}', { date: formatDateOnly(phase.closed_at, locale) ?? '' })}</span>
             )}
           </div>
 
           {/* The note only stands while the Phase is closed — reopening leaves
               it as the draft for the next close rather than destroying it. */}
           {standing === 'complete' && phase.closing_note && (
-            <div className="max-w-2xl rounded-md bg-muted/30 px-3 py-2">
-              <span className="block text-[11px] font-medium text-muted-foreground mb-1">Closing note</span>
+            <div className="max-w-2xl">
+              <span className="block text-[11px] font-medium text-muted-foreground mb-1">{t('Closing note')}</span>
               <p className="text-[13px] text-foreground whitespace-pre-wrap">{phase.closing_note}</p>
             </div>
           )}
@@ -543,12 +510,12 @@ function PhaseDetailView({
           {/* Period — the time box itself. */}
           <div className="flex items-end gap-3 max-w-md">
             <DateField
-              label="Start"
+              label={t('Start')}
               value={phase.start_date ?? ''}
               onChange={(v) => void saveDates({ start_date: v || null })}
             />
             <DateField
-              label="End"
+              label={t('End')}
               value={phase.end_date ?? ''}
               onChange={(v) => void saveDates({ end_date: v || null })}
             />
@@ -558,38 +525,32 @@ function PhaseDetailView({
           <PhaseReschedules phaseId={phase.id} onOpenInitiative={onOpenInitiative} />
 
           {/* ── Objects ── */}
-          <section>
-            <div className="h-px bg-border mb-3" />
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-[13px] font-medium text-foreground/90">Objects</h2>
-              <button
-                type="button"
-                aria-label="Add Objects"
-                onClick={() => { setPickerFor(pickerFor === 'objects' ? null : 'objects'); setQuery(''); }}
-                className="flex items-center justify-center size-5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-              >
+          <PageSection title={t('Objects')} action={
+            <ButtonAppearanceProvider appearance="navigation">
+              <Button variant="ghost" size="icon-xs" aria-label={t('Add Objects')} className="text-muted-foreground"
+                onClick={() => { setPickerFor(pickerFor === 'objects' ? null : 'objects'); setQuery(''); }}>
                 <Plus size={13} />
-              </button>
-            </div>
-
+              </Button>
+            </ButtonAppearanceProvider>
+          }>
             {myObjects.length === 0 && pickerFor !== 'objects' && (
-              <div className="text-[12px] text-muted-foreground/50 py-1">No Objects in this Phase yet.</div>
+              <div className="px-2 text-[12px] text-muted-foreground/60 py-1">{t('No Objects in this Phase yet.')}</div>
             )}
             {myObjects.map((o) => (
               <div
                 key={o.id}
                 onClick={() => onOpenObject?.(o.id, phase.domain_id)}
-                className={`flex items-center gap-2 px-1 py-1.5 min-h-[2.375rem] rounded-md group/row hover:bg-muted/20 transition-colors ${onOpenObject ? 'cursor-pointer' : ''}`}
+                className={`flex items-center gap-2 px-2 py-1 min-h-8 rounded-md group/row hover:bg-muted/40 transition-colors ${onOpenObject ? 'cursor-pointer' : ''}`}
               >
                 <ObjectIcon size={13} className="text-muted-foreground shrink-0" />
-                <span className="text-[13px] font-[550] text-foreground truncate flex-1 min-w-0">{o.name}</span>
+                <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{o.name}</span>
                 {o.due_date && (
-                  <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">{fmtDate(o.due_date)}</span>
+                  <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">{formatDateOnly(o.due_date, locale)}</span>
                 )}
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); void setObjectPhase(o.id, null); }}
-                  aria-label={`Remove ${o.name} from this Phase`}
+                  aria-label={t('Remove {name} from this Phase', { name: o.name })}
                   className="shrink-0 flex items-center justify-center size-5 rounded text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-foreground hover:bg-muted/40 transition-opacity"
                 >
                   <X size={12} />
@@ -599,7 +560,7 @@ function PhaseDetailView({
 
             {pickerFor === 'objects' && (
               <MemberPicker
-                placeholder="Search Objects…"
+                placeholder={t('Search Objects…')}
                 query={query}
                 onQuery={setQuery}
                 onClose={closePicker}
@@ -610,45 +571,41 @@ function PhaseDetailView({
                     type="button"
                     key={o.id}
                     onClick={() => void setObjectPhase(o.id, phase.id)}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-accent text-left"
+                    className="w-full flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] hover:bg-muted/40 text-left"
                   >
                     <ObjectIcon size={11} />
                     <span className="flex-1 truncate text-foreground">{o.name}</span>
-                    {o.phase_id && <span className="text-[10px] text-muted-foreground shrink-0">in another Phase</span>}
+                    {o.phase_id && <span className="text-[10px] text-muted-foreground shrink-0">{t('In another Phase')}</span>}
                   </button>
                 ))}
               </MemberPicker>
             )}
-          </section>
+          </PageSection>
 
           {/* ── Elements ── */}
-          <section>
-            <div className="h-px bg-border mb-3" />
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-[13px] font-medium text-foreground/90">Elements</h2>
-              <button
-                type="button"
-                aria-label="Add Elements"
-                onClick={() => { setPickerFor(pickerFor === 'elements' ? null : 'elements'); setQuery(''); }}
-                className="flex items-center justify-center size-5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-              >
+          <PageSection title={t('Elements')} action={
+            <ButtonAppearanceProvider appearance="navigation">
+              <Button variant="ghost" size="icon-xs" aria-label={t('Add Elements')} className="text-muted-foreground"
+                onClick={() => { setPickerFor(pickerFor === 'elements' ? null : 'elements'); setQuery(''); }}>
                 <Plus size={13} />
-              </button>
-            </div>
-
+              </Button>
+            </ButtonAppearanceProvider>
+          }>
             {myElements.length === 0 && pickerFor !== 'elements' && (
-              <div className="text-[12px] text-muted-foreground/50 py-1">No Elements in this Phase yet.</div>
+              <div className="px-2 text-[12px] text-muted-foreground/60 py-1">{t('No Elements in this Phase yet.')}</div>
             )}
             {myElements.map((el) => (
               <div
                 key={el.id}
-                className="flex items-center gap-2 px-1 py-1.5 min-h-[2.375rem] rounded-md group/row hover:bg-muted/20 transition-colors"
+                className="flex items-center gap-2 px-2 py-1 min-h-8 rounded-md group/row hover:bg-muted/40 transition-colors"
               >
                 <ElementProgressMark status={el.status} size={14} />
-                <span className="text-[13px] font-[550] text-foreground truncate flex-1 min-w-0">{el.title}</span>
+                <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{el.title}</span>
                 {el.carried_over_count > 0 && (() => {
                   const reason = carryReasons.get(el.id)?.reason;
-                  const countLabel = `Carried through ${el.carried_over_count} earlier ${el.carried_over_count === 1 ? 'Phase' : 'Phases'}`;
+                  const countLabel = el.carried_over_count === 1
+                    ? t('Carried through 1 earlier Phase')
+                    : t('Carried through {n} earlier Phases', { n: el.carried_over_count });
                   return (
                     <span
                       title={reason ? `${countLabel} — ${reason}` : countLabel}
@@ -672,12 +629,12 @@ function PhaseDetailView({
                   </span>
                 )}
                 {el.due_date && (
-                  <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">{fmtDate(el.due_date)}</span>
+                  <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">{formatDateOnly(el.due_date, locale)}</span>
                 )}
                 <button
                   type="button"
                   onClick={() => void setElementPhase(el.id, null)}
-                  aria-label={`Remove ${el.title} from this Phase`}
+                  aria-label={t('Remove {name} from this Phase', { name: el.title })}
                   className="shrink-0 flex items-center justify-center size-5 rounded text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-foreground hover:bg-muted/40 transition-opacity"
                 >
                   <X size={12} />
@@ -687,7 +644,7 @@ function PhaseDetailView({
 
             {pickerFor === 'elements' && (
               <MemberPicker
-                placeholder="Search Elements…"
+                placeholder={t('Search Elements…')}
                 query={query}
                 onQuery={setQuery}
                 onClose={closePicker}
@@ -698,7 +655,7 @@ function PhaseDetailView({
                     type="button"
                     key={el.id}
                     onClick={() => void setElementPhase(el.id, phase.id)}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-accent text-left"
+                    className="w-full flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] hover:bg-muted/40 text-left"
                   >
                     <ElementIcon size={11} />
                     <span className="flex-1 truncate text-foreground">{el.title}</span>
@@ -711,7 +668,7 @@ function PhaseDetailView({
                 ))}
               </MemberPicker>
             )}
-          </section>
+          </PageSection>
         </div>
       </div>
 
@@ -748,26 +705,25 @@ function PhaseReschedules({
   phaseId: string;
   onOpenInitiative?: (strategyId: string) => void;
 }) {
+  const { t } = useI18n();
   const { data, error } = usePhaseReschedules(phaseId);
   if (error) {
     return (
       <p className="text-[12px] text-[var(--status-danger)]">
-        Could not read what moved this Phase.
+        {t('Could not read what moved this Phase.')}
       </p>
     );
   }
   if (data.length === 0) return null;
 
   return (
-    <section>
-      <div className="h-px bg-border mb-3" />
-      <h2 className="text-[13px] font-medium text-foreground/90 mb-2">Why these dates moved</h2>
+    <PageSection title={t('Why these dates moved')}>
       <div className="flex flex-col">
         {data.map((entry) => (
           <ReschedulingDecision key={entry.bindingId} entry={entry} onOpenInitiative={onOpenInitiative} />
         ))}
       </div>
-    </section>
+    </PageSection>
   );
 }
 
@@ -781,24 +737,25 @@ function ReschedulingDecision({
   entry: PhaseReschedule;
   onOpenInitiative?: (strategyId: string) => void;
 }) {
+  const { t } = useI18n();
   const decided = formatElementDate(entry.decidedAt);
   return (
-    <div className="py-2 border-b border-border/40 last:border-b-0">
+    <div className="-mx-2 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
       <div className="flex items-center gap-2">
         <span className="size-1.5 rounded-full shrink-0 bg-[var(--text-tertiary)]" aria-hidden />
         <span className="text-[13px] font-[550] text-foreground truncate min-w-0 flex-1">
           {entry.title}
         </span>
+        {/* The way back to the Initiative is a quiet link, not a capsule. */}
         {onOpenInitiative && (
-          <Button
-            variant="ghost"
-            size="xs"
-            aria-label={`Open ${entry.strategyName}`}
+          <button
+            type="button"
+            aria-label={t('Open {name}', { name: entry.strategyName })}
             onClick={() => onOpenInitiative(entry.strategyId)}
-            className="shrink-0 text-muted-foreground/60 hover:text-muted-foreground max-w-[180px]"
+            className="shrink-0 max-w-[180px] truncate text-[12px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
           >
-            <span className="truncate">{entry.strategyName}</span>
-          </Button>
+            {entry.strategyName}
+          </button>
         )}
       </div>
 
@@ -807,17 +764,17 @@ function ReschedulingDecision({
       <p className="text-[12px] text-muted-foreground pl-3.5 mt-0.5">
         {entry.abandoned ? (
           <>
-            <span className="text-[var(--text-tertiary)]">Gave up </span>
+            <span className="text-[var(--text-tertiary)]">{t('Gave up')} </span>
             {entry.abandoned}
           </>
         ) : (
-          <span className="text-muted-foreground/50">Nothing recorded as given up</span>
+          <span className="text-muted-foreground/50">{t('Nothing recorded as given up')}</span>
         )}
       </p>
 
       {(entry.decidedByName || decided) && (
         <p className="text-[11px] text-muted-foreground/70 pl-3.5 mt-0.5">
-          {[entry.decidedByName, decided ? `decided ${decided}` : null].filter(Boolean).join(' · ')}
+          {[entry.decidedByName, decided ? t('decided {date}', { date: decided }) : null].filter(Boolean).join(' · ')}
         </p>
       )}
     </div>
@@ -838,19 +795,20 @@ function PhaseStatusMenu({
   standing: PhaseStanding;
   onSelect: (status: PhaseStatus) => void;
 }) {
+  const { t } = useI18n();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="secondary" size="xs" align="start" aria-label="Phase status">
+        <Button variant="secondary" size="xs" align="start" aria-label={t('Phase status')}>
           <span className={`size-1.5 rounded-full ${STANDING_DOT[standing]}`} aria-hidden />
-          {PHASE_STANDING_LABEL[standing]}
+          {t(PHASE_STANDING_LABEL[standing])}
           <ChevronDown size={12} className="text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <MenuShell as="dropdown" align="start">
         {PHASE_STATUS_ORDER.map((s) => (
           <DropdownMenuItem key={s} onSelect={() => onSelect(s)} className="justify-between">
-            {PHASE_STATUS_LABEL[s]}
+            {t(PHASE_STATUS_LABEL[s])}
             {s === status && <Check size={13} className="text-muted-foreground" />}
           </DropdownMenuItem>
         ))}
@@ -881,9 +839,10 @@ function MemberPicker({
   // list: a row click moves focus off the input, and this is the layer
   // that keeps catching Escape after that.
   useEscapeLayer(true, onClose);
+  const { t } = useI18n();
   return (
     <>
-      <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-2">
+      <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-1">
         <Search size={12} className="text-muted-foreground" />
         <input
           value={query}
@@ -892,13 +851,13 @@ function MemberPicker({
           className="flex-1 bg-transparent text-[13px] outline-none"
           autoFocus
         />
-        <button type="button" onClick={onClose} aria-label="Close" className="text-muted-foreground hover:text-foreground">
+        <button type="button" onClick={onClose} aria-label={t('Close')} className="text-muted-foreground hover:text-foreground">
           <X size={12} />
         </button>
       </div>
-      <div className="rounded-lg border border-border/60 bg-card max-h-72 overflow-auto">
+      <div className="max-h-72 overflow-auto">
         {empty && (
-          <div className="px-3 py-3 text-[12px] text-muted-foreground italic">No matches</div>
+          <div className="px-3 py-3 text-[12px] text-muted-foreground">{t('No matches.')}</div>
         )}
         {children}
       </div>
@@ -918,6 +877,7 @@ function PhaseCreateDialog({
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
+  const { t } = useI18n();
   const [name, setName] = useState('');
   // Dates start from the Domain's Phase defaults (Settings > Strategy >
   // Phase) — seeded once on open; the fields stay editable.
@@ -958,9 +918,9 @@ function PhaseCreateDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="h-10 flex items-center px-4 border-b border-border/60">
-          <span className="text-[13px] font-semibold text-foreground">New Phase</span>
+          <span className="text-[13px] font-semibold text-foreground">{t('New Phase')}</span>
           <div className="flex-1" />
-          <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close">
+          <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label={t('Close')}>
             <X size={14} />
           </button>
         </div>
@@ -969,7 +929,7 @@ function PhaseCreateDialog({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Phase name (e.g. 要件定義)"
+            placeholder={t('Phase name (e.g. Requirements)')}
             autoFocus
             onKeyDown={(e) => {
               if (isCommitEnter(e)) {
@@ -980,25 +940,21 @@ function PhaseCreateDialog({
             className="w-full text-xl font-semibold text-foreground bg-transparent border-none outline-none leading-tight"
           />
           <div className="flex items-end gap-3">
-            <DateField label="Start" value={startDate} onChange={setStartDate} />
-            <DateField label="End" value={endDate} onChange={setEndDate} />
+            <DateField label={t('Start')} value={startDate} onChange={setStartDate} />
+            <DateField label={t('End')} value={endDate} onChange={setEndDate} />
           </div>
         </div>
 
         <div className="h-12 flex items-center justify-end gap-2 px-4 border-t border-border/60">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1.5 rounded-md text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/30"
-          >
-            Cancel
-          </button>
+          <Button variant="ghost" type="button" onClick={onClose}>
+            {t('Cancel')}
+          </Button>
           <Button variant="primary"
             type="button"
             onClick={() => void handleSave()}
             disabled={!canSave || saving}
           >
-            {saving ? 'Saving…' : 'Create'}
+            {saving ? t('Saving…') : t('Create')}
           </Button>
         </div>
       </div>

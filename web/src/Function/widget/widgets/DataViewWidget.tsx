@@ -18,11 +18,12 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { MenuShell, MENU_ROW } from "@/Function/shared/menu";
-import { useDataTables } from "@/ActivitySpace/sustainment/table/data";
-import { useWidgetTableData } from "@/hooks/useWidgetTableData";
+import { useDataTables } from "@/hooks/tableData";
+import { useTableData } from "@/hooks/useTableData";
 import type { DataTableColumn, DataTableColumnType } from "@/types/database";
 import { WidgetHeaderAction, useWidgetMeta } from "../WidgetFrame";
 import type { WidgetProps } from "../types";
+import { useI18n } from "@/Function/i18n/I18nProvider";
 import {
   dataBars,
   displayCell,
@@ -33,6 +34,13 @@ import {
 
 const INPUT =
   "h-8 min-w-0 w-full rounded-sm bg-transparent px-2 text-sm hover:bg-muted/40 focus:bg-muted/60 disabled:opacity-50";
+const COLUMN_TYPE_LABEL: Record<string, string> = {
+  text: "Text",
+  number: "Number",
+  date: "Date",
+  select: "Select",
+  checkbox: "Checkbox",
+};
 const COLUMN_TYPES: DataTableColumnType[] = [
   "text",
   "number",
@@ -54,6 +62,7 @@ function Choice({
   onChange: (id: string) => void;
   disabled?: boolean;
 }) {
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   return (
     <DropdownMenu onOpenChange={() => setSearch("")}>
@@ -67,7 +76,7 @@ function Choice({
           className="max-w-full"
         >
           <span className="truncate">
-            {label}: {options.find((o) => o.id === value)?.label ?? "Choose…"}
+            {t("{label}: {value}", { label, value: options.find((o) => o.id === value)?.label ?? t("Choose…") })}
           </span>
           <ChevronDown size={12} />
         </Button>
@@ -75,8 +84,8 @@ function Choice({
       <MenuShell as="dropdown" width="standard" align="start">
         <input
           autoFocus
-          aria-label={`Find ${label.toLowerCase()}`}
-          placeholder={`Choose ${label.toLowerCase()}…`}
+          aria-label={t("Find {name}", { name: label })}
+          placeholder={t("Choose…")}
           className={INPUT}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -122,6 +131,7 @@ function EditValue({
   disabled?: boolean;
   type?: string;
 }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
@@ -135,7 +145,7 @@ function EditValue({
       await onSave(draft);
       setDraft(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save. Try again.");
+      setError(e instanceof Error ? e.message : t("Could not save. Try again."));
     } finally {
       busy.current = false;
       setSaving(false);
@@ -166,14 +176,14 @@ function EditValue({
       />
       {saving && (
         <span className="px-2 text-xs text-muted-foreground" role="status">
-          Saving…
+          {t("Saving…")}
         </span>
       )}
       {error && (
         <div className="px-2 text-xs text-destructive" role="alert">
           {error}
           <Button variant="ghost" size="xs" onClick={() => void save()}>
-            Retry
+            {t("Retry")}
           </Button>
         </div>
       )}
@@ -182,9 +192,10 @@ function EditValue({
 }
 
 export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
+  const { t } = useI18n();
   const params = normalizeDataViewParams(rawParams);
   const tables = useDataTables();
-  const source = useWidgetTableData(params.tableId);
+  const source = useTableData(params.tableId);
   const [configure, setConfigure] = useState(!params.tableId);
   const [editData, setEditData] = useState(false);
   const [newTable, setNewTable] = useState("");
@@ -212,7 +223,7 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
     try {
       await action();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save. Try again.");
+      setError(e instanceof Error ? e.message : t("Could not save. Try again."));
     } finally {
       busy.current = false;
       setSaving(false);
@@ -261,11 +272,11 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
           variant="ghost"
           size="xs"
           onClick={() => setConfigure(!configure)}
-          aria-label="Configure data widget"
+          aria-label={t("Configure data widget")}
           aria-expanded={configure}
         >
           <Settings2 size={12} />
-          Configure
+          {t("Configure")}
         </Button>
       </WidgetHeaderAction>
       <div
@@ -281,7 +292,7 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
         {(configure || !params.tableId) && (
           <div className="space-y-2">
             <Choice
-              label="Table"
+              label={t("Table")}
               value={params.tableId}
               options={(tables.data ?? []).map((t) => ({
                 id: t.id,
@@ -301,17 +312,17 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
               }}
             />
             {tables.loading && (
-              <p className="text-xs text-muted-foreground">Loading tables…</p>
+              <p className="text-xs text-muted-foreground">{t("Loading tables…")}</p>
             )}
             {tables.error && (
               <p role="alert" className="text-sm text-destructive">
-                Could not load tables.
+                {t("Could not load tables.")}
                 <Button
                   variant="ghost"
                   size="xs"
                   onClick={() => void tables.refetch()}
                 >
-                  Retry
+                  {t("Retry")}
                 </Button>
               </p>
             )}
@@ -334,8 +345,8 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
               }}
             >
               <input
-                aria-label="New table name"
-                placeholder="Name a new table…"
+                aria-label={t("New table name")}
+                placeholder={t("Name a new table…")}
                 className={INPUT}
                 value={newTable}
                 onChange={(e) => setNewTable(e.target.value)}
@@ -347,46 +358,46 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                 size="sm"
                 disabled={saving || !newTable.trim()}
               >
-                Create table
+                {t("Create table")}
               </Button>
             </form>
             {data && (
               <>
-                <p className="px-2 text-xs text-muted-foreground">Widget title</p>
+                <p className="px-2 text-xs text-muted-foreground">{t("Widget title")}</p>
                 <EditValue
                   value={params.title ?? ""}
-                  label="Widget title"
+                  label={t("Widget title")}
                   onSave={async (title) => change({ title })}
                 />
                 <Choice
-                  label="View"
+                  label={t("View")}
                   value={params.view}
                   options={[
-                    { id: "table", label: "Table" },
-                    { id: "cards", label: "Cards" },
-                    { id: "bar", label: "Bars" },
+                    { id: "table", label: t("Table") },
+                    { id: "cards", label: t("Cards") },
+                    { id: "bar", label: t("Bars") },
                   ]}
                   onChange={(view) =>
                     change({ view: view as typeof params.view })
                   }
                 />
                 <Choice
-                  label="Label"
+                  label={t("Label")}
                   value={params.labelColumnId ?? ""}
-                  options={[{ id: "", label: "Row number" }, ...columnOptions]}
+                  options={[{ id: "", label: t("Row number") }, ...columnOptions]}
                   onChange={(id) => change({ labelColumnId: id || null })}
                 />
                 {params.view === "cards" && (
                   <Choice
-                    label="Group by"
+                    label={t("Group by")}
                     value={params.groupColumnId ?? ""}
-                    options={[{ id: "", label: "None" }, ...columnOptions]}
+                    options={[{ id: "", label: t("None") }, ...columnOptions]}
                     onChange={(id) => change({ groupColumnId: id || null })}
                   />
                 )}
                 {params.view === "bar" && (
                   <Choice
-                    label="Value"
+                    label={t("Value")}
                     value={params.valueColumnId}
                     options={data.columns
                       .filter((c) => c.type === "number")
@@ -421,7 +432,7 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                   <div className="min-w-0 flex-1">
                     <EditValue
                       value={data.table.name}
-                      label="Table name"
+                      label={t("Table name")}
                       disabled={saving}
                       onSave={(name) => source.renameTable(name)}
                     />
@@ -429,11 +440,11 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    aria-label="Delete table"
+                    aria-label={t("Delete table")}
                     disabled={saving}
                     onClick={() =>
                       setConfirm({
-                        label: `Delete “${data.table.name}” and all its rows and columns? Every widget using this table will lose its data.`,
+                        label: t("Delete “{name}” and all its rows and columns? Every widget using this table will lose its data.", { name: data.table.name }),
                         run: async () => {
                           await source.deleteTable();
                           change({ tableId: null });
@@ -450,30 +461,29 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
         )}
         {source.loading && (
           <p className="text-sm text-muted-foreground" role="status">
-            Loading data…
+            {t("Loading data…")}
           </p>
         )}
         {source.error && (
           <div role="alert" className="text-sm text-destructive">
-            Could not load this table.
+            {t("Could not load this table.")}
             <Button
               variant="ghost"
               size="xs"
               onClick={() => void source.refetch()}
             >
-              Retry
+              {t("Retry")}
             </Button>
           </div>
         )}
         {!params.tableId && (
           <p className="text-sm text-muted-foreground">
-            Choose a table or create one. Add your own columns and rows, then
-            display the same data as a table, cards, or chart.
+            {t("Choose a table or create one. Add your own columns and rows, then display the same data as a table, cards, or chart.")}
           </p>
         )}
         {params.tableId && !source.loading && !source.error && !data && (
           <p className="text-sm text-muted-foreground">
-            This table is unavailable. Choose another table in Configure.
+            {t("This table is unavailable. Choose another table in Configure.")}
           </p>
         )}
         {data && (
@@ -485,12 +495,12 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                 onClick={() => setEditData(!editData)}
                 aria-expanded={editData}
               >
-                {editData ? "Hide data editor" : "Edit data"}
+                {editData ? t("Hide data editor") : t("Edit data")}
               </Button>
             )}
             {!data.rows.length && (
               <p className="text-sm text-muted-foreground">
-                No rows yet. Add columns and rows in the data editor.
+                {t("No rows yet. Add columns and rows in the data editor.")}
               </p>
             )}
             {showEditor && (
@@ -507,7 +517,7 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                             <div className="flex items-center">
                               <EditValue
                                 value={column.name}
-                                label={`Rename ${column.name}`}
+                                label={t("Rename {name}", { name: column.name })}
                                 disabled={saving}
                                 onSave={(name) =>
                                   source.renameColumn(column.id, name)
@@ -516,11 +526,11 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                               <Button
                                 variant="ghost"
                                 size="icon-xs"
-                                aria-label={`Delete column ${column.name}`}
+                                aria-label={t("Delete column {name}", { name: column.name })}
                                 disabled={saving}
                                 onClick={() =>
                                   setConfirm({
-                                    label: `Delete “${column.name}” and every value in this column?`,
+                                    label: t("Delete “{name}” and every value in this column?", { name: column.name }),
                                     run: () => source.deleteColumn(column.id),
                                   })
                                 }
@@ -529,12 +539,12 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                               </Button>
                             </div>
                             <span className="px-2 text-xs font-normal text-muted-foreground">
-                              {column.type}
+                              {t(COLUMN_TYPE_LABEL[column.type] ?? column.type)}
                             </span>
                           </th>
                         ))}
                         <th className="w-8">
-                          <span className="sr-only">Row actions</span>
+                          <span className="sr-only">{t("Row actions")}</span>
                         </th>
                       </tr>
                     </thead>
@@ -551,11 +561,11 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                             <Button
                               variant="ghost"
                               size="icon-xs"
-                              aria-label={`Delete row ${index + 1}`}
+                              aria-label={t("Delete row {n}", { n: index + 1 })}
                               disabled={saving}
                               onClick={() =>
                                 setConfirm({
-                                  label: `Delete row ${index + 1} and its values?`,
+                                  label: t("Delete row {n} and its values?", { n: index + 1 }),
                                   run: () => source.deleteRow(row.id),
                                 })
                               }
@@ -570,7 +580,7 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                 </div>
                 {!columns.length && (
                   <p className="text-xs text-muted-foreground">
-                    Add a column or select visible columns in Configure.
+                    {t("Add a column or select visible columns in Configure.")}
                   </p>
                 )}
                 <form
@@ -589,18 +599,18 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                 >
                   <input
                     ref={newColumnInput}
-                    aria-label="New column name"
-                    placeholder="Name a column…"
+                    aria-label={t("New column name")}
+                    placeholder={t("Name a column…")}
                     className={`${INPUT} flex-1`}
                     value={newColumn}
                     disabled={saving}
                     onChange={(e) => setNewColumn(e.target.value)}
                   />
                   <Choice
-                    label="Type"
+                    label={t("Type")}
                     value={columnType}
                     disabled={saving}
-                    options={COLUMN_TYPES.map((id) => ({ id, label: id }))}
+                    options={COLUMN_TYPES.map((id) => ({ id, label: t(COLUMN_TYPE_LABEL[id]) }))}
                     onChange={(id) => setColumnType(id as DataTableColumnType)}
                   />
                   <Button
@@ -609,7 +619,7 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                     type="submit"
                     disabled={saving || !newColumn.trim()}
                   >
-                    Add column
+                    {t("Add column")}
                   </Button>
                   <Button
                     variant="ghost"
@@ -618,7 +628,7 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                     disabled={saving || !data.columns.length}
                     onClick={() => void run(() => source.createRow())}
                   >
-                    Add row
+                    {t("Add row")}
                   </Button>
                 </form>
               </>
@@ -639,17 +649,14 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                         </span>
                       </h3>
                     )}
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
                       {group.rows.map((row) => (
-                        <article
-                          key={row.id}
-                          className="rounded-md border border-[var(--border-subtle)] p-3"
-                        >
+                        <article key={row.id} className="py-1">
                           {params.labelColumnId && (
                             <h4 className="mb-2 break-words text-sm font-medium">
                               {displayCell(
                                 data.cellsByRow[row.id]?.[params.labelColumnId],
-                              ) || "Untitled"}
+                              ) || t("Untitled")}
                             </h4>
                           )}
                           <dl className="space-y-2">
@@ -691,7 +698,7 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
           </>
         )}
         {confirm && (
-          <div role="alert" className="space-y-2 rounded-md bg-muted/40 p-3">
+          <div role="alert" className="space-y-2">
             <p className="text-sm">{confirm.label}</p>
             <div className="flex gap-2">
               <Button
@@ -705,7 +712,7 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                   })
                 }
               >
-                Delete
+                {t("Delete")}
               </Button>
               <Button
                 variant="secondary"
@@ -713,19 +720,19 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                 disabled={saving}
                 onClick={() => setConfirm(null)}
               >
-                Cancel
+                {t("Cancel")}
               </Button>
             </div>
           </div>
         )}
         {saving && (
           <p role="status" className="text-xs text-muted-foreground">
-            Saving…
+            {t("Saving…")}
           </p>
         )}
         {error && (
           <p role="alert" className="text-sm text-destructive">
-            {error} Try the action again.
+            {t("{error} Try the action again.", { error })}
           </p>
         )}
       </div>
@@ -739,17 +746,17 @@ function DataBars({
   rows: { id: string; label: string; value: number }[];
   valueLabel?: string;
 }) {
+  const { t } = useI18n();
   if (!valueLabel)
     return (
       <p className="text-sm text-muted-foreground">
-        Choose a numeric value column in Configure.
+        {t("Choose a numeric value column in Configure.")}
       </p>
     );
   if (!rows.length)
     return (
       <p className="text-sm text-muted-foreground">
-        No numeric readings in {valueLabel} yet. Empty and invalid readings are
-        excluded.
+        {t("No numeric readings in {name} yet. Empty and invalid readings are excluded.", { name: valueLabel })}
       </p>
     );
   return (

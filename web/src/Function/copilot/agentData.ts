@@ -17,7 +17,7 @@ const AGENT_RUN_OPEN_STATUSES: AgentRunStatus[] = ['queued', 'running', 'awaitin
 /** A run whose Workpad is moving. */
 const AGENT_RUN_WORKING_STATUSES: AgentRunStatus[] = ['queued', 'running'];
 
-export function isAgentRunActive(run: AgentRun | null | undefined): boolean {
+function isAgentRunActive(run: AgentRun | null | undefined): boolean {
   return !!run && AGENT_RUN_WORKING_STATUSES.includes(run.status);
 }
 
@@ -44,7 +44,7 @@ const AGENT_RUN_COLUMNS =
   'id, element_id, domain_id, worker_id, status, model, triggered_from, triggered_by, summary, result, error, step_count, started_at, finished_at, created_at, mode, prompt, reply_to, input_tokens, output_tokens, cost_usd, activity_space_id, continuation_count';
 
 // Latest run for an Element (any status), or null if it's never been run.
-export async function fetchLatestAgentRun(elementId: string): Promise<AgentRun | null> {
+async function fetchLatestAgentRun(elementId: string): Promise<AgentRun | null> {
   const { data, error } = await supabase
     .from('agent_runs')
     .select(AGENT_RUN_COLUMNS)
@@ -56,7 +56,7 @@ export async function fetchLatestAgentRun(elementId: string): Promise<AgentRun |
   return (data as AgentRun) ?? null;
 }
 
-export async function fetchAgentRunSteps(runId: string): Promise<AgentRunStep[]> {
+async function fetchAgentRunSteps(runId: string): Promise<AgentRunStep[]> {
   const { data, error } = await supabase
     .from('agent_run_steps')
     .select('*')
@@ -116,7 +116,7 @@ interface StartOptions {
   replyTo?: string | null;
 }
 
-export async function startAgentRun(opts: StartOptions, retried = false): Promise<{ run: AgentRun; existing: boolean }> {
+async function startAgentRun(opts: StartOptions, retried = false): Promise<{ run: AgentRun; existing: boolean }> {
   const userId = await getCurrentUserId();
   const { data: existing } = await supabase
     .from('agent_runs')
@@ -169,7 +169,7 @@ export async function startAgentRun(opts: StartOptions, retried = false): Promis
 /** What became of a request to start a run. */
 export type AgentStartOutcome = 'started' | 'busy' | 'failed';
 
-export async function cancelAgentRun(runId: string): Promise<void> {
+async function cancelAgentRun(runId: string): Promise<void> {
   const { error } = await supabase
     .from('agent_runs')
     .update({ status: 'cancelled', finished_at: new Date().toISOString() })

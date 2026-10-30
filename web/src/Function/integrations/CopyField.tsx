@@ -18,7 +18,7 @@ export function CopyField({ value, multiline = false, label }: { value: string; 
     } catch { /* clipboard unavailable; the text stays selectable */ }
   };
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-[var(--surface-rail)]/40 px-3 py-2">
+    <div className="flex items-start gap-2 rounded-md bg-muted/40 px-3 py-2">
       <code aria-label={label} className={cn('min-w-0 flex-1 select-all font-mono text-[12px] text-foreground', multiline ? 'whitespace-pre-wrap break-all' : 'truncate')}>{value}</code>
       <Button variant="ghost" size="icon-xs" aria-label={copied ? t('Copied') : t('Copy')} onClick={copy}>
         {copied ? <Check size={12} /> : <Copy size={12} />}

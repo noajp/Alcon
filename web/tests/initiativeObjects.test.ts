@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assembleStrategies } from '@/ActivitySpace/strategy/initiative/initiativeObjects';
+import { assembleStrategies } from '@/hooks/initiativeObjects';
 import type { Strategy, StrategyChild, StrategyObject } from '@/types/database';
 
 // assembleStrategies is the one path that turns rows into a Initiative's
@@ -20,6 +20,7 @@ function strategy(id: string, scope: Record<string, unknown> = {}): Strategy {
     color: null,
     icon: null,
     portfolio_id: null,
+    vision_id: null,
     created_by: null,
     created_at: '2026-08-31T00:00:00Z',
     updated_at: '2026-08-31T00:00:00Z',

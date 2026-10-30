@@ -1,0 +1,171 @@
+// Board and page surfaces: widget names and descriptions, the widget picker,
+// the Calendar grid, Create Domain, and the overview widgets' own copy.
+// One row per message: [ja, ko, fr, es]. Concept names (Domain, Object,
+// Element, Initiative, Space, Worker, Phase) stay English in every language.
+type Row = [ja: string, ko: string, fr: string, es: string];
+
+const SURFACE_MESSAGES: Record<string, Row> = {
+  // ── Widget names ──────────────────────────────────────────────
+  'AI app': ['AI アプリ', 'AI 앱', 'App IA', 'App de IA'],
+  'Deck': ['スライド', '슬라이드', 'Présentation', 'Presentación'],
+  'Domain approaches': ['Domain のアプローチ', 'Domain 접근 방식', 'Approches des Domains', 'Enfoques de los Domains'],
+  'Approaches': ['アプローチ', '접근 방식', 'Approches', 'Enfoques'],
+  'Related Domains': ['関連する Domain', '관련 Domain', 'Domains liés', 'Domains relacionados'],
+  'Related Initiatives': ['関連する Initiative', '관련 Initiative', 'Initiatives liées', 'Initiatives relacionadas'],
+  'Operations planner': ['業務プランナー', '운영 플래너', 'Planificateur d’opérations', 'Planificador de operaciones'],
+  'Initiative intent': ['Initiative の意図', 'Initiative 의도', 'Intention de l’Initiative', 'Intención de la Initiative'],
+  'Linked Note': ['リンクしたノート', '연결된 노트', 'Note liée', 'Nota vinculada'],
+  'Situation': ['状況', '상황', 'Situation', 'Situación'],
+  'Decision Lab': ['意思決定ラボ', '의사결정 랩', 'Labo de décision', 'Laboratorio de decisiones'],
+  'Risk & Load': ['リスクと負荷', '위험과 부하', 'Risque et charge', 'Riesgo y carga'],
+  'Decisions & assumptions': ['意思決定と前提', '결정과 가정', 'Décisions et hypothèses', 'Decisiones y supuestos'],
+  'Where the people are': ['人の配置', '사람들의 위치', 'Où sont les personnes', 'Dónde está la gente'],
+  'OKR': ['OKR', 'OKR', 'OKR', 'OKR'],
+  'Gap analysis': ['ギャップ分析', '갭 분석', 'Analyse des écarts', 'Análisis de brechas'],
+  'Measures': ['成功条件', '성공 조건', 'Mesures', 'Medidas'],
+  'Assumptions': ['前提', '가정', 'Hypothèses', 'Supuestos'],
+  'Decisions': ['意思決定', '결정', 'Décisions', 'Decisiones'],
+  'Progress': ['進捗', '진행률', 'Progression', 'Progreso'],
+  'Key numbers': ['主要な数値', '핵심 수치', 'Chiffres clés', 'Cifras clave'],
+  'Object progress': ['Object の進捗', 'Object 진행률', 'Progression des Objects', 'Progreso de los Objects'],
+  'Milestones': ['マイルストーン', '마일스톤', 'Jalons', 'Hitos'],
+  'Mini Gantt': ['ミニガント', '미니 간트', 'Mini Gantt', 'Mini Gantt'],
+  'Mini calendar': ['ミニカレンダー', '미니 캘린더', 'Mini calendrier', 'Mini calendario'],
+  'Breakdown': ['内訳', '분류', 'Répartition', 'Desglose'],
+  'Upcoming 7 days': ['今後 7 日間', '앞으로 7일', '7 prochains jours', 'Próximos 7 días'],
+  'Recent activity': ['最近のアクティビティ', '최근 활동', 'Activité récente', 'Actividad reciente'],
+
+  // ── Widget descriptions (the picker) ──────────────────────────
+  'Create a persistent calculator, checklist or mini app with AI': ['計算機・チェックリスト・ミニアプリを AI で作って置いておく', 'AI로 계산기, 체크리스트, 미니 앱을 만들어 두기', 'Créez avec l’IA une calculatrice, une checklist ou une mini-app durable', 'Crea con IA una calculadora, una lista o una mini app que se quede aquí'],
+  'A Slides deck: its pages here, the full editor when opened full screen': ['スライド：ここではページを表示し、全画面で開くと編集できる', '슬라이드: 여기서는 페이지를 보여 주고, 전체 화면에서 편집', 'Une présentation : ses pages ici, l’éditeur complet en plein écran', 'Una presentación: sus páginas aquí y el editor completo a pantalla completa'],
+  'A Note from Notebook, written in place': ['Notebook のノートを、その場で書く', 'Notebook의 노트를 그 자리에서 작성', 'Une note du Notebook, écrite sur place', 'Una nota del Notebook, escrita aquí mismo'],
+  'A CRM deal: stage, amount, health and next step, changed in place': ['CRM の商談：ステージ・金額・状態・次のステップをその場で変更', 'CRM 거래: 단계, 금액, 상태, 다음 단계를 그 자리에서 변경', 'Une affaire CRM : étape, montant, santé et prochaine étape, modifiables sur place', 'Un trato del CRM: etapa, importe, salud y siguiente paso, editables aquí'],
+  'CRM forecasts and follow-ups from a pipeline Table': ['パイプラインの Table から CRM の予測とフォローアップを出す', '파이프라인 Table에서 CRM 예측과 후속 조치', 'Prévisions et relances CRM à partir d’une Table de pipeline', 'Previsiones y seguimientos de CRM a partir de una Table de pipeline'],
+  'Your table data as editable rows, grouped cards, or a chart': ['Table のデータを、編集できる行・グループ化したカード・グラフで表示', 'Table 데이터를 편집 가능한 행, 그룹 카드, 차트로', 'Les données de votre Table en lignes modifiables, cartes groupées ou graphique', 'Los datos de tu Table como filas editables, tarjetas agrupadas o gráfico'],
+  'Type, dates, lead, progress': ['種類・日付・担当・進捗', '유형, 날짜, 책임자, 진행률', 'Type, dates, responsable, progression', 'Tipo, fechas, responsable, progreso'],
+  'Why this exists, from the Initiative it feeds': ['これがある理由を、貢献先の Initiative から示す', '기여하는 Initiative에서 본 존재 이유', 'Pourquoi il existe, d’après l’Initiative qu’il sert', 'Por qué existe, según la Initiative a la que contribuye'],
+  'Pin a Note to this Object': ['この Object にノートを固定する', '이 Object에 노트 고정', 'Épingler une note à cet Object', 'Fijar una nota a este Object'],
+  'Whether this Initiative is going to land': ['この Initiative が達成できそうか', '이 Initiative가 달성될지', 'Si cette Initiative va aboutir', 'Si esta Initiative va a cumplirse'],
+  'Compare ways to protect a commitment and see the cost to other work': ['約束を守る方法を比べ、ほかの仕事への影響を見る', '약속을 지킬 방법을 비교하고 다른 일에 미치는 비용 보기', 'Comparer les façons de tenir un engagement et voir le coût pour le reste', 'Compara formas de cumplir un compromiso y mira el coste para el resto del trabajo'],
+  'Which Object is hurting, and who is carrying it': ['どの Object が苦しく、誰が抱えているか', '어느 Object가 힘들고 누가 맡고 있는지', 'Quel Object souffre, et qui le porte', 'Qué Object sufre y quién lo sostiene'],
+  'What this is standing on, and the Initiative it belongs to': ['何を前提にしているか、どの Initiative に属するか', '무엇을 전제로 하는지, 어느 Initiative에 속하는지', 'Sur quoi il repose, et l’Initiative dont il relève', 'En qué se apoya y a qué Initiative pertenece'],
+  'Assignments flowing from Worker to Object to Initiative': ['Worker から Object、Initiative へとつながる担当', 'Worker에서 Object, Initiative로 이어지는 배정', 'Les affectations, du Worker à l’Object puis à l’Initiative', 'Asignaciones del Worker al Object y a la Initiative'],
+  'The Initiative cascade, with its measures as key results': ['Initiative の連なりを、成功条件を主要な結果として表示', 'Initiative 계층과 성공 조건을 핵심 결과로', 'La cascade d’Initiatives, avec leurs mesures comme résultats clés', 'La cascada de Initiatives, con sus medidas como resultados clave'],
+  'How far each reading is from the condition it is judged against': ['各計測値が判断基準からどれだけ離れているか', '각 측정값이 판단 기준에서 얼마나 떨어져 있는지', 'L’écart entre chaque mesure et sa condition de réussite', 'Cuánto se aleja cada lectura de la condición con que se juzga'],
+  'The conditions this Initiative is held to': ['この Initiative の成功条件', '이 Initiative의 성공 조건', 'Les conditions de réussite de cette Initiative', 'Las condiciones que debe cumplir esta Initiative'],
+  'What the plan takes as given': ['計画が前提にしていること', '계획이 전제로 하는 것', 'Ce que le plan tient pour acquis', 'Lo que el plan da por sentado'],
+  'What was chosen, and when it is due for review': ['何を選んだか、いつ見直すか', '무엇을 골랐고 언제 다시 볼지', 'Ce qui a été choisi, et quand le revoir', 'Qué se eligió y cuándo revisarlo'],
+  'Completion across the whole subject, as a bar': ['全体の完了率を棒で表示', '전체 완료율을 막대로', 'L’avancement global, en barre', 'El avance total, como barra'],
+  'Completion, active, overdue, hours': ['完了率・進行中・期限切れ・工数', '완료율, 진행 중, 기한 초과, 시간', 'Avancement, en cours, en retard, heures', 'Avance, en curso, vencidos, horas'],
+  'A bar per Object in the Space': ['Space の Object ごとの棒', 'Space의 Object별 막대', 'Une barre par Object du Space', 'Una barra por Object del Space'],
+  'High-priority Elements with due dates': ['期限のある優先度の高い Element', '마감일이 있는 우선순위 높은 Element', 'Elements prioritaires avec échéance', 'Elements prioritarios con fecha límite'],
+  'Compact timeline preview': ['コンパクトなタイムライン', '간단한 타임라인', 'Aperçu compact de la chronologie', 'Vista previa compacta de la cronología'],
+  'Current month, with due dates marked': ['今月と期限の印', '이번 달과 마감일 표시', 'Le mois en cours, avec les échéances', 'El mes actual, con las fechas límite marcadas'],
+  'How many, counted by whichever column you choose': ['選んだ列ごとの件数', '선택한 열 기준 개수', 'Combien, compté selon la colonne de votre choix', 'Cuántos, contados por la columna que elijas'],
+  'Elements past their due date': ['期限を過ぎた Element', '마감일이 지난 Element', 'Elements dont l’échéance est passée', 'Elements con la fecha límite vencida'],
+  'Elements due in the next week': ['1 週間以内が期限の Element', '일주일 안에 마감인 Element', 'Elements à rendre dans la semaine', 'Elements que vencen en la próxima semana'],
+  'Workers assigned in this scope': ['この範囲に割り当てられた Worker', '이 범위에 배정된 Worker', 'Workers affectés dans ce périmètre', 'Workers asignados en este ámbito'],
+  'Latest changes and updates': ['最近の変更と更新', '최근 변경과 업데이트', 'Derniers changements et mises à jour', 'Últimos cambios y actualizaciones'],
+
+  // ── Widget picker ─────────────────────────────────────────────
+  'Core': ['基本', '기본', 'Essentiel', 'Básico'],
+  'Plan': ['計画', '계획', 'Plan', 'Plan'],
+  'Charts': ['グラフ', '차트', 'Graphiques', 'Gráficos'],
+  'Add widget': ['ウィジェットを追加', '위젯 추가', 'Ajouter un widget', 'Añadir widget'],
+  'Find a widget…': ['ウィジェットを探す…', '위젯 찾기…', 'Chercher un widget…', 'Buscar un widget…'],
+  'Nothing else fits here.': ['ここに置けるものはほかにありません。', '여기에 더 놓을 수 있는 것이 없습니다.', 'Rien d’autre ne peut aller ici.', 'No cabe nada más aquí.'],
+  'Arrange widgets': ['ウィジェットを並べ替える', '위젯 정렬', 'Réorganiser les widgets', 'Reordenar widgets'],
+  'Hold': ['長押し', '길게 누르기', 'Appui long', 'Mantener'],
+  'Private widget': ['非公開のウィジェット', '비공개 위젯', 'Widget privé', 'Widget privado'],
+  'You don’t have access to this widget.': ['このウィジェットを見る権限がありません。', '이 위젯에 접근할 수 없습니다.', 'Vous n’avez pas accès à ce widget.', 'No tienes acceso a este widget.'],
+
+  // ── Overview widgets ──────────────────────────────────────────
+  'Completion': ['完了率', '완료율', 'Avancement', 'Avance'],
+  'In Progress': ['進行中', '진행 중', 'En cours', 'En curso'],
+  'Hours': ['工数', '시간', 'Heures', 'Horas'],
+  '{done} done · {todo} todo · {active} active': ['完了 {done} · 未着手 {todo} · 進行中 {active}', '완료 {done} · 할 일 {todo} · 진행 중 {active}', '{done} terminés · {todo} à faire · {active} en cours', '{done} hechos · {todo} pendientes · {active} en curso'],
+  '{n} done in the last 14 days': ['直近 14 日で {n} 件完了', '최근 14일 동안 {n}건 완료', '{n} terminés ces 14 derniers jours', '{n} hechos en los últimos 14 días'],
+  'Oldest {n}d ago': ['最も古いもので {n} 日前', '가장 오래된 것 {n}일 전', 'Le plus ancien il y a {n} j', 'El más antiguo hace {n} d'],
+  'All on track': ['すべて予定どおり', '모두 순조로움', 'Tout est dans les temps', 'Todo en plazo'],
+  '{actual}h of {estimated}h estimated': ['見積 {estimated} 時間のうち {actual} 時間', '예상 {estimated}시간 중 {actual}시간', '{actual} h sur {estimated} h estimées', '{actual} h de {estimated} h estimadas'],
+  'No hours tracked': ['工数の記録はありません', '기록된 시간이 없습니다', 'Aucune heure saisie', 'No hay horas registradas'],
+  'No Objects in this Domain yet.': ['この Domain にはまだ Object がありません。', '이 Domain에는 아직 Object가 없습니다.', 'Aucun Object dans ce Domain pour l’instant.', 'Este Domain aún no tiene Objects.'],
+  'Through': ['経由', '경유', 'Via', 'A través de'],
+  'Loading Initiatives…': ['Initiative を読み込み中…', 'Initiative 불러오는 중…', 'Chargement des Initiatives…', 'Cargando Initiatives…'],
+  'Unable to load related Initiatives.': ['関連する Initiative を読み込めませんでした。', '관련 Initiative를 불러오지 못했습니다.', 'Impossible de charger les Initiatives liées.', 'No se pudieron cargar las Initiatives relacionadas.'],
+  'No Initiatives linked yet. Add this Domain’s Objects to an Initiative to connect intent and execution.': ['まだ Initiative とつながっていません。この Domain の Object を Initiative に加えると、意図と実行がつながります。', '아직 연결된 Initiative가 없습니다. 이 Domain의 Object를 Initiative에 추가하면 의도와 실행이 연결됩니다.', 'Aucune Initiative liée. Ajoutez les Objects de ce Domain à une Initiative pour relier l’intention et l’exécution.', 'Aún no hay Initiatives vinculadas. Añade los Objects de este Domain a una Initiative para unir intención y ejecución.'],
+  'Initiatives supported by Objects in this Domain.': ['この Domain の Object が支えている Initiative。', '이 Domain의 Object가 뒷받침하는 Initiative.', 'Initiatives portées par des Objects de ce Domain.', 'Initiatives que apoyan los Objects de este Domain.'],
+  'Loading Domains…': ['Domain を読み込み中…', 'Domain 불러오는 중…', 'Chargement des Domains…', 'Cargando Domains…'],
+  'Unable to load related Domains.': ['関連する Domain を読み込めませんでした。', '관련 Domain을 불러오지 못했습니다.', 'Impossible de charger les Domains liés.', 'No se pudieron cargar los Domains relacionados.'],
+  'No related Domains in this Space or shared with you. Link Objects to this Initiative to connect the work.': ['この Space や共有されたものに、関連する Domain はありません。Object をこの Initiative に紐づけると仕事がつながります。', '이 Space나 공유받은 것 중 관련 Domain이 없습니다. Object를 이 Initiative에 연결하면 일이 이어집니다.', 'Aucun Domain lié dans ce Space ou partagé avec vous. Liez des Objects à cette Initiative pour relier le travail.', 'No hay Domains relacionados en este Space ni compartidos contigo. Vincula Objects a esta Initiative para conectar el trabajo.'],
+  'Domains in this Space or shared with you, connected through this Initiative’s Objects.': ['この Initiative の Object を通じてつながる、この Space と共有された Domain。', '이 Initiative의 Object를 통해 이어진, 이 Space나 공유받은 Domain.', 'Domains de ce Space ou partagés avec vous, reliés par les Objects de cette Initiative.', 'Domains de este Space o compartidos contigo, conectados por los Objects de esta Initiative.'],
+
+  // ── Domain overview ───────────────────────────────────────────
+  'Choose a Domain from the sidebar.': ['サイドバーから Domain を選んでください。', '사이드바에서 Domain을 선택하세요.', 'Choisissez un Domain dans la barre latérale.', 'Elige un Domain en la barra lateral.'],
+  'Loading Domain…': ['Domain を読み込み中…', 'Domain 불러오는 중…', 'Chargement du Domain…', 'Cargando el Domain…'],
+  'Unable to load this Domain.': ['この Domain を読み込めませんでした。', '이 Domain을 불러오지 못했습니다.', 'Impossible de charger ce Domain.', 'No se pudo cargar este Domain.'],
+  'Unable to refresh this Domain. Showing the last loaded data; drafts are retained.': ['この Domain を更新できませんでした。最後に読み込んだ内容を表示しています。下書きは残っています。', '이 Domain을 새로 고치지 못했습니다. 마지막으로 불러온 내용을 보여 주며, 초안은 유지됩니다.', 'Impossible d’actualiser ce Domain. Les dernières données chargées sont affichées ; les brouillons sont conservés.', 'No se pudo actualizar este Domain. Se muestran los últimos datos cargados; los borradores se conservan.'],
+  'Domain name…': ['Domain 名…', 'Domain 이름…', 'Nom du Domain…', 'Nombre del Domain…'],
+  'What this Domain is for…': ['この Domain の目的…', '이 Domain의 목적…', 'À quoi sert ce Domain…', 'Para qué sirve este Domain…'],
+  'No description yet.': ['説明はまだありません。', '아직 설명이 없습니다.', 'Pas encore de description.', 'Aún no hay descripción.'],
+
+  // ── Initiative page ───────────────────────────────────────────
+  'Add Objects': ['Object を追加', 'Object 추가', 'Ajouter des Objects', 'Añadir Objects'],
+  'Add description…': ['説明を追加…', '설명 추가…', 'Ajouter une description…', 'Añadir descripción…'],
+  'Add existing Initiative': ['既存の Initiative を追加', '기존 Initiative 추가', 'Ajouter une Initiative existante', 'Añadir una Initiative existente'],
+  'Add nested Initiative': ['配下に Initiative を追加', '하위 Initiative 추가', 'Ajouter une Initiative imbriquée', 'Añadir una Initiative anidada'],
+  'Delete Initiative': ['Initiative を削除', 'Initiative 삭제', 'Supprimer l’Initiative', 'Eliminar la Initiative'],
+  'Initiative actions': ['Initiative の操作', 'Initiative 작업', 'Actions sur l’Initiative', 'Acciones de la Initiative'],
+  'Initiative name': ['Initiative 名', 'Initiative 이름', 'Nom de l’Initiative', 'Nombre de la Initiative'],
+  'No Objects match.': ['該当する Object はありません。', '일치하는 Object가 없습니다.', 'Aucun Object ne correspond.', 'Ningún Object coincide.'],
+  'Object name': ['Object 名', 'Object 이름', 'Nom de l’Object', 'Nombre del Object'],
+  'Read-only': ['閲覧のみ', '읽기 전용', 'Lecture seule', 'Solo lectura'],
+  'Search Initiatives…': ['Initiative を検索…', 'Initiative 검색…', 'Chercher des Initiatives…', 'Buscar Initiatives…'],
+  'Search Objects across Domains…': ['Domain をまたいで Object を検索…', 'Domain 전체에서 Object 검색…', 'Chercher des Objects dans tous les Domains…', 'Buscar Objects en todos los Domains…'],
+  '{error} — change reverted': ['{error} — 変更を元に戻しました', '{error} — 변경을 되돌렸습니다', '{error} — modification annulée', '{error} — cambio revertido'],
+  "Only the Initiative's owner can edit it": ['この Initiative を編集できるのはオーナーだけです', '이 Initiative는 소유자만 편집할 수 있습니다', 'Seul le propriétaire de l’Initiative peut la modifier', 'Solo el propietario de la Initiative puede editarla'],
+
+  // ── Portfolio page ────────────────────────────────────────────
+  'Alerts': ['注意', '알림', 'Alertes', 'Alertas'],
+  'Inside': ['所属', '상위', 'Dans', 'Dentro de'],
+  'No Initiatives': ['Initiative なし', 'Initiative 없음', 'Aucune Initiative', 'Sin Initiatives'],
+  'Portfolio name': ['Portfolio 名', 'Portfolio 이름', 'Nom du Portfolio', 'Nombre del Portfolio'],
+
+  // ── Profile ───────────────────────────────────────────────────
+  'Profile sections': ['プロフィールの項目', '프로필 항목', 'Sections du profil', 'Secciones del perfil'],
+  'Deleted Elements': ['削除した Element', '삭제된 Element', 'Elements supprimés', 'Elements eliminados'],
+  'Add personal Element': ['個人の Element を追加', '개인 Element 추가', 'Ajouter un Element personnel', 'Añadir un Element personal'],
+
+  // ── Tool pages ────────────────────────────────────────────────
+  'Delete this record?': ['この記録を削除しますか？', '이 기록을 삭제할까요?', 'Supprimer cet enregistrement ?', '¿Eliminar este registro?'],
+  'Change scope': ['範囲を切り替える', '범위 변경', 'Changer de périmètre', 'Cambiar el ámbito'],
+
+  // ── Names the app writes ──────────────────────────────────────
+  'New status': ['新しいステータス', '새 상태', 'Nouveau statut', 'Nuevo estado'],
+  'Untitled deck': ['無題の資料', '제목 없는 자료', 'Présentation sans titre', 'Presentación sin título'],
+  'Folder': ['フォルダ', '폴더', 'Dossier', 'Carpeta'],
+
+  // ── Calendar ──────────────────────────────────────────────────
+  'All day': ['終日', '종일', 'Toute la journée', 'Todo el día'],
+
+  // ── Create Domain ─────────────────────────────────────────────
+  'A Domain is where work happens — a hospital, a company, a project. Its Objects (deliverables) and Elements (actions) live inside it, and an Object can belong to several Domains.': ['Domain は活動の場です。病院・会社・プロジェクトなど。その中に Object（成果物）と Element（行動）が入り、1 つの Object を複数の Domain に置くこともできます。', 'Domain은 활동이 일어나는 곳입니다. 병원, 회사, 프로젝트 등. 그 안에 Object(성과물)와 Element(행동)가 있으며, 하나의 Object는 여러 Domain에 속할 수 있습니다.', 'Un Domain est le lieu de l’activité — un hôpital, une entreprise, un projet. Ses Objects (livrables) et Elements (actions) y vivent, et un Object peut appartenir à plusieurs Domains.', 'Un Domain es donde ocurre el trabajo: un hospital, una empresa, un proyecto. Dentro viven sus Objects (entregables) y Elements (acciones), y un Object puede pertenecer a varios Domains.'],
+  'Domain name': ['Domain 名', 'Domain 이름', 'Nom du Domain', 'Nombre del Domain'],
+  'Choose a name your team will immediately recognise.': ['チームがすぐに分かる名前にしてください。', '팀이 바로 알아볼 수 있는 이름을 고르세요.', 'Choisissez un nom que votre équipe reconnaîtra tout de suite.', 'Elige un nombre que tu equipo reconozca enseguida.'],
+  'e.g. Alcon Dev, Marketing, Ward 1': ['例：Alcon 開発、マーケティング、第 1 病棟', '예: Alcon 개발, 마케팅, 1병동', 'ex. Alcon Dev, Marketing, Service 1', 'p. ej. Alcon Dev, Marketing, Planta 1'],
+  'Identifier': ['識別子', '식별자', 'Identifiant', 'Identificador'],
+  'Used as a prefix for Object and Element IDs (e.g. MKT-001). Auto-generated from the name.': ['Object と Element の ID の接頭辞になります（例：MKT-001）。名前から自動で作られます。', 'Object와 Element ID의 접두사로 쓰입니다(예: MKT-001). 이름에서 자동으로 만들어집니다.', 'Préfixe des identifiants d’Object et d’Element (ex. MKT-001). Généré à partir du nom.', 'Prefijo de los ID de Object y Element (p. ej. MKT-001). Se genera a partir del nombre.'],
+  'e.g. MKT': ['例：MKT', '예: MKT', 'ex. MKT', 'p. ej. MKT'],
+  'Privacy': ['公開範囲', '공개 범위', 'Confidentialité', 'Privacidad'],
+  'Control who can find and access this Domain.': ['この Domain を見つけて開ける人を決めます。', '이 Domain을 찾고 열 수 있는 사람을 정합니다.', 'Choisissez qui peut trouver et ouvrir ce Domain.', 'Controla quién puede encontrar y abrir este Domain.'],
+  'Workspace': ['Space 全体', 'Space 전체', 'Tout le Space', 'Todo el Space'],
+  'Anyone in the Space can find and access.': ['Space の全員が見つけて開けます。', 'Space의 누구나 찾고 열 수 있습니다.', 'Tout membre du Space peut le trouver et l’ouvrir.', 'Cualquiera del Space puede encontrarlo y abrirlo.'],
+  'Private': ['非公開', '비공개', 'Privé', 'Privado'],
+  'Only invited members can find and access.': ['招待されたメンバーだけが見つけて開けます。', '초대된 멤버만 찾고 열 수 있습니다.', 'Seuls les membres invités peuvent le trouver et l’ouvrir.', 'Solo los miembros invitados pueden encontrarlo y abrirlo.'],
+  'Failed to create Domain': ['Domain を作成できませんでした', 'Domain을 만들지 못했습니다', 'Impossible de créer le Domain', 'No se pudo crear el Domain'],
+  'Creating…': ['作成中…', '만드는 중…', 'Création…', 'Creando…'],
+};
+
+const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(SURFACE_MESSAGES).map(([key, row]) => [key, row[index]]));
+
+export const SURFACE_TRANSLATIONS = { ja: column(0), ko: column(1), fr: column(2), es: column(3) };

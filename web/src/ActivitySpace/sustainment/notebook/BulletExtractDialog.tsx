@@ -6,6 +6,8 @@ import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { useObjects, createElement as createElementRow } from '@/hooks/useSupabase';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { Button } from '@/ui/button';
 
 interface BulletExtractDialogProps {
   /** Bullet/check item texts the user selected. */
@@ -37,6 +39,7 @@ export function BulletExtractDialog({
   onClose,
   onCreated,
 }: BulletExtractDialogProps) {
+  const { t } = useI18n();
   const { data } = useObjects(activeDomainId ?? null);
   const objects = data.objects;
 
@@ -51,9 +54,9 @@ export function BulletExtractDialog({
   useEscapeLayer(true, onClose);
 
   const targetLabel = useMemo(() => {
-    if (!targetObjectId) return 'Domain 直下';
+    if (!targetObjectId) return t('Directly under the Domain');
     return objects.find((o) => o.id === targetObjectId)?.name ?? 'Object';
-  }, [targetObjectId, objects]);
+  }, [targetObjectId, objects, t]);
 
   const pickedCount = picked.filter(Boolean).length;
 
@@ -65,7 +68,7 @@ export function BulletExtractDialog({
       // Keep each item's original index so the host can map the new
       // Element back to its source bullet <li> and stamp the link.
       const itemsToCreate = editTexts
-        .map((t, i) => ({ title: t.trim(), index: i }))
+        .map((text, i) => ({ title: text.trim(), index: i }))
         .filter((it) => picked[it.index] && it.title);
       const created: { index: number; elementId: string }[] = [];
       for (const item of itemsToCreate) {
@@ -80,7 +83,7 @@ export function BulletExtractDialog({
       onCreated(created);
       onClose();
     } catch (e) {
-      setError((e as Error).message || 'Element 作成に失敗しました');
+      setError((e as Error).message || t('Could not create the Elements.'));
       setSubmitting(false);
     }
   };
@@ -100,10 +103,11 @@ export function BulletExtractDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-3 py-2.5 flex items-center justify-between border-b border-border/60">
-          <div className="text-[12px] font-medium">→ Element 化</div>
+          <div className="text-[12px] font-medium">{t('Turn into Elements')}</div>
           <button
             type="button"
             onClick={onClose}
+            aria-label={t('Close')}
             className="text-muted-foreground hover:text-foreground"
           >
             <X size={14} />
@@ -112,7 +116,7 @@ export function BulletExtractDialog({
 
         <div className="px-3 py-2.5 border-b border-border/60">
           <div className="text-[10px] text-muted-foreground/80 mb-1.5">
-            作成先
+            {t('Create in')}
           </div>
           <ObjectScopeSelect
             objects={objects.map((o) => ({ id: o.id, name: o.name }))}
@@ -125,10 +129,10 @@ export function BulletExtractDialog({
         <div className="flex-1 overflow-auto px-2 py-2">
           {editTexts.length === 0 && (
             <div className="text-[12px] text-muted-foreground/70 px-2 py-3 text-center">
-              選択範囲に箇条書き行がありません
+              {t('No bullet lines in the selection.')}
             </div>
           )}
-          {editTexts.map((t, i) => (
+          {editTexts.map((text, i) => (
             <div
               key={i}
               className="flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-accent group min-h-[1.625rem]"
@@ -142,10 +146,10 @@ export function BulletExtractDialog({
                   setPicked(next);
                 }}
                 aria-pressed={picked[i]}
-                aria-label={picked[i] ? 'Deselect' : 'Select'}
+                aria-label={picked[i] ? t('Deselect') : t('Select')}
                 className={`w-4 h-4 shrink-0 rounded-[2px] flex items-center justify-center transition-colors ${
                   picked[i]
-                    ? 'bg-emerald-500 hover:bg-emerald-600'
+                    ? 'bg-[var(--status-success)] hover:opacity-90'
                     : 'border border-muted-foreground/40 hover:border-foreground/60'
                 }`}
               >
@@ -156,7 +160,7 @@ export function BulletExtractDialog({
               {/* Editable line — matches the title cell typography in Element List */}
               <input
                 type="text"
-                value={t}
+                value={text}
                 onChange={(e) => {
                   const next = editTexts.slice();
                   next[i] = e.target.value;
@@ -178,17 +182,17 @@ export function BulletExtractDialog({
 
         <div className="px-3 py-2.5 border-t border-border/60 flex items-center justify-between">
           <div className="text-[11px] text-muted-foreground">
-            {pickedCount}件 → <span className="text-foreground/80">{targetLabel}</span>
+            {t('{count} → {target}', { count: pickedCount, target: targetLabel })}
           </div>
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="sm"
             onClick={submit}
             disabled={pickedCount === 0 || submitting}
-            className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 bg-foreground text-background rounded-md disabled:opacity-30 disabled:cursor-not-allowed"
           >
             {submitting && <Loader2 size={12} className="animate-spin" />}
-            {submitting ? '作成中…' : 'Element 化'}
-          </button>
+            {submitting ? t('Creating…') : t('Create Elements')}
+          </Button>
         </div>
       </div>
     </>
@@ -206,6 +210,7 @@ function ObjectScopeSelect({
   onChange: (id: string | null) => void;
   label: string;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
 
   return (
@@ -232,11 +237,11 @@ function ObjectScopeSelect({
             ].join(' ')}
           >
             <ObjectIcon size={12} />
-            <span>Domain 直下</span>
+            <span>{t('Directly under the Domain')}</span>
           </button>
           {objects.length === 0 && (
             <div className="px-2.5 py-2 text-[11px] text-muted-foreground/70">
-              この Domain に Object はまだありません
+              {t('No Objects in this Domain yet.')}
             </div>
           )}
           {objects.map((o) => (

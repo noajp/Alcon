@@ -49,7 +49,8 @@ import { PopoverContent } from '@/ui/popover';
  * its full-width trigger without asking for the trigger width by name.
  *
  * `wide` (288px) is only for panels with label + right-aligned control rows —
- * Display's Grouping/Ordering selects and Filter's date range. Nothing else.
+ * Display's Grouping/Ordering selects and Filter's date range — and for the
+ * widget picker, whose rows carry a name and a one-line description.
  */
 export const MENU_WIDTH = {
   standard: 'w-56',
@@ -72,7 +73,7 @@ export type MenuWidth = keyof typeof MENU_WIDTH;
  * keyed on the `data-menu-shell` attribute this component stamps below. Do not
  * "restore" it as a Tailwind variant; it renders nothing.
  */
-export const MENU_SHELL_BASE = [
+const MENU_SHELL_BASE = [
   'rounded-md',
   'p-1',
   // Cancels the `min-w-[8rem]` DropdownMenuContent ships with, so the width
@@ -97,7 +98,7 @@ export const MENU_SHELL_BASE = [
  * design-lint-ignore
  * `#ffffff`: `hover:bg-accent` — and Radix's own `focus:bg-accent` — paints the
  * surface colour onto the surface and shows nothing at all. `--surface-strong`
- * is the token whose documented job (DESIGN.md §1.4) is to differ from the
+ * is the token whose job is to differ from the
  * background, with the theme deciding whether that means lighter or darker.
  * `globals.css` re-points the Radix items inside a MenuShell at the same token,
  * so hovering a hand-rolled row and hovering a Radix row look identical.

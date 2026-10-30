@@ -2,9 +2,9 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useCurrentUserId } from '@/providers/authContext';
 import type { Integration, IntegrationUpdate, Json } from '@/types/database';
 import type { IntegrationInsertRow } from './catalog';
+import { useSpaceRoleQuery } from '@/Function/space/data';
 
 // A Space's integrations (ADR 0027): list, create, update, delete, set the
 // credential, and run a connection test. RLS lets members read and only
@@ -52,23 +52,8 @@ export function useIntegrations(spaceId: string | null) {
 /** Whether the signed-in person is an owner of the Space — the same role the
  *  integrations write policies check. Null until the role has loaded. */
 export function useIsSpaceOwner(spaceId: string | null): boolean | null {
-  const userId = useCurrentUserId();
-  const query = useQuery({
-    queryKey: ['space-role', spaceId, userId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('activity_space_members')
-        .select('role')
-        .eq('activity_space_id', spaceId!)
-        .eq('user_id', userId!)
-        .maybeSingle();
-      if (error) throw error;
-      return (data?.role as string | undefined) ?? null;
-    },
-    enabled: !!spaceId && !!userId,
-    staleTime: 60_000,
-  });
-  return query.data === undefined ? null : query.data === 'owner';
+  const role = useSpaceRoleQuery(spaceId).data;
+  return role === undefined ? null : role === 'owner';
 }
 
 /** Writes (or, with an empty string, clears) the credential in Vault. */

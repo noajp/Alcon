@@ -4,9 +4,11 @@ import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Input } from '@/ui/input';
 import { Button } from '@/ui/button';
+import { ChoiceCard } from '@/ui/choice-card';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { createDomain } from '@/hooks/useSupabase';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { suggestObjectPrefix } from '@/ActivitySpace/execution/object/objectPrefix';
+import { suggestObjectPrefix } from '@/Function/shared/objectPrefix';
 import { Globe, Lock } from 'lucide-react';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -32,6 +34,7 @@ export function CreateView({ onCancel, onCreated }: CreateViewProps) {
 // ─── Create Domain ────────────────────────────────────────────────────────────
 
 function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCreated: (r: CreateResult) => void }) {
+  const { t } = useI18n();
   const { user } = useAuthContext();
   const [name, setName] = useState('');
   const [identifier, setIdentifier] = useState('');
@@ -65,7 +68,7 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
       onCreated({ type: 'domain', id: domain.id });
     } catch (err) {
       console.error('Failed to create domain:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create Domain');
+      setError(err instanceof Error ? err.message : t('Failed to create Domain'));
     } finally {
       creatingRef.current = false;
       setCreating(false);
@@ -76,70 +79,48 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
     <div className="h-full overflow-y-auto bg-card">
       <div className="max-w-2xl mx-auto px-10 py-12">
         <div className="mb-10">
-          <h1 className="text-2xl font-semibold text-foreground mb-1.5">Create Domain</h1>
-          <p className="text-sm text-muted-foreground">
-            Set up a new execution space for your organisation, project, or initiative.
+          <div className="mb-4 flex size-9 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
+            <DomainIcon size={18} />
+          </div>
+          <h1 className="text-2xl font-semibold text-foreground mb-1.5">{t('Create Domain')}</h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {t('A Domain is where work happens — a hospital, a company, a project. Its Objects (deliverables) and Elements (actions) live inside it, and an Object can belong to several Domains.')}
           </p>
         </div>
 
-        <div className="mb-8">
-          <div className="flex gap-4">
-            <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 text-foreground/50">
-              <DomainIcon size={20} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[13px] font-semibold text-foreground mb-2">Domain</p>
-              <ul className="space-y-1.5 text-[12px] text-muted-foreground">
-                <li className="flex gap-2">
-                  <span className="text-foreground/40 mt-px shrink-0">—</span>
-                  <span>A top-level container representing an independent operational unit — a hospital, company, initiative, or project portfolio.</span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-foreground/40 mt-px shrink-0">—</span>
-                  <span>Group Objects (departments, projects) and Elements (records, work units) under a Domain.</span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-foreground/40 mt-px shrink-0">—</span>
-                  <span>Objects support multi-homing — they can belong to multiple Domains simultaneously.</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <Field label="Domain name" hint="Choose a name your team will immediately recognise.">
+        <div className="space-y-7">
+          <Field label={t('Domain name')} hint={t('Choose a name your team will immediately recognise.')}>
             <Input
               autoFocus
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
-              placeholder="e.g. Alcon Dev, Marketing, Ward 1"
+              placeholder={t('e.g. Alcon Dev, Marketing, Ward 1')}
               onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) handleCreate(); }}
             />
           </Field>
 
-          <Field label="Identifier" hint="Used as a prefix for Object and Element IDs (e.g. MKT-001). Auto-generated from the name.">
+          <Field label={t('Identifier')} hint={t('Used as a prefix for Object and Element IDs (e.g. MKT-001). Auto-generated from the name.')}>
             <Input
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
-              placeholder="e.g. MKT"
+              placeholder={t('e.g. MKT')}
             />
           </Field>
 
-          <Field label="Privacy" hint="Control who can find and access this Domain.">
-            <div className="space-y-2">
-              <PrivacyOption icon={<Globe size={16} />} title="Workspace" desc="Anyone in the Space can find and access." checked={privacy === 'workspace'} onClick={() => setPrivacy('workspace')} />
-              <PrivacyOption icon={<Lock size={16} />} title="Private" desc="Only invited members can find and access." checked={privacy === 'private'} onClick={() => setPrivacy('private')} />
+          <Field label={t('Privacy')} hint={t('Control who can find and access this Domain.')}>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <PrivacyOption icon={<Globe size={14} />} title={t('Workspace')} desc={t('Anyone in the Space can find and access.')} checked={privacy === 'workspace'} onClick={() => setPrivacy('workspace')} />
+              <PrivacyOption icon={<Lock size={14} />} title={t('Private')} desc={t('Only invited members can find and access.')} checked={privacy === 'private'} onClick={() => setPrivacy('private')} />
             </div>
           </Field>
         </div>
 
         {error && <p className="mt-6 text-[12px] text-destructive">{error}</p>}
 
-        <div className="flex items-center justify-end gap-2 mt-10 pt-6 border-t border-border">
-          <Button variant="secondary" size="md" onClick={onCancel} disabled={creating}>Cancel</Button>
+        <div className="flex items-center justify-end gap-2 mt-10">
+          <Button variant="secondary" size="md" onClick={onCancel} disabled={creating}>{t('Cancel')}</Button>
           <Button variant="primary" size="md" onClick={handleCreate} disabled={!name.trim() || creating}>
-            {creating ? 'Creating...' : 'Create Domain'}
+            {creating ? t('Creating…') : t('Create Domain')}
           </Button>
         </div>
       </div>
@@ -164,23 +145,17 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
+// Privacy is a choice between two described options — the shared ChoiceCard:
+// a thin outline, and the chosen one marked by the accent tint and a check.
 function PrivacyOption({
   icon, title, desc, checked, onClick,
 }: { icon: ReactNode; title: string; desc: string; checked: boolean; onClick: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-md border text-left transition-colors ${
-        checked ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/30'
-      }`}
-    >
-      <span className={`mt-0.5 ${checked ? 'text-foreground' : 'text-muted-foreground'}`}>{icon}</span>
-      <span className="flex-1 min-w-0">
-        <span className="block text-sm font-semibold text-foreground">{title}</span>
-        <span className="block text-xs text-muted-foreground">{desc}</span>
+    <ChoiceCard selected={checked} label={title} onClick={onClick} className="gap-1">
+      <span className="flex items-start gap-2 text-xs font-normal text-muted-foreground">
+        <span className="mt-0.5 shrink-0">{icon}</span>
+        <span className="min-w-0">{desc}</span>
       </span>
-      <span className={`mt-1 w-3.5 h-3.5 rounded-full border ${checked ? 'border-foreground bg-foreground' : 'border-border'}`} />
-    </button>
+    </ChoiceCard>
   );
 }

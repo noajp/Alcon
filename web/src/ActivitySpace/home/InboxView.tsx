@@ -4,6 +4,8 @@ import { Archive, Check, Inbox } from 'lucide-react';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { InvitationCard } from '@/Function/membership/InvitationCard';
+import { WorkflowApprovalCard } from '@/Function/audit/WorkflowApprovalCard';
+import { useActiveSpaceScope } from '@/Function/space/data';
 import { useInvitation } from '@/Function/membership/invitations';
 import { Button } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';
@@ -19,7 +21,10 @@ interface InboxViewProps {
 export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
   const { t, locale } = useI18n();
   const { selected, revision, toggleRead, archive } = useInbox({ onNavigate, onViewChange });
-  const elementId = selected?.element_id;
+  // An audit Space (ADR 0048) does not open Elements: their notifications
+  // say so instead of opening the Element in the reader.
+  const audit = useActiveSpaceScope() === 'audit';
+  const elementId = audit ? null : selected?.element_id;
   const { detail, refresh } = useNotificationElement(elementId, revision);
 
   // Every island opens with the same 50px header, so the title line sits
@@ -29,10 +34,9 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
       <div className="flex h-full min-h-0 flex-col bg-card">
         <header className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
           <Inbox size={12} aria-hidden="true" />
-          <span className="text-[12px] font-semibold text-foreground">{t('Inbox')}</span>
+          <span className="text-[13px] font-medium text-foreground">{t('Inbox')}</span>
         </header>
-        <div className="flex flex-1 flex-col items-center justify-center gap-5 text-muted-foreground">
-          <Inbox size={88} strokeWidth={0.8} className="opacity-60" aria-hidden="true" />
+        <div className="flex flex-1 items-center justify-center text-muted-foreground">
           <p className="text-[13px]">{t('No notification selected')}</p>
         </div>
       </div>
@@ -42,7 +46,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
   return (
     <div className="flex h-full min-h-0 flex-col bg-card">
       <header className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0 overflow-hidden">
-        <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
+        <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">
           {selected.actor_name && <span className="font-medium text-foreground">{selected.actor_name}</span>}
           {selected.actor_name && ' · '}
           <time dateTime={selected.created_at}>{new Date(selected.created_at).toLocaleString(locale)}</time>
@@ -63,6 +67,16 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
           <p>{t(detail ? 'This Element is no longer available.' : 'Opening…')}</p>
           {detail && <Button variant="ghost" onClick={refresh}>{t('Retry')}</Button>}
         </div>
+      ) : audit && selected.element_id ? (
+        <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">
+          <h1 className="text-2xl font-semibold">{selected.title}</h1>
+          {selected.body && <p className="mt-6 whitespace-pre-wrap text-[15px] leading-7 text-foreground/90">{selected.body}</p>}
+          <p className="mt-6 text-[13px] text-muted-foreground">{t('This Space shows the AI audit only. Elements open once its owner switches it to full in Settings.')}</p>
+        </article>
+      ) : selected.workflow_approval_id ? (
+        <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">
+          <WorkflowApprovalCard key={selected.workflow_approval_id} approvalId={selected.workflow_approval_id} />
+        </article>
       ) : selected.kind === 'invite' ? (
         <InvitationNotice key={selected.id} invitationId={selected.invitation_id ?? null} title={selected.title} />
       ) : (

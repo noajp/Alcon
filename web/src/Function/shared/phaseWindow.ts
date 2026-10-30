@@ -1,3 +1,4 @@
+import { DAY_MS, parseDateOnly } from '@/Function/shared/dateUtils';
 // Phase window — the single place that decides what a Phase's start_date and
 // end_date mean as a span of time, so "does this land by the end" and "how
 // wide is the chart" agree because they read the same two dates the same way.
@@ -19,14 +20,6 @@
 // an assignment problem, not a date problem, and this module has no opinion
 // on it.
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** 'YYYY-MM-DD' → local Date at midnight (no timezone drift on bare dates). */
-export function parseYMD(s: string): Date {
-  const [y, m, d] = s.split('T')[0].split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
 export type PhaseDates = { start_date: string | null; end_date: string | null };
 
 /**
@@ -41,9 +34,11 @@ export type PhaseDates = { start_date: string | null; end_date: string | null };
  * not merely short.
  */
 export function phaseWindowMs(phase: PhaseDates): { t0: number; t1: number } | null {
-  if (!phase.start_date || !phase.end_date) return null;
-  const t0 = parseYMD(phase.start_date).getTime();
-  const t1 = parseYMD(phase.end_date).getTime() + DAY_MS;
+  const start = parseDateOnly(phase.start_date, null);
+  const end = parseDateOnly(phase.end_date, null);
+  if (!start || !end) return null;
+  const t0 = start.getTime();
+  const t1 = end.getTime() + DAY_MS;
   return t1 > t0 ? { t0, t1 } : null;
 }
 
@@ -76,10 +71,9 @@ export function businessDaysBetween(from: Date, to: Date): number {
  * facts and deserve different words.
  */
 export function phaseElapsedRemaining(phase: PhaseDates, now: Date): { elapsed: number; remaining: number } | null {
-  if (!phase.start_date || !phase.end_date) return null;
-  const start = parseYMD(phase.start_date);
-  const end = parseYMD(phase.end_date);
-  if (now < start) return null;
+  const start = parseDateOnly(phase.start_date, null);
+  const end = parseDateOnly(phase.end_date, null);
+  if (!start || !end || now < start) return null;
   const elapsed = businessDaysBetween(start, now > end ? end : now);
   const remaining = now >= end ? 0 : businessDaysBetween(now, end) - 1;
   return { elapsed, remaining };

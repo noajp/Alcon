@@ -8,8 +8,6 @@ import { useSyncExternalStore } from 'react';
 // resolved *within* the active space.
 const ACTIVE_KEY = 'alcon:active-space';
 const ACTIVE_SPACE_CHANGE_EVENT = 'alcon:active-space-change';
-export const CREATE_SPACE_EVENT = 'alcon:create-space';
-
 export function getActiveSpaceId(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem(ACTIVE_KEY);

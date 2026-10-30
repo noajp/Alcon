@@ -1,8 +1,9 @@
 'use client';
 
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useState } from 'react';
-import { FileText, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { updateObject } from '@/hooks/useSupabase';
 import { NotePicker } from '@/ActivitySpace/sustainment/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/sustainment/notebook/LinkedNoteEmbed';
@@ -16,6 +17,7 @@ import type { WidgetHost } from '../types';
 // =============================================================
 
 export function LinkedNoteWidget({ host }: { host: WidgetHost }) {
+  const { t } = useI18n();
   const object = host.object;
   const [pickerOpen, setPickerOpen] = useState(false);
   if (!object) return null;
@@ -45,15 +47,11 @@ export function LinkedNoteWidget({ host }: { host: WidgetHost }) {
 
   return (
     <div className="relative">
-      <Button
-        type="button"
-        onClick={() => setPickerOpen(true)}
-        className="w-full" align="start"
-      >
-        <FileText size={13} />
-        <span className="flex-1 text-left">Link a Note</span>
-        <Plus size={13} />
-      </Button>
+      <ButtonAppearanceProvider appearance="inline">
+        <Button type="button" variant="ghost" onClick={() => setPickerOpen(true)} align="start">
+          <Plus size={13} />{t('Link a Note')}
+        </Button>
+      </ButtonAppearanceProvider>
       <NotePicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}

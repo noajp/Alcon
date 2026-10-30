@@ -5,7 +5,8 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import { FileText, Inbox, Home, ListTodo, Settings } from 'lucide-react';
-import { ObjectIcon, ElementIcon } from '@/Function/shared/conceptIcons';
+import { ObjectIcon, ElementIcon, CrmIcon } from '@/Function/shared/conceptIcons';
+import { crmRoute, routeTo } from '@/Function/crm/crmRoute';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { APP_GROUPS, MODE_META } from '@/shell/railApps';
 import {
@@ -24,8 +25,12 @@ import type { ViewId } from '@/shell/viewRegistry';
 import { CREATE_ELEMENT_EVENT } from '@/shell/QuickAddElementLauncher';
 import { filterCreateCommands, type CreateCommandId } from '@/shell/paletteCreateCommands';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { viewInScope, type SpaceScope } from '@/Function/space/spaceScope';
 
 interface CommandPaletteProps {
+  /** An audit Space (ADR 0048) offers only the views it shows: no search
+   *  into Elements, Objects, Notes or records, and nothing to create. */
+  scope: SpaceScope;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
   /** Settings opens in its own tab rather than overwriting the active
@@ -54,6 +59,7 @@ function kindIcon(kind: SearchResult['kind']): React.ComponentType<{ size?: numb
     case 'element': return ElementIcon;
     case 'object':  return ObjectIcon;
     case 'note':    return FileText;
+    case 'deal': case 'company': case 'contact': return CrmIcon;
   }
 }
 
@@ -65,7 +71,8 @@ function createCommandIcon(id: CreateCommandId): React.ComponentType<{ size?: nu
   }
 }
 
-export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: CommandPaletteProps) {
+export function CommandPalette({ scope, onNavigate, onViewChange, onOpenSettings }: CommandPaletteProps) {
+  const full = scope === 'full';
   const { t } = useI18n();
   const { openCreate } = useWorkspaceActions();
   const [open, setOpen] = useState(false);
@@ -89,7 +96,7 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
   // Debounced search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query.trim()) { setResults([]); setSearching(false); return; }
+    if (!query.trim() || !full) { setResults([]); setSearching(false); return; }
     setSearching(true);
     debounceRef.current = window.setTimeout(async () => {
       try {
@@ -103,7 +110,7 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query]);
+  }, [query, full]);
 
   const close = () => { setOpen(false); setQuery(''); setResults([]); };
 
@@ -138,24 +145,29 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
     element: results.filter(r => r.kind === 'element'),
     object:  results.filter(r => r.kind === 'object'),
     note:    results.filter(r => r.kind === 'note'),
+    record:  results.filter(r => r.kind === 'deal' || r.kind === 'company' || r.kind === 'contact'),
   };
-  const visibleCreateCommands = filterCreateCommands(query);
+  // A CRM record opens its page in the CRM, as its sidebar row would.
+  const openRecord = (r: SearchResult) => handleNav('crm', { crm: routeTo(crmRoute(undefined), r.kind === 'deal' ? { view: 'deals', dealId: r.id } : r.kind === 'company' ? { view: 'companies', companyId: r.id } : { view: 'contacts', contactId: r.id }) });
+  const RECORD_KIND: Partial<Record<SearchResult['kind'], string>> = { deal: 'Deal', company: 'Company', contact: 'Contact' };
+  const visibleCreateCommands = full ? filterCreateCommands(query) : [];
+  const navCommands = NAV_COMMANDS.filter(c => viewInScope(c.view, scope));
 
   return (
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
-      title={t('Search')}
-      description={t('Search elements, objects, notes. Press ⌘K to open.')}
+      title={t(full ? 'Search' : 'Go to')}
+      description={t(full ? 'Search elements, objects, notes and records. Press ⌘K to open.' : 'Go to Inbox, People, Audit or Settings. Press ⌘K to open.')}
     >
       <CommandInput
-        placeholder={t('Search elements, objects, notes…')}
+        placeholder={t(full ? 'Search elements, objects, notes, records…' : 'Go to Inbox, People, Audit or Settings…')}
         value={query}
         onValueChange={setQuery}
       />
       <CommandList>
         <CommandEmpty>
-          {t(searching ? 'Searching…' : query ? 'No results.' : 'Type to search.')}
+          {t(searching ? 'Searching…' : query ? 'No results.' : full ? 'Type to search.' : 'Type to filter.')}
         </CommandEmpty>
 
         {visibleCreateCommands.length > 0 && (
@@ -263,9 +275,30 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
           </>
         )}
 
+        {grouped.record.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading={t('Records')}>
+              {grouped.record.map(r => {
+                const Icon = kindIcon(r.kind);
+                return (
+                  <CommandItem key={`${r.kind}-${r.id}`} value={`${r.kind}-${r.id} ${r.title} ${r.snippet ?? ''}`} onSelect={() => openRecord(r)}>
+                    <Icon />
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate">{r.title}</div>
+                      {r.snippet && <div className="text-[11px] text-muted-foreground truncate">{r.snippet}</div>}
+                    </div>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">{t(RECORD_KIND[r.kind] ?? '')}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </>
+        )}
+
         <CommandSeparator />
         <CommandGroup heading={t('Navigation')}>
-          {NAV_COMMANDS.map(c => (
+          {navCommands.map(c => (
             <CommandItem
               key={c.id}
               value={`nav-${c.label}-${t(c.label)}`}

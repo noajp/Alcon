@@ -11,7 +11,8 @@ import {
   updateIntent,
 } from '@/hooks/useSupabase';
 import type { Intent, IntentBinding, IntentLineage } from '@/types/database';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
+import { translate, useI18n } from '@/Function/i18n/I18nProvider';
 import { DateField } from '@/Function/shared/date';
 import { MenuShell, MENU_SEPARATOR } from '@/Function/shared/menu';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
@@ -35,14 +36,14 @@ import {
   type DecisionReview,
   type ReviewOutcome,
 } from '@/ActivitySpace/strategy/initiative/initiativeReviewModel';
-import { isAssumption } from '@/ActivitySpace/strategy/initiative/initiativeAssumptionModel';
+import { isAssumption } from '@/Function/strategy/initiativeAssumptionModel';
 import { isMeasure } from '@/ActivitySpace/strategy/initiative/initiativeMeasureModel';
 import {
   BoundTarget,
   IntentTargetPicker,
   type PickerTarget,
 } from '@/ActivitySpace/strategy/initiative/IntentTargetPicker';
-import type { InitiativeIntentState } from '@/ActivitySpace/strategy/initiative/useInitiativeIntent';
+import type { InitiativeIntentState } from '@/hooks/useInitiativeIntent';
 import { WidgetHeaderAction } from '@/Function/widget';
 
 // =============================================================
@@ -105,6 +106,7 @@ export function InitiativeDecisions({
   onOpenObject?: (objectId: string, domainId: string | null) => void;
 }) {
   const { initiativeId, data, error, refetch, ensureRoot, scope, scopeError } = initiative;
+  const { t } = useI18n();
 
   // Written values, laid over the fetched rows. They are not cleared on
   // success — the value here *is* what the server now holds, so clearing it
@@ -279,7 +281,7 @@ export function InitiativeDecisions({
       titleRef.current?.focus();
     } catch (e) {
       console.error('record decision failed:', e);
-      setFailure('Could not record the decision. Nothing was saved.');
+      setFailure(t('Could not record the decision. Nothing was saved.'));
     } finally {
       setSaving(false);
     }
@@ -300,7 +302,7 @@ export function InitiativeDecisions({
         else delete next[id];
         return next;
       });
-      setFailure('Could not change the status. The decision is unchanged.');
+      setFailure(t('Could not change the status. The decision is unchanged.'));
     }
   }
 
@@ -362,13 +364,13 @@ export function InitiativeDecisions({
       if (next) await setStatus(id, next);
       if (linkFailed) {
         setFailure(link
-          ? 'The review was recorded, but the decision that replaced it was not linked.'
-          : 'The review was recorded, but the earlier reversal is still linked.');
+          ? t('The review was recorded, but the decision that replaced it was not linked.')
+          : t('The review was recorded, but the earlier reversal is still linked.'));
       }
       refetch();
     } catch (e) {
       console.error('record review failed:', e);
-      setFailure('Could not record the review. Nothing was appended.');
+      setFailure(t('Could not record the review. Nothing was appended.'));
     } finally {
       setReviewSaving(false);
     }
@@ -387,7 +389,7 @@ export function InitiativeDecisions({
         next.delete(id);
         return next;
       });
-      setFailure('Could not delete the decision. It is still recorded.');
+      setFailure(t('Could not delete the decision. It is still recorded.'));
     }
   }
 
@@ -396,7 +398,7 @@ export function InitiativeDecisions({
     try {
       const binding = await addIntentBinding({
         intent_id: decisionId,
-        target_type: target.type,
+        target_type: target.type === 'deal' ? 'crm_deal' : target.type,
         target_id: target.id,
         relationship_type: relationshipFor(target.type),
       });
@@ -404,7 +406,7 @@ export function InitiativeDecisions({
       refetch();
     } catch (e) {
       console.error('bind decision to target failed:', e);
-      setFailure('Could not link that. Nothing was recorded as moved.');
+      setFailure(t('Could not link that. Nothing was recorded as moved.'));
     }
   }
 
@@ -424,7 +426,7 @@ export function InitiativeDecisions({
         next.delete(bindingId);
         return next;
       });
-      setFailure('Could not unlink that. It is still recorded as moved.');
+      setFailure(t('Could not unlink that. It is still recorded as moved.'));
     }
   }
 
@@ -441,7 +443,7 @@ export function InitiativeDecisions({
         <div className="flex items-center gap-2">
           {dueCount > 0 && (
             <span className="text-[11px] text-[var(--status-warning)] tabular-nums">
-              {dueCount} due for review
+              {t('{n} due for review', { n: dueCount })}
             </span>
           )}
           {/* Held until the fetch lands: the root Intent is created only when
@@ -450,7 +452,7 @@ export function InitiativeDecisions({
               one-root-per-Initiative index. */}
           <button
             type="button"
-            aria-label="Record a decision"
+            aria-label={t('Record a decision')}
             disabled={!data || !initiative.canEdit}
             title={initiative.lockReason ?? undefined}
             onClick={() => {
@@ -471,18 +473,17 @@ export function InitiativeDecisions({
 
       {error ? (
         <p className="text-[12px] text-[var(--status-danger)] py-1">
-          Could not read this Initiative&apos;s decisions.
+          {t("Could not read this Initiative's decisions.")}
         </p>
       ) : !data ? (
         // Not `loading`: the hook reports false on the first render, before the
         // fetch it is about to start. Keying on the absence of the bundle keeps
         // "nothing decided here" from flashing over a Initiative that has a
         // decision record, which is the same lie as a fabricated zero.
-        <p className="text-[12px] text-muted-foreground/50 py-1">Reading the record…</p>
+        <p className="text-[12px] text-muted-foreground/50 py-1">{t('Reading the record…')}</p>
       ) : decisions.length === 0 ? (
         <p className="text-[12px] text-muted-foreground/50 py-1">
-          Nothing decided here yet — record a call and what it cost, so the Initiative carries the
-          reason and not just the result.
+          {t('Nothing decided here yet — record a call and what it cost, so the Initiative carries the reason and not just the result.')}
         </p>
       ) : (
         <div className="flex flex-col">
@@ -597,7 +598,7 @@ function toLanding(
     const object = objects.get(binding.target_id);
     return object
       ? { ...base, type: 'object', label: object.name, objectId: object.id, domainId: object.domainId }
-      : { ...base, type: 'object', label: 'Object outside this Initiative' };
+      : { ...base, type: 'object', label: translate('Object outside this Initiative') };
   }
   if (binding.target_type === 'element') {
     const element = elements.get(binding.target_id);
@@ -610,7 +611,7 @@ function toLanding(
           objectId: element.objectId,
           domainId: element.domainId,
         }
-      : { ...base, type: 'element', label: 'Element outside this Initiative' };
+      : { ...base, type: 'element', label: translate('Element outside this Initiative') };
   }
   if (binding.target_type === 'phase') {
     const phase = phases.get(binding.target_id);
@@ -621,16 +622,16 @@ function toLanding(
           label: phase.name,
           hint: phaseHint(phase.startDate, phase.endDate),
         }
-      : { ...base, type: 'phase', label: 'Phase outside this Initiative' };
+      : { ...base, type: 'phase', label: translate('Phase outside this Initiative') };
   }
   // A Domain or Worker binding — nothing on this surface writes either, but the
   // table takes them and the assumptions section writes Workers. Shown as
   // unopenable rather than dropped.
-  return { ...base, type: 'object', label: 'Bound elsewhere' };
+  return { ...base, type: 'object', label: translate('Bound elsewhere') };
 }
 
 /** The one field style, shared by both composers. No ring, no border, no
- *  outline (DESIGN.md §5.3) — the focused field is the one carrying a ground,
+ *  outline — the focused field is the one carrying a ground,
  *  and the negative margin keeps that ground from shifting the text sideways
  *  when it appears. */
 const FIELD = [
@@ -710,6 +711,7 @@ function DecisionRow({
   onStatus: (status: DecisionStatus) => void;
   onDelete: () => void;
 }) {
+  const { t } = useI18n();
   const decided = formatElementDate(decision.decidedAt);
   // `horizon` is a calendar day, so it is parsed from its parts. Handed to
   // `new Date()` whole it would be UTC midnight, and print as the day before
@@ -717,7 +719,7 @@ function DecisionRow({
   const horizonDay = formatElementDate(fromDateOnlyString(decision.horizon));
 
   return (
-    <div className="group/row py-2 border-b border-border/40 last:border-b-0">
+    <div className="group/row -mx-2 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
       <div className="flex items-center gap-2">
         <span
           className="size-1.5 rounded-full shrink-0"
@@ -732,10 +734,13 @@ function DecisionRow({
             the notice and its answer in two places on the same row. The
             accessible name keeps both halves — replacing it with the action
             alone would drop "overdue" for anyone who cannot see the colour. */}
+        {/* Row controls carry no frame: the row is content, and a capsule on
+            every line is what made the section read as a form. */}
+        <ButtonAppearanceProvider appearance="navigation">
         <Button
           variant="ghost"
           size="xs"
-          aria-label={`${reviewLabel(decision)}. Record a review of ${decision.title}`}
+          aria-label={t('{review}. Record a review of {title}', { review: reviewLabel(decision), title: decision.title })}
           aria-expanded={review.open}
           disabled={!canEdit}
           onClick={review.open ? review.onClose : review.onOpen}
@@ -749,8 +754,8 @@ function DecisionRow({
               variant="ghost"
               size="icon-xs"
               disabled={!canEdit}
-              aria-label={`Options for ${decision.title}`}
-              className="shrink-0"
+              aria-label={t('Options for {title}', { title: decision.title })}
+              className="shrink-0 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
             >
               <MoreHorizontal size={14} />
             </Button>
@@ -771,7 +776,7 @@ function DecisionRow({
                   {decisionStatusLabel(status)}
                 </span>
                 {decision.status === status && (
-                  <span className="text-[11px] text-muted-foreground">Current</span>
+                  <span className="text-[11px] text-muted-foreground">{t('Current')}</span>
                 )}
               </DropdownMenuItem>
             ))}
@@ -780,10 +785,11 @@ function DecisionRow({
               onClick={onDelete}
               className="text-[var(--status-danger)] focus:text-[var(--status-danger)]"
             >
-              Delete decision
+              {t('Delete decision')}
             </DropdownMenuItem>
           </MenuShell>
         </DropdownMenu>
+        </ButtonAppearanceProvider>
       </div>
 
       {/* The cost line. Kept visible when empty: a decision recorded without
@@ -792,19 +798,19 @@ function DecisionRow({
       <p className="text-[12px] text-muted-foreground pl-3.5 mt-0.5">
         {decision.abandoned ? (
           <>
-            <span className="text-[var(--text-tertiary)]">Gave up </span>
+            <span className="text-[var(--text-tertiary)]">{t('Gave up')} </span>
             {decision.abandoned}
           </>
         ) : (
-          <span className="text-muted-foreground/50">Nothing recorded as given up</span>
+          <span className="text-muted-foreground/50">{t('Nothing recorded as given up')}</span>
         )}
       </p>
 
       <p className="text-[11px] text-muted-foreground/70 pl-3.5 mt-0.5">
         {decisionStatusLabel(decision.status)}
         {decision.decidedBy ? ` · ${decision.decidedBy}` : ''}
-        {decided ? ` · decided ${decided}` : ''}
-        {horizonDay ? ` · review ${horizonDay}` : ''}
+        {decided ? ` · ${t('decided {date}', { date: decided })}` : ''}
+        {horizonDay ? ` · ${t('review {date}', { date: horizonDay })}` : ''}
       </p>
 
       {/* What happened to this call in the end. A reversal that does not name
@@ -814,14 +820,14 @@ function DecisionRow({
         <p className="text-[11px] text-muted-foreground/70 pl-3.5 mt-0.5">
           {supersededBy && (
             <span>
-              <span className="text-[var(--status-danger)]">Reversed by </span>
+              <span className="text-[var(--status-danger)]">{t('Reversed by')} </span>
               {supersededBy}
             </span>
           )}
           {supersededBy && supersedes && ' · '}
           {supersedes && (
             <span>
-              <span className="text-[var(--text-tertiary)]">Replaces </span>
+              <span className="text-[var(--text-tertiary)]">{t('Replaces')} </span>
               {supersedes}
             </span>
           )}
@@ -832,7 +838,7 @@ function DecisionRow({
           says what in the Initiative now carries it, which is the half that
           exists nowhere else — the Object's own surface has no way to name the
           decision that moved it. Linking changes no date; a person does that. */}
-      <div className="flex flex-wrap items-center gap-1 pl-3.5 mt-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-3.5 mt-1">
         {landings.map((landing) => (
           <BoundTarget
             key={landing.bindingId}
@@ -849,13 +855,13 @@ function DecisionRow({
         ))}
         {canEdit && (
           <IntentTargetPicker
-            label={landings.length === 0 ? 'Link what this moved' : 'Link another'}
+            label={landings.length === 0 ? t('Link what this moved') : t('Link another')}
             targets={candidates}
             onPick={onLink}
             empty={
               scopeError
-                ? 'Could not read this Initiative’s Objects, Elements and Phases.'
-                : 'This Initiative covers no Objects yet — add some to link what a decision moved.'
+                ? t("Could not read this Initiative's Objects, Elements and Phases.")
+                : t('This Initiative covers no Objects yet — add some to link what a decision moved.')
             }
           />
         )}
@@ -865,13 +871,13 @@ function DecisionRow({
           upheld in June and overturned in August has two entries, and the June
           one is why the August one is worth reading. */}
       {review.entries.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground/50 pl-3.5 mt-0.5">Not reviewed yet</p>
+        <p className="text-[11px] text-muted-foreground/50 pl-3.5 mt-0.5">{t('Not reviewed yet')}</p>
       ) : (
         <ul className="pl-3.5 mt-0.5">
           {review.entries.map((entry) => (
             <li key={entry.id} className="text-[11px] text-muted-foreground/70">
               <span className={`font-medium ${outcomeTone(entry.outcome)}`}>
-                {entry.outcome ? reviewOutcomeLabel(entry.outcome) : 'Reviewed'}
+                {entry.outcome ? reviewOutcomeLabel(entry.outcome) : t('Reviewed')}
               </span>
               {entry.reason ? ` · ${entry.reason}` : ''}
               {` · ${entry.actorName}`}
@@ -900,6 +906,7 @@ function ReviewComposer({
   decisionTitle: string;
   review: RowReview;
 }) {
+  const { t } = useI18n();
   const { draft, reviewedBy, saving, siblings, onDraft, onReviewedBy, onSubmit, onClose } = review;
   const suggested = draft.outcome ? suggestedStatusAfter(draft.outcome) : null;
 
@@ -914,7 +921,7 @@ function ReviewComposer({
 
   return (
     <div
-      className="rounded-lg border border-border/60 bg-card p-3 space-y-2 mt-2"
+      className="mt-2 space-y-2 py-1"
       onKeyDown={escape}
     >
       <div className="flex items-center gap-1">
@@ -934,8 +941,8 @@ function ReviewComposer({
         value={draft.reason}
         autoFocus
         onChange={(e) => onDraft({ reason: e.target.value })}
-        placeholder="Why it landed that way"
-        aria-label={`Why the review of ${decisionTitle} landed that way`}
+        placeholder={t('Why it landed that way')}
+        aria-label={t('Why the review of {title} landed that way', { title: decisionTitle })}
         className={`${FIELD} text-[13px]`}
       />
       {/* Only a reversal asks this, and only when there is something to point
@@ -944,14 +951,14 @@ function ReviewComposer({
           Initiative's other decisions rather than creating one. */}
       {draft.outcome === 'reversed' && siblings.length > 0 && (
         <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
-          Replaced by
+          {t('Replaced by')}
           <select
             value={draft.supersededBy ?? ''}
             onChange={(e) => onDraft({ supersededBy: e.target.value || null })}
-            aria-label={`The decision taken in place of ${decisionTitle}`}
+            aria-label={t('The decision taken in place of {title}', { title: decisionTitle })}
             className={`${FIELD} flex-1 min-w-0 text-[12px]`}
           >
-            <option value="">Not recorded</option>
+            <option value="">{t('Not recorded')}</option>
             {siblings.map((s) => (
               <option key={s.id} value={s.id}>{s.title}</option>
             ))}
@@ -962,7 +969,7 @@ function ReviewComposer({
         <input
           value={reviewedBy}
           onChange={(e) => onReviewedBy(e.target.value)}
-          placeholder="Reviewed by"
+          placeholder={t('Reviewed by')}
           className={`${FIELD} flex-1 min-w-0 text-[12px]`}
         />
         {suggested && (
@@ -972,14 +979,14 @@ function ReviewComposer({
             aria-pressed={draft.alsoStatus}
             onClick={() => onDraft({ alsoStatus: !draft.alsoStatus })}
           >
-            Set the status to {decisionStatusLabel(suggested)}
+            {t('Set the status to {status}', { status: decisionStatusLabel(suggested) })}
           </Button>
         )}
       </div>
       <div className="flex items-center justify-end gap-2">
-        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
+        <Button variant="ghost" size="sm" onClick={onClose}>
           <X size={14} />
-          Cancel
+          {t('Cancel')}
         </Button>
         <Button
           variant="primary"
@@ -987,7 +994,7 @@ function ReviewComposer({
           disabled={!draft.outcome || !draft.reason.trim() || !reviewedBy.trim() || saving}
           onClick={onSubmit}
         >
-          {saving ? 'Recording…' : 'Record review'}
+          {saving ? t('Recording…') : t('Record review')}
         </Button>
       </div>
     </div>
@@ -1025,6 +1032,7 @@ function Composer({
   onSubmit: () => void;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   // Escape closes and nothing else. The draft stays in the parent's state, so
   // reopening the composer hands back what was typed instead of eating it.
   const escape = (e: React.KeyboardEvent) => {
@@ -1036,7 +1044,7 @@ function Composer({
 
   return (
     <div
-      className="rounded-lg border border-border/60 bg-card p-3 space-y-2 mt-2"
+      className="mt-2 space-y-2 py-1"
       onKeyDown={escape}
     >
       <textarea
@@ -1045,35 +1053,35 @@ function Composer({
         rows={1}
         autoFocus
         onChange={(e) => onTitle(e.target.value)}
-        placeholder="What was decided"
+        placeholder={t('What was decided')}
         className={`${FIELD} text-[13px] leading-relaxed resize-none`}
       />
       <textarea
         value={abandoned}
         rows={1}
         onChange={(e) => onAbandoned(e.target.value)}
-        placeholder="What it gave up"
+        placeholder={t('What it gave up')}
         className={`${FIELD} text-[13px] leading-relaxed resize-none`}
       />
       <div className="flex items-center gap-2">
         <input
           value={decidedBy}
           onChange={(e) => onDecidedBy(e.target.value)}
-          placeholder="Decided by"
+          placeholder={t('Decided by')}
           className={`${FIELD} flex-1 min-w-0 text-[12px]`}
         />
         <DateField
           value={horizon}
           onChange={onHorizon}
-          placeholder="Review on"
+          placeholder={t('Review on')}
           size="xs"
-          aria-label="Review on"
+          aria-label={t('Review on')}
         />
       </div>
       <div className="flex items-center justify-end gap-2">
-        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
+        <Button variant="ghost" size="sm" onClick={onClose}>
           <X size={14} />
-          Cancel
+          {t('Cancel')}
         </Button>
         <Button
           variant="primary"
@@ -1081,7 +1089,7 @@ function Composer({
           disabled={!title.trim() || saving}
           onClick={onSubmit}
         >
-          {saving ? 'Recording…' : 'Record'}
+          {saving ? t('Recording…') : t('Record')}
         </Button>
       </div>
     </div>
@@ -1109,7 +1117,7 @@ function statusVar(status: DecisionStatus): string {
  *  The hover tone is pinned to the resting one because the chip is pressable:
  *  the ghost variant would otherwise pull an overdue chip back to the ordinary
  *  text colour under the cursor, dropping the warning at the moment the reader
- *  is reaching for it. The hover feedback is the ground (DESIGN.md §5.1). */
+ *  is reaching for it. The hover feedback is the ground. */
 function reviewTone(decision: Decision): string {
   if (!isDueForReview(decision)) {
     return 'text-muted-foreground/60 hover:text-muted-foreground';

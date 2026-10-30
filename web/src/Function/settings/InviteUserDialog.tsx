@@ -7,9 +7,12 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { inviteMember } from '@/Function/membership/invitations';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
+import { Button } from '@/ui/button';
+import type { InvitationRole } from '@/types/database';
 
 // Search `profiles` by display_name and invite the picked user to a Domain
-// (Guest path) or an ActivitySpace (full member), per `target`. The invitation
+// (Guest path) or an ActivitySpace (full member), per `target`. A Domain
+// invitation is as a member or as a viewer, who reads and changes nothing. The invitation
 // grants nothing until they accept it from their Inbox (ADR 0029); accepting
 // makes them a member, and the database then gives them their human Worker.
 // Email-based invites for users who don't have an account yet are deferred to
@@ -49,6 +52,7 @@ export function InviteUserDialog({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [role, setRole] = useState<InvitationRole>('member');
 
   useEscapeLayer(true, onClose);
 
@@ -83,6 +87,7 @@ export function InviteUserDialog({
         target.kind,
         target.kind === 'space' ? target.spaceId : target.domainId,
         profile.id,
+        target.kind === 'domain' ? role : 'member',
       );
       onInvited();
     } catch (e) {
@@ -119,6 +124,31 @@ export function InviteUserDialog({
           <p className="mb-3 text-[12px] text-muted-foreground">
             {t('They join when they accept the invitation in their Inbox.')}
           </p>
+          {target.kind === 'domain' && (
+            <div className="mb-3">
+              <div className="mb-1.5 text-[12px] font-medium text-foreground">{t('Invite as')}</div>
+              <div className="grid grid-cols-2 gap-2">
+                {(['member', 'viewer'] as const).map((value) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    shape="tab"
+                    variant={role === value ? 'secondary' : 'ghost'}
+                    aria-pressed={role === value}
+                    onClick={() => setRole(value)}
+                    className="min-w-0 w-full truncate"
+                  >
+                    {t(value === 'member' ? 'Member' : 'Viewer')}
+                  </Button>
+                ))}
+              </div>
+              {role === 'viewer' && (
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  {t('Viewers read everything in this Domain and change nothing.')}
+                </p>
+              )}
+            </div>
+          )}
           <div className="relative">
             <Search
               size={14}
@@ -130,13 +160,13 @@ export function InviteUserDialog({
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
               placeholder={t('Search by display name…')}
-              className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
+              className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:bg-muted/40 transition-colors"
             />
           </div>
           {error && <p className="mt-2 text-[12px] text-[var(--status-danger)]">{error}</p>}
         </div>
 
-        <div className="max-h-[320px] overflow-y-auto divide-y divide-border/40 mt-3">
+        <div className="max-h-[320px] overflow-y-auto mt-3">
           {loading ? (
             <div className="px-5 py-8 text-center text-xs text-muted-foreground">{t('Searching…')}</div>
           ) : results.length === 0 ? (

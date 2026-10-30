@@ -39,7 +39,7 @@ export function SettingsModal({ mark, title, subtitle, onClose, sections, active
             {mark}
             <div className="flex min-w-0 items-baseline gap-2">
               <h2 id={titleId} className="truncate text-[13px] font-semibold text-foreground">{title}</h2>
-              <p className="truncate text-[12px] text-muted-foreground">{subtitle}</p>
+              <p className="truncate text-[13px] text-muted-foreground">{subtitle}</p>
             </div>
           </div>
           <button

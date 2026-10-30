@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useDomains, updateDomain } from '@/hooks/useSupabase';
 import type { Domain, DomainPhaseDefaults } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { PHASE_DEFAULTS_MAX } from '@/ActivitySpace/strategy/phase/phaseDefaults';
+import { PHASE_DEFAULTS_MAX } from '@/Function/shared/phaseDefaults';
 import { SlaSettings } from './SlaSettings';
 import { SettingsSection, SettingsRow } from './SettingsSection';
 import { Group, SelectRow, SelectControl, ToggleRow } from './SettingsControls';
@@ -84,7 +84,7 @@ export function PhaseDefaultsSettings() {
                 options={START_OPTIONS.map((o) => START_LABEL[o])}
                 onChange={(label) => save(domain, { start: START_OPTIONS.find((o) => START_LABEL[o] === label) ?? 'today' })} />
             </SettingsRow>
-            {errors[domain.id] && <div className="px-4 py-2 text-[11px] text-destructive">{errors[domain.id]}</div>}
+            {errors[domain.id] && <div className="py-2 text-[11px] text-destructive">{errors[domain.id]}</div>}
           </SettingsSection>
         );
       })}
@@ -135,7 +135,7 @@ export function TimelineDisplaySettings() {
   const aheadOptions = useMemo(() => range(TIMELINE_MONTHS_AHEAD_RANGE), []);
   return (
     <div className="space-y-6">
-      {error && <div className="-mt-2 text-[12px] text-destructive">{t("Couldn't save")}: {error}</div>}
+      {error && <div className="-mt-2 text-[12px] text-destructive">{t("Couldn't save: {error}", { error })}</div>}
       <Group title={t('Window')}>
         <SelectRow label={t('Scale')} desc={t('How much of the year one screen shows')}
           value={SCALE_LABEL[preferences.timeline_scale]} options={Object.values(SCALE_LABEL)}

@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
+import { Loader2 } from 'lucide-react';
 import type { ElementWithDetails } from '@/types/database';
 import { fetchElementWithDetails } from '@/hooks/useSupabase';
 import { useCurrentUserId } from '@/providers/authContext';
@@ -11,6 +12,7 @@ import {
 import { Button } from '@/ui/button';
 import { CONTROL, FONT, STATUS, STATUS_ORDER } from '@/shared/designTokens';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import {
   checkInAttempt, checkInBase, checkInChange, checkInFailure, hasNewerCheckInVersion,
   type CheckInAttempt, type CheckInBase, type CheckInDraft,
@@ -32,6 +34,7 @@ export function ElementCheckIn(props: ElementCheckInProps) {
 }
 
 function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInProps & { userId: string | null }) {
+  const { t } = useI18n();
   const fieldId = useId();
   const [base, setBase] = useState(() => checkInBase(element));
   const [draft, setDraft] = useState<CheckInDraft>({ status: null, next: null, note: '' });
@@ -63,7 +66,7 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
 
   const restorePending = useCallback(() => {
     try {
-      if (!userId) throw new Error('Sign in before updating this Element.');
+      if (!userId) throw new Error(t('Sign in before updating this Element.'));
       const pending = readPendingCheckIn(window.sessionStorage, userId, element.id, storageLimits);
       if (pending) {
         pendingRef.current = pending;
@@ -73,13 +76,13 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
         setDraft(pending.draft);
         setUnconfirmed(true);
         setLatest(null);
-        setError('An earlier update needs confirmation. Retry it before editing. You can close safely and resume it here.');
+        setError(t('An earlier update needs confirmation. Retry it before editing. You can close safely and resume it here.'));
       }
       setStorageError(null);
     } catch (cause) {
-      setStorageError(cause instanceof Error ? cause.message : 'This browser could not restore the previous update. Try restoring it again.');
+      setStorageError(cause instanceof Error ? t(cause.message) : t('This browser could not restore the previous update. Try restoring it again.'));
     } finally { setChecking(false); }
-  }, [element.id, userId]);
+  }, [element.id, userId, t]);
 
   useEffect(() => {
     let active = true;
@@ -111,7 +114,7 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
     setError(null);
     let sent = false;
     try {
-      if (!userId) throw new Error('Sign in before updating this Element.');
+      if (!userId) throw new Error(t('Sign in before updating this Element.'));
       const attempt = retry ?? checkInAttempt(change!, attemptRef.current, () => crypto.randomUUID());
       attemptRef.current = attempt;
       const pending: PendingCheckIn = pendingRef.current ?? { version: 1, userId, base, draft, attempt };
@@ -127,13 +130,13 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
         if (mountedRef.current) {
           setSaved(true);
           setNeedsClose(true);
-          setError('Your update was saved, but this browser could not clear its retry record. You can close safely; reopening will check the same update.');
+          setError(t('Your update was saved, but this browser could not clear its retry record. You can close safely; reopening will check the same update.'));
         }
         return;
       }
     } catch (cause) {
       if (!sent) {
-        if (mountedRef.current) setStorageError(cause instanceof Error ? cause.message : 'This browser could not keep the update for a safe retry. No request was sent.');
+        if (mountedRef.current) setStorageError(cause instanceof Error ? t(cause.message) : t('This browser could not keep the update for a safe retry. No request was sent.'));
         return;
       }
       const failure = checkInFailure(cause, !!retry);
@@ -142,7 +145,7 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
         unconfirmedRef.current = attemptRef.current;
         setUnconfirmed(true);
         setLatest(null);
-        setError('The save result is unknown. Retry this update before editing. You can close safely and resume it here.');
+        setError(t('The save result is unknown. Retry this update before editing. You can close safely and resume it here.'));
         requestAnimationFrame(() => saveRef.current?.focus());
         return;
       }
@@ -150,7 +153,7 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
         if (pendingRef.current) clearPendingCheckIn(window.sessionStorage, pendingRef.current, storageLimits);
         pendingRef.current = null;
       } catch {
-        if (mountedRef.current) setStorageError('The confirmed result could not be cleared from this browser. Restore the previous update before writing another one.');
+        if (mountedRef.current) setStorageError(t('The confirmed result could not be cleared from this browser. Restore the previous update before writing another one.'));
       }
       if (!mountedRef.current) return;
       unconfirmedRef.current = null;
@@ -160,21 +163,21 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
         setConflict(true);
         setLatest(null);
         setReviewed(false);
-        setError('This Element changed while you were editing. Your update is still here. Review the latest version before saving.');
+        setError(t('This Element changed while you were editing. Your update is still here. Review the latest version before saving.'));
         requestAnimationFrame(() => reviewRef.current?.focus());
       } else if (failure === 'permission') {
-        setError('You no longer have permission to update this Element. Your draft is still here.');
+        setError(t('You no longer have permission to update this Element. Your draft is still here.'));
       } else if (failure === 'history_changed') {
         // The receipt proves the original update was saved. Its later-edited
         // history must never be recreated by silently sending a new request.
         savedRef.current = true;
         setHistoryChanged(true);
         setLatest(null);
-        setError('This update was saved, but its history was later edited or removed. Close this update and review the shared history in Element details before writing another.');
+        setError(t('This update was saved, but its history was later edited or removed. Close this update and review the shared history in Element details before writing another.'));
       } else if (failure === 'invalid') {
-        setError('This update was rejected. Check the status and the length of your note or next step, then try again. Your draft is still here.');
+        setError(t('This update was rejected. Check the status and the length of your note or next step, then try again. Your draft is still here.'));
       } else {
-        setError('This update was not saved. Your draft is still here. Check your changes and try again.');
+        setError(t('This update was not saved. Your draft is still here. Check your changes and try again.'));
       }
       return;
     } finally {
@@ -198,12 +201,12 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
       if (!mountedRef.current) return;
       if (!current) {
         setLatest(null);
-        setError('This Element is no longer available. Your draft is still here.');
+        setError(t('This Element is no longer available. Your draft is still here.'));
         return;
       }
       setLatest(checkInBase(current));
     } catch {
-      if (mountedRef.current) setError('Could not load the latest version. Your draft is still here. Try again.');
+      if (mountedRef.current) setError(t('Could not load the latest version. Your draft is still here. Try again.'));
     } finally {
       busyRef.current = false;
       if (mountedRef.current) setBusy(null);
@@ -224,7 +227,7 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
 
   return (
     <form
-      aria-label={`Update ${base.title}`}
+      aria-label={t('Update {title}', { title: base.title })}
       aria-busy={!!busy}
       className={cn('min-w-0 space-y-3', FONT.base)}
       onClick={event => event.stopPropagation()}
@@ -242,7 +245,7 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
       }}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor={`${fieldId}-status`} className={cn(FONT.sm, 'text-muted-foreground')}>Status</label>
+        <label htmlFor={`${fieldId}-status`} className={cn(FONT.sm, 'text-muted-foreground')}>{t('Status')}</label>
         <select
           id={`${fieldId}-status`}
           value={selectedStatus ?? ''}
@@ -252,10 +255,10 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
             selectedStatus ? STATUS[selectedStatus].textColor : 'text-muted-foreground')}
           aria-describedby={base.approvalPending ? `${fieldId}-approval` : undefined}
         >
-          <option value="" disabled>Not set</option>
+          <option value="" disabled>{t('Not set')}</option>
           {STATUS_ORDER.map(status => (
             <option key={status} value={status} disabled={status === 'done' && base.approvalPending}>
-              {STATUS[status].label}
+              {t(STATUS[status].label)}
             </option>
           ))}
         </select>
@@ -263,12 +266,12 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
 
       {base.approvalPending && (
         <p id={`${fieldId}-approval`} className={cn(FONT.sm, 'text-muted-foreground')}>
-          Use Approval in the Element details to approve this work before marking it Done.
+          {t('Use Approval in the Element details to approve this work before marking it Done.')}
         </p>
       )}
 
       <div>
-        <label htmlFor={`${fieldId}-note`} className="sr-only">Update note (optional)</label>
+        <label htmlFor={`${fieldId}-note`} className="sr-only">{t('Update note (optional)')}</label>
         <textarea
           id={`${fieldId}-note`}
           rows={2}
@@ -277,7 +280,7 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
           onChange={event => edit({ note: event.target.value })}
           disabled={disabled}
           readOnly={writeLocked}
-          placeholder="Share an update, if useful…"
+          placeholder={t('Share an update, if useful…')}
           className={cn('block w-full resize-y rounded-md bg-transparent p-2 placeholder:text-muted-foreground focus:bg-[var(--surface-raised)] disabled:opacity-50', FONT.base)}
         />
       </div>
@@ -285,16 +288,16 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
       <div className="space-y-2">
         <Button type="button" variant="ghost" size="sm" align="start" disabled={disabled}
           aria-expanded={nextOpen} aria-controls={`${fieldId}-next-area`} onClick={() => setNextOpen(open => !open)}>
-          {nextOpen ? <ChevronDown size={CONTROL.icon.sm} aria-hidden="true" /> : <ChevronRight size={CONTROL.icon.sm} aria-hidden="true" />}
-          {draft.next !== null ? 'Next step · edited' : 'Next step'}
+          <DisclosureTriangle open={nextOpen} />
+          {t(draft.next !== null ? 'Next step · edited' : 'Next step')}
         </Button>
         {nextOpen && (
           <div id={`${fieldId}-next-area`}>
-            <label htmlFor={`${fieldId}-next`} className="sr-only">Next step (optional)</label>
+            <label htmlFor={`${fieldId}-next`} className="sr-only">{t('Next step (optional)')}</label>
             <textarea id={`${fieldId}-next`} rows={2} maxLength={CHECK_IN_NEXT_MAX}
               value={draft.next ?? base.next ?? ''} disabled={disabled} readOnly={writeLocked}
               onChange={event => edit({ next: event.target.value })}
-              placeholder="What would move this forward?"
+              placeholder={t('What would move this forward?')}
               className={cn('block w-full resize-y rounded-md bg-transparent p-2 placeholder:text-muted-foreground focus:bg-[var(--surface-raised)] disabled:opacity-50', FONT.base)} />
           </div>
         )}
@@ -302,50 +305,50 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
 
       {showReview && !latest && (
         <div className="space-y-2">
-          {!error && <p className={cn(FONT.sm, 'text-muted-foreground')}>A newer version is available. Your draft has been kept.</p>}
+          {!error && <p className={cn(FONT.sm, 'text-muted-foreground')}>{t('A newer version is available. Your draft has been kept.')}</p>}
           <Button ref={reviewRef} type="button" variant="secondary" disabled={disabled} onClick={() => void reviewLatest()}>
             {busy === 'review' && <Loader2 size={CONTROL.icon.sm} className="animate-spin" aria-hidden="true" />}
-            Review latest
+            {t('Review latest')}
           </Button>
         </div>
       )}
 
       {latest && (
         <div className="space-y-2 rounded-md bg-[var(--surface-raised)] p-3" aria-live="polite">
-          <p className="font-medium">Latest shared version</p>
+          <p className="font-medium">{t('Latest shared version')}</p>
           <p className="break-words">{latest.title}</p>
           <dl className={cn('space-y-2', FONT.sm)}>
-            <div><dt className="text-muted-foreground">Status</dt><dd>{latest.status ? STATUS[latest.status].label : 'Not set'}</dd></div>
-            <div><dt className="text-muted-foreground">Next step</dt><dd className="whitespace-pre-wrap break-words">{latest.next || 'No next step set'}</dd></div>
+            <div><dt className="text-muted-foreground">{t('Status')}</dt><dd>{t(latest.status ? STATUS[latest.status].label : 'Not set')}</dd></div>
+            <div><dt className="text-muted-foreground">{t('Next step')}</dt><dd className="whitespace-pre-wrap break-words">{latest.next || t('No next step set')}</dd></div>
           </dl>
-          <p className={cn(FONT.sm, 'text-muted-foreground')}>Your edits above are kept. Continue with this version, then review your update before saving.</p>
-          <Button type="button" variant="secondary" disabled={disabled} onClick={useLatest}>Continue with this version</Button>
+          <p className={cn(FONT.sm, 'text-muted-foreground')}>{t('Your edits above are kept. Continue with this version, then review your update before saving.')}</p>
+          <Button type="button" variant="secondary" disabled={disabled} onClick={useLatest}>{t('Continue with this version')}</Button>
         </div>
       )}
 
       {error && <p role="alert" className={cn(FONT.sm, 'break-words text-[var(--status-danger)]')}>{error}</p>}
-      {checking && <p role="status" className={cn(FONT.sm, 'text-muted-foreground')}>Checking for an unfinished update…</p>}
+      {checking && <p role="status" className={cn(FONT.sm, 'text-muted-foreground')}>{t('Checking for an unfinished update…')}</p>}
       {storageError && (
         <div className="space-y-2">
           <p role="alert" className={cn(FONT.sm, 'break-words text-[var(--status-danger)]')}>{storageError}</p>
-          <Button type="button" variant="secondary" disabled={!!busy} onClick={restorePending}>Try restoring again</Button>
+          <Button type="button" variant="secondary" disabled={!!busy} onClick={restorePending}>{t('Try restoring again')}</Button>
         </div>
       )}
       {reviewed && !showReview && !latest && !error && (
-        <p role="status" className={cn(FONT.sm, 'text-muted-foreground')}>Latest version loaded. Review your changes, then save.</p>
+        <p role="status" className={cn(FONT.sm, 'text-muted-foreground')}>{t('Latest version loaded. Review your changes, then save.')}</p>
       )}
-      {approvalBlocked && <p role="alert" className={cn(FONT.sm, 'text-[var(--status-danger)]')}>Approval is still required. Choose another status to save this update.</p>}
+      {approvalBlocked && <p role="alert" className={cn(FONT.sm, 'text-[var(--status-danger)]')}>{t('Approval is still required. Choose another status to save this update.')}</p>}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className={cn(FONT.sm, 'text-muted-foreground')} role={saved ? 'status' : undefined}>
-          {saved ? 'Update saved.' : 'Saved updates appear in the shared history.'}
+          {t(saved ? 'Update saved.' : 'Saved updates appear in the shared history.')}
         </p>
         <div className="flex items-center gap-2">
-          {onCancel && !historyChanged && !needsClose && <Button type="button" variant="ghost" disabled={!!busy} onClick={onCancel}>{unconfirmed ? 'Close, keep update' : 'Cancel'}</Button>}
-          {historyChanged || needsClose ? <Button type="button" variant="secondary" onClick={onSaved}>Close update</Button> : (
+          {onCancel && !historyChanged && !needsClose && <Button type="button" variant="ghost" disabled={!!busy} onClick={onCancel}>{t(unconfirmed ? 'Close, keep update' : 'Cancel')}</Button>}
+          {historyChanged || needsClose ? <Button type="button" variant="secondary" onClick={onSaved}>{t('Close update')}</Button> : (
             <Button ref={saveRef} type="submit" variant="primary" size="md" disabled={!canSave} aria-keyshortcuts="Control+Enter Meta+Enter">
               {busy === 'save' && <Loader2 size={CONTROL.icon.md} className="animate-spin" aria-hidden="true" />}
-              {busy === 'save' ? 'Saving…' : unconfirmed ? 'Retry this update' : 'Save update'}
+              {t(busy === 'save' ? 'Saving…' : unconfirmed ? 'Retry this update' : 'Save update')}
             </Button>
           )}
         </div>

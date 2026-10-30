@@ -42,9 +42,11 @@ export function AuthPage() {
       <div className="relative min-h-screen flex items-center justify-center bg-[var(--content-bg)]">
         <div className="absolute right-4 top-4"><LanguageSelect /></div>
         <div className="w-full max-w-sm">
-          <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-8 text-center">
-            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--status-success)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {/* A message, not a form: no card around it. The mark is the app's
+              one accent — matte blue with a white check. */}
+          <div className="p-8 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[var(--accent-default)] flex items-center justify-center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
             </div>

@@ -24,6 +24,7 @@ import {
 } from '@/ui/dialog';
 import { CARRY_OVER_REASON_PREFIX, closePhase, createElementComment, invalidateCarryOverReasons, type Phase } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { formatDisplayName, getCachedDisplayNames } from '@/Function/settings/preferencesStore';
 import {
   planPhaseClose,
@@ -31,7 +32,7 @@ import {
   unfinishedIn,
   type CloseDestination,
   type PhaseElementRow,
-} from './phaseClose';
+} from '@/Function/strategy/phaseClose';
 
 /** Mounted only while the dialog is open, so every field starts fresh. */
 export function PhaseCloseDialog({
@@ -50,6 +51,7 @@ export function PhaseCloseDialog({
   onClosed: () => void;
 }) {
   const { user, profile } = useAuthContext();
+  const { t } = useI18n();
 
   // The note a previous close left behind is the draft for this one.
   const [note, setNote] = useState(phase.closing_note ?? '');
@@ -110,7 +112,7 @@ export function PhaseCloseDialog({
       onClosed();
     } catch (e) {
       console.error('Failed to close Phase', e);
-      setFailure('Could not close this Phase. It is still open, so closing again finishes what did not get through.');
+      setFailure(t('Could not close this Phase. It is still open, so closing again finishes what did not get through.'));
     } finally {
       setSaving(false);
     }
@@ -120,21 +122,20 @@ export function PhaseCloseDialog({
     <Dialog open onOpenChange={(next) => { if (!next) onDismiss(); }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Close {phase.name}</DialogTitle>
+          <DialogTitle>{t('Close {name}', { name: phase.name })}</DialogTitle>
           <DialogDescription>
             {rollup.total === 0
-              ? 'No Elements were assigned to this Phase.'
-              : `${rollup.done} of ${rollup.total} Elements done.`}
+              ? t('No Elements were assigned to this Phase.')
+              : t('{done} of {total} Elements done.', { done: rollup.done, total: rollup.total })}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-2">
           <label htmlFor="phase-closing-note" className="text-[12px] font-medium text-foreground">
-            Closing note
+            {t('Closing note')}
           </label>
           <p className="text-[12px] text-muted-foreground">
-            What did closing mean — got what it was for, or ran out of time? If unfinished work was a
-            decision rather than a slip, this is where that is written down.
+            {t('What did closing mean — got what it was for, or ran out of time? If unfinished work was a decision rather than a slip, this is where that is written down.')}
           </p>
           <textarea
             id="phase-closing-note"
@@ -142,7 +143,7 @@ export function PhaseCloseDialog({
             onChange={(e) => setNote(e.target.value)}
             rows={3}
             autoFocus
-            placeholder="Achieved what it was for — or out of time. Say which, and why."
+            placeholder={t('Achieved what it was for — or out of time. Say which, and why.')}
             className="w-full resize-none rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground outline-none transition-[color,background-color] focus:bg-[var(--accent-subtle)]"
           />
         </div>
@@ -151,18 +152,18 @@ export function PhaseCloseDialog({
           <div className="flex flex-col gap-1">
             <span className="text-[12px] font-medium text-foreground">
               {unfinished.length === 1
-                ? '1 Element is not done. Where does it go?'
-                : `${unfinished.length} Elements are not done. Where do they go?`}
+                ? t('1 Element is not done. Where does it go?')
+                : t('{n} Elements are not done. Where do they go?', { n: unfinished.length })}
             </span>
             <DestinationChoice
               value={destination}
               onChange={setDestination}
               option="carry"
-              label={nextPhase ? `Carry over to ${nextPhase.name}` : 'Carry over to the next Phase'}
+              label={nextPhase ? t('Carry over to {name}', { name: nextPhase.name }) : t('Carry over to the next Phase')}
               hint={
                 nextPhase
-                  ? 'Moves them forward and counts the round they just spent here.'
-                  : 'No later Phase to carry into.'
+                  ? t('Moves them forward and counts the round they just spent here.')
+                  : t('No later Phase to carry into.')
               }
               disabled={!nextPhase}
             />
@@ -170,26 +171,24 @@ export function PhaseCloseDialog({
               value={destination}
               onChange={setDestination}
               option="unassign"
-              label="Take out of this Phase"
-              hint="They keep their owners and dates, but belong to no Phase."
+              label={t('Take out of this Phase')}
+              hint={t('They keep their owners and dates, but belong to no Phase.')}
             />
             <DestinationChoice
               value={destination}
               onChange={setDestination}
               option="keep"
-              label="Leave them here"
-              hint="They stay in this Phase, unfinished, on the record."
+              label={t('Leave them here')}
+              hint={t('They stay in this Phase, unfinished, on the record.')}
             />
           </div>
         )}
 
         {destination === 'carry' && nextPhase && (
           <div className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-medium text-foreground">Why, for each (optional)</span>
+            <span className="text-[12px] font-medium text-foreground">{t('Why, for each (optional)')}</span>
             <p className="text-[12px] text-muted-foreground">
-              The count on a carried Element says how many rounds, not why. A word here is the
-              difference between “always meant to land next round” and “someone else’s work spilled
-              onto this.”
+              {t('The count on a carried Element says how many rounds, not why. A word here is the difference between “always meant to land next round” and “someone else’s work spilled onto this.”')}
             </p>
             <div className="flex flex-col gap-1.5">
               {unfinished.map((el) => (
@@ -199,7 +198,7 @@ export function PhaseCloseDialog({
                     type="text"
                     value={reasons[el.id] ?? ''}
                     onChange={(e) => setReasons((prev) => ({ ...prev, [el.id]: e.target.value }))}
-                    placeholder="Reason (optional)"
+                    placeholder={t('Reason (optional)')}
                     className="w-[55%] shrink-0 rounded-md px-2 py-1 text-[12px] text-foreground placeholder:text-muted-foreground outline-none transition-[color,background-color] focus:bg-[var(--accent-subtle)]"
                   />
                 </div>
@@ -212,10 +211,10 @@ export function PhaseCloseDialog({
 
         <DialogFooter>
           <Button variant="ghost" size="md" onClick={onDismiss} disabled={saving}>
-            Cancel
+            {t('Cancel')}
           </Button>
           <Button variant="primary" size="md" onClick={() => void handleClose()} disabled={!canClose}>
-            {saving ? 'Closing…' : 'Close Phase'}
+            {saving ? t('Closing…') : t('Close Phase')}
           </Button>
         </DialogFooter>
       </DialogContent>

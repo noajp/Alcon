@@ -2,16 +2,17 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createCustomColumn, updateCustomColumn, deleteCustomColumn, setCustomColumnValue, fetchCustomColumnsWithValues, isPropertyWriteRefused, noticePropertyValueFailed, type CustomColumnWithValues } from '@/hooks/useSupabase';
-import { revealCustomColumn } from '@/ActivitySpace/execution/object/useListColumns';
+import { revealCustomColumn } from '@/Function/shared/listTable/useListColumns';
 import type { Json } from '@/types/database';
 import { Button } from '@/ui/button';
 import { ObjectFieldDialog } from './ObjectFieldDialog';
-import { CHOICE_TYPES, type FieldDraft } from './fieldModel';
-export const SELECT_TYPES = CHOICE_TYPES;
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { type FieldDraft } from './fieldModel';
 export type ColumnScope = { kind: 'object'; objectId: string };
 
 /** Definitions belong to an Object; visibility belongs to the current view. */
 export function useCustomColumns(scope: ColumnScope | null, options: { colStorageKey?: string } = {}) {
+  const { t } = useI18n();
   const objectId = scope?.objectId;
   const qc = useQueryClient();
   const queryKey = useMemo(() => ['custom-columns', 'object', objectId ?? ''] as const, [objectId]);
@@ -54,14 +55,14 @@ export function useCustomColumns(scope: ColumnScope | null, options: { colStorag
     openEditColumn: (column: CustomColumnWithValues) => { if (objectId && column.object_id === objectId) setEditor({ objectId, column }); },
     addColumnModal: <>
       {((failure && failure.objectId === objectId) || query.isError) && <div role="alert" className="fixed bottom-4 right-4 z-[100] rounded-lg bg-popover border border-border p-4 text-sm text-foreground flex items-center gap-3">
-        {failure ? 'Field value was not saved.' : 'Fields could not be loaded.'}
+        {failure ? t('Field value was not saved.') : t('Fields could not be loaded.')}
         <Button type="button" variant="secondary" size="sm" disabled={retrying} onClick={async () => {
           setRetrying(true);
           try { if (failure) { await failure.retry(); setFailure(null); } else await refetch(); }
           catch { /* Keep the failure visible. */ }
           finally { setRetrying(false); }
-        }}>{retrying ? 'Retrying…' : 'Retry'}</Button>
-        {failure && <Button type="button" variant="ghost" size="sm" onClick={() => setFailure(null)}>Dismiss</Button>}
+        }}>{retrying ? t('Retrying…') : t('Retry')}</Button>
+        {failure && <Button type="button" variant="ghost" size="sm" onClick={() => setFailure(null)}>{t('Dismiss')}</Button>}
       </div>}
       {editor && editor.objectId === objectId && <ObjectFieldDialog
         key={`${editor.objectId}:${editor.column?.id ?? 'new'}`} column={editor.column}
@@ -69,7 +70,7 @@ export function useCustomColumns(scope: ColumnScope | null, options: { colStorag
         onDelete={editor.column ? async () => { await deleteCustomColumn(editor.column!.id); await refresh(); } : undefined}
         onDuplicate={editor.column ? async () => {
           const column = editor.column!;
-          const created = await createCustomColumn({ object_id: objectId!, name: `${column.name} (copy)`, column_type: column.column_type, options: column.options });
+          const created = await createCustomColumn({ object_id: objectId!, name: t('{name} (copy)', { name: column.name }), column_type: column.column_type, options: column.options });
           revealCustomColumn(options.colStorageKey, created.id); await refresh();
         } : undefined}
       />}

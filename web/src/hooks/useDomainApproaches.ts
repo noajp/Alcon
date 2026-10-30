@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import { readAllPages, type CountedRows } from './readAllPages';
 import { chunkIds } from './chunkedIn';
-import type { ApproachData, DomainApproach, ApproachCondition, ApproachContribution, ApproachAssessment, ApproachReview } from '@/ActivitySpace/execution/domain/approachModel';
+import type { ApproachData, DomainApproach, ApproachCondition, ApproachContribution, ApproachAssessment, ApproachReview } from '@/Function/domain/approachModel';
 
 type InitiativeOption = { id: string; name: string };
 type MeasureOption = { id: string; strategy_id: string; title: string };

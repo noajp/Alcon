@@ -1,23 +1,28 @@
 'use client';
 
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
+import { Input } from '@/ui/input';
+import { FONT } from '@/shared/designTokens';
 
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { StrategyNavigation } from './sidebar/StrategyNavigation';
 import { SettingsModal } from '@/Function/settings/SettingsModal';
 import { StrategySettingsModal } from '@/Function/settings/StrategySettingsModal';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { resolveVision, useVisions } from '@/hooks/visionData';
+import { useSpaceRole } from '@/Function/space/data';
+import { useCurrentUserId } from '@/providers/authContext';
+import { NavPortfolioIcon, NavStrategyIcon, NavVisionIcon } from './sidebar/NavIcons';
 import { NotebookTree } from './sidebar/NotebookTree';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
-import { ArrowLeft, Plus, Bot, Settings, Users, Search } from 'lucide-react';
-import { useAuthContext } from '@/providers/AuthProvider';
+import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp, PanelLeftClose } from 'lucide-react';
 import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
-import { domainHasObjectsMessage } from '@/ActivitySpace/execution/domain/data';
+import { domainHasObjectsMessage, useDomainRole, type DomainRole } from '@/hooks/domainData';
 import { countDomainObjects } from '@/hooks/useObjectArchive';
-import { supabase } from '@/lib/supabase';
 import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
 import {
   DndContext,
@@ -39,10 +44,11 @@ import { ObjectIcon } from '@/shell/icons';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { useDomains, reorderDomains } from '@/hooks/useSupabase';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
-import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/ActivitySpace/execution/domain/domainsStore';
+import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/Function/space/domainsStore';
 import { SpaceSwitcher } from '@/Function/space/SpaceSwitcher';
 
 import { NavTableIcon } from '@/shell/sidebar/NavIcons';
+import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 import { useDataTables } from '@/hooks/useSupabase';
 import { railModeOf } from '@/shell/ModeRail';
 import type { RailMode } from '@/shell/railApps';
@@ -50,10 +56,14 @@ import { CREATE_ELEMENT_EVENT, type CreateElementDetail } from '@/shell/QuickAdd
 import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarStore';
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
-import { ScmSidebar } from '@/ActivitySpace/sustainment/scm/ScmSidebar';
 import { CrmSidebar } from '@/ActivitySpace/sustainment/crm/CrmSidebar';
+import { AuditSidebar } from '@/ActivitySpace/sustainment/audit/AuditSidebar';
+import { AiSidebar } from '@/ActivitySpace/home/ai/AiSidebar';
+import { SlidesSidebar, createDeckHere, createFolderHere, pickDeckFile } from '@/ActivitySpace/sustainment/slides/SlidesSidebar';
+import { useSlidesReady } from '@/ActivitySpace/sustainment/slides/sync';
 import { InboxList } from '@/ActivitySpace/home/InboxList';
 import { CalendarSidebar } from '@/ActivitySpace/sustainment/calendar/CalendarSidebar';
+import { WorkloadSidebar } from '@/ActivitySpace/sustainment/workload/WorkloadSidebar';
 import type { NavigationState } from '@/types/navigation';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
@@ -74,6 +84,8 @@ interface AppSidebarProps {
   overlay: boolean;
   onCreateNew?: (type: 'domain' | 'object' | 'note') => void;
   onSearch?: () => void;
+  /** Hides the sidebar — the button at its foot, right end. */
+  onHide?: () => void;
 }
 
 // The ModeRail picks a top-level mode; the sidebar renders only that mode's
@@ -98,7 +110,7 @@ function isEmojiIcon(s: string) {
 // of every mode, no affordance of its own.
 function SidebarModeLabel({ label }: { label: string }) {
   return (
-    <div className="px-2 h-6 mt-3 flex items-center text-[11px] font-semibold tracking-wide text-muted-foreground/60">
+    <div className="px-2.5 h-7 mt-5 mb-0.5 flex items-center text-[12px] font-medium text-muted-foreground/80">
       {label}
     </div>
   );
@@ -130,35 +142,19 @@ function TableSidebar({
 
   return (
     <div className="mt-1">
-      <div className="flex items-center gap-1 px-2 h-6 mt-3">
-        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('Table')}</span>
-      </div>
+      <SidebarSectionLabel>{t('Table')}</SidebarSectionLabel>
       <div className="mt-1 flex flex-col">
-        {tables.map((t) => {
-          const active = t.id === activeTableId;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => { onViewChange('tables'); onNavigate({ tableId: t.id }); }}
-              title={t.name}
-              className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                active
-                  ? 'bg-sidebar-accent text-foreground'
-                  : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-              }`}
-            >
-              <NavTableIcon size={16} />
-              <span className="min-w-0 flex-1 text-left truncate">{t.name}</span>
-              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/60">{t.rowCount}</span>
-            </button>
-          );
-        })}
-        {tables.length === 0 && (
-          <div className="px-2.5 py-6 text-[11px] text-muted-foreground/60 leading-relaxed">
-            {t('No tables yet — click + to add one.')}
-          </div>
-        )}
+        {tables.map((t) => (
+          <SidebarRow
+            key={t.id}
+            active={t.id === activeTableId}
+            icon={<NavTableIcon size={16} />}
+            label={t.name}
+            title={t.name}
+            meta={t.rowCount}
+            onClick={() => { onViewChange('tables'); onNavigate({ tableId: t.id }); }}
+          />
+        ))}
       </div>
     </div>
   );
@@ -175,6 +171,7 @@ export function AppSidebar({
   overlay,
   onCreateNew,
   onSearch,
+  onHide,
 }: AppSidebarProps) {
   const { openCreate } = useWorkspaceActions();
   const { t } = useI18n();
@@ -207,7 +204,15 @@ export function AppSidebar({
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
-  const [strategySettingsOpen, setStrategySettingsOpen] = useState(false);
+  // Strategy: the Space's Visions (the sidebar's rows) and the one whose
+  // settings modal is open.
+  const strategySpaceId = useActiveSpaceId();
+  const { data: visions } = useVisions(strategySpaceId);
+  const activeVision = resolveVision(visions, navigation.visionId);
+  const [settingsVisionId, setSettingsVisionId] = useState<string | null>(null);
+  const settingsVision = visions.find((v) => v.id === settingsVisionId) ?? null;
+  const visionViewerId = useCurrentUserId();
+  const visionViewerRole = useSpaceRole(strategySpaceId);
   const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const railMode = railModeOf(activeView);
@@ -232,21 +237,15 @@ export function AppSidebar({
   // Execution) a Domain or Object from a small menu. Modes with nothing to
   // create show no "+".
   const calendarDay = useCalendarDay();
-  const createLabel = activeView === 'portfolio' ? 'New Portfolio' : ({
-    notebook: 'Add Notebook', tables: 'Add Table', strategy: 'New Initiative',
+  // Slides makes nothing until the Space's decks are loaded; the load would replace it.
+  const slidesReady = useSlidesReady();
+  const createLabel = ({
+    notebook: 'Add Notebook', tables: 'Add Table', slides: 'Create new', strategy: 'Create new',
     calendar: 'Add schedule', execution: 'Create new',
   } as Partial<Record<RailMode, string>>)[railMode ?? 'execution'];
   const openCreateMenu = () => {
     if (railMode === 'tables') { openCreate('table'); return; }
     if (railMode === 'notebook') { openCreate('notebook'); return; }
-    if (railMode === 'strategy') {
-      if (activeView === 'portfolio') { onNavigate({ portfolioCreate: true }); return; }
-      // Land on the Initiative list (an open Initiative's detail has no
-      // create dialog) and let this tab's surface open it once mounted.
-      onNavigate({ strategyId: null, strategyCreate: true });
-      onViewChange('strategy');
-      return;
-    }
     if (railMode === 'calendar') {
       window.dispatchEvent(new CustomEvent<CreateElementDetail>(CREATE_ELEMENT_EVENT, { detail: { dueDate: calendarDay } }));
       return;
@@ -441,10 +440,12 @@ export function AppSidebar({
           {railMode === 'strategy' && (
           <>
           <SidebarModeLabel label={t('Strategy')} />
-          <StrategyNavigation activeView={activeView} onSelect={(id) => {
-            if (id === 'strategy') onNavigate({ strategyId: null });
-            onViewChange(id);
-          }} onOpenSettings={() => setStrategySettingsOpen(true)} />
+          <StrategyNavigation visions={visions} activeVisionId={activeVision?.id ?? null} activeView={activeView}
+            onSelect={(visionId, view) => {
+              onNavigate({ visionId, strategyId: null, portfolioId: null });
+              onViewChange(view);
+            }}
+            onOpenSettings={setSettingsVisionId} />
           </>
           )}
 
@@ -526,19 +527,38 @@ export function AppSidebar({
               onViewChange={onViewChange}
             />
           )}
-          {/* ── Workload / Team modes ── each a single full surface in the
-              main pane, so the sidebar just names the mode. */}
-          {railMode === 'workload' && <SidebarModeLabel label={t('Workload')} />}
+          {/* ── Workload ── the team's load, the plan that fixes it, and
+              each person, narrowing the chart to them. */}
+          {railMode === 'workload' && <WorkloadSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'workload') onViewChange('workload'); }} />}
+          {/* ── Team ── a single full surface in the main pane. */}
           {/* ── Inbox ── the notification list; the main pane reads the open one. */}
           {railMode === 'inbox' && <InboxList onNavigate={onNavigate} onViewChange={onViewChange} onOpen={() => onViewChange('inbox')} />}
           {/* ── Calendar ── today, a mini month that moves the grid, and who is shown. */}
           {railMode === 'calendar' && <><SidebarModeLabel label={t('Calendar')} /><CalendarSidebar /></>}
-          {railMode === 'team' && <SidebarModeLabel label={t('Team')} />}
+          {railMode === 'team' && <SidebarModeLabel label={t('People')} />}
           {railMode === 'crm' && <CrmSidebar navigation={navigation} onNavigate={onNavigate} />}
-          {railMode === 'scm' && <ScmSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'scm') onViewChange('scm'); }} />}
+          {/* ── Audit ── what needs a person, the workflows, and the log. */}
+          {railMode === 'audit' && <AuditSidebar navigation={navigation} onNavigate={onNavigate} />}
+          {/* ── AI ── this person's conversations, in folders. */}
+          {railMode === 'ai' && <AiSidebar onOpen={() => { if (activeView !== 'ai') onViewChange('ai'); }} />}
+          {/* ── Slides ── the Space's deck folders; the main pane edits the open deck. */}
+          {railMode === 'slides' && <SlidesSidebar onOpen={() => { if (activeView !== 'slides') onViewChange('slides'); }} />}
           </>
           )}
         </nav></ButtonAppearanceProvider>
+
+        {/* The foot: hiding the sidebar is the sidebar's own business, so its
+            button sits at the sidebar's bottom-right corner. */}
+        {onHide && (
+          <ButtonAppearanceProvider appearance="navigation">
+          <div className="flex h-8 shrink-0 items-center justify-end px-2 pb-1.5">
+            <Button size="icon-xs" variant="ghost" onClick={onHide} className="text-muted-foreground"
+              title={t('Hide sidebar')} aria-label={t('Hide sidebar')}>
+              <PanelLeftClose size={14} />
+            </Button>
+          </div>
+          </ButtonAppearanceProvider>
+        )}
 
         {!collapsed && (
           <div
@@ -560,23 +580,84 @@ export function AppSidebar({
             className="fixed w-52 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden"
             style={{ top: createMenuPos.top, left: createMenuPos.left }}
           >
-            <CreateMenuItem
-              icon={<DomainIcon size={16} />}
-              label={t('Domain')}
-              desc={t('Top-level container')}
-              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
-            />
-            <CreateMenuItem
-              icon={<ObjectIcon size={14} />}
-              label={t('Object')}
-              desc={t('Mid-level structural unit')}
-              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('object'); }}
-            />
+            {railMode === 'slides' ? (
+              <>
+                {/* Slides: a deck in the open deck's folder, a folder, or a deck from a file. */}
+                <CreateMenuItem
+                  icon={<FilePlus size={16} />}
+                  label={t('New deck')}
+                  desc={t('In the open deck’s folder, or the first one')}
+                  disabled={!slidesReady}
+                  onClick={() => { setCreateMenuOpen(false); createDeckHere(); onViewChange('slides'); }}
+                />
+                <CreateMenuItem
+                  icon={<FolderPlus size={16} />}
+                  label={t('New folder')}
+                  desc={t('A place to keep decks together')}
+                  disabled={!slidesReady}
+                  onClick={() => { setCreateMenuOpen(false); createFolderHere(); }}
+                />
+                <CreateMenuItem
+                  icon={<FileUp size={16} />}
+                  label={t('Open a deck file')}
+                  desc={t('A .kata.json file, as a new deck')}
+                  disabled={!slidesReady}
+                  onClick={() => { setCreateMenuOpen(false); pickDeckFile(); onViewChange('slides'); }}
+                />
+              </>
+            ) : railMode === 'strategy' ? (
+              <>
+                {/* Vision → Portfolio → Initiative, the Strategy tree. Each
+                    page opens its own create card once mounted; Portfolio
+                    and Initiative are made under the active Vision. */}
+                <CreateMenuItem
+                  icon={<NavVisionIcon size={16} />}
+                  label={t('Vision')}
+                  desc={t('What this Space aims for')}
+                  onClick={() => { setCreateMenuOpen(false); onNavigate({ visionCreate: true }); onViewChange('vision'); }}
+                />
+                {activeVision && (
+                  <>
+                    <CreateMenuItem
+                      icon={<NavPortfolioIcon size={16} />}
+                      label={t('Portfolio')}
+                      desc={t('A bundle of Initiatives in {name}', { name: activeVision.name })}
+                      onClick={() => { setCreateMenuOpen(false); onNavigate({ visionId: activeVision.id, portfolioId: null, portfolioCreate: true }); onViewChange('portfolio'); }}
+                    />
+                    <CreateMenuItem
+                      icon={<NavStrategyIcon size={16} />}
+                      label={t('Initiative')}
+                      desc={t('An outcome to win in {name}', { name: activeVision.name })}
+                      onClick={() => { setCreateMenuOpen(false); onNavigate({ visionId: activeVision.id, strategyId: null, strategyCreate: true }); onViewChange('strategy'); }}
+                    />
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <CreateMenuItem
+                  icon={<DomainIcon size={16} />}
+                  label={t('Domain')}
+                  desc={t('Top-level container')}
+                  onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
+                />
+                <CreateMenuItem
+                  icon={<ObjectIcon size={14} />}
+                  label={t('Object')}
+                  desc={t('Mid-level structural unit')}
+                  onClick={() => { setCreateMenuOpen(false); onCreateNew?.('object'); }}
+                />
+              </>
+            )}
           </div>
         </>
       )}
 
-      {strategySettingsOpen && <StrategySettingsModal onClose={() => setStrategySettingsOpen(false)} />}
+      {settingsVision && (
+        <StrategySettingsModal vision={settingsVision} canEdit={settingsVision.created_by === visionViewerId || visionViewerRole === 'owner'}
+          onClose={() => setSettingsVisionId(null)}
+          onDeleted={() => { setSettingsVisionId(null); onNavigate({ visionId: null, portfolioId: null }); }} />
+      )}
       {settingsDomain && (
         <DomainSettingsModal
           domain={settingsDomain}
@@ -690,7 +771,6 @@ function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
   );
 }
 
-type DomainRole = 'owner' | 'admin' | 'member';
 
 function DomainSettingsModal({
   domain,
@@ -709,20 +789,7 @@ function DomainSettingsModal({
   // The viewer's own seat, read once for every tab. It answers the same
   // question RLS answers on write: owner/admin may change the Domain, only
   // an owner may delete it, and anyone else is a guest who can only leave.
-  const { user } = useAuthContext();
-  const [role, setRole] = useState<DomainRole | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    if (!user) return;
-    void supabase
-      .from('domain_members')
-      .select('role')
-      .eq('domain_id', domain.id)
-      .eq('user_id', user.id)
-      .maybeSingle()
-      .then(({ data }) => { if (!cancelled) setRole((data?.role as DomainRole | undefined) ?? null); });
-    return () => { cancelled = true; };
-  }, [domain.id, user]);
+  const role = useDomainRole(domain.id).data ?? null;
   const canEdit = role === 'owner' || role === 'admin';
 
   return (
@@ -819,7 +886,7 @@ function DomainGeneralSettings({
       else await leaveDomain(domain.id);
       onDeleted();
     } catch (e) {
-      setError(e instanceof Error ? e.message : `Failed to ${confirming} Domain`);
+      setError(e instanceof Error ? e.message : t(confirming === 'delete' ? 'The Domain could not be deleted. Try again.' : 'Could not leave the Domain. Try again.'));
       setBusy(false);
       setConfirming(null);
     }
@@ -837,7 +904,7 @@ function DomainGeneralSettings({
       });
       onUpdated(updated);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update Domain');
+      setError(e instanceof Error ? e.message : t('Could not update the Domain. Try again.'));
     } finally {
       setSaving(false);
     }
@@ -846,36 +913,27 @@ function DomainGeneralSettings({
   return (
     <div className="max-w-xl">
       <div className="mb-5">
-        <h3 className="text-[15px] font-semibold text-foreground">General</h3>
+        <h3 className={`${FONT.lg} text-foreground`}>{t('General')}</h3>
         <p className="mt-1 text-[12px] text-muted-foreground">
-          {canEdit
-            ? 'Configure this Domain\u2019s name, identifier, and access mode.'
-            : 'You were invited to this Domain. Only its owner or admin can change these settings.'}
+          {t(canEdit
+            ? 'Configure this Domain’s name, identifier, and access mode.'
+            : 'You were invited to this Domain. Only its owner or admin can change these settings.')}
         </p>
       </div>
 
       <fieldset disabled={!canEdit} className="space-y-5">
         <div>
-          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Name</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-md bg-muted/40 px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:bg-[var(--accent-subtle)]"
-          />
+          <label htmlFor="domain-settings-name" className="mb-1.5 block text-[12px] font-semibold text-foreground">{t('Name')}</label>
+          <Input id="domain-settings-name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
 
         <div>
-          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Identifier</label>
-          <input
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            placeholder="e.g. ALCON"
-            className="w-full rounded-md bg-muted/40 px-3 py-2 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:bg-[var(--accent-subtle)]"
-          />
+          <label htmlFor="domain-settings-identifier" className="mb-1.5 block text-[12px] font-semibold text-foreground">{t('Identifier')}</label>
+          <Input id="domain-settings-identifier" value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder={t('e.g. MKT')} />
         </div>
 
         <div>
-          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Privacy</label>
+          <div className="mb-1.5 text-[12px] font-semibold text-foreground">{t('Privacy')}</div>
           <div className="grid grid-cols-2 gap-2">
             {([
               ['workspace', 'Workspace'],
@@ -890,72 +948,55 @@ function DomainGeneralSettings({
                 onClick={() => setPrivacy(value)}
                 className="min-w-0 w-full truncate"
               >
-                {label}
+                {t(label)}
               </Button>
             ))}
           </div>
         </div>
 
         {error && (
-          <div className="rounded-md border border-[var(--status-danger)]/30 bg-[var(--status-danger)]/10 px-3 py-2 text-[12px] text-[var(--status-danger)]">
-            {error}
-          </div>
+          <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>
         )}
 
         {canEdit && (
-          <div className="flex justify-end border-t border-border pt-4">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!canSave || saving}
-              className="rounded-md bg-foreground px-3 py-1.5 text-[12px] font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-40"
-            >
-              {saving ? 'Saving...' : 'Save changes'}
-            </button>
+          <div className="flex justify-end">
+            <Button variant="primary" onClick={handleSave} disabled={!canSave || saving}>
+              {t(saving ? 'Saving…' : 'Save changes')}
+            </Button>
           </div>
         )}
       </fieldset>
 
       {/* Outside the fieldset: a guest's one available action must stay enabled. */}
       {isOwner ? (
-        <div className="mt-5 flex items-center justify-between gap-4">
+        <div className="mt-8 flex items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="text-[12px] font-semibold text-foreground">{t('Delete Domain')}</div>
             <p className="mt-0.5 text-[12px] text-muted-foreground">
               {t('Permanently delete this Domain for every member. Move or delete its Objects first.')}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => { void askDelete(); }}
-            disabled={busy}
-            className="shrink-0 rounded-md bg-destructive/10 px-3 py-1.5 text-[12px] font-semibold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
-          >
-            Delete
-          </button>
+          <Button variant="danger" className="shrink-0" onClick={() => { void askDelete(); }} disabled={busy}>
+            {t('Delete')}
+          </Button>
         </div>
       ) : role ? (
-        <div className="mt-5 flex items-center justify-between gap-4 border-t border-border pt-4">
+        <div className="mt-8 flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-[12px] font-semibold text-foreground">Leave Domain</div>
+            <div className="text-[12px] font-semibold text-foreground">{t('Leave Domain')}</div>
             <p className="mt-0.5 text-[12px] text-muted-foreground">
-              Remove yourself. The Domain and your past work stay as they are.
+              {t('Remove yourself. The Domain and your past work stay as they are.')}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setConfirming('leave')}
-            disabled={busy}
-            className="shrink-0 rounded-md bg-destructive/10 px-3 py-1.5 text-[12px] font-semibold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
-          >
-            Leave
-          </button>
+          <Button variant="danger" className="shrink-0" onClick={() => setConfirming('leave')} disabled={busy}>
+            {t('Leave Domain')}
+          </Button>
         </div>
       ) : null}
 
       <ConfirmDialog
         open={confirming === 'delete'}
-        title={`Delete "${domain.name}"?`}
+        title={t('Delete “{name}”?', { name: domain.name })}
         description={t('Its members, Phases, and templates are deleted. Tables stay but are no longer in any Domain. This can’t be undone.')}
         busy={busy}
         onConfirm={() => { void runConfirmed(); }}
@@ -963,9 +1004,9 @@ function DomainGeneralSettings({
       />
       <ConfirmDialog
         open={confirming === 'leave'}
-        title={`Leave "${domain.name}"?`}
-        description="You lose access to this Domain until someone invites you again."
-        confirmLabel="Leave"
+        title={t('Leave “{name}”?', { name: domain.name })}
+        description={t('You lose access to this Domain until someone invites you again.')}
+        confirmLabel={t('Leave Domain')}
         busy={busy}
         onConfirm={() => { void runConfirmed(); }}
         onCancel={() => setConfirming(null)}
@@ -975,13 +1016,14 @@ function DomainGeneralSettings({
 }
 
 
-function CreateMenuItem({ icon, label, desc, onClick }: {
-  icon: React.ReactNode; label: string; desc: string; onClick: () => void;
+function CreateMenuItem({ icon, label, desc, onClick, disabled = false }: {
+  icon: React.ReactNode; label: string; desc: string; onClick: () => void; disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-start gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors text-left"
+      disabled={disabled}
+      className="w-full flex items-start gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors text-left disabled:opacity-50 disabled:hover:bg-transparent"
     >
       <span className="mt-0.5 w-4 flex items-center justify-center text-muted-foreground">{icon}</span>
       <span className="flex-1 min-w-0">

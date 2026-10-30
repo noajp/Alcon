@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useMemo } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -10,6 +10,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useBoardContext, zoneDroppableId } from './BoardContext';
+import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { WidgetFrame } from './WidgetFrame';
 import { WIDGET_COMPONENTS, WIDGET_REGISTRY } from './registry';
 import { ZONE_VARIANT, type WidgetInstance, type WidgetParams, type Zone } from './types';
@@ -47,7 +49,7 @@ export function WidgetZone({
 
   const { setNodeRef, isOver } = useDroppable({ id: zoneDroppableId(zone), data: { zone } });
 
-  const gapClass = zone === 'rail' ? 'space-y-6' : zone === 'band' ? 'space-y-2' : 'space-y-6';
+  const gapClass = zone === 'rail' ? 'space-y-4' : zone === 'band' ? 'space-y-2' : 'space-y-8';
 
   // Empty and idle, a zone takes no space at all — the + that fills it lives
   // on the surface. While arranging it becomes a visible drop target, so a
@@ -60,7 +62,7 @@ export function WidgetZone({
         items={items.map((w) => w.id)}
         strategy={columns === 2 ? rectSortingStrategy : verticalListSortingStrategy}
       >
-        <div className={columns === 2 ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : gapClass}>
+        <div className={columns === 2 ? 'grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-8' : gapClass}>
           {items.map((instance) => (
             <SortableWidget
               key={instance.id}
@@ -98,7 +100,9 @@ function SortableWidget({
   columns: 1 | 2;
 }) {
   const { board, host, arranging, setArranging } = useBoardContext();
+  const { t } = useI18n();
   const def = WIDGET_REGISTRY[instance.type];
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: instance.id,
@@ -119,8 +123,32 @@ function SortableWidget({
     [def, instance.params],
   );
 
+  // Placed here from an origin this person cannot see. The board is theirs to
+  // arrange, so the place is shown and can be moved. The widget is not theirs:
+  // nothing about it is shown, and taking it off the board is left to someone
+  // who can see it — its author could not find it again otherwise.
+  if (instance.hidden) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={{ transform: CSS.Transform.toString(transform), transition }}
+        {...(arranging ? { ...attributes, ...listeners } : {})}
+      >
+        <WidgetFrame
+          variant={ZONE_VARIANT[zone]}
+          title={t('Private widget')}
+          arranging={arranging}
+          isDragging={isDragging}
+          onLongPress={() => setArranging(true)}
+        >
+          <p className="text-xs text-muted-foreground">{t('You don’t have access to this widget.')}</p>
+        </WidgetFrame>
+      </div>
+    );
+  }
+
   // A layout can outlive the widget it names (a build that removed one, a
-  // board synced from another client). `migrate` drops those on read; this is
+  // board written by another client). `layoutFromRows` drops those on read; this is
   // the belt to that braces.
   if (!def) return null;
 
@@ -137,23 +165,33 @@ function SortableWidget({
     >
       <WidgetFrame
         variant={ZONE_VARIANT[zone]}
-        title={typeof params.title === 'string' && params.title.trim() ? params.title : def.label}
+        // A title someone typed is theirs and shown as written; the default
+        // is the widget's name, in the viewer's language.
+        title={typeof params.title === 'string' && params.title.trim() ? params.title : t(def.label)}
         padded={def.padded ?? true}
         arranging={arranging}
         isDragging={isDragging}
         onLongPress={() => setArranging(true)}
-        onRemove={() => board.removeWidget(instance.id)}
+        onRemove={() => (def.holdsContents ? setConfirmingRemove(true) : board.removeWidget(instance.id))}
       >
         <Suspense fallback={<div className="h-16 rounded-md bg-muted/30 animate-pulse" />}>
           <Body
             key={`${host.subject.kind}:${host.subject.id ?? 'me'}:${String(params.tableId ?? '')}`}
             host={host}
-            instanceId={instance.id}
+            instanceId={instance.widgetId ?? instance.id}
             params={params}
             setParams={(next) => board.setParams(instance.id, next)}
           />
         </Suspense>
       </WidgetFrame>
+      <ConfirmDialog
+        open={confirmingRemove}
+        title={`Remove ${def.label}?`}
+        description="This deletes the widget and what it holds for everyone who can see it."
+        confirmLabel="Remove"
+        onConfirm={() => { setConfirmingRemove(false); board.removeWidget(instance.id); }}
+        onCancel={() => setConfirmingRemove(false)}
+      />
     </div>
   );
 }

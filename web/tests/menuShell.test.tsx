@@ -30,7 +30,7 @@
 //     the two row editors put their footer strip at the same spot.
 //   - Radix's ContextMenu family (8 surfaces in ListTable) is untouched. Its
 //     content lives in `ui/context-menu.tsx` and is shared with
-//     ElementTableRow, NotesSidebar and FilesPane — converting ListTable's half
+//     ElementTableRow and FilesPane — converting ListTable's half
 //     alone would make right-click menus disagree with each other, which is
 //     worse than the disagreement being fixed. That is its own piece of work.
 
@@ -61,7 +61,6 @@ function classesOf(el: Element): string[] {
 
 /** The menu-bearing files covered by this contract. */
 const CONVERGED = [
-  'Function/property/AddPropertyButton.tsx',
   'Function/shared/listControls/ListControls.tsx',
   'Function/widget/WidgetPicker.tsx',
   'Function/shared/listTable/ColumnHeaderMenu.tsx',

@@ -1,14 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 
-// A right-rail section — and, through WidgetFrame, the frame every rail widget
-// wears. The rail is metadata beside a document, so it is not boxed: a small
-// muted heading and its rows, separated from the next section by space alone.
-// Boxes, header bands and shadows made each property group compete with the
-// document for attention; the heading is the only chrome it needs. The
-// chevron shows on hover and while collapsed, so an open rail reads as text.
+// A right-rail island — and, through WidgetFrame, the frame every rail widget
+// wears. The rail is the concept's facts beside its document (Properties,
+// Labels, Activity), so each group is an island of its own: a surface a notch
+// off the page, with a quiet heading, rows inside it, and room around them.
+// The tone alone sets it apart — no outline, no shadow — so a page with three
+// islands does not read as three boxes. The chevron shows on hover and while
+// collapsed.
 export function RailCard({
   title, children, padded = false, icon, action,
 }: {
@@ -18,35 +19,33 @@ export function RailCard({
   icon?: React.ReactNode;
   /** Optional control pinned to the right of the heading (e.g. an "+ add"
    *  button). Rendered outside the collapse toggle so pressing it doesn't
-   *  collapse the section. */
+   *  collapse the card. */
   action?: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   return (
-    <section className="group/rail">
+    <section className="group/rail rounded-lg bg-[var(--surface-rail)]">
       {/* Height is declared, not left to padding, so the heading is the same
-          28px whether the section is open or shut. */}
-      <div className="flex items-center h-7">
+          40px whether the card is open or shut. */}
+      <div className="flex h-10 items-center pl-2.5 pr-2">
         <button
           type="button"
           onClick={() => setCollapsed((c) => !c)}
           aria-expanded={!collapsed}
-          className="min-w-0 h-full flex items-center gap-1 px-2 rounded-md text-[12px] font-medium text-muted-foreground text-left hover:text-foreground transition-colors"
+          className="flex h-full min-w-0 items-center gap-1 rounded-md px-1.5 text-left text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           {icon}
           <span className="truncate">{title}</span>
-          <ChevronDown
-            size={12}
-            className={`shrink-0 transition-[transform,opacity] ${
-              collapsed ? '-rotate-90 opacity-100' : 'opacity-0 group-hover/rail:opacity-100'
-            }`}
+          <DisclosureTriangle
+            open={!collapsed}
+            className={collapsed ? 'opacity-100' : 'opacity-0 group-hover/rail:opacity-100'}
           />
         </button>
         <div className="flex-1" />
-        {action && <div className="shrink-0 pr-1">{action}</div>}
+        {action && <div className="shrink-0">{action}</div>}
       </div>
       {!collapsed && (
-        <div className={padded ? 'px-2 pt-1' : 'pt-0.5'}>
+        <div className={padded ? 'px-4 pb-4' : 'px-2 pb-2'}>
           {children}
         </div>
       )}

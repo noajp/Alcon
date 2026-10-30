@@ -4,7 +4,7 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArchiveRestore, Pencil } from 'lucide-react';
+import { Archive, ArchiveRestore, Pencil, Trash2 } from 'lucide-react';
 import {
   createObject,
   deleteObject,
@@ -17,6 +17,7 @@ import {
 import { EntityActionsMenu, type ActionTarget } from '@/Function/shared/EntityActionsMenu';
 import { DropdownMenuItem } from '@/ui/dropdown-menu';
 import { RenamePrefixDialog } from './RenamePrefixDialog';
+import { DeletedElementsDialog } from './DeletedElementsDialog';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { isArchivedObject } from '@/Function/shared/objectArchive';
 import { archiveObject, restoreObject } from '@/hooks/useObjectArchive';
@@ -45,6 +46,7 @@ export function ObjectActionsMenu({
   const managesObject = useManagesObject();
   const archived = isArchivedObject(object);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [deletedOpen, setDeletedOpen] = useState(false);
   // Domain membership (primary first), cached per Object.
   const qc = useQueryClient();
   const membershipKey = useMemo(() => ['object', object.id, 'domain-ids'] as const, [object.id]);
@@ -151,13 +153,13 @@ export function ObjectActionsMenu({
   return (
     <>
       <EntityActionsMenu
-        ariaLabel="Object actions"
+        ariaLabel={t('Object actions')}
         targets={targets}
         primaryId={primaryId}
         memberIds={memberIds}
-        moveLabel="Move to Domain"
-        multiHomeLabel="Multi-home to Domain"
-        targetEmptyLabel="No Domains"
+        moveLabel={t('Move to Domain')}
+        multiHomeLabel={t('Multi-home to Domain')}
+        targetEmptyLabel={t('No Domains')}
         onDuplicate={duplicate}
         onMove={move}
         onToggleMultiHome={toggleMultiHome}
@@ -165,6 +167,9 @@ export function ObjectActionsMenu({
       >
         <DropdownMenuItem onClick={() => setRenameOpen(true)} className="gap-2 text-[13px]">
           <Pencil size={13} className="text-muted-foreground" /> Rename ID prefix
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setDeletedOpen(true)} className="gap-2 text-[13px]">
+          <Trash2 size={13} className="text-muted-foreground" /> Deleted Elements
         </DropdownMenuItem>
         {managesObject(object) && (
           <DropdownMenuItem onClick={() => { void toggleArchive(); }} className="gap-2 text-[13px]">
@@ -174,6 +179,14 @@ export function ObjectActionsMenu({
           </DropdownMenuItem>
         )}
       </EntityActionsMenu>
+      {deletedOpen && (
+        <DeletedElementsDialog
+          objectId={object.id}
+          objectName={object.name}
+          onClose={() => setDeletedOpen(false)}
+          onRestored={() => { void onRefresh?.(); }}
+        />
+      )}
       {renameOpen && (
         <RenamePrefixDialog
           object={object}

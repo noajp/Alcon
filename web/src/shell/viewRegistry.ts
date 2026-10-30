@@ -1,7 +1,8 @@
 import type React from 'react';
 import {
+  NavAiIcon,
+  NavAuditIcon,
   NavCrmIcon,
-  NavScmIcon,
   NavHomeIcon,
   NavInboxIcon,
   NavCalendarIcon,
@@ -12,7 +13,7 @@ import {
   NavPortfolioIcon,
   NavNoteIcon,
   NavSettingsIcon,
-  NavTableIcon,
+  NavTableIcon, NavSlidesIcon,
   NavTeamsIcon,
   NavDomainIcon,
   NavPhaseIcon,
@@ -47,12 +48,14 @@ export type ViewId =
   | 'domain-overview'
   | 'domains'
   | 'tables'
+  | 'slides'
   | 'team'
   | 'crm'
-  | 'scm'
+  | 'audit'
   | 'settings'
   | 'profile'
-  | 'account';
+  | 'account'
+  | 'ai';
 
 export interface ViewMeta {
   /** Sidebar / tab display label. */
@@ -79,11 +82,13 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   'domain-overview': { label: 'Domain overview', icon: NavDomainIcon },
   domains:       { label: 'Domains',     icon: NavDomainIcon },
   tables:        { label: 'Table',       icon: NavTableIcon },
-  team:          { label: 'Team',        icon: NavTeamsIcon },
+  slides:        { label: 'Slides',      icon: NavSlidesIcon },
+  team:          { label: 'People',      icon: NavTeamsIcon },
   crm:           { label: 'CRM',         icon: NavCrmIcon },
-  scm:           { label: 'SCM',         icon: NavScmIcon },
+  audit:         { label: 'Audit',       icon: NavAuditIcon },
   settings:      { label: 'Settings',    icon: NavSettingsIcon },
   profile:       { label: 'Profile', icon: NavTeamsIcon },
   account:       { label: 'Account' },
+  ai:            { label: 'AI',          icon: NavAiIcon },
 };
 

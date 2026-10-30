@@ -3,8 +3,8 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import type React from 'react';
 import {
+  NavAuditIcon,
   NavCrmIcon,
-  NavScmIcon,
   NavInboxIcon,
   NavTeamsIcon as NavPersonalIcon,
   NavNoteIcon,
@@ -14,14 +14,16 @@ import {
   NavStrategyModeIcon,
   NavExecutionModeIcon,
   NavCalendarIcon,
+  NavSlidesIcon,
+  NavAiIcon,
 } from '@/shell/sidebar/NavIcons';
 import type { ViewId } from '@/shell/viewRegistry';
 
 // The ModeRail's top-level modes, and which of them are permanent.
 //
-// Inbox / Calendar / Strategy / Execution are permanent rail entries.
+// Inbox / Calendar / Strategy / Execution / AI are permanent rail entries.
 // Personal pages are reached through the avatar; other tools use the launcher.
-export type RailMode = 'personal' | 'inbox' | 'strategy' | 'execution' | 'workload' | 'notebook' | 'tables' | 'team' | 'calendar' | 'crm' | 'scm';
+export type RailMode = 'personal' | 'inbox' | 'strategy' | 'execution' | 'workload' | 'notebook' | 'tables' | 'slides' | 'team' | 'calendar' | 'crm' | 'audit' | 'ai';
 
 export interface ModeMeta {
   label: string;
@@ -40,10 +42,12 @@ export const MODE_META: Record<RailMode, ModeMeta> = {
   workload:  { label: 'Workload',  icon: NavWorkloadIcon, defaultView: 'workload', views: ['workload'] },
   notebook:  { label: 'Notebook',  icon: NavNoteIcon, defaultView: 'note', views: ['note'] },
   tables:    { label: 'Table',     icon: NavTableIcon, defaultView: 'tables', views: ['tables'] },
-  team:      { label: 'Team',      icon: NavTeamsIcon, defaultView: 'team', views: ['team'] },
+  slides:    { label: 'Slides',    icon: NavSlidesIcon, defaultView: 'slides', views: ['slides'] },
+  team:      { label: 'People',    icon: NavTeamsIcon, defaultView: 'team', views: ['team'] },
   calendar:  { label: 'Calendar',  icon: NavCalendarIcon, defaultView: 'calendar', views: ['calendar', 'schedule'] },
   crm:       { label: 'CRM',       icon: NavCrmIcon, defaultView: 'crm', views: ['crm'] },
-  scm:       { label: 'SCM',       icon: NavScmIcon, defaultView: 'scm', views: ['scm'] },
+  audit:     { label: 'Audit',     icon: NavAuditIcon, defaultView: 'audit', views: ['audit'] },
+  ai:        { label: 'AI',        icon: NavAiIcon, defaultView: 'ai', views: ['ai'] },
 };
 
 /** Navigation, highlighting and the launcher read the same mode definitions. */
@@ -52,14 +56,14 @@ export function railModeOf(view: string): RailMode | null {
     MODE_META[mode].views.some(id => id === view)) ?? null;
 }
 
-export const CORE_MODES: RailMode[] = ['inbox', 'calendar', 'strategy', 'execution'];
+export const CORE_MODES: RailMode[] = ['inbox', 'calendar', 'strategy', 'execution', 'ai'];
 
 // The launcher's catalog. Everything here is Sustainment — the tools of work
 // that keep the people doing the fighting able to keep going. The two groups
 // are a display split only: Tools serve any surface, Workload watches capacity.
 export const APP_GROUPS: { title: string; apps: RailMode[] }[] = [
-  { title: 'Tools', apps: ['notebook', 'tables', 'team'] },
-  { title: 'Sustainment', apps: ['workload', 'crm', 'scm'] },
+  { title: 'Tools', apps: ['notebook', 'tables', 'slides', 'team'] },
+  { title: 'Sustainment', apps: ['workload', 'crm', 'audit'] },
 ];
 
 const APP_MODES: RailMode[] = APP_GROUPS.flatMap((g) => g.apps);

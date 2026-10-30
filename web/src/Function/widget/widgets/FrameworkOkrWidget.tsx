@@ -16,6 +16,7 @@ import {
 import { useWidgetEmpty, useWidgetMeta } from '../WidgetFrame';
 import { objectiveTree, toMeasureInput, type Objective } from './strategyFrameworkModel';
 import type { WidgetHost } from '../types';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // =============================================================
 // OKR — the Initiative cascade, with its measures read as key results.
@@ -33,6 +34,7 @@ import type { WidgetHost } from '../types';
 // =============================================================
 
 export function FrameworkOkrWidget({ host }: { host: WidgetHost }) {
+  const { t } = useI18n();
   const rootId = host.subject.id ?? '';
   const { data: strategies } = useStrategies();
 
@@ -84,15 +86,15 @@ export function FrameworkOkrWidget({ host }: { host: WidgetHost }) {
   const unstated = objectives.filter((o) => !o.stated).length;
   useWidgetMeta(
     objectives.length === 0 ? null
-    : unstated > 0 ? `${unstated} without key results`
-    : `${objectives.length} objective${objectives.length === 1 ? '' : 's'}`,
+    : unstated > 0 ? t('{n} without key results', { n: unstated })
+    : objectives.length === 1 ? t('1 objective') : t('{n} objectives', { n: objectives.length }),
   );
   useWidgetEmpty(!error && (loading || objectives.length === 0));
 
   if (error) {
     return (
-      <p className="px-3 py-2 text-[12px] text-[var(--status-danger)]">
-        Could not read this Initiative&apos;s key results.
+      <p className="py-1 text-[12px] text-[var(--status-danger)]">
+        {t('Could not read this Initiative’s key results.')}
       </p>
     );
   }
@@ -125,15 +127,13 @@ function ObjectiveRow({
   isRoot: boolean;
   onOpen?: () => void;
 }) {
+  const { t } = useI18n();
   const { tally } = objective;
   return (
-    // The cascade is drawn with an indent and a rule down the left rather than
-    // connector strokes: depth here is at most a handful of levels, and a rule
-    // reads as "these hang off that" without a second geometry to maintain.
-    <div
-      className={objective.depth > 0 ? 'pl-4 ml-3 border-l border-[var(--border-subtle)]' : ''}
-    >
-      <div className="flex items-baseline gap-2 px-3 py-1.5">
+    // The cascade is drawn with indent alone: depth here is at most a handful
+    // of levels, and spacing reads as "these hang off that" without a line.
+    <div className={objective.depth > 0 ? 'pl-5' : ''}>
+      <div className="flex items-baseline gap-2 py-1.5">
         <NavStrategyIcon size={12} className="shrink-0 translate-y-px text-muted-foreground" />
         {onOpen ? (
           <button
@@ -152,27 +152,24 @@ function ObjectiveRow({
             and "2 unread" call for different things. */}
         {objective.stated ? (
           <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-            {tally.met}/{tally.total} met
+            {t('{met}/{total} met', { met: tally.met, total: tally.total })}
             {tally.missed > 0 && (
-              <span className="ml-1.5 text-[var(--status-danger)]">· {tally.missed} missed</span>
+              <span className="ml-1.5 text-[var(--status-danger)]">· {t('{n} missed', { n: tally.missed })}</span>
             )}
             {tally.unmeasured > 0 && (
-              <span className="ml-1.5 text-[var(--status-warning)]">
-                · {tally.unmeasured} unread
-              </span>
+              <span className="ml-1.5">· {t('{n} unread', { n: tally.unmeasured })}</span>
             )}
           </span>
         ) : (
-          <span className="shrink-0 text-[11px] text-[var(--status-warning)]">
-            No key results
+          <span className="shrink-0 text-[11px] text-muted-foreground">
+            {t('No key results')}
           </span>
         )}
       </div>
 
       {!objective.stated && isRoot && (
-        <p className="px-3 pb-1.5 text-[11px] leading-5 text-muted-foreground">
-          Nothing here says how this Initiative would be judged. Record a condition in Measures and
-          it becomes a key result.
+        <p className="pb-1.5 text-[11px] leading-5 text-muted-foreground">
+          {t('Nothing here says how this Initiative would be judged. Record a condition in Measures and it becomes a key result.')}
         </p>
       )}
 
@@ -185,18 +182,20 @@ function ObjectiveRow({
   );
 }
 
+// Only a missed key result asks for action, so only it is coloured.
 const STATE_TONE: Record<Measure['state'], string> = {
-  met: 'text-[var(--status-success)]',
+  met: 'text-muted-foreground',
   missed: 'text-[var(--status-danger)]',
-  unmeasured: 'text-[var(--status-warning)]',
+  unmeasured: 'text-muted-foreground',
   unstated: 'text-muted-foreground',
 };
 
 function KeyResultRow({ measure }: { measure: Measure }) {
+  const { t } = useI18n();
   const target = targetLabel(measure);
   const reading = formatMeasureValue(measure.actual, measure.unit);
   return (
-    <div className="flex items-baseline gap-2 px-3 py-1 pl-8">
+    <div className="flex items-baseline gap-2 py-1 pl-5">
       <span className="min-w-0 flex-1 truncate text-[12px] text-foreground/80">
         {measure.title}
       </span>
@@ -204,7 +203,7 @@ function KeyResultRow({ measure }: { measure: Measure }) {
         <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{target}</span>
       )}
       <span className={`shrink-0 text-[11px] tabular-nums ${STATE_TONE[measure.state]}`}>
-        {reading ?? measureStateLabel(measure.state)}
+        {reading ?? t(measureStateLabel(measure.state))}
       </span>
     </div>
   );

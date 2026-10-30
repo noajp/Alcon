@@ -10,6 +10,7 @@ import {
   AvatarGroupCount,
 } from '@/ui/avatar';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/ui/tooltip';
+import { translate } from '@/Function/i18n/I18nProvider';
 import {
   UNREACHABLE_WORKER_LABEL,
   UNREACHABLE_WORKER_RING_CLASS,
@@ -156,7 +157,7 @@ export function ReachHint({ worker }: { worker: WorkerAvatarSubject | null | und
       className="shrink-0 text-[11px] text-muted-foreground"
       title={unreachableWorkerTitle(worker?.name)}
     >
-      {UNREACHABLE_WORKER_LABEL}
+      {translate(UNREACHABLE_WORKER_LABEL)}
     </span>
   );
 }

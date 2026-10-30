@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ElementImportRejectedError, parseIntake, normalizeIntake } from '@/ActivitySpace/execution/element/intake/intakeModel';
+import { ElementImportRejectedError, parseIntake, normalizeIntake } from '@/Function/shared/element/intakeModel';
 
 const server = vi.hoisted(() => ({ userId: '00000000-0000-0000-0000-000000000001' as string | null, rpc: vi.fn(), changed: vi.fn(), invalidate: vi.fn() }));
 vi.mock('@/lib/supabase', () => ({ getCurrentUserId: async () => server.userId, supabase: { rpc: server.rpc } }));
 vi.mock('@/lib/queryClient', () => ({ getQueryClient: () => ({ invalidateQueries: server.invalidate }) }));
-vi.mock('@/ActivitySpace/execution/domain/domainsStore', () => ({ notifyDomainsChanged: server.changed }));
+vi.mock('@/Function/space/domainsStore', () => ({ notifyDomainsChanged: server.changed }));
 import { clearPendingWorkImport, importExistingWork, readPendingWorkImport, rememberPendingWorkImport, resolveExistingWork, type PendingWorkImport, type WorkImportTarget } from '@/hooks/importExistingWork';
 
 const user = '00000000-0000-0000-0000-000000000001';

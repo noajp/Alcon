@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTeamRoster, mergeTeamDomainMembers, parseCapacityDraft, type TeamRosterSource } from '@/ActivitySpace/sustainment/team/teamRoster';
+import { buildTeamRoster, mergeTeamDomainMembers, parseCapacityDraft, type TeamRosterSource } from '@/Function/team/teamRoster';
 import type { Worker } from '@/types/database';
 
 function worker(id: string, overrides: Partial<Worker> = {}): Worker {
@@ -80,7 +80,7 @@ describe('Team roster identity and permissions', () => {
       workers: [worker('outside-agent', { type: 'ai_agent', object_id: 'outside' })],
       spaceMembers: [{ user_id: 'owner', role: 'owner' }],
       domainMembers: [{ user_id: 'owner', domain_id: 'domain', role: 'owner' }],
-      elements: [{ id: 'element', title: 'Assigned work', display_id: null, status: 'todo', due_date: null, object_id: 'object' }],
+      elements: [{ id: 'element', title: 'Assigned work', display_id: null, status: 'todo', due_date: null, object_id: 'object', start_date: null, created_at: null, updated_at: null }],
       assignees: [{ element_id: 'element', worker_id: 'outside-agent' }],
     }), 'owner');
     expect(entries[0]).toMatchObject({ canManage: false, isMember: false, membership: 'Assigned Worker' });
@@ -103,16 +103,18 @@ describe('Team roster identity and permissions', () => {
     const entries = buildTeamRoster(source({
       workers: [duplicate, duplicate],
       elements: [
-        { id: 'later', title: 'Later', status: 'todo', due_date: '2026-09-10', display_id: null, object_id: 'object' },
-        { id: 'none', title: 'Undated', status: 'backlog', due_date: null, display_id: null, object_id: 'object' },
-        { id: 'early', title: 'Early', status: 'blocked', due_date: '2026-09-01', display_id: null, object_id: 'object' },
-        { id: 'done', title: 'Done', status: 'done', due_date: '2026-08-01', display_id: null, object_id: 'object' },
-        { id: 'cancelled', title: 'Cancelled', status: 'cancelled', due_date: null, display_id: null, object_id: 'object' },
+        { id: 'later', title: 'Later', status: 'todo', due_date: '2026-09-10', display_id: null, object_id: 'object', start_date: null, created_at: null, updated_at: null },
+        { id: 'none', title: 'Undated', status: 'backlog', due_date: null, display_id: null, object_id: 'object', start_date: null, created_at: null, updated_at: null },
+        { id: 'early', title: 'Early', status: 'blocked', due_date: '2026-09-01', display_id: null, object_id: 'object', start_date: null, created_at: null, updated_at: null },
+        { id: 'done', title: 'Done', status: 'done', due_date: '2026-08-01', display_id: null, object_id: 'object', start_date: null, created_at: null, updated_at: null },
+        { id: 'cancelled', title: 'Cancelled', status: 'cancelled', due_date: null, display_id: null, object_id: 'object', start_date: null, created_at: null, updated_at: null },
       ],
       assignees: ['later', 'none', 'early', 'early', 'done', 'cancelled', 'invisible'].map((element_id) => ({ element_id, worker_id: 'assigned' })),
     }), 'viewer');
     expect(entries).toHaveLength(1);
     expect(entries[0].activeElements.map((element) => element.id)).toEqual(['early', 'later', 'none']);
+    // The full record keeps closed work: it is the assignment history and skill evidence.
+    expect(entries[0].elements.map((element) => element.id).sort()).toEqual(['cancelled', 'done', 'early', 'later', 'none']);
   });
 });
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { lazy } from 'react';
-import { normalizeOperationsParams } from '@/ActivitySpace/sustainment/operations/operationsModel';
+import { normalizeOperationsParams } from '@/Function/operations/operationsModel';
 import { normalizeDataViewParams } from './widgets/dataViewModel';
 import { DIMENSIONS, type Dimension } from '@/Function/shared/dimensions';
 import type { WidgetComponent, WidgetDefinition, WidgetHost } from './types';
@@ -27,8 +27,35 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'generated-app': {
     type: 'generated-app', label: 'AI app',
     description: 'Create a persistent calculator, checklist or mini app with AI',
-    group: 'core', accepts: ['object'], zones: ['main'], defaultSize: 'full',
+    group: 'core', accepts: ['object'], zones: ['main'], defaultSize: 'full', holdsContents: true,
     load: async () => (await import('./widgets/GeneratedAppWidget')).GeneratedAppWidget,
+  },
+  'design': {
+    type: 'design', label: 'Design',
+    description: 'An artboard in HTML and SVG, drawn and revised with AI',
+    group: 'core', accepts: ['me', 'domain', 'object', 'initiative'], zones: ['main'], defaultSize: 'full', holdsContents: true,
+    load: async () => (await import('./widgets/DesignWidget')).DesignWidget,
+  },
+  'deck': {
+    type: 'deck', label: 'Deck',
+    description: 'A Slides deck: its pages here, the full editor when opened full screen',
+    group: 'core', accepts: ['me', 'domain', 'object', 'initiative'], zones: ['main'], defaultSize: 'full',
+    normalizeParams: (raw) => ({ deckId: typeof raw?.deckId === 'string' && raw.deckId.length <= 64 ? raw.deckId : null }),
+    load: async () => (await import('./widgets/DeckWidget')).DeckWidget,
+  },
+  'note': {
+    type: 'note', label: 'Note',
+    description: 'A Note from Notebook, written in place',
+    group: 'core', accepts: ['me', 'domain', 'object', 'initiative'], zones: ['main'], defaultSize: 'full', padded: false,
+    normalizeParams: (raw) => ({ noteId: typeof raw?.noteId === 'string' && raw.noteId.length <= 64 ? raw.noteId : null }),
+    load: async () => (await import('./widgets/NoteWidget')).NoteWidget,
+  },
+  'crm-deal': {
+    type: 'crm-deal', label: 'Deal',
+    description: 'A CRM deal: stage, amount, health and next step, changed in place',
+    group: 'core', accepts: ['me', 'domain', 'object', 'initiative'], zones: ['main', 'rail'], defaultSize: 'half',
+    normalizeParams: (raw) => ({ dealId: typeof raw?.dealId === 'string' && raw.dealId.length <= 64 ? raw.dealId : null }),
+    load: async () => (await import('./widgets/CrmDealWidget')).CrmDealWidget,
   },
   'approach-references': {
     type: 'approach-references', label: 'Domain approaches', group: 'core',
@@ -65,12 +92,6 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultSize: 'full',
     normalizeParams: normalizeOperationsParams,
     load: async () => (await import('./widgets/OperationsPlannerWidget')).default,
-  },
-  'scm-risks': {
-    type: 'scm-risks', label: 'Supply risks',
-    description: 'Items that will run out first in this Space, from the SCM plan',
-    group: 'plan', accepts: ['me'], zones: ['main', 'rail'], singleton: true, defaultSize: 'half',
-    load: async () => (await import('./widgets/ScmRiskWidget')).ScmRiskWidget,
   },
   'data-view': {
     type: 'data-view',
@@ -321,7 +342,6 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     accepts: ['object', 'me', 'initiative', 'domain'],
     zones: ['main'],
     singleton: true,
-    padded: false,
     defaultSize: 'full',
     load: async () => {
       const { KpiCardsWidget } = await import('./widgets/KpiCardsWidget');

@@ -2,7 +2,8 @@
 
 import { useMemo } from 'react';
 import { Diamond } from 'lucide-react';
-import { formatElementDate, daysUntil } from '@/Function/shared/dateUtils';
+import { daysUntil, parseDateOnly } from '@/Function/shared/dateUtils';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { STATUS } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
 import { useWidgetEmpty } from '../WidgetFrame';
@@ -16,6 +17,7 @@ interface Props {
  * Sorted by due date, grouped by month.
  */
 export function MilestonesWidget({ elements }: Props) {
+  const { t, locale } = useI18n();
   const milestones = useMemo(() => {
     return elements
       .filter((e) => e.due_date && (e.priority === 'high' || e.priority === 'urgent'))
@@ -30,65 +32,43 @@ export function MilestonesWidget({ elements }: Props) {
 
   // Group by month
   const grouped = milestones.reduce<Record<string, ElementWithDetails[]>>((acc, el) => {
-    const key = formatElementDate(el.due_date!, 'monthYear')!;
+    const key = (parseDateOnly(el.due_date) ?? new Date(el.due_date!)).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
     (acc[key] ||= []).push(el);
     return acc;
   }, {});
 
   return (
-    <div className="space-y-4 max-h-[360px] overflow-y-auto -mx-2 px-2">
+    <div className="space-y-4 max-h-[360px] overflow-y-auto">
       {Object.entries(grouped).map(([month, items]) => (
         <div key={month}>
-          <div className="text-[10px] font-medium text-muted-foreground mb-2 sticky top-0 bg-background py-1">
-            {month}
-          </div>
+          <div className="text-[12px] text-muted-foreground pb-1">{month}</div>
           <div>
             {items.map((m) => {
               const days = daysUntil(m.due_date!);
               const statusMeta = STATUS[m.status as keyof typeof STATUS];
               const isOverdue = days < 0 && m.status !== 'done';
               const isDone = m.status === 'done';
-              const isUrgent = m.priority === 'urgent';
+              const due = parseDateOnly(m.due_date) ?? new Date(m.due_date!);
 
               return (
-                <div key={m.id} className="flex items-start gap-3 py-2.5">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Diamond
-                        size={14}
-                        className={`shrink-0 ${isUrgent ? 'text-[var(--status-danger)]' : 'text-muted-foreground'}`}
-                      />
-                      <span className="text-[14px] font-medium text-foreground truncate">
-                        {m.title}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1 pl-[22px]">
-                      <span className="text-[12px] text-muted-foreground">
-                        {formatElementDate(m.due_date!)}
-                      </span>
-                      <span
-                        className={`text-[12px] ${
-                          isOverdue
-                            ? 'text-[var(--status-danger)] font-medium'
-                            : isDone
-                              ? 'text-emerald-600'
-                              : 'text-muted-foreground'
-                        }`}
-                      >
-                        {isDone
-                          ? 'Done'
-                          : isOverdue
-                            ? `${Math.abs(days)}d overdue`
-                            : days === 0
-                              ? 'Today'
-                              : `in ${days}d`}
-                      </span>
-                      {statusMeta && (
-                        <span className={`text-[12px] ${statusMeta.textColor}`}>
-                          {statusMeta.label}
-                        </span>
-                      )}
-                    </div>
+                <div key={m.id} className="py-1.5">
+                  <div className="flex items-center gap-2">
+                    <Diamond size={12} className="shrink-0 text-muted-foreground" />
+                    <span className="text-[13px] font-medium text-foreground truncate">{m.title}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 pl-5 text-[12px] text-muted-foreground">
+                    <span>{due.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}</span>
+                    {/* Only a milestone already missed asks for action, so only it is red. */}
+                    <span className={isOverdue ? 'text-[var(--status-danger)]' : undefined}>
+                      {isDone
+                        ? t('Done')
+                        : isOverdue
+                          ? t('{n}d overdue', { n: Math.abs(days) })
+                          : days === 0
+                            ? t('Today')
+                            : t('in {n}d', { n: days })}
+                    </span>
+                    {statusMeta && !isDone && <span>{t(statusMeta.label)}</span>}
                   </div>
                 </div>
               );

@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Minus } from 'lucide-react';
-import { CARD } from '@/shared/designTokens';
+import { FONT } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 import { RailCard } from '@/Function/shared/RailCard';
 import type { FrameVariant } from './types';
@@ -13,8 +13,7 @@ import type { FrameVariant } from './types';
 // board into arrange mode.
 //
 // The frame was not invented here. `RailCard` — the collapsible island the
-// Properties rail is already made of — IS the widget frame (an unboxed
-// heading and its rows, see RailCard); the island
+// Properties rail is already made of — IS the widget frame; the island
 // variant renders it verbatim, so a widget and a hand-placed rail card are
 // the same object to the eye. The `section` variant is the other look this
 // app already had (heading + hairline-bordered body, as Milestones and Child
@@ -89,7 +88,8 @@ export interface WidgetFrameProps {
   /** Body sits flush (tables draw their own edges). */
   padded?: boolean;
   onLongPress: () => void;
-  onRemove: () => void;
+  /** Absent when this viewer may not take the widget off the board. */
+  onRemove?: () => void;
   children: React.ReactNode;
 }
 
@@ -106,8 +106,8 @@ function RemoveBadge({ title, onRemove }: { title: string; onRemove: () => void 
       variant="secondary"
       size="icon-xs"
       aria-label={`Remove ${title}`}
-      // Pill on something pressable is normally wrong (DESIGN.md §5.7 reserves
-      // it for badges) — this is the exception the rule describes: a badge
+      // Pill on something pressable is normally wrong (pills are for badges)
+      // — this is the exception: a badge
       // overlaid on a corner, not a control in a row. Neutral rather than
       // danger, because it removes a block from a layout, not data.
       className="animate-fade-in absolute -top-2 -left-2 z-20 rounded-full border border-[var(--border-strong)] shadow-[var(--shadow-island)]"
@@ -191,8 +191,7 @@ export function WidgetFrame({
   };
 
   // Arrange mode is shown, not animated. A looping wobble is the one kind of
-  // motion this app does not do (DESIGN.md §7: motion is functional and
-  // short) — and at the size of a full-width band it reads as the page
+  // motion this app does not do (motion is functional and short) — and at the size of a full-width band it reads as the page
   // shaking rather than the widget being loose. A dashed outline says
   // "detached, draggable" and then holds still.
   const arrangeChrome = arranging
@@ -250,36 +249,30 @@ export function WidgetFrame({
         )}
 
         {variant === 'section' && (
-          // The frame closes over the title: one box per widget, with its
-          // name inside it. A heading floating above an unrelated box reads
-          // as two things, which is wrong the moment the box can be picked up
-          // and moved. (Rail widgets are unboxed instead — see RailCard.)
+          // A section of the page, not a box on it: the main column is
+          // already one island, and a bordered box inside it is a card in a
+          // card. The heading and its body are one block, held together by
+          // spacing; arrange mode's dashed outline shows the block's edge
+          // when it can be picked up and moved.
           <section className="relative">
-            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-              {/* The title row is a plain heading inside the box — no tinted
-                  band. The hairline under it is `--border-subtle` (a divider
-                  inside one surface) so a full-bleed body (a table) does not
-                  start flush against the title. */}
-              <div className="flex items-center justify-between h-10 px-4 border-b border-[var(--border-subtle)]">
-                <h2 className="min-w-0 truncate text-[13px] font-medium text-foreground/90">{title}</h2>
-                {headerNode}
-              </div>
-              <div className={padded ? 'px-4 py-3' : ''}>{body}</div>
+            <div className="flex h-8 items-center justify-between gap-3">
+              <h2 className={`${FONT.lg} min-w-0 truncate text-foreground`}>{title}</h2>
+              {headerNode}
             </div>
+            <div className={padded ? 'pt-2' : 'pt-1'}>{body}</div>
           </section>
         )}
 
         {variant === 'band' && (
-          <div className="relative">
-            <div className={`${CARD} h-10 px-4 flex items-center gap-3 overflow-hidden`}>
-              <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{title}</span>
-              <div className="flex-1 min-w-0">{body}</div>
-              {headerNode}
-            </div>
+          // A line of the page under its title, like the properties line on a
+          // document — no box and no heading: what it shows says what it is.
+          <div className="relative flex h-7 items-center gap-3 overflow-hidden" aria-label={title} role="group">
+            <div className="flex-1 min-w-0">{body}</div>
+            {headerNode}
           </div>
         )}
       </div>
-      {arranging && <RemoveBadge title={title} onRemove={onRemove} />}
+      {arranging && onRemove && <RemoveBadge title={title} onRemove={onRemove} />}
     </div>
   );
 }

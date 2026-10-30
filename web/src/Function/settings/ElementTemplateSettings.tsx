@@ -13,16 +13,16 @@ import {
   deleteElementTemplate,
 } from '@/hooks/useSupabase';
 import type { Domain, ElementTemplate, ElementStatus, ElementPriority } from '@/types/database';
-import { PRIORITY_OPTIONS } from '@/Function/shared/PriorityPicker';
-import { STATUS_OPTIONS as STATUS_VALUES } from '@/Function/shared/listControls/types';
+import { PRIORITY_OPTIONS, STATUS_ORDER } from '@/shared/designTokens';
 import { domainLabelNames, hydrateLabelColors, labelColor, useLabelColors } from '@/Function/shared/labelColor';
-import { Button } from '@/ui/button';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/ui/dialog';
 import { MenuShell } from '@/Function/shared/menu';
 import { SettingsSection, SettingsRow } from './SettingsSection';
+import { useI18n, translate } from '@/Function/i18n/I18nProvider';
 
 // Settings > Elements > Templates (el_QLT-029). A saved Element shape,
 // Domain-scoped, pickable from QuickAddElementPopup so a new Element can
@@ -32,10 +32,11 @@ import { SettingsSection, SettingsRow } from './SettingsSection';
 
 
 function messageOf(e: unknown): string {
-  return e instanceof Error ? e.message : "Couldn't save.";
+  return e instanceof Error ? e.message : translate("Couldn't save.");
 }
 
 export function ElementTemplateSettings() {
+  const { t } = useI18n();
   const { data: domains, loading } = useDomains();
   useLabelColors();
   // The Template dialog's Labels field reads the same in-memory catalogue
@@ -51,7 +52,7 @@ export function ElementTemplateSettings() {
   if (!loading && domains.length === 0) {
     return (
       <p className="text-[12px] text-muted-foreground">
-        No Domains in this Space yet. Templates are set per Domain, so there is nothing to configure until one exists.
+        {t('No Domains in this Space yet. Templates are set per Domain, so there is nothing to configure until one exists.')}
       </p>
     );
   }
@@ -59,8 +60,7 @@ export function ElementTemplateSettings() {
   return (
     <div className="space-y-6">
       <p className="text-[12px] text-muted-foreground -mt-2">
-        A saved Element shape, offered as a starting point from the &quot;+&quot; new-Element popup. Authoring one
-        needs owner or admin access to the Domain.
+        {t('A saved Element shape, offered as a starting point from the “+” new-Element popup. Authoring one needs owner or admin access to the Domain.')}
       </p>
       {domains.map((domain) => (
         <DomainTemplates key={domain.id} domain={domain} />
@@ -70,6 +70,7 @@ export function ElementTemplateSettings() {
 }
 
 function DomainTemplates({ domain }: { domain: Domain }) {
+  const { t } = useI18n();
   const { templates, loading, error, refetch } = useElementTemplates(domain.id);
   const [editing, setEditing] = useState<ElementTemplate | 'new' | null>(null);
   const [pending, setPending] = useState<Set<string>>(new Set());
@@ -83,17 +84,17 @@ function DomainTemplates({ domain }: { domain: Domain }) {
     });
   };
 
-  const handleDelete = async (t: ElementTemplate) => {
-    if (!await appDialog.confirm(`Delete the "${t.name}" template? This cannot be undone.`)) return;
-    setBusy(t.id, true);
+  const handleDelete = async (tpl: ElementTemplate) => {
+    if (!await appDialog.confirm(t('Delete the "{name}" template? This cannot be undone.', { name: tpl.name }))) return;
+    setBusy(tpl.id, true);
     setRowError(null);
     try {
-      await deleteElementTemplate(t.id);
+      await deleteElementTemplate(tpl.id);
       await refetch();
     } catch (e) {
       setRowError(messageOf(e));
     } finally {
-      setBusy(t.id, false);
+      setBusy(tpl.id, false);
     }
   };
 
@@ -101,41 +102,43 @@ function DomainTemplates({ domain }: { domain: Domain }) {
     <>
       <SettingsSection
         title={domain.name}
-        description={loading ? 'Loading…' : templates.length === 0 ? 'No templates yet' : `${templates.length} ${templates.length === 1 ? 'template' : 'templates'}`}
+        description={loading ? t('Loading…') : templates.length === 0 ? t('No templates yet') : templates.length === 1 ? t('1 template') : t('{n} templates', { n: templates.length })}
       >
-        {templates.map((t) => (
+        {templates.map((tpl) => (
           <SettingsRow
-            key={t.id}
-            label={t.name}
-            hint={[t.type, t.status ? statusLabel(t.status) : null, t.priority].filter(Boolean).join(' · ') || undefined}
+            key={tpl.id}
+            label={tpl.name}
+            hint={[tpl.type, tpl.status ? t(statusLabel(tpl.status)) : null, tpl.priority ? t(PRIORITY_OPTIONS.find((p) => p.value === tpl.priority)?.label ?? tpl.priority) : null].filter(Boolean).join(' · ') || undefined}
           >
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon-xs" aria-label={`Actions for ${t.name}`} disabled={pending.has(t.id)}>
+                <Button variant="ghost" size="icon-xs" aria-label={t('Actions for {name}', { name: tpl.name })} disabled={pending.has(tpl.id)}>
                   <MoreHorizontal size={14} />
                 </Button>
               </DropdownMenuTrigger>
               <MenuShell as="dropdown" align="end">
-                <DropdownMenuItem onSelect={() => setEditing(t)}>Edit</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setEditing(tpl)}>{t('Edit')}</DropdownMenuItem>
                 <DropdownMenuItem
-                  onSelect={() => void handleDelete(t)}
+                  onSelect={() => void handleDelete(tpl)}
                   className="text-[var(--status-danger)] focus:text-[var(--status-danger)]"
                 >
-                  Delete
+                  {t('Delete')}
                 </DropdownMenuItem>
               </MenuShell>
             </DropdownMenu>
           </SettingsRow>
         ))}
-        <div className="flex h-10 items-center px-2">
-          <Button variant="ghost" size="sm" onClick={() => setEditing('new')}>
-            <Plus size={14} />
-            New template
-          </Button>
+        <div className="flex h-10 items-center">
+          <ButtonAppearanceProvider appearance="inline">
+            <Button variant="ghost" size="sm" onClick={() => setEditing('new')}>
+              <Plus size={14} />
+              {t('New template')}
+            </Button>
+          </ButtonAppearanceProvider>
         </div>
       </SettingsSection>
       {(error || rowError) && (
-        <div className="-mt-4 mb-4 px-1 text-[11px] text-destructive">{error ?? rowError}</div>
+        <div className="-mt-4 mb-4 text-[11px] text-destructive">{error ?? rowError}</div>
       )}
       {editing && (
         <TemplateDialog
@@ -179,6 +182,7 @@ function TemplateDialog({
   onClose: () => void;
   onSaved: () => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   const [form, setForm] = useState<TemplateForm>(() => formOf(template));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -195,13 +199,13 @@ function TemplateDialog({
 
   const submit = async () => {
     const name = form.name.trim();
-    if (!name) { setError('Give the template a name.'); return; }
+    if (!name) { setError(t('Give the template a name.')); return; }
     const hours = form.estimatedHours.trim();
     // Plain decimal digits only — `Number()` alone would also accept
     // scientific notation ("1e3") and other input that reads as a typo
     // rather than a considered estimate.
     if (hours !== '' && !/^\d+(\.\d+)?$/.test(hours)) {
-      setError('Estimated hours must be a positive number.');
+      setError(t('Estimated hours must be a positive number.'));
       return;
     }
     const estimated_hours = hours === '' ? null : Number(hours);
@@ -231,56 +235,56 @@ function TemplateDialog({
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{template ? 'Edit template' : 'New template'}</DialogTitle>
-          <DialogDescription>In {domain.name}. Blank fields are left unset on the created Element.</DialogDescription>
+          <DialogTitle>{template ? t('Edit template') : t('New template')}</DialogTitle>
+          <DialogDescription>{t('In {domain}. Blank fields are left unset on the created Element.', { domain: domain.name })}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
-          <Field label="Name">
+          <Field label={t('Name')}>
             <input
               autoFocus
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="e.g. Bug report"
-              className="w-full text-[13px] bg-muted/40 rounded-md px-2.5 py-1.5 outline-none"
+              placeholder={t('e.g. Bug report')}
+              className="w-full text-[13px] bg-muted/40 rounded-md px-2.5 py-1.5 border border-border/60 outline-none focus:bg-muted/70"
             />
           </Field>
 
           <div className="grid grid-cols-3 gap-2">
-            <Field label="Type">
+            <Field label={t('Type')}>
               <select
                 value={form.type}
                 onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                className="w-full text-[13px] bg-muted/40 rounded-md px-2 py-1.5 border border-border/60 focus:outline-none"
+                className="w-full text-[13px] bg-muted/40 rounded-md px-2 py-1.5 border border-border/60 outline-none focus:bg-muted/70"
               >
                 <option value="">—</option>
-                {(domain.element_types ?? []).map((t) => <option key={t} value={t}>{t}</option>)}
+                {(domain.element_types ?? []).map((type) => <option key={type} value={type}>{type}</option>)}
               </select>
             </Field>
-            <Field label="Status">
+            <Field label={t('Status')}>
               <select
                 value={form.status}
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as ElementStatus | '' }))}
-                className="w-full text-[13px] bg-muted/40 rounded-md px-2 py-1.5 border border-border/60 focus:outline-none"
+                className="w-full text-[13px] bg-muted/40 rounded-md px-2 py-1.5 border border-border/60 outline-none focus:bg-muted/70"
               >
                 <option value="">—</option>
-                {STATUS_VALUES.map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
+                {STATUS_ORDER.map((s) => <option key={s} value={s}>{t(statusLabel(s))}</option>)}
               </select>
             </Field>
-            <Field label="Priority">
+            <Field label={t('Priority')}>
               <select
                 value={form.priority}
                 onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value as ElementPriority | '' }))}
-                className="w-full text-[13px] bg-muted/40 rounded-md px-2 py-1.5 border border-border/60 focus:outline-none"
+                className="w-full text-[13px] bg-muted/40 rounded-md px-2 py-1.5 border border-border/60 outline-none focus:bg-muted/70"
               >
                 <option value="">—</option>
-                {PRIORITY_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                {PRIORITY_OPTIONS.map((p) => <option key={p.value} value={p.value}>{t(p.label)}</option>)}
               </select>
             </Field>
           </div>
 
           {labelOptions.length > 0 && (
-            <Field label="Labels">
+            <Field label={t('Labels')}>
               <div className="flex flex-wrap gap-1.5">
                 {labelOptions.map((name) => {
                   const on = form.labels.has(name);
@@ -302,17 +306,17 @@ function TemplateDialog({
             </Field>
           )}
 
-          <Field label="Description">
+          <Field label={t('Description')}>
             <textarea
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               rows={3}
-              placeholder="Prefilled into the Element on create"
-              className="w-full text-[13px] bg-muted/40 rounded-md px-2.5 py-1.5 outline-none resize-none"
+              placeholder={t('Prefilled into the Element on create')}
+              className="w-full text-[13px] bg-muted/40 rounded-md px-2.5 py-1.5 border border-border/60 outline-none focus:bg-muted/70 resize-none"
             />
           </Field>
 
-          <Field label="Estimated hours" hint="Applied to the Element directly after creation">
+          <Field label={t('Estimated hours')} hint={t('Applied to the Element directly after creation')}>
             <input
               type="number"
               inputMode="decimal"
@@ -320,7 +324,7 @@ function TemplateDialog({
               value={form.estimatedHours}
               onChange={(e) => setForm((f) => ({ ...f, estimatedHours: e.target.value }))}
               placeholder="—"
-              className="w-24 text-[13px] bg-muted/40 rounded-md px-2.5 py-1.5 outline-none"
+              className="w-24 text-[13px] bg-muted/40 rounded-md px-2.5 py-1.5 border border-border/60 outline-none focus:bg-muted/70"
             />
           </Field>
 
@@ -328,9 +332,9 @@ function TemplateDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" size="md" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" size="md" onClick={onClose}>{t('Cancel')}</Button>
           <Button variant="primary" size="md" onClick={() => void submit()} disabled={saving}>
-            {template ? 'Save' : 'Create'}
+            {template ? t('Save') : t('Create')}
           </Button>
         </DialogFooter>
       </DialogContent>

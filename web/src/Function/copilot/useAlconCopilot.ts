@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { translate } from '@/Function/i18n/I18nProvider';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Shape of a Copilot conversation turn.
@@ -35,7 +36,7 @@ export interface CopilotContext {
   elementId?: string;
   objectId?: string;
   domainId?: string;
-  /** The Space a Space-wide tool (SCM) should read. */
+  /** The Space a Space-wide tool should read. */
   spaceId?: string;
   /** The person's business date (local), so date-based tools agree with the UI. */
   today?: string;
@@ -54,9 +55,8 @@ function functionsUrl(): string | null {
 }
 
 /**
- * Drives the SSE conversation with the alcon-copilot Edge Function. State is
- * held in memory (Phase 1) — persistence to a copilot_threads table is a
- * follow-up.
+ * Drives the SSE conversation with the alcon-copilot Edge Function. The
+ * conversation lives here while it is open; CopilotProvider keeps it.
  */
 export function useAlconCopilot() {
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
@@ -68,6 +68,15 @@ export function useAlconCopilot() {
     abortRef.current?.abort();
     abortRef.current = null;
     setMessages([]);
+    setError(null);
+    setStreaming(false);
+  }, []);
+
+  /** Shows a kept conversation, to go on from where it stopped. */
+  const load = useCallback((kept: CopilotMessage[]) => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setMessages(kept.map((m) => ({ ...m, done: true })));
     setError(null);
     setStreaming(false);
   }, []);
@@ -84,7 +93,7 @@ export function useAlconCopilot() {
 
     const url = functionsUrl();
     if (!url) {
-      setError('Supabase URL が設定されていません');
+      setError(translate('Supabase URL is not configured.'));
       return;
     }
 
@@ -109,7 +118,7 @@ export function useAlconCopilot() {
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) {
-      setError('ログインしてください');
+      setError(translate('Sign in to continue.'));
       setStreaming(false);
       return;
     }
@@ -224,11 +233,11 @@ export function useAlconCopilot() {
       } else if (evt === 'done') {
         next[i] = { ...last, done: true };
       } else if (evt === 'error') {
-        next[i] = { ...last, done: true, content: last.content + `\n\n_(エラー: ${payload.error})_` };
+        next[i] = { ...last, done: true, content: last.content + `\n\n_(${translate('Error: {error}', { error: String(payload.error ?? '') })})_` };
       }
       return next;
     });
   }
 
-  return { messages, streaming, error, send, cancel, reset };
+  return { messages, streaming, error, send, cancel, reset, load };
 }

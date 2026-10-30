@@ -14,6 +14,8 @@ import {
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getQueryClient } from '@/lib/queryClient';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { parseDateOnly } from '@/Function/shared/dateUtils';
 
 // Last Object an Element was quick-added to — pressing C on a screen with no
 // Object context (Home, Notes, …) targets this Object again.
@@ -63,7 +65,7 @@ interface QuickAddElementLauncherProps {
  * overlays) to raise the QuickAddElementPopup, mirroring CommandPalette's
  * ⌘K window listener. The save target resolves to the Object in view when
  * there is one, else the last quick-added Object; the popup's "Save to" pill
- * can always re-point it (incl. My Elements / Domain-direct).
+ * can always re-point it (incl. My Elements).
  */
 export function QuickAddElementLauncher({
   activeDomainId,
@@ -71,6 +73,7 @@ export function QuickAddElementLauncher({
   onRefresh,
 }: QuickAddElementLauncherProps) {
   const explorerData = useExplorerData();
+  const { t, locale } = useI18n();
   const { user } = useAuthContext();
   const userId = user?.id ?? null;
   const [open, setOpen] = useState(false);
@@ -162,16 +165,18 @@ export function QuickAddElementLauncher({
     ? objectOptions.find((o) => o.id === defaultObjectId)?.name
     : domains.find((d) => d.id === activeDomainId)?.name ?? undefined;
 
-  // Same three save scopes as the list views' quick-add handlers:
-  // personal (owner_id = me) / Object / Domain-direct (object_id = null).
+  // Same two save scopes as the list views' quick-add handlers: an Object, or
+  // personal (owner_id = me) when the popup names no Object. An Element always
+  // has exactly one home; the database refuses one with neither.
   const handleSubmit = async (inputs: NewElementInput[]) => {
     let skippedAssignees = 0;
     for (const input of inputs) {
       try {
+        const objectId = input.personal ? null : input.objectId ?? null;
         const created = await createElement({
           title: input.title,
-          object_id: input.personal ? null : input.objectId ?? null,
-          owner_id: input.personal ? userId : null,
+          object_id: objectId,
+          owner_id: objectId ? null : userId,
           description: input.description ?? null,
           type: input.type ?? null,
           status: input.status ?? undefined,
@@ -197,7 +202,7 @@ export function QuickAddElementLauncher({
     <QuickAddElementPopup
       open={open}
       contextLabel={contextLabel}
-      hint={presetDueDate ? `Due ${presetDueDate}` : undefined}
+      hint={presetDueDate ? t('Due {date}', { date: parseDateOnly(presetDueDate)?.toLocaleDateString(locale, { month: 'short', day: 'numeric' }) ?? presetDueDate }) : undefined}
       onClose={() => setOpen(false)}
       onSubmit={handleSubmit}
       types={elementTypes}

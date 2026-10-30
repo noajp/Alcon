@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canEditObject, canManageDomainTypes } from '../src/ActivitySpace/execution/object/objectAccess';
+import { canEditObject, canManageDomainTypes, isViewOnly } from '../src/ActivitySpace/execution/object/objectAccess';
 
 describe('canEditObject', () => {
   it('only members edit', () => {
@@ -21,5 +21,16 @@ describe('canManageDomainTypes', () => {
     expect(canManageDomainTypes(roles, 'd9')).toBe(false);
     expect(canManageDomainTypes(roles, null)).toBe(false);
     expect(canManageDomainTypes(undefined, 'd1')).toBe(true);
+  });
+});
+
+describe('isViewOnly', () => {
+  it('a Domain viewer is view-only, except in an Object they belong to', () => {
+    expect(isViewOnly('viewer')).toBe(true);
+    expect(isViewOnly('viewer', new Set(['o1']), 'o2')).toBe(true);
+    expect(isViewOnly('viewer', new Set(['o1']), 'o1')).toBe(false);
+  });
+  it('members, admins, owners, people without a row and unknown roles are not', () => {
+    for (const role of ['owner', 'admin', 'member', null, undefined]) expect(isViewOnly(role)).toBe(false);
   });
 });

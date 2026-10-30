@@ -6,52 +6,25 @@ export type { ExplorerData } from '@/Function/sync/explorerPatch';
 
 export type {
   AgentRun,
-  AgentRunStatus,
-  AgentRunStep,
   AlconObject,
   AlconObjectWithChildren,
   ApprovalState,
-  CustomColumn,
-  CustomColumnType,
-  CustomColumnValue,
   CustomColumnWithValues,
   DataTable,
-  DataTableCell,
   DataTableColumn,
   DataTableColumnType,
-  DataTableRow,
   Domain,
   DomainAIConfig,
-  DomainMember,
-  DomainMemberInsert,
   DomainPrivacy,
-  EdgeType,
-  Element,
   ElementApproval,
-  ElementAssignee,
-  ElementAssigneeWithWorker,
   ElementComment,
-  ElementEdge,
   ElementEdgeWithElement,
-  ElementObject,
   ElementReaction,
   ElementWithDetails,
   Notification,
   NotificationKind,
-  ObjectDomain,
-  ObjectMember,
-  ObjectMemberInsert,
-  ObjectMilestone,
-  ObjectTab,
-  ObjectTabType,
   Phase,
-  Strategy,
-  StrategyComment,
-  StrategyCommentInsert,
-  StrategyObject,
-  StrategyStatus,
   StrategyWithObjects,
-  Subelement,
   Worker,
   WorkerAvailability,
   WorkerAvailabilityKind,
@@ -68,7 +41,6 @@ export {
   deleteObjectTab,
   fetchObjectDomainIds,
   fetchObjectLabels,
-  fetchObjectTabs,
   fileObjectUnderDomains,
   moveObject,
   renameObjectPrefix,
@@ -76,26 +48,20 @@ export {
   reorderObjectTabs,
   setObjectDomains,
   updateObject,
-  updateObjectTab,
   useObjectTabs,
-} from '@/ActivitySpace/execution/object/data';
+} from '@/hooks/objectData';
 
 export {
   addElementAssignee,
   addElementToObject,
-  canElementStart,
   createElement,
-  createElementEdge,
   createSubelement,
   decideApproval,
   deleteElement,
-  deleteElementEdge,
   deleteSubelement,
   fetchElementApprovals,
   fetchElementWithDetails,
-  getElementAssignees,
   getElementEdges,
-  getElementObjects,
   removeElementAssignee,
   removeElementFromObject,
   reorderElements,
@@ -104,20 +70,16 @@ export {
   updateElement,
   updateSubelement,
   useElementBlockers,
-} from '@/ActivitySpace/execution/element/data';
+} from '@/hooks/elementData';
 
 export {
   createCustomColumn,
   deleteCustomColumn,
-  deleteCustomColumnObjectValue,
-  deleteCustomColumnValue,
-  fetchCustomColumns,
   fetchCustomColumnsWithValues,
   fetchDomainCustomColumnsWithValues,
   fetchElementCustomColumnsWithValues,
   isPropertyWriteRefused,
   noticePropertyValueFailed,
-  reorderCustomColumns,
   setCustomColumnObjectValue,
   setCustomColumnValue,
   updateCustomColumn,
@@ -132,16 +94,14 @@ export {
   fetchAllWorkers,
   fetchAssignableWorkers,
   fetchWorkerAvailability,
-  invalidateWorkersCache,
   updateWorker,
   useAssignableWorkers,
-  useSelfWorker,
   useWorkerAvailability,
   useWorkerById,
   useWorkerCommitments,
   useWorkers,
   useWorkersByIds,
-} from '@/ActivitySpace/sustainment/team/data';
+} from '@/hooks/teamData';
 
 export {
   addDomainElementType,
@@ -156,7 +116,7 @@ export {
   setDomainLabelColor,
   updateDomain,
   useDomains,
-} from '@/ActivitySpace/execution/domain/data';
+} from '@/hooks/domainData';
 
 export {
   createActivitySpace,
@@ -170,62 +130,45 @@ export {
 export {
   addDataTableColumn,
   addDataTableColumns,
-  addDataTableRow,
   bulkInsertDataTableRows,
   createDataTable,
-  deleteDataTable,
-  fetchDataTableSchema,
-  setDataTableCell,
-  updateDataTable,
   useDataTables,
-  type DataTableSchema,
-  type DataTableWithRowCount,
-} from '@/ActivitySpace/sustainment/table/data';
+} from '@/hooks/tableData';
 
 export {
   archiveNotification,
-  fetchNotifications,
   markAllNotificationsRead,
   markNotificationRead,
   notifyAboutElement,
   useNotifications,
-} from '@/ActivitySpace/execution/element/notificationData';
+} from '@/hooks/notificationData';
 
 export {
   createElementTemplate,
   deleteElementTemplate,
   updateElementTemplate,
   useElementTemplates,
-} from '@/ActivitySpace/execution/element/templateData';
+} from '@/hooks/templateData';
 
 export {
-  addReaction,
   CARRY_OVER_REASON_PREFIX,
   createElementComment,
   deleteElementComment,
   fetchCommentReactions,
   fetchElementComments,
   invalidateCarryOverReasons,
-  removeReaction,
   toggleReaction,
   updateElementComment,
   useCarryOverReasons,
   useElementCommentActivity,
   withCommentActivity,
   useElementComments,
-  type CarryOverReason,
-  type ElementCommentActivity,
-} from '@/ActivitySpace/execution/element/commentData';
+} from '@/hooks/commentData';
 
 export { globalSearch, type SearchResult } from '@/Function/shared/searchData';
 
 export {
-  cancelAgentRun,
-  fetchAgentRunSteps,
-  fetchLatestAgentRun,
-  isAgentRunActive,
   pingAgentRuntime,
-  startAgentRun,
   useAgentRun,
   type AgentStartOutcome,
 } from '@/Function/copilot/agentData';
@@ -234,28 +177,24 @@ export {
   addIntentBinding,
   addIntentLineage,
   addStrategyChild,
-  castIntentPrediction,
   createIntent,
   createStrategy,
   createStrategyComment,
-  decideIntentEscalation,
   deleteIntent,
   deleteStrategy,
   deleteStrategyComment,
-  fetchStrategyComments,
   fetchStrategyElements,
   removeIntentBinding,
   removeStrategyChild,
   setStrategyObjects,
   updateIntent,
-  updateIntentNextActionStatus,
   updateStrategy,
   useIntentBindingsForTargets,
   useStrategies,
   useStrategyComments,
   useStrategyIntentBundle,
   type IntentBundle,
-} from '@/ActivitySpace/strategy/initiative/strategyData';
+} from '@/hooks/strategyData';
 
 export {
   closePhase,
@@ -266,14 +205,9 @@ export {
   updatePhase,
   usePhaseReschedules,
   usePhases,
-  type PhaseCandidateElement,
   type PhaseReschedule,
-} from '@/ActivitySpace/strategy/phase/data';
+} from '@/hooks/phaseData';
 
 export {
-  createObjectMilestone,
-  deleteObjectMilestone,
-  fetchObjectMilestones,
-  updateObjectMilestone,
   useObjectMilestones,
-} from '@/ActivitySpace/execution/object/milestoneData';
+} from '@/hooks/milestoneData';

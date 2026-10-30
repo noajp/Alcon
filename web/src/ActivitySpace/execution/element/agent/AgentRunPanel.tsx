@@ -1,13 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import {
-  AlertCircle, ArrowRight, Check, CheckCircle2, ChevronDown, ChevronRight, Copy, FileText, Flag, Hand, ListChecks,
-  Loader2, MessageSquare, Pause, ShieldCheck, Wrench, CircleDot,
-} from 'lucide-react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
+import { AlertCircle, ArrowRight, Check, CheckCircle2, Copy, FileText, Flag, Hand, ListChecks, Loader2, MessageSquare, Pause, ShieldCheck, Wrench, CircleDot } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { TextComposer } from '@/ui/text-composer';
 import { cn } from '@/lib/utils';
+import { FONT } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import type { AgentArtifact, AgentRunStatus, AgentRunStep, AgentRunStepType } from '@/types/database';
@@ -74,7 +73,7 @@ function StepRow({ step }: { step: AgentRunStep }) {
         <Icon size={13} strokeWidth={2} className={step.type === 'error' ? 'shrink-0 text-[var(--status-danger)]' : 'shrink-0 text-muted-foreground'} />
         <span className="shrink-0 text-foreground/90">{label}</span>
         {chip && <Chip>{chip}</Chip>}
-        {hasDetail && <ChevronRight size={12} className={cn('ml-auto shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} />}
+        {hasDetail && <DisclosureTriangle open={open} className="ml-auto text-muted-foreground" />}
       </button>
       {open && step.detail && (
         <div className="mb-1 ml-6 mt-0.5 rounded-md bg-muted/30 px-2 py-1.5">
@@ -96,7 +95,7 @@ function Workpad({ steps }: { steps: AgentRunStep[] }) {
     <div className="mt-1">
       {steps.length > VISIBLE_STEPS && (
         <button type="button" aria-expanded={all} onClick={() => setAll((a) => !a)} className="mb-0.5 flex items-center gap-1 px-1 text-[12px] text-muted-foreground hover:text-foreground">
-          <ChevronDown size={12} className={cn('transition-transform', !all && '-rotate-90')} />
+          <DisclosureTriangle open={all} />
           {all ? t('Show fewer steps') : t('Show all {n} steps', { n: steps.length })}
         </button>
       )}
@@ -119,8 +118,8 @@ function ApprovalCard({ agent }: { agent: Agent }) {
   const shared = sharedColumns(rows);
   const omitted = rows.reduce((n, r) => n + r.more, 0);
   return (
-    <div className="mt-2 rounded-lg border border-border bg-card">
-      <div className="flex items-start gap-2 px-3 pt-3">
+    <div className="mt-2">
+      <div className="flex items-start gap-2 px-1 pt-1">
         <Hand size={15} className="mt-0.5 shrink-0 text-[var(--accent-default)]" />
         <div className="min-w-0">
           <div className="text-[13px] font-medium text-foreground">{agent.pending.summary}</div>
@@ -128,7 +127,7 @@ function ApprovalCard({ agent }: { agent: Agent }) {
         </div>
       </div>
 
-      <div className="mt-2 overflow-x-auto px-3">
+      <div className="mt-2 overflow-x-auto px-1">
         <table className="w-full border-collapse text-[12px]">
           <thead>
             <tr className="text-left text-muted-foreground">
@@ -157,7 +156,7 @@ function ApprovalCard({ agent }: { agent: Agent }) {
                   )}
                 <td className="border-b border-border/60 py-1.5 align-top">
                   <button type="button" aria-label={t('Raw input')} aria-expanded={openRow === r.id} onClick={() => setOpenRow((o) => (o === r.id ? null : r.id))} className="rounded p-0.5 text-muted-foreground hover:bg-muted/50 hover:text-foreground">
-                    <ChevronRight size={13} className={cn('transition-transform', openRow === r.id && 'rotate-90')} />
+                    <DisclosureTriangle open={openRow === r.id} />
                   </button>
                 </td>
               </FragmentRow>
@@ -169,7 +168,7 @@ function ApprovalCard({ agent }: { agent: Agent }) {
         )}
       </div>
 
-      <div className="px-3 pb-3 pt-2">
+      <div className="px-1 pt-2">
         {agent.isMine ? (
           <TextComposer
             value={note}
@@ -217,10 +216,10 @@ function ArtifactItem({ artifact }: { artifact: AgentArtifact }) {
     try { await navigator.clipboard.writeText(artifact.content); setCopied(true); setTimeout(() => setCopied(false), 1200); } catch { /* clipboard denied */ }
   };
   return (
-    <li className="rounded-lg border border-border">
-      <div className="flex items-center gap-2 px-2.5 py-1.5">
+    <li>
+      <div className="flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-muted/40">
         <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-          <ChevronRight size={13} className={cn('shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} />
+          <DisclosureTriangle open={open} className="text-muted-foreground" />
           <FileText size={13} className="shrink-0 text-muted-foreground" />
           <span className="truncate text-[13px] text-foreground">{artifact.title}</span>
           <span className="shrink-0 text-[11px] text-muted-foreground">{artifact.format}</span>
@@ -230,7 +229,7 @@ function ArtifactItem({ artifact }: { artifact: AgentArtifact }) {
         </Button>
       </div>
       {open && (
-        <div className="border-t border-border px-3 py-2">
+        <div className="py-2 pl-6 pr-1">
           {artifact.format === 'markdown' || artifact.format === 'text'
             ? <MarkdownLite text={artifact.content} />
             : <pre className="max-h-96 overflow-auto font-mono text-[12px] leading-relaxed">{artifact.content}</pre>}
@@ -255,26 +254,26 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
 
   return (
     <section className="space-y-2">
-      {agent.error && <p className="px-3 text-[12px] text-[var(--status-danger)]">{agent.error}</p>}
+      {agent.error && <p className="px-1 text-[12px] text-[var(--status-danger)]">{agent.error}</p>}
       {run && status && (
         <div>
-          <div role="status" aria-live="polite" className="flex min-h-9 items-center gap-2.5 rounded-full border border-border px-3 py-1.5">
+          <div role="status" aria-live="polite" className="flex min-h-9 items-center gap-2.5 px-1 py-1.5">
             <StatusGlyph status={run.status} />
             <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{line}</span>
             {cost > 0 && <span className="shrink-0 font-mono text-[11px] text-muted-foreground">${cost.toFixed(2)}</span>}
-            <span className={cn('shrink-0 rounded-full border border-border px-2 py-px text-[11px]', status.tone)}>{t(status.label)}</span>
+            <span className={cn('shrink-0 text-[12px]', status.tone)}>{t(status.label)}</span>
             {agent.isActive || run.status === 'awaiting_approval' ? (
               <Button variant="ghost" size="xs" onClick={() => void agent.cancel()}>{t('Stop')}</Button>
             ) : run.status === 'paused' ? (
               agent.isMine ? <Button variant="secondary" size="xs" onClick={() => void agent.resume()}>{t('Resume')}</Button> : null
             ) : finished ? (
               <Button variant="ghost" size="xs" disabled={agent.starting} onClick={onRunAgain}>
-                {run.mode === 'reply' ? t('Run the task') : t('Run again')}
+                {run.mode === 'reply' ? t('Work on the Element') : t('Run again')}
               </Button>
             ) : null}
           </div>
           {(run.status === 'failed' || run.status === 'paused') && run.error && (
-            <p className="mt-1 px-3 text-[12px] text-muted-foreground">{run.error}</p>
+            <p className="mt-1 px-1 text-[12px] text-muted-foreground">{run.error}</p>
           )}
           <div className="px-1">
             <Workpad steps={agent.steps} />
@@ -285,8 +284,8 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
 
       {agent.artifacts.length > 0 && (
         <div>
-          <div className="mb-1 px-1 text-[12px] text-muted-foreground">{t('Deliverables')}</div>
-          <ul className="space-y-1.5">{agent.artifacts.map((a) => <ArtifactItem key={a.id} artifact={a} />)}</ul>
+          <h2 className={`${FONT.lg} mb-1 px-1 text-foreground`}>{t('Deliverables')}</h2>
+          <ul className="space-y-px">{agent.artifacts.map((a) => <ArtifactItem key={a.id} artifact={a} />)}</ul>
         </div>
       )}
     </section>

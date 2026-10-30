@@ -4,10 +4,11 @@ import { Button } from '@/ui/button';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
-import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from './objectDraft';
-import type { Brief } from './types';
+import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from '@/hooks/objectDraft';
+import type { Brief } from '@/types/notes';
 import { useDomains } from '@/hooks/useSupabase';
 import { ChevronDown } from 'lucide-react';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface ObjectDraftDialogProps {
   brief: Brief;
@@ -32,7 +33,10 @@ interface ElementItem extends ObjectDraftElement {
   include: boolean;
 }
 
+const PRIORITY_LABEL: Record<string, string> = { urgent: 'Urgent', high: 'High', low: 'Low' };
+
 export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraftReady, onClose, onCreate }: ObjectDraftDialogProps) {
+  const { t } = useI18n();
   const { data: domains } = useDomains();
   const [phase, setPhase] = useState<Phase>('generating');
   const [errorMsg, setErrorMsg] = useState('');
@@ -78,10 +82,10 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
       applyDraft(draft);
       onDraftReady?.(draft);
     } catch (err) {
-      setErrorMsg((err as Error).message || 'Failed to draft object');
+      setErrorMsg((err as Error).message || t('Could not draft the Object.'));
       setPhase('error');
     }
-  }, [brief, applyDraft, onDraftReady]);
+  }, [brief, applyDraft, onDraftReady, t]);
 
   const didInitRef = useRef(false);
   useEffect(() => {
@@ -112,11 +116,11 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
         elements: elements.filter((e) => e.include).map(({ include: _i, ...rest }) => rest),
       });
     } catch (err) {
-      setSubmitError((err as Error).message || 'Failed to create Object');
+      setSubmitError((err as Error).message || t('Could not create the Object.'));
     } finally {
       setSubmitting(false);
     }
-  }, [name, description, color, elements, domainId, onCreate]);
+  }, [name, description, color, elements, domainId, onCreate, t]);
 
   const includedCount = elements.filter((e) => e.include).length;
 
@@ -135,7 +139,7 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={t('Close')}
           className="absolute right-3 top-3 w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent rounded-full z-10"
         >
           <CloseIcon />
@@ -144,22 +148,23 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
         <div className="px-5 pt-5 pb-3 pr-14 border-b border-border flex items-start justify-between">
           <div>
             <div className="text-[11px] font-medium text-muted-foreground mb-1">
-              Object化する
+              {t('Turn into an Object')}
             </div>
             <div className="text-[12px] text-muted-foreground">
-              From Brief <span className="text-foreground/80 font-medium">{brief.title}</span>
+              {t('From {title}', { title: brief.title })}
             </div>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={run}
             disabled={phase === 'generating'}
-            className="inline-flex items-center gap-1 text-[11px] px-2 py-1 border border-border rounded-md hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground disabled:opacity-50 disabled:cursor-wait mr-8"
-            title="AIで再生成"
+            className="mr-8"
+            title={t('Regenerate with AI')}
           >
-            {phase === 'generating' ? <Spinner /> : <SparkleIcon />}
-            <span>{phase === 'generating' ? '生成中...' : '再生成'}</span>
-          </button>
+            {phase === 'generating' && <Spinner />}
+            {phase === 'generating' ? t('Drafting…') : t('Regenerate')}
+          </Button>
         </div>
 
         <div className="flex-1 overflow-auto">
@@ -167,17 +172,17 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
           {phase === 'error' && <ErrorState message={errorMsg} onRetry={run} />}
           {phase === 'ready' && (
             <div className="px-5 pt-5 pb-6 space-y-4">
-              <Field label="Name">
+              <Field label={t('Name')}>
                 <input
                   autoFocus
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Object name"
+                  placeholder={t('Object name')}
                   className="w-full bg-muted/40 outline-none text-[15px] font-semibold text-foreground rounded-lg px-2.5 py-2 border-none"
                 />
               </Field>
 
-              <Field label="Domain">
+              <Field label={t('Domain')}>
                 <div ref={domainPickerRef} className="relative">
                   <button
                     type="button"
@@ -187,7 +192,7 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
                     <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[10px] font-semibold text-muted-foreground">
                       {activeDomain?.name.charAt(0) ?? '?'}
                     </div>
-                    <span className="flex-1 text-left truncate">{activeDomain?.name ?? 'No Domain'}</span>
+                    <span className="flex-1 text-left truncate">{activeDomain?.name ?? t('No Domain')}</span>
                     <ChevronDown size={14} className="text-muted-foreground shrink-0" />
                   </button>
                   {domainPickerOpen && (
@@ -212,35 +217,35 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
                 </div>
               </Field>
 
-              <Field label="Description">
+              <Field label={t('Description')}>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="2〜3行の概要"
+                  placeholder={t('A two- or three-line summary')}
                   rows={3}
                   className="w-full bg-muted/40 outline-none text-[13px] leading-[1.6] text-foreground/90 rounded-lg px-2.5 py-2 border-none resize-none"
                 />
               </Field>
 
-              <div className="mt-2 pt-4 border-t border-border/60">
+              <div className="mt-2 pt-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-[11px] font-medium text-muted-foreground">
-                    Elements
+                    {t('Elements')}
                   </div>
                   <span className="text-[11px] text-muted-foreground tabular-nums">
-                    {includedCount} / {elements.length} 追加
+                    {t('{included} of {total} added', { included: includedCount, total: elements.length })}
                   </span>
                 </div>
                 {elements.length === 0 ? (
                   <div className="text-[12px] text-muted-foreground/70">
-                    Brief に Action Items が無かったため、Elements は提案されませんでした。
+                    {t('No Elements were suggested because the note has no action items.')}
                   </div>
                 ) : (
                   <ul className="space-y-1">
                     {elements.map((el, i) => (
                       <li
                         key={i}
-                        className="group flex items-start gap-2 py-1.5 border-t border-border/40 first:border-t-0"
+                        className="group flex items-start gap-2 py-1.5"
                       >
                         <input
                           type="checkbox"
@@ -263,7 +268,7 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
                           )}
                           {el.priority && el.priority !== 'medium' && (
                             <div className="text-[10px] text-muted-foreground/80 mt-0.5 tabular-nums">
-                              priority: {el.priority}
+                              {t('Priority: {priority}', { priority: t(PRIORITY_LABEL[el.priority] ?? el.priority) })}
                             </div>
                           )}
                         </div>
@@ -273,8 +278,8 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
                             setElements((prev) => prev.filter((_, j) => j !== i))
                           }
                           className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive px-1 mt-0.5"
-                          aria-label="Remove"
-                          title="Remove"
+                          aria-label={t('Remove')}
+                          title={t('Remove')}
                         >
                           <XIcon />
                         </button>
@@ -298,10 +303,12 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
           >
             {submitting && <Spinner />}
             {submitting
-              ? 'Creating...'
-              : includedCount > 0
-              ? `Create Object + ${includedCount} Element${includedCount === 1 ? '' : 's'}`
-              : 'Create Object'}
+              ? t('Creating…')
+              : includedCount === 1
+              ? t('Create Object + 1 Element')
+              : includedCount > 1
+              ? t('Create Object + {count} Elements', { count: includedCount })
+              : t('Create Object')}
           </Button>
         </div>
       </div>
@@ -321,35 +328,25 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function GeneratingState() {
+  const { t } = useI18n();
   return (
     <div className="h-[220px] flex flex-col items-center justify-center gap-3 text-muted-foreground">
       <Spinner size={18} />
-      <div className="text-[12px]">AI が Object と Elements を起草しています...</div>
+      <div className="text-[12px]">{t('AI is drafting the Object and its Elements…')}</div>
     </div>
   );
 }
 
 function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="h-[220px] flex flex-col items-center justify-center gap-3 text-destructive px-6 text-center">
-      <div className="text-[12px]">AIドラフト生成に失敗しました</div>
+      <div className="text-[12px]">{t('Could not generate the AI draft.')}</div>
       <div className="text-[11px] text-muted-foreground max-w-sm break-words">{message}</div>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="text-[12px] px-3 py-1.5 border border-border rounded-md hover:bg-accent text-foreground/80 hover:text-foreground mt-1"
-      >
-        Retry
-      </button>
+      <Button variant="ghost" size="sm" onClick={onRetry} className="mt-1">
+        {t('Retry')}
+      </Button>
     </div>
-  );
-}
-
-function SparkleIcon() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" />
-    </svg>
   );
 }
 

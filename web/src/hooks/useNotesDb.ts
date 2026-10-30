@@ -1,13 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { getQueryClient } from '@/lib/queryClient';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
-import { createNoteContentStore, EMPTY_NOTE_CONTENT } from '@/ActivitySpace/sustainment/notebook/noteContentStore';
+import { createNoteContentStore, EMPTY_NOTE_CONTENT } from '@/Function/notebook/noteContentStore';
 import type {
-  Brief,
-  BriefComment,
-  BriefStructured,
   NoteNode,
   NoteNodeType,
 } from '@/types/notes';
@@ -34,18 +33,6 @@ interface NoteContentRow {
   updated_at: string;
 }
 
-interface BriefRow {
-  id: string;
-  source_note_id: string | null;
-  source_note_name: string;
-  title: string;
-  summary: string;
-  structured: BriefStructured | null;
-  html_snapshot: string | null;
-  created_by: string;
-  created_at: string;
-}
-
 function rowToNode(r: NoteRow): NoteNode {
   return {
     id: r.id,
@@ -55,20 +42,6 @@ function rowToNode(r: NoteRow): NoteNode {
     parentId: r.parent_id,
     linkedObjectId: r.linked_object_id ?? null,
     createdBy: r.created_by,
-  };
-}
-
-function rowToBrief(r: BriefRow): Brief {
-  return {
-    id: r.id,
-    sourceFileId: r.source_note_id ?? '',
-    sourceFileName: r.source_note_name,
-    title: r.title,
-    summary: r.summary,
-    structured: r.structured ?? undefined,
-    sourceSnapshot: r.html_snapshot ?? undefined,
-    createdBy: r.created_by,
-    createdAt: r.created_at,
   };
 }
 
@@ -165,7 +138,7 @@ export async function ensureAppGuideNotes(): Promise<void> {
  * files), so parenting straight under a Folder that already has Sections
  * would leave the new file unreachable in the UI.
  */
-export async function ensureNoteHome(): Promise<{
+async function ensureNoteHome(): Promise<{
   sectionId: string;
   createdFolder: NoteNode | null;
   createdSection: NoteNode | null;
@@ -347,6 +320,7 @@ export function useNotes() {
     // Re-sync from the DB on failure — otherwise the optimistic update sticks
     // in local state even though the write never landed.
     if (error) { void reload(); throw error; }
+    void getQueryClient().invalidateQueries({ queryKey: ['note-header', id] });
   }, [reload]);
 
   const deleteNode = useCallback(async (id: string) => {
@@ -370,15 +344,6 @@ export function useNotes() {
     if (error) { void reload(); throw error; }
   }, [reload]);
 
-  /** Move a Note (folder or file) under a new parent. `parentId === null`
-   *  promotes it to the tree root. Used by the NotesSidebar DnD + the
-   *  "Move to folder…" context menu. */
-  const moveNode = useCallback(async (id: string, parentId: string | null) => {
-    updateNodes((prev) => prev.map((n) => (n.id === id ? { ...n, parentId } : n)));
-    const { error } = await supabase.from('notes').update({ parent_id: parentId }).eq('id', id);
-    if (error) { void reload(); throw error; }
-  }, [reload]);
-
   /** Persist the Note's link to an Object (or clear it with null). The
    *  PageView header surfaces this so users can hook a Note to an
    *  Object/Domain when extracting bullets into Elements. */
@@ -399,7 +364,6 @@ export function useNotes() {
     createNode,
     renameNode,
     deleteNode,
-    moveNode,
     setLinkedObject,
   };
 }
@@ -470,160 +434,49 @@ export function useNoteContent(noteId: string | null) {
   };
 }
 
-// ============================================
-// useBriefs — flat list of brief summaries
-// ============================================
-export function useBriefs() {
-  const [briefs, setBriefs] = useState<Brief[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  const reload = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('briefs')
-        .select('*')
-        .order('created_at', { ascending: false });
+/** One Note's id and name, or null when the viewer cannot see it (Notes are
+ *  their author's own). Shared by every embed of the same Note. */
+export function useNoteHeader(noteId: string | null) {
+  return useQuery({
+    queryKey: ['note-header', noteId],
+    enabled: !!noteId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('notes').select('id, name').eq('id', noteId!).maybeSingle();
       if (error) throw error;
-      setBriefs((data as BriefRow[]).map(rowToBrief));
-      setError(null);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    reload();
-  }, [reload]);
-
-  const createBrief = useCallback(
-    async (input: {
-      sourceNoteId: string;
-      sourceNoteName: string;
-      title: string;
-      summary: string;
-      structured?: BriefStructured;
-      sourceSnapshot?: string;
-    }): Promise<Brief> => {
-      const { data, error } = await supabase
-        .from('briefs')
-        .insert({
-          source_note_id: input.sourceNoteId,
-          source_note_name: input.sourceNoteName,
-          title: input.title,
-          summary: input.summary,
-          structured: input.structured ?? null,
-          html_snapshot: input.sourceSnapshot ?? null,
-        })
-        .select('*')
-        .single();
-      if (error) throw error;
-      const brief = rowToBrief(data as BriefRow);
-      setBriefs((prev) => [brief, ...prev]);
-      return brief;
+      return (data ?? null) as { id: string; name: string } | null;
     },
-    []
-  );
-
-  const deleteBrief = useCallback(async (id: string) => {
-    setBriefs((prev) => prev.filter((t) => t.id !== id));
-    const { error } = await supabase.from('briefs').delete().eq('id', id);
-    if (error) throw error;
-  }, []);
-
-  return { briefs, loading, error, reload, createBrief, deleteBrief };
+  });
 }
 
-// ============================================
-// useBriefComments — comments anchored to a Brief
-// ============================================
-interface BriefCommentRow {
+export interface NoteFileSummary {
   id: string;
-  brief_id: string;
-  author_id: string | null;
-  author_kind: 'human' | 'ai_agent';
-  author_name: string | null;
-  content: string;
-  created_at: string;
+  name: string;
+  parent_id: string | null;
   updated_at: string;
 }
 
-function rowToBriefComment(r: BriefCommentRow): BriefComment {
-  return {
-    id: r.id,
-    briefId: r.brief_id,
-    authorId: r.author_id,
-    authorKind: r.author_kind,
-    authorName: r.author_name ?? undefined,
-    content: r.content,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
-  };
+/** Every Note file the viewer can see, most recently edited first. */
+export async function fetchNoteFiles(): Promise<NoteFileSummary[]> {
+  const { data, error } = await supabase
+    .from('notes')
+    .select('id, name, parent_id, updated_at')
+    .eq('type', 'file')
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as NoteFileSummary[];
 }
 
-export function useBriefComments(briefId: string | null) {
-  const [state, setState] = useState<{ activeId: string | null; comments: BriefComment[]; loading: boolean }>({
-    activeId: briefId,
-    comments: [],
-    loading: !!briefId,
-  });
-  // Reset on briefId change without scheduling an effect pass.
-  if (state.activeId !== briefId) {
-    setState({ activeId: briefId, comments: [], loading: !!briefId });
-  }
-
-  useEffect(() => {
-    if (!briefId) return;
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from('brief_comments')
-        .select('*')
-        .eq('brief_id', briefId)
-        .order('created_at', { ascending: true });
-      if (cancelled) return;
-      const comments = !error && data ? (data as BriefCommentRow[]).map(rowToBriefComment) : [];
-      setState((prev) =>
-        prev.activeId === briefId ? { activeId: briefId, comments, loading: false } : prev
-      );
-    })();
-    return () => { cancelled = true; };
-  }, [briefId]);
-
-  const addComment = useCallback(
-    async (content: string, authorName?: string): Promise<BriefComment | null> => {
-      if (!briefId) return null;
-      const trimmed = content.trim();
-      if (!trimmed) return null;
-      const { data, error } = await supabase
-        .from('brief_comments')
-        .insert({ brief_id: briefId, content: trimmed, author_name: authorName ?? null })
-        .select('*')
-        .single();
-      if (error || !data) throw error ?? new Error('Failed to add comment');
-      const comment = rowToBriefComment(data as BriefCommentRow);
-      setState((prev) =>
-        prev.activeId === briefId
-          ? { ...prev, comments: [...prev.comments, comment] }
-          : prev
-      );
-      return comment;
-    },
-    [briefId]
-  );
-
-  const deleteComment = useCallback(async (id: string) => {
-    setState((prev) => ({ ...prev, comments: prev.comments.filter((c) => c.id !== id) }));
-    const { error } = await supabase.from('brief_comments').delete().eq('id', id);
-    if (error) throw error;
-  }, []);
-
-  return {
-    comments: state.comments,
-    loading: state.loading,
-    addComment,
-    deleteComment,
-  };
+/** A new, empty Note file. Files need a parent (DB CHECK), so it goes into a
+ *  Section rather than a bare Folder — a Folder that has (or gains) Sections
+ *  would hide it. The empty content row lets the editor upsert later. */
+export async function createNoteFile(name: string): Promise<NoteFileSummary> {
+  const { sectionId } = await ensureNoteHome();
+  const { data, error } = await supabase
+    .from('notes')
+    .insert({ type: 'file', name, parent_id: sectionId })
+    .select('id, name, parent_id, updated_at')
+    .single();
+  if (error || !data) throw error ?? new Error('Failed to create note');
+  await supabase.from('note_contents').insert({ note_id: data.id, html: '' });
+  return data as NoteFileSummary;
 }

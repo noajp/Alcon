@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Plus, Search, X } from 'lucide-react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
-import { supabase } from '@/lib/supabase';
-import { ensureNoteHome } from '@/hooks/useNotesDb';
+import { createNoteFile, fetchNoteFiles, type NoteFileSummary } from '@/hooks/useNotesDb';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // NotePicker — popover that lets the caller pick an existing Note
 // or create a new one. Used by ElementDetailView (per-Element Note
@@ -20,12 +20,6 @@ import { ensureNoteHome } from '@/hooks/useNotesDb';
 // The component owns its own data fetch (small list, fresh on each
 // open) so callers don't have to thread useNotes() through.
 
-interface NoteFile {
-  id: string;
-  name: string;
-  parent_id: string | null;
-  updated_at: string;
-}
 
 interface NotePickerProps {
   open: boolean;
@@ -42,7 +36,8 @@ export function NotePicker({
   onPick,
   anchorClassName = 'absolute top-full right-0 mt-1',
 }: NotePickerProps) {
-  const [notes, setNotes] = useState<NoteFile[]>([]);
+  const { t } = useI18n();
+  const [notes, setNotes] = useState<NoteFileSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
@@ -54,16 +49,10 @@ export function NotePicker({
     if (!open) return;
     let cancelled = false;
     setLoading(true);
-    (async () => {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('id, name, parent_id, updated_at')
-        .eq('type', 'file')
-        .order('updated_at', { ascending: false });
-      if (cancelled) return;
-      if (!error && data) setNotes(data as NoteFile[]);
-      setLoading(false);
-    })();
+    fetchNoteFiles()
+      .then((files) => { if (!cancelled) setNotes(files); })
+      .catch(() => undefined)
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => {
       cancelled = true;
     };
@@ -99,20 +88,9 @@ export function NotePicker({
   const handleCreate = async () => {
     if (creating) return;
     setCreating(true);
-    const desiredName = query.trim() || 'Untitled note';
+    const desiredName = query.trim() || t('Untitled note');
     try {
-      // Files require a non-null parent (DB CHECK) — resolve into a Section
-      // rather than a bare Folder, so the new note isn't hidden the moment
-      // that Folder has (or gains) Sections.
-      const { sectionId } = await ensureNoteHome();
-      const { data, error } = await supabase
-        .from('notes')
-        .insert({ type: 'file', name: desiredName, parent_id: sectionId })
-        .select('id, name, parent_id, updated_at')
-        .single();
-      if (error || !data) throw error ?? new Error('Failed to create note');
-      // Seed an empty content row so the editor can upsert later.
-      await supabase.from('note_contents').insert({ note_id: data.id, html: '' });
+      const data = await createNoteFile(desiredName);
       onPick(data.id, { isNew: true, name: data.name });
     } catch (error) {
       console.warn('[NotePicker] create failed', error);
@@ -137,7 +115,7 @@ export function NotePicker({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search or name new note…"
+          placeholder={t('Search or name a new note…')}
           className="flex-1 text-[12px] bg-transparent border-none outline-none placeholder:text-muted-foreground/60"
         />
         {query && (
@@ -145,7 +123,7 @@ export function NotePicker({
             type="button"
             onClick={() => setQuery('')}
             className="text-muted-foreground hover:text-foreground"
-            aria-label="Clear"
+            aria-label={t('Clear search')}
           >
             <X size={12} />
           </button>
@@ -161,18 +139,18 @@ export function NotePicker({
       >
         <Plus size={13} className="text-muted-foreground" />
         <span className="font-medium">
-          {query.trim() ? `New Note: "${query.trim()}"` : 'New Note'}
+          {query.trim() ? t('New note: "{name}"', { name: query.trim() }) : t('New note')}
         </span>
       </button>
 
       {/* Existing notes list */}
       <div className="max-h-[280px] overflow-y-auto py-1">
         {loading && (
-          <div className="px-3 py-2 text-[11px] text-muted-foreground">Loading…</div>
+          <div className="px-3 py-2 text-[11px] text-muted-foreground">{t('Loading…')}</div>
         )}
         {!loading && filtered.length === 0 && (
           <div className="px-3 py-3 text-[11px] text-muted-foreground text-center">
-            {notes.length === 0 ? 'No notes yet.' : 'No matches.'}
+            {notes.length === 0 ? t('No notes yet.') : t('No matches.')}
           </div>
         )}
         {!loading &&
@@ -184,7 +162,7 @@ export function NotePicker({
               className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-foreground hover:bg-accent transition-colors text-left"
             >
               <FileText size={13} className="text-muted-foreground shrink-0" />
-              <span className="truncate flex-1 min-w-0">{note.name || 'Untitled'}</span>
+              <span className="truncate flex-1 min-w-0">{note.name || t('Untitled')}</span>
             </button>
           ))}
       </div>

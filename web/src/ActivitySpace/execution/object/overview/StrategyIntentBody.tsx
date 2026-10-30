@@ -5,6 +5,7 @@ import { ChevronRight } from 'lucide-react';
 import type { StrategyWithObjects } from '@/types/database';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { extractStrategyIntent } from './strategyIntent';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /**
  * "Initiative intent" — the Strategy half of the round trip, seen from Execution.
@@ -36,6 +37,7 @@ export function StrategyIntentBody({
   /** Open a Initiative on the Strategy surface. */
   onOpenStrategy: (strategyId: string) => void;
 }) {
+  const { t } = useI18n();
   const entries = useMemo(
     () => strategies.map((s) => ({ strategy: s, sections: extractStrategyIntent(s.description) })),
     [strategies],
@@ -45,10 +47,9 @@ export function StrategyIntentBody({
     <>
       {entries.map(({ strategy, sections }, idx) => (
         <div key={strategy.id}>
-          {/* An Object can contribute to more than one Initiative, so separate
-              them the way the Properties card separates its groups — a hairline
-              rule, not a heading per Initiative. */}
-          {idx > 0 && <div className="h-px bg-border/50 mx-2 my-2" />}
+          {/* An Object can contribute to more than one Initiative; spacing
+              separates them, not a rule or a heading per Initiative. */}
+          {idx > 0 && <div className="h-3" />}
 
           <button
             type="button"
@@ -69,7 +70,7 @@ export function StrategyIntentBody({
 
           {sections.length === 0 ? (
             <p className="px-2 pb-1.5 text-[11px] leading-5 text-muted-foreground">
-              No stated intent yet.
+              {t('No stated intent yet.')}
             </p>
           ) : (
             <div className="px-2 pb-1.5 space-y-1.5">

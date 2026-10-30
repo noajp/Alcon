@@ -1,6 +1,6 @@
 "use client"
 
-// Shared action and tab control. Geometry and borders follow /DESIGN.md.
+// Shared action and tab control. Geometry and borders come from CONTROL.
 
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
@@ -44,13 +44,13 @@ const buttonVariants = cva(
         secondary:
           "bg-[var(--surface-strong)] text-[var(--text-primary)] hover:bg-[var(--surface-overlay)]",
         /**
-         * The toolbar default. Transparent at rest; the hover ground is
+         * The toolbar default. Transparent and unframed at rest; the hover ground is
          * `--surface-strong` for the reason MenuShell documents — in the light
          * themes `--accent` and the surface it sits on are the same colour, so
          * `hover:bg-accent` paints nothing.
          */
         ghost:
-          "bg-transparent text-[var(--text-primary)] hover:bg-[var(--surface-strong)]",
+          "border-transparent hover:border-transparent bg-transparent text-[var(--text-primary)] hover:bg-[var(--surface-strong)]",
         /**
          * Destructive. Tinted at rest, solid red on hover (Primer).
          *
@@ -134,6 +134,9 @@ function Button({
       data-size={size}
       data-shape={shape}
       className={cn(buttonVariants({ variant, size, align: resolvedAlign, shape, multiline, className }),
+        // A tab reads as a button even when it is not the selected one: it
+        // keeps its fine outline where a ghost action drops it.
+        appearance === 'control' && shape === 'tab' && 'border-[var(--border-default)] hover:border-[var(--border-strong)]',
         appearance !== 'control' && 'rounded-[var(--control-tab-radius)] border-transparent hover:border-transparent aria-pressed:border-transparent aria-selected:border-transparent',
         appearance === 'inline' && variant === 'ghost' && 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] font-normal'
       )}

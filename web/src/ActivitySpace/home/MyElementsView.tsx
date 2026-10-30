@@ -1,10 +1,10 @@
 'use client';
 
-
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
-import { fetchMyElements, type MyElementsData } from '@/ActivitySpace/home/myElementsData';
+import { Plus, Trash2 } from 'lucide-react';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { fetchMyElements, type MyElementsData } from '@/hooks/myElementsData';
 import { useAuthContext } from '@/providers/AuthProvider';
 import {
   assignWorkersToElement,
@@ -18,6 +18,8 @@ import {
 import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
+import { DeletedElementsDialog } from '@/ActivitySpace/execution/object/DeletedElementsDialog';
+import { bulkSetAssignee } from '@/hooks/bulkAssign';
 import type {
   Worker,
 } from '@/types/database';
@@ -25,12 +27,11 @@ import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { QuickAddElementPopup, type NewElementInput } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
-import type { ColumnId, DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
+import type { ColumnId, DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { ELEMENT_DEFAULT_VISIBLE } from '@/Function/shared/listConfig';
-import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
-import { EmptyState } from '@/Function/shared/EmptyState';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';
-import { pushUndo } from '@/ActivitySpace/execution/element/bulkUndo';
+import { pushUndo } from '@/Function/shared/element/bulkUndo';
 import {
   ListControls,
   loadState,
@@ -99,7 +100,9 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
     });
   }, [qc, queryKey]);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const { t } = useI18n();
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [deletedOpen, setDeletedOpen] = useState(false);
   const [controls, setControls] = useState<ListControlsState>(() => loadState('my-elements'));
   useEffect(() => { saveState('my-elements', controls); }, [controls]);
 
@@ -171,7 +174,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
 
   // Multi-select + bulk ops. Personal Elements aren't Object-homed, so the
   // bulk bar offers Delete + Duplicate only (no Move / Add-to-Object).
-  const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
+  const { selectedRowIds, handleRowSelect, clearSelection, selectOnly } = useElementSelection();
   const bulkDelete = useCallback(async () => {
     for (const id of selectedRowIds) {
       try { await deleteElement(id); } catch (e) { console.error('Delete failed', id, e); }
@@ -213,6 +216,14 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
       });
     }
   }, [userId, selectedRowIds, elements, clearSelection, fetchMine, onRefresh]);
+  // Hand the selection to one person (undoable); Elements they cannot take keep their people.
+  const assigneeOptions = useMemo(() => (spaceWorkers ?? []).map((w) => ({ id: w.id, name: w.name, hint: w.type === 'ai_agent' ? t('AI') : null })), [spaceWorkers, t]);
+  const bulkAssign = useCallback(async (workerId: string) => {
+    // What could not be handed over stays selected, with the bar saying why.
+    const failed = await bulkSetAssignee([...selectedRowIds], workerId, async () => { await fetchMine(); await onRefresh?.(); });
+    selectOnly(failed);
+    return failed.length;
+  }, [selectedRowIds, selectOnly, fetchMine, onRefresh]);
   const bulkSetField = useCallback(async (
     field: 'status' | 'priority' | 'due_date',
     value: unknown,
@@ -248,7 +259,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
         const created = await createElement({
           title: input.title,
           object_id: input.objectId ?? null,
-          owner_id: userId,
+          owner_id: input.objectId ? null : userId,
           description: input.description ?? null,
           type: input.type ?? null,
           labels: input.labels ?? [],
@@ -294,8 +305,8 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
       {/* Plain header — no Domain breadcrumb because personal Elements are
           intentionally Domain-less. */}
       <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
-        {!embedded && <span className="text-[12px] font-semibold text-foreground">My Elements</span>}
-        <span className="text-[11px] text-muted-foreground">{elements.length}{embedded ? " Elements" : ""}</span>
+        {!embedded && <span className="text-[13px] font-medium text-foreground">{t('My Elements')}</span>}
+        <span className="text-[11px] text-muted-foreground">{embedded ? t('{n} Elements', { n: elements.length }) : elements.length}</span>
         <div className="flex-1" />
         <ListControls
           state={controls}
@@ -307,19 +318,24 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
           onReset={() => setControls(DEFAULT_STATE)}
           sortColumnsStorageKey="my-elements"
         />
-        <button
-          type="button"
-          onClick={() => setQuickAddOpen(true)}
-          className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-          title="Add personal Element"
-        >
-          <Plus size={14} />
-        </button>
+        <ButtonAppearanceProvider appearance="navigation">
+          {userId && (
+            <Button variant="ghost" size="icon-xs" onClick={() => setDeletedOpen(true)} title={t('Deleted Elements')} aria-label={t('Deleted Elements')}>
+              <Trash2 size={14} />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon-xs" onClick={() => setQuickAddOpen(true)} title={t('Add personal Element')} aria-label={t('Add personal Element')}>
+            <Plus size={14} />
+          </Button>
+        </ButtonAppearanceProvider>
+        {deletedOpen && userId && (
+          <DeletedElementsDialog mine={userId} onClose={() => setDeletedOpen(false)} onRestored={() => { void fetchMine(); void onRefresh?.(); }} />
+        )}
       </div>
 
       {loading ? (
-        <div className="flex-1 flex items-center justify-center text-[13px] text-muted-foreground">
-          Loading…
+        <div className="flex-1 flex items-center justify-center text-[13px] text-muted-foreground" role="status">
+          {t('Loading…')}
         </div>
       ) : elements.length === 0 ? (
         <MyElementsEmptyState onAdd={() => setQuickAddOpen(true)} />
@@ -344,7 +360,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
 
       <QuickAddElementPopup
         open={quickAddOpen}
-        contextLabel="My Elements"
+        contextLabel={t('My Elements')}
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
         types={elementTypes}
@@ -360,6 +376,8 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
         onSetStatus={(s) => bulkSetField('status', s, `Set status of ${selectedRowIds.size} Elements`)}
         onSetPriority={(p) => bulkSetField('priority', p, `Set priority of ${selectedRowIds.size} Elements`)}
         onSetDueDate={(d) => bulkSetField('due_date', d, `Set due date of ${selectedRowIds.size} Elements`)}
+        onSetAssignee={(workerId) => bulkAssign(workerId)}
+        assigneeOptions={assigneeOptions}
         onClear={clearSelection}
       />
     </div>
@@ -367,14 +385,11 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
 }
 
 function MyElementsEmptyState({ onAdd }: { onAdd: () => void }) {
+  const { t } = useI18n();
   return (
-    <EmptyState
-      icon={NavMyTasksIcon}
-      title="Your personal Elements"
-      description={<>Anything that&apos;s yours alone — quick captures, personal todos, ideas — lives here.</>}
-      hint={<>You&apos;ll also see Elements from shared Domains where you&apos;re assigned.</>}
-      cta="Create Element"
-      onCta={onAdd}
-    />
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 px-8 text-center">
+      <p className="text-[13px] text-muted-foreground">{t("Anything that's yours alone — quick captures, personal todos, ideas — lives here.")}</p>
+      <Button variant="primary" size="sm" className="gap-1.5" onClick={onAdd}><Plus size={14} />{t('Create Element')}</Button>
+    </div>
   );
 }

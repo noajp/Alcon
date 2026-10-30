@@ -1,4 +1,5 @@
-import type { NoteNodeType, NoteNode } from './types';
+import type { NoteNodeType, NoteNode } from '@/types/notes';
+import { translate } from '@/Function/i18n/I18nProvider';
 
 type CreateNode = (type: NoteNodeType, name: string, parentId: string | null) => Promise<NoteNode>;
 type DeleteNode = (id: string) => Promise<void>;
@@ -15,12 +16,12 @@ type DeleteNode = (id: string) => Promise<void>;
 export async function seedNotebook(
   createNode: CreateNode,
   deleteNode: DeleteNode,
-  name = 'New Notebook',
+  name = translate('New Notebook'),
 ): Promise<{ folder: NoteNode; page: NoteNode }> {
   const folder = await createNode('folder', name, null);
   try {
-    const section = await createNode('section', 'New Section', folder.id);
-    const page = await createNode('file', 'Untitled', section.id);
+    const section = await createNode('section', translate('New Section'), folder.id);
+    const page = await createNode('file', translate('Untitled'), section.id);
     return { folder, page };
   } catch (e) {
     try { await deleteNode(folder.id); } catch { /* best-effort */ }

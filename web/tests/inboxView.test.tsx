@@ -92,6 +92,10 @@ vi.mock('@/Function/membership/invitations', () => ({
   SCOPE_LABEL: { space: 'Space', domain: 'Domain', object: 'Object' },
 }));
 
+// What the active Space shows (ADR 0048); 'full' unless a test says otherwise.
+let scope: 'audit' | 'full' = 'full';
+vi.mock('@/Function/space/data', () => ({ useActiveSpaceScope: () => scope }));
+
 vi.mock('@/providers/AuthProvider', () => ({
   useAuthContext: () => ({ user: { id: USER_ID }, profile: { display_name: 'Me' } }),
 }));
@@ -107,6 +111,7 @@ function InboxView(props: { onViewChange?: (view: string) => void; onNavigate?: 
 }
 
 beforeEach(() => {
+  scope = 'full';
   feed = [notification()];
   selectInboxNotification(null);
   markNotificationRead.mockClear();
@@ -135,6 +140,15 @@ describe('a notification is something you can follow', () => {
     // every Element with no id.
     expect(onViewChange).not.toHaveBeenCalled();
     expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  it('does not open the Element in a Space that shows the AI audit only', async () => {
+    scope = 'audit';
+    render(<InboxView />);
+    fireEvent.click(screen.getByRole('button', { name: /commented on Wire the Inbox/ }));
+    await vi.waitFor(() => expect(screen.getByText(/shows the AI audit only/)).toBeTruthy());
+    expect(fetchElementWithDetails).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('element-detail')).toBeNull();
   });
 
   it('says so when the Element a notification names is gone', async () => {

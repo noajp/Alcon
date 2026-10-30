@@ -1,4 +1,3 @@
-import type { ScmView } from '@/ActivitySpace/sustainment/scm/scmNavigation';
 import type { ComponentType } from 'react';
 import type {
   ExplorerData,
@@ -37,8 +36,7 @@ export type WidgetSize = 'half' | 'full';
 
 /**
  * The chrome a widget wears. Not a free choice — it follows from the zone
- * (see ZONE_VARIANT), because an unboxed rail section and a boxed
- * main-column section are
+ * (see ZONE_VARIANT), because a rail island and a main-column section are
  * two established looks in this app and mixing them per widget is how a
  * surface starts looking assembled rather than designed.
  */
@@ -80,7 +78,7 @@ export interface WidgetHost {
   /** Present on space-wide boards (Home). */
   explorerData?: ExplorerData;
   onRefresh?: () => void;
-  onNavigate?: (nav: { objectId?: string; strategyId?: string; domainId?: string | null; tableId?: string; scmView?: ScmView; scmNode?: string | null }) => void;
+  onNavigate?: (nav: { objectId?: string; strategyId?: string; domainId?: string | null; tableId?: string }) => void;
   onViewChange?: (view: string) => void;
 }
 
@@ -104,7 +102,7 @@ export type WidgetParams = Record<string, unknown>;
  * the subject knowing anything about configuration.
  */
 export interface WidgetProps {
-  /** Stable placement identity for persisted generated apps. */
+  /** The widget's row id — what a widget keeps its own data under. */
   instanceId?: string;
   host: WidgetHost;
   params: WidgetParams;
@@ -140,6 +138,12 @@ export interface WidgetDefinition {
    */
   normalizeParams?: (raw: WidgetParams | undefined) => WidgetParams;
   /**
+   * Keeps contents of its own beside its settings (a generated app and what
+   * people typed into it). Taking the last placement of such a widget off a
+   * board deletes those contents for everyone, so removing it asks first.
+   */
+  holdsContents?: boolean;
+  /**
    * Lazy component. The definition owning its own import is what removed the
    * central `renderWidget` switch — every widget now code-splits by default
    * instead of one chart being special-cased.
@@ -147,23 +151,30 @@ export interface WidgetDefinition {
   load: () => Promise<WidgetComponent>;
 }
 
-/** One placed widget. `id` is per-instance so a board can hold two of a kind. */
+/**
+ * One placed widget.
+ *
+ * `id` is what the board addresses it by and stays the same for as long as it
+ * is placed: a surface's default instance keeps its hand-written id
+ * (`ov-trail`), anything added later uses its widget's id. A default instance
+ * has no rows until the board's first edit writes them, so `widgetId` and
+ * `placementId` are absent until then.
+ */
 export interface WidgetInstance {
   id: string;
   type: string;
   size?: WidgetSize;
   params?: WidgetParams;
+  /** The `widgets` row — what a widget keeps its own data under. */
+  widgetId?: string;
+  placementId?: string;
+  position?: number;
+  /** Placed here from somewhere the viewer cannot see. Its type and contents
+   *  are unknown to this client; only its place on the board is. */
+  hidden?: boolean;
 }
 
 export type BoardLayout = Record<Zone, WidgetInstance[]>;
-
-export interface StoredBoard {
-  version: number;
-  zones: BoardLayout;
-  /** Ids of default instances the user removed on purpose — see
-   *  `reconcileBoard`. */
-  dismissed?: string[];
-}
 
 export const ZONES: Zone[] = ['band', 'main', 'rail'];
 

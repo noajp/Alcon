@@ -20,16 +20,14 @@ import {
   folderDisplayName,
 } from '@/ActivitySpace/sustainment/notebook/noteTree';
 
-import {
-  PageView,
-  BriefsEmptyState,
-  ObjectDraftDialog,
-} from '@/ActivitySpace/sustainment/notebook';
-import { summarizeNoteContent } from '@/ActivitySpace/sustainment/notebook/aiSummary';
-import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from '@/ActivitySpace/sustainment/notebook/objectDraft';
+import { PageView } from '@/ActivitySpace/sustainment/notebook/PageView';
+import { ObjectDraftDialog } from '@/ActivitySpace/sustainment/notebook/ObjectDraftDialog';
+import { summarizeNoteContent } from '@/hooks/noteSummary';
+import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from '@/hooks/objectDraft';
 import type { Brief } from '@/types/notes';
 
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 interface NotebookSurfaceProps {
   visible: boolean;
   navigation: NavigationState;
@@ -43,6 +41,7 @@ interface NotebookSurfaceProps {
 
 // Keep per-tab notebook state and draft cache across activity switches.
 export function NotebookSurface({ visible, navigation, onNavigate, onViewChange, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId }: NotebookSurfaceProps) {
+  const { t } = useI18n();
   const { nodes, createNode, deleteNode, renameNode, setLinkedObject } = useNotes();
   // Note selection lives in navigation state so the Folder sidebar (in
   // AppSidebar), the middle FilesPane, and the PageView here all stay in
@@ -90,7 +89,7 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
   const handleAddFile = async () => {
     if (!filesParentId) return;
     try {
-      const node = await createNode('file', 'Untitled', filesParentId);
+      const node = await createNode('file', t('Untitled'), filesParentId);
       setSelectedFileId(node.id);
     } catch (e) { console.error('Failed to create note file', e); }
   };
@@ -99,7 +98,7 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
   };
   const handleDeleteFile = async (id: string) => {
     const file = nodes.find((n) => n.id === id);
-    if (!await appDialog.confirm(`Delete the page "${file?.name || 'Untitled'}"? This cannot be undone.`)) return;
+    if (!await appDialog.confirm(t('Delete the page "{name}"? This cannot be undone.', { name: file?.name || t('Untitled') }))) return;
     try {
       await deleteNode(id);
       if (selectedFileId === id) setSelectedFileId(null);
@@ -123,7 +122,7 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
     handledNewNoteRef.current = pendingNewNote;
     (async () => {
       try {
-        const node = await createNode('file', 'Untitled', null);
+        const node = await createNode('file', t('Untitled'), null);
         setSelectedFileId(node.id);
       } catch (e) {
         console.error('Failed to create note:', e);
@@ -131,7 +130,7 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
         onNewNoteHandled?.();
       }
     })();
-  }, [pendingNewNote, createNode, onNewNoteHandled, setSelectedFileId]);
+  }, [pendingNewNote, createNode, onNewNoteHandled, setSelectedFileId, t]);
 
   const selectedFile = resolvedFileId
     ? nodes.find((n) => n.id === resolvedFileId && n.type === 'file') ?? null
@@ -169,7 +168,7 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
       setObjectizing({ phase: 'ready', brief: tempBrief, initialDraft: draft });
     } catch (err) {
       console.error('[objectize] failed', err);
-      setObjectizing({ phase: 'error', message: (err as Error).message || 'Failed to objectize note' });
+      setObjectizing({ phase: 'error', message: (err as Error).message || t('Could not turn this Note into an Object.') });
     }
   };
 
@@ -202,18 +201,17 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
                this pane just waits for a pick. */
             <div className="flex-1 flex items-center justify-center bg-card px-6">
               <p className="text-[13px] text-muted-foreground">
-                Select a notebook from the sidebar.
+                {t('Select a notebook from the sidebar.')}
               </p>
             </div>
             ) : (
             <div className="relative flex-1 flex flex-col overflow-hidden bg-card">
-            {/* Breadcrumb — the open Notebook's name + "New page". Books and
-                Sections are the sidebar's tree; this pane lists pages. */}
+            {/* Breadcrumb — the open Notebook's name. Books and Sections are
+                the sidebar's tree; pages are added from the list's "New page". */}
             {resolvedFolderId && (
               <NotebookBreadcrumb
                 folderName={folderDisplayName(nodes, resolvedFolderId)}
                 onBack={() => onNavigate({ noteFolderId: null, noteSectionId: null, noteId: null })}
-                onAddFile={() => void handleAddFile()}
               />
             )}
             <div className="flex-1 flex overflow-hidden bg-card">
@@ -265,9 +263,11 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
                   onToggleFilesPane={() => setFilesPaneOpen((v) => !v)}
                 />
               ) : selectedFile ? (
-                !contentError && <div role="status" className="flex-1 flex items-center justify-center text-sm text-muted-foreground">Loading Note…</div>
+                !contentError && <div role="status" className="flex-1 flex items-center justify-center text-sm text-muted-foreground">{t('Loading Note…')}</div>
               ) : (
-                <BriefsEmptyState />
+                <div className="flex-1 flex items-center justify-center text-center px-8 py-12">
+                  <p className="text-[13px] text-muted-foreground">{t('Select a page to start writing.')}</p>
+                </div>
               )}
               </div>
               <Dialog
@@ -275,7 +275,7 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
                 onOpenChange={(o) => { if (!o) setObjectizing(null); }}
               >
                 <DialogContent className="max-w-sm text-center">
-                  <DialogTitle className="text-[12px] text-destructive">Obj化に失敗しました</DialogTitle>
+                  <DialogTitle className="text-[12px] text-destructive">{t('Could not turn this Note into an Object.')}</DialogTitle>
                   <div className="text-[11px] text-muted-foreground break-words">
                     {objectizing?.phase === 'error' ? objectizing.message : ''}
                   </div>

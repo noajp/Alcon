@@ -1,5 +1,5 @@
 import type { DecisionLabComparison, DecisionLabInput, DecisionLabScenario } from './decisionLabModel';
-import { displayIdOf } from '@/ActivitySpace/execution/element/displayId';
+import { displayIdOf } from '@/Function/shared/element/displayId';
 
 /** A readable decision, stored with the existing Intent record, not widget configuration. */
 export function decisionLabRecord(input: DecisionLabInput, comparison: DecisionLabComparison, scenario: DecisionLabScenario, label: string, reason: string) {

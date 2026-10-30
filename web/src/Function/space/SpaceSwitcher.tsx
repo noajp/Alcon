@@ -5,7 +5,6 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 import { useState } from 'react';
 import { Check, Plus, Trash2, Settings, Users, ChevronRight, LogOut, ArrowLeft } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
-import { supabase } from '@/lib/supabase';
 import {
   useActivitySpaces,
   createActivitySpace,
@@ -13,6 +12,7 @@ import {
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useActiveSpaceId, setActiveSpaceId } from './activeSpaceStore';
+import { countSpaceDomains } from './data';
 
 type Panel = 'main' | 'spaces' | 'create';
 
@@ -51,11 +51,14 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
 
   const remove = async () => {
     if (!active) return;
-    const { count } = await supabase
-      .from('domains')
-      .select('id', { count: 'exact', head: true })
-      .eq('activity_space_id', active.id);
-    if ((count ?? 0) > 0) {
+    let domainCount: number;
+    try {
+      domainCount = await countSpaceDomains(active.id);
+    } catch (e) {
+      await appDialog.alert(e instanceof Error && e.message ? e.message : 'Could not check the Space for Domains. Try again.');
+      return;
+    }
+    if (domainCount > 0) {
       await appDialog.alert(`"${active.name}" still has Domains. Move or delete them before deleting the Space.`);
       return;
     }

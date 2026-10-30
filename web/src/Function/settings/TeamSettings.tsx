@@ -9,7 +9,9 @@ import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { createWorker, deleteWorker, updateWorker } from '@/hooks/useSupabase';
-import type { Worker } from '@/types/database';
+import type { DomainMemberRole, Worker } from '@/types/database';
+import { setDomainMemberRole } from '@/hooks/useDomainMembers';
+import { Button } from '@/ui/button';
 import { ReachHint, WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { isUnreachableWorker } from '@/Function/shared/workerReach';
 import { SettingsSection } from './SettingsSection';
@@ -17,6 +19,8 @@ import { InviteUserDialog } from './InviteUserDialog';
 import { ConnectWorkerAccountDialog } from './ConnectWorkerAccountDialog';
 import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { FONT } from '@/shared/designTokens';
 
 interface TeamSettingsProps {
   /** Optional Domain scope — when provided, the Humans list is filtered to
@@ -27,12 +31,18 @@ interface TeamSettingsProps {
 
 export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   const { user } = useAuthContext();
+  const { t } = useI18n();
   const activeSpaceId = useActiveSpaceId();
   const [workers, setWorkers] = useState<Worker[]>([]);
   // The Space a Worker added here belongs to: the Domain's, else the active one.
   const [workerSpaceId, setWorkerSpaceId] = useState<string | null>(null);
   const [memberUserIds, setMemberUserIds] = useState<Set<string>>(new Set());
-  const [myRole, setMyRole] = useState<'owner' | 'member' | null>(null);
+  const [memberRoles, setMemberRoles] = useState<Map<string, DomainMemberRole>>(new Map());
+  // Viewers are not assignable, so they are not among the Workers above; they
+  // are listed from their membership rows.
+  const [viewers, setViewers] = useState<{ userId: string; name: string | null; avatarUrl: string | null }[]>([]);
+  const [roleBusy, setRoleBusy] = useState<string | null>(null);
+  const [myRole, setMyRole] = useState<DomainMemberRole | null>(null);
   const [isSpaceOwner, setIsSpaceOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +57,11 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   // Space or Domain may change only their capacity and status.
   const isOwner = domainId ? myRole === 'owner' : false;
   const isAnyOwner = isOwner || isSpaceOwner;
+  // set_domain_member_role: owners and admins change roles; only an owner
+  // touches an owner's.
+  const canManageRoles = domainId ? myRole === 'owner' || myRole === 'admin' : false;
+  const canChangeRoleOf = (userId: string) =>
+    canManageRoles && userId !== user?.id && (memberRoles.get(userId) !== 'owner' || isOwner);
   // Connecting redirects a Worker's assignments and notifications to an
   // account. Only a human Object Worker can be connected, by an owner, to
   // someone in its Space: every account already has its own human Worker, so
@@ -80,7 +95,13 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
       ]);
       if (workersErr) throw workersErr;
       if (memberRowsResult.error) throw memberRowsResult.error;
-      const memberRows = (memberRowsResult.data ?? []) as { user_id: string; role: 'owner' | 'member' }[];
+      const memberRows = (memberRowsResult.data ?? []) as { user_id: string; role: DomainMemberRole }[];
+      const viewerIds = memberRows.filter((r) => r.role === 'viewer').map((r) => r.user_id);
+      const { data: viewerProfiles, error: viewerProfilesErr } = viewerIds.length > 0
+        ? await supabase.from('profiles').select('id, display_name, avatar_url').in('id', viewerIds)
+        : { data: [], error: null };
+      if (viewerProfilesErr) throw viewerProfilesErr;
+      const profileById = new Map(((viewerProfiles ?? []) as { id: string; display_name: string | null; avatar_url: string | null }[]).map((p) => [p.id, p]));
       const spaceId = (domainResult.data as { activity_space_id: string | null } | null)?.activity_space_id ?? activeSpaceId;
       const { data: spaceRole, error: spaceRoleErr } = spaceId && user?.id
         ? await supabase.from('activity_space_members').select('role')
@@ -91,10 +112,12 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
       setWorkerSpaceId(spaceId);
       setIsSpaceOwner((spaceRole as { role: string } | null)?.role === 'owner');
       setMemberUserIds(new Set(memberRows.map((r) => r.user_id)));
+      setMemberRoles(new Map(memberRows.map((r) => [r.user_id, r.role])));
+      setViewers(viewerIds.map((id) => ({ userId: id, name: profileById.get(id)?.display_name ?? null, avatarUrl: profileById.get(id)?.avatar_url ?? null })));
       setMyRole(memberRows.find((r) => r.user_id === user?.id)?.role ?? null);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load team');
+      setError(e instanceof Error ? e.message : t('Failed to load team'));
     } finally {
       setLoading(false);
     }
@@ -107,12 +130,25 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   useWhenInvitationsSettle(invitees, () => void reload());
 
   const handleDelete = async (id: string) => {
-    if (!await appDialog.confirm('Remove this team member? Their assignments will be cleared.')) return;
+    if (!await appDialog.confirm(t('Remove this team member? Their assignments will be cleared.'))) return;
     try {
       await deleteWorker(id);
       setWorkers((prev) => prev.filter((w) => w.id !== id));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to remove member');
+      setError(e instanceof Error ? e.message : t('Failed to remove member'));
+    }
+  };
+
+  const handleRoleChange = async (userId: string, role: DomainMemberRole) => {
+    if (!domainId) return;
+    setRoleBusy(userId);
+    try {
+      await setDomainMemberRole(domainId, userId, role);
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('Failed to change role'));
+    } finally {
+      setRoleBusy(null);
     }
   };
 
@@ -122,7 +158,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
       const updated = await updateWorker(w.id, { status: next });
       setWorkers((prev) => prev.map((x) => (x.id === w.id ? updated : x)));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update status');
+      setError(e instanceof Error ? e.message : t('Failed to update status'));
     }
   };
 
@@ -148,42 +184,36 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <div className="min-w-[180px] flex-1">
-          <h2 className="text-[15px] font-semibold text-foreground">Team</h2>
+          <h2 className={`${FONT.lg} text-foreground`}>{t('Team')}</h2>
           <p className="text-[12px] text-muted-foreground mt-0.5">
-            Workers (human or AI) that can be assigned to Elements.
+            {t('Workers (human or AI) that can be assigned to Elements.')}
           </p>
         </div>
         {canManage && <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
           {domainId && (
-            <button
-              onClick={() => setShowInvite(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-border text-foreground rounded-md text-[12px] font-medium hover:bg-muted/40 transition-colors"
-            >
+            <Button variant="ghost" onClick={() => setShowInvite(true)}>
               <UserPlus size={12} />
-              Invite
-            </button>
+              {t('Invite')}
+            </Button>
           )}
-          <button
-            onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background rounded-md text-[12px] font-medium hover:opacity-90 transition-opacity"
-          >
+          <Button variant="ghost" onClick={() => setShowAdd(true)}>
             <Plus size={12} />
-            Add
-          </button>
+            {t('Add')}
+          </Button>
         </div>}
       </div>
 
       {error && (
-        <div className="mb-3 p-3 rounded-md border border-[var(--status-danger)] dark:border-[var(--status-danger)] bg-[var(--status-danger-subtle)] dark:bg-[var(--status-danger)]/20 text-[12px] text-[var(--status-danger)] dark:text-[var(--status-danger)]">
+        <div className="mb-3 text-[12px] text-[var(--status-danger)]">
           {error}
         </div>
       )}
 
-      <SettingsSection title={`Humans (${humans.length})`}>
+      <SettingsSection title={t('Humans ({n})', { n: humans.length })}>
         {loading && humans.length === 0 ? (
-          <div className="px-4 py-6 text-[12px] text-muted-foreground">Loading…</div>
+          <div className="py-3 text-[13px] text-muted-foreground">{t('Loading…')}</div>
         ) : humans.length === 0 ? (
-          <div className="px-4 py-6 text-[12px] text-muted-foreground">No human members yet.</div>
+          <div className="py-3 text-[13px] text-muted-foreground">{t('No human members yet.')}</div>
         ) : (
           humans.map((w) => (
             <WorkerRow
@@ -192,6 +222,11 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
               onDelete={canRemove(w) ? () => handleDelete(w.id) : undefined}
               onToggleStatus={canToggle(w) ? () => handleStatusToggle(w) : undefined}
               onConnect={canConnect(w) ? () => setConnecting(w) : undefined}
+              roleAction={w.user_id && canChangeRoleOf(w.user_id) ? {
+                label: t('Make viewer'),
+                busy: roleBusy === w.user_id,
+                run: () => void handleRoleChange(w.user_id!, 'viewer'),
+              } : undefined}
             />
           ))
         )}
@@ -200,9 +235,29 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
         )}
       </SettingsSection>
 
-      <SettingsSection title={`AI agents (${agents.length})`}>
+      {domainId && viewers.length > 0 && (
+        <SettingsSection title={t('Viewers ({n})', { n: viewers.length })}>
+          {viewers.map((v) => (
+            <div key={v.userId} className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
+              <WorkerAvatar worker={{ name: v.name, avatar_url: v.avatarUrl }} size={32} className="shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium text-foreground truncate">{v.name || t('Unnamed')}</div>
+                <div className="text-[11px] text-muted-foreground">{t('View only')}</div>
+              </div>
+              {canChangeRoleOf(v.userId) && (
+                <Button type="button" variant="ghost" size="xs" disabled={roleBusy === v.userId}
+                  onClick={() => void handleRoleChange(v.userId, 'member')}>
+                  {t('Make member')}
+                </Button>
+              )}
+            </div>
+          ))}
+        </SettingsSection>
+      )}
+
+      <SettingsSection title={t('AI agents ({n})', { n: agents.length })}>
         {agents.length === 0 ? (
-          <div className="px-4 py-6 text-[12px] text-muted-foreground">No AI agents yet.</div>
+          <div className="py-3 text-[13px] text-muted-foreground">{t('No AI agents yet.')}</div>
         ) : (
           agents.map((w) => (
             <WorkerRow
@@ -258,8 +313,11 @@ function WorkerRow({
   onDelete,
   onToggleStatus,
   onConnect,
+  roleAction,
 }: {
   worker: Worker;
+  /** Change this person's role in the Domain, for its owners and admins. */
+  roleAction?: { label: string; busy: boolean; run: () => void };
   /** Omitted when the viewer may not remove / (de)activate this Worker. */
   onDelete?: () => void;
   onToggleStatus?: () => void;
@@ -268,44 +326,48 @@ function WorkerRow({
    *  only about "no account". */
   onConnect?: () => void;
 }) {
+  const { t } = useI18n();
   const isAi = worker.type !== 'human';
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5">
+    <div className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
       <WorkerAvatar worker={worker} size={32} className="shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-[13px] font-medium text-foreground truncate">{worker.name}</span>
           {worker.status === 'inactive' && (
-            <span className="text-[9px] font-medium px-1 py-px rounded bg-muted text-muted-foreground">
-              Inactive
+            <span className="text-[11px] text-muted-foreground">
+              {t('Inactive')}
             </span>
           )}
           <ReachHint worker={worker} />
         </div>
         <div className="text-[11px] text-muted-foreground truncate">
-          {[worker.role, worker.email].filter(Boolean).join(' · ') || (isAi ? worker.ai_model || 'Agent' : 'No role')}
+          {[worker.role, worker.email].filter(Boolean).join(' · ') || (isAi ? worker.ai_model || t('Agent') : t('No role'))}
         </div>
       </div>
       {onConnect && isUnreachableWorker(worker) && (
-        <button
-          onClick={onConnect}
-          className="px-2 py-1 text-[11px] text-foreground border border-border rounded-md hover:bg-muted/40 transition-colors"
-          title="Connect this Worker to an account so assignments and notifications reach them"
-        >
-          Connect
-        </button>
+        <Button type="button" variant="ghost" size="xs" onClick={onConnect}
+          title={t('Connect this Worker to an account so assignments and notifications reach them')}>
+          {t('Connect')}
+        </Button>
+      )}
+      {roleAction && (
+        <Button type="button" variant="ghost" size="xs" disabled={roleAction.busy} onClick={roleAction.run}>
+          {roleAction.label}
+        </Button>
       )}
       {onToggleStatus && <button
         onClick={onToggleStatus}
         className="px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
-        title={worker.status === 'active' ? 'Deactivate' : 'Reactivate'}
+        title={worker.status === 'active' ? t('Deactivate') : t('Reactivate')}
       >
-        {worker.status === 'active' ? 'Deactivate' : 'Activate'}
+        {worker.status === 'active' ? t('Deactivate') : t('Activate')}
       </button>}
       {onDelete && <button
         onClick={onDelete}
         className="p-1.5 text-muted-foreground hover:text-[var(--status-danger)] hover:bg-[var(--status-danger-subtle)] dark:hover:bg-[var(--status-danger)]/20 rounded transition-colors"
-        title="Remove"
+        title={t('Remove')}
+        aria-label={t('Remove')}
       >
         <Trash2 size={13} />
       </button>}
@@ -323,6 +385,7 @@ function AddMemberDialog({
   onClose: () => void;
   onCreated: (worker: Worker) => void;
 }) {
+  const { t } = useI18n();
   const [type, setType] = useState<'human' | 'ai_agent'>('human');
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
@@ -348,7 +411,7 @@ function AddMemberDialog({
       });
       onCreated(created);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to add member');
+      setError(e instanceof Error ? e.message : t('Failed to add member'));
       setSaving(false);
     }
   };
@@ -365,9 +428,10 @@ function AddMemberDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-full max-w-md bg-card rounded-xl border border-border shadow-xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h3 className="text-[14px] font-semibold text-foreground">Add team member</h3>
+          <h3 className="text-[14px] font-semibold text-foreground">{t('Add team member')}</h3>
           <button
             onClick={onClose}
+            aria-label={t('Close')}
             className="p-1 text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
           >
             <X size={14} />
@@ -376,60 +440,48 @@ function AddMemberDialog({
 
         <div className="p-5 space-y-4">
           <div>
-            <label className="block text-[12px] font-medium text-foreground mb-1.5">Type</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setType('human')}
-                className={`flex-1 py-2 rounded-md text-[12px] font-medium transition-colors ${
-                  type === 'human'
-                    ? 'bg-foreground text-background'
-                    : 'border border-border text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Human
-              </button>
-              <button
-                onClick={() => setType('ai_agent')}
-                className={`flex-1 py-2 rounded-md text-[12px] font-medium transition-colors ${
-                  type === 'ai_agent'
-                    ? 'bg-foreground text-background'
-                    : 'border border-border text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                AI agent
-              </button>
+            <label className="block text-[12px] font-medium text-foreground mb-1.5">{t('Type')}</label>
+            <div className="flex gap-2" role="tablist">
+              <Button shape="tab" role="tab" aria-selected={type === 'human'} variant={type === 'human' ? 'secondary' : 'ghost'}
+                className="flex-1 justify-center" onClick={() => setType('human')}>
+                {t('Human')}
+              </Button>
+              <Button shape="tab" role="tab" aria-selected={type === 'ai_agent'} variant={type === 'ai_agent' ? 'secondary' : 'ghost'}
+                className="flex-1 justify-center" onClick={() => setType('ai_agent')}>
+                {t('AI agent')}
+              </Button>
             </div>
           </div>
 
           <div>
-            <label className="block text-[12px] font-medium text-foreground mb-1.5">Name</label>
+            <label className="block text-[12px] font-medium text-foreground mb-1.5">{t('Name')}</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={type === 'human' ? 'e.g. Alex Chen' : 'e.g. Codex'}
+              placeholder={type === 'human' ? t('e.g. Alex Chen') : t('e.g. Codex')}
               onKeyDown={submitOnEnter}
               autoFocus
-              className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
+              className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:bg-muted/40 transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-[12px] font-medium text-foreground mb-1.5">Role</label>
+            <label className="block text-[12px] font-medium text-foreground mb-1.5">{t('Role')}</label>
             <input
               type="text"
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              placeholder={type === 'human' ? 'e.g. Frontend Engineer' : 'e.g. Code reviewer'}
+              placeholder={type === 'human' ? t('e.g. Frontend Engineer') : t('e.g. Code reviewer')}
               onKeyDown={submitOnEnter}
-              className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
+              className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:bg-muted/40 transition-colors"
             />
           </div>
 
           {type === 'human' ? (
             <div>
               <label className="block text-[12px] font-medium text-foreground mb-1.5">
-                Email <span className="text-muted-foreground font-normal">(optional)</span>
+                {t('Email')} <span className="text-muted-foreground font-normal">{t('(optional)')}</span>
               </label>
               <input
                 type="email"
@@ -437,19 +489,19 @@ function AddMemberDialog({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="alex@example.com"
                 onKeyDown={submitOnEnter}
-                className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
+                className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:bg-muted/40 transition-colors"
               />
             </div>
           ) : (
             <div>
-              <label className="block text-[12px] font-medium text-foreground mb-1.5">AI model</label>
+              <label className="block text-[12px] font-medium text-foreground mb-1.5">{t('AI model')}</label>
               <input
                 type="text"
                 value={aiModel}
                 onChange={(e) => setAiModel(e.target.value)}
                 placeholder="claude-opus-4-7"
                 onKeyDown={submitOnEnter}
-                className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
+                className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:bg-muted/40 transition-colors"
               />
             </div>
           )}
@@ -459,20 +511,13 @@ function AddMemberDialog({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border bg-muted/30 rounded-b-xl">
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!name.trim() || saving}
-            className="px-3 py-1.5 bg-foreground text-background rounded-md text-[12px] font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
-          >
-            {saving ? 'Adding…' : 'Add member'}
-          </button>
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
+          <Button variant="ghost" onClick={onClose}>
+            {t('Cancel')}
+          </Button>
+          <Button variant="primary" onClick={handleSave} disabled={!name.trim() || saving}>
+            {saving ? t('Adding…') : t('Add member')}
+          </Button>
         </div>
       </div>
     </div>

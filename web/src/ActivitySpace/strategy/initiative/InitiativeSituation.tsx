@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import type { AlconObjectWithChildren, Phase } from '@/hooks/useSupabase';
 import { PhaseBurnup } from '@/Function/shared/PhaseBurnup';
 import { phaseElapsedRemaining } from '@/Function/shared/phaseWindow';
 import { completionOf } from '@/Function/shared/completion';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { fetchPhasesByIds } from '@/hooks/phaseData';
 
 // =============================================================
 // InitiativeSituation — what a Initiative is doing, derived rather than written.
@@ -62,14 +63,7 @@ function usePhasesOfElements(phaseIds: string[]): Phase[] {
     // `key` itself (see the guard below).
     if (!ids.length) return;
     let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from('phases')
-        .select('*')
-        .in('id', ids)
-        .order('start_date', { ascending: true, nullsFirst: false });
-      if (!cancelled) setPhases((data || []) as Phase[]);
-    })();
+    void fetchPhasesByIds(ids).then((rows) => { if (!cancelled) setPhases(rows); });
     return () => {
       cancelled = true;
     };
@@ -92,7 +86,9 @@ const EMPTY_PHASES: Phase[] = [];
  * is still enough to answer the question the board has never answered: not
  * "how many are done" but "does this land by the date we set".
  */
-function forecast(t: Tally): { text: string; short: number } | null {
+type Forecast = { message: string; values?: Record<string, number>; short: number };
+
+function forecast(t: Tally): Forecast | null {
   if (t.scope === 0) return null;
   const window = phaseElapsedRemaining(t.phase, new Date());
   // Null means the Phase has not opened yet, or is missing a date — either
@@ -101,9 +97,10 @@ function forecast(t: Tally): { text: string; short: number } | null {
   if (!window) return null;
   const { elapsed, remaining } = window;
 
-  if (t.completed >= t.scope) return { text: 'スコープを完了', short: 0 };
+  if (t.completed >= t.scope) return { message: 'Scope complete', short: 0 };
   if (remaining <= 0) {
-    return { text: `期限を過ぎて残り ${t.scope - t.completed} 件`, short: t.scope - t.completed };
+    const left = t.scope - t.completed;
+    return { message: 'Past the end date with {n} left', values: { n: left }, short: left };
   }
   // A pace needs enough elapsed time to be a pace rather than a single day
   // multiplied. Measured on this board: Sprint 2 opened on a Sunday, so by
@@ -118,7 +115,8 @@ function forecast(t: Tally): { text: string; short: number } | null {
   // it. The counts are still shown — they are observed, not extrapolated.
   if (elapsed < MIN_SAMPLE_DAYS) {
     return {
-      text: `完了 ${t.completed} / ${t.scope} 件、残り ${remaining} 営業日。経過 ${elapsed} 営業日ではペースを測れない`,
+      message: '{done} of {scope} done, {remaining} business days left. {elapsed} business days elapsed is too few to measure a pace',
+      values: { done: t.completed, scope: t.scope, remaining, elapsed },
       short: 0,
     };
   }
@@ -127,8 +125,8 @@ function forecast(t: Tally): { text: string; short: number } | null {
   const landing = Math.floor(t.completed + perDay * remaining);
   const short = t.scope - landing;
   return short > 0
-    ? { text: `開始からの平均ペースなら期限までに ${landing} 件。スコープに ${short} 件届かない`, short }
-    : { text: `開始からの平均ペースなら期限前にスコープを完了`, short: 0 };
+    ? { message: 'At the average pace since the start, {landing} land by the end date — {short} short of scope', values: { landing, short }, short }
+    : { message: 'At the average pace since the start, scope completes before the end date', short: 0 };
 }
 
 export function InitiativeSituation({
@@ -139,6 +137,7 @@ export function InitiativeSituation({
   objectIds: string[];
   allObjects: AlconObjectWithChildren[];
 }) {
+  const { t } = useI18n();
   // Every Element this Initiative owns, through its Objects.
   const elements = useMemo(() => {
     const seen = new Set<string>();
@@ -188,32 +187,32 @@ export function InitiativeSituation({
     <>
       {tallies.length === 0 && (
         <div className="text-[12px] text-muted-foreground/50 py-1">
-          Phase に入った Element がありません — 期間を持つ Phase に入れると着地見込みが出ます。
+          {t('No Elements are in a Phase. Put them in a dated Phase to see where they land.')}
         </div>
       )}
 
-      {tallies.map((t) => {
-        const f = forecast(t);
+      {tallies.map((tally) => {
+        const f = forecast(tally);
         return (
-          <div key={t.phase.id} className="mb-2">
+          <div key={tally.phase.id} className="mb-2">
             <div className="flex items-baseline gap-2 px-1">
-              <span className="text-[13px] font-medium text-foreground">{t.phase.name}</span>
+              <span className="text-[13px] font-medium text-foreground">{tally.phase.name}</span>
               {f && (
                 <span
                   className={`text-[12px] ${f.short > 0 ? 'text-[var(--status-warning)]' : 'text-muted-foreground'}`}
                 >
-                  {f.text}
+                  {t(f.message, f.values)}
                 </span>
               )}
             </div>
-            <PhaseBurnup phase={t.phase} scope={t.scope} started={t.started} completed={t.completed} />
+            <PhaseBurnup phase={tally.phase} scope={tally.scope} started={tally.started} completed={tally.completed} />
           </div>
         );
       })}
 
       {unphased > 0 && (
         <div className="text-[12px] text-muted-foreground px-1 pb-2">
-          Phase の外に未完了 {unphased} 件。上の burn-up には入っていません。
+          {t('{n} open outside any Phase — not counted in the burn-up above.', { n: unphased })}
         </div>
       )}
 

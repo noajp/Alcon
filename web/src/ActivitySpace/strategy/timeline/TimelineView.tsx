@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   fetchStrategyElements,
@@ -14,10 +15,12 @@ import { ObjectIcon } from '@/shell/icons';
 import { NavStrategyIcon, NavTimelineIcon } from '@/shell/sidebar/NavIcons';
 import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { QuietEmpty } from '@/ActivitySpace/strategy/QuietEmpty';
 import {
   usePreference, getCachedTimelineScale, getCachedTimelineMonthsBack, getCachedTimelineMonthsAhead,
   getCachedTimelineTodayMarker, getCachedTimelineProgressFill, type TimelineScale,
 } from '@/Function/settings/preferencesStore';
+import { daysBetween, startOfDay, parseDateOnly } from '@/Function/shared/dateUtils';
 
 // =============================================================
 // Timeline — Linear-Roadmap-style portfolio timeline for the
@@ -33,7 +36,6 @@ import {
 // of its Elements' dates.
 // =============================================================
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 // Pixels per day by scale (Settings > Strategy > Timeline): month ≈ 120px
 // per month, quarter ≈ 60px. The window (months back / ahead) is a
 // preference too; both are read live, so a change in Settings redraws an
@@ -102,7 +104,7 @@ export function TimelineView({
   }, [rootStrategies, scopeKey]);
 
   // ── Month window ───────────────────────────────────────────
-  const { locale } = useI18n();
+  const { t, locale } = useI18n();
   const scale = usePreference(getCachedTimelineScale);
   const monthsBack = usePreference(getCachedTimelineMonthsBack);
   const monthsAhead = usePreference(getCachedTimelineMonthsAhead);
@@ -156,7 +158,7 @@ export function TimelineView({
 
   const todayX = useMemo(() => {
     if (!showToday) return null;
-    const t = stripTime(new Date());
+    const t = startOfDay(new Date());
     if (t < windowStart || t > windowEnd) return null;
     return daysBetween(windowStart, t) * dayW + dayW / 2;
   }, [windowStart, windowEnd, dayW, showToday]);
@@ -196,7 +198,7 @@ export function TimelineView({
       const key = row.range ? quarterKey(row.range.end) : 'upcoming';
       if (!byQuarter.has(key)) {
         byQuarter.set(key, {
-          label: row.range ? quarterLabel(row.range.end) : 'Upcoming',
+          label: row.range ? quarterLabel(row.range.end) : t('Upcoming'),
           order: row.range ? row.range.end.getFullYear() * 4 + quarterOf(row.range.end) : Infinity,
           rows: [],
         });
@@ -213,7 +215,7 @@ export function TimelineView({
       });
     }
     return out;
-  }, [rootStrategies, elementsByStrategy, objectsById]);
+  }, [rootStrategies, elementsByStrategy, objectsById, t]);
 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -230,10 +232,10 @@ export function TimelineView({
     <div className="flex flex-col h-full bg-card">
       {/* Top bar — mirrors the other Strategy-layer surfaces */}
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-        <NavTimelineIcon size={12} />
-        <span className="text-[12px] font-semibold text-foreground">Timeline</span>
+        <NavTimelineIcon size={14} />
+        <span className="text-[13px] font-medium text-foreground">{t('Timeline')}</span>
         <span className="text-[11px] text-muted-foreground ml-1">
-          {loading ? 'Loading…' : `${rootStrategies.length} initiative${rootStrategies.length === 1 ? '' : 's'}`}
+          {loading ? t('Loading…') : rootStrategies.length === 1 ? t('1 Initiative') : t('{n} Initiatives', { n: rootStrategies.length })}
         </span>
         <div className="flex-1" />
         <div className="flex items-center gap-1">
@@ -241,8 +243,8 @@ export function TimelineView({
             type="button"
             onClick={() => setAnchorOffset((o) => o - 1)}
             className="w-[24px] h-[24px] rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-center"
-            title="Back one month"
-            aria-label="Back one month"
+            title={t('Back one month')}
+            aria-label={t('Back one month')}
           >
             <ChevronLeft size={13} />
           </button>
@@ -255,14 +257,14 @@ export function TimelineView({
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
             }`}
           >
-            Today
+            {t('Today')}
           </button>
           <button
             type="button"
             onClick={() => setAnchorOffset((o) => o + 1)}
             className="w-[24px] h-[24px] rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-center"
-            title="Forward one month"
-            aria-label="Forward one month"
+            title={t('Forward one month')}
+            aria-label={t('Forward one month')}
           >
             <ChevronRight size={13} />
           </button>
@@ -271,13 +273,7 @@ export function TimelineView({
 
       <div className="flex-1 overflow-auto">
         {!loading && rootStrategies.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center px-6 gap-3">
-            <NavTimelineIcon size={28} />
-            <p className="text-[13px] text-muted-foreground max-w-md">
-              No Initiatives yet. Create one in the Initiative view and give its
-              Objects start / due dates to see them on the timeline.
-            </p>
-          </div>
+          <QuietEmpty text={t('No Initiatives yet. Create one and give its Objects start and due dates to see them on the Timeline.')} />
         ) : (
           <div className="min-w-fit">
             {/* Month axis */}
@@ -360,10 +356,10 @@ export function TimelineView({
                     {expanded.has(row.strategy.id) && row.objects.length === 0 && (
                       <div className="flex items-stretch border-b border-border/20 bg-muted/5" style={{ height: OBJECT_ROW_H }}>
                         <div
-                          className="sticky left-0 z-[1] bg-card flex items-center text-[11px] text-muted-foreground italic border-r border-border/30 flex-shrink-0"
+                          className="sticky left-0 z-[1] bg-card flex items-center text-[11px] text-muted-foreground border-r border-border/30 flex-shrink-0"
                           style={{ width: LEFT_COL_W, paddingLeft: 36 }}
                         >
-                          No Objects in this Initiative yet
+                          {t('No Objects in this Initiative yet')}
                         </div>
                         <div className="flex-shrink-0" style={{ width: totalW }} />
                       </div>
@@ -412,6 +408,7 @@ function InitiativeTimelineRow({
   onToggle: () => void;
   onOpen: () => void;
 }) {
+  const { t } = useI18n();
   const { strategy, range, progress } = row;
   const bar = range ? rangeToBar(range, windowStart, windowEnd, dayW) : null;
   const color = strategy.color ?? 'var(--accent-default)';
@@ -426,10 +423,10 @@ function InitiativeTimelineRow({
           type="button"
           onClick={onToggle}
           aria-expanded={isOpen}
-          aria-label={isOpen ? 'Collapse objects' : 'Expand objects'}
+          aria-label={isOpen ? t('Collapse Objects') : t('Expand Objects')}
           className="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
         >
-          {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          <DisclosureTriangle open={isOpen} />
         </button>
         <span className="flex-shrink-0" style={{ color }}>
           <NavStrategyIcon size={13} />
@@ -502,6 +499,7 @@ function ObjectTimelineRow({
   dayW: number;
   onOpen: () => void;
 }) {
+  const { t } = useI18n();
   const bar = range ? rangeToBar(range, windowStart, windowEnd, dayW) : null;
   const color = obj.color ?? 'var(--accent-default)';
 
@@ -537,8 +535,8 @@ function ObjectTimelineRow({
             title={obj.name}
           />
         ) : (
-          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/60 italic">
-            No dates
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/60">
+            {t('No dates')}
           </span>
         )}
       </div>
@@ -595,15 +593,6 @@ function GridCell({
 // =============================================================
 // Date helpers
 // =============================================================
-function stripTime(d: Date): Date {
-  const r = new Date(d);
-  r.setHours(0, 0, 0, 0);
-  return r;
-}
-
-function daysBetween(a: Date, b: Date): number {
-  return Math.round((b.getTime() - a.getTime()) / DAY_MS);
-}
 
 function quarterOf(d: Date): number {
   return Math.floor(d.getMonth() / 3) + 1;
@@ -620,14 +609,14 @@ function quarterLabel(d: Date): string {
 /** An Object's span: its own start/due dates, falling back to the union
  *  of its Elements' dates when it has none of its own. */
 function objectRange(obj: AlconObject, elements: ElementWithDetails[]): DateRange | null {
-  const s = obj.start_date ? stripTime(new Date(obj.start_date)) : null;
-  const d = obj.due_date ? stripTime(new Date(obj.due_date)) : null;
+  const s = parseDateOnly(obj.start_date, null);
+  const d = parseDateOnly(obj.due_date, null);
   if (s || d) return { start: s ?? d!, end: d ?? s! };
   let min: Date | null = null;
   let max: Date | null = null;
   for (const el of elements) {
-    const es = el.start_date ? stripTime(new Date(el.start_date)) : null;
-    const ed = el.due_date ? stripTime(new Date(el.due_date)) : null;
+    const es = parseDateOnly(el.start_date, null);
+    const ed = parseDateOnly(el.due_date, null);
     const lo = es ?? ed;
     const hi = ed ?? es;
     if (lo && (!min || lo < min)) min = lo;

@@ -12,7 +12,7 @@ import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrill
 import { NavCalendarIcon } from '@/shell/sidebar/NavIcons';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { fetchExplorerData } from '@/Function/sync/explorerData';
-import { fetchMyElements } from '@/ActivitySpace/home/myElementsData';
+import { fetchMyElements } from '@/hooks/myElementsData';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { Button } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';
@@ -73,13 +73,13 @@ function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: My
     <ElementDrilldown label="Calendar" onNavigate={onNavigate} onViewChange={onViewChange}>
       {openElement => <div className="flex min-h-0 flex-1 flex-col bg-card">
       <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
-        <NavCalendarIcon size={12} />
-        <span className="text-[12px] font-semibold text-foreground">{t('Calendar')}</span>
+        <NavCalendarIcon size={14} />
+        <span className="text-[13px] font-medium text-foreground">{t('Calendar')}</span>
         <div className="flex-1" />
         <CalendarScopePicker domains={domains} objects={scoped.availableObjects} selection={{ ...selection, domainIds }} onChange={setSelection} />
       </div>
-      {error && <div role="alert" className="px-4 py-2 text-sm text-destructive">Could not load the calendar. <Button size="xs" variant="ghost" onClick={() => { void domainQuery.refetch(); void fetchMine(); }}>Retry</Button></div>}
-      {loading && <div role="status" className="px-4 py-2 text-sm text-muted-foreground">Loading schedules…</div>}
+      {error && <div role="alert" className="px-4 py-2 text-sm text-destructive">{t('Could not load the calendar.')} <Button size="xs" variant="ghost" onClick={() => { void domainQuery.refetch(); void fetchMine(); }}>{t('Retry')}</Button></div>}
+      {loading && <div role="status" className="px-4 py-2 text-sm text-muted-foreground">{t('Loading schedules…')}</div>}
       <div className="flex-1 min-h-0 overflow-hidden" aria-busy={loading}>
         <CalendarView objects={selection.mine ? [] : scoped.objects} onObjectClick={object => {
           const domainId = domainIds.find(id => explorers[domainIds.indexOf(id)]?.data?.objects.some(item => item.id === object.id));

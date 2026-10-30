@@ -1,0 +1,75 @@
+'use client';
+
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useAlconCopilot, type CopilotMessage } from './useAlconCopilot';
+import { useAiConversations } from '@/hooks/useAiConversations';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+
+// One conversation with the AI across the app: the pop-up and the AI screen
+// are two windows onto it, so expanding the pop-up carries the talk along.
+// Each conversation is kept as a session once its first answer is in, in the
+// person's folders for the Space (the AI screen's sidebar lists them).
+type Conversation = ReturnType<typeof useAlconCopilot> & {
+  library: ReturnType<typeof useAiConversations>;
+  /** The kept session on screen; null for one not yet answered. */
+  sessionId: string | null;
+  openSession: (id: string) => Promise<void>;
+  /** A fresh conversation, kept in this folder once answered (none: loose). */
+  newConversation: (folderId?: string | null) => void;
+};
+
+const CopilotContext = createContext<Conversation | null>(null);
+
+/** A session's title: the start of its first question. */
+const titleOf = (messages: CopilotMessage[]) =>
+  (messages.find((m) => m.role === 'user')?.content ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
+
+export function CopilotProvider({ children }: { children: ReactNode }) {
+  const conversation = useAlconCopilot();
+  const spaceId = useActiveSpaceId();
+  const library = useAiConversations(spaceId);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const folderForNew = useRef<string | null>(null);
+  const { messages, streaming, reset, load } = conversation;
+  const { saveSession, loadMessages } = library;
+
+  const newConversation = useCallback((folderId: string | null = null) => {
+    reset();
+    folderForNew.current = folderId;
+    setSessionId(null);
+  }, [reset]);
+
+  const openSession = useCallback(async (id: string) => {
+    const kept = await loadMessages(id);
+    if (!kept) return;
+    load(kept as CopilotMessage[]);
+    setSessionId(id);
+  }, [loadMessages, load]);
+
+  // Another Space has its own conversations.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- the Space is an outside store; its change starts afresh
+  useEffect(() => { newConversation(); }, [spaceId, newConversation]);
+
+  // Keep the conversation each time an answer finishes.
+  const wasStreaming = useRef(false);
+  useEffect(() => {
+    const finished = wasStreaming.current && !streaming;
+    wasStreaming.current = streaming;
+    if (!finished || messages.length === 0) return;
+    const kept = messages.map(({ role, content, toolEvents }) => ({ role, content, ...(toolEvents?.length ? { toolEvents } : {}) }));
+    void saveSession(sessionId, { title: titleOf(messages), folder_id: folderForNew.current, messages: kept })
+      .then((id) => { if (id && id !== sessionId) setSessionId(id); });
+  }, [streaming, messages, sessionId, saveSession]);
+
+  return (
+    <CopilotContext.Provider value={{ ...conversation, library, sessionId, openSession, newConversation }}>
+      {children}
+    </CopilotContext.Provider>
+  );
+}
+
+export function useCopilotConversation(): Conversation {
+  const conversation = useContext(CopilotContext);
+  if (!conversation) throw new Error('useCopilotConversation needs a CopilotProvider');
+  return conversation;
+}

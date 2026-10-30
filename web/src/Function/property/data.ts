@@ -15,7 +15,6 @@ import type {
   Json,
 } from '@/types/database';
 
-
 // ============================================
 // Custom Columns CRUD
 //
@@ -45,18 +44,6 @@ export function noticePropertyValueFailed(error: unknown): void {
     : isPropertyWriteRefused(error)
     ? 'You cannot change this value. It belongs to an Element, Object or field outside your access.'
     : 'The value could not be saved. Try again.'));
-}
-
-// Fetch all custom columns for an object
-export async function fetchCustomColumns(objectId: string): Promise<CustomColumn[]> {
-  const { data, error } = await supabase
-    .from('custom_columns')
-    .select('*')
-    .eq('object_id', objectId)
-    .order('order_index');
-
-  if (error) throw error;
-  return (data || []) as CustomColumn[];
 }
 
 // Attach element-keyed values to a set of column definitions. Each column id
@@ -357,40 +344,4 @@ export async function setCustomColumnObjectValue(
     .single();
   if (error) throw error;
   return data as CustomColumnValue;
-}
-
-// Delete a custom column value
-export async function deleteCustomColumnValue(columnId: string, elementId: string): Promise<void> {
-  const { error } = await supabase
-    .from('custom_column_values')
-    .delete()
-    .eq('column_id', columnId)
-    .eq('element_id', elementId);
-
-  if (error) throw error;
-}
-
-export async function deleteCustomColumnObjectValue(columnId: string, objectId: string): Promise<void> {
-  const { error } = await supabase
-    .from('custom_column_values')
-    .delete()
-    .eq('column_id', columnId)
-    .eq('object_id', objectId);
-
-  if (error) throw error;
-}
-
-// Reorder columns
-export async function reorderCustomColumns(objectId: string, columnIds: string[]): Promise<void> {
-  const updates = columnIds.map((id, index) => ({
-    id,
-    order_index: index,
-  }));
-
-  for (const update of updates) {
-    await supabase
-      .from('custom_columns')
-      .update({ order_index: update.order_index })
-      .eq('id', update.id);
-  }
 }

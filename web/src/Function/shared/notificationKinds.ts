@@ -3,6 +3,7 @@ import {
 } from 'lucide-react';
 import type { NotificationKind } from '@/hooks/useSupabase';
 import { MessageIcon } from '@/Function/shared/conceptIcons';
+import { translate } from '@/Function/i18n/I18nProvider';
 
 export interface NotificationKindMeta {
   icon: React.ComponentType<{ size?: number; className?: string }>;
@@ -38,6 +39,6 @@ export function notificationKindMeta(kind: string): NotificationKindMeta {
   return NOTIFICATION_KIND_META[kind as NotificationKind] ?? {
     icon: Bell,
     color: 'text-muted-foreground',
-    label: kind ? kind.replace(/_/g, ' ') : 'Update',
+    label: kind ? kind.replace(/_/g, ' ') : translate('Update'),
   };
 }

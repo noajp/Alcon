@@ -7,7 +7,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { parseDateOnly, toDateOnlyString } from '@/Function/shared/dateUtils';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
-import { useWorkersByIds } from '@/ActivitySpace/sustainment/team/data';
+import { useWorkersByIds } from '@/hooks/teamData';
 import { miniMonthDays, monthOf, shiftMonth } from './schedule';
 import {
   setCalendarDay, setCalendarWorkerHidden, showAllCalendarWorkers,
@@ -81,7 +81,7 @@ export function CalendarSidebar() {
       </div>
 
       <div className="mt-4 flex h-6 items-center gap-1 px-2">
-        <h2 className="flex-1 text-[11px] font-semibold tracking-wide text-muted-foreground/60">{t('People')}</h2>
+        <h2 className="flex-1 text-[12px] font-medium text-muted-foreground/80">{t('People')}</h2>
         {people.some(worker => hidden.includes(worker.id)) && <Button size="xs" variant="ghost" onClick={showAllCalendarWorkers}>{t('Show all')}</Button>}
       </div>
       {people.length === 0 && <p className="px-2 py-1 text-[12px] text-muted-foreground">{t('No one is scheduled here.')}</p>}

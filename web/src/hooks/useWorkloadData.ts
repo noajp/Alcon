@@ -1,0 +1,127 @@
+'use client';
+
+import { useCallback } from 'react';
+import { useQueries, type UseQueryResult } from '@tanstack/react-query';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { fetchExplorerData } from '@/Function/sync/explorerData';
+import type { ExplorerData } from '@/Function/sync/explorerPatch';
+import { readAllIn, readAllPages, rowId } from '@/hooks/readAllPages';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
+import { supabase } from '@/lib/supabase';
+import { useCurrentUserId } from '@/providers/authContext';
+import type { AlconObject, Element, ElementAssignee, ElementWithDetails, Worker } from '@/types/database';
+import { resolveWorkloadScope, selectWorkloadElements, workloadDomainIds, type WorkloadScope, type WorkloadSelection } from '@/Function/workload/workloadModel';
+import { setWorkloadDomainChoice, useWorkloadDomainChoice } from '@/Function/workload/workloadStore';
+export type { WorkloadScope } from '@/Function/workload/workloadModel';
+
+
+/** An explicit Object detail scope is authorized by that Object's RLS. It
+ * does not require its Domain to be visible and never reads sibling Objects.
+ * The ExplorerData shape lets existing optimistic edits and deltas update it. */
+export async function fetchWorkloadObject(objectId: string, signal?: AbortSignal): Promise<ExplorerData> {
+  const abort = signal ?? new AbortController().signal;
+  const objects = await readAllPages<AlconObject>('Workload Object', (from, to) => supabase
+    .from('objects').select('*', { count: 'exact' }).eq('id', objectId)
+    .order('id').range(from, to).abortSignal(abort), rowId);
+  const object = objects[0];
+  if (!object) throw new Error('This Object is no longer available.');
+  const [directElements, homes] = await Promise.all([
+    readAllPages<Element>('Object Elements', (from, to) => supabase
+      .from('elements').select('*', { count: 'exact' }).eq('object_id', objectId)
+      .order('id').range(from, to).abortSignal(abort), rowId),
+    readAllPages<{ element_id: string }>('Object Element membership', (from, to) => supabase
+      .from('element_objects').select('element_id', { count: 'exact' }).eq('object_id', objectId)
+      .order('element_id').range(from, to).abortSignal(abort), row => row.element_id),
+  ]);
+  const directIds = new Set(directElements.map(row => row.id));
+  const linkedElements = await readAllIn<Element>('Linked Object Elements', homes.map(row => row.element_id).filter(id => !directIds.has(id)),
+    (chunk, from, to) => supabase.from('elements').select('*', { count: 'exact' }).in('id', chunk)
+      .order('id').range(from, to).abortSignal(abort), rowId);
+  const elements = [...directElements, ...linkedElements];
+  const assignees = await readAllIn<ElementAssignee>('Object assignments', elements.map(row => row.id),
+    (chunk, from, to) => supabase.from('element_assignees').select('*', { count: 'exact' }).in('element_id', chunk)
+      .order('id').range(from, to).abortSignal(abort), rowId);
+  const workers = await readAllIn<Worker>('Assigned Workers', assignees.map(row => row.worker_id),
+    (chunk, from, to) => supabase.from('workers').select('*', { count: 'exact' }).in('id', chunk)
+      .order('id').range(from, to).abortSignal(abort), rowId);
+  const workerById = new Map(workers.map(worker => [worker.id, worker]));
+  const assignments = new Map<string, ElementAssignee[]>();
+  for (const assignee of assignees) {
+    const group = assignments.get(assignee.element_id) ?? [];
+    group.push(assignee);
+    assignments.set(assignee.element_id, group);
+  }
+  const rows: ElementWithDetails[] = elements.map(element => ({
+    ...element,
+    objectIds: [objectId],
+    assignees: (assignments.get(element.id) ?? []).map(assignee => ({ ...assignee, worker: workerById.get(assignee.worker_id) })),
+  }));
+  return { objects: [{ ...object, elements: rows }], rootElements: [] };
+}
+
+type WorkloadCombine = (results: UseQueryResult<ExplorerData, Error>[]) => { results: UseQueryResult<ExplorerData, Error>[]; elements: ElementWithDetails[] };
+const combines = new Map<string, WorkloadCombine>();
+
+/** Folds the explorer queries of one scope into its Elements. The same
+ * function is handed back for the same scope, so useQueries keeps the result
+ * — and the Elements their identity — until a query result changes. */
+function combineWorkload(scopeKey: string): WorkloadCombine {
+  const cached = combines.get(scopeKey);
+  if (cached) return cached;
+  const [domainIds, objectIds] = JSON.parse(scopeKey) as [string[], string[]];
+  const combine: WorkloadCombine = (results) => ({
+    results,
+    elements: selectWorkloadElements(results.flatMap((query, index) => query.data
+      ? [{ domainId: domainIds[index] ?? null, data: query.data }] : []), domainIds, objectIds),
+  });
+  // A handful of scopes are open at a time; the cache only has to outlive a render.
+  if (combines.size > 32) combines.clear();
+  combines.set(scopeKey, combine);
+  return combine;
+}
+
+/** Workload observes the same Domain explorer entries as Execution. Optimistic
+ * edits and confirmed deltas therefore update both surfaces through one cache. */
+export function useWorkloadData(scopeOverride?: WorkloadScope) {
+  const userId = useCurrentUserId();
+  const spaceId = useActiveSpaceId();
+  const contextKey = JSON.stringify([userId, spaceId]);
+  const domainQuery = useSustainmentDomains();
+  const domains = domainQuery.data;
+  // The standalone surface and its sidebar share one Domain choice per Space.
+  const selection: WorkloadSelection = { contextKey, domainIds: useWorkloadDomainChoice(contextKey) };
+  const accessibleIds = domains.map(domain => domain.id);
+  const { selectedDomainIds, domainIds, objectIds } = resolveWorkloadScope(selection, contextKey, accessibleIds, scopeOverride);
+  const setSelectedDomainIds = (update: (previous: string[]) => string[]) => {
+    const next = update(workloadDomainIds(selection, contextKey, accessibleIds));
+    // Every Domain chosen is "follow all", so a Domain created later joins.
+    setWorkloadDomainChoice(contextKey, next.length === accessibleIds.length && accessibleIds.every(id => next.includes(id)) ? null : next);
+  };
+  // useQueries hands back fresh arrays every render; `combine` re-runs only
+  // when a query result or the scope changes, so the Elements keep their
+  // identity and the chart and the rebalancing plan downstream recompute
+  // only when the board does.
+  const scopeKey = JSON.stringify([domainIds, objectIds]);
+  const combine = combineWorkload(scopeKey);
+  const { results: explorers, elements } = useQueries({ combine, queries: [
+    ...domainIds.map(id => ({
+      queryKey: ['explorer', id],
+      queryFn: () => fetchExplorerData(id),
+      enabled: Boolean(userId),
+    })),
+    ...objectIds.map(id => ({
+      queryKey: ['explorer', 'object', id, userId],
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchWorkloadObject(id, signal),
+      enabled: Boolean(userId),
+    })),
+  ] });
+  // Exact guest Domain/Object tabs do not depend on the active Space's list.
+  const needsDomains = !scopeOverride;
+  const loading = (needsDomains && domainQuery.loading) || Boolean(userId && explorers.some(query => query.isPending));
+  const error = (needsDomains ? domainQuery.error : null) ?? explorers.find(query => query.error)?.error ?? null;
+  const retry = useCallback(async () => {
+    await Promise.all([domainQuery.refetch(), ...explorers.map(query => query.refetch())]);
+  }, [domainQuery, explorers]);
+
+  return { contextKey, domains, selectedDomainIds, setSelectedDomainIds, elements, loading, error, retry };
+}

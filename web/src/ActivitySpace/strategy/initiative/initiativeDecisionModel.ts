@@ -13,6 +13,8 @@
 // argument so a test does not have to wait until Tuesday to see a horizon pass.
 // =============================================================
 
+import { translate } from '@/Function/i18n/I18nProvider';
+import { dayNumberIfDate } from '@/Function/shared/dateUtils';
 /** Mirrors the `intents.status` check constraint. */
 export type DecisionStatus = 'on_track' | 'at_risk' | 'off_track' | 'done';
 
@@ -77,7 +79,7 @@ export interface Decision extends Omit<DecisionInput, 'status'> {
 }
 
 export function decisionStatusLabel(status: DecisionStatus): string {
-  return STATUS_LABELS[status];
+  return translate(STATUS_LABELS[status]);
 }
 
 /** Unknown and missing both mean the column default, which is `on_track`. */
@@ -97,18 +99,12 @@ export function normalizeDecisionStatus(status: string | null | undefined): Deci
  * user west of Greenwich.
  */
 function daysBetween(fromDay: string, toDay: string): number | null {
-  const from = dayNumber(fromDay);
-  const to = dayNumber(toDay);
+  const from = dayNumberIfDate(fromDay);
+  const to = dayNumberIfDate(toDay);
   if (from === null || to === null) return null;
   return to - from;
 }
 
-function dayNumber(day: string): number | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(day);
-  if (!m) return null;
-  const ms = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return Number.isNaN(ms) ? null : Math.round(ms / 86_400_000);
-}
 
 /**
  * Whether a review landed on or after the day it was owed.
@@ -122,8 +118,8 @@ function answeredOnOrAfter(lastReviewedAt: string | null | undefined, horizon: s
   if (!lastReviewedAt || !horizon) return false;
   const at = new Date(lastReviewedAt);
   if (Number.isNaN(at.getTime())) return false;
-  const reviewed = dayNumber(localDay(at));
-  const owed = dayNumber(horizon);
+  const reviewed = dayNumberIfDate(localDay(at));
+  const owed = dayNumberIfDate(horizon);
   return reviewed !== null && owed !== null && reviewed >= owed;
 }
 
@@ -216,14 +212,14 @@ function decidedRank(decision: Decision): number {
 export function reviewLabel(decision: Decision): string {
   switch (decision.review) {
     case 'unset':
-      return 'No review date';
+      return translate('No review date');
     case 'today':
-      return 'Review today';
+      return translate('Review today');
     case 'overdue':
-      return `Review ${Math.abs(decision.daysToReview ?? 0)}d overdue`;
+      return translate('Review {n}d overdue', { n: Math.abs(decision.daysToReview ?? 0) });
     case 'reviewed':
-      return 'Reviewed';
+      return translate('Reviewed');
     default:
-      return `Review in ${decision.daysToReview}d`;
+      return translate('Review in {n}d', { n: decision.daysToReview ?? 0 });
   }
 }

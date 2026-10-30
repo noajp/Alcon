@@ -1,6 +1,6 @@
 # Alcon REST API
 
-スクリプト、ノーコードツール、他の SaaS から、トークンを発行した本人の権限で盤面を読み書きする入口。MCP（[mcp.md](mcp.md)）と同じツールを HTTP の形で出している。設計の判断は [ADR 0033](adr/0033-the-rest-api-is-the-mcp-tool-layer-over-http.md)、認証は [ADR 0032](adr/0032-external-callers-authenticate-with-a-pat-or-oauth-and-get-a-short-lived-user-jwt.md)。
+スクリプト、ノーコードツール、他の SaaS から、トークンを発行した本人の権限で盤面を読み書きする入口。MCP（[mcp.md](mcp.md)）と同じツールを HTTP の形で出している。設計の判断は [ADR 0033](architecture.md)、認証は [ADR 0032](architecture.md)。
 
 - ベース URL: `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/alcon-api`
 - 認証: `Authorization: Bearer <個人用アクセストークン>`（`alc_pat_…`。Settings › Integrations の「Alcon へ接続する」で発行）

@@ -1,3 +1,5 @@
+import { translate } from '@/Function/i18n/I18nProvider';
+
 // Whether anything sent to a Worker can arrive.
 //
 // Notifications land on `auth.users` uuids (`notifications.recipient_id`,
@@ -33,8 +35,8 @@ export function isUnreachableWorker(worker: ReachSubject | null | undefined): bo
  *  reader is about to rely on — and the fix second, so the tooltip is also
  *  the pointer to the invitation path (ELE_QLT-031). */
 export function unreachableWorkerTitle(name: string | null | undefined): string {
-  const who = name?.trim() || 'This Worker';
-  return `${who} has no account connected — assignments and notifications don't reach them. Connect the Worker to an account to fix this.`;
+  const who = name?.trim() || translate('This Worker');
+  return translate("{who} has no account connected — assignments and notifications don't reach them. Connect the Worker to an account to fix this.", { who });
 }
 
 /** Short row-level wording for pickers and rosters, where the tooltip is
@@ -67,12 +69,13 @@ export function workerTriggerLabel(
   workers: (ReachSubject & { name?: string | null }) | (ReachSubject & { name?: string | null })[] | null | undefined,
 ): string {
   const list = Array.isArray(workers) ? workers : workers ? [workers] : [];
-  if (list.length === 0) return base;
+  const label = translate(base);
+  if (list.length === 0) return label;
   const parts = list.map((w) => {
-    const name = w.name?.trim() || 'Unnamed';
-    return isUnreachableWorker(w) ? `${name} (${UNREACHABLE_WORKER_LABEL})` : name;
+    const name = w.name?.trim() || translate('Unnamed');
+    return isUnreachableWorker(w) ? translate('{name} ({reason})', { name, reason: translate(UNREACHABLE_WORKER_LABEL) }) : name;
   });
-  return `${base}: ${parts.join(', ')}`;
+  return translate('{label}: {list}', { label, list: parts.join(', ') });
 }
 
 /** The DOM facts a hand-rolled avatar needs to carry the mark — ring class,

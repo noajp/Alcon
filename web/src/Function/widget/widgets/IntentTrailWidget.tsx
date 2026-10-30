@@ -13,6 +13,7 @@ import {
   type TrailRow,
   type TrailScope,
 } from './intentTrailModel';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // =============================================================
 // Decisions & assumptions — what this piece of work is standing on.
@@ -29,6 +30,7 @@ import {
 // =============================================================
 
 export function IntentTrailWidget({ host }: { host: WidgetHost }) {
+  const { t } = useI18n();
   const subjectId = host.subject.id ?? '';
   const subjectType =
     host.subject.kind === 'object' ? 'object'
@@ -92,8 +94,8 @@ export function IntentTrailWidget({ host }: { host: WidgetHost }) {
 
   if (error) {
     return (
-      <p className="px-2 py-1 text-[12px] text-[var(--status-danger)]">
-        Could not read what this is standing on.
+      <p className="py-1 text-[12px] text-[var(--status-danger)]">
+        {t('Could not read what this is standing on.')}
       </p>
     );
   }
@@ -125,6 +127,7 @@ function TrailRowView({
   onOpenInitiative: () => void;
   canOpen: boolean;
 }) {
+  const { t } = useI18n();
   const tone =
     row.status === 'off_track' ? 'text-[var(--status-danger)]'
     : row.status === 'at_risk' ? 'text-[var(--status-warning)]'
@@ -136,22 +139,22 @@ function TrailRowView({
       : 'text-muted-foreground';
 
   return (
-    <div className="px-2 py-2 space-y-1">
+    <div className="py-2 space-y-1">
       {/* Kind and edge on one line, state on the right. The verb is the
           Initiative's own word for why the edge exists — kept, because
           "could falsify" and "delivers" are different reasons to care. */}
       <div className="flex items-center gap-1.5 text-[11px]">
         <span className="font-semibold text-muted-foreground">
-          {row.kind === 'decision' ? 'Decision' : 'Assumption'}
+          {row.kind === 'decision' ? t('Decision') : t('Assumption')}
         </span>
         <span className="text-muted-foreground/70 truncate">
-          · {row.relationships.map((r) => RELATIONSHIP_LABEL[r]).join(' · ')}
+          · {row.relationships.map((r) => t(RELATIONSHIP_LABEL[r])).join(' · ')}
         </span>
         <span className="flex-1" />
         {row.review ? (
           <span className={`shrink-0 tabular-nums ${reviewTone}`}>{row.review.label}</span>
         ) : tone ? (
-          <span className={`shrink-0 ${tone}`}>{row.statusLabel}</span>
+          <span className={`shrink-0 ${tone}`}>{t(row.statusLabel)}</span>
         ) : null}
       </div>
 
@@ -160,7 +163,7 @@ function TrailRowView({
       {/* Reached through a child: name it, so the reader knows which of the
           Object's Elements the decision actually touched. */}
       {row.via && (
-        <p className="text-[11px] text-muted-foreground truncate">via {row.via}</p>
+        <p className="text-[11px] text-muted-foreground truncate">{t('via {name}', { name: row.via })}</p>
       )}
 
       <button
@@ -171,7 +174,7 @@ function TrailRowView({
       >
         <NavStrategyIcon size={12} className="shrink-0 text-muted-foreground" />
         <span className="flex-1 min-w-0 truncate text-[11px] text-muted-foreground group-hover:text-foreground">
-          {row.initiativeName ?? 'Initiative'}
+          {row.initiativeName ?? t('Initiative')}
         </span>
         {canOpen && (
           <ChevronRight size={12} className="shrink-0 text-muted-foreground/40 group-hover:text-foreground transition-colors" />

@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+
+# Design fonts — copied from node_modules by scripts/design-fonts.mjs
+/public/design-fonts/

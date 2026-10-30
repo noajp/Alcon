@@ -12,6 +12,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 } from '@/ui/dropdown-menu';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export interface ActionTarget {
   id: string;
@@ -61,6 +62,8 @@ export function EntityActionsMenu({
    *  they read as more settings, not actions bundled with it. */
   children?: ReactNode;
 }) {
+  // Callers pass English labels; translate them here (a no-op when already translated).
+  const { t: tr } = useI18n();
   const memberSet = new Set(memberIds);
   const moveTargets = targets.filter((t) => t.id !== primaryId);
 
@@ -69,8 +72,8 @@ export function EntityActionsMenu({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={ariaLabel}
-          title={ariaLabel}
+          aria-label={tr(ariaLabel)}
+          title={tr(ariaLabel)}
           className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
         >
           <MoreHorizontal size={14} />
@@ -78,17 +81,17 @@ export function EntityActionsMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-[190px]">
         <DropdownMenuItem onClick={onDuplicate} className="gap-2 text-[13px]">
-          <Copy size={13} className="text-muted-foreground" /> Duplicate
+          <Copy size={13} className="text-muted-foreground" /> {tr('Duplicate')}
         </DropdownMenuItem>
 
         {/* Move — re-parent to a different primary */}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="gap-2 text-[13px]">
-            <ArrowRightLeft size={13} className="text-muted-foreground" /> {moveLabel}
+            <ArrowRightLeft size={13} className="text-muted-foreground" /> {tr(moveLabel)}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="min-w-[190px] max-h-[320px] overflow-auto">
             {moveTargets.length === 0 ? (
-              <div className="px-2 py-1.5 text-[12px] text-muted-foreground/70">{targetEmptyLabel}</div>
+              <div className="px-2 py-1.5 text-[12px] text-muted-foreground/70">{tr(targetEmptyLabel)}</div>
             ) : (
               moveTargets.map((t) => (
                 <DropdownMenuItem key={t.id} onClick={() => onMove(t.id)} className="gap-2 text-[13px]">
@@ -102,11 +105,11 @@ export function EntityActionsMenu({
         {/* Multi-home — toggle secondary memberships; menu stays open */}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="gap-2 text-[13px]">
-            <GitBranch size={13} className="text-muted-foreground" /> {multiHomeLabel}
+            <GitBranch size={13} className="text-muted-foreground" /> {tr(multiHomeLabel)}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="min-w-[190px] max-h-[320px] overflow-auto">
             {targets.length === 0 ? (
-              <div className="px-2 py-1.5 text-[12px] text-muted-foreground/70">{targetEmptyLabel}</div>
+              <div className="px-2 py-1.5 text-[12px] text-muted-foreground/70">{tr(targetEmptyLabel)}</div>
             ) : (
               targets.map((t) => {
                 const isMember = memberSet.has(t.id);
@@ -125,7 +128,7 @@ export function EntityActionsMenu({
                       {isMember && <Check size={13} />}
                     </span>
                     <span className="truncate flex-1">{t.name}</span>
-                    {isPrimary && <span className="text-[10px] text-muted-foreground/70 shrink-0">primary</span>}
+                    {isPrimary && <span className="text-[10px] text-muted-foreground/70 shrink-0">{tr('primary')}</span>}
                   </DropdownMenuItem>
                 );
               })
@@ -145,7 +148,7 @@ export function EntityActionsMenu({
           onClick={onDelete}
           className="gap-2 text-[13px] text-destructive focus:text-destructive"
         >
-          <Trash2 size={13} /> Delete
+          <Trash2 size={13} /> {tr('Delete')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

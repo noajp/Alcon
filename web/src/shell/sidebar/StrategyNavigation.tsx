@@ -1,52 +1,63 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react';
-import { Button } from '@/ui/button';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
+import { MoreHorizontal } from 'lucide-react';
 import { VIEW_REGISTRY } from '@/shell/viewRegistry';
+import { SidebarRow, SidebarRowAction } from '@/Function/shared/SidebarRow';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import type { Vision } from '@/types/database';
 
-// The Strategy mode's navigation: the Vision row with Portfolio and
-// Initiative nested under it — the same row anatomy as a Domain in Execution
-// (name, a chevron that folds the children, a "…" that opens its settings).
-// Phase and Timeline stay routable from an Initiative but are not listed.
-export function StrategyNavigation({ activeView, onSelect, onOpenSettings }: {
+// The Strategy mode's navigation: one row per Vision with Portfolio and
+// Initiative nested under it — the same tree, built from the same SidebarRow,
+// as Execution's Domain with its Objects and Elements (name, a chevron that
+// folds the children, a "…" that opens its settings). Phase and Timeline stay routable from an Initiative
+// but are not listed.
+export function StrategyNavigation({ visions, activeVisionId, activeView, onSelect, onOpenSettings }: {
+  visions: Vision[];
+  /** The Vision the Strategy pages are showing. */
+  activeVisionId: string | null;
   activeView: string;
-  onSelect: (view: string) => void;
-  /** Opens the Strategy settings modal. */
-  onOpenSettings: () => void;
+  onSelect: (visionId: string, view: 'vision' | 'portfolio' | 'strategy') => void;
+  onOpenSettings: (visionId: string) => void;
 }) {
   const { t } = useI18n();
-  const [expanded, setExpanded] = useState(true);
-  // A child becoming current (⌘K, a link) unfolds the row so the current
-  // page is never hidden — the same as a Domain unfolding for its Object.
-  const [seenView, setSeenView] = useState(activeView);
-  if (activeView !== seenView) {
-    setSeenView(activeView);
-    if (activeView === 'portfolio' || activeView === 'strategy') setExpanded(true);
+  const [folded, setFolded] = useState<Set<string>>(new Set());
+  // The active Vision's children are never hidden behind a fold made earlier.
+  const [seen, setSeen] = useState(`${activeVisionId}:${activeView}`);
+  if (seen !== `${activeVisionId}:${activeView}`) {
+    setSeen(`${activeVisionId}:${activeView}`);
+    if (activeVisionId && (activeView === 'portfolio' || activeView === 'strategy') && folded.has(activeVisionId)) {
+      setFolded((prev) => { const n = new Set(prev); n.delete(activeVisionId); return n; });
+    }
   }
-  const rootActive = activeView === 'vision';
-  const { icon: RootIcon, label: rootLabel } = VIEW_REGISTRY.vision;
+  const { icon: VisionIcon } = VIEW_REGISTRY.vision;
+  if (visions.length === 0) {
+    return null;
+  }
   return <nav aria-label={t('Strategy')} className="mb-1 mt-1">
-    <div className={`flex min-w-0 items-center rounded-md ${rootActive ? 'bg-sidebar-accent' : ''}`}>
-      <Button variant="ghost" size="md" align="start" onClick={() => onSelect('vision')}
-        aria-current={rootActive ? 'page' : undefined}
-        className={`min-w-0 flex-1 gap-2.5 text-xs font-semibold ${rootActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-        {RootIcon && <RootIcon size={16} />}<span className="truncate">{t(rootLabel)}</span>
-      </Button>
-      <Button variant="ghost" size="icon-sm" onClick={() => setExpanded((v) => !v)}
-        aria-label={`${t(expanded ? 'Collapse' : 'Expand')} ${t(rootLabel)}`} aria-expanded={expanded}>
-        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-      </Button>
-      <Button variant="ghost" size="icon-xs" onClick={onOpenSettings} aria-label={t('Strategy settings')} className="mr-1"><MoreHorizontal size={12} /></Button>
-    </div>
-    {expanded && <div className="mt-0.5 pl-7">
-      {(['portfolio', 'strategy'] as const).map((id) => {
-        const { icon: Icon, label } = VIEW_REGISTRY[id];
-        return <Button key={id} variant="ghost" size="md" align="start" aria-current={activeView === id ? 'page' : undefined}
-          className={`w-full gap-2.5 text-xs font-semibold ${activeView === id ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-          onClick={() => onSelect(id)}>{Icon && <Icon size={16} />}{t(label)}</Button>;
-      })}
-    </div>}
+    {visions.map((vision) => {
+      const active = vision.id === activeVisionId;
+      const rootActive = active && activeView === 'vision';
+      const expanded = !folded.has(vision.id);
+      return <div key={vision.id} className="mb-0.5">
+        <SidebarRow active={rootActive} icon={VisionIcon && <VisionIcon size={16} />} label={vision.name} title={vision.name}
+          onClick={() => onSelect(vision.id, 'vision')}
+          actions={<>
+            <SidebarRowAction label={t(expanded ? 'Collapse {name}' : 'Expand {name}', { name: vision.name })} aria-expanded={expanded}
+              onClick={() => setFolded((prev) => { const n = new Set(prev); if (n.has(vision.id)) n.delete(vision.id); else n.add(vision.id); return n; })}>
+              <DisclosureTriangle open={expanded} />
+            </SidebarRowAction>
+            <SidebarRowAction label={`${vision.name} — ${t('Vision settings')}`} onClick={() => onOpenSettings(vision.id)}><MoreHorizontal size={12} /></SidebarRowAction>
+          </>} />
+        {expanded && <div className="mt-0.5 pl-7">
+          {(['portfolio', 'strategy'] as const).map((id) => {
+            const { icon: Icon, label } = VIEW_REGISTRY[id];
+            return <SidebarRow key={id} active={active && activeView === id} icon={Icon && <Icon size={16} />} label={t(label)}
+              onClick={() => onSelect(vision.id, id)} />;
+          })}
+        </div>}
+      </div>;
+    })}
   </nav>;
 }

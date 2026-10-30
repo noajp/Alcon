@@ -1,7 +1,8 @@
 'use client';
 
-import type { CrmHealthLevel } from './crmModel';
-import { dayIndex } from './crmModel';
+import type { CrmActivityKind, CrmDealRole, CrmHealthLevel, CrmStage } from '@/Function/crm/crmModel';
+import { readChange } from '@/Function/crm/crmModel';
+import { dayIndexOf } from '@/Function/shared/dateUtils';
 
 /** Currency amounts, compact when asked. Unknown codes fall back to "CODE 1,234". */
 export function money(amount: number | null | undefined, currency: string | null | undefined, locale: string, compact = false): string {
@@ -23,7 +24,7 @@ export function moneyList(values: Record<string, number>, locale: string, compac
 /** "Today", "Tomorrow", "3 days ago", or a short date. */
 export function relativeDay(value: string | null, today: string, locale: string, t: (message: string, values?: Record<string, string | number>) => string): string {
   if (!value) return '—';
-  const diff = dayIndex(value)! - dayIndex(today)!;
+  const diff = dayIndexOf(value)! - dayIndexOf(today)!;
   if (diff === 0) return t('Today');
   if (diff === 1) return t('Tomorrow');
   if (diff === -1) return t('Yesterday');
@@ -49,3 +50,34 @@ export function HealthBadge({ level, score, t }: { level: CrmHealthLevel; score:
     <HealthDot level={level} />{t(HEALTH_LABEL[level])}{score !== null && <span className="text-muted-foreground">{score}</span>}
   </span>;
 }
+
+const KIND_LABEL: Record<CrmActivityKind, string> = { call: 'Call', email: 'Mail', meeting: 'Meeting', note: 'Memo', stage: 'Stage', change: 'Change' };
+const CHANGE_LABEL = { amount: 'Amount', probability: 'Probability', close_date: 'Close date' } as const;
+
+/** One history line as people read it: what kind of entry it is and what it
+ * says. Stage moves show the stage names; revisions show both values in the
+ * reader's format. `quiet` marks lines the database wrote, not people. */
+export function historyLine(kind: CrmActivityKind, body: string, stages: readonly CrmStage[], locale: string, t: (message: string) => string): { label: string; text: string; quiet: boolean } {
+  if (kind === 'stage') {
+    const name = (id: string) => t(stages.find(stage => stage.id === id)?.label ?? (id === 'won' ? 'Won' : id === 'lost' ? 'Lost' : id));
+    return { label: t('Stage'), text: body.split(' → ').map(name).join(' → '), quiet: true };
+  }
+  if (kind === 'change') {
+    const change = readChange(body);
+    if (!change) return { label: t('Change'), text: body, quiet: true };
+    const show = (side: { value: string; currency: string | null } | null) => {
+      if (!side) return '—';
+      if (change.field === 'amount') { const amount = Number(side.value); return Number.isFinite(amount) ? money(amount, side.currency, locale) : side.value; }
+      if (change.field === 'probability') return `${side.value}%`;
+      const date = new Date(`${side.value}T00:00:00`);
+      return Number.isNaN(date.getTime()) ? side.value : date.toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
+    };
+    return { label: t(CHANGE_LABEL[change.field]), text: `${show(change.from)} → ${show(change.to)}`, quiet: true };
+  }
+  return { label: t(KIND_LABEL[kind]), text: body, quiet: false };
+}
+
+/** A person's part in a deal's decision, as people say it. */
+export const ROLE_LABEL: Record<CrmDealRole, string> = {
+  decision_maker: 'Decision maker', champion: 'Champion', influencer: 'Influencer', blocker: 'Blocker', user: 'End user', other: 'Other role',
+};

@@ -2,18 +2,19 @@
 
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { STATUS } from '@/shared/designTokens';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import {
   formatQuiet,
   type InitiativeRiskReport,
   type ObjectRisk,
   type RiskReason,
-} from '@/ActivitySpace/strategy/initiative/initiativeRiskModel';
-import { ABSENCE_WINDOW_DAYS } from '@/ActivitySpace/strategy/initiative/initiativeAssumptionModel';
+} from '@/Function/strategy/initiativeRiskModel';
+import { ABSENCE_WINDOW_DAYS } from '@/Function/strategy/initiativeAssumptionModel';
 import {
   holderAbsenceLabel,
   type InitiativeBusFactor,
   type SoleHolder,
-} from '@/ActivitySpace/strategy/initiative/initiativeBusFactorModel';
+} from '@/Function/strategy/initiativeBusFactorModel';
 
 // =============================================================
 // InitiativeRisk — the Initiative's cross-section.
@@ -45,17 +46,18 @@ export function InitiativeRiskView({
   error?: Error | null;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
 }) {
+  const { t } = useI18n();
   return (
     <>
       {error ? (
         <p className="text-[12px] text-[var(--status-danger)] py-1">
-          Could not read the Initiative&apos;s execution state.
+          {t("Could not read the Initiative's execution state.")}
         </p>
       ) : loading && !report ? (
-        <p className="text-[12px] text-muted-foreground/50 py-1">Reading execution state…</p>
+        <p className="text-[12px] text-muted-foreground/50 py-1">{t('Reading execution state…')}</p>
       ) : !report || report.openTotal === 0 ? (
         <p className="text-[12px] text-muted-foreground/50 py-1">
-          No open Elements under this Initiative yet — add Objects with live work to see where it hurts.
+          {t('No open Elements under this Initiative yet — add Objects with live work to see where it hurts.')}
         </p>
       ) : (
         <div className="space-y-4">
@@ -73,21 +75,19 @@ export function InitiativeRiskView({
               there would report the absence of data as the absence of risk. */}
           {report.scheduled === 0 ? (
             <p className="text-[11px] text-[var(--status-warning)]">
-              No due dates on any of the {report.openTotal} open Elements — this Initiative&apos;s
-              schedule is unmeasured, not clear.
+              {t("No due dates on any of the {n} open Elements — this Initiative's schedule is unmeasured, not clear.", { n: report.openTotal })}
             </p>
           ) : report.scheduled < report.openTotal ? (
             <p className="text-[11px] text-muted-foreground">
-              Measured against the {report.scheduled} of {report.openTotal} open Elements that carry
-              a due date.
+              {t('Measured against the {scheduled} of {total} open Elements that carry a due date.', { scheduled: report.scheduled, total: report.openTotal })}
             </p>
           ) : null}
 
-          <Block label="Needs attention">
+          <Block label={t('Needs attention')}>
             <Findings risks={report.objects} onOpenObject={onOpenObject} />
           </Block>
 
-          <Block label="Carried by">
+          <Block label={t('Carried by')}>
             <Load
               rows={report.load}
               concentrated={report.concentration !== null}
@@ -96,7 +96,7 @@ export function InitiativeRiskView({
           </Block>
 
           {busFactor && (
-            <Block label="Nobody else on it">
+            <Block label={t('Nobody else on it')}>
               <Cover busFactor={busFactor} />
             </Block>
           )}
@@ -120,8 +120,8 @@ function Block({ label, children }: { label: string; children: React.ReactNode }
 
 // =============================================================
 // Signal row — four counts, each one an action if it is not zero.
-// The tone is carried only by a firing count; a zero stays grey so the eye
-// lands on what is wrong instead of scanning four coloured numbers.
+// The tone is carried only by a firing count; a zero is a plain figure, so the
+// eye lands on what is wrong instead of scanning four coloured numbers.
 // =============================================================
 function SignalRow({
   overdue,
@@ -139,16 +139,18 @@ function SignalRow({
   // Both date signals go dark together: with no due dates in the Initiative
   // neither of them is measuring anything, and a grey zero would read as calm.
   const dated = scheduled > 0;
+  const { t } = useI18n();
+  // Figures side by side, held apart by spacing rather than boxed as tiles.
   return (
-    <div className="grid grid-cols-4 rounded-md border border-border/60 overflow-hidden">
-      <Signal label="Overdue" value={dated ? overdue : null} tone="text-[var(--status-danger)]" />
+    <div className="grid grid-cols-4 gap-4">
+      <Signal label={t('Overdue')} value={dated ? overdue : null} tone="text-[var(--status-danger)]" />
       <Signal
-        label="Due soon, not started"
+        label={t('Due soon, not started')}
         value={dated ? dueSoon : null}
         tone="text-[var(--status-warning)]"
       />
-      <Signal label="Stalled" value={stalled} tone="text-[var(--status-danger)]" />
-      <Signal label="Blocked" value={blocked} tone={STATUS.blocked.color} />
+      <Signal label={t('Stalled')} value={stalled} tone="text-[var(--status-danger)]" />
+      <Signal label={t('Blocked')} value={blocked} tone={STATUS.blocked.color} />
     </div>
   );
 }
@@ -164,10 +166,10 @@ function Signal({
   tone: string;
 }) {
   return (
-    <div className="px-3 py-2 border-r border-border/60 last:border-r-0">
+    <div className="min-w-0">
       <div
         className={`text-[18px] leading-[26px] font-semibold tabular-nums ${
-          value === null ? 'text-muted-foreground/40' : value > 0 ? tone : 'text-muted-foreground/40'
+          value === null ? 'text-muted-foreground/40' : value > 0 ? tone : 'text-foreground'
         }`}
       >
         {value === null ? '—' : value}
@@ -207,10 +209,11 @@ function Findings({
   risks: ObjectRisk[];
   onOpenObject?: (objectId: string, domainId: string | null) => void;
 }) {
+  const { t, locale } = useI18n();
   if (risks.length === 0) {
     return (
       <p className="text-[12px] text-muted-foreground/50 py-1">
-        Every Object under this Initiative is moving — nothing needs reassigning right now.
+        {t('Every Object under this Initiative is moving — nothing needs reassigning right now.')}
       </p>
     );
   }
@@ -223,18 +226,18 @@ function Findings({
           type="button"
           disabled={!onOpenObject}
           onClick={() => onOpenObject?.(risk.object.id, risk.object.domainId ?? null)}
-          className="flex items-center gap-2 px-1 py-1.5 min-h-[2.375rem] rounded-md text-left transition-colors hover:bg-muted/20 focus-visible:bg-muted/40 disabled:pointer-events-none"
+          className="flex items-center gap-2 px-2 py-1 min-h-8 rounded-md text-left transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 disabled:pointer-events-none"
         >
           <ObjectIcon size={13} className="text-muted-foreground shrink-0" />
-          <span className="text-[13px] font-[550] text-foreground truncate min-w-0">
+          <span className="text-[13px] font-medium text-foreground truncate min-w-0">
             {risk.object.name}
           </span>
           <span className={`text-[11px] font-medium shrink-0 ${REASON_TONE[risk.reason]}`}>
-            {REASON_LABEL[risk.reason]}
+            {t(REASON_LABEL[risk.reason])}
           </span>
           <span className="flex-1" />
           <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
-            {describe(risk)}
+            {describe(risk, t, locale)}
           </span>
         </button>
       ))}
@@ -242,34 +245,39 @@ function Findings({
   );
 }
 
+type T = (message: string, values?: Record<string, string | number>) => string;
+
 /** The one line that tells the reader what to do about this row. */
-function describe(risk: ObjectRisk): string {
+function describe(risk: ObjectRisk, t: T, locale: string): string {
   const quiet = risk.quietForMs === null ? null : formatQuiet(risk.quietForMs);
   switch (risk.reason) {
     case 'overdue':
-      return `${risk.overdue} of ${risk.open} open past its date`;
+      return t('{n} of {open} open past its date', { n: risk.overdue, open: risk.open });
     case 'stalled': {
       // The stalled Element's own silence, not the Object's — a neighbour being
       // edited would otherwise make a dead agent look two minutes old.
       const out = risk.stalledQuietMs === null ? null : formatQuiet(risk.stalledQuietMs);
-      return `${risk.stalled} of ${risk.inFlight} in flight silent${out ? ` for ${out}` : ''}`;
+      return out
+        ? t('{n} of {inFlight} in flight silent for {time}', { n: risk.stalled, inFlight: risk.inFlight, time: out })
+        : t('{n} of {inFlight} in flight silent', { n: risk.stalled, inFlight: risk.inFlight });
     }
     case 'blocked':
-      return `${risk.blocked} of ${risk.open} open blocked`;
+      return t('{n} of {open} open blocked', { n: risk.blocked, open: risk.open });
     case 'due_soon':
-      return `${risk.dueSoon} due by ${short(risk.dueSoonBy)}, none started`;
+      return t('{n} due by {date}, none started', { n: risk.dueSoon, date: short(risk.dueSoonBy, t, locale) });
     default:
-      return `${risk.open} open, none started${quiet ? ` for ${quiet}` : ''}`;
+      return quiet
+        ? t('{n} open, none started for {time}', { n: risk.open, time: quiet })
+        : t('{n} open, none started', { n: risk.open });
   }
 }
 
 /** `2026-09-03` → `Sep 3`. The year is noise on a three-day horizon. */
-function short(date: string | null): string {
-  if (date === null) return 'no date';
-  const [, m, d] = date.split('-');
-  const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const name = month[Number(m) - 1];
-  return name ? `${name} ${Number(d)}` : date;
+function short(date: string | null, t: T, locale: string): string {
+  if (date === null) return t('no date');
+  const [y, m, d] = date.split('-').map(Number);
+  if (!y || !m || !d) return date;
+  return new Date(y, m - 1, d).toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
 
 // =============================================================
@@ -291,10 +299,11 @@ function Load({
    *  staffing list, which is where the reader decides who picks it up. */
   unstaffed: number;
 }) {
+  const { t } = useI18n();
   if (rows.length === 0) {
     return (
       <p className="text-[12px] text-muted-foreground/50 py-1">
-        Nobody is assigned to the open work — every Element here is unstaffed.
+        {t('Nobody is assigned to the open work — every Element here is unstaffed.')}
       </p>
     );
   }
@@ -315,26 +324,24 @@ function Load({
               />
             </span>
             <span className="text-[11px] text-muted-foreground tabular-nums w-16 text-right shrink-0">
-              {row.open} open
+              {t('{n} open', { n: row.open })}
             </span>
           </div>
         ))}
       </div>
       {rest > 0 && (
         <p className="text-[11px] text-muted-foreground mt-1">
-          and {rest} more {rest === 1 ? 'Worker' : 'Workers'}
+          {rest === 1 ? t('and 1 more Worker') : t('and {n} more Workers', { n: rest })}
         </p>
       )}
       {unstaffed > 0 && (
         <p className="text-[11px] text-[var(--status-warning)] mt-1.5">
-          {unstaffed} open {unstaffed === 1 ? 'Element has' : 'Elements have'} nobody on{' '}
-          {unstaffed === 1 ? 'it' : 'them'}.
+          {unstaffed === 1 ? t('1 open Element has nobody on it.') : t('{n} open Elements have nobody on them.', { n: unstaffed })}
         </p>
       )}
       {concentrated && (
         <p className="text-[11px] text-[var(--status-warning)] mt-1.5">
-          {top.name} holds {Math.round(top.share * 100)}% of the open work — this Initiative runs
-          through one Worker. Add capacity or cut scope.
+          {t('{name} holds {pct}% of the open work — this Initiative runs through one Worker. Add capacity or cut scope.', { name: top.name, pct: Math.round(top.share * 100) })}
         </p>
       )}
     </div>
@@ -356,13 +363,14 @@ function Load({
 // board and not yet an alarm; what makes it an alarm is a name against a date.
 // =============================================================
 function Cover({ busFactor }: { busFactor: InitiativeBusFactor }) {
+  const { t } = useI18n();
   const { holders, single, openTotal } = busFactor;
   if (holders.length === 0) {
     return (
       <p className="text-[12px] text-muted-foreground/50 py-1">
         {openTotal === 0
-          ? 'No open Elements to cover.'
-          : 'Every staffed Element here has a second person on it — no single Worker is holding work alone.'}
+          ? t('No open Elements to cover.')
+          : t('Every staffed Element here has a second person on it — no single Worker is holding work alone.')}
       </p>
     );
   }
@@ -370,6 +378,8 @@ function Cover({ busFactor }: { busFactor: InitiativeBusFactor }) {
   const visible = holders.slice(0, 5);
   const rest = holders.length - visible.length;
   const exposed = holders.filter((h) => h.away);
+  const soleCount = exposed[0]?.sole ?? 0;
+  const soleElements = soleCount === 1 ? t('1 open Element') : t('{n} open Elements', { n: soleCount });
 
   return (
     <div>
@@ -380,27 +390,24 @@ function Cover({ busFactor }: { busFactor: InitiativeBusFactor }) {
       </div>
       {rest > 0 && (
         <p className="text-[11px] text-muted-foreground mt-1">
-          and {rest} more {rest === 1 ? 'Worker' : 'Workers'}
+          {rest === 1 ? t('and 1 more Worker') : t('and {n} more Workers', { n: rest })}
         </p>
       )}
       <p className="text-[11px] text-muted-foreground mt-1.5">
-        {single} of {openTotal} open {single === 1 ? 'Element has' : 'Elements have'} exactly one
-        person on {single === 1 ? 'it' : 'them'}.
+        {single === 1
+          ? t('1 of {total} open Elements has exactly one person on it.', { total: openTotal })
+          : t('{n} of {total} open Elements have exactly one person on them.', { n: single, total: openTotal })}
       </p>
       {/* One sentence, for the worst of them. The rest are named in the rows
           above with their own dates; repeating the whole reading per Worker
           would turn the warning into a wall nobody finishes. */}
       {exposed.length > 0 && (
         <p className="text-[11px] text-[var(--status-warning)] mt-1.5">
-          {exposed[0].name} has no hours on {exposed[0].awayDays} of the next {ABSENCE_WINDOW_DAYS}{' '}
-          days and is the only person on {exposed[0].sole} open{' '}
-          {exposed[0].sole === 1 ? 'Element' : 'Elements'}
           {exposed[0].dueWhileAway > 0
-            ? `, ${exposed[0].dueWhileAway} of them due while away`
-            : ''}
-          . Brief a second person or move the dates.
+            ? t('{name} has no hours on {away} of the next {window} days and is the only person on {elements}, {due} of them due while away. Brief a second person or move the dates.', { name: exposed[0].name, away: exposed[0].awayDays, window: ABSENCE_WINDOW_DAYS, elements: soleElements, due: exposed[0].dueWhileAway })
+            : t('{name} has no hours on {away} of the next {window} days and is the only person on {elements}. Brief a second person or move the dates.', { name: exposed[0].name, away: exposed[0].awayDays, window: ABSENCE_WINDOW_DAYS, elements: soleElements })}
           {exposed.length > 1
-            ? ` ${exposed.length - 1} more sole ${exposed.length === 2 ? 'holder is' : 'holders are'} away in the same window.`
+            ? ` ${exposed.length === 2 ? t('1 more sole holder is away in the same window.') : t('{n} more sole holders are away in the same window.', { n: exposed.length - 1 })}`
             : ''}
         </p>
       )}
@@ -409,6 +416,7 @@ function Cover({ busFactor }: { busFactor: InitiativeBusFactor }) {
 }
 
 function HolderRow({ holder }: { holder: SoleHolder }) {
+  const { t } = useI18n();
   const absence = holderAbsenceLabel(holder);
   return (
     <div className="flex items-center gap-2 h-7">
@@ -420,7 +428,7 @@ function HolderRow({ holder }: { holder: SoleHolder }) {
       )}
       <span className="flex-1" />
       <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
-        {holder.sole} alone
+        {t('{n} alone', { n: holder.sole })}
       </span>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // Diamond milestone marker — a single-date ◇ on a timeline. Originated in
 // StrategyTimelineView (Object-band Strategy Timeline); pulled out here so
@@ -23,8 +24,10 @@ interface MilestoneDiamondProps {
 }
 
 export function MilestoneDiamond({ left, top, label, date, onClick, className }: MilestoneDiamondProps) {
+  const { t } = useI18n();
   const [hovered, setHovered] = useState(false);
-  const title = `${label ?? 'Milestone'} · ${date}${onClick ? ' (click to delete)' : ''}`;
+  const base = `${label ?? t('Milestone')} · ${date}`;
+  const title = onClick ? t('{label} (click to delete)', { label: base }) : base;
   const diamond = (
     <div
       style={{
@@ -44,11 +47,11 @@ export function MilestoneDiamond({ left, top, label, date, onClick, className }:
       onMouseLeave={() => setHovered(false)}
     >
       {onClick ? (
-        <button type="button" onClick={onClick} title={title} aria-label="Milestone" className="block cursor-pointer">
+        <button type="button" onClick={onClick} title={title} aria-label={t('Milestone')} className="block cursor-pointer">
           {diamond}
         </button>
       ) : (
-        <div role="img" title={title} aria-label="Milestone">
+        <div role="img" title={title} aria-label={t('Milestone')}>
           {diamond}
         </div>
       )}

@@ -10,6 +10,8 @@
  * Do not hardcode hex values in components.
  */
 
+import { translate } from '@/Function/i18n/I18nProvider';
+
 // ============================================
 // Status
 //
@@ -49,6 +51,9 @@ export const PRIORITY = {
 // Element status and priority display order; priorities run highest to lowest.
 export const STATUS_ORDER = ['backlog', 'todo', 'in_progress', 'review', 'done', 'blocked', 'cancelled'] as const satisfies readonly (keyof typeof STATUS)[];
 export const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low'] as const satisfies readonly (keyof typeof PRIORITY)[];
+// Picker rows in display order; labels are untranslated (callers pass them through t()).
+export const STATUS_OPTIONS: { value: (typeof STATUS_ORDER)[number]; label: string }[] = STATUS_ORDER.map((value) => ({ value, label: STATUS[value].label }));
+export const PRIORITY_OPTIONS: { value: (typeof PRIORITY_ORDER)[number]; label: string }[] = PRIORITY_ORDER.map((value) => ({ value, label: PRIORITY[value].label }));
 
 // ============================================
 // Typography scale
@@ -68,16 +73,16 @@ export const FONT = {
   base: 'text-[13px] leading-[20px] font-normal',
   /** Sub-text / icon labels */
   sm:   'text-[12px] leading-[16px] font-normal',
-  /** Uppercase section labels / meta */
+  /** Small counts / meta */
   xs:   'text-[11px] leading-[16px] font-medium',
-  /** Uppercase section headers (KEY DECISIONS etc.) */
+  /** Section headers over a group of fields */
   label: 'text-[12px] leading-[16px] font-medium text-[var(--text-tertiary)]',
   /** Monospace for IDs, codes, shortcuts */
   mono: 'text-[12px] font-mono text-[var(--text-tertiary)]',
 } as const;
 
 // ============================================
-// Control geometry and fine outlines — see /DESIGN.md.
+// Control geometry and fine outlines.
 export const CONTROL = {
   /** Height of a control with a label. */
   height: { xs: 'h-6', sm: 'h-7', md: 'h-8', lg: 'h-11' },
@@ -170,8 +175,9 @@ export function priorityColor(priority?: string | null): string {
 }
 
 /** Human label for a status key, without importing the whole STATUS table. */
+/** The status's name in the viewer's language. */
 export function statusLabel(status?: string | null): string {
-  return STATUS[status as StatusKey]?.label ?? status ?? STATUS.todo.label;
+  return translate(STATUS[status as StatusKey]?.label ?? status ?? STATUS.todo.label);
 }
 
 // ============================================
@@ -184,10 +190,6 @@ export const CARD =
 
 export const CARD_HOVER =
   'hover:border-[var(--border-strong)] transition-colors duration-[120ms]';
-
-export const CARD_DRAG =
-  'ring-2 ring-[var(--accent-default)] border-[var(--accent-default)]';
-
 /** Shared geometry for Object and Element quick creation. */
 export const QUICK_CREATE = {
   panel: 'pointer-events-auto w-full max-w-[760px] max-h-[calc(100dvh-48px)] overflow-y-auto rounded-2xl bg-popover/95 backdrop-blur-md border border-border p-4',

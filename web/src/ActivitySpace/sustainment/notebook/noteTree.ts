@@ -6,7 +6,7 @@
 // a section, but may also sit directly under a folder — pre-section data and
 // the "no sections yet" default both render that way.
 
-import type { NoteNode } from './types';
+import type { NoteNode } from '@/types/notes';
 
 /** Sections belonging to a folder, alpha-sorted for a stable tab order. */
 export function sectionsInFolder(nodes: NoteNode[], folderId: string | null): NoteNode[] {

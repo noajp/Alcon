@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { renameObjectPrefix, type AlconObjectWithChildren } from '@/hooks/useSupabase';
 
 interface RenamePrefixDialogProps {
@@ -33,6 +34,7 @@ const PREFIX_PATTERN = /^[A-Z0-9]+$/;
 // for why a client-side SELECT-then-UPDATE couldn't close that race or see
 // past the caller's own RLS visibility.
 export function RenamePrefixDialog({ object, onClose, onRenamed }: RenamePrefixDialogProps) {
+  const { t } = useI18n();
   const [value, setValue] = useState(object.prefix ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,11 +44,11 @@ export function RenamePrefixDialog({ object, onClose, onRenamed }: RenamePrefixD
 
   const save = async () => {
     if (!normalized) {
-      setError("Prefix can't be empty.");
+      setError(t('Prefix can’t be empty.'));
       return;
     }
     if (!PREFIX_PATTERN.test(normalized)) {
-      setError('Prefix can only contain letters and numbers — the whole point is avoiding another unreadable id.');
+      setError(t('Prefix can only contain letters and numbers — the whole point is avoiding another unreadable id.'));
       return;
     }
     setBusy(true);
@@ -64,10 +66,10 @@ export function RenamePrefixDialog({ object, onClose, onRenamed }: RenamePrefixD
       const code = (e as { code?: string } | null)?.code;
       setError(
         code === '23505'
-          ? `"${normalized}" is already used by another Object in this Space.`
+          ? t('“{prefix}” is already used by another Object in this Space.', { prefix: normalized })
           : e instanceof Error
             ? e.message
-            : 'Failed to save — try again.',
+            : t('Failed to save — try again.'),
       );
       setBusy(false);
     }
@@ -77,13 +79,13 @@ export function RenamePrefixDialog({ object, onClose, onRenamed }: RenamePrefixD
     <Dialog open onOpenChange={(o) => { if (!o && !busy) onClose(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Rename ID prefix</DialogTitle>
+          <DialogTitle>{t('Rename ID prefix')}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3">
           <p className="text-[12px] text-muted-foreground">
-            Changes new Elements&apos; ids from here on
-            {object.prefix ? ` (el_${object.prefix}-… → el_${normalized || '…'}-…)` : ''}.
-            Existing Elements keep their current ids.
+            {object.prefix
+              ? t('Changes new Elements’ ids from here on ({from} → {to}). Existing Elements keep their current ids.', { from: `el_${object.prefix}-…`, to: `el_${normalized || '…'}-…` })
+              : t('Changes new Elements’ ids from here on. Existing Elements keep their current ids.')}
           </p>
           <Input
             value={value}
@@ -91,17 +93,17 @@ export function RenamePrefixDialog({ object, onClose, onRenamed }: RenamePrefixD
             onKeyDown={(e) => {
               if (e.key === 'Enter' && canSave) save();
             }}
-            placeholder="Prefix"
+            placeholder={t('Prefix')}
             maxLength={12}
             autoFocus
           />
           {error && <div className="text-[11px] text-destructive">{error}</div>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={busy}>
-              Cancel
+              {t('Cancel')}
             </Button>
             <Button type="button" variant="primary" size="sm" disabled={!canSave} onClick={save}>
-              Save
+              {t('Save')}
             </Button>
           </div>
         </div>

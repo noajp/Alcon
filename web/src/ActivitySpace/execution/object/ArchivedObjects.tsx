@@ -1,14 +1,15 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Archive, ChevronRight } from 'lucide-react';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
+import { Archive } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { canManageObject } from '@/Function/shared/objectArchive';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useCurrentUserId } from '@/providers/authContext';
 import { restoreObject, useArchivedObjects } from '@/hooks/useObjectArchive';
-import { useMyDomainRoles, useMyObjectRoles } from './useMyMemberships';
+import { useMyDomainRoles, useMyObjectRoles } from '@/hooks/useMyMemberships';
 
 /** Whether the viewer manages a given Object (may archive / restore it). */
 export function useManagesObject(): (object: { id: string; domain_id: string | null }) => boolean {
@@ -90,7 +91,7 @@ export function ArchivedObjectsSection({
   const [open, setOpen] = useState(false);
   if (objects.length === 0) return null;
   return (
-    <div className="border-t border-border/60 px-3 py-2">
+    <div className="mt-4 px-3 py-2">
       <Button
         variant="ghost"
         size="xs"
@@ -99,7 +100,7 @@ export function ArchivedObjectsSection({
         onClick={() => setOpen((v) => !v)}
         className="text-muted-foreground"
       >
-        <ChevronRight size={12} className={open ? 'rotate-90 transition-transform' : 'transition-transform'} />
+        <DisclosureTriangle open={open} />
         {t('Archived ({count})', { count: objects.length })}
       </Button>
       {open && (

@@ -12,7 +12,8 @@ import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
 import { CommandPalette } from '@/shell/CommandPalette';
 import { QuickAddElementLauncher } from '@/shell/QuickAddElementLauncher';
-import { AlconCopilotPanel } from '@/Function/copilot';
+import { AlconCopilotPanel } from '@/Function/copilot/AlconCopilotPanel';
+import { CopilotProvider } from '@/Function/copilot/CopilotProvider';
 import type { AppTab } from '@/shell/appTab';
 import { mergeNavigation, navigationAfterDomainChange } from '@/shell/navigationState';
 import type { NavigationState } from '@/types/navigation';
@@ -23,8 +24,10 @@ import { seedNotebook } from '@/ActivitySpace/sustainment/notebook/notebookActio
 import { useNotes } from '@/hooks/useNotesDb';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
-import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/ActivitySpace/execution/domain/domainsStore';
+import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/Function/space/domainsStore';
 import { useActiveSpaceId, setActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { useActiveSpaceScope } from '@/Function/space/data';
+import { scopedView, viewInScope } from '@/Function/space/spaceScope';
 import { OnboardingCreate } from '@/Function/space/OnboardingCreate';
 import { MyInvitations } from '@/Function/membership/MyInvitations';
 import { getCachedHomeViewId } from '@/Function/settings/preferencesStore';
@@ -34,9 +37,10 @@ import { finishIntegrationOAuth } from '@/Function/integrations/data';
 import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { NavAiIcon } from '@/shell/sidebar/NavIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { Button, ButtonAppearanceProvider } from '@/ui/button';
+import { seedStarterSpace } from '@/Function/space/seedStarterSpace';
+import { Button } from '@/ui/button';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -110,7 +114,7 @@ function AppContent() {
   // on the saved home view before any fetch; reading them here, at launch,
   // is what keeps that cache in step with the account across devices.
   useUserPreferences();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { user } = useAuthContext();
   // Every server-confirmed change reaches the caches through this one channel.
   useWorkspaceDeltaStream(user?.id ?? null);
@@ -188,6 +192,9 @@ function AppContent() {
     if (!user) return;
     const space = await createActivitySpace({ name, user_id: user.id });
     setActiveSpaceId(space.id);
+    // The Space exists either way; a failed seed just leaves it empty.
+    try { await seedStarterSpace(space.id, user.id, locale); }
+    catch (err) { console.error('Failed to seed the starter Space:', err); }
     await refetchSpaces();
   };
 
@@ -199,11 +206,11 @@ function AppContent() {
   if (spaces.length === 0) {
     return (
       <OnboardingCreate
-        title={t('Create your Space')}
+        title={t('Create your ActivitySpace')}
         subtitle={t('A shared place for your team. Bring in one existing project to get started.')}
         label={t('Name')}
         placeholder="Acme Inc."
-        cta={t('Create Space')}
+        cta={t('Create ActivitySpace')}
         onCreate={handleCreateSpace}
       >
         {/* Invited to someone else's Space? Accepting is how you join it. */}
@@ -253,6 +260,10 @@ function WorkspaceContent({
   onActiveDomainChange: (id: string) => void;
 }) {
   const { t } = useI18n();
+  // An audit Space shows only the Space, People and Audit (ADR 0048): every
+  // way to a view passes through updateTab, which turns a view outside the
+  // scope into the Audit home.
+  const scope = useActiveSpaceScope();
   // The shell's view + navigation. Kept as a list of tabs so a surface's
   // internal state (Domain tab selection, expand state, scroll position …)
   // survives while another view is shown; the page shows one at a time and
@@ -263,13 +274,18 @@ function WorkspaceContent({
   const [tabs, setTabs] = useState<AppTab[]>(() => [initialTabRef.current!]);
   const [activeTabId] = useState<string>(() => initialTabRef.current!.id);
 
-  const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0];
+  const storedTab = tabs.find(t => t.id === activeTabId) ?? tabs[0];
+  // A tab opened on a view the Space does not show (it was switched to
+  // audit, or the default home view is outside it) reads as Audit; the view
+  // it held comes back if the Space returns to full.
+  const activeTab = viewInScope(storedTab.activeView, scope) ? storedTab : { ...storedTab, activeView: scopedView(storedTab.activeView, scope) };
 
   // Per-tab updaters — operate on the tab id that's passed in, not whichever
   // tab happens to be active. Each tab's MainContent gets a stable handler
   // bound to its own id so background tabs can keep their state correctly.
   const updateTab = (id: string, partial: Partial<Omit<AppTab, 'id'>>) => {
-    setTabs(prev => prev.map(t => (t.id === id ? { ...t, ...partial } : t)));
+    const next = partial.activeView === undefined ? partial : { ...partial, activeView: scopedView(partial.activeView, scope) };
+    setTabs(prev => prev.map(t => (t.id === id ? { ...t, ...next } : t)));
   };
   const updateTabNavigation = (id: string, partial: Partial<NavigationState>) => {
     if (partial.objectId && partial.objectDomainId && partial.objectDomainId !== activeDomainId) {
@@ -321,20 +337,33 @@ function WorkspaceContent({
   const [sidebarOverlay, setSidebarOverlay] = useState(false);
   // Profile (reached from the avatar; Now / My Elements / My Notes / AI are
   // its tabs) has nothing to list, so it takes the whole width.
+  // Slides brings its own deck list, so it takes the whole width too.
   const personalMode = railModeOf(activeTab.activeView) === 'personal';
-  const sidebarHidden = sidebarCollapsed || personalMode;
+  const aiScreen = activeTab.activeView === 'ai';
+  const noSidebar = personalMode;
+  const sidebarHidden = sidebarCollapsed || noSidebar;
   const [discoverOpen, setDiscoverOpen] = useState(false);
-  // Alcon Copilot pane — open state shared by the strip's PanelRight
-  // toggle, ⌘L, and the panel's own close button. localStorage round-trips
-  // it across reloads.
-  const [copilotOpen, setCopilotOpen] = useState(false);
+  // The AI pop-up — open state shared by the corner button, ⌘L and the
+  // pop-up's own close. It starts closed, so the work has the whole page
+  // until someone asks for it. On Slides it is the open deck's assistant.
+  const [copilotOpen, handleCopilotOpenChange] = useState(false);
+  const onSlides = activeTab.activeView === 'slides';
+  // The pop-up's expand button opens the AI screen; the screen's shrink
+  // button goes back to where the person was, with the pop-up open.
+  const lastViewRef = useRef('home');
   useEffect(() => {
-    try { if (localStorage.getItem('alcon.copilot.open') === '1') setCopilotOpen(true); } catch { /* SSR */ }
-  }, []);
-  const handleCopilotOpenChange = (next: boolean) => {
-    setCopilotOpen(next);
-    try { localStorage.setItem('alcon.copilot.open', next ? '1' : '0'); } catch { /* ignore */ }
+    if (activeTab.activeView !== 'ai') lastViewRef.current = activeTab.activeView;
+  }, [activeTab.activeView]);
+  const handleExpandAi = () => {
+    handleCopilotOpenChange(false);
+    setActiveView('ai');
   };
+  const handleMinimizeAi = () => {
+    setActiveView(lastViewRef.current);
+    handleCopilotOpenChange(true);
+  };
+  // Nothing is created up front: a Space may start from Strategy (a Vision or
+  // Portfolio) as well as from a Domain, so the person picks where to begin.
   const [createType, setCreateType] = useState<CreateType | null>(null);
   const [pendingNewNote, setPendingNewNote] = useState(0);
   // The workspace owns the Object creation popup.
@@ -344,12 +373,18 @@ function WorkspaceContent({
   const previousDomainIdRef = useRef(activeDomainId);
 
   useEffect(() => {
+    if (scope === 'audit') return;
     const handler = () => setCreateType('domain');
     window.addEventListener(CREATE_DOMAIN_EVENT, handler);
     return () => window.removeEventListener(CREATE_DOMAIN_EVENT, handler);
-  }, []);
+  }, [scope]);
 
-  const openObjectPopup = useCallback(() => setObjectPopupOpen(true), []);
+  // An Object lives in a Domain: with none yet, creating one starts with the Domain.
+  const hasDomains = domains.length > 0;
+  const openObjectPopup = useCallback(() => {
+    if (hasDomains) setObjectPopupOpen(true);
+    else setCreateType('domain');
+  }, [hasDomains]);
   // The sidebar's "+" in Notebook mode — the same quick-create card,
   // asking for the notebook's name.
   const [notebookPopupOpen, setNotebookPopupOpen] = useState(false);
@@ -485,6 +520,7 @@ function WorkspaceContent({
   return (
     <ExplorerDataProvider value={explorerData}>
     <WorkspaceActionsProvider onOpenCreateObject={openObjectPopup} onOpenCreateNotebook={openNotebookPopup}>
+    <CopilotProvider>
     <div
       className="h-dvh flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground"
       style={{
@@ -496,10 +532,12 @@ function WorkspaceContent({
     >
       <div className="relative flex-1 flex overflow-hidden">
         <ModeRail
+          scope={scope}
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
+          onShowSidebar={!noSidebar && sidebarHidden && !sidebarOverlay ? handleSidebarToggle : undefined}
         />
-        {!personalMode && <AppSidebar
+        {!noSidebar && <AppSidebar
           navigation={activeTab.navigation}
           onNavigate={handleSidebarNavigate}
           activeView={activeTab.activeView}
@@ -511,10 +549,11 @@ function WorkspaceContent({
           collapsed={sidebarCollapsed}
           overlay={sidebarCollapsed && sidebarOverlay}
           onCreateNew={handleSidebarCreateNew}
-          onSearch={() => setDiscoverOpen(true)}
+          onSearch={scope === 'full' ? () => setDiscoverOpen(true) : undefined}
+          onHide={handleSidebarToggle}
         />}
 
-        {!personalMode && sidebarCollapsed && sidebarOverlay && (
+        {!noSidebar && sidebarCollapsed && sidebarOverlay && (
           <div
             className="absolute inset-0 z-40 bg-black/45"
             onClick={() => setSidebarOverlay(false)}
@@ -522,7 +561,7 @@ function WorkspaceContent({
           />
         )}
 
-        <div className={`flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5 pb-1.5 ${sidebarHidden ? 'pl-1.5' : 'pl-0'}`}>
+        <div className={`relative flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5 pb-1.5 ${sidebarHidden ? 'pl-1.5' : 'pl-0'}`}>
         {/* MainContent + Copilot live side-by-side as two islands. When the
             Copilot is open it claims its own width on the right; otherwise
             MainContent fills the row. */}
@@ -549,7 +588,7 @@ function WorkspaceContent({
                     <MainContent
                       activeSpaceId={activeSpaceId}
                       onOpenSettings={handleOpenSettings}
-                      activeActivity={tab.activeView}
+                      activeActivity={scopedView(tab.activeView, scope)}
                       navigation={tab.navigation}
                       onNavigate={(nav) => updateTabNavigation(tab.id, nav)}
                       onViewChange={(view) => updateTab(tab.id, { activeView: view })}
@@ -557,47 +596,42 @@ function WorkspaceContent({
                       pendingNewNote={isActive ? pendingNewNote : 0}
                       onNewNoteHandled={() => setPendingNewNote(0)}
                       activeDomainId={activeDomainId}
+                      onMinimizeAi={handleMinimizeAi}
                     />
                   </div>
                 );
               })
             )}
           </div>
-          <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} />
-        </div>
-        {/* The strip under the islands: the page-level toggles sit at its
-            right end — the sidebar (omitted while it has nothing to show, on
-            Profile) and the AI pane. ⌘L and the pane's own close flip the
-            same boolean. */}
-        <ButtonAppearanceProvider appearance="navigation">
-        <div className="flex h-7 shrink-0 items-center justify-end pt-0.5">
-          {!personalMode && (
-            <Button size="icon-xs" variant="ghost" onClick={handleSidebarToggle} className="text-muted-foreground"
-              title={t(sidebarHidden ? 'Show sidebar' : 'Hide sidebar')} aria-label={t(sidebarHidden ? 'Show sidebar' : 'Hide sidebar')}>
-              {sidebarHidden ? <PanelLeftOpen size={12} /> : <PanelLeftClose size={12} />}
-            </Button>
+          {!aiScreen && (
+            <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} subject={onSlides ? 'slides' : null}
+              variant="floating" onExpand={onSlides ? undefined : handleExpandAi} />
           )}
-          <Button size="icon-xs" variant="ghost" onClick={() => handleCopilotOpenChange(!copilotOpen)} className={copilotOpen ? 'text-foreground' : 'text-muted-foreground'}
-            aria-pressed={copilotOpen} title={`${t(copilotOpen ? 'Hide AI' : 'Show AI')} (⌘L)`} aria-label={t(copilotOpen ? 'Hide AI' : 'Show AI')}>
-            {copilotOpen ? <PanelRightOpen size={12} /> : <PanelRightClose size={12} />}
-          </Button>
         </div>
-        </ButtonAppearanceProvider>
+        {/* The AI: a button at the bottom-right corner, and the conversation
+            pops up above it. */}
+        {!aiScreen && (
+          <Button size="sm" variant="secondary" onClick={() => handleCopilotOpenChange(!copilotOpen)}
+            aria-pressed={copilotOpen} title={`${t(copilotOpen ? 'Hide AI' : 'Show AI')} (⌘L)`}
+            className="absolute bottom-4 right-4 z-40 bg-card shadow-[var(--shadow-island)]">
+            <NavAiIcon size={14} />{t('AI')}
+          </Button>
+        )}
         </div>
       </div>
 
       {/* Global ⌘K command palette */}
-      <CommandPalette onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} />
-      <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />
+      <CommandPalette scope={scope} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} />
+      {scope === 'full' && <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />}
 
       {/* Global C → quick-add Element popup. Context Object = the one open in
           the active tab (objects view only — other views keep a stale
           navigation.objectId around). */}
-      <QuickAddElementLauncher
+      {scope === 'full' && <QuickAddElementLauncher
         activeDomainId={activeDomainId}
         contextObjectId={activeTab.activeView === 'objects' ? activeTab.navigation.objectId ?? null : null}
         onRefresh={refetch}
-      />
+      />}
 
       {/* Quick-create cards — one shape for every "+": the Notebook card and
           the Object card here (Linear-style, no full-page form); Initiative
@@ -632,6 +666,7 @@ function WorkspaceContent({
         }}
       />
     </div>
+    </CopilotProvider>
     </WorkspaceActionsProvider>
     </ExplorerDataProvider>
   );

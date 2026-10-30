@@ -1,0 +1,1 @@
+export { SlidesView } from './SlidesView';

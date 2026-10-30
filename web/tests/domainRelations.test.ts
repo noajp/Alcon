@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
-import { initiativesForObjects, domainsForObjects } from '@/ActivitySpace/execution/domain/domainRelations';
+import { initiativesForObjects, domainsForObjects } from '@/Function/domain/domainRelations';
 import { applyWorkspaceDelta, type Delta } from '@/Function/sync/deltaStream';
 
 const initiatives = [{ id: 'i1', name: 'A', description: null, status: 'active' as const }, { id: 'i2', name: 'B', description: null, status: 'active' as const }];

@@ -11,7 +11,8 @@ import { type BoardLayout } from './types';
 
 /** Object Overview. The spine (icon / title / description) is not a widget. */
 export const OBJECT_OVERVIEW_BOARD: BoardLayout = {
-  band: [],
+  // The summary line under the name: how much is done and what is still open.
+  band: [{ id: 'ov-progress', type: 'progress-band' }],
   main: [
     { id: 'ov-milestones', type: 'milestones' },
   ],
@@ -60,7 +61,9 @@ export const HOME_BOARD: BoardLayout = {
  * (Frameworks / Initiatives / Objects / Activity), which is not a board.
  */
 export const INITIATIVE_BOARD: BoardLayout = {
-  band: [],
+  // The summary line under the name: how much of the work under it is done,
+  // and what is still open or late.
+  band: [{ id: 'initiative-progress', type: 'progress-band' }],
   main: [
     { id: 'initiative-approaches', type: 'approach-references' },
     { id: 'initiative-domains', type: 'initiative-domains' },
@@ -96,13 +99,6 @@ export const OBJECT_SUMMARY_BOARD: BoardLayout = {
     { id: 'sum-overdue', type: 'overdue-list', size: 'half' },
     { id: 'sum-upcoming', type: 'upcoming-list', size: 'half' },
   ],
-  rail: [],
-};
-
-/** The CRM surface is one operations planner. */
-export const CRM_BOARD: BoardLayout = {
-  band: [],
-  main: [{ id: 'crm-planner', type: 'operations-planner', size: 'full', params: { kind: 'crm' } }],
   rail: [],
 };
 

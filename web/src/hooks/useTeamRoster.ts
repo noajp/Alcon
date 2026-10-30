@@ -3,31 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getActiveSpaceId, useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { buildTeamRoster, mergeTeamDomainMembers, type TeamElement, type TeamRosterSource } from '@/ActivitySpace/sustainment/team/teamRoster';
+import { buildTeamRoster, mergeTeamDomainMembers, type TeamElement, type TeamRosterSource } from '@/Function/team/teamRoster';
 import type { SpaceGuestRow } from '@/Function/space/data';
-import { updateWorker } from '@/ActivitySpace/sustainment/team/data';
-import { selectIn } from '@/hooks/chunkedIn';
-import { readAllPages, type CountedRows } from '@/hooks/readAllPages';
+import { updateWorker } from '@/hooks/teamData';
+import { readAllIn, readAllPages, rowId, uniqueById } from '@/hooks/readAllPages';
 import { fetchSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { Worker } from '@/types/database';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 
-function readIds<Row>(
-  label: string,
-  ids: readonly string[],
-  run: (chunk: string[], from: number, to: number) => PromiseLike<CountedRows<Row>>,
-  identity: (row: Row) => string,
-): Promise<Row[]> {
-  return selectIn(ids, async (chunk) => ({
-    data: await readAllPages(label, (from, to) => run(chunk, from, to), identity), error: null,
-  }));
-}
-
-const rowId = (row: { id: string }) => row.id;
-const unique = <Row extends { id: string }>(rows: Row[]) => [...new Map(rows.map((row) => [row.id, row])).values()];
-const ELEMENT_FIELDS = 'id, title, display_id, status, due_date, object_id';
+const ELEMENT_FIELDS = 'id, title, display_id, status, due_date, object_id, start_date, created_at, updated_at';
 
 export async function fetchTeamRoster(spaceId: string, signal: AbortSignal): Promise<TeamRosterSource> {
   const [domains, spaceMembers] = await Promise.all([
@@ -38,59 +24,59 @@ export async function fetchTeamRoster(spaceId: string, signal: AbortSignal): Pro
   ]);
   const domainIds = domains.map((row) => row.id);
   const [directDomainMembers, domainGuests, objectDomains, directObjects] = await Promise.all([
-    readIds<TeamRosterSource['domainMembers'][number]>('Domain members', domainIds, (chunk, from, to) => supabase
+    readAllIn<TeamRosterSource['domainMembers'][number]>('Domain members', domainIds, (chunk, from, to) => supabase
       .from('domain_members').select('user_id, domain_id, role', { count: 'exact' }).in('domain_id', chunk)
       .order('domain_id').order('user_id').range(from, to).abortSignal(signal), (row) => `${row.domain_id}:${row.user_id}`),
     // Public Domain visibility does not grant domain_members SELECT. The
     // boundary RPC supplies the visible Space's guests without widening RLS.
-    readIds<SpaceGuestRow>('Domain guests', domainIds, (chunk, from, to) => supabase
+    readAllIn<SpaceGuestRow>('Domain guests', domainIds, (chunk, from, to) => supabase
       .rpc('get_space_guest_domain_members', { p_space_id: spaceId }, { count: 'exact' }).in('domain_id', chunk)
       .order('domain_id').order('user_id').range(from, to).abortSignal(signal), (row) => `${row.domain_id}:${row.user_id}`),
-    readIds<TeamRosterSource['objectDomains'][number]>('Object Domains', domainIds, (chunk, from, to) => supabase
+    readAllIn<TeamRosterSource['objectDomains'][number]>('Object Domains', domainIds, (chunk, from, to) => supabase
       .from('object_domains').select('object_id, domain_id', { count: 'exact' }).in('domain_id', chunk)
       .order('object_id').order('domain_id').range(from, to).abortSignal(signal), (row) => `${row.object_id}:${row.domain_id}`),
-    readIds<TeamRosterSource['objects'][number]>('Team Objects', domainIds, (chunk, from, to) => onlyActiveObjects(supabase
-      .from('objects').select('id, domain_id', { count: 'exact' }).in('domain_id', chunk))
+    readAllIn<TeamRosterSource['objects'][number]>('Team Objects', domainIds, (chunk, from, to) => onlyActiveObjects(supabase
+      .from('objects').select('id, domain_id, name', { count: 'exact' }).in('domain_id', chunk))
       .order('id').range(from, to).abortSignal(signal), rowId),
   ]);
   const domainMembers = mergeTeamDomainMembers(domainIds, directDomainMembers, domainGuests);
   const directObjectIds = new Set(directObjects.map((row) => row.id));
-  const linkedObjects = await readIds<TeamRosterSource['objects'][number]>('Linked Team Objects', objectDomains
+  const linkedObjects = await readAllIn<TeamRosterSource['objects'][number]>('Linked Team Objects', objectDomains
     .map((row) => row.object_id).filter((id) => !directObjectIds.has(id)), (chunk, from, to) => onlyActiveObjects(supabase
-    .from('objects').select('id, domain_id', { count: 'exact' }).in('id', chunk))
+    .from('objects').select('id, domain_id, name', { count: 'exact' }).in('id', chunk))
     .order('id').range(from, to).abortSignal(signal), rowId);
-  const objects = unique([...directObjects, ...linkedObjects]);
+  const objects = uniqueById([...directObjects, ...linkedObjects]);
   const objectIds = objects.map((row) => row.id);
   const [memberWorkers, objectWorkers, directElements, elementHomes] = await Promise.all([
-    readIds<Worker>('Member Workers', [...spaceMembers, ...domainMembers].map((row) => row.user_id), (chunk, from, to) => supabase
+    readAllIn<Worker>('Member Workers', [...spaceMembers, ...domainMembers].map((row) => row.user_id), (chunk, from, to) => supabase
       .from('workers').select('*', { count: 'exact' }).in('user_id', chunk)
       .order('id').range(from, to).abortSignal(signal), rowId),
-    readIds<Worker>('Object Workers', objectIds, (chunk, from, to) => supabase
+    readAllIn<Worker>('Object Workers', objectIds, (chunk, from, to) => supabase
       .from('workers').select('*', { count: 'exact' }).in('object_id', chunk)
       .order('id').range(from, to).abortSignal(signal), rowId),
-    readIds<TeamElement>('Team Elements', objectIds, (chunk, from, to) => supabase
+    readAllIn<TeamElement>('Team Elements', objectIds, (chunk, from, to) => supabase
       .from('elements').select(ELEMENT_FIELDS, { count: 'exact' }).in('object_id', chunk)
       .order('id').range(from, to).abortSignal(signal), rowId),
-    readIds<{ element_id: string; object_id: string }>('Element Objects', objectIds, (chunk, from, to) => supabase
+    readAllIn<{ element_id: string; object_id: string }>('Element Objects', objectIds, (chunk, from, to) => supabase
       .from('element_objects').select('element_id, object_id', { count: 'exact' }).in('object_id', chunk)
       .order('element_id').order('object_id').range(from, to).abortSignal(signal), (row) => `${row.element_id}:${row.object_id}`),
   ]);
   const directElementIds = new Set(directElements.map((row) => row.id));
-  const linkedElements = await readIds<TeamElement>('Linked Team Elements', elementHomes
+  const linkedElements = await readAllIn<TeamElement>('Linked Team Elements', elementHomes
     .map((row) => row.element_id).filter((id) => !directElementIds.has(id)), (chunk, from, to) => supabase
     .from('elements').select(ELEMENT_FIELDS, { count: 'exact' }).in('id', chunk)
     .order('id').range(from, to).abortSignal(signal), rowId);
-  const elements = unique([...directElements, ...linkedElements]);
-  const assignees = await readIds<TeamRosterSource['assignees'][number]>('Team assignments', elements.map((row) => row.id), (chunk, from, to) => supabase
+  const elements = uniqueById([...directElements, ...linkedElements]);
+  const assignees = await readAllIn<TeamRosterSource['assignees'][number]>('Team assignments', elements.map((row) => row.id), (chunk, from, to) => supabase
     .from('element_assignees').select('element_id, worker_id', { count: 'exact' }).in('element_id', chunk)
     .order('element_id').order('worker_id').range(from, to).abortSignal(signal), (row) => `${row.element_id}:${row.worker_id}`);
-  const knownWorkers = unique([...memberWorkers, ...objectWorkers]);
+  const knownWorkers = uniqueById([...memberWorkers, ...objectWorkers]);
   const knownWorkerIds = new Set(knownWorkers.map((row) => row.id));
-  const assignedWorkers = await readIds<Worker>('Assigned Workers', assignees
+  const assignedWorkers = await readAllIn<Worker>('Assigned Workers', assignees
     .map((row) => row.worker_id).filter((id) => !knownWorkerIds.has(id)), (chunk, from, to) => supabase
     .from('workers').select('*', { count: 'exact' }).in('id', chunk)
     .order('id').range(from, to).abortSignal(signal), rowId);
-  return { domains, spaceMembers, domainMembers, objectDomains, objects, elements, assignees, workers: unique([...knownWorkers, ...assignedWorkers]) };
+  return { domains, spaceMembers, domainMembers, objectDomains, objects, elements, assignees, workers: uniqueById([...knownWorkers, ...assignedWorkers]) };
 }
 
 export function useTeamRoster() {
@@ -120,7 +106,7 @@ export function useTeamRoster() {
     if (hours !== null && (!Number.isFinite(hours) || hours < 0 || hours > 24)) throw new Error('Capacity must be between 0 and 24 hours per day.');
     const assertContext = () => {
       if (!enabled || !userId || !spaceId || currentContext.current !== contextKey || getActiveSpaceId() !== spaceId) {
-        throw new Error('The active Space or account changed. Open Team again before saving.');
+        throw new Error('The active Space or account changed. Open People again before saving.');
       }
     };
     assertContext();
@@ -147,9 +133,11 @@ export function useTeamRoster() {
   }, [enabled, userId, spaceId, contextKey, queryClient, queryKey]);
 
   const workers = useMemo(() => entries.map((entry) => entry.worker), [entries]);
+  const objectNames = useMemo(() => new Map((enabled ? query.data?.objects ?? [] : [])
+    .map((row) => [row.id, row.name ?? ''] as const)), [enabled, query.data]);
 
   return {
-    entries, workers, contextKey, enabled,
+    entries, workers, objectNames, contextKey, enabled,
     loading: enabled && query.isPending,
     refreshing: enabled && query.isFetching && !query.isPending,
     error: enabled ? query.error : null,

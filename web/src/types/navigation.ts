@@ -1,25 +1,11 @@
-import type { ScmView } from '@/ActivitySpace/sustainment/scm/scmNavigation';
-import type { ScmHealth } from '@/ActivitySpace/sustainment/scm/scmEngine';
-import type { CrmRoute } from '@/ActivitySpace/sustainment/crm/crmRoute';
+import type { CrmRoute } from '@/Function/crm/crmRoute';
+import type { AuditRoute } from '@/Function/audit/auditRoute';
 
 export interface NavigationState {
-  /** SCM: the open pane, the location every pane is filtered to (null = all),
-   * the item-location open in detail (`itemId:locationId`), and the open
-   * purchase order. */
-  scmView?: ScmView;
-  scmLocationId?: string | null;
-  scmNode?: string | null;
-  scmOrderId?: string | null;
-  /** Inventory filtered to one stock health, when opened from a health count. */
-  scmHealth?: ScmHealth | null;
-  /** Scenarios opened from a supplier, pre-set to simulate its delay. */
-  scmSupplierDelay?: string | null;
-  /** The stock ledger filtered to one item. */
-  scmLedgerItemId?: string | null;
-  /** Inventory showing the item catalogue rather than stock. */
-  scmCatalog?: boolean | null;
   /** The CRM App's view, filters and open deal within this window tab. */
   crm?: CrmRoute;
+  /** The Audit App's view and open deployment or run within this window tab. */
+  audit?: AuditRoute;
   objectId: string | null;
   /** Domain accompanying an explicit Object route. Keeps the destination
    * Object selected while the shell changes its active Domain. */
@@ -46,6 +32,13 @@ export interface NavigationState {
   strategyCreate?: boolean | null;
   /** The sidebar's "+" on the Portfolio page asked for a new Portfolio. */
   portfolioCreate?: boolean | null;
+  /** Portfolio open on the Portfolio page; null = the tree. */
+  portfolioId?: string | null;
+  /** The Vision the Strategy pages show (its Portfolios, its Initiatives);
+   *  null = the Space's first Vision. */
+  visionId?: string | null;
+  /** The sidebar's "+" asked for a new Vision. */
+  visionCreate?: boolean | null;
   /** What the Home main island is showing, when on the Home view. A pinned
    *  item's content renders in place (no layer/view switch) instead of the
    *  welcome. null = the welcome landing. */

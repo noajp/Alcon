@@ -6,9 +6,10 @@ import type { AlconObjectWithChildren, Worker } from '@/hooks/useSupabase';
 import { useSortable } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
-import { type DataColumn } from '@/ActivitySpace/execution/object/useListColumns';
+import { type DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { OBJECT_DRAG_PREFIX, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, ROW_ROUND_TO_LAST, selectionSquareClass, selectionSquareClassToLast } from './shared';
 import { ObjectCell } from './cells';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // Object row — sortable + selectable, mirrors ElementRow at the structural
 // level. The checkbox affordance, hover/selected bg, and sticky-left
@@ -39,6 +40,7 @@ export const ObjectRow = memo(function ObjectRow({
   elementTypes, canRowSelect, onAddType, onRemoveType, dropEdge, selPrev, selNext, onSelectObject, onRowSelect,
   onObjectUpdate, objectWorkers, onObjectCustomColumnValueChange,
 }: ObjectRowProps) {
+  const { t } = useI18n();
   const dragId = OBJECT_DRAG_PREFIX + obj.id;
   // No sortable transform — rows stay static; the DragOverlay card and blue
   // drop line carry the feedback (see ElementRow for the rationale).
@@ -92,7 +94,7 @@ export const ObjectRow = memo(function ObjectRow({
         {canRowSelect && (
           <button
             type="button"
-            aria-label={isSelected ? 'Deselect object' : 'Select object'}
+            aria-label={isSelected ? t('Deselect Object') : t('Select Object')}
             onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => onRowSelect(obj.id, e.shiftKey ? 'range' : 'single')}
             className={`size-4 rounded-[5px] border flex items-center justify-center mx-auto transition-opacity ${
@@ -112,7 +114,7 @@ export const ObjectRow = memo(function ObjectRow({
       </td>
       <td className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         <div className="flex items-center min-w-0 min-h-[1.625rem]">
-          <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
+          <span className="text-[14px] font-medium text-foreground truncate flex-1 min-w-0">
             {obj.name}
           </span>
         </div>

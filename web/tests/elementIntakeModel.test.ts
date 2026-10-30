@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   INTAKE_TEXT_LIMIT, intakeTextFromRows, normalizeIntake, parseIntake, reconcileIntakeResult,
   type IntakeWorker,
-} from '../src/ActivitySpace/execution/element/intake/intakeModel';
+} from '@/Function/shared/element/intakeModel';
 
 const workers: IntakeWorker[] = [
   { id: 'worker-alex', name: 'Alex Rivera', email: 'alex@example.com', status: 'active' },

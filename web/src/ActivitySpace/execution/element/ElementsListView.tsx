@@ -1,21 +1,21 @@
 'use client';
 
-import { Button } from '@/ui/button';
 
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Plus } from 'lucide-react';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains, useElementTemplates, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
-import { pushUndo } from '@/ActivitySpace/execution/element/bulkUndo';
+import { pushUndo } from '@/Function/shared/element/bulkUndo';
+import { bulkSetAssignee } from '@/hooks/bulkAssign';
 import { ObjectIcon } from '@/shell/icons';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { EmptyState } from '@/Function/shared/EmptyState';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
@@ -26,7 +26,7 @@ import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } fro
 import { assignWorkersToElement, noticeSkippedAssignees, useAssignableWorkers } from '@/hooks/useSupabase';
 import { partitionAssignable } from '@/Function/shared/assignableWorkers';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { type ListSection } from '@/ActivitySpace/execution/object/ListTable';
+import type { ListSection } from '@/Function/shared/listTable/shared';
 import { TabBar } from '@/shell/TabBar';
 import type { NavigationState } from '@/types/navigation';
 import type { Worker, ObjectTab, ObjectTabType, Json } from '@/types/database';
@@ -53,7 +53,7 @@ const VIEW_MODE_TITLES: Partial<Record<ObjectTabType, string>> = {
   gantt: 'Gantt',
   calendar: 'Calendar',
   workers: 'Workers',
-  custom_view: 'CustomView',
+  custom_view: 'Custom view',
 };
 
 function isViewMode(t: ObjectTabType): boolean {
@@ -95,6 +95,7 @@ interface ElementsListViewProps {
  * drill-in, and the Domain-direct quick-add popup.
  */
 export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onViewChange }: ElementsListViewProps) {
+  const { t } = useI18n();
   const explorerData = useExplorerData();
   const [detailId, setDetailId] = useState<string | null>(null);
   const [visibleTabs, setVisibleTabs] = useState<ObjectTabType[]>(loadVisibleTabs);
@@ -266,7 +267,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   );
 
   // Multi-select + bulk operations (shared with the other element lists).
-  const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
+  const { selectedRowIds, handleRowSelect, clearSelection, selectOnly } = useElementSelection();
   const bulkDelete = async () => {
     for (const id of selectedRowIds) {
       try { await deleteElement(id); } catch (e) { console.error('Delete failed', id, e); }
@@ -340,6 +341,14 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
         },
       });
     }
+  };
+  // Hand the selection to one person (undoable); Elements they cannot take keep their people.
+  const assigneeOptions = useMemo(() => popupWorkers.map((w) => ({ id: w.id, name: w.name, hint: w.type === 'ai_agent' ? 'AI' : null })), [popupWorkers]);
+  const bulkAssign = async (workerId: string) => {
+    // What could not be handed over stays selected, with the bar saying why.
+    const failed = await bulkSetAssignee([...selectedRowIds], workerId, () => onRefresh?.());
+    selectOnly(failed);
+    return failed.length;
   };
   // Generic bulk field edit (status / priority / due_date) with undo. Captures
   // each element's prior value so Ctrl+Z restores it exactly.
@@ -456,10 +465,10 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   const quickAddDefaults = sectionGroupValues(quickAddGroup);
 
   const handleQuickAddSubmit = async (inputs: NewElementInput[]) => {
-    // Three save scopes the popup can produce:
-    //   - personal (My Elements): owner_id = me, object_id = null
+    // Two save scopes the popup can produce:
     //   - Object:                  object_id = input.objectId
-    //   - Domain-direct:           object_id = null
+    //   - personal (My Elements): owner_id = me, object_id = null — also when
+    //     no Object is named, since an Element always has exactly one home
     // Fallback for objectId-undefined: the per-section target the user opened
     // the popup from.
     // Per-Element failures stay non-fatal — one bad row in a pasted batch
@@ -473,12 +482,13 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
 
     for (const input of inputs) {
       try {
+        const objectId = input.personal
+          ? null
+          : (input.objectId !== undefined ? input.objectId : quickAddTargetObjectId);
         const created = await createElement({
           title: input.title,
-          object_id: input.personal
-            ? null
-            : (input.objectId !== undefined ? input.objectId : quickAddTargetObjectId),
-          owner_id: input.personal ? userId : null,
+          object_id: objectId,
+          owner_id: objectId ? null : userId,
           description: input.description ?? null,
           type: input.type ?? null,
           labels: input.labels ?? [],
@@ -541,7 +551,6 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
           onViewChange?.('objects');
           onNavigate?.({ objectId: null });
         }}
-        onAdd={openQuickAddDomain}
       />
 
       {/* View-mode tabs — uses the shared shell `TabBar` so the look
@@ -636,11 +645,8 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
       {effectiveViewMode === 'workers' && (
         <div className="flex-1 flex items-center justify-center p-12 text-center">
           <div>
-            <p className="text-[13px] text-muted-foreground mb-1">
-              Domain-level Workers view is coming soon.
-            </p>
-            <p className="text-[12px] text-muted-foreground/70">
-              Open an Object to see its Workers tab.
+            <p className="text-[13px] text-muted-foreground">
+              {t('Domain-level Workers view is coming soon. Open an Object to see its Workers tab.')}
             </p>
           </div>
         </div>
@@ -674,6 +680,8 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
         onSetStatus={(s) => bulkSetField('status', s, `Set status of ${selectedRowIds.size} Elements`)}
         onSetPriority={(p) => bulkSetField('priority', p, `Set priority of ${selectedRowIds.size} Elements`)}
         onSetDueDate={(d) => bulkSetField('due_date', d, `Set due date of ${selectedRowIds.size} Elements`)}
+        onSetAssignee={(workerId) => bulkAssign(workerId)}
+        assigneeOptions={assigneeOptions}
         onClear={clearSelection}
       />
     </div>
@@ -684,32 +692,19 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
 function ElementsHierarchyHeader({
   domainName,
   onDomainClick,
-  onAdd,
 }: {
   domainName: string;
   onDomainClick?: () => void;
-  onAdd?: () => void;
 }) {
   return (
     <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
       <button
         type="button"
         onClick={onDomainClick}
-        className="px-1.5 py-0.5 rounded text-[12px] font-semibold text-muted-foreground truncate max-w-[220px] transition-colors hover:text-foreground hover:bg-muted/40"
+        className="px-1.5 py-0.5 rounded text-[13px] font-medium text-muted-foreground truncate max-w-[220px] transition-colors hover:text-foreground hover:bg-muted/40"
       >
         {domainName}
       </button>
-      <div className="flex-1" />
-      {onAdd && (
-        <Button variant="ghost" size="icon-xs"
-          type="button"
-          onClick={onAdd}
-          title="Add Element"
-          aria-label="Add Element"
-        >
-          <Plus size={14} />
-        </Button>
-      )}
     </div>
   );
 }

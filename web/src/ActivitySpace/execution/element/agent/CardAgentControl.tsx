@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useAgentRun } from '@/hooks/useSupabase';
-import { getActiveDomainId } from '@/ActivitySpace/execution/domain/domainsStore';
+import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { StartAgentButton } from './StartAgentButton';
 
 interface CardAgentControlProps {

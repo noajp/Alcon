@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { pipelineColumns, resolveStage, stageChange, type CrmDeal, type CrmStage, type CrmWorkspace } from './crmModel';
+import { pipelineColumns, resolveStage, stageChange, type CrmDeal, type CrmStage, type CrmWorkspace } from '@/Function/crm/crmModel';
 import { HealthDot, money, moneyList, relativeDay } from './crmFormat';
-import type { Crm } from './useCrm';
+import type { Crm } from '@/hooks/useCrm';
 
 const DRAG_TYPE = 'application/x-alcon-deal';
 
@@ -70,7 +70,7 @@ export function CrmPipeline({ crm, workspace, deals, onOpen, selectedId }: {
           onDrop={event => { event.preventDefault(); setOver(null); const dealId = event.dataTransfer.getData(DRAG_TYPE); if (dealId) void drop(dealId, column.stage); }}>
           <header className="space-y-0.5 px-3 pb-2 pt-3">
             <div className="flex items-center gap-2 text-sm font-medium">
-              <span className={`truncate ${column.stage.id === 'won' ? 'text-[var(--status-success)]' : ''}`}>{column.stage.id ? t(column.stage.label) : t('No stage')}</span>
+              <span className="truncate">{column.stage.id ? t(column.stage.label) : t('No stage')}</span>
               <span className="text-xs tabular-nums text-muted-foreground">{column.deals.length}</span>
               {!column.closed && column.stage.id && <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">{column.stage.probability}%</span>}
             </div>

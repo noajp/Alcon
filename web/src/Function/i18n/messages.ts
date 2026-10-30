@@ -1,6 +1,19 @@
 import type { Locale } from './locales';
-import { CRM_TRANSLATIONS } from '@/ActivitySpace/sustainment/crm/crmMessages';
-import { SCM_MESSAGES } from './scmMessages';
+import { CRM_TRANSLATIONS } from '@/Function/i18n/crmMessages';
+import { WORKLOAD_TRANSLATIONS } from '@/Function/i18n/workloadMessages';
+import { AUDIT_TRANSLATIONS } from '@/Function/i18n/auditMessages';
+import { PEOPLE_TRANSLATIONS } from '@/Function/i18n/peopleMessages';
+import { SURFACE_TRANSLATIONS } from './surfaceMessages';
+import { STRATEGY_BOARD_TRANSLATIONS } from './strategyBoardMessages';
+import { APPROACH_TRANSLATIONS } from './approachMessages';
+import { SHARED_TRANSLATIONS } from './sharedMessages';
+import { WIDGET_TRANSLATIONS } from './widgetMessages';
+import { STRATEGY_TRANSLATIONS } from './strategyMessages';
+import { EXECUTION_TRANSLATIONS } from './executionMessages';
+import { DOCUMENTS_TRANSLATIONS } from './documentsMessages';
+import { APP_TRANSLATIONS } from './appMessages';
+import { OPERATIONS_TRANSLATIONS } from '@/Function/i18n/operationsMessages';
+import { DESIGN_TRANSLATIONS } from './designMessages';
 
 type TranslationMap = Record<string, string>;
 
@@ -23,8 +36,8 @@ const ja: TranslationMap = {
   'App sidebar': 'アプリサイドバー', 'At least 6 characters': '6文字以上', 'Back to sign in': 'サインインに戻る',
   'Calendar': 'Calendar', 'Cancel': 'キャンセル', 'Check your email': 'メールを確認してください', 'Connected accounts': '連携アカウント', 'Connection Error': '接続エラー',
   'Create': '作成', 'Create account': 'アカウントを作成', 'Create an account': 'アカウントを作成',
-  'Create Domain': 'Domain を作成', 'Create new': '新規作成', 'Create Space': 'スペースを作成',
-  'Create your Space': 'スペースを作成', 'Creating account...': 'アカウントを作成中...', 'Customize': 'カスタマイズ',
+  'Create Domain': 'Domain を作成', 'Create new': '新規作成', 'Create ActivitySpace': 'ActivitySpace を作成',
+  'Create your ActivitySpace': 'ActivitySpace を作成', 'Creating account...': 'アカウントを作成中...', 'Customize': 'カスタマイズ',
   'Default': '標準', 'Default home view': '既定のホームビュー', 'Discover': '見つける',
   'Display names': '名前の表示', 'Domain': 'Domain', 'Domain overview': 'Domain の概要', 'Domains': 'Domains',
   "Don't have an account? ": 'アカウントをお持ちでないですか？ ', 'Email': 'メールアドレス',
@@ -83,7 +96,7 @@ const ko: TranslationMap = {
   'Already have an account? ': '이미 계정이 있나요? ', 'App sidebar': '앱 사이드바', 'At least 6 characters': '6자 이상',
   'Back to sign in': '로그인으로 돌아가기', 'Calendar': 'Calendar', 'Cancel': '취소', 'Check your email': '이메일을 확인하세요', 'Connected accounts': '연결된 계정', 'Connection Error': '연결 오류', 'Create': '만들기',
   'Create account': '계정 만들기', 'Create an account': '계정 만들기', 'Create Domain': 'Domain 만들기', 'Create new': '새로 만들기',
-  'Create Space': '공간 만들기', 'Create your Space': '공간을 만드세요', 'Creating account...': '계정 만드는 중...',
+  'Create ActivitySpace': 'ActivitySpace 만들기', 'Create your ActivitySpace': 'ActivitySpace를 만드세요', 'Creating account...': '계정 만드는 중...',
   'Customize': '사용자 설정', 'Default': '기본', 'Default home view': '기본 홈 뷰', 'Discover': '탐색', 'Display names': '이름 표시',
   'Domain': 'Domain', 'Domain overview': 'Domain 개요', 'Domains': 'Domains', "Don't have an account? ": '계정이 없으신가요? ',
   'Email': '이메일', 'Elements': 'Elements', 'Execution': 'Execution', 'First day of the week': '주 시작일', 'Font size': '글자 크기',
@@ -160,7 +173,7 @@ const fr: TranslationMap = {
   'Back to sign in': 'Retour à la connexion', 'Calendar': 'Calendar', 'Cancel': 'Annuler', 'Check your email': 'Consultez votre messagerie',
   'Connected accounts': 'Comptes connectés', 'Connection Error': 'Erreur de connexion', 'Create': 'Créer',
   'Create account': 'Créer le compte', 'Create an account': 'Créer un compte', 'Create Domain': 'Créer un Domain', 'Create new': 'Créer',
-  'Create Space': "Créer l’espace", 'Create your Space': 'Créez votre espace', 'Creating account...': 'Création du compte...', 'Customize': 'Personnaliser',
+  'Create ActivitySpace': "Créer l’ActivitySpace", 'Create your ActivitySpace': 'Créez votre ActivitySpace', 'Creating account...': 'Création du compte...', 'Customize': 'Personnaliser',
   'Default': 'Par défaut', 'Default home view': "Vue d’accueil par défaut", 'Discover': 'Découvrir', 'Display names': 'Affichage des noms',
   'Domain': 'Domain', 'Domain overview': 'Aperçu du Domain', 'Domains': 'Domains', "Don't have an account? ": "Vous n’avez pas de compte ? ",
   'Email': 'E-mail', 'Elements': 'Elements', 'Execution': 'Execution', 'First day of the week': 'Premier jour de la semaine', 'Font size': 'Taille du texte',
@@ -236,7 +249,7 @@ const es: TranslationMap = {
   'Already have an account? ': '¿Ya tienes una cuenta? ', 'App sidebar': 'Barra lateral', 'At least 6 characters': 'Al menos 6 caracteres',
   'Back to sign in': 'Volver a iniciar sesión', 'Calendar': 'Calendar', 'Cancel': 'Cancelar', 'Check your email': 'Revisa tu correo', 'Connected accounts': 'Cuentas conectadas', 'Connection Error': 'Error de conexión', 'Create': 'Crear',
   'Create account': 'Crear cuenta', 'Create an account': 'Crear una cuenta', 'Create Domain': 'Crear Domain', 'Create new': 'Crear',
-  'Create Space': 'Crear espacio', 'Create your Space': 'Crea tu espacio', 'Creating account...': 'Creando cuenta...', 'Customize': 'Personalizar',
+  'Create ActivitySpace': 'Crear ActivitySpace', 'Create your ActivitySpace': 'Crea tu ActivitySpace', 'Creating account...': 'Creando cuenta...', 'Customize': 'Personalizar',
   'Default': 'Predeterminado', 'Default home view': 'Vista de inicio predeterminada', 'Discover': 'Descubrir', 'Display names': 'Visualización de nombres',
   'Domain': 'Domain', 'Domain overview': 'Resumen del Domain', 'Domains': 'Domains', "Don't have an account? ": '¿No tienes una cuenta? ',
   'Email': 'Correo electrónico', 'Elements': 'Elements', 'Execution': 'Execution', 'First day of the week': 'Primer día de la semana', 'Font size': 'Tamaño del texto',
@@ -296,12 +309,12 @@ Object.assign(ja, {
   'Collapse': '折りたたむ', 'Convert text emoticons into emojis': '顔文字を絵文字に変換',
   'Customize sidebar item visibility, ordering, and badge style': 'サイドバー項目の表示、並び順、バッジを調整します',
   'Dark': 'ダーク', 'Discover Domains and Objects': 'Domains と Objects を見つける', 'Drag to resize': 'ドラッグしてサイズ変更',
-  'Enter': 'Enter', 'Expand': '展開する', 'Full name': 'フルネーム', 'Hide AI': 'AI を隠す', 'Hide sidebar': 'サイドバーを隠す',
+  'Enter': 'Enter', 'Expand': '展開する', 'Full name': 'フルネーム', 'Open the AI screen': 'AI の画面で開く', 'Shrink to a pop-up': 'ポップアップに戻す', 'Hide AI': 'AI を隠す', 'Hide sidebar': 'サイドバーを隠す',
   'How names are shown across the interface': '画面全体での名前の表示方法', 'Labels': 'ラベル', 'Large': '大', 'Larger': 'より大',
   'Light': 'ライト', 'Match the system or pick a colour theme': 'システムに合わせるかカラーテーマを選びます',
   'Monday': '月曜日', 'Navigation': 'ナビゲーション', 'Note': 'ノート', 'Notes': 'ノート', 'Object': 'Object',
-  'Remove {label} from the rail': 'レールから {label} を外す', 'Saturday': '土曜日', 'Search elements, objects, notes. Press ⌘K to open.': 'Elements、Objects、ノートを検索します。⌘K で開きます。',
-  'Search elements, objects, notes…': 'Elements、Objects、ノートを検索…', 'Searching…': '検索中…',
+  'Remove {label} from the rail': 'レールから {label} を外す', 'Saturday': '土曜日', 'Search elements, objects, notes and records. Press ⌘K to open.': 'Elements、Objects、ノート、記録を検索します。⌘K で開きます。', 'Records': '記録', 'Deal': '商談', 'Item': '品目',
+  'Search elements, objects, notes, records…': 'Elements、Objects、ノート、記録を検索…', 'Searching…': '検索中…',
   'Select which view to open when launching Alcon': 'Alcon の起動時に開くビューを選択します',
   'Send comment on…': 'コメントの送信キー', 'Short name': '短い名前', 'Show AI': 'AI を表示', 'Show sidebar': 'サイドバーを表示',
   'SLAs': 'SLA', 'Small': '小', 'Smaller': 'より小', 'Statuses': 'ステータス', 'Sunday': '日曜日',
@@ -315,12 +328,12 @@ Object.assign(ko, {
   'Change the cursor to a pointer over interactive elements': '상호작용 요소에 포인터 커서를 표시합니다',
   'Convert text emoticons into emojis': '텍스트 이모티콘을 이모지로 변환', 'Customize sidebar item visibility, ordering, and badge style': '사이드바 표시, 순서, 배지 스타일을 설정합니다',
   'Dark': '다크', 'Discover Domains and Objects': 'Domains과 Objects 탐색', 'Drag to resize': '드래그하여 크기 조절', 'Enter': 'Enter', 'Expand': '펼치기', 'Full name': '전체 이름',
-  'Hide AI': 'AI 숨기기', 'Hide sidebar': '사이드바 숨기기', 'Large': '큼', 'Larger': '더 큼',
+  'Open the AI screen': 'AI 화면으로 열기', 'Shrink to a pop-up': '팝업으로 되돌리기', 'Hide AI': 'AI 숨기기', 'Hide sidebar': '사이드바 숨기기', 'Large': '큼', 'Larger': '더 큼',
   'How names are shown across the interface': '인터페이스에서 이름을 표시하는 방식', 'Labels': '라벨', 'Light': '라이트',
   'Match the system or pick a colour theme': '시스템에 맞추거나 색상 테마를 선택합니다',
   'Monday': '월요일', 'Navigation': '탐색', 'Note': '노트', 'Notes': '노트', 'Object': 'Object', 'Remove {label} from the rail': '레일에서 {label} 제거', 'Saturday': '토요일',
-  'Search elements, objects, notes. Press ⌘K to open.': 'Elements, Objects, 노트를 검색합니다. ⌘K로 엽니다.',
-  'Search elements, objects, notes…': 'Elements, Objects, 노트 검색…', 'Searching…': '검색 중…',
+  'Search elements, objects, notes and records. Press ⌘K to open.': 'Elements, Objects, 노트, 기록을 검색합니다. ⌘K로 엽니다.', 'Records': '기록', 'Deal': '거래', 'Item': '품목',
+  'Search elements, objects, notes, records…': 'Elements, Objects, 노트, 기록 검색…', 'Searching…': '검색 중…',
   'Select which view to open when launching Alcon': 'Alcon 시작 시 열 뷰를 선택합니다', 'Send comment on…': '댓글 제출 키', 'Short name': '짧은 이름',
   'Show AI': 'AI 표시', 'Show sidebar': '사이드바 표시', 'SLAs': 'SLA', 'Small': '작음', 'Smaller': '더 작음', 'Statuses': '상태', 'Sunday': '일요일', 'Templates': '템플릿', 'Top-level container': '최상위 컨테이너', 'Try Again': '다시 시도', 'Updates': '업데이트',
   'Used for date pickers': '날짜 선택기에 사용', 'Username': '사용자 이름', 'Which key press submits a comment': '댓글을 제출할 키',
@@ -332,12 +345,12 @@ Object.assign(fr, {
   'Change the cursor to a pointer over interactive elements': 'Afficher un pointeur sur les éléments interactifs', 'Convert text emoticons into emojis': 'Convertir les émoticônes en emojis',
   'Customize sidebar item visibility, ordering, and badge style': 'Personnaliser la visibilité, l’ordre et les badges de la barre latérale',
   'Dark': 'Sombre', 'Discover Domains and Objects': 'Découvrir les Domains et Objects', 'Drag to resize': 'Faire glisser pour redimensionner', 'Enter': 'Entrée', 'Expand': 'Développer', 'Full name': 'Nom complet',
-  'Hide AI': 'Masquer l’IA', 'Hide sidebar': 'Masquer la barre latérale', 'Large': 'Grand', 'Larger': 'Très grand',
+  'Open the AI screen': 'Ouvrir l’écran IA', 'Shrink to a pop-up': 'Réduire en fenêtre', 'Hide AI': 'Masquer l’IA', 'Hide sidebar': 'Masquer la barre latérale', 'Large': 'Grand', 'Larger': 'Très grand',
   'How names are shown across the interface': 'Mode d’affichage des noms dans l’interface', 'Labels': 'Étiquettes', 'Light': 'Clair',
   'Match the system or pick a colour theme': 'Suivre le système ou choisir un thème de couleur',
   'Monday': 'Lundi', 'Navigation': 'Navigation', 'Note': 'Note', 'Notes': 'Notes', 'Object': 'Object', 'Remove {label} from the rail': 'Retirer {label} de la barre', 'Saturday': 'Samedi',
-  'Search elements, objects, notes. Press ⌘K to open.': 'Recherchez des Elements, Objects et notes. Appuyez sur ⌘K pour ouvrir.',
-  'Search elements, objects, notes…': 'Rechercher des Elements, Objects et notes…', 'Searching…': 'Recherche…',
+  'Search elements, objects, notes and records. Press ⌘K to open.': 'Recherchez des Elements, Objects, notes et fiches. Appuyez sur ⌘K pour ouvrir.', 'Records': 'Fiches', 'Deal': 'Affaire', 'Item': 'Article',
+  'Search elements, objects, notes, records…': 'Rechercher des Elements, Objects, notes, fiches…', 'Searching…': 'Recherche…',
   'Select which view to open when launching Alcon': 'Choisir la vue ouverte au lancement d’Alcon', 'Send comment on…': 'Envoyer le commentaire avec…', 'Short name': 'Prénom',
   'Show AI': 'Afficher l’IA', 'Show sidebar': 'Afficher la barre latérale', 'SLAs': 'SLA', 'Small': 'Petit', 'Smaller': 'Très petit', 'Statuses': 'Statuts', 'Sunday': 'Dimanche', 'Templates': 'Modèles', 'Top-level container': 'Conteneur principal', 'Try Again': 'Réessayer', 'Updates': 'Mises à jour',
   'Used for date pickers': 'Utilisé dans les sélecteurs de date', 'Username': "Nom d’utilisateur", 'Which key press submits a comment': 'Touche utilisée pour envoyer un commentaire',
@@ -349,12 +362,12 @@ Object.assign(es, {
   'Change the cursor to a pointer over interactive elements': 'Mostrar un puntero sobre los elementos interactivos', 'Convert text emoticons into emojis': 'Convertir emoticonos de texto en emojis',
   'Customize sidebar item visibility, ordering, and badge style': 'Personaliza la visibilidad, el orden y las insignias de la barra lateral',
   'Dark': 'Oscuro', 'Discover Domains and Objects': 'Descubrir Domains y Objects', 'Drag to resize': 'Arrastra para cambiar el tamaño', 'Enter': 'Intro', 'Expand': 'Expandir', 'Full name': 'Nombre completo',
-  'Hide AI': 'Ocultar IA', 'Hide sidebar': 'Ocultar barra lateral', 'Large': 'Grande', 'Larger': 'Más grande',
+  'Open the AI screen': 'Abrir la pantalla de IA', 'Shrink to a pop-up': 'Reducir a ventana', 'Hide AI': 'Ocultar IA', 'Hide sidebar': 'Ocultar barra lateral', 'Large': 'Grande', 'Larger': 'Más grande',
   'How names are shown across the interface': 'Cómo se muestran los nombres en la interfaz', 'Labels': 'Etiquetas', 'Light': 'Claro',
   'Match the system or pick a colour theme': 'Usa el tema del sistema o elige un tema de color',
   'Monday': 'Lunes', 'Navigation': 'Navegación', 'Note': 'Nota', 'Notes': 'Notas', 'Object': 'Object', 'Remove {label} from the rail': 'Quitar {label} de la barra', 'Saturday': 'Sábado',
-  'Search elements, objects, notes. Press ⌘K to open.': 'Busca Elements, Objects y notas. Pulsa ⌘K para abrir.',
-  'Search elements, objects, notes…': 'Buscar Elements, Objects y notas…', 'Searching…': 'Buscando…',
+  'Search elements, objects, notes and records. Press ⌘K to open.': 'Busca Elements, Objects, notas y registros. Pulsa ⌘K para abrir.', 'Records': 'Registros', 'Deal': 'Trato', 'Item': 'Artículo',
+  'Search elements, objects, notes, records…': 'Buscar Elements, Objects, notas, registros…', 'Searching…': 'Buscando…',
   'Select which view to open when launching Alcon': 'Selecciona la vista que se abrirá al iniciar Alcon', 'Send comment on…': 'Enviar comentario con…', 'Short name': 'Nombre corto',
   'Show AI': 'Mostrar IA', 'Show sidebar': 'Mostrar barra lateral', 'SLAs': 'SLA', 'Small': 'Pequeño', 'Smaller': 'Más pequeño', 'Statuses': 'Estados', 'Sunday': 'Domingo', 'Templates': 'Plantillas', 'Top-level container': 'Contenedor principal', 'Try Again': 'Reintentar', 'Updates': 'Actualizaciones',
   'Used for date pickers': 'Se usa en los selectores de fecha', 'Username': 'Nombre de usuario', 'Which key press submits a comment': 'Tecla que envía un comentario',
@@ -362,8 +375,11 @@ Object.assign(es, {
 
 const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
   ja: {
+    "New Vision": "新しい Vision", "Add a Vision": "Vision を追加", "A Vision says what this Space aims for. Portfolios and Initiatives hang under it, the way Objects and Elements hang under a Domain.": "Vision は、この Space が目指す姿です。Domain の下に Objects と Elements があるように、Vision の下に Portfolio と Initiative を置きます。", "A Space can hold several Visions.": "Space には複数の Vision を持てます。", "Create Vision": "Vision を作成", "Vision name…": "Vision 名…", "The aim, in one statement…": "目指す姿を一文で…", "Vision name": "Vision 名", "No statement yet.": "まだ書かれていません。", "Portfolios": "Portfolios", "Remove from Vision": "Vision から外す", "In another Vision": "別の Vision に所属", "Add a Vision first": "先に Vision を追加", "Portfolios belong to a Vision, the way Objects belong to a Domain.": "Objects が Domain に属するように、Portfolio は Vision に属します。", "Not in a Vision": "Vision に入っていない", "Vision settings": "Vision 設定", "Name and deletion": "名前と削除", "Delete Vision": "Vision を削除", "Its Portfolios are deleted with it; its Initiatives stay, outside any Vision.": "中の Portfolio も削除されます。Initiative は残り、どの Vision にも入らない状態になります。", "Delete the Vision \"{name}\"? Its Portfolios are deleted with it; its Initiatives stay, outside any Vision.": "Vision「{name}」を削除しますか？ 中の Portfolio も削除されます。Initiative は残り、どの Vision にも入らない状態になります。", "What this Space aims for": "この Space が目指す姿", "A bundle of Initiatives in {name}": "{name} の Initiative の束", "An outcome to win in {name}": "{name} で勝ち取る成果", "Only the Vision's author or a Space owner can change it.": "Vision を変更できるのは、書いた人か Space のオーナーだけです。",
+    "The Portfolio could not be moved.": "Portfolio を移動できませんでした。",
+    "Portfolios nest, and an Initiative belongs to at most one Portfolio.": "Portfolio は入れ子にでき、Initiative が入る Portfolio は最大 1 つです。", "New Portfolio in {name}": "{name} の中に新しい Portfolio", "New Portfolio inside": "中に Portfolio を作る", "Move into…": "移動先…", "Top level": "最上位", "Delete the Portfolio \"{name}\" and the {n} Portfolios inside it? Their Initiatives stay, outside any Portfolio.": "Portfolio「{name}」と中の {n} 件の Portfolio を削除しますか？ Initiative は残り、どの Portfolio にも入らない状態になります。", "{n} alerts": "{n} 件の警告", "{n} Initiatives": "{n} 件の Initiative", "{n}% done": "{n}% 完了", "Portfolios inside": "中の Portfolio", "No Initiatives in this Portfolio yet.": "この Portfolio にはまだ Initiative がありません。", "Description": "説明", "What this Portfolio is a bet on, and what it should add up to.": "この Portfolio が何に賭けるのか、合わせて何になるべきか。", "Write the Vision — the future this Space works toward, in one statement.": "Vision を書く — この Space が向かう未来を一文で。", "By when": "いつまでに", "Set a horizon": "期限を設定", "No horizon yet": "期限は未設定", "Why": "なぜ", "Why this, and what changes when it is true.": "なぜこれなのか、実現したら何が変わるのか。", "Not written yet.": "まだ書かれていません。", "We will know because": "達成の判断基準", "No conditions yet.": "条件はまだありません。", "Condition {n}": "条件 {n}", "Remove condition": "条件を削除", "Add a condition": "条件を追加",
     "Only the Initiative's owner can move it.": "Initiative を動かせるのは作成者だけです。", "No nested Initiatives yet — group related Initiatives here.": "入れ子の Initiative はまだありません。関連する Initiative をここにまとめられます。",
-    "Vision": "Vision", "Portfolio": "Portfolio", "New Portfolio": "新しい Portfolio", "Portfolio name…": "Portfolio 名…", "Add Portfolios": "Portfolio を追加", "A Portfolio bundles Initiatives that serve one part of the Vision, so the Strategy reads as a few bets instead of a long list.": "Portfolio は Vision の一部分に向かう Initiative を束ねます。長い一覧ではなく、少数の賭けとして Strategy を読めるようにします。", "An Initiative belongs to at most one Portfolio.": "Initiative が入る Portfolio は最大 1 つです。", "Create Portfolio": "Portfolio を作成", "Not in a Portfolio": "Portfolio に入っていない", "Add Initiative": "Initiative を追加", "Find an Initiative…": "Initiative を検索…", "In another Portfolio": "別の Portfolio に所属", "Remove from Portfolio": "Portfolio から外す", "Delete": "削除", "Delete the Portfolio \"{name}\"? Its Initiatives stay, outside any Portfolio.": "Portfolio「{name}」を削除しますか？ 中の Initiative は残り、どの Portfolio にも入らない状態になります。", "What {space} aims for": "{space} が目指す姿", "Write the Vision — the future this Space works toward, and how it will know it got there.": "Vision を書く — この Space が向かう未来と、そこに着いたと分かる条件。", "No Vision yet. The Space owner writes it here.": "Vision はまだありません。Space のオーナーがここに書きます。", "Saving…": "保存中…", "Saved": "保存しました",
+    "Vision": "Vision", "Portfolio": "Portfolio", "New Portfolio": "新しい Portfolio", "Portfolio name…": "Portfolio 名…", "Add Portfolios": "Portfolio を追加", "A Portfolio bundles Initiatives that serve one part of the Vision, so the Strategy reads as a few bets instead of a long list.": "Portfolio は Vision の一部分に向かう Initiative を束ねます。長い一覧ではなく、少数の賭けとして Strategy を読めるようにします。", "An Initiative belongs to at most one Portfolio.": "Initiative が入る Portfolio は最大 1 つです。", "Create Portfolio": "Portfolio を作成", "Not in a Portfolio": "Portfolio に入っていない", "Add Initiative": "Initiative を追加", "Find an Initiative…": "Initiative を検索…", "In another Portfolio": "別の Portfolio に所属", "Remove from Portfolio": "Portfolio から外す", "Delete": "削除", "Delete the Portfolio \"{name}\"? Its Initiatives stay, outside any Portfolio.": "Portfolio「{name}」を削除しますか？ 中の Initiative は残り、どの Portfolio にも入らない状態になります。", "Saving…": "保存中…", "Saved": "保存しました",
     "Default length": "既定の長さ", "Days a new Phase spans, end date included": "新しい Phase の日数（終了日を含む）", "days": "日", "Start": "開始", "Where a new Phase begins": "新しい Phase の開始日の決め方", "After the last Phase": "最後の Phase の翌日", "How a new Phase starts out in each Domain. Leave the length blank to start with empty dates.": "Domain ごとに、新しい Phase の初期値を決めます。長さを空にすると日付は空のまま始まります。", "No Domains in this Space yet. Phase defaults are set per Domain.": "この Space にはまだ Domain がありません。Phase の既定値は Domain ごとに設定します。", "Window": "表示範囲", "Scale": "スケール", "Quarter": "四半期", "How much of the year one screen shows": "1 画面に収める期間", "Months back": "過去の月数", "How far before this month the window starts": "今月より前をどこまで表示するか", "Months ahead": "先の月数", "How far after this month the window runs": "今月より先をどこまで表示するか", "Marks": "目印", "Today marker": "今日の線", "A line through today across every row": "すべての行を貫く今日の線", "Progress fill": "進捗の塗り", "Shade each band by how much of its work is done": "帯を完了した割合だけ塗る",
     'Domain settings': 'Domain 設定', 'Members': 'メンバー', 'Name and privacy': '名前と公開範囲', 'Name and membership': '名前とメンバーシップ', 'Manage team members': 'メンバーを管理', 'How Initiatives are judged': 'Initiative の評価のしかた', 'How Phases divide time': 'Phase による期間の区切り方', 'How the Timeline is drawn': 'Timeline の描き方', 'Close': '閉じる',
     'Activity settings': 'Activity 設定', 'Strategy settings': 'Strategy 設定', 'Execution settings': 'Execution 設定', 'Sustainment settings': 'Sustainment 設定', 'Initiative': 'Initiative', '{title} settings are coming soon.': '{title} の設定は準備中です。',
@@ -371,48 +387,52 @@ const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
     'Carbon': 'カーボン', "Couldn't save": '保存できませんでした', 'Domain Elements': 'Domain の Elements', 'Graphite': 'グラファイト',
     'Ivory': 'アイボリー', 'Mid-level structural unit': '中間レベルの構造単位', 'Midnight': 'ミッドナイト', 'Mist': 'ミスト',
     'New Element': '新しい Element', 'New Initiative': '新しい Initiative', 'New Object': '新しい Object',
-    'No notebooks yet — click + to add one.': 'ノートブックはまだありません。+ で追加できます。',
-    'No tables yet — click + to add one.': 'テーブルはまだありません。+ で追加できます。',
-    'Open Calendar': 'Calendar を開く', 'Open Inbox': 'Inbox を開く', 'Open Notebook': 'Notebook を開く', 'Open Table': 'Table を開く', 'Open Team': 'Team を開く', 'Open Workload': 'Workload を開く',
+    'Open Calendar': 'Calendar を開く', 'Open Inbox': 'Inbox を開く', 'Open Notebook': 'Notebook を開く', 'Open Table': 'Table を開く', 'Open People': 'People を開く', 'Open Workload': 'Workload を開く',
     'Go to Now': '現在へ移動', 'Snow': 'スノー', 'Something went wrong': '問題が発生しました', 'Strings like :) will be converted to 🙂': ':) などの文字を 🙂 に変換します', 'Sustainment apps': 'Sustainment アプリ',
   },
   ko: {
+    "New Vision": "새 Vision", "Add a Vision": "Vision 추가", "A Vision says what this Space aims for. Portfolios and Initiatives hang under it, the way Objects and Elements hang under a Domain.": "Vision은 이 Space가 지향하는 모습입니다. Domain 아래에 Objects와 Elements가 있듯이 Vision 아래에 Portfolio와 Initiative를 둡니다.", "A Space can hold several Visions.": "Space에는 여러 Vision을 둘 수 있습니다.", "Create Vision": "Vision 만들기", "Vision name…": "Vision 이름…", "The aim, in one statement…": "지향점을 한 문장으로…", "Vision name": "Vision 이름", "No statement yet.": "아직 작성되지 않았습니다.", "Portfolios": "Portfolios", "Remove from Vision": "Vision에서 제거", "In another Vision": "다른 Vision에 속함", "Add a Vision first": "먼저 Vision 추가", "Portfolios belong to a Vision, the way Objects belong to a Domain.": "Objects가 Domain에 속하듯 Portfolio는 Vision에 속합니다.", "Not in a Vision": "Vision에 속하지 않음", "Vision settings": "Vision 설정", "Name and deletion": "이름과 삭제", "Delete Vision": "Vision 삭제", "Its Portfolios are deleted with it; its Initiatives stay, outside any Vision.": "안의 Portfolio도 함께 삭제됩니다. Initiative는 남고 어떤 Vision에도 속하지 않게 됩니다.", "Delete the Vision \"{name}\"? Its Portfolios are deleted with it; its Initiatives stay, outside any Vision.": "Vision \"{name}\"을(를) 삭제할까요? 안의 Portfolio도 함께 삭제됩니다. Initiative는 남고 어떤 Vision에도 속하지 않게 됩니다.", "What this Space aims for": "이 Space가 지향하는 모습", "A bundle of Initiatives in {name}": "{name}의 Initiative 묶음", "An outcome to win in {name}": "{name}에서 이룰 성과", "Only the Vision's author or a Space owner can change it.": "Vision은 작성자나 Space 소유자만 변경할 수 있습니다.",
+    "The Portfolio could not be moved.": "Portfolio를 이동할 수 없습니다.",
+    "Portfolios nest, and an Initiative belongs to at most one Portfolio.": "Portfolio는 중첩할 수 있고, Initiative는 최대 하나의 Portfolio에 속합니다.", "New Portfolio in {name}": "{name} 안에 새 Portfolio", "New Portfolio inside": "안에 Portfolio 만들기", "Move into…": "이동…", "Top level": "최상위", "Delete the Portfolio \"{name}\" and the {n} Portfolios inside it? Their Initiatives stay, outside any Portfolio.": "Portfolio \"{name}\"과 그 안의 Portfolio {n}개를 삭제할까요? Initiative는 남고 어떤 Portfolio에도 속하지 않게 됩니다.", "{n} alerts": "경고 {n}건", "{n} Initiatives": "Initiative {n}개", "{n}% done": "{n}% 완료", "Portfolios inside": "안의 Portfolio", "No Initiatives in this Portfolio yet.": "이 Portfolio에는 아직 Initiative가 없습니다.", "Description": "설명", "What this Portfolio is a bet on, and what it should add up to.": "이 Portfolio가 무엇에 베팅하는지, 합쳐서 무엇이 되어야 하는지.", "Write the Vision — the future this Space works toward, in one statement.": "Vision을 적으세요 — 이 Space가 향하는 미래를 한 문장으로.", "By when": "언제까지", "Set a horizon": "기한 설정", "No horizon yet": "기한 없음", "Why": "왜", "Why this, and what changes when it is true.": "왜 이것인지, 실현되면 무엇이 달라지는지.", "Not written yet.": "아직 작성되지 않았습니다.", "We will know because": "달성의 판단 기준", "No conditions yet.": "조건이 아직 없습니다.", "Condition {n}": "조건 {n}", "Remove condition": "조건 삭제", "Add a condition": "조건 추가",
     "Only the Initiative's owner can move it.": "Initiative는 작성자만 옮길 수 있습니다.", "No nested Initiatives yet — group related Initiatives here.": "중첩된 Initiative가 아직 없습니다. 관련 Initiative를 여기에 묶을 수 있습니다.",
-    "Vision": "Vision", "Portfolio": "Portfolio", "New Portfolio": "새 Portfolio", "Portfolio name…": "Portfolio 이름…", "Add Portfolios": "Portfolio 추가", "A Portfolio bundles Initiatives that serve one part of the Vision, so the Strategy reads as a few bets instead of a long list.": "Portfolio는 Vision의 한 부분을 향하는 Initiative를 묶어, 긴 목록 대신 몇 가지 베팅으로 Strategy를 읽게 합니다.", "An Initiative belongs to at most one Portfolio.": "Initiative는 최대 하나의 Portfolio에 속합니다.", "Create Portfolio": "Portfolio 만들기", "Not in a Portfolio": "Portfolio에 속하지 않음", "Add Initiative": "Initiative 추가", "Find an Initiative…": "Initiative 검색…", "In another Portfolio": "다른 Portfolio에 속함", "Remove from Portfolio": "Portfolio에서 제거", "Delete": "삭제", "Delete the Portfolio \"{name}\"? Its Initiatives stay, outside any Portfolio.": "Portfolio \"{name}\"을(를) 삭제할까요? Initiative는 남고 어떤 Portfolio에도 속하지 않게 됩니다.", "What {space} aims for": "{space}이(가) 지향하는 모습", "Write the Vision — the future this Space works toward, and how it will know it got there.": "Vision을 적으세요 — 이 Space가 향하는 미래와, 도달했음을 아는 기준.", "No Vision yet. The Space owner writes it here.": "아직 Vision이 없습니다. Space 소유자가 여기에 적습니다.", "Saving…": "저장 중…", "Saved": "저장됨",
+    "Vision": "Vision", "Portfolio": "Portfolio", "New Portfolio": "새 Portfolio", "Portfolio name…": "Portfolio 이름…", "Add Portfolios": "Portfolio 추가", "A Portfolio bundles Initiatives that serve one part of the Vision, so the Strategy reads as a few bets instead of a long list.": "Portfolio는 Vision의 한 부분을 향하는 Initiative를 묶어, 긴 목록 대신 몇 가지 베팅으로 Strategy를 읽게 합니다.", "An Initiative belongs to at most one Portfolio.": "Initiative는 최대 하나의 Portfolio에 속합니다.", "Create Portfolio": "Portfolio 만들기", "Not in a Portfolio": "Portfolio에 속하지 않음", "Add Initiative": "Initiative 추가", "Find an Initiative…": "Initiative 검색…", "In another Portfolio": "다른 Portfolio에 속함", "Remove from Portfolio": "Portfolio에서 제거", "Delete": "삭제", "Delete the Portfolio \"{name}\"? Its Initiatives stay, outside any Portfolio.": "Portfolio \"{name}\"을(를) 삭제할까요? Initiative는 남고 어떤 Portfolio에도 속하지 않게 됩니다.", "Saving…": "저장 중…", "Saved": "저장됨",
     "Default length": "기본 길이", "Days a new Phase spans, end date included": "새 Phase의 일수(종료일 포함)", "days": "일", "Start": "시작", "Where a new Phase begins": "새 Phase의 시작일을 정하는 방식", "After the last Phase": "마지막 Phase 다음 날", "How a new Phase starts out in each Domain. Leave the length blank to start with empty dates.": "Domain별로 새 Phase의 초기값을 정합니다. 길이를 비우면 날짜가 빈 채로 시작합니다.", "No Domains in this Space yet. Phase defaults are set per Domain.": "이 Space에는 아직 Domain이 없습니다. Phase 기본값은 Domain별로 설정합니다.", "Window": "표시 범위", "Scale": "배율", "Quarter": "분기", "How much of the year one screen shows": "한 화면에 담는 기간", "Months back": "이전 개월 수", "How far before this month the window starts": "이번 달 이전을 어디까지 표시할지", "Months ahead": "이후 개월 수", "How far after this month the window runs": "이번 달 이후를 어디까지 표시할지", "Marks": "표시", "Today marker": "오늘 선", "A line through today across every row": "모든 행을 지나는 오늘 선", "Progress fill": "진행률 채우기", "Shade each band by how much of its work is done": "완료한 비율만큼 막대를 채웁니다",
     'Domain settings': 'Domain 설정', 'Members': '멤버', 'Name and privacy': '이름과 공개 범위', 'Name and membership': '이름과 멤버십', 'Manage team members': '멤버 관리', 'How Initiatives are judged': 'Initiative 평가 방식', 'How Phases divide time': 'Phase로 기간을 나누는 방식', 'How the Timeline is drawn': 'Timeline 표시 방식', 'Close': '닫기',
     'Activity settings': 'Activity 설정', 'Strategy settings': 'Strategy 설정', 'Execution settings': 'Execution 설정', 'Sustainment settings': 'Sustainment 설정', 'Initiative': 'Initiative', '{title} settings are coming soon.': '{title} 설정은 준비 중입니다.',
     'Day': '일', 'Week': '주', 'Month': '월', 'Choose scope': '범위 선택', 'Choose calendar scope': 'Calendar 범위 선택', 'Calendar scope lists': 'Calendar 범위 목록', 'Find a calendar…': '캘린더 검색…', 'No matches.': '일치하는 항목이 없습니다.',
     'Carbon': '카본', "Couldn't save": '저장할 수 없습니다', 'Domain Elements': 'Domain Elements', 'Graphite': '그래파이트', 'Ivory': '아이보리',
     'Mid-level structural unit': '중간 수준 구조 단위', 'Midnight': '미드나잇', 'Mist': '미스트', 'New Element': '새 Element', 'New Initiative': '새 Initiative', 'New Object': '새 Object',
-    'No notebooks yet — click + to add one.': '노트북이 없습니다. +를 눌러 추가하세요.', 'No tables yet — click + to add one.': '테이블이 없습니다. +를 눌러 추가하세요.',
-    'Open Calendar': 'Calendar 열기', 'Open Inbox': 'Inbox 열기', 'Open Notebook': 'Notebook 열기', 'Open Table': 'Table 열기', 'Open Team': 'Team 열기', 'Open Workload': 'Workload 열기',
+    'Open Calendar': 'Calendar 열기', 'Open Inbox': 'Inbox 열기', 'Open Notebook': 'Notebook 열기', 'Open Table': 'Table 열기', 'Open People': 'People 열기', 'Open Workload': 'Workload 열기',
     'Go to Now': '지금으로 이동', 'Snow': '스노우', 'Something went wrong': '문제가 발생했습니다', 'Strings like :) will be converted to 🙂': ':)와 같은 문자열을 🙂로 변환합니다', 'Sustainment apps': 'Sustainment 앱',
   },
   fr: {
+    "New Vision": "Nouvelle Vision", "Add a Vision": "Ajouter une Vision", "A Vision says what this Space aims for. Portfolios and Initiatives hang under it, the way Objects and Elements hang under a Domain.": "Une Vision dit ce que vise ce Space. Les Portfolios et les Initiatives s’y rattachent, comme les Objects et les Elements à un Domain.", "A Space can hold several Visions.": "Un Space peut porter plusieurs Visions.", "Create Vision": "Créer une Vision", "Vision name…": "Nom de la Vision…", "The aim, in one statement…": "Le but, en une phrase…", "Vision name": "Nom de la Vision", "No statement yet.": "Pas encore rédigé.", "Portfolios": "Portfolios", "Remove from Vision": "Retirer de la Vision", "In another Vision": "Dans une autre Vision", "Add a Vision first": "Ajoutez d’abord une Vision", "Portfolios belong to a Vision, the way Objects belong to a Domain.": "Les Portfolios appartiennent à une Vision, comme les Objects à un Domain.", "Not in a Vision": "Hors Vision", "Vision settings": "Paramètres de la Vision", "Name and deletion": "Nom et suppression", "Delete Vision": "Supprimer la Vision", "Its Portfolios are deleted with it; its Initiatives stay, outside any Vision.": "Ses Portfolios sont supprimés avec elle ; ses Initiatives restent, hors de toute Vision.", "Delete the Vision \"{name}\"? Its Portfolios are deleted with it; its Initiatives stay, outside any Vision.": "Supprimer la Vision « {name} » ? Ses Portfolios sont supprimés avec elle ; ses Initiatives restent, hors de toute Vision.", "What this Space aims for": "Ce que vise ce Space", "A bundle of Initiatives in {name}": "Un ensemble d’Initiatives dans {name}", "An outcome to win in {name}": "Un résultat à obtenir dans {name}", "Only the Vision's author or a Space owner can change it.": "Seul l’auteur de la Vision ou un propriétaire du Space peut la modifier.",
+    "The Portfolio could not be moved.": "Le Portfolio n’a pas pu être déplacé.",
+    "Portfolios nest, and an Initiative belongs to at most one Portfolio.": "Les Portfolios s’imbriquent et une Initiative appartient à au plus un Portfolio.", "New Portfolio in {name}": "Nouveau Portfolio dans {name}", "New Portfolio inside": "Nouveau Portfolio à l’intérieur", "Move into…": "Déplacer dans…", "Top level": "Niveau supérieur", "Delete the Portfolio \"{name}\" and the {n} Portfolios inside it? Their Initiatives stay, outside any Portfolio.": "Supprimer le Portfolio « {name} » et les {n} Portfolios qu’il contient ? Leurs Initiatives restent, hors de tout Portfolio.", "{n} alerts": "{n} alertes", "{n} Initiatives": "{n} Initiatives", "{n}% done": "{n} % terminé", "Portfolios inside": "Portfolios à l’intérieur", "No Initiatives in this Portfolio yet.": "Aucune Initiative dans ce Portfolio pour l’instant.", "Description": "Description", "What this Portfolio is a bet on, and what it should add up to.": "Sur quoi ce Portfolio parie, et ce à quoi il doit aboutir.", "Write the Vision — the future this Space works toward, in one statement.": "Écrivez la Vision — l’avenir vers lequel ce Space travaille, en une phrase.", "By when": "Pour quand", "Set a horizon": "Définir un horizon", "No horizon yet": "Pas encore d’horizon", "Why": "Pourquoi", "Why this, and what changes when it is true.": "Pourquoi cela, et ce qui change une fois réalisé.", "Not written yet.": "Pas encore rédigé.", "We will know because": "Nous le saurons parce que", "No conditions yet.": "Pas encore de conditions.", "Condition {n}": "Condition {n}", "Remove condition": "Retirer la condition", "Add a condition": "Ajouter une condition",
     "Only the Initiative's owner can move it.": "Seul le créateur de l’Initiative peut la déplacer.", "No nested Initiatives yet — group related Initiatives here.": "Pas encore d’Initiative imbriquée — regroupez ici les Initiatives liées.",
-    "Vision": "Vision", "Portfolio": "Portfolio", "New Portfolio": "Nouveau Portfolio", "Portfolio name…": "Nom du Portfolio…", "Add Portfolios": "Ajouter des Portfolios", "A Portfolio bundles Initiatives that serve one part of the Vision, so the Strategy reads as a few bets instead of a long list.": "Un Portfolio regroupe les Initiatives qui servent une partie de la Vision : la Strategy se lit en quelques paris plutôt qu’en une longue liste.", "An Initiative belongs to at most one Portfolio.": "Une Initiative appartient à au plus un Portfolio.", "Create Portfolio": "Créer un Portfolio", "Not in a Portfolio": "Hors Portfolio", "Add Initiative": "Ajouter une Initiative", "Find an Initiative…": "Rechercher une Initiative…", "In another Portfolio": "Dans un autre Portfolio", "Remove from Portfolio": "Retirer du Portfolio", "Delete": "Supprimer", "Delete the Portfolio \"{name}\"? Its Initiatives stay, outside any Portfolio.": "Supprimer le Portfolio « {name} » ? Ses Initiatives restent, hors de tout Portfolio.", "What {space} aims for": "Ce que vise {space}", "Write the Vision — the future this Space works toward, and how it will know it got there.": "Écrivez la Vision — l’avenir vers lequel ce Space travaille, et comment il saura y être arrivé.", "No Vision yet. The Space owner writes it here.": "Pas encore de Vision. Le propriétaire du Space l’écrit ici.", "Saving…": "Enregistrement…", "Saved": "Enregistré",
+    "Vision": "Vision", "Portfolio": "Portfolio", "New Portfolio": "Nouveau Portfolio", "Portfolio name…": "Nom du Portfolio…", "Add Portfolios": "Ajouter des Portfolios", "A Portfolio bundles Initiatives that serve one part of the Vision, so the Strategy reads as a few bets instead of a long list.": "Un Portfolio regroupe les Initiatives qui servent une partie de la Vision : la Strategy se lit en quelques paris plutôt qu’en une longue liste.", "An Initiative belongs to at most one Portfolio.": "Une Initiative appartient à au plus un Portfolio.", "Create Portfolio": "Créer un Portfolio", "Not in a Portfolio": "Hors Portfolio", "Add Initiative": "Ajouter une Initiative", "Find an Initiative…": "Rechercher une Initiative…", "In another Portfolio": "Dans un autre Portfolio", "Remove from Portfolio": "Retirer du Portfolio", "Delete": "Supprimer", "Delete the Portfolio \"{name}\"? Its Initiatives stay, outside any Portfolio.": "Supprimer le Portfolio « {name} » ? Ses Initiatives restent, hors de tout Portfolio.", "Saving…": "Enregistrement…", "Saved": "Enregistré",
     "Default length": "Durée par défaut", "Days a new Phase spans, end date included": "Jours couverts par une nouvelle Phase, date de fin incluse", "days": "jours", "Start": "Début", "Where a new Phase begins": "Où commence une nouvelle Phase", "After the last Phase": "Le lendemain de la dernière Phase", "How a new Phase starts out in each Domain. Leave the length blank to start with empty dates.": "Valeurs initiales d’une nouvelle Phase par Domain. Laissez la durée vide pour commencer sans dates.", "No Domains in this Space yet. Phase defaults are set per Domain.": "Aucun Domain dans ce Space. Les valeurs par défaut des Phases se règlent par Domain.", "Window": "Fenêtre", "Scale": "Échelle", "Quarter": "Trimestre", "How much of the year one screen shows": "Quelle part de l’année tient sur un écran", "Months back": "Mois en arrière", "How far before this month the window starts": "Jusqu’où la fenêtre commence avant ce mois", "Months ahead": "Mois en avant", "How far after this month the window runs": "Jusqu’où la fenêtre s’étend après ce mois", "Marks": "Repères", "Today marker": "Repère du jour", "A line through today across every row": "Une ligne sur aujourd’hui à travers toutes les lignes", "Progress fill": "Remplissage de progression", "Shade each band by how much of its work is done": "Teinter chaque bande selon la part de travail terminée",
     'Domain settings': 'Paramètres du Domain', 'Members': 'Membres', 'Name and privacy': 'Nom et confidentialité', 'Name and membership': 'Nom et adhésion', 'Manage team members': 'Gérer les membres', 'How Initiatives are judged': 'Comment les Initiatives sont évaluées', 'How Phases divide time': 'Comment les Phases découpent le temps', 'How the Timeline is drawn': 'Comment la Timeline est tracée', 'Close': 'Fermer',
     'Activity settings': 'Paramètres Activity', 'Strategy settings': 'Paramètres Strategy', 'Execution settings': 'Paramètres Execution', 'Sustainment settings': 'Paramètres Sustainment', 'Initiative': 'Initiative', '{title} settings are coming soon.': 'Les paramètres {title} arrivent bientôt.',
     'Day': 'Jour', 'Week': 'Semaine', 'Month': 'Mois', 'Choose scope': 'Choisir la portée', 'Choose calendar scope': 'Choisir la portée du Calendar', 'Calendar scope lists': 'Listes de portée du Calendar', 'Find a calendar…': 'Rechercher un calendrier…', 'No matches.': 'Aucun résultat.',
     'Carbon': 'Carbone', "Couldn't save": 'Enregistrement impossible', 'Domain Elements': 'Elements du Domain', 'Graphite': 'Graphite', 'Ivory': 'Ivoire',
     'Mid-level structural unit': 'Unité structurelle intermédiaire', 'Midnight': 'Minuit', 'Mist': 'Brume', 'New Element': 'Nouvel Element', 'New Initiative': 'Nouvelle Initiative', 'New Object': 'Nouvel Object',
-    'No notebooks yet — click + to add one.': 'Aucun carnet. Cliquez sur + pour en ajouter un.', 'No tables yet — click + to add one.': 'Aucun tableau. Cliquez sur + pour en ajouter un.',
-    'Open Calendar': 'Ouvrir Calendar', 'Open Inbox': 'Ouvrir Inbox', 'Open Notebook': 'Ouvrir Notebook', 'Open Table': 'Ouvrir Table', 'Open Team': 'Ouvrir Team', 'Open Workload': 'Ouvrir Workload',
+    'Open Calendar': 'Ouvrir Calendar', 'Open Inbox': 'Ouvrir Inbox', 'Open Notebook': 'Ouvrir Notebook', 'Open Table': 'Ouvrir Table', 'Open People': 'Ouvrir People', 'Open Workload': 'Ouvrir Workload',
     'Go to Now': 'Aller à Maintenant', 'Snow': 'Neige', 'Something went wrong': 'Un problème est survenu', 'Strings like :) will be converted to 🙂': 'Les chaînes comme :) seront converties en 🙂', 'Sustainment apps': 'Applications Sustainment',
   },
   es: {
+    "New Vision": "Nueva Vision", "Add a Vision": "Añadir una Vision", "A Vision says what this Space aims for. Portfolios and Initiatives hang under it, the way Objects and Elements hang under a Domain.": "Una Vision dice a qué aspira este Space. Los Portfolios y las Initiatives cuelgan de ella, como los Objects y los Elements de un Domain.", "A Space can hold several Visions.": "Un Space puede tener varias Visions.", "Create Vision": "Crear Vision", "Vision name…": "Nombre de la Vision…", "The aim, in one statement…": "El objetivo, en una frase…", "Vision name": "Nombre de la Vision", "No statement yet.": "Aún sin escribir.", "Portfolios": "Portfolios", "Remove from Vision": "Quitar de la Vision", "In another Vision": "En otra Vision", "Add a Vision first": "Añade primero una Vision", "Portfolios belong to a Vision, the way Objects belong to a Domain.": "Los Portfolios pertenecen a una Vision, como los Objects a un Domain.", "Not in a Vision": "Sin Vision", "Vision settings": "Ajustes de la Vision", "Name and deletion": "Nombre y eliminación", "Delete Vision": "Eliminar Vision", "Its Portfolios are deleted with it; its Initiatives stay, outside any Vision.": "Sus Portfolios se eliminan con ella; sus Initiatives se conservan, fuera de cualquier Vision.", "Delete the Vision \"{name}\"? Its Portfolios are deleted with it; its Initiatives stay, outside any Vision.": "¿Eliminar la Vision «{name}»? Sus Portfolios se eliminan con ella; sus Initiatives se conservan, fuera de cualquier Vision.", "What this Space aims for": "A qué aspira este Space", "A bundle of Initiatives in {name}": "Un conjunto de Initiatives en {name}", "An outcome to win in {name}": "Un resultado que lograr en {name}", "Only the Vision's author or a Space owner can change it.": "Solo quien escribió la Vision o un propietario del Space puede cambiarla.",
+    "The Portfolio could not be moved.": "No se pudo mover el Portfolio.",
+    "Portfolios nest, and an Initiative belongs to at most one Portfolio.": "Los Portfolios se anidan y una Initiative pertenece como máximo a un Portfolio.", "New Portfolio in {name}": "Nuevo Portfolio en {name}", "New Portfolio inside": "Nuevo Portfolio dentro", "Move into…": "Mover a…", "Top level": "Nivel superior", "Delete the Portfolio \"{name}\" and the {n} Portfolios inside it? Their Initiatives stay, outside any Portfolio.": "¿Eliminar el Portfolio «{name}» y los {n} Portfolios que contiene? Sus Initiatives se conservan, fuera de cualquier Portfolio.", "{n} alerts": "{n} alertas", "{n} Initiatives": "{n} Initiatives", "{n}% done": "{n} % hecho", "Portfolios inside": "Portfolios dentro", "No Initiatives in this Portfolio yet.": "Aún no hay Initiatives en este Portfolio.", "Description": "Descripción", "What this Portfolio is a bet on, and what it should add up to.": "A qué apuesta este Portfolio y en qué debería sumar.", "Write the Vision — the future this Space works toward, in one statement.": "Escribe la Vision: el futuro hacia el que trabaja este Space, en una frase.", "By when": "Para cuándo", "Set a horizon": "Fijar un horizonte", "No horizon yet": "Sin horizonte aún", "Why": "Por qué", "Why this, and what changes when it is true.": "Por qué esto y qué cambia cuando se cumple.", "Not written yet.": "Aún sin escribir.", "We will know because": "Lo sabremos porque", "No conditions yet.": "Aún no hay condiciones.", "Condition {n}": "Condición {n}", "Remove condition": "Quitar condición", "Add a condition": "Añadir una condición",
     "Only the Initiative's owner can move it.": "Solo quien creó la Initiative puede moverla.", "No nested Initiatives yet — group related Initiatives here.": "Aún no hay Initiatives anidadas; agrupa aquí las Initiatives relacionadas.",
-    "Vision": "Vision", "Portfolio": "Portfolio", "New Portfolio": "Nuevo Portfolio", "Portfolio name…": "Nombre del Portfolio…", "Add Portfolios": "Añadir Portfolios", "A Portfolio bundles Initiatives that serve one part of the Vision, so the Strategy reads as a few bets instead of a long list.": "Un Portfolio agrupa las Initiatives que sirven a una parte de la Vision, para que la Strategy se lea como unas pocas apuestas y no como una lista larga.", "An Initiative belongs to at most one Portfolio.": "Una Initiative pertenece como máximo a un Portfolio.", "Create Portfolio": "Crear Portfolio", "Not in a Portfolio": "Sin Portfolio", "Add Initiative": "Añadir Initiative", "Find an Initiative…": "Buscar una Initiative…", "In another Portfolio": "En otro Portfolio", "Remove from Portfolio": "Quitar del Portfolio", "Delete": "Eliminar", "Delete the Portfolio \"{name}\"? Its Initiatives stay, outside any Portfolio.": "¿Eliminar el Portfolio «{name}»? Sus Initiatives se conservan, fuera de cualquier Portfolio.", "What {space} aims for": "A qué aspira {space}", "Write the Vision — the future this Space works toward, and how it will know it got there.": "Escribe la Vision: el futuro hacia el que trabaja este Space y cómo sabrá que ha llegado.", "No Vision yet. The Space owner writes it here.": "Aún no hay Vision. La escribe aquí el propietario del Space.", "Saving…": "Guardando…", "Saved": "Guardado",
+    "Vision": "Vision", "Portfolio": "Portfolio", "New Portfolio": "Nuevo Portfolio", "Portfolio name…": "Nombre del Portfolio…", "Add Portfolios": "Añadir Portfolios", "A Portfolio bundles Initiatives that serve one part of the Vision, so the Strategy reads as a few bets instead of a long list.": "Un Portfolio agrupa las Initiatives que sirven a una parte de la Vision, para que la Strategy se lea como unas pocas apuestas y no como una lista larga.", "An Initiative belongs to at most one Portfolio.": "Una Initiative pertenece como máximo a un Portfolio.", "Create Portfolio": "Crear Portfolio", "Not in a Portfolio": "Sin Portfolio", "Add Initiative": "Añadir Initiative", "Find an Initiative…": "Buscar una Initiative…", "In another Portfolio": "En otro Portfolio", "Remove from Portfolio": "Quitar del Portfolio", "Delete": "Eliminar", "Delete the Portfolio \"{name}\"? Its Initiatives stay, outside any Portfolio.": "¿Eliminar el Portfolio «{name}»? Sus Initiatives se conservan, fuera de cualquier Portfolio.", "Saving…": "Guardando…", "Saved": "Guardado",
     "Default length": "Duración predeterminada", "Days a new Phase spans, end date included": "Días que abarca una Phase nueva, fecha de fin incluida", "days": "días", "Start": "Inicio", "Where a new Phase begins": "Dónde empieza una Phase nueva", "After the last Phase": "El día después de la última Phase", "How a new Phase starts out in each Domain. Leave the length blank to start with empty dates.": "Valores iniciales de una Phase nueva por Domain. Deja la duración vacía para empezar sin fechas.", "No Domains in this Space yet. Phase defaults are set per Domain.": "Aún no hay Domains en este Space. Los valores predeterminados de Phase se fijan por Domain.", "Window": "Ventana", "Scale": "Escala", "Quarter": "Trimestre", "How much of the year one screen shows": "Cuánto del año cabe en una pantalla", "Months back": "Meses atrás", "How far before this month the window starts": "Hasta dónde empieza la ventana antes de este mes", "Months ahead": "Meses adelante", "How far after this month the window runs": "Hasta dónde llega la ventana después de este mes", "Marks": "Marcas", "Today marker": "Marca de hoy", "A line through today across every row": "Una línea por hoy en todas las filas", "Progress fill": "Relleno de progreso", "Shade each band by how much of its work is done": "Sombrear cada banda según el trabajo terminado",
     'Domain settings': 'Ajustes del Domain', 'Members': 'Miembros', 'Name and privacy': 'Nombre y privacidad', 'Name and membership': 'Nombre y pertenencia', 'Manage team members': 'Gestionar miembros', 'How Initiatives are judged': 'Cómo se evalúan las Initiatives', 'How Phases divide time': 'Cómo las Phases dividen el tiempo', 'How the Timeline is drawn': 'Cómo se dibuja la Timeline', 'Close': 'Cerrar',
     'Activity settings': 'Ajustes de Activity', 'Strategy settings': 'Ajustes de Strategy', 'Execution settings': 'Ajustes de Execution', 'Sustainment settings': 'Ajustes de Sustainment', 'Initiative': 'Initiative', '{title} settings are coming soon.': 'Los ajustes de {title} llegarán pronto.',
     'Day': 'Día', 'Week': 'Semana', 'Month': 'Mes', 'Choose scope': 'Elegir alcance', 'Choose calendar scope': 'Elegir el alcance del Calendar', 'Calendar scope lists': 'Listas de alcance del Calendar', 'Find a calendar…': 'Buscar un calendario…', 'No matches.': 'Sin coincidencias.',
     'Carbon': 'Carbono', "Couldn't save": 'No se pudo guardar', 'Domain Elements': 'Elements del Domain', 'Graphite': 'Grafito', 'Ivory': 'Marfil',
     'Mid-level structural unit': 'Unidad estructural intermedia', 'Midnight': 'Medianoche', 'Mist': 'Niebla', 'New Element': 'Nuevo Element', 'New Initiative': 'Nueva Initiative', 'New Object': 'Nuevo Object',
-    'No notebooks yet — click + to add one.': 'Todavía no hay cuadernos. Pulsa + para añadir uno.', 'No tables yet — click + to add one.': 'Todavía no hay tablas. Pulsa + para añadir una.',
-    'Open Calendar': 'Abrir Calendar', 'Open Inbox': 'Abrir Inbox', 'Open Notebook': 'Abrir Notebook', 'Open Table': 'Abrir Table', 'Open Team': 'Abrir Team', 'Open Workload': 'Abrir Workload',
+    'Open Calendar': 'Abrir Calendar', 'Open Inbox': 'Abrir Inbox', 'Open Notebook': 'Abrir Notebook', 'Open Table': 'Abrir Table', 'Open People': 'Abrir People', 'Open Workload': 'Abrir Workload',
     'Go to Now': 'Ir a Ahora', 'Snow': 'Nieve', 'Something went wrong': 'Algo salió mal', 'Strings like :) will be converted to 🙂': 'Las cadenas como :) se convertirán en 🙂', 'Sustainment apps': 'Aplicaciones Sustainment',
   },
 };
@@ -1237,11 +1257,15 @@ Object.assign(ko, CRM_TRANSLATIONS.ko);
 Object.assign(fr, CRM_TRANSLATIONS.fr);
 Object.assign(es, CRM_TRANSLATIONS.es);
 
-// The SCM App (Sustainment).
-Object.assign(ja, SCM_MESSAGES.ja);
-Object.assign(ko, SCM_MESSAGES.ko);
-Object.assign(fr, SCM_MESSAGES.fr);
-Object.assign(es, SCM_MESSAGES.es);
+Object.assign(ja, WORKLOAD_TRANSLATIONS.ja);
+Object.assign(ko, WORKLOAD_TRANSLATIONS.ko);
+Object.assign(fr, WORKLOAD_TRANSLATIONS.fr);
+Object.assign(es, WORKLOAD_TRANSLATIONS.es);
+
+Object.assign(ja, AUDIT_TRANSLATIONS.ja);
+Object.assign(ko, AUDIT_TRANSLATIONS.ko);
+Object.assign(fr, AUDIT_TRANSLATIONS.fr);
+Object.assign(es, AUDIT_TRANSLATIONS.es);
 
 // Settings › Integrations: Google sign-in (OAuth) for Google Drive.
 Object.assign(ja, {
@@ -1343,3 +1367,165 @@ Object.assign(es, {
   'This Google sign-in has expired. Connect again.': 'Este inicio de sesión con Google caducó. Vuelve a conectar.',
   'This Google sign-in has already been used or has expired.': 'Este inicio de sesión con Google ya se usó o caducó.',
 });
+
+Object.assign(ja, {
+  'Add Objects to this Domain': 'この Domain に Object を追加',
+  'Objects are mid-level structural units — projects, departments, or any container you want to organise.': 'Object は中間の構造単位です。プロジェクト、部署など、まとめたい単位を表します。',
+  'Objects live directly under a Domain (no nesting) and can be shared across multiple Domains.': 'Object は Domain の直下に置き（入れ子にはできません）、複数の Domain で共有できます。',
+  'Create Object': 'Object を作成',
+  'Create your first Domain': '最初の Domain を作成',
+  'A Domain is where work happens — a company, a department, or a project portfolio. Objects and Elements live inside it.': 'Domain は活動の場です。会社、部署、プロジェクト群などを表し、Object と Element はその中に置きます。',
+  'You can add more Domains later and share Objects across them.': 'Domain はあとから追加でき、Object は複数の Domain で共有できます。',
+  'Your personal Elements': '自分だけの Element',
+  "Anything that's yours alone — quick captures, personal todos, ideas — lives here.": 'メモ、個人の ToDo、アイデアなど、自分だけのものをここに置きます。',
+  "You'll also see Elements from shared Domains where you're assigned.": '共有 Domain で自分が担当している Element もここに表示されます。',
+  'Create Element': 'Element を作成',
+  'Add Elements to this Domain': 'この Domain に Element を追加',
+  'Elements are the smallest unit you track — anything actionable or worth recording.': 'Element は管理する最小単位です。行動できること、記録しておきたいことを表します。',
+  'Domain-direct Elements live at the top level. Open an Object to add Elements there.': 'ここで作る Element は Domain 直下に置かれます。Object の中に追加するには Object を開いてください。',
+  'Add Elements to this Object': 'この Object に Element を追加',
+  'You can also add sections, set priorities, assignees, and due dates.': 'セクションの追加や、優先度・担当・期限の設定もできます。',
+  'Add Phases': 'Phase を追加',
+  'A Phase time-boxes a stage of work — requirements, design, build.': 'Phase は活動を期間で区切る単位です（要件定義、設計、構築など）。',
+  'Assign Objects and Elements to it and track what each period covers.': 'Object と Element を割り当てて、各期間で何を扱うかを追えます。',
+  'Create Phase': 'Phase を作成',
+  'Add Initiatives': 'Initiative を追加',
+  'An Initiative groups Objects across Domains around one outcome — what to achieve and how to win.': 'Initiative は、一つの成果に向けて Domain をまたいで Object を束ねます。何を達成し、どう勝つかを表します。',
+  'Each Initiative gets its own timeline and resource view.': 'Initiative ごとにタイムラインとリソースの表示があります。',
+  'Create Initiative': 'Initiative を作成',
+});
+
+Object.assign(ko, {
+  "Add Objects to this Domain": "이 Domain에 Object 추가",
+  "Objects are mid-level structural units — projects, departments, or any container you want to organise.": "Object는 중간 수준의 구조 단위입니다. 프로젝트, 부서 등 묶고 싶은 단위를 나타냅니다.",
+  "Objects live directly under a Domain (no nesting) and can be shared across multiple Domains.": "Object는 Domain 바로 아래에 두며(중첩 불가) 여러 Domain에서 공유할 수 있습니다.",
+  "Create Object": "Object 만들기",
+  "Create your first Domain": "첫 Domain 만들기",
+  "A Domain is where work happens — a company, a department, or a project portfolio. Objects and Elements live inside it.": "Domain은 활동이 이루어지는 곳입니다. 회사, 부서, 프로젝트 묶음 등을 나타내며 Object와 Element가 그 안에 놓입니다.",
+  "You can add more Domains later and share Objects across them.": "Domain은 나중에 더 추가할 수 있고, Object는 여러 Domain에서 공유할 수 있습니다.",
+  "Your personal Elements": "나만의 Element",
+  "Anything that's yours alone — quick captures, personal todos, ideas — lives here.": "빠른 메모, 개인 할 일, 아이디어 등 나만의 것을 여기에 둡니다.",
+  "You'll also see Elements from shared Domains where you're assigned.": "공유 Domain에서 내가 담당하는 Element도 여기에 표시됩니다.",
+  "Create Element": "Element 만들기",
+  "Add Elements to this Domain": "이 Domain에 Element 추가",
+  "Elements are the smallest unit you track — anything actionable or worth recording.": "Element는 관리하는 가장 작은 단위입니다. 실행할 수 있거나 기록해 둘 만한 것을 나타냅니다.",
+  "Domain-direct Elements live at the top level. Open an Object to add Elements there.": "여기서 만든 Element는 Domain 바로 아래에 놓입니다. Object 안에 추가하려면 Object를 여세요.",
+  "Add Elements to this Object": "이 Object에 Element 추가",
+  "You can also add sections, set priorities, assignees, and due dates.": "섹션을 추가하고 우선순위, 담당자, 기한도 설정할 수 있습니다.",
+  "Add Phases": "Phase 추가",
+  "A Phase time-boxes a stage of work — requirements, design, build.": "Phase는 활동을 기간으로 구분하는 단위입니다(요구사항, 설계, 구축 등).",
+  "Assign Objects and Elements to it and track what each period covers.": "Object와 Element를 배정해 각 기간에 무엇을 다루는지 추적합니다.",
+  "Create Phase": "Phase 만들기",
+  "Add Initiatives": "Initiative 추가",
+  "An Initiative groups Objects across Domains around one outcome — what to achieve and how to win.": "Initiative는 하나의 성과를 향해 여러 Domain의 Object를 묶습니다. 무엇을 달성하고 어떻게 이길지를 나타냅니다.",
+  "Each Initiative gets its own timeline and resource view.": "Initiative마다 타임라인과 리소스 보기가 있습니다.",
+  "Create Initiative": "Initiative 만들기",
+});
+
+Object.assign(fr, {
+  "Add Objects to this Domain": "Ajouter des Objects à ce Domain",
+  "Objects are mid-level structural units — projects, departments, or any container you want to organise.": "Les Objects sont des unités structurelles intermédiaires : projets, services ou tout ensemble que vous souhaitez organiser.",
+  "Objects live directly under a Domain (no nesting) and can be shared across multiple Domains.": "Les Objects se placent directement sous un Domain (sans imbrication) et peuvent être partagés entre plusieurs Domains.",
+  "Create Object": "Créer un Object",
+  "Create your first Domain": "Créez votre premier Domain",
+  "A Domain is where work happens — a company, a department, or a project portfolio. Objects and Elements live inside it.": "Un Domain est le lieu où le travail se fait : une entreprise, un service ou un portefeuille de projets. Les Objects et les Elements s’y trouvent.",
+  "You can add more Domains later and share Objects across them.": "Vous pourrez ajouter d’autres Domains plus tard et partager des Objects entre eux.",
+  "Your personal Elements": "Vos Elements personnels",
+  "Anything that's yours alone — quick captures, personal todos, ideas — lives here.": "Tout ce qui n’appartient qu’à vous (notes rapides, tâches personnelles, idées) se trouve ici.",
+  "You'll also see Elements from shared Domains where you're assigned.": "Vous verrez aussi les Elements des Domains partagés qui vous sont assignés.",
+  "Create Element": "Créer un Element",
+  "Add Elements to this Domain": "Ajouter des Elements à ce Domain",
+  "Elements are the smallest unit you track — anything actionable or worth recording.": "Les Elements sont la plus petite unité suivie : tout ce qui peut être fait ou mérite d’être consigné.",
+  "Domain-direct Elements live at the top level. Open an Object to add Elements there.": "Les Elements créés ici se placent directement sous le Domain. Ouvrez un Object pour y ajouter des Elements.",
+  "Add Elements to this Object": "Ajouter des Elements à cet Object",
+  "You can also add sections, set priorities, assignees, and due dates.": "Vous pouvez aussi ajouter des sections et définir priorités, responsables et échéances.",
+  "Add Phases": "Ajouter des Phases",
+  "A Phase time-boxes a stage of work — requirements, design, build.": "Une Phase délimite une étape du travail dans le temps : exigences, conception, réalisation.",
+  "Assign Objects and Elements to it and track what each period covers.": "Affectez-lui des Objects et des Elements et suivez ce que couvre chaque période.",
+  "Create Phase": "Créer une Phase",
+  "Add Initiatives": "Ajouter des Initiatives",
+  "An Initiative groups Objects across Domains around one outcome — what to achieve and how to win.": "Une Initiative regroupe des Objects de plusieurs Domains autour d’un résultat : quoi atteindre et comment gagner.",
+  "Each Initiative gets its own timeline and resource view.": "Chaque Initiative dispose de sa propre chronologie et de sa vue des ressources.",
+  "Create Initiative": "Créer une Initiative",
+});
+
+Object.assign(es, {
+  "Add Objects to this Domain": "Añadir Objects a este Domain",
+  "Objects are mid-level structural units — projects, departments, or any container you want to organise.": "Los Objects son unidades estructurales intermedias: proyectos, departamentos o cualquier conjunto que quieras organizar.",
+  "Objects live directly under a Domain (no nesting) and can be shared across multiple Domains.": "Los Objects se sitúan directamente bajo un Domain (sin anidar) y pueden compartirse entre varios Domains.",
+  "Create Object": "Crear Object",
+  "Create your first Domain": "Crea tu primer Domain",
+  "A Domain is where work happens — a company, a department, or a project portfolio. Objects and Elements live inside it.": "Un Domain es donde ocurre el trabajo: una empresa, un departamento o una cartera de proyectos. Los Objects y los Elements viven dentro.",
+  "You can add more Domains later and share Objects across them.": "Podrás añadir más Domains después y compartir Objects entre ellos.",
+  "Your personal Elements": "Tus Elements personales",
+  "Anything that's yours alone — quick captures, personal todos, ideas — lives here.": "Todo lo que es solo tuyo (notas rápidas, tareas personales, ideas) está aquí.",
+  "You'll also see Elements from shared Domains where you're assigned.": "También verás los Elements de Domains compartidos que tengas asignados.",
+  "Create Element": "Crear Element",
+  "Add Elements to this Domain": "Añadir Elements a este Domain",
+  "Elements are the smallest unit you track — anything actionable or worth recording.": "Los Elements son la unidad más pequeña que se sigue: cualquier cosa accionable o que merezca registrarse.",
+  "Domain-direct Elements live at the top level. Open an Object to add Elements there.": "Los Elements creados aquí quedan directamente bajo el Domain. Abre un Object para añadir Elements dentro.",
+  "Add Elements to this Object": "Añadir Elements a este Object",
+  "You can also add sections, set priorities, assignees, and due dates.": "También puedes añadir secciones y definir prioridades, responsables y fechas límite.",
+  "Add Phases": "Añadir Phases",
+  "A Phase time-boxes a stage of work — requirements, design, build.": "Una Phase delimita en el tiempo una etapa del trabajo: requisitos, diseño, construcción.",
+  "Assign Objects and Elements to it and track what each period covers.": "Asígnale Objects y Elements y sigue qué cubre cada periodo.",
+  "Create Phase": "Crear Phase",
+  "Add Initiatives": "Añadir Initiatives",
+  "An Initiative groups Objects across Domains around one outcome — what to achieve and how to win.": "Una Initiative agrupa Objects de varios Domains en torno a un resultado: qué lograr y cómo ganar.",
+  "Each Initiative gets its own timeline and resource view.": "Cada Initiative tiene su propia línea de tiempo y vista de recursos.",
+  "Create Initiative": "Crear Initiative",
+});
+
+// Tool pages (CRM): the tab strip and the subject's head.
+Object.assign(ja, { 'Views': 'ビュー', 'Overview': '概要', 'Properties': 'プロパティ', 'Description': '説明', 'Hide this view': 'このビューを隠す', 'Show a view': 'ビューを表示', '{n} days': '{n} 日' });
+Object.assign(ko, { 'Views': '보기', 'Overview': '개요', 'Properties': '속성', 'Description': '설명', 'Hide this view': '이 보기 숨기기', 'Show a view': '보기 표시', '{n} days': '{n}일' });
+Object.assign(fr, { 'Views': 'Vues', 'Overview': 'Aperçu', 'Properties': 'Propriétés', 'Description': 'Description', 'Hide this view': 'Masquer cette vue', 'Show a view': 'Afficher une vue', '{n} days': '{n} jours' });
+Object.assign(es, { 'Views': 'Vistas', 'Overview': 'Resumen', 'Properties': 'Propiedades', 'Description': 'Descripción', 'Hide this view': 'Ocultar esta vista', 'Show a view': 'Mostrar una vista', '{n} days': '{n} días' });
+
+// Slides (ActivitySpace/sustainment/slides): its sidebar. The app name stays English.
+Object.assign(ja, { 'In the open deck’s folder, or the first one': '開いている資料のフォルダ（なければ最初のフォルダ）に', 'A place to keep decks together': '資料をまとめて置く場所', 'A .kata.json file, as a new deck': '.kata.json ファイルを新しい資料として', 'Slides': 'Slides', 'New deck': '新しい資料', 'Delete folder': 'フォルダを削除', 'Duplicate': '複製', 'Move to': '移動先', 'Delete deck': '資料を削除', 'New folder': '新しいフォルダ', 'Open a deck file': '資料ファイルを開く', 'My skills': 'マイ・スキル', 'Look library': '世界観ライブラリ' });
+Object.assign(ko, { 'In the open deck’s folder, or the first one': '열려 있는 자료의 폴더(없으면 첫 번째 폴더)에', 'A place to keep decks together': '자료를 모아 두는 곳', 'A .kata.json file, as a new deck': '.kata.json 파일을 새 자료로', 'Slides': 'Slides', 'New deck': '새 자료', 'Delete folder': '폴더 삭제', 'Duplicate': '복제', 'Move to': '이동', 'Delete deck': '자료 삭제', 'New folder': '새 폴더', 'Open a deck file': '자료 파일 열기', 'My skills': '내 스킬', 'Look library': '룩 라이브러리' });
+Object.assign(fr, { 'In the open deck’s folder, or the first one': 'Dans le dossier de la présentation ouverte, sinon le premier', 'A place to keep decks together': 'Un endroit pour regrouper les présentations', 'A .kata.json file, as a new deck': 'Un fichier .kata.json, comme nouvelle présentation', 'Slides': 'Slides', 'New deck': 'Nouvelle présentation', 'Delete folder': 'Supprimer le dossier', 'Duplicate': 'Dupliquer', 'Move to': 'Déplacer vers', 'Delete deck': 'Supprimer la présentation', 'New folder': 'Nouveau dossier', 'Open a deck file': 'Ouvrir un fichier de présentation', 'My skills': 'Mes compétences', 'Look library': 'Bibliothèque de styles' });
+Object.assign(es, { 'In the open deck’s folder, or the first one': 'En la carpeta de la presentación abierta, o en la primera', 'A place to keep decks together': 'Un lugar para agrupar presentaciones', 'A .kata.json file, as a new deck': 'Un archivo .kata.json, como nueva presentación', 'Slides': 'Slides', 'New deck': 'Nueva presentación', 'Delete folder': 'Eliminar carpeta', 'Duplicate': 'Duplicar', 'Move to': 'Mover a', 'Delete deck': 'Eliminar presentación', 'New folder': 'Nueva carpeta', 'Open a deck file': 'Abrir un archivo de presentación', 'My skills': 'Mis habilidades', 'Look library': 'Biblioteca de estilos' });
+
+// Domain viewers: read everything in a Domain, change nothing.
+Object.assign(ja, { 'Viewer': '閲覧者', 'Invite as': '招待する役割', 'Invited as viewer': '閲覧者として招待中', 'View only': '閲覧のみ', 'Viewers': '閲覧者', 'Make viewer': '閲覧者にする', 'Make member': 'メンバーにする', 'Viewers read everything in this Domain and change nothing.': '閲覧者はこの Domain のすべてを読めますが、何も変更できません。', 'This person already works in this Domain through its Space. Invite them as a member, or change their role in the member list.': 'この人は Space を通じてすでにこの Domain で作業できます。メンバーとして招待するか、メンバー一覧で役割を変更してください。', 'The role could not be changed. Try again.': '役割を変更できませんでした。もう一度お試しください。' });
+Object.assign(ko, { 'Viewer': '뷰어', 'Invite as': '초대 역할', 'Invited as viewer': '뷰어로 초대됨', 'View only': '보기 전용', 'Viewers': '뷰어', 'Make viewer': '뷰어로 변경', 'Make member': '멤버로 변경', 'Viewers read everything in this Domain and change nothing.': '뷰어는 이 Domain의 모든 것을 볼 수 있지만 아무것도 변경할 수 없습니다.', 'This person already works in this Domain through its Space. Invite them as a member, or change their role in the member list.': '이 사람은 Space를 통해 이미 이 Domain에서 작업할 수 있습니다. 멤버로 초대하거나 멤버 목록에서 역할을 변경하세요.', 'The role could not be changed. Try again.': '역할을 변경하지 못했습니다. 다시 시도하세요.' });
+Object.assign(fr, { 'Viewer': 'Lecteur', 'Invite as': 'Inviter comme', 'Invited as viewer': 'Invité comme lecteur', 'View only': 'Lecture seule', 'Viewers': 'Lecteurs', 'Make viewer': 'Passer en lecteur', 'Make member': 'Passer en membre', 'Viewers read everything in this Domain and change nothing.': 'Les lecteurs voient tout dans ce Domain et ne modifient rien.', 'This person already works in this Domain through its Space. Invite them as a member, or change their role in the member list.': 'Cette personne travaille déjà dans ce Domain via son Space. Invitez-la comme membre, ou changez son rôle dans la liste des membres.', 'The role could not be changed. Try again.': "Le rôle n'a pas pu être modifié. Réessayez." });
+Object.assign(es, { 'Viewer': 'Lector', 'Invite as': 'Invitar como', 'Invited as viewer': 'Invitado como lector', 'View only': 'Solo lectura', 'Viewers': 'Lectores', 'Make viewer': 'Cambiar a lector', 'Make member': 'Cambiar a miembro', 'Viewers read everything in this Domain and change nothing.': 'Los lectores ven todo en este Domain y no cambian nada.', 'This person already works in this Domain through its Space. Invite them as a member, or change their role in the member list.': 'Esta persona ya trabaja en este Domain a través de su Space. Invítala como miembro o cambia su rol en la lista de miembros.', 'The role could not be changed. Try again.': 'No se pudo cambiar el rol. Inténtalo de nuevo.' });
+
+// Board and page surfaces — widget names, the picker, Calendar, Create
+// Domain — and the boards' own (Decision Lab, Domain approaches).
+Object.assign(ja, SURFACE_TRANSLATIONS.ja);
+Object.assign(ko, SURFACE_TRANSLATIONS.ko);
+Object.assign(fr, SURFACE_TRANSLATIONS.fr);
+Object.assign(es, SURFACE_TRANSLATIONS.es);
+Object.assign(ja, STRATEGY_BOARD_TRANSLATIONS.ja);
+Object.assign(ko, STRATEGY_BOARD_TRANSLATIONS.ko);
+Object.assign(fr, STRATEGY_BOARD_TRANSLATIONS.fr);
+Object.assign(es, STRATEGY_BOARD_TRANSLATIONS.es);
+Object.assign(ja, APPROACH_TRANSLATIONS.ja);
+Object.assign(ko, APPROACH_TRANSLATIONS.ko);
+Object.assign(fr, APPROACH_TRANSLATIONS.fr);
+Object.assign(es, APPROACH_TRANSLATIONS.es);
+
+// Each area's own strings: the shared parts, widget bodies, Strategy,
+// Execution, Notebook/Table/Slides, the app shell and settings, Operations,
+// the Design widget.
+for (const area of [SHARED_TRANSLATIONS, WIDGET_TRANSLATIONS, STRATEGY_TRANSLATIONS, EXECUTION_TRANSLATIONS, DOCUMENTS_TRANSLATIONS, APP_TRANSLATIONS, OPERATIONS_TRANSLATIONS, DESIGN_TRANSLATIONS]) {
+  Object.assign(ja, area.ja);
+  Object.assign(ko, area.ko);
+  Object.assign(fr, area.fr);
+  Object.assign(es, area.es);
+}
+
+// People (ActivitySpace/sustainment/team). Last, so the app name stays
+// English everywhere, like every other concept name.
+Object.assign(ja, PEOPLE_TRANSLATIONS.ja);
+Object.assign(ko, PEOPLE_TRANSLATIONS.ko);
+Object.assign(fr, PEOPLE_TRANSLATIONS.fr);
+Object.assign(es, PEOPLE_TRANSLATIONS.es);
+Object.assign(ja, { 'New chat': '新しいチャット', 'No folder': 'フォルダなし', 'Folders': 'フォルダ', 'Conversations': '会話', 'Delete conversation': '会話を削除', 'Start a new conversation': '新しい会話を始める', 'Delete the conversation "{name}"? This cannot be undone.': '会話「{name}」を削除しますか？元に戻せません。', 'Delete the folder "{name}" and its {count} conversations? This cannot be undone.': 'フォルダ「{name}」と中の会話 {count} 件を削除しますか？元に戻せません。' });
+Object.assign(ko, { 'New chat': '새 채팅', 'No folder': '폴더 없음', 'Folders': '폴더', 'Conversations': '대화', 'Delete conversation': '대화 삭제', 'Start a new conversation': '새 대화 시작', 'Delete the conversation "{name}"? This cannot be undone.': '대화 "{name}"을(를) 삭제할까요? 되돌릴 수 없습니다.', 'Delete the folder "{name}" and its {count} conversations? This cannot be undone.': '폴더 "{name}"와(과) 대화 {count}개를 삭제할까요? 되돌릴 수 없습니다.' });
+Object.assign(fr, { 'New chat': 'Nouvelle discussion', 'No folder': 'Aucun dossier', 'Folders': 'Dossiers', 'Conversations': 'Conversations', 'Delete conversation': 'Supprimer la conversation', 'Start a new conversation': 'Commencer une nouvelle conversation', 'Delete the conversation "{name}"? This cannot be undone.': 'Supprimer la conversation « {name} » ? Cette action est irréversible.', 'Delete the folder "{name}" and its {count} conversations? This cannot be undone.': 'Supprimer le dossier « {name} » et ses {count} conversations ? Cette action est irréversible.' });
+Object.assign(es, { 'New chat': 'Nuevo chat', 'No folder': 'Sin carpeta', 'Folders': 'Carpetas', 'Conversations': 'Conversaciones', 'Delete conversation': 'Eliminar conversación', 'Start a new conversation': 'Empezar una conversación nueva', 'Delete the conversation "{name}"? This cannot be undone.': '¿Eliminar la conversación «{name}»? No se puede deshacer.', 'Delete the folder "{name}" and its {count} conversations? This cannot be undone.': '¿Eliminar la carpeta «{name}» y sus {count} conversaciones? No se puede deshacer.' });

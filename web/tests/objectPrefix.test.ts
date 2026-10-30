@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { suggestObjectPrefix } from '@/ActivitySpace/execution/object/objectPrefix';
+import { suggestObjectPrefix } from '@/Function/shared/objectPrefix';
 
 describe('suggestObjectPrefix', () => {
   it('uses token initials for multi-token names', () => {
