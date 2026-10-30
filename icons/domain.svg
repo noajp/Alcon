@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="256" height="256" fill="none">
-  <g fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
-          <path opacity="0.4" d="M9 12 L9 36 M39 12 L39 36"></path>
-          <path d="M10.99 11.07 L22.01 5.93 Q24 5 25.99 5.93 L37.01 11.07 Q39 12 37.01 12.93 L25.99 18.07 Q24 19 22.01 18.07 L10.99 12.93 Q9 12 10.99 11.07 Z"></path>
-          <path opacity="0.62" d="M10.99 23.07 L22.01 17.93 Q24 17 25.99 17.93 L37.01 23.07 Q39 24 37.01 24.93 L25.99 30.07 Q24 31 22.01 30.07 L10.99 24.93 Q9 24 10.99 23.07 Z"></path>
-          <path d="M10.99 35.07 L22.01 29.93 Q24 29 25.99 29.93 L37.01 35.07 Q39 36 37.01 36.93 L25.99 42.07 Q24 43 22.01 42.07 L10.99 36.93 Q9 36 10.99 35.07 Z"></path>
-        </g>
-</svg>
