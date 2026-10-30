@@ -16,19 +16,9 @@ Initiative は目的・前提・意思決定・成功条件を持ち、担当や
 
 **Strategy と Execution は分けて表示し、相互に参照できるようにする。** 「意図」と「行動」を区別しつつ、Initiative には配下の Object と実行上のリスク・負荷を、Object には貢献先の Initiative と意図を常に表示する。目的と実行状況を一クリックで行き来できることを重視する。
 
-## AI 駆動ループ
+## 盤面から開発するとき
 
-**バックログは盤面（Supabase の `elements`）で一元管理する。** 外部の TODO リストを作らず、セッションが終了しても盤面を読めば作業を再開できる状態を保つ。
-
-セッションを始めたら、まず盤面を見る。
-
-| 盤面の状態 | 規約 |
-|---|---|
-| 着手できる Element がある | [friction](./skills/friction/SKILL.md) — 実装 → PR → レビューゲート → マージ → 書き戻し |
-| 空いている | [exercise](./skills/exercise/SKILL.md) — 新たな仕事を探さず、架空の作戦を運用し、使いにくい点を記録する |
-| PR をレビューする | [code-review](./skills/code-review/SKILL.md) |
-
-課金、不可逆な操作、結論が出ない設計判断、作業の停滞など、ユーザーの判断が必要な事項は Object「Decisions — 判断」に Element として起票する。ユーザーにアサインし、判断待ちの間はほかの作業を進める。市場投入に関わる仕事は Initiative「Friction GTM — 市場投入」の Ends をもとに、Object「Go-to-Market」に登録する。
+ユーザーが「盤面から取って」「演習して」「レビューして」と頼んだときだけ [friction](./skills/friction/SKILL.md) を読む。それ以外のセッションでは盤面を見に行かず、頼まれたことをする。大きな設計判断は [docs/architecture.md](../docs/architecture.md) に1項目足す。
 
 ## コマンド
 
@@ -57,7 +47,7 @@ npx vercel --prod            # 本番デプロイ
 
 `web/src/` の下に、`shell/`（外殻 — ModeRail / AppSidebar / CommandPalette / MainContent / viewRegistry）、`ActivitySpace/`（盤面の面 — `home/` `strategy/` `execution/` `sustainment/`）、`Function/`（盤面を成立させる仕組みと画面をまたぐモデル — `widget/` `property/` `settings/` `space/` `sync/` `shared/`、`strategy/` `crm/` `team/` など概念ごと）、`hooks/`（Supabase の CRUD は全部ここ）、`shared/designTokens.ts`、`lib/` `providers/` `auth/` `types/` `ui/`。`app/` は layout / page / globals.css だけ。
 
-root 直下は `supabase/`（migrations と functions）、`ops/`（自走ループの配管）、`docs/`（adr / friction-risk-register.md）、`website/`（LP）。
+root 直下は `supabase/`（migrations と functions）、`ops/`（盤面から開発するときの配管）、`docs/`（architecture.md と外部向けの API・MCP の説明）、`website/`（LP）。
 
 ## 実装ルール
 
@@ -76,7 +66,7 @@ root 直下は `supabase/`（migrations と functions）、`ops/`（自走ルー
 - Project ID: `rkugtcqztkkacvoylupw`。閲覧範囲は RLS で制御する。CRUD は `hooks/` に集約
 - AI は Edge Functions 経由（`alcon-copilot` / `run-agent` / `summarize-note` 等）
 - **`supabase/` は root にのみ存在する**（migrations・functions とも）。`web/supabase/` は作らない
-- **既存テーブルに触る migration は `to_regclass` ガード必須** —— 基底スキーマは migrations フォルダの外にあり、PR の preview branch は空 DB に replay する（書式は [friction/references/db.md](./skills/friction/references/db.md)）
+- **既存テーブルに触る migration は `to_regclass` ガード必須** —— 基底スキーマは migrations フォルダの外にあり、PR の preview branch は空 DB に replay する（書式は [friction](./skills/friction/SKILL.md) の「DB を直に触るとき」）
 
 ## リポジトリ直下を「旧版」として消さない
 

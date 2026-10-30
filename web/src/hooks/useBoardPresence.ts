@@ -12,7 +12,7 @@ export interface BoardViewer { userId: string; name: string }
 
 /**
  * Who else has this subject's board open right now. The channel is private:
- * the server lets in only people who can see the subject (docs/adr/0041), so
+ * the server lets in only people who can see the subject (ADR 0041 in docs/architecture.md), so
  * nobody learns who is looking at something they cannot open. A personal
  * board has no one else to show.
  */

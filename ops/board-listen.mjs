@@ -11,13 +11,12 @@
 //
 // strategy_comments is the downward direction. Everything else here reports what
 // execution did; a Initiative comment is where the intent is written, and one that
-// names the agent is an order. See docs/adr/0012.
+// names the agent is an order. See ADR 0012 in docs/architecture.md.
 //
 // element_comments carries a second board's worth of traffic once another
 // team's is on the same database, and the same naming rule decides what of it
 // is ours: FEEDBACK for a foreign Element's comment that names the agent,
-// COMMENT for anything on Friction Dev's own. See elementScope.mjs and
-// .claude/skills/friction/FEEDBACK.md.
+// COMMENT for anything on Friction Dev's own. See elementScope.mjs.
 //
 // Deliberately dependency-free — it speaks the Phoenix wire protocol over node's
 // built-in WebSocket rather than pulling @supabase/supabase-js into an ops

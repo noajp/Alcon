@@ -4,7 +4,7 @@ import { betaZodOutputFormat } from 'npm:@anthropic-ai/sdk@0.135.0/helpers/beta/
 import { z } from 'npm:zod@4.6.7';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.86.2';
 
-// The Slides editor's AI path (docs/adr/0042): Claude returns the deck's JSON
+// The Slides editor's AI path (ADR 0042 in docs/architecture.md): Claude returns the deck's JSON
 // only — pages, their logic and content — and the editor's own parts draw it.
 // The editor turns the returned slides into its deck (buildContent /
 // normalizeSlide) itself, so this function shares no code with the web app.
