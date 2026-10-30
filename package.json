@@ -7,8 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "sync": "node ops/git-sync.mjs",
-    "sync:dry": "node ops/git-sync.mjs --dry-run"
+    "sync": "node .claude/ops/git-sync.mjs",
+    "sync:dry": "node .claude/ops/git-sync.mjs --dry-run",
+    "rename-product": "node .claude/ops/rename-product.mjs"
   },
   "overrides": {
     "react": "19.2.0",

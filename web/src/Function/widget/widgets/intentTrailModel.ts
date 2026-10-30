@@ -5,7 +5,7 @@
 // Objects and Phases they touch (`intent_bindings`). Until now that edge could
 // only be read from the Initiative's side: an Element existed because of a
 // decision and had no way to say so, and the person holding it never saw the
-// assumption that would fall over if they stopped. PRODUCT.md names this as
+// assumption that would fall over if they stopped. the product names this as
 // the founding pain — "タスクはそもそもの意図を失っている" — and this model
 // is the reading in the other direction.
 //

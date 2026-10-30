@@ -2,8 +2,6 @@
 
 Next.js 16 + Supabase + Tailwind CSS + recharts。企業・軍事作戦・病院など、さまざまな組織の活動を少数の共通概念で扱う。原則は **「意図で委ね、成果と根拠で確かめる」**。人間が目的・成功条件・制約・権限を示し、AI はその意図に沿って権限内で手段を選ぶ。権限を超える判断が必要になったり、前提が成り立たなくなったりした場合は、人間に判断を求める。
 
-思想・データモデル・境界と権限の詳細は [PRODUCT.md](./PRODUCT.md)（製品判断をするときに読む）。
-
 ## 概念モデル
 
 | 分類 | 何を扱うか | 単位 |
@@ -16,9 +14,9 @@ Initiative は目的・前提・意思決定・成功条件を持ち、担当や
 
 **Strategy と Execution は分けて表示し、相互に参照できるようにする。** 「意図」と「行動」を区別しつつ、Initiative には配下の Object と実行上のリスク・負荷を、Object には貢献先の Initiative と意図を常に表示する。目的と実行状況を一クリックで行き来できることを重視する。
 
-## 盤面から開発するとき
+## Alcon の Element から開発するとき
 
-ユーザーが「盤面から取って」「演習して」「レビューして」と頼んだときだけ [friction](./skills/friction/SKILL.md) を読む。それ以外のセッションでは盤面を見に行かず、頼まれたことをする。大きな設計判断は [docs/architecture.md](../docs/architecture.md) に1項目足す。
+ユーザーが「Element から取って開発して」「架空の案件で使ってみて」「PR をレビューして」と頼んだときだけ [alcon スキル](./skills/alcon/SKILL.md) を読む。それ以外のセッションでは Element を見に行かず、頼まれたことをする。
 
 ## コマンド
 
@@ -45,14 +43,14 @@ npx vercel --prod            # 本番デプロイ
 
 ## ディレクトリ
 
-`web/src/` の下に、`shell/`（外殻 — ModeRail / AppSidebar / CommandPalette / MainContent / viewRegistry）、`ActivitySpace/`（盤面の面 — `home/` `strategy/` `execution/` `sustainment/`）、`Function/`（盤面を成立させる仕組みと画面をまたぐモデル — `widget/` `property/` `settings/` `space/` `sync/` `shared/`、`strategy/` `crm/` `team/` など概念ごと）、`hooks/`（Supabase の CRUD は全部ここ）、`shared/designTokens.ts`、`lib/` `providers/` `auth/` `types/` `ui/`。`app/` は layout / page / globals.css だけ。
+`web/src/` の下に、`shell/`（外殻 — ModeRail / AppSidebar / CommandPalette / MainContent / viewRegistry）、`ActivitySpace/`（画面 — `home/` `strategy/` `execution/` `sustainment/`）、`Function/`（画面を支える仕組みと、画面をまたぐモデル — `widget/` `property/` `settings/` `space/` `sync/` `shared/`、`strategy/` `crm/` `team/` など概念ごと）、`hooks/`（Supabase の CRUD は全部ここ）、`shared/designTokens.ts`、`lib/` `providers/` `auth/` `types/` `ui/`。`app/` は layout / page / globals.css だけ。
 
-root 直下は `supabase/`（migrations と functions）、`ops/`（盤面から開発するときの配管）、`docs/`（architecture.md と外部向けの API・MCP の説明）、`website/`（LP）。
+root 直下は `supabase/`（migrations と functions）、`sdk/`（asset-relay の SDK）、`docs/`（外部向けの API・MCP・asset-relay の説明）、`website/`（LP）。開発にだけ使うもの（この文書・`skills/`・`ops/` の補助スクリプト・`research/`）は `.claude/` に置く。製品名は `npm run rename-product <新しい名前>` で一括で変える。
 
 ## 実装ルール
 
 1. 変更後は必ず `npx tsc --noEmit` と `npm test`
-2. 新規ファイルは、盤面の画面なら `ActivitySpace/<分類>/<概念>/`、それを支える仕組みなら `Function/<concept>/`。横断 UI は `Function/shared/`、外殻は `shell/`。依存は `ActivitySpace/` → `Function/` / `hooks/` の一方向。`Function/` `hooks/` から `ActivitySpace/` を import せず（画面の一部を盤面に置く `widget/widgets/` だけ例外）、画面は `supabase` を直接使わず `hooks/` を通す（Kata 由来の Slides だけ例外）。どちらも ESLint が検査する
+2. 新規ファイルは、画面なら `ActivitySpace/<分類>/<概念>/`、それを支える仕組みなら `Function/<concept>/`。横断 UI は `Function/shared/`、外殻は `shell/`。依存は `ActivitySpace/` → `Function/` / `hooks/` の一方向。`Function/` `hooks/` から `ActivitySpace/` を import せず（画面の一部を Board に置く `widget/widgets/` だけ例外）、画面は `supabase` を直接使わず `hooks/` を通す（Kata 由来の Slides だけ例外）。どちらも ESLint が検査する
 3. **新 view**：`viewRegistry.ts`（label/icon の単一情報源）→ `MainContent` 分岐 → `railApps.ts` の `MODE_META`。新モードを App にするなら `RailMode` / `APP_GROUPS` も
 4. **新 Widget**：本体を `Function/widget/widgets/` に、定義を `registry.tsx` に1つ（`accepts` / `zones` / `load()` の動的 import）、既定配置は `defaults.ts`。既存ウィジェットを別の Subject でも使う場合は、`accepts` に対象を追加する。Home 以外のボードは対象を見られる全員が共有するので、ウィジェットの中身は `useWidgetDocument`（全員で共有）に置き、本人だけに見せる下書きは `useWidgetViewerState` に置く
 5. **グラフの集計軸を固定しない** — 集計軸は `Function/shared/dimensions.ts` の `Dimension` から選択できるようにし、`WidgetInstance.params` に保存する。軸の違いだけで別のウィジェットを作らない
@@ -66,7 +64,7 @@ root 直下は `supabase/`（migrations と functions）、`ops/`（盤面から
 - Project ID: `rkugtcqztkkacvoylupw`。閲覧範囲は RLS で制御する。CRUD は `hooks/` に集約
 - AI は Edge Functions 経由（`alcon-copilot` / `run-agent` / `summarize-note` 等）
 - **`supabase/` は root にのみ存在する**（migrations・functions とも）。`web/supabase/` は作らない
-- **既存テーブルに触る migration は `to_regclass` ガード必須** —— 基底スキーマは migrations フォルダの外にあり、PR の preview branch は空 DB に replay する（書式は [friction](./skills/friction/SKILL.md) の「DB を直に触るとき」）
+- **既存テーブルに触る migration は `to_regclass` ガード必須** —— 基底スキーマは migrations フォルダの外にあり、PR の preview branch は空 DB に replay する（書式は [alcon スキル](./skills/alcon/SKILL.md) の「DB を直接触るとき」）
 
 ## リポジトリ直下を「旧版」として消さない
 

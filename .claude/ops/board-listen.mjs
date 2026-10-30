@@ -2,7 +2,7 @@
 //
 // The board, as an event stream.
 //
-// Friction already broadcasts: elements, element_comments, element_assignees,
+// The database already broadcasts: elements, element_comments, element_assignees,
 // strategy_comments, dev_events and dev_control are all in the supabase_realtime
 // publication. This listener joins that stream and prints one line per change
 // worth waking the loop for. Run it under the Monitor tool and each line becomes
@@ -11,12 +11,12 @@
 //
 // strategy_comments is the downward direction. Everything else here reports what
 // execution did; a Initiative comment is where the intent is written, and one that
-// names the agent is an order. See ADR 0012 in docs/architecture.md.
+// names the agent is an order. See ADR 0012.
 //
 // element_comments carries a second board's worth of traffic once another
 // team's is on the same database, and the same naming rule decides what of it
 // is ours: FEEDBACK for a foreign Element's comment that names the agent,
-// COMMENT for anything on Friction Dev's own. See elementScope.mjs.
+// COMMENT for anything on the dev Domain's own. See elementScope.mjs.
 //
 // Deliberately dependency-free — it speaks the Phoenix wire protocol over node's
 // built-in WebSocket rather than pulling @supabase/supabase-js into an ops
@@ -49,18 +49,18 @@ if (!claimLease('board-listen')) process.exit(0)
 // nothing deserves to be told why; a hook that fires on every session start
 // has no reader for the explanation and would only be adding a line of noise
 // to a machine that happens not to have the key.
-const HOOK = process.env.FRICTION_LOOP_HOOK === '1'
+const HOOK = process.env.LOOP_HOOK === '1'
 
 // Started by a hook there is no terminal to print to, so the holder writes to a
 // log file it owns and removes on the way out. Run by hand, stdout is the point
 // and nothing is written to disk.
 if (HOOK) attachLog('board-listen')
 
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
-// The Friction Dev domain. Everything the self-build loop cares about hangs off
+// The dev Domain (Alcon開発). Everything the self-build loop cares about hangs off
 // it; anything on another domain is the user's real work and none of our business.
-const FRICTION_DEV_DOMAIN = '8945f193-1e57-4baf-a315-cf7cc5dad7f4'
+const DEV_DOMAIN = 'e3a72eca-f276-4776-9999-4abd4797a6b2'
 
 // Our own comments echo back off the stream. Waking the loop for its own
 // writes is how you build a machine that talks to itself forever.
@@ -125,7 +125,7 @@ async function rest(path) {
   return res.json()
 }
 
-// Which objects belong to Friction Dev, and the last known state of every
+// Which objects belong to the dev Domain, and the last known state of every
 // element on it.
 //
 // The state cache is not an optimisation, it is the only way to know what
@@ -156,7 +156,7 @@ function snapshot(row) {
 }
 
 async function refreshObjects() {
-  const objects = await rest(`objects?domain_id=eq.${FRICTION_DEV_DOMAIN}&select=id`)
+  const objects = await rest(`objects?domain_id=eq.${DEV_DOMAIN}&select=id`)
   objectIds.clear()
   for (const o of objects) objectIds.add(o.id)
   foreignObjectIds.clear()
@@ -205,7 +205,7 @@ async function seedElements() {
 // that is genuinely gone, or whose row the service role cannot read, should
 // not cost one round trip per comment, forever — but not the same mechanism.
 // Those two clear themselves on every refresh, because re-listing "every
-// Object in Friction Dev" or "every Strategy" is one cheap, bounded query.
+// Object in the dev Domain" or "every Strategy" is one cheap, bounded query.
 // There is no equally cheap way to re-derive "every foreign Element anyone
 // has ever commented on", so these two grow instead of resetting: unbounded
 // in principle, but bounded in practice by how many distinct foreign Elements
@@ -253,11 +253,11 @@ function nameOf(elementId) {
 // Initiatives, by id: their name, and whether they are the loop's business.
 //
 // `strategies` has no domain column — a Initiative reaches Execution through
-// strategy_objects — so scope is "holds at least one Friction Dev object".
+// strategy_objects — so scope is "holds at least one the dev Domain object".
 // Unlike elementState this may be re-read at any time: nothing is diffed
 // against it, it only resolves an id to something a person can read.
 //
-// The scope flags go stale if an Object joins Friction Dev mid-session and is
+// The scope flags go stale if an Object joins the dev Domain mid-session and is
 // then attached to a Initiative — that Initiative's chatter stays unreported until
 // a restart. Left alone because orders are unaffected: an order is reported
 // whatever the scope says, so the stale half is the half that only ever costs
@@ -307,7 +307,7 @@ function formatElement(type, rec) {
   }
 
   if (!rec || !objectIds.has(rec.object_id)) {
-    // An Element that just left Friction Dev's scope — re-homed to a foreign
+    // An Element that just left the dev Domain's scope — re-homed to a foreign
     // Object's object_id — must not keep answering isOurElement forever off a
     // stale snapshot. Left uncleared, every future comment on it would keep
     // reporting as our own COMMENT regardless of mention: the exact leak

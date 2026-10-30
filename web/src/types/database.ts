@@ -1156,6 +1156,7 @@ export type NotificationKind =
   | 'due_soon'
   | 'review_due'
   | 'invite'
+  | 'asset_announced'
 
 export interface Notification {
   id: string
@@ -1325,6 +1326,41 @@ export interface Integration {
 
 export type IntegrationUpdate = Partial<Pick<Integration,
   'name' | 'description' | 'endpoint' | 'auth_type' | 'auth_header' | 'delegation' | 'enabled'>>
+
+export type AssetKind = 'app' | 'ai_agent' | 'script' | 'service' | 'other'
+export type AssetStatus = 'unclaimed' | 'active' | 'revoked'
+
+// An app or AI that announced itself through the asset relay (ADR 0036).
+// `manifest` is what it says about itself; `observed` is what the relay saw
+// of the connection. Members of the Space read; only owners accept or revoke.
+export interface Asset {
+  id: string
+  activity_space_id: string
+  name: string
+  kind: AssetKind
+  status: AssetStatus
+  manifest: Record<string, Json>
+  observed: Record<string, Json>
+  token_prefix: string
+  claimed_by: string | null
+  claimed_at: string | null
+  revoked_at: string | null
+  last_seen_at: string | null
+  event_count: number
+  created_at: string
+  updated_at: string
+}
+
+/** What an asset reported it did, in its own words. */
+export interface AssetEvent {
+  id: string
+  asset_id: string
+  kind: string
+  summary: string
+  payload: Json | null
+  occurred_at: string
+  created_at: string
+}
 
 export type PersonalAccessTokenAccess = 'read' | 'read_write'
 

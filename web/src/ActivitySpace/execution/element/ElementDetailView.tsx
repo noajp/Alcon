@@ -432,7 +432,7 @@ function ElementDetailBody({
   const [estimatedHours, setEstimatedHours] = useState<string>(element.estimated_hours?.toString() || '');
 
   // Lease — who holds this Element right now (el_TRJ-012). Read-only here:
-  // the lease is taken and returned through ops/lease.mjs, never from the UI.
+  // the lease is taken and returned through .claude/ops/lease.mjs, never from the UI.
   // The branch is the quotable half, so it copies on click.
   const lease = liveLease(element, useNow());
   const [branchCopied, setBranchCopied] = useState(false);

@@ -40,7 +40,7 @@ export function liveLease(el: Leased, now: number): LiveLease | null {
 /**
  * A holder token compact enough for a row, still distinct per session.
  *
- * Tokens are `<agent>@<worktree>` (ops/lease.mjs). The worktree half is what
+ * Tokens are `<agent>@<worktree>` (.claude/ops/lease.mjs). The worktree half is what
  * tells two sessions of the same agent apart, so it can't be dropped — but a
  * 30-character directory name doesn't belong in a 13px row. Keep the agent,
  * keep the tail of the suffix (worktree names differ at the end: a random

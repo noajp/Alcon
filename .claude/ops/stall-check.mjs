@@ -34,14 +34,14 @@ import { attachLog, claimLease, noteLease } from './singleLease.mjs'
 const ONCE = process.argv.includes('--once')
 if (!ONCE && !claimLease('stall-check')) process.exit(0)
 
-const HOOK = process.env.FRICTION_LOOP_HOOK === '1'
+const HOOK = process.env.LOOP_HOOK === '1'
 
 // Only the watch owns a log. `--once` is a question asked by a person at a
 // terminal; it answers on stdout and leaves nothing behind.
 if (HOOK && !ONCE) attachLog('stall-check')
 
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
-const FRICTION_DEV_DOMAIN = '8945f193-1e57-4baf-a315-cf7cc5dad7f4'
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const DEV_DOMAIN = 'e3a72eca-f276-4776-9999-4abd4797a6b2'
 
 function arg(flag, fallback) {
   const i = process.argv.indexOf(flag)
@@ -87,7 +87,7 @@ async function stalledElements() {
   const params = new URLSearchParams({
     select: 'id,display_id,title,status,updated_at,objects!inner(domain_id),element_comments(created_at)',
     status: 'eq.in_progress',
-    'objects.domain_id': `eq.${FRICTION_DEV_DOMAIN}`,
+    'objects.domain_id': `eq.${DEV_DOMAIN}`,
   })
   const res = await fetch(`${SUPABASE_URL}/rest/v1/elements?${params}`, {
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
@@ -128,7 +128,7 @@ async function lapsedBlocked() {
     status: 'eq.blocked',
     claimed_by: 'not.is.null',
     claim_expires_at: `lt.${new Date().toISOString()}`,
-    'objects.domain_id': `eq.${FRICTION_DEV_DOMAIN}`,
+    'objects.domain_id': `eq.${DEV_DOMAIN}`,
   })
   const res = await fetch(`${SUPABASE_URL}/rest/v1/elements?${params}`, {
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },

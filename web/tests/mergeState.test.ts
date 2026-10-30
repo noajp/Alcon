@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyMergeState, REMOVAL_REASON } from '../../ops/mergeState.mjs';
+import { classifyMergeState, REMOVAL_REASON } from '../../.claude/ops/mergeState.mjs';
 
 describe('classifyMergeState', () => {
   it('a tip still equal to origin/main is untouched — nothing was ever committed', () => {

@@ -68,7 +68,7 @@ jobs:
 
   # Tell the board what happened.
   #
-  # The self-build loop listens to Friction's realtime stream, so anything that
+  # The self-build loop listens to the realtime stream, so anything that
   # happens here has to be written into the database to reach it. Without this
   # the loop finds out that CI went red the next time a human looks, which is
   # the failure mode the whole event-driven rebuild exists to remove.

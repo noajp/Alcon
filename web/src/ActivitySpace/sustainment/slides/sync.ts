@@ -9,7 +9,7 @@ import type { Deck, Folder, KataFile, MixState, ChatMessage } from './kata/model
 
 // =============================================================
 // Slides ⇄ Supabase. The editor keeps its workspace in one store; the Space
-// keeps decks and folders as rows (ADR 0042 in docs/architecture.md). This module loads a Space's
+// keeps decks and folders as rows (ADR 0042). This module loads a Space's
 // rows into the store, writes back what the editor changed, and takes in what
 // other people changed — the store never has to know where it is saved.
 //

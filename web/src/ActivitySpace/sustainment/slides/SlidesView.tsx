@@ -9,7 +9,7 @@ import { useKataLocale } from './useKataLocale';
 /**
  * Slides: the presentation editor (formerly the Kata app) on a Space's decks.
  * Notes and documents go in, and come out as pages with a storyline, a logic
- * per page and a look (ADR 0042 in docs/architecture.md).
+ * per page and a look (ADR 0042).
  */
 export function SlidesView() {
   const { t } = useI18n();

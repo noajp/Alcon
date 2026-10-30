@@ -19,6 +19,7 @@ import {
 import { useIntegrations, useIsSpaceOwner } from './data';
 import { IntegrationDetailDialog, IntegrationIcon, SourceChip } from './IntegrationDetailDialog';
 import { AlconConnectPanel } from './AlconConnectPanel';
+import { AssetRelayPanel } from './AssetRelayPanel';
 import { setOAuthOutcome, useOAuthOutcome } from './oauthReturn';
 
 // Settings › Integrations (ADR 0027). Two tabs:
@@ -28,12 +29,14 @@ import { setOAuthOutcome, useOAuthOutcome } from './oauthReturn';
 //   alcon     the other direction: point an MCP client or script at Alcon
 //             with an OAuth sign-in or a personal access token
 //             (AlconConnectPanel, ADR 0032 / 0034).
+//   assets    the apps and AIs that joined the Space by adding one line to
+//             their backend (AssetRelayPanel, ADR 0036).
 // Members see everything read-only; only owners can connect or change.
 
 const DOCS_URL = 'https://github.com/noajp/Alcon/blob/main/docs/mcp.md';
 
 export function IntegrationsSettings({ tab }: { tab: string | null }) {
-  return tab === 'alcon' ? <AlconConnectPanel /> : <ExternalServicesPanel />;
+  return tab === 'alcon' ? <AlconConnectPanel /> : tab === 'assets' ? <AssetRelayPanel /> : <ExternalServicesPanel />;
 }
 
 type Opened = { preset: IntegrationPreset; integration: Integration | null } | null;

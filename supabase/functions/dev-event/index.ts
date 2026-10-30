@@ -1,6 +1,6 @@
 // Ingress for events that happen outside the database.
 //
-// The self-build loop listens to Friction's realtime stream. CI going red and a
+// The self-build loop listens to the realtime stream. CI going red and a
 // PR landing are events the loop needs, but they happen on GitHub, so this
 // writes them into dev_events and they arrive on the same stream as everything
 // else — one channel to drain instead of three.

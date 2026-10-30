@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { readReportPost } from '../../ops/reportPost.mjs';
+import { readReportPost } from '../../.claude/ops/reportPost.mjs';
 
 describe('explicit report posting', () => {
   it('keeps ordinary diagnostic reads read-only', () => {

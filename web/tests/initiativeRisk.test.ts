@@ -53,7 +53,7 @@ describe('lastSignalAt — the progress comment is the heartbeat', () => {
   });
 });
 
-describe('isStalled — same predicate as ops/stall-check.mjs', () => {
+describe('isStalled — same predicate as .claude/ops/stall-check.mjs', () => {
   it('fires on in_progress that has not reported past the threshold', () => {
     const e = el({ id: 'a', status: 'in_progress', lastProgressAt: NOW - 40 * MIN });
     expect(isStalled(e, NOW)).toBe(true);

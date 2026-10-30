@@ -45,6 +45,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
         tabs: [
           { id: 'external', label: 'Connect external services' },
           { id: 'alcon', label: 'Connect to Alcon' },
+          { id: 'assets', label: 'Connected assets' },
         ],
       },
     ],
