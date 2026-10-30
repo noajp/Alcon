@@ -16,7 +16,7 @@
 // session take over any other's Element and let a stranger's report keep a
 // dead session's claim alive. The token is derived from the worktree the
 // session runs in — the thing that is actually distinct per session — and
-// can be pinned with FRICTION_HOLDER when that isn't right.
+// can be pinned with LOOP_HOLDER when that isn't right.
 //
 // Usage (from anywhere in the repo):
 //   node ops/lease.mjs claim   <display_id|uuid> [--branch <name>] [--note "方針1行"]
@@ -31,11 +31,11 @@
 // comment (still stamped, so it lands while the lease is live) and then
 // returns the row.
 
-import { readFileSync, realpathSync } from 'node:fs'
+import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 // ---- identity -------------------------------------------------------------
 
@@ -43,7 +43,7 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
  * The token this session claims and stamps with. Pure: derived from inputs
  * so it can be tested without a filesystem.
  *
- *   FRICTION_HOLDER=… wins outright.
+ *   LOOP_HOLDER=… wins outright.
  *   Otherwise 'Claude@<worktree basename>' — the primary checkout is 'Alcon',
  *   a session worktree is its directory name, which is what makes two
  *   concurrent sessions distinguishable.
@@ -53,9 +53,9 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
  * @returns {string}
  */
 export function holderToken(env = process.env, repoRoot = REPO) {
-  const pinned = (env.FRICTION_HOLDER ?? '').trim()
+  const pinned = (env.LOOP_HOLDER ?? '').trim()
   if (pinned) return pinned
-  const agent = (env.FRICTION_AGENT ?? 'Claude').trim() || 'Claude'
+  const agent = (env.LOOP_AGENT ?? 'Claude').trim() || 'Claude'
   return `${agent}@${basename(repoRoot)}`
 }
 
@@ -163,7 +163,7 @@ async function postComment(db, elementId, content, holder) {
     element_id: elementId,
     author_kind: 'ai_agent',
     author_id: null,
-    author_name: (process.env.FRICTION_AGENT ?? 'Claude').trim() || 'Claude',
+    author_name: (process.env.LOOP_AGENT ?? 'Claude').trim() || 'Claude',
     content,
     holder,
   })
@@ -256,8 +256,8 @@ if (isMain) {
     // Two sessions in checkouts with the same directory name would share a
     // token and could take each other's lease. The primary checkout is the
     // likely place for that to happen; say so where it can be seen.
-    if (!process.env.FRICTION_HOLDER && basename(REPO) === 'Alcon') {
-      console.error('WARN      token derives from the primary checkout name; a second session there would share it — set FRICTION_HOLDER')
+    if (!process.env.LOOP_HOLDER && statSync(join(REPO, '.git'), { throwIfNoEntry: false })?.isDirectory()) {
+      console.error('WARN      token derives from the primary checkout name; a second session there would share it — set LOOP_HOLDER')
     }
   } else if (cmd === 'claim' || cmd === 'comment' || cmd === 'release') {
     const db = board()

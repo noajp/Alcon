@@ -303,7 +303,7 @@ async function execute(a: ExecArgs): Promise<void> {
       // Never Alcon itself: the board tools already act as the starter, and a
       // stored token would act outside this run.
       if (pointsAtAlcon(row.endpoint, Deno.env.get("SUPABASE_URL"))) {
-        await addStep(admin, run.id, "error", `連携「${row.name}」は Alcon 自身を指しているため使いません`, "盤面の操作はエージェントの標準の道具で行います。");
+        await addStep(admin, run.id, "error", `連携「${row.name}」は Alcon 自身を指しているため使いません`, "Alcon のデータの操作はエージェントの標準の道具で行います。");
         continue;
       }
       // OAuth is Google Drive's sign-in; any other OAuth row has no way to authenticate.

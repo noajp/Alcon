@@ -1,6 +1,6 @@
 # Alcon asset relay — 中継連結基盤
 
-ローカルで動くアプリや AI が、バックエンドの一行で Space に名乗り出て、承諾された時点で「資産」として認識され、以後の活動が Space に残る受け口。設計の判断は [ADR 0036](architecture.md)、一行の SDK は [sdk/README.md](../sdk/README.md)。
+ローカルで動くアプリや AI が、バックエンドの一行で Space に名乗り出て、承諾された時点で「資産」として認識され、以後の活動が Space に残る受け口。一行の SDK は [sdk/README.md](../sdk/README.md)。
 
 - エンドポイント: `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/asset-relay`
 - 名乗り（`/hello`）は認証なし。以後は `Authorization: Bearer <資産トークン>`（`alc_ast_…`。名乗りの応答で一度だけ返る）

@@ -20,7 +20,7 @@
 //
 //   node ops/loop-report.mjs
 //   node ops/loop-report.mjs --hours 72
-//   node ops/loop-report.mjs --post ./retrospective.txt --author Codex
+//   node ops/loop-report.mjs --post ./retrospective.txt --author Codex --initiative "<Initiative 名>"
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -28,8 +28,8 @@ import { fileURLToPath } from 'node:url'
 import { readLease } from './singleLease.mjs'
 import { readReportPost } from './reportPost.mjs'
 
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
-const INITIATIVE = 'Friction Self-Build'
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const INITIATIVE = (() => { const i = process.argv.indexOf('--initiative'); return i === -1 ? null : process.argv[i + 1] })()
 
 function arg(flag, fallback) {
   const i = process.argv.indexOf(flag)
@@ -140,7 +140,7 @@ const MARKERS = [['▶', '着手'], ['●', '進捗'], ['⬆', 'PR'], ['✔', '�
 
 async function activity() {
   const [objects] = await Promise.all([
-    rest(`objects?domain_id=eq.8945f193-1e57-4baf-a315-cf7cc5dad7f4&select=id,prefix`),
+    rest(`objects?domain_id=eq.e3a72eca-f276-4776-9999-4abd4797a6b2&select=id,prefix`),
   ])
   const ids = objects.map((o) => o.id)
   if (!ids.length) return { lines: ['- 対象 Object なし'], counts: {} }
@@ -196,12 +196,16 @@ const body = [
   '**ループの状態**',
   ...health(),
   '',
-  '**盤面の動き**',
+  '**Element の動き**',
   ...act,
 ].join('\n')
 
 console.log(body)
 
+if (post && !INITIATIVE) {
+  console.log('\nFATAL 投稿先を --initiative <Initiative 名> で指定してください')
+  process.exit(1)
+}
 if (post) {
   const [initiative] = await rest(`strategies?name=eq.${encodeURIComponent(INITIATIVE)}&select=id`)
   if (!initiative) {

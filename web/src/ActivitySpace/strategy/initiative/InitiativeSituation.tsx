@@ -229,7 +229,7 @@ export function InitiativeSituation({
           itself, so neither should that.
           Kept as two components because they answer different questions from
           different data: this one reads phases, that one reads due dates,
-          progress comments (the stall definition lives in ops/stall-check.mjs
+          progress comments (the stall definition lives in .claude/ops/stall-check.mjs
           and must not be re-derived here) and assignees. */}
     </>
   );

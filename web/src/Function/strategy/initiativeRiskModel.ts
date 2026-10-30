@@ -107,7 +107,7 @@ export interface InitiativeRiskReport {
 
 export interface InitiativeRiskOptions {
   /** Minutes of silence that make an in_progress Element stalled.
-   *  Same default as `ops/stall-check.mjs --warn-minutes`. */
+   *  Same default as `.claude/ops/stall-check.mjs --warn-minutes`. */
   stallMinutes?: number;
   /** Hours of silence that make an Object with open-but-unstarted work idle. */
   idleHours?: number;
@@ -190,7 +190,7 @@ export function dateKey(now: number): string {
  * moves the row's timestamp without anybody working, so `updated_at` cannot
  * tell a stopped agent from healthy work. `updated_at` is only the fallback
  * for an Element that was moved into `in_progress` and never claimed, which is
- * exactly how `ops/stall-check.mjs` reads it.
+ * exactly how `.claude/ops/stall-check.mjs` reads it.
  */
 export function lastSignalAt(el: RiskElement): number | null {
   if (el.lastProgressAt !== null) return el.lastProgressAt;
@@ -200,7 +200,7 @@ export function lastSignalAt(el: RiskElement): number | null {
 }
 
 /**
- * Stalled, defined once. This is `ops/stall-check.mjs`'s predicate and must
+ * Stalled, defined once. This is `.claude/ops/stall-check.mjs`'s predicate and must
  * stay it: in_progress, and no progress report for longer than the threshold.
  * If the loop's watcher and this pane disagreed about what "stalled" means,
  * the board and the screen would be reporting two different Initiatives.

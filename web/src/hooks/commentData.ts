@@ -62,7 +62,7 @@ export async function deleteElementComment(id: string): Promise<void> {
 // carry reason isn't a Initiative-level decision — most are one line, and
 // forcing every one through that heavier record would price most of them
 // out), this reuses element_comments with a fixed, greppable prefix: the same
-// "convention over schema" the friction board's own report format already
+// "convention over schema" the dev board's own report format already
 // relies on (▶/●/⬆/✔/■). PhaseCloseDialog writes it; this reads it back.
 // ============================================
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AGENT_MENTION, classifyElementComment, isOurElement, resolveElementName } from '../../ops/elementScope.mjs';
+import { AGENT_MENTION, classifyElementComment, isOurElement, resolveElementName } from '../../.claude/ops/elementScope.mjs';
 
 // el_OPS-030. Measured on the real board: `formatComment()` had no scope
 // check at all, so a comment on another team's Element passed straight
@@ -34,7 +34,7 @@ describe('classifyElementComment', () => {
 
   it('drops our own echo before checking whose board it is — on our own board too', () => {
     // Without this ordering, every one of our own progress comments on
-    // Friction Dev would re-report itself as a fresh COMMENT the moment it
+    // the dev Domain would re-report itself as a fresh COMMENT the moment it
     // arrives back off the realtime stream.
     expect(classifyElementComment({ authorName: SELF, content: '● 進捗 — done', selfAuthor: SELF, isOurs: true })).toBeNull();
   });
@@ -69,7 +69,7 @@ describe('resolveElementName', () => {
   const seeded = new Map([['e1', { label: 'el_OPS-030 fix the scope check' }]]);
   const foreign = new Map([['e2', { label: 'el_LOG-003 燃料・発電機の供給網', inScope: false }]]);
 
-  it('prefers the seeded (Friction Dev) cache', () => {
+  it('prefers the seeded (the dev Domain) cache', () => {
     expect(resolveElementName('e1', { elementState: seeded, foreignElementState: foreign })).toBe(
       'el_OPS-030 fix the scope check',
     );

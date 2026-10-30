@@ -69,7 +69,7 @@ const ja: StarterContent = {
     {
       key: 'execution',
       name: 'Execution を試す',
-      description: '日々の行動を盤面に乗せる。',
+      description: '日々の行動を Element にする。',
       elements: [
         { title: '自分たちの Domain を作る', description: '会社、部署、プロジェクト群など、活動の場ごとに Domain を作ります。' },
         { title: 'Object を作り、Element を追加する', description: 'Object は Domain の直下に置きます。入れ子にはできませんが、複数の Domain で共有できます。' },
@@ -118,7 +118,7 @@ const ja: StarterContent = {
       name: '実務で使いこなす',
       description: '実際の仕事を Alcon に乗せ、意図と結びつける。',
       initiatives: [
-        { name: '日々の実行を盤面に乗せる', description: '自分たちの Domain・Object・Element を作り、担当と期限を持たせる。', objectKeys: ['execution'] },
+        { name: '日々の実行を Element にする', description: '自分たちの Domain・Object・Element を作り、担当と期限を持たせる。', objectKeys: ['execution'] },
         { name: '意図と実行を結びつける', description: 'Vision と Initiative を書き、Object を結びつけて、目的と実行状況を行き来できるようにする。', objectKeys: ['strategy'] },
         { name: '仕事道具を活用する', description: 'Notebook・Table・Calendar・Workload を日常の仕事に組み込む。', objectKeys: ['sustainment'] },
       ],

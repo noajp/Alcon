@@ -51,7 +51,7 @@ const WORKLOAD_MESSAGES: Record<string, Row> = {
   'after the plan': ['プラン適用後', '계획 적용 후', 'après le plan', 'tras el plan'],
   'Applying…': ['適用中…', '적용 중…', 'Application…', 'Aplicando…'],
   'Apply all {n} changes': ['{n} 件の変更をすべて適用', '변경 {n}건 모두 적용', 'Appliquer les {n} changements', 'Aplicar los {n} cambios'],
-  'Reading the board…': ['盤面を読んでいます…', '보드를 읽는 중…', 'Lecture du tableau…', 'Leyendo el tablero…'],
+  'Reading the board…': ['データを読んでいます…', '보드를 읽는 중…', 'Lecture du tableau…', 'Leyendo el tablero…'],
   'No change fits': ['収まる変更がありません', '맞는 변경이 없습니다', 'Aucun changement ne convient', 'Ningún cambio encaja'],
   'Nothing to rebalance': ['平準化の必要はありません', '평준화할 것이 없습니다', 'Rien à rééquilibrer', 'Nada que reequilibrar'],
   'Nobody has room on those days and the dates cannot move without breaking more. Add capacity, or cut scope.': ['その日に空きのある人がおらず、日程を動かすと別の箇所が崩れます。稼働を増やすか、範囲を絞ってください。', '그날 여유 있는 사람이 없고, 일정을 옮기면 다른 곳이 무너집니다. 가용 인력을 늘리거나 범위를 줄이세요.', 'Personne n’a de place ces jours-là et déplacer les dates casserait autre chose. Ajoutez de la capacité ou réduisez le périmètre.', 'Nadie tiene hueco esos días y mover las fechas rompería otra cosa. Añade capacidad o reduce el alcance.'],

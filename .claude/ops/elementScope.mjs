@@ -2,7 +2,7 @@
 // does — the decision el_OPS-030 exists to pin down. Kept separate from
 // board-listen.mjs because this is the one piece of that script with no
 // socket, no REST call and no timer: given who wrote a comment, what it says,
-// and whether the Element belongs to Friction Dev, the answer never changes.
+// and whether the Element belongs to the dev Domain, the answer never changes.
 // That is exactly the shape a test can hold still, the same reason
 // faultReporter.mjs was split out — see web/tests/faultReporter.test.ts.
 //
@@ -25,7 +25,7 @@ export const AGENT_MENTION = /@claude\b/i;
 
 /**
  * Which of the two caches answers for an Element — the one seeded from
- * Friction Dev at startup, or the one resolved on demand for an id that
+ * the dev Domain at startup, or the one resolved on demand for an id that
  * wasn't in it.
  *
  * A foreign Element resolves through neither and is not ours, which is the
@@ -74,7 +74,7 @@ export function resolveElementName(elementId, { elementState, foreignElementStat
  * The self-check runs before the ours-check on purpose: an echo of our own
  * writing back off the stream is not news regardless of which board it
  * landed on. Checking `isOurs` first would re-report every one of our own
- * progress comments on Friction Dev as fresh `COMMENT` lines forever, and
+ * progress comments on the dev Domain as fresh `COMMENT` lines forever, and
  * would report our own FEEDBACK replies on a foreign board as fresh
  * `FEEDBACK` — a machine reporting its own writing to itself, twice.
  */

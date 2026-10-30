@@ -209,9 +209,9 @@ describe('board tools', () => {
 
 describe('mcpHost', () => {
   it('sends strategy tools to the strategy runner and board tools to the board runner', async () => {
-    const { db } = fakeDb({ strategies: [{ id: UUID, name: 'Friction GTM', status: 'active' }], intents: [], strategy_objects: [], strategy_children: [] });
+    const { db } = fakeDb({ strategies: [{ id: UUID, name: 'Alcon GTM', status: 'active' }], intents: [], strategy_objects: [], strategy_children: [] });
     const h = mcpHost(db, { agent: 'AI (MCP)', userId: 'u' });
     const res = await h.call('getInitiative', { id: UUID });
-    expect(res).toMatchObject({ ok: true, data: { name: 'Friction GTM', intents: [], objects: [] } });
+    expect(res).toMatchObject({ ok: true, data: { name: 'Alcon GTM', intents: [], objects: [] } });
   });
 });

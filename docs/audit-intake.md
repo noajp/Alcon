@@ -1,6 +1,6 @@
 # 記録の受け口（audit-intake）
 
-ゲートウェイ（Metaxy の実行基盤）が、関節で残した記録を Alcon の監査台帳へ送るための口。設計の判断は [ADR 0045](architecture.md)、台帳そのものは [ADR 0044](architecture.md)。
+ゲートウェイ（Metaxy の実行基盤）が、関節で残した記録を Alcon の監査台帳へ送るための口。
 
 ## 鍵の登録
 

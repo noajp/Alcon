@@ -1,6 +1,6 @@
 # Alcon REST API
 
-スクリプト、ノーコードツール、他の SaaS から、トークンを発行した本人の権限で盤面を読み書きする入口。MCP（[mcp.md](mcp.md)）と同じツールを HTTP の形で出している。設計の判断は [ADR 0033](architecture.md)、認証は [ADR 0032](architecture.md)。
+スクリプト、ノーコードツール、他の SaaS から、トークンを発行した本人の権限で Alcon のデータを読み書きする入口。MCP（[mcp.md](mcp.md)）と同じツールを HTTP の形で出している。
 
 - ベース URL: `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/alcon-api`
 - 認証: `Authorization: Bearer <個人用アクセストークン>`（`alc_pat_…`。Settings › Integrations の「Alcon へ接続する」で発行）
@@ -44,7 +44,7 @@
 | 403 | `forbidden` | 読み取りのみのトークンで書き込んだ。書き込みを権限（RLS）が拒んだ。見えない Object・存在しない Object への Element の作成もここに入る |
 | 404 | `not_found` | 経路がない。対象がない、または本人に見えない |
 | 405 | `method_not_allowed` | そのパスにないメソッド（`Allow` ヘッダーに使えるもの） |
-| 422 | `invalid_request` / `rejected` | 未知のフィールド、必須の欠落、型・選択肢の不一致。盤面が受け付けなかった |
+| 422 | `invalid_request` / `rejected` | 未知のフィールド、必須の欠落、型・選択肢の不一致。Alcon が受け付けなかった |
 | 500 | `server_error` | サーバーの設定がない、または照会に失敗した |
 
 見えない Element は 403 ではなく 404 になる。境界の外に何があるかは返さない。

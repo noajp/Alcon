@@ -1,6 +1,6 @@
 # Alcon asset relay — 一行で Space に参加する
 
-ローカルで動くアプリや AI のバックエンドに一行足すと、そのアプリは Alcon の Space に名乗り出て、Space のオーナーが承諾した時点で「資産」として認識される。以後、アプリが何をしたか（起動・停止、どの外部サービスと AI プロバイダに通信したか、アプリ自身が言う出来事）が Alcon に残る。設計は [ADR 0036](../docs/architecture.md)、受け口の仕様は [docs/asset-relay.md](../docs/asset-relay.md)。
+ローカルで動くアプリや AI のバックエンドに一行足すと、そのアプリは Alcon の Space に名乗り出て、Space のオーナーが承諾した時点で「資産」として認識される。以後、アプリが何をしたか（起動・停止、どの外部サービスと AI プロバイダに通信したか、アプリ自身が言う出来事）が Alcon に残る。受け口の仕様は [docs/asset-relay.md](../docs/asset-relay.md)。
 
 ## Node
 

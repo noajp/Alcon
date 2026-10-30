@@ -195,7 +195,7 @@ for (const b of branches) {
   // its upstream. git-sync anchors to the primary checkout, and does not get
   // to choose what that checkout is sitting on — so a checkout parked on a
   // stale branch made `-d` refuse branches that origin/main fully contained.
-  // Measured: `claude/fric-ops-sync-root`, zero commits ahead of origin/main,
+  // Measured: `claude/ops-sync-root`, zero commits ahead of origin/main,
   // rejected as `not fully merged` because HEAD was 29 commits behind. That is
   // how six merged branches accumulated while a sweep ran after every merge.
   //

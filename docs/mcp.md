@@ -1,6 +1,6 @@
 # Alcon MCP サーバー
 
-外部の AI（Claude Code、Claude、ChatGPT など）やスクリプトから、接続した本人の権限で盤面を読み書きする入口。設計の判断は [ADR 0026](architecture.md)、認証は [ADR 0032](architecture.md) と [ADR 0034](architecture.md)。
+外部の AI（Claude Code、Claude、ChatGPT など）やスクリプトから、接続した本人の権限で Alcon のデータを読み書きする入口。
 
 - エンドポイント: `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/alcon-mcp`
 - 方式: Streamable HTTP（状態を持たない。POST で JSON-RPC を 1 件送り、JSON で応答を受け取る）
@@ -14,7 +14,7 @@
 
 削除、一括変更、Object 間の移動、Object の編集はできない。この許可リスト（`_shared/externalTools.ts`）は REST API（[api.md](api.md)）と共通。見える範囲と書ける範囲は、アプリでの本人の権限（RLS）と同じ。書き込みは Element の Activity に「… — via Claude Code (MCP · token: laptop)」の形で、どのトークン経由かまで記録され、コメントは AI 名で投稿される。
 
-担当にできるのは、Element と同じ Space の Worker だけ（[ADR 0028](architecture.md)）。`listWorkers` は `elementId` を渡すとその Element に割り当てられる Worker を、`objectId` / `domainId` を渡すとその Domain を見られる人を、引数なしなら本人が属する Space 全体の Worker を返す。`addElementAssignee` は Space の外の Worker を `Worker is outside this Element's Space` で断り、`createElement` の `assigneeWorkerIds` は割り当てられない Worker を飛ばして `assigneeError` に名前を返す。
+担当にできるのは、Element と同じ Space の Worker だけ。`listWorkers` は `elementId` を渡すとその Element に割り当てられる Worker を、`objectId` / `domainId` を渡すとその Domain を見られる人を、引数なしなら本人が属する Space 全体の Worker を返す。`addElementAssignee` は Space の外の Worker を `Worker is outside this Element's Space` で断り、`createElement` の `assigneeWorkerIds` は割り当てられない Worker を飛ばして `assigneeError` に名前を返す。
 
 ## 認証
 
@@ -37,7 +37,7 @@ Supabase のセッションの JWT（1 時間で切れる）も受け付ける�
 2. Alcon のサインイン画面が開く。サインインすると同意画面（`/oauth/consent`）に、クライアント名・戻り先・できること・できないことが出る
 3. 「読み取りと書き込み」か「読み取りのみ」を選んで承認する
 
-接続したアプリは、Settings › Integrations の「接続中のアプリ」に並ぶ。権限を替えたり、切断したりでき、切断すると次の呼び出しから 401 になる。OAuth で発行されたトークンで盤面に届くのは、Alcon の MCP（と REST API）を通したときだけで、PostgREST などに直接持ち込んでも盤面は読み書きできない。書き込みは「Claude (MCP · OAuth)」の形で記録される。
+接続したアプリは、Settings › Integrations の「接続中のアプリ」に並ぶ。権限を替えたり、切断したりでき、切断すると次の呼び出しから 401 になる。OAuth で発行されたトークンでデータに届くのは、Alcon の MCP（と REST API）を通したときだけで、PostgREST などに直接持ち込んでもデータは読み書きできない。書き込みは「Claude (MCP · OAuth)」の形で記録される。
 
 仕組み：401 の `WWW-Authenticate` が `resource_metadata` で `…/alcon-mcp/.well-known/oauth-protected-resource` を指し、そこに認可サーバー（Supabase Auth の OAuth サーバー、`https://<ref>.supabase.co/auth/v1`）が書いてある。クライアントの登録・PKCE・トークンの発行と更新は Supabase が行う。
 
@@ -71,11 +71,11 @@ PAT と OAuth を受け付けるには、Edge Function のシークレット `AL
 
 ## 逆向き：Alcon のエージェントが外部サービスを使う
 
-この文書は外部の AI が Alcon を操作する入口を扱う。Alcon のエージェント（run-agent）が Linear・Asana・任意の MCP / API を道具として使う接続は、Settings › Integrations の「外部サービスをつなぐ」で Space の owner が設定する。資格情報は Vault に置かれ、外部への書き込みは既定で毎回承認を待つ。設計は [ADR 0027](architecture.md)。エージェントは Alcon 自身を指す連携を使わず、Alcon の PAT は連携の資格情報として保存できない（エージェントは開始した人の権限で、盤面の道具をすでに持っている）。
+この文書は外部の AI が Alcon を操作する入口を扱う。Alcon のエージェント（run-agent）が Linear・Asana・任意の MCP / API を道具として使う接続は、Settings › Integrations の「外部サービスをつなぐ」で Space の owner が設定する。資格情報は Vault に置かれ、外部への書き込みは既定で毎回承認を待つ。エージェントは Alcon 自身を指す連携を使わず、Alcon の PAT は連携の資格情報として保存できない（エージェントは開始した人の権限で、盤面の道具をすでに持っている）。
 
 ### Google Drive（OAuth）
 
-Google Drive は資格情報を貼り付けず、owner が Google にサインインしてつなぐ。スコープは `drive.file` だけなので、エージェントが扱えるのは Alcon が作ったファイルと利用者が選んだファイルに限られ、作ったファイルは接続した Google アカウントの名義になる。エージェントには `drive_search`・`drive_read`（読み取り）と `drive_create`・`drive_update`・`drive_create_folder`（書き込み、承認を通る）が出る。設計は [ADR 0035](architecture.md)。
+Google Drive は資格情報を貼り付けず、owner が Google にサインインしてつなぐ。スコープは `drive.file` だけなので、エージェントが扱えるのは Alcon が作ったファイルと利用者が選んだファイルに限られ、作ったファイルは接続した Google アカウントの名義になる。エージェントには `drive_search`・`drive_read`（読み取り）と `drive_create`・`drive_update`・`drive_create_folder`（書き込み、承認を通る）が出る。
 
 アクセスは Google アカウントに付き、Space ごとには分かれない。同じ Google アカウントを 2 つの Space でつなぐと、どちらの Space のエージェントも、もう一方で Alcon が作ったファイルを見られる。また切断は Google で Alcon の許可全体を取り消すので、一方の Space で切断すると、同じアカウントをつないだ他の Space も次のリフレッシュで `oauth_expired`（再接続が必要）になる。
 

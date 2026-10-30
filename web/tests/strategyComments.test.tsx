@@ -66,13 +66,13 @@ function setup(overrides: Partial<Parameters<typeof StrategyCommentsPanel>[0]> =
   render(
     <StrategyCommentsPanel
       strategyId="s1"
-      strategyName="Friction"
+      strategyName="Alcon"
       strategyOwnerId={USER_ID}
       workers={[]}
       {...overrides}
     />,
   );
-  return screen.getByPlaceholderText(/Comment on Friction/i) as HTMLTextAreaElement;
+  return screen.getByPlaceholderText(/Comment on Alcon/i) as HTMLTextAreaElement;
 }
 
 beforeEach(() => {

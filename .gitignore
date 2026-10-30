@@ -46,3 +46,6 @@ next-env.d.ts
 
 # Asset relay token kept by a local app that imported sdk/
 .alcon/
+
+# python
+__pycache__/

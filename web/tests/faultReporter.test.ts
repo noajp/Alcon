@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createFaultReporter, faultSignature, formatDuration, shouldEscalate } from '../../ops/faultReporter.mjs';
+import { createFaultReporter, faultSignature, formatDuration, shouldEscalate } from '../../.claude/ops/faultReporter.mjs';
 
 // The monitors report failures as transitions, not as states — and both halves
 // of that can fail invisibly.

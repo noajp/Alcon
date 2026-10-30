@@ -16,7 +16,7 @@ import {
 // A board is a subject's shared arrangement of widgets: one per surface and
 // subject, the same for everyone who can see the subject. A widget is a row of
 // its own, placed on a board by reference, so what it shows and who may see it
-// do not depend on where it sits (ADR 0039 in docs/architecture.md).
+// do not depend on where it sits (ADR 0039).
 //
 // A surface's default instances are not rows until somebody edits the board.
 // Until then they are read from `defaults.ts`, and `reconcileBoard` folds any

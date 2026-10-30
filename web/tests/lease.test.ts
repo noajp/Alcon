@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { holderToken, parseArgs, readBody, isUuid } from '../../ops/lease.mjs';
+import { holderToken, parseArgs, readBody, isUuid } from '../../.claude/ops/lease.mjs';
 
 // The holder token is what makes two concurrent sessions distinguishable on
 // the board. If it ever collapsed to the same string for two worktrees, the
@@ -21,23 +21,23 @@ describe('holderToken', () => {
     expect(a).not.toBe(b);
   });
 
-  it('FRICTION_HOLDER pins the token outright', () => {
-    expect(holderToken({ FRICTION_HOLDER: ' Codex@box-7 ' }, '/anything')).toBe('Codex@box-7');
+  it('LOOP_HOLDER pins the token outright', () => {
+    expect(holderToken({ LOOP_HOLDER: ' Codex@box-7 ' }, '/anything')).toBe('Codex@box-7');
   });
 
-  it('a blank FRICTION_HOLDER does not produce an empty token', () => {
-    expect(holderToken({ FRICTION_HOLDER: '   ' }, '/r/wt')).toBe('Claude@wt');
+  it('a blank LOOP_HOLDER does not produce an empty token', () => {
+    expect(holderToken({ LOOP_HOLDER: '   ' }, '/r/wt')).toBe('Claude@wt');
   });
 
-  it('FRICTION_AGENT renames the prefix but keeps the worktree', () => {
-    expect(holderToken({ FRICTION_AGENT: 'Codex' }, '/r/wt')).toBe('Codex@wt');
+  it('LOOP_AGENT renames the prefix but keeps the worktree', () => {
+    expect(holderToken({ LOOP_AGENT: 'Codex' }, '/r/wt')).toBe('Codex@wt');
   });
 });
 
 describe('parseArgs', () => {
   it('splits positionals from --flag value pairs', () => {
-    expect(parseArgs(['claim', 'ELE_TRJ-016', '--branch', 'claude/fric-x', '--note', 'why']))
-      .toEqual({ _: ['claim', 'ELE_TRJ-016'], branch: 'claude/fric-x', note: 'why' });
+    expect(parseArgs(['claim', 'ELE_TRJ-016', '--branch', 'claude/x', '--note', 'why']))
+      .toEqual({ _: ['claim', 'ELE_TRJ-016'], branch: 'claude/x', note: 'why' });
   });
 
   it('treats a flag with no value as boolean true', () => {

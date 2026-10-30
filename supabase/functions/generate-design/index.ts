@@ -4,7 +4,7 @@ import { betaZodOutputFormat } from 'npm:@anthropic-ai/sdk@0.135.0/helpers/beta/
 import { z } from 'npm:zod@4.6.7';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.86.2';
 
-// The Design widget's AI path (ADR 0043 in docs/architecture.md): Claude draws one artboard in
+// The Design widget's AI path (ADR 0043): Claude draws one artboard in
 // static HTML, CSS and SVG and returns it as JSON. The web app checks it again
 // (parseDesign) and draws it in a frame that runs no script and loads nothing
 // but the app's own fonts — so this function shares no code with it.

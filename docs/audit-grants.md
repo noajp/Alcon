@@ -1,6 +1,6 @@
 # 権限表の配布（audit-grants）
 
-ゲートウェイ（Metaxy の実行基盤）が守る権限を、Alcon から受け取るための口。設計の判断は [ADR 0046](architecture.md)。記録の送り方は [audit-intake](audit-intake.md)。
+ゲートウェイ（Metaxy の実行基盤）が守る権限を、Alcon から受け取るための口。記録の送り方は [audit-intake](audit-intake.md)。
 
 ## 権限を決める
 

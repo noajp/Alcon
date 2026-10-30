@@ -46,11 +46,11 @@ function repoKey() {
 }
 
 function lockPath(name) {
-  return join(tmpdir(), `friction-loop-${repoKey()}-${name}.lock`)
+  return join(tmpdir(), `dev-loop-${repoKey()}-${name}.lock`)
 }
 
 function logPath(name) {
-  return join(tmpdir(), `friction-loop-${repoKey()}-${name}.log`)
+  return join(tmpdir(), `dev-loop-${repoKey()}-${name}.log`)
 }
 
 function alive(pid) {

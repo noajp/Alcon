@@ -18,8 +18,8 @@ describe('liveLease', () => {
   });
 
   it('reports holder, branch and remaining time while live', () => {
-    const l = liveLease(row({ claimed_by: 'Claude@a', branch: 'claude/fric-x', claim_expires_at: '2026-09-06T12:38:00Z' }), T0);
-    expect(l).toEqual({ holder: 'Claude@a', branch: 'claude/fric-x', expiresAt: '2026-09-06T12:38:00Z', remainingMs: 38 * 60_000 });
+    const l = liveLease(row({ claimed_by: 'Claude@a', branch: 'claude/x', claim_expires_at: '2026-09-06T12:38:00Z' }), T0);
+    expect(l).toEqual({ holder: 'Claude@a', branch: 'claude/x', expiresAt: '2026-09-06T12:38:00Z', remainingMs: 38 * 60_000 });
   });
 
   it('a claim with no expiry is not treated as live', () => {
