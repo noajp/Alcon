@@ -717,12 +717,12 @@ export function ListTable({
                     <td className="sticky left-0 z-10 bg-card w-7 px-1 py-2" />
                     <td className="sticky left-7 z-10 bg-card w-7 px-1 py-2">
                       <div className="flex items-center justify-center text-muted-foreground">
-                        <ObjectIcon size={14} />
+                        <ObjectIcon size={16} />
                       </div>
                     </td>
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0">
-                      <div className="flex items-center min-w-0 min-h-[1.625rem] text-muted-foreground">
-                        <span className="text-[13px] group-hover:text-foreground transition-colors">
+                      <div className="flex items-center min-w-0 min-h-[1.875rem] text-muted-foreground">
+                        <span className="text-[14px] group-hover:text-foreground transition-colors">
                           {t('Add Object')}
                         </span>
                       </div>

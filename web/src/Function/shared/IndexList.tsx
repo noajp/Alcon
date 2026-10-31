@@ -63,8 +63,8 @@ export function IndexRow({ icon, name, description, health, count, onOpen, inden
         <span className="shrink-0 text-muted-foreground">{icon}</span>
         {renameField ?? (
           <>
-            <span className="truncate text-[14px] font-medium text-foreground">{name}</span>
-            {description && <span className="hidden min-w-0 truncate text-[13px] font-normal text-muted-foreground sm:inline">{description}</span>}
+            <span className="truncate text-[15px] font-medium text-foreground">{name}</span>
+            {description && <span className="hidden min-w-0 truncate text-[14px] font-normal text-muted-foreground sm:inline">{description}</span>}
           </>
         )}
       </div>

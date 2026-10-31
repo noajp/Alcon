@@ -216,7 +216,7 @@ function PortfolioTreeRow({ node, tree, gutter, rollup, open, onToggle, onOpen, 
     <>
     <ActionsContextMenu items={items}>
       <div>
-        <IndexRow indent={node.depth * 20} icon={<NavPortfolioIcon size={13} />} name={portfolio.name} description={portfolio.description}
+        <IndexRow indent={node.depth * 20} icon={<NavPortfolioIcon size={16} />} name={portfolio.name} description={portfolio.description}
           onOpen={onOpen}
           lead={hasChildren ? (
             <button type="button" onClick={onToggle}
@@ -342,7 +342,7 @@ function InitiativeIndexRow({ strategy, health, onOpen }: {
   const moved = health?.lastActivityAt != null ? formatRelative(new Date(health.lastActivityAt).toISOString()) : null;
   return (
     <InitiativeMenu initiative={strategy}><div>
-    <IndexRow icon={<NavStrategyIcon size={13} />} name={strategy.name} onOpen={onOpen}
+    <IndexRow icon={<NavStrategyIcon size={16} />} name={strategy.name} onOpen={onOpen}
       count={countObjects(strategy.objectIds)}
       actions={<InitiativeActionsButton initiative={strategy} />}
       health={

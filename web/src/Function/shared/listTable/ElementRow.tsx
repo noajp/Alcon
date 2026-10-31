@@ -213,7 +213,7 @@ export const ElementRow = memo(function ElementRow({
         {/* @container: the lease chip below decides how much of itself to
             show from this cell's own width, not the viewport's — the Name
             column is user-resizable and shares the row with the sidebar. */}
-        <div className="@container flex items-center gap-2 min-w-0 min-h-[1.625rem]">
+        <div className="@container flex items-center gap-2 min-w-0 min-h-[1.875rem]">
           <DisplayIdChip id={rowId} size="sm" fit="column" />
           {/* Status — between the id and the title, so Priority · id · Status
               read as one leading cluster: how urgent, which row, how far
@@ -238,7 +238,7 @@ export const ElementRow = memo(function ElementRow({
             )}
           </span>
           <div className="flex flex-1 min-w-0 items-center gap-2">
-            <span className="text-[14px] font-medium truncate flex-1 min-w-0 text-foreground">{el.title}</span>
+            <span className="text-[15px] font-medium truncate flex-1 min-w-0 text-foreground">{el.title}</span>
           </div>
           {lease && (
             // Who holds this right now. Only a live lease is shown — a lapsed

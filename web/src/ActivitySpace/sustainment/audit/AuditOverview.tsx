@@ -109,7 +109,7 @@ export function AuditOverview({ source, scoped, status, onOpenWorkflow, onOpenRu
                     {scoped.deployments.map(d => {
                       const s = scoped.summaries.get(d.id);
                       const rate = s?.autoRate ?? null;
-                      return <IndexRow key={d.id} icon={<Workflow size={13} />} name={d.name}
+                      return <IndexRow key={d.id} icon={<Workflow size={16} />} name={d.name}
                         description={[template(d.template_id)?.name, t(STATE_LABEL[d.state])].filter(Boolean).join(' · ')}
                         health={<div className="flex min-w-0 items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
                           {rate === null ? <span className="text-muted-foreground/60">{t('No finished runs')}</span>
