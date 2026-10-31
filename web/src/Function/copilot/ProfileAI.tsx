@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { ArrowUp, Square } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useAlconCopilot } from './useAlconCopilot';
@@ -26,7 +27,9 @@ export function ProfileAI({ activeDomainId }: { activeDomainId?: string | null }
         {messages.map((message, index) => <article key={index} className={`text-sm ${message.role === 'user' ? 'ml-auto max-w-xl rounded-md bg-muted p-3' : 'max-w-3xl'}`}>
           <p className="text-xs text-muted-foreground mb-1">{message.role === 'user' ? t('You') : t('AI')}</p>
           {message.toolEvents?.map((event, i) => <p key={i} className="text-xs text-muted-foreground">{event.result ? t(event.result.ok ? '{name} · Complete' : '{name} · Failed', { name: event.name }) : `${event.name}…`}</p>)}
-          <p className="whitespace-pre-wrap break-words">{message.content || (streaming && index === messages.length - 1 ? t('Thinking…') : '')}</p>
+          {message.role === 'assistant' && message.content
+            ? <MarkdownLite text={message.content} className="break-words" />
+            : <p className="whitespace-pre-wrap break-words">{message.content || (streaming && index === messages.length - 1 ? t('Thinking…') : '')}</p>}
         </article>)}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       </div>
