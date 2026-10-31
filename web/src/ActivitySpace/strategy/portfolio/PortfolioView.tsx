@@ -6,7 +6,6 @@ import { ChevronRight, CornerDownRight, FolderInput, FolderPlus, Pencil, Plus, T
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverAnchor, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
-import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '@/ui/context-menu';
 import { MenuShell } from '@/Function/shared/menu';
 import { EmptyState } from '@/Function/shared/EmptyState';
 import { QuickCreatePopup } from '@/Function/shared/QuickCreatePopup';
@@ -18,7 +17,8 @@ import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
 import { IndexList, IndexRow } from '@/Function/shared/IndexList';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import { appDialog } from '@/Function/shared/appDialogStore';
-import { InitiativeMenu } from '@/ActivitySpace/strategy/initiative/InitiativeMenu';
+import { InitiativeActionsButton, InitiativeMenu } from '@/ActivitySpace/strategy/initiative/InitiativeMenu';
+import { ActionsButton, ActionsContextMenu, type ActionItem } from '@/Function/shared/ActionMenus';
 import { RenameInput } from '@/ActivitySpace/sustainment/notebook/RenameInput';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
@@ -94,7 +94,7 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
   return (
     <div className="flex flex-col h-full bg-card">
       {open ? (
-        <PortfolioDetail node={open} visionName={vision?.name ?? null} portfolios={portfolios} byPortfolio={byPortfolio} healthById={healthById}
+        <PortfolioDetail node={open} tree={tree} visionName={vision?.name ?? null} portfolios={portfolios} byPortfolio={byPortfolio} healthById={healthById}
           candidates={roots.filter((s) => s.portfolio_id !== open.portfolio.id)}
           onOpenPortfolio={onSelectPortfolio} onSelectStrategy={onSelectStrategy}
           onNewInside={() => setLocalNew({ parentId: open.portfolio.id })} />
@@ -104,6 +104,12 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
             <NavPortfolioIcon size={14} />
             <span className="text-[13px] font-medium text-foreground">{t('Portfolios')}</span>
             {vision && <span className="truncate text-[13px] text-muted-foreground">{vision.name}</span>}
+            {vision && (
+              <ButtonAppearanceProvider appearance="navigation">
+                <Button variant="ghost" size="icon-xs" className="ml-auto text-muted-foreground" onClick={() => setLocalNew({ parentId: null })}
+                  title={t('New Portfolio')} aria-label={t('New Portfolio')}><Plus size={14} /></Button>
+              </ButtonAppearanceProvider>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto">
             {loading ? null : !vision ? (
@@ -116,14 +122,14 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
                 cta="Create Portfolio" onCta={() => setLocalNew({ parentId: null })} />
             ) : (
               <div className="h-full overflow-auto">
-                <IndexList headers={[t('Name'), t('Health'), t('Initiatives')]}>
+                <IndexList headers={[t('Name'), t('Health'), t('Initiatives')]} withActions>
                   <PortfolioTree tree={tree} byPortfolio={byPortfolio} healthById={healthById}
                     onOpen={onSelectPortfolio} onNewInside={(id) => setLocalNew({ parentId: id })} />
                 </IndexList>
                 {unassigned.length > 0 && (
                   <>
                     <div className="px-6 pt-4 text-[12px] font-medium text-muted-foreground/80">{t('Not in a Portfolio')}</div>
-                    <IndexList headers={[t('Name'), t('Health'), t('Objects')]} showHeader={false}>
+                    <IndexList headers={[t('Name'), t('Health'), t('Objects')]} showHeader={false} withActions>
                       {unassigned.map((s) => (
                         <InitiativeIndexRow key={s.id} strategy={s} health={healthById.get(s.id)} onOpen={() => onSelectStrategy(s.id)} />
                       ))}
@@ -205,9 +211,10 @@ function PortfolioTreeRow({ node, tree, gutter, rollup, open, onToggle, onOpen, 
   const [renaming, setRenaming] = useState(false);
   const guarded = useGuardedWrite();
   const hasChildren = node.children.length > 0;
+  const { items, picker } = usePortfolioActions({ portfolio, node, tree, onRename: () => setRenaming(true), onNewInside });
   return (
-    <PortfolioMenu portfolio={portfolio} node={node} tree={tree}
-      onRename={() => setRenaming(true)} onNewInside={onNewInside}>
+    <>
+    <ActionsContextMenu items={items}>
       <div>
         <IndexRow indent={node.depth * 20} icon={<NavPortfolioIcon size={13} />} name={portfolio.name} description={portfolio.description}
           onOpen={onOpen}
@@ -224,15 +231,24 @@ function PortfolioTreeRow({ node, tree, gutter, rollup, open, onToggle, onOpen, 
               onCancel={() => setRenaming(false)} />
           ) : undefined}
           health={<PortfolioHealthCell rollup={rollup} />}
-          count={rollup.initiatives} />
+          count={rollup.initiatives}
+          actions={<ActionsButton items={items} label={t('Portfolio actions')} />} />
       </div>
-    </PortfolioMenu>
+    </ActionsContextMenu>
+    {picker}
+    </>
   );
 }
 
-function PortfolioMenu({ portfolio, node, tree, onRename, onNewInside, children }: {
+/**
+ * A Portfolio's actions — a new Portfolio inside it, rename, move it into
+ * another, delete — for right-click on its row and for its "…" (on the row,
+ * or beside its name on its page). Rename is offered where the name can be
+ * edited in place; `onDeleted` runs after a delete (the page leaves).
+ */
+function usePortfolioActions({ portfolio, node, tree, onRename, onNewInside, onDeleted }: {
   portfolio: Portfolio; node: PortfolioNode; tree: PortfolioNode[];
-  onRename: () => void; onNewInside: () => void; children: React.ReactNode;
+  onRename?: () => void; onNewInside: () => void; onDeleted?: () => void;
 }) {
   const { t } = useI18n();
   const [moveOpen, setMoveOpen] = useState(false);
@@ -248,30 +264,20 @@ function PortfolioMenu({ portfolio, node, tree, onRename, onNewInside, children 
       ? t('Delete the Portfolio "{name}" and the {n} Portfolios inside it? Their Initiatives stay, outside any Portfolio.', { name: portfolio.name, n: String(nested) })
       : t('Delete the Portfolio "{name}"? Its Initiatives stay, outside any Portfolio.', { name: portfolio.name });
     if (!await appDialog.confirm(msg)) return;
-    await guarded(() => deletePortfolio(portfolio.id));
+    await guarded(async () => { await deletePortfolio(portfolio.id); onDeleted?.(); });
   };
-  return (
-    <>
-      <ContextMenu>
-        <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-        {/* Focus is not handed back to the row on close: Rename's input and the
-            Move picker open from this menu and must keep it. */}
-        <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
-          <ContextMenuItem onSelect={onNewInside}><FolderPlus size={14} />{t('New Portfolio inside')}</ContextMenuItem>
-          {/* After the menu has closed, so the input mounts into a settled focus. */}
-          <ContextMenuItem onSelect={() => setTimeout(onRename, 0)}><Pencil size={14} />{t('Rename')}</ContextMenuItem>
-          <ContextMenuItem onSelect={() => setTimeout(() => setMoveOpen(true), 0)}><FolderInput size={14} />{t('Move into…')}</ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem variant="destructive" onSelect={() => void remove()}><Trash2 size={14} />{t('Delete')}</ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
-      {moveOpen && (
-        <MovePicker targets={targets} allowTopLevel={portfolio.parent_id !== null}
-          onPick={(parentId) => { setMoveOpen(false); void guarded(() => movePortfolio(portfolio.id, parentId)); }}
-          onClose={() => setMoveOpen(false)} />
-      )}
-    </>
-  );
+  const items: ActionItem[] = [
+    { key: 'new', label: t('New Portfolio inside'), icon: <FolderPlus size={14} />, onSelect: onNewInside },
+    ...(onRename ? [{ key: 'rename', label: t('Rename'), icon: <Pencil size={14} />, onSelect: onRename }] : []),
+    { key: 'move', label: t('Move into…'), icon: <FolderInput size={14} />, onSelect: () => setMoveOpen(true) },
+    { key: 'delete', label: t('Delete'), icon: <Trash2 size={14} />, destructive: true, separatorBefore: true, onSelect: () => void remove() },
+  ];
+  const picker = moveOpen ? (
+    <MovePicker targets={targets} allowTopLevel={portfolio.parent_id !== null}
+      onPick={(parentId) => { setMoveOpen(false); void guarded(() => movePortfolio(portfolio.id, parentId)); }}
+      onClose={() => setMoveOpen(false)} />
+  ) : null;
+  return { items, picker };
 }
 
 // Where to nest a Portfolio: every other Portfolio outside its own subtree,
@@ -338,6 +344,7 @@ function InitiativeIndexRow({ strategy, health, onOpen }: {
     <InitiativeMenu initiative={strategy}><div>
     <IndexRow icon={<NavStrategyIcon size={13} />} name={strategy.name} onOpen={onOpen}
       count={countObjects(strategy.objectIds)}
+      actions={<InitiativeActionsButton initiative={strategy} />}
       health={
         <div className="flex min-w-0 items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
           {health?.progressPct != null && (
@@ -371,8 +378,9 @@ function RollupFigures({ rollup }: { rollup: PortfolioRollup }) {
 }
 
 // ── One Portfolio, opened ───────────────────────────────────────────────
-function PortfolioDetail({ node, visionName, portfolios, byPortfolio, healthById, candidates, onOpenPortfolio, onSelectStrategy, onNewInside }: {
+function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, healthById, candidates, onOpenPortfolio, onSelectStrategy, onNewInside }: {
   node: PortfolioNode;
+  tree: PortfolioNode[];
   /** The Vision this Portfolio sits under. */
   visionName: string | null;
   portfolios: Portfolio[];
@@ -394,6 +402,8 @@ function PortfolioDetail({ node, visionName, portfolios, byPortfolio, healthById
   const q = query.trim().toLowerCase();
   const matches = candidates.filter((s) => !q || s.name.toLowerCase().includes(q));
   const parent = path.length > 1 ? path[path.length - 2] : null;
+  // The page's own actions; after a delete it goes back to the list.
+  const { items, picker } = usePortfolioActions({ portfolio, node, tree, onNewInside, onDeleted: () => onOpenPortfolio(null) });
   const move = async (strategyId: string, into: Portfolio | null) => {
     setPickerOpen(false);
     setError(null);
@@ -414,7 +424,11 @@ function PortfolioDetail({ node, visionName, portfolios, byPortfolio, healthById
           <span key={p.id} className="flex min-w-0 items-center gap-1">
             <ChevronRight size={12} className="shrink-0 text-muted-foreground/60" />
             {p.id === portfolio.id ? (
-              <span className="truncate px-1.5 text-[13px] font-medium text-foreground">{p.name}</span>
+              <>
+                <span className="truncate px-1.5 text-[13px] font-medium text-foreground">{p.name}</span>
+                <ActionsButton items={items} label={t('Portfolio actions')} />
+                {picker}
+              </>
             ) : (
               <button type="button" onClick={() => onOpenPortfolio(p.id)}
                 className="truncate rounded px-1.5 py-0.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">{p.name}</button>
