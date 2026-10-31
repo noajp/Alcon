@@ -13,7 +13,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ToggleRow } from '@/Function/settings/SettingsControls';
 import type { Integration } from '@/types/database';
 import {
-  KIND_LABELS, SOURCE_LABELS, buildIntegrationRow, oauthProviderOf, readLastTest, signsInWithOAuth, testOutcomeLabel, type OAuthProvider,
+  KIND_LABELS, SOURCE_LABELS, darkIconFor, buildIntegrationRow, oauthProviderOf, readLastTest, signsInWithOAuth, testOutcomeLabel, type OAuthProvider,
   type IntegrationAuthType, type IntegrationDelegation, type IntegrationPreset, type IntegrationSource,
 } from './catalog';
 import { useIntegrationActions, useIntegrationOAuthStatus } from './data';
@@ -66,11 +66,21 @@ const CUSTOM_AUTH_LABELS: Record<'none' | 'bearer' | 'header', string> = {
   header: 'Custom header',
 };
 
+/** A service's logo on a tile, or the name's first letter when it has none. */
 export function IntegrationIcon({ name, icon, size }: { name: string; icon: string | null; size: number }) {
   const style = { width: size, height: size };
   if (icon) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={icon} alt="" style={style} className="shrink-0 rounded-lg object-contain" />;
+    const dark = darkIconFor(icon);
+    const logo = Math.round(size * 0.58);
+    return (
+      <span aria-hidden="true" style={style}
+        className="inline-flex shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={icon} alt="" width={logo} height={logo} className={cn('object-contain', dark && 'dark:hidden')} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {dark && <img src={dark} alt="" width={logo} height={logo} className="hidden object-contain dark:block" />}
+      </span>
+    );
   }
   return (
     <span aria-hidden="true" style={style}

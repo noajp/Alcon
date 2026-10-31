@@ -273,7 +273,7 @@ function ConnectedRow({ integration, onOpen }: { integration: Integration; onOpe
   return (
     <button type="button" onClick={onOpen}
       className="-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-md px-2 py-2 text-left outline-none transition-colors hover:bg-[var(--surface-strong)] focus-visible:bg-[var(--surface-strong)]">
-      <IntegrationIcon name={integration.name} icon={integration.icon} size={24} />
+      <IntegrationIcon name={integration.name} icon={integration.icon ?? presetById(integration.preset)?.icon ?? null} size={24} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-[13px] font-medium text-foreground">{integration.name}</span>
