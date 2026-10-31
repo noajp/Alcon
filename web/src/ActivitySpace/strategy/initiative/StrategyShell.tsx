@@ -284,7 +284,7 @@ function StrategyListView({
       {strategies.map((s) => (
         <InitiativeMenu key={s.id} initiative={s}>
           <div>
-            <IndexRow icon={<NavStrategyIcon size={13} />} name={s.name}
+            <IndexRow icon={<NavStrategyIcon size={16} />} name={s.name}
               health={<InitiativeHealthCell health={health.get(s.id)} />}
               count={countObjects(s.objectIds)}
               onOpen={() => onSelectStrategy(s)}
