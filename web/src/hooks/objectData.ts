@@ -13,6 +13,7 @@ import { useCallback, useMemo } from 'react';
 // owner/admin of that Domain; taking it out needs one of the two.
 const LINK_REFUSED = 'Only owners or admins of both this Object and the Domain can file it there.';
 const UNLINK_REFUSED = 'Only owners or admins of this Object or of the Domain can take it out of there.';
+const DELETE_REFUSED = 'Only owners or admins of this Object or of its Domain can delete it.';
 const CREATE_CLEANUP_FAILED = 'The Object was created but could not be filed under every chosen Domain, and it could not be removed. Delete it, or ask an owner or admin of those Domains to file it.';
 const MOVE_NEEDS_MEMBERSHIP = 'You need to be a member of this Object to move it.';
 const CREATE_REFUSED = 'You can create an Object only in a Domain you can see.';
@@ -338,13 +339,16 @@ export async function deleteObject(id: string): Promise<void> {
     }
   }
 
-  // Delete the object itself.
-  const { error } = await supabase
+  // Delete the object itself. A delete RLS refuses matches no rows rather
+  // than erroring; ask for the row so a refusal is visible.
+  const { data: gone, error } = await supabase
     .from('objects')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
   if (error) throw error;
+  if (!gone?.length) throw new Error(translate(DELETE_REFUSED));
 }
 
 // Mirror reorderElements: bulk-update objects.order_index with an
