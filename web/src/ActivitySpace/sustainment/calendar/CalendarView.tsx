@@ -638,7 +638,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
         <>
           <div className="fixed inset-0 z-40" onClick={() => setDayPicker(null)} />
           <div
-            className="fixed z-50 w-64 rounded-xl border border-border bg-popover text-popover-foreground shadow-md p-2"
+            className="fixed z-50 w-64 rounded-lg border border-border bg-popover text-popover-foreground shadow-md p-2"
             style={{
               left: Math.max(8, Math.min(dayPicker.x, window.innerWidth - 272)),
               top: Math.max(8, Math.min(dayPicker.y, window.innerHeight - 300)),

@@ -82,7 +82,7 @@ export function OAuthConsentScreen() {
 
   return (
     <div className="min-h-dvh flex items-center justify-center bg-[var(--content-bg)] px-4 py-10">
-      <div className="w-full max-w-md rounded-xl border border-border/60 bg-background p-6 space-y-5">
+      <div className="w-full max-w-md rounded-lg border border-border/60 bg-background p-6 space-y-5">
         {state.kind === 'loading' || state.kind === 'leaving' ? (
           <p className="text-[13px] text-muted-foreground">{state.kind === 'leaving' ? t('Returning to the app…') : t('Loading…')}</p>
         ) : state.kind === 'error' ? (

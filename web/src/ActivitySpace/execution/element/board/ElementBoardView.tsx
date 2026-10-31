@@ -198,7 +198,7 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
                   {dueDate ? formatElementDate(dueDate) : t('Date')}
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 rounded-xl" align="start" onPointerDown={stop}>
+              <PopoverContent className="w-auto p-0 rounded-lg" align="start" onPointerDown={stop}>
                 <CalendarPicker
                   mode="single"
                   selected={dueDate ?? undefined}

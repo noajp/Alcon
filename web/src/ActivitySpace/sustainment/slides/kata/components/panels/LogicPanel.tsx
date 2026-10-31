@@ -209,7 +209,7 @@ function DeckTab() {
                 role="radio"
                 aria-checked={on}
                 onClick={() => editDeck((d) => ({ ...d, mode: id }))}
-                className={clsx("flex flex-col gap-1 rounded-xl p-2.5 text-left", on ? "bg-k-chosen ring-2 ring-k-ink" : "ring-1 ring-k-line hover:ring-k-ink-3")}
+                className={clsx("flex flex-col gap-1 rounded-lg p-2.5 text-left", on ? "bg-k-chosen ring-2 ring-k-ink" : "ring-1 ring-k-line hover:ring-k-ink-3")}
               >
                 <span className="text-[12px] font-semibold">{name}</span>
                 <span className="text-[10px] leading-snug text-k-ink-3">{desc}</span>
@@ -234,7 +234,7 @@ function DeckTab() {
                   setStoryline(s.id);
                   pushMessage({ from: "kata", text: tx("「{name}」の順に組み直しました。手で付け替えた役割はそのまま残しています。", "Reordered as “{name}”. Roles you set by hand are kept.", { name: s.name }) });
                 }}
-                className={clsx("flex flex-col gap-2 rounded-xl p-2.5 text-left", on ? "bg-k-chosen ring-2 ring-k-ink" : "ring-1 ring-k-line hover:ring-k-ink-3")}
+                className={clsx("flex flex-col gap-2 rounded-lg p-2.5 text-left", on ? "bg-k-chosen ring-2 ring-k-ink" : "ring-1 ring-k-line hover:ring-k-ink-3")}
               >
                 <span className="text-[12px] font-semibold leading-tight">{s.name}</span>
                 <span className="flex flex-wrap items-center gap-1 text-[10px] text-k-ink-2">
@@ -358,7 +358,7 @@ function PageTab() {
   const special = slide.layout === "cover" || slide.layout === "closing";
   return (
     <div className="scroll-thin flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4 pt-4">
-      <section className="rounded-xl bg-k-panel-2 p-3 ring-1 ring-k-line">
+      <section className="rounded-lg bg-k-panel-2 p-3 ring-1 ring-k-line">
         <div className="mb-1 font-mono text-[10px] tracking-[0.08em] text-k-ink-3">{String(index + 1).padStart(2, "0")} — {tx("タイトル（主張）", "Title (claim)")}</div>
         <p className="text-[13px] font-medium leading-relaxed">{slide.title || tx("（タイトル未入力）", "(Untitled)")}</p>
         <label className="mt-3 flex items-center justify-between gap-3 text-[12px]">
@@ -391,7 +391,7 @@ function PageTab() {
                 type="button"
                 aria-pressed={on}
                 onClick={() => setLayout(slide.id, l.id)}
-                className={clsx("flex items-center gap-3 rounded-xl p-2 text-left", on ? "bg-k-chosen ring-2 ring-k-ink" : "ring-1 ring-k-line hover:ring-k-ink-3")}
+                className={clsx("flex items-center gap-3 rounded-lg p-2 text-left", on ? "bg-k-chosen ring-2 ring-k-ink" : "ring-1 ring-k-line hover:ring-k-ink-3")}
               >
                 <LayoutGlyph id={l.id} />
                 <span className="flex flex-col gap-0.5">

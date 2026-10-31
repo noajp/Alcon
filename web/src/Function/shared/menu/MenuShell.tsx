@@ -8,12 +8,8 @@
 // measured in Chrome (compiled Tailwind, light theme) before it was written.
 // What the numbers actually said:
 //
-//   radius   6px on all twelve. The "three radii" were a mirage — `rounded-md`
-//            was already unanimous. The only 12px surfaces are the ListTable
-//            *cell* editors (CELL_POPOVER_RADIUS), which are deliberately
-//            matched to the date-picker popover and are not menus. So this
-//            file does not change any radius; it removes the place where a
-//            fourth one could be introduced.
+//   radius   one for every frame: 8px, the islands' own, with rows at 4px
+//            inside the 4px padding so the corners run concentric.
 //   width    seven distinct values — 128 / 140 / 160 / 170 / 180 / 200 / 240 /
 //            288. Two toolbar buttons that sit 6px apart (Sort, Filter) opened
 //            240px and 288px surfaces.
@@ -74,7 +70,7 @@ export type MenuWidth = keyof typeof MENU_WIDTH;
  * "restore" it as a Tailwind variant; it renders nothing.
  */
 const MENU_SHELL_BASE = [
-  'rounded-md',
+  'rounded-lg',
   'p-1',
   // Cancels the `min-w-[8rem]` DropdownMenuContent ships with, so the width
   // step is the only thing deciding how wide a menu is.

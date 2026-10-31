@@ -563,7 +563,7 @@ export function AppSidebar({
           <div className="fixed inset-0 z-40" onClick={() => setCreateMenuOpen(false)} />
           <div
             ref={createMenuRef}
-            className="fixed w-52 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden"
+            className="fixed w-52 bg-popover border border-border rounded-lg shadow-xl z-50 py-1 overflow-hidden"
             style={{ top: createMenuPos.top, left: createMenuPos.left }}
           >
             {railMode === 'slides' ? (

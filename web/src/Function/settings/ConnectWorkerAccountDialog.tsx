@@ -116,7 +116,7 @@ export function ConnectWorkerAccountDialog({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-card rounded-xl border border-border shadow-xl overflow-hidden"
+        className="w-full max-w-md bg-card rounded-lg border border-border shadow-xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">

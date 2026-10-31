@@ -158,7 +158,7 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
             onClick={() => setShowAdd(false)}
           >
             <div
-              className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm overflow-hidden"
+              className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-sm overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">

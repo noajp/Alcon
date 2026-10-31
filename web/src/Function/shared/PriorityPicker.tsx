@@ -44,7 +44,7 @@ export function PriorityPicker({
   return (
     <DropdownMenu {...controlled}>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent align={align} className={cn('rounded-xl min-w-[160px]', className)}>
+      <DropdownMenuContent align={align} className={cn('rounded-lg min-w-[160px]', className)}>
         {PRIORITY_OPTIONS.map((opt) => (
           <DropdownMenuItem
             key={opt.value}

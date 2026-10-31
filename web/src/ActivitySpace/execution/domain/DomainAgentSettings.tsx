@@ -76,7 +76,7 @@ export function DomainAgentSettings({
   };
 
   return (
-    <fieldset disabled={!canEdit} className="rounded-xl border border-border/60 bg-card p-4 space-y-4 disabled:opacity-70">
+    <fieldset disabled={!canEdit} className="rounded-lg border border-border/60 bg-card p-4 space-y-4 disabled:opacity-70">
       {/* Header */}
       <div className="flex items-start gap-3">
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">

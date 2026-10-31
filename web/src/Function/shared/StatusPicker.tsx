@@ -140,7 +140,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
       <PopoverContent
         align="start"
         sideOffset={6}
-        className="w-60 rounded-xl p-1"
+        className="w-60 rounded-lg p-1"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-2 py-1.5 text-[11.5px] text-muted-foreground">{t('Change status…')}</div>

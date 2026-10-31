@@ -426,7 +426,7 @@ function AddMemberDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-md bg-card rounded-xl border border-border shadow-xl">
+      <div className="w-full max-w-md bg-card rounded-lg border border-border shadow-xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-[14px] font-semibold text-foreground">{t('Add team member')}</h3>
           <button

@@ -192,7 +192,7 @@ export const CARD_HOVER =
   'hover:border-[var(--border-strong)] transition-colors duration-[120ms]';
 /** Shared geometry for Object and Element quick creation. */
 export const QUICK_CREATE = {
-  panel: 'pointer-events-auto w-full max-w-[760px] max-h-[calc(100dvh-48px)] overflow-y-auto rounded-2xl bg-popover/95 backdrop-blur-md border border-border p-4',
+  panel: 'pointer-events-auto w-full max-w-[760px] max-h-[calc(100dvh-48px)] overflow-y-auto rounded-lg bg-popover/95 backdrop-blur-md border border-border p-4',
   header: 'flex items-center gap-2 mb-2',
   context: 'inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground',
   title: 'quick-create-title block w-full bg-transparent px-0 py-1 text-lg text-foreground placeholder:text-muted-foreground/60 resize-none',

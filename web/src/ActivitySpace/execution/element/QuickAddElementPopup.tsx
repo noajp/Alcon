@@ -386,7 +386,7 @@ export function QuickAddElementPopup({
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="rounded-xl min-w-[180px]">
+              <DropdownMenuContent align="start" className="rounded-lg min-w-[180px]">
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Template')}</DropdownMenuLabel>
                 {templates.map((t) => (
                   <DropdownMenuItem key={t.id} onSelect={() => applyTemplate(t)} className="gap-2 text-[12px]">
@@ -409,7 +409,7 @@ export function QuickAddElementPopup({
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="rounded-xl min-w-[180px]">
+              <DropdownMenuContent align="start" className="rounded-lg min-w-[180px]">
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Type')}</DropdownMenuLabel>
                 {types.map((t) => (
                   <DropdownMenuItem key={t} onSelect={() => setType(t)} className="gap-2 text-[12px]">
@@ -437,7 +437,7 @@ export function QuickAddElementPopup({
                 <ChevronDown size={10} className="opacity-60" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="rounded-xl min-w-[180px]">
+            <DropdownMenuContent align="start" className="rounded-lg min-w-[180px]">
               <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Status')}</DropdownMenuLabel>
               {STATUS_OPTIONS.map((s) => (
                 <DropdownMenuItem key={s.value} onSelect={() => setStatus(s.value)} className="gap-2 text-[12px]">
@@ -490,7 +490,7 @@ export function QuickAddElementPopup({
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="rounded-xl min-w-[220px] max-h-[260px] overflow-y-auto">
+              <DropdownMenuContent align="start" className="rounded-lg min-w-[220px] max-h-[260px] overflow-y-auto">
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Assignee')}</DropdownMenuLabel>
                 {workers.map((w) => {
                   const on = assigneeIds.has(w.id);
@@ -530,7 +530,7 @@ export function QuickAddElementPopup({
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="rounded-xl min-w-[240px] max-h-[260px] overflow-y-auto">
+              <DropdownMenuContent align="start" className="rounded-lg min-w-[240px] max-h-[260px] overflow-y-auto">
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Save to')}</DropdownMenuLabel>
                 {canSaveToPersonal && (
                   <>
@@ -569,7 +569,7 @@ export function QuickAddElementPopup({
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="rounded-xl min-w-[220px] max-h-[260px] overflow-y-auto">
+              <DropdownMenuContent align="start" className="rounded-lg min-w-[220px] max-h-[260px] overflow-y-auto">
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Labels')}</DropdownMenuLabel>
                 {availableLabels.map((l) => {
                   const on = labels.has(l);

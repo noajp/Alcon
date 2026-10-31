@@ -102,7 +102,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   let lastGroup = "";
   return createPortal(
     <div className="fixed inset-0 z-[95] flex items-start justify-center bg-black/25 pt-[14vh]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={trapRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={tx("コマンド", "Commands")} className="anim-in w-[560px] overflow-hidden rounded-2xl border border-k-line bg-k-panel shadow-[var(--shadow-pop)]">
+      <div ref={trapRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={tx("コマンド", "Commands")} className="anim-in w-[560px] overflow-hidden rounded-lg border border-k-line bg-k-panel shadow-[var(--shadow-pop)]">
         <div className="flex items-center gap-3 border-b border-k-line px-4">
           <Search size={16} className="text-k-ink-3" />
           <input

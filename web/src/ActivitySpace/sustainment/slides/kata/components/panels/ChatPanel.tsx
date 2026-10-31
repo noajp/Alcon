@@ -53,7 +53,7 @@ export function ChatPanel() {
           {m.text ? (
             <div
               className={clsx(
-                "max-w-[300px] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[13px] leading-[1.7]",
+                "max-w-[300px] whitespace-pre-wrap rounded-lg px-3.5 py-2.5 text-[13px] leading-[1.7]",
                 m.from === "me" ? "rounded-br-md bg-k-primary text-k-on-primary" : "rounded-bl-md bg-k-bubble text-k-ink",
               )}
             >
@@ -63,14 +63,14 @@ export function ChatPanel() {
         </div>
       ))}
       {busy ? (
-        <div className="dot-pulse flex items-center gap-1 self-start rounded-2xl rounded-bl-md bg-k-bubble px-3.5 py-3">
+        <div className="dot-pulse flex items-center gap-1 self-start rounded-lg rounded-bl-md bg-k-bubble px-3.5 py-3">
           <span className="h-1.5 w-1.5 rounded-full bg-k-ink-2" />
           <span className="h-1.5 w-1.5 rounded-full bg-k-ink-2" />
           <span className="h-1.5 w-1.5 rounded-full bg-k-ink-2" />
         </div>
       ) : null}
       {file.chat.length > 0 && !busy && file.chat.at(-1)?.from === "kata" && /(組みました|Built|built)/.test(file.chat.at(-1)?.text ?? "") ? (
-        <div className="anim-in mt-1 flex flex-col gap-2 rounded-xl border border-k-line p-3">
+        <div className="anim-in mt-1 flex flex-col gap-2 rounded-lg border border-k-line p-3">
           <div className="flex items-baseline justify-between">
             <span className="text-[12px] font-semibold">{tx("論点の置き方を変える", "Change the framing")}</span>
             <span className="text-[10px] text-k-ink-3">{tx("この資料で答える問い", "The question this deck answers")}</span>
@@ -113,7 +113,7 @@ function AskThisDeck({ items }: { items: string[] }) {
       <p className="text-[13px] leading-[1.8] text-k-ink-2">{tx("文章を貼れば組み直し、一言なら今の資料を直します。", "Paste text to rebuild it, or type a short request to edit the current deck.")}</p>
       <div className="flex flex-col gap-1.5">
         {items.map((t) => (
-          <button key={t} type="button" onClick={() => sendToKata(t)} className="rounded-xl border border-k-line px-3 py-2.5 text-left text-[13px] text-k-ink-2 hover:border-k-ink hover:text-k-ink">
+          <button key={t} type="button" onClick={() => sendToKata(t)} className="rounded-md border border-k-line px-3 py-2.5 text-left text-[13px] text-k-ink-2 hover:border-k-ink hover:text-k-ink">
             {t}
           </button>
         ))}
@@ -140,7 +140,7 @@ function Welcome({ canTry }: { canTry: boolean }) {
             key={x.id}
             type="button"
             onClick={() => sendToKata("", { name: tx("見本：{name}", "Sample: {name}", { name: x.name }), body: x.text })}
-            className="group flex items-center justify-between gap-3 rounded-xl border border-k-line px-3 py-2.5 text-left hover:border-k-ink"
+            className="group flex items-center justify-between gap-3 rounded-md border border-k-line px-3 py-2.5 text-left hover:border-k-ink"
           >
             <span className="flex flex-col gap-0.5">
               <span className="text-[13px] font-semibold">{x.name}</span>
@@ -248,7 +248,7 @@ export function ChatComposer() {
           </button>
         </div>
       ) : null}
-      <div className="flex items-end gap-2 rounded-xl border border-k-line-strong bg-k-panel px-2 py-1.5 focus-within:border-k-ink">
+      <div className="flex items-end gap-2 rounded-lg border border-k-line-strong bg-k-panel px-2 py-1.5 focus-within:border-k-ink">
         <button type="button" aria-label={tx("ファイルを添付", "Attach file")} onClick={() => fileRef.current?.click()} className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-k-ink-3 hover:bg-k-hover hover:text-k-ink">
           <Paperclip size={15} />
         </button>

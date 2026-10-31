@@ -325,7 +325,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
             {[0.18, 0.35, 0.55, 1].map((opacity, i) => (
               <div
                 key={i}
-                className="w-14 h-14 rounded-xl border-2 border-muted-foreground flex items-center justify-center"
+                className="w-14 h-14 rounded-lg border-2 border-muted-foreground flex items-center justify-center"
                 style={{ opacity, borderStyle: i === 0 ? 'dashed' : 'solid' }}
               >
                 <ImageIcon size={22} />

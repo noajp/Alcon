@@ -46,7 +46,7 @@ export const CELL_TRIGGER_BASE =
   // a list table raises them to 14px through --cell-text.
   'inline-flex items-center max-w-full [font-size:calc(var(--cell-text,13px)*var(--fs))] font-normal leading-5 text-foreground hover:bg-muted px-2 py-1 rounded-md transition-colors cursor-pointer truncate disabled:cursor-default disabled:pointer-events-none disabled:hover:bg-transparent';
 export const CELL_TRIGGER_EMPTY = 'text-muted-foreground';
-export const CELL_POPOVER_RADIUS = 'rounded-xl';
+export const CELL_POPOVER_RADIUS = 'rounded-lg';
 
 /**
  * The single, shared truncating label for any cell value. CELL_TRIGGER_BASE is
@@ -159,7 +159,7 @@ function CustomColumnCellBody({
             {dateString ? <><CalendarIcon size={11} className="opacity-60" />{formatDate(dateString, locale)}</> : <EmptyCellMark />}
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0 rounded-xl" align="start">
+        <PopoverContent className="w-auto p-0 rounded-lg" align="start">
           <Calendar
             mode="single"
             selected={selected}
@@ -261,7 +261,7 @@ function PersonCell({
           <CellText>{current ? current.name : <EmptyCellMark />}</CellText>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-56 p-1 rounded-xl">
+      <PopoverContent align="start" className="w-56 p-1 rounded-lg">
         <div className="max-h-64 overflow-auto">
           {workers.length === 0 && !(elementId && loading) && (
             <div className="px-2 py-1.5 text-[12px] text-muted-foreground">
@@ -336,7 +336,7 @@ function TextCell({
           <CellText>{display || <EmptyCellMark />}</CellText>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 p-2 rounded-xl">
+      <PopoverContent align="start" className="w-72 p-2 rounded-lg">
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -481,7 +481,7 @@ function ProgressCell({
           <span className="tabular-nums">{current ?? 0}%</span>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-56 p-3 rounded-xl">
+      <PopoverContent align="start" className="w-56 p-3 rounded-lg">
         <div className="flex items-center justify-between pb-2">
           <span className="text-[12px] font-medium text-muted-foreground">{t('Progress')}</span>
           <div className="flex items-center gap-1">

@@ -110,7 +110,7 @@ function Popover({ label, button, children }: { label: string; button: ReactNode
       </button>
       {pos
         ? createPortal(
-            <div ref={popRef} data-formatbar="true" onMouseDown={keep} style={{ top: pos.top, left: pos.left }} className="anim-in fixed z-[85] min-w-[180px] rounded-xl border border-k-line bg-k-panel p-2 shadow-[var(--shadow-pop)]">
+            <div ref={popRef} data-formatbar="true" onMouseDown={keep} style={{ top: pos.top, left: pos.left }} className="anim-in fixed z-[85] min-w-[180px] rounded-lg border border-k-line bg-k-panel p-2 shadow-[var(--shadow-pop)]">
               {children(close)}
             </div>,
             document.body,

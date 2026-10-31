@@ -66,7 +66,7 @@ export function LookEditor({ lookId, onClose: close }: { lookId: string; onClose
 
   return createPortal(
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/25 p-6" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={trapRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={tx("世界観を編集", "Edit look")} className="anim-in flex max-h-[90vh] w-[880px] overflow-hidden rounded-2xl bg-k-panel shadow-[var(--shadow-pop)]">
+      <div ref={trapRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={tx("世界観を編集", "Edit look")} className="anim-in flex max-h-[90vh] w-[880px] overflow-hidden rounded-lg bg-k-panel shadow-[var(--shadow-pop)]">
         <div className="flex flex-1 flex-col gap-4 bg-k-stage p-6">
           <div className="font-mono text-[10px] tracking-[0.1em] text-k-ink-3">PREVIEW — {String(view.index + 1).padStart(2, "0")}</div>
           <div className="overflow-hidden rounded-md shadow-[var(--shadow-slide)]">
