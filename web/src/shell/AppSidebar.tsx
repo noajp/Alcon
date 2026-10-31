@@ -377,18 +377,18 @@ export function AppSidebar({
           width,
           transform: collapsed && !overlay ? 'translateX(-100%)' : 'translateX(0)',
         }}
-        className={`app-sidebar h-full flex flex-col flex-shrink-0 overflow-hidden ${
+        className={`app-sidebar flex flex-col flex-shrink-0 overflow-hidden ${
           collapsed
-            ? 'absolute inset-y-0 left-0 z-50 bg-background shadow-xl'
-            // Pinned, a line divides it from the main island, as in VS Code.
-            : 'relative mr-1.5 border-r border-border'
+            ? 'absolute inset-y-0 left-0 z-50 h-full bg-background shadow-xl'
+            // Pinned, it is a framed panel beside the main island, as in VS Code.
+            : 'relative mx-1.5 mt-1.5 rounded-lg border border-border'
         } ${resizing ? '' : 'transition-transform duration-200 ease-out'}`}
       >
         {/* Header — fixed; only the navigation under it scrolls. The same
             height as the main island's header (50px), so the Space name and
             the island's title sit on one line. */}
         <ButtonAppearanceProvider appearance="navigation">
-        <div className="mt-1.5 flex h-[50px] shrink-0 items-center pl-1 pr-2">
+        <div className={`${collapsed ? 'mt-1.5' : ''} flex h-[50px] shrink-0 items-center pl-1 pr-2`}>
           {activeView === 'settings' ? (
             <Button variant="ghost" size="sm" align="start" onClick={onCloseSettings} className="text-muted-foreground">
               <ArrowLeft size={14} />{t('Back')}
