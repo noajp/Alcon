@@ -464,9 +464,14 @@ export function ListTable({
   const nameFluid = !cols.isSized(NAME_COL_KEY);
   const packedWidth = 56 + cols.widthFor(NAME_COL_KEY) + visibleColumns.reduce((sum, c) => sum + cols.widthFor(c.id), 0) + (hasTrailingCol ? 80 : 0);
 
+  // With no rows the table is its header alone, and a horizontal scrollbar
+  // (when the columns are wider than the pane) would sit right under it as a
+  // stray bar. Nothing is there to scroll to, so an empty list does not scroll.
+  const empty = sections.every((s) => s.objects.length === 0 && (s.elements?.length ?? 0) === 0);
+
   return (
     <DndContext id={dndId} sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
-    <div data-list-scroller className="overflow-x-auto h-full [overflow-anchor:none]">
+    <div data-list-scroller className={`${empty ? 'overflow-x-hidden' : 'overflow-x-auto'} h-full [overflow-anchor:none]`}>
       <table
         ref={tableRef}
         // `min-w-full` so the table fills the wrap (rows + section bands span
