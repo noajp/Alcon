@@ -95,6 +95,7 @@ const CODE_REVIEW_MESSAGES: Record<string, Row> = {
   'Verdicts and line comments are also posted to the pull request on GitHub.': ['判定と行コメントは GitHub の Pull Request にも投稿されます。', '판단과 줄 댓글은 GitHub의 Pull Request에도 게시됩니다.', 'Les avis et commentaires de ligne sont aussi publiés sur la pull request GitHub.', 'Los veredictos y comentarios de línea también se publican en la pull request de GitHub.'],
   // Reviews view
   'Reviews': ['レビュー', '리뷰', 'Revues', 'Revisiones'],
+  'This pull request is not in this Space.': ['この Pull Request はこの Space にありません。', '이 Pull Request는 이 Space에 없습니다.', 'Cette pull request n’est pas dans ce Space.', 'Esta pull request no está en este Space.'],
   'Open Reviews': ['レビューを開く', '리뷰 열기', 'Ouvrir les revues', 'Abrir revisiones'],
   'Needs your review': ['あなたのレビュー待ち', '내 리뷰 대기', 'En attente de votre revue', 'Pendiente de tu revisión'],
   'Yours': ['自分の', '내 것', 'Les vôtres', 'Tuyas'],

@@ -13,14 +13,16 @@ import { setActiveSettingsSection } from '@/Function/settings/settingsNav';
 import type { InboxBucket } from '@/Function/codeReview/diffModel';
 import { useReviewInbox } from '@/hooks/codeChangeData';
 import { CodeChangeRow } from './CodeChangesSection';
-import { CodeReviewDialog } from './CodeReviewDialog';
+import { CodeReviewScreen } from './CodeReviewDialog';
+import type { NavigationState } from '@/types/navigation';
 import { CodeChangeIcon } from './codeChangeLabels';
 
 // Reviews — code review inside the work it serves. The Space's pull requests,
 // each linked to the Element it carries out, sorted for the person looking:
 // the ones waiting on their review, their own, the rest that are open, and
-// the finished. Opening one is the review screen (guided sections, the diff,
-// the intent beside it). Until GitHub is connected the page says what
+// the finished. The sidebar lists them; the one picked there opens here as the
+// review screen (guided sections, the diff, the intent beside it). With none
+// picked this is the overview: until GitHub is connected it says what
 // connecting gives, and an owner connects it here.
 
 const HIDE_INTRO_KEY = 'alcon.reviews.hideIntro';
@@ -32,7 +34,11 @@ const TABS: { id: InboxBucket; label: string; empty: string }[] = [
   { id: 'done', label: 'Merged and closed', empty: 'Nothing merged or closed yet.' },
 ];
 
-export function ReviewsView({ onOpenSettings }: { onOpenSettings: () => void }) {
+export function ReviewsView({ navigation, onNavigate, onOpenSettings }: {
+  navigation: NavigationState;
+  onNavigate: (nav: Partial<NavigationState>) => void;
+  onOpenSettings: () => void;
+}) {
   const { t } = useI18n();
   const { user } = useAuthContext();
   const spaceId = useActiveSpaceId();
@@ -40,7 +46,7 @@ export function ReviewsView({ onOpenSettings }: { onOpenSettings: () => void }) 
   const github = integrations.data.find((r) => r.preset === 'github' && r.enabled) ?? null;
   const inbox = useReviewInbox(spaceId, user?.id ?? null);
   const [tab, setTab] = useState<InboxBucket>('review');
-  const [openId, setOpenId] = useState<string | null>(null);
+  const openId = navigation.codeChangeId ?? null;
   const [hideIntro, setHideIntro] = useState(() => {
     try { return localStorage.getItem(HIDE_INTRO_KEY) === '1'; } catch { return false; }
   });
@@ -53,6 +59,20 @@ export function ReviewsView({ onOpenSettings }: { onOpenSettings: () => void }) 
   const rows = inbox.data.filter((e) => e.bucket === tab);
   const open = inbox.data.find((e) => e.change.id === openId)?.change ?? null;
   const showIntro = !integrations.loading && !github && !hideIntro;
+
+  if (openId) {
+    if (open) return <CodeReviewScreen key={open.id} change={open} />;
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 bg-card text-[13px] text-muted-foreground">
+        {inbox.loading ? t('Loading…') : (
+          <>
+            {t('This pull request is not in this Space.')}
+            <Button variant="ghost" size="sm" onClick={() => onNavigate({ codeChangeId: null })}>{t('Overview')}</Button>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-auto bg-card">
@@ -100,7 +120,7 @@ export function ReviewsView({ onOpenSettings }: { onOpenSettings: () => void }) 
               </p>
             )}
             {rows.map(({ change, element }) => (
-              <CodeChangeRow key={change.id} change={change} onOpen={() => setOpenId(change.id)}
+              <CodeChangeRow key={change.id} change={change} onOpen={() => onNavigate({ codeChangeId: change.id })}
                 context={element && (
                   <span className="max-w-48 shrink-0 truncate text-[12px] text-muted-foreground" title={element.title}>
                     {element.display_id ? <span className="font-mono">{element.display_id}</span> : element.title}
@@ -110,7 +130,6 @@ export function ReviewsView({ onOpenSettings }: { onOpenSettings: () => void }) 
           </div>
         </section>
       </div>
-      {open && <CodeReviewDialog change={open} open onOpenChange={(v) => { if (!v) setOpenId(null); }} />}
     </div>
   );
 }

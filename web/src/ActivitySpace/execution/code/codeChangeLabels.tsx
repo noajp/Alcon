@@ -1,6 +1,6 @@
 'use client';
 
-import { GitCompare } from 'lucide-react';
+import { GitCompare, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from 'lucide-react';
 import type { CodeChange } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { CriterionVerdict, IntentVerdict, ReviewState } from '@/Function/codeReview/diffModel';
@@ -9,8 +9,22 @@ import type { CriterionVerdict, IntentVerdict, ReviewState } from '@/Function/co
 // the Initiative, and in the review screen. Labels are English source strings
 // for t().
 
-/** The mark for code changes everywhere they appear. */
+/** The mark for code review as a whole (the rail, the Reviews page). */
 export const CodeChangeIcon = GitCompare;
+
+const STATE_ICON: Record<CodeChange['state'], { icon: typeof GitPullRequest; color: string }> = {
+  open: { icon: GitPullRequest, color: 'text-[var(--status-success)]' },
+  draft: { icon: GitPullRequestDraft, color: 'text-muted-foreground' },
+  merged: { icon: GitMerge, color: 'text-[var(--accent-hover)]' },
+  closed: { icon: GitPullRequestClosed, color: 'text-[var(--status-danger)]' },
+};
+
+/** One pull request's mark: its shape and colour say whether it is open, a
+ *  draft, merged or closed. */
+export function CodeChangeStateIcon({ state, size = 13, className = '' }: { state: CodeChange['state']; size?: number; className?: string }) {
+  const { icon: Icon, color } = STATE_ICON[state] ?? STATE_ICON.open;
+  return <Icon size={size} className={`shrink-0 ${color} ${className}`} />;
+}
 
 export type Tone = 'success' | 'warning' | 'danger' | 'neutral' | 'accent';
 

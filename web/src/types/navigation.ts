@@ -43,6 +43,8 @@ export interface NavigationState {
    *  item's content renders in place (no layer/view switch) instead of the
    *  welcome. null = the welcome landing. */
   homeSelection?: { type: 'note_folder' | 'domain'; id: string } | null;
+  /** The pull request open in the Reviews mode; null = the overview. */
+  codeChangeId?: string | null;
   documentId?: string | null;
   canvasId?: string | null;
 }

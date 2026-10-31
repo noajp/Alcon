@@ -2,6 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from 'react';
 import type React from 'react';
+import { GitCompare } from 'lucide-react';
 import {
   NavAuditIcon,
   NavCrmIcon,
@@ -24,7 +25,7 @@ import type { ViewId } from '@/shell/viewRegistry';
 // Strategy and Execution are the permanent rail entries. Inbox, Calendar and
 // the AI sit at the right of the status bar, Notebook and Slides at its left.
 // Personal pages are reached through the avatar; other tools use the launcher.
-export type RailMode = 'personal' | 'inbox' | 'strategy' | 'execution' | 'workload' | 'notebook' | 'tables' | 'slides' | 'team' | 'calendar' | 'crm' | 'audit' | 'ai';
+export type RailMode = 'personal' | 'inbox' | 'strategy' | 'execution' | 'reviews' | 'workload' | 'notebook' | 'tables' | 'slides' | 'team' | 'calendar' | 'crm' | 'audit' | 'ai';
 
 export interface ModeMeta {
   label: string;
@@ -39,7 +40,8 @@ export const MODE_META: Record<RailMode, ModeMeta> = {
   // Vision opens first (the row at the top of the mode); Phase and Timeline
   // stay routable but are not in the nav.
   strategy:  { label: 'Strategy',  icon: NavStrategyModeIcon, defaultView: 'vision', views: ['vision', 'portfolio', 'strategy', 'phase', 'timeline'] },
-  execution: { label: 'Execution', icon: NavExecutionModeIcon, defaultView: 'objects', views: ['objects', 'domain-elements', 'domains', 'domain-overview', 'reviews'] },
+  execution: { label: 'Execution', icon: NavExecutionModeIcon, defaultView: 'objects', views: ['objects', 'domain-elements', 'domains', 'domain-overview'] },
+  reviews:   { label: 'Reviews',   icon: GitCompare, defaultView: 'reviews', views: ['reviews'] },
   workload:  { label: 'Workload',  icon: NavWorkloadIcon, defaultView: 'workload', views: ['workload'] },
   notebook:  { label: 'Notebook',  icon: NavNoteIcon, defaultView: 'note', views: ['note'] },
   tables:    { label: 'Table',     icon: NavTableIcon, defaultView: 'tables', views: ['tables'] },
@@ -67,7 +69,7 @@ export const BAR_TOOLS: RailMode[] = ['notebook', 'slides'];
 // are a display split only: Tools serve any surface, Workload watches capacity.
 export const APP_GROUPS: { title: string; apps: RailMode[] }[] = [
   { title: 'Tools', apps: ['tables', 'team'] },
-  { title: 'Sustainment', apps: ['workload', 'crm', 'audit'] },
+  { title: 'Sustainment', apps: ['workload', 'crm', 'audit', 'reviews'] },
 ];
 
 const APP_MODES: RailMode[] = APP_GROUPS.flatMap((g) => g.apps);

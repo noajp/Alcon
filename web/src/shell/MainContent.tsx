@@ -249,7 +249,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           )}
 
 
-          {activeActivity === 'reviews' && <ReviewsView onOpenSettings={onOpenSettings} />}
+          {activeActivity === 'reviews' && <ReviewsView navigation={navigation} onNavigate={onNavigate} onOpenSettings={onOpenSettings} />}
 
           {activeActivity === 'audit' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">

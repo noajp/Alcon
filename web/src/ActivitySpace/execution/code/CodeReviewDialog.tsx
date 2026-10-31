@@ -17,7 +17,7 @@ import {
   useCodeChangeActions, useCodeChangeComments, useCodeChangeReviews, useCodeCommentActions, useCodeDiff, useRetryPublish,
 } from '@/hooks/codeChangeData';
 import type { CodeChange, CodeChangeComment, Json } from '@/types/database';
-import { CodeChangeIcon, LineCounts, StatePill } from './codeChangeLabels';
+import { CodeChangeStateIcon, LineCounts, StatePill } from './codeChangeLabels';
 import { DiffFileView, type DiffLayout, type LineAnchor } from './DiffFileView';
 import { IntentPanel } from './IntentPanel';
 
@@ -48,18 +48,30 @@ function readMergeMethod(): MergeMethod {
   } catch { return 'merge'; }
 }
 
-export function CodeReviewDialog({ change: given, open, onOpenChange }: { change: CodeChange; open: boolean; onOpenChange: (open: boolean) => void }) {
+export function CodeReviewDialog({ change, open, onOpenChange }: { change: CodeChange; open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent showCloseButton className="flex h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none">
+        {open && <CodeReviewScreen change={change} inDialog />}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** The review screen itself — in the Reviews mode's main pane, or in a
+ *  dialog over an Element or an Initiative. */
+export function CodeReviewScreen({ change: given, inDialog = false }: { change: CodeChange; inDialog?: boolean }) {
   const { t } = useI18n();
   const { user, profile } = useAuthContext();
   // What this screen learned since it opened (a new guide, a merge) stays on
   // top of the row it was given, wherever that row came from.
   const [patch, setPatch] = useState<Partial<CodeChange>>({});
   const change = useMemo(() => ({ ...given, ...patch }), [given, patch]);
-  const agent = useAgentRun(open ? change.element_id : null, { autoLoad: open });
+  const agent = useAgentRun(change.element_id);
   const agentWorking = isAgentRunOpen(agent.run);
-  const diff = useCodeDiff(open ? change : null, agentWorking);
-  const comments = useCodeChangeComments(open ? change.id : null);
-  const reviews = useCodeChangeReviews(open ? change.id : null);
+  const diff = useCodeDiff(change, agentWorking);
+  const comments = useCodeChangeComments(change.id);
+  const reviews = useCodeChangeReviews(change.id);
   const commentActions = useCodeCommentActions(change.id);
   const retry = useRetryPublish(change.id);
   const actions = useCodeChangeActions(change.element_id);
@@ -73,7 +85,6 @@ export function CodeReviewDialog({ change: given, open, onOpenChange }: { change
   }, []);
 
   useEffect(() => {
-    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
         e.preventDefault();
@@ -82,7 +93,7 @@ export function CodeReviewDialog({ change: given, open, onOpenChange }: { change
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, layout, setAndKeepLayout]);
+  }, [layout, setAndKeepLayout]);
 
   const files = useMemo(() => diff.data?.files ?? [], [diff.data]);
   const githubComments = useMemo(() => diff.data?.githubComments ?? [], [diff.data]);
@@ -156,13 +167,13 @@ export function CodeReviewDialog({ change: given, open, onOpenChange }: { change
     })),
   }), [change.repo, change.number, change.url, change.head_ref, change.head_sha, comments.data, reviews.data]);
 
+  const Title = inDialog ? DialogTitle : 'h1';
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton className="flex h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-card">
         {/* Header */}
-        <div className="flex min-h-12 shrink-0 items-center gap-3 border-b border-[var(--border-default)] px-4 pr-12">
-          <CodeChangeIcon size={16} className="shrink-0 text-muted-foreground" />
-          <DialogTitle className="min-w-0 truncate text-[14px] font-medium">{change.title || `${change.repo}#${change.number}`}</DialogTitle>
+        <div className={`flex min-h-12 shrink-0 items-center gap-3 border-b border-[var(--border-default)] px-4 ${inDialog ? 'pr-12' : ''}`}>
+          <CodeChangeStateIcon state={change.state} size={16} />
+          <Title className="min-w-0 truncate text-[14px] font-medium">{change.title || `${change.repo}#${change.number}`}</Title>
           <StatePill state={change.state} />
           <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{change.repo}#{change.number}</span>
           {change.head_ref && (
@@ -333,8 +344,7 @@ export function CodeReviewDialog({ change: given, open, onOpenChange }: { change
             />
           </aside>
         </div>
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 }
 

@@ -9,7 +9,7 @@ import { isCancelKey, isCommitEnter } from '@/Function/shared/keyboard';
 import { parsePullUrl, readIntentCheck } from '@/Function/codeReview/diffModel';
 import { useCodeChangeActions, useCodeChanges } from '@/hooks/codeChangeData';
 import type { CodeChange } from '@/types/database';
-import { CodeChangeIcon, INTENT_META, LineCounts, Pill, StatePill } from './codeChangeLabels';
+import { CodeChangeIcon, CodeChangeStateIcon, INTENT_META, LineCounts, Pill, StatePill } from './codeChangeLabels';
 import { CodeReviewDialog } from './CodeReviewDialog';
 
 // An Element's code changes: the pull requests that carry it out. An agent
@@ -104,7 +104,7 @@ export function CodeChangeRow({ change, onOpen, onUnlink, context }: {
       onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); }}
       className="group/cc flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] hover:bg-muted/40"
     >
-      <CodeChangeIcon size={13} className="shrink-0 text-muted-foreground" />
+      <CodeChangeStateIcon state={change.state} />
       {context}
       <span className="min-w-0 flex-1 truncate font-medium text-foreground">{change.title || `${change.repo}#${change.number}`}</span>
       {change.linked_via === 'agent' && <span title={t('Opened by an agent')}><Bot size={12} className="shrink-0 text-muted-foreground" /></span>}
