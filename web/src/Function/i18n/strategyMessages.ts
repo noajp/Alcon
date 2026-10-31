@@ -290,6 +290,8 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   'Set your Vision': ['Vision を定める', 'Vision 정하기', 'Définissez votre Vision', 'Define tu Vision'],
   'Create your first Portfolio': ['最初の Portfolio を作成', '첫 Portfolio 만들기', 'Créez votre premier Portfolio', 'Crea tu primer Portfolio'],
   'Choose a Domain': ['Domain を選択', 'Domain 선택', 'Choisissez un Domain', 'Elige un Domain'],
+  'Move to…': ['移動…', '이동…', 'Déplacer vers…', 'Mover a…'],
+  'Portfolio actions': ['Portfolio の操作', 'Portfolio 작업', 'Actions du Portfolio', 'Acciones del Portfolio'],
   'Collapse {name}': ['{name} を折りたたむ', '{name} 접기', 'Replier {name}', 'Contraer {name}'],
   'Expand {name}': ['{name} を展開', '{name} 펼치기', 'Déplier {name}', 'Expandir {name}'],
 };

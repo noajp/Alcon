@@ -3,11 +3,11 @@
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronRight, Plus, Search, X, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { IndexList, IndexRow } from '@/Function/shared/IndexList';
-import { InitiativeMenu } from './InitiativeMenu';
+import { InitiativeActionsButton, InitiativeMenu } from './InitiativeMenu';
 import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { EmptyState } from '@/Function/shared/EmptyState';
@@ -163,6 +163,10 @@ export function StrategyShell({
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
         <NavStrategyIcon size={14} />
         <span className="text-[13px] font-medium text-foreground">{t('Initiatives')}</span>
+        <ButtonAppearanceProvider appearance="navigation">
+          <Button variant="ghost" size="icon-xs" className="ml-auto text-muted-foreground" onClick={() => setNewOpen(true)}
+            title={t('New Initiative')} aria-label={t('New Initiative')}><Plus size={14} /></Button>
+        </ButtonAppearanceProvider>
       </div>
 
       <div className="flex-1 overflow-hidden">
@@ -276,14 +280,15 @@ function StrategyListView({
   // honestly while the list stays open; the cells re-render with this view.
   useNow();
   return (
-    <IndexList headers={[t('Name'), t('Health'), t('Objects')]} showHeader={showHeader}>
+    <IndexList headers={[t('Name'), t('Health'), t('Objects')]} showHeader={showHeader} withActions>
       {strategies.map((s) => (
         <InitiativeMenu key={s.id} initiative={s}>
           <div>
             <IndexRow icon={<NavStrategyIcon size={13} />} name={s.name}
               health={<InitiativeHealthCell health={health.get(s.id)} />}
               count={countObjects(s.objectIds)}
-              onOpen={() => onSelectStrategy(s)} />
+              onOpen={() => onSelectStrategy(s)}
+              actions={<InitiativeActionsButton initiative={s} />} />
           </div>
         </InitiativeMenu>
       ))}
@@ -752,6 +757,8 @@ function StrategyDetailView({
         <span className="px-1.5 py-0.5 text-[13px] font-medium text-foreground truncate max-w-[240px]">
           {strategy.name}
         </span>
+        {/* Beside the name, as on an Object: move it, or delete it. */}
+        <InitiativeActionsButton initiative={strategy} onDelete={() => { if (!deleting) setConfirmingDelete(true); }} />
         {!canEdit && (
           // Said once, where the eye lands first. The Initiative's own
           // structure — name, description, Objects, nested Initiatives —
@@ -771,24 +778,6 @@ function StrategyDetailView({
             <span role="status" className="text-[11px] text-muted-foreground truncate">
               {deleteError ?? t('{error} — change reverted', { error: saveError ?? '' })}
             </span>
-          )}
-          {canEdit && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label={t('Initiative actions')}
-                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
-                >
-                  <MoreHorizontal size={14} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setConfirmingDelete(true)} disabled={deleting} className="text-destructive">
-                  <Trash2 size={13} /> {t('Delete Initiative')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           )}
         </div>
       </div>

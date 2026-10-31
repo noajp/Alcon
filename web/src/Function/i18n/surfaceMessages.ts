@@ -114,7 +114,6 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   'Add description…': ['説明を追加…', '설명 추가…', 'Ajouter une description…', 'Añadir descripción…'],
   'Add existing Initiative': ['既存の Initiative を追加', '기존 Initiative 추가', 'Ajouter une Initiative existante', 'Añadir una Initiative existente'],
   'Add nested Initiative': ['配下に Initiative を追加', '하위 Initiative 추가', 'Ajouter une Initiative imbriquée', 'Añadir una Initiative anidada'],
-  'Delete Initiative': ['Initiative を削除', 'Initiative 삭제', 'Supprimer l’Initiative', 'Eliminar la Initiative'],
   'Initiative actions': ['Initiative の操作', 'Initiative 작업', 'Actions sur l’Initiative', 'Acciones de la Initiative'],
   'Initiative name': ['Initiative 名', 'Initiative 이름', 'Nom de l’Initiative', 'Nombre de la Initiative'],
   'No Objects match.': ['該当する Object はありません。', '일치하는 Object가 없습니다.', 'Aucun Object ne correspond.', 'Ningún Object coincide.'],
