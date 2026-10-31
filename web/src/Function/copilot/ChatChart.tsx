@@ -7,9 +7,15 @@ import {
 import type { ChartSpec } from './chartSpec';
 
 // A chart the AI drew inside its answer. The spec is data only (chartSpec.ts
-// validates it); colors come from the theme's tokens.
+// validates it); colors are the key color's family, from the theme's tokens.
 
-const COLORS = ['var(--accent-default)', 'var(--chart-2)', 'var(--chart-1)', 'var(--chart-4)', 'var(--chart-3)', 'var(--chart-5)'];
+// Built around the key color (the accent blue): the accent first, then it
+// lifted toward the text color and sunk toward the card by turns — one
+// family, far enough apart to tell slices apart, so a chart reads as part of
+// the UI rather than a rainbow.
+const lift = (pct: number) => `color-mix(in oklab, var(--accent-default), var(--text-primary) ${pct}%)`;
+const sink = (pct: number) => `color-mix(in oklab, var(--accent-default), var(--card) ${pct}%)`;
+const COLORS = ['var(--accent-default)', lift(40), sink(35), lift(65), lift(20), sink(55)];
 const AXIS = { stroke: 'var(--text-tertiary)', fontSize: 11, tickLine: false } as const;
 const TOOLTIP = {
   contentStyle: { background: 'var(--surface-overlay)', borderColor: 'var(--border-subtle)', borderRadius: 8, fontSize: 12 },
@@ -28,7 +34,7 @@ export default function ChatChart({ spec }: { spec: ChartSpec }) {
             <PieChart>
               <Tooltip {...TOOLTIP} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Pie data={data} dataKey={series[0]} nameKey="name" innerRadius="45%" outerRadius="80%" paddingAngle={1} stroke="none">
+              <Pie data={data} dataKey={series[0]} nameKey="name" innerRadius="45%" outerRadius="80%" paddingAngle={1} stroke="var(--card)" strokeWidth={2}>
                 {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
             </PieChart>

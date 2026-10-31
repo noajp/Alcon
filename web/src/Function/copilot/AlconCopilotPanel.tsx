@@ -79,7 +79,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeDomainId, setActiveDomainId] = useState<string | null>(null);
-  const { messages, streaming, error, send, cancel, newConversation } = useCopilotConversation();
+  const { messages, streaming, error, send, cancel, newConversation, retry, truncate } = useCopilotConversation();
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const boxRef = useRef<HTMLElement>(null);
@@ -181,6 +181,13 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
 
   const startEdge = (e: React.PointerEvent<HTMLDivElement>) => startFloat(e, e.currentTarget.dataset.edge as Edge);
 
+  const contextNow = (): CopilotContext => ({
+    viewLabel: 'Alcon',
+    domainId: activeDomainId ?? undefined,
+    spaceId: getActiveSpaceId() ?? undefined,
+    today: toDateOnlyString(new Date()),
+  });
+
   const addFiles = async (list: FileList | File[]) => {
     setFileError(null);
     const picked = Array.from(list);
@@ -204,16 +211,22 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
     if ((!text && files.length === 0) || streaming) return;
     setInput('');
     const attachments = files;
-    if (inputRef.current) inputRef.current.style.height = '';
+    if (inputRef.current) { inputRef.current.style.height = ''; inputRef.current.style.overflowY = ''; }
     setFiles([]);
     setFileError(null);
-    const ctx: CopilotContext = {
-      viewLabel: 'Alcon',
-      domainId: activeDomainId ?? undefined,
-      spaceId: getActiveSpaceId() ?? undefined,
-      today: toDateOnlyString(new Date()),
-    };
-    send(text, { context: ctx, attachments });
+    send(text, { context: contextNow(), attachments });
+  };
+
+  // Editing the latest question puts it back in the composer and starts over
+  // from it.
+  const lastUser = messages.map((m) => m.role).lastIndexOf('user');
+  const editLast = () => {
+    const q = messages[lastUser];
+    if (!q) return;
+    setInput(q.content);
+    setFiles((q.attachments ?? []).filter((a) => a.data));
+    truncate(lastUser);
+    window.setTimeout(() => inputRef.current?.focus(), 0);
   };
 
   // Render nothing until hydration finishes so the initial CSR matches the
@@ -272,10 +285,12 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
       {subject === 'slides' ? <SlidesAssistant /> : <>
       {/* Conversation — empty state is intentionally blank; the placeholder
           in the composer is the only nudge. */}
-      <div ref={listRef} className={`flex-1 overflow-y-auto py-3 text-[12.5px] leading-relaxed ${page ? 'px-8' : 'px-3'}`}>
-        <div className={`space-y-3 ${column}`}>
+      <div ref={listRef} className={`flex-1 overflow-y-auto pb-4 pt-3 text-[12.5px] leading-relaxed ${page ? 'px-8' : 'px-3'}`}>
+        <div className={`space-y-4 ${column}`}>
           {messages.map((m, i) => (
-            <CopilotMessageView key={i} message={m} streaming={streaming && i === messages.length - 1 && !m.done} />
+            <CopilotMessageView key={i} message={m} streaming={streaming && i === messages.length - 1 && !m.done}
+              onRetry={!streaming && m.role === 'assistant' && i === messages.length - 1 ? () => retry({ context: contextNow() }) : undefined}
+              onEdit={!streaming && i === lastUser ? editLast : undefined} />
           ))}
           {error && (
             <div role="alert" className="text-[11.5px] text-[var(--status-danger)]">
@@ -287,7 +302,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
 
       {/* Composer — a soft-bordered box at the foot: files picked, dropped or
           pasted show as chips above the text; Enter sends. */}
-      <div className={`pb-3 pt-1 ${page ? 'px-8 pb-6' : 'px-3'}`}>
+      <div className={`pb-3 pt-3 ${page ? 'px-8 pb-6' : 'px-3'}`}>
         <form
           onSubmit={(e) => { e.preventDefault(); submit(); }}
           onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragging(true); } }}
@@ -311,6 +326,8 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
                 // Grows with what is written, up to the cap.
                 e.target.style.height = 'auto';
                 e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                // No scrollbar until the text outgrows the cap.
+                e.target.style.overflowY = e.target.scrollHeight > 160 ? 'auto' : 'hidden';
               }}
               onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); void addFiles(e.clipboardData.files); } }}
               onKeyDown={(e) => {
@@ -320,10 +337,10 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
                 }
               }}
               rows={1}
-              placeholder={streaming ? '…' : t('Ask anything, or drop a PDF / Markdown / text file')}
+              placeholder={streaming ? '…' : t('Type anything')}
               aria-label={t('Message AI')}
               disabled={streaming}
-              className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent px-0.5 py-1 text-[12.5px] leading-[1.5] disabled:opacity-60"
+              className="max-h-40 min-h-[24px] flex-1 resize-none overflow-hidden bg-transparent px-0.5 py-1 text-[12.5px] leading-[1.5] disabled:opacity-60"
               style={{ fontWeight: 400 }}
             />
             {streaming ? (

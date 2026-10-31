@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { AlertCircle, Check, ChevronRight, FileText, Loader2 } from 'lucide-react';
+import { AlertCircle, Check, CheckCheck, ChevronRight, Copy, FileText, Loader2, Pencil, RotateCcw } from 'lucide-react';
+import { formatAge } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import type { CopilotAttachment, CopilotMessage, ToolEvent } from './useAlconCopilot';
@@ -12,28 +13,78 @@ import { splitAnswer } from './chartSpec';
 const ChatChart = dynamic(() => import('./ChatChart'), { ssr: false, loading: () => <div className="h-52 rounded-lg border border-border/60" /> });
 
 /** One turn of the conversation. The AI's answer is Markdown, rendered — no
- *  bare asterisks; its work shows as steps above it. */
-export function CopilotMessageView({ message, streaming }: { message: CopilotMessage; streaming: boolean }) {
+ *  bare asterisks; its work shows as steps above it. Under each turn, as in
+ *  Claude's chat: copy, and on the latest exchange retry (an answer) or edit
+ *  (a question); the time shows beside them. */
+export function CopilotMessageView({ message, streaming, onRetry, onEdit }: {
+  message: CopilotMessage;
+  streaming: boolean;
+  /** Present on the latest answer once it is in. */
+  onRetry?: () => void;
+  /** Present on the latest question while nothing is streaming. */
+  onEdit?: () => void;
+}) {
+  const { t } = useI18n();
   if (message.role === 'user') {
     return (
-      <div className="flex flex-col items-end gap-1 animate-fade-in">
+      <div className="group flex flex-col items-end gap-1 animate-fade-in">
         {message.attachments?.length ? <AttachmentChips files={message.attachments} /> : null}
         {message.content && (
           <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-lg border border-primary/20 bg-primary/15 px-2.5 py-1.5 text-foreground">
             {message.content}
           </div>
         )}
+        {/* The latest question keeps its row in view; earlier ones show it on hover. */}
+        <div className={`flex items-center gap-0.5 transition-opacity ${onEdit ? '' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'}`}>
+          <CheckCheck size={12} className="text-muted-foreground/70" aria-label={t('Sent')} />
+          {message.at != null && <span className="px-1 text-[11px] text-muted-foreground/70">{formatAge(new Date(message.at), true)}</span>}
+          {message.content && <CopyButton text={message.content} />}
+          {onEdit && <ActionButton label={t('Edit')} onClick={onEdit}><Pencil size={12} /></ActionButton>}
+        </div>
       </div>
     );
   }
   const events = message.toolEvents ?? [];
+  const settled = message.done && !streaming;
   return (
-    <div className="space-y-1.5">
+    <div className="group space-y-1.5">
       {events.length > 0 && <ToolSteps events={events} live={streaming} answered={!!message.content} />}
       {message.content
         ? <Answer content={message.content} />
         : streaming && events.length === 0 && <Working label="Thinking" />}
+      {settled && message.content && (
+        <div className={`flex items-center gap-0.5 transition-opacity ${onRetry ? '' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'}`}>
+          <CopyButton text={message.content} />
+          {onRetry && <ActionButton label={t('Retry')} onClick={onRetry}><RotateCcw size={12} /></ActionButton>}
+          {message.at != null && <span className="pl-1 text-[11px] text-muted-foreground/70">{formatAge(new Date(message.at), true)}</span>}
+        </div>
+      )}
     </div>
+  );
+}
+
+function ActionButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} title={label} aria-label={label}
+      className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+      {children}
+    </button>
+  );
+}
+
+/** Copies the text as written (Markdown for an answer); a check confirms it. */
+function CopyButton({ text }: { text: string }) {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const id = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(id);
+  }, [copied]);
+  return (
+    <ActionButton label={t(copied ? 'Copied' : 'Copy')} onClick={() => { void navigator.clipboard.writeText(text).then(() => setCopied(true)); }}>
+      {copied ? <Check size={12} className="animate-scale-in" /> : <Copy size={12} />}
+    </ActionButton>
   );
 }
 
