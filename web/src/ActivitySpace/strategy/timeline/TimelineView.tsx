@@ -15,7 +15,7 @@ import { ObjectIcon } from '@/shell/icons';
 import { NavStrategyIcon, NavTimelineIcon } from '@/shell/sidebar/NavIcons';
 import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { QuietEmpty } from '@/ActivitySpace/strategy/QuietEmpty';
+import { EmptyState } from '@/Function/shared/EmptyState';
 import {
   usePreference, getCachedTimelineScale, getCachedTimelineMonthsBack, getCachedTimelineMonthsAhead,
   getCachedTimelineTodayMarker, getCachedTimelineProgressFill, type TimelineScale,
@@ -273,7 +273,8 @@ export function TimelineView({
 
       <div className="flex-1 overflow-auto">
         {!loading && rootStrategies.length === 0 ? (
-          <QuietEmpty text={t('No Initiatives yet. Create one and give its Objects start and due dates to see them on the Timeline.')} />
+          <EmptyState art="initiative" title="Nothing on the Timeline yet"
+            description="Create an Initiative and give its Objects start and due dates to see them here." />
         ) : (
           <div className="min-w-fit">
             {/* Month axis */}

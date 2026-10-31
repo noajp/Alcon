@@ -588,6 +588,9 @@ button, a, input, select, textarea {
 .animate-fade-in  { animation: fade-in  var(--motion-base) forwards; }
 .animate-slide-up { animation: slide-up var(--motion-base) forwards; }
 .animate-scale-in { animation: scale-in var(--motion-base) forwards; }
+/* Empty-list drawings (EmptyArt): faces are filled with the pane's
+   background, so blocks in front hide the lines behind them. */
+.empty-art { --empty-art-fill: var(--card); }
 /* A label that is still at work: light sweeps across it (the AI's running step). */
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 .animate-shimmer {

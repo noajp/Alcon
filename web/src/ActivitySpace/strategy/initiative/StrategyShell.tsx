@@ -10,7 +10,7 @@ import { IndexList, IndexRow } from '@/Function/shared/IndexList';
 import { InitiativeMenu } from './InitiativeMenu';
 import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
-import { QuietEmpty } from '@/ActivitySpace/strategy/QuietEmpty';
+import { EmptyState } from '@/Function/shared/EmptyState';
 import { QuickCreatePopup, quickCreatePillClass } from '@/Function/shared/QuickCreatePopup';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/ui/command';
@@ -167,8 +167,9 @@ export function StrategyShell({
 
       <div className="flex-1 overflow-hidden">
         {loading ? null : inVision.length === 0 && unplaced.length === 0 ? (
-          <QuietEmpty text={t('No Initiatives yet. An Initiative groups Objects across Domains around one outcome.')}
-            cta={t('Create Initiative')} onCta={() => setNewOpen(true)} />
+          <EmptyState art="initiative" title="Create your first Initiative"
+            description="An Initiative groups Objects across Domains around one outcome."
+            cta="Create Initiative" onCta={() => setNewOpen(true)} />
         ) : (
           <div className="h-full overflow-auto">
             {inVision.length > 0 && (

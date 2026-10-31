@@ -12,8 +12,6 @@ import { applyObjectFilter, orderObjects, DEFAULT_STATE, type ListControlsState 
 import { getActiveDomainId, CREATE_DOMAIN_EVENT } from '@/Function/space/domainsStore';
 import { hydrateLabelColors } from '@/Function/shared/labelColor';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
-import { NavObjectsIcon } from '@/shell/sidebar/NavIcons';
-import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { EmptyState } from '@/Function/shared/EmptyState';
 import { ListTable } from '@/Function/shared/listTable/ListTable';
 import type { ListSection } from '@/Function/shared/listTable/shared';
@@ -147,10 +145,9 @@ function ObjectsEmptyState() {
   const { openCreate } = useWorkspaceActions();
   return (
     <EmptyState
-      icon={NavObjectsIcon}
+      art="objects"
       title="Add Objects to this Domain"
       description="Objects are mid-level structural units — projects, departments, or any container you want to organise."
-      hint="Objects live directly under a Domain (no nesting) and can be shared across multiple Domains."
       cta="Create Object"
       onCta={() => openCreate('object')}
     />
@@ -160,10 +157,9 @@ function ObjectsEmptyState() {
 function NoDomainEmptyState() {
   return (
     <EmptyState
-      icon={DomainIcon}
+      art="domain"
       title="Create your first Domain"
       description="A Domain is where work happens — a company, a department, or a project portfolio. Objects and Elements live inside it."
-      hint="You can add more Domains later and share Objects across them."
       cta="Create Domain"
       onCta={() => { window.dispatchEvent(new CustomEvent(CREATE_DOMAIN_EVENT)); }}
     />

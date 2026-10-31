@@ -13,7 +13,6 @@ import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
 import { pushUndo } from '@/Function/shared/element/bulkUndo';
 import { bulkSetAssignee } from '@/hooks/bulkAssign';
 import { ObjectIcon } from '@/shell/icons';
-import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { EmptyState } from '@/Function/shared/EmptyState';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
@@ -712,10 +711,9 @@ function ElementsHierarchyHeader({
 function ElementsDomainEmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <EmptyState
-      icon={NavMyTasksIcon}
+      art="elements"
       title="Add Elements to this Domain"
       description="Elements are the smallest unit you track — anything actionable or worth recording."
-      hint="Domain-direct Elements live at the top level. Open an Object to add Elements there."
       cta="Create Element"
       onCta={onAdd}
     />

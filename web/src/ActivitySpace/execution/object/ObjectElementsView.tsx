@@ -8,7 +8,6 @@ import type { ListControlsState } from '@/Function/shared/listControls';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
 import { ListTable } from '@/Function/shared/listTable/ListTable';
 import type { ListSection } from '@/Function/shared/listTable/shared';
-import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { EmptyState } from '@/Function/shared/EmptyState';
 
 // ObjectElementsView — the body of an Object detail's "Elements" tab.
@@ -143,11 +142,11 @@ export function ObjectElementsView({
 function ElementsEmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <EmptyState
-      icon={NavMyTasksIcon}
+      art="elements"
       title="Add Elements to this Object"
       description="Elements are the smallest unit you track — anything actionable or worth recording."
-      hint="You can also add sections, set priorities, assignees, and due dates."
       cta="Create Element"
+      shortcut="C"
       onCta={onAdd}
     />
   );
