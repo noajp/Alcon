@@ -7,7 +7,7 @@ import type { CopilotAttachment } from './useAlconCopilot';
 export const ATTACH_ACCEPT = '.pdf,.md,.markdown,.txt,application/pdf,text/markdown,text/plain';
 export const MAX_FILES = 5;
 export const MAX_PDF_BYTES = 10 * 1024 * 1024;
-export const MAX_TEXT_CHARS = 400_000;
+const MAX_TEXT_CHARS = 400_000;
 
 export type AttachKind = 'pdf' | 'text';
 
