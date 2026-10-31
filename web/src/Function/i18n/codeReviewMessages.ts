@@ -72,6 +72,11 @@ const CODE_REVIEW_MESSAGES: Record<string, Row> = {
   'Write a guide': ['ガイドを作る', '가이드 작성', 'Rédiger un guide', 'Escribir una guía'],
   'Next section': ['次のセクション', '다음 섹션', 'Section suivante', 'Siguiente sección'],
   'That is the whole change — give your verdict on the right.': ['変更はここまでです。右側で判定してください。', '변경은 여기까지입니다. 오른쪽에서 판단을 남기세요.', 'C’est toute la modification — donnez votre avis à droite.', 'Ese es todo el cambio: da tu veredicto a la derecha.'],
+  'Show files': ['ファイルを表示', '파일 표시', 'Afficher les fichiers', 'Mostrar archivos'],
+  'Hide files': ['ファイルを隠す', '파일 숨기기', 'Masquer les fichiers', 'Ocultar archivos'],
+  'Show intent': ['意図を表示', '의도 표시', 'Afficher l’intention', 'Mostrar la intención'],
+  'Hide intent': ['意図を隠す', '의도 숨기기', 'Masquer l’intention', 'Ocultar la intención'],
+  'Too narrow for split — widen the window or fold a column': ['分割表示には幅が足りません。ウィンドウを広げるか、列を畳んでください', '분할 보기에는 너비가 부족합니다. 창을 넓히거나 열을 접으세요', 'Trop étroit pour le côte à côte — élargissez la fenêtre ou repliez une colonne', 'Demasiado estrecho para dividir: amplía la ventana o pliega una columna'],
   // Iterate
   'Agent is working — the diff follows its pushes': ['エージェントが作業中 — push に合わせて差分を更新します', '에이전트가 작업 중 — push에 맞춰 diff를 갱신합니다', 'L’agent travaille — le diff suit ses push', 'El agente está trabajando: el diff sigue sus push'],
   'The agent is already working on this Element.': ['この Element ではエージェントがすでに作業中です。', '이 Element에서 에이전트가 이미 작업 중입니다.', 'L’agent travaille déjà sur cet Element.', 'El agente ya está trabajando en este Element.'],

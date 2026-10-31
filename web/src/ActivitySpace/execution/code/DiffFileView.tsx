@@ -161,7 +161,7 @@ export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileV
           )}
           {hunks.map((h, hi) => (
             <div key={hi}>
-              <div className="bg-[var(--accent-subtle)] px-3 text-[11px] leading-[22px] text-muted-foreground">{h.header}</div>
+              <div className="truncate whitespace-nowrap bg-[var(--accent-subtle)] px-3 text-[11px] leading-[22px] text-muted-foreground" title={h.header}>{h.header}</div>
               {layout === 'unified'
                 ? h.lines.map((l, li) => {
                   const anchor = anchorOf(file.filename, l);

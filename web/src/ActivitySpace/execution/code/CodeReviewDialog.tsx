@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Bot, ChevronLeft, ChevronRight, ExternalLink, FileText, Folder, GitMerge, ListOrdered, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertTriangle, Bot, ChevronLeft, ChevronRight, ExternalLink, FileText, Folder, GitMerge, ListOrdered, PanelLeft, PanelRight, RefreshCw, Sparkles } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -30,8 +30,43 @@ import { IntentPanel } from './IntentPanel';
 // them. Verdicts and line comments go to the pull request on GitHub as well;
 // the points still open can be sent back to the agent, which pushes to the
 // same branch while the diff follows. ⌘B / Ctrl+B switches unified and split.
+//
+// The diff is what has to stay readable, so the screen gives way around it:
+// the files and intent columns fold away when the screen is narrow (each can
+// be opened from the toolbar), and split falls back to unified when the diff
+// is too narrow for two columns of code.
 
 const LAYOUT_KEY = 'alcon.codeReview.layout';
+const PANELS_KEY = 'alcon.codeReview.panels';
+
+/** Below these widths of the whole screen a column starts folded. */
+const FILES_FROM = 1180;
+const INTENT_FROM = 860;
+/** Below this width of the diff column, split shows as unified. */
+const SPLIT_FROM = 760;
+
+type Panels = { files: boolean | null; intent: boolean | null };
+
+function readPanels(): Panels {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}') as Partial<Panels>;
+    return { files: typeof raw.files === 'boolean' ? raw.files : null, intent: typeof raw.intent === 'boolean' ? raw.intent : null };
+  } catch { return { files: null, intent: null }; }
+}
+
+/** The width of an element, kept current. */
+function useWidth<T extends HTMLElement>(): [(el: T | null) => void, number] {
+  const [width, setWidth] = useState(0);
+  const observer = useRef<ResizeObserver | null>(null);
+  const ref = useCallback((el: T | null) => {
+    observer.current?.disconnect();
+    if (!el) return;
+    setWidth(el.clientWidth);
+    observer.current = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    observer.current.observe(el);
+  }, []);
+  return [ref, width];
+}
 const MERGE_KEY = 'alcon.codeReview.mergeMethod';
 
 type MergeMethod = 'merge' | 'squash' | 'rebase';
@@ -78,6 +113,20 @@ export function CodeReviewScreen({ change: given, inDialog = false }: { change: 
   const [layout, setLayout] = useState<DiffLayout>(() => readLayout());
   const fileRefs = useRef(new Map<string, HTMLDivElement>());
   const [focused, setFocused] = useState<string | null>(null);
+
+  const [rootRef, rootWidth] = useWidth<HTMLDivElement>();
+  const [mainRef, mainWidth] = useWidth<HTMLElement>();
+  // A column's own choice wins; until one is made it follows the width.
+  const [panels, setPanels] = useState<Panels>(() => readPanels());
+  const showFiles = panels.files ?? rootWidth >= FILES_FROM;
+  const showIntent = panels.intent ?? rootWidth >= INTENT_FROM;
+  const togglePanel = (key: keyof Panels, shown: boolean) => {
+    const next = { ...panels, [key]: !shown };
+    setPanels(next);
+    try { localStorage.setItem(PANELS_KEY, JSON.stringify(next)); } catch { /* per-viewer convenience only */ }
+  };
+  const splitFits = mainWidth === 0 || mainWidth >= SPLIT_FROM;
+  const shownLayout: DiffLayout = layout === 'split' && !splitFits ? 'unified' : layout;
 
   const setAndKeepLayout = useCallback((next: DiffLayout) => {
     setLayout(next);
@@ -169,7 +218,7 @@ export function CodeReviewScreen({ change: given, inDialog = false }: { change: 
 
   const Title = inDialog ? DialogTitle : 'h1';
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-card">
+    <div ref={rootRef} className="flex min-h-0 flex-1 flex-col overflow-hidden bg-card">
         {/* Header */}
         <div className={`flex min-h-12 shrink-0 items-center gap-3 border-b border-[var(--border-default)] px-4 ${inDialog ? 'pr-12' : ''}`}>
           <CodeChangeStateIcon state={change.state} size={16} />
@@ -209,7 +258,7 @@ export function CodeReviewScreen({ change: given, inDialog = false }: { change: 
 
         <div className="flex min-h-0 flex-1">
           {/* Sections or files */}
-          <aside className="hidden w-64 shrink-0 overflow-auto border-r border-[var(--border-default)] py-2 lg:block">
+          {showFiles && <aside className="w-60 shrink-0 overflow-auto border-r border-[var(--border-default)] py-2">
             {mode === 'guided' && guide ? (
               <ol className="px-2">
                 {guide.sections.map((s, i) => (
@@ -231,11 +280,15 @@ export function CodeReviewScreen({ change: given, inDialog = false }: { change: 
                 <FileTree nodes={tree} depth={0} focused={focused} cited={cited} onOpen={openFile} />
               </>
             )}
-          </aside>
+          </aside>}
 
           {/* Diff */}
-          <main className="min-w-0 flex-1 overflow-auto">
-            <div className="sticky top-0 z-20 flex h-10 items-center gap-2 border-b border-[var(--border-default)] bg-background px-4">
+          <main ref={mainRef} className="min-w-0 flex-1 overflow-auto">
+            <div className="sticky top-0 z-20 flex h-10 items-center gap-2 border-b border-[var(--border-default)] bg-background px-3">
+              <Button variant="ghost" size="icon-xs" onClick={() => togglePanel('files', showFiles)} aria-pressed={showFiles}
+                aria-label={showFiles ? t('Hide files') : t('Show files')} title={showFiles ? t('Hide files') : t('Show files')}>
+                <PanelLeft size={13} />
+              </Button>
               <Segmented
                 label={t('Review mode')}
                 value={mode}
@@ -244,18 +297,24 @@ export function CodeReviewScreen({ change: given, inDialog = false }: { change: 
               />
               <Segmented
                 label={t('Diff layout')}
-                value={layout}
-                options={[{ value: 'unified', label: t('Unified'), title: `${t('Unified')} (⌘B)` }, { value: 'split', label: t('Split'), title: `${t('Split')} (⌘B)` }]}
+                value={shownLayout}
+                options={[
+                  { value: 'unified', label: t('Unified'), title: `${t('Unified')} (⌘B)` },
+                  { value: 'split', label: t('Split'), title: splitFits ? `${t('Split')} (⌘B)` : t('Too narrow for split — widen the window or fold a column'), disabled: !splitFits },
+                ]}
                 onChange={setAndKeepLayout}
               />
-              {files.length > 0 && <LineCounts additions={size.additions} deletions={size.deletions} title={sizeTitle} />}
-              {sizeTitle && <span className="text-[11px] text-muted-foreground" title={sizeTitle}>*</span>}
+              {files.length > 0 && <span className="hidden sm:inline"><LineCounts additions={size.additions} deletions={size.deletions} title={sizeTitle} /></span>}
               <div className="flex-1" />
               {agentWorking && (
                 <span className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-hover)]"><Bot size={12} />{t('Agent is working — the diff follows its pushes')}</span>
               )}
               <Button variant="ghost" size="icon-xs" onClick={() => void diff.refetch()} disabled={diff.isFetching} aria-label={t('Refresh from GitHub')} title={t('Refresh from GitHub')}>
                 <RefreshCw size={12} className={diff.isFetching ? 'animate-spin' : ''} />
+              </Button>
+              <Button variant="ghost" size="icon-xs" onClick={() => togglePanel('intent', showIntent)} aria-pressed={showIntent}
+                aria-label={showIntent ? t('Hide intent') : t('Show intent')} title={showIntent ? t('Hide intent') : t('Show intent')}>
+                <PanelRight size={13} />
               </Button>
             </div>
             <div className="space-y-3 p-4">
@@ -302,7 +361,7 @@ export function CodeReviewScreen({ change: given, inDialog = false }: { change: 
                   key={f.filename}
                   ref={(el) => { if (el) fileRefs.current.set(f.filename, el); else fileRefs.current.delete(f.filename); }}
                   file={f}
-                  layout={layout}
+                  layout={shownLayout}
                   comments={commentsByFile.get(f.filename) ?? []}
                   githubComments={githubByFile.get(f.filename)}
                   currentUserId={user?.id ?? null}
@@ -332,7 +391,7 @@ export function CodeReviewScreen({ change: given, inDialog = false }: { change: 
           </main>
 
           {/* Intent */}
-          <aside className="w-[22rem] shrink-0 overflow-auto border-l border-[var(--border-default)]">
+          {showIntent && <aside className="w-80 shrink-0 overflow-auto border-l border-[var(--border-default)]">
             <IntentPanel
               change={change}
               onCheck={() => actions.check.mutate(change.id, {
@@ -342,20 +401,20 @@ export function CodeReviewScreen({ change: given, inDialog = false }: { change: 
               checkError={actions.check.error ? (actions.check.error as Error).message : null}
               onOpenFile={openFile}
             />
-          </aside>
+          </aside>}
         </div>
     </div>
   );
 }
 
 function Segmented<V extends string>({ label, value, options, onChange }: {
-  label: string; value: V; options: { value: V; label: string; title?: string }[]; onChange: (v: V) => void;
+  label: string; value: V; options: { value: V; label: string; title?: string; disabled?: boolean }[]; onChange: (v: V) => void;
 }) {
   return (
     <div className="inline-flex rounded-md bg-[var(--surface-strong)] p-0.5" role="group" aria-label={label}>
       {options.map((o) => (
-        <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)} title={o.title}
-          className={`h-6 rounded px-2 text-[12px] ${value === o.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+        <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)} title={o.title} disabled={o.disabled}
+          className={`h-6 whitespace-nowrap rounded px-2 text-[12px] disabled:opacity-40 ${value === o.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
           {o.label}
         </button>
       ))}
