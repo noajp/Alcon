@@ -50,16 +50,16 @@
      semantic --status-* ramp above, which carries severity (success / warning
      / danger) on badges and toasts — an Element that is `blocked` is not the
      same statement as a destructive action.
-     The neutral ends blend the theme's own muted-foreground so they re-tone
+     Backlog and To Do blend the theme's own muted-foreground so they re-tone
      with the surface ramp (and with the .app-sidebar override) instead of
      freezing one gray. The hues are theme-invariant, like --status-*. */
   --element-status-backlog:     color-mix(in oklab, var(--muted-foreground) 60%, transparent);
   --element-status-todo:        color-mix(in oklab, var(--muted-foreground) 70%, transparent);
-  --element-status-in-progress: var(--accent-default);
-  --element-status-review:      #8d7ddb;
-  --element-status-done:        #23734f;
-  --element-status-blocked:     #c29a4c;
-  --element-status-cancelled:   color-mix(in oklab, var(--muted-foreground) 40%, transparent);
+  --element-status-in-progress: #2f9e44;
+  --element-status-review:      #06b6d4;
+  --element-status-done:        var(--accent-default);
+  --element-status-blocked:     #eea21f;
+  --element-status-cancelled:   var(--status-danger);
 
   /* Badge grounds — subtle pair for every hue above (§1.3: badge ground is
      subtle, dot / icon is default). Derived, so a hue is edited in one place. */
@@ -71,17 +71,13 @@
   --element-status-blocked-subtle:     color-mix(in oklab, var(--element-status-blocked) 15%, transparent);
   --element-status-cancelled-subtle:   color-mix(in oklab, var(--element-status-cancelled) 15%, transparent);
 
-  /* Text-safe darkening — only `blocked` needs one: its base hue is
-     #eab308, a yellow that reads at ~1.9:1 against white as an 11px label
-     (the status text in Overdue/Milestones/Upcoming widget rows), well
-     under AA even though the dot/donut it colors elsewhere reads fine at
-     that size. Derived from the same base var via color-mix, the same
-     mechanism -subtle above already uses — one more variant this hue
-     needed, not a parallel text ramp. Dot/bg/icon keep the base hue.
-     75% base / 25% black measured at ~4.0:1 against white — in line with
-     the other three statuses' text contrast (done 3.99, in_progress 3.96,
-     review 4.27), not maximally dark. `black` the keyword silently drops
-     this declaration in this build's CSS pipeline — #000000 does not. */
+  /* Text-safe darkening — only `blocked` needs one: its amber orange is
+     too light against white as an 11px label (the status text in Overdue /
+     Milestones / Upcoming widget rows), though the dot and donut it colors
+     elsewhere read fine. Derived from the same base var via color-mix, as the
+     -subtle pairs are; dot / bg / icon keep the base hue. `black` the keyword
+     silently drops this declaration in this build's CSS pipeline — #000000
+     does not. */
   --element-status-blocked-text: color-mix(in oklab, var(--element-status-blocked) 75%, #000000);
 
   /* ---- Priority ramp ----

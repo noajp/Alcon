@@ -8,12 +8,7 @@ import { ElementDependencies } from './ElementDependencies';
 import { CheckInDialog } from '../../home/now/CheckInDialog';
 import { STATUS, PRIORITY, FONT } from '@/shared/designTokens';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import {
-  Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle, Tag,
-  Ban, Send, Circle, Flag, History, Timer,
-  ChevronRight, ChevronLeft, Pencil,
-  Check, Compass,
-} from 'lucide-react';
+import { Calendar, User, Link2, Plus, CheckCircle2, Tag, Circle, Flag, History, Timer, ChevronRight, ChevronLeft, Pencil, Check, Compass } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -165,16 +160,6 @@ function ElementDetailRoute(props: ElementDetailViewProps) {
 // ============================================
 // Status & Priority options
 // ============================================
-const statusOptions = [
-  { status: 'backlog', label: STATUS.backlog.label, icon: Circle, color: 'text-muted-foreground' },
-  { status: 'todo', label: STATUS.todo.label, icon: Circle, color: 'text-muted-foreground' },
-  { status: 'in_progress', label: STATUS.in_progress.label, icon: Clock, color: 'text-amber-400' },
-  { status: 'review', label: STATUS.review.label, icon: Send, color: 'text-[var(--accent-default)]' },
-  { status: 'done', label: STATUS.done.label, icon: CheckCircle2, color: 'text-indigo-400' },
-  { status: 'blocked', label: STATUS.blocked.label, icon: XCircle, color: 'text-[var(--status-danger)]' },
-  { status: 'cancelled', label: STATUS.cancelled.label, icon: Ban, color: 'text-muted-foreground' },
-];
-
 const priorityOptions = [
   { priority: 'urgent', label: PRIORITY.urgent.label, color: 'text-orange-400' },
   { priority: 'high', label: PRIORITY.high.label, color: 'text-amber-400' },
@@ -449,7 +434,7 @@ function ElementDetailBody({
 
   // Active left tab
 
-  const currentStatus = statusOptions.find(s => s.status === element.status) || statusOptions[1];
+  const currentStatus = STATUS[(element.status ?? 'todo') as keyof typeof STATUS] ?? STATUS.todo;
   const currentPriority = priorityOptions.find(p => p.priority === element.priority) || priorityOptions[2];
 
   // Sync with prop changes

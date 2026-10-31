@@ -24,7 +24,7 @@ import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { isCancelKey, isCommitEnter, isSubmitChord } from '@/Function/shared/keyboard';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { PRIORITY, PRIORITY_ORDER } from '@/shared/designTokens';
+import { PRIORITY, PRIORITY_ORDER, STATUS, STATUS_ORDER } from '@/shared/designTokens';
 
 // A card title reads at most three lines — beyond that it ellipsises, and the
 // inline rename box grows to the same three lines before it scrolls. Both
@@ -32,17 +32,11 @@ import { PRIORITY, PRIORITY_ORDER } from '@/shared/designTokens';
 const TITLE_MAX_LINES = 3;
 const TITLE_LINE_HEIGHT = 20;
 
-type ElementStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled';
+type ElementStatus = (typeof STATUS_ORDER)[number];
 
-const COLUMNS: { status: ElementStatus; label: string }[] = [
-  { status: 'backlog', label: 'Backlog' },
-  { status: 'todo', label: 'To Do' },
-  { status: 'in_progress', label: 'In Progress' },
-  { status: 'review', label: 'In Review' },
-  { status: 'done', label: 'Done' },
-  { status: 'blocked', label: 'Blocked' },
-  { status: 'cancelled', label: 'Cancelled' },
-];
+// One column per status, in the app's status order (designTokens), so the
+// board, the status menu and every grouped list read the same way.
+const COLUMNS: { status: ElementStatus; label: string }[] = STATUS_ORDER.map((status) => ({ status, label: STATUS[status].label }));
 
 interface ElementCardProps {
   element: ElementWithDetails;
