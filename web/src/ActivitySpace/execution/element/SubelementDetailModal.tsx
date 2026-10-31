@@ -124,11 +124,11 @@ export function SubelementDetailModal({
 
   return (
     // Bottom-center floating popup — same chrome as QuickAddElementPopup so
-    // creating a sub-element feels like creating an Element (rounded-2xl
+    // creating a sub-element feels like creating an Element (rounded-lg
     // popover, chip header, ArrowUp submit). No dark backdrop; Esc / X close.
     <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4 pointer-events-none">
       <div
-        className="pointer-events-auto w-full max-w-[560px] rounded-2xl bg-popover/95 backdrop-blur-md border border-border/60 p-4"
+        className="pointer-events-auto w-full max-w-[560px] rounded-lg bg-popover/95 backdrop-blur-md border border-border/60 p-4"
         role="dialog"
         aria-label={isCreate ? t('New sub-element') : t('Sub-element')}
       >

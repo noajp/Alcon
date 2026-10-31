@@ -43,7 +43,7 @@ export function SkillsDialog({ onClose: close }: { onClose: () => void }) {
 
   return createPortal(
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/25 p-6" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={trapRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={tx("マイ・スキル", "My skills")} className="anim-in flex h-[560px] w-[820px] overflow-hidden rounded-2xl bg-k-panel shadow-[var(--shadow-pop)]">
+      <div ref={trapRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={tx("マイ・スキル", "My skills")} className="anim-in flex h-[560px] w-[820px] overflow-hidden rounded-lg bg-k-panel shadow-[var(--shadow-pop)]">
         <aside className="flex w-[230px] shrink-0 flex-col gap-1 border-r border-k-line bg-k-panel-2 p-3">
           <div className="px-2 pb-2 pt-1 font-mono text-[10px] tracking-[0.1em] text-k-ink-3">MY SKILLS</div>
           {skills.map((k) => (

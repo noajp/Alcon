@@ -149,7 +149,7 @@ export function DesignPanel() {
             <MoreHorizontal size={15} />
           </button>
           {menu ? (
-            <div className="anim-in absolute right-0 top-8 z-30 w-[220px] rounded-xl border border-k-line bg-k-panel p-1.5 shadow-[var(--shadow-pop)]">
+            <div className="anim-in absolute right-0 top-8 z-30 w-[220px] rounded-lg border border-k-line bg-k-panel p-1.5 shadow-[var(--shadow-pop)]">
               <button
                 type="button"
                 className={menuItem}

@@ -102,7 +102,7 @@ describe('MenuShell renders one skeleton', () => {
       cs.filter((c) => /^(rounded-|p-|px-|py-|w-|min-w-|max-w-|max-h-)/.test(c)).sort();
 
     expect(geometry(pop)).toEqual(geometry(ddm));
-    expect(geometry(pop)).toContain('rounded-md');
+    expect(geometry(pop)).toContain('rounded-lg');
     expect(geometry(pop)).toContain('p-1');
     expect(geometry(pop)).toContain('w-56');
   });

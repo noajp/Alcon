@@ -19,7 +19,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
-import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp, PanelLeftClose } from 'lucide-react';
+import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp } from 'lucide-react';
 import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
 import { domainHasObjectsMessage, useDomainRole, type DomainRole } from '@/hooks/domainData';
 import { countDomainObjects } from '@/hooks/useObjectArchive';
@@ -84,8 +84,6 @@ interface AppSidebarProps {
   overlay: boolean;
   onCreateNew?: (type: 'domain' | 'object' | 'note') => void;
   onSearch?: () => void;
-  /** Hides the sidebar — the button at its foot, right end. */
-  onHide?: () => void;
 }
 
 // The ModeRail picks a top-level mode; the sidebar renders only that mode's
@@ -171,7 +169,6 @@ export function AppSidebar({
   overlay,
   onCreateNew,
   onSearch,
-  onHide,
 }: AppSidebarProps) {
   const { openCreate } = useWorkspaceActions();
   const { t } = useI18n();
@@ -380,17 +377,18 @@ export function AppSidebar({
           width,
           transform: collapsed && !overlay ? 'translateX(-100%)' : 'translateX(0)',
         }}
-        className={`app-sidebar h-full flex flex-col flex-shrink-0 overflow-hidden ${
+        className={`app-sidebar flex flex-col flex-shrink-0 overflow-hidden ${
           collapsed
-            ? 'absolute inset-y-0 left-0 z-50 bg-background shadow-xl'
-            : 'relative'
+            ? 'absolute inset-y-0 left-0 z-50 h-full bg-background shadow-xl'
+            // Pinned, it shares the rail's frame, a line between them, as in VS Code.
+            : 'relative border-l border-border'
         } ${resizing ? '' : 'transition-transform duration-200 ease-out'}`}
       >
         {/* Header — fixed; only the navigation under it scrolls. The same
             height as the main island's header (50px), so the Space name and
             the island's title sit on one line. */}
         <ButtonAppearanceProvider appearance="navigation">
-        <div className="mt-1.5 flex h-[50px] shrink-0 items-center pl-1 pr-2">
+        <div className={`${collapsed ? 'mt-1.5' : ''} flex h-[50px] shrink-0 items-center pl-1 pr-2`}>
           {activeView === 'settings' ? (
             <Button variant="ghost" size="sm" align="start" onClick={onCloseSettings} className="text-muted-foreground">
               <ArrowLeft size={14} />{t('Back')}
@@ -547,18 +545,6 @@ export function AppSidebar({
           )}
         </nav></ButtonAppearanceProvider>
 
-        {/* The foot: hiding the sidebar is the sidebar's own business, so its
-            button sits at the sidebar's bottom-right corner. */}
-        {onHide && (
-          <ButtonAppearanceProvider appearance="navigation">
-          <div className="flex h-8 shrink-0 items-center justify-end px-2 pb-1.5">
-            <Button size="icon-xs" variant="ghost" onClick={onHide} className="text-muted-foreground"
-              title={t('Hide sidebar')} aria-label={t('Hide sidebar')}>
-              <PanelLeftClose size={14} />
-            </Button>
-          </div>
-          </ButtonAppearanceProvider>
-        )}
 
         {!collapsed && (
           <div
@@ -577,7 +563,7 @@ export function AppSidebar({
           <div className="fixed inset-0 z-40" onClick={() => setCreateMenuOpen(false)} />
           <div
             ref={createMenuRef}
-            className="fixed w-52 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden"
+            className="fixed w-52 bg-popover border border-border rounded-lg shadow-xl z-50 py-1 overflow-hidden"
             style={{ top: createMenuPos.top, left: createMenuPos.left }}
           >
             {railMode === 'slides' ? (

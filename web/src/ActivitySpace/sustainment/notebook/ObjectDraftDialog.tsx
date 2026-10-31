@@ -132,7 +132,7 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
       }}
     >
       <div
-        className="relative w-full max-w-xl bg-card border border-border rounded-2xl shadow-2xl flex flex-col max-h-[88vh] overflow-hidden"
+        className="relative w-full max-w-xl bg-card border border-border rounded-lg shadow-2xl flex flex-col max-h-[88vh] overflow-hidden"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Close */}

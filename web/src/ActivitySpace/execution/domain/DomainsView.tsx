@@ -54,7 +54,7 @@ export function DomainsView({
                 key={d.id}
                 type="button"
                 onClick={() => drillIn(d.id)}
-                className="text-left rounded-2xl bg-white dark:bg-card border border-border/60 shadow-[var(--shadow-island)] hover:border-border transition-all p-5 group"
+                className="text-left rounded-lg bg-white dark:bg-card border border-border/60 shadow-[var(--shadow-island)] hover:border-border transition-all p-5 group"
               >
                 <div className="flex items-start gap-3">
                   <div

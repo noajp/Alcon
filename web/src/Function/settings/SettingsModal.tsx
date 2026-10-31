@@ -33,7 +33,7 @@ export function SettingsModal({ mark, title, subtitle, onClose, sections, active
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 sm:p-6">
       <div role="dialog" aria-modal="true" aria-labelledby={titleId}
-        className="flex flex-col w-full max-w-3xl max-h-[90vh] sm:max-h-[86vh] overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+        className="flex flex-col w-full max-w-3xl max-h-[90vh] sm:max-h-[86vh] overflow-hidden rounded-lg border border-border bg-card shadow-2xl">
         <div className="flex h-[50px] shrink-0 items-center justify-between border-b border-border/60 pl-4 pr-3">
           <div className="flex min-w-0 items-center gap-2.5">
             {mark}

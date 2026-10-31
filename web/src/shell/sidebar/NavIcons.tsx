@@ -6,7 +6,7 @@ import {
   House,
   Grid2x2,
   Settings,
-  Inbox,
+  Bell,
   Calendar,
   BookOpen,
   ChartNoAxesColumn,
@@ -17,7 +17,7 @@ import {
   Mountain,
   Briefcase,
   Stone,
-  Blocks,
+  Layers,
 } from 'lucide-react';
 import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon } from '@/Function/shared/conceptIcons';
 
@@ -36,7 +36,7 @@ export const NavSlidesIcon = ({ size = 20 }: { size?: number }) => <GalleryHoriz
 export const NavObjectsIcon = ObjectIcon;
 export const NavSettingsIcon = ({ size = 20 }: { size?: number }) => <Settings size={size} strokeWidth={2} />;
 export const NavMyTasksIcon = ElementIcon;
-export const NavInboxIcon = ({ size = 20 }: { size?: number }) => <Inbox size={size} strokeWidth={2} />;
+export const NavInboxIcon = ({ size = 20 }: { size?: number }) => <Bell size={size} strokeWidth={2} />;
 export const NavCalendarIcon = ({ size = 20 }: { size?: number }) => <Calendar size={size} strokeWidth={2} />;
 export const NavNoteIcon = ({ size = 20 }: { size?: number }) => <BookOpen size={size} strokeWidth={2} />;
 export const NavDomainIcon = DomainIcon;
@@ -58,7 +58,7 @@ export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => (
 );
 // ModeRail layer marks.
 export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => <Stone size={size} strokeWidth={2} />;
-export const NavExecutionModeIcon = ({ size = 20 }: { size?: number }) => <Blocks size={size} strokeWidth={2} />;
+export const NavExecutionModeIcon = ({ size = 20 }: { size?: number }) => <Layers size={size} strokeWidth={2} />;
 export const NavSustainmentModeIcon = ({ size = 20 }: { size?: number }) => <Grip size={size} strokeWidth={2} />;
 // Strategy's units: the Vision above, its Portfolios of Initiatives below.
 export const NavVisionIcon = ({ size = 20 }: { size?: number }) => <Mountain size={size} strokeWidth={2} />;

@@ -99,7 +99,7 @@ function ExportMenu() {
         <ChevronDown size={12} />
       </button>
       {open ? (
-        <div role="menu" className="anim-in absolute right-0 top-10 z-50 w-64 rounded-xl border border-k-line bg-k-panel p-1.5 shadow-[var(--shadow-pop)]">
+        <div role="menu" className="anim-in absolute right-0 top-10 z-50 w-64 rounded-lg border border-k-line bg-k-panel p-1.5 shadow-[var(--shadow-pop)]">
           <button
             role="menuitem"
             type="button"

@@ -266,7 +266,7 @@ export function BulkActionBar({
                   <CalendarIcon size={15} />
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" side="top" sideOffset={8} className="w-auto p-0 rounded-xl">
+              <PopoverContent align="start" side="top" sideOffset={8} className="w-auto p-0 rounded-lg">
                 <Calendar
                   mode="single"
                   onSelect={(d) => onSetDueDate(d ? toDateOnlyString(d) : null)}
@@ -392,7 +392,7 @@ export function BulkActionBar({
         {picker && (
           <div
             ref={popoverRef}
-            className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-[280px] max-h-[320px] overflow-y-auto rounded-xl bg-popover shadow-2xl ring-1 ring-border/40 py-1"
+            className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-[280px] max-h-[320px] overflow-y-auto rounded-lg bg-popover shadow-2xl ring-1 ring-border/40 py-1"
           >
             <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground">
               {picker === 'move' ? t('Move to Object') : t('Add to Object (multi-home)')}
@@ -424,7 +424,7 @@ export function BulkActionBar({
         {confirmDelete && (
           <div
             ref={confirmRef}
-            className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-[260px] rounded-xl bg-popover shadow-2xl ring-1 ring-border/40 p-3"
+            className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-[260px] rounded-lg bg-popover shadow-2xl ring-1 ring-border/40 p-3"
           >
             <div className="text-[13px] font-semibold text-foreground mb-1">
               {t(count === 1 ? 'Delete {n} Element?' : 'Delete {n} Elements?', { n: count })}

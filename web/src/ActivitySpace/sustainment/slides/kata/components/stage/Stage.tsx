@@ -340,7 +340,7 @@ function FindingsChip({ findings }: { findings: Finding[] }) {
         {tx("赤入れ", "Review")} {findings.length}
       </button>
       {open ? (
-        <div className="anim-in absolute left-0 top-8 z-40 w-80 rounded-xl border border-k-line bg-k-panel p-3 shadow-[var(--shadow-pop)]">
+        <div className="anim-in absolute left-0 top-8 z-40 w-80 rounded-lg border border-k-line bg-k-panel p-3 shadow-[var(--shadow-pop)]">
           <div className="mb-2 font-mono text-[10px] tracking-[0.08em] text-k-danger">REVIEW</div>
           <ul className="flex flex-col gap-2">
             {findings.map((f, i) => (
@@ -395,7 +395,7 @@ function SourceChip({ source, doc, nth }: { source: string; doc: { name: string;
       </button>
       {pos
         ? createPortal(
-            <div ref={popRef} role="dialog" aria-label={tx("出どころ", "Source")} style={{ top: pos.top, left: pos.left, width: pos.width }} className="anim-in fixed z-[80] rounded-xl border border-k-line bg-k-panel p-4 shadow-[var(--shadow-pop)]">
+            <div ref={popRef} role="dialog" aria-label={tx("出どころ", "Source")} style={{ top: pos.top, left: pos.left, width: pos.width }} className="anim-in fixed z-[80] rounded-lg border border-k-line bg-k-panel p-4 shadow-[var(--shadow-pop)]">
               <div className="mb-2 flex items-baseline justify-between gap-3">
                 <span className="truncate font-mono text-[10px] tracking-[0.08em] text-k-ink-3">SOURCE — {doc.name}</span>
                 <span className="shrink-0 truncate text-[11px] font-medium text-k-ink-2">{label}</span>

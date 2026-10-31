@@ -45,7 +45,7 @@ export function Shortcuts() {
   if (!open) return null;
   return createPortal(
     <div className="fixed inset-0 z-[94] flex items-center justify-center bg-black/25" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}>
-      <div ref={trapRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={tx("ショートカット", "Shortcuts")} className="anim-in w-[440px] rounded-2xl border border-k-line bg-k-panel p-6 shadow-[var(--shadow-pop)]">
+      <div ref={trapRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={tx("ショートカット", "Shortcuts")} className="anim-in w-[440px] rounded-lg border border-k-line bg-k-panel p-6 shadow-[var(--shadow-pop)]">
         <div className="mb-4 font-mono text-[10px] tracking-[0.1em] text-k-ink-3">SHORTCUTS</div>
         <dl className="flex flex-col">
           {keys().map(([k, v]) => (
