@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { parseGithubSecret } from "./githubOAuth.ts";
 
 // Pull requests on GitHub for code_changes, with the credential of the
 // Space's GitHub integration (the fine-grained token stored in Vault for the
@@ -199,19 +200,21 @@ export async function mergePull(ref: PullRef, token: string, m: { method: MergeM
 }
 
 /**
- * The tokens to try for a Space: each enabled GitHub integration's credential,
- * then none (a public repository reads without one). Reading the secret uses
- * the service role, so callers check the person's access first.
+ * The tokens to try for a Space: each enabled GitHub integration's credential
+ * (the token itself, or the access token of a GitHub sign-in), then none (a
+ * public repository reads without one). Reading the secret uses the service
+ * role, so callers check the person's access first.
  */
 export async function githubTokens(admin: SupabaseClient, spaceId: string | null): Promise<(string | null)[]> {
   const tokens: (string | null)[] = [];
   if (spaceId) {
     const { data: rows } = await admin.from("integrations")
-      .select("id, preset, endpoint").eq("activity_space_id", spaceId).eq("enabled", true).order("created_at");
-    for (const row of (rows ?? []) as { id: string; preset: string | null; endpoint: string }[]) {
+      .select("id, preset, endpoint, auth_type").eq("activity_space_id", spaceId).eq("enabled", true).order("created_at");
+    for (const row of (rows ?? []) as { id: string; preset: string | null; endpoint: string; auth_type: string }[]) {
       if (row.preset !== "github" && !/(^|\.)github(copilot)?\.com\//.test(row.endpoint.replace(/^https:\/\//, ""))) continue;
       const { data: secret } = await admin.rpc("get_integration_secret", { p_integration_id: row.id });
-      if (typeof secret === "string" && secret) tokens.push(secret);
+      const token = row.auth_type === "oauth" ? parseGithubSecret(secret)?.access_token : secret;
+      if (typeof token === "string" && token) tokens.push(token);
     }
   }
   tokens.push(null);

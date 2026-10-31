@@ -120,7 +120,7 @@ describe('cookie and return URL', () => {
     const ret = { kind: 'finish' as const, handle: HANDLE, integrationId: null };
     await Promise.all([completeOAuthReturn(ret, finish), completeOAuthReturn(ret, finish)]);
     expect(calls).toEqual([HANDLE]);
-    const failing = async () => { throw new Error('This Google sign-in was started by someone else, so it was discarded.'); };
+    const failing = async () => { throw new Error('This sign-in was started by someone else, so it was discarded.'); };
     const outcomes: unknown[] = [];
     await completeOAuthReturn({ kind: 'finish', handle: HANDLE.replace('h', 'j'), integrationId: INTEGRATION }, async (h) => {
       outcomes.push(h);
@@ -412,5 +412,47 @@ describe('Drive request builders', () => {
     expect(bad.isError).toBe(true);
     const denied = await drive.runDriveTool('drive_search', {}, 'ya29.t', async () => new Response('{"error":{"message":"Insufficient permissions"}}', { status: 403 }));
     expect(denied).toEqual({ text: 'Google Drive: HTTP 403 Insufficient permissions', isError: true });
+  });
+});
+
+// GitHub sign-in: the same flow as Google, with GitHub's URLs, scope and secret.
+const gh = await import(new URL('../../supabase/functions/_shared/githubOAuth.ts', import.meta.url).pathname);
+
+const GITHUB_ROW = {
+  id: INTEGRATION, preset: 'github', kind: 'mcp', name: 'GitHub', description: null,
+  endpoint: 'https://api.githubcopilot.com/mcp/', auth_type: 'oauth', auth_header: null, delegation: 'approve_each',
+};
+
+describe('GitHub sign-in', () => {
+  it('asks GitHub for repo, with S256 and no sign-up', () => {
+    const u = new URL(gh.buildGithubAuthorizeUrl({ clientId: 'Iv1.abc', redirectUri: 'https://x.supabase.co/functions/v1/integration-oauth/callback', state: 's', codeChallenge: 'c' }));
+    expect(u.origin + u.pathname).toBe('https://github.com/login/oauth/authorize');
+    expect(Object.fromEntries(u.searchParams)).toMatchObject({ scope: 'repo', state: 's', code_challenge: 'c', code_challenge_method: 'S256', allow_signup: 'false' });
+  });
+
+  it('signs in only the GitHub preset row, and the catalog row is that row', () => {
+    expect(gh.isGithubOAuthRow(GITHUB_ROW)).toBe(true);
+    expect(gh.isGithubOAuthRow({ ...GITHUB_ROW, auth_type: 'bearer' })).toBe(false);
+    expect(gh.isGithubOAuthRow({ ...GITHUB_ROW, endpoint: 'https://evil.example.com/mcp/' })).toBe(false);
+    expect(gh.isGithubOAuthRow(DRIVE_ROW)).toBe(false);
+    const preset = presetById('github')!;
+    expect(gh.isGithubOAuthRow({ preset: preset.id, kind: preset.kind, auth_type: preset.auth, endpoint: preset.endpoint })).toBe(true);
+  });
+
+  it('keeps a token response only with a token, and reads GitHub scope lists', () => {
+    expect(gh.githubSecretFromTokenResponse({ access_token: 'gho_x', scope: 'repo,read:user', token_type: 'bearer' }))
+      .toEqual({ v: 1, provider: 'github', access_token: 'gho_x', scope: 'repo,read:user' });
+    expect(gh.githubSecretFromTokenResponse({ error: 'bad_verification_code' })).toBeNull();
+    expect(gh.githubHasScope('repo,read:user')).toBe(true);
+    expect(gh.githubHasScope('public_repo')).toBe(false);
+  });
+
+  it('resolves a GitHub row to its access token and never to a Google secret', async () => {
+    // A GitHub token is used as stored: nothing is read or written back.
+    const admin = {};
+    const secret = JSON.stringify({ v: 1, provider: 'github', access_token: 'gho_x', scope: 'repo' });
+    expect(await client.resolveCredential(admin, GITHUB_ROW, secret)).toBe('gho_x');
+    expect(await client.resolveCredential(admin, GITHUB_ROW, JSON.stringify(SECRET))).toBeNull();
+    expect(await client.resolveCredential(admin, GITHUB_ROW, 'gho_plain')).toBeNull();
   });
 });

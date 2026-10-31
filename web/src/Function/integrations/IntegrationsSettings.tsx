@@ -100,12 +100,12 @@ function ExternalServicesPanel() {
           oauthOutcome.status === 'ok' ? 'bg-[var(--status-success-subtle)]' : oauthOutcome.status === 'error' ? 'bg-[var(--status-danger-subtle)]' : 'bg-[var(--surface-strong)]')}>
           <span>
             {oauthOutcome.status === 'pending'
-              ? t('Finishing Google sign-in…')
+              ? t('Finishing sign-in…')
               : oauthOutcome.status === 'ok'
-                ? t('{name} is connected.', { name: oauthReturnName ?? t('Google Drive') })
+                ? oauthReturnName ? t('{name} is connected.', { name: oauthReturnName }) : t('Connected')
                 : oauthOutcome.message
                   ? t(oauthOutcome.message)
-                  : t('Google sign-in did not finish, so nothing was connected. Try again.')}
+                  : t('Sign-in did not finish, so nothing was connected. Try again.')}
           </span>
           {oauthOutcome.status !== 'pending' && (
             <Button variant="ghost" size="xs" onClick={() => setOAuthOutcome(null)}>{t('Dismiss')}</Button>

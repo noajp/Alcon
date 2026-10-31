@@ -2,14 +2,15 @@
 
 import { useSyncExternalStore } from 'react';
 
-// Coming back from Google sign-in (ADR 0035). integration-oauth redirects to
+// Coming back from an integration sign-in — Google or GitHub (ADR 0035).
+// integration-oauth redirects to
 //   /?integration_oauth=finish&handle=<one-time handle>&integration=<id>
 //   /?integration_oauth=error&integration=<id>
-// The page reads that once, removes it from the address, opens Settings ›
-// Integrations and, for `finish`, confirms the sign-in with POST /finish
-// under the signed-in person's JWT — nothing is stored until then, and only
-// for the person who started it. The outcome is left here for the
-// Integrations screen to show.
+// The page reads that once, removes it from the address, opens the screen the
+// sign-in started from (Settings › Integrations, or Reviews when it began
+// there) and, for `finish`, confirms the sign-in with POST /finish under the
+// signed-in person's JWT — nothing is stored until then, and only for the
+// person who started it. The outcome is left here for that screen to show.
 
 export type OAuthReturn =
   | { kind: 'finish'; handle: string; integrationId: string | null }
@@ -42,6 +43,21 @@ export function stripOAuthReturn(href: string): string {
   const u = new URL(href);
   for (const key of ['integration_oauth', 'integration', 'handle']) u.searchParams.delete(key);
   return `${u.pathname}${u.search}${u.hash}`;
+}
+
+/** sessionStorage: the view a sign-in was started from, when it is not Settings. */
+export const OAUTH_RETURN_VIEW_KEY = 'alcon.integrationOAuth.returnView';
+const RETURN_VIEWS = new Set(['reviews']);
+
+/** The view to come back to, read once; null means Settings › Integrations. */
+export function takeOAuthReturnView(): string | null {
+  try {
+    const view = sessionStorage.getItem(OAUTH_RETURN_VIEW_KEY);
+    sessionStorage.removeItem(OAUTH_RETURN_VIEW_KEY);
+    return view && RETURN_VIEWS.has(view) ? view : null;
+  } catch {
+    return null;
+  }
 }
 
 let current: OAuthOutcome | null = null;
