@@ -38,7 +38,7 @@ describe('Element vocabulary order and sorting weight', () => {
   });
 
   it('retains lifecycle order and urgent-first priority options', () => {
-    expect(STATUS_ORDER).toEqual(['backlog', 'todo', 'in_progress', 'review', 'done', 'blocked', 'cancelled']);
+    expect(STATUS_ORDER).toEqual(['backlog', 'todo', 'in_progress', 'review', 'done', 'cancelled', 'blocked']);
     expect(PRIORITY_ORDER).toEqual(['urgent', 'high', 'medium', 'low']);
     expect(PRIORITY_ORDER.map(priorityWeight)).toEqual([4, 3, 2, 1]);
     expect(priorityWeight(null)).toBe(0);
@@ -46,7 +46,7 @@ describe('Element vocabulary order and sorting weight', () => {
   });
 
   it('makes list grouping labels agree with the canonical picker vocabulary', () => {
-    expect(STATUS_ORDER.map(labelForStatus)).toEqual(['Backlog', 'To Do', 'In Progress', 'In Review', 'Done', 'Blocked', 'Cancelled']);
+    expect(STATUS_ORDER.map(labelForStatus)).toEqual(['Backlog', 'To Do', 'In Progress', 'In Review', 'Done', 'Cancelled', 'Blocked']);
     expect(PRIORITY_ORDER.map(labelForPriority)).toEqual(['Urgent', 'High', 'Medium', 'Low']);
   });
 });

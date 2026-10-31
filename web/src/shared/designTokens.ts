@@ -49,7 +49,7 @@ export const PRIORITY = {
 } as const;
 
 // Element status and priority display order; priorities run highest to lowest.
-export const STATUS_ORDER = ['backlog', 'todo', 'in_progress', 'review', 'done', 'blocked', 'cancelled'] as const satisfies readonly (keyof typeof STATUS)[];
+export const STATUS_ORDER = ['backlog', 'todo', 'in_progress', 'review', 'done', 'cancelled', 'blocked'] as const satisfies readonly (keyof typeof STATUS)[];
 export const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low'] as const satisfies readonly (keyof typeof PRIORITY)[];
 // Picker rows in display order; labels are untranslated (callers pass them through t()).
 export const STATUS_OPTIONS: { value: (typeof STATUS_ORDER)[number]; label: string }[] = STATUS_ORDER.map((value) => ({ value, label: STATUS[value].label }));
