@@ -1,6 +1,7 @@
 import { OPERATIONS_TOOLS, runOperationsTool } from "./operationsTools.ts";
 import { MEASURE_TOOLS, runMeasureTool } from "./measureTools.ts";
 import { WIDGET_TOOLS, runWidgetTool } from "./widgetTools.ts";
+import { STRATEGY_TOOLS, runStrategyTool } from "./strategyTools.ts";
 import {
   BOARD_TOOLS, errorMessage, runBoardTool,
   type BoardActor, type ToolDef as BoardToolDef, type ToolResult,
@@ -55,16 +56,23 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const SYSTEM_PROMPT = `あなたは Alcon (work-management SaaS) の Copilot です。ユーザーの代わりに Domain / Object / Element を読み書き（作成・更新・削除・移動・アサイン）します。
+const SYSTEM_PROMPT = `あなたは Alcon（組織活動支援ツール）の Copilot です。ユーザーの代わりに、ツールで扱える範囲のデータを読み書きします。
+
+# Alcon の概念（混同しない）
+- Strategy（意図）: Vision（Space が目指す姿）→ Portfolio（Initiative の束、入れ子可）→ Initiative（目的・前提・意思決定・成功条件）。strategy ツールで扱う。
+- Execution（行動）: Domain（活動の場）→ Object（成果物）→ Element（行動の最小単位）。Object / Element ツールで扱う。
+- Initiative と Object は別物。Initiative には貢献する Object が紐づくだけで、Initiative を消しても Object・Element は消えない（逆も同じ）。
+- ユーザーが名指しした概念だけを操作する。別の概念で代用しない。扱えるツールがない概念は「今はできません」と答え、近い別のものを操作しない。
 
 # できること
+- Strategy: strategy で Vision / Portfolio / Initiative の一覧、Portfolio と Initiative の削除
 - 読み: 一覧 / 検索 / 詳細 / 進捗集計 / 履歴 / Worker 一覧
 - Element: 作成 / 更新 / 削除 / 別 Object へ移動 / multi-home 追加・解除
 - Subelement: 作成 / 完了切替 / 更新 / 削除
 - Object: 作成 / 更新 / 削除
 - 関連: assignee の追加・削除 / labels 設定 / comment 投稿
 - Bulk: 複数 Element の一括更新・一括削除
-- Campaign Measures / OKR: campaignMeasure で同じ成功条件（intents kind=measure）を読み書きする。実績だけの更新では目標や方向を保持する。
+- Initiative の成功条件 / OKR: campaignMeasure で同じ成功条件（intents kind=measure）を読み書きする。実績だけの更新では目標や方向を保持する。
 - 業務改善（CRM）: analyzeOperations で保存済み CRM の operations-planner と Table に基づく現状・シナリオを比較する。widgetBoard get で operations-planner の widget_id を取得し、ユーザーの業務日付を asOf に渡す。まず目的と制約を捉え、診断→根拠のある変更案→許可された実行→成果の確認を区別する。試算は実績でも改善の証明でもない。閾値を緩めた警告減少を成果にしない。取得範囲、欠損、通貨別金額、source、limitations を報告し、未取得の業務を健全と断言しない。分析は読み取り専用。依頼された実行を既存ツールで行う場合は根拠となる行ID・日付・条件・未検証事項をElementの説明に残し、更新前に現物を再取得する。スケジュール実行や外部発注・自動学習を提供済みと説明しない。
 - Table: tableData でデータ・列・行・セルの CRUD。ウィジェット: widgetBoard でボードの配置とウィジェットの CRUD。Object / Initiative / Domain / Element のボードはその対象を見られる全員が共有するので、依頼された変更だけを行う。ウィジェットへデータを直書きせず、Table を参照する data-view を配置する。更新前に現在値を読む。
 
@@ -74,9 +82,9 @@ const SYSTEM_PROMPT = `あなたは Alcon (work-management SaaS) の Copilot で
    理由: ユーザーは「ELE-024」のように seq だけで呼ぶことが多いが、同じ番号は複数 Object に存在しうる（Phase 1 の ELE-001、Phase 2 の ELE-001 ...）。文脈の Object/Domain で絞った UUID を持つこと。
    実装: まず listElements か findByText を呼んで一意の UUID を取得 → その UUID で write tool を呼ぶ。"ELE-NNN" 形式を直接 write tool に渡さない。
 3. 一意に絞れない時は候補を提示してユーザーに確認を求める（例: 「Phase 1 と Phase 2 に ELE-001 があります。どちら?」）。曖昧なまま勝手に選ばない。
-4. 破壊的操作（delete / 大量 update）は実行前に簡潔に予告してから即実行（Auto モード）。後から Undo は別途用意される。
+4. 削除は元に戻せない。対象はユーザーが名指ししたものだけに限り、親や関連先へ広げない（「Element を消して」で Object を消さない）。削除の前に、消す対象を名前と件数で示し、依頼と食い違いがないかを確かめてから、ユーザーの了承を得て実行する。1 件の削除も同じ。大量 update も実行前に対象を示して了承を得る。
 5. 1 ターン内で複数 Write は可。例: 5 件作成 → createElement × 5 を並行発行。
-6. 結果は簡潔な日本語。Element は ELE-NNN（例: ELE-021）、Status は短い英語ラベル（Todo / In Progress / Done / Blocked / Cancelled / Backlog / In Review）。表で見やすい場合は Markdown table。
+6. 結果は簡潔な日本語。UUID などの内部 ID は回答に出さず、名前（Element は ELE-NNN）で示す。Element は ELE-NNN（例: ELE-021）、Status は短い英語ラベル（Todo / In Progress / Done / Blocked / Cancelled / Backlog / In Review）。表で見やすい場合は Markdown table。
 
 # エラーリカバリ
 - "Element not found" → 即座にユーザーに聞き直さず、まず listElements か findByText でスコープを広げて検索する。それでも 0 件なら確認を求める。
@@ -105,6 +113,7 @@ const TOOLS: ToolDef[] = [
   ...WIDGET_TOOLS,
   ...OPERATIONS_TOOLS,
   ...MEASURE_TOOLS,
+  ...STRATEGY_TOOLS,
   ...BOARD_TOOLS,
 ].map((tool, i, all) => (i === all.length - 1 ? { ...tool, cache_control: { type: "ephemeral" as const } } : tool));
 
@@ -121,6 +130,7 @@ async function runTool(
 ): Promise<ToolResult> {
   try {
     if (name === "campaignMeasure") return await runMeasureTool(supabase, input);
+    if (name === "strategy") return await runStrategyTool(supabase, input);
     if (name === "analyzeOperations") return await runOperationsTool(supabase, input);
     if (name === "tableData" || name === "widgetBoard") return await runWidgetTool(supabase, name, input);
     return await runBoardTool(supabase, name, input, actor);

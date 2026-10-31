@@ -3,7 +3,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const MEASURE_TOOLS = [{
   name: 'campaignMeasure',
-  description: 'Read/write Campaign success conditions used by Measures and OKR widgets in the same intents rows as human editors (kind=measure). actions: campaigns discovers visible Campaign IDs/names; list returns measures (optional strategyId); get/create/update/delete require strategyId, and get/update/delete require measure id. Lists return {items,nextOffset,total}; follow nextOffset. Create attaches to the Campaign root, creating that root if necessary. patch fields: title, subtitle, target_value, actual_value, unit, direction (at_least/at_most), measured_at (ISO timestamp), status (on_track/at_risk/off_track/done), order_index. Create requires nonempty title, finite target_value and direction. Numbers must be finite numbers or null, never numeric strings. Updating only a reading leaves all other fields intact; actual_value automatically stamps measured_at, null clears both. Omitted fields never reset. Cannot change kind, Campaign, parent, or owner. Read identifiers and existing values before writing. Never invent operational measurements.',
+  description: 'Read/write Initiative success conditions used by Measures and OKR widgets in the same intents rows as human editors (kind=measure). actions: campaigns discovers visible Initiative IDs/names; list returns measures (optional strategyId); get/create/update/delete require strategyId, and get/update/delete require measure id. Lists return {items,nextOffset,total}; follow nextOffset. Create attaches to the Initiative root, creating that root if necessary. patch fields: title, subtitle, target_value, actual_value, unit, direction (at_least/at_most), measured_at (ISO timestamp), status (on_track/at_risk/off_track/done), order_index. Create requires nonempty title, finite target_value and direction. Numbers must be finite numbers or null, never numeric strings. Updating only a reading leaves all other fields intact; actual_value automatically stamps measured_at, null clears both. Omitted fields never reset. Cannot change kind, Initiative, parent, or owner. Read identifiers and existing values before writing. Never invent operational measurements.',
   input_schema: {type:'object',properties:{action:{type:'string',enum:['campaigns','list','get','create','update','delete']},strategyId:{type:'string'},id:{type:'string'},patch:{type:'object',additionalProperties:true},offset:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:100}},required:['action'],additionalProperties:false},
 }];
 function uuid(value: unknown): string {
@@ -35,7 +35,7 @@ export function validateMeasurePatch(raw: unknown, creating: boolean, now = new 
 async function readRoot(db: SupabaseClient, strategyId: string) {
   const {data,error} = await db.from('intents').select('id,kind').eq('strategy_id',strategyId).is('parent_intent_id',null).maybeSingle();
   if (error) throw new Error(error.message);
-  if (data && !['master','decision'].includes(data.kind)) throw new Error('Campaign root kind is invalid');
+  if (data && !['master','decision'].includes(data.kind)) throw new Error('Initiative root kind is invalid');
   return data;
 }
 export async function runMeasureTool(db: SupabaseClient, input: Record<string,unknown>): Promise<{ok:true;data:unknown}> {
@@ -70,7 +70,7 @@ export async function runMeasureTool(db: SupabaseClient, input: Record<string,un
         if (!root) throw new Error(inserted.error.message);
       } else root = inserted.data;
     }
-    if (!root) throw new Error('Campaign root could not be resolved');
+    if (!root) throw new Error('Initiative root could not be resolved');
     const {data,error} = await db.from('intents').insert({...patch,strategy_id:strategyId,parent_intent_id:root.id,kind:'measure',created_by:auth.user.id}).select().single();
     if (error) throw new Error(error.message);
     return {ok:true,data};
