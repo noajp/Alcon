@@ -40,6 +40,7 @@ const CrmView = dynamic(() => import('@/ActivitySpace/sustainment/crm/CrmView').
 const TeamView = dynamic(() => import('@/ActivitySpace/sustainment/team/TeamView').then(m => m.TeamView), { ssr: false, loading: viewLoading });
 const MyCalendarView = dynamic(() => import('@/ActivitySpace/home/MyCalendarView').then(m => m.MyCalendarView), { ssr: false, loading: viewLoading });
 const ProfileView = dynamic(() => import('@/ActivitySpace/home/ProfileView').then(m => m.ProfileView), { ssr: false, loading: viewLoading });
+const ReviewsView = dynamic(() => import('@/ActivitySpace/execution/code/ReviewsView').then(m => m.ReviewsView), { ssr: false, loading: viewLoading });
 const SettingsView = dynamic(() => import('@/Function/settings/SettingsView').then(m => m.SettingsView), { ssr: false, loading: viewLoading });
 
 
@@ -247,6 +248,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
+
+          {activeActivity === 'reviews' && <ReviewsView navigation={navigation} onNavigate={onNavigate} onOpenSettings={onOpenSettings} />}
 
           {activeActivity === 'audit' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">

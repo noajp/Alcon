@@ -1,4 +1,5 @@
 import type React from 'react';
+import { GitCompare } from 'lucide-react';
 import {
   NavAiIcon,
   NavAuditIcon,
@@ -47,6 +48,7 @@ export type ViewId =
   | 'note'
   | 'domain-overview'
   | 'domains'
+  | 'reviews'
   | 'tables'
   | 'slides'
   | 'team'
@@ -81,6 +83,7 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   note:          { label: 'Notebook',    icon: NavNoteIcon },
   'domain-overview': { label: 'Domain overview', icon: NavDomainIcon },
   domains:       { label: 'Domains',     icon: NavDomainIcon },
+  reviews:       { label: 'Reviews',     icon: GitCompare },
   tables:        { label: 'Table',       icon: NavTableIcon },
   slides:        { label: 'Slides',      icon: NavSlidesIcon },
   team:          { label: 'People',      icon: NavTeamsIcon },

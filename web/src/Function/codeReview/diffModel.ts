@@ -2,7 +2,9 @@
 // next to the intent they were built for. The pure rules behind the review
 // screen — reading GitHub's per-file patch into lines, pairing them for the
 // split view, folding paths into a file tree, telling implementation from
-// tests and docs, and reading the stored intent check and the team's verdicts.
+// tests and docs, reading the stored intent check, the guided walk-through and
+// the team's verdicts — and which changes wait on whom in the Reviews inbox,
+// and what an agent is asked when the review sends a change back.
 //
 // Pure — no React, no Supabase — so the rules are unit-tested in
 // tests/diffModel.test.ts.
@@ -76,6 +78,25 @@ export function parsePatch(patch: string | null | undefined): DiffHunk[] {
   const tail = last?.lines[last.lines.length - 1];
   if (tail && tail.kind === 'context' && tail.text === '' && patch.endsWith('\n')) last.lines.pop();
   return hunks;
+}
+
+/** How many unchanged lines sit before each hunk — the stretch the patch
+ *  leaves out between the previous hunk (or the top of the file) and it. */
+export function unchangedBefore(hunks: readonly DiffHunk[]): number[] {
+  let lastOld = 0;
+  return hunks.map((h) => {
+    const gap = Math.max(0, h.oldStart - lastOld - 1);
+    const olds = h.lines.map((l) => l.oldNo).filter((n): n is number => n != null);
+    // A hunk with no old lines (a new file) still starts at its header's line.
+    lastOld = olds.length ? Math.max(...olds) : Math.max(lastOld, h.oldStart);
+    return gap;
+  });
+}
+
+/** A path as a name and the folder it sits in. */
+export function splitPath(path: string): { name: string; dir: string } {
+  const at = path.lastIndexOf('/');
+  return at < 0 ? { name: path, dir: '' } : { name: path.slice(at + 1), dir: path.slice(0, at + 1) };
 }
 
 export interface SplitRow { left: DiffLine | null; right: DiffLine | null }
@@ -275,4 +296,144 @@ export function reviewState(reviews: readonly ReviewRecord[], headSha: string | 
   const matches = current.filter((r) => r.verdict === 'matches').length;
   const needsChanges = current.filter((r) => r.verdict === 'needs_changes').length;
   return { latest, matches, needsChanges, overall: needsChanges > 0 ? 'needs_changes' : matches > 0 ? 'matches' : 'pending' };
+}
+
+// ── Matching a cited path ──────────────────────────────────────────────────
+
+/** The changed file a path names. The model may cite a path by its tail, so
+ *  a file that ends with it (or that it ends with) matches too. */
+export function matchFile(path: string, filenames: readonly string[]): string | null {
+  const p = path.trim().replace(/^\.?\//, '');
+  if (!p) return null;
+  return filenames.find((f) => f === p)
+    ?? filenames.find((f) => f.endsWith(`/${p}`) || p.endsWith(`/${f}`))
+    ?? null;
+}
+
+// ── Guided review ──────────────────────────────────────────────────────────
+
+export interface GuideSection {
+  title: string;
+  what: string;
+  why: string;
+  /** Changed files, as the diff names them. */
+  files: string[];
+  /** The files the guide left out, gathered at the end. */
+  rest?: boolean;
+}
+
+export interface ReviewGuide {
+  summary: string;
+  sections: GuideSection[];
+  headSha: string | null;
+  at: string | null;
+}
+
+/** Reads the stored guide against the files actually changed: each file sits
+ *  in the first section that names it, sections left empty are dropped, and
+ *  files no section names follow in a last section. Malformed reads as null. */
+export function readGuide(raw: unknown, filenames: readonly string[]): ReviewGuide | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  const placed = new Set<string>();
+  const sections: GuideSection[] = [];
+  for (const x of list(r.sections)) {
+    if (!x || typeof x !== 'object') continue;
+    const sec = x as Record<string, unknown>;
+    const files: string[] = [];
+    for (const cited of strings(sec.files)) {
+      const f = matchFile(cited, filenames);
+      if (f && !placed.has(f)) { placed.add(f); files.push(f); }
+    }
+    if (files.length === 0 || !str(sec.title)) continue;
+    sections.push({ title: str(sec.title), what: str(sec.what), why: str(sec.why), files });
+  }
+  if (sections.length === 0) return null;
+  const rest = filenames.filter((f) => !placed.has(f));
+  if (rest.length) sections.push({ title: '', what: '', why: '', files: rest, rest: true });
+  return {
+    summary: str(r.summary),
+    sections,
+    headSha: typeof r.head_sha === 'string' ? r.head_sha : null,
+    at: typeof r.at === 'string' ? r.at : null,
+  };
+}
+
+// ── The Reviews inbox ──────────────────────────────────────────────────────
+
+export type InboxBucket = 'review' | 'mine' | 'open' | 'done';
+
+export interface InboxChange {
+  id: string;
+  element_id: string;
+  state: 'open' | 'draft' | 'merged' | 'closed';
+  head_sha: string | null;
+  linked_by: string | null;
+}
+
+export interface InboxContext {
+  /** Elements the person owns or is assigned to (not as reviewer). */
+  myElements: ReadonlySet<string>;
+  /** Elements the person is assigned to review. */
+  reviewingElements: ReadonlySet<string>;
+  /** Elements someone is assigned to review. */
+  elementsWithReviewer: ReadonlySet<string>;
+  /** The head commits the person has given a verdict on, per change. */
+  myVerdictHeads: ReadonlyMap<string, ReadonlySet<string | null>>;
+}
+
+/**
+ * Where a change sits for one person. Finished changes are done. A change of
+ * theirs — they linked it, or its Element is theirs — is mine. An open change
+ * waits on their review when they have no verdict on its head yet and they
+ * are its Element's reviewer — or the Element has no reviewer, so anyone on
+ * the team may take it. Everything else is open.
+ */
+export function inboxBucket(change: InboxChange, userId: string, ctx: InboxContext): InboxBucket {
+  if (change.state === 'merged' || change.state === 'closed') return 'done';
+  if (change.linked_by === userId || ctx.myElements.has(change.element_id)) return 'mine';
+  const heads = ctx.myVerdictHeads.get(change.id);
+  const reviewedHead = !!heads && (heads.has(change.head_sha) || (!change.head_sha && heads.size > 0));
+  const mayReview = ctx.reviewingElements.has(change.element_id) || !ctx.elementsWithReviewer.has(change.element_id);
+  if (change.state === 'open' && !reviewedHead && mayReview) return 'review';
+  return 'open';
+}
+
+// ── Sending a change back to its agent ─────────────────────────────────────
+
+export interface IterateInput {
+  repo: string;
+  number: number;
+  url: string;
+  headRef: string | null;
+  comments: readonly { path: string; line: number; body: string; author: string | null; resolved: boolean }[];
+  reviews: readonly { verdict: ReviewVerdict; body: string; reviewer: string | null; stale: boolean }[];
+}
+
+/** Pure. What the agent is asked: fix the open points on the same pull
+ *  request. Resolved comments and verdicts on an older head are left out.
+ *  Null when there is nothing to address. */
+export function iteratePrompt(input: IterateInput): string | null {
+  const comments = input.comments.filter((c) => !c.resolved && c.body.trim());
+  const reviews = input.reviews.filter((r) => !r.stale && r.verdict !== 'matches' && r.body.trim());
+  if (comments.length === 0 && reviews.length === 0) return null;
+  const lines = [
+    `レビューで指摘された点を、Pull Request ${input.repo}#${input.number}（${input.url}）で直してください。`,
+    input.headRef
+      ? `新しい PR は開かず、同じブランチ \`${input.headRef}\` にコミットを追加して push してください。マージはしないでください。`
+      : '新しい PR は開かず、同じ PR のブランチにコミットを追加して push してください。マージはしないでください。',
+    '',
+  ];
+  if (reviews.length) {
+    lines.push('## レビュー');
+    for (const r of reviews) lines.push(`- ${r.reviewer ?? 'レビュアー'}: ${r.body.trim()}`);
+    lines.push('');
+  }
+  if (comments.length) {
+    lines.push('## 行コメント');
+    for (const c of comments) lines.push(`- \`${c.path}:${c.line}\`（${c.author ?? 'レビュアー'}）: ${c.body.trim()}`);
+    lines.push('');
+  }
+  lines.push('直し終えたら、何をどう直したかを報告してください。指摘が意図と食い違うと考えるときは、直さずにその理由を報告してください。');
+  return lines.join('\n');
 }

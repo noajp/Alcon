@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, HelpCircle, Sparkles } from 'lucide-react';
+import { AlertTriangle, Github, HelpCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -9,7 +9,7 @@ import { formatAge } from '@/Function/shared/dateUtils';
 import { formatDisplayName, getCachedDisplayNames } from '@/Function/settings/preferencesStore';
 import { FONT } from '@/shared/designTokens';
 import { isCheckStale, readIntentCheck, reviewState, type ReviewVerdict } from '@/Function/codeReview/diffModel';
-import { useCodeChangeReviews, useElementIntent, useSubmitCodeReview } from '@/hooks/codeChangeData';
+import { useCodeChangeReviews, useElementIntent, useRetryPublish, useSubmitCodeReview } from '@/hooks/codeChangeData';
 import type { CodeChange } from '@/types/database';
 import { CRITERION_META, INTENT_KIND_LABEL, INTENT_META, Pill, TEAM_META } from './codeChangeLabels';
 
@@ -170,9 +170,11 @@ function TeamVerdicts({ change }: { change: CodeChange }) {
   const { user, profile } = useAuthContext();
   const reviews = useCodeChangeReviews(change.id);
   const submit = useSubmitCodeReview(change.id);
+  const retry = useRetryPublish(change.id);
   const [note, setNote] = useState('');
   const state = reviewState(reviews.data ?? [], change.head_sha);
-  const notes = (reviews.data ?? []).filter((r) => r.body.trim()).slice(-8).reverse();
+  // What was said, and any verdict that did not reach GitHub.
+  const notes = (reviews.data ?? []).filter((r) => r.body.trim() || r.github_error).slice(-8).reverse();
 
   const send = (verdict: ReviewVerdict) => {
     if (verdict === 'comment' && !note.trim()) return;
@@ -190,6 +192,7 @@ function TeamVerdicts({ change }: { change: CodeChange }) {
         <Pill tone={TEAM_META[state.overall].tone}>{t(TEAM_META[state.overall].label)}</Pill>
       </div>
       <p className="text-[12px] text-muted-foreground">{t('Does this software do what was intended? Each person’s latest verdict counts; a verdict on an older commit stops counting when new commits arrive.')}</p>
+      <p className="text-[12px] text-muted-foreground">{t('Verdicts and line comments are also posted to the pull request on GitHub.')}</p>
       <textarea
         value={note}
         onChange={(e) => setNote(e.target.value)}
@@ -221,8 +224,20 @@ function TeamVerdicts({ change }: { change: CodeChange }) {
               <div className="flex items-center gap-2">
                 <span className="font-medium text-foreground">{r.reviewer_name ?? t('Unknown')}</span>
                 <span className="text-[11px] text-muted-foreground">{formatAge(r.created_at, true)}</span>
+                {r.github_review_id != null && <span className="text-muted-foreground" title={t('Posted to GitHub')}><Github size={11} /></span>}
+                {r.github_error && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-[var(--status-warning)]" title={r.github_error}>
+                    <AlertTriangle size={11} />{t('Not on GitHub')}
+                    {r.reviewer_id === user?.id && (
+                      <button type="button" onClick={() => retry.mutate({ reviewId: r.id })} disabled={retry.isPending}
+                        className="inline-flex items-center gap-0.5 text-[var(--accent-hover)] hover:underline">
+                        <RefreshCw size={10} />{t('Retry')}
+                      </button>
+                    )}
+                  </span>
+                )}
               </div>
-              <p className="whitespace-pre-wrap text-[var(--text-secondary)]">{r.body}</p>
+              {r.body.trim() && <p className="whitespace-pre-wrap text-[var(--text-secondary)]">{r.body}</p>}
             </li>
           ))}
         </ul>

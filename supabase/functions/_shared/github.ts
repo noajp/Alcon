@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Reading pull requests from GitHub for code_changes, with the credential of
-// the Space's GitHub integration (the fine-grained token stored in Vault for
-// the GitHub MCP preset works on the REST API too). Used by the
+// Pull requests on GitHub for code_changes, with the credential of the
+// Space's GitHub integration (the fine-grained token stored in Vault for the
+// GitHub MCP preset works on the REST API too): reading them, and carrying
+// reviews, line comments and merges made in Alcon back. Used by the
 // code-changes Edge Function and by run-agent when an agent opens a PR.
 //
 // The token goes only into the outgoing Authorization header; it is never
@@ -62,14 +63,17 @@ export class GithubError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
 }
 
-async function gh(path: string, token: string | null): Promise<unknown> {
+async function gh(path: string, token: string | null, write?: { method: "POST" | "PUT"; body: unknown }): Promise<unknown> {
   const res = await fetch(`${API}${path}`, {
+    method: write?.method ?? "GET",
     headers: {
       accept: "application/vnd.github+json",
       "x-github-api-version": "2022-11-28",
       "user-agent": "alcon-code-changes",
+      ...(write ? { "content-type": "application/json" } : {}),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
+    ...(write ? { body: JSON.stringify(write.body) } : {}),
     signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) {
@@ -124,6 +128,76 @@ export async function fetchPullFiles(ref: PullRef, token: string | null): Promis
   return files.slice(0, MAX_FILES);
 }
 
+/** A line comment on the pull request, as GitHub has it. */
+export interface GithubReviewComment {
+  id: number;
+  path: string;
+  line: number | null;
+  side: "LEFT" | "RIGHT";
+  body: string;
+  user: string | null;
+  created_at: string;
+  commit_id: string | null;
+  url: string | null;
+}
+
+const str = (v: unknown) => (typeof v === "string" ? v : null);
+
+export async function fetchReviewComments(ref: PullRef, token: string | null): Promise<GithubReviewComment[]> {
+  const out: GithubReviewComment[] = [];
+  for (let page = 1; page <= 3; page++) {
+    const batch = await gh(`/repos/${ref.repo}/pulls/${ref.number}/comments?per_page=100&page=${page}`, token) as Record<string, unknown>[];
+    for (const c of batch) {
+      const line = typeof c.line === "number" ? c.line : typeof c.original_line === "number" ? c.original_line : null;
+      out.push({
+        id: Number(c.id), path: String(c.path ?? ""), line, side: c.side === "LEFT" ? "LEFT" : "RIGHT",
+        body: String(c.body ?? "").slice(0, 8000), user: str(((c.user ?? {}) as Record<string, unknown>).login),
+        created_at: String(c.created_at ?? ""), commit_id: typeof c.commit_id === "string" ? c.commit_id : null,
+        url: typeof c.html_url === "string" ? c.html_url : null,
+      });
+    }
+    if (batch.length < 100) break;
+  }
+  return out;
+}
+
+export type ReviewEvent = "APPROVE" | "REQUEST_CHANGES" | "COMMENT";
+
+/** Posts a review; returns its id. */
+export async function postReview(ref: PullRef, token: string, review: { event: ReviewEvent; body: string; commitId: string | null }): Promise<number> {
+  const out = await gh(`/repos/${ref.repo}/pulls/${ref.number}/reviews`, token, {
+    method: "POST",
+    body: { event: review.event, body: review.body, ...(review.commitId ? { commit_id: review.commitId } : {}) },
+  }) as Record<string, unknown>;
+  return Number(out.id);
+}
+
+/** Posts a comment on one line of the diff; returns its id. */
+export async function postLineComment(
+  ref: PullRef, token: string,
+  c: { body: string; commitId: string; path: string; line: number; side: "LEFT" | "RIGHT" },
+): Promise<number> {
+  const out = await gh(`/repos/${ref.repo}/pulls/${ref.number}/comments`, token, {
+    method: "POST", body: { body: c.body, commit_id: c.commitId, path: c.path, line: c.line, side: c.side },
+  }) as Record<string, unknown>;
+  return Number(out.id);
+}
+
+/** Posts a comment on the pull request's conversation; returns its id. */
+export async function postIssueComment(ref: PullRef, token: string, body: string): Promise<number> {
+  const out = await gh(`/repos/${ref.repo}/issues/${ref.number}/comments`, token, { method: "POST", body: { body } }) as Record<string, unknown>;
+  return Number(out.id);
+}
+
+export type MergeMethod = "merge" | "squash" | "rebase";
+
+/** Merges the pull request, only if its head is still `sha`. */
+export async function mergePull(ref: PullRef, token: string, m: { method: MergeMethod; sha: string | null }): Promise<void> {
+  await gh(`/repos/${ref.repo}/pulls/${ref.number}/merge`, token, {
+    method: "PUT", body: { merge_method: m.method, ...(m.sha ? { sha: m.sha } : {}) },
+  });
+}
+
 /**
  * The tokens to try for a Space: each enabled GitHub integration's credential,
  * then none (a public repository reads without one). Reading the secret uses
@@ -144,7 +218,8 @@ export async function githubTokens(admin: SupabaseClient, spaceId: string | null
   return tokens;
 }
 
-/** Runs `fn` with each token until one is allowed; the last refusal is thrown. */
+/** Runs `fn` with each token until one is allowed; the last refusal is thrown.
+ *  A write passes only the real tokens: GitHub refuses anonymous writes. */
 export async function withGithubToken<T>(tokens: (string | null)[], fn: (token: string | null) => Promise<T>): Promise<T> {
   let last: unknown = new GithubError("GitHub is not connected", 401);
   for (const token of tokens) {

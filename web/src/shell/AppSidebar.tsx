@@ -5,6 +5,7 @@ import { Input } from '@/ui/input';
 import { FONT } from '@/shared/designTokens';
 
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
+import { ReviewsSidebar } from '@/ActivitySpace/execution/code/ReviewsSidebar';
 import { StrategyNavigation } from './sidebar/StrategyNavigation';
 import { SettingsModal } from '@/Function/settings/SettingsModal';
 import { StrategySettingsModal } from '@/Function/settings/StrategySettingsModal';
@@ -536,6 +537,8 @@ export function AppSidebar({
           {/* ── Calendar ── today, a mini month that moves the grid, and who is shown. */}
           {railMode === 'calendar' && <><SidebarModeLabel label={t('Calendar')} /><CalendarSidebar /></>}
           {railMode === 'team' && <SidebarModeLabel label={t('People')} />}
+          {/* ── Reviews ── the Space's pull requests; the main pane reviews the open one. */}
+          {railMode === 'reviews' && <ReviewsSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'reviews') onViewChange('reviews'); }} />}
           {railMode === 'crm' && <CrmSidebar navigation={navigation} onNavigate={onNavigate} />}
           {/* ── Audit ── what needs a person, the workflows, and the log. */}
           {railMode === 'audit' && <AuditSidebar navigation={navigation} onNavigate={onNavigate} />}
