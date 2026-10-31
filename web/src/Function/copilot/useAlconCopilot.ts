@@ -22,6 +22,14 @@ export interface ToolEvent {
   result?: { ok: boolean; rows?: number; error?: string };
 }
 
+/** A finished turn: done, and any step still waiting for its result marked
+ *  as not run — the stream has ended, so no result is coming and the step
+ *  should stop reading as in progress. */
+function settle(message: CopilotMessage): CopilotMessage {
+  const events = message.toolEvents?.map((e) => (e.result ? e : { ...e, result: { ok: false, error: translate('Not run') } }));
+  return { ...message, done: true, ...(events ? { toolEvents: events } : {}) };
+}
+
 /** A file handed to the AI with a question. A PDF travels as base64, a
  *  Markdown or text file as its text. A kept conversation keeps only the
  *  name: `data` is absent there, and the file is not sent again. */
@@ -201,18 +209,24 @@ export function useAlconCopilot() {
       setMessages((prev) => {
         const next = prev.slice();
         const last = next[next.length - 1];
-        if (last && last.role === 'assistant') next[next.length - 1] = { ...last, done: true };
+        if (last && last.role === 'assistant') next[next.length - 1] = settle(last);
         return next;
       });
     } catch (e) {
       if ((e as { name?: string }).name === 'AbortError') {
-        // user cancelled — no-op
+        // Stopped by the person: the steps it never reached stop spinning.
+        setMessages((prev) => {
+          const next = prev.slice();
+          const last = next[next.length - 1];
+          if (last && last.role === 'assistant') next[next.length - 1] = settle(last);
+          return next;
+        });
       } else {
         setError(e instanceof Error ? e.message : String(e));
         setMessages((prev) => {
           const next = prev.slice();
           const last = next[next.length - 1];
-          if (last && last.role === 'assistant') next[next.length - 1] = { ...last, done: true };
+          if (last && last.role === 'assistant') next[next.length - 1] = settle(last);
           return next;
         });
       }
@@ -237,8 +251,9 @@ export function useAlconCopilot() {
         next[i] = { ...last, toolEvents: events };
       } else if (evt === 'tool_result') {
         const events = (last.toolEvents ?? []).slice();
-        // Attach the result to the most recent un-resolved event of the same name.
-        for (let k = events.length - 1; k >= 0; k--) {
+        // Attach the result to the earliest unresolved call of the same name —
+        // a turn's calls run, and report, in the order they were made.
+        for (let k = 0; k < events.length; k++) {
           if (events[k].name === payload.name && !events[k].result) {
             events[k] = {
               ...events[k],
@@ -253,9 +268,14 @@ export function useAlconCopilot() {
         }
         next[i] = { ...last, toolEvents: events };
       } else if (evt === 'done') {
-        next[i] = { ...last, done: true };
+        // Cut off by the length limit with no calls left to run: say so,
+        // rather than end mid-sentence as if that were the answer.
+        const cut = payload.stop_reason === 'max_tokens'
+          ? `\n\n_(${translate('The answer was cut off by the length limit. Ask to continue.')})_`
+          : '';
+        next[i] = settle({ ...last, content: last.content + cut });
       } else if (evt === 'error') {
-        next[i] = { ...last, done: true, content: last.content + `\n\n_(${translate('Error: {error}', { error: String(payload.error ?? '') })})_` };
+        next[i] = settle({ ...last, content: last.content + `\n\n_(${translate('Error: {error}', { error: String(payload.error ?? '') })})_` });
       }
       return next;
     });

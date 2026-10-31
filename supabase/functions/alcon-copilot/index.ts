@@ -50,8 +50,10 @@ import Anthropic from "npm:@anthropic-ai/sdk@0.40.1";
 // ──────────────────────────────────────────────────────────────────────────
 
 const MODEL = "claude-sonnet-4-6";
-const MAX_TOKENS = 1500;
-const MAX_TURNS = 8;          // safety cap on the tool-use loop
+// Room for one turn that files a batch of Elements with descriptions; a
+// turn cut off by this is continued rather than dropped (see the loop).
+const MAX_TOKENS = 8000;
+const MAX_TURNS = 16;         // safety cap on the tool-use loop
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -287,6 +289,8 @@ Deno.serve(async (req: Request) => {
           let stopReason: string | null = null;
           let currentBlock: AnthropicContentBlock | null = null;
           let currentJson = "";
+          // Tool calls whose input did not parse — the turn was cut off mid-call.
+          const broken = new Set<AnthropicContentBlock>();
 
           const apiStream = client.messages.stream({
             model: MODEL,
@@ -318,7 +322,7 @@ Deno.serve(async (req: Request) => {
               if (currentBlock) {
                 if (currentBlock.type === "tool_use") {
                   try { currentBlock.input = JSON.parse(currentJson || "{}"); }
-                  catch { currentBlock.input = {}; }
+                  catch { currentBlock.input = {}; broken.add(currentBlock); }
                 } else if (currentBlock.type === "text") {
                   currentBlock.text = textBuf;
                   textBuf = "";
@@ -332,11 +336,21 @@ Deno.serve(async (req: Request) => {
             }
           }
 
+          // A turn cut off by max_tokens keeps the calls it finished; the one
+          // it was in the middle of is dropped (and reported as not run), and
+          // the model is asked to carry on from there.
+          const cutOff = stopReason === "max_tokens";
+          for (const block of broken) {
+            send("tool_result", { name: block.name, ok: false, error: "cut off before it was complete" });
+          }
+          const kept = turnContent.filter((b) => !broken.has(b));
+          const calls = kept.filter((b) => b.type === "tool_use");
+
           // Assistant's reply for this turn → push into messages.
-          messages.push({ role: "assistant", content: turnContent });
+          messages.push({ role: "assistant", content: kept });
 
           // Final answer? we're done.
-          if (stopReason !== "tool_use" || jsonOnly) {
+          if (jsonOnly || (stopReason !== "tool_use" && !(cutOff && calls.length > 0))) {
             send("done", { stop_reason: stopReason ?? "end_turn" });
             controller.close();
             return;
@@ -344,8 +358,7 @@ Deno.serve(async (req: Request) => {
 
           // ── Tool loop: run every tool_use block & feed results back ────
           const toolResults: AnthropicContentBlock[] = [];
-          for (const block of turnContent) {
-            if (block.type !== "tool_use") continue;
+          for (const block of calls) {
             const result = await runTool(supabase, block.name!, (block.input ?? {}) as Record<string, unknown>, actor);
             send("tool_result", {
               name: block.name,
@@ -358,6 +371,9 @@ Deno.serve(async (req: Request) => {
               // deno-lint-ignore no-explicit-any
               ...( { tool_use_id: block.id, content: JSON.stringify(result.ok ? result.data : { error: result.error }) } as any),
             });
+          }
+          if (cutOff) {
+            toolResults.push({ type: "text", text: "（前の返答は長さの上限で途中で切れました。実行済みの結果を踏まえ、残りの手順を続けてください。）" });
           }
           messages.push({ role: "user", content: toolResults });
           // → loop back to next turn
