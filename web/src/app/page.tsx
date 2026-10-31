@@ -340,7 +340,6 @@ function WorkspaceContent({
   const personalMode = railModeOf(activeTab.activeView) === 'personal';
   const aiScreen = activeTab.activeView === 'ai';
   const noSidebar = personalMode;
-  const sidebarHidden = sidebarCollapsed || noSidebar;
   const [discoverOpen, setDiscoverOpen] = useState(false);
   // The AI pop-up — open state shared by the status bar's button, ⌘L and the
   // pop-up's own close. It starts closed, so the work has the whole page
@@ -530,6 +529,10 @@ function WorkspaceContent({
       }}
     >
       <div className="relative flex-1 flex overflow-hidden">
+        {/* The rail and the pinned sidebar share one frame, divided by a
+            line, as in VS Code. Not positioned, so the sidebar's drawer
+            (absolute, measured from the row) escapes its clipping. */}
+        <div className="mt-1.5 ml-1 mr-1.5 flex shrink-0 overflow-hidden rounded-lg border border-border/60 shadow-[var(--shadow-island)]">
         <ModeRail
           scope={scope}
           activeView={activeTab.activeView}
@@ -549,6 +552,7 @@ function WorkspaceContent({
           onCreateNew={handleSidebarCreateNew}
           onSearch={scope === 'full' ? () => setDiscoverOpen(true) : undefined}
         />}
+        </div>
 
         {!noSidebar && sidebarCollapsed && sidebarOverlay && (
           <div
@@ -558,7 +562,7 @@ function WorkspaceContent({
           />
         )}
 
-        <div className={`relative flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5 ${sidebarHidden ? 'pl-1.5' : 'pl-0'}`}>
+        <div className={`relative flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5`}>
         {/* MainContent + Copilot live side-by-side as two islands. When the
             Copilot is open it claims its own width on the right; otherwise
             MainContent fills the row. */}

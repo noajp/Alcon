@@ -140,7 +140,7 @@ export function ModeRail({
 
   return (
     <ButtonAppearanceProvider appearance="navigation"><Popover open={launcherOpen} onOpenChange={setLauncherOpen}>
-    <div className="mt-1.5 ml-1 flex w-[46px] shrink-0 flex-col items-center gap-1 rounded-lg border border-border/60 bg-background py-2 shadow-[var(--shadow-island)]">
+    <div className="flex w-[46px] shrink-0 flex-col items-center gap-1 bg-background py-2">
       {coreModes.map((mode) => (
         <RailButton
           key={mode}
