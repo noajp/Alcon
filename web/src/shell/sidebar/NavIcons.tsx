@@ -6,7 +6,7 @@ import {
   House,
   Grid2x2,
   Settings,
-  Inbox,
+  Bell,
   Calendar,
   BookOpen,
   ChartNoAxesColumn,
@@ -36,7 +36,7 @@ export const NavSlidesIcon = ({ size = 20 }: { size?: number }) => <GalleryHoriz
 export const NavObjectsIcon = ObjectIcon;
 export const NavSettingsIcon = ({ size = 20 }: { size?: number }) => <Settings size={size} strokeWidth={2} />;
 export const NavMyTasksIcon = ElementIcon;
-export const NavInboxIcon = ({ size = 20 }: { size?: number }) => <Inbox size={size} strokeWidth={2} />;
+export const NavInboxIcon = ({ size = 20 }: { size?: number }) => <Bell size={size} strokeWidth={2} />;
 export const NavCalendarIcon = ({ size = 20 }: { size?: number }) => <Calendar size={size} strokeWidth={2} />;
 export const NavNoteIcon = ({ size = 20 }: { size?: number }) => <BookOpen size={size} strokeWidth={2} />;
 export const NavDomainIcon = DomainIcon;
