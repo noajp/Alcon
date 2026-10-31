@@ -91,7 +91,7 @@ export const CONTROL = {
   /** Horizontal padding. Vertical padding is never used — height is declared. */
   padX: { xs: 'px-2', sm: 'px-2.5', md: 'px-3', lg: 'px-4' },
   /** Gap between icon and label. */
-  gap: { xs: 'gap-1.5', sm: 'gap-1.5', md: 'gap-2', lg: 'gap-2' },
+  gap: { xs: 'gap-1', sm: 'gap-1', md: 'gap-1.5', lg: 'gap-1.5' },
   /** Label type. 12px = FONT.sm, 13px = FONT.base. */
   text: { xs: 'text-[12px]', sm: 'text-[12px]', md: 'text-[13px]', lg: 'text-sm' },
   /** Center visible label metrics, rather than a font's asymmetric leading. */
