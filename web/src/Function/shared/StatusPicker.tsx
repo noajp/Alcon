@@ -2,7 +2,7 @@
 
 import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
 import { useRef, useState, type ReactNode } from 'react';
-import { Check } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { updateElement } from '@/hooks/useSupabase';
@@ -181,8 +181,10 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                 // Stop bubbling on the whole input cluster so clicks /
                 // pointer events inside don't trigger applyStatus on the
                 // surrounding row.
+                // No box: the number is typed in place, and the arrows beside
+                // the % step it by 10 (↑/↓ in the field step by 1, Shift by 10).
                 <span
-                  className="inline-flex items-center bg-muted/40 border border-border rounded px-1 py-0.5"
+                  className="inline-flex items-center"
                   onClick={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
@@ -197,6 +199,12 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                     onBlur={(e) => commitProgress(e.target.value)}
                     onKeyDown={(e) => {
                       e.stopPropagation();
+                      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        const by = (e.shiftKey ? 10 : 1) * (e.key === 'ArrowUp' ? 1 : -1);
+                        void commitProgress(String((parseInt(progressDraft, 10) || 0) + by));
+                        return;
+                      }
                       // Enter commits and keeps the menu open: the mark
                       // and the trigger update in place, and the person
                       // can keep adjusting or pick another status.
@@ -205,9 +213,21 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                         commitProgress((e.target as HTMLInputElement).value);
                       }
                     }}
-                    className="w-8 text-[11.5px] tabular-nums bg-transparent text-right focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-8 rounded text-[11.5px] tabular-nums bg-transparent text-right outline-none transition-colors hover:bg-muted/40 focus:bg-muted/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="text-[11.5px] text-muted-foreground ml-0.5">%</span>
+                  <span className="ml-1 flex flex-col">
+                    <button type="button" aria-label={t('Increase progress')} tabIndex={-1}
+                      onClick={() => { void commitProgress(String(Math.min(100, (parseInt(progressDraft, 10) || 0) + 10))); }}
+                      className="flex h-2.5 w-4 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground">
+                      <ChevronUp size={10} strokeWidth={2.5} />
+                    </button>
+                    <button type="button" aria-label={t('Decrease progress')} tabIndex={-1}
+                      onClick={() => { void commitProgress(String(Math.max(0, (parseInt(progressDraft, 10) || 0) - 10))); }}
+                      className="flex h-2.5 w-4 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground">
+                      <ChevronDown size={10} strokeWidth={2.5} />
+                    </button>
+                  </span>
                 </span>
               )}
               {isCurrent && row.status !== 'in_progress' && (
