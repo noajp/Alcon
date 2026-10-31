@@ -17,8 +17,9 @@ export interface IntegrationPreset {
   id: string;
   name: string;
   description: string;
-  /** Image URL of the service's logo. Null until logos are added; the card
-   *  falls back to the name's first letter. */
+  /** Image URL of the service's logo (from svgl.app, kept in
+   *  public/integrations). Null for the custom presets; the card falls back
+   *  to the name's first letter. */
   icon: string | null;
   kind: IntegrationKind;
   /** Fixed endpoint. Null for the custom presets, where the person types it. */
@@ -38,27 +39,27 @@ export interface IntegrationPreset {
 
 export const INTEGRATION_PRESETS: readonly IntegrationPreset[] = [
   {
-    id: 'linear', name: 'Linear', icon: null, kind: 'mcp', endpoint: 'https://mcp.linear.app/mcp', auth: 'bearer',
+    id: 'linear', name: 'Linear', icon: '/integrations/linear.svg', kind: 'mcp', endpoint: 'https://mcp.linear.app/mcp', auth: 'bearer',
     description: "Read and update Linear issues, projects and cycles through Linear's MCP server.",
     credentialLabel: 'Linear API key', category: 'project', source: 'official', builtBy: 'Linear', featured: true, custom: false,
   },
   {
-    id: 'asana', name: 'Asana', icon: null, kind: 'http', endpoint: 'https://app.asana.com/api/1.0', auth: 'bearer',
+    id: 'asana', name: 'Asana', icon: '/integrations/asana.svg', kind: 'http', endpoint: 'https://app.asana.com/api/1.0', auth: 'bearer',
     description: 'Read and update Asana projects and their work through the Asana REST API.',
     credentialLabel: 'Personal access token', category: 'project', source: 'official', builtBy: 'Asana', featured: true, custom: false,
   },
   {
-    id: 'google-drive', name: 'Google Drive', icon: null, kind: 'http', endpoint: 'https://www.googleapis.com/drive/v3', auth: 'oauth',
+    id: 'google-drive', name: 'Google Drive', icon: '/integrations/google-drive.svg', kind: 'http', endpoint: 'https://www.googleapis.com/drive/v3', auth: 'oauth',
     description: 'Search, read, create and update Google Drive files. Agents see only files Alcon created or that you chose.',
     credentialLabel: 'Google account', category: 'files', source: 'official', builtBy: 'Google', featured: true, custom: false,
   },
   {
-    id: 'github', name: 'GitHub', icon: null, kind: 'mcp', endpoint: 'https://api.githubcopilot.com/mcp/', auth: 'oauth',
+    id: 'github', name: 'GitHub', icon: '/integrations/github.svg', kind: 'mcp', endpoint: 'https://api.githubcopilot.com/mcp/', auth: 'oauth',
     description: "Review and merge pull requests in Alcon, and let agents work with repositories, issues and pull requests through GitHub's MCP server.",
     credentialLabel: 'GitHub account', category: 'development', source: 'official', builtBy: 'GitHub', featured: false, custom: false,
   },
   {
-    id: 'slack', name: 'Slack', icon: null, kind: 'http', endpoint: 'https://slack.com/api', auth: 'bearer',
+    id: 'slack', name: 'Slack', icon: '/integrations/slack.svg', kind: 'http', endpoint: 'https://slack.com/api', auth: 'bearer',
     description: 'Read channels and post messages through the Slack Web API.',
     credentialLabel: 'Bot token (xoxb-)', category: 'communication', source: 'official', builtBy: 'Slack', featured: false, custom: false,
   },
@@ -89,6 +90,17 @@ export const SOURCE_LABELS: Record<IntegrationSource, string> = {
   community: 'Community',
   custom: 'Custom',
 };
+
+// Logos drawn in one color that would vanish on a dark surface have a
+// light-on-dark counterpart, shown under the dark themes.
+const DARK_ICONS: Record<string, string> = {
+  '/integrations/github.svg': '/integrations/github-dark.svg',
+};
+
+/** The logo to show under a dark theme, when it differs from the light one. */
+export function darkIconFor(icon: string): string | null {
+  return DARK_ICONS[icon] ?? null;
+}
 
 export function presetById(id: string | null | undefined): IntegrationPreset | null {
   return INTEGRATION_PRESETS.find((p) => p.id === id) ?? null;

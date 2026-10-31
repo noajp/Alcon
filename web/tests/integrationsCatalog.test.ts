@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EMPTY_FILTER, INTEGRATION_PRESETS, buildIntegrationRow, filterPresets, installedPresetIds,
+  EMPTY_FILTER, INTEGRATION_PRESETS, buildIntegrationRow, darkIconFor, filterPresets, installedPresetIds,
   isSafeEndpoint, presetById, readLastTest, signsInWithOAuth, testOutcomeLabel, type IntegrationDraft,
 } from '@/Function/integrations/catalog';
+
+import { existsSync } from 'node:fs';
 
 const server = await import(new URL('../../supabase/functions/_shared/integrationClient.ts', import.meta.url).pathname);
 
@@ -147,5 +149,24 @@ describe('readLastTest', () => {
     expect(testOutcomeLabel('connected')).toBe('Connected');
     expect(testOutcomeLabel('reachable')).toMatch(/not checked/);
     for (const c of ['auth_failed', 'http_error', 'unreachable', 'blocked', 'oauth_required', 'oauth_expired', 'whatever']) expect(testOutcomeLabel(c)).not.toBe('Connected');
+  });
+});
+
+describe('preset logos', () => {
+  const publicFile = (src: string) => new URL(`../public${src}`, import.meta.url).pathname;
+
+  it('every service preset has a logo that exists, and only custom presets go without', () => {
+    for (const p of INTEGRATION_PRESETS) {
+      if (p.custom) { expect(p.icon).toBeNull(); continue; }
+      expect(p.icon, p.id).toMatch(/^\/integrations\/.+\.svg$/);
+      expect(existsSync(publicFile(p.icon!)), p.icon!).toBe(true);
+      const dark = darkIconFor(p.icon!);
+      if (dark) expect(existsSync(publicFile(dark)), dark).toBe(true);
+    }
+  });
+
+  it('a one-color logo has a dark counterpart; a colored one does not', () => {
+    expect(darkIconFor('/integrations/github.svg')).toBe('/integrations/github-dark.svg');
+    expect(darkIconFor('/integrations/slack.svg')).toBeNull();
   });
 });
