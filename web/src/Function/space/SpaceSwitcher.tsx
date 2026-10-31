@@ -97,7 +97,7 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
               {initial}
             </span>
           )}
-          <span className="text-left text-[13px] font-semibold text-foreground truncate max-w-[100px]">
+          <span className="text-left text-[13px] font-medium text-foreground truncate max-w-[100px]">
             {active?.name ?? 'Space'}
           </span>
         </button>
