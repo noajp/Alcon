@@ -32,6 +32,18 @@
   --status-info:           var(--accent-default);
   --status-info-subtle:    var(--accent-subtle);
 
+  /* ---- Syntax (code in a diff) ----
+     A few hues, never louder than the add/remove grounds under them. Plain
+     code stays the text colour; comments step back to the tertiary text. */
+  --syntax-keyword:  #7a4fd0;
+  --syntax-string:   #2f7d3a;
+  --syntax-number:   #b05a12;
+  --syntax-function: #2f62b5;
+  --syntax-type:     #8a6400;
+  --syntax-property: #0b7285;
+  --syntax-tag:      #c0364b;
+  --syntax-comment:  var(--text-tertiary);
+
   /* ---- Element status ramp ----
      The hue an Element status is drawn in: the mark in every list row, the
      Gantt bar, the calendar dot, the dashboard chart slice. Separate from the
@@ -223,6 +235,15 @@
   --surface-overlay: #1c1c1e;
   /* Right-rail cards lift a notch off the main island. */
   --surface-rail:    #1b1b1d;
+
+  /* ---- Syntax — Dark ---- */
+  --syntax-keyword:  #b9a2f5;
+  --syntax-string:   #9dd18b;
+  --syntax-number:   #f0a66e;
+  --syntax-function: #82b4ff;
+  --syntax-type:     #e6c46e;
+  --syntax-property: #86d0df;
+  --syntax-tag:      #f08a96;
 
   /* ---- Border — Dark ---- */
   --border-subtle:  rgba(255, 255, 255, 0.055);

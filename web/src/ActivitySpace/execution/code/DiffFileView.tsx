@@ -7,7 +7,9 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { isSubmitChord, isCancelKey } from '@/Function/shared/keyboard';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { fileKind, parsePatch, splitPath, splitRows, unchangedBefore, type DiffLine } from '@/Function/codeReview/diffModel';
+import { highlightHunks, languageOf, type TokenLine } from '@/Function/codeReview/syntax';
 import type { CodeDiffFile, GithubLineComment } from '@/hooks/codeChangeData';
+import { useHighlighter } from './useHighlighter';
 import type { CodeChangeComment } from '@/types/database';
 import { LineCounts, Pill } from './codeChangeLabels';
 
@@ -50,6 +52,41 @@ const fromGithub = (c: GithubLineComment & { line: number }): CodeChangeComment 
 
 const EMPTY_GITHUB: GithubLineComment[] = [];
 
+/** Patches larger than this are shown without syntax colours. */
+const HIGHLIGHT_MAX = 200_000;
+
+const SYNTAX_TONE: Record<string, string> = {
+  'hljs-keyword': 'text-[var(--syntax-keyword)]',
+  'hljs-built_in': 'text-[var(--syntax-type)]',
+  'hljs-type': 'text-[var(--syntax-type)]',
+  'hljs-class': 'text-[var(--syntax-type)]',
+  'hljs-literal': 'text-[var(--syntax-number)]',
+  'hljs-number': 'text-[var(--syntax-number)]',
+  'hljs-string': 'text-[var(--syntax-string)]',
+  'hljs-regexp': 'text-[var(--syntax-string)]',
+  'hljs-template-variable': 'text-[var(--syntax-property)]',
+  'hljs-subst': 'text-foreground',
+  'hljs-title': 'text-[var(--syntax-function)]',
+  'hljs-function': 'text-[var(--syntax-function)]',
+  'hljs-params': 'text-foreground',
+  'hljs-attr': 'text-[var(--syntax-property)]',
+  'hljs-attribute': 'text-[var(--syntax-property)]',
+  'hljs-property': 'text-[var(--syntax-property)]',
+  'hljs-variable': 'text-[var(--syntax-property)]',
+  'hljs-tag': 'text-[var(--syntax-tag)]',
+  'hljs-name': 'text-[var(--syntax-tag)]',
+  'hljs-selector-tag': 'text-[var(--syntax-tag)]',
+  'hljs-selector-class': 'text-[var(--syntax-type)]',
+  'hljs-meta': 'text-[var(--syntax-comment)]',
+  'hljs-comment': 'text-[var(--syntax-comment)] italic',
+  'hljs-doctag': 'text-[var(--syntax-keyword)]',
+  'hljs-section': 'text-[var(--syntax-function)]',
+  'hljs-bullet': 'text-[var(--syntax-number)]',
+  'hljs-symbol': 'text-[var(--syntax-number)]',
+  'hljs-addition': 'text-[var(--status-success)]',
+  'hljs-deletion': 'text-[var(--status-danger)]',
+};
+
 const LINE_TONE: Record<DiffLine['kind'], string> = {
   add: 'bg-[var(--status-success-subtle)]',
   del: 'bg-[var(--status-danger-subtle)]',
@@ -77,6 +114,24 @@ export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileV
   const [composing, setComposing] = useState<LineAnchor | null>(null);
   const hunks = useMemo(() => parsePatch(file.patch), [file.patch]);
   const gaps = useMemo(() => unchangedBefore(hunks), [hunks]);
+  // Syntax colours, worked out only for a file that is open.
+  const highlighter = useHighlighter();
+  const language = languageOf(file.filename);
+  const colourable = open && !reviewed && !!highlighter && !!language && (file.patch?.length ?? 0) <= HIGHLIGHT_MAX;
+  const tokensOf = useMemo(() => {
+    const map = new Map<DiffLine, TokenLine>();
+    if (!colourable) return map;
+    highlightHunks(hunks, language!, highlighter!).forEach((lines, hi) => lines.forEach((tokens, li) => map.set(hunks[hi].lines[li], tokens)));
+    return map;
+  }, [colourable, hunks, language, highlighter]);
+  const code = (l: DiffLine): ReactNode => {
+    const tokens = tokensOf.get(l);
+    if (!tokens) return l.text || ' ';
+    if (tokens.length === 0) return ' ';
+    return tokens.map((tok, i) => (tok.cls && SYNTAX_TONE[tok.cls]
+      ? <span key={i} className={SYNTAX_TONE[tok.cls]}>{tok.text}</span>
+      : tok.text));
+  };
   const comments = useMemo(() => [
     ...own,
     ...githubComments.filter((c): c is GithubLineComment & { line: number } => c.line != null).map(fromGithub),
@@ -188,7 +243,7 @@ export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileV
                     <div key={li}>
                       <div className={`group/line flex min-w-max ${LINE_TONE[l.kind]}`}>
                         {gutter(numberOf(l), anchor, numberTone(l))}
-                        <span className="whitespace-pre pr-6">{l.text || ' '}</span>
+                        <span className="whitespace-pre pr-6">{code(l)}</span>
                       </div>
                       {threadFor(anchor)}
                     </div>
@@ -203,13 +258,13 @@ export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileV
                         <div className={`group/line flex min-w-0 overflow-hidden border-r border-[var(--border-default)] ${row.left ? LINE_TONE[row.left.kind] : ''}`}>
                           {row.left && <>
                             {gutter(row.left.oldNo, row.left.kind === 'context' ? null : leftAnchor, row.left.kind === 'del' ? 'text-[var(--status-danger)]' : undefined)}
-                            <span className="whitespace-pre pr-2">{row.left.text || ' '}</span>
+                            <span className="whitespace-pre pr-2">{code(row.left)}</span>
                           </>}
                         </div>
                         <div className={`group/line flex min-w-0 overflow-hidden ${row.right ? LINE_TONE[row.right.kind] : ''}`}>
                           {row.right && <>
                             {gutter(row.right.newNo, rightAnchor, row.right.kind === 'add' ? 'text-[var(--status-success)]' : undefined)}
-                            <span className="whitespace-pre pr-2">{row.right.text || ' '}</span>
+                            <span className="whitespace-pre pr-2">{code(row.right)}</span>
                           </>}
                         </div>
                       </div>
