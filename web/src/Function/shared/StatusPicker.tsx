@@ -54,12 +54,15 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
   // Single source of truth for the progress value — same precedence as every
   // list / board / rail mark. Callers that have already merged custom-column
   // progress pass `progressOverride`; otherwise defer to getElementProgress
-  // (done→100, then element.progress, then subelement ratio).
+  // (done→100, then the SubElement share, then element.progress).
   const triggerProgress = progressOverride ?? getElementProgress(element);
+  // With SubElements the % is theirs to set — shown, not typed.
+  const fromSubelements = (element.subelements?.length ?? 0) > 0;
   // The In Progress row's mark follows the % being typed, so the pie is a
   // live preview of what committing will show.
   const draftProgress = (() => {
     const parsed = parseInt(progressDraft, 10);
+    if (fromSubelements) return triggerProgress;
     return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : triggerProgress;
   })();
 
@@ -178,7 +181,12 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                 />
               </span>
               <span className="flex-1 text-left">{t(row.label)}</span>
-              {row.status === 'in_progress' && (
+              {row.status === 'in_progress' && fromSubelements && (
+                <span className="text-[11.5px] tabular-nums text-muted-foreground" title={t('Calculated from SubElements')}>
+                  {triggerProgress}%
+                </span>
+              )}
+              {row.status === 'in_progress' && !fromSubelements && (
                 // Stop bubbling on the whole input cluster so clicks /
                 // pointer events inside don't trigger applyStatus on the
                 // surrounding row.
