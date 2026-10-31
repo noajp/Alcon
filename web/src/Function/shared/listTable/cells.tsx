@@ -11,6 +11,7 @@ import { addElementAssignee, removeElementAssignee, fetchAssignableWorkers, useW
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
+import { QuickDates } from '@/Function/shared/date/QuickDates';
 import { ReachHint, WorkerAvatar, WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
@@ -293,6 +294,9 @@ function DateRangeCellPopover({
 }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
+  // A due date is one click: a quick pick or a day on the grid saves it and
+  // closes. "Range" switches to start → due, saved when the popover closes.
+  const [ranging, setRanging] = useState(false);
   const [draft, setDraft] = useState<DateRange | undefined>(undefined);
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
 
@@ -313,37 +317,68 @@ function DateRangeCellPopover({
     if (next[0] !== startDate || next[1] !== dueDate) void onChange(next[0], next[1]);
   };
 
+  // A single due date keeps the start only while it still comes first.
+  const pickDue = (due: string) => {
+    const start = startDate && startDate <= due ? startDate : null;
+    if (start !== startDate || due !== dueDate) void onChange(start, due);
+    setOpen(false);
+  };
+
   return (
     <Popover
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
-        if (o) setDraft(initialDraft());
-        else persist(draft);
+        if (o) { setDraft(initialDraft()); setRanging(!!startDate && startDate !== dueDate); }
+        else if (ranging) persist(draft);
       }}
     >
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent className={`w-auto p-0 ${CELL_POPOVER_RADIUS}`} align="start">
-        <Calendar
-          mode="range"
-          captionLayout="dropdown"
-          startMonth={new Date(2020, 0)}
-          endMonth={new Date(2035, 11)}
-          defaultMonth={draft?.from}
-          selected={draft}
-          onSelect={(r) => setDraft(r)}
-          // Always render 6 week rows so the popover height never jumps
-          // between months (and stays aligned with the Type popover).
-          fixedWeeks
-          showOutsideDays
-          autoFocus
-          weekStartsOn={weekStartsOn}
-        />
+        {!ranging && <QuickDates weekStartsOn={weekStartsOn} current={dueDate} onPick={pickDue} />}
+        {ranging ? (
+          <Calendar
+            mode="range"
+            captionLayout="dropdown"
+            startMonth={new Date(2020, 0)}
+            endMonth={new Date(2035, 11)}
+            defaultMonth={draft?.from}
+            selected={draft}
+            onSelect={(r) => setDraft(r)}
+            // Always render 6 week rows so the popover height never jumps
+            // between months (and stays aligned with the Type popover).
+            fixedWeeks
+            showOutsideDays
+            autoFocus
+            weekStartsOn={weekStartsOn}
+          />
+        ) : (
+          <Calendar
+            mode="single"
+            captionLayout="dropdown"
+            startMonth={new Date(2020, 0)}
+            endMonth={new Date(2035, 11)}
+            defaultMonth={parseDateOnly(dueDate)}
+            selected={parseDateOnly(dueDate)}
+            onSelect={(d) => { if (d) pickDue(formatDateOnly(d)); }}
+            fixedWeeks
+            showOutsideDays
+            autoFocus
+            weekStartsOn={weekStartsOn}
+          />
+        )}
         <CellClearFooter
-          label={draft?.from
-            ? `${formatDateShort(formatDateOnly(draft.from), locale)} – ${draft.to ? formatDateShort(formatDateOnly(draft.to), locale) : '…'}`
-            : t('Pick a day, or drag a range')}
-          onClear={() => { setDraft(undefined); void onChange(null, null); setOpen(false); }}
+          label={
+            <button type="button" onClick={() => { setRanging((r) => !r); setDraft(initialDraft()); }}
+              className="rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted/40 hover:text-foreground">
+              {ranging
+                ? (draft?.from
+                  ? `${formatDateShort(formatDateOnly(draft.from), locale)} – ${draft.to ? formatDateShort(formatDateOnly(draft.to), locale) : '…'}`
+                  : t('Pick the start, then the due date'))
+                : t('Set a range')}
+            </button>
+          }
+          onClear={() => { setDraft(undefined); setRanging(false); void onChange(null, null); setOpen(false); }}
         />
       </PopoverContent>
     </Popover>
@@ -711,6 +746,9 @@ export function DueDateCell({
   const display = dateString ? formatDateShort(dateString, locale) : null;
   const canEdit = !!onObjectUpdate;
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
+  const [open, setOpen] = useState(false);
+  // One click sets it: a quick pick or a day on the grid saves and closes.
+  const pick = (value: string | null) => { void onObjectUpdate?.(obj.id, { due_date: value }); setOpen(false); };
   const trigger = (
     <button
       type="button"
@@ -722,21 +760,24 @@ export function DueDateCell({
   );
   if (!canEdit) return trigger;
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent className={`w-auto p-0 ${CELL_POPOVER_RADIUS}`} align="start">
+        <QuickDates weekStartsOn={weekStartsOn} current={dateString} onPick={pick} />
         <Calendar
           mode="single"
           captionLayout="dropdown"
           startMonth={new Date(2020, 0)}
           endMonth={new Date(2035, 11)}
           selected={selected}
-          onSelect={(d) => onObjectUpdate?.(obj.id, { due_date: d ? formatDateOnly(d) : null })}
+          defaultMonth={selected}
+          onSelect={(d) => pick(d ? formatDateOnly(d) : null)}
           fixedWeeks
           showOutsideDays
           autoFocus
           weekStartsOn={weekStartsOn}
         />
+        {dateString && <CellClearFooter onClear={() => pick(null)} />}
       </PopoverContent>
     </Popover>
   );
