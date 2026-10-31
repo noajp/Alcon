@@ -380,7 +380,8 @@ export function AppSidebar({
         className={`app-sidebar h-full flex flex-col flex-shrink-0 overflow-hidden ${
           collapsed
             ? 'absolute inset-y-0 left-0 z-50 bg-background shadow-xl'
-            : 'relative'
+            // Pinned, a line divides it from the main island, as in VS Code.
+            : 'relative mr-1.5 border-r border-border'
         } ${resizing ? '' : 'transition-transform duration-200 ease-out'}`}
       >
         {/* Header — fixed; only the navigation under it scrolls. The same
