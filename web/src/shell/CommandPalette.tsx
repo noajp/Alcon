@@ -8,7 +8,7 @@ import { FileText, Inbox, Home, ListTodo, Settings } from 'lucide-react';
 import { ObjectIcon, ElementIcon, CrmIcon } from '@/Function/shared/conceptIcons';
 import { crmRoute, routeTo } from '@/Function/crm/crmRoute';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
-import { APP_GROUPS, MODE_META } from '@/shell/railApps';
+import { APP_GROUPS, BAR_TOOLS, MODE_META } from '@/shell/railApps';
 import {
   CommandDialog,
   CommandInput,
@@ -48,9 +48,9 @@ const NAV_COMMANDS = [
   { id: 'inbox',        label: 'Open Inbox',         icon: Inbox,    view: 'inbox' },
   { id: 'domain-elements',      label: 'Domain Elements',    icon: ListTodo, view: 'domain-elements' },
   { id: 'objects',     label: 'Objects',            icon: ObjectIcon, view: 'objects' },
-  ...APP_GROUPS.flatMap(group => group.apps.map(mode => ({
+  ...[...BAR_TOOLS, ...APP_GROUPS.flatMap(group => group.apps)].map(mode => ({
     id: mode, label: `Open ${MODE_META[mode].label}`, icon: MODE_META[mode].icon, view: MODE_META[mode].defaultView,
-  }))),
+  })),
   { id: 'settings',     label: 'Settings',           icon: Settings, view: 'settings' },
 ] satisfies { id: string; label: string; icon: React.ComponentType<{ size?: number }>; view: ViewId }[];
 

@@ -21,7 +21,8 @@ import type { ViewId } from '@/shell/viewRegistry';
 
 // The ModeRail's top-level modes, and which of them are permanent.
 //
-// Inbox / Calendar / Strategy / Execution / AI are permanent rail entries.
+// Strategy and Execution are the permanent rail entries. Inbox, Calendar and
+// the AI sit at the right of the status bar, Notebook and Slides at its left.
 // Personal pages are reached through the avatar; other tools use the launcher.
 export type RailMode = 'personal' | 'inbox' | 'strategy' | 'execution' | 'workload' | 'notebook' | 'tables' | 'slides' | 'team' | 'calendar' | 'crm' | 'audit' | 'ai';
 
@@ -56,13 +57,16 @@ export function railModeOf(view: string): RailMode | null {
     MODE_META[mode].views.some(id => id === view)) ?? null;
 }
 
-export const CORE_MODES: RailMode[] = ['inbox', 'calendar', 'strategy', 'execution', 'ai'];
+export const CORE_MODES: RailMode[] = ['strategy', 'execution'];
+
+/** The document tools at the left of the status bar. */
+export const BAR_TOOLS: RailMode[] = ['notebook', 'slides'];
 
 // The launcher's catalog. Everything here is Sustainment — the tools of work
 // that keep the people doing the fighting able to keep going. The two groups
 // are a display split only: Tools serve any surface, Workload watches capacity.
 export const APP_GROUPS: { title: string; apps: RailMode[] }[] = [
-  { title: 'Tools', apps: ['notebook', 'tables', 'slides', 'team'] },
+  { title: 'Tools', apps: ['tables', 'team'] },
   { title: 'Sustainment', apps: ['workload', 'crm', 'audit'] },
 ];
 

@@ -17,7 +17,7 @@ import {
   Mountain,
   Briefcase,
   Stone,
-  Blocks,
+  Layers,
 } from 'lucide-react';
 import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon } from '@/Function/shared/conceptIcons';
 
@@ -58,7 +58,7 @@ export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => (
 );
 // ModeRail layer marks.
 export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => <Stone size={size} strokeWidth={2} />;
-export const NavExecutionModeIcon = ({ size = 20 }: { size?: number }) => <Blocks size={size} strokeWidth={2} />;
+export const NavExecutionModeIcon = ({ size = 20 }: { size?: number }) => <Layers size={size} strokeWidth={2} />;
 export const NavSustainmentModeIcon = ({ size = 20 }: { size?: number }) => <Grip size={size} strokeWidth={2} />;
 // Strategy's units: the Vision above, its Portfolios of Initiatives below.
 export const NavVisionIcon = ({ size = 20 }: { size?: number }) => <Mountain size={size} strokeWidth={2} />;

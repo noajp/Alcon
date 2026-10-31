@@ -194,7 +194,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
 
   const boxClass = page
     ? 'flex flex-1 flex-col overflow-hidden bg-card'
-    : `absolute z-40 flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl ${rect ? '' : 'bottom-14 right-4 h-[min(600px,calc(100%-5rem))] w-[400px] max-w-[calc(100%-2rem)]'}`;
+    : `absolute z-40 flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl ${rect ? '' : 'bottom-4 right-4 h-[min(600px,calc(100%-2rem))] w-[400px] max-w-[calc(100%-2rem)]'}`;
   const boxStyle = page ? undefined : (rect ?? undefined);
   // The conversation and composer keep a readable measure on the AI screen.
   const column = page ? 'mx-auto w-full max-w-3xl' : '';

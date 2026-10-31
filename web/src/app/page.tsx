@@ -6,6 +6,7 @@ import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { WorkspaceActionsProvider } from '@/shell/WorkspaceActionsContext';
 import { AppSidebar } from '@/shell/AppSidebar';
 import { ModeRail, railModeOf } from '@/shell/ModeRail';
+import { StatusBar } from '@/shell/StatusBar';
 import { useUserPreferences } from '@/Function/settings/useUserPreferences';
 import { DiscoverModal } from '@/shell/DiscoverModal';
 import { MainContent } from '@/shell/MainContent';
@@ -37,10 +38,8 @@ import { finishIntegrationOAuth } from '@/Function/integrations/data';
 import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
-import { NavAiIcon } from '@/shell/sidebar/NavIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { seedStarterSpace } from '@/Function/space/seedStarterSpace';
-import { Button } from '@/ui/button';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -343,7 +342,7 @@ function WorkspaceContent({
   const noSidebar = personalMode;
   const sidebarHidden = sidebarCollapsed || noSidebar;
   const [discoverOpen, setDiscoverOpen] = useState(false);
-  // The AI pop-up — open state shared by the corner button, ⌘L and the
+  // The AI pop-up — open state shared by the status bar's button, ⌘L and the
   // pop-up's own close. It starts closed, so the work has the whole page
   // until someone asks for it. On Slides it is the open deck's assistant.
   const [copilotOpen, handleCopilotOpenChange] = useState(false);
@@ -535,7 +534,6 @@ function WorkspaceContent({
           scope={scope}
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
-          onShowSidebar={!noSidebar && sidebarHidden && !sidebarOverlay ? handleSidebarToggle : undefined}
         />
         {!noSidebar && <AppSidebar
           navigation={activeTab.navigation}
@@ -550,7 +548,6 @@ function WorkspaceContent({
           overlay={sidebarCollapsed && sidebarOverlay}
           onCreateNew={handleSidebarCreateNew}
           onSearch={scope === 'full' ? () => setDiscoverOpen(true) : undefined}
-          onHide={handleSidebarToggle}
         />}
 
         {!noSidebar && sidebarCollapsed && sidebarOverlay && (
@@ -561,7 +558,7 @@ function WorkspaceContent({
           />
         )}
 
-        <div className={`relative flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5 pb-1.5 ${sidebarHidden ? 'pl-1.5' : 'pl-0'}`}>
+        <div className={`relative flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5 ${sidebarHidden ? 'pl-1.5' : 'pl-0'}`}>
         {/* MainContent + Copilot live side-by-side as two islands. When the
             Copilot is open it claims its own width on the right; otherwise
             MainContent fills the row. */}
@@ -608,17 +605,15 @@ function WorkspaceContent({
               variant="floating" onExpand={onSlides ? undefined : handleExpandAi} />
           )}
         </div>
-        {/* The AI: a button at the bottom-right corner, and the conversation
-            pops up above it. */}
-        {!aiScreen && (
-          <Button size="sm" variant="secondary" onClick={() => handleCopilotOpenChange(!copilotOpen)}
-            aria-pressed={copilotOpen} title={`${t(copilotOpen ? 'Hide AI' : 'Show AI')} (⌘L)`}
-            className="absolute bottom-4 right-4 z-40 bg-card shadow-[var(--shadow-island)]">
-            <NavAiIcon size={14} />{t('AI')}
-          </Button>
-        )}
         </div>
       </div>
+      <StatusBar
+        scope={scope}
+        activeView={activeTab.activeView}
+        onViewChange={handleSidebarViewChange}
+        sidebar={noSidebar ? undefined : { visible: !sidebarCollapsed || sidebarOverlay, onToggle: handleSidebarToggle }}
+        ai={{ open: copilotOpen || aiScreen, onToggle: aiScreen ? handleMinimizeAi : () => handleCopilotOpenChange(!copilotOpen) }}
+      />
 
       {/* Global ⌘K command palette */}
       <CommandPalette scope={scope} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} />

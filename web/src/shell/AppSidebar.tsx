@@ -19,7 +19,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
-import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp, PanelLeftClose } from 'lucide-react';
+import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp } from 'lucide-react';
 import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
 import { domainHasObjectsMessage, useDomainRole, type DomainRole } from '@/hooks/domainData';
 import { countDomainObjects } from '@/hooks/useObjectArchive';
@@ -84,8 +84,6 @@ interface AppSidebarProps {
   overlay: boolean;
   onCreateNew?: (type: 'domain' | 'object' | 'note') => void;
   onSearch?: () => void;
-  /** Hides the sidebar — the button at its foot, right end. */
-  onHide?: () => void;
 }
 
 // The ModeRail picks a top-level mode; the sidebar renders only that mode's
@@ -171,7 +169,6 @@ export function AppSidebar({
   overlay,
   onCreateNew,
   onSearch,
-  onHide,
 }: AppSidebarProps) {
   const { openCreate } = useWorkspaceActions();
   const { t } = useI18n();
@@ -547,18 +544,6 @@ export function AppSidebar({
           )}
         </nav></ButtonAppearanceProvider>
 
-        {/* The foot: hiding the sidebar is the sidebar's own business, so its
-            button sits at the sidebar's bottom-right corner. */}
-        {onHide && (
-          <ButtonAppearanceProvider appearance="navigation">
-          <div className="flex h-8 shrink-0 items-center justify-end px-2 pb-1.5">
-            <Button size="icon-xs" variant="ghost" onClick={onHide} className="text-muted-foreground"
-              title={t('Hide sidebar')} aria-label={t('Hide sidebar')}>
-              <PanelLeftClose size={14} />
-            </Button>
-          </div>
-          </ButtonAppearanceProvider>
-        )}
 
         {!collapsed && (
           <div

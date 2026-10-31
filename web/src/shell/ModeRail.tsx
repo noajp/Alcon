@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, PanelLeftOpen } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { NavSustainmentModeIcon } from '@/shell/sidebar/NavIcons';
 import {
   APP_GROUPS,
@@ -12,7 +12,6 @@ import {
   useRailApps,
   type RailMode,
 } from '@/shell/railApps';
-import { useNotifications } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
@@ -50,9 +49,7 @@ function RailButton({
   icon: Icon,
   active,
   onClick,
-  unreadCount = 0,
 }: {
-  unreadCount?: number;
   label: string;
   icon: React.ComponentType<{ size?: number }>;
   active: boolean;
@@ -72,7 +69,6 @@ function RailButton({
       }`}
     >
       <Icon size={18} />
-      {unreadCount > 0 && <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--status-danger)] px-1 text-[9px] font-semibold text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}
     </button>
   );
 }
@@ -114,18 +110,13 @@ export function ModeRail({
   scope,
   activeView,
   onViewChange,
-  onShowSidebar,
 }: {
   scope: SpaceScope;
   activeView: string;
   onViewChange: (view: string) => void;
-  /** Present while the sidebar is hidden: brings it back. */
-  onShowSidebar?: () => void;
 }) {
   const { t } = useI18n();
   const activeMode = railModeOf(activeView);
-  const { user } = useAuthContext();
-  const { unreadCount } = useNotifications(user?.id ?? null);
   const [apps, setApp] = useRailApps();
   const [launcherOpen, setLauncherOpen] = useState(false);
 
@@ -149,11 +140,10 @@ export function ModeRail({
 
   return (
     <ButtonAppearanceProvider appearance="navigation"><Popover open={launcherOpen} onOpenChange={setLauncherOpen}>
-    <div className="my-1.5 ml-1 flex w-[46px] shrink-0 flex-col items-center gap-1 rounded-lg border border-border/60 bg-background py-2 shadow-[var(--shadow-island)]">
+    <div className="mt-1.5 ml-1 flex w-[46px] shrink-0 flex-col items-center gap-1 rounded-lg border border-border/60 bg-background py-2 shadow-[var(--shadow-island)]">
       {coreModes.map((mode) => (
         <RailButton
           key={mode}
-          unreadCount={mode === 'inbox' ? unreadCount : 0}
           label={t(MODE_META[mode].label)}
           icon={MODE_META[mode].icon}
           active={mode === activeMode}
@@ -196,13 +186,6 @@ export function ModeRail({
           sit above — the one personal entry point on an otherwise all-work
           rail. */}
       <div className="mt-auto flex flex-col items-center gap-1">
-        {onShowSidebar && (
-          <Button variant="ghost" size="icon-md" onClick={onShowSidebar} title={t('Show sidebar')} aria-label={t('Show sidebar')}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground/70 hover:bg-sidebar-accent/50 hover:text-foreground">
-            <PanelLeftOpen size={16} />
-          </Button>
-        )}
-        <div className="my-1 h-px w-5 bg-border" />
         <ProfileRailButton active={activeMode === 'personal'} onClick={() => onViewChange('profile')} />
       </div>
 
