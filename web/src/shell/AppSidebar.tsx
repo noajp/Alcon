@@ -423,7 +423,9 @@ export function AppSidebar({
           </div>
           )}
         </div>
-        <nav className="flex-1 overflow-y-auto pb-3 pl-1 pr-2">
+        {/* Pulled up so each mode's title (Execution, Notebook …) sits just under
+            the main island's header line, level with where its content starts. */}
+        <nav className="-mt-4 flex-1 overflow-y-auto pb-3 pl-1 pr-2">
 
           {activeView === 'settings' ? (
             <SettingsSidebarPanel />
