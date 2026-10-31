@@ -1,11 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { AlertCircle, Check, ChevronRight, FileText, Loader2 } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import type { CopilotAttachment, CopilotMessage, ToolEvent } from './useAlconCopilot';
 import { toolVerb } from './copilotFiles';
+import { splitAnswer } from './chartSpec';
+
+const ChatChart = dynamic(() => import('./ChatChart'), { ssr: false, loading: () => <div className="h-52 rounded-lg border border-border/60" /> });
 
 /** One turn of the conversation. The AI's answer is Markdown, rendered — no
  *  bare asterisks; its work shows as steps above it. */
@@ -27,8 +31,22 @@ export function CopilotMessageView({ message, streaming }: { message: CopilotMes
     <div className="space-y-1.5">
       {events.length > 0 && <ToolSteps events={events} live={streaming} answered={!!message.content} />}
       {message.content
-        ? <MarkdownLite text={message.content} className="break-words text-foreground/95" />
+        ? <Answer content={message.content} />
         : streaming && events.length === 0 && <Working label="Thinking" />}
+    </div>
+  );
+}
+
+/** The answer's prose as Markdown, with any chart blocks drawn as charts. */
+function Answer({ content }: { content: string }) {
+  const parts = useMemo(() => splitAnswer(content), [content]);
+  return (
+    <div className="space-y-2">
+      {parts.map((p, i) => p.kind === 'text'
+        ? <MarkdownLite key={i} text={p.text} className="break-words text-foreground/95" />
+        : p.kind === 'chart'
+          ? <ChatChart key={i} spec={p.spec} />
+          : <div key={i} className="h-52 rounded-lg border border-border/60 animate-pulse" />)}
     </div>
   );
 }
