@@ -86,6 +86,7 @@ import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { ElementDirectionSection } from './ElementDirectionSection';
+import { CodeChangesSection } from '../code/CodeChangesSection';
 import { SubelementRow } from './SubelementRow';
 import { SubelementBulkBar } from './SubelementBulkBar';
 import { useElementSelection } from './useElementSelection';
@@ -978,6 +979,8 @@ function ElementDetailBody({
           <ElementDependencies elementId={element.id} spaceId={coordinationSpaceId ?? null}
             onOpenElement={onOpenElement} onChanged={onRefresh} />
           </div>
+
+          <CodeChangesSection elementId={element.id} />
 
           <AgentRunPanel
             agent={agent}

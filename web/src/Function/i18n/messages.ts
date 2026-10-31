@@ -14,6 +14,7 @@ import { DOCUMENTS_TRANSLATIONS } from './documentsMessages';
 import { APP_TRANSLATIONS } from './appMessages';
 import { OPERATIONS_TRANSLATIONS } from '@/Function/i18n/operationsMessages';
 import { DESIGN_TRANSLATIONS } from './designMessages';
+import { CODE_REVIEW_TRANSLATIONS } from './codeReviewMessages';
 
 type TranslationMap = Record<string, string>;
 
@@ -1512,7 +1513,7 @@ Object.assign(es, APPROACH_TRANSLATIONS.es);
 // Each area's own strings: the shared parts, widget bodies, Strategy,
 // Execution, Notebook/Table/Slides, the app shell and settings, Operations,
 // the Design widget.
-for (const area of [SHARED_TRANSLATIONS, WIDGET_TRANSLATIONS, STRATEGY_TRANSLATIONS, EXECUTION_TRANSLATIONS, DOCUMENTS_TRANSLATIONS, APP_TRANSLATIONS, OPERATIONS_TRANSLATIONS, DESIGN_TRANSLATIONS]) {
+for (const area of [SHARED_TRANSLATIONS, WIDGET_TRANSLATIONS, STRATEGY_TRANSLATIONS, EXECUTION_TRANSLATIONS, DOCUMENTS_TRANSLATIONS, APP_TRANSLATIONS, OPERATIONS_TRANSLATIONS, DESIGN_TRANSLATIONS, CODE_REVIEW_TRANSLATIONS]) {
   Object.assign(ja, area.ja);
   Object.assign(ko, area.ko);
   Object.assign(fr, area.fr);

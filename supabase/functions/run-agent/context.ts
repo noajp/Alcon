@@ -99,6 +99,11 @@ ${bullet(ctx.artifacts.map((t) => `- ${t}`))}
 
 # 使える外部連携
 ${bullet(integrations, "(なし — 外部サービスへの操作が要る任務なら、finish(blocked) で連携の追加を依頼する)")}
-
+${ctx.integrations.some((i) => /github/i.test(i.name)) ? `
+# ソフトウェアを作る任務のとき（GitHub）
+- 既定のブランチに直接コミットしない。ブランチ \`alcon/${(el.display_id ?? el.id).toLowerCase()}\` を作り、そこにコミットして Pull Request を開く
+- PR のタイトルの先頭に「${el.display_id ?? ""}」を付ける。本文には、この Element の任務と、関連する Initiative のどの成功条件・意思決定に応える変更かを書く
+- 開いた PR は自動でこの Element の「コード変更」に紐付き、チームが差分を意図と照らして確かめる。マージはしない
+` : ""}
 今日の日付: ${ctx.today}`;
 }
