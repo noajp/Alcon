@@ -91,7 +91,7 @@ function ToolSteps({ events, live, answered }: { events: ToolEvent[]; live: bool
     <div className="text-[12px]">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex items-center gap-1 rounded text-muted-foreground transition-colors hover:text-foreground">
-        <span>{t('{n} steps', { n: events.length })}</span>
+        <span>{events.length === 1 ? t('1 step') : t('{n} steps', { n: events.length })}</span>
         {failed > 0 && <span className="text-[var(--status-danger)]">· {t('{n} failed', { n: failed })}</span>}
         <ChevronRight size={12} className={`transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
       </button>
