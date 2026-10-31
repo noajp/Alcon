@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, X } from 'lucide-react';
 import { isCommitEnter, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NavPhaseIcon } from '@/shell/sidebar/NavIcons';
-import { QuietEmpty } from '@/ActivitySpace/strategy/QuietEmpty';
+import { EmptyState } from '@/Function/shared/EmptyState';
 import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ObjectIcon } from '@/shell/icons';
@@ -187,10 +187,11 @@ export function PhaseView({
 
       <div className="flex-1 overflow-hidden">
         {loading ? null : !activeDomainId ? (
-          <QuietEmpty text={t('Select a Domain to plan its Phases.')} />
+          <EmptyState art="phase" title="Choose a Domain" description="Select a Domain to plan its Phases." />
         ) : phases.length === 0 ? (
-          <QuietEmpty text={t('No Phases yet. A Phase time-boxes a stage of work — requirements, design, build.')}
-            cta={t('Create Phase')} onCta={() => setNewOpen(true)} />
+          <EmptyState art="phase" title="Create your first Phase"
+            description="A Phase time-boxes a stage of work — requirements, design, build."
+            cta="Create Phase" onCta={() => setNewOpen(true)} />
         ) : (
           <PhaseTimeline phases={phases} members={members} onOpen={setOpenPhaseId} />
         )}

@@ -8,7 +8,7 @@ import { Popover, PopoverAnchor, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '@/ui/context-menu';
 import { MenuShell } from '@/Function/shared/menu';
-import { QuietEmpty } from '@/ActivitySpace/strategy/QuietEmpty';
+import { EmptyState } from '@/Function/shared/EmptyState';
 import { QuickCreatePopup } from '@/Function/shared/QuickCreatePopup';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { PageHead, PageLayout, PageSection } from '@/Function/shared/PageHead';
@@ -107,11 +107,13 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
           </div>
           <div className="flex-1 overflow-y-auto">
             {loading ? null : !vision ? (
-              <QuietEmpty text={t('Portfolios belong to a Vision, the way Objects belong to a Domain. Add a Vision first.')}
-                cta={t('Create Vision')} onCta={onRequestVision} />
+              <EmptyState art="vision" title="Start with a Vision"
+                description="Portfolios belong to a Vision, the way Objects belong to a Domain."
+                cta="Create Vision" onCta={onRequestVision} />
             ) : portfolios.length === 0 && unassigned.length === 0 ? (
-              <QuietEmpty text={t('A Portfolio bundles Initiatives that serve one part of the Vision, so the Strategy reads as a few bets instead of a long list.')}
-                cta={t('Create Portfolio')} onCta={() => setLocalNew({ parentId: null })} />
+              <EmptyState art="portfolio" title="Create your first Portfolio"
+                description="A Portfolio bundles Initiatives that serve one part of the Vision, so the Strategy reads as a few bets instead of a long list."
+                cta="Create Portfolio" onCta={() => setLocalNew({ parentId: null })} />
             ) : (
               <div className="h-full overflow-auto">
                 <IndexList headers={[t('Name'), t('Health'), t('Initiatives')]}>

@@ -6,7 +6,8 @@ type Row = [ja: string, ko: string, fr: string, es: string];
 
 const STRATEGY_MESSAGES: Record<string, Row> = {
   // Initiative list and page
-  'No Initiatives yet. An Initiative groups Objects across Domains around one outcome.': ['Initiative はまだありません。Initiative は 1 つの成果に向けて Domain をまたいで Object をまとめます。', '아직 Initiative가 없습니다. Initiative는 하나의 성과를 위해 여러 Domain의 Object를 묶습니다.', 'Aucune Initiative pour l’instant. Une Initiative regroupe des Objects de plusieurs Domains autour d’un même résultat.', 'Aún no hay Initiatives. Una Initiative agrupa Objects de varios Domains en torno a un resultado.'],
+  'Create your first Initiative': ['最初の Initiative を作成', '첫 Initiative 만들기', 'Créez votre première Initiative', 'Crea tu primera Initiative'],
+  'An Initiative groups Objects across Domains around one outcome.': ['Initiative は、Domain をまたいで Object を一つの成果のもとにまとめます。', 'Initiative는 Domain을 넘나들며 Object를 하나의 성과 아래 묶습니다.', 'Une Initiative regroupe des Objects de plusieurs Domains autour d’un résultat.', 'Una Initiative agrupa Objects de varios Domains en torno a un resultado.'],
   '{n} stalled': ['{n} 件が停滞', '{n}개 정체', '{n} au point mort', '{n} estancados'],
   '{n} blocked': ['{n} 件がブロック', '{n}개 차단됨', '{n} bloqués', '{n} bloqueados'],
   'No Elements': ['Element なし', 'Element 없음', 'Aucun Element', 'Sin Elements'],
@@ -220,7 +221,8 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   // Phase
   'Add Phase': ['Phase を追加', 'Phase 추가', 'Ajouter une Phase', 'Añadir Phase'],
   'Select a Domain to plan its Phases.': ['Domain を選ぶと、その Phase を計画できます。', 'Domain을 선택하면 해당 Phase를 계획할 수 있습니다.', 'Sélectionnez un Domain pour planifier ses Phases.', 'Selecciona un Domain para planificar sus Phases.'],
-  'No Phases yet. A Phase time-boxes a stage of work — requirements, design, build.': ['Phase はまだありません。Phase は要件定義・設計・構築といった作業の段階を期間で区切ります。', '아직 Phase가 없습니다. Phase는 요구사항, 설계, 구축 같은 작업 단계를 기간으로 나눕니다.', 'Aucune Phase pour l’instant. Une Phase délimite dans le temps une étape du travail — exigences, conception, réalisation.', 'Aún no hay Phases. Una Phase acota en el tiempo una etapa del trabajo: requisitos, diseño, construcción.'],
+  'Create your first Phase': ['最初の Phase を作成', '첫 Phase 만들기', 'Créez votre première Phase', 'Crea tu primera Phase'],
+  'A Phase time-boxes a stage of work — requirements, design, build.': ['Phase は、要件・設計・構築といった仕事の段階を期間で区切ります。', 'Phase는 요구사항·설계·구축 같은 작업 단계를 기간으로 나눕니다.', 'Une Phase cadre dans le temps une étape du travail — exigences, conception, réalisation.', 'Una Phase acota en el tiempo una etapa del trabajo: requisitos, diseño, construcción.'],
   'Planned': ['予定', '예정', 'Planifiée', 'Planificada'],
   'Active': ['進行中', '진행 중', 'Active', 'Activa'],
   'Out of time': ['期限超過', '기한 초과', 'Hors délai', 'Fuera de plazo'],
@@ -277,12 +279,17 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   '1 Initiative': ['1 件の Initiative', 'Initiative 1개', '1 Initiative', '1 Initiative'],
   'Back one month': ['1 か月戻る', '한 달 뒤로', 'Reculer d’un mois', 'Retroceder un mes'],
   'Forward one month': ['1 か月進む', '한 달 앞으로', 'Avancer d’un mois', 'Avanzar un mes'],
-  'No Initiatives yet. Create one and give its Objects start and due dates to see them on the Timeline.': ['Initiative はまだありません。作成して Object に開始日と期限を設定すると、Timeline に表示されます。', '아직 Initiative가 없습니다. 만들고 Object에 시작일과 마감일을 지정하면 Timeline에 표시됩니다.', 'Aucune Initiative pour l’instant. Créez-en une et donnez des dates de début et d’échéance à ses Objects pour les voir sur la Timeline.', 'Aún no hay Initiatives. Crea una y da fechas de inicio y límite a sus Objects para verlos en la Timeline.'],
+  'Nothing on the Timeline yet': ['Timeline はまだ空です', 'Timeline이 아직 비어 있습니다', 'Rien sur la Timeline pour l’instant', 'Aún no hay nada en la Timeline'],
+  'Create an Initiative and give its Objects start and due dates to see them here.': ['Initiative を作成し、その Object に開始日と期限を設定すると、ここに表示されます。', 'Initiative를 만들고 Object에 시작일과 마감일을 지정하면 여기에 표시됩니다.', 'Créez une Initiative et donnez des dates de début et d’échéance à ses Objects pour les voir ici.', 'Crea una Initiative y da fechas de inicio y límite a sus Objects para verlos aquí.'],
   'No Objects in this Initiative yet': ['この Initiative に Object はまだありません', '이 Initiative에 아직 Object가 없습니다', 'Aucun Object dans cette Initiative pour l’instant', 'Aún no hay Objects en esta Initiative'],
   'Collapse Objects': ['Object を折りたたむ', 'Object 접기', 'Replier les Objects', 'Contraer Objects'],
   'Expand Objects': ['Object を展開', 'Object 펼치기', 'Déplier les Objects', 'Expandir Objects'],
   // Portfolio
-  'Portfolios belong to a Vision, the way Objects belong to a Domain. Add a Vision first.': ['Object が Domain に属するように、Portfolio は Vision に属します。まず Vision を追加してください。', 'Object가 Domain에 속하듯 Portfolio는 Vision에 속합니다. 먼저 Vision을 추가하세요.', 'Les Portfolios appartiennent à une Vision, comme les Objects à un Domain. Ajoutez d’abord une Vision.', 'Los Portfolios pertenecen a una Vision, como los Objects a un Domain. Añade primero una Vision.'],
+  'Start with a Vision': ['まず Vision から', 'Vision부터 시작하기', 'Commencez par une Vision', 'Empieza por una Vision'],
+  'Portfolios belong to a Vision, the way Objects belong to a Domain.': ['Object が Domain に属するように、Portfolio は Vision に属します。', 'Object가 Domain에 속하듯 Portfolio는 Vision에 속합니다.', 'Les Portfolios appartiennent à une Vision, comme les Objects à un Domain.', 'Los Portfolios pertenecen a una Vision, como los Objects a un Domain.'],
+  'Set your Vision': ['Vision を定める', 'Vision 정하기', 'Définissez votre Vision', 'Define tu Vision'],
+  'Create your first Portfolio': ['最初の Portfolio を作成', '첫 Portfolio 만들기', 'Créez votre premier Portfolio', 'Crea tu primer Portfolio'],
+  'Choose a Domain': ['Domain を選択', 'Domain 선택', 'Choisissez un Domain', 'Elige un Domain'],
   'Collapse {name}': ['{name} を折りたたむ', '{name} 접기', 'Replier {name}', 'Contraer {name}'],
   'Expand {name}': ['{name} を展開', '{name} 펼치기', 'Déplier {name}', 'Expandir {name}'],
 };

@@ -7,7 +7,7 @@ import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
 import { MenuShell } from '@/Function/shared/menu';
 import { DatePopover } from '@/Function/shared/date';
-import { QuietEmpty } from '@/ActivitySpace/strategy/QuietEmpty';
+import { EmptyState } from '@/Function/shared/EmptyState';
 import { QuickCreatePopup } from '@/Function/shared/QuickCreatePopup';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { PageHead, PageLayout, PageSection } from '@/Function/shared/PageHead';
@@ -63,8 +63,9 @@ export function VisionView({ visionId, createRequested, onCreateHandled, onSelec
       </div>
       <div className="flex-1 overflow-y-auto">
         {loading || role.isPending ? null : !vision ? (
-          <QuietEmpty text={t('A Vision says what this Space aims for. Portfolios and Initiatives hang under it, the way Objects and Elements hang under a Domain.')}
-            cta={t('Create Vision')} onCta={() => setLocalNew(true)} />
+          <EmptyState art="vision" title="Set your Vision"
+            description="A Vision says what this Space aims for. Portfolios and Initiatives hang under it, the way Objects and Elements hang under a Domain."
+            cta="Create Vision" onCta={() => setLocalNew(true)} />
         ) : (
           <VisionPage key={vision.id} vision={vision} canEdit={canEdit} onOpenPortfolio={onOpenPortfolio} onSelectStrategy={onSelectStrategy} />
         )}
