@@ -27,7 +27,7 @@ export function EmptyState({ art, title, description, cta, shortcut, onCta }: {
   // state follows the viewer's language without wiring `t` at each call site.
   const { t } = useI18n();
   const tr = (value: ReactNode) => (typeof value === 'string' ? t(value) : value);
-  const rise = (step: number) => ({ className: 'opacity-0 animate-slide-up', style: { animationDelay: `${500 + step * 140}ms`, animationDuration: '700ms' } as CSSProperties });
+  const rise = (step: number) => ({ className: 'opacity-0 animate-slide-up', style: { animationDelay: `${900 + step * 220}ms`, animationDuration: '1000ms' } as CSSProperties });
   return (
     // flex-1 for a flex-column host, h-full for a plain block host — either
     // way the column fills the pane.
