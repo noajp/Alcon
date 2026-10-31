@@ -33,7 +33,7 @@ import { OnboardingCreate } from '@/Function/space/OnboardingCreate';
 import { MyInvitations } from '@/Function/membership/MyInvitations';
 import { getCachedHomeViewId } from '@/Function/settings/preferencesStore';
 import { setActiveSettingsSection } from '@/Function/settings/settingsNav';
-import { completeOAuthReturn, readOAuthReturn, stripOAuthReturn } from '@/Function/integrations/oauthReturn';
+import { completeOAuthReturn, readOAuthReturn, stripOAuthReturn, takeOAuthReturnView } from '@/Function/integrations/oauthReturn';
 import { finishIntegrationOAuth } from '@/Function/integrations/data';
 import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
@@ -310,18 +310,22 @@ function WorkspaceContent({
     setSettingsReturnView(activeTab.activeView);
     setActiveView('settings');
   };
-  // Back from Google sign-in (integration-oauth): drop the parameters from
-  // the URL, confirm the sign-in as this person (POST /finish — nothing is
-  // stored before that) and open Settings › Integrations to show the outcome.
+  // Back from an integration sign-in (integration-oauth): drop the parameters
+  // from the URL, confirm the sign-in as this person (POST /finish — nothing
+  // is stored before that) and open the screen it started from — Reviews, or
+  // Settings › Integrations — to show the outcome.
   useEffect(() => {
     const result = readOAuthReturn(window.location.search);
     if (!result) return;
     window.history.replaceState(window.history.state, '', stripOAuthReturn(window.location.href));
     void completeOAuthReturn(result, finishIntegrationOAuth);
-    setActiveSettingsSection('integrations', 'external');
-    const launchView = initialTabRef.current?.activeView ?? 'inbox';
-    if (launchView !== 'settings') setSettingsReturnView(launchView);
-    setTabs(prev => prev.map(t => (t.id === activeTabId ? { ...t, activeView: 'settings' } : t)));
+    const returnView = takeOAuthReturnView();
+    if (!returnView) {
+      setActiveSettingsSection('integrations', 'external');
+      const launchView = initialTabRef.current?.activeView ?? 'inbox';
+      if (launchView !== 'settings') setSettingsReturnView(launchView);
+    }
+    setTabs(prev => prev.map(t => (t.id === activeTabId ? { ...t, activeView: returnView ?? 'settings' } : t)));
   }, [activeTabId]);
   const handleCloseSettings = () => {
     setActiveView(settingsReturnView && settingsReturnView !== 'settings' ? settingsReturnView : 'inbox');

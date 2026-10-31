@@ -13,7 +13,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ToggleRow } from '@/Function/settings/SettingsControls';
 import type { Integration } from '@/types/database';
 import {
-  KIND_LABELS, SOURCE_LABELS, buildIntegrationRow, readLastTest, signsInWithOAuth, testOutcomeLabel,
+  KIND_LABELS, SOURCE_LABELS, buildIntegrationRow, oauthProviderOf, readLastTest, signsInWithOAuth, testOutcomeLabel, type OAuthProvider,
   type IntegrationAuthType, type IntegrationDelegation, type IntegrationPreset, type IntegrationSource,
 } from './catalog';
 import { useIntegrationActions, useIntegrationOAuthStatus } from './data';
@@ -23,15 +23,42 @@ import { useIntegrationActions, useIntegrationOAuthStatus } from './data';
 // disconnect. The credential is write-only: it is sent to Vault and the
 // dialog only ever knows whether one is set (`secret_id`).
 //
-// An OAuth preset (Google Drive) has no credential field. Connect creates the
-// row and sends the browser to Google sign-in (integration-oauth); the
-// dialog then shows the account it signed in as, with Reconnect. Disconnect
-// revokes the grant at Google before deleting the row. Until the server has
-// a Google OAuth client, Connect stays disabled with a note saying so.
+// An OAuth preset (Google Drive, GitHub) has no credential field. Connect
+// creates the row and sends the browser to the provider's sign-in
+// (integration-oauth); the dialog then shows the account it signed in as,
+// with Reconnect. Disconnect revokes the grant at the provider before
+// deleting the row. Until the server has that provider's OAuth client,
+// Connect stays disabled with a note saying so.
 //
 // For an existing connection, delegation and on/off apply at once
 // (optimistically, rolled back on failure); custom name / endpoint / auth are
 // saved with 「保存」. Members see the same dialog read-only.
+
+/** What a sign-in connection says, per provider (English source strings for t()). */
+const OAUTH_COPY: Record<OAuthProvider, {
+  opening: string; signIn: string; notSetUp: string; howItConnects: string; whose: string; actsAs: string; disconnect: string; revokeFailed: string;
+}> = {
+  google: {
+    opening: 'Opening Google…',
+    signIn: 'Sign in with Google',
+    notSetUp: 'Google sign-in is not set up yet. An administrator needs to register the Google OAuth client before this can be connected.',
+    howItConnects: 'Connect opens Google sign-in. Alcon asks only for access to files it creates or that you choose.',
+    whose: 'Access belongs to the Google account: if it is connected in another Space too, agents there see the files Alcon created here, and disconnecting either one disconnects both.',
+    actsAs: 'Files are created as {account}.',
+    disconnect: "Disconnect {name}? Alcon's access is revoked at Google. If the same Google account is connected in another Space, that connection stops working too.",
+    revokeFailed: 'Alcon could not revoke its access at Google. Remove it from your Google Account under Security › Third-party access.',
+  },
+  github: {
+    opening: 'Opening GitHub…',
+    signIn: 'Sign in with GitHub',
+    notSetUp: 'GitHub sign-in is not set up yet. An administrator needs to register the GitHub OAuth App before this can be connected.',
+    howItConnects: 'Connect opens GitHub sign-in. Alcon asks to read and write the repositories you can reach, to review and merge pull requests and to let agents push branches.',
+    whose: 'Access belongs to the GitHub account: reviews, comments and merges from Alcon are posted as that account, and agents act as it. Disconnecting in one Space disconnects every Space that uses the same account.',
+    actsAs: 'Pull requests, reviews and merges are made as {account}.',
+    disconnect: "Disconnect {name}? Alcon's access is revoked at GitHub. If the same GitHub account is connected in another Space, that connection stops working too.",
+    revokeFailed: 'Alcon could not revoke its access at GitHub. Remove it on GitHub under Settings › Applications › Authorized OAuth Apps.',
+  },
+};
 
 const CUSTOM_AUTH_LABELS: Record<'none' | 'bearer' | 'header', string> = {
   none: 'None',
@@ -98,7 +125,9 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
   const unavailable = preset.unavailableReason;
   const readOnly = !canEdit || !!unavailable;
   const oauth = signsInWithOAuth(preset);
-  const oauthStatus = useIntegrationOAuthStatus(oauth && canEdit);
+  const provider = oauthProviderOf(preset) ?? 'google';
+  const copy = OAUTH_COPY[provider];
+  const oauthStatus = useIntegrationOAuthStatus(oauth && canEdit, provider);
   const oauthReady = oauthStatus === true;
   const oauthAccount = integration?.external_account ?? null;
   const oauthConnected = oauth && hasSecret;
@@ -111,7 +140,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
 
   const draft = () => ({ name, endpoint, auth, authHeader, delegation, enabled });
 
-  /** Leaves the app for Google sign-in; it comes back to Settings › Integrations. */
+  /** Leaves the app for the provider's sign-in; it comes back to Settings › Integrations. */
   const signIn = async (id: string) => {
     const url = await actions.signIn.mutateAsync(id);
     window.location.assign(url);
@@ -129,7 +158,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
       onCreated(created);
     } catch (e) { setError(t(errorText(e))); return; }
     if (oauth) {
-      // The row stays when sign-in can't start; Sign in with Google retries.
+      // The row stays when sign-in can't start; Sign in retries.
       try { await signIn(created.id); } catch (e) { setError(t(errorText(e))); }
     }
   };
@@ -192,21 +221,21 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
   const disconnect = async () => {
     if (!integration) return;
     const question = oauthConnected
-      ? t("Disconnect {name}? Alcon's access is revoked at Google. If the same Google account is connected in another Space, that connection stops working too.", { name: integration.name })
+      ? t(copy.disconnect, { name: integration.name })
       : t('Disconnect {name}? Its credential is deleted and agents can no longer use it.', { name: integration.name });
     if (!await appDialog.confirm(question)) return;
     setError(null);
     try {
       if (oauthConnected) {
-        // Revoke the grant at Google first; deleting the row alone would only
-        // forget the tokens. If Google can't confirm it, still disconnect and
-        // say where to remove the access by hand.
+        // Revoke the grant at the provider first; deleting the row alone would
+        // only forget the tokens. If the provider can't confirm it, still
+        // disconnect and say where to remove the access by hand.
         let revoked = false;
         try {
           revoked = (await actions.revoke.mutateAsync(integration.id)).revoked;
         } catch { /* reported below */ }
         if (!revoked) {
-          await appDialog.alert(t('Alcon could not revoke its access at Google. Remove it from your Google Account under Security › Third-party access.'));
+          await appDialog.alert(t(copy.revokeFailed));
         }
       }
       await actions.remove.mutateAsync(integration.id);
@@ -241,7 +270,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
         )}
         {oauth && canEdit && oauthStatus === false && (
           <p className="rounded-md bg-[var(--status-warning-subtle)] px-3 py-2 text-[12px] text-foreground">
-            {t('Google sign-in is not set up yet. An administrator needs to register the Google OAuth client before this can be connected.')}
+            {t(copy.notSetUp)}
           </p>
         )}
 
@@ -298,15 +327,15 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
                     </span>
                     {canEdit && (
                       <Button variant="ghost" size="xs" onClick={reconnect} disabled={busy || !oauthReady}>
-                        {actions.signIn.isPending ? t('Opening Google…') : t('Reconnect')}
+                        {actions.signIn.isPending ? t(copy.opening) : t('Reconnect')}
                       </Button>
                     )}
                   </div>
                   {oauthAccount && (
-                    <p className="text-[12px] text-muted-foreground">{t('Files are created as {account}.', { account: oauthAccount })}</p>
+                    <p className="text-[12px] text-muted-foreground">{t(copy.actsAs, { account: oauthAccount })}</p>
                   )}
                   <p className="text-[12px] text-muted-foreground">
-                    {t('Access belongs to the Google account: if it is connected in another Space too, agents there see the files Alcon created here, and disconnecting either one disconnects both.')}
+                    {t(copy.whose)}
                   </p>
                 </div>
               ) : integration ? (
@@ -314,14 +343,14 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
                   <span className="text-[13px] text-muted-foreground">{t('Not connected')}</span>
                   {canEdit && (
                     <Button variant="secondary" size="sm" onClick={reconnect} disabled={busy || !oauthReady}>
-                      {actions.signIn.isPending ? t('Opening Google…') : t('Sign in with Google')}
+                      {actions.signIn.isPending ? t(copy.opening) : t(copy.signIn)}
                     </Button>
                   )}
                 </div>
               ) : (
                 <div className="space-y-1.5 text-[12px] text-muted-foreground">
-                  <p>{t('Connect opens Google sign-in. Alcon asks only for access to files it creates or that you choose.')}</p>
-                  <p>{t('Access belongs to the Google account: if it is connected in another Space too, agents there see the files Alcon created here, and disconnecting either one disconnects both.')}</p>
+                  <p>{t(copy.howItConnects)}</p>
+                  <p>{t(copy.whose)}</p>
                 </div>
               )}
             </Field>

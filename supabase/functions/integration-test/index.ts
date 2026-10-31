@@ -15,6 +15,7 @@
 //           resolveCredential) reads the signed-in user from Drive's about
 //           endpoint → connected. No token → oauth_required; a refresh token
 //           Google refuses → oauth_expired.
+//           GitHub: the signed-in token opens the MCP server as above.
 //
 // Who may test: a Space owner. The integration must be visible to the caller
 // (RLS: Space member) and the caller must hold the owner role in that Space —
@@ -27,6 +28,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { McpSession, callHttp, isSafeEndpoint, readCapped, resolveCredential, type IntegrationRow } from "../_shared/integrationClient.ts";
 import { GOOGLE_ABOUT_URL, isGoogleDriveRow } from "../_shared/googleOAuth.ts";
+import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -105,9 +107,14 @@ async function runTest(row: IntegrationRow & { preset: string | null }, secret: 
   }
 }
 
-/** Google Drive: who the stored token belongs to, asked of Drive itself. */
+/** A signed-in connection. GitHub: the token opens its MCP server. Google
+ *  Drive: who the stored token belongs to, asked of Drive itself. */
 async function runOAuthTest(admin: SupabaseClient, row: IntegrationRow & { preset: string | null }, raw: string | null): Promise<LastTest> {
   const at = new Date().toISOString();
+  if (isGithubOAuthRow(row)) {
+    const token = raw ? await resolveCredential(admin, row, raw) : null;
+    return token ? await runTest(row, token) : { ok: false, at, code: "oauth_required", detail: "" };
+  }
   if (!isGoogleDriveRow(row) || !raw) return { ok: false, at, code: "oauth_required", detail: "" };
   let token: string | null;
   try {

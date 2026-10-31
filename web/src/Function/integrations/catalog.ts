@@ -53,9 +53,9 @@ export const INTEGRATION_PRESETS: readonly IntegrationPreset[] = [
     credentialLabel: 'Google account', category: 'files', source: 'official', builtBy: 'Google', featured: true, custom: false,
   },
   {
-    id: 'github', name: 'GitHub', icon: null, kind: 'mcp', endpoint: 'https://api.githubcopilot.com/mcp/', auth: 'bearer',
-    description: "Work with repositories, issues and pull requests through GitHub's MCP server.",
-    credentialLabel: 'Fine-grained personal access token', category: 'development', source: 'official', builtBy: 'GitHub', featured: false, custom: false,
+    id: 'github', name: 'GitHub', icon: null, kind: 'mcp', endpoint: 'https://api.githubcopilot.com/mcp/', auth: 'oauth',
+    description: "Review and merge pull requests in Alcon, and let agents work with repositories, issues and pull requests through GitHub's MCP server.",
+    credentialLabel: 'GitHub account', category: 'development', source: 'official', builtBy: 'GitHub', featured: false, custom: false,
   },
   {
     id: 'slack', name: 'Slack', icon: null, kind: 'http', endpoint: 'https://slack.com/api', auth: 'bearer',
@@ -97,6 +97,14 @@ export function presetById(id: string | null | undefined): IntegrationPreset | n
 /** True for a preset that connects by signing in (OAuth) rather than a pasted credential. */
 export function signsInWithOAuth(preset: IntegrationPreset): boolean {
   return !preset.custom && preset.auth === 'oauth';
+}
+
+export type OAuthProvider = 'google' | 'github';
+
+/** Whom a sign-in preset signs in with; null for one that takes a credential. */
+export function oauthProviderOf(preset: IntegrationPreset): OAuthProvider | null {
+  if (!signsInWithOAuth(preset)) return null;
+  return preset.id === 'github' ? 'github' : 'google';
 }
 
 // ── Filtering ──────────────────────────────────────────────────────────────

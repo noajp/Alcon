@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { Integration, IntegrationUpdate, Json } from '@/types/database';
-import type { IntegrationInsertRow } from './catalog';
+import type { IntegrationInsertRow, OAuthProvider } from './catalog';
 import { useSpaceRoleQuery } from '@/Function/space/data';
 
 // A Space's integrations (ADR 0027): list, create, update, delete, set the
@@ -15,8 +15,8 @@ import { useSpaceRoleQuery } from '@/Function/space/data';
 // (Vault) and is never selected back. `secret_id` only says whether one is set.
 
 //
-// An OAuth connection (Google Drive) has no credential to type: the
-// integration-oauth Edge Function signs in with Google and stores the tokens;
+// An OAuth connection (Google Drive, GitHub) has no credential to type: the
+// integration-oauth Edge Function signs in with the provider and stores the tokens;
 // `external_account` says which account it signed in as.
 
 const COLUMNS = 'id, activity_space_id, preset, kind, name, description, icon, endpoint, auth_type, auth_header, secret_id, delegation, enabled, last_test, external_account, created_by, created_at, updated_at';
@@ -78,16 +78,16 @@ async function testIntegration(integrationId: string): Promise<Json> {
   return (data as { last_test: Json }).last_test;
 }
 
-/** Starts Google sign-in for an OAuth integration; returns the URL to navigate to. */
+/** Starts the sign-in for an OAuth integration; returns the URL to navigate to. */
 async function startIntegrationOAuth(integrationId: string): Promise<string> {
   const { data, error } = await supabase.functions.invoke('integration-oauth/start', { body: { integrationId } });
   if (error) throw await functionError(error);
   const url = (data as { url?: unknown } | null)?.url;
-  if (typeof url !== 'string' || !url.startsWith('https://')) throw new Error('Google sign-in could not be started.');
+  if (typeof url !== 'string' || !url.startsWith('https://')) throw new Error('Sign-in could not be started.');
   return url;
 }
 
-/** Confirms a finished Google sign-in (the one-time handle from the return
+/** Confirms a finished sign-in (the one-time handle from the return
  *  URL) as the signed-in person; returns the connected integration's id. */
 export async function finishIntegrationOAuth(handle: string): Promise<string | null> {
   const { data, error } = await supabase.functions.invoke('integration-oauth/finish', { body: { handle } });
@@ -104,20 +104,20 @@ async function revokeIntegrationOAuth(integrationId: string): Promise<{ revoked:
   return { revoked: (data as { revoked?: unknown } | null)?.revoked === true };
 }
 
-/** Whether Google sign-in is configured on the server: true / false, null while
- *  loading. An unreachable function reads as not configured. */
-export function useIntegrationOAuthStatus(enabled: boolean): boolean | null {
+/** Whether sign-in with `provider` is configured on the server: true / false,
+ *  null while loading. An unreachable function reads as not configured. */
+export function useIntegrationOAuthStatus(enabled: boolean, provider: OAuthProvider = 'google'): boolean | null {
   const query = useQuery({
     queryKey: ['integration-oauth-status'],
-    queryFn: async () => {
+    queryFn: async (): Promise<Record<OAuthProvider, boolean>> => {
       const { data, error } = await supabase.functions.invoke('integration-oauth/status', { method: 'GET' });
-      if (error) return false;
-      return (data as { google?: unknown } | null)?.google === true;
+      const body = (error ? null : data) as { google?: unknown; github?: unknown } | null;
+      return { google: body?.google === true, github: body?.github === true };
     },
     enabled,
     staleTime: 5 * 60_000,
   });
-  return query.data === undefined ? null : query.data;
+  return query.data === undefined ? null : query.data[provider];
 }
 
 /** Create / update / delete / secret / test for one Space. Updates and deletes

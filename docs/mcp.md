@@ -79,7 +79,13 @@ Google Drive は資格情報を貼り付けず、owner が Google にサイン�
 
 アクセスは Google アカウントに付き、Space ごとには分かれない。同じ Google アカウントを 2 つの Space でつなぐと、どちらの Space のエージェントも、もう一方で Alcon が作ったファイルを見られる。また切断は Google で Alcon の許可全体を取り消すので、一方の Space で切断すると、同じアカウントをつないだ他の Space も次のリフレッシュで `oauth_expired`（再接続が必要）になる。
 
-サインインは Edge Function `integration-oauth` が行う。ブラウザが JWT なしで `/go` と `/callback` に来るので `--no-verify-jwt` で配置し、`/start`・`/finish`・`/revoke` は関数の中で JWT を確かめる。コールバックはトークンを預かるだけで連携には保存せず、アプリに戻ったあと、サインイン中の利用者の JWT で `/finish` を呼んだときに、`/start` を呼んだ本人であり今もオーナーである場合だけ保存する。他人が完了したサインインのトークンは、Google で取り消さずに捨てる（取り消すと、その人が自分の Space で使っている接続まで切れる）。
+### GitHub（OAuth）
+
+GitHub も資格情報を貼り付けず、owner が GitHub にサインインしてつなぐ（Settings › Integrations か、Reviews の「GitHub を接続」から。Reviews から始めたサインインは Reviews に戻る）。スコープは `repo` で、サインインした人が触れるリポジトリを読み書きできる。この接続を、Reviews（差分の取得、判定・行コメントの投稿、マージ）とエージェント（GitHub の MCP サーバー）の両方が使い、投稿・マージ・push はサインインした GitHub アカウントの名義になる。トークンは期限切れにならず、切断（GitHub の grant の取り消し）か、本人が GitHub の Settings › Applications で Alcon を外すまで使える。アクセスが GitHub アカウントに付き、一方の Space で切断すると同じアカウントの他の Space も切れるのは Google と同じ。
+
+### サインインの流れ（共通）
+
+サインインは Edge Function `integration-oauth` が行い、連携の行（`google-drive` なら Google、`github` なら GitHub）で相手を決める。ブラウザが JWT なしで `/go` と `/callback` に来るので `--no-verify-jwt` で配置し、`/start`・`/finish`・`/revoke` は関数の中で JWT を確かめる。コールバックはトークンを預かるだけで連携には保存せず、アプリに戻ったあと、サインイン中の利用者の JWT で `/finish` を呼んだときに、`/start` を呼んだ本人であり今もオーナーである場合だけ、同じ相手の行に保存する。他人が完了したサインインのトークンは、相手で取り消さずに捨てる（取り消すと、その人が自分の Space で使っている接続まで切れる）。
 
 配置は順番を守る。アプリは `integrations.external_account` を読むので、先に migration `20261006090000_integration_oauth.sql` を本番に適用し、次に関数、最後にアプリを公開する。
 
@@ -87,14 +93,17 @@ Google Drive は資格情報を貼り付けず、owner が Google にサイン�
 env -u SUPABASE_ACCESS_TOKEN supabase functions deploy integration-oauth --project-ref rkugtcqztkkacvoylupw --no-verify-jwt --use-api
 env -u SUPABASE_ACCESS_TOKEN supabase functions deploy integration-test --project-ref rkugtcqztkkacvoylupw --use-api
 env -u SUPABASE_ACCESS_TOKEN supabase functions deploy run-agent --project-ref rkugtcqztkkacvoylupw --use-api
+env -u SUPABASE_ACCESS_TOKEN supabase functions deploy code-changes --project-ref rkugtcqztkkacvoylupw --use-api
 ```
 
-Edge Function のシークレットに次の 3 つを入れる。どれかがない間、`GET /integration-oauth/status` は `{ "google": false }` を返し、画面は「Google サインインはまだ設定されていません」と示して接続を押せなくする。
+Edge Function のシークレットに次を入れる。相手ごとのクライアントか `APP_ORIGIN` がない間、`GET /integration-oauth/status` はその相手を `false`（`{ "google": false, "github": false }`）で返し、画面は「… サインインはまだ設定されていません」と示して接続を押せなくする。
 
 | シークレット | 内容 |
 | --- | --- |
 | `GOOGLE_OAUTH_CLIENT_ID` | Google Cloud の OAuth クライアント（ウェブアプリケーション）の ID |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | 同じクライアントのシークレット |
+| `GITHUB_OAUTH_CLIENT_ID` | GitHub の OAuth App の Client ID |
+| `GITHUB_OAUTH_CLIENT_SECRET` | 同じ OAuth App の Client secret |
 | `APP_ORIGIN` | サインイン後に戻るアプリの origin（例 `https://alcon.example.com`）。パスは付けない。保存を確定する `/finish` はこのアプリから呼ばれるので、ない間はサインインを完了できない（コールバックは何も保存せず「APP_ORIGIN を設定してください」と返す） |
 
-OAuth クライアントには、承認済みのリダイレクト URI として `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/integration-oauth/callback` を登録し、同意画面に `https://www.googleapis.com/auth/drive.file` を加える。
+Google の OAuth クライアントには、承認済みのリダイレクト URI として `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/integration-oauth/callback` を登録し、同意画面に `https://www.googleapis.com/auth/drive.file` を加える。GitHub の OAuth App（GitHub › Settings › Developer settings › OAuth Apps）は、Authorization callback URL に同じ URL を、Homepage URL に `APP_ORIGIN` を入れる。

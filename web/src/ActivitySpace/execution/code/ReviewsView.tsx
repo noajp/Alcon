@@ -1,14 +1,16 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Bot, CheckCircle2, ExternalLink, Github, Inbox, ListOrdered, RefreshCw } from 'lucide-react';
+import { Bot, CheckCircle2, Github, Inbox, ListOrdered, RefreshCw } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { FONT } from '@/shared/designTokens';
 import { buildIntegrationRow, presetById, readLastTest } from '@/Function/integrations/catalog';
-import { useIntegrationActions, useIntegrations, useIsSpaceOwner } from '@/Function/integrations/data';
+import { useIntegrationActions, useIntegrationOAuthStatus, useIntegrations, useIsSpaceOwner } from '@/Function/integrations/data';
+import { OAUTH_RETURN_VIEW_KEY, setOAuthOutcome, useOAuthOutcome } from '@/Function/integrations/oauthReturn';
+import type { Integration } from '@/types/database';
 import { setActiveSettingsSection } from '@/Function/settings/settingsNav';
 import type { InboxBucket } from '@/Function/codeReview/diffModel';
 import { useReviewInbox } from '@/hooks/codeChangeData';
@@ -23,7 +25,8 @@ import { CodeChangeIcon } from './codeChangeLabels';
 // the finished. The sidebar lists them; the one picked there opens here as the
 // review screen (guided sections, the diff, the intent beside it). With none
 // picked this is the overview: until GitHub is connected it says what
-// connecting gives, and an owner connects it here.
+// connecting gives, and an owner connects it here — signing in with GitHub,
+// which comes back to this page.
 
 const HIDE_INTRO_KEY = 'alcon.reviews.hideIntro';
 
@@ -44,6 +47,8 @@ export function ReviewsView({ navigation, onNavigate, onOpenSettings }: {
   const spaceId = useActiveSpaceId();
   const integrations = useIntegrations(spaceId);
   const github = integrations.data.find((r) => r.preset === 'github' && r.enabled) ?? null;
+  const connected = !!github?.secret_id;
+  const outcome = useOAuthOutcome();
   const inbox = useReviewInbox(spaceId, user?.id ?? null);
   const [tab, setTab] = useState<InboxBucket>('review');
   const openId = navigation.codeChangeId ?? null;
@@ -58,7 +63,7 @@ export function ReviewsView({ navigation, onNavigate, onOpenSettings }: {
   }, [inbox.data]);
   const rows = inbox.data.filter((e) => e.bucket === tab);
   const open = inbox.data.find((e) => e.change.id === openId)?.change ?? null;
-  const showIntro = !integrations.loading && !github && !hideIntro;
+  const showIntro = !integrations.loading && !connected && !hideIntro;
 
   if (openId) {
     if (open) return <CodeReviewScreen key={open.id} change={open} />;
@@ -81,8 +86,8 @@ export function ReviewsView({ navigation, onNavigate, onOpenSettings }: {
           <CodeChangeIcon size={18} className="text-muted-foreground" />
           <h1 className="text-2xl font-semibold leading-tight tracking-[-0.012em] text-foreground">{t('Reviews')}</h1>
           <div className="flex-1" />
-          {github ? (
-            <GithubStatus lastTest={github.last_test} onManage={onOpenSettings} />
+          {connected ? (
+            <GithubStatus lastTest={github!.last_test} onManage={onOpenSettings} />
           ) : !showIntro && !integrations.loading ? (
             <Button variant="ghost" size="sm" onClick={() => { setHideIntro(false); try { localStorage.removeItem(HIDE_INTRO_KEY); } catch { /* per-viewer */ } }}>
               <Github size={14} />{t('Connect GitHub')}
@@ -90,9 +95,22 @@ export function ReviewsView({ navigation, onNavigate, onOpenSettings }: {
           ) : null}
         </header>
 
+        {outcome && (
+          <div role="status" className={`flex items-start justify-between gap-3 rounded-md px-3 py-2 text-[12px] text-foreground ${
+            outcome.status === 'ok' ? 'bg-[var(--status-success-subtle)]' : outcome.status === 'error' ? 'bg-[var(--status-danger-subtle)]' : 'bg-[var(--surface-strong)]'}`}>
+            <span>
+              {outcome.status === 'pending' ? t('Finishing sign-in…')
+                : outcome.status === 'ok' ? t('{name} is connected.', { name: 'GitHub' })
+                  : outcome.message ? t(outcome.message) : t('Sign-in did not finish, so nothing was connected. Try again.')}
+            </span>
+            {outcome.status !== 'pending' && <Button variant="ghost" size="xs" onClick={() => setOAuthOutcome(null)}>{t('Dismiss')}</Button>}
+          </div>
+        )}
+
         {showIntro && (
           <Intro
             spaceId={spaceId}
+            existing={github}
             onDismiss={() => { setHideIntro(true); try { localStorage.setItem(HIDE_INTRO_KEY, '1'); } catch { /* per-viewer */ } }}
           />
         )}
@@ -155,10 +173,9 @@ const FEATURES = [
 ] as const;
 
 /** What connecting GitHub gives, and — for an owner — the connection itself. */
-function Intro({ spaceId, onDismiss }: { spaceId: string | null; onDismiss: () => void }) {
+function Intro({ spaceId, existing, onDismiss }: { spaceId: string | null; existing: Integration | null; onDismiss: () => void }) {
   const { t } = useI18n();
   const isOwner = useIsSpaceOwner(spaceId);
-  const [connecting, setConnecting] = useState(false);
   return (
     <section className="rounded-lg border border-[var(--border-default)]">
       <div className="flex items-center gap-2 border-b border-[var(--border-default)] px-4 py-2">
@@ -174,10 +191,8 @@ function Intro({ spaceId, onDismiss }: { spaceId: string | null; onDismiss: () =
           <p className="text-[14px] leading-relaxed text-[var(--text-secondary)]">
             {t('See pull requests beside the Elements they carry out and the Initiatives they serve. Check whether the software does what was intended, discuss it line by line, and merge — without switching to GitHub.')}
           </p>
-          {connecting && spaceId ? (
-            <ConnectGithub spaceId={spaceId} onCancel={() => setConnecting(false)} />
-          ) : isOwner ? (
-            <Button variant="primary" onClick={() => setConnecting(true)}><Github size={14} />{t('Connect GitHub')}</Button>
+          {isOwner && spaceId ? (
+            <ConnectGithub spaceId={spaceId} existing={existing} />
           ) : isOwner === false ? (
             <p className="text-[12px] text-muted-foreground">{t('An owner of this Space connects GitHub. Public repositories can be reviewed without it.')}</p>
           ) : null}
@@ -196,48 +211,46 @@ function Intro({ spaceId, onDismiss }: { spaceId: string | null; onDismiss: () =
   );
 }
 
-const TOKEN_URL = 'https://github.com/settings/personal-access-tokens/new';
-
-/** Creates the Space's GitHub integration with a fine-grained token, then
- *  tests it. The token goes to Vault and is never read back. */
-function ConnectGithub({ spaceId, onCancel }: { spaceId: string; onCancel: () => void }) {
+/** Signs in with GitHub: creates the Space's GitHub integration (or reuses
+ *  one that is not signed in yet) and leaves for GitHub's authorization
+ *  screen. integration-oauth brings the browser back here, and only then is
+ *  the token stored — in Vault, never read back. */
+function ConnectGithub({ spaceId, existing }: { spaceId: string; existing: Integration | null }) {
   const { t } = useI18n();
   const actions = useIntegrationActions(spaceId);
-  const [token, setToken] = useState('');
+  const ready = useIntegrationOAuthStatus(true, 'github');
   const [error, setError] = useState<string | null>(null);
-  const busy = actions.create.isPending || actions.test.isPending;
+  const busy = actions.create.isPending || actions.signIn.isPending;
 
   const connect = async () => {
-    const preset = presetById('github');
-    if (!preset) return;
-    const built = buildIntegrationRow(preset, spaceId, { delegation: 'approve_each', enabled: true });
-    if (!built.ok) { setError(t(built.error)); return; }
     setError(null);
     try {
-      const created = await actions.create.mutateAsync({ row: built.row, secret: token.trim() });
-      await actions.test.mutateAsync(created.id).catch(() => undefined);
+      let id = existing?.id ?? null;
+      if (!id) {
+        const preset = presetById('github');
+        if (!preset) return;
+        const built = buildIntegrationRow(preset, spaceId, { delegation: 'approve_each', enabled: true });
+        if (!built.ok) { setError(t(built.error)); return; }
+        id = (await actions.create.mutateAsync({ row: built.row, secret: '' })).id;
+      }
+      const url = await actions.signIn.mutateAsync(id);
+      try { sessionStorage.setItem(OAUTH_RETURN_VIEW_KEY, 'reviews'); } catch { /* lands in Settings › Integrations instead */ }
+      window.location.assign(url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(t(e instanceof Error ? e.message : String(e)));
     }
   };
 
   return (
-    <div className="space-y-2 rounded-md bg-[var(--surface-raised)] p-4">
-      <label className="block text-[12px] font-medium text-foreground" htmlFor="github-token">{t('Fine-grained personal access token')}</label>
-      <input id="github-token" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)}
-        placeholder="github_pat_…"
-        className="h-8 w-full rounded-md bg-[var(--surface-strong)] px-2 font-mono text-[12px] text-foreground outline-none" />
-      <p className="text-[12px] text-muted-foreground">
-        {t('Give it access to the repositories to review, with Pull requests: Read and write and Contents: Read and write. Agents use the same connection to open pull requests.')}{' '}
-        <a href={TOKEN_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[var(--accent-hover)] hover:underline">
-          {t('Create a token')}<ExternalLink size={11} />
-        </a>
-      </p>
+    <div className="space-y-2">
+      <Button variant="primary" onClick={() => void connect()} disabled={busy || ready !== true}>
+        <Github size={14} />{busy ? t('Opening GitHub…') : t('Connect GitHub')}
+      </Button>
+      {ready === false && (
+        <p className="text-[12px] text-[var(--status-warning)]">{t('GitHub sign-in is not set up yet. An administrator needs to register the GitHub OAuth App before this can be connected.')}</p>
+      )}
+      {ready && <p className="text-[12px] text-muted-foreground">{t('Connect opens GitHub sign-in. Alcon asks to read and write the repositories you can reach, to review and merge pull requests and to let agents push branches.')}</p>}
       {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
-      <div className="flex gap-2">
-        <Button variant="primary" size="sm" disabled={!token.trim() || busy} onClick={() => void connect()}>{busy ? t('Connecting…') : t('Connect')}</Button>
-        <Button variant="ghost" size="sm" onClick={onCancel}>{t('Cancel')}</Button>
-      </div>
     </div>
   );
 }
