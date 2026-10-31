@@ -129,7 +129,10 @@ export function ObjectActionsMenu({
       await deleteObject(object.id);
       onDeleted?.();
       await onRefresh?.();
-    } catch (e) { console.error('Delete Object failed', e); }
+    } catch (e) {
+      console.error('Delete Object failed', e);
+      if (e instanceof Error && e.message) await appDialog.alert(e.message);
+    }
   };
 
   // Archiving hides the Object from lists and pickers and keeps its data; the
