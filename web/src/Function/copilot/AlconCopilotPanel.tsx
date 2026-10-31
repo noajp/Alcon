@@ -3,9 +3,11 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/ui/button';
 
 import { useEffect, useRef, useState } from 'react';
-import { X, ChevronRight, Loader2, Wrench, AlertCircle, CheckCircle2, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Maximize2, Minimize2, Paperclip } from 'lucide-react';
 import { SendIcon } from '@/Function/shared/SendIcon';
-import { type CopilotContext, type ToolEvent } from './useAlconCopilot';
+import { type CopilotAttachment, type CopilotContext } from './useAlconCopilot';
+import { CopilotMessageView, AttachmentChips } from './CopilotMessages';
+import { ATTACH_ACCEPT, AttachError, MAX_FILES, MAX_PDF_BYTES, readAttachment } from './copilotFiles';
 import { useCopilotConversation } from './CopilotProvider';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
@@ -72,6 +74,10 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
   const [rect, setRect] = useState<FloatRect | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [input, setInput] = useState('');
+  const [files, setFiles] = useState<CopilotAttachment[]>([]);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeDomainId, setActiveDomainId] = useState<string | null>(null);
   const { messages, streaming, error, send, cancel, newConversation } = useCopilotConversation();
   const listRef = useRef<HTMLDivElement>(null);
@@ -175,17 +181,39 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
 
   const startEdge = (e: React.PointerEvent<HTMLDivElement>) => startFloat(e, e.currentTarget.dataset.edge as Edge);
 
+  const addFiles = async (list: FileList | File[]) => {
+    setFileError(null);
+    const picked = Array.from(list);
+    if (files.length + picked.length > MAX_FILES) { setFileError(t('Up to {n} files at a time.', { n: MAX_FILES })); return; }
+    const read: CopilotAttachment[] = [];
+    for (const file of picked) {
+      try { read.push(await readAttachment(file)); }
+      catch (e) {
+        if (e instanceof AttachError) {
+          setFileError(e.reason === 'type'
+            ? t('{name}: only PDF, Markdown and text files can be read.', { name: e.fileName })
+            : t('{name} is too large (PDF up to {mb} MB).', { name: e.fileName, mb: MAX_PDF_BYTES / 1024 / 1024 }));
+        } else setFileError(e instanceof Error ? e.message : String(e));
+      }
+    }
+    if (read.length) setFiles((prev) => [...prev, ...read]);
+  };
+
   const submit = () => {
     const text = input.trim();
-    if (!text || streaming) return;
+    if ((!text && files.length === 0) || streaming) return;
     setInput('');
+    const attachments = files;
+    if (inputRef.current) inputRef.current.style.height = '';
+    setFiles([]);
+    setFileError(null);
     const ctx: CopilotContext = {
       viewLabel: 'Alcon',
       domainId: activeDomainId ?? undefined,
       spaceId: getActiveSpaceId() ?? undefined,
       today: toDateOnlyString(new Date()),
     };
-    send(text, { context: ctx });
+    send(text, { context: ctx, attachments });
   };
 
   // Render nothing until hydration finishes so the initial CSR matches the
@@ -247,7 +275,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
       <div ref={listRef} className={`flex-1 overflow-y-auto py-3 text-[12.5px] leading-relaxed ${page ? 'px-8' : 'px-3'}`}>
         <div className={`space-y-3 ${column}`}>
           {messages.map((m, i) => (
-            <MessageBubble key={i} role={m.role} content={m.content} toolEvents={m.toolEvents} streaming={streaming && i === messages.length - 1 && !m.done} />
+            <CopilotMessageView key={i} message={m} streaming={streaming && i === messages.length - 1 && !m.done} />
           ))}
           {error && (
             <div role="alert" className="text-[11.5px] text-[var(--status-danger)]">
@@ -257,91 +285,62 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
         </div>
       </div>
 
-      {/* Composer — a soft-bordered box floating at the foot. */}
+      {/* Composer — a soft-bordered box at the foot: files picked, dropped or
+          pasted show as chips above the text; Enter sends. */}
       <div className={`pb-3 pt-1 ${page ? 'px-8 pb-6' : 'px-3'}`}>
         <form
           onSubmit={(e) => { e.preventDefault(); submit(); }}
-          className={`flex items-end gap-2 rounded-lg bg-[var(--surface-rail)] border border-border/30 shadow-[var(--shadow-island)] px-3 py-2 ${column}`}
+          onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragging(true); } }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => { if (e.dataTransfer.files.length) { e.preventDefault(); setDragging(false); void addFiles(e.dataTransfer.files); } }}
+          className={`flex flex-col gap-1.5 rounded-lg border bg-[var(--surface-rail)] px-2.5 pb-2 pt-2 shadow-[var(--shadow-island)] transition-colors focus-within:border-border ${dragging ? 'border-[var(--accent-default)] bg-[var(--accent-subtle)]' : 'border-border/30'} ${column}`}
         >
+          {files.length > 0 && <div className="flex"><AttachmentChips files={files} onRemove={(i) => setFiles((prev) => prev.filter((_, k) => k !== i))} /></div>}
           <textarea
             ref={inputRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              // Grows with what is written, up to the cap.
+              e.target.style.height = 'auto';
+              e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+            }}
+            onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); void addFiles(e.clipboardData.files); } }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 submit();
               }
             }}
             rows={1}
-            placeholder={streaming ? '…' : t('Type anything')}
+            placeholder={streaming ? '…' : t('Ask anything, or drop a PDF / Markdown / text file')}
             aria-label={t('Message AI')}
             disabled={streaming}
-            className="flex-1 resize-none bg-transparent text-[12.5px] leading-[1.5] py-1.5 max-h-32 min-h-[24px] disabled:opacity-60"
+            className="max-h-40 min-h-[24px] w-full resize-none bg-transparent px-0.5 py-1 text-[12.5px] leading-[1.5] disabled:opacity-60"
             style={{ fontWeight: 400 }}
           />
-          {streaming ? (
-            <Button size="icon-sm" type="button" onClick={cancel} title={t('Stop')} aria-label={t('Stop')} variant="ghost">
-              <X size={14} />
+          <div className="flex items-center gap-1">
+            <input ref={fileInputRef} type="file" accept={ATTACH_ACCEPT} multiple hidden
+              onChange={(e) => { if (e.target.files) void addFiles(e.target.files); e.target.value = ''; }} />
+            <Button size="icon-sm" type="button" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={streaming}
+              title={t('Attach a file (PDF, Markdown, text)')} aria-label={t('Attach a file (PDF, Markdown, text)')} className="text-muted-foreground">
+              <Paperclip size={14} />
             </Button>
-          ) : (
-            <Button size="icon-sm" type="submit" disabled={!input.trim()} title={t('Send (Enter)')} aria-label={t('Send')} variant="primary">
-              <SendIcon size={16} />
-            </Button>
-          )}
+            {fileError && <span role="alert" className="min-w-0 truncate text-[11px] text-[var(--status-danger)]" title={fileError}>{fileError}</span>}
+            <div className="flex-1" />
+            {streaming ? (
+              <Button size="icon-sm" type="button" onClick={cancel} title={t('Stop')} aria-label={t('Stop')} variant="ghost">
+                <X size={14} />
+              </Button>
+            ) : (
+              <Button size="icon-sm" type="submit" disabled={!input.trim() && files.length === 0} title={t('Send (Enter)')} aria-label={t('Send')} variant="primary">
+                <SendIcon size={16} />
+              </Button>
+            )}
+          </div>
         </form>
       </div>
       </>}
     </aside>
-  );
-}
-
-function MessageBubble({
-  role, content, toolEvents, streaming,
-}: { role: 'user' | 'assistant'; content: string; toolEvents?: ToolEvent[]; streaming?: boolean }) {
-  if (role === 'user') {
-    return (
-      <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-lg bg-primary/15 border border-primary/20 text-foreground px-2.5 py-1.5 whitespace-pre-wrap break-words">
-          {content}
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="space-y-1.5">
-      {toolEvents && toolEvents.length > 0 && (
-        <div className="space-y-1">
-          {toolEvents.map((event, i) => <ToolChip key={i} event={event} />)}
-        </div>
-      )}
-      <div className="whitespace-pre-wrap break-words text-foreground/95">
-        {content || (streaming && <Loader2 size={13} className="inline animate-spin text-muted-foreground" />)}
-      </div>
-    </div>
-  );
-}
-
-function ToolChip({ event }: { event: ToolEvent }) {
-  const { t } = useI18n();
-  const status: 'running' | 'ok' | 'error' =
-    !event.result ? 'running' : event.result.ok ? 'ok' : 'error';
-  const Icon = status === 'running' ? Loader2 : status === 'ok' ? CheckCircle2 : AlertCircle;
-  const tone =
-    status === 'running' ? 'text-muted-foreground' :
-    status === 'ok'      ? 'text-[var(--status-success)]' :
-                           'text-[var(--status-danger)]';
-  const summary = event.result?.ok
-    ? (event.result.rows != null ? t('{n} rows', { n: event.result.rows }) : t('OK'))
-    : (event.result?.error ?? '');
-
-  return (
-    <div className={`inline-flex items-center gap-1.5 max-w-full text-[11px] px-1.5 py-0.5 rounded-md bg-muted/40 ${tone}`}>
-      <Wrench size={10} className="opacity-70 shrink-0" />
-      <span className="font-mono opacity-90 truncate">{event.name}</span>
-      <ChevronRight size={10} className="opacity-50 shrink-0" />
-      <Icon size={11} className={`shrink-0 ${status === 'running' ? 'animate-spin' : ''}`} />
-      {summary && <span className="opacity-80 truncate">{summary}</span>}
-    </div>
   );
 }

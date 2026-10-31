@@ -22,9 +22,20 @@ export interface ToolEvent {
   result?: { ok: boolean; rows?: number; error?: string };
 }
 
+/** A file handed to the AI with a question. A PDF travels as base64, a
+ *  Markdown or text file as its text. A kept conversation keeps only the
+ *  name: `data` is absent there, and the file is not sent again. */
+export interface CopilotAttachment {
+  name: string;
+  mediaType: 'application/pdf' | 'text/plain';
+  data?: string;
+}
+
 export interface CopilotMessage {
   role: 'user' | 'assistant';
   content: string;
+  /** Files sent with a user turn. */
+  attachments?: CopilotAttachment[];
   /** Tool-use timeline for assistant turns (one entry per tool call). */
   toolEvents?: ToolEvent[];
   /** True once the stream for this assistant turn has finished. */
@@ -44,7 +55,10 @@ export interface CopilotContext {
 
 interface SendOptions {
   context?: CopilotContext;
+  attachments?: CopilotAttachment[];
 }
+
+type RequestTurn = { role: 'user' | 'assistant'; content: string; attachments?: CopilotAttachment[] };
 
 const FUNCTIONS_PATH = '/functions/v1/alcon-copilot';
 
@@ -89,7 +103,8 @@ export function useAlconCopilot() {
 
   const send = useCallback(async (text: string, opts: SendOptions = {}) => {
     const trimmed = text.trim();
-    if (!trimmed || streaming) return;
+    const files = opts.attachments ?? [];
+    if ((!trimmed && files.length === 0) || streaming) return;
 
     const url = functionsUrl();
     if (!url) {
@@ -100,15 +115,20 @@ export function useAlconCopilot() {
     setError(null);
 
     // Push the user turn + an empty assistant turn we'll stream into.
-    const historyForRequest: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+    const historyForRequest: RequestTurn[] = [];
     setMessages((prev) => {
       const next: CopilotMessage[] = [
         ...prev,
-        { role: 'user', content: trimmed },
+        { role: 'user', content: trimmed, ...(files.length ? { attachments: files } : {}) },
         { role: 'assistant', content: '', toolEvents: [], done: false },
       ];
       for (const m of next) {
-        if (m.role === 'user') historyForRequest.push({ role: 'user', content: m.content });
+        if (m.role === 'user') {
+          // Files whose contents are still at hand go along with every turn,
+          // so later questions can refer back to them.
+          const sendable = (m.attachments ?? []).filter((a) => a.data);
+          historyForRequest.push({ role: 'user', content: m.content, ...(sendable.length ? { attachments: sendable } : {}) });
+        }
         else if (m.role === 'assistant' && m.done) {
           historyForRequest.push({ role: 'assistant', content: m.content });
         }

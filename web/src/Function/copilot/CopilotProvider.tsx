@@ -21,8 +21,11 @@ type Conversation = ReturnType<typeof useAlconCopilot> & {
 const CopilotContext = createContext<Conversation | null>(null);
 
 /** A session's title: the start of its first question. */
-const titleOf = (messages: CopilotMessage[]) =>
-  (messages.find((m) => m.role === 'user')?.content ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
+const titleOf = (messages: CopilotMessage[]) => {
+  const first = messages.find((m) => m.role === 'user');
+  // A question sent with only a file takes the file's name.
+  return (first?.content || first?.attachments?.[0]?.name || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+};
 
 export function CopilotProvider({ children }: { children: ReactNode }) {
   const conversation = useAlconCopilot();
@@ -56,7 +59,12 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
     const finished = wasStreaming.current && !streaming;
     wasStreaming.current = streaming;
     if (!finished || messages.length === 0) return;
-    const kept = messages.map(({ role, content, toolEvents }) => ({ role, content, ...(toolEvents?.length ? { toolEvents } : {}) }));
+    // A file's contents are not kept, only its name.
+    const kept = messages.map(({ role, content, toolEvents, attachments }) => ({
+      role, content,
+      ...(toolEvents?.length ? { toolEvents } : {}),
+      ...(attachments?.length ? { attachments: attachments.map(({ name, mediaType }) => ({ name, mediaType })) } : {}),
+    }));
     void saveSession(sessionId, { title: titleOf(messages), folder_id: folderForNew.current, messages: kept })
       .then((id) => { if (id && id !== sessionId) setSessionId(id); });
   }, [streaming, messages, sessionId, saveSession]);
