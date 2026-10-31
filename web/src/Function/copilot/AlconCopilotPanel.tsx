@@ -293,41 +293,39 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
           onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragging(true); } }}
           onDragLeave={() => setDragging(false)}
           onDrop={(e) => { if (e.dataTransfer.files.length) { e.preventDefault(); setDragging(false); void addFiles(e.dataTransfer.files); } }}
-          className={`flex flex-col gap-1.5 rounded-lg border bg-[var(--surface-rail)] px-2.5 pb-2 pt-2 shadow-[var(--shadow-island)] transition-colors focus-within:border-border ${dragging ? 'border-[var(--accent-default)] bg-[var(--accent-subtle)]' : 'border-border/30'} ${column}`}
+          className={`flex flex-col gap-1 rounded-lg border bg-[var(--surface-rail)] px-1.5 py-1.5 shadow-[var(--shadow-island)] transition-colors focus-within:border-border ${dragging ? 'border-[var(--accent-default)] bg-[var(--accent-subtle)]' : 'border-border/30'} ${column}`}
         >
-          {files.length > 0 && <div className="flex"><AttachmentChips files={files} onRemove={(i) => setFiles((prev) => prev.filter((_, k) => k !== i))} /></div>}
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              // Grows with what is written, up to the cap.
-              e.target.style.height = 'auto';
-              e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
-            }}
-            onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); void addFiles(e.clipboardData.files); } }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                submit();
-              }
-            }}
-            rows={1}
-            placeholder={streaming ? '…' : t('Ask anything, or drop a PDF / Markdown / text file')}
-            aria-label={t('Message AI')}
-            disabled={streaming}
-            className="max-h-40 min-h-[24px] w-full resize-none bg-transparent px-0.5 py-1 text-[12.5px] leading-[1.5] disabled:opacity-60"
-            style={{ fontWeight: 400 }}
-          />
-          <div className="flex items-center gap-1">
+          {files.length > 0 && <div className="flex px-1 pt-0.5"><AttachmentChips files={files} onRemove={(i) => setFiles((prev) => prev.filter((_, k) => k !== i))} /></div>}
+          <div className="flex items-end gap-1">
             <input ref={fileInputRef} type="file" accept={ATTACH_ACCEPT} multiple hidden
               onChange={(e) => { if (e.target.files) void addFiles(e.target.files); e.target.value = ''; }} />
             <Button size="icon-sm" type="button" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={streaming}
               title={t('Attach a file (PDF, Markdown, text)')} aria-label={t('Attach a file (PDF, Markdown, text)')} className="text-muted-foreground">
               <Paperclip size={14} />
             </Button>
-            {fileError && <span role="alert" className="min-w-0 truncate text-[11px] text-[var(--status-danger)]" title={fileError}>{fileError}</span>}
-            <div className="flex-1" />
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                // Grows with what is written, up to the cap.
+                e.target.style.height = 'auto';
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+              }}
+              onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); void addFiles(e.clipboardData.files); } }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+              rows={1}
+              placeholder={streaming ? '…' : t('Ask anything, or drop a PDF / Markdown / text file')}
+              aria-label={t('Message AI')}
+              disabled={streaming}
+              className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent px-0.5 py-1 text-[12.5px] leading-[1.5] disabled:opacity-60"
+              style={{ fontWeight: 400 }}
+            />
             {streaming ? (
               <Button size="icon-sm" type="button" onClick={cancel} title={t('Stop')} aria-label={t('Stop')} variant="ghost">
                 <X size={14} />
@@ -338,6 +336,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
               </Button>
             )}
           </div>
+          {fileError && <span role="alert" className="truncate px-1 text-[11px] text-[var(--status-danger)]" title={fileError}>{fileError}</span>}
         </form>
       </div>
       </>}
