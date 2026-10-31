@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 // Line drawings for an empty list, one per concept, all built from the same
 // rounded isometric blocks: a Domain is a stack of layers, Objects a cluster
@@ -8,9 +8,7 @@ import type { CSSProperties, ReactNode } from 'react';
 // Portfolio a row of bets, an Initiative a path to an outcome, Phases
 // segments laid end to end. Drawn in the text color; each block is filled
 // with the pane's own background so blocks in front hide the lines behind
-// them. On mount the blocks rise into place from below one by one, bottom
-// first, then one keeps a slow float (globals.css `.empty-art-*`; with
-// reduced motion they fade in and stay still).
+// them.
 
 export type EmptyArtKind = 'domain' | 'objects' | 'elements' | 'vision' | 'portfolio' | 'initiative' | 'phase';
 
@@ -62,37 +60,27 @@ function Box({ x, y, w, d, h }: { x: number; y: number; w: number; d: number; h:
   );
 }
 
-/** One block that rises into place; `i` orders the entrance. `float` keeps
- *  it bobbing after it lands. */
-function Piece({ i, float, children }: { i: number; float?: boolean; children: ReactNode }) {
-  return (
-    <g className="empty-art-piece" style={{ '--i': i } as CSSProperties}>
-      {float ? <g className="empty-art-float">{children}</g> : children}
-    </g>
-  );
-}
-
 /** Screen position of iso grid cell (a, b) at level c, cell size s. */
 function cell(a: number, b: number, c: number, s: number, ox: number, oy: number) {
   return { x: ox + (a - b) * COS * s, y: oy + (a + b) * s / 2 - c * s };
 }
 
 function DomainArt() {
-  // Three layers stacked flush, bottom first; the top one floats.
+  // Three layers stacked flush, bottom first.
   return (
     <>
       {[0, 1, 2].map((n) => (
-        <Piece key={n} i={n} float={n === 2}>
+        <g key={n}>
           <Box x={48} y={73 - n * 10} w={34} d={34} h={10} />
-        </Piece>
+        </g>
       ))}
     </>
   );
 }
 
 function ObjectsArt() {
-  // A 2×2×2 cluster of flush blocks; the front top one floats. Built a layer
-  // at a time, bottom first, and back to front within a layer.
+  // A 2×2×2 cluster of flush blocks, drawn a layer at a time, bottom first,
+  // and back to front within a layer.
   const s = 17;
   const blocks: [number, number, number][] = [];
   for (let p = 0; p < 2; p++) for (let q = 0; q < 2; q++) for (let r = 0; r < 2; r++) blocks.push([p, q, r]);
@@ -102,9 +90,9 @@ function ObjectsArt() {
       {blocks.map(([p, q, r], n) => {
         const { x, y } = cell(p, q, r, s, 48, 48);
         return (
-          <Piece key={n} i={n} float={p === 1 && q === 1 && r === 1}>
+          <g key={n}>
             <Box x={x} y={y} w={s} d={s} h={s} />
-          </Piece>
+          </g>
         );
       })}
     </>
@@ -119,13 +107,13 @@ function ElementsArt() {
   tiles.sort((u, v) => u[0] + u[1] - (v[0] + v[1]));
   return (
     <>
-      {tiles.map(([p, q], n) => {
+      {tiles.map(([p, q]) => {
         const lifted = p === 1 && q === 1;
         const { x, y } = cell(p, q, lifted ? 0.3 : 0, s, 48, 31);
         return (
-          <Piece key={`${p}-${q}`} i={n} float={lifted}>
+          <g key={`${p}-${q}`}>
             <Box x={x} y={y} w={s} d={s} h={5} />
-          </Piece>
+          </g>
         );
       })}
     </>
@@ -133,22 +121,21 @@ function ElementsArt() {
 }
 
 function VisionArt() {
-  // A stepped summit: three tiers, each smaller, stacked on one centre; the
-  // top one floats.
+  // A stepped summit: three tiers, each smaller, stacked on one centre.
   const tiers = [42, 28, 14];
   return (
     <>
       {tiers.map((w, n) => (
-        <Piece key={n} i={n} float={n === 2}>
+        <g key={n}>
           <Box x={48} y={45 - n * 9 + w / 2} w={w} d={w} h={9} />
-        </Piece>
+        </g>
       ))}
     </>
   );
 }
 
 function PortfolioArt() {
-  // A row of bets of different sizes; the small front one floats.
+  // A row of bets of different sizes.
   const heights = [36, 26, 16];
   const s = 19, a = 16;
   return (
@@ -156,9 +143,9 @@ function PortfolioArt() {
       {heights.map((h, q) => {
         const { x, y } = cell(0, q, 0, s, 64, 48);
         return (
-          <Piece key={q} i={q} float={q === 2}>
+          <g key={q}>
             <Box x={x} y={y + a - h} w={a} d={a} h={h} />
-          </Piece>
+          </g>
         );
       })}
     </>
@@ -166,8 +153,7 @@ function PortfolioArt() {
 }
 
 function InitiativeArt() {
-  // A path of two tiles leading to a block: the way to an outcome. The block
-  // floats.
+  // A path of two tiles leading to a block: the way to an outcome.
   const s = 20, a = 20;
   return (
     <>
@@ -175,9 +161,9 @@ function InitiativeArt() {
         const { x, y } = cell(p, 0, 0, s, 30.7, 30);
         const h = p === 2 ? 20 : 5;
         return (
-          <Piece key={p} i={p} float={p === 2}>
+          <g key={p}>
             <Box x={x} y={y + a - h} w={a} d={a} h={h} />
-          </Piece>
+          </g>
         );
       })}
     </>
@@ -185,14 +171,14 @@ function InitiativeArt() {
 }
 
 function PhaseArt() {
-  // Stages laid end to end, flush; the current (middle) one floats.
+  // Stages laid end to end, flush.
   const len = 26;
   return (
     <>
       {[0, 1, 2].map((k) => (
-        <Piece key={k} i={k} float={k === 1}>
+        <g key={k}>
           <Box x={29 + k * COS * len} y={42 + k * len / 2} w={len} d={18} h={8} />
-        </Piece>
+        </g>
       ))}
     </>
   );

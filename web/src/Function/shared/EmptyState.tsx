@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { EmptyArt, type EmptyArtKind } from './EmptyArt';
@@ -10,9 +10,8 @@ import { EmptyArt, type EmptyArtKind } from './EmptyArt';
 // Laid out the way an empty list reads in Linear: the concept's line drawing,
 // one heading, a sentence or two, and then the one decisive action that
 // starts the list, as the accent-blue primary button (with its key, when it
-// has one). On mount the drawing assembles and the text rises in after it.
-// One fixed-width, left-aligned column in the middle of the pane, so two
-// empty views side by side line up.
+// has one). One fixed-width, left-aligned column in the middle of the pane,
+// so two empty views side by side line up.
 export function EmptyState({ art, title, description, cta, shortcut, onCta }: {
   art: EmptyArtKind;
   title: string;
@@ -27,21 +26,20 @@ export function EmptyState({ art, title, description, cta, shortcut, onCta }: {
   // state follows the viewer's language without wiring `t` at each call site.
   const { t } = useI18n();
   const tr = (value: ReactNode) => (typeof value === 'string' ? t(value) : value);
-  const rise = (step: number) => ({ className: 'opacity-0 animate-slide-up', style: { animationDelay: `${1200 + step * 220}ms`, animationDuration: '1000ms' } as CSSProperties });
   return (
     // flex-1 for a flex-column host, h-full for a plain block host — either
     // way the column fills the pane.
     <div className="flex-1 h-full flex flex-col items-center justify-center py-20 px-8 select-none">
       <div className="w-full max-w-[380px]">
         <div className="mb-6"><EmptyArt kind={art} /></div>
-        <div {...rise(0)}>
+        <div>
           <h2 className="mb-2 text-[16px] font-semibold text-foreground">{t(title)}</h2>
         </div>
-        <div {...rise(1)}>
+        <div>
           <p className="text-[14px] leading-[22px] text-muted-foreground">{tr(description)}</p>
         </div>
         {cta && onCta && (
-          <div {...rise(2)}>
+          <div>
             <Button variant="primary" onClick={onCta} className="mt-6 gap-1.5">
               {t(cta)}
               {shortcut && (
