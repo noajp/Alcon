@@ -2,6 +2,7 @@ import { OPERATIONS_TOOLS, runOperationsTool } from "./operationsTools.ts";
 import { MEASURE_TOOLS, runMeasureTool } from "./measureTools.ts";
 import { WIDGET_TOOLS, runWidgetTool } from "./widgetTools.ts";
 import { STRATEGY_TOOLS, runStrategyTool } from "./strategyTools.ts";
+import { BATCH_TOOLS, runBatchTool } from "./batchTools.ts";
 import {
   BOARD_TOOLS, errorMessage, runBoardTool,
   type BoardActor, type ToolDef as BoardToolDef, type ToolResult,
@@ -88,7 +89,7 @@ const SYSTEM_PROMPT = `あなたは Alcon（組織活動支援ツール）の Co
    実装: まず listElements か findByText を呼んで一意の UUID を取得 → その UUID で write tool を呼ぶ。"ELE-NNN" 形式を直接 write tool に渡さない。
 3. 一意に絞れない時は候補を提示してユーザーに確認を求める（例: 「Phase 1 と Phase 2 に ELE-001 があります。どちら?」）。曖昧なまま勝手に選ばない。
 4. 削除は元に戻せない。対象はユーザーが名指ししたものだけに限り、親や関連先へ広げない（「Element を消して」で Object を消さない）。削除の前に、消す対象を名前と件数で示し、依頼と食い違いがないかを確かめてから、ユーザーの了承を得て実行する。1 件の削除も同じ。大量 update も実行前に対象を示して了承を得る。
-5. 1 ターン内で複数 Write は可。例: 5 件作成 → createElement × 5 を並行発行。
+5. 2 件以上の Element を作るときは createElements を 1 回だけ呼ぶ（createElement を並べない）。説明文は頼まれない限り 1〜2 文に収める。作成先の Object が文脈で分かっていれば、改めて一覧を引かない。
 6. 結果は簡潔な日本語。UUID などの内部 ID は回答に出さず、名前（Element は ELE-NNN）で示す。Element は ELE-NNN（例: ELE-021）、Status は短い英語ラベル（Todo / In Progress / Done / Blocked / Cancelled / Backlog / In Review）。表で見やすい場合は Markdown table。
 7. 数値の比較・推移・内訳は、Markdown の表に加えてグラフでも示せる。グラフは次の形の fenced block で書く（JSON だけ。値は数値、name は項目名）。type は bar / line / area / pie。系列が複数なら各行に同じキーを持たせ、積み上げは "stacked": true。
    \`\`\`chart
@@ -125,6 +126,7 @@ const TOOLS: ToolDef[] = [
   ...OPERATIONS_TOOLS,
   ...MEASURE_TOOLS,
   ...STRATEGY_TOOLS,
+  ...BATCH_TOOLS,
   ...BOARD_TOOLS,
 ].map((tool, i, all) => (i === all.length - 1 ? { ...tool, cache_control: { type: "ephemeral" as const } } : tool));
 
@@ -142,6 +144,7 @@ async function runTool(
   try {
     if (name === "campaignMeasure") return await runMeasureTool(supabase, input);
     if (name === "strategy") return await runStrategyTool(supabase, input);
+    if (name === "createElements") return await runBatchTool(supabase, input, actor);
     if (name === "analyzeOperations") return await runOperationsTool(supabase, input);
     if (name === "tableData" || name === "widgetBoard") return await runWidgetTool(supabase, name, input);
     return await runBoardTool(supabase, name, input, actor);
