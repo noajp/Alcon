@@ -80,6 +80,25 @@ export function parsePatch(patch: string | null | undefined): DiffHunk[] {
   return hunks;
 }
 
+/** How many unchanged lines sit before each hunk — the stretch the patch
+ *  leaves out between the previous hunk (or the top of the file) and it. */
+export function unchangedBefore(hunks: readonly DiffHunk[]): number[] {
+  let lastOld = 0;
+  return hunks.map((h) => {
+    const gap = Math.max(0, h.oldStart - lastOld - 1);
+    const olds = h.lines.map((l) => l.oldNo).filter((n): n is number => n != null);
+    // A hunk with no old lines (a new file) still starts at its header's line.
+    lastOld = olds.length ? Math.max(...olds) : Math.max(lastOld, h.oldStart);
+    return gap;
+  });
+}
+
+/** A path as a name and the folder it sits in. */
+export function splitPath(path: string): { name: string; dir: string } {
+  const at = path.lastIndexOf('/');
+  return at < 0 ? { name: path, dir: '' } : { name: path.slice(at + 1), dir: path.slice(0, at + 1) };
+}
+
 export interface SplitRow { left: DiffLine | null; right: DiffLine | null }
 
 /** Pairs a hunk's lines for side-by-side reading: context on both sides, and

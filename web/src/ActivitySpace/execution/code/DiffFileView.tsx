@@ -1,13 +1,12 @@
 'use client';
 
 import { forwardRef, useMemo, useState, type ReactNode } from 'react';
-import { AlertTriangle, Check, Github, MessageSquarePlus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
-import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
+import { AlertTriangle, Check, ChevronsUpDown, FileCode2, Github, MessageSquarePlus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { isSubmitChord, isCancelKey } from '@/Function/shared/keyboard';
 import { formatAge } from '@/Function/shared/dateUtils';
-import { fileKind, parsePatch, splitRows, type DiffLine } from '@/Function/codeReview/diffModel';
+import { fileKind, parsePatch, splitPath, splitRows, unchangedBefore, type DiffLine } from '@/Function/codeReview/diffModel';
 import type { CodeDiffFile, GithubLineComment } from '@/hooks/codeChangeData';
 import type { CodeChangeComment } from '@/types/database';
 import { LineCounts, Pill } from './codeChangeLabels';
@@ -30,6 +29,9 @@ interface Props {
   currentUserId: string | null;
   /** Highlighted because the intent check cited it. */
   highlighted: boolean;
+  /** Marked reviewed by this viewer on the current head: shown folded. */
+  reviewed: boolean;
+  onToggleReviewed: () => void;
   onAddComment: (anchor: LineAnchor, body: string) => Promise<void>;
   onResolve: (id: string, resolved: boolean) => void;
   onDelete: (id: string) => void;
@@ -55,8 +57,6 @@ const LINE_TONE: Record<DiffLine['kind'], string> = {
   note: 'text-muted-foreground italic',
 };
 
-const MARK: Record<DiffLine['kind'], string> = { add: '+', del: '−', context: ' ', note: ' ' };
-
 const anchorOf = (path: string, line: DiffLine): LineAnchor | null =>
   line.kind === 'note' ? null
     : line.kind === 'del' ? { path, line: line.oldNo!, side: 'old' }
@@ -67,7 +67,7 @@ const keyOf = (a: LineAnchor) => `${a.side}:${a.line}`;
 const KIND_LABEL: Record<string, string> = { test: 'Test', docs: 'Docs', generated: 'Generated' };
 
 export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileView(
-  { file, layout, comments: own, githubComments = EMPTY_GITHUB, currentUserId, highlighted, onAddComment, onResolve, onDelete, onRetry }, ref,
+  { file, layout, comments: own, githubComments = EMPTY_GITHUB, currentUserId, highlighted, reviewed, onToggleReviewed, onAddComment, onResolve, onDelete, onRetry }, ref,
 ) {
   const { t } = useI18n();
   const kind = fileKind(file.filename);
@@ -76,6 +76,7 @@ export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileV
   const [open, setOpen] = useState(kind === 'implementation');
   const [composing, setComposing] = useState<LineAnchor | null>(null);
   const hunks = useMemo(() => parsePatch(file.patch), [file.patch]);
+  const gaps = useMemo(() => unchangedBefore(hunks), [hunks]);
   const comments = useMemo(() => [
     ...own,
     ...githubComments.filter((c): c is GithubLineComment & { line: number } => c.line != null).map(fromGithub),
@@ -119,30 +120,44 @@ export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileV
     );
   };
 
-  const gutter = (n: number | null, anchor: LineAnchor | null) => (
-    <span className="group/gutter relative w-11 shrink-0 select-none pr-2 text-right text-muted-foreground/70">
-      {n ?? ''}
+  /** The line-number cell, with the comment button that appears on hover. */
+  const gutter = (label: ReactNode, anchor: LineAnchor | null, tone = 'text-muted-foreground/60') => (
+    <span className={`relative w-12 shrink-0 select-none pr-3 text-right tabular-nums ${tone}`}>
+      {label}
       {anchor && (
         <button
           type="button"
           onClick={() => setComposing(anchor)}
           aria-label={t('Comment on this line')}
-          className="absolute left-0 top-0 hidden size-4 items-center justify-center rounded bg-[var(--accent-default)] text-white group-hover/line:flex"
+          className="absolute left-1 top-0.5 hidden size-4 items-center justify-center rounded bg-[var(--accent-default)] text-white group-hover/line:flex"
         >
           <MessageSquarePlus size={10} />
         </button>
       )}
     </span>
   );
+  /** Deleted lines show a dash where a new line would show its number. */
+  const numberOf = (l: DiffLine) => (l.kind === 'del' ? '−' : l.newNo ?? '');
+  const numberTone = (l: DiffLine) => (l.kind === 'del' ? 'text-[var(--status-danger)]' : l.kind === 'add' ? 'text-[var(--status-success)]' : 'text-muted-foreground/60');
+
+  const gapRow = (n: number, key: string) => n > 0 && (
+    <div key={key} className="flex h-7 items-center gap-2 bg-[var(--surface-raised)] px-3 font-sans text-[11px] text-muted-foreground">
+      <ChevronsUpDown size={12} className="shrink-0" />
+      {t('{n} unchanged lines', { n })}
+    </div>
+  );
+
+  const { name, dir } = splitPath(file.filename);
+  const renamedFrom = file.previous_filename && file.previous_filename !== file.filename ? file.previous_filename : null;
+  const expanded = open && !reviewed;
 
   return (
-    <div ref={ref} className={`overflow-hidden rounded-md border ${highlighted ? 'border-[var(--accent-default)]' : 'border-[var(--border-default)]'}`}>
-      <div className="sticky top-0 z-10 flex h-9 items-center gap-2 border-b border-[var(--border-default)] bg-[var(--surface-raised)] px-2">
-        <button type="button" onClick={() => setOpen((v) => !v)} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
-          <DisclosureTriangle open={open} />
-          <span className="truncate font-mono text-[12px] text-foreground">
-            {file.previous_filename && file.previous_filename !== file.filename ? `${file.previous_filename} → ` : ''}{file.filename}
-          </span>
+    <div ref={ref} className={`overflow-hidden rounded-lg border bg-card ${highlighted ? 'border-[var(--accent-default)]' : 'border-[var(--border-default)]'}`}>
+      <div className={`sticky top-0 z-10 flex h-10 items-center gap-2 bg-card px-3 ${expanded ? 'border-b border-[var(--border-default)]' : ''}`}>
+        <button type="button" onClick={() => setOpen((v) => !v)} className="flex min-w-0 flex-1 items-center gap-2 text-left" title={file.filename}>
+          <FileCode2 size={14} className="shrink-0 text-muted-foreground" />
+          <span className="shrink-0 text-[13px] font-medium text-foreground">{name}</span>
+          <span className="min-w-0 truncate text-[12px] text-muted-foreground">{renamedFrom ? `${renamedFrom} → ${dir}` : dir}</span>
         </button>
         {file.status === 'added' && <Pill tone="success">{t('New')}</Pill>}
         {file.status === 'removed' && <Pill tone="danger">{t('Deleted')}</Pill>}
@@ -150,10 +165,14 @@ export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileV
         {kind !== 'implementation' && <Pill tone="neutral">{t(KIND_LABEL[kind])}</Pill>}
         {comments.length > 0 && <span className="text-[11px] text-muted-foreground">{t('{n} comments', { n: comments.length })}</span>}
         <LineCounts additions={file.additions} deletions={file.deletions} />
+        <label className="ml-1 inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground">
+          <input type="checkbox" checked={reviewed} onChange={() => onToggleReviewed()} className="size-3.5 accent-[var(--accent-default)]" />
+          {t('Reviewed')}
+        </label>
       </div>
 
-      {open && (
-        <div className="overflow-x-auto font-mono text-[12px] leading-[20px]">
+      {expanded && (
+        <div className="overflow-x-auto font-mono text-[12px] leading-[22px]">
           {file.patch == null && (
             <div className="px-3 py-3 font-sans text-[12px] text-muted-foreground">
               {t('No diff to show — a binary file, or too large for GitHub to return.')}
@@ -161,17 +180,15 @@ export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileV
           )}
           {hunks.map((h, hi) => (
             <div key={hi}>
-              <div className="truncate whitespace-nowrap bg-[var(--accent-subtle)] px-3 text-[11px] leading-[22px] text-muted-foreground" title={h.header}>{h.header}</div>
+              {gapRow(gaps[hi], `gap-${hi}`)}
               {layout === 'unified'
                 ? h.lines.map((l, li) => {
                   const anchor = anchorOf(file.filename, l);
                   return (
                     <div key={li}>
                       <div className={`group/line flex min-w-max ${LINE_TONE[l.kind]}`}>
-                        {gutter(l.oldNo, anchor)}
-                        {gutter(l.newNo, null)}
-                        <span className="w-4 shrink-0 select-none text-center text-muted-foreground">{MARK[l.kind]}</span>
-                        <span className="whitespace-pre pr-4">{l.text}</span>
+                        {gutter(numberOf(l), anchor, numberTone(l))}
+                        <span className="whitespace-pre pr-6">{l.text || ' '}</span>
                       </div>
                       {threadFor(anchor)}
                     </div>
@@ -183,16 +200,16 @@ export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileV
                   return (
                     <div key={ri}>
                       <div className="grid grid-cols-2">
-                        <div className={`group/line flex min-w-0 overflow-hidden border-r border-[var(--border-default)] ${row.left ? LINE_TONE[row.left.kind] : 'bg-[var(--surface-raised)]'}`}>
+                        <div className={`group/line flex min-w-0 overflow-hidden border-r border-[var(--border-default)] ${row.left ? LINE_TONE[row.left.kind] : ''}`}>
                           {row.left && <>
-                            {gutter(row.left.oldNo, row.left.kind === 'context' ? null : leftAnchor)}
-                            <span className="whitespace-pre pr-2">{row.left.text}</span>
+                            {gutter(row.left.oldNo, row.left.kind === 'context' ? null : leftAnchor, row.left.kind === 'del' ? 'text-[var(--status-danger)]' : undefined)}
+                            <span className="whitespace-pre pr-2">{row.left.text || ' '}</span>
                           </>}
                         </div>
-                        <div className={`group/line flex min-w-0 overflow-hidden ${row.right ? LINE_TONE[row.right.kind] : 'bg-[var(--surface-raised)]'}`}>
+                        <div className={`group/line flex min-w-0 overflow-hidden ${row.right ? LINE_TONE[row.right.kind] : ''}`}>
                           {row.right && <>
-                            {gutter(row.right.newNo, rightAnchor)}
-                            <span className="whitespace-pre pr-2">{row.right.text}</span>
+                            {gutter(row.right.newNo, rightAnchor, row.right.kind === 'add' ? 'text-[var(--status-success)]' : undefined)}
+                            <span className="whitespace-pre pr-2">{row.right.text || ' '}</span>
                           </>}
                         </div>
                       </div>

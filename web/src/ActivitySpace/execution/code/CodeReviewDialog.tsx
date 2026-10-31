@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Bot, ChevronLeft, ChevronRight, ExternalLink, FileText, Folder, GitMerge, ListOrdered, PanelLeft, PanelRight, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertTriangle, Bot, ChevronLeft, ChevronRight, ExternalLink, FileCode2, GitMerge, ListOrdered, PanelLeft, PanelRight, RefreshCw, Search, Sparkles } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -11,7 +11,7 @@ import { formatDisplayName, getCachedDisplayNames } from '@/Function/settings/pr
 import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { isAgentRunOpen, useAgentRun } from '@/Function/copilot/agentData';
 import {
-  buildFileTree, changeSize, iteratePrompt, matchFile, readGuide, readIntentCheck, reviewState, treeOrder, type FileTreeNode,
+  buildFileTree, changeSize, iteratePrompt, matchFile, readGuide, readIntentCheck, reviewState, splitPath, treeOrder,
 } from '@/Function/codeReview/diffModel';
 import {
   useCodeChangeActions, useCodeChangeComments, useCodeChangeReviews, useCodeCommentActions, useCodeDiff, useRetryPublish,
@@ -38,6 +38,15 @@ import { IntentPanel } from './IntentPanel';
 
 const LAYOUT_KEY = 'alcon.codeReview.layout';
 const PANELS_KEY = 'alcon.codeReview.panels';
+/** Files a viewer marked reviewed, per change: path → the head commit it was marked on. */
+const reviewedKey = (changeId: string) => `alcon.codeReview.reviewed.${changeId}`;
+
+function readReviewed(changeId: string): Record<string, string> {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(reviewedKey(changeId)) ?? '{}');
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, string> : {};
+  } catch { return {}; }
+}
 
 /** Below these widths of the whole screen a column starts folded. */
 const FILES_FROM = 1180;
@@ -113,6 +122,16 @@ export function CodeReviewScreen({ change: given, inDialog = false }: { change: 
   const [layout, setLayout] = useState<DiffLayout>(() => readLayout());
   const fileRefs = useRef(new Map<string, HTMLDivElement>());
   const [focused, setFocused] = useState<string | null>(null);
+  // Reviewed is each viewer's own progress through the files; a new push
+  // un-marks the files it was given on an older head.
+  const [reviewedMap, setReviewedMap] = useState<Record<string, string>>(() => readReviewed(given.id));
+  const isReviewed = (path: string) => !!change.head_sha && reviewedMap[path] === change.head_sha;
+  const toggleReviewed = (path: string) => {
+    const next = { ...reviewedMap };
+    if (isReviewed(path)) delete next[path]; else next[path] = change.head_sha ?? '';
+    setReviewedMap(next);
+    try { localStorage.setItem(reviewedKey(change.id), JSON.stringify(next)); } catch { /* per-viewer convenience only */ }
+  };
 
   const [rootRef, rootWidth] = useWidth<HTMLDivElement>();
   const [mainRef, mainWidth] = useWidth<HTMLElement>();
@@ -276,8 +295,7 @@ export function CodeReviewScreen({ change: given, inDialog = false }: { change: 
               </ol>
             ) : (
               <>
-                <div className="px-3 pb-1 text-[11px] text-muted-foreground">{t('{n} files', { n: files.length })}</div>
-                <FileTree nodes={tree} depth={0} focused={focused} cited={cited} onOpen={openFile} />
+                <FileList paths={ordered.map((f) => f.filename)} focused={focused} cited={cited} isReviewed={isReviewed} onOpen={openFile} />
               </>
             )}
           </aside>}
@@ -366,6 +384,8 @@ export function CodeReviewScreen({ change: given, inDialog = false }: { change: 
                   githubComments={githubByFile.get(f.filename)}
                   currentUserId={user?.id ?? null}
                   highlighted={focused === f.filename}
+                  reviewed={isReviewed(f.filename)}
+                  onToggleReviewed={() => toggleReviewed(f.filename)}
                   onAddComment={addComment}
                   onResolve={(id, resolved) => commentActions.resolve.mutate({ id, resolved })}
                   onDelete={(id) => commentActions.remove.mutate(id)}
@@ -482,32 +502,42 @@ function MergeControl({ base, teamNeedsChanges, merging, error, onMerge }: {
   );
 }
 
-function FileTree({ nodes, depth, focused, cited, onOpen }: {
-  nodes: FileTreeNode[]; depth: number; focused: string | null; cited: Set<string>; onOpen: (path: string) => void;
+/** The changed files, flat: name, then its folder, filtered as you type. A
+ *  dot marks a file the intent check cited; reviewed files are dimmed. */
+function FileList({ paths, focused, cited, isReviewed, onOpen }: {
+  paths: string[]; focused: string | null; cited: Set<string>; isReviewed: (path: string) => boolean; onOpen: (path: string) => void;
 }) {
+  const { t } = useI18n();
+  const [filter, setFilter] = useState('');
+  const q = filter.trim().toLowerCase();
+  const shown = q ? paths.filter((p) => p.toLowerCase().includes(q)) : paths;
+  const reviewedCount = paths.filter(isReviewed).length;
   return (
-    <ul>
-      {nodes.map((n) => (
-        <li key={`${n.file ? 'f' : 'd'}:${n.path}`}>
-          {n.file ? (
-            <button type="button" onClick={() => onOpen(n.file!)}
-              className={`flex h-7 w-full items-center gap-1.5 pr-2 text-left text-[12px] hover:bg-[var(--surface-strong)] ${focused === n.file ? 'bg-[var(--surface-strong)] text-foreground' : 'text-[var(--text-secondary)]'}`}
-              style={{ paddingLeft: 12 + depth * 12 }} title={n.file}>
-              <FileText size={12} className="shrink-0 text-muted-foreground" />
-              <span className="truncate">{n.name}</span>
-              {cited.has(n.file) && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-[var(--accent-default)]" />}
-            </button>
-          ) : (
-            <>
-              <div className="flex h-7 items-center gap-1.5 pr-2 text-[12px] text-muted-foreground" style={{ paddingLeft: 12 + depth * 12 }}>
-                <Folder size={12} className="shrink-0" />
-                <span className="truncate">{n.name}</span>
-              </div>
-              <FileTree nodes={n.children} depth={depth + 1} focused={focused} cited={cited} onOpen={onOpen} />
-            </>
-          )}
-        </li>
-      ))}
-    </ul>
+    <div className="px-2">
+      <div className="mb-1 flex h-8 items-center gap-1.5 rounded-md bg-[var(--surface-strong)] px-2">
+        <Search size={12} className="shrink-0 text-muted-foreground" />
+        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('Filter files…')} aria-label={t('Filter files…')}
+          className="min-w-0 flex-1 bg-transparent text-[12px] text-foreground outline-none placeholder:text-muted-foreground" />
+      </div>
+      <div className="px-1 pb-1 text-[11px] text-muted-foreground">
+        {t('{n} files', { n: paths.length })}{reviewedCount > 0 && ` · ${t('{n} reviewed', { n: reviewedCount })}`}
+      </div>
+      <ul>
+        {shown.map((path) => {
+          const { name, dir } = splitPath(path);
+          return (
+            <li key={path}>
+              <button type="button" onClick={() => onOpen(path)} title={path}
+                className={`flex h-7 w-full items-center gap-1.5 rounded-md px-1.5 text-left text-[12px] hover:bg-[var(--surface-strong)] ${focused === path ? 'bg-[var(--surface-strong)]' : ''} ${isReviewed(path) ? 'opacity-50' : ''}`}>
+                <FileCode2 size={12} className="shrink-0 text-muted-foreground" />
+                <span className="shrink-0 text-foreground">{name}</span>
+                <span className="min-w-0 truncate text-muted-foreground">{dir}</span>
+                {cited.has(path) && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-[var(--accent-default)]" />}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildFileTree, changeSize, fileKind, inboxBucket, isCheckStale, iteratePrompt, matchFile, parsePatch, parsePullUrl, readGuide,
-  readIntentCheck, reviewState, splitRows, treeOrder,
+  readIntentCheck, reviewState, splitPath, splitRows, treeOrder, unchangedBefore,
   type InboxChange, type InboxContext, type ReviewRecord,
 } from '@/Function/codeReview/diffModel';
 
@@ -250,5 +250,17 @@ describe('iteratePrompt', () => {
   });
   it('is null when nothing is left to address', () => {
     expect(iteratePrompt({ ...base, comments: [], reviews: [{ verdict: 'matches', body: 'ok', reviewer: null, stale: false }] })).toBeNull();
+  });
+});
+
+describe('unchangedBefore / splitPath', () => {
+  it('counts the lines the patch leaves out before each hunk', () => {
+    const hunks = parsePatch('@@ -10,3 +10,3 @@\n a\n-b\n+B\n c\n@@ -40,2 +40,2 @@\n x\n y');
+    expect(unchangedBefore(hunks)).toEqual([9, 27]);
+    expect(unchangedBefore(parsePatch('@@ -0,0 +1,2 @@\n+a\n+b'))).toEqual([0]);
+  });
+  it('splits a path into name and folder', () => {
+    expect(splitPath('web/src/a.ts')).toEqual({ name: 'a.ts', dir: 'web/src/' });
+    expect(splitPath('README.md')).toEqual({ name: 'README.md', dir: '' });
   });
 });
