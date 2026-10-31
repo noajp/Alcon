@@ -25,6 +25,13 @@ function getCustomProgress(elementId: string, customColumns?: CustomColumnWithVa
   return clampProgress(progressColumn.values?.[elementId]?.value);
 }
 
+/** Pure. The share of SubElements checked off, as a whole percent. */
+function subelementProgress(subelements: { is_completed?: boolean | null }[]): number {
+  if (subelements.length === 0) return 0;
+  const completed = subelements.filter((sub) => !!sub.is_completed).length;
+  return Math.round((completed / subelements.length) * 100);
+}
+
 export function getElementProgress(
   element: ElementWithDetails,
   customColumns?: CustomColumnWithValues[],
@@ -33,19 +40,19 @@ export function getElementProgress(
   // lower just because subelements or a custom tag lag behind.
   if (element.status === 'done') return 100;
 
-  // Manual override from the status picker — highest precedence.
+  // SubElements decide it when there are any: the share checked off. The
+  // database writes the same number to `progress` (and Done when all are
+  // checked off); reading it from the list here shows a check-off at once.
+  const subelements = element.subelements ?? [];
+  if (subelements.length > 0) return subelementProgress(subelements);
+
+  // Otherwise the % set in the status picker.
   if (typeof element.progress === 'number') {
     return Math.max(0, Math.min(100, Math.round(element.progress)));
   }
 
   const customProgress = getCustomProgress(element.id, customColumns);
   if (customProgress !== null) return customProgress;
-
-  const subelements = element.subelements ?? [];
-  if (subelements.length > 0) {
-    const completed = subelements.filter((sub) => !!sub.is_completed).length;
-    return Math.round((completed / subelements.length) * 100);
-  }
 
   return 0;
 }
