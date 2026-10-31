@@ -18,6 +18,7 @@ import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
 import { IndexList, IndexRow } from '@/Function/shared/IndexList';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import { appDialog } from '@/Function/shared/appDialogStore';
+import { InitiativeMenu } from '@/ActivitySpace/strategy/initiative/InitiativeMenu';
 import { RenameInput } from '@/ActivitySpace/sustainment/notebook/RenameInput';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
@@ -332,6 +333,7 @@ function InitiativeIndexRow({ strategy, health, onOpen }: {
   const alerts = health ? health.risk.overdue + health.risk.stalled + health.risk.blocked : 0;
   const moved = health?.lastActivityAt != null ? formatRelative(new Date(health.lastActivityAt).toISOString()) : null;
   return (
+    <InitiativeMenu initiative={strategy}><div>
     <IndexRow icon={<NavStrategyIcon size={13} />} name={strategy.name} onOpen={onOpen}
       count={countObjects(strategy.objectIds)}
       health={
@@ -346,6 +348,7 @@ function InitiativeIndexRow({ strategy, health, onOpen }: {
           {alerts > 0 && <span className="min-w-0 truncate text-foreground/80">{t('{n} alerts', { n: String(alerts) })}</span>}
         </div>
       } />
+    </div></InitiativeMenu>
   );
 }
 

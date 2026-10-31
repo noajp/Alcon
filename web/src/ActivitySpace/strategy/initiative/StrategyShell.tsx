@@ -7,6 +7,7 @@ import { Check, ChevronDown, ChevronRight, Plus, Search, X, MoreHorizontal, Tras
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { IndexList, IndexRow } from '@/Function/shared/IndexList';
+import { InitiativeMenu } from './InitiativeMenu';
 import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { QuietEmpty } from '@/ActivitySpace/strategy/QuietEmpty';
@@ -275,10 +276,14 @@ function StrategyListView({
   return (
     <IndexList headers={[t('Name'), t('Health'), t('Objects')]} showHeader={showHeader}>
       {strategies.map((s) => (
-        <IndexRow key={s.id} icon={<NavStrategyIcon size={13} />} name={s.name}
-          health={<InitiativeHealthCell health={health.get(s.id)} />}
-          count={countObjects(s.objectIds)}
-          onOpen={() => onSelectStrategy(s)} />
+        <InitiativeMenu key={s.id} initiative={s}>
+          <div>
+            <IndexRow icon={<NavStrategyIcon size={13} />} name={s.name}
+              health={<InitiativeHealthCell health={health.get(s.id)} />}
+              count={countObjects(s.objectIds)}
+              onOpen={() => onSelectStrategy(s)} />
+          </div>
+        </InitiativeMenu>
       ))}
     </IndexList>
   );
