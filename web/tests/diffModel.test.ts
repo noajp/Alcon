@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildFileTree, changeSize, fileKind, isCheckStale, parsePatch, parsePullUrl, readIntentCheck, reviewState, splitRows, treeOrder,
-  type ReviewRecord,
+  buildFileTree, changeSize, fileKind, inboxBucket, isCheckStale, iteratePrompt, matchFile, parsePatch, parsePullUrl, readGuide,
+  readIntentCheck, reviewState, splitRows, treeOrder,
+  type InboxChange, type InboxContext, type ReviewRecord,
 } from '@/Function/codeReview/diffModel';
 
 const server = await import(new URL('../../supabase/functions/_shared/github.ts', import.meta.url).pathname);
@@ -166,5 +167,88 @@ describe('reviewState', () => {
     const s = reviewState([r('a', 'matches', '1', 'h1')], 'h2');
     expect(s.overall).toBe('pending');
     expect(s.latest[0].stale).toBe(true);
+  });
+});
+
+describe('matchFile', () => {
+  const files = ['web/src/a/Thing.tsx', 'web/src/b/Thing.tsx', 'README.md'];
+  it('matches exactly, then by tail', () => {
+    expect(matchFile('README.md', files)).toBe('README.md');
+    expect(matchFile('b/Thing.tsx', files)).toBe('web/src/b/Thing.tsx');
+    expect(matchFile('./README.md', files)).toBe('README.md');
+    expect(matchFile('nope.ts', files)).toBeNull();
+  });
+});
+
+describe('readGuide', () => {
+  const files = ['db.sql', 'api.ts', 'ui.tsx', 'notes.md'];
+  it('places each file once, drops empty sections and gathers the rest', () => {
+    const g = readGuide({
+      summary: 's', head_sha: 'h1',
+      sections: [
+        { title: 'Data', what: 'w', why: 'y', files: ['db.sql', 'api.ts'] },
+        { title: 'Ghost', what: '', why: '', files: ['missing.ts'] },
+        { title: 'API again', what: '', why: '', files: ['api.ts', 'ui.tsx'] },
+      ],
+    }, files)!;
+    expect(g.sections.map((s) => s.title)).toEqual(['Data', 'API again', '']);
+    expect(g.sections[1].files).toEqual(['ui.tsx']);
+    expect(g.sections[2]).toMatchObject({ rest: true, files: ['notes.md'] });
+    expect(g.headSha).toBe('h1');
+  });
+  it('reads malformed or empty guides as null', () => {
+    expect(readGuide(null, files)).toBeNull();
+    expect(readGuide({ sections: '[]' }, files)).toBeNull();
+    expect(readGuide({ sections: [{ title: 'x', files: ['zzz'] }] }, files)).toBeNull();
+  });
+});
+
+describe('inboxBucket', () => {
+  const ctx = (over: Partial<InboxContext> = {}): InboxContext => ({
+    myElements: new Set(), reviewingElements: new Set(), elementsWithReviewer: new Set(), myVerdictHeads: new Map(), ...over,
+  });
+  const change = (over: Partial<InboxChange> = {}): InboxChange => ({ id: 'c', element_id: 'e', state: 'open', head_sha: 'h2', linked_by: 'other', ...over });
+
+  it('puts finished changes in done and the person’s own in mine', () => {
+    expect(inboxBucket(change({ state: 'merged' }), 'me', ctx())).toBe('done');
+    expect(inboxBucket(change({ linked_by: 'me' }), 'me', ctx())).toBe('mine');
+    expect(inboxBucket(change(), 'me', ctx({ myElements: new Set(['e']) }))).toBe('mine');
+  });
+  it('waits on a review until a verdict is given on the current head', () => {
+    expect(inboxBucket(change(), 'me', ctx())).toBe('review');
+    expect(inboxBucket(change(), 'me', ctx({ myVerdictHeads: new Map([['c', new Set(['h1'])]]) }))).toBe('review');
+    expect(inboxBucket(change(), 'me', ctx({ myVerdictHeads: new Map([['c', new Set(['h2'])]]) }))).toBe('open');
+  });
+  it('leaves a change with someone else as reviewer to them, and drafts open', () => {
+    expect(inboxBucket(change(), 'me', ctx({ elementsWithReviewer: new Set(['e']) }))).toBe('open');
+    expect(inboxBucket(change(), 'me', ctx({ elementsWithReviewer: new Set(['e']), reviewingElements: new Set(['e']) }))).toBe('review');
+    expect(inboxBucket(change({ state: 'draft' }), 'me', ctx())).toBe('open');
+  });
+});
+
+describe('iteratePrompt', () => {
+  const base = { repo: 'o/r', number: 7, url: 'https://github.com/o/r/pull/7', headRef: 'alcon/el-1' };
+  it('asks for the open points on the same branch', () => {
+    const p = iteratePrompt({
+      ...base,
+      comments: [
+        { path: 'a.ts', line: 3, body: 'rename this', author: 'Ann', resolved: false },
+        { path: 'b.ts', line: 1, body: 'done already', author: 'Ann', resolved: true },
+      ],
+      reviews: [
+        { verdict: 'needs_changes', body: 'missing the empty state', reviewer: 'Bo', stale: false },
+        { verdict: 'needs_changes', body: 'old point', reviewer: 'Bo', stale: true },
+        { verdict: 'matches', body: 'lgtm', reviewer: 'Cy', stale: false },
+      ],
+    })!;
+    expect(p).toContain('alcon/el-1');
+    expect(p).toContain('`a.ts:3`');
+    expect(p).toContain('missing the empty state');
+    expect(p).not.toContain('done already');
+    expect(p).not.toContain('old point');
+    expect(p).not.toContain('lgtm');
+  });
+  it('is null when nothing is left to address', () => {
+    expect(iteratePrompt({ ...base, comments: [], reviews: [{ verdict: 'matches', body: 'ok', reviewer: null, stale: false }] })).toBeNull();
   });
 });

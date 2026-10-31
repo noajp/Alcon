@@ -4,7 +4,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { FileText, Inbox, Home, ListTodo, Settings } from 'lucide-react';
+import { FileText, GitCompare, Inbox, Home, ListTodo, Settings } from 'lucide-react';
 import { ObjectIcon, ElementIcon, CrmIcon } from '@/Function/shared/conceptIcons';
 import { crmRoute, routeTo } from '@/Function/crm/crmRoute';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
@@ -48,6 +48,7 @@ const NAV_COMMANDS = [
   { id: 'inbox',        label: 'Open Inbox',         icon: Inbox,    view: 'inbox' },
   { id: 'domain-elements',      label: 'Domain Elements',    icon: ListTodo, view: 'domain-elements' },
   { id: 'objects',     label: 'Objects',            icon: ObjectIcon, view: 'objects' },
+  { id: 'reviews',     label: 'Open Reviews',       icon: GitCompare, view: 'reviews' },
   ...[...BAR_TOOLS, ...APP_GROUPS.flatMap(group => group.apps)].map(mode => ({
     id: mode, label: `Open ${MODE_META[mode].label}`, icon: MODE_META[mode].icon, view: MODE_META[mode].defaultView,
   })),

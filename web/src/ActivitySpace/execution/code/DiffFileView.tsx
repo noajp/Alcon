@@ -1,19 +1,21 @@
 'use client';
 
 import { forwardRef, useMemo, useState, type ReactNode } from 'react';
-import { Check, MessageSquarePlus, RotateCcw, Trash2 } from 'lucide-react';
+import { AlertTriangle, Check, Github, MessageSquarePlus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { isSubmitChord, isCancelKey } from '@/Function/shared/keyboard';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { fileKind, parsePatch, splitRows, type DiffLine } from '@/Function/codeReview/diffModel';
-import type { CodeDiffFile } from '@/hooks/codeChangeData';
+import type { CodeDiffFile, GithubLineComment } from '@/hooks/codeChangeData';
 import type { CodeChangeComment } from '@/types/database';
 import { LineCounts, Pill } from './codeChangeLabels';
 
 // One changed file in the review screen: its header, its hunks in unified or
-// split layout, and the line comments under the lines they were left on.
+// split layout, and the line comments under the lines they were left on —
+// those written in Alcon (with whether they reached GitHub) and those written
+// on GitHub, which read here but are answered there.
 
 export type DiffLayout = 'unified' | 'split';
 
@@ -23,13 +25,28 @@ interface Props {
   file: CodeDiffFile;
   layout: DiffLayout;
   comments: CodeChangeComment[];
+  /** Line comments written on GitHub. */
+  githubComments?: GithubLineComment[];
   currentUserId: string | null;
   /** Highlighted because the intent check cited it. */
   highlighted: boolean;
   onAddComment: (anchor: LineAnchor, body: string) => Promise<void>;
   onResolve: (id: string, resolved: boolean) => void;
   onDelete: (id: string) => void;
+  /** Posts one of the person's comments to GitHub again after a refusal. */
+  onRetry?: (id: string) => void;
 }
+
+const GITHUB_PREFIX = 'gh:';
+
+/** A GitHub comment in the shape the threads draw. */
+const fromGithub = (c: GithubLineComment & { line: number }): CodeChangeComment => ({
+  id: `${GITHUB_PREFIX}${c.id}`, code_change_id: '', author_id: '', author_name: c.user, path: c.path, line: c.line,
+  side: c.side === 'LEFT' ? 'old' : 'new', body: c.body, head_sha: null, resolved: false, created_at: c.created_at,
+  github_comment_id: c.id, github_error: null,
+});
+
+const EMPTY_GITHUB: GithubLineComment[] = [];
 
 const LINE_TONE: Record<DiffLine['kind'], string> = {
   add: 'bg-[var(--status-success-subtle)]',
@@ -50,7 +67,7 @@ const keyOf = (a: LineAnchor) => `${a.side}:${a.line}`;
 const KIND_LABEL: Record<string, string> = { test: 'Test', docs: 'Docs', generated: 'Generated' };
 
 export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileView(
-  { file, layout, comments, currentUserId, highlighted, onAddComment, onResolve, onDelete }, ref,
+  { file, layout, comments: own, githubComments = EMPTY_GITHUB, currentUserId, highlighted, onAddComment, onResolve, onDelete, onRetry }, ref,
 ) {
   const { t } = useI18n();
   const kind = fileKind(file.filename);
@@ -59,6 +76,10 @@ export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileV
   const [open, setOpen] = useState(kind === 'implementation');
   const [composing, setComposing] = useState<LineAnchor | null>(null);
   const hunks = useMemo(() => parsePatch(file.patch), [file.patch]);
+  const comments = useMemo(() => [
+    ...own,
+    ...githubComments.filter((c): c is GithubLineComment & { line: number } => c.line != null).map(fromGithub),
+  ].sort((a, b) => a.created_at.localeCompare(b.created_at)), [own, githubComments]);
 
   const byLine = useMemo(() => {
     const map = new Map<string, CodeChangeComment[]>();
@@ -86,7 +107,7 @@ export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileV
     return (
       <div className="border-y border-[var(--border-default)] bg-[var(--surface-raised)] px-3 py-2 font-sans">
         {list.map((c) => (
-          <LineComment key={c.id} comment={c} mine={c.author_id === currentUserId} onResolve={onResolve} onDelete={onDelete} />
+          <LineComment key={c.id} comment={c} mine={c.author_id === currentUserId} onResolve={onResolve} onDelete={onDelete} onRetry={onRetry} />
         ))}
         {isComposing && (
           <CommentComposer
@@ -186,7 +207,7 @@ export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileV
             <div className="border-t border-[var(--border-default)] bg-[var(--surface-raised)] px-3 py-2 font-sans">
               <div className="mb-1 text-[11px] text-muted-foreground">{t('On lines no longer in this diff')}</div>
               {outdated.map((c) => (
-                <LineComment key={c.id} comment={c} mine={c.author_id === currentUserId} onResolve={onResolve} onDelete={onDelete} showLine />
+                <LineComment key={c.id} comment={c} mine={c.author_id === currentUserId} onResolve={onResolve} onDelete={onDelete} onRetry={onRetry} showLine />
               ))}
             </div>
           )}
@@ -196,11 +217,12 @@ export const DiffFileView = forwardRef<HTMLDivElement, Props>(function DiffFileV
   );
 });
 
-function LineComment({ comment, mine, onResolve, onDelete, showLine }: {
+function LineComment({ comment, mine, onResolve, onDelete, onRetry, showLine }: {
   comment: CodeChangeComment; mine: boolean; showLine?: boolean;
-  onResolve: (id: string, resolved: boolean) => void; onDelete: (id: string) => void;
+  onResolve: (id: string, resolved: boolean) => void; onDelete: (id: string) => void; onRetry?: (id: string) => void;
 }) {
   const { t } = useI18n();
+  const external = comment.id.startsWith(GITHUB_PREFIX);
   return (
     <div className={`group/comment flex items-start gap-2 py-1 text-[12px] ${comment.resolved ? 'opacity-60' : ''}`}>
       <div className="min-w-0 flex-1">
@@ -209,11 +231,25 @@ function LineComment({ comment, mine, onResolve, onDelete, showLine }: {
           <span className="text-[11px] text-muted-foreground">{formatAge(comment.created_at, true)}</span>
           {showLine && <span className="font-mono text-[11px] text-muted-foreground">L{comment.line}</span>}
           {comment.resolved && <span className="text-[11px] text-muted-foreground">{t('Resolved')}</span>}
+          {external && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Github size={11} />{t('On GitHub')}</span>}
+          {!external && comment.github_comment_id != null && (
+            <span className="text-muted-foreground" title={t('Posted to GitHub')}><Github size={11} /></span>
+          )}
+          {!external && comment.github_error && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-[var(--status-warning)]" title={comment.github_error}>
+              <AlertTriangle size={11} />{t('Not on GitHub')}
+              {mine && onRetry && (
+                <button type="button" onClick={() => onRetry(comment.id)} className="inline-flex items-center gap-0.5 text-[var(--accent-hover)] hover:underline">
+                  <RefreshCw size={10} />{t('Retry')}
+                </button>
+              )}
+            </span>
+          )}
         </div>
         <p className="whitespace-pre-wrap text-foreground">{comment.body}</p>
       </div>
       <ButtonAppearanceProvider appearance="inline">
-        <div className="flex shrink-0 opacity-0 transition-opacity group-hover/comment:opacity-100">
+        <div className={`flex shrink-0 opacity-0 transition-opacity group-hover/comment:opacity-100 ${external ? 'hidden' : ''}`}>
           <Button variant="ghost" size="icon-xs" onClick={() => onResolve(comment.id, !comment.resolved)}
             aria-label={comment.resolved ? t('Reopen') : t('Resolve')} title={comment.resolved ? t('Reopen') : t('Resolve')}>
             {comment.resolved ? <RotateCcw size={12} /> : <Check size={12} />}

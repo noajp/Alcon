@@ -1323,6 +1323,8 @@ export interface CodeChange {
   deletions: number | null
   changed_files: number | null
   intent_check: Json | null
+  /** The AI's walk-through of the change, in sections (read with readGuide). */
+  guide: Json | null
   linked_via: 'manual' | 'agent'
   run_id: string | null
   linked_by: string | null
@@ -1340,6 +1342,9 @@ export interface CodeChangeReview {
   body: string
   head_sha: string | null
   created_at: string
+  /** The review posted to the pull request, or why it could not be. */
+  github_review_id: number | null
+  github_error: string | null
 }
 
 export interface CodeChangeComment {
@@ -1354,6 +1359,9 @@ export interface CodeChangeComment {
   head_sha: string | null
   resolved: boolean
   created_at: string
+  /** The comment posted to the pull request, or why it could not be. */
+  github_comment_id: number | null
+  github_error: string | null
 }
 
 // An external service a Space connects for its agents (ADR 0027). Members

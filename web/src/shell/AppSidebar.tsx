@@ -19,7 +19,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
-import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp } from 'lucide-react';
+import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp, GitCompare } from 'lucide-react';
 import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
 import { domainHasObjectsMessage, useDomainRole, type DomainRole } from '@/hooks/domainData';
 import { countDomainObjects } from '@/hooks/useObjectArchive';
@@ -501,6 +501,11 @@ export function AppSidebar({
             onSelect={view => { setActiveDomainId(d.id); onNavigate({ objectId: null }); onViewChange(view); }}
             onSettings={() => setSettingsDomain(d)}
           />)}
+
+          {/* Reviews — the pull requests that carry out this Space's Elements. */}
+          <div className="mt-3">
+            <SidebarRow active={activeView === 'reviews'} icon={<GitCompare size={16} />} label={t('Reviews')} onClick={() => onViewChange('reviews')} />
+          </div>
 
           </>
           )}
