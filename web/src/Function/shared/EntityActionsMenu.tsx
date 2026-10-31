@@ -76,7 +76,10 @@ export function EntityActionsMenu({
           title={tr(ariaLabel)}
           className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
         >
-          <MoreHorizontal size={14} />
+          {/* In a 50px header the 24px button lands on a half pixel, so the
+              dots blur and read low beside the title; half a pixel up puts
+              them crisp on the middle of its letters. */}
+          <MoreHorizontal size={14} className="-translate-y-[0.5px]" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-[190px]">
