@@ -21,7 +21,9 @@ import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/prefer
 import type { DateRange } from 'react-day-picker';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { isAgentRunOpen } from '@/Function/copilot/agentData';
-import { AgentRunPanel, DelegateToAiButton } from './agent';
+import { AgentRunPanel } from './agent';
+import { OpenInMenu } from '@/ActivitySpace/execution/openIn/OpenInMenu';
+import { createNoteFile } from '@/hooks/useNotesDb';
 import {
   updateElement,
   fetchElementWithDetails,
@@ -694,6 +696,28 @@ function ElementDetailBody({
           <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack} />
         </div>
         <div className="flex-1" />
+        {/* Take the Element to a tool: Claude Code, the in-app agent (it
+            works with your permissions and stops for approval before
+            external writes, ADR 0027), its Note, a deck. */}
+        <OpenInMenu
+          subject={{
+            kind: 'Element', identifier: element.display_id, title: element.title,
+            description: element.description, path: [domainName, ...(objectPath ?? []).map((seg) => seg.name)].filter((x): x is string => !!x),
+          }}
+          noteId={element.note_id ?? null}
+          onCreateNote={async () => {
+            const note = await createNoteFile(element.title);
+            await updateElement(element.id, { note_id: note.id });
+            log('note', `Linked new Note “${note.name}”`);
+            onRefresh?.();
+            return note.id;
+          }}
+          agent={{
+            aiWorkers, defaultWorkerId: assignedAiWorkerId, busy: isAgentRunOpen(agent.run),
+            starting: agent.starting, error: agent.error ?? null,
+            onStart: ({ workerId, prompt }) => agent.start({ workerId, prompt, triggeredFrom: 'detail', domainId }),
+          }}
+        />
         {/* The rail's "Add widget" is page chrome, not content: it portals
             here, beside the breadcrumb, instead of heading the rail. */}
         <WidgetActionSlotTarget className="flex items-center gap-1" />
@@ -851,18 +875,6 @@ function ElementDetailBody({
                 />
               </div>
             )}
-
-            {/* Hand the Element to an agent — it works the task with your
-                permissions and stops for your approval before external
-                writes (ADR 0027). */}
-            <DelegateToAiButton
-              aiWorkers={aiWorkers}
-              defaultWorkerId={assignedAiWorkerId}
-              disabled={isAgentRunOpen(agent.run)}
-              starting={agent.starting}
-              error={agent.error}
-              onStart={({ workerId, prompt }) => agent.start({ workerId, prompt, triggeredFrom: 'detail', domainId })}
-            />
 
             {/* Approval — one button that opens a menu to enable the workflow
                 and record a decision (Approve / Request changes / Reject).

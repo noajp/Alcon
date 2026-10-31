@@ -40,6 +40,7 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { seedStarterSpace } from '@/Function/space/seedStarterSpace';
+import { OPEN_IN_APP_EVENT, type OpenInAppDetail } from '@/Function/shared/appNavigation';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -300,6 +301,19 @@ function WorkspaceContent({
   // the visible tab).
   const setActiveView = (view: string) => updateTab(activeTab.id, { activeView: view });
   const setActiveNavigation = (nav: Partial<NavigationState>) => updateTabNavigation(activeTab.id, nav);
+
+  // A page asked for another screen (an Element's "Open in" → its Note, a new
+  // deck): switch this tab's view, and its route when one is given.
+  // Re-subscribed each render, so it always writes to the tab active now.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const { view, nav } = (e as CustomEvent<OpenInAppDetail>).detail;
+      if (nav) setActiveNavigation(nav);
+      setActiveView(view);
+    };
+    window.addEventListener(OPEN_IN_APP_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_IN_APP_EVENT, onOpen);
+  });
 
   // Settings opens in place and remembers where it came from, so the
   // sidebar's Back returns to that view — the one navigation target a

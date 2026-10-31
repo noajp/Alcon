@@ -3,6 +3,7 @@
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { AppShell } from './kata/components/shell/AppShell';
 import { useSlidesSync } from './sync';
+import { useNewDeckRequest } from './newDeckRequest';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useKataLocale } from './useKataLocale';
 
@@ -16,6 +17,7 @@ export function SlidesView() {
   useKataLocale();
   const spaceId = useActiveSpaceId();
   const { ready, error } = useSlidesSync(spaceId);
+  useNewDeckRequest(ready);
   if (!spaceId) return <p className="p-6 text-sm text-muted-foreground">{t('Open a Space to work on its decks.')}</p>;
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-auto bg-background">
