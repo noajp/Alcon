@@ -588,14 +588,14 @@ button, a, input, select, textarea {
 .animate-fade-in  { animation: fade-in  var(--motion-base) forwards; }
 .animate-slide-up { animation: slide-up var(--motion-base) forwards; }
 .animate-scale-in { animation: scale-in var(--motion-base) forwards; }
-/* Empty-list drawings (EmptyArt): pieces rise into place from below one by
-   one, bottom first, then one keeps a slow float. --empty-art-fill is the
+/* Empty-list drawings (EmptyArt): 0.3s after the page shows, pieces rise
+   into place from below one by one, bottom first, then one keeps a slow float. --empty-art-fill is the
    pane's background, so faces in front hide the lines behind them. */
 @keyframes empty-art-rise  { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes empty-art-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 .empty-art { --empty-art-fill: var(--card); }
-.empty-art-piece { animation: empty-art-rise 1600ms cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(var(--i) * 320ms); }
-.empty-art-float { animation: empty-art-float 5s ease-in-out 3.6s infinite; }
+.empty-art-piece { animation: empty-art-rise 1600ms cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(300ms + var(--i) * 320ms); }
+.empty-art-float { animation: empty-art-float 5s ease-in-out 3.9s infinite; }
 /* With reduced motion the pieces still arrive in turn, but fade rather than
    rise, and nothing keeps moving. */
 @keyframes empty-art-appear { from { opacity: 0; } to { opacity: 1; } }
