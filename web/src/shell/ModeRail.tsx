@@ -62,7 +62,7 @@ function RailButton({
       title={label}
       aria-label={label}
       aria-pressed={active}
-      className={`relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+      className={`relative flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
         active
           ? 'bg-sidebar-accent text-foreground'
           : 'text-muted-foreground/70 hover:bg-sidebar-accent/50 hover:text-foreground'
@@ -97,11 +97,11 @@ function ProfileRailButton({
       title={name ?? t('Profile')}
       aria-label={t('Profile')}
       aria-pressed={active}
-      className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+      className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
         active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/50'
       }`}
     >
-      <WorkerAvatar worker={worker} size={28} />
+      <WorkerAvatar worker={worker} size={26} />
     </button>
   );
 }
@@ -140,7 +140,7 @@ export function ModeRail({
 
   return (
     <ButtonAppearanceProvider appearance="navigation"><Popover open={launcherOpen} onOpenChange={setLauncherOpen}>
-    <div className="flex w-[46px] shrink-0 flex-col items-center gap-1 bg-background py-2">
+    <div className="flex w-10 shrink-0 flex-col items-center gap-1 bg-background py-2">
       {coreModes.map((mode) => (
         <RailButton
           key={mode}
@@ -172,7 +172,7 @@ export function ModeRail({
         title={t('Sustainment')}
         aria-label={t('Sustainment')}
         aria-expanded={launcherOpen}
-        className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+        className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
           launcherOpen
             ? 'bg-sidebar-accent text-foreground'
             : 'text-muted-foreground/70 hover:bg-sidebar-accent/50 hover:text-foreground'
