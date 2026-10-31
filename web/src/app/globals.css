@@ -55,9 +55,9 @@
      freezing one gray. The hues are theme-invariant, like --status-*. */
   --element-status-backlog:     color-mix(in oklab, var(--muted-foreground) 60%, transparent);
   --element-status-todo:        color-mix(in oklab, var(--muted-foreground) 70%, transparent);
-  --element-status-in-progress: var(--accent-default);
-  --element-status-review:      #8d7ddb;
-  --element-status-done:        #23734f;
+  --element-status-in-progress: #2f9e44;
+  --element-status-review:      #22b5b0;
+  --element-status-done:        var(--accent-default);
   --element-status-blocked:     #c29a4c;
   --element-status-cancelled:   color-mix(in oklab, var(--muted-foreground) 40%, transparent);
 
@@ -79,8 +79,7 @@
      mechanism -subtle above already uses — one more variant this hue
      needed, not a parallel text ramp. Dot/bg/icon keep the base hue.
      75% base / 25% black measured at ~4.0:1 against white — in line with
-     the other three statuses' text contrast (done 3.99, in_progress 3.96,
-     review 4.27), not maximally dark. `black` the keyword silently drops
+     the other statuses' text, not maximally dark. `black` the keyword silently drops
      this declaration in this build's CSS pipeline — #000000 does not. */
   --element-status-blocked-text: color-mix(in oklab, var(--element-status-blocked) 75%, #000000);
 
