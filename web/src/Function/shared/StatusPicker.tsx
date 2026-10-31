@@ -9,6 +9,7 @@ import { updateElement } from '@/hooks/useSupabase';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { ElementStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { stepProgress } from '@/Function/shared/progressStep';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // Linear-style status picker — opens from the progress ○ mark. Each row's
@@ -182,7 +183,8 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                 // pointer events inside don't trigger applyStatus on the
                 // surrounding row.
                 // No box: the number is typed in place, and the arrows beside
-                // the % step it by 10 (↑/↓ in the field step by 1, Shift by 10).
+                // the % (or ↑/↓ in the field) step it — 5% up to 80%, then 2%,
+                // then 1% from 90% (stepProgress).
                 <span
                   className="inline-flex items-center"
                   onClick={(e) => e.stopPropagation()}
@@ -201,8 +203,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                       e.stopPropagation();
                       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                         e.preventDefault();
-                        const by = (e.shiftKey ? 10 : 1) * (e.key === 'ArrowUp' ? 1 : -1);
-                        void commitProgress(String((parseInt(progressDraft, 10) || 0) + by));
+                        void commitProgress(String(stepProgress(parseInt(progressDraft, 10) || 0, e.key === 'ArrowUp' ? 1 : -1)));
                         return;
                       }
                       // Enter commits and keeps the menu open: the mark
@@ -218,12 +219,12 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                   <span className="text-[11.5px] text-muted-foreground ml-0.5">%</span>
                   <span className="ml-1 flex flex-col">
                     <button type="button" aria-label={t('Increase progress')} tabIndex={-1}
-                      onClick={() => { void commitProgress(String(Math.min(100, (parseInt(progressDraft, 10) || 0) + 10))); }}
+                      onClick={() => { void commitProgress(String(stepProgress(parseInt(progressDraft, 10) || 0, 1))); }}
                       className="flex h-2.5 w-4 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground">
                       <ChevronUp size={10} strokeWidth={2.5} />
                     </button>
                     <button type="button" aria-label={t('Decrease progress')} tabIndex={-1}
-                      onClick={() => { void commitProgress(String(Math.max(0, (parseInt(progressDraft, 10) || 0) - 10))); }}
+                      onClick={() => { void commitProgress(String(stepProgress(parseInt(progressDraft, 10) || 0, -1))); }}
                       className="flex h-2.5 w-4 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground">
                       <ChevronDown size={10} strokeWidth={2.5} />
                     </button>
