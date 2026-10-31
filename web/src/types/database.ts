@@ -1298,6 +1298,64 @@ export interface AgentRunStep {
   created_at: string
 }
 
+// A pull request that carries out an Element (code_changes), with the AI's
+// check against the intent and the team's verdicts and line comments. Rows in
+// code_changes are written by the code-changes / run-agent Edge Functions;
+// a person may unlink one. The diff itself is read from GitHub on demand.
+export type CodeChangeState = 'open' | 'draft' | 'merged' | 'closed'
+
+export interface CodeChange {
+  id: string
+  element_id: string
+  activity_space_id: string | null
+  provider: 'github'
+  repo: string
+  number: number
+  url: string
+  title: string
+  body: string | null
+  state: CodeChangeState
+  base_ref: string | null
+  head_ref: string | null
+  head_sha: string | null
+  author_login: string | null
+  additions: number | null
+  deletions: number | null
+  changed_files: number | null
+  intent_check: Json | null
+  linked_via: 'manual' | 'agent'
+  run_id: string | null
+  linked_by: string | null
+  synced_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CodeChangeReview {
+  id: string
+  code_change_id: string
+  reviewer_id: string
+  reviewer_name: string | null
+  verdict: 'matches' | 'needs_changes' | 'comment'
+  body: string
+  head_sha: string | null
+  created_at: string
+}
+
+export interface CodeChangeComment {
+  id: string
+  code_change_id: string
+  author_id: string
+  author_name: string | null
+  path: string
+  line: number
+  side: 'old' | 'new'
+  body: string
+  head_sha: string | null
+  resolved: boolean
+  created_at: string
+}
+
 // An external service a Space connects for its agents (ADR 0027). Members
 // read; owners write. The credential lives in Vault: secret_id only says one
 // is set, and the browser writes it through set_integration_secret and never
@@ -2235,6 +2293,21 @@ export interface Database {
         Row: Integration
         Insert: Omit<Integration, 'id' | 'secret_id' | 'last_test' | 'external_account' | 'created_by' | 'created_at' | 'updated_at'>
         Update: IntegrationUpdate
+      }
+      code_changes: {
+        Row: CodeChange
+        Insert: never
+        Update: never
+      }
+      code_change_reviews: {
+        Row: CodeChangeReview
+        Insert: Pick<CodeChangeReview, 'code_change_id' | 'verdict'> & Partial<Pick<CodeChangeReview, 'reviewer_name' | 'body' | 'head_sha'>>
+        Update: never
+      }
+      code_change_comments: {
+        Row: CodeChangeComment
+        Insert: Pick<CodeChangeComment, 'code_change_id' | 'path' | 'line' | 'side' | 'body'> & Partial<Pick<CodeChangeComment, 'author_name' | 'head_sha'>>
+        Update: Pick<CodeChangeComment, 'resolved'>
       }
     }
   }

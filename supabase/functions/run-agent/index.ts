@@ -34,6 +34,7 @@ import {
   McpSession, callHttp, httpIsRead, HTTP_REQUEST_SCHEMA, isSafeEndpoint, pointsAtAlcon, resolveCredential, type IntegrationRow, type RemoteTool,
 } from "../_shared/integrationClient.ts";
 import { isGoogleDriveRow } from "../_shared/googleOAuth.ts";
+import { fetchPull, pullUrlsIn, upsertCodeChange, withGithubToken } from "../_shared/github.ts";
 import { DRIVE_TOOLS, driveOperationLabel, runDriveTool } from "../_shared/googleDrive.ts";
 import { approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR } from "./agentTools.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
@@ -213,6 +214,11 @@ async function pauseOnError(admin: SupabaseClient, run: Run, message: string) {
 }
 
 /** Pure. A valid tool name (≤64 chars, [a-zA-Z0-9_-]) not already taken. */
+/** A GitHub integration: the preset, or a custom connection to GitHub's MCP server or API. */
+function isGithubRow(row: IntegrationRow): boolean {
+  return row.preset === "github" || /^https:\/\/(api\.)?github(copilot)?\.com\//.test(row.endpoint);
+}
+
 function uniqueToolName(raw: string, taken: Map<string, unknown>): string {
   const base = raw.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
   if (!taken.has(base)) return base;
@@ -387,7 +393,29 @@ async function execute(a: ExecArgs): Promise<void> {
       : it.remote && it.session
         ? await it.session.callTool(it.remote.name, call.input)
         : await callHttp(it.integration, it.secret, call.input);
+    if (!r.isError && isGithubRow(it.integration) && it.remote && /^(create|update)_pull_request$/i.test(it.remote.name)) {
+      await linkOpenedPulls(r.text, it.secret);
+    }
     return { content: r.text, ...(r.isError ? { is_error: true } : {}) };
+  };
+
+  // A pull request the agent opened (or updated) through GitHub becomes one of
+  // the Element's code changes, so the team can read its diff against the
+  // intent. A failure here never fails the call that opened it.
+  const linkedPulls = new Set<string>();
+  const linkOpenedPulls = async (text: string, token: string | null) => {
+    for (const ref of pullUrlsIn(text).slice(0, 3)) {
+      const key = `${ref.repo}#${ref.number}`;
+      if (linkedPulls.has(key)) continue;
+      linkedPulls.add(key);
+      try {
+        const pull = await withGithubToken([token, null], (t) => fetchPull(ref, t));
+        await upsertCodeChange(admin, run.element_id, ref, pull, { linkedBy: user.id, via: "agent", runId: run.id });
+        await addStep(admin, run.id, "artifact", `コード変更を紐付けました: ${key}`, pull.title);
+      } catch (e) {
+        await addStep(admin, run.id, "error", `PR ${key} を Element に紐付けられませんでした`, errorMessage(e));
+      }
+    }
   };
 
   const executeCall = async (call: ToolCall): Promise<{ content: string; is_error?: boolean; finish?: FinishPayload }> => {

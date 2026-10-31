@@ -38,6 +38,7 @@ import {
 import { ObjectIcon } from '@/shell/icons';
 import { InitiativeIntentProvider } from '@/ActivitySpace/strategy/initiative/InitiativeIntent';
 import { StrategyCommentsPanel } from '@/ActivitySpace/strategy/initiative/StrategyCommentsPanel';
+import { InitiativeCodeChanges } from '@/ActivitySpace/execution/code/InitiativeCodeChanges';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { canEditInitiative } from '@/Function/strategy/initiativeAccess';
@@ -1065,6 +1066,10 @@ function StrategyDetailView({
               )}
             </ButtonAppearanceProvider>
           ) : null}
+
+          {/* What the work under these Objects has shipped as code, read
+              against this Initiative's intent. */}
+          <InitiativeCodeChanges objects={allObjects.filter((o) => selectedIds.has(o.id))} />
 
           {/* Activity — last, because it accumulates: the sections above are
               the Initiative's current state and stay a fixed height, while this

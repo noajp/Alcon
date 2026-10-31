@@ -1,0 +1,67 @@
+// Code changes and their review against the intent (ActivitySpace/execution/
+// code), one row per message: [ja, ko, fr, es]. Concept names (Element,
+// Initiative, Object…) stay English in every language.
+type Row = [ja: string, ko: string, fr: string, es: string];
+
+const CODE_REVIEW_MESSAGES: Record<string, Row> = {
+  'Code changes': ['コード変更', '코드 변경', 'Modifications de code', 'Cambios de código'],
+  'Link pull request': ['Pull Request を紐付ける', 'Pull Request 연결', 'Lier une pull request', 'Vincular pull request'],
+  'Linking…': ['紐付け中…', '연결하는 중…', 'Liaison…', 'Vinculando…'],
+  'Opened by an agent': ['エージェントが作成', '에이전트가 생성함', 'Ouverte par un agent', 'Abierta por un agente'],
+  'Unlink': ['紐付けを外す', '연결 해제', 'Délier', 'Desvincular'],
+  'Diff layout': ['差分の表示', 'Diff 레이아웃', 'Affichage du diff', 'Vista del diff'],
+  'Implementation only. All files: +{a} −{d}': ['実装ファイルのみ。全ファイル: +{a} −{d}', '구현 파일만. 전체 파일: +{a} −{d}', 'Implémentation seulement. Tous les fichiers : +{a} −{d}', 'Solo implementación. Todos los archivos: +{a} −{d}'],
+  'No files changed.': ['変更されたファイルはありません。', '변경된 파일이 없습니다.', 'Aucun fichier modifié.', 'No hay archivos modificados.'],
+  'Reading the diff from GitHub…': ['GitHub から差分を読み込んでいます…', 'GitHub에서 diff를 읽는 중…', 'Lecture du diff depuis GitHub…', 'Leyendo el diff desde GitHub…'],
+  'Refresh from GitHub': ['GitHub から再読み込み', 'GitHub에서 새로 고침', 'Actualiser depuis GitHub', 'Actualizar desde GitHub'],
+  'Split': ['分割', '분할', 'Côte à côte', 'Dividido'],
+  'Unified': ['統合', '통합', 'Unifié', 'Unificado'],
+  '{n} files': ['{n} ファイル', '파일 {n}개', '{n} fichiers', '{n} archivos'],
+  'Comment on this line': ['この行にコメント', '이 줄에 댓글', 'Commenter cette ligne', 'Comentar esta línea'],
+  'Comment on this line…': ['この行にコメント…', '이 줄에 댓글…', 'Commenter cette ligne…', 'Comentar esta línea…'],
+  'Deleted': ['削除', '삭제됨', 'Supprimé', 'Eliminado'],
+  'New': ['新規', '새 파일', 'Nouveau', 'Nuevo'],
+  'Renamed': ['名前変更', '이름 변경', 'Renommé', 'Renombrado'],
+  'No diff to show — a binary file, or too large for GitHub to return.': ['表示できる差分がありません。バイナリか、GitHub が返さないほど大きいファイルです。', '표시할 diff가 없습니다. 바이너리 파일이거나 GitHub가 반환하지 않을 만큼 큰 파일입니다.', 'Aucun diff à afficher — fichier binaire, ou trop volumineux pour que GitHub le renvoie.', 'No hay diff que mostrar: es un archivo binario o demasiado grande para que GitHub lo devuelva.'],
+  'On lines no longer in this diff': ['今の差分にない行へのコメント', '현재 diff에 없는 줄의 댓글', 'Sur des lignes absentes de ce diff', 'En líneas que ya no están en este diff'],
+  'Resolve': ['解決', '해결', 'Résoudre', 'Resolver'],
+  'Resolved': ['解決済み', '해결됨', 'Résolu', 'Resuelto'],
+  'Not checked': ['未判定', '미확인', 'Non vérifié', 'Sin comprobar'],
+  'AI reads the diff against the intent above and says, criterion by criterion, whether the change carries it out.': ['AI が差分を上の意図と照らし合わせ、条件ごとに変更がそれを実現しているかを判定します。', 'AI가 diff를 위의 의도와 대조해, 기준마다 변경이 이를 실현하는지 판단합니다.', 'L’IA lit le diff au regard de l’intention ci-dessus et indique, critère par critère, si la modification la réalise.', 'La IA lee el diff frente a la intención de arriba y dice, criterio por criterio, si el cambio la cumple.'],
+  'As intended': ['意図どおり', '의도대로', 'Conforme à l’intention', 'Según lo previsto'],
+  'Check again': ['再判定', '다시 확인', 'Vérifier à nouveau', 'Comprobar de nuevo'],
+  'Check against intent': ['意図と照合する', '의도와 대조', 'Vérifier par rapport à l’intention', 'Comprobar con la intención'],
+  'Checking…': ['判定中…', '확인하는 중…', 'Vérification…', 'Comprobando…'],
+  'Does this software do what was intended? Each person’s latest verdict counts; a verdict on an older commit stops counting when new commits arrive.': ['このソフトウェアは意図したことをしているか。各自の最新の判定を数えます。新しいコミットが来ると、古いコミットへの判定は数えなくなります。', '이 소프트웨어가 의도한 일을 하나요? 각자의 최신 판단만 셉니다. 새 커밋이 오면 이전 커밋에 대한 판단은 세지 않습니다.', 'Ce logiciel fait-il ce qui était voulu ? Seul le dernier avis de chacun compte ; un avis sur un ancien commit cesse de compter quand de nouveaux commits arrivent.', '¿Este software hace lo que se pretendía? Cuenta el último veredicto de cada persona; un veredicto sobre un commit anterior deja de contar cuando llegan commits nuevos.'],
+  'For the team to confirm': ['チームで確かめること', '팀이 확인할 것', 'À confirmer par l’équipe', 'Para que el equipo confirme'],
+  'Intent check': ['意図との照合', '의도 대조', 'Vérification de l’intention', 'Comprobación de intención'],
+  'Intent': ['意図', '의도', 'Intention', 'Intención'],
+  'Needs changes': ['要修正', '수정 필요', 'Modifications requises', 'Requiere cambios'],
+  'New commits since this check': ['この判定のあとに新しいコミットがあります', '이 확인 이후 새 커밋이 있습니다', 'Nouveaux commits depuis cette vérification', 'Hay commits nuevos desde esta comprobación'],
+  'Outside the intent': ['意図の範囲外', '의도 범위 밖', 'Hors de l’intention', 'Fuera de la intención'],
+  'Team review': ['チームの判定', '팀 리뷰', 'Avis de l’équipe', 'Revisión del equipo'],
+  'This Element’s Object serves no Initiative, so only the Element itself is the intent.': ['この Element の Object はどの Initiative にも属していないため、Element そのものを意図として扱います。', '이 Element의 Object는 어떤 Initiative에도 속하지 않아 Element 자체를 의도로 봅니다.', 'L’Object de cet Element ne sert aucune Initiative : seul l’Element lui-même sert d’intention.', 'El Object de este Element no sirve a ninguna Initiative, así que solo el propio Element es la intención.'],
+  'What matches or misses the intent…': ['意図に合っている点・外れている点…', '의도에 맞거나 어긋나는 점…', 'Ce qui correspond ou non à l’intention…', 'Qué cumple o no la intención…'],
+  'older commit': ['古いコミット', '이전 커밋', 'ancien commit', 'commit anterior'],
+  // Labels read from tables (codeChangeLabels.tsx)
+  'Open PR': ['オープン', '열림', 'Ouverte', 'Abierta'],
+  'Merged': ['マージ済み', '병합됨', 'Fusionnée', 'Fusionada'],
+  'Matches intent': ['意図に合致', '의도에 부합', 'Conforme à l’intention', 'Cumple la intención'],
+  'Partly matches': ['一部合致', '일부 부합', 'Partiellement conforme', 'Cumple en parte'],
+  'Off intent': ['意図と不一致', '의도와 불일치', 'Hors intention', 'No cumple la intención'],
+  'Unclear': ['判断できない', '불명확', 'Incertain', 'Incierto'],
+  'Partly': ['一部', '일부', 'En partie', 'En parte'],
+  'Contradicts': ['逆行', '상충', 'Contredit', 'Contradice'],
+  'Team: as intended': ['チーム：意図どおり', '팀: 의도대로', 'Équipe : conforme', 'Equipo: según lo previsto'],
+  'Team: needs changes': ['チーム：要修正', '팀: 수정 필요', 'Équipe : modifications requises', 'Equipo: requiere cambios'],
+  'Purpose': ['目的', '목적', 'Objectif', 'Propósito'],
+  'Test': ['テスト', '테스트', 'Test', 'Prueba'],
+  'Generated': ['生成物', '생성됨', 'Généré', 'Generado'],
+  // Errors from the code-changes Edge Function
+  'GitHub could not show this pull request. Connect GitHub in Settings › Integrations with a token that can read the repository.': ['GitHub がこの Pull Request を表示できませんでした。Settings › Integrations で、このリポジトリを読めるトークンで GitHub を接続してください。', 'GitHub에서 이 Pull Request를 표시할 수 없습니다. Settings › Integrations에서 이 저장소를 읽을 수 있는 토큰으로 GitHub를 연결하세요.', 'GitHub n’a pas pu afficher cette pull request. Connectez GitHub dans Settings › Integrations avec un jeton qui peut lire le dépôt.', 'GitHub no pudo mostrar esta pull request. Conecta GitHub en Settings › Integrations con un token que pueda leer el repositorio.'],
+  'Paste a GitHub pull request URL (https://github.com/owner/repo/pull/123).': ['GitHub の Pull Request の URL を貼り付けてください（https://github.com/owner/repo/pull/123）。', 'GitHub Pull Request URL을 붙여 넣으세요 (https://github.com/owner/repo/pull/123).', 'Collez l’URL d’une pull request GitHub (https://github.com/owner/repo/pull/123).', 'Pega la URL de una pull request de GitHub (https://github.com/owner/repo/pull/123).'],
+};
+
+const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(CODE_REVIEW_MESSAGES).map(([key, row]) => [key, row[index]]));
+
+export const CODE_REVIEW_TRANSLATIONS = { ja: column(0), ko: column(1), fr: column(2), es: column(3) };
