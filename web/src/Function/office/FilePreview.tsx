@@ -138,7 +138,7 @@ export function FilePreview({ file, source, height = 480, actions, editor, compa
   // the file can be saved. What is typed waits as edits until it is saved
   // (or discarded); they belong to the version they were made on, so
   // another version (this one saved, or a newer one listed) starts clean.
-  const editable = !!editor && (officeKind === 'xlsx' || officeKind === 'docx');
+  const editable = !!editor && (officeKind === 'xlsx' || officeKind === 'docx' || officeKind === 'pptx');
   const [editState, setEditState] = useState<{ fileId: string; pending: ReadonlyMap<string, OfficeEdit> } | null>(null);
   const pending = useMemo<ReadonlyMap<string, OfficeEdit>>(() => (editState?.fileId === file.id ? editState.pending : new Map()), [editState, file.id]);
   const dirty = pending.size > 0;
@@ -271,7 +271,7 @@ export function FilePreview({ file, source, height = 480, actions, editor, compa
         ) : kind === 'office' ? (
           officeKind === 'xlsx' ? (workbook ? <SheetView sheets={workbook} edit={session} changes={sheetChanges} /> : spinner)
           : docLayout ? <DocView doc={docLayout} edit={session} changes={docChanges} />
-          : deck ? <DeckView deck={deck} present={fullscreen} />
+          : deck ? <DeckView deck={deck} present={fullscreen} edit={session} />
             : office === null ? spinner : <OfficeTextView preview={office} />
         ) : kind === 'text' ? (
           text === null ? spinner

@@ -56,6 +56,8 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   '(empty)': ['（空）', '(비어 있음)', '(vide)', '(vacío)'],
   'Added': ['追加', '추가됨', 'Ajouté', 'Añadido'],
   'Discard': ['破棄', '취소', 'Abandonner', 'Descartar'],
+  'This paragraph has a tab, line break, picture, note or field, so it cannot be edited here yet.': ['この段落にはタブ・改行・画像・脚注・フィールドが含まれているため、まだここでは編集できません。', '이 단락에는 탭·줄 바꿈·그림·각주·필드가 있어 아직 여기서 편집할 수 없습니다.', 'Ce paragraphe contient une tabulation, un saut de ligne, une image, une note ou un champ : il ne peut pas encore être modifié ici.', 'Este párrafo tiene una tabulación, un salto de línea, una imagen, una nota o un campo, así que aún no se puede editar aquí.'],
+  'This paragraph has a line break or field, so it cannot be edited here yet.': ['この段落には改行かフィールドが含まれているため、まだここでは編集できません。', '이 단락에는 줄 바꿈이나 필드가 있어 아직 여기서 편집할 수 없습니다.', 'Ce paragraphe contient un saut de ligne ou un champ : il ne peut pas encore être modifié ici.', 'Este párrafo tiene un salto de línea o un campo, así que aún no se puede editar aquí.'],
   'Version history': ['版の履歴', '버전 기록', 'Historique des versions', 'Historial de versiones'],
   'Version {n} of {total}, saved by {name} {age}': ['{total} 版中の {n} 版目（{name}、{age}に保存）', '{total}개 버전 중 {n}번째 ({name}, {age} 저장)', 'Version {n} sur {total}, enregistrée par {name} {age}', 'Versión {n} de {total}, guardada por {name} {age}'],
   'Back to the latest': ['最新の版に戻る', '최신 버전으로', 'Revenir à la dernière', 'Volver a la última'],

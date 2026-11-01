@@ -18,11 +18,19 @@ import { desc, drawingColor, emu as px, first, is, kid, kids, openPackage, path,
 // the browser, or jsdom in the tests.
 
 export interface Run { text: string; size: number; bold: boolean; italic: boolean; underline: boolean; color: string | null; font: string | null; spacing: number }
-export interface Para { align: 'left' | 'center' | 'right' | 'justify'; runs: Run[]; bullet: string | null; indent: number; lineHeight: number | null }
+export interface Para {
+  align: 'left' | 'center' | 'right' | 'justify'; runs: Run[]; bullet: string | null; indent: number; lineHeight: number | null;
+  /** On a slide's own shape, when the paragraph is plain text runs only
+   *  (no line break or field): its order in the shape's text, so it can be
+   *  edited as text (see officeEdits). */
+  src?: number;
+}
 export interface TextBody { paras: Para[]; anchor: 'top' | 'middle' | 'bottom'; inset: [number, number, number, number]; vertical: boolean; wrap: boolean }
 interface Box { x: number; y: number; w: number; h: number; rot: number }
 export type DeckItem =
-  | ({ kind: 'shape'; geom: string; adj: Record<string, number>; flipH: boolean; flipV: boolean; fill: string | null; stroke: Stroke | null; text: TextBody | null } & Box)
+  | ({ kind: 'shape'; geom: string; adj: Record<string, number>; flipH: boolean; flipV: boolean; fill: string | null; stroke: Stroke | null; text: TextBody | null;
+    /** The shape's id on its slide (cNvPr), for a shape of the slide itself. */
+    spId?: string } & Box)
   | ({ kind: 'chart'; chart: ChartData } & Box)
   | ({ kind: 'image'; src: string; crop: { l: number; t: number; r: number; b: number } } & Box)
   | ({ kind: 'table'; cols: number[]; rows: { h: number; cells: { text: TextBody; fill: string | null; span: number; skip: boolean }[] }[] } & Box);
@@ -153,7 +161,7 @@ function styleFont(style: Element | null, theme: Theme): { font: string | null; 
   return { font: idx === 'major' ? theme.fonts.major : idx === 'minor' ? theme.fonts.minor : null, color: colorOf(ref, theme) };
 }
 
-function textOf(txBody: Element | null, theme: Theme, chain: Element[], bodyPrs: Element[], fallback: { font: string | null; color: string | null } | null = null): TextBody | null {
+function textOf(txBody: Element | null, theme: Theme, chain: Element[], bodyPrs: Element[], fallback: { font: string | null; color: string | null } | null = null, editable = false): TextBody | null {
   if (!txBody) return null;
   const bodies = [kid(txBody, 'a:bodyPr'), ...bodyPrs].filter((e): e is Element => !!e);
   const attr = (a: string) => bodies.map((b) => b.getAttribute(a)).find((v) => v != null) ?? null;
@@ -163,7 +171,7 @@ function textOf(txBody: Element | null, theme: Theme, chain: Element[], bodyPrs:
   const fontScale = autofit?.getAttribute('fontScale') ? Number(autofit.getAttribute('fontScale')) / 100000 : 1;
   const lnReduce = autofit?.getAttribute('lnSpcReduction') ? Number(autofit.getAttribute('lnSpcReduction')) / 100000 : 0;
 
-  const paras: Para[] = kids(txBody, 'a:p').map((p) => {
+  const paras: Para[] = kids(txBody, 'a:p').map((p, index) => {
     const pPr = kid(p, 'a:pPr');
     const lvl = Number(pPr?.getAttribute('lvl') ?? 0);
     const levels = [pPr, ...chain.map((ls) => kid(ls, `a:lvl${lvl + 1}pPr`))].filter((e): e is Element => !!e);
@@ -196,6 +204,7 @@ function textOf(txBody: Element | null, theme: Theme, chain: Element[], bodyPrs:
       bullet,
       indent: px(pAttr('marL')),
       lineHeight: lnPct ? (Number(lnPct) / 100000) * (1 - lnReduce) * 1.2 : null,
+      ...(editable && Array.from(p.children).every((c) => is(c, 'pPr') || is(c, 'r') || is(c, 'endParaRPr')) ? { src: index } : {}),
     } satisfies Para;
   });
   const anchor = attr('anchor');
@@ -279,7 +288,9 @@ async function itemsOf(tree: Element, ctx: ReadCtx): Promise<DeckItem[]> {
         // Own fill, else the placeholder's it inherits, else its style's.
         fill: isLine ? null : firstSet(fillOf(spPr, theme), ...from.map((p) => fillOf(p.spPr, theme)), styleFill(style, theme)),
         stroke: strokeOf(spPr, theme, isLine, style),
-        text: textOf(txBody, theme, styleChain(txBody, ph, ctx.inherit), from.map((p) => p.bodyPr).filter((e): e is Element => !!e), styleFont(style, theme)),
+        text: textOf(txBody, theme, styleChain(txBody, ph, ctx.inherit), from.map((p) => p.bodyPr).filter((e): e is Element => !!e), styleFont(style, theme), !!ctx.inherit),
+        // The slide's own shapes (not its layout's or master's) can be edited.
+        ...(ctx.inherit && first(node, 'cNvPr')?.getAttribute('id') ? { spId: first(node, 'cNvPr')!.getAttribute('id')! } : {}),
       });
     } else if (is(node, 'pic')) {
       const blipFill = kid(node, 'p:blipFill');
