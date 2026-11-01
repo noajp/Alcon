@@ -90,7 +90,7 @@ export function AttachmentList({ owner, actions, empty = null }: {
 /** An attached file's preview; its edits are saved as the file's next
  *  version. With versions, a history menu shows an earlier one in place
  *  (read only) and can make it the newest again. */
-export function AttachmentPreview({ file, owner, actions }: { file: Attachment; owner: AttachmentOwner; actions?: ReactNode }) {
+export function AttachmentPreview({ file, owner, actions, height }: { file: Attachment; owner: AttachmentOwner; actions?: ReactNode; height?: number }) {
   const { t } = useI18n();
   const versions = versionChain(useAttachments(owner).all, file.id);
   const { saveEdits, restoreVersion } = useAttachmentActions(owner);
@@ -150,7 +150,7 @@ export function AttachmentPreview({ file, owner, actions }: { file: Attachment; 
         </Button>
       </div>
     )}
-    <FilePreview file={shown} source={attachmentSource} editor={picked ? undefined : editor} compareTo={comparing && canCompare ? before : null}
+    <FilePreview file={shown} source={attachmentSource} editor={picked ? undefined : editor} compareTo={comparing && canCompare ? before : null} height={height}
       actions={history || (!picked && actions) ? <>{history}{!picked && actions}</> : undefined} />
   </>;
 }

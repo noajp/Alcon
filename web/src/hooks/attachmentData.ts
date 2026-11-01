@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
 import { applyOfficeEdits, type OfficeEdit } from '@/Function/office/officeEdits';
 import { latestVersions, versionChain } from '@/Function/shared/fileVersions';
+import { fileText } from '@/Function/office/fileText';
 
 // Files attached to one thing in the Space — an Element, an Object, an
 // Initiative, a Portfolio, a CRM deal or company — from the person's
@@ -75,7 +76,7 @@ export function ownerOf(file: Attachment): AttachmentOwner {
 const listKey = (owner: AttachmentOwner) => ['attachments', owner.kind, owner.id] as const;
 
 /** Pure. Days left before a trashed file is erased (0 = due). */
-function trashDaysLeft(deletedAt: string, now = Date.now()): number {
+export function trashDaysLeft(deletedAt: string, now = Date.now()): number {
   return Math.max(0, TRASH_DAYS - Math.floor((now - new Date(deletedAt).getTime()) / DAY));
 }
 
@@ -134,7 +135,12 @@ async function insertFile(owner: AttachmentOwner, name: string, mime: string | n
   const { data, error } = await supabase.from('attachments').insert({
     [OWNER_COLUMN[owner.kind]]: owner.id, path, name, size: bytes.size, mime_type: mime, previous_id: previous?.id ?? null,
   }).select(COLUMNS).single();
-  if (!error && data) return data as Attachment;
+  if (!error && data) {
+    // Its words, for finding it (in the background; a file that cannot be
+    // read is found by its name only).
+    void indexText(data as Attachment, bytes);
+    return data as Attachment;
+  }
   // The listing was refused: don't leave the bytes behind unlisted.
   await supabase.storage.from(BUCKET).remove([path]);
   if (error?.code === '23505') return null;
@@ -269,14 +275,15 @@ export interface SpaceFile extends Attachment {
   versions: number;
 }
 
-/** Every file attached in a Space, as its latest version (not trashed),
- *  newest first. RLS leaves out what the viewer cannot see. */
-export function useSpaceAttachments(spaceId: string | null) {
+/** Every file attached in a Space, as its latest version, newest first —
+ *  or, `trashed`, those in the trash (within their days), most recently
+ *  trashed first. RLS leaves out what the viewer cannot see. */
+export function useSpaceAttachments(spaceId: string | null, trashed = false) {
   const query = useQuery({
-    queryKey: ['attachments-of', 'space', spaceId],
+    queryKey: ['attachments-of', 'space', spaceId, trashed],
     enabled: !!spaceId,
     queryFn: async (): Promise<SpaceFile[]> => {
-      const { data, error } = await supabase.rpc('space_attachments', { p_space: spaceId });
+      const { data, error } = await supabase.rpc('space_attachments', { p_space: spaceId, p_trashed: trashed });
       if (error) throw error;
       return (data ?? []) as SpaceFile[];
     },
@@ -307,3 +314,52 @@ export const attachmentSource = {
   download: (f: { id: string }) => downloadAttachment(f as Attachment),
   open: (f: { id: string }) => openAttachment(f as Attachment),
 };
+
+// ── Finding a file by its words ─────────────────────────────────────────
+
+/** Takes a version's text out and stores it (an empty text when there is
+ *  none to read, so it is not tried again). Best effort. */
+async function indexText(file: Pick<Attachment, 'id' | 'name' | 'mime_type'>, bytes: Blob): Promise<void> {
+  try {
+    const body = (await fileText(await bytes.arrayBuffer(), file.name, file.mime_type)) ?? '';
+    await supabase.from('attachment_texts').upsert({ attachment_id: file.id, body, extracted_at: new Date().toISOString() });
+  } catch {
+    // An unreadable file (damaged, password-protected) is found by its name.
+    await supabase.from('attachment_texts').upsert({ attachment_id: file.id, body: '' });
+  }
+}
+
+const INDEX_MAX_BYTES = 20 * 1024 * 1024;
+const indexing = new Set<string>();
+
+/** Reads, in the background, the text of a Space's files that have none
+ *  yet (attached before their words were kept), a few at a time. */
+export async function indexSpaceFiles(spaceId: string): Promise<void> {
+  if (indexing.has(spaceId)) return;
+  indexing.add(spaceId);
+  try {
+    const { data } = await supabase.rpc('attachments_to_index', { p_space: spaceId, p_limit: 20 });
+    for (const f of (data ?? []) as { id: string; path: string; name: string; mime_type: string | null; size: number }[]) {
+      if (f.size > INDEX_MAX_BYTES) { await supabase.from('attachment_texts').upsert({ attachment_id: f.id, body: '' }); continue; }
+      const { data: blob } = await supabase.storage.from(BUCKET).download(f.path);
+      if (blob) await indexText(f, blob);
+    }
+  } finally {
+    indexing.delete(spaceId);
+  }
+}
+
+/** A file found by its name, what it is attached to, or its words. */
+export interface FoundFile extends Pick<Attachment, 'id' | 'name' | 'mime_type' | 'element_id' | 'object_id' | 'strategy_id' | 'portfolio_id' | 'deal_id' | 'company_id'> {
+  owner_label: string | null;
+  element_object_id: string | null;
+  /** The words around where the text matched (null when the name did). */
+  snippet: string | null;
+}
+
+/** Files in a Space whose name, owner or text holds `query`. */
+export async function searchAttachments(spaceId: string, query: string, limit = 8): Promise<FoundFile[]> {
+  const { data, error } = await supabase.rpc('search_attachments', { p_space: spaceId, p_query: query.normalize('NFKC'), p_limit: limit });
+  if (error) return [];
+  return (data ?? []) as FoundFile[];
+}

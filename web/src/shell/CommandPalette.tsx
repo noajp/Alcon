@@ -5,7 +5,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import { FileText, Inbox, Home, ListTodo, Settings } from 'lucide-react';
-import { ObjectIcon, ElementIcon, CrmIcon } from '@/Function/shared/conceptIcons';
+import { ObjectIcon, ElementIcon, CrmIcon, FilesIcon } from '@/Function/shared/conceptIcons';
 import { crmRoute, routeTo } from '@/Function/crm/crmRoute';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { APP_GROUPS, BAR_TOOLS, MODE_META } from '@/shell/railApps';
@@ -20,6 +20,8 @@ import {
   CommandShortcut,
 } from '@/ui/command';
 import { globalSearch, type SearchResult } from '@/hooks/useSupabase';
+import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
+import { openAttachmentOwner } from '@/Function/shared/attachments/openOwner';
 import type { NavigationState } from '@/types/navigation';
 import type { ViewId } from '@/shell/viewRegistry';
 import { CREATE_ELEMENT_EVENT } from '@/shell/QuickAddElementLauncher';
@@ -60,6 +62,7 @@ function kindIcon(kind: SearchResult['kind']): React.ComponentType<{ size?: numb
     case 'object':  return ObjectIcon;
     case 'note':    return FileText;
     case 'deal': case 'company': case 'contact': return CrmIcon;
+    case 'file': return FilesIcon;
   }
 }
 
@@ -146,6 +149,7 @@ export function CommandPalette({ scope, onNavigate, onViewChange, onOpenSettings
     object:  results.filter(r => r.kind === 'object'),
     note:    results.filter(r => r.kind === 'note'),
     record:  results.filter(r => r.kind === 'deal' || r.kind === 'company' || r.kind === 'contact'),
+    file:    results.filter(r => r.kind === 'file'),
   };
   // A CRM record opens its page in the CRM, as its sidebar row would.
   const openRecord = (r: SearchResult) => handleNav('crm', { crm: routeTo(crmRoute(undefined), r.kind === 'deal' ? { view: 'deals', dealId: r.id } : r.kind === 'company' ? { view: 'companies', companyId: r.id } : { view: 'contacts', contactId: r.id }) });
@@ -292,6 +296,27 @@ export function CommandPalette({ scope, onNavigate, onViewChange, onOpenSettings
                   </CommandItem>
                 );
               })}
+            </CommandGroup>
+          </>
+        )}
+
+        {grouped.file.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading={t('Files')}>
+              {grouped.file.map(r => (
+                // A file opens what it is attached to; the line under its name
+                // is where its words matched (or what it is attached to).
+                <CommandItem key={`file-${r.id}`} value={`file-${r.id} ${r.title} ${r.snippet ?? ''} ${r.file?.owner_label ?? ''}`}
+                  onSelect={() => { close(); if (r.file) openAttachmentOwner(r.file); }}>
+                  <FileTypeIcon name={r.title} mime={r.file?.mime_type ?? null} />
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate">{r.title}</div>
+                    {r.snippet && <div className="text-[11px] text-muted-foreground truncate">{r.snippet}</div>}
+                  </div>
+                  {r.file?.owner_label && <span className="shrink-0 max-w-40 truncate text-[11px] text-muted-foreground">{r.file.owner_label}</span>}
+                </CommandItem>
+              ))}
             </CommandGroup>
           </>
         )}

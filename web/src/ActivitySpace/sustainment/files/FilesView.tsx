@@ -1,152 +1,216 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { ArrowUpRight, Search } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowUpRight, Loader2, RotateCcw, Search, X } from 'lucide-react';
+import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
-import { PageIcon, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { AttachmentPreview } from '@/Function/shared/attachments/AttachmentList';
 import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
-import { openInApp } from '@/Function/shared/appNavigation';
+import { useElementSize } from '@/Function/office/officeViewParts';
+import { openAttachmentOwner } from '@/Function/shared/attachments/openOwner';
 import { formatAge } from '@/Function/shared/dateUtils';
-import { crmRoute, routeTo } from '@/Function/crm/crmRoute';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { FilesIcon } from '@/Function/shared/conceptIcons';
-import { ownerOf, useSpaceAttachments, type AttachmentOwnerKind, type SpaceFile } from '@/hooks/attachmentData';
+import { fileKindOf } from '@/Function/files/filesRoute';
+import { TRASH_DAYS, indexSpaceFiles, ownerOf, searchAttachments, trashDaysLeft, useAttachmentActions, useSpaceAttachments, type AttachmentOwnerKind, type SpaceFile } from '@/hooks/attachmentData';
+import { appDialog } from '@/Function/shared/appDialogStore';
 import { useWorkers } from '@/hooks/teamData';
+import type { NavigationState } from '@/types/navigation';
 import { FileImportActions, canImport } from '@/ActivitySpace/execution/element/FileImportActions';
+import { KINDS, WHERE } from './FilesSidebar';
 
-/** What a file is attached to, as the filter groups it. */
-type OwnerGroup = 'all' | 'execution' | 'strategy' | 'crm';
-const OWNER_GROUP: Record<AttachmentOwnerKind, Exclude<OwnerGroup, 'all'>> = {
-  element: 'execution', object: 'execution', strategy: 'strategy', portfolio: 'strategy', deal: 'crm', company: 'crm',
-};
 const OWNER_LABEL: Record<AttachmentOwnerKind, string> = {
   element: 'Element', object: 'Object', strategy: 'Initiative', portfolio: 'Portfolio', deal: 'Deal', company: 'Company',
 };
 
-/** What a file is, as the filter groups it. */
-type TypeGroup = 'all' | 'doc' | 'sheet' | 'deck' | 'pdf' | 'image' | 'other';
-/** Pure. A file's kind, from its name and type. */
-function typeOf(f: SpaceFile): Exclude<TypeGroup, 'all'> {
-  const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
-  if (['docx', 'doc', 'odt', 'rtf', 'txt', 'md'].includes(ext)) return 'doc';
-  if (['xlsx', 'xls', 'csv', 'ods', 'tsv'].includes(ext)) return 'sheet';
-  if (['pptx', 'ppt', 'odp', 'key'].includes(ext)) return 'deck';
-  if (ext === 'pdf') return 'pdf';
-  if (f.mime_type?.startsWith('image/')) return 'image';
-  return 'other';
-}
-
-/** Opens what a file is attached to, where it lives in Alcon. */
-function openOwner(f: SpaceFile) {
-  const owner = ownerOf(f);
-  if (owner.kind === 'element') openInApp('domain-elements', { objectId: f.element_object_id ?? null });
-  else if (owner.kind === 'object') openInApp('objects', { objectId: owner.id });
-  else if (owner.kind === 'strategy') openInApp('strategy', { strategyId: owner.id });
-  else if (owner.kind === 'portfolio') openInApp('portfolio', { portfolioId: owner.id });
-  else openInApp('crm', { crm: routeTo(crmRoute(undefined), owner.kind === 'deal' ? { view: 'deals', dealId: owner.id } : { view: 'companies', companyId: owner.id }) });
-}
+const nameOf = (f: SpaceFile) => { const dot = f.name.lastIndexOf('.'); return dot > 0 ? f.name.slice(0, dot) : f.name; };
 
 /**
- * Files: every file attached anywhere in the Space — to Elements, Objects,
- * Initiatives, Portfolios, deals and companies — in one list, newest first.
- * A file stays where it is attached (it is that thing's evidence, seen by
- * whoever can see that thing); this is the way in from the other side:
- * find a file by its name, its kind or where it sits, preview it (Word and
- * Excel editable, with its versions) and go to what it is attached to.
+ * Files: every file attached anywhere in the Space, newest first, as one
+ * list. A file stays where it is attached (it is that thing's evidence,
+ * seen by whoever can see that thing); this is the way in from the other
+ * side. The sidebar narrows the list by where files sit or what they are;
+ * a row opens its file beside the list (Word and Excel editable, with
+ * versions) without losing the list.
  */
-export function FilesView() {
+export function FilesView({ navigation, onNavigate }: { navigation: NavigationState; onNavigate: (nav: Partial<NavigationState>) => void }) {
+  const route = navigation.files ?? {};
+  return route.trash ? <TrashList /> : <FileList navigation={navigation} onNavigate={onNavigate} />;
+}
+
+function FileList({ navigation, onNavigate }: { navigation: NavigationState; onNavigate: (nav: Partial<NavigationState>) => void }) {
   const { t } = useI18n();
+  const route = navigation.files ?? {};
   const spaceId = useActiveSpaceId();
   const { data: files, loading } = useSpaceAttachments(spaceId);
   const workers = useWorkers().data;
   const [query, setQuery] = useState('');
-  const [ownerGroup, setOwnerGroup] = useState<OwnerGroup>('all');
-  const [typeGroup, setTypeGroup] = useState<TypeGroup>('all');
-  const [openId, setOpenId] = useState<string | null>(null);
+  // The search reads a file's text as well as its name and owner. Files not
+  // read yet are read in the background while Files is open; the search
+  // waits for a pause in typing.
+  useEffect(() => { if (spaceId) void indexSpaceFiles(spaceId); }, [spaceId, files.length]);
+  const [settled, setSettled] = useState('');
+  useEffect(() => { const id = setTimeout(() => setSettled(query.trim()), 250); return () => clearTimeout(id); }, [query]);
+  const found = useQuery({
+    queryKey: ['attachments-search', spaceId, settled],
+    enabled: !!spaceId && settled.length > 0,
+    queryFn: () => searchAttachments(spaceId!, settled, 100),
+  });
+  const snippets = useMemo(() => new Map((found.data ?? []).map((h) => [h.id, h.snippet])), [found.data]);
 
   const shown = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return files.filter((f) => (ownerGroup === 'all' || OWNER_GROUP[ownerOf(f).kind] === ownerGroup)
-      && (typeGroup === 'all' || typeOf(f) === typeGroup)
-      && (!q || f.name.toLowerCase().includes(q) || (f.owner_label ?? '').toLowerCase().includes(q)));
-  }, [files, query, ownerGroup, typeGroup]);
-
-  const chip = <T extends string>(group: string, value: T, current: T, label: string, set: (v: T) => void) => (
-    <button key={`${group}-${value}`} type="button" onClick={() => set(value)} aria-pressed={value === current}
-      className={`h-7 rounded-full px-3 text-[12.5px] transition-colors ${value === current ? 'bg-foreground/10 text-foreground' : 'text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground'}`}>
-      {label}
-    </button>
-  );
+    const q = settled.toLowerCase();
+    const matches = (f: SpaceFile) => !q || snippets.has(f.id) || f.name.toLowerCase().includes(q) || (f.owner_label ?? '').toLowerCase().includes(q);
+    return files.filter((f) => (!route.where || ownerOf(f).kind === route.where)
+      && (!route.kind || fileKindOf(f.name, f.mime_type) === route.kind)
+      && matches(f));
+  }, [files, settled, snippets, route.where, route.kind]);
+  const open = files.find((f) => f.id === route.fileId) ?? null;
+  const select = (f: SpaceFile | null) => onNavigate({ files: { ...route, fileId: f?.id ?? null } });
+  const title = route.where ? t(WHERE.find((w) => w.id === route.where)!.label)
+    : route.kind ? (route.kind === 'pdf' ? 'PDF' : t(KINDS.find((k) => k.id === route.kind)!.label))
+    : t('All files');
+  const who = (f: SpaceFile) => workers.find((w) => w.user_id === f.uploaded_by)?.name ?? t('Someone');
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-5xl px-8 py-8">
-        <div className="flex items-center gap-3">
-          <PageIcon><FilesIcon size={18} /></PageIcon>
-          <h1 className={PAGE_TITLE} style={PAGE_TITLE_WEIGHT}>{t('Files')}</h1>
-          {files.length > 0 && <span className="text-sm tabular-nums text-muted-foreground">{files.length}</span>}
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground">{t('Every file attached in this Space, where it is attached.')}</p>
-
-        <div className="mt-6 flex flex-wrap items-center gap-2">
-          <label className="flex h-8 min-w-56 flex-1 items-center gap-2 rounded-md bg-muted/50 px-2.5 text-[13px] focus-within:bg-muted">
-            <Search size={13} className="text-muted-foreground" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Search by file name or where it is attached')}
-              aria-label={t('Search files')} className="min-w-0 flex-1 bg-transparent outline-none" />
+    <div className="flex h-full min-h-0">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex shrink-0 items-center gap-3 px-6 pb-3 pt-5">
+          <h1 className="text-[17px] font-semibold text-foreground">{title}</h1>
+          <span className="text-[13px] tabular-nums text-muted-foreground">{shown.length}</span>
+          <span className="flex-1" />
+          <label className="flex h-7 w-56 items-center gap-1.5 rounded-md bg-muted/50 px-2 text-[12.5px] focus-within:bg-muted">
+            <Search size={12} className="shrink-0 text-muted-foreground" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Search names and contents')} aria-label={t('Search files')}
+              className="min-w-0 flex-1 bg-transparent outline-none" />
           </label>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-1">
-          {chip('owner', 'all', ownerGroup, t('Everywhere'), setOwnerGroup)}
-          {chip('owner', 'execution', ownerGroup, t('Execution'), setOwnerGroup)}
-          {chip('owner', 'strategy', ownerGroup, t('Strategy'), setOwnerGroup)}
-          {chip('owner', 'crm', ownerGroup, t('CRM'), setOwnerGroup)}
-          <span className="mx-2 h-4 w-px bg-border/60" />
-          {chip('type', 'all', typeGroup, t('All kinds'), setTypeGroup)}
-          {chip('type', 'doc', typeGroup, t('Documents'), setTypeGroup)}
-          {chip('type', 'sheet', typeGroup, t('Spreadsheets'), setTypeGroup)}
-          {chip('type', 'deck', typeGroup, t('Presentations'), setTypeGroup)}
-          {chip('type', 'pdf', typeGroup, 'PDF', setTypeGroup)}
-          {chip('type', 'image', typeGroup, t('Images'), setTypeGroup)}
-          {chip('type', 'other', typeGroup, t('Other'), setTypeGroup)}
-        </div>
 
-        <div className="mt-4 -mx-2">
-          {loading ? <p className="px-2 py-6 text-sm text-muted-foreground">{t('Loading…')}</p>
-            : !shown.length ? <p className="px-2 py-6 text-sm text-muted-foreground">{files.length ? t('No files match.') : t('No files are attached in this Space yet. Attach them to Elements, Objects, Initiatives or CRM records.')}</p>
+        {/* Column heads; the list scrolls under them. */}
+        <div className="flex shrink-0 items-center gap-3 border-b border-border/60 px-6 pb-1.5 text-[11.5px] text-muted-foreground">
+          <span className="min-w-0 flex-1">{t('Name')}</span>
+          {!open && <span className="hidden w-56 shrink-0 md:block">{t('Attached to')}</span>}
+          {!open && <span className="hidden w-32 shrink-0 lg:block">{t('Added by')}</span>}
+          <span className="w-20 shrink-0 text-right">{t('Updated')}</span>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-1">
+          {loading ? <p className="px-3 py-6 text-[13px] text-muted-foreground">{t('Loading…')}</p>
+            : !shown.length ? <p className="px-3 py-6 text-[13px] text-muted-foreground">{files.length ? t('No files match.') : t('No files are attached in this Space yet. Attach them to Elements, Objects, Initiatives or CRM records.')}</p>
             : shown.map((f) => {
               const owner = ownerOf(f);
-              const open = openId === f.id;
-              const dot = f.name.lastIndexOf('.');
+              const active = open?.id === f.id;
               return (
-                <div key={f.id}>
-                  <div className="flex min-h-[2.375rem] items-center gap-3 rounded-lg px-2 py-1 hover:bg-foreground/[0.06]">
-                    <button type="button" onClick={() => setOpenId(open ? null : f.id)} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                <button key={f.id} type="button" onClick={() => select(active ? null : f)} aria-pressed={active}
+                  className={`flex min-h-9 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left transition-colors ${active ? 'bg-foreground/[0.08]' : 'hover:bg-foreground/[0.05]'}`}>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
                       <FileTypeIcon name={f.name} mime={f.mime_type} />
-                      <span className="truncate text-[14px] font-medium text-foreground" title={f.name}>{dot > 0 ? f.name.slice(0, dot) : f.name}</span>
-                      {f.versions > 1 && <span className="shrink-0 text-[11.5px] tabular-nums text-muted-foreground">v{f.versions}</span>}
-                      <DisclosureTriangle open={open} className="shrink-0 text-muted-foreground" />
-                    </button>
-                    <button type="button" onClick={() => openOwner(f)} title={t('Open where it is attached')}
-                      className="group/owner flex w-36 min-w-0 shrink-0 lg:w-64 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-[12.5px] text-muted-foreground hover:bg-muted hover:text-foreground">
-                      <span className="shrink-0 text-muted-foreground/70">{t(OWNER_LABEL[owner.kind])}</span>
-                      <span className="truncate">{f.owner_label ?? '—'}</span>
-                      <ArrowUpRight size={12} className="shrink-0 opacity-0 group-hover/owner:opacity-100" />
-                    </button>
-                    <span className="hidden w-32 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">
-                      {workers.find((w) => w.user_id === f.uploaded_by)?.name ?? t('Someone')}
+                      <span className="truncate text-[13.5px] text-foreground" title={f.name}>{nameOf(f)}</span>
+                      {f.versions > 1 && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">v{f.versions}</span>}
                     </span>
-                    <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(f.created_at, true)}</span>
-                  </div>
-                  {open && <div className="px-2 pb-3">
-                    <AttachmentPreview file={f} owner={owner} actions={canImport(f.name) ? <FileImportActions file={f} /> : undefined} />
-                  </div>}
-                </div>
+                    {/* Where the search matched inside the file. */}
+                    {settled && snippets.get(f.id) && (
+                      <span className="mt-0.5 block truncate pl-6 text-[12px] text-muted-foreground">{snippets.get(f.id)}</span>
+                    )}
+                  </span>
+                  {!open && (
+                    <span className="hidden w-56 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">
+                      <span className="text-muted-foreground/70">{t(OWNER_LABEL[owner.kind])} · </span>{f.owner_label ?? '—'}
+                    </span>
+                  )}
+                  {!open && <span className="hidden w-32 shrink-0 truncate text-[12.5px] text-muted-foreground lg:block">{who(f)}</span>}
+                  <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(f.created_at, true)}</span>
+                </button>
               );
             })}
         </div>
       </div>
+
+      {open && <FilePane file={open} who={who(open)} onClose={() => select(null)} />}
+    </div>
+  );
+}
+
+/** The open file, beside the list: where it is attached, and the file itself. */
+function FilePane({ file, who, onClose }: { file: SpaceFile; who: string; onClose: () => void }) {
+  const { t } = useI18n();
+  const owner = ownerOf(file);
+  const [ref, size] = useElementSize<HTMLDivElement>();
+  return (
+    <aside className="flex w-[min(58%,880px)] shrink-0 flex-col border-l border-border/60">
+      <div className="flex shrink-0 items-start gap-2 px-4 pb-2 pt-4">
+        <FileTypeIcon name={file.name} mime={file.mime_type} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[14px] font-medium text-foreground" title={file.name}>{file.name}</div>
+          <button type="button" onClick={() => openAttachmentOwner(file)} title={t('Open where it is attached')}
+            className="group/owner mt-0.5 flex max-w-full items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground">
+            <span className="truncate">{t(OWNER_LABEL[owner.kind])} · {file.owner_label ?? '—'}</span>
+            <ArrowUpRight size={12} className="shrink-0 opacity-60 group-hover/owner:opacity-100" />
+            <span className="shrink-0 text-muted-foreground/70">· {who} · {formatAge(file.created_at, true)}</span>
+          </button>
+        </div>
+        <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Close')} title={t('Close')} onClick={onClose}><X size={14} /></Button>
+      </div>
+      <div ref={ref} className="min-h-0 flex-1 px-4 pb-4">
+        {size.h > 0 && (
+          <AttachmentPreview key={file.id} file={file} owner={owner} height={Math.max(240, size.h - 4)}
+            actions={canImport(file.name) ? <FileImportActions file={file} /> : undefined} />
+        )}
+      </div>
+    </aside>
+  );
+}
+
+/** The trash: every file removed in the Space and still inside its days,
+ *  most recently removed first, each with Restore — wherever it was
+ *  attached, so there is one place to look. */
+function TrashList() {
+  const { t } = useI18n();
+  const { data: files, loading } = useSpaceAttachments(useActiveSpaceId(), true);
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 px-6 pb-3 pt-5">
+        <div className="flex items-center gap-3">
+          <h1 className="text-[17px] font-semibold text-foreground">{t('Deleted')}</h1>
+          <span className="text-[13px] tabular-nums text-muted-foreground">{files.length}</span>
+        </div>
+        <p className="mt-0.5 text-[12.5px] text-muted-foreground">{t('Removed files can be restored for {days} days, then they are erased.', { days: TRASH_DAYS })}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-3 border-b border-border/60 px-6 pb-1.5 text-[11.5px] text-muted-foreground">
+        <span className="min-w-0 flex-1">{t('Name')}</span>
+        <span className="hidden w-56 shrink-0 md:block">{t('Attached to')}</span>
+        <span className="w-24 shrink-0 text-right">{t('Erased in')}</span>
+        <span className="w-24 shrink-0" />
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-1">
+        {loading ? <p className="px-3 py-6 text-[13px] text-muted-foreground">{t('Loading…')}</p>
+          : !files.length ? <p className="px-3 py-6 text-[13px] text-muted-foreground">{t('Nothing has been removed.')}</p>
+          : files.map((f) => <TrashRow key={f.id} file={f} />)}
+      </div>
+    </div>
+  );
+}
+
+function TrashRow({ file }: { file: SpaceFile }) {
+  const { t } = useI18n();
+  const owner = ownerOf(file);
+  const { restore } = useAttachmentActions(owner);
+  return (
+    <div className="flex h-9 items-center gap-3 rounded-md px-3 hover:bg-foreground/[0.05]">
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="opacity-60"><FileTypeIcon name={file.name} mime={file.mime_type} /></span>
+        <span className="truncate text-[13.5px] text-muted-foreground" title={file.name}>{nameOf(file)}</span>
+      </span>
+      <span className="hidden w-56 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">
+        <span className="text-muted-foreground/70">{t(OWNER_LABEL[owner.kind])} · </span>{file.owner_label ?? '—'}
+      </span>
+      <span className="w-24 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{t('{n} days left', { n: trashDaysLeft(file.deleted_at!) })}</span>
+      <span className="flex w-24 shrink-0 justify-end">
+        <Button type="button" variant="ghost" size="xs" disabled={restore.isPending}
+          onClick={() => restore.mutate(file, { onError: (e) => void appDialog.alert(e instanceof Error ? e.message : String(e)) })}>
+          {restore.isPending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}{t('Restore')}
+        </Button>
+      </span>
     </div>
   );
 }

@@ -57,6 +57,7 @@ import { CREATE_ELEMENT_EVENT, type CreateElementDetail } from '@/shell/QuickAdd
 import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarStore';
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
+import { FilesSidebar } from '@/ActivitySpace/sustainment/files/FilesSidebar';
 import { CrmSidebar } from '@/ActivitySpace/sustainment/crm/CrmSidebar';
 import { AuditSidebar } from '@/ActivitySpace/sustainment/audit/AuditSidebar';
 import { AiSidebar } from '@/ActivitySpace/home/ai/AiSidebar';
@@ -537,7 +538,7 @@ export function AppSidebar({
           {/* ── Calendar ── today, a mini month that moves the grid, and who is shown. */}
           {railMode === 'calendar' && <><SidebarModeLabel label={t('Calendar')} /><CalendarSidebar /></>}
           {railMode === 'team' && <SidebarModeLabel label={t('People')} />}
-          {railMode === 'files' && <SidebarModeLabel label={t('Files')} />}
+          {railMode === 'files' && <FilesSidebar navigation={navigation} onNavigate={onNavigate} />}
           {/* ── Reviews ── the Space's pull requests; the main pane reviews the open one. */}
           {railMode === 'reviews' && <ReviewsSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'reviews') onViewChange('reviews'); }} />}
           {railMode === 'crm' && <CrmSidebar navigation={navigation} onNavigate={onNavigate} />}
