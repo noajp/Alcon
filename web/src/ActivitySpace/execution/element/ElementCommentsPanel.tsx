@@ -34,6 +34,8 @@ interface ElementCommentsPanelProps {
   onAskAgent?: (ask: { prompt: string; commentId: string; workerId: string | null }) => Promise<AgentStartOutcome>;
   /** Changes when the agent's run moves on; the thread re-reads its comments. */
   refreshKey?: string | null;
+  /** Other ways to send, from the ▾ beside Send (e.g. Share an update). */
+  sendOptions?: { label: string; onSelect: () => void }[];
 }
 
 interface MentionCandidate {
@@ -47,7 +49,7 @@ interface MentionCandidate {
 
 const QUICK_EMOJI = ['👍', '🎉', '❤️', '👀', '🚀', '✅'];
 
-export function ElementCommentsPanel({ elementId, workers, onCountChange, focusCommentId, onAskAgent, refreshKey }: ElementCommentsPanelProps) {
+export function ElementCommentsPanel({ elementId, workers, onCountChange, focusCommentId, onAskAgent, refreshKey, sendOptions }: ElementCommentsPanelProps) {
   const { t } = useI18n();
   const aiWorkers = useMemo(() => workers.filter((w) => w.type === 'ai_agent').map((w) => ({ id: w.id, name: w.name })), [workers]);
   const humanNames = useMemo(() => workers.filter((w) => w.type === 'human').map((w) => w.name), [workers]);
@@ -431,6 +433,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
         onKeyDown={onComposerKeyDown}
         placeholder={onAskAgent ? t('Leave a comment… @AI asks the agent') : undefined}
         sendShortcut={sendShortcut}
+        sendOptions={sendOptions}
       >
         {mentionListOpen && (
           <div role="listbox" className="absolute left-0 bottom-full mb-1 z-20 w-64 bg-popover border border-border rounded-md shadow-lg overflow-hidden">

@@ -92,7 +92,12 @@ import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
-import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal } from 'lucide-react';
+import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal, Paperclip, X } from 'lucide-react';
+import { useElementFiles, useElementFileActions, openElementFile } from '@/hooks/elementFileData';
+import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckRequest';
+import { openInApp } from '@/Function/shared/appNavigation';
+import { NavSlidesIcon } from '@/shell/sidebar/NavIcons';
+import { appDialog } from '@/Function/shared/appDialogStore';
 import { CodeChangeIcon } from '@/ActivitySpace/execution/code/codeChangeLabels';
 import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NotePicker } from '@/ActivitySpace/sustainment/notebook/NotePicker';
@@ -629,6 +634,10 @@ function ElementDetailBody({
   const [dependencySignal, setDependencySignal] = useState(0);
   const [approvalSignal, setApprovalSignal] = useState(0);
   const [linkPrSignal, setLinkPrSignal] = useState(0);
+  // Files attached from this computer.
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { data: files } = useElementFiles(element.id);
+  const fileActions = useElementFileActions(element.id);
   const handlePickNote = async (
     noteId: string,
     opts: { isNew: boolean; name: string },
@@ -875,48 +884,60 @@ function ElementDetailBody({
               )}
             </div>
 
-            {/* Note linker — opens NotePicker; hidden once a Note is
-                linked (the embed below has an unlink button instead). */}
-            {!element.note_id && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setNotePickerOpen(true)}
-                  className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-                  title={t('Link a Note')}
-                  aria-label={t('Link a Note')}
-                >
-                  <FileText size={15} />
-                </button>
-                <NotePicker
-                  open={notePickerOpen}
-                  onClose={() => setNotePickerOpen(false)}
-                  onPick={handlePickNote}
-                  anchorClassName="absolute top-full left-0 mt-1"
-                />
-              </div>
-            )}
+            {/* Attach a file from this computer — it lists under the row and
+                opens through a short-lived link (element_files). */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={fileActions.upload.isPending}
+              className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors disabled:opacity-50"
+              title={t('Attach a file')}
+              aria-label={t('Attach a file')}
+            >
+              <Paperclip size={15} />
+            </button>
+            <input ref={fileInputRef} type="file" multiple hidden
+              onChange={(e) => {
+                const picked = Array.from(e.target.files ?? []);
+                e.target.value = '';
+                for (const f of picked) fileActions.upload.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) });
+              }} />
 
-            {/* More attachments, kept out of the page until chosen: linking
-                a pull request opens its URL field in the Code changes
-                section below. */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
-                  title={t('More')}
-                  aria-label={t('More')}
-                >
-                  <MoreHorizontal size={15} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[200px]">
-                <DropdownMenuItem onSelect={() => setTimeout(() => setLinkPrSignal((n) => n + 1), 0)} className="gap-2.5 py-1.5 text-[13px]">
-                  <CodeChangeIcon size={15} className="text-muted-foreground" />{t('Link pull request')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* More to attach, kept off the page until chosen: a Note
+                (Document), a new deck (Slide), a pull request. */}
+            <div className="relative">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
+                    title={t('More')}
+                    aria-label={t('More')}
+                  >
+                    <MoreHorizontal size={15} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-[200px]">
+                  {!element.note_id && (
+                    <DropdownMenuItem onSelect={() => setTimeout(() => setNotePickerOpen(true), 0)} className="gap-2.5 py-1.5 text-[13px]">
+                      <FileText size={15} className="text-muted-foreground" />{t('Document')}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onSelect={() => { requestNewDeck(element.title); openInApp('slides'); }} className="gap-2.5 py-1.5 text-[13px]">
+                    <NavSlidesIcon size={15} />{t('Slide')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setTimeout(() => setLinkPrSignal((n) => n + 1), 0)} className="gap-2.5 py-1.5 text-[13px]">
+                    <CodeChangeIcon size={15} className="text-muted-foreground" />{t('Link pull request')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <NotePicker
+                open={notePickerOpen}
+                onClose={() => setNotePickerOpen(false)}
+                onPick={handlePickNote}
+                anchorClassName="absolute top-full left-0 mt-1"
+              />
+            </div>
 
             {/* Approval — turned on from the "…" menu; once on, its state
                 icon here opens the panel to record a decision (Approve /
@@ -951,6 +972,29 @@ function ElementDetailBody({
             })()}
           </div>
           </ButtonAppearanceProvider>
+          {files.length > 0 && (
+            <section className="w-full" aria-label={t('Files')}>
+              <div className="flex flex-wrap gap-1.5">
+                {files.map((f) => (
+                  <span key={f.id} className="group/file inline-flex max-w-[260px] items-center gap-1.5 rounded-md border border-border/60 bg-[var(--surface-rail)] py-1 pl-2 pr-1 text-[12.5px]">
+                    <Paperclip size={12} className="shrink-0 text-muted-foreground" />
+                    <button type="button" className="truncate text-foreground hover:underline" title={f.name}
+                      onClick={() => { void openElementFile(f).catch((err) => appDialog.alert(err instanceof Error ? err.message : String(err))); }}>
+                      {f.name}
+                    </button>
+                    {f.uploaded_by === user?.id && (
+                      <button type="button" aria-label={t('Remove {name}', { name: f.name })}
+                        onClick={() => fileActions.remove.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) })}
+                        className="flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/file:opacity-100">
+                        <X size={11} />
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+
           <ElementDirectionSection
             key={`direction-${element.id}`}
             element={element}
@@ -1069,14 +1113,14 @@ function ElementDetailBody({
 
           {/* The reader keeps changes next to their discussion. */}
           <div className={layout === 'reader' ? '' : 'mt-4'}>
-            <div className="mb-4 flex items-center justify-between gap-2">
-              <h2 className={`${FONT.lg} text-foreground`}>{t('Comments')}</h2>
-              <ButtonAppearanceProvider appearance="inline">
-                <Button variant="ghost" size="sm" onClick={() => setCheckInOpen(true)}>{t('Share an update')}</Button>
-              </ButtonAppearanceProvider>
+            {/* Comments and shared updates are one thread: a plain comment
+                sends with the button, an update from its ▾. */}
+            <div className="mb-4 flex items-center gap-2">
+              <h2 className={`${FONT.lg} text-foreground`}>{t('Updates')}</h2>
             </div>
             <ElementCommentsPanel
               key={`comments-${element.id}`}
+              sendOptions={[{ label: t('Share an update'), onSelect: () => setCheckInOpen(true) }]}
               refreshKey={agent.run ? `${agent.run.id}:${agent.run.status}:${agent.run.step_count}` : null}
               elementId={element.id}
               workers={allWorkers}
