@@ -431,7 +431,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
         submitting={submitting}
         enterHeldBy={mentionListOpen}
         onKeyDown={onComposerKeyDown}
-        placeholder={onAskAgent ? t('Leave a comment… @AI asks the agent') : undefined}
+        placeholder={onAskAgent ? t('Write an update… @AI asks the agent') : undefined}
         sendShortcut={sendShortcut}
         sendOptions={sendOptions}
       >
