@@ -38,27 +38,19 @@ export function DisplayIdChip({
    *  - `row`: cap relative to the row. A viewport breakpoint can't see how
    *    wide the row is — list and detail columns move with the sidebar and
    *    the right rail, so a wide window still hands a row a narrow box.
-   *  - `column`: one width down a whole list, so what follows the id (the
-   *    status mark, the title) starts at the same x on every row. The list
-   *    measures its widest drawn id and hands that width to every chip as
-   *    `--list-id-w` (useUniformIdWidth); outside such a list the chip falls
-   *    back to a 4.5rem (12px) / 5rem (13px) floor. Capped at 9rem so one
-   *    runaway id can't push every title off screen.
    *  - `full`: never truncate. For surfaces with no hover to fall back on,
    *    like the drag preview, where a clipped id can't be recovered. */
-  fit?: 'row' | 'column' | 'full';
+  fit?: 'row' | 'full';
 }) {
   if (!id) return null;
   const FIT = {
     row: 'max-w-[min(10rem,35%)] truncate',
-    column: `${size === 'xs' ? 'min-w-[var(--list-id-w,4.5rem)]' : 'min-w-[var(--list-id-w,5rem)]'} max-w-36 truncate text-left`,
     full: '',
   }[fit];
   return (
     <span
       dir="rtl"
       title={id}
-      data-list-id={fit === 'column' ? '' : undefined}
       className={`shrink-0 tabular-nums text-muted-foreground/60 ${
         size === 'xs' ? 'text-xs' : 'text-[13px]'
       } ${FIT}`}
