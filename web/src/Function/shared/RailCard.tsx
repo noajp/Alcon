@@ -23,7 +23,7 @@ export function RailCard({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   return (
-    <section className="group/rail rounded-lg border border-[var(--border-strong)] bg-[var(--surface-rail)] shadow-[var(--shadow-island)]">
+    <section className="group/rail rounded-lg border border-[var(--border-default)] bg-[var(--surface-rail)] shadow-[var(--shadow-island)]">
       {/* Height is declared, not left to padding, so the heading is the same
           40px whether the card is open or shut. */}
       <div className="flex h-10 items-center pl-2.5 pr-2">
