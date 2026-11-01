@@ -1,13 +1,15 @@
 import type { Deck as PptxDeck, DeckItem, DeckSlide, Para, Run, TextBody } from "@/Function/office/deckLayout";
-import type { ColorRef, Deck, FontRef, Slide, SlideObject, TextStyle } from "./types";
+import type { ChartData } from "@/Function/office/chartLayout";
+import type { ChartContent, ChartKind, ColorRef, Deck, FontRef, Slide, SlideObject, TextStyle } from "./types";
 import { newId } from "./id";
 
 // PowerPoint のデッキを Slides のデッキにする。型には当てはめず、ページごとに
 // 図形・文字・画像・表を元の位置のまま「自由配置」のページに置く（取り込んだ後は
 // 置いたものとして動かし、打ち直せる）。大きさは 1280×720 に収まるよう縦横同じ倍率で
-// 縮め、余りは中央に寄せる。Slides の置きものが持てないもの（回転・グラデーション・
-// 文字ごとの書式・グラフ）は、近いもの（塗りは最初の色、文字は段落の先頭の書式、
-// グラフは枠と題）にする。
+// 縮め、余りは中央に寄せる。グラフは数字ごと「グラフ」の型のページにする：グラフと
+// 文字だけのページはそのページを、ほかの図形や画像もあるページは自由配置のページの
+// 後ろに足す。Slides の置きものが持てないもの（回転・グラデーション・文字ごとの書式）は、
+// 近いもの（塗りは最初の色、文字は段落の先頭の書式）にする。
 
 const W = 1280;
 const H = 720;
@@ -72,7 +74,7 @@ function itemObjects(item: DeckItem, place: (x: number, y: number, w: number, h:
     case "image":
       return [{ id: newId("o"), kind: "image", ...box, fill: "none", stroke: "none", strokeWidth: 0, src: item.src, ratio: box.w / Math.max(1, box.h) }];
     case "chart":
-      // 置きものはグラフを持てないので、場所と題だけ残す（元のファイルのプレビューでは描ける）
+      // 置きものはグラフを持てない。グラフはグラフの型のページになるので、ここには場所と題だけ残す
       return [{ id: newId("o"), kind: "rect", ...box, fill: "none", stroke: "line", strokeWidth: 1, dash: true, text: item.chart.title ?? "Chart", textStyle: { size: Math.round(18 * s * 1.5) } }];
     case "table": {
       const out: SlideObject[] = [];
@@ -132,13 +134,40 @@ function titleOf(slide: DeckSlide, n: number): string {
   return best?.text.slice(0, 120) ?? `Slide ${n + 1}`;
 }
 
-/** 純粋。PowerPoint のデッキ（読んだもの）を、自由配置のページのデッキにする */
+const CHART_KIND: Record<ChartData["kind"], ChartKind> = {
+  pie: "share", doughnut: "share", bar: "bar", column: "column", combo: "column", line: "line", area: "line", stock: "line", scatter: "scatter",
+};
+const num = (v: number | null) => (v != null && Number.isFinite(v) ? v : 0);
+
+/** 純粋。読んだグラフを、グラフの型の中身にする（項目は12・系列は3まで。型の上限） */
+export function chartContent(chart: ChartData, takeaway = ""): ChartContent {
+  const kind = CHART_KIND[chart.kind];
+  const categories = chart.categories.slice(0, 12);
+  const series = kind === "scatter"
+    // 相関は 0番目が横軸、1番目が縦軸。PowerPoint の散布図は横軸の値を項目に持つ
+    ? [{ name: "x", values: categories.map((c) => Number(c) || 0) }, { name: chart.series[0]?.name ?? "", values: (chart.series[0]?.values ?? []).slice(0, categories.length).map(num) }]
+    : chart.series.slice(0, kind === "share" ? 1 : 3).map((sr) => ({ name: sr.name, values: categories.map((_, i) => num(sr.values[i] ?? null)) }));
+  return { kind, categories, series: series.length ? series : [{ name: "", values: categories.map(() => 0) }], unit: "", highlight: -1, takeaway };
+}
+
+/** 純粋。PowerPoint のデッキ（読んだもの）を、自由配置とグラフのページのデッキにする */
 export function deckFromPptx(pptx: PptxDeck, title: string): Deck {
   const s = Math.min(W / pptx.width, H / pptx.height);
   const ox = (W - pptx.width * s) / 2;
   const oy = (H - pptx.height * s) / 2;
   const place = (x: number, y: number, w: number, h: number) => ({ x: Math.round(ox + x * s), y: Math.round(oy + y * s), w: Math.round(w * s), h: Math.round(h * s) });
-  const slides: Slide[] = pptx.slides.map((slide, n) => {
+  const slides: Slide[] = pptx.slides.flatMap((slide, n) => {
+    const title = titleOf(slide, n);
+    const charts = slide.items.filter((i): i is Extract<DeckItem, { kind: "chart" }> => i.kind === "chart");
+    // グラフの型のページ。ページの題を主張に（無ければグラフの題）、ほかの文字は言えること（takeaway）に
+    const titled = slide.items.some((i) => i.kind === "shape" && i.text && bodyText(i.text).trim());
+    const texts = slide.items.flatMap((i) => (i.kind === "shape" && i.text ? [bodyText(i.text).trim()] : [])).filter((t) => t && !t.startsWith(title));
+    const chartSlides: Slide[] = charts.map((c) => ({
+      id: newId("s"), title: (titled ? title : c.chart.title?.trim()) || title, layout: "chart",
+      content: { chart: chartContent(c.chart, texts.join(" ").slice(0, 200)) },
+    }));
+    const onlyText = slide.items.every((i) => i.kind === "chart" || (i.kind === "shape" && !hexOf(i.fill) && !(i.stroke && hexOf(i.stroke.color))));
+    if (charts.length && onlyText) return chartSlides;
     const objects: SlideObject[] = [];
     // 背景：画像ならその画像、色なら全面の塗り（無ければ白。PowerPoint の既定）
     const bgImage = slide.background?.match(/url\("([^"]+)"\)/)?.[1];
@@ -147,7 +176,7 @@ export function deckFromPptx(pptx: PptxDeck, title: string): Deck {
     // design-lint-ignore — PowerPoint's own default page colour, kept as slide data (not a UI colour)
     else objects.push({ id: newId("o"), kind: "rect", ...full, fill: (hexOf(slide.background) ?? "#ffffff") as ColorRef, stroke: "none", strokeWidth: 0, behind: true });
     for (const item of slide.items) objects.push(...itemObjects(item, place, s));
-    return { id: newId("s"), title: titleOf(slide, n), layout: "free", content: { free: {} }, objects };
+    return [{ id: newId("s"), title, layout: "free", content: { free: {} }, objects } as Slide, ...chartSlides];
   });
   return { title, storyline: "scr", slides };
 }

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { deckFromPptx, hexOf } from '@/ActivitySpace/sustainment/slides/kata/model/fromPptx';
+import { chartContent, deckFromPptx, hexOf } from '@/ActivitySpace/sustainment/slides/kata/model/fromPptx';
 import { fromKataJson, toKataJson } from '@/ActivitySpace/sustainment/slides/kata/model/kataFile';
 import type { Deck as PptxDeck, DeckItem, TextBody } from '@/Function/office/deckLayout';
+import type { ChartData, ChartSeries } from '@/Function/office/chartLayout';
+
+const series = (name: string, values: (number | null)[]): ChartSeries => ({ name, color: null, values, type: 'bar', axis: 'left', labels: false });
 
 const body = (text: string, o: Partial<TextBody> = {}, run: Record<string, unknown> = {}): TextBody => ({
   paras: text.split('\n').map((t) => ({ align: 'left', runs: [{ text: t, size: 18, bold: false, italic: false, underline: false, color: null, font: null, spacing: 0, ...run }], bullet: null, indent: 0, lineHeight: null })),
@@ -55,7 +58,7 @@ describe('deckFromPptx', () => {
     const d = deckFromPptx({ width: 1280, height: 720, slides: [{ background: 'center / cover no-repeat url("data:image/png;base64,AAA")', items: [
       shape({ x: 0, y: 0, w: 400, h: 400, text: body('mid', { anchor: 'middle' }) }),
       { kind: 'image', src: 'data:image/png;base64,BBB', crop: { l: 0, t: 0, r: 0, b: 0 }, x: 10, y: 10, w: 200, h: 100, rot: 0 },
-      { kind: 'chart', chart: { title: 'Sales' } as never, x: 0, y: 0, w: 300, h: 200, rot: 0 },
+      { kind: 'chart', chart: { title: 'Sales', kind: 'pie', stacked: false, categories: ['a'], series: [] }, x: 0, y: 0, w: 300, h: 200, rot: 0 },
       { kind: 'table', cols: [100, 50], rows: [{ h: 40, cells: [{ text: body('A'), fill: '#eeeeee', span: 2, skip: false }, { text: body(''), fill: null, span: 1, skip: true }] }], x: 20, y: 30, w: 150, h: 40, rot: 0 },
     ] }] }, 'x');
     const objs = d.slides[0].objects!;
@@ -66,6 +69,28 @@ describe('deckFromPptx', () => {
     expect(objs[4]).toMatchObject({ kind: 'rect', x: 20, y: 30, w: 150, h: 40, fill: '#eeeeee', stroke: 'line' });
     expect(objs[5]).toMatchObject({ kind: 'text', text: 'A' });
     expect(objs).toHaveLength(6);
+    // A slide with pictures and tables keeps its freeform page; the chart follows as its own page.
+    expect(d.slides.map((s) => s.layout)).toEqual(['free', 'chart']);
+  });
+
+  it('turns a chart into a chart page, in place of a slide that is only text and the chart', () => {
+    const chart: ChartData = { title: 'Sales', kind: 'column', stacked: false, categories: ['Q1', 'Q2'], series: [series('A', [1, null]), series('B', [3, 4])] };
+    const d = deckFromPptx(deck([
+      shape({ text: body('Sales doubled', {}, { size: 32 }) }),
+      shape({ text: body('Driven by Q2') }),
+      { kind: 'chart', chart, x: 0, y: 0, w: 300, h: 200, rot: 0 },
+    ]), 'x');
+    expect(d.slides).toHaveLength(1);
+    expect(d.slides[0]).toMatchObject({ layout: 'chart', title: 'Sales doubled', content: { chart: {
+      kind: 'column', categories: ['Q1', 'Q2'], series: [{ name: 'A', values: [1, 0] }, { name: 'B', values: [3, 4] }], highlight: -1, takeaway: 'Driven by Q2',
+    } } });
+  });
+
+  it('maps chart kinds, keeps one series for a pie, and builds scatter axes', () => {
+    const base = { title: null, stacked: false, categories: ['1', '2'], series: [series('S', [5, 6]), series('T', [7, 8])] };
+    expect(chartContent({ ...base, kind: 'doughnut' })).toMatchObject({ kind: 'share', series: [{ name: 'S' }] });
+    expect(chartContent({ ...base, kind: 'area' }).kind).toBe('line');
+    expect(chartContent({ ...base, kind: 'scatter' }).series).toEqual([{ name: 'x', values: [1, 2] }, { name: 'S', values: [5, 6] }]);
   });
 
   it('survives being saved and opened again', () => {
