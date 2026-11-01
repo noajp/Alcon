@@ -14,6 +14,8 @@ export interface FilesRoute {
   kind?: FileKind | null;
   /** The file open beside the list. */
   fileId?: string | null;
+  /** The trash instead of the files: what was removed, to restore. */
+  trash?: boolean;
 }
 
 /** Pure. A file's kind, from its name and type. */

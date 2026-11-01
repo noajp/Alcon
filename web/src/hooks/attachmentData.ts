@@ -269,14 +269,15 @@ export interface SpaceFile extends Attachment {
   versions: number;
 }
 
-/** Every file attached in a Space, as its latest version (not trashed),
- *  newest first. RLS leaves out what the viewer cannot see. */
-export function useSpaceAttachments(spaceId: string | null) {
+/** Every file attached in a Space, as its latest version, newest first —
+ *  or, `trashed`, those in the trash (within their days), most recently
+ *  trashed first. RLS leaves out what the viewer cannot see. */
+export function useSpaceAttachments(spaceId: string | null, trashed = false) {
   const query = useQuery({
-    queryKey: ['attachments-of', 'space', spaceId],
+    queryKey: ['attachments-of', 'space', spaceId, trashed],
     enabled: !!spaceId,
     queryFn: async (): Promise<SpaceFile[]> => {
-      const { data, error } = await supabase.rpc('space_attachments', { p_space: spaceId });
+      const { data, error } = await supabase.rpc('space_attachments', { p_space: spaceId, p_trashed: trashed });
       if (error) throw error;
       return (data ?? []) as SpaceFile[];
     },

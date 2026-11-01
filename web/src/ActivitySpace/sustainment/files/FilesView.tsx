@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowUpRight, Search, X } from 'lucide-react';
+import { ArrowUpRight, Loader2, RotateCcw, Search, X } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { AttachmentPreview } from '@/Function/shared/attachments/AttachmentList';
@@ -12,7 +12,8 @@ import { formatAge } from '@/Function/shared/dateUtils';
 import { crmRoute, routeTo } from '@/Function/crm/crmRoute';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { fileKindOf } from '@/Function/files/filesRoute';
-import { ownerOf, useSpaceAttachments, type AttachmentOwnerKind, type SpaceFile } from '@/hooks/attachmentData';
+import { TRASH_DAYS, ownerOf, trashDaysLeft, useAttachmentActions, useSpaceAttachments, type AttachmentOwnerKind, type SpaceFile } from '@/hooks/attachmentData';
+import { appDialog } from '@/Function/shared/appDialogStore';
 import { useWorkers } from '@/hooks/teamData';
 import type { NavigationState } from '@/types/navigation';
 import { FileImportActions, canImport } from '@/ActivitySpace/execution/element/FileImportActions';
@@ -43,6 +44,11 @@ const nameOf = (f: SpaceFile) => { const dot = f.name.lastIndexOf('.'); return d
  * versions) without losing the list.
  */
 export function FilesView({ navigation, onNavigate }: { navigation: NavigationState; onNavigate: (nav: Partial<NavigationState>) => void }) {
+  const route = navigation.files ?? {};
+  return route.trash ? <TrashList /> : <FileList navigation={navigation} onNavigate={onNavigate} />;
+}
+
+function FileList({ navigation, onNavigate }: { navigation: NavigationState; onNavigate: (nav: Partial<NavigationState>) => void }) {
   const { t } = useI18n();
   const route = navigation.files ?? {};
   const { data: files, loading } = useSpaceAttachments(useActiveSpaceId());
@@ -142,5 +148,59 @@ function FilePane({ file, who, onClose }: { file: SpaceFile; who: string; onClos
         )}
       </div>
     </aside>
+  );
+}
+
+/** The trash: every file removed in the Space and still inside its days,
+ *  most recently removed first, each with Restore — wherever it was
+ *  attached, so there is one place to look. */
+function TrashList() {
+  const { t } = useI18n();
+  const { data: files, loading } = useSpaceAttachments(useActiveSpaceId(), true);
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 px-6 pb-3 pt-5">
+        <div className="flex items-center gap-3">
+          <h1 className="text-[17px] font-semibold text-foreground">{t('Deleted')}</h1>
+          <span className="text-[13px] tabular-nums text-muted-foreground">{files.length}</span>
+        </div>
+        <p className="mt-0.5 text-[12.5px] text-muted-foreground">{t('Removed files can be restored for {days} days, then they are erased.', { days: TRASH_DAYS })}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-3 border-b border-border/60 px-6 pb-1.5 text-[11.5px] text-muted-foreground">
+        <span className="min-w-0 flex-1">{t('Name')}</span>
+        <span className="hidden w-56 shrink-0 md:block">{t('Attached to')}</span>
+        <span className="w-24 shrink-0 text-right">{t('Erased in')}</span>
+        <span className="w-24 shrink-0" />
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-1">
+        {loading ? <p className="px-3 py-6 text-[13px] text-muted-foreground">{t('Loading…')}</p>
+          : !files.length ? <p className="px-3 py-6 text-[13px] text-muted-foreground">{t('Nothing has been removed.')}</p>
+          : files.map((f) => <TrashRow key={f.id} file={f} />)}
+      </div>
+    </div>
+  );
+}
+
+function TrashRow({ file }: { file: SpaceFile }) {
+  const { t } = useI18n();
+  const owner = ownerOf(file);
+  const { restore } = useAttachmentActions(owner);
+  return (
+    <div className="flex h-9 items-center gap-3 rounded-md px-3 hover:bg-foreground/[0.05]">
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="opacity-60"><FileTypeIcon name={file.name} mime={file.mime_type} /></span>
+        <span className="truncate text-[13.5px] text-muted-foreground" title={file.name}>{nameOf(file)}</span>
+      </span>
+      <span className="hidden w-56 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">
+        <span className="text-muted-foreground/70">{t(OWNER_LABEL[owner.kind])} · </span>{file.owner_label ?? '—'}
+      </span>
+      <span className="w-24 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{t('{n} days left', { n: trashDaysLeft(file.deleted_at!) })}</span>
+      <span className="flex w-24 shrink-0 justify-end">
+        <Button type="button" variant="ghost" size="xs" disabled={restore.isPending}
+          onClick={() => restore.mutate(file, { onError: (e) => void appDialog.alert(e instanceof Error ? e.message : String(e)) })}>
+          {restore.isPending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}{t('Restore')}
+        </Button>
+      </span>
+    </div>
   );
 }

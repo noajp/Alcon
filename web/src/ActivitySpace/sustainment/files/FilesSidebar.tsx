@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Briefcase, Building2, File, FileImage, FileSpreadsheet, FileText, Handshake, Presentation, Target } from 'lucide-react';
+import { Briefcase, Building2, File, FileImage, FileSpreadsheet, FileText, Handshake, Presentation, Target, Trash2 } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ToolSidebar, type ToolNavItem } from '@/Function/shared/tool/ToolSidebar';
 import { ElementIcon, FilesIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
@@ -11,8 +11,8 @@ import { ownerOf, useSpaceAttachments, type AttachmentOwnerKind } from '@/hooks/
 import type { NavigationState } from '@/types/navigation';
 
 // The Files sidebar, on the shared ToolSidebar: every file, then the files
-// by what they are attached to and by their kind. Only what the Space has
-// is listed — no empty filters to click into.
+// by what they are attached to and by their kind — only what the Space has,
+// so no empty filter to click into — and, at the foot, the trash.
 
 export const WHERE: { id: AttachmentOwnerKind; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
   { id: 'element', label: 'Elements', icon: ElementIcon },
@@ -52,8 +52,10 @@ export function FilesSidebar({ navigation, onNavigate }: { navigation: Navigatio
     title={t('Files')}
     scope={{
       value: null, options: [{ id: null, name: t('All files') }], label: t('All files'), icon: FilesIcon,
-      active: !route.where && !route.kind, onOpen: () => go({}), onChange: () => go({}),
+      active: !route.where && !route.kind && !route.trash, onOpen: () => go({}), onChange: () => go({}),
     }}
+    // Removed files stay restorable for their days; the way back is here.
+    footer={[{ id: 'trash', label: t('Deleted'), icon: Trash2, active: !!route.trash, onClick: () => go({ trash: true }) }]}
     sections={[
       ...(whereItems.length ? [{ id: 'where', label: t('Attached to'), items: whereItems }] : []),
       ...(kindItems.length ? [{ id: 'kind', label: t('Kind'), items: kindItems }] : []),
