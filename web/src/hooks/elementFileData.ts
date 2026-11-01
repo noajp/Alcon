@@ -8,9 +8,16 @@ import { translate } from '@/Function/i18n/I18nProvider';
 // the private `element-files` bucket under "<element id>/…" and each one is
 // listed in element_files; both follow the Element's visibility (RLS), so a
 // file is opened through a short-lived signed link, never a public URL.
+//
+// Removing a file moves it to a trash for TRASH_DAYS: the row is marked
+// deleted and the bytes stay, so its uploader can restore it. Once the days
+// are up the file is no longer listed, and the uploader's next visit erases
+// the bytes and the row (Storage takes deletes only through its API).
 
 const BUCKET = 'element-files';
 const MAX_BYTES = 50 * 1024 * 1024;
+export const TRASH_DAYS = 30;
+const DAY = 86_400_000;
 
 export interface ElementFile {
   id: string;
@@ -21,10 +28,26 @@ export interface ElementFile {
   mime_type: string | null;
   uploaded_by: string;
   created_at: string;
+  deleted_at: string | null;
 }
 
 const filesKey = (elementId: string) => ['element', elementId, 'files'] as const;
 const EMPTY: ElementFile[] = [];
+
+/** Pure. Days left before a trashed file is erased (0 = due). */
+export function trashDaysLeft(deletedAt: string, now = Date.now()): number {
+  return Math.max(0, TRASH_DAYS - Math.floor((now - new Date(deletedAt).getTime()) / DAY));
+}
+
+/** Erases files whose trash days are up — the bytes through the Storage
+ *  API, then the rows. Only the uploader's own; best effort, as the next
+ *  visit tries again. */
+async function purgeExpired(files: ElementFile[], userId: string | undefined) {
+  const due = files.filter((f) => f.deleted_at && f.uploaded_by === userId && trashDaysLeft(f.deleted_at) === 0);
+  if (!due.length) return;
+  const { error } = await supabase.storage.from(BUCKET).remove(due.map((f) => f.path));
+  if (!error) await supabase.from('element_files').delete().in('id', due.map((f) => f.id));
+}
 
 export function useElementFiles(elementId: string | null) {
   const query = useQuery({
@@ -32,13 +55,21 @@ export function useElementFiles(elementId: string | null) {
     enabled: !!elementId,
     queryFn: async (): Promise<ElementFile[]> => {
       const { data, error } = await supabase.from('element_files')
-        .select('id, element_id, path, name, size, mime_type, uploaded_by, created_at')
+        .select('id, element_id, path, name, size, mime_type, uploaded_by, created_at, deleted_at')
         .eq('element_id', elementId!).order('created_at');
       if (error) throw error;
-      return (data ?? []) as ElementFile[];
+      const rows = (data ?? []) as ElementFile[];
+      const { data: auth } = await supabase.auth.getUser();
+      void purgeExpired(rows, auth.user?.id);
+      return rows.filter((f) => !f.deleted_at || trashDaysLeft(f.deleted_at) > 0);
     },
   });
-  return { data: query.data ?? EMPTY, loading: !!elementId && query.isPending };
+  const all = query.data ?? EMPTY;
+  return {
+    data: all.filter((f) => !f.deleted_at),
+    trashed: all.filter((f) => f.deleted_at),
+    loading: !!elementId && query.isPending,
+  };
 }
 
 /** Pure. A storage key under the Element. Storage accepts ASCII keys only
@@ -70,16 +101,19 @@ export function useElementFileActions(elementId: string) {
     },
     onSettled: refresh,
   });
-  const remove = useMutation({
-    mutationFn: async (file: ElementFile) => {
-      const { data, error } = await supabase.from('element_files').delete().eq('id', file.id).select('id');
-      if (error) throw error;
-      if (!data?.length) throw new Error(translate('Only the person who attached a file can remove it.'));
-      await supabase.storage.from(BUCKET).remove([file.path]);
-    },
-    onSettled: refresh,
-  });
-  return { upload, remove };
+  // Trash and restore both write the two trash columns only; RLS lets the
+  // uploader alone, so an empty result means someone else's file.
+  const mark = async (file: ElementFile, deleted: boolean) => {
+    const { data: auth } = await supabase.auth.getUser();
+    const { data, error } = await supabase.from('element_files')
+      .update(deleted ? { deleted_at: new Date().toISOString(), deleted_by: auth.user?.id ?? null } : { deleted_at: null, deleted_by: null })
+      .eq('id', file.id).select('id');
+    if (error) throw error;
+    if (!data?.length) throw new Error(translate('Only the person who attached a file can remove it.'));
+  };
+  const remove = useMutation({ mutationFn: (file: ElementFile) => mark(file, true), onSettled: refresh });
+  const restore = useMutation({ mutationFn: (file: ElementFile) => mark(file, false), onSettled: refresh });
+  return { upload, remove, restore };
 }
 
 /** A short-lived signed link to a file, for previewing it in the page. */
@@ -98,4 +132,17 @@ export async function openElementFile(file: ElementFile): Promise<void> {
   if (error || !data?.signedUrl) { tab?.close(); throw error ?? new Error('Could not open the file.'); }
   if (tab) { tab.opener = null; tab.location.href = data.signedUrl; }
   else window.location.assign(data.signedUrl);
+}
+
+/** Saves a file to the person's computer under its own name, through a
+ *  signed link that asks the browser to download rather than show it. */
+export async function downloadElementFile(file: ElementFile): Promise<void> {
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(file.path, 60, { download: file.name });
+  if (error || !data?.signedUrl) throw error ?? new Error('Could not download the file.');
+  const a = document.createElement('a');
+  a.href = data.signedUrl;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }

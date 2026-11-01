@@ -8,7 +8,7 @@ import {
   Plus,
 
   X,
-  Search, CircleDashed, Flag, Tag, UserRound, Box, CalendarDays, Shapes, ListFilter as GroupIcon, ArrowDownWideNarrow, RotateCcw, Play,
+  Search, CircleDashed, Flag, Tag, UserRound, Box, CalendarDays, Shapes, ArrowDownWideNarrow, ArrowUpNarrowWide, RotateCcw, Play,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuItem,
@@ -53,7 +53,6 @@ function Grid6Icon({ size = 14 }: { size?: number }) {
     </svg>
   );
 }
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import {
   MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR,
@@ -76,7 +75,6 @@ import {
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
-import { FieldVisibility } from '@/Function/property/FieldVisibility';
 import { fieldDisplayLabel } from '@/Function/property/fieldModel';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { useListColumns, type ColumnId } from '@/Function/shared/listTable/useListColumns';
@@ -521,22 +519,25 @@ function DisplayPanel({
   // flat in that case.
   const groupByValue = groupOptions.some((o) => o.id === display.groupBy) ? display.groupBy : 'none';
   return (
-    <div>
-      {/* Grouping + Ordering as Linear-style labelled dropdowns. */}
-      <LabeledSelect
-        icon={<GroupIcon size={15} />} label="Grouping"
-        value={groupByValue}
-        options={groupOptions.map(option => ({ ...option, label: t(option.label) }))}
-        onSelect={(id) => setDisplay({ groupBy: id })}
-      />
-      {propertiesStorageKey ? <OrderingControl storageKey={propertiesStorageKey} customColumns={propertiesCustom ?? EMPTY_CUSTOM} display={display} setDisplay={setDisplay} /> :
-        <LabeledSelect icon={<ArrowDownWideNarrow size={15} />} label="Ordering" value={display.orderBy}
-          options={ORDER_OPTIONS.map(option => ({ ...option, label: fieldDisplayLabel(t, option) }))} onSelect={(id) => setDisplay({ orderBy: id })} />}
+    <div className="py-1">
+      {/* Grouping and Ordering: a quiet label, a select box on the right —
+          Linear's Display panel. Ordering carries its direction as the
+          arrow button beside the select instead of a row of its own. */}
+      <div className="space-y-1 px-1 pb-2">
+        <LabeledSelect
+          label="Grouping"
+          value={groupByValue}
+          options={groupOptions.map(option => ({ ...option, label: t(option.label) }))}
+          onSelect={(id) => setDisplay({ groupBy: id })}
+        />
+        {propertiesStorageKey ? <OrderingControl storageKey={propertiesStorageKey} customColumns={propertiesCustom ?? EMPTY_CUSTOM} display={display} setDisplay={setDisplay} /> :
+          <LabeledSelect label="Ordering" value={display.orderBy}
+            leading={display.orderBy !== 'manual' ? <DirectionToggle direction={display.orderDir} onChange={(orderDir) => setDisplay({ orderDir })} /> : undefined}
+            options={ORDER_OPTIONS.map(option => ({ ...option, label: fieldDisplayLabel(t, option) }))} onSelect={(id) => setDisplay({ orderBy: id })} />}
+      </div>
 
-
-      {/* Properties — which data columns show. Driven by the same shared
-          column store the list header uses, so toggles here and in the
-          header stay in sync. The "+" adds a new Property. */}
+      {/* Which properties show — the same store the list header's "+"
+          toggles, so the two never disagree. */}
       {propertiesStorageKey ? (
         <PropertiesSection
           storageKey={propertiesStorageKey}
@@ -546,25 +547,15 @@ function DisplayPanel({
       ) : displayProperties && displayProperties.options.length > 0 ? (
         <>
           <div className={MENU_SEPARATOR} />
-          <MenuSectionLabel>{t('Properties')}</MenuSectionLabel>
-          <div className="px-2 pb-2 flex flex-wrap gap-1.5">
-            {displayProperties.options.map((opt) => {
-              const active = displayProperties.active.has(opt.id);
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => displayProperties.onToggle(opt.id)}
-                  className={`px-2 py-1 text-[12px] rounded-full transition-colors border ${
-                    active
-                      ? 'bg-muted text-foreground border-border'
-                      : 'bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground'
-                  }`}
-                >
+          <div className="px-2 pt-2 pb-1">
+            <div className="pb-2 text-[13px] text-muted-foreground">{t('Display properties')}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {displayProperties.options.map((opt) => (
+                <PropertyPill key={opt.id} active={displayProperties.active.has(opt.id)} onClick={() => displayProperties.onToggle(opt.id)}>
                   {t(opt.label)}
-                </button>
-              );
-            })}
+                </PropertyPill>
+              ))}
+            </div>
           </div>
         </>
       ) : null}
@@ -577,7 +568,7 @@ function DisplayPanel({
             onClick={() => { orderingColumns.setSort(null); onReset(); }}
             className={`${MENU_ROW} text-muted-foreground hover:text-foreground`}
           >
-            <RotateCcw size={14} />{t('Reset to defaults')}
+            <RotateCcw size={13} />{t('Reset to defaults')}
           </button>
         </>
       )}
@@ -585,44 +576,87 @@ function DisplayPanel({
   );
 }
 
-// A label + dropdown-select row (Linear's Display menu pattern).
+// A label + select row (Linear's Display panel): the label quiet on the
+// left, the current choice in a box on the right. `leading` sits just
+// before the box (Ordering's direction arrow).
 function LabeledSelect<T extends string>({
-  label, value, options, onSelect, icon,
+  label, value, options, onSelect, leading,
 }: {
   label: string;
-  icon?: React.ReactNode;
   value: T;
   options: { id: T; label: string }[];
   onSelect: (id: T) => void;
+  leading?: React.ReactNode;
 }) {
   const { t } = useI18n();
   const current = options.find((o) => o.id === value);
   return (
-    <div className={`${MENU_ROW} justify-between hover:bg-transparent`}>
-      <span className="flex items-center gap-2 text-muted-foreground">{icon}{t(label)}</span>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button type="button" variant="ghost" shape="tab" size="sm" aria-label={t(label)} className="w-32 justify-between">
-            <span className="truncate">{current?.label ?? value}</span>
-            <ChevronDown size={12} className="shrink-0 text-muted-foreground" />
-          </Button>
-        </DropdownMenuTrigger>
-        <MenuShell as="dropdown" align="end">
-          {options.map((o) => (
-            <DropdownMenuItem
-              key={o.id}
-              onSelect={() => onSelect(o.id)}
-              className="gap-2 text-[13px]"
+    <div className="flex min-h-8 items-center justify-between gap-3 px-1">
+      <span className="truncate text-[13px] text-muted-foreground">{t(label)}</span>
+      <div className="flex shrink-0 items-center gap-1">
+        {leading}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={t(label)}
+              className="inline-flex h-7 w-36 items-center justify-between gap-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-strong)] px-2.5 text-[13px] text-foreground transition-colors hover:border-[var(--border-strong)] data-[state=open]:border-[var(--border-strong)]"
             >
-              <span className="w-4 inline-flex justify-center">
-                {o.id === value && <Check size={12} className="text-foreground" />}
-              </span>
-              <span className="flex-1">{o.label}</span>
-            </DropdownMenuItem>
-          ))}
-        </MenuShell>
-      </DropdownMenu>
+              <span className="truncate">{current?.label ?? value}</span>
+              <ChevronDown size={13} className="shrink-0 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <MenuShell as="dropdown" align="end">
+            {options.map((o) => (
+              <DropdownMenuItem key={o.id} onSelect={() => onSelect(o.id)}>
+                <span className="flex-1 truncate">{o.label}</span>
+                {o.id === value && <Check size={13} className="text-foreground" />}
+              </DropdownMenuItem>
+            ))}
+          </MenuShell>
+        </DropdownMenu>
+      </div>
     </div>
+  );
+}
+
+/** Ordering's direction, as one arrow button that flips it. */
+function DirectionToggle({ direction, onChange }: { direction: 'asc' | 'desc'; onChange: (d: 'asc' | 'desc') => void }) {
+  const { t } = useI18n();
+  const Icon = direction === 'asc' ? ArrowUpNarrowWide : ArrowDownWideNarrow;
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(direction === 'asc' ? 'desc' : 'asc')}
+      title={t(direction === 'asc' ? 'Ascending' : 'Descending')}
+      aria-label={t(direction === 'asc' ? 'Ascending' : 'Descending')}
+      className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--surface-strong)] hover:text-foreground"
+    >
+      <Icon size={15} />
+    </button>
+  );
+}
+
+/** A display property's on/off pill. On reads as a filled chip, off as its
+ *  name alone. */
+function PropertyPill({ active, onClick, disabled, children, title }: {
+  active: boolean; onClick: () => void; disabled?: boolean; children: React.ReactNode; title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
+      title={title}
+      className={`inline-flex h-7 max-w-full items-center rounded-full border px-3 text-[13px] transition-colors disabled:opacity-50 ${
+        active
+          ? 'border-[var(--border-default)] bg-[var(--surface-strong)] text-foreground hover:border-[var(--border-strong)]'
+          : 'border-transparent text-muted-foreground hover:text-foreground'
+      }`}
+    >
+      <span className="truncate">{children}</span>
+    </button>
   );
 }
 
@@ -641,8 +675,22 @@ function PropertiesSection({
   return (
     <>
       <div className={MENU_SEPARATOR} />
-      <FieldVisibility compact columns={cols.allColumns} isVisible={cols.isVisible} onToggle={cols.toggleVisible} />
-      {onAddColumn && <Button type="button" variant="ghost" size="sm" onClick={onAddColumn}><Plus size={14} />{t('Add field')}</Button>}
+      <div className="px-2 pt-2 pb-1">
+        <div className="pb-2 text-[13px] text-muted-foreground">{t('Display properties')}</div>
+        <div className="flex flex-wrap gap-1.5">
+          {cols.allColumns.map((c) => (
+            <PropertyPill key={c.id} active={cols.isVisible(c.id)} disabled={!c.toggleable} onClick={() => cols.toggleVisible(c.id)} title={fieldDisplayLabel(t, c)}>
+              {fieldDisplayLabel(t, c)}
+            </PropertyPill>
+          ))}
+          {onAddColumn && (
+            <button type="button" onClick={onAddColumn}
+              className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-[var(--border-default)] px-3 text-[13px] text-muted-foreground transition-colors hover:border-[var(--border-strong)] hover:text-foreground">
+              <Plus size={13} />{t('Add field')}
+            </button>
+          )}
+        </div>
+      </div>
     </>
   );
 }
@@ -711,12 +759,8 @@ function OrderingControl({ storageKey, customColumns, display, setDisplay }: {
     cols.setSort(id === 'manual' ? null : { id, direction });
     setDisplay({ orderBy: 'manual', orderDir: direction });
   };
-  return <>
-    <LabeledSelect label="Ordering" icon={<ArrowUpDown size={15} />}
-      value={active?.id ?? 'manual'} options={[{ id: 'manual', label: t('Manual') }, ...candidates]}
-      onSelect={(id) => choose(id, active?.direction ?? 'asc')} />
-    {active && <LabeledSelect label="Direction" icon={active.direction === 'asc' ? <ArrowUp size={15} /> : <ArrowDown size={15} />}
-      value={active.direction} options={[{ id: 'asc', label: t('Ascending') }, { id: 'desc', label: t('Descending') }]}
-      onSelect={(direction) => choose(active.id, direction)} />}
-  </>;
+  return <LabeledSelect label="Ordering"
+    leading={active ? <DirectionToggle direction={active.direction} onChange={(direction) => choose(active.id, direction)} /> : undefined}
+    value={active?.id ?? 'manual'} options={[{ id: 'manual', label: t('Manual') }, ...candidates]}
+    onSelect={(id) => choose(id, active?.direction ?? 'asc')} />;
 }

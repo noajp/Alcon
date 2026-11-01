@@ -2,37 +2,39 @@
 
 import { FieldVisibility } from '@/Function/property/FieldVisibility';
 import { Button } from '@/ui/button';
-import { useRef } from 'react';
-import { Settings2, ArrowLeft, ArrowRight, Pencil, ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, EyeOff } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { ArrowLeft, ArrowRight, Pencil, ArrowDown, ArrowUp, EyeOff, Plus, X, Check } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem } from '@/ui/dropdown-menu';
-import { MenuShell } from '@/Function/shared/menu';
+import { MenuShell, MENU_ROW, MENU_SEPARATOR } from '@/Function/shared/menu';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { type ColumnId, type ColumnSort, type DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { HEADER_DRAG_PREFIX } from './shared';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { fieldDisplayLabel } from '@/Function/property/fieldModel';
 
-// Header cell for a single data column. The entire `<th>` is the drag
-// surface for reorder (no grab cursor — dnd-kit's distance constraint
-// keeps small clicks as clicks). Inside:
-//   - a sort button (label + asc/desc arrow) that cycles the column's sort
-//   - an overflow menu for `Hide column` (toggleable columns only)
-//   - a resize handle on the right edge
-// Resize and the menu's trigger stop pointer propagation so they don't
-// accidentally start a header drag.
+// A data column's header, as in Asana: the name is a button that opens the
+// column's menu (sort, move, edit, hide), and the whole cell is what you
+// grab to move the column. A drag never moves the header itself — the
+// table draws a floating label under the pointer and a line where the
+// column will land, so the columns stay still while you aim. The right edge
+// resizes.
 export function ColumnHeader({
-  column, width, isDragging, sort, onResize, onToggleSort, onHide, onEdit, onMoveLeft, onMoveRight,
+  column, width, inset = 0, isDragging, dropEdge, sort, onResize, onResizeStart, onSort, onHide, onEdit, onMoveLeft, onMoveRight,
 }: {
   column: DataColumn;
   width: number;
+  /** Drawn width that is not the saved width (the sort arrow's room). */
+  inset?: number;
   isDragging: boolean;
+  /** Where a column being dragged would land against this one. */
+  dropEdge: 'before' | 'after' | null;
   /** 'asc' | 'desc' when this column owns the active sort, else null. */
   sort: ColumnSort['direction'] | null;
   onResize: (width: number) => void;
-  onToggleSort: () => void;
-  /** Pass undefined for always-on columns (Type) to omit the Hide item. */
+  onResizeStart?: () => void;
+  onSort: (direction: ColumnSort['direction'] | null) => void;
+  /** Pass undefined for always-on columns to omit the Hide item. */
   onHide?: () => void;
   onEdit?: () => void;
   onMoveLeft?: () => void;
@@ -41,106 +43,94 @@ export function ColumnHeader({
   const { t } = useI18n();
   // Built-in column names are English keys; a Property's name is the user's own.
   const label = fieldDisplayLabel(t, column);
-  const dragId = HEADER_DRAG_PREFIX + column.id;
-  const {
-    setNodeRef, attributes, listeners, transform, transition,
-    // Don't animate layout changes — otherwise an unrelated re-render (e.g.
-    // toggling a column's sort) makes dnd-kit transition the header's
-    // transform, which reads as a visible stutter/jank. Active drag still
-    // moves via `transform`; reordered columns just snap into place.
-  } = useSortable({ id: dragId, animateLayoutChanges: () => false });
-  const dragStyle: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    // Same drag-perf treatment as the row components.
-    transition: isDragging ? 'none' : transition,
-    willChange: isDragging ? 'transform' : undefined,
-    width,
-    minWidth: width,
-    maxWidth: width,
-    opacity: isDragging ? 0.4 : undefined,
-  };
-  const SortIcon = sort === 'asc' ? ArrowUp : sort === 'desc' ? ArrowDown : ArrowUpDown;
+  const end = column.align === 'end';
+  const { setNodeRef, attributes, listeners } = useSortable({ id: HEADER_DRAG_PREFIX + column.id, animateLayoutChanges: () => false });
+  const [open, setOpen] = useState(false);
+  // The menu opens on click, not on press: a press may be the start of a
+  // drag, and a press that travelled is not a click.
+  const downAt = useRef<{ x: number; y: number } | null>(null);
+  const SortIcon = sort === 'asc' ? ArrowUp : ArrowDown;
   return (
     <th
       ref={setNodeRef}
-      style={dragStyle}
+      style={{ width, minWidth: width, maxWidth: width }}
       {...attributes}
       {...listeners}
-      className="table-cell group/col relative px-1.5 py-2.5 text-left text-[13px] font-normal text-muted-foreground bg-card whitespace-nowrap select-none border-b border-border/60"
+      className={`table-cell group/col relative ${end ? 'px-0.5' : 'px-1'} py-1.5 text-left text-[13px] font-normal text-muted-foreground bg-card whitespace-nowrap select-none border-b border-border/60 transition-opacity ${isDragging ? 'opacity-40' : ''}`}
     >
-      <div className="flex items-center gap-1 min-w-0">
-        {/* Sort toggle — click cycles none → asc → desc → none. We do NOT
-            stop pointerdown here: the label IS the column's drag surface,
-            and the PointerSensor's 3px distance constraint already tells a
-            click (→ sort) apart from a drag (→ reorder). Stopping pointerdown
-            (as before) made the label un-draggable, so columns couldn't be
-            reordered by grabbing their name. */}
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onToggleSort(); }}
-          title={
-            sort === 'asc' ? t('Sort by {name} (asc) — click for desc', { name: label }) :
-            sort === 'desc' ? t('Sort by {name} (desc) — click to clear', { name: label }) :
-            t('Sort by {name}', { name: label })
-          }
-          // px-1.5 mirrors the body trigger's inner padding (CELL_TRIGGER_BASE),
-          // so the header text starts at the same x as the cell text below.
-          // Without it the label sits 6px left of the body content.
-          className="flex-1 min-w-0 flex items-center justify-start gap-1 px-1.5 text-left text-muted-foreground/80 hover:text-foreground transition-colors focus:outline-none"
-        >
-          <span className="truncate">{label}</span>
-          <SortIcon
-            size={11}
-            className={`shrink-0 transition-opacity ${
-              sort ? 'opacity-100 text-foreground' : 'opacity-0 group-hover/col:opacity-50'
-            }`}
-          />
-        </button>
-        {/* Overflow menu — Edit / Move / Hide for toggleable columns.
-            Transparent at rest and shown on header hover, keyboard focus or
-            while open, so a row of headers is a row of words rather than a
-            row of chevrons. Transparent (not display:none) keeps it
-            reachable by Tab. */}
-        {onHide && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label={t('{name} options', { name: label })}
-                className="shrink-0 w-5 h-4 inline-flex items-center justify-center rounded text-muted-foreground opacity-0 group-hover/col:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 hover:bg-muted hover:text-foreground transition-[opacity,color,background-color]"
-                onPointerDown={(e) => e.stopPropagation()}
-              >
-                <ChevronDown size={12} />
-              </button>
-            </DropdownMenuTrigger>
-            <MenuShell as="dropdown" align="end">
-              {onEdit && <DropdownMenuItem onSelect={onEdit}><Pencil size={12} />{t('Edit field')}</DropdownMenuItem>}
-              <DropdownMenuItem disabled={!onMoveLeft} onSelect={onMoveLeft}><ArrowLeft size={12} />{t('Move left')}</DropdownMenuItem>
-              <DropdownMenuItem disabled={!onMoveRight} onSelect={onMoveRight}><ArrowRight size={12} />{t('Move right')}</DropdownMenuItem>
-              <DropdownMenuItem onSelect={onHide} className="gap-2">
-                <EyeOff size={12} className="text-muted-foreground" />
-                <span>{t('Hide column')}</span>
-              </DropdownMenuItem>
-            </MenuShell>
-          </DropdownMenu>
-        )}
-      </div>
-      {/* Resize handle — absolute on the right edge, visible on hover.
-          PointerDown captures the pointer and updates width on move; the
-          stopPropagation keeps dnd-kit's drag from kicking in. */}
-      <ResizeHandle width={width} onResize={onResize} />
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            onPointerDown={(e) => { downAt.current = { x: e.clientX, y: e.clientY }; e.preventDefault(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              const d = downAt.current;
+              downAt.current = null;
+              if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 3) return;
+              setOpen(true);
+            }}
+            title={label}
+            // The name starts (or, flush right, ends) at the x of the cell
+            // text below: th px-1 + px-2 = the cells' 12px; a flush-right
+            // column's th px-0.5 + px-1 = its cells' 6px.
+            className={`flex h-7 w-full min-w-0 items-center gap-1 rounded-md text-muted-foreground/90 transition-colors hover:bg-[var(--surface-strong)] hover:text-foreground focus:outline-none focus-visible:bg-[var(--surface-strong)] data-[state=open]:bg-[var(--surface-strong)] data-[state=open]:text-foreground ${end ? 'justify-end px-1' : 'justify-start px-2'}`}
+          >
+            <span className="truncate">{label}</span>
+            {sort && <SortIcon size={12} className="shrink-0 text-foreground" />}
+          </button>
+        </DropdownMenuTrigger>
+        <MenuShell as="dropdown" align={end ? 'end' : 'start'} onCloseAutoFocus={(e) => e.preventDefault()}>
+          <DropdownMenuItem onSelect={() => onSort('asc')}>
+            <ArrowUp size={14} />
+            <span className="flex-1">{t('Sort ascending')}</span>
+            {sort === 'asc' && <Check size={13} />}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onSort('desc')}>
+            <ArrowDown size={14} />
+            <span className="flex-1">{t('Sort descending')}</span>
+            {sort === 'desc' && <Check size={13} />}
+          </DropdownMenuItem>
+          {sort && (
+            <DropdownMenuItem onSelect={() => onSort(null)}>
+              <X size={14} />{t('Clear sort')}
+            </DropdownMenuItem>
+          )}
+          <div className={MENU_SEPARATOR} />
+          <DropdownMenuItem disabled={!onMoveLeft} onSelect={onMoveLeft}><ArrowLeft size={14} />{t('Move left')}</DropdownMenuItem>
+          <DropdownMenuItem disabled={!onMoveRight} onSelect={onMoveRight}><ArrowRight size={14} />{t('Move right')}</DropdownMenuItem>
+          {(onEdit || onHide) && <div className={MENU_SEPARATOR} />}
+          {onEdit && <DropdownMenuItem onSelect={onEdit}><Pencil size={14} />{t('Edit field')}</DropdownMenuItem>}
+          {onHide && <DropdownMenuItem onSelect={onHide}><EyeOff size={14} />{t('Hide column')}</DropdownMenuItem>}
+        </MenuShell>
+      </DropdownMenu>
+      {dropEdge && (
+        <span aria-hidden className={`pointer-events-none absolute inset-y-1 z-20 w-0.5 rounded-full bg-[var(--accent-default)] ${dropEdge === 'before' ? '-left-px' : '-right-px'}`} />
+      )}
+      <ResizeHandle width={width - inset} inset={inset} onResize={onResize} onResizeStart={onResizeStart} />
     </th>
   );
 }
 
+/** The column's right edge. Dragging it changes this column's width and
+ *  nothing else: the columns to its left stay where they are (the table
+ *  freezes the Name width first — see ListTable), so the edge follows the
+ *  pointer. */
 export function ResizeHandle({
-  width, onResize,
+  width, inset = 0, startWidth, onResize, onResizeStart,
 }: {
   width: number;
+  /** Header width that is not this column's (the sort arrow's room). */
+  inset?: number;
+  /** The drawn width at the start of a drag, when the header cell is not
+   *  the whole column (Name spans two tracks and two header cells). */
+  startWidth?: () => number;
   onResize: (w: number) => void;
+  onResizeStart?: () => void;
 }) {
   const { t } = useI18n();
-  const startRef = useRef<{ x: number; w: number; left: number; header: HTMLTableCellElement | null } | null>(null);
+  const startRef = useRef<{ x: number; w: number } | null>(null);
+  const [active, setActive] = useState(false);
   return (
     <div
       role="separator"
@@ -152,63 +142,68 @@ export function ResizeHandle({
       aria-valuemax={1200}
       onKeyDown={(e) => {
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-          e.preventDefault(); e.stopPropagation(); onResize(width + (e.key === 'ArrowRight' ? 16 : -16));
+          e.preventDefault(); e.stopPropagation(); onResizeStart?.(); onResize(width + (e.key === 'ArrowRight' ? 16 : -16));
         }
       }}
-      onPointerCancel={() => { startRef.current = null; }}
-      onLostPointerCapture={() => { startRef.current = null; }}
-      // Wide transparent grab area for an easy target; the visible feedback
-      // is a thin 1px gray line on the right edge (group-hover), so it reads
-      // as a slim divider rather than a fat blue bar.
-      className="group/resize absolute top-0 right-0 z-10 h-full w-2 touch-none cursor-col-resize"
+      onPointerCancel={() => { startRef.current = null; setActive(false); }}
+      onLostPointerCapture={() => { startRef.current = null; setActive(false); }}
+      // A wide transparent grab area centred on the edge; the visible
+      // feedback is the hairline in the middle, accent while dragging.
+      className="group/resize absolute top-0 -right-1.5 z-30 h-full w-3 touch-none cursor-col-resize"
       onPointerDown={(e) => {
         const header = e.currentTarget.closest('th');
-        const rect = header?.getBoundingClientRect();
-        // Use rendered geometry so stretched tracks do not snap. The left
-        // edge delta accounts for scroll only when the track actually moves;
-        // frozen Name headers must not inherit the scroller's movement.
-        startRef.current = { x: e.clientX, w: rect?.width ?? width, left: rect?.left ?? 0, header };
+        onResizeStart?.();
+        startRef.current = { x: e.clientX, w: startWidth ? startWidth() : header ? header.getBoundingClientRect().width - inset : width };
+        setActive(true);
         e.currentTarget.setPointerCapture(e.pointerId);
         e.preventDefault();
         e.stopPropagation();
       }}
       onPointerMove={(e) => {
         if (!startRef.current) return;
-        const start = startRef.current;
-        const left = start.header?.getBoundingClientRect().left ?? start.left;
-        const next = start.w + (e.clientX - start.x) + (start.left - left);
-        // Raw width — setWidth applies the right per-column min/max clamp
-        // (the Name column has a higher floor than the data columns).
-        onResize(next);
+        // Raw width — setWidth applies the per-column min/max clamp.
+        onResize(startRef.current.w + (e.clientX - startRef.current.x));
       }}
       onPointerUp={(e) => {
         if (!startRef.current) return;
         startRef.current = null;
+        setActive(false);
         try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* fine */ }
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      <span className="absolute top-0 right-0 h-full w-px bg-muted-foreground/40 opacity-0 group-hover/resize:opacity-100 transition-opacity" />
+      <span className={`absolute inset-y-1.5 left-1/2 w-px -translate-x-1/2 transition-colors ${active ? 'bg-[var(--accent-default)]' : 'bg-transparent group-hover/resize:bg-[var(--border-strong)]'}`} />
     </div>
   );
 }
 
-// Column show/hide menu — trailing header "+" for lists that can't create a
-// Property (no single scope: Domain Elements, My Elements). Toggles which
-// built-in/custom columns are visible. Lists that CAN add a Property use a
-// direct "+" instead (see the header cell above).
-export function ColumnMenu({
-  allColumns, isVisible, onToggle,
+/** The trailing "+" of the header: which fields show as columns (a switch
+ *  each, searchable), and — where the list has a scope to create one in —
+ *  a new field. */
+export function FieldsMenu({
+  allColumns, isVisible, onToggle, onCreate,
 }: {
   allColumns: DataColumn[];
   isVisible: (id: ColumnId) => boolean;
   onToggle: (id: ColumnId) => void;
+  onCreate?: (anchor?: DOMRect) => void;
 }) {
   const { t } = useI18n();
-  return <Popover>
-    <PopoverTrigger asChild><Button type="button" variant="ghost" size="icon-sm" aria-label={t('Configure fields')} title={t('Configure fields')}><Settings2 size={14} /></Button></PopoverTrigger>
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  return <Popover open={open} onOpenChange={setOpen}>
+    <PopoverTrigger asChild>
+      <Button ref={triggerRef} type="button" variant="ghost" size="icon-sm" aria-label={t('Fields')} title={t('Fields')}><Plus size={14} /></Button>
+    </PopoverTrigger>
     <MenuShell align="end" width="wide">
       <FieldVisibility columns={allColumns} isVisible={isVisible} onToggle={onToggle} />
+      {onCreate && <>
+        <div className={MENU_SEPARATOR} />
+        <button type="button" className={`${MENU_ROW} text-muted-foreground hover:text-foreground`}
+          onClick={() => { setOpen(false); onCreate(triggerRef.current?.getBoundingClientRect()); }}>
+          <Plus size={14} />{t('Create field')}
+        </button>
+      </>}
     </MenuShell>
   </Popover>;
 }

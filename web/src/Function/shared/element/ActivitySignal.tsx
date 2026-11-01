@@ -22,7 +22,7 @@ export function ActivitySignal({
   const relative = formatRelative(activity.lastCommentAt);
   return (
     <span
-      className={`shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70 ${className}`}
+      className={`shrink-0 flex items-center gap-1.5 text-[11px] text-muted-foreground/70 ${className}`}
       title={`${t(activity.commentCount === 1 ? '{n} comment' : '{n} comments', { n: activity.commentCount })} · ${relative}`}
     >
       <MessageIcon size={12} />

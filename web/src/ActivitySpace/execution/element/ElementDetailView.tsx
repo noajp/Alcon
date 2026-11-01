@@ -22,8 +22,6 @@ import type { DateRange } from 'react-day-picker';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { isAgentRunOpen } from '@/Function/copilot/agentData';
 import { AgentRunPanel } from './agent';
-import { OpenInMenu } from '@/ActivitySpace/execution/openIn/OpenInMenu';
-import { createNoteFile } from '@/hooks/useNotesDb';
 import {
   updateElement,
   fetchElementWithDetails,
@@ -91,8 +89,8 @@ import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
-import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal, Paperclip, X } from 'lucide-react';
-import { useElementFiles, useElementFileActions } from '@/hooks/elementFileData';
+import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal, Paperclip } from 'lucide-react';
+import { useElementFiles, useElementFileActions, trashDaysLeft, TRASH_DAYS } from '@/hooks/elementFileData';
 import { ElementFilePreview } from './ElementFilePreview';
 import { FileTypeIcon } from './fileTypeIcon';
 import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckRequest';
@@ -193,7 +191,6 @@ const priorityOptions = [
 // ============================================
 function ElementDetailBody({
   element,
-  objectName: _objectName,
   layout = 'full',
   objectPath,
   domainName,
@@ -629,7 +626,8 @@ function ElementDetailBody({
   const [linkPrSignal, setLinkPrSignal] = useState(0);
   // Files attached from this computer.
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { data: files } = useElementFiles(element.id);
+  const { data: files, trashed: trashedFiles } = useElementFiles(element.id);
+  const [trashOpen, setTrashOpen] = useState(false);
   const fileActions = useElementFileActions(element.id);
   // Files whose preview is open under their row.
   const [openFileIds, setOpenFileIds] = useState<Set<string>>(() => new Set());
@@ -734,28 +732,6 @@ function ElementDetailBody({
             onOpenApproval={() => setApprovalSignal((n) => n + 1)} />
         </div>
         <div className="flex-1" />
-        {/* Take the Element to a tool: Claude Code, the in-app agent (it
-            works with your permissions and stops for approval before
-            external writes, ADR 0027), its Note, a deck. */}
-        <OpenInMenu
-          subject={{
-            kind: 'Element', identifier: element.display_id, title: element.title,
-            description: element.description, path: [domainName, ...(objectPath ?? []).map((seg) => seg.name)].filter((x): x is string => !!x),
-          }}
-          noteId={element.note_id ?? null}
-          onCreateNote={async () => {
-            const note = await createNoteFile(element.title);
-            await updateElement(element.id, { note_id: note.id });
-            log('note', `Linked new Note “${note.name}”`);
-            onRefresh?.();
-            return note.id;
-          }}
-          agent={{
-            aiWorkers, defaultWorkerId: assignedAiWorkerId, busy: isAgentRunOpen(agent.run),
-            starting: agent.starting, error: agent.error ?? null,
-            onStart: ({ workerId, prompt }) => agent.start({ workerId, prompt, triggeredFrom: 'detail', domainId }),
-          }}
-        />
       </div>
 
       {/* Scrollable body — Linear-style two-column layout */}
@@ -991,10 +967,16 @@ function ElementDetailBody({
                         </button>
                         <span className="flex-1" />
                         {f.uploaded_by === user?.id && (
-                          <button type="button" aria-label={t('Remove {name}', { name: f.name })}
-                            onClick={() => fileActions.remove.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) })}
-                            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted/50 hover:text-foreground group-hover/file:opacity-100">
-                            <X size={12} />
+                          // A bin, not an ×: beside an open preview an × reads as
+                          // "close". It asks first, and the file goes to the trash
+                          // below, restorable for TRASH_DAYS.
+                          <button type="button" aria-label={t('Remove {name}', { name: f.name })} title={t('Remove {name}', { name: f.name })}
+                            onClick={async () => {
+                              if (!await appDialog.confirm(t('Move “{name}” to the trash? It can be restored for {days} days.', { name: f.name, days: TRASH_DAYS }))) return;
+                              fileActions.remove.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) });
+                            }}
+                            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted/50 hover:text-[var(--status-danger)] group-hover/file:opacity-100">
+                            <Trash2 size={12} />
                           </button>
                         )}
                       </div>
@@ -1003,6 +985,37 @@ function ElementDetailBody({
                   );
                 })}
               </div>
+            </section>
+          )}
+
+          {/* Deleted files — folded under the files, each with the days it
+              has left and, for its uploader, Restore. */}
+          {trashedFiles.length > 0 && (
+            <section className="-mt-1 w-full" aria-label={t('Deleted files')}>
+              <button type="button" onClick={() => setTrashOpen((o) => !o)} aria-expanded={trashOpen}
+                className="flex items-center gap-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground">
+                <DisclosureTriangle open={trashOpen} />
+                <Trash2 size={12} />
+                {t('Deleted files')} <span className="tabular-nums">{trashedFiles.length}</span>
+              </button>
+              {trashOpen && (
+                <div className="-mx-2 mt-1">
+                  {trashedFiles.map((f) => (
+                    <div key={f.id} className="flex min-h-[2rem] items-center gap-2 rounded-lg px-2 py-1 text-muted-foreground hover:bg-foreground/[0.06]">
+                      <span className="opacity-60"><FileTypeIcon name={f.name} mime={f.mime_type} /></span>
+                      <span className="min-w-0 truncate text-[13px] line-through decoration-muted-foreground/40" title={f.name}>{f.name}</span>
+                      <span className="flex-1" />
+                      <span className="shrink-0 text-[11.5px] tabular-nums">{t('{n} days left', { n: trashDaysLeft(f.deleted_at!) })}</span>
+                      {f.uploaded_by === user?.id && (
+                        <Button type="button" variant="ghost" size="xs" className="text-muted-foreground"
+                          onClick={() => fileActions.restore.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) })}>
+                          <RotateCcw size={12} />{t('Restore')}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           )}
 

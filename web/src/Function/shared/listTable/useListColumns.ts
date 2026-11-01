@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { fieldValueText } from '@/Function/property/fieldModel';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { ELEMENT_DEFAULT_VISIBLE, OBJECT_DEFAULT_VISIBLE } from '@/Function/shared/listConfig';
@@ -34,6 +35,10 @@ export interface DataColumn {
   /** Built-in `type` is non-toggleable (always on); others can be hidden. */
   toggleable: boolean;
   defaultWidth: number;
+  /** Floor for resizing, when the column's content is narrower than the shared one. */
+  minWidth?: number;
+  /** 'end' sets the header and the cells flush right (the due date). */
+  align?: 'end';
   /** For kind === 'custom': the backing Property (custom_columns) definition. */
   custom?: CustomColumnWithValues;
 }
@@ -44,6 +49,13 @@ export interface DataColumn {
 // little slack instead of truncating, while the table still reads dense.
 // Users can per-column resize from there.
 const DEFAULT_COLUMN_WIDTH = 128;
+// A due date is one short date ("Nov 13", "11月13日"), so its column hugs
+// it and sits flush right: the assignee or lead after it is the same 20px
+// away as the label before it, not across an empty half column. The width
+// is what the header's word needs in each language.
+function dateColumnWidth(locale: string): number {
+  return locale === 'es' ? 88 : locale === 'ja' || locale === 'ko' ? 84 : locale === 'fr' ? 76 : 72;
+}
 
 // Special width key for the Name column (not a real DataColumn — it isn't
 // toggleable or reorderable). Stored alongside data-column widths so resize
@@ -51,7 +63,7 @@ const DEFAULT_COLUMN_WIDTH = 128;
 export const NAME_COL_KEY = '__name__';
 // Name can shrink on compact layouts while retaining a readable title.
 const NAME_DEFAULT_WIDTH = 400;
-const NAME_MIN_WIDTH = 240;
+export const NAME_MIN_WIDTH = 240;
 const NAME_MAX_WIDTH = 1200;
 
 // Built-in (code-defined) columns per entity. 'type' is always-on (leftmost,
@@ -224,9 +236,6 @@ export interface ListColumnsState {
   setWidth: (id: ColumnId, width: number) => void;
   /** Currently active sort (or null = natural order). */
   sort: ColumnSort | null;
-  /** Cycle this column's sort: none → asc → desc → none. Sorting by a
-   *  different column always starts over at asc. */
-  cycleSort: (id: ColumnId) => void;
   /** Direct setter for the sort state — used by toolbar menus that pick
    *  both column and direction in one click rather than cycling. */
   setSort: (sort: ColumnSort | null) => void;
@@ -300,6 +309,7 @@ export function useListColumns(
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const { order, visibleIds, hiddenIds, widths, sort } = snapshot;
 
+  const { locale } = useI18n();
   // The full catalogue of columns this view knows about right now.
   const catalogue = useMemo<DataColumn[]>(() => {
     const customDefs: DataColumn[] = customColumns.map((c) => ({
@@ -310,8 +320,10 @@ export function useListColumns(
       defaultWidth: DEFAULT_COLUMN_WIDTH,
       custom: c,
     }));
-    return [...new Map([...builtinsFor(entity), ...(extraColumns ?? []), ...customDefs].map((c) => [c.id, c])).values()];
-  }, [customColumns, extraColumns, entity]);
+    const dateWidth = dateColumnWidth(locale);
+    return [...new Map([...builtinsFor(entity), ...(extraColumns ?? []), ...customDefs].map((c) => [c.id,
+      c.id === 'due_date' ? { ...c, defaultWidth: dateWidth, minWidth: dateWidth, align: 'end' as const } : c])).values()];
+  }, [customColumns, extraColumns, entity, locale]);
 
   // ─── Reconcile with catalogue ─────────────────────────────────────────────
   // 1) Order: keep stored entries that still exist; append catalogue
@@ -362,7 +374,7 @@ export function useListColumns(
     // Clamp on READ (not just on resize) so a width persisted under the old
     // bounds — e.g. a Name saved at 300 before the floor moved to 550 — is
     // floored to the current minimum instead of leaking through narrower.
-    const lo = id === NAME_COL_KEY ? NAME_MIN_WIDTH : COLUMN_MIN_WIDTH;
+    const lo = id === NAME_COL_KEY ? NAME_MIN_WIDTH : catalogueById.get(id)?.minWidth ?? COLUMN_MIN_WIDTH;
     const hi = id === NAME_COL_KEY ? NAME_MAX_WIDTH : COLUMN_MAX_WIDTH;
     const stored = widths[id];
     if (typeof stored === 'number' && stored > 0) return Math.max(lo, Math.min(hi, stored));
@@ -417,26 +429,15 @@ export function useListColumns(
   const setWidth = useCallback((id: ColumnId, width: number) => {
     if (!storageKey) return;
     // Name uses its own floor/ceiling; data columns use the shared bounds.
-    const lo = id === NAME_COL_KEY ? NAME_MIN_WIDTH : COLUMN_MIN_WIDTH;
+    const lo = id === NAME_COL_KEY ? NAME_MIN_WIDTH : catalogueById.get(id)?.minWidth ?? COLUMN_MIN_WIDTH;
     const hi = id === NAME_COL_KEY ? NAME_MAX_WIDTH : COLUMN_MAX_WIDTH;
     const clamped = Math.max(lo, Math.min(hi, Math.round(width)));
     setSnapshot(storageKey, (prev) => {
       if (prev.widths[id] === clamped) return prev;
       return { ...prev, widths: { ...prev.widths, [id]: clamped } };
     });
-  }, [storageKey]);
+  }, [storageKey, catalogueById]);
 
-  const cycleSort = useCallback((id: ColumnId) => {
-    if (!storageKey) return;
-    setSnapshot(storageKey, (prev) => {
-      const cur = prev.sort;
-      let next: ColumnSort | null;
-      if (!cur || cur.id !== id) next = { id, direction: 'asc' };
-      else if (cur.direction === 'asc') next = { id, direction: 'desc' };
-      else next = null;
-      return { ...prev, sort: next };
-    });
-  }, [storageKey]);
 
   const setSortDirect = useCallback((nextSort: ColumnSort | null) => {
     if (!storageKey) return;
@@ -453,7 +454,6 @@ export function useListColumns(
     moveColumn,
     setWidth,
     sort,
-    cycleSort,
     setSort: setSortDirect,
   };
 }

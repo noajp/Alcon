@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useId, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import { Plus } from 'lucide-react';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
@@ -14,12 +14,14 @@ import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { getElementProgress } from '@/Function/shared/ElementProgressMark';
-import { useListColumns, sortElements, NAME_COL_KEY, type ColumnId, type DataColumn, type ColumnEntity } from '@/Function/shared/listTable/useListColumns';
+import { useListColumns, sortElements, NAME_COL_KEY, NAME_MIN_WIDTH, type ColumnId, type DataColumn, type ColumnEntity } from '@/Function/shared/listTable/useListColumns';
 import { EMPTY_CUSTOM_COLUMNS, EMPTY_ELEMENT_TYPES, EMPTY_WORKERS, EMPTY_ELEMENT_IDS, type ElementUpdate, type ListSection, HEADER_DRAG_PREFIX, OBJECT_DRAG_PREFIX, ROW_ROUND_BASE, STICKY_TINT_HOVER } from './shared';
 import { ElementRow } from './ElementRow';
 import { ObjectRow } from './ObjectRow';
-import { ColumnHeader, ResizeHandle, ColumnMenu } from './ColumnHeaderMenu';
+import { ColumnHeader, ResizeHandle, FieldsMenu } from './ColumnHeaderMenu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { fieldDisplayLabel } from '@/Function/property/fieldModel';
+import { useOptionalExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 // Build a type-scoped, pointer-first collision detector. Two reasons it's
 // custom:
@@ -33,11 +35,11 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 //     target "below the last row"). `pointerWithin` picks the row the cursor
 //     is literally inside; when the cursor is past the last row, we fall
 //     back to closestCenter so it resolves to that last row (→ drop after).
-//  `onPointer` is called with the live pointer Y so the edge calc in
-//  onDragOver can use the cursor position too.
-function makeRowAwareCollision(onPointerY: (y: number) => void): CollisionDetection {
+//  `onPointer` is called with the live pointer so the edge calc in
+//  onDragMove can use the cursor position too (Y for rows, X for columns).
+function makeRowAwareCollision(onPointer: (x: number, y: number) => void): CollisionDetection {
   return (args) => {
-    if (args.pointerCoordinates) onPointerY(args.pointerCoordinates.y);
+    if (args.pointerCoordinates) onPointer(args.pointerCoordinates.x, args.pointerCoordinates.y);
     const activeId = String(args.active.id);
     const isCol = activeId.startsWith(HEADER_DRAG_PREFIX);
     const isObj = activeId.startsWith(OBJECT_DRAG_PREFIX);
@@ -247,13 +249,28 @@ export function ListTable({
     [sections],
   );
   const elementActivity = useElementCommentActivity(sectionElementIds);
+  // The Objects column reads each Element's home Objects. Only some loaders
+  // resolve them (My Elements); elsewhere they come from the explorer tree,
+  // where an Element is listed under every Object it belongs to.
+  const explorer = useOptionalExplorerData();
+  const homesByElement = useMemo(() => {
+    const m = new Map<string, { id: string; name: string }[]>();
+    for (const o of explorer?.objects ?? []) for (const e of o.elements ?? []) {
+      const list = m.get(e.id) ?? [];
+      if (!list.some((h) => h.id === o.id)) list.push({ id: o.id, name: o.name });
+      m.set(e.id, list);
+    }
+    return m;
+  }, [explorer?.objects]);
   const sortedSections = useMemo(
     () => sections.map((s) => ({
       ...s,
       objects: sortElements(s.objects ?? [], cols.sort, customColumns),
-      elements: sortElements(withCommentActivity(s.elements ?? [], elementActivity), cols.sort, customColumns),
+      elements: sortElements(
+        withCommentActivity(s.elements ?? [], elementActivity).map((e) => (e.objects ? e : { ...e, objects: homesByElement.get(e.id) ?? [] })),
+        cols.sort, customColumns),
     })),
-    [sections, cols.sort, customColumns, elementActivity],
+    [sections, cols.sort, customColumns, elementActivity, homesByElement],
   );
 
   // Header-drag tracking — keeps the dragged column dim while it's in flight
@@ -270,10 +287,14 @@ export function ListTable({
   // drop-line edge is decided by where the CURSOR sits relative to the
   // hovered row's midline — predictable, unlike the dragged rect's centre.
   const pointerYRef = useRef(0);
+  const pointerXRef = useRef(0);
+  // A column being dragged: the header it would land against, and on which
+  // side — drawn as a vertical line, like the rows' horizontal one.
+  const [colDrop, setColDrop] = useState<{ id: ColumnId; edge: 'before' | 'after' } | null>(null);
   // eslint-disable-next-line react-hooks/preserve-manual-memoization -- Existing ListTable diagnostic retained during mechanical extraction.
   const collisionDetection = useMemo(
   // eslint-disable-next-line react-hooks/refs -- Existing ListTable diagnostic retained during mechanical extraction.
-    () => makeRowAwareCollision((y) => { pointerYRef.current = y; }),
+    () => makeRowAwareCollision((x, y) => { pointerXRef.current = x; pointerYRef.current = y; }),
     [],
   );
 
@@ -326,7 +347,7 @@ export function ListTable({
   // Name column is always present. Every visible data column (Type, Due
   // date, Assignee, custom Properties) sits to the right of it in the order the
   // user chose. The trailing `+` cell is the column-management affordance.
-  const totalDataColumns = 1 /* name */ + visibleColumns.length;
+  const totalDataColumns = 2 /* title + signals */ + visibleColumns.length;
   // Reserve a trailing "+ add column" slot whenever the parent wires up
   // either an element list (anyElements) or a column-creation handler
   // (onAddColumn — used by the Domain Object list).
@@ -375,7 +396,14 @@ export function ListTable({
   const handleDragMove = (e: DragMoveEvent) => {
     const { active, over } = e;
     const a = String(active.id);
-    if (a.startsWith(HEADER_DRAG_PREFIX)) return;
+    if (a.startsWith(HEADER_DRAG_PREFIX)) {
+      const o = over ? String(over.id) : null;
+      if (!o || !o.startsWith(HEADER_DRAG_PREFIX) || o === a || !over?.rect) { setColDrop(null); return; }
+      const id = o.slice(HEADER_DRAG_PREFIX.length);
+      const edge = pointerXRef.current < over.rect.left + over.rect.width / 2 ? 'before' : 'after';
+      setColDrop((prev) => (prev && prev.id === id && prev.edge === edge) ? prev : { id, edge });
+      return;
+    }
     if (!over) { setDropTarget(null); return; }
     const o = String(over.id);
     if (a === o) { setDropTarget(null); return; }
@@ -399,25 +427,32 @@ export function ListTable({
   };
   const handleDragCancel = () => {
     setDraggingColId(null);
+    setColDrop(null);
     setActiveRow(null);
     setDropTarget(null);
   };
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
+    const drop = colDrop;
     setDraggingColId(null);
+    setColDrop(null);
     setActiveRow(null);
     setDropTarget(null);
-    if (!over || active.id === over.id) return;
     const activeId = String(active.id);
-    const overId = String(over.id);
-    // Column reorder branch.
-    if (activeId.startsWith(HEADER_DRAG_PREFIX) && overId.startsWith(HEADER_DRAG_PREFIX)) {
-      cols.moveColumn(
-        activeId.slice(HEADER_DRAG_PREFIX.length),
-        overId.slice(HEADER_DRAG_PREFIX.length),
-      );
+    // Column reorder: land on the side of the header the line was drawn on.
+    // The new place is named by the visible column it now precedes (null =
+    // last), so hidden columns keep their own places in the saved order.
+    if (activeId.startsWith(HEADER_DRAG_PREFIX)) {
+      if (!drop) return;
+      const moving = activeId.slice(HEADER_DRAG_PREFIX.length);
+      const rest = visibleColumnIds.filter((id) => id !== moving);
+      const at = rest.indexOf(drop.id);
+      if (at === -1) return;
+      cols.moveColumn(moving, rest[drop.edge === 'before' ? at : at + 1] ?? null);
       return;
     }
+    if (!over || active.id === over.id) return;
+    const overId = String(over.id);
     // Object row reorder branch — scoped to within the section that holds
     // both rows; persisted to objects.order_index. Object ids carry the
     // `obj:` prefix so this branch only fires for drags between two
@@ -460,7 +495,52 @@ export function ListTable({
   // the right. Once sized, Name keeps that width and the trailing column
   // soaks up the slack instead.
   const nameFluid = !cols.isSized(NAME_COL_KEY);
-  const packedWidth = 52 + cols.widthFor(NAME_COL_KEY) + visibleColumns.reduce((sum, c) => sum + cols.widthFor(c.id), 0) + (hasTrailingCol ? 80 : 0);
+  // Resizing any column first fixes Name at the width it is drawn at. While
+  // Name is fluid it gives up whatever another column takes, so widening a
+  // column would pull its left edge leftward instead of moving its right
+  // edge with the pointer. Fixed, the columns to the left stay put and the
+  // trailing space (or a horizontal scroll) takes up the change.
+  const drawnNameWidth = () => {
+    const table = tableRef.current;
+    const th = table?.querySelector('thead th');
+    if (!table || !th) return cols.widthFor(NAME_COL_KEY);
+    return th.getBoundingClientRect().width - 52 + (parseFloat(getComputedStyle(table).getPropertyValue('--signals-w')) || 0);
+  };
+  const freezeName = () => { if (nameFluid) cols.setWidth(NAME_COL_KEY, drawnNameWidth()); };
+  // A column only as wide as its words (the due date) has no room for the
+  // sort arrow, so it grows by the arrow while it holds the sort.
+  const drawnWidth = (c: DataColumn) => cols.widthFor(c.id) + (c.align === 'end' && cols.sort?.id === c.id ? 16 : 0);
+  // Name is pinned while the rest scrolls under it, so a Name wider than the
+  // pane would hide every other column for good. It is drawn no wider than
+  // leaves the first stretch of data columns (up to 240px) in view; the
+  // saved width comes back when the pane is wide enough again.
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const [viewWidth, setViewWidth] = useState(0);
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setViewWidth(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const dataWidth = visibleColumns.reduce((sum, c) => sum + drawnWidth(c), 0);
+  const nameWidth = viewWidth
+    ? Math.min(cols.widthFor(NAME_COL_KEY), Math.max(NAME_MIN_WIDTH, viewWidth - 52 - Math.min(dataWidth, 240)))
+    : cols.widthFor(NAME_COL_KEY);
+  // Name is two tracks: the pinned title, then the rows' signals (comments,
+  // labels…), which scroll with the data columns. The signals track is as
+  // wide as the widest row's signals — measured once the rows are drawn and
+  // handed to the columns as --signals-w — but never leaves the title less
+  // than 160px.
+  useLayoutEffect(() => {
+    const table = tableRef.current;
+    if (!table) return;
+    let w = 0;
+    table.querySelectorAll<HTMLElement>('[data-row-signals]').forEach((el) => { w = Math.max(w, el.scrollWidth); });
+    table.style.setProperty('--signals-w', `${Math.max(0, Math.min(w, nameWidth - 160))}px`);
+  }, [sortedSections, visibleColumns, nameWidth]);
+  const titleWidth = `calc(${nameWidth}px - var(--signals-w, 0px))`;
+  const packedWidth = 52 + nameWidth + visibleColumns.reduce((sum, c) => sum + drawnWidth(c), 0) + (hasTrailingCol ? 80 : 0);
 
   // With no rows the table is its header alone, and a horizontal scrollbar
   // (when the columns are wider than the pane) would sit right under it as a
@@ -469,7 +549,9 @@ export function ListTable({
 
   return (
     <DndContext id={dndId} sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
-    <div data-list-scroller className={`${empty ? 'overflow-x-hidden' : 'overflow-x-auto'} h-full [overflow-anchor:none]`}>
+    <div
+      ref={scrollerRef}
+      data-list-scroller className={`${empty ? 'overflow-x-hidden' : 'overflow-x-auto'} h-full [overflow-anchor:none]`}>
       <table
         ref={tableRef}
         // `min-w-full` so the table fills the wrap (rows + section bands span
@@ -490,10 +572,11 @@ export function ListTable({
         <colgroup>
           <col style={{ width: 52, minWidth: 52 }} />
           <col style={nameFluid
-            ? { width: '100%', minWidth: cols.widthFor(NAME_COL_KEY) }
-            : { width: cols.widthFor(NAME_COL_KEY), minWidth: cols.widthFor(NAME_COL_KEY) }} />
+            ? { width: '100%', minWidth: titleWidth }
+            : { width: titleWidth, minWidth: titleWidth }} />
+          <col style={{ width: 'var(--signals-w, 0px)', minWidth: 'var(--signals-w, 0px)' }} />
           {visibleColumns.map((c) => {
-            const w = cols.widthFor(c.id);
+            const w = drawnWidth(c);
             // Match the data cells' `table-cell` so the column track
             // isn't reserved below md — otherwise the hidden data columns leave
             // an empty gap and force horizontal scroll in narrow panels.
@@ -503,20 +586,25 @@ export function ListTable({
         </colgroup>
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
-            {/* "Name" heads both frozen columns (the status mark or Object
-                icon, then the name); the icons start where the word does,
+            {/* "Name" heads the pinned columns (the status mark or Object
+                icon, then the title); the icons start where the word does,
                 30px in. Both `top-0` (from thead) and `left-0` keep it in
                 place: it is the intersection corner, so z-30 keeps it above
                 the row's sticky-left cells and any data column header
-                scrolling under. */}
+                scrolling under. The signals track's header after it is
+                blank and scrolls; Name's resize edge is at its end. */}
             <th colSpan={2} className="sticky top-0 left-0 z-30 relative pl-7.5 pr-3 py-2.5 text-left text-[13px] font-normal text-muted-foreground bg-card border-b border-border/60">
               {t('Name')}
+            </th>
+            <th className="relative p-0 bg-card border-b border-border/60">
               {/* Name is resizable too — same handle as the data columns,
                   persisted under NAME_COL_KEY. Fixed on the Object list
                   instead (see the colgroup above), so no handle there. */}
               {entity !== 'object' && (
                 <ResizeHandle
-                  width={cols.widthFor(NAME_COL_KEY)}
+                  width={nameWidth}
+                  startWidth={drawnNameWidth}
+                  onResizeStart={freezeName}
                   onResize={(w) => cols.setWidth(NAME_COL_KEY, w)}
                 />
               )}
@@ -526,11 +614,14 @@ export function ListTable({
                 <ColumnHeader
                   key={col.id}
                   column={col}
-                  width={cols.widthFor(col.id)}
+                  width={drawnWidth(col)}
+                  inset={drawnWidth(col) - cols.widthFor(col.id)}
                   isDragging={draggingColId === col.id}
+                  dropEdge={colDrop?.id === col.id ? colDrop.edge : null}
                   sort={cols.sort && cols.sort.id === col.id ? cols.sort.direction : null}
+                  onResizeStart={freezeName}
                   onResize={(w) => cols.setWidth(col.id, w)}
-                  onToggleSort={() => cols.cycleSort(col.id)}
+                  onSort={(direction) => cols.setSort(direction ? { id: col.id, direction } : null)}
                   onEdit={col.custom && onEditColumn ? () => onEditColumn(col.custom!) : undefined}
                   onMoveLeft={visibleColumns.indexOf(col) > 0 ? () => cols.moveColumn(col.id, visibleColumns[visibleColumns.indexOf(col) - 1].id) : undefined}
                   onMoveRight={visibleColumns.indexOf(col) < visibleColumns.length - 1 ? () => cols.moveColumn(col.id, visibleColumns[visibleColumns.indexOf(col) + 2]?.id ?? null) : undefined}
@@ -541,24 +632,10 @@ export function ListTable({
             {hasTrailingCol && (
               // Keep column controls at the right edge of the flexible spacer.
               <th className="table-cell w-8 px-1 py-2.5 bg-card text-center border-b border-border/60">
-                {/* Trailing "+": lists that can create a Property (a scope is
-                    wired) open the add-property picker directly, anchored to
-                    the button. Lists that can't (cross-Object: Domain Elements,
-                    My Elements) fall back to the column show/hide menu so the
-                    "+" is still present everywhere. */}
-                <div className="flex items-center justify-end gap-1">
-                <ColumnMenu allColumns={cols.allColumns} isVisible={cols.isVisible} onToggle={cols.toggleVisible} />
-                {onAddColumn && (
-                  <button
-                    type="button"
-                    onClick={(e) => onAddColumn(e.currentTarget.getBoundingClientRect())}
-                    title={t('Add field')}
-                    aria-label={t('Add field')}
-                    className="w-6 h-6 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-                  >
-                    <Plus size={14} />
-                  </button>
-                )}
+                {/* Trailing "+": which fields show as columns, and a new
+                    field where the list has a scope to create one in. */}
+                <div className="flex items-center justify-end">
+                  <FieldsMenu allColumns={cols.allColumns} isVisible={cols.isVisible} onToggle={cols.toggleVisible} onCreate={onAddColumn} />
                 </div>
               </th>
             )}
@@ -598,18 +675,24 @@ export function ListTable({
                         <span className="absolute left-6.5 flex items-center text-foreground/70">{section.icon}</span>
                       </button>
                     </td>
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className={`sticky left-13 z-10 bg-card pr-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className={`bg-card pr-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
                       <button
                         type="button"
                         onClick={() => toggle(section.id)}
-                      className="w-full min-h-[2.625rem] flex items-center min-w-0 pl-0.5 pr-1 py-1.5 bg-muted/70 group-hover:bg-muted rounded-r-lg transition-colors text-left"
+                      className="w-full min-h-[2.625rem] flex items-center min-w-0 pl-3.5 pr-1 py-1.5 bg-muted/70 group-hover:bg-muted rounded-r-lg transition-colors text-left"
                         aria-label={isCollapsed ? t('Expand') : t('Collapse')}
                       >
-                        <span className="text-[14px] font-medium text-foreground min-w-0 truncate">
-                          {section.name}
-                        </span>
-                        <span className="text-muted-foreground/60 font-normal tabular-nums text-[14px] ml-2">
-                          {itemCount}
+                        {/* The band spans the whole table, wider than the pane,
+                            and a cell that wide cannot stick — so the name
+                            and count stick inside it instead, at the x the
+                            row titles stay at. */}
+                        <span className="sticky left-[66px] flex min-w-0 items-center">
+                          <span className="text-[14px] font-medium text-foreground min-w-0 truncate">
+                            {section.name}
+                          </span>
+                          <span className="text-muted-foreground/60 font-normal tabular-nums text-[14px] ml-2">
+                            {itemCount}
+                          </span>
                         </span>
                         <span className="flex-1" />
                         {onAddElement && (
@@ -717,8 +800,8 @@ export function ListTable({
                         <ObjectIcon size={16} />
                       </div>
                     </td>
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="md:sticky md:left-13 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0">
-                      <div className="flex items-center min-w-0 min-h-[1.875rem] text-muted-foreground">
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="bg-card pl-3.5 pr-0.5 py-2 min-w-0">
+                      <div className="sticky left-[66px] flex w-fit items-center min-w-0 min-h-[1.875rem] text-muted-foreground">
                         <span className="text-[14px] group-hover:text-foreground transition-colors">
                           {t('Add Object')}
                         </span>
@@ -737,7 +820,11 @@ export function ListTable({
         stays still and only this card moves. Rendered only for row drags;
         column drags keep their in-place feedback. */}
     <DragOverlay dropAnimation={null}>
-      {activeRowData ? <DragCard data={activeRowData} /> : null}
+      {activeRowData ? <DragCard data={activeRowData} /> : draggingColId ? (
+        <div className="inline-flex h-7 items-center rounded-md border border-[var(--border-default)] bg-[var(--surface-overlay)] px-2.5 text-[13px] text-foreground shadow-lg">
+          {fieldDisplayLabel(t, cols.allColumns.find((c) => c.id === draggingColId) ?? { id: draggingColId, label: draggingColId })}
+        </div>
+      ) : null}
     </DragOverlay>
     </DndContext>
   );

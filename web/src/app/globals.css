@@ -645,6 +645,31 @@ button, a, input, select, textarea {
   --rail-active: var(--accent-default); /* accent used by Send buttons and similar primary actions */
 }
 
+/* Office previews are paper, as in Office, in every theme: white cells,
+   light grid, grey headers, Excel's green for the bar and the active sheet;
+   slides on the grey canvas under PowerPoint's orange bar. */
+:root {
+  --sheet-paper:     #ffffff;
+  --sheet-grid:      #e1e1e1;
+  --sheet-head:      #f3f3f3;
+  --sheet-head-text: #5f5f5f;
+  --sheet-text:      #1f1f1f;
+  --sheet-accent:    #107c41;
+  --slide-accent:    #c43e1c; /* PowerPoint's orange, for a deck's bar */
+  --doc-accent:      #2b579a; /* Word's blue, for a document's bar */
+  --sheet-negative:  #ff0000; /* a number format's [Red] section */
+  --sheet-up:        #1e8e3e; /* a rising candle */
+  --sheet-down:      #d93025; /* a falling candle */
+  /* Office's default series colours, for a chart series the file leaves
+     uncoloured. */
+  --sheet-series-1:  #4472c4;
+  --sheet-series-2:  #ed7d31;
+  --sheet-series-3:  #a5a5a5;
+  --sheet-series-4:  #ffc000;
+  --sheet-series-5:  #5b9bd5;
+  --sheet-series-6:  #70ad47;
+}
+
 /* ============================================
    Font size (text-only UI scale)
    The Preferences → Font size control sets --fs (1 = default). Every font-size

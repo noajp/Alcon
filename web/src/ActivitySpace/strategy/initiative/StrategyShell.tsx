@@ -164,8 +164,8 @@ export function StrategyShell({
         <NavStrategyIcon size={14} />
         <span className="text-[13px] font-medium text-foreground">{t('Initiatives')}</span>
         <ButtonAppearanceProvider appearance="navigation">
-          <Button variant="ghost" size="icon-xs" className="ml-auto text-muted-foreground" onClick={() => setNewOpen(true)}
-            title={t('New Initiative')} aria-label={t('New Initiative')}><Plus size={14} /></Button>
+          <Button variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={() => setNewOpen(true)}>
+            <Plus size={14} />{t('Add Initiative')}</Button>
         </ButtonAppearanceProvider>
       </div>
 

@@ -6,9 +6,8 @@ import type { DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { MenuSectionLabel } from '@/Function/shared/menu';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 
-/** Shared by the table header and Display panel. Hiding never deletes data. */
-export function FieldVisibility({ columns, isVisible, onToggle, compact = false }: {
-  compact?: boolean;
+/** The list header's field switches (its trailing "+"). Hiding never deletes data. */
+export function FieldVisibility({ columns, isVisible, onToggle }: {
   columns: DataColumn[];
   isVisible: (id: string) => boolean;
   onToggle: (id: string) => void;
@@ -17,13 +16,6 @@ export function FieldVisibility({ columns, isVisible, onToggle, compact = false 
   const [search, setSearch] = useState('');
   const labelOf = (c: DataColumn) => fieldDisplayLabel(t, c);
   const matching = columns.filter((c) => labelOf(c).toLocaleLowerCase().includes(search.toLocaleLowerCase()));
-  if (compact) return <div className="px-2 py-2">
-    <MenuSectionLabel className="px-0 pb-2">{t('Display properties')}</MenuSectionLabel>
-    <div className="flex flex-wrap gap-1.5">
-      {columns.map((c) => <Button key={c.id} type="button" size="sm" variant={isVisible(c.id) ? 'secondary' : 'ghost'} className={`max-w-full ${isVisible(c.id) ? 'bg-[var(--surface-strong)]' : 'text-muted-foreground'}`}
-        aria-pressed={isVisible(c.id)} disabled={!c.toggleable} onClick={() => onToggle(c.id)} title={labelOf(c)}><span className="truncate">{labelOf(c)}</span></Button>)}
-    </div>
-  </div>;
   return <ButtonAppearanceProvider appearance="navigation"><div className="space-y-2">
     <input aria-label={t('Find fields')} placeholder={t('Find fields…')} value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-8 bg-transparent px-2 text-sm focus:bg-muted rounded-md" />
     {(['builtin', 'custom'] as const).map((kind) => {
