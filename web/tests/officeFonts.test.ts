@@ -15,6 +15,13 @@ describe('fontStack', () => {
     expect(fontStack('Calibri')).toMatch(/^Calibri, Carlito, .*"Hiragino Sans".*sans-serif$/);
     expect(fontStack('Arial Narrow')).toMatch(/^"Arial Narrow", "Helvetica Neue Condensed"/);
     expect(fontStack('Times New Roman')).toMatch(/serif$/);
+    expect(fontStack('Arial Black')).toMatch(/^"Arial Black"/);
+    expect(fontStack('Garamond')).toMatch(/^Garamond, "EB Garamond".*serif$/);
+    expect(fontStack('Century Gothic')).toMatch(/^"Century Gothic", Futura/);
+    expect(fontStack('Book Antiqua')).toMatch(/Palatino/);
+    expect(fontStack('Montserrat')).toMatch(/^"Montserrat", "Helvetica Neue"/);
+    expect(fontStack('Candara')).toMatch(/^"Candara", Optima/);
+    expect(fontStack('Fira Code')).toMatch(/^"Fira Code", Consolas.*monospace$/);
   });
 
   it('keeps an unknown face first, falling back by kind, and gives nothing for no name', () => {
