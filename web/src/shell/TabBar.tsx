@@ -215,12 +215,10 @@ function SortableViewTab({ tab, active, sortable, onSelect, onContextMenu }: {
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id, disabled: !sortable });
   const { t } = useI18n();
-  const Icon = OBJECT_TAB_META[tab.tab_type].Icon;
   return <Button ref={setNodeRef} type="button" shape="tab" variant={active ? 'secondary' : 'ghost'}
     {...attributes} {...listeners} aria-pressed={active} onClick={onSelect} onContextMenu={onContextMenu}
     style={{ transform: CSS.Transform.toString(transform), transition }}
     className={sortable ? `touch-none ${isDragging ? 'relative z-10 opacity-70' : ''}` : undefined}>
-    <span className={active ? 'text-foreground' : 'text-muted-foreground'}><Icon size={14}/></span>
     {t(tab.title)}
   </Button>;
 }
