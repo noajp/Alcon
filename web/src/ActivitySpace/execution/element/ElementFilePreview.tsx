@@ -212,8 +212,11 @@ function DeckText({ text }: { text: TextBody }) {
     <div className="absolute inset-0 flex flex-col overflow-hidden"
       style={{ padding: `${t}px ${r}px ${b}px ${l}px`, justifyContent: text.anchor === 'middle' ? 'center' : text.anchor === 'bottom' ? 'flex-end' : 'flex-start', writingMode: text.vertical ? 'vertical-rl' : undefined }}>
       {text.paras.map((p, i) => (
-        <p key={i} style={{ textAlign: p.align, lineHeight: p.lineHeight ?? 1.2, margin: 0, minHeight: '1em', fontSize: `${(p.runs[0]?.size ?? 18) * 4 / 3}px` }}>
-          {p.bullet && '• '}
+        <p key={i} style={{
+          textAlign: p.align, lineHeight: p.lineHeight ?? 1.2, margin: 0, minHeight: '1em', fontSize: `${(p.runs[0]?.size ?? 18) * 4 / 3}px`,
+          paddingLeft: p.indent || undefined, textIndent: p.bullet && p.indent ? '-1em' : undefined, whiteSpace: text.wrap ? undefined : 'nowrap',
+        }}>
+          {p.bullet && <span style={{ color: p.runs[0]?.color ?? undefined }}>{p.bullet}{' '}</span>}
           {p.runs.map((run, j) => run.text === '\n' ? <br key={j} /> : (
             <span key={j} style={{
               fontSize: `${run.size * 4 / 3}px`, fontWeight: run.bold ? 700 : 400, fontStyle: run.italic ? 'italic' : undefined,
@@ -231,8 +234,17 @@ function DeckText({ text }: { text: TextBody }) {
 function DeckItemView({ item }: { item: DeckItem }) {
   const box: React.CSSProperties = { left: item.x, top: item.y, width: item.w, height: item.h, transform: item.rot ? `rotate(${item.rot}deg)` : undefined };
   if (item.kind === 'image') {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={item.src} alt="" className="absolute object-fill" style={box} />;
+    // A cropped picture: the whole image scaled so its kept part fills the
+    // frame, shifted by the cropped-off share.
+    const { l, t, r, b } = item.crop;
+    const kw = 1 - l - r, kh = 1 - t - b;
+    return (
+      <div className="absolute overflow-hidden" style={box}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={item.src} alt="" className="absolute max-w-none"
+          style={{ width: `${100 / (kw || 1)}%`, height: `${100 / (kh || 1)}%`, left: `${(-l / (kw || 1)) * 100}%`, top: `${(-t / (kh || 1)) * 100}%` }} />
+      </div>
+    );
   }
   if (item.kind === 'table') {
     return (
