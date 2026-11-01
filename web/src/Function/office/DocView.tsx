@@ -1,13 +1,16 @@
 'use client';
 
 import { useEffect } from 'react';
-import type { DocBlock, DocLayout, DocRun } from './docLayout';
+import type { DocBlock, DocLayout, DocPara, DocRun } from './docLayout';
+import { paraKey, type EditSession } from './officeEdits';
 import { OfficeCanvas, runCss } from './officeViewParts';
 
 /** A document as Word lays it out: a white page at the document's width
  *  and margins on the grey canvas under Word's blue bar, scaled down to fit
- *  the preview; page breaks start a new sheet of paper. */
-export function DocView({ doc }: { doc: DocLayout }) {
+ *  the preview; page breaks start a new sheet of paper. With an edit
+ *  session, a paragraph of plain text can be retyped in place (Enter or a
+ *  click elsewhere keeps it, Esc puts it back). */
+export function DocView({ doc, edit = null }: { doc: DocLayout; edit?: EditSession | null }) {
   const pages: DocBlock[][] = [[]];
   for (const b of doc.blocks) {
     if (b.kind === 'break') pages.push([]);
@@ -36,7 +39,7 @@ export function DocView({ doc }: { doc: DocLayout }) {
               </div>
             )}
             <div className="flow-root flex-1" style={{ columnCount: doc.columns > 1 ? doc.columns : undefined, columnGap: 32 }}>
-              <DocBlocks blocks={blocks} />
+              <DocBlocks blocks={blocks} edit={edit} />
             </div>
             {i === pages.length - 1 && doc.footnotes.length > 0 && (
               <div className="mt-6 border-t border-[var(--sheet-grid)] pt-2 text-[11px]">
@@ -62,7 +65,7 @@ function isDark(hex: string): boolean {
   return 0.299 * r + 0.587 * g + 0.114 * b < 140;
 }
 
-function DocBlocks({ blocks }: { blocks: DocBlock[] }) {
+function DocBlocks({ blocks, edit = null }: { blocks: DocBlock[]; edit?: EditSession | null }) {
   return <>{blocks.map((b, i) => {
     if (b.kind === 'break') return null;
     if (b.kind === 'table') {
@@ -76,7 +79,7 @@ function DocBlocks({ blocks }: { blocks: DocBlock[] }) {
                   // Text left on "auto" colour turns light on a dark fill, as Word does.
                   <td key={c} colSpan={cell.span} rowSpan={cell.rowSpan} className="align-top"
                     style={{ background: cell.fill ?? undefined, color: cell.fill && isDark(cell.fill) ? 'var(--sheet-paper)' : undefined, border: cell.borders ? `1px solid ${cell.borderColor ?? 'var(--sheet-text)'}` : undefined, padding: '2px 7px' }}>
-                    <DocBlocks blocks={cell.blocks} />
+                    <DocBlocks blocks={cell.blocks} edit={edit} />
                   </td>
                 ))}
               </tr>
@@ -93,7 +96,8 @@ function DocBlocks({ blocks }: { blocks: DocBlock[] }) {
         lineHeight: b.line ? b.line * 1.15 : 1.15, minHeight: `${size * 4 / 3 * 1.15}px`, fontSize: `${size * 4 / 3}px`, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
       }}>
         {b.marker && <span style={{ display: 'inline-block', minWidth: '1.5em' }}>{b.marker}</span>}
-        {b.runs.map((run, j) => <DocRunView key={j} run={run} />)}
+        {edit && b.src !== undefined ? <EditablePara para={b as DocPara & { src: number }} edit={edit} />
+          : b.runs.map((run, j) => <DocRunView key={j} run={run} />)}
       </div>
     );
   })}</>;
@@ -119,3 +123,26 @@ function DocRunView({ run }: { run: DocRun }) {
   );
 }
 
+
+/** A paragraph's text, typed over in place. Retyped, it shows as one run in
+ *  the paragraph's first look (the file keeps each run's own when saved),
+ *  underlined in the document's colour until it is saved. */
+function EditablePara({ para, edit }: { para: DocPara & { src: number }; edit: EditSession }) {
+  const original = para.runs.map((r) => r.text).join('');
+  const pending = edit.pending.get(paraKey(para.src));
+  const shown = pending?.to ?? original;
+  return (
+    <span key={shown} contentEditable="plaintext-only" suppressContentEditableWarning spellCheck={false}
+      onBlur={(e) => edit.set({ kind: 'para', index: para.src, from: original, to: e.currentTarget.textContent ?? '' })}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+        else if (e.key === 'Escape') { e.preventDefault(); e.currentTarget.textContent = shown; e.currentTarget.blur(); }
+      }}
+      className="cursor-text rounded-[2px] outline-none hover:outline-1 hover:outline-dashed hover:outline-[var(--doc-accent)] focus:outline-2 focus:outline-solid focus:outline-[var(--doc-accent)]"
+      style={pending ? { boxShadow: 'inset 0 -2px 0 var(--doc-accent)' } : undefined}>
+      {pending ? <span style={runCss(para.runs.find((r) => r.text) ?? {})}>{pending.to}</span>
+        : para.runs.map((run, j) => <DocRunView key={j} run={run} />)}
+    </span>
+  );
+}

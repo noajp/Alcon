@@ -26,6 +26,8 @@ export interface Cell {
   runs?: CellRun[];
   /** A conditional-format data bar: its length (0–1) and colour. */
   bar?: { pct: number; color: string };
+  /** The cell is worked out by a formula (shown here as its last result). */
+  formula?: boolean;
 }
 export interface SheetImage { x: number; y: number; w: number; h: number; src: string }
 /** A chart over a sheet: the chart, and where the sheet anchors it. */
@@ -363,6 +365,7 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
         cells[col] = {
           text, numeric, style: xf ? { ...xf.style, color } : null, colSpan: 1, rowSpan: 1, hidden: false,
           ...(cell?.runs ? { runs: cell.runs } : {}), ...(typeof cell?.value === 'number' ? { value: cell.value } : {}),
+          ...(kid(c, 'f') ? { formula: true } : {}),
         };
         if (text || xf?.style.bg) maxCol = Math.max(maxCol, col);
       }
