@@ -67,6 +67,7 @@ const WORKSPACE_TABLES = [
   'phases', 'domain_approaches', 'approach_conditions', 'approach_contributions', 'approach_assessments', 'approach_reviews',
   'intents', 'intent_bindings', 'intent_lineage', 'intent_next_actions',
   'intent_escalations', 'intent_alignments', 'intent_audits', 'intent_predictions', 'intent_resources',
+  'attachments',
 ] as const;
 
 export type WorkspaceTable = (typeof WORKSPACE_TABLES)[number];
@@ -177,6 +178,13 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
   }
   if (['domains', 'domain_members', 'activity_space_members'].includes(d.table)) {
     invalidateSoon(qc, ['sustainment-domains']);
+  }
+  // Someone's upload, new version or trash: every list of files and every
+  // pinned file reads again (a version is a new row, so no row to patch).
+  if (d.table === 'attachments') {
+    invalidateSoon(qc, ['attachments']);
+    invalidateSoon(qc, ['attachments-of']);
+    invalidateSoon(qc, ['attachment']);
   }
   // Who can be assigned follows memberships (list_assignable_workers).
   if (['domain_members', 'object_members', 'activity_space_members', 'object_domains'].includes(d.table)) {

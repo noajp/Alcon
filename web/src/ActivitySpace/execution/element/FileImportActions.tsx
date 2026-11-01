@@ -17,7 +17,7 @@ import { deckFromPptx } from '@/ActivitySpace/sustainment/slides/kata/model/from
 import type { Deck } from '@/ActivitySpace/sustainment/slides/kata/model/types';
 import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckRequest';
 import { importDataTable } from '@/hooks/tableData';
-import { elementFileSource, type ElementFile } from '@/hooks/elementFileData';
+import { attachmentSource, type Attachment } from '@/hooks/attachmentData';
 
 /**
  * What an attached file can become in Alcon, from its preview's toolbar: a
@@ -30,20 +30,20 @@ import { elementFileSource, type ElementFile } from '@/hooks/elementFileData';
 /** Whether a file has anything to become (so the toolbar shows the tool). */
 export const canImport = (name: string) => ['xlsx', 'docx', 'pptx'].includes(officeKindOf(name) ?? '');
 
-export function FileImportActions({ file }: { file: ElementFile }) {
+export function FileImportActions({ file }: { file: Attachment }) {
   const kind = officeKindOf(file.name);
   return kind === 'docx' ? <ImportDocToNote file={file} /> : kind === 'pptx' ? <ImportDeckToSlides file={file} /> : <ImportSheetToTable file={file} />;
 }
 
-const baseName = (file: ElementFile) => file.name.replace(/\.[^.]+$/, '');
+const baseName = (file: Attachment) => file.name.replace(/\.[^.]+$/, '');
 
-function ImportDocToNote({ file }: { file: ElementFile }) {
+function ImportDocToNote({ file }: { file: Attachment }) {
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const importDoc = async () => {
     setBusy(true);
     try {
-      const doc = (await readStoredFile(file, elementFileSource)).doc;
+      const doc = (await readStoredFile(file, attachmentSource)).doc;
       const html = doc ? docToNoteHtml(doc) : '';
       if (!html) { await appDialog.alert(t('This document has no text to import.')); return; }
       const note = await createNoteFile(baseName(file), html);
@@ -92,13 +92,13 @@ async function shrinkPictures(deck: Deck, max = 1600): Promise<Deck> {
   return { ...deck, slides };
 }
 
-function ImportDeckToSlides({ file }: { file: ElementFile }) {
+function ImportDeckToSlides({ file }: { file: Attachment }) {
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const importDeck = async () => {
     setBusy(true);
     try {
-      const pptx = (await readStoredFile(file, elementFileSource)).deck;
+      const pptx = (await readStoredFile(file, attachmentSource)).deck;
       if (!pptx?.slides.length) { await appDialog.alert(t('This deck has no slides to import.')); return; }
       const deck = await shrinkPictures(deckFromPptx(pptx, baseName(file)));
       requestNewDeck(baseName(file), deck);
@@ -116,12 +116,12 @@ function ImportDeckToSlides({ file }: { file: ElementFile }) {
   );
 }
 
-function ImportSheetToTable({ file }: { file: ElementFile }) {
+function ImportSheetToTable({ file }: { file: Attachment }) {
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [sheets, setSheets] = useState<string[] | null>(null);
 
-  const read = () => readStoredFile(file, elementFileSource);
+  const read = () => readStoredFile(file, attachmentSource);
   const importSheet = async (name: string) => {
     setBusy(true);
     try {
