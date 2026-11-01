@@ -12,7 +12,10 @@ import JSZip from 'jszip';
 
 export interface CellEdit { kind: 'cell'; sheet: string; ref: string; from: string; to: string }
 export interface ParaEdit { kind: 'para'; index: number; from: string; to: string }
-export type OfficeEdit = CellEdit | ParaEdit;
+/** A paragraph of a slide's shape: the slide (in the deck's order), the
+ *  shape's id on it, and the paragraph's order in the shape's text. */
+export interface SlideTextEdit { kind: 'slide'; slide: number; shape: string; para: number; from: string; to: string }
+export type OfficeEdit = CellEdit | ParaEdit | SlideTextEdit;
 export interface EditResult {
   bytes: Uint8Array;
   /** Applied, but the cell or paragraph no longer held what the edit found. */
@@ -31,7 +34,8 @@ export interface EditSession {
 }
 const cellKey = (sheet: string, ref: string) => `c:${sheet}!${ref.toUpperCase()}`;
 export const paraKey = (index: number) => `p:${index}`;
-const editKey = (e: OfficeEdit) => (e.kind === 'cell' ? cellKey(e.sheet, e.ref) : paraKey(e.index));
+export const slideTextKey = (slide: number, shape: string, para: number) => `s:${slide}:${shape}:${para}`;
+const editKey = (e: OfficeEdit) => (e.kind === 'cell' ? cellKey(e.sheet, e.ref) : e.kind === 'para' ? paraKey(e.index) : slideTextKey(e.slide, e.shape, e.para));
 
 /** Pure. The pending edits after one more: it keeps what the file first held
  *  (`from`), and an edit back to that is no edit. */
@@ -252,7 +256,65 @@ async function editExcel(zip: JSZip, edits: CellEdit[]) {
   return { conflicts, skipped: [] as OfficeEdit[] };
 }
 
-/** Applies edits to a .xlsx or .docx and returns the new file. */
+// ── PowerPoint ──────────────────────────────────────────────────────────
+
+const A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+/** A slide paragraph's own text elements: those of its runs. */
+const runTexts = (p: Element) => Array.from(p.children).filter((r) => r.localName === 'r')
+  .flatMap((r) => Array.from(r.children).filter((t) => t.localName === 't' && t.namespaceURI === A));
+
+async function editPowerPoint(zip: JSZip, edits: SlideTextEdit[]) {
+  const read = async (path: string) => { const f = zip.file(path); return f ? parse(await f.async('string')) : null; };
+  const pres = await read('ppt/presentation.xml');
+  const rels = await read('ppt/_rels/presentation.xml.rels');
+  if (!pres || !rels) throw new Error('Not a presentation');
+  const targets = new Map(byLocal(rels, 'Relationship').map((r) => [r.getAttribute('Id'), r.getAttribute('Target') ?? '']));
+  // The slides in the deck's order, as the preview reads them.
+  const slidePaths = byLocal(pres, 'sldId')
+    .map((s) => targets.get(s.getAttributeNS(R, 'id') ?? s.getAttribute('r:id')))
+    .filter((t): t is string => !!t)
+    .map((t) => (t.startsWith('/') ? t.slice(1) : `ppt/${t}`));
+  const conflicts: OfficeEdit[] = [];
+  const skipped: OfficeEdit[] = [];
+  const bySlide = new Map<number, SlideTextEdit[]>();
+  for (const e of edits) bySlide.set(e.slide, [...(bySlide.get(e.slide) ?? []), e]);
+  for (const [n, list] of bySlide) {
+    const path = slidePaths[n];
+    const doc = path ? await read(path) : null;
+    if (!doc || !path) { skipped.push(...list); continue; }
+    for (const e of list) {
+      const shape = byLocal(doc, 'sp').find((sp) => byLocal(sp, 'cNvPr')[0]?.getAttribute('id') === e.shape);
+      const body = shape ? byLocal(shape, 'txBody')[0] : null;
+      const paras = body ? Array.from(body.children).filter((c) => c.localName === 'p') : [];
+      let p: Element | undefined = paras[e.para];
+      const text = (q: Element) => runTexts(q).map((t) => t.textContent ?? '').join('');
+      if (!p || text(p) !== e.from) {
+        // The paragraph moved within the shape: the one that still reads what
+        // the edit found. If none does, someone changed it too; the edit wins.
+        const near = paras.find((q) => text(q) === e.from);
+        if (near) p = near;
+        else if (!p) { skipped.push(e); continue; }
+        else conflicts.push(e);
+      }
+      const texts = runTexts(p);
+      if (!texts.length) {
+        if (!e.to) continue;
+        const run = doc.createElementNS(A, 'a:r');
+        const t = doc.createElementNS(A, 'a:t');
+        run.appendChild(t);
+        const end = Array.from(p.children).find((c) => c.localName === 'endParaRPr');
+        p.insertBefore(run, end ?? null);
+        texts.push(t);
+      }
+      const next = distributeText(texts.map((t) => t.textContent ?? ''), e.to);
+      texts.forEach((t, i) => { t.textContent = next[i]; });
+    }
+    zip.file(path, serialize(doc));
+  }
+  return { conflicts, skipped };
+}
+
+/** Applies edits to a .xlsx, .docx or .pptx and returns the new file. */
 export async function applyOfficeEdits(bytes: ArrayBuffer | Uint8Array, edits: OfficeEdit[]): Promise<EditResult> {
   const zip = await JSZip.loadAsync(bytes);
   let outcome: { conflicts: OfficeEdit[]; skipped: OfficeEdit[] };
@@ -262,6 +324,8 @@ export async function applyOfficeEdits(bytes: ArrayBuffer | Uint8Array, edits: O
     const doc = parse(await zip.file('word/document.xml')!.async('string'));
     outcome = editWord(doc, edits.filter((e): e is ParaEdit => e.kind === 'para'));
     zip.file('word/document.xml', serialize(doc));
-  } else throw new Error('Only workbooks and Word documents can be edited here.');
+  } else if (zip.file('ppt/presentation.xml')) {
+    outcome = await editPowerPoint(zip, edits.filter((e): e is SlideTextEdit => e.kind === 'slide'));
+  } else throw new Error('Only workbooks, Word documents and PowerPoint decks can be edited here.');
   return { bytes: await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }), ...outcome };
 }

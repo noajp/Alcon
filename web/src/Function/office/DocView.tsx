@@ -5,7 +5,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { DocBlock, DocLayout, DocPara, DocRun } from './docLayout';
 import { paraKey, type EditSession } from './officeEdits';
 import type { DocChanges } from './officeDiff';
-import { OfficeCanvas, runCss } from './officeViewParts';
+import { EditableRuns, OfficeCanvas, runCss } from './officeViewParts';
 
 /** A document as Word lays it out: a white page at the document's width
  *  and margins on the grey canvas under Word's blue bar, scaled down to fit
@@ -99,7 +99,8 @@ function DocBlocks({ blocks, edit = null, changes = null }: { blocks: DocBlock[]
     const mark = changes?.marks.get(b);
     return (
       // A div, not a p: a paragraph may hold a text box with paragraphs of its own.
-      <div key={i} title={mark?.kind === 'changed' ? t('Before: {value}', { value: mark.before || t('(empty)') }) : mark ? t('Added') : undefined} style={{
+      <div key={i} title={mark?.kind === 'changed' ? t('Before: {value}', { value: mark.before || t('(empty)') }) : mark ? t('Added')
+        : edit && b.src === undefined && b.runs.some((r) => r.text.trim()) ? t('This paragraph has a tab, line break, picture, note or field, so it cannot be edited here yet.') : undefined} style={{
         ...(mark ? { backgroundColor: mark.kind === 'changed' ? 'var(--status-warning-subtle)' : 'var(--status-success-subtle)', boxShadow: `-6px 0 0 ${mark.kind === 'changed' ? 'var(--status-warning)' : 'var(--status-success)'}` } : {}),
         textAlign: b.align, margin: `${b.before}px 0 ${b.after}px`, paddingLeft: b.indent || undefined, textIndent: b.firstLine || undefined,
         lineHeight: b.line ? b.line * 1.15 : 1.15, minHeight: `${size * 4 / 3 * 1.15}px`, fontSize: `${size * 4 / 3}px`, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
@@ -133,25 +134,14 @@ function DocRunView({ run }: { run: DocRun }) {
 }
 
 
-/** A paragraph's text, typed over in place. Retyped, it shows as one run in
- *  the paragraph's first look (the file keeps each run's own when saved),
- *  underlined in the document's colour until it is saved. */
+/** A Word paragraph of plain text, typed over in place. */
 function EditablePara({ para, edit }: { para: DocPara & { src: number }; edit: EditSession }) {
   const original = para.runs.map((r) => r.text).join('');
-  const pending = edit.pending.get(paraKey(para.src));
-  const shown = pending?.to ?? original;
   return (
-    <span key={shown} contentEditable="plaintext-only" suppressContentEditableWarning spellCheck={false}
-      onBlur={(e) => edit.set({ kind: 'para', index: para.src, from: original, to: e.currentTarget.textContent ?? '' })}
-      onKeyDown={(e) => {
-        e.stopPropagation();
-        if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
-        else if (e.key === 'Escape') { e.preventDefault(); e.currentTarget.textContent = shown; e.currentTarget.blur(); }
-      }}
-      className="cursor-text rounded-[2px] outline-none focus:outline-2 focus:outline-solid focus:outline-[var(--doc-accent)]"
-      style={pending ? { boxShadow: 'inset 0 -2px 0 var(--doc-accent)' } : undefined}>
-      {pending ? <span style={runCss(para.runs.find((r) => r.text) ?? {})}>{pending.to}</span>
-        : para.runs.map((run, j) => <DocRunView key={j} run={run} />)}
-    </span>
+    <EditableRuns original={original} edited={edit.pending.get(paraKey(para.src))?.to} accent="var(--doc-accent)"
+      look={runCss(para.runs.find((r) => r.text) ?? {})}
+      onChange={(to) => edit.set({ kind: 'para', index: para.src, from: original, to })}>
+      {para.runs.map((run, j) => <DocRunView key={j} run={run} />)}
+    </EditableRuns>
   );
 }

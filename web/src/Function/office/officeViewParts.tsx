@@ -58,3 +58,30 @@ export function runCss(r: RunLook): CSSProperties {
     fontFamily: fontStack(r.font) ?? undefined,
   };
 }
+
+/**
+ * A paragraph's text, typed over in place (Word's and PowerPoint's
+ * previews). Enter or a click elsewhere keeps it, Esc puts it back. Retyped,
+ * it shows as one run in `look` (the file keeps each run's own look when
+ * saved), underlined in the file's colour until it is saved.
+ */
+export function EditableRuns({ original, edited, onChange, look, accent, children }: {
+  original: string; edited: string | undefined; onChange: (to: string) => void;
+  look: CSSProperties; accent: string; children: ReactNode;
+}) {
+  const shown = edited ?? original;
+  return (
+    <span key={shown} contentEditable="plaintext-only" suppressContentEditableWarning spellCheck={false}
+      onBlur={(e) => onChange(e.currentTarget.textContent ?? '')}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.nativeEvent.isComposing) return;
+        if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+        else if (e.key === 'Escape') { e.preventDefault(); e.currentTarget.textContent = shown; e.currentTarget.blur(); }
+      }}
+      className="cursor-text rounded-[2px] outline-none focus:outline-2 focus:outline-solid"
+      style={{ outlineColor: accent, ...(edited !== undefined ? { boxShadow: `inset 0 -2px 0 ${accent}` } : {}) }}>
+      {edited !== undefined ? <span style={look}>{edited}</span> : children}
+    </span>
+  );
+}
