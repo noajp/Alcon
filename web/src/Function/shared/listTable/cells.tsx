@@ -295,7 +295,8 @@ function DateRangeCellPopover({
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   // A due date is one click: a quick pick or a day on the grid saves it and
-  // closes. "Range" switches to start → due, saved when the popover closes.
+  // closes. "Range" (the tab at the top) takes a start and a due date; the
+  // second day saves and closes.
   const [ranging, setRanging] = useState(false);
   const [draft, setDraft] = useState<DateRange | undefined>(undefined);
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
@@ -335,6 +336,14 @@ function DateRangeCellPopover({
     >
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent className={`w-auto p-0 ${CELL_POPOVER_RADIUS}`} align="start">
+        {/* Due date or a range, chosen up front rather than hidden in the
+            footer. */}
+        <div className="flex gap-1 px-2 pt-2">
+          <Button shape="tab" size="xs" variant={ranging ? 'ghost' : 'secondary'} aria-pressed={!ranging}
+            onClick={() => { setRanging(false); setDraft(initialDraft()); }}>{t('Due date')}</Button>
+          <Button shape="tab" size="xs" variant={ranging ? 'secondary' : 'ghost'} aria-pressed={ranging}
+            onClick={() => { setRanging(true); setDraft(initialDraft()); }}>{t('Range')}</Button>
+        </div>
         {!ranging && <QuickDates weekStartsOn={weekStartsOn} current={dueDate} onPick={pickDue} />}
         {ranging ? (
           <Calendar
@@ -344,7 +353,11 @@ function DateRangeCellPopover({
             endMonth={new Date(2035, 11)}
             defaultMonth={draft?.from}
             selected={draft}
-            onSelect={(r) => setDraft(r)}
+            // The second day closes the range: it saves and the popover shuts.
+            onSelect={(r) => {
+              setDraft(r);
+              if (r?.from && r.to && formatDateOnly(r.from) !== formatDateOnly(r.to)) { persist(r); setOpen(false); }
+            }}
             // Always render 6 week rows so the popover height never jumps
             // between months (and stays aligned with the Type popover).
             fixedWeeks
@@ -368,16 +381,11 @@ function DateRangeCellPopover({
           />
         )}
         <CellClearFooter
-          label={
-            <button type="button" onClick={() => { setRanging((r) => !r); setDraft(initialDraft()); }}
-              className="rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted/40 hover:text-foreground">
-              {ranging
-                ? (draft?.from
-                  ? `${formatDateShort(formatDateOnly(draft.from), locale)} – ${draft.to ? formatDateShort(formatDateOnly(draft.to), locale) : '…'}`
-                  : t('Pick the start, then the due date'))
-                : t('Set a range')}
-            </button>
-          }
+          label={ranging
+            ? (draft?.from
+              ? `${formatDateShort(formatDateOnly(draft.from), locale)} – ${draft.to ? formatDateShort(formatDateOnly(draft.to), locale) : '…'}`
+              : t('Pick the start, then the due date'))
+            : undefined}
           onClear={() => { setDraft(undefined); setRanging(false); void onChange(null, null); setOpen(false); }}
         />
       </PopoverContent>

@@ -13,6 +13,7 @@ import { ElementProgressMark, getElementProgress } from '@/Function/shared/Eleme
 import { WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
 import { phaseWindowMs } from '@/Function/shared/phaseWindow';
 import { MilestoneDiamond } from '@/Function/shared/MilestoneDiamond';
+import { dragRange } from './ganttRange';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /** Pre-grouped band (e.g. ElementsListView's Domain / per-Object
@@ -298,16 +299,9 @@ export function GanttView({
 
     if (!startDate && !endDate) return null;
 
-    // Apply drag offset for the element being dragged
+    // The element being dragged previews where the drag would put it.
     if (dragging && dragging.elementId === element.id && dragDaysDelta !== 0) {
-      if (dragging.type === 'move') {
-        if (startDate) startDate = addDays(startDate, dragDaysDelta);
-        if (endDate) endDate = addDays(endDate, dragDaysDelta);
-      } else if (dragging.type === 'resize-start' && startDate) {
-        startDate = addDays(startDate, dragDaysDelta);
-      } else if (dragging.type === 'resize-end' && endDate) {
-        endDate = addDays(endDate, dragDaysDelta);
-      }
+      ({ start: startDate, end: endDate } = dragRange({ start: startDate, end: endDate }, dragging.type, dragDaysDelta));
     }
 
     const effectiveStart = startDate ?? endDate!;
@@ -357,24 +351,17 @@ export function GanttView({
       const daysDelta = Math.round(deltaX / pxPerDay);
 
       if (daysDelta !== 0) {
-        // Calculate final dates
-        let newStartDate = dragging.originalStart ? new Date(dragging.originalStart) : null;
-        let newEndDate = dragging.originalEnd ? new Date(dragging.originalEnd) : null;
+        const { start: newStartDate, end: newEndDate } = dragRange(
+          { start: dragging.originalStart, end: dragging.originalEnd }, dragging.type, daysDelta);
 
-        if (dragging.type === 'move') {
-          if (newStartDate) newStartDate = addDays(newStartDate, daysDelta);
-          if (newEndDate) newEndDate = addDays(newEndDate, daysDelta);
-        } else if (dragging.type === 'resize-start' && newStartDate) {
-          newStartDate = addDays(newStartDate, daysDelta);
-        } else if (dragging.type === 'resize-end' && newEndDate) {
-          newEndDate = addDays(newEndDate, daysDelta);
-        }
-
-        // Save to database
+        // Save to database. A range pulled back to one day is a due date
+        // alone, as the list's date cell stores it.
         try {
-          const updates: { start_date?: string; due_date?: string } = {};
-          if (newStartDate) updates.start_date = fmtDateOnly(newStartDate);
+          const updates: { start_date?: string | null; due_date?: string } = {};
           if (newEndDate) updates.due_date = fmtDateOnly(newEndDate);
+          if (newStartDate) {
+            updates.start_date = newEndDate && fmtDateOnly(newStartDate) === fmtDateOnly(newEndDate) ? null : fmtDateOnly(newStartDate);
+          }
 
           if (Object.keys(updates).length > 0) {
             await persistDates(dragging.elementId, updates);
@@ -912,12 +899,12 @@ export function GanttView({
 
                       {/* Resize handles */}
                       <div
-                        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-l-md"
+                        className="absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-l-md"
                         style={{ backgroundColor: 'var(--gantt-resize-handle-tint)' }}
                         onMouseDown={(e) => { e.stopPropagation(); handleDragStart(e, element.id, 'resize-start'); }}
                       />
                       <div
-                        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-r-md"
+                        className="absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-r-md"
                         style={{ backgroundColor: 'var(--gantt-resize-handle-tint)' }}
                         onMouseDown={(e) => { e.stopPropagation(); handleDragStart(e, element.id, 'resize-end'); }}
                       />
