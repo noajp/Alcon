@@ -6,6 +6,7 @@ import { useKata } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
 import { updateSlide } from "@/ActivitySpace/sustainment/slides/kata/model/deck";
 import { cssColor, isLineKind, moveBy, resizeBy, snapMove, textStyleCss, updateObject, type Handle } from "@/ActivitySpace/sustainment/slides/kata/model/objects";
 import { tx } from "@/ActivitySpace/sustainment/slides/kata/i18n";
+import { useAssetSrc } from "@/ActivitySpace/sustainment/slides/deckAssets";
 
 let gestureSeq = 0;
 const layer: CSSProperties = { position: "absolute", inset: 0, pointerEvents: "none" };
@@ -216,10 +217,7 @@ function ObjectShape({ o, interactive, editingText, onPointerDown, onDoubleClick
   if (o.kind === "image") {
     return (
       <div {...common} style={box}>
-        {o.src ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={o.src} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", pointerEvents: "none" }} />
-        ) : null}
+        {o.src ? <ObjectImage src={o.src} /> : null}
       </div>
     );
   }
@@ -318,4 +316,12 @@ function arrowHead(x1: number, y1: number, x2: number, y2: number, sw: number) {
   const by = y2 - uy * L;
   const points = [`${x2},${y2}`, `${bx - uy * W},${by + ux * W}`, `${bx + uy * W},${by - ux * W}`].join(" ");
   return { points, base: { x: bx + ux * 0.5, y: by + uy * 0.5 } };
+}
+
+/** 置いた画像。保存先に移した画像は、短い期限の署名つきリンクで読む */
+function ObjectImage({ src }: { src: string }) {
+  const url = useAssetSrc(src);
+  if (!url) return null;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={url} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", pointerEvents: "none" }} />;
 }
