@@ -54,7 +54,7 @@ export function runCss(r: RunLook): CSSProperties {
     fontSize: px ? `${px}px` : undefined,
     verticalAlign: r.script === 'super' ? 'super' : r.script === 'sub' ? 'sub' : undefined,
     color: r.color ?? undefined,
-    background: r.highlight ?? undefined,
+    backgroundColor: r.highlight ?? undefined,
     fontFamily: fontStack(r.font) ?? undefined,
   };
 }

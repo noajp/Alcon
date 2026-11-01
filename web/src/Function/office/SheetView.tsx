@@ -102,11 +102,12 @@ export function SheetView({ sheets }: { sheets: WorkSheet[] }) {
                           <td key={c} colSpan={cell?.colSpan} rowSpan={cell?.rowSpan} title={cell?.text || undefined}
                             className={`px-1 ${spill ? 'relative z-[1] overflow-visible' : 'overflow-hidden'}`}
                             style={{
-                              border: `1px solid ${grid}`,
-                              borderTop: st?.borders.top ?? undefined, borderRight: st?.borders.right ?? undefined,
-                              borderBottom: st?.borders.bottom ?? undefined, borderLeft: st?.borders.left ?? undefined,
+                              // Longhands only: React warns when a shorthand and its
+                              // longhands change together between renders.
+                              borderTop: st?.borders.top ?? `1px solid ${grid}`, borderRight: st?.borders.right ?? `1px solid ${grid}`,
+                              borderBottom: st?.borders.bottom ?? `1px solid ${grid}`, borderLeft: st?.borders.left ?? `1px solid ${grid}`,
                               ...(st ? runCss(st) : {}),
-                              background: st?.bg ?? undefined,
+                              backgroundColor: st?.bg ?? undefined,
                               // A data bar fills the cell from the left by its share.
                               backgroundImage: cell?.bar ? `linear-gradient(90deg, ${cell.bar.color} ${cell.bar.pct * 100}%, transparent ${cell.bar.pct * 100}%)` : undefined,
                               textAlign: st?.align ?? (cell?.numeric ? 'right' : 'left'),
