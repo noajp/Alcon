@@ -602,7 +602,7 @@ export function ListTable({
                       <button
                         type="button"
                         onClick={() => toggle(section.id)}
-                      className="w-full min-h-[2.625rem] flex items-center min-w-0 pl-0.5 pr-1 py-1.5 bg-muted/70 group-hover:bg-muted rounded-r-lg transition-colors text-left"
+                      className="w-full min-h-[2.625rem] flex items-center min-w-0 pl-3.5 pr-1 py-1.5 bg-muted/70 group-hover:bg-muted rounded-r-lg transition-colors text-left"
                         aria-label={isCollapsed ? t('Expand') : t('Collapse')}
                       >
                         <span className="text-[14px] font-medium text-foreground min-w-0 truncate">
@@ -717,7 +717,7 @@ export function ListTable({
                         <ObjectIcon size={16} />
                       </div>
                     </td>
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="md:sticky md:left-13 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0">
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="md:sticky md:left-13 z-10 bg-card pl-3.5 pr-0.5 py-2 min-w-0">
                       <div className="flex items-center min-w-0 min-h-[1.875rem] text-muted-foreground">
                         <span className="text-[14px] group-hover:text-foreground transition-colors">
                           {t('Add Object')}

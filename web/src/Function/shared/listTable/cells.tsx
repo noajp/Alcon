@@ -5,7 +5,7 @@ import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { Button } from '@/ui/button';
 import { useCallback, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { CalendarIcon, Menu, Plus, Check, X } from 'lucide-react';
+import { Menu, Plus, Check, X } from 'lucide-react';
 import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { addElementAssignee, removeElementAssignee, fetchAssignableWorkers, useWorkerById, noticeAssignmentFailed } from '@/hooks/useSupabase';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
@@ -518,14 +518,14 @@ export function ElementCell({
       <button
         type="button"
         disabled={!canUpdate}
-        className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? (isOverdue ? 'text-[var(--status-danger)]' : '') : CELL_TRIGGER_EMPTY}`}
+        className={`${CELL_TRIGGER_BASE} pr-0 ${dateString ? (isOverdue ? 'text-[var(--status-danger)]' : '') : CELL_TRIGGER_EMPTY}`}
       >
-        {display ? <><CalendarIcon size={11} className="opacity-60" /><CellText>{display}</CellText></> : <EmptyCellMark />}
+        {display ? <CellText>{display}</CellText> : <EmptyCellMark />}
       </button>
     );
     return (
       <td
-        className="table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        className="table-cell pl-0 pr-1.5 py-1 text-right max-w-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {canUpdate ? (
@@ -695,7 +695,7 @@ export function ObjectCell({
   if (column.id === 'due_date') {
     return (
       <td
-        className="table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        className="table-cell pl-0 pr-1.5 py-1 text-right max-w-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <DueDateCell obj={obj} onObjectUpdate={onObjectUpdate} />
@@ -761,9 +761,9 @@ export function DueDateCell({
     <button
       type="button"
       disabled={!canEdit}
-      className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? '' : CELL_TRIGGER_EMPTY}`}
+      className={`${CELL_TRIGGER_BASE} pr-0 ${dateString ? '' : CELL_TRIGGER_EMPTY}`}
     >
-      {display ? <><CalendarIcon size={11} className="opacity-60" /><CellText>{display}</CellText></> : <EmptyCellMark />}
+      {display ? <CellText>{display}</CellText> : <EmptyCellMark />}
     </button>
   );
   if (!canEdit) return trigger;

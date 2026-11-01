@@ -179,11 +179,14 @@ export const ElementRow = memo(function ElementRow({
           )}
         </span>
       </td>
-      <td className="md:sticky md:left-13 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
+      <td className="md:sticky md:left-13 z-10 bg-card pl-3.5 pr-0.5 py-2 min-w-0 max-w-0">
         {/* @container: the lease chip below decides how much of itself to
             show from this cell's own width, not the viewport's — the Name
             column is user-resizable and shares the row with the sidebar. */}
-        <div className="@container flex items-center gap-2 min-w-0 min-h-[1.875rem]">
+        {/* One rhythm across the row: status → title → signals → labels →
+            the date column all sit 20px apart (the cell's pl-3.5 and pr-0.5
+            add up with the neighbouring cells' padding to the same 20px). */}
+        <div className="@container flex items-center gap-5 min-w-0 min-h-[1.875rem]">
           <div className="flex flex-1 min-w-0 items-center gap-2">
             <span className="text-[15px] font-medium truncate flex-1 min-w-0 text-foreground">{el.title}</span>
           </div>

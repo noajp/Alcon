@@ -42,6 +42,7 @@ export function ColumnHeader({
   // Built-in column names are English keys; a Property's name is the user's own.
   const label = fieldDisplayLabel(t, column);
   const dragId = HEADER_DRAG_PREFIX + column.id;
+  const end = column.align === 'end';
   const {
     setNodeRef, attributes, listeners, transform, transition,
     // Don't animate layout changes — otherwise an unrelated re-render (e.g.
@@ -68,7 +69,7 @@ export function ColumnHeader({
       {...listeners}
       className="table-cell group/col relative px-1.5 py-2.5 text-left text-[13px] font-normal text-muted-foreground bg-card whitespace-nowrap select-none border-b border-border/60"
     >
-      <div className="flex items-center gap-1 min-w-0">
+      <div className="relative flex items-center min-w-0">
         {/* Sort toggle — click cycles none → asc → desc → none. We do NOT
             stop pointerdown here: the label IS the column's drag surface,
             and the PointerSensor's 3px distance constraint already tells a
@@ -86,44 +87,43 @@ export function ColumnHeader({
           // px-1.5 mirrors the body trigger's inner padding (CELL_TRIGGER_BASE),
           // so the header text starts at the same x as the cell text below.
           // Without it the label sits 6px left of the body content.
-          className="flex-1 min-w-0 flex items-center justify-start gap-1 px-1.5 text-left text-muted-foreground/80 hover:text-foreground transition-colors focus:outline-none"
+          className={`w-full min-w-0 flex items-center ${end ? 'justify-end px-0 text-right' : 'justify-start px-1.5 text-left'} text-muted-foreground/80 hover:text-foreground transition-colors focus:outline-none`}
         >
           <span className="truncate">{label}</span>
-          <SortIcon
-            size={11}
-            className={`shrink-0 transition-opacity ${
-              sort ? 'opacity-100 text-foreground' : 'opacity-0 group-hover/col:opacity-50'
-            }`}
-          />
+          {sort && <SortIcon size={11} className="ml-1 shrink-0 text-foreground" />}
         </button>
-        {/* Overflow menu — Edit / Move / Hide for toggleable columns.
-            Transparent at rest and shown on header hover, keyboard focus or
-            while open, so a row of headers is a row of words rather than a
-            row of chevrons. Transparent (not display:none) keeps it
-            reachable by Tab. */}
-        {onHide && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label={t('{name} options', { name: label })}
-                className="shrink-0 w-5 h-4 inline-flex items-center justify-center rounded text-muted-foreground opacity-0 group-hover/col:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 hover:bg-muted hover:text-foreground transition-[opacity,color,background-color]"
-                onPointerDown={(e) => e.stopPropagation()}
-              >
-                <ChevronDown size={12} />
-              </button>
-            </DropdownMenuTrigger>
-            <MenuShell as="dropdown" align="end">
-              {onEdit && <DropdownMenuItem onSelect={onEdit}><Pencil size={12} />{t('Edit field')}</DropdownMenuItem>}
-              <DropdownMenuItem disabled={!onMoveLeft} onSelect={onMoveLeft}><ArrowLeft size={12} />{t('Move left')}</DropdownMenuItem>
-              <DropdownMenuItem disabled={!onMoveRight} onSelect={onMoveRight}><ArrowRight size={12} />{t('Move right')}</DropdownMenuItem>
-              <DropdownMenuItem onSelect={onHide} className="gap-2">
-                <EyeOff size={12} className="text-muted-foreground" />
-                <span>{t('Hide column')}</span>
-              </DropdownMenuItem>
-            </MenuShell>
-          </DropdownMenu>
-        )}
+        {/* The hover controls — the sort hint and the Edit / Move / Hide menu —
+            float over the label's end instead of reserving width beside it,
+            so a column only as wide as its words (the due date) still shows
+            its whole name at rest. A flush-right column has them on its left. Transparent at rest (not display:none, so
+            the menu stays reachable by Tab); pointer-events-none lets a click
+            on the sort hint reach the label's sort button underneath. */}
+        <span className={`pointer-events-none absolute inset-y-0 ${end ? 'left-0 pr-1' : 'right-0 pl-1'} flex items-center gap-0.5 bg-card opacity-0 transition-opacity group-hover/col:opacity-100 has-[[data-state=open]]:opacity-100 has-[:focus-visible]:opacity-100`}>
+          {!sort && <SortIcon size={11} className="opacity-50" />}
+          {onHide && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={t('{name} options', { name: label })}
+                  className="pointer-events-auto shrink-0 w-5 h-4 inline-flex items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <ChevronDown size={12} />
+                </button>
+              </DropdownMenuTrigger>
+              <MenuShell as="dropdown" align="end">
+                {onEdit && <DropdownMenuItem onSelect={onEdit}><Pencil size={12} />{t('Edit field')}</DropdownMenuItem>}
+                <DropdownMenuItem disabled={!onMoveLeft} onSelect={onMoveLeft}><ArrowLeft size={12} />{t('Move left')}</DropdownMenuItem>
+                <DropdownMenuItem disabled={!onMoveRight} onSelect={onMoveRight}><ArrowRight size={12} />{t('Move right')}</DropdownMenuItem>
+                <DropdownMenuItem onSelect={onHide} className="gap-2">
+                  <EyeOff size={12} className="text-muted-foreground" />
+                  <span>{t('Hide column')}</span>
+                </DropdownMenuItem>
+              </MenuShell>
+            </DropdownMenu>
+          )}
+        </span>
       </div>
       {/* Resize handle — absolute on the right edge, visible on hover.
           PointerDown captures the pointer and updates width on move; the
