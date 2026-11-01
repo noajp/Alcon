@@ -7,8 +7,11 @@ export interface NavigationState {
   crm?: CrmRoute;
   /** The Audit App's view and open deployment or run within this window tab. */
   audit?: AuditRoute;
-  /** The Files App's filter and open file within this window tab. */
+  /** The Files App's page and open file within this window tab. */
   files?: FilesRoute;
+  /** The Table App's page when no Table is open: the Space's home, its
+   *  folders (or one folder), or every Table. */
+  tableBrowse?: { view?: 'home' | 'folders' | 'tables'; folderId?: string | null };
   objectId: string | null;
   /** Domain accompanying an explicit Object route. Keeps the destination
    * Object selected while the shell changes its active Domain. */

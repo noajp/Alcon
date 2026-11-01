@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowUpRight, Loader2, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { ArrowUpRight, ChevronRight, FolderInput, FolderPlus, Loader2, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { AttachmentPreview } from '@/Function/shared/attachments/AttachmentList';
@@ -16,10 +16,15 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 import { useWorkers } from '@/hooks/teamData';
 import type { NavigationState } from '@/types/navigation';
 import { FileImportActions, canImport } from '@/ActivitySpace/execution/element/FileImportActions';
-import { WHERE } from './FilesSidebar';
 import { useTrashFile } from './useTrashFile';
 import { AttachButton } from '@/Function/shared/attachments/AttachButton';
 import { useFolders } from '@/hooks/folderData';
+import { moveFileToFolder } from '@/hooks/attachmentData';
+import { FolderList, MoveToFolderItems, useNewFolder } from '@/Function/shared/folders/FolderList';
+import { DropdownMenu, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { MenuShell } from '@/Function/shared/menu';
+import { useActivitySpaces } from '@/Function/space/data';
+import type { FilesRoute } from '@/Function/files/filesRoute';
 
 const OWNER_LABEL: Record<AttachmentOwnerKind, string> = {
   element: 'Element', object: 'Object', strategy: 'Initiative', portfolio: 'Portfolio', deal: 'Deal', company: 'Company', folder: 'Folder',
@@ -28,16 +33,76 @@ const OWNER_LABEL: Record<AttachmentOwnerKind, string> = {
 const nameOf = (f: SpaceFile) => { const dot = f.name.lastIndexOf('.'); return dot > 0 ? f.name.slice(0, dot) : f.name; };
 
 /**
- * Files: every file attached anywhere in the Space, newest first, as one
- * list. A file stays where it is attached (it is that thing's evidence,
- * seen by whoever can see that thing); this is the way in from the other
- * side. The sidebar narrows the list by where files sit or what they are;
- * a row opens its file beside the list (Word and Excel editable, with
- * versions) without losing the list.
+ * Files, laid out as Execution is: the Space's home (its folders and the
+ * latest files), Folders (each opening onto what it holds), Files (every
+ * file in the Space — those in folders and those attached to work — newest
+ * first) and the trash. A file stays where it is (a folder's, or the
+ * evidence of what it is attached to, seen by whoever can see that); a row
+ * opens it beside the list (Word and Excel editable, with versions).
  */
 export function FilesView({ navigation, onNavigate }: { navigation: NavigationState; onNavigate: (nav: Partial<NavigationState>) => void }) {
   const route = navigation.files ?? {};
-  return route.trash ? <TrashList /> : <FileList navigation={navigation} onNavigate={onNavigate} />;
+  const go = (next: FilesRoute) => onNavigate({ files: next });
+  if (route.view === 'trash') return <TrashList />;
+  if (route.folderId || route.view === 'files') return <FileList navigation={navigation} onNavigate={onNavigate} />;
+  if (route.view === 'folders') return <FoldersPage go={go} />;
+  return <FilesHome go={go} />;
+}
+
+function FoldersPage({ go }: { go: (next: FilesRoute) => void }) {
+  return <FolderList app="files" counts={useFolderCounts()} onOpen={(id) => go({ folderId: id })} />;
+}
+
+/** How many live files each folder holds. */
+function useFolderCounts() {
+  const { data: files } = useSpaceAttachments(useActiveSpaceId());
+  return useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of files) if (f.folder_id) m.set(f.folder_id, (m.get(f.folder_id) ?? 0) + 1);
+    return m;
+  }, [files]);
+}
+
+/** The Space's home in Files: its folders, and the files added last. */
+function FilesHome({ go }: { go: (next: FilesRoute) => void }) {
+  const { t } = useI18n();
+  const spaceId = useActiveSpaceId();
+  const space = useActivitySpaces().data.find((s) => s.id === spaceId);
+  const { data: files } = useSpaceAttachments(spaceId);
+  const counts = useFolderCounts();
+  const newFolder = useNewFolder('files');
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="px-6 pb-8 pt-5">
+        <h1 className="text-[17px] font-semibold text-foreground">{space?.name ?? t('Files')}</h1>
+        <div className="mt-6 flex items-center gap-2">
+          <button type="button" onClick={() => go({ view: 'folders' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Folders')}</button>
+          <span className="flex-1" />
+          <Button type="button" variant="ghost" size="xs" onClick={() => { void newFolder().then((id) => { if (id) go({ folderId: id }); }); }}><FolderPlus size={13} />{t('New folder')}</Button>
+        </div>
+        <div className="-mx-3 mt-1"><FolderList app="files" counts={counts} onOpen={(id) => go({ folderId: id })} compact /></div>
+        <div className="mt-8 flex items-center gap-2">
+          <button type="button" onClick={() => go({ view: 'files' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Recent files')}</button>
+        </div>
+        <div className="-mx-3 mt-1">
+          {files.slice(0, 8).map((f) => (
+            <button key={f.id} type="button" onClick={() => go({ view: 'files', fileId: f.id })}
+              className="flex h-9 w-full items-center gap-3 rounded-md px-3 text-left hover:bg-foreground/[0.05]">
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                <FileTypeIcon name={f.name} mime={f.mime_type} />
+                <span className="truncate text-[13.5px] text-foreground">{nameOf(f)}</span>
+              </span>
+              <span className="hidden w-56 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">
+                <span className="text-muted-foreground/70">{t(OWNER_LABEL[ownerOf(f).kind])} · </span>{f.owner_label ?? '—'}
+              </span>
+              <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(f.created_at, true)}</span>
+            </button>
+          ))}
+          {!files.length && <p className="px-3 py-4 text-[13px] text-muted-foreground">{t('No files yet. Make a folder and drop files into it, or attach them to Elements, Objects, Initiatives or CRM records.')}</p>}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function FileList({ navigation, onNavigate }: { navigation: NavigationState; onNavigate: (nav: Partial<NavigationState>) => void }) {
@@ -63,14 +128,12 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
   const shown = useMemo(() => {
     const q = settled.toLowerCase();
     const matches = (f: SpaceFile) => !q || snippets.has(f.id) || f.name.toLowerCase().includes(q) || (f.owner_label ?? '').toLowerCase().includes(q);
-    return files.filter((f) => (!route.where || ownerOf(f).kind === route.where)
-      && (!route.folderId || f.folder_id === route.folderId)
-      && matches(f));
-  }, [files, settled, snippets, route.where, route.folderId]);
+    return files.filter((f) => (!route.folderId || f.folder_id === route.folderId) && matches(f));
+  }, [files, settled, snippets, route.folderId]);
   const open = files.find((f) => f.id === route.fileId) ?? null;
   const select = (f: SpaceFile | null) => onNavigate({ files: { ...route, fileId: f?.id ?? null } });
   const folder = useFolders('files').data.find((f) => f.id === route.folderId) ?? null;
-  const title = folder ? folder.name : route.where ? t(WHERE.find((w) => w.id === route.where)!.label) : t('All files');
+
   const { upload } = useAttachmentActions({ kind: 'folder', id: folder?.id ?? '' });
   // A folder takes files dropped on its list, as well as through the paperclip.
   const [dropping, setDropping] = useState(false);
@@ -84,7 +147,13 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
     <div className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-3 px-6 pb-3 pt-5">
-          <h1 className="text-[17px] font-semibold text-foreground">{title}</h1>
+          {folder ? (
+            <h1 className="flex min-w-0 items-center gap-1 text-[17px] font-semibold text-foreground">
+              <button type="button" onClick={() => onNavigate({ files: { view: 'folders' } })} className="font-normal text-muted-foreground hover:text-foreground">{t('Folders')}</button>
+              <ChevronRight size={14} className="shrink-0 text-muted-foreground" />
+              <span className="truncate">{folder.name}</span>
+            </h1>
+          ) : <h1 className="text-[17px] font-semibold text-foreground">{t('Files')}</h1>}
           <span className="text-[13px] tabular-nums text-muted-foreground">{shown.length}</span>
           <span className="flex-1" />
           {folder && (
@@ -165,6 +234,16 @@ function FilePane({ file, who, onClose }: { file: SpaceFile; who: string; onClos
             <span className="shrink-0 text-muted-foreground/70">· {who} · {formatAge(file.created_at, true)}</span>
           </button>
         </div>
+        {file.folder_id && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Move to')} title={t('Move to')}><FolderInput size={13} /></Button>
+            </DropdownMenuTrigger>
+            <MenuShell as="dropdown" align="end">
+              <MoveToFolderItems app="files" current={file.folder_id} onMove={(id) => { if (id) void moveFileToFolder(file, id).catch((e) => void appDialog.alert(e instanceof Error ? e.message : String(e))); }} />
+            </MenuShell>
+          </DropdownMenu>
+        )}
         <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Remove {name}', { name: file.name })} title={t('Remove {name}', { name: file.name })}
           onClick={() => void trash().then((done) => { if (done) onClose(); })}><Trash2 size={13} /></Button>
         <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Close')} title={t('Close')} onClick={onClose}><X size={14} /></Button>

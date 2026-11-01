@@ -24,10 +24,16 @@ import {
   DropdownMenuItem, DropdownMenuSeparator,
 } from '@/ui/dropdown-menu';
 
+import { TableBrowser } from './TableBrowser';
+import type { NavigationState } from '@/types/navigation';
+
 type TableSource = ReturnType<typeof useTableData>;
 interface TableViewProps {
   activeTableId: string | null;
   onSelectTable: (id: string | null) => void;
+  /** The page shown while no Table is open (home, folders, every Table). */
+  browse: NonNullable<NavigationState['tableBrowse']>;
+  onBrowse: (next: NonNullable<NavigationState['tableBrowse']>) => void;
 }
 
 // A table switch discards only that table's transient editors and dialogs.
@@ -36,7 +42,7 @@ export function TableView(props: TableViewProps) {
   return <TableSurface key={props.activeTableId ?? '__none__'} {...props} />;
 }
 
-function TableSurface({ activeTableId, onSelectTable }: TableViewProps) {
+function TableSurface({ activeTableId, onSelectTable, browse, onBrowse }: TableViewProps) {
   const { t } = useI18n();
   const { data: tables, loading, error: listError, refetch } = useDataTables();
   const activeTable = tables.find((table) => table.id === activeTableId) ?? null;
@@ -104,7 +110,7 @@ function TableSurface({ activeTableId, onSelectTable }: TableViewProps) {
         ) : listError ? null : tables.length === 0 ? (
           <TablesEmptyState onCreate={() => setNewOpen(true)} />
         ) : (
-          <div className="h-full flex items-center justify-center px-6 text-sm text-muted-foreground">{t('Select a table from the sidebar.')}</div>
+          <TableBrowser tables={tables} browse={browse} onBrowse={onBrowse} onOpenTable={(id) => onSelectTable(id)} onRefresh={refetch} />
         )}
       </div>
       {newOpen && <NewTableDialog onClose={() => setNewOpen(false)} onSaved={(id) => {

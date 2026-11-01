@@ -231,6 +231,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               <TableView
                 activeTableId={navigation.tableId ?? null}
                 onSelectTable={(id) => onNavigate({ tableId: id })}
+                browse={navigation.tableBrowse ?? {}}
+                onBrowse={(next) => onNavigate({ tableId: null, tableBrowse: next })}
               />
             </div>
           )}

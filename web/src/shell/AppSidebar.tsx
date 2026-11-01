@@ -49,15 +49,15 @@ import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from
 import { SpaceSwitcher } from '@/Function/space/SpaceSwitcher';
 
 import { NavTableIcon } from '@/shell/sidebar/NavIcons';
-import { useDataTables } from '@/hooks/useSupabase';
-import { updateDataTable } from '@/hooks/tableData';
 import { railModeOf } from '@/shell/ModeRail';
 import type { RailMode } from '@/shell/railApps';
 import { CREATE_ELEMENT_EVENT, type CreateElementDetail } from '@/shell/QuickAddElementLauncher';
 import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarStore';
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
-import { FolderTree } from '@/Function/shared/folders/FolderTree';
+import { SpaceHomeTree } from '@/Function/shared/folders/SpaceHomeTree';
+import { SidebarSectionLabel } from '@/Function/shared/SidebarRow';
+import { Folder as FolderIcon } from 'lucide-react';
 import { FilesSidebar } from '@/ActivitySpace/sustainment/files/FilesSidebar';
 import { CrmSidebar } from '@/ActivitySpace/sustainment/crm/CrmSidebar';
 import { AuditSidebar } from '@/ActivitySpace/sustainment/audit/AuditSidebar';
@@ -124,29 +124,31 @@ function SidebarModeLabel({ label }: { label: string }) {
 // until a table is chosen here.
 function TableSidebar({
   activeTableId,
+  browse,
   onNavigate,
   onViewChange,
 }: {
   activeTableId: string | null;
+  browse: NonNullable<NavigationState['tableBrowse']>;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
 }) {
   const { t } = useI18n();
-  const { data: tables, refetch } = useDataTables();
-  // The New Table dialog lives in TableView; when it creates a table it
-  // dispatches this so our separate list instance refreshes.
-  useEffect(() => {
-    const h = () => void refetch();
-    window.addEventListener('alcon:tables-changed', h);
-    return () => window.removeEventListener('alcon:tables-changed', h);
-  }, [refetch]);
 
-  // Tables in folders of Table's own (a folder and its Tables, two levels).
+  // As Execution's: the Space's row unfolding onto Folders and Tables, each
+  // a page of the main pane (a Table opens from those pages).
+  const go = (next: NonNullable<NavigationState['tableBrowse']>) => { onViewChange('tables'); onNavigate({ tableId: null, tableBrowse: next }); };
+  const view = activeTableId ? null : browse.folderId ? 'folders' : browse.view ?? 'home';
   return (
-    <FolderTree app="tables" title={t('Table')} activeItemId={activeTableId}
-      items={tables.map((table) => ({ id: table.id, name: table.name, folderId: table.folder_id ?? null, icon: <NavTableIcon size={16} />, meta: table.rowCount }))}
-      onOpenItem={(id) => { onViewChange('tables'); onNavigate({ tableId: id }); }}
-      onMoveItem={async (id, folderId) => { await updateDataTable(id, { folder_id: folderId }); refetch(); }} />
+    <div className="mt-1">
+      <SidebarSectionLabel>{t('Table')}</SidebarSectionLabel>
+      <div className="mt-1">
+        <SpaceHomeTree homeActive={view === 'home'} onOpenHome={() => go({ view: 'home' })} items={[
+          { id: 'folders', label: t('Folders'), icon: FolderIcon, active: view === 'folders', onClick: () => go({ view: 'folders' }) },
+          { id: 'tables', label: t('Tables'), icon: NavTableIcon, active: view === 'tables', onClick: () => go({ view: 'tables' }) },
+        ]} />
+      </div>
+    </div>
   );
 }
 
@@ -515,6 +517,7 @@ export function AppSidebar({
           {railMode === 'tables' && (
             <TableSidebar
               activeTableId={navigation.tableId ?? null}
+              browse={navigation.tableBrowse ?? {}}
               onNavigate={onNavigate}
               onViewChange={onViewChange}
             />
