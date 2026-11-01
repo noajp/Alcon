@@ -1,7 +1,7 @@
 'use client';
 
 import { useLayoutEffect, useRef, useState } from 'react';
-import { MoreHorizontal } from 'lucide-react';
+import { ChevronDown, MoreHorizontal } from 'lucide-react';
 import { SendIcon } from '@/Function/shared/SendIcon';
 import { Button } from '@/ui/button';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
@@ -226,6 +226,7 @@ export function CommentComposer({
    *  Shift+Enter. '⌘+Enter' flips that: plain Enter (and Shift+Enter) always
    *  insert a newline, only the modifier sends. */
   sendShortcut = '⌘+Enter',
+  sendOptions,
   children,
 }: {
   value: string;
@@ -236,6 +237,9 @@ export function CommentComposer({
   enterHeldBy?: boolean;
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   sendShortcut?: '⌘+Enter' | 'Enter';
+  /** Other ways to send, offered from a ▾ beside the send button (a split
+   *  button), e.g. sharing an update instead of a plain comment. */
+  sendOptions?: { label: string; onSelect: () => void }[];
   /** Anything anchored to the composer — the mention popover. */
   children?: React.ReactNode;
 }) {
@@ -283,10 +287,33 @@ export function CommentComposer({
             }
           }}
         />
-        <Button size="icon-sm" type="button" variant="primary" onClick={onSubmit}
-          disabled={!value.trim() || submitting} title={t('Send')} aria-label={t('Send')}>
-          <SendIcon size={16} />
-        </Button>
+        {/* mb-0.5: the 24px buttons sit 2px above the 28px text line's foot,
+            so on one line they are centred in the box; the text grows above. */}
+        <div className="mb-0.5 flex shrink-0 items-stretch">
+          <Button size="xs" type="button" variant="primary" onClick={onSubmit}
+            disabled={!value.trim() || submitting} title={t('Send')} aria-label={t('Send')}
+            className={sendOptions?.length ? 'rounded-l-md rounded-r-none px-2' : 'rounded-md px-2'}>
+            <SendIcon size={13} />
+          </Button>
+          {sendOptions?.length ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                {/* Dimmed with Send while nothing is written, so the pair reads
+                    as one quiet control; it still opens (an update needs no
+                    comment text). */}
+                <Button size="xs" type="button" variant="primary" aria-label={t('More ways to send')} title={t('More ways to send')}
+                  className={`rounded-l-none rounded-r-md border-l border-l-white/25 px-1 ${value.trim() ? '' : 'opacity-50 hover:opacity-80'}`}>
+                  <ChevronDown size={12} />
+                </Button>
+              </DropdownMenuTrigger>
+              <MenuShell as="dropdown" align="end">
+                {sendOptions.map((o) => (
+                  <DropdownMenuItem key={o.label} onSelect={o.onSelect} className="py-1.5 text-[13px]">{o.label}</DropdownMenuItem>
+                ))}
+              </MenuShell>
+            </DropdownMenu>
+          ) : null}
+        </div>
       </div>
       {children}
     </div>

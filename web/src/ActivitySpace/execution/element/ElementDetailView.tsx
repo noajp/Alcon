@@ -29,6 +29,8 @@ import {
   fetchElementWithDetails,
   updateSubelement,
   deleteSubelement,
+  createSubelement,
+  useAssignableWorkers,
   fetchAssignableWorkers,
   addElementAssignee,
   removeElementAssignee,
@@ -62,12 +64,11 @@ import { labelColor, labelColorKey, domainLabelNames, useLabelColors, setLabelCo
 import { LabelPaletteRows } from '@/Function/shared/LabelPaletteRows';
 import { MenuShell } from '@/Function/shared/menu';
 import { RailCard } from '@/Function/shared/RailCard';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import {
   useBoard,
   WidgetSurface,
   WidgetZone,
-  WidgetActionSlotProvider,
-  WidgetActionSlotTarget,
   ELEMENT_DETAIL_BOARD,
   type WidgetHost,
   type Zone,
@@ -91,7 +92,14 @@ import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
-import { Smile, FileText, FolderInput, Trash2, RotateCcw } from 'lucide-react';
+import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal, Paperclip, X } from 'lucide-react';
+import { useElementFiles, useElementFileActions, type ElementFile } from '@/hooks/elementFileData';
+import { ElementFilePreview } from './ElementFilePreview';
+import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckRequest';
+import { openInApp } from '@/Function/shared/appNavigation';
+import { NavSlidesIcon } from '@/shell/sidebar/NavIcons';
+import { appDialog } from '@/Function/shared/appDialogStore';
+import { CodeChangeIcon } from '@/ActivitySpace/execution/code/codeChangeLabels';
 import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NotePicker } from '@/ActivitySpace/sustainment/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/sustainment/notebook/LinkedNoteEmbed';
@@ -284,6 +292,27 @@ function ElementDetailBody({
   useEscapeLayer(emojiPickerOpen, () => setEmojiPickerOpen(false));
   // Subelement create / detail modal — null when closed; { mode: 'create' }
   // for the new-sub-element popup; { mode: 'detail', subelement } for editing.
+  // The Sub-elements section's fold: open when there are some, folded (▶)
+  // when there are none — unfolding it offers the "Add sub-element" line.
+  const [subsOpen, setSubsOpen] = useState(() => (element.subelements?.length ?? 0) > 0);
+  const [newSubTitle, setNewSubTitle] = useState('');
+  const [addingSub, setAddingSub] = useState(false);
+  // Who a sub-element can be put on: the parent Element's assignable people.
+  const { data: subWorkers } = useAssignableWorkers({ elementId: element.id }, subsOpen);
+  const addSubelement = async () => {
+    const title = newSubTitle.trim();
+    if (!title || addingSub) return;
+    setAddingSub(true);
+    try {
+      await createSubelement({ title, element_id: element.id });
+      setNewSubTitle('');
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to add sub-element', e);
+    } finally {
+      setAddingSub(false);
+    }
+  };
   const [subModal, setSubModal] = useState<
     | { mode: 'create' }
     | { mode: 'detail'; subelement: Subelement }
@@ -605,6 +634,12 @@ function ElementDetailBody({
   const [directionSignal, setDirectionSignal] = useState(0);
   const [dependencySignal, setDependencySignal] = useState(0);
   const [approvalSignal, setApprovalSignal] = useState(0);
+  const [linkPrSignal, setLinkPrSignal] = useState(0);
+  // Files attached from this computer.
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { data: files } = useElementFiles(element.id);
+  const fileActions = useElementFileActions(element.id);
+  const [previewFile, setPreviewFile] = useState<ElementFile | null>(null);
   const handlePickNote = async (
     noteId: string,
     opts: { isNew: boolean; name: string },
@@ -674,7 +709,6 @@ function ElementDetailBody({
   );
 
   return (
-    <WidgetActionSlotProvider>
     <div ref={rootRef} className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Breadcrumb — data hierarchy only: Domain > Object > Element. */}
       <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
@@ -725,9 +759,6 @@ function ElementDetailBody({
             onStart: ({ workerId, prompt }) => agent.start({ workerId, prompt, triggeredFrom: 'detail', domainId }),
           }}
         />
-        {/* The rail's "Add widget" is page chrome, not content: it portals
-            here, beside the breadcrumb, instead of heading the rail. */}
-        <WidgetActionSlotTarget className="flex items-center gap-1" />
       </div>
 
       {/* Scrollable body — Linear-style two-column layout */}
@@ -811,13 +842,13 @@ function ElementDetailBody({
 
           {/* One row under the description, as Linear keeps a single line
               under an issue: reactions, the Note link and (once on) the
-              approval state as quiet icons, then "+ Add sub-element". Direction,
-              dependencies and turning approval on are in the "…" menu; a
-              section that has content takes the full width under the row with
-              its own heading — Direction first (approach / acceptance / next
-              step), then Sub-elements, then Dependencies, so the read order is
-              intent → its breakdown → what it waits on. Sharing an update
-              belongs to the discussion, so it sits in the Comments heading. */}
+              approval state as quiet icons. Direction, dependencies and
+              turning approval on are in the "…" menu. Below, each section
+              takes the full width with its own heading — Direction (once
+              set), Sub-elements (always, with its "+"), then Dependencies —
+              so the read order is intent → its breakdown → what it waits on.
+              Sharing an update belongs to the discussion, so it sits in the
+              Comments heading. */}
           <div className="-ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
           <ButtonAppearanceProvider appearance="inline">
           <div className="flex items-center gap-0.5">
@@ -855,27 +886,60 @@ function ElementDetailBody({
               )}
             </div>
 
-            {/* Note linker — opens NotePicker; hidden once a Note is
-                linked (the embed below has an unlink button instead). */}
-            {!element.note_id && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setNotePickerOpen(true)}
-                  className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-                  title={t('Link a Note')}
-                  aria-label={t('Link a Note')}
-                >
-                  <FileText size={15} />
-                </button>
-                <NotePicker
-                  open={notePickerOpen}
-                  onClose={() => setNotePickerOpen(false)}
-                  onPick={handlePickNote}
-                  anchorClassName="absolute top-full left-0 mt-1"
-                />
-              </div>
-            )}
+            {/* Attach a file from this computer — it lists under the row and
+                opens through a short-lived link (element_files). */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={fileActions.upload.isPending}
+              className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors disabled:opacity-50"
+              title={t('Attach a file')}
+              aria-label={t('Attach a file')}
+            >
+              <Paperclip size={15} />
+            </button>
+            <input ref={fileInputRef} type="file" multiple hidden
+              onChange={(e) => {
+                const picked = Array.from(e.target.files ?? []);
+                e.target.value = '';
+                for (const f of picked) fileActions.upload.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) });
+              }} />
+
+            {/* More to attach, kept off the page until chosen: a Note
+                (Document), a new deck (Slide), a pull request. */}
+            <div className="relative">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
+                    title={t('More')}
+                    aria-label={t('More')}
+                  >
+                    <MoreHorizontal size={15} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-[200px]">
+                  {!element.note_id && (
+                    <DropdownMenuItem onSelect={() => setTimeout(() => setNotePickerOpen(true), 0)} className="gap-2.5 py-1.5 text-[13px]">
+                      <FileText size={15} className="text-muted-foreground" />{t('Document')}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onSelect={() => { requestNewDeck(element.title); openInApp('slides'); }} className="gap-2.5 py-1.5 text-[13px]">
+                    <NavSlidesIcon size={15} />{t('Slide')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setTimeout(() => setLinkPrSignal((n) => n + 1), 0)} className="gap-2.5 py-1.5 text-[13px]">
+                    <CodeChangeIcon size={15} className="text-muted-foreground" />{t('Link pull request')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <NotePicker
+                open={notePickerOpen}
+                onClose={() => setNotePickerOpen(false)}
+                onPick={handlePickNote}
+                anchorClassName="absolute top-full left-0 mt-1"
+              />
+            </div>
 
             {/* Approval — turned on from the "…" menu; once on, its state
                 icon here opens the panel to record a decision (Approve /
@@ -910,6 +974,30 @@ function ElementDetailBody({
             })()}
           </div>
           </ButtonAppearanceProvider>
+          {previewFile && <ElementFilePreview file={previewFile} onClose={() => setPreviewFile(null)} />}
+          {files.length > 0 && (
+            <section className="w-full" aria-label={t('Files')}>
+              <div className="flex flex-wrap gap-1.5">
+                {files.map((f) => (
+                  <span key={f.id} className="group/file inline-flex max-w-[260px] items-center gap-1.5 rounded-md border border-border/60 bg-[var(--surface-rail)] py-1 pl-2 pr-1 text-[12.5px]">
+                    <Paperclip size={12} className="shrink-0 text-muted-foreground" />
+                    <button type="button" className="truncate text-foreground hover:underline" title={f.name}
+                      onClick={() => setPreviewFile(f)}>
+                      {f.name}
+                    </button>
+                    {f.uploaded_by === user?.id && (
+                      <button type="button" aria-label={t('Remove {name}', { name: f.name })}
+                        onClick={() => fileActions.remove.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) })}
+                        className="flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/file:opacity-100">
+                        <X size={11} />
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+
           <ElementDirectionSection
             key={`direction-${element.id}`}
             element={element}
@@ -917,55 +1005,58 @@ function ElementDetailBody({
             openSignal={directionSignal}
           />
 
-          {/* Sub-elements — list-style (no card bg). Each row mirrors the
-              Elements list (checkbox + atom icon + title) and clicking a
-              row opens the SubelementDetailModal. New sub-elements are
-              created through the same modal — once at least one exists,
-              the only entry point is a small "+" at the right end of the
-              header. Empty state still shows a labelled "Add sub-element"
-              link so the affordance is obvious. */}
-          <div className={totalSubs > 0 ? 'w-full' : ''}>
-            {totalSubs > 0 && (
-              <div className="mb-1 flex h-8 items-center gap-2">
+          {/* Sub-elements — a section like Comments: its heading folds the
+              list (▶). Unfolded, the rows read like the Elements list
+              (status, title, date, assignee, each set in place; the row opens
+              the SubelementDetailModal), and a grey "Add sub-element" line
+              under them takes a title and Enter. */}
+          <section className="w-full">
+            {/* Baseline-aligned, so the small done/total count sits on the
+                heading's line rather than floating at its middle. */}
+            <div className="mb-1 flex h-8 items-baseline gap-1 pt-1.5">
+              <button type="button" onClick={() => setSubsOpen((o) => !o)} aria-expanded={subsOpen}
+                className="flex items-center gap-2 rounded-md text-foreground">
                 <h2 className={`${FONT.lg} text-foreground`}>{t('Sub-elements')}</h2>
-                <span className="text-[12px] tabular-nums text-muted-foreground">{completedSubs}/{totalSubs}</span>
-                <div className="flex-1" />
-                <button
-                  type="button"
-                  onClick={() => setSubModal({ mode: 'create' })}
-                  className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
-                  title={t('New sub-element')}
-                  aria-label={t('New sub-element')}
-                >
-                  <Plus size={13} strokeWidth={2.5} />
-                </button>
+                <DisclosureTriangle open={subsOpen} className="text-muted-foreground" />
+              </button>
+              {totalSubs > 0 && <span className="ml-1 text-[12px] tabular-nums text-muted-foreground">{completedSubs}/{totalSubs}</span>}
+            </div>
+            {subsOpen && (
+              <div
+                className="-mx-2 space-y-0 group/sublist"
+                data-has-selection={subSelection.selectedRowIds.size > 0 ? '' : undefined}
+              >
+                {element.subelements?.map((sub) => (
+                  <SubelementRow
+                    key={sub.id}
+                    subelement={sub}
+                    workers={subWorkers}
+                    onRefresh={onRefresh}
+                    onOpen={() => setSubModal({ mode: 'detail', subelement: sub })}
+                    canRowSelect
+                    isSelected={subSelection.selectedRowIds.has(sub.id)}
+                    hasSelectionRef={hasSubSelectionRef}
+                    onRowSelect={(id, mode) => subSelection.handleRowSelect(id, mode, subIds)}
+                  />
+                ))}
+                <div className="flex min-h-[2.125rem] items-center gap-2 px-2">
+                  <span className="flex opacity-40"><ElementProgressMark status="todo" size={16} /></span>
+                  <input
+                    value={newSubTitle}
+                    onChange={(e) => setNewSubTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); void addSubelement(); }
+                      else if (e.key === 'Escape') { e.preventDefault(); setNewSubTitle(''); e.currentTarget.blur(); }
+                    }}
+                    disabled={addingSub}
+                    placeholder={t('Add sub-element')}
+                    aria-label={t('Add sub-element')}
+                    className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground/60"
+                  />
+                </div>
               </div>
             )}
-            <div
-              className="space-y-0 group/sublist"
-              data-has-selection={subSelection.selectedRowIds.size > 0 ? '' : undefined}
-            >
-              {element.subelements?.map((sub) => (
-                <SubelementRow
-                  key={sub.id}
-                  subelement={sub}
-                  onRefresh={onRefresh}
-                  onOpen={() => setSubModal({ mode: 'detail', subelement: sub })}
-                  canRowSelect
-                  isSelected={subSelection.selectedRowIds.has(sub.id)}
-                  hasSelectionRef={hasSubSelectionRef}
-                  onRowSelect={(id, mode) => subSelection.handleRowSelect(id, mode, subIds)}
-                />
-              ))}
-              {totalSubs === 0 && (
-                <ButtonAppearanceProvider appearance="inline">
-                  <Button variant="ghost" size="sm" onClick={() => setSubModal({ mode: 'create' })}>
-                    <Plus size={13} strokeWidth={2.5} />{t('Add sub-element')}
-                  </Button>
-                </ButtonAppearanceProvider>
-              )}
-            </div>
-          </div>
+          </section>
 
           <SubelementBulkBar
             count={subSelection.selectedRowIds.size}
@@ -979,7 +1070,7 @@ function ElementDetailBody({
             onOpenElement={onOpenElement} onChanged={onRefresh} openSignal={dependencySignal} />
           </div>
 
-          <CodeChangesSection elementId={element.id} />
+          <CodeChangesSection elementId={element.id} openSignal={linkPrSignal} />
 
           <AgentRunPanel
             agent={agent}
@@ -1025,14 +1116,14 @@ function ElementDetailBody({
 
           {/* The reader keeps changes next to their discussion. */}
           <div className={layout === 'reader' ? '' : 'mt-4'}>
-            <div className="mb-4 flex items-center justify-between gap-2">
-              <h2 className={`${FONT.lg} text-foreground`}>{t('Comments')}</h2>
-              <ButtonAppearanceProvider appearance="inline">
-                <Button variant="ghost" size="sm" onClick={() => setCheckInOpen(true)}>{t('Share an update')}</Button>
-              </ButtonAppearanceProvider>
+            {/* Comments and shared updates are one thread: a plain comment
+                sends with the button, an update from its ▾. */}
+            <div className="mb-4 flex items-center gap-2">
+              <h2 className={`${FONT.lg} text-foreground`}>{t('Updates')}</h2>
             </div>
             <ElementCommentsPanel
               key={`comments-${element.id}`}
+              sendOptions={[{ label: t('Share an update'), onSelect: () => setCheckInOpen(true) }]}
               refreshKey={agent.run ? `${agent.run.id}:${agent.run.status}:${agent.run.step_count}` : null}
               elementId={element.id}
               workers={allWorkers}
@@ -1053,7 +1144,7 @@ function ElementDetailBody({
                 assumptions the Initiative bound to it. Above Properties for the
                 same reason Initiative intent sits above them on an Object: why
                 it exists comes before who owns it. */}
-            <WidgetSurface board={board} host={host} zones={ELEMENT_ZONES}>
+            <WidgetSurface board={board} host={host} zones={ELEMENT_ZONES} addable={false}>
               <WidgetZone zone="rail" />
             </WidgetSurface>
 
@@ -1351,7 +1442,6 @@ function ElementDetailBody({
         />
       )}
     </div>
-    </WidgetActionSlotProvider>
   );
 }
 

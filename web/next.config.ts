@@ -4,8 +4,12 @@ const nextConfig: NextConfig = {
   async headers() {
     // srcdoc apps still render, but cannot navigate their frame to an external
     // URL carrying private inputs. Inner CSP also blocks subresource requests.
+    // The one frame allowed is an Element's attached file, previewed through
+    // its signed link — the path, not the whole Supabase origin.
+    const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/+$/, '');
+    const frameSrc = supabase ? `${supabase}/storage/v1/object/sign/element-files/` : "'none'";
     return [
-      { source: '/:path*', headers: [{ key: 'Content-Security-Policy', value: "frame-src 'none'; object-src 'none'" }] },
+      { source: '/:path*', headers: [{ key: 'Content-Security-Policy', value: `frame-src ${frameSrc}; object-src 'none'` }] },
       // A design downloaded as HTML loads its fonts from the app wherever it is
       // opened; fonts are fetched in CORS mode, so the app's own font files say
       // anyone may read them. They are public files with no user data.

@@ -55,12 +55,16 @@ export function WidgetSurface({
   zones,
   children,
   className = '',
+  addable = true,
 }: {
   board: Board;
   host: WidgetHost;
   /** The zones this surface renders. The picker offers only widgets that fit
    *  one of them, so a rail widget cannot be added to a surface with no rail. */
   zones: Zone[];
+  /** False for a surface whose widgets are fixed (an Element's page): no
+   *  "Add widget" and no presence beside it, in the chrome or in place. */
+  addable?: boolean;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -156,9 +160,9 @@ export function WidgetSurface({
       {/* One + for the whole surface. A widget knows its own zone, so there
           is nothing to choose before choosing the widget. It renders in the
           chrome when a target is mounted, and in place when not. */}
-      {actionSlot
+      {addable && (actionSlot
         ? createPortal(chrome, actionSlot)
-        : <div className="flex justify-end">{chrome}</div>}
+        : <div className="flex justify-end">{chrome}</div>)}
 
       {/* Text selection is suppressed while arranging: a press-and-drag that
           started as a long press would otherwise paint a selection across the

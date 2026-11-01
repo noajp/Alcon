@@ -348,8 +348,11 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
                 <X size={14} />
               </Button>
             ) : (
-              <Button size="icon-sm" type="submit" disabled={!input.trim() && files.length === 0} title={t('Send (Enter)')} aria-label={t('Send')} variant="primary">
-                <SendIcon size={16} />
+              // Same rectangular send as the Updates composer; mb-0.5 centres
+              // its 24px against the 28px row while one line is written.
+              <Button size="xs" type="submit" disabled={!input.trim() && files.length === 0} title={t('Send (Enter)')} aria-label={t('Send')} variant="primary"
+                className="mb-0.5 rounded-md px-2">
+                <SendIcon size={13} />
               </Button>
             )}
           </div>

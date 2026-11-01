@@ -516,6 +516,10 @@ export interface Subelement {
   display_id: string | null       // e.g. "sub_PH1-001-01"
   seq_number: number | null
   is_completed: boolean | null
+  /** Same set as an Element's; kept in step with is_completed (Done ⇔ completed) by the DB. */
+  status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled'
+  due_date?: string | null        // 'YYYY-MM-DD'
+  assignee_id?: string | null     // workers.id
   order_index: number | null
   created_at: string | null
   updated_at: string | null

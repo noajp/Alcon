@@ -184,7 +184,9 @@ export function ElementProgressMark({
       style={{ width: size, height: size }}
       aria-hidden
     >
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none">
+      {/* text-current: the svg takes the wrapper's status colour even where
+          a parent recolours bare svgs (menu items mute them). */}
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none" className="text-current">
         <g transform={groupTransform}>{inner}</g>
       </svg>
     </span>

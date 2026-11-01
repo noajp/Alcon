@@ -143,7 +143,8 @@ function Button({
         appearance === 'inline' && variant === 'ghost' && 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] font-normal',
         // The one decisive action (Create, Send, the empty state's verb) is a
         // pill, like the tabs and the quick-create property chips beside it.
-        variant === 'primary' && 'rounded-full'
+        // A caller that sets its own corners (a split button's halves) keeps them.
+        variant === 'primary' && !/(^|\s)rounded-/.test(className ?? '') && 'rounded-full'
       )}
       {...props}
     >

@@ -21,7 +21,7 @@ type TranslationMap = Record<string, string>;
 const ja: TranslationMap = {
   'Choose a Domain for this Object.': 'この Object を置く Domain を選んでください。',
   'Ask the agent': 'エージェントに頼む',
-  'Leave a comment… @AI asks the agent': 'コメントを書く… @AI でエージェントに頼めます',
+  'Write an update… @AI asks the agent': '近況を書く… @AI でエージェントに頼めます',
   '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '{n} 人の担当者は追加しませんでした（inactive か、この Element を見られない人です）。',
   'This Worker cannot be assigned to this Element: they are inactive, outside its Space, or cannot see it.': 'この Worker はこの Element に割り当てられません（inactive、別の Space、またはこの Element を見られない人です）。',
   'The assignees could not be changed. Try again.': '担当者を変更できませんでした。もう一度お試しください。',
@@ -76,7 +76,7 @@ const ja: TranslationMap = {
 const ko: TranslationMap = {
   'Choose a Domain for this Object.': '이 Object를 둘 Domain을 선택하세요.',
   'Ask the agent': '에이전트에게 요청',
-  'Leave a comment… @AI asks the agent': '댓글 남기기… @AI로 에이전트에게 요청할 수 있습니다',
+  'Write an update… @AI asks the agent': '업데이트 쓰기… @AI로 에이전트에게 요청할 수 있습니다',
   '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '담당자 {n}명은 추가하지 않았습니다(비활성이거나 이 Element를 볼 수 없는 사람입니다).',
   'This Worker cannot be assigned to this Element: they are inactive, outside its Space, or cannot see it.': '이 Worker는 이 Element에 할당할 수 없습니다(비활성, 다른 Space, 또는 이 Element를 볼 수 없는 사람입니다).',
   'The assignees could not be changed. Try again.': '담당자를 변경하지 못했습니다. 다시 시도하세요.',
@@ -151,7 +151,7 @@ const ko: TranslationMap = {
 const fr: TranslationMap = {
   'Choose a Domain for this Object.': 'Choisissez un Domain pour cet Object.',
   'Ask the agent': 'Demander à l’agent',
-  'Leave a comment… @AI asks the agent': 'Laisser un commentaire… @AI pour demander à l’agent',
+  'Write an update… @AI asks the agent': 'Écrire une mise à jour… @AI pour demander à l’agent',
   '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '{n} responsable(s) non ajouté(s) : inactif(s) ou sans accès à cet Element.',
   'This Worker cannot be assigned to this Element: they are inactive, outside its Space, or cannot see it.': 'Ce Worker ne peut pas être assigné à cet Element : inactif, hors de son Space ou sans accès.',
   'The assignees could not be changed. Try again.': 'Impossible de modifier les responsables. Réessayez.',
@@ -227,7 +227,7 @@ const fr: TranslationMap = {
 const es: TranslationMap = {
   'Choose a Domain for this Object.': 'Elige un Domain para este Object.',
   'Ask the agent': 'Pedir al agente',
-  'Leave a comment… @AI asks the agent': 'Deja un comentario… @AI para pedírselo al agente',
+  'Write an update… @AI asks the agent': 'Escribe una actualización… @AI para pedírselo al agente',
   '{n} assignee(s) were not added: they are inactive or cannot see this Element.': '{n} responsable(s) no se añadieron: están inactivos o no pueden ver este Element.',
   'This Worker cannot be assigned to this Element: they are inactive, outside its Space, or cannot see it.': 'Este Worker no se puede asignar a este Element: está inactivo, fuera de su Space o no puede verlo.',
   'The assignees could not be changed. Try again.': 'No se pudieron cambiar los responsables. Inténtalo de nuevo.',
