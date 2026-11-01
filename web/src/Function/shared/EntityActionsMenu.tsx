@@ -82,22 +82,22 @@ export function EntityActionsMenu({
           <MoreHorizontal size={14} className="-translate-y-[0.5px]" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[190px]">
-        <DropdownMenuItem onClick={onDuplicate} className="gap-2 text-[13px]">
-          <Copy size={13} className="text-muted-foreground" /> {tr('Duplicate')}
+      <DropdownMenuContent align="start" className="min-w-[220px]">
+        <DropdownMenuItem onClick={onDuplicate} className="gap-2.5 py-1.5 text-[13px]">
+          <Copy size={15} className="text-muted-foreground" /> {tr('Duplicate')}
         </DropdownMenuItem>
 
         {/* Move — re-parent to a different primary */}
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="gap-2 text-[13px]">
-            <ArrowRightLeft size={13} className="text-muted-foreground" /> {tr(moveLabel)}
+          <DropdownMenuSubTrigger className="gap-2.5 py-1.5 text-[13px]">
+            <ArrowRightLeft size={15} className="text-muted-foreground" /> {tr(moveLabel)}
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-[190px] max-h-[320px] overflow-auto">
+          <DropdownMenuSubContent className="min-w-[220px] max-h-[320px] overflow-auto">
             {moveTargets.length === 0 ? (
               <div className="px-2 py-1.5 text-[12px] text-muted-foreground/70">{tr(targetEmptyLabel)}</div>
             ) : (
               moveTargets.map((t) => (
-                <DropdownMenuItem key={t.id} onClick={() => onMove(t.id)} className="gap-2 text-[13px]">
+                <DropdownMenuItem key={t.id} onClick={() => onMove(t.id)} className="gap-2.5 py-1.5 text-[13px]">
                   <span className="truncate">{t.name}</span>
                 </DropdownMenuItem>
               ))
@@ -107,10 +107,10 @@ export function EntityActionsMenu({
 
         {/* Multi-home — toggle secondary memberships; menu stays open */}
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="gap-2 text-[13px]">
-            <GitBranch size={13} className="text-muted-foreground" /> {tr(multiHomeLabel)}
+          <DropdownMenuSubTrigger className="gap-2.5 py-1.5 text-[13px]">
+            <GitBranch size={15} className="text-muted-foreground" /> {tr(multiHomeLabel)}
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-[190px] max-h-[320px] overflow-auto">
+          <DropdownMenuSubContent className="min-w-[220px] max-h-[320px] overflow-auto">
             {targets.length === 0 ? (
               <div className="px-2 py-1.5 text-[12px] text-muted-foreground/70">{tr(targetEmptyLabel)}</div>
             ) : (
@@ -125,7 +125,7 @@ export function EntityActionsMenu({
                       e.preventDefault(); // keep the submenu open for multiple toggles
                       if (!isPrimary) onToggleMultiHome(t.id, isMember);
                     }}
-                    className="gap-2 text-[13px]"
+                    className="gap-2.5 py-1.5 text-[13px]"
                   >
                     <span className="w-3.5 shrink-0 flex items-center justify-center">
                       {isMember && <Check size={13} />}
@@ -149,9 +149,9 @@ export function EntityActionsMenu({
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={onDelete}
-          className="gap-2 text-[13px] text-destructive focus:text-destructive"
+          className="gap-2.5 py-1.5 text-[13px] text-destructive focus:text-destructive"
         >
-          <Trash2 size={13} /> {tr('Delete')}
+          <Trash2 size={15} /> {tr('Delete')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

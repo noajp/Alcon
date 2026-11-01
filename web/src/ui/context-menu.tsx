@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu"
-import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
+import { CheckIcon, CircleIcon, PlayIcon } from "lucide-react"
 
 import { anchoredOverlayMotion, cn } from "@/lib/utils"
 
@@ -72,7 +72,8 @@ function ContextMenuSubTrigger({
       {...props}
     >
       {children}
-      <ChevronRightIcon className="ml-auto" />
+      {/* A small filled ▶ says "opens a submenu", quieter than a chevron. */}
+      <PlayIcon className="ml-auto !size-2 fill-current" strokeWidth={0} />
     </ContextMenuPrimitive.SubTrigger>
   )
 }

@@ -168,17 +168,17 @@ export function ObjectActionsMenu({
         onToggleMultiHome={toggleMultiHome}
         onDelete={del}
       >
-        <DropdownMenuItem onClick={() => setRenameOpen(true)} className="gap-2 text-[13px]">
-          <Pencil size={13} className="text-muted-foreground" /> Rename ID prefix
+        <DropdownMenuItem onClick={() => setRenameOpen(true)} className="gap-2.5 py-1.5 text-[13px]">
+          <Pencil size={15} className="text-muted-foreground" /> Rename ID prefix
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setDeletedOpen(true)} className="gap-2 text-[13px]">
-          <Trash2 size={13} className="text-muted-foreground" /> Deleted Elements
+        <DropdownMenuItem onClick={() => setDeletedOpen(true)} className="gap-2.5 py-1.5 text-[13px]">
+          <Trash2 size={15} className="text-muted-foreground" /> Deleted Elements
         </DropdownMenuItem>
         {managesObject(object) && (
-          <DropdownMenuItem onClick={() => { void toggleArchive(); }} className="gap-2 text-[13px]">
+          <DropdownMenuItem onClick={() => { void toggleArchive(); }} className="gap-2.5 py-1.5 text-[13px]">
             {archived
-              ? <><ArchiveRestore size={13} className="text-muted-foreground" /> {t('Restore')}</>
-              : <><Archive size={13} className="text-muted-foreground" /> {t('Archive')}</>}
+              ? <><ArchiveRestore size={15} className="text-muted-foreground" /> {t('Restore')}</>
+              : <><Archive size={15} className="text-muted-foreground" /> {t('Archive')}</>}
           </DropdownMenuItem>
         )}
       </EntityActionsMenu>
