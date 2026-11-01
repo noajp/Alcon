@@ -1,6 +1,6 @@
-import JSZip from 'jszip';
 import { readChart, type ChartData } from './chartLayout';
 import { presetPath } from './presetGeometry';
+import { desc, drawingColor, emu as px, first, is, kid, kids, openPackage, path, relId, relOfType, themeColors, themeFonts, type Package, type Rel } from './ooxml';
 
 // A PowerPoint deck read for drawing: each slide's shapes where the deck
 // puts them — rectangles, ellipses, lines, text, pictures, tables, groups —
@@ -30,15 +30,6 @@ export interface Stroke { color: string | null; width: number; dash: boolean; he
 export interface DeckSlide { background: string | null; items: DeckItem[] }
 export interface Deck { width: number; height: number; slides: DeckSlide[] }
 
-const EMU = 9525;
-const px = (emu: string | null | undefined) => (emu ? Number(emu) / EMU : 0);
-
-const kids = (el: Element | null | undefined, name: string) =>
-  el ? Array.from(el.children).filter((c) => c.tagName === name) : [];
-const kid = (el: Element | null | undefined, name: string) => kids(el, name)[0] ?? null;
-const path = (el: Element | null | undefined, ...names: string[]) =>
-  names.reduce<Element | null>((at, n) => kid(at, n), el ?? null);
-
 interface Theme {
   colors: Record<string, string>;
   fonts: { major: string | null; minor: string | null };
@@ -46,38 +37,16 @@ interface Theme {
    *  points at by index, coloured by the reference's own colour. */
   styles: { fill: Element[]; line: Element[]; bgFill: Element[] };
 }
-const CLR_MAP: Record<string, string> = { tx1: 'dk1', tx2: 'dk2', bg1: 'lt1', bg2: 'lt2' };
-
-/** A colour element (<a:srgbClr>, <a:schemeClr>, <a:sysClr>) as CSS, with
- *  its alpha, lumMod / lumOff, tint and shade applied. */
-function colorOf(el: Element | null, theme: Theme, ph: string | null = null): string | null {
-  const c = el ? Array.from(el.children).find((n) => ['a:srgbClr', 'a:schemeClr', 'a:sysClr', 'a:prstClr'].includes(n.tagName)) : null;
-  if (!c) return null;
-  const hex = c.tagName === 'a:srgbClr' ? c.getAttribute('val')
-    : c.tagName === 'a:sysClr' ? c.getAttribute('lastClr')
-    // phClr: the colour a style reference supplies to the style it points at.
-    : c.tagName === 'a:schemeClr' && c.getAttribute('val') === 'phClr' ? ph
-    : c.tagName === 'a:schemeClr' ? theme.colors[CLR_MAP[c.getAttribute('val') ?? ''] ?? c.getAttribute('val') ?? '']
-    : ({ black: '000000', white: 'FFFFFF' } as Record<string, string>)[c.getAttribute('val') ?? ''];
-  if (!hex) return null;
-  let [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  const val = (name: string) => { const v = kid(c, name)?.getAttribute('val'); return v ? Number(v) / 100000 : null; };
-  const mod = val('a:lumMod'), off = val('a:lumOff'), tint = val('a:tint'), shade = val('a:shade');
-  if (mod != null || off != null) [r, g, b] = [r, g, b].map((v) => v * (mod ?? 1) + 255 * (off ?? 0));
-  if (tint != null) [r, g, b] = [r, g, b].map((v) => v * tint + 255 * (1 - tint));
-  if (shade != null) [r, g, b] = [r, g, b].map((v) => v * shade);
-  [r, g, b] = [r, g, b].map((v) => Math.round(Math.min(255, Math.max(0, v))));
-  const alpha = val('a:alpha');
-  return alpha != null ? `rgba(${r}, ${g}, ${b}, ${alpha})` : `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
-}
+/** A colour element as CSS, in the deck's theme (see ooxml). */
+const colorOf = (el: Element | null, theme: Theme, ph: string | null = null) => drawingColor(el, theme.colors, ph);
 
 /** A shape's or background's fill as CSS: a colour, or a linear gradient
  *  (DrawingML's angle runs clockwise from left-to-right; CSS's from
  *  bottom-to-top, hence the quarter turn). */
 function fillEl(el: Element, theme: Theme, ph: string | null = null): string | null {
-  if (el.tagName === 'a:solidFill') return colorOf(el, theme, ph);
-  if (el.tagName === 'a:pattFill') return colorOf(kid(el, 'a:fgClr'), theme, ph);
-  if (el.tagName === 'a:gradFill') {
+  if (is(el, 'solidFill')) return colorOf(el, theme, ph);
+  if (is(el, 'pattFill')) return colorOf(kid(el, 'a:fgClr'), theme, ph);
+  if (is(el, 'gradFill')) {
     const stops = kids(kid(el, 'a:gsLst'), 'a:gs')
       .map((gs) => ({ pos: Number(gs.getAttribute('pos') ?? 0) / 1000, color: colorOf(gs, theme, ph) }))
       .filter((s) => s.color)
@@ -89,11 +58,11 @@ function fillEl(el: Element, theme: Theme, ph: string | null = null): string | n
   }
   return null;
 }
-const FILLS = ['a:solidFill', 'a:gradFill', 'a:pattFill', 'a:noFill', 'a:blipFill', 'a:grpFill'];
+const FILLS = ['solidFill', 'gradFill', 'pattFill', 'noFill', 'blipFill', 'grpFill'];
 /** The fill a properties element sets: CSS, null for an explicit "no
  *  fill", undefined when it says nothing (and the fill is inherited). */
 function fillOf(spPr: Element | null, theme: Theme): string | null | undefined {
-  const el = spPr ? Array.from(spPr.children).find((c) => FILLS.includes(c.tagName)) : null;
+  const el = spPr ? Array.from(spPr.children).find((c) => FILLS.includes(c.localName)) : null;
   return el ? fillEl(el, theme) : undefined;
 }
 /** The first value that is set (null counts: it means "none"). */
@@ -129,8 +98,8 @@ const masterType = (t: string) => (t === 'ctrTitle' ? 'title' : ['subTitle', 'ob
 
 function placeholdersOf(tree: Element | null): PlaceholderMaps {
   const maps: PlaceholderMaps = { byIdx: new Map(), byType: new Map() };
-  for (const sp of tree ? Array.from(tree.getElementsByTagName('p:sp')) : []) {
-    const ph = sp.getElementsByTagName('p:ph')[0];
+  for (const sp of desc(tree, 'sp')) {
+    const ph = first(sp, 'ph');
     if (!ph) continue;
     const spPr = kid(sp, 'p:spPr');
     const txBody = kid(sp, 'p:txBody');
@@ -203,15 +172,15 @@ function textOf(txBody: Element | null, theme: Theme, chain: Element[], bodyPrs:
     const lnPct = levels.map((l) => path(l, 'a:lnSpc', 'a:spcPct')?.getAttribute('val')).find(Boolean);
     const bulletLevel = levels.find((l) => kid(l, 'a:buNone') || kid(l, 'a:buChar') || kid(l, 'a:buAutoNum'));
     const bullet = !bulletLevel || kid(bulletLevel, 'a:buNone') ? null : kid(bulletLevel, 'a:buChar')?.getAttribute('char') ?? '•';
-    const defaults = levels.map((l) => (l.tagName === 'a:pPr' ? null : kid(l, 'a:defRPr'))).filter((e): e is Element => !!e);
-    const runs: Run[] = Array.from(p.children).filter((r) => r.tagName === 'a:r' || r.tagName === 'a:br' || r.tagName === 'a:fld').map((r) => {
+    const defaults = levels.map((l) => (is(l, 'pPr') ? null : kid(l, 'a:defRPr'))).filter((e): e is Element => !!e);
+    const runs: Run[] = Array.from(p.children).filter((r) => is(r, 'r') || is(r, 'br') || is(r, 'fld')).map((r) => {
       const rPrs = [kid(r, 'a:rPr'), ...defaults].filter((e): e is Element => !!e);
       const rAttr = (a: string) => rPrs.map((x) => x.getAttribute(a)).find((v) => v != null) ?? null;
       const colorEl = rPrs.map((x) => kid(x, 'a:solidFill')).find(Boolean) ?? null;
       const face = rPrs.map((x) => kid(x, 'a:ea')?.getAttribute('typeface') ?? kid(x, 'a:latin')?.getAttribute('typeface')).find(Boolean);
       const u = rAttr('u');
       return {
-        text: r.tagName === 'a:br' ? '\n' : kid(r, 'a:t')?.textContent ?? '',
+        text: is(r, 'br') ? '\n' : kid(r, 'a:t')?.textContent ?? '',
         size: (rAttr('sz') ? Number(rAttr('sz')) / 100 : 18) * fontScale,
         bold: rAttr('b') === '1',
         italic: rAttr('i') === '1',
@@ -273,8 +242,10 @@ function place(items: DeckItem[], grpXfrm: Element | null): DeckItem[] {
 
 interface ReadCtx {
   theme: Theme;
-  media: (rId: string) => Promise<string | null>;
-  chart: (rId: string) => Promise<ChartData | null>;
+  pkg: Package;
+  /** The relationships of the part being read (slide, layout, master,
+   *  diagram drawing): what its r:ids point at. */
+  rels: Map<string, Rel>;
   /** null on a layout or master: their placeholders are templates, not content. */
   inherit: Inherit | null;
 }
@@ -283,16 +254,16 @@ async function itemsOf(tree: Element, ctx: ReadCtx): Promise<DeckItem[]> {
   const { theme } = ctx;
   const out: DeckItem[] = [];
   for (const node of Array.from(tree.children)) {
-    const ph = node.getElementsByTagName('p:ph')[0] ?? null;
+    const ph = first(node, 'ph');
     if (ph && !ctx.inherit) continue;
     const from = inheritedOf(ph, ctx.inherit);
-    if (node.tagName === 'p:sp' || node.tagName === 'p:cxnSp') {
+    if (is(node, 'sp') || is(node, 'cxnSp')) {
       const spPr = kid(node, 'p:spPr');
       const xfrm = kid(spPr, 'a:xfrm');
       const box = boxOf(xfrm) ?? from.map((p) => p.box).find(Boolean) ?? null;
       if (!box) continue;
       const prstGeom = kid(spPr, 'a:prstGeom');
-      const geom = prstGeom?.getAttribute('prst') ?? (node.tagName === 'p:cxnSp' ? 'line' : 'rect');
+      const geom = prstGeom?.getAttribute('prst') ?? (is(node, 'cxnSp') ? 'line' : 'rect');
       // Adjust values: <a:gd name="adj" fmla="val 16667"/>.
       const adj: Record<string, number> = {};
       for (const gd of kids(kid(prstGeom, 'a:avLst'), 'a:gd')) {
@@ -310,23 +281,39 @@ async function itemsOf(tree: Element, ctx: ReadCtx): Promise<DeckItem[]> {
         stroke: strokeOf(spPr, theme, isLine, style),
         text: textOf(txBody, theme, styleChain(txBody, ph, ctx.inherit), from.map((p) => p.bodyPr).filter((e): e is Element => !!e), styleFont(style, theme)),
       });
-    } else if (node.tagName === 'p:pic') {
+    } else if (is(node, 'pic')) {
       const blipFill = kid(node, 'p:blipFill');
-      const rId = kid(blipFill, 'a:blip')?.getAttribute('r:embed');
-      const src = rId ? await ctx.media(rId) : null;
+      const src = await ctx.pkg.dataUrl(ctx.rels.get(relId(kid(blipFill, 'a:blip'), 'embed') ?? '')?.target);
       const box = boxOf(path(node, 'p:spPr', 'a:xfrm')) ?? from.map((p) => p.box).find(Boolean) ?? null;
       const rect = kid(blipFill, 'a:srcRect');
       const crop = (a: string) => Number(rect?.getAttribute(a) ?? 0) / 100000;
       if (src && box) out.push({ kind: 'image', src, ...box, crop: { l: crop('l'), t: crop('t'), r: crop('r'), b: crop('b') } });
-    } else if (node.tagName === 'p:grpSp') {
+    } else if (is(node, 'grpSp')) {
       out.push(...place(await itemsOf(node, ctx), path(node, 'p:grpSpPr', 'a:xfrm')));
-    } else if (node.tagName === 'p:graphicFrame') {
-      const tbl = node.getElementsByTagName('a:tbl')[0];
+    } else if (is(node, 'graphicFrame')) {
+      const tbl = first(node, 'tbl');
       const box = boxOf(kid(node, 'p:xfrm')) ?? from.map((p) => p.box).find(Boolean) ?? null;
-      const chartRef = node.getElementsByTagName('c:chart')[0];
+      const chartRef = first(node, 'chart');
       if (chartRef && box) {
-        const chart = await ctx.chart(chartRef.getAttribute('r:id') ?? '');
+        const doc = await ctx.pkg.xml(ctx.rels.get(relId(chartRef) ?? '')?.target ?? '');
+        const chart = doc ? readChart(doc, ctx.theme.colors) : null;
         if (chart) out.push({ kind: 'chart', chart, ...box });
+        continue;
+      }
+      // SmartArt: its layout engine is PowerPoint's, but the file keeps the
+      // shapes it last drew (the diagram drawing part) — those are drawn,
+      // placed in the frame.
+      const diagram = first(node, 'relIds');
+      if (diagram && box) {
+        const data = await ctx.pkg.xml(ctx.rels.get(relId(diagram, 'dm') ?? '')?.target ?? '');
+        const drawingId = first(data, 'dataModelExt')?.getAttribute('relId');
+        const drawingPath = (drawingId ? ctx.rels.get(drawingId)?.target : null) ?? relOfType(ctx.rels, 'diagramDrawing');
+        const drawing = drawingPath ? await ctx.pkg.xml(drawingPath) : null;
+        const tree = first(drawing, 'spTree');
+        if (tree && drawingPath) {
+          const shapes = await itemsOf(tree, { ...ctx, rels: await ctx.pkg.rels(drawingPath), inherit: null });
+          out.push(...shapes.map((it) => ({ ...it, x: it.x + box.x, y: it.y + box.y })));
+        }
         continue;
       }
       if (!tbl || !box) continue;
@@ -351,52 +338,17 @@ async function itemsOf(tree: Element, ctx: ReadCtx): Promise<DeckItem[]> {
 
 /** Reads a .pptx's bytes into its slides. */
 export async function readDeck(bytes: ArrayBuffer): Promise<Deck> {
-  const zip = await JSZip.loadAsync(bytes);
-  const cache = new Map<string, Promise<Document | null>>();
-  const xml = (p: string) => {
-    if (!cache.has(p)) {
-      const f = zip.file(p);
-      cache.set(p, f ? f.async('string').then((s) => new DOMParser().parseFromString(s, 'application/xml')) : Promise.resolve(null));
-    }
-    return cache.get(p)!;
-  };
-  const relsOf = async (p: string) => {
-    const dir = p.slice(0, p.lastIndexOf('/'));
-    const doc = await xml(`${dir}/_rels/${p.slice(dir.length + 1)}.rels`);
-    const map = new Map<string, { target: string; type: string }>();
-    for (const r of Array.from(doc?.getElementsByTagName('Relationship') ?? [])) {
-      const target = r.getAttribute('Target') ?? '';
-      map.set(r.getAttribute('Id') ?? '', {
-        target: target.startsWith('/') ? target.slice(1) : new URL(target, `http://x/${dir}/`).pathname.slice(1),
-        type: r.getAttribute('Type') ?? '',
-      });
-    }
-    return map;
-  };
-  const relOfType = (rels: Map<string, { target: string; type: string }>, type: string) =>
-    [...rels.values()].find((r) => r.type.endsWith(`/${type}`) || r.target.includes(`/${type}`))?.target ?? null;
-  const chartFor = (rels: Map<string, { target: string; type: string }>, theme: Theme) => async (rId: string) => {
-    const target = rels.get(rId)?.target;
-    const doc = target ? await xml(target) : null;
-    const order = ['dk1', 'lt1', 'dk2', 'lt2', 'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6'];
-    return doc ? readChart(doc, order.map((k) => theme.colors[k] ?? '000000')) : null;
-  };
-  const mediaFor = (rels: Map<string, { target: string; type: string }>) => async (rId: string) => {
-    const target = rels.get(rId)?.target;
-    const f = target ? zip.file(target) : null;
-    if (!f) return null;
-    const ext = target!.split('.').pop()?.toLowerCase();
-    const mime = ext === 'svg' ? 'image/svg+xml' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
-    return `data:${mime};base64,${await f.async('base64')}`;
-  };
+  const pkg = await openPackage(bytes);
+  const { xml } = pkg;
+  const relsOf = (p: string) => pkg.rels(p);
 
   const pres = await xml('ppt/presentation.xml');
-  const size = pres?.getElementsByTagName('p:sldSz')[0];
+  const size = first(pres, 'sldSz');
   const presRels = await relsOf('ppt/presentation.xml');
-  const defaultText = pres?.getElementsByTagName('p:defaultTextStyle')[0] ?? null;
+  const defaultText = first(pres, 'defaultTextStyle');
 
-  const slidePaths = Array.from(pres?.getElementsByTagName('p:sldId') ?? [])
-    .map((s) => presRels.get(s.getAttribute('r:id') ?? '')?.target)
+  const slidePaths = desc(pres, 'sldId')
+    .map((s) => presRels.get(relId(s) ?? '')?.target)
     .filter((p): p is string => !!p);
 
   const themes = new Map<string, Theme>();
@@ -405,19 +357,10 @@ export async function readDeck(bytes: ArrayBuffer): Promise<Deck> {
     const key = themePath ?? '';
     if (!themes.has(key)) {
       const doc = themePath ? await xml(themePath) : null;
-      const colors: Record<string, string> = {};
-      for (const c of Array.from(doc?.getElementsByTagName('a:clrScheme')[0]?.children ?? [])) {
-        const v = c.children[0];
-        colors[c.tagName.replace('a:', '')] = v?.getAttribute('val') ?? v?.getAttribute('lastClr') ?? '000000';
-      }
-      const face = (group: string) => {
-        const g = doc?.getElementsByTagName(`a:${group}`)[0];
-        return kid(g, 'a:ea')?.getAttribute('typeface') || kid(g, 'a:latin')?.getAttribute('typeface') || null;
-      };
-      const list = (name: string) => Array.from(doc?.getElementsByTagName(name)[0]?.children ?? []);
+      const list = (name: string) => Array.from(first(doc, name)?.children ?? []);
       themes.set(key, {
-        colors, fonts: { major: face('majorFont'), minor: face('minorFont') },
-        styles: { fill: list('a:fillStyleLst'), line: list('a:lnStyleLst'), bgFill: list('a:bgFillStyleLst') },
+        colors: themeColors(doc), fonts: themeFonts(doc),
+        styles: { fill: list('fillStyleLst'), line: list('lnStyleLst'), bgFill: list('bgFillStyleLst') },
       });
     }
     return themes.get(key)!;
@@ -428,20 +371,20 @@ export async function readDeck(bytes: ArrayBuffer): Promise<Deck> {
     // Hand the page back between slides, so a long deck never freezes it.
     await new Promise((r) => setTimeout(r, 0));
     const doc = await xml(p);
-    const cSld = doc?.getElementsByTagName('p:cSld')[0];
+    const cSld = first(doc, 'cSld');
     const tree = kid(cSld, 'p:spTree');
     if (!doc || !tree) continue;
     const rels = await relsOf(p);
     const layoutPath = relOfType(rels, 'slideLayout');
     const layoutDoc = layoutPath ? await xml(layoutPath) : null;
-    const layoutRels = layoutPath ? await relsOf(layoutPath) : new Map();
+    const layoutRels = layoutPath ? await relsOf(layoutPath) : new Map<string, Rel>();
     const masterPath = layoutPath ? relOfType(layoutRels, 'slideMaster') : null;
     const masterDoc = masterPath ? await xml(masterPath) : null;
-    const masterRels = masterPath ? await relsOf(masterPath) : new Map();
+    const masterRels = masterPath ? await relsOf(masterPath) : new Map<string, Rel>();
     const theme = masterPath ? await themeOf(masterPath) : await themeOf('ppt/presentation.xml');
     const layoutTree = path(layoutDoc?.documentElement, 'p:cSld', 'p:spTree');
     const masterTree = path(masterDoc?.documentElement, 'p:cSld', 'p:spTree');
-    const txStyles = masterDoc?.getElementsByTagName('p:txStyles')[0];
+    const txStyles = first(masterDoc, 'txStyles');
 
     const inherit: Inherit = {
       layout: placeholdersOf(layoutTree), master: placeholdersOf(masterTree),
@@ -450,11 +393,11 @@ export async function readDeck(bytes: ArrayBuffer): Promise<Deck> {
     };
 
     // The background is the slide's, else its layout's, else its master's.
-    const bgOf = async (root: Element | null | undefined, r: Map<string, { target: string; type: string }>) => {
+    const bgOf = async (root: Element | null | undefined, r: Map<string, Rel>) => {
       const bgPr = path(root, 'p:cSld', 'p:bg', 'p:bgPr');
       if (!bgPr) return null;
-      const blip = path(bgPr, 'a:blipFill', 'a:blip')?.getAttribute('r:embed');
-      if (blip) { const src = await mediaFor(r)(blip); return src ? `center / cover no-repeat url("${src}")` : null; }
+      const blip = relId(path(bgPr, 'a:blipFill', 'a:blip'), 'embed');
+      if (blip) { const src = await pkg.dataUrl(r.get(blip)?.target); return src ? `center / cover no-repeat url("${src}")` : null; }
       return fillOf(bgPr, theme) ?? null;
     };
     const background = (await bgOf(doc.documentElement, rels)) ?? (await bgOf(layoutDoc?.documentElement, layoutRels)) ?? (await bgOf(masterDoc?.documentElement, masterRels));
@@ -463,9 +406,9 @@ export async function readDeck(bytes: ArrayBuffer): Promise<Deck> {
     // the slide's, unless the slide or its layout hides them.
     const showMaster = doc.documentElement.getAttribute('showMasterSp') !== '0' && layoutDoc?.documentElement.getAttribute('showMasterSp') !== '0';
     const items: DeckItem[] = [];
-    if (showMaster && masterTree) items.push(...await itemsOf(masterTree, { theme, media: mediaFor(masterRels), chart: chartFor(masterRels, theme), inherit: null }));
-    if (doc.documentElement.getAttribute('showMasterSp') !== '0' && layoutTree) items.push(...await itemsOf(layoutTree, { theme, media: mediaFor(layoutRels), chart: chartFor(layoutRels, theme), inherit: null }));
-    items.push(...await itemsOf(tree, { theme, media: mediaFor(rels), chart: chartFor(rels, theme), inherit }));
+    if (showMaster && masterTree) items.push(...await itemsOf(masterTree, { theme, pkg, rels: masterRels, inherit: null }));
+    if (doc.documentElement.getAttribute('showMasterSp') !== '0' && layoutTree) items.push(...await itemsOf(layoutTree, { theme, pkg, rels: layoutRels, inherit: null }));
+    items.push(...await itemsOf(tree, { theme, pkg, rels, inherit }));
     slides.push({ background, items });
   }
   return { width: px(size?.getAttribute('cx')) || 960, height: px(size?.getAttribute('cy')) || 540, slides };

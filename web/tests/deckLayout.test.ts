@@ -121,4 +121,22 @@ describe('readDeck', () => {
       { name: '利益率', type: 'line', axis: 'right', values: [0.1, 0.15], labels: true },
     ] } });
   });
+
+  it('draws SmartArt from the shapes the file keeps for it, placed in its frame', async () => {
+    const zip = new JSZip();
+    zip.file('ppt/presentation.xml', `<p:presentation ${ns}><p:sldIdLst><p:sldId id="256" r:id="rId2"/></p:sldIdLst><p:sldSz cx="9525000" cy="5715000"/></p:presentation>`);
+    zip.file('ppt/_rels/presentation.xml.rels', '<Relationships><Relationship Id="rId2" Target="slides/slide1.xml"/></Relationships>');
+    zip.file('ppt/slides/slide1.xml', `<p:sld ${ns} xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram"><p:cSld><p:spTree>`
+      + '<p:graphicFrame><p:xfrm><a:off x="952500" y="476250"/><a:ext cx="3810000" cy="1905000"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/diagram"><dgm:relIds r:dm="rId3" r:lo="rId4" r:qs="rId5" r:cs="rId6"/></a:graphicData></a:graphic></p:graphicFrame>'
+      + '</p:spTree></p:cSld></p:sld>');
+    zip.file('ppt/slides/_rels/slide1.xml.rels', '<Relationships><Relationship Id="rId3" Target="../diagrams/data1.xml"/><Relationship Id="rId7" Target="../diagrams/drawing1.xml" Type="http://schemas.microsoft.com/office/2007/relationships/diagramDrawing"/></Relationships>');
+    zip.file('ppt/diagrams/data1.xml', '<dgm:dataModel xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram"><dgm:extLst><a:ext xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><dsp:dataModelExt relId="rId7"/></a:ext></dgm:extLst></dgm:dataModel>');
+    zip.file('ppt/diagrams/drawing1.xml', '<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><dsp:spTree>'
+      + '<dsp:sp><dsp:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="952500" cy="476250"/></a:xfrm><a:prstGeom prst="chevron"/><a:solidFill><a:srgbClr val="4472C4"/></a:solidFill></dsp:spPr><dsp:txBody><a:bodyPr/><a:p><a:r><a:t>計画</a:t></a:r></a:p></dsp:txBody></dsp:sp>'
+      + '</dsp:spTree></dsp:drawing>');
+    const [slide] = (await readDeck(await zip.generateAsync({ type: 'arraybuffer' }))).slides;
+    expect(slide.items).toHaveLength(1);
+    expect(slide.items[0]).toMatchObject({ kind: 'shape', geom: 'chevron', x: 100, y: 50, w: 100, h: 50, fill: '#4472c4', text: { paras: [{ runs: [{ text: '計画' }] }] } });
+  });
 });
+

@@ -1,4 +1,4 @@
-import JSZip from 'jszip';
+import { first, kid, kids, openPackage, relId, relOfType, themeColors as readThemeColors, twip } from './ooxml';
 
 // A Word document read for drawing it as Word lays it out: the page's
 // width and margins; paragraphs with their style (followed through
@@ -37,10 +37,7 @@ export interface DocLayout {
 }
 
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-const kids = (el: Element | null | undefined, name: string) => (el ? Array.from(el.children).filter((c) => c.localName === name) : []);
-const kid = (el: Element | null | undefined, name: string) => kids(el, name)[0] ?? null;
 const val = (el: Element | null | undefined, name = 'val') => el?.getAttributeNS(W, name) ?? el?.getAttribute(`w:${name}`) ?? null;
-const twip = (v: string | null | undefined) => (v ? Number(v) / 15 : 0);
 const on = (el: Element | null) => !!el && !['0', 'false', 'off'].includes(val(el) ?? '');
 
 // Word's highlight names as the file format defines them (hex, no #).
@@ -69,29 +66,16 @@ function counter(n: number, fmt: string): string {
 
 /** Reads a .docx's bytes into its layout. */
 export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
-  const zip = await JSZip.loadAsync(bytes);
-  const xml = async (p: string) => {
-    const f = zip.file(p);
-    return f ? new DOMParser().parseFromString(await f.async('string'), 'application/xml') : null;
-  };
+  const pkg = await openPackage(bytes);
+  const { xml } = pkg;
   const doc = await xml('word/document.xml');
   const body = doc?.getElementsByTagNameNS(W, 'body')[0] ?? null;
   if (!body) throw new Error('No document body');
 
   /** A part's relationships: id → part path. */
-  const relsOf = async (part: string) => {
-    const dir = part.slice(0, part.lastIndexOf('/'));
-    const doc = await xml(`${dir}/_rels/${part.slice(dir.length + 1)}.rels`);
-    const map = new Map<string, string>();
-    for (const r of Array.from(doc?.getElementsByTagName('Relationship') ?? [])) {
-      const t = r.getAttribute('Target') ?? '';
-      map.set(r.getAttribute('Id') ?? '', t.startsWith('/') ? t.slice(1) : `${dir}/${t}`);
-    }
-    return map;
-  };
+  const relsOf = async (part: string) => new Map([...(await pkg.rels(part)).entries()].map(([id, r]) => [id, r.target]));
   const rels = await relsOf('word/document.xml');
-  const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
-  const rid = (el: Element | null | undefined, name: string) => el?.getAttributeNS(R, name) ?? el?.getAttribute(`r:${name}`) ?? null;
+  const rid = (el: Element | null | undefined, name: string) => relId(el, name);
 
   const sect = kids(body, 'sectPr')[0] ?? null;
   const pgSz = kid(sect, 'pgSz'), pgMar = kid(sect, 'pgMar');
@@ -100,16 +84,9 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
   const noteOrder: string[] = [];
 
   // Theme fonts and colours.
-  const themeDoc = await xml([...rels.values()].find((t) => t.includes('theme/')) ?? 'word/theme/theme1.xml');
-  const themeFace = (group: string, script: 'latin' | 'ea') => {
-    const g = themeDoc?.getElementsByTagName(`a:${group}`)[0];
-    return Array.from(g?.children ?? []).find((c) => c.localName === script)?.getAttribute('typeface') || null;
-  };
-  const themeColors: Record<string, string> = {};
-  for (const c of Array.from(themeDoc?.getElementsByTagName('a:clrScheme')[0]?.children ?? [])) {
-    const v = c.children[0];
-    themeColors[c.localName] = v?.getAttribute('val') ?? v?.getAttribute('lastClr') ?? '000000';
-  }
+  const themeDoc = await xml(relOfType(await pkg.rels('word/document.xml'), 'theme') ?? 'word/theme/theme1.xml');
+  const themeFace = (group: string, script: 'latin' | 'ea') => kid(first(themeDoc, group), script)?.getAttribute('typeface') || null;
+  const themeColors = readThemeColors(themeDoc);
 
   // Styles: each resolved through basedOn into ordered property elements.
   const stylesDoc = await xml('word/styles.xml');
@@ -170,13 +147,7 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
     };
   };
 
-  const dataUrl = async (target: string | null | undefined) => {
-    const f = target ? zip.file(target) : null;
-    if (!f) return null;
-    const type = target!.split('.').pop()?.toLowerCase();
-    const mime = type === 'svg' ? 'image/svg+xml' : type === 'jpg' || type === 'jpeg' ? 'image/jpeg' : type === 'emf' || type === 'wmf' ? null : `image/${type}`;
-    return mime ? `data:${mime};base64,${await f.async('base64')}` : null;
-  };
+  const dataUrl = (target: string | null | undefined) => pkg.dataUrl(target);
   /** Where a floating drawing sits: right when aligned or offset past the
    *  middle of the text column, else left; null for one in line. */
   const floatOf = (drawing: Element): 'left' | 'right' | null => {
@@ -291,7 +262,19 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
     return out;
   };
 
+  // Tables nest; past this depth an inner table is read as its text only,
+  // so a pathological file (thousands deep) cannot exhaust the stack.
+  let tableDepth = 0;
+  const MAX_TABLE_DEPTH = 24;
   const table = async (tbl: Element, partRels: Map<string, string> = rels): Promise<DocTable> => {
+    if (tableDepth >= MAX_TABLE_DEPTH) {
+      const text = (tbl.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 2000);
+      return { kind: 'table', cols: [0], rows: [[{ blocks: [{ kind: 'p', align: 'left', before: 0, after: 0, line: null, indent: 0, firstLine: 0, marker: null, heading: false, runs: [{ text, bold: false, italic: false, underline: false, strike: false, size: 10.5, color: null, font: null, highlight: null }] }], fill: null, span: 1, rowSpan: 1, skip: false, borders: false, borderColor: null }]] };
+    }
+    tableDepth++;
+    try { return await tableAt(tbl, partRels); } finally { tableDepth--; }
+  };
+  const tableAt = async (tbl: Element, partRels: Map<string, string>): Promise<DocTable> => {
     const cols = kids(kid(tbl, 'tblGrid'), 'gridCol').map((c) => twip(val(c, 'w')));
     const tblPr = kid(tbl, 'tblPr');
     // The table style: its borders, and what it does to the header row,
@@ -393,7 +376,7 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
     for (const [name, bold, italic] of [['embedRegular', false, false], ['embedBold', true, false], ['embedItalic', false, true], ['embedBoldItalic', true, true]] as const) {
       const e = kid(font, name);
       const target = e ? fontRels.get(rid(e, 'id') ?? '') : null;
-      const f = target ? zip.file(target) : null;
+      const f = target ? pkg.file(target) : null;
       const key = val(e, 'fontKey')?.replace(/[{}-]/g, '');
       if (!f || !key || key.length !== 32) continue;
       const data = new Uint8Array(await f.async('uint8array'));

@@ -1,10 +1,13 @@
+import { desc, drawingColor, kid, kids } from './ooxml';
+
 // A DrawingML chart part (xl/charts/chartN.xml, ppt/charts/chartN.xml)
 // read for drawing: its title, its series — each with its own chart type,
 // so a bar-and-line combination stays one — the axis each plots against
 // (secondary axes kept apart), whether its values are labelled, and its
 // colour. Values come from the part's cached points; where a file keeps
 // none (Google Sheets exports), `range` reads them from the cells the
-// series refers to. Shared by the workbook and deck readers.
+// series refers to. Shared by the workbook and deck readers; `theme` is
+// the theme's colours by scheme name.
 
 export type SeriesType = 'bar' | 'line' | 'area' | 'scatter' | 'pie' | 'stock';
 export interface ChartSeries {
@@ -17,30 +20,12 @@ export interface ChartData {
   stacked: boolean; categories: string[]; series: ChartSeries[];
 }
 
-const kids = (el: Element | null | undefined, name: string) => (el ? Array.from(el.children).filter((c) => c.localName === name) : []);
-const kid = (el: Element | null | undefined, name: string) => kids(el, name)[0] ?? null;
-const desc = (el: Element | Document | null | undefined, name: string) => (el ? Array.from(el.getElementsByTagName('*')).filter((c) => c.localName === name) : []);
 const general = (v: number) => (Number.isInteger(v) ? String(v) : String(parseFloat(v.toPrecision(10))));
-
-const ORDER = ['dk1', 'lt1', 'dk2', 'lt2', 'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6'];
-const MAP: Record<string, string> = { tx1: 'dk1', bg1: 'lt1', tx2: 'dk2', bg2: 'lt2' };
-
-/** A solid colour under a shape-properties element, as CSS. `theme` is
- *  the theme's colours in scheme order (dk1, lt1, dk2, lt2, accent1–6). */
-function colorUnder(el: Element | null, theme: string[]): string | null {
-  const c = kid(el, 'solidFill')?.children[0];
-  if (!c) return null;
-  const v = c.getAttribute('val') ?? '';
-  const hex = c.localName === 'srgbClr' ? v : c.localName === 'schemeClr' ? theme[ORDER.indexOf(MAP[v] ?? v)] : c.localName === 'sysClr' ? c.getAttribute('lastClr') : null;
-  if (!hex) return null;
-  let [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  const mod = kid(c, 'lumMod')?.getAttribute('val'), off = kid(c, 'lumOff')?.getAttribute('val');
-  if (mod || off) [r, g, b] = [r, g, b].map((x) => Math.round(Math.min(255, x * (mod ? Number(mod) / 100000 : 1) + 255 * (off ? Number(off) / 100000 : 0))));
-  return `#${[r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')}`;
-}
+/** A solid colour under a shape-properties element, as CSS. */
+const colorUnder = (el: Element | null, colors: Record<string, string>) => drawingColor(kid(el, 'solidFill'), colors);
 
 /** Reads a chart part. Null when it holds no chart this view can draw. */
-export function readChart(doc: Document, theme: string[], range: (f: string) => (string | number | null)[] = () => []): ChartData | null {
+export function readChart(doc: Document, theme: Record<string, string>, range: (f: string) => (string | number | null)[] = () => []): ChartData | null {
   const plot = desc(doc, 'plotArea')[0];
   const groups = plot ? Array.from(plot.children).filter((c) => c.localName.endsWith('Chart')) : [];
   if (!groups.length) return null;

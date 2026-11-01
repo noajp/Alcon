@@ -1,5 +1,5 @@
-import JSZip from 'jszip';
 import { readChart, type ChartData } from './chartLayout';
+import { desc, kid, kids, openPackage, relId, relOfType, SCHEME_ORDER, themeColors } from './ooxml';
 
 // An Excel workbook read for drawing it as Excel does: each sheet's cells
 // with their fills, fonts, borders, alignment and number formats, the
@@ -33,9 +33,6 @@ export interface WorkSheet {
   gridLines: boolean; defaultCol: number; defaultRow: number; charts: SheetChart[]; images: SheetImage[];
 }
 
-const kids = (el: Element | null | undefined, name: string) => (el ? Array.from(el.children).filter((c) => c.localName === name) : []);
-const kid = (el: Element | null | undefined, name: string) => kids(el, name)[0] ?? null;
-const desc = (el: Element | Document | null | undefined, name: string) => (el ? Array.from(el.getElementsByTagName('*')).filter((c) => c.localName === name) : []);
 
 // ── Colour ────────────────────────────────────────────────────────────────
 
@@ -60,16 +57,26 @@ function tinted(hex: string, tint: number): string {
   return out.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
 }
 
+// Excel's legacy indexed palette (indexes 8–63; 0–7 repeat 8–15), as hex
+// without the leading #. A workbook may replace it with its own
+// <indexedColors>.
+const INDEXED = ['000000', 'FFFFFF', 'FF0000', '00FF00', '0000FF', 'FFFF00', 'FF00FF', '00FFFF',
+  '000000', 'FFFFFF', 'FF0000', '00FF00', '0000FF', 'FFFF00', 'FF00FF', '00FFFF', '800000', '008000', '000080', '808000', '800080', '008080',
+  'C0C0C0', '808080', '9999FF', '993366', 'FFFFCC', 'CCFFFF', '660066', 'FF8080', '0066CC', 'CCCCFF', '000080', 'FF00FF', 'FFFF00', '00FFFF',
+  '800080', '800000', '008080', '0000FF', '00CCFF', 'CCFFFF', 'CCFFCC', 'FFFF99', '99CCFF', 'FF99CC', 'CC99FF', 'FFCC99', '3366FF', '33CCCC',
+  '99CC00', 'FFCC00', 'FF9900', 'FF6600', '666699', '969696', '003366', '339966', '003300', '333300', '993300', '993366', '333399', '333333'];
+
 /** A SpreadsheetML colour (<color rgb|theme|indexed tint>) as CSS. Theme
  *  slots 0–3 are light/dark swapped from the theme's own order, as Excel
  *  reads them. */
-function sheetColor(el: Element | null, theme: string[]): string | null {
+function sheetColor(el: Element | null, theme: string[], indexed: string[] = INDEXED): string | null {
   if (!el) return null;
   let hex: string | null = null;
   const rgb = el.getAttribute('rgb'), th = el.getAttribute('theme'), idx = el.getAttribute('indexed');
   if (rgb) hex = rgb.length === 8 ? rgb.slice(2) : rgb;
   else if (th != null) hex = theme[[1, 0, 3, 2][Number(th)] ?? Number(th)] ?? null;
-  else if (idx != null) hex = ({ 8: '000000', 9: 'FFFFFF', 10: 'FF0000', 11: '00FF00', 12: '0000FF', 13: 'FFFF00' } as Record<string, string>)[idx] ?? null;
+  // 64 and 65 are the system's text and window colours: automatic.
+  else if (idx != null) hex = indexed[Number(idx)] ?? null;
   if (!hex) return null;
   const tint = Number(el.getAttribute('tint') ?? 0);
   return `#${(tint ? tinted(hex, tint) : hex).toLowerCase()}`;
@@ -99,7 +106,24 @@ function formatNumber(n: number, code: string): { text: string; red: boolean } {
   const sections = code.split(/;(?=(?:[^"]*"[^"]*")*[^"]*$)/);
   let section = sections[0];
   let value = n;
-  if (n < 0 && sections[1]) { section = sections[1]; value = -n; }
+  // Sections may carry their own conditions ([>100], [<=0]): the first that
+  // holds is used, a section without one is the rest. Otherwise sections
+  // are positive; negative (shown without its sign); zero.
+  const COND = /\[(<=|>=|<>|<|>|=)(-?[\d.]+)\]/;
+  const conditional = sections.some((x) => COND.test(x));
+  if (conditional) {
+    const holds = (x: string) => {
+      const m = COND.exec(x);
+      if (!m) return null;
+      const k = Number(m[2]);
+      return m[1] === '<' ? n < k : m[1] === '<=' ? n <= k : m[1] === '>' ? n > k : m[1] === '>=' ? n >= k : m[1] === '=' ? n === k : n !== k;
+    };
+    const pick = sections.find((x) => holds(x) === true) ?? sections.find((x) => holds(x) === null);
+    if (!pick) return { text: generalNumber(n), red: false };
+    section = pick;
+    value = Math.abs(n);
+    if (n < 0) section = section.replace(/^((?:\[[^\]]*\])*)/, '$1"-"');
+  } else if (n < 0 && sections[1]) { section = sections[1]; value = -n; }
   else if (n === 0 && sections[2]) section = sections[2];
   const red = /\[Red\]/i.test(section);
   section = section.replace(/\[[^\]]*\]/g, '');
@@ -168,34 +192,24 @@ interface Raw { value: string | number | null; style: number; runs?: CellRun[] }
 
 /** Reads a .xlsx's bytes into its sheets, as drawn. */
 export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
-  const zip = await JSZip.loadAsync(bytes);
-  const xml = async (p: string) => {
-    const f = zip.file(p);
-    return f ? new DOMParser().parseFromString(await f.async('string'), 'application/xml') : null;
-  };
-  const relsOf = async (p: string) => {
-    const dir = p.slice(0, p.lastIndexOf('/'));
-    const doc = await xml(`${dir}/_rels/${p.slice(dir.length + 1)}.rels`);
-    const map = new Map<string, string>();
-    for (const r of desc(doc, 'Relationship')) {
-      const target = r.getAttribute('Target') ?? '';
-      map.set(r.getAttribute('Id') ?? '', target.startsWith('/') ? target.slice(1) : new URL(target, `http://x/${dir}/`).pathname.slice(1));
-    }
-    return map;
-  };
+  const pkg = await openPackage(bytes);
+  const { xml } = pkg;
+  const relsOf = async (p: string) => new Map([...(await pkg.rels(p)).entries()].map(([id, r]) => [id, r.target]));
 
-  const wbRels = await relsOf('xl/workbook.xml');
-  const themePath = [...wbRels.values()].find((t) => t.includes('theme/'));
-  const theme: string[] = [];
-  for (const c of Array.from(desc(themePath ? await xml(themePath) : null, 'clrScheme')[0]?.children ?? [])) {
-    const v = c.children[0];
-    theme.push(v?.getAttribute('val') ?? v?.getAttribute('lastClr') ?? '000000');
-  }
+  const wbRels = await pkg.rels('xl/workbook.xml');
+  const themePath = relOfType(wbRels, 'theme');
+  // The theme's colours by name (charts), and in scheme order (cell colours
+  // index them).
+  const themeByName = themeColors(themePath ? await xml(themePath) : null);
+  const theme = SCHEME_ORDER.slice(0, 10).map((k) => themeByName[k] ?? '000000');
 
   // Styles: each cellXfs entry resolved to a CellStyle and a number format.
   const styles = await xml('xl/styles.xml');
   const numFmts = new Map<number, string>(Object.entries(BUILTIN_FORMATS).map(([k, v]) => [Number(k), v]));
   for (const f of desc(styles, 'numFmt')) numFmts.set(Number(f.getAttribute('numFmtId')), f.getAttribute('formatCode') ?? 'General');
+  const custom = kids(desc(styles, 'indexedColors')[0], 'rgbColor').map((c) => (c.getAttribute('rgb') ?? '').slice(-6));
+  const indexed = custom.length ? custom : INDEXED;
+  const cellColor = (el: Element | null) => sheetColor(el, theme, indexed);
   const fonts = kids(desc(styles, 'fonts')[0], 'font');
   const fills = kids(desc(styles, 'fills')[0], 'fill');
   const borders = kids(desc(styles, 'borders')[0], 'border');
@@ -209,15 +223,15 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
     const side = (name: string) => {
       const s = kid(border, name);
       const css = s ? BORDER_CSS[s.getAttribute('style') ?? ''] : undefined;
-      return css ? `${css} ${sheetColor(kid(s, 'color'), theme) ?? 'var(--sheet-text)'}` : null;
+      return css ? `${css} ${cellColor(kid(s, 'color')) ?? 'var(--sheet-text)'}` : null;
     };
     const h = al?.getAttribute('horizontal');
     const v = al?.getAttribute('vertical');
     return {
       format: numFmts.get(Number(xf.getAttribute('numFmtId') ?? 0)) ?? 'General',
       style: {
-        bg: fill?.getAttribute('patternType') === 'solid' ? sheetColor(kid(fill, 'fgColor'), theme) : null,
-        color: sheetColor(kid(font, 'color'), theme),
+        bg: fill?.getAttribute('patternType') === 'solid' ? cellColor(kid(fill, 'fgColor')) : null,
+        color: cellColor(kid(font, 'color')),
         bold: bool(kid(font, 'b')), italic: bool(kid(font, 'i')), underline: !!kid(font, 'u'), strike: bool(kid(font, 'strike')),
         size: kid(font, 'sz') ? Number(kid(font, 'sz')!.getAttribute('val')) : null,
         font: kid(font, 'name')?.getAttribute('val') ?? null,
@@ -247,7 +261,7 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
       return {
         text: kid(r, 't')?.textContent ?? '',
         bold: bool(kid(pr, 'b')), italic: bool(kid(pr, 'i')), underline: !!kid(pr, 'u'),
-        color: sheetColor(kid(pr, 'color'), theme),
+        color: cellColor(kid(pr, 'color')),
         size: kid(pr, 'sz') ? Number(kid(pr, 'sz')!.getAttribute('val')) : null,
         font: kid(pr, 'rFont')?.getAttribute('val') ?? null,
       };
@@ -261,17 +275,17 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
   const dxfs = kids(desc(styles, 'dxfs')[0], 'dxf').map((dxf) => {
     const font = kid(dxf, 'font'), fill = kid(kid(dxf, 'fill'), 'patternFill');
     return {
-      color: sheetColor(kid(font, 'color'), theme),
+      color: cellColor(kid(font, 'color')),
       bold: kid(font, 'b') ? bool(kid(font, 'b')) : null,
       italic: kid(font, 'i') ? bool(kid(font, 'i')) : null,
-      bg: sheetColor(kid(fill, 'bgColor'), theme) ?? sheetColor(kid(fill, 'fgColor'), theme),
+      bg: cellColor(kid(fill, 'bgColor')) ?? cellColor(kid(fill, 'fgColor')),
     };
   });
 
   const wb = await xml('xl/workbook.xml');
   const sheetDefs = desc(wb, 'sheet').map((s) => ({
     name: s.getAttribute('name') ?? '',
-    path: wbRels.get(s.getAttribute('r:id') ?? s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id') ?? '') ?? '',
+    path: wbRels.get(relId(s) ?? '')?.target ?? '',
   })).filter((s) => s.path);
 
   // First pass: every sheet's raw cells, so a chart can read another sheet.
@@ -362,7 +376,7 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
       }
     }
 
-    applyConditionalFormats(doc, rows, raw, dxfs, theme);
+    applyConditionalFormats(doc, rows, raw, dxfs, theme, indexed);
 
     // Charts and pictures: where each drawing anchors them.
     const colX = (c: number) => { let x = 0; for (let i = 0; i < c; i++) x += cols[i] ?? defaultCol; return x; };
@@ -371,17 +385,16 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
     const images: SheetImage[] = [];
     const sheetRels = await relsOf(def.path);
     for (const d of desc(doc, 'drawing')) {
-      const drawingPath = sheetRels.get(d.getAttribute('r:id') ?? '');
+      const drawingPath = sheetRels.get(relId(d) ?? '');
       const drawing = drawingPath ? await xml(drawingPath) : null;
       if (!drawing || !drawingPath) continue;
       const drawingRels = await relsOf(drawingPath);
       for (const anchor of [...desc(drawing, 'oneCellAnchor'), ...desc(drawing, 'twoCellAnchor'), ...desc(drawing, 'absoluteAnchor')]) {
-        const RNS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
         const chartRef = desc(anchor, 'chart')[0];
-        const chartPath = chartRef ? drawingRels.get(chartRef.getAttribute('r:id') ?? chartRef.getAttributeNS(RNS, 'id') ?? '') : null;
+        const chartPath = chartRef ? drawingRels.get(relId(chartRef) ?? '') : null;
         const chartDoc = chartPath ? await xml(chartPath) : null;
         const blip = desc(anchor, 'blip')[0];
-        const picPath = !chartDoc && blip ? drawingRels.get(blip.getAttribute('r:embed') ?? blip.getAttributeNS(RNS, 'embed') ?? '') : null;
+        const picPath = !chartDoc && blip ? drawingRels.get(relId(blip, 'embed') ?? '') : null;
         if (!chartDoc && !picPath) continue;
         const at = (el: Element | null) => el ? {
           x: colX(Number(kid(el, 'col')?.textContent ?? 0)) + Number(kid(el, 'colOff')?.textContent ?? 0) / 9525,
@@ -395,14 +408,10 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
         const w = to ? to.x - from.x : Number(ext?.getAttribute('cx') ?? 0) / 9525;
         const h = to ? to.y - from.y : Number(ext?.getAttribute('cy') ?? 0) / 9525;
         if (picPath) {
-          const f = zip.file(picPath);
-          const type = picPath.split('.').pop()?.toLowerCase();
-          if (f && type && !['emf', 'wmf'].includes(type)) {
-            const mime = type === 'svg' ? 'image/svg+xml' : type === 'jpg' || type === 'jpeg' ? 'image/jpeg' : `image/${type}`;
-            images.push({ x: from.x, y: from.y, w, h, src: `data:${mime};base64,${await f.async('base64')}` });
-          }
+          const src = await pkg.dataUrl(picPath);
+          if (src) images.push({ x: from.x, y: from.y, w, h, src });
         } else {
-          const chart = readChart(chartDoc!, theme, range);
+          const chart = readChart(chartDoc!, themeByName, range);
           if (!chart) continue;
           charts.push({ ...chart, x: from.x, y: from.y, w, h });
         }
@@ -432,8 +441,8 @@ function mix(a: string, b: string, t: number): string {
  *  them: each rule over its ranges, the higher-priority rule winning where
  *  two set the same thing. Rules that need a formula evaluated are left
  *  out rather than guessed. */
-function applyConditionalFormats(doc: Document, rows: { h: number; cells: Cell[] }[], raw: Map<string, Raw>, dxfs: Dxf[], theme: string[]) {
-  const rules: { rule: Element; refs: [number, number][] }[] = [];
+function applyConditionalFormats(doc: Document, rows: { h: number; cells: Cell[] }[], raw: Map<string, Raw>, dxfs: Dxf[], theme: string[], indexed: string[]) {
+  const rules: { rule: Element; refs: [number, number][]; anchor: [number, number] }[] = [];
   for (const cf of desc(doc, 'conditionalFormatting')) {
     const refs: [number, number][] = [];
     for (const part of (cf.getAttribute('sqref') ?? '').split(/\s+/).filter(Boolean)) {
@@ -441,7 +450,7 @@ function applyConditionalFormats(doc: Document, rows: { h: number; cells: Cell[]
       const [r1, c1] = cellRef(a), [r2, c2] = b ? cellRef(b) : [r1, c1];
       for (let r = r1; r <= Math.min(r2, r1 + MAX_ROWS); r++) for (let c = c1; c <= Math.min(c2, c1 + 200); c++) refs.push([r, c]);
     }
-    for (const rule of kids(cf, 'cfRule')) rules.push({ rule, refs });
+    for (const rule of kids(cf, 'cfRule')) rules.push({ rule, refs, anchor: refs[0] ?? [0, 0] });
   }
   // Lowest priority number wins, so apply the rest first.
   rules.sort((x, y) => Number(y.rule.getAttribute('priority') ?? 0) - Number(x.rule.getAttribute('priority') ?? 0));
@@ -456,8 +465,8 @@ function applyConditionalFormats(doc: Document, rows: { h: number; cells: Cell[]
     const base: CellStyle = cell.style ?? { bg: null, color: null, bold: false, italic: false, underline: false, strike: false, size: null, font: null, align: null, valign: 'bottom', wrap: false, borders: { top: null, right: null, bottom: null, left: null } };
     cell.style = { ...base, bg: d.bg ?? base.bg, color: d.color ?? base.color, bold: d.bold ?? base.bold, italic: d.italic ?? base.italic };
   };
-  const colorOfCfvo = (el: Element | null) => sheetColorLoose(el, theme);
-  for (const { rule, refs } of rules) {
+  const colorOfCfvo = (el: Element | null) => sheetColorLoose(el, theme, indexed);
+  for (const { rule, refs, anchor } of rules) {
     const type = rule.getAttribute('type');
     const dxf = dxfs[Number(rule.getAttribute('dxfId') ?? -1)];
     const nums = refs.map(([r, c]) => valueAt(r, c)).filter((v): v is number => typeof v === 'number');
@@ -490,19 +499,37 @@ function applyConditionalFormats(doc: Document, rows: { h: number; cells: Cell[]
       continue;
     }
     if (!dxf) continue;
-    const formulas = kids(rule, 'formula').map((f) => Number(f.textContent));
+    // A rule's operands: numbers, quoted text, or a single cell — a relative
+    // reference moving with each cell as Excel moves it from the range's
+    // top-left. Anything else needs a formula engine and leaves the rule out.
+    const operand = (f: string, r: number, c: number): number | string | null => {
+      const t = f.trim();
+      if (t !== '' && Number.isFinite(Number(t))) return Number(t);
+      const q = /^"(.*)"$/.exec(t);
+      if (q) return q[1];
+      const m = /^(\$?)([A-Z]+)(\$?)(\d+)$/.exec(t);
+      if (!m) return null;
+      const [rr, cc] = cellRef(`${m[2]}${m[4]}`);
+      const v = valueAt(m[3] ? rr : rr + r - anchor[0], m[1] ? cc : cc + c - anchor[1]);
+      return v == null ? null : v;
+    };
+    const formulaText = kids(rule, 'formula').map((f) => f.textContent ?? '');
     const avg = nums.reduce((a, b) => a + b, 0) / (nums.length || 1);
     const counts = new Map<string, number>();
     for (const [r, c] of refs) { const k = String(valueAt(r, c) ?? ''); counts.set(k, (counts.get(k) ?? 0) + 1); }
     for (const [r, c] of refs) {
       const v = valueAt(r, c);
       let hit = false;
-      if (type === 'cellIs' && typeof v === 'number' && formulas.every(Number.isFinite)) {
-        const [a, b] = formulas;
+      const ops = formulaText.map((f) => operand(f, r, c));
+      if (type === 'cellIs' && v != null && ops.length && ops.every((o) => o != null) && typeof ops[0] === typeof v) {
+        // Text compares as Excel does, case-blind.
+        const key = (x: number | string) => (typeof x === 'string' ? x.toLowerCase() : x);
+        const [x, a, b] = [v, ...(ops as (number | string)[])].map(key);
+        const [lo, hi] = b === undefined ? [a, a] : a <= b ? [a, b] : [b, a];
         const op = rule.getAttribute('operator');
-        hit = op === 'greaterThan' ? v > a : op === 'lessThan' ? v < a : op === 'greaterThanOrEqual' ? v >= a : op === 'lessThanOrEqual' ? v <= a
-          : op === 'equal' ? v === a : op === 'notEqual' ? v !== a : op === 'between' ? v >= Math.min(a, b) && v <= Math.max(a, b)
-          : op === 'notBetween' ? v < Math.min(a, b) || v > Math.max(a, b) : false;
+        hit = op === 'greaterThan' ? x > a : op === 'lessThan' ? x < a : op === 'greaterThanOrEqual' ? x >= a : op === 'lessThanOrEqual' ? x <= a
+          : op === 'equal' ? x === a : op === 'notEqual' ? x !== a : op === 'between' ? x >= lo && x <= hi
+          : op === 'notBetween' ? x < lo || x > hi : false;
       } else if (type === 'containsText' || type === 'notContainsText' || type === 'beginsWith' || type === 'endsWith') {
         const text = rule.getAttribute('text') ?? '', s = String(v ?? '');
         hit = type === 'containsText' ? s.includes(text) : type === 'notContainsText' ? !s.includes(text) : type === 'beginsWith' ? s.startsWith(text) : s.endsWith(text);
@@ -527,7 +554,7 @@ function applyConditionalFormats(doc: Document, rows: { h: number; cells: Cell[]
 }
 
 /** A conditional format's colour element (rgb or theme) as #rrggbb. */
-function sheetColorLoose(el: Element | null, theme: string[]): string | null {
-  const c = sheetColor(el, theme);
+function sheetColorLoose(el: Element | null, theme: string[], indexed: string[]): string | null {
+  const c = sheetColor(el, theme, indexed);
   return c && /^#[0-9a-f]{6}$/.test(c) ? c : null;
 }

@@ -69,6 +69,28 @@ export function presetPath(prst: string, w: number, h: number, adjust: Adj = {})
       return { fill: poly([[x, 0], [w, 0], [w - x, h], [0, h]]) };
     }
     case 'trapezoid': { const x = ss * a('adj', 25000); return { fill: poly([[x, 0], [w - x, 0], [w, h], [0, h]]) }; }
+    case 'flowChartExtract': case 'flowChartMerge': {
+      const up: [number, number][] = [[w / 2, 0], [w, h], [0, h]];
+      return { fill: poly(prst === 'flowChartMerge' ? up.map(([x, y]) => [x, h - y]) : up) };
+    }
+    case 'flowChartDelay':
+      return { fill: `M0 0 H${n(w / 2)} A${n(w / 2)} ${n(h / 2)} 0 0 1 ${n(w / 2)} ${n(h)} H0 Z` };
+    case 'flowChartOffpageConnector': return { fill: poly([[0, 0], [w, 0], [w, h * 0.8], [w / 2, h], [0, h * 0.8]]) };
+    case 'flowChartPunchedCard': return { fill: poly([[w * 0.2, 0], [w, 0], [w, h], [0, h], [0, h * 0.2]]) };
+    case 'flowChartCollate': return { fill: poly([[0, 0], [w, 0], [0, h], [w, h]]) };
+    case 'flowChartSort': return { fill: poly([[w / 2, 0], [w, h / 2], [w / 2, h], [0, h / 2]]), detail: `M0 ${n(h / 2)} H${n(w)}` };
+    case 'flowChartSummingJunction': case 'flowChartOr': {
+      const r = Math.SQRT1_2;
+      return {
+        fill: ellipse(w / 2, h / 2, w / 2, h / 2),
+        detail: prst === 'flowChartOr' ? `M${n(w / 2)} 0 V${n(h)} M0 ${n(h / 2)} H${n(w)}`
+          : `M${n(w / 2 - (w / 2) * r)} ${n(h / 2 - (h / 2) * r)} L${n(w / 2 + (w / 2) * r)} ${n(h / 2 + (h / 2) * r)} M${n(w / 2 + (w / 2) * r)} ${n(h / 2 - (h / 2) * r)} L${n(w / 2 - (w / 2) * r)} ${n(h / 2 + (h / 2) * r)}`,
+      };
+    }
+    case 'flowChartInternalStorage':
+      return { fill: poly([[0, 0], [w, 0], [w, h], [0, h]]), detail: `M${n(w * 0.1)} 0 V${n(h)} M0 ${n(h * 0.1)} H${n(w)}` };
+    case 'flowChartMultidocument':
+      return { fill: `M0 ${n(h * 0.1)} H${n(w * 0.9)} V${n(h * 0.85)} C${n(w * 0.65)} ${n(h * 0.72)} ${n(w * 0.45)} ${n(h * 1.05)} 0 ${n(h * 0.92)} Z`, detail: `M${n(w * 0.05)} ${n(h * 0.1)} V${n(h * 0.05)} H${n(w * 0.95)} V${n(h * 0.8)} M${n(w * 0.1)} ${n(h * 0.05)} V0 H${n(w)} V${n(h * 0.75)}` };
     case 'flowChartManualInput': return { fill: poly([[0, h * 0.2], [w, 0], [w, h], [0, h]]) };
     case 'flowChartManualOperation': return { fill: poly([[0, 0], [w, 0], [w * 0.8, h], [w * 0.2, h]]) };
     case 'pentagon': return { fill: radial(w, h, 5, null) };

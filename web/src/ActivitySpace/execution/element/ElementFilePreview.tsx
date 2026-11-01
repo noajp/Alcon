@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
 import { Button } from '@/ui/button';
-import { useI18n } from '@/Function/i18n/I18nProvider';
+import { translate, useI18n } from '@/Function/i18n/I18nProvider';
 import { downloadElementFile, elementFileUrl, openElementFile, type ElementFile } from '@/hooks/elementFileData';
 import { officeKindOf, readOffice, type OfficePreview } from './officePreview';
 import { readDeck, type Deck, type DeckItem, type TextBody } from './deckLayout';
@@ -56,6 +56,13 @@ function readFile(file: ElementFile, kind: Kind): Promise<Loaded> {
     const signed = await elementFileUrl(file);
     if (kind === 'text' || kind === 'html') return { text: (await (await fetch(signed)).text()).slice(0, 2_000_000) };
     const bytes = await (await fetch(signed)).arrayBuffer();
+    // An encrypted Office file is not a zip but a compound file (the old
+    // binary container): say so plainly instead of a zip error.
+    const head = new Uint8Array(bytes.slice(0, 4));
+    if (head[0] === 0xd0 && head[1] === 0xcf && head[2] === 0x11 && head[3] === 0xe0) {
+      throw new Error(translate('This file is password-protected, so it cannot be previewed. Download it to open it.'));
+    }
+    if (!(head[0] === 0x50 && head[1] === 0x4b)) throw new Error(translate('This file could not be read. It may be damaged.'));
     if (officeKind === 'xlsx') return { workbook: await readWorkbook(bytes) };
     if (officeKind === 'docx') {
       const doc = await readDocLayout(bytes).catch(() => null);
@@ -63,7 +70,11 @@ function readFile(file: ElementFile, kind: Kind): Promise<Loaded> {
     }
     const deck = await readDeck(bytes).catch(() => null);
     return deck?.slides.length ? { deck } : { office: await readOffice('pptx', bytes) };
-  })();
+  })().catch((e: unknown) => {
+    // A zip that will not open is a damaged file, whatever JSZip calls it.
+    const message = e instanceof Error ? e.message : String(e);
+    throw new Error(/zip|central directory|end of data/i.test(message) ? translate('This file could not be read. It may be damaged.') : message);
+  });
   read.catch(() => READ_CACHE.delete(file.id));
   READ_CACHE.set(file.id, read);
   while (READ_CACHE.size > READ_CACHE_SIZE) READ_CACHE.delete(READ_CACHE.keys().next().value!);

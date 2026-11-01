@@ -28,6 +28,8 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   '{n} days left': ['あと{n}日', '{n}일 남음', 'Encore {n} j', 'Quedan {n} días'],
   'Previous slide': ['前のスライド', '이전 슬라이드', 'Diapositive précédente', 'Diapositiva anterior'],
   'Next slide': ['次のスライド', '다음 슬라이드', 'Diapositive suivante', 'Diapositiva siguiente'],
+  'This file is password-protected, so it cannot be previewed. Download it to open it.': ['パスワードで保護されたファイルのため、プレビューできません。ダウンロードして開いてください。', '암호로 보호된 파일이라 미리 볼 수 없습니다. 다운로드해서 여세요.', 'Ce fichier est protégé par un mot de passe et ne peut pas être prévisualisé. Téléchargez-le pour l’ouvrir.', 'Este archivo está protegido con contraseña y no se puede previsualizar. Descárgalo para abrirlo.'],
+  'This file could not be read. It may be damaged.': ['このファイルは読み込めませんでした。破損している可能性があります。', '이 파일을 읽을 수 없습니다. 손상되었을 수 있습니다.', 'Ce fichier n’a pas pu être lu. Il est peut-être endommagé.', 'No se pudo leer este archivo. Puede estar dañado.'],
   'Download': ['ダウンロード', '다운로드', 'Télécharger', 'Descargar'],
   'Full screen': ['全画面表示', '전체 화면', 'Plein écran', 'Pantalla completa'],
   'Exit full screen': ['全画面表示を終了', '전체 화면 종료', 'Quitter le plein écran', 'Salir de pantalla completa'],

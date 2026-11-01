@@ -18,6 +18,15 @@ describe('presetPath', () => {
     expect(presetPath('donut', 100, 100)?.evenOdd).toBe(true);
   });
 
+  it('draws the flowchart symbols decks use', () => {
+    expect(presetPath('flowChartExtract', 100, 50)?.fill).toBe('M50 0 L100 50 L0 50 Z');
+    expect(presetPath('flowChartMerge', 100, 50)?.fill).toBe('M50 50 L100 0 L0 0 Z');
+    expect(presetPath('flowChartDelay', 100, 50)?.fill).toBe('M0 0 H50 A50 25 0 0 1 50 50 H0 Z');
+    for (const p of ['flowChartOffpageConnector', 'flowChartPunchedCard', 'flowChartCollate', 'flowChartSort', 'flowChartOr', 'flowChartSummingJunction', 'flowChartInternalStorage', 'flowChartMultidocument']) {
+      expect(presetPath(p, 100, 50)).not.toBeNull();
+    }
+  });
+
   it('returns null for a shape it does not know, so the view draws a box', () => {
     expect(presetPath('gear9', 100, 100)).toBeNull();
   });
