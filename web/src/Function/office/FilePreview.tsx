@@ -93,7 +93,11 @@ export function readStoredFile(file: StoredFile, source: FileSource, kind: Previ
   return read;
 }
 
-export function FilePreview({ file, source, height = 480 }: { file: StoredFile; source: FileSource; height?: number }) {
+export function FilePreview({ file, source, height = 480, actions }: {
+  file: StoredFile; source: FileSource; height?: number;
+  /** The caller's own tools for this file (import it, …), shown first. */
+  actions?: React.ReactNode;
+}) {
   const { t } = useI18n();
   const kind = previewKindOf(file);
   const officeKind = officeKindOf(file.name);
@@ -145,6 +149,8 @@ export function FilePreview({ file, source, height = 480 }: { file: StoredFile; 
       {/* Tools float over the preview's corner and show on hover: zoom for
           a page, full screen for everything. */}
       <div className={`absolute right-2 top-2.5 z-30 flex items-center gap-0.5 rounded-md border border-border/60 bg-[var(--surface-overlay)] p-0.5 shadow-sm transition-opacity ${fullscreen ? '' : 'opacity-0 group-hover/preview:opacity-100 focus-within:opacity-100'}`}>
+        {actions}
+        {actions && <span className="mx-0.5 h-4 w-px bg-border/60" />}
         {zoomable && <>
           <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Zoom out')} title={t('Zoom out')} disabled={zoom <= 0.25}
             onClick={() => setZoom((z) => Math.max(0.25, Math.round((z - 0.1) * 100) / 100))}><Minus size={13} /></Button>

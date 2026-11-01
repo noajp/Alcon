@@ -281,3 +281,17 @@ export async function bulkInsertDataTableRows(
   }
   return { rows: createdRows };
 }
+
+/** Creates a Table from imported columns and rows (a sheet of a workbook)
+ *  and returns its id. */
+export async function importDataTable(
+  name: string,
+  columns: { name: string; type: DataTableColumnType }[],
+  rows: (string | number | null)[][],
+): Promise<string> {
+  const table = await createDataTable({ name });
+  const created = await addDataTableColumns(table.id, columns);
+  const byOrder = [...created].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+  await bulkInsertDataTableRows(table.id, rows.map((row) => Object.fromEntries(byOrder.map((col, k) => [col.id, row[k] ?? null]))));
+  return table.id;
+}
