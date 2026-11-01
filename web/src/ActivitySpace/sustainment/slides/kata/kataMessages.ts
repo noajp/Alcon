@@ -378,6 +378,8 @@ const KATA_MESSAGES: Record<string, Row> = {
   "Cover": ["表紙", "표지", "Couverture", "Portada"],
   "Title and purpose of the deck": ["資料の名前と目的", "자료의 제목과 목적", "Titre et objectif de la présentation", "Título y propósito de la presentación"],
   "What you need decided or asked": ["決めてほしいこと・お願い", "결정받거나 요청할 사항", "Ce qu’il faut décider ou demander", "Lo que necesitas que se decida o pedir"],
+  "Freeform": ["自由配置", "자유 배치", "Libre", "Libre"],
+  "No template: only what is placed on the page": ["型を使わず、置いたものだけで組む", "템플릿 없이 놓은 것만으로 구성", "Sans modèle : seulement ce qui est posé sur la page", "Sin plantilla: solo lo que se coloca en la página"],
   // Theme tokens
   "Ink": ["文字", "글자", "Encre", "Tinta"],
   "Muted": ["補足", "보조", "Atténué", "Atenuado"],

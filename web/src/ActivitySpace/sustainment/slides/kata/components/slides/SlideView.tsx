@@ -52,7 +52,7 @@ export function SlideView({ slide, index, role, tokens, editable = false, editOb
         }}
       >
         <ObjectsLayer slide={slide} editable={editObjects} behind />
-        {isCover ? (
+        {slide.layout === "free" ? null : isCover ? (
           <Body slide={slide} />
         ) : (
           <div style={{ position: "absolute", inset: 0, padding: "56px 80px 44px", display: "flex", flexDirection: "column" }}>

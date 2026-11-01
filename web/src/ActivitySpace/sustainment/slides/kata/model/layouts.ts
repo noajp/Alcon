@@ -27,6 +27,7 @@ export const LAYOUTS: LayoutDef[] = [
   { id: "statement", get name() { return tx("一言と数字", "Headline + number"); }, get desc() { return tx("大きな一言と1つの数字で言い切る", "Say it with one big line and one number"); }, logic: true, basis: "Duarte: big idea, one number" },
   { id: "cover", get name() { return tx("表紙", "Cover"); }, get desc() { return tx("資料の名前と目的", "Title and purpose of the deck"); }, logic: false },
   { id: "closing", get name() { return tx("結び", "Close"); }, get desc() { return tx("決めてほしいこと・お願い", "What you need decided or asked"); }, logic: false },
+  { id: "free", get name() { return tx("自由配置", "Freeform"); }, get desc() { return tx("型を使わず、置いたものだけで組む", "No template: only what is placed on the page"); }, logic: false },
 ];
 
 export const LAYOUT_BY_ID = Object.fromEntries(LAYOUTS.map((l) => [l.id, l])) as Record<LayoutId, LayoutDef>;
@@ -85,6 +86,8 @@ export function atomsOf(slide: Slide): Atom[] {
       return [{ head: "", body: c.cover!.subtitle }];
     case "closing":
       return c.closing!.asks.map((a) => ({ head: "", body: a }));
+    case "free":
+      return [];
   }
 }
 
@@ -171,6 +174,8 @@ export function buildContent(layout: LayoutId, atoms: Atom[]): SlideContent {
       return { cover: { subtitle: a[0]?.body ?? "", meta: "" } };
     case "closing":
       return { closing: { asks: pad(a.map((x) => (x.head ? `${x.head}：${x.body}` : x.body)), 2, () => "").slice(0, 5) } };
+    case "free":
+      return { free: {} };
   }
 }
 

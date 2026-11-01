@@ -14,7 +14,9 @@ export type LayoutId =
   | "agenda"
   | "grid"
   | "kpi"
-  | "closing";
+  | "closing"
+  /** 型を使わないページ：自由に置いたものだけを描く（PowerPoint から取り込んだページなど） */
+  | "free";
 
 export type StorylineId = "scr" | "pyramid" | "skyrain" | "issue" | "scqa";
 
@@ -91,6 +93,8 @@ export interface CoverContent {
 export interface ClosingContent {
   asks: string[];
 }
+/** 型を使わないページは中身を持たない（置いたものだけ） */
+export type FreeContent = Record<string, never>;
 
 export interface SlideContent {
   cover?: CoverContent;
@@ -107,6 +111,7 @@ export interface SlideContent {
   grid?: GridContent;
   kpi?: KpiContent;
   closing?: ClosingContent;
+  free?: FreeContent;
 }
 
 /** 色：世界観の色の名前（世界観を変えると追従する）か、#RRGGBB */
