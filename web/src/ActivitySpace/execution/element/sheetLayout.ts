@@ -383,7 +383,8 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
           categories: firstCats.map((v) => (v == null ? '' : typeof v === 'number' ? generalNumber(v) : String(v))),
           series: sers.map((s, i) => ({
             name: desc(kid(s, 'tx'), 'v')[0]?.textContent ?? (() => { const f = desc(kid(s, 'tx'), 'f')[0]?.textContent; return f ? String(range(f)[0] ?? '') : ''; })() ?? `Series ${i + 1}`,
-            color: drawingColor(kid(s, 'spPr'), theme),
+            // A bar's colour is its fill; a line's, its outline.
+            color: drawingColor(kid(s, 'spPr'), theme) ?? drawingColor(kid(kid(s, 'spPr'), 'ln'), theme),
             values: values(kid(s, 'val') ?? kid(s, 'yVal')).map((v) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v))),
           })),
         });
