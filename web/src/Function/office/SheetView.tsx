@@ -242,7 +242,8 @@ const SheetRow = memo(function SheetRow({ r, row, h, cols, grid, head, editable,
                 : was !== undefined ? `inset 0 0 0 2px ${was ? 'var(--status-warning)' : 'var(--status-success)'}` : undefined,
               cursor: editable ? 'cell' : undefined,
               // The selected cell, outlined as Excel does.
-              outline: isChosen ? '2px solid var(--sheet-accent)' : undefined, outlineOffset: isChosen ? -2 : undefined,
+              // A formula's cell, which is not typed in, is outlined in grey.
+              outline: isChosen ? `2px solid ${locked ? 'var(--sheet-head-text)' : 'var(--sheet-accent)'}` : undefined, outlineOffset: isChosen ? -2 : undefined,
               // Longhands only: React warns when a shorthand and its
               // longhands change together between renders.
               borderTop: st?.borders.top ?? `1px solid ${grid}`, borderRight: st?.borders.right ?? `1px solid ${grid}`,

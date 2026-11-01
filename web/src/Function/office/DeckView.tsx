@@ -6,35 +6,40 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { Deck, DeckItem, DeckSlide, TextBody } from './deckLayout';
 import { presetPath } from './presetGeometry';
 import SheetChartView from './SheetChart';
-import { OfficeCanvas, runCss, useElementSize } from './officeViewParts';
+import { EditableRuns, OfficeCanvas, runCss, useElementSize } from './officeViewParts';
+import { slideTextKey, type EditSession } from './officeEdits';
 
 /** A deck as its slides — shapes, colours, pictures, type, tables, where
  *  the deck puts them (deckLayout) — on the grey canvas under PowerPoint's
  *  orange bar, one after another at the width of the preview; each slide
  *  is drawn at the deck's size and scaled to fit, so it follows the
  *  preview into full screen. (A deck that will not read is shown as its
- *  text instead — see readFile.) */
-export function DeckView({ deck, present }: { deck: Deck; present: boolean }) {
-  return present ? <SlideShow deck={deck} /> : <DeckList deck={deck} />;
+ *  text instead — see readFile.) With an edit session, a slide's own
+ *  paragraphs of plain text can be typed over in place. */
+export function DeckView({ deck, present, edit = null }: { deck: Deck; present: boolean; edit?: EditSession | null }) {
+  return present ? <SlideShow deck={deck} /> : <DeckList deck={deck} edit={edit} />;
 }
 
-function DeckList({ deck }: { deck: Deck }) {
+/** Where a slide's text can be typed: the session, and which slide. */
+interface SlideEdit { edit: EditSession; slide: number }
+
+function DeckList({ deck, edit }: { deck: Deck; edit: EditSession | null }) {
   return (
     <OfficeCanvas accent="var(--slide-accent)">
       {(width) => {
         const scale = Math.min(1.5, (width - 48) / deck.width);
-        return deck.slides.map((slide, i) => <Slide key={i} deck={deck} slide={slide} scale={scale} className="shadow-md" />);
+        return deck.slides.map((slide, i) => <Slide key={i} deck={deck} slide={slide} scale={scale} className="shadow-md" editAt={edit ? { edit, slide: i } : null} />);
       }}
     </OfficeCanvas>
   );
 }
 
 /** One slide, drawn at the deck's size and scaled. */
-function Slide({ deck, slide, scale, className }: { deck: Deck; slide: DeckSlide; scale: number; className: string }) {
+function Slide({ deck, slide, scale, className, editAt = null }: { deck: Deck; slide: DeckSlide; scale: number; className: string; editAt?: SlideEdit | null }) {
   return (
     <div className={`relative shrink-0 overflow-hidden ${className}`} style={{ width: deck.width * scale, height: deck.height * scale }}>
       <div className="absolute left-0 top-0 origin-top-left" style={{ width: deck.width, height: deck.height, transform: `scale(${scale})`, background: slide.background ?? 'var(--sheet-paper)' }}>
-        {slide.items.map((item, j) => <DeckItemView key={j} item={item} />)}
+        {slide.items.map((item, j) => <DeckItemView key={j} item={item} editAt={editAt} />)}
       </div>
     </div>
   );
@@ -78,30 +83,42 @@ function SlideShow({ deck }: { deck: Deck }) {
   );
 }
 
-function DeckText({ text }: { text: TextBody }) {
+function DeckText({ text, editAt = null, shape }: { text: TextBody; editAt?: SlideEdit | null; shape?: string }) {
+  const { t: tr } = useI18n();
   const [t, r, b, l] = text.inset;
   return (
     <div className="absolute inset-0 flex flex-col overflow-hidden"
       style={{ padding: `${t}px ${r}px ${b}px ${l}px`, justifyContent: text.anchor === 'middle' ? 'center' : text.anchor === 'bottom' ? 'flex-end' : 'flex-start', writingMode: text.vertical ? 'vertical-rl' : undefined }}>
       {text.paras.map((p, i) => (
-        <p key={i} style={{
+        <p key={i} title={editAt && shape && p.src === undefined && p.runs.some((x) => x.text.trim()) ? tr('This paragraph has a line break or field, so it cannot be edited here yet.') : undefined} style={{
           textAlign: p.align, lineHeight: p.lineHeight ?? 1.2, margin: 0, minHeight: '1em', fontSize: `${(p.runs[0]?.size ?? 18) * 4 / 3}px`,
           paddingLeft: p.indent || undefined, textIndent: p.bullet && p.indent ? '-1em' : undefined, whiteSpace: text.wrap ? undefined : 'nowrap',
         }}>
           {p.bullet && <span style={{ color: p.runs[0]?.color ?? undefined }}>{p.bullet}{' '}</span>}
-          {p.runs.map((run, j) => run.text === '\n' ? <br key={j} /> : (
-            <span key={j} style={{
+          {(() => {
+            const look = (run: TextBody['paras'][number]['runs'][number]): React.CSSProperties => ({
               ...runCss(run), fontWeight: run.bold ? 700 : 400, color: run.color ?? 'var(--sheet-text)',
               letterSpacing: run.spacing ? `${run.spacing}px` : undefined, whiteSpace: 'pre-wrap',
-            }}>{run.text}</span>
-          ))}
+            });
+            const runs = p.runs.map((run, j) => run.text === '\n' ? <br key={j} /> : <span key={j} style={look(run)}>{run.text}</span>);
+            if (!editAt || !shape || p.src === undefined) return runs;
+            const original = p.runs.map((x) => x.text).join('');
+            const at = { slide: editAt.slide, shape, para: p.src };
+            return (
+              <EditableRuns original={original} edited={editAt.edit.pending.get(slideTextKey(at.slide, at.shape, at.para))?.to}
+                accent="var(--slide-accent)" look={p.runs[0] ? look(p.runs[0]) : {}}
+                onChange={(to) => editAt.edit.set({ kind: 'slide', ...at, from: original, to })}>
+                {runs}
+              </EditableRuns>
+            );
+          })()}
         </p>
       ))}
     </div>
   );
 }
 
-function DeckItemView({ item }: { item: DeckItem }) {
+function DeckItemView({ item, editAt = null }: { item: DeckItem; editAt?: SlideEdit | null }) {
   const box: React.CSSProperties = { left: item.x, top: item.y, width: item.w, height: item.h, transform: item.rot ? `rotate(${item.rot}deg)` : undefined };
   if (item.kind === 'image') {
     // A cropped picture: the whole image scaled so its kept part fills the
@@ -169,7 +186,7 @@ function DeckItemView({ item }: { item: DeckItem }) {
           </svg>
         )}
       </div>
-      {item.text && <DeckText text={item.text} />}
+      {item.text && <DeckText text={item.text} editAt={editAt} shape={item.spId} />}
     </div>
   );
 }

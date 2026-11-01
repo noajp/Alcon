@@ -4,6 +4,7 @@ import JSZip from 'jszip';
 import { applyOfficeEdits, withEdit, type OfficeEdit } from '@/Function/office/officeEdits';
 import { readWorkbook } from '@/Function/office/sheetLayout';
 import { readDocLayout, type DocPara } from '@/Function/office/docLayout';
+import { readDeck } from '@/Function/office/deckLayout';
 import { googleSheetsWorkbook, wordDocument } from './fixtures/officeFixtures';
 
 const buf = (u: Uint8Array) => u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength) as ArrayBuffer;
@@ -94,5 +95,46 @@ describe('applyOfficeEdits — Word', () => {
     expect(out.skipped).toHaveLength(1);
     expect((await paras(buf(out.bytes))).map(textOf)).toContain('決まったこと');
     expect((await paras(buf(out.bytes))).map(textOf)).toContain('議事録');
+  });
+});
+
+describe('applyOfficeEdits — PowerPoint', () => {
+  const P = 'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const sp = (id: string, paras: string) => `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="t${id}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="4000000" cy="1000000"/></a:xfrm></p:spPr><p:txBody><a:bodyPr/>${paras}</p:txBody></p:sp>`;
+  async function deck(...slides: string[]) {
+    const zip = new JSZip();
+    zip.file('ppt/presentation.xml', `<p:presentation ${P}><p:sldIdLst>${slides.map((_, i) => `<p:sldId id="${256 + i}" r:id="rId${i + 1}"/>`).join('')}</p:sldIdLst><p:sldSz cx="9144000" cy="5143500"/></p:presentation>`);
+    zip.file('ppt/_rels/presentation.xml.rels', `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${slides.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i + 1}.xml"/>`).join('')}</Relationships>`);
+    slides.forEach((body, i) => zip.file(`ppt/slides/slide${i + 1}.xml`, `<p:sld ${P}><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/>${body}</p:spTree></p:cSld></p:sld>`));
+    return zip.generateAsync({ type: 'arraybuffer' });
+  }
+  const shapeParas = async (bytes: ArrayBuffer, slide: number) => (await readDeck(bytes)).slides[slide].items.flatMap((i) => (i.kind === 'shape' && i.text ? i.text.paras.map((p) => ({ id: i.spId, p })) : []));
+  const textOfPara = (p: { runs: { text: string }[] }) => p.runs.map((r) => r.text).join('');
+
+  it('rewrites a slide paragraph in its own runs, and leaves breaks and fields alone', async () => {
+    const before = await deck(
+      sp('2', '<a:p><a:r><a:rPr b="1"/><a:t>Revenue </a:t></a:r><a:r><a:t>grew</a:t></a:r></a:p><a:p><a:r><a:t>line</a:t></a:r><a:br/><a:r><a:t>two</a:t></a:r></a:p>'),
+      sp('5', '<a:p><a:r><a:t>Second slide</a:t></a:r></a:p>'),
+    );
+    const paras = await shapeParas(before, 0);
+    expect(paras.map(({ id, p }) => [id, p.src])).toEqual([['2', 0], ['2', undefined]]);
+    const out = await applyOfficeEdits(before, [
+      { kind: 'slide', slide: 0, shape: '2', para: 0, from: 'Revenue grew', to: 'Revenue grew 12%' },
+      { kind: 'slide', slide: 1, shape: '5', para: 0, from: 'Second slide', to: 'Next steps' },
+    ]);
+    expect(out.conflicts).toEqual([]);
+    const [first] = await shapeParas(buf(out.bytes), 0);
+    expect(first.p.runs.map((r) => [r.text, r.bold])).toEqual([['Revenue ', true], ['grew 12%', false]]);
+    expect(textOfPara((await shapeParas(buf(out.bytes), 1))[0].p)).toBe('Next steps');
+  });
+
+  it('finds a paragraph that moved within its shape, and skips a shape that is gone', async () => {
+    const before = await deck(sp('2', '<a:p><a:r><a:t>New first</a:t></a:r></a:p><a:p><a:r><a:t>Target</a:t></a:r></a:p>'));
+    const out = await applyOfficeEdits(before, [
+      { kind: 'slide', slide: 0, shape: '2', para: 0, from: 'Target', to: 'Hit' },
+      { kind: 'slide', slide: 0, shape: '9', para: 0, from: 'x', to: 'y' },
+    ]);
+    expect(out.skipped).toHaveLength(1);
+    expect((await shapeParas(buf(out.bytes), 0)).map(({ p }) => textOfPara(p))).toEqual(['New first', 'Hit']);
   });
 });
