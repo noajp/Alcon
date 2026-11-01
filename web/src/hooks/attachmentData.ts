@@ -105,10 +105,13 @@ export function useAttachments(owner: AttachmentOwner | null) {
       return rows;
     },
   });
-  const latest = latestVersions(query.data ?? EMPTY);
+  const all = query.data ?? EMPTY;
+  const latest = latestVersions(all);
   return {
     data: latest.filter((f) => !f.deleted_at),
     trashed: latest.filter((f) => f.deleted_at && trashDaysLeft(f.deleted_at) > 0),
+    /** Every version of every file, for a file's history. */
+    all,
     loading: !!owner?.id && query.isPending,
   };
 }
@@ -189,7 +192,24 @@ export function useAttachmentActions(owner: AttachmentOwner) {
     },
     onSettled: refresh,
   });
-  return { upload, remove, restore, saveEdits };
+  /** Makes an earlier version the newest again, as a new version with its
+   *  bytes (the versions after it stay in the history). */
+  const restoreVersion = useMutation({
+    mutationFn: async (version: Attachment): Promise<Attachment> => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const head = versionChain(await rowsOf(owner), version.id)[0];
+        if (!head || head.deleted_at) throw new Error(translate('This file was removed.'));
+        if (head.id === version.id) return head;
+        const { data: blob, error } = await supabase.storage.from(BUCKET).download(version.path);
+        if (error || !blob) throw error ?? new Error('Could not read the file.');
+        const saved = await insertFile(owner, head.name, head.mime_type, blob, head);
+        if (saved) return saved;
+      }
+      throw new Error(translate('Someone else keeps saving this file. Try again in a moment.'));
+    },
+    onSettled: refresh,
+  });
+  return { upload, remove, restore, saveEdits, restoreVersion };
 }
 
 /** A short-lived signed link to a file, for previewing it in the page. */

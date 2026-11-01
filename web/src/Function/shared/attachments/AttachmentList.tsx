@@ -1,13 +1,18 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
-import { RotateCcw, Trash2 } from 'lucide-react';
+import { Check, History, Loader2, RotateCcw, Trash2 } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import { FilePreview, type FileEditor } from '@/Function/office/FilePreview';
 import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { MenuShell, MenuSectionLabel } from '@/Function/shared/menu';
+import { formatAge } from '@/Function/shared/dateUtils';
+import { versionChain } from '@/Function/shared/fileVersions';
+import { useWorkers } from '@/hooks/teamData';
 import {
   TRASH_DAYS, attachmentSource, trashDaysLeft, useAttachmentActions, useAttachments,
   type Attachment, type AttachmentOwner,
@@ -28,7 +33,7 @@ export function AttachmentList({ owner, actions, empty = null }: {
   empty?: ReactNode;
 }) {
   const { t } = useI18n();
-  const { data: files, trashed } = useAttachments(owner);
+  const { data: files, trashed, all } = useAttachments(owner);
   const fileActions = useAttachmentActions(owner);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [trashOpen, setTrashOpen] = useState(false);
@@ -48,13 +53,15 @@ export function AttachmentList({ owner, actions, empty = null }: {
             const dot = f.name.lastIndexOf('.');
             const title = dot > 0 ? f.name.slice(0, dot) : f.name;
             // A new version has a new id; the row stays open across it.
-            const isOpen = open.has(f.id) || (!!f.previous_id && open.has(f.previous_id));
+            const versions = versionChain(all, f.id);
+            const isOpen = versions.some((v) => open.has(v.id));
             return (
               <div key={f.id} className="group/file">
                 <div className="flex min-h-[2.125rem] items-center gap-2 rounded-lg px-2 py-1 hover:bg-foreground/[0.06]">
                   <FileTypeIcon name={f.name} mime={f.mime_type} />
                   <button type="button" onClick={() => toggle(f.id)} aria-expanded={isOpen} className="flex min-w-0 items-center gap-2 text-left">
                     <span className="truncate text-[14px] font-medium text-foreground" title={f.name}>{title}</span>
+                    {versions.length > 1 && <span className="shrink-0 text-[11.5px] tabular-nums text-muted-foreground">v{versions.length}</span>}
                     <DisclosureTriangle open={isOpen} className="shrink-0 text-muted-foreground" />
                   </button>
                   <span className="flex-1" />
@@ -70,7 +77,7 @@ export function AttachmentList({ owner, actions, empty = null }: {
                     <Trash2 size={12} />
                   </button>
                 </div>
-                {isOpen && <div className="px-2 pb-2"><AttachmentPreview file={f} owner={owner} actions={actions?.(f)} /></div>}
+                {isOpen && <div className="px-2 pb-2"><AttachmentPreview file={f} versions={versions} owner={owner} actions={actions?.(f)} /></div>}
               </div>
             );
           })}
@@ -105,9 +112,59 @@ export function AttachmentList({ owner, actions, empty = null }: {
   </>;
 }
 
-/** An attached file's preview; its edits are saved as the file's next version. */
-function AttachmentPreview({ file, owner, actions }: { file: Attachment; owner: AttachmentOwner; actions?: ReactNode }) {
-  const { saveEdits } = useAttachmentActions(owner);
+/** An attached file's preview; its edits are saved as the file's next
+ *  version. With versions, a history menu shows an earlier one in place
+ *  (read only) and can make it the newest again. */
+function AttachmentPreview({ file, versions, owner, actions }: { file: Attachment; versions: Attachment[]; owner: AttachmentOwner; actions?: ReactNode }) {
+  const { t } = useI18n();
+  const { saveEdits, restoreVersion } = useAttachmentActions(owner);
   const editor = useMemo<FileEditor>(() => ({ save: (edits) => saveEdits.mutateAsync({ file, edits }) }), [file, saveEdits]);
-  return <FilePreview file={file} source={attachmentSource} editor={editor} actions={actions} />;
+  const workers = useWorkers().data;
+  const who = (v: Attachment) => workers.find((w) => w.user_id === v.uploaded_by)?.name ?? t('Someone');
+  // The version shown: the latest unless an earlier one was picked.
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const picked = versions.find((v) => v.id === pickedId && v.id !== file.id) ?? null;
+  const shown = picked ?? file;
+  const number = (v: Attachment) => versions.length - versions.indexOf(v);
+  const fail = (err: unknown) => void appDialog.alert(err instanceof Error ? err.message : String(err));
+
+  const history = versions.length > 1 && (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Version history')} title={t('Version history')}><History size={13} /></Button>
+      </DropdownMenuTrigger>
+      <MenuShell as="dropdown" align="end" width="wide">
+        <MenuSectionLabel>{t('Version history')}</MenuSectionLabel>
+        {versions.map((v) => (
+          <DropdownMenuItem key={v.id} onSelect={() => setPickedId(v.id === file.id ? null : v.id)}>
+            <span className="w-7 shrink-0 tabular-nums text-muted-foreground">v{number(v)}</span>
+            <span className="min-w-0 flex-1 truncate">{who(v)}</span>
+            <span className="shrink-0 text-[11.5px] text-muted-foreground">{formatAge(v.created_at, true)}</span>
+            {v.id === shown.id && <Check size={13} />}
+          </DropdownMenuItem>
+        ))}
+      </MenuShell>
+    </DropdownMenu>
+  );
+
+  return <>
+    {picked && (
+      <div className="mt-1 flex flex-wrap items-center gap-2 rounded-md bg-muted/50 px-2.5 py-1.5 text-[12.5px]">
+        <History size={13} className="text-muted-foreground" />
+        <span className="min-w-0 flex-1">
+          {t('Version {n} of {total}, saved by {name} {age}', { n: number(picked), total: versions.length, name: who(picked), age: formatAge(picked.created_at, true) })}
+        </span>
+        <Button type="button" variant="ghost" size="xs" onClick={() => setPickedId(null)}>{t('Back to the latest')}</Button>
+        <Button type="button" variant="secondary" size="xs" disabled={restoreVersion.isPending}
+          onClick={async () => {
+            if (!await appDialog.confirm(t('Make version {n} the latest? The versions after it stay in the history.', { n: number(picked) }))) return;
+            restoreVersion.mutate(picked, { onSuccess: () => setPickedId(null), onError: fail });
+          }}>
+          {restoreVersion.isPending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}{t('Restore this version')}
+        </Button>
+      </div>
+    )}
+    <FilePreview file={shown} source={attachmentSource} editor={picked ? undefined : editor}
+      actions={history || (!picked && actions) ? <>{history}{!picked && actions}</> : undefined} />
+  </>;
 }
