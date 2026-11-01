@@ -3,7 +3,7 @@
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useCallback, useMemo } from 'react';
-import { Compass, ShieldCheck, Waypoints } from 'lucide-react';
+import { ShieldCheck, Waypoints } from 'lucide-react';
 import { DropdownMenuItem } from '@/ui/dropdown-menu';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -22,7 +22,7 @@ import { fetchElementMoveTargets, fetchElementObjectIds } from '@/hooks/elementD
 /**
  * "⋯" menu for an Element, wired to the breadcrumb in ElementDetailView.
  * Duplicate / Move to Object / Multi-home to Object, then what the page can
- * add to the Element — its direction, a dependency, approval — then Delete.
+ * add to the Element — a dependency, approval — then Delete.
  * Targets are the
  * sibling Objects in the Element's primary Domain, fetched here so the menu is
  * self-contained across every mount (Object detail, Elements list, My Elements).
@@ -35,7 +35,6 @@ export function ElementActionsMenu({
   element,
   onRefresh,
   onDeleted,
-  onSetDirection,
   onAddDependency,
   onOpenApproval,
 }: {
@@ -43,8 +42,6 @@ export function ElementActionsMenu({
   onRefresh?: () => void | Promise<void>;
   /** Navigate away after the Element is deleted (usually onBack). */
   onDeleted?: () => void;
-  /** Opens the page's direction editor (approach, acceptance, next step). */
-  onSetDirection?: () => void;
   /** Opens the page's dependency picker. */
   onAddDependency?: () => void;
   /** Opens the page's approval panel. */
@@ -132,11 +129,6 @@ export function ElementActionsMenu({
       onToggleMultiHome={toggleMultiHome}
       onDelete={del}
     >
-      {onSetDirection && (
-        <DropdownMenuItem onSelect={() => setTimeout(onSetDirection, 0)} className="gap-2.5 py-1.5 text-[13px]">
-          <Compass size={15} className="text-muted-foreground" /> {t('Set direction')}
-        </DropdownMenuItem>
-      )}
       {onAddDependency && (
         <DropdownMenuItem onSelect={() => setTimeout(onAddDependency, 0)} className="gap-2.5 py-1.5 text-[13px]">
           <Waypoints size={15} className="text-muted-foreground" /> {t('Add dependency')}

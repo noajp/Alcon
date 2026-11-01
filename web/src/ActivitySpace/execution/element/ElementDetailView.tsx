@@ -83,7 +83,6 @@ import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
-import { ElementDirectionSection } from './ElementDirectionSection';
 import { CodeChangesSection } from '../code/CodeChangesSection';
 import { SubelementRow } from './SubelementRow';
 import { SubelementBulkBar } from './SubelementBulkBar';
@@ -93,8 +92,9 @@ import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
 import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal, Paperclip, X } from 'lucide-react';
-import { useElementFiles, useElementFileActions, type ElementFile } from '@/hooks/elementFileData';
+import { useElementFiles, useElementFileActions } from '@/hooks/elementFileData';
 import { ElementFilePreview } from './ElementFilePreview';
+import { FileTypeIcon } from './fileTypeIcon';
 import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckRequest';
 import { openInApp } from '@/Function/shared/appNavigation';
 import { NavSlidesIcon } from '@/shell/sidebar/NavIcons';
@@ -427,8 +427,8 @@ function ElementDetailBody({
   // Activity log — element_activity rows plus a synthetic "created" line.
   // Changes to the Element itself (status, title, description, priority,
   // dates, estimate, people, moves) are written by database triggers; log()
-  // below records only what the database cannot see (direction, sub-elements,
-  // reactions, Notes).
+  // below records only what the database cannot see (sub-elements, reactions,
+  // Notes).
   const { data: activityEntries } = useElementActivityLog(element.id);
   const activityLog = useMemo(
     () => mergeActivity(activityEntries ?? [], element),
@@ -545,13 +545,6 @@ function ElementDetailBody({
     }
   };
 
-  const handleDirectionSave = (detail: string) => {
-    // ElementDirectionSection has already persisted the merged direction;
-    // this just records the activity-log entry and refreshes the parent.
-    log('direction', detail);
-    onRefresh?.();
-  };
-
   const handleStatusChange = async (newStatus: string) => {
     // StatusPicker has already persisted the status change; this just
     // records the activity-log entry and notifies assignees.
@@ -631,7 +624,6 @@ function ElementDetailBody({
   // description; × in the embed header clears element.note_id.
   const [notePickerOpen, setNotePickerOpen] = useState(false);
   // The "…" menu opens these on the page: each bump opens its editor/picker.
-  const [directionSignal, setDirectionSignal] = useState(0);
   const [dependencySignal, setDependencySignal] = useState(0);
   const [approvalSignal, setApprovalSignal] = useState(0);
   const [linkPrSignal, setLinkPrSignal] = useState(0);
@@ -639,7 +631,13 @@ function ElementDetailBody({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { data: files } = useElementFiles(element.id);
   const fileActions = useElementFileActions(element.id);
-  const [previewFile, setPreviewFile] = useState<ElementFile | null>(null);
+  // Files whose preview is open under their row.
+  const [openFileIds, setOpenFileIds] = useState<Set<string>>(() => new Set());
+  const toggleFile = (id: string) => setOpenFileIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
   const handlePickNote = async (
     noteId: string,
     opts: { isNew: boolean; name: string },
@@ -732,7 +730,6 @@ function ElementDetailBody({
           {/* ⋯ actions for the lowest breadcrumb item (this Element):
               duplicate / move / multi-home / delete. */}
           <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack}
-            onSetDirection={() => setDirectionSignal((n) => n + 1)}
             onAddDependency={() => setDependencySignal((n) => n + 1)}
             onOpenApproval={() => setApprovalSignal((n) => n + 1)} />
         </div>
@@ -841,15 +838,14 @@ function ElementDetailBody({
           </div>
 
           {/* One row under the description, as Linear keeps a single line
-              under an issue: reactions, the Note link and (once on) the
-              approval state as quiet icons. Direction, dependencies and
-              turning approval on are in the "…" menu. Below, each section
-              takes the full width with its own heading — Direction (once
-              set), Sub-elements (always, with its "+"), then Dependencies —
-              so the read order is intent → its breakdown → what it waits on.
-              Sharing an update belongs to the discussion, so it sits in the
-              Comments heading. */}
-          <div className="-ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
+              under an issue: reactions, attaching a file, the "…" of other
+              attachments and (once on) the approval state, as quiet icons.
+              Dependencies and turning approval on are in the Element's "…"
+              menu. Below, each section takes the full width with its own
+              heading — attached files, Sub-elements (always), then
+              Dependencies — so the read order is the breakdown → what it
+              waits on. */}
+          <div className="relative -ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
           <ButtonAppearanceProvider appearance="inline">
           <div className="flex items-center gap-0.5">
             {/* Smile button → quick-emoji popover that toggles a
@@ -974,36 +970,41 @@ function ElementDetailBody({
             })()}
           </div>
           </ButtonAppearanceProvider>
-          {previewFile && <ElementFilePreview file={previewFile} onClose={() => setPreviewFile(null)} />}
+          {/* Attached files — one row each: its kind's icon and its title,
+              then ▶ to open its preview right under it (images, PDF, text,
+              media, Word / Excel / PowerPoint). */}
           {files.length > 0 && (
             <section className="w-full" aria-label={t('Files')}>
-              <div className="flex flex-wrap gap-1.5">
-                {files.map((f) => (
-                  <span key={f.id} className="group/file inline-flex max-w-[260px] items-center gap-1.5 rounded-md border border-border/60 bg-[var(--surface-rail)] py-1 pl-2 pr-1 text-[12.5px]">
-                    <Paperclip size={12} className="shrink-0 text-muted-foreground" />
-                    <button type="button" className="truncate text-foreground hover:underline" title={f.name}
-                      onClick={() => setPreviewFile(f)}>
-                      {f.name}
-                    </button>
-                    {f.uploaded_by === user?.id && (
-                      <button type="button" aria-label={t('Remove {name}', { name: f.name })}
-                        onClick={() => fileActions.remove.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) })}
-                        className="flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/file:opacity-100">
-                        <X size={11} />
-                      </button>
-                    )}
-                  </span>
-                ))}
+              <div className="-mx-2">
+                {files.map((f) => {
+                  const dot = f.name.lastIndexOf('.');
+                  const title = dot > 0 ? f.name.slice(0, dot) : f.name;
+                  const open = openFileIds.has(f.id);
+                  return (
+                    <div key={f.id} className="group/file">
+                      <div className="flex min-h-[2.125rem] items-center gap-2 rounded-lg px-2 py-1 hover:bg-foreground/[0.06]">
+                        <FileTypeIcon name={f.name} mime={f.mime_type} />
+                        <button type="button" onClick={() => toggleFile(f.id)} aria-expanded={open}
+                          className="flex min-w-0 items-center gap-2 text-left">
+                          <span className="truncate text-[14px] font-medium text-foreground" title={f.name}>{title}</span>
+                          <DisclosureTriangle open={open} className="shrink-0 text-muted-foreground" />
+                        </button>
+                        <span className="flex-1" />
+                        {f.uploaded_by === user?.id && (
+                          <button type="button" aria-label={t('Remove {name}', { name: f.name })}
+                            onClick={() => fileActions.remove.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) })}
+                            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted/50 hover:text-foreground group-hover/file:opacity-100">
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                      {open && <div className="px-2 pb-2"><ElementFilePreview file={f} /></div>}
+                    </div>
+                  );
+                })}
               </div>
             </section>
           )}
-
-          <ElementDirectionSection
-            key={`direction-${element.id}`}
-            element={element}
-            onSaved={handleDirectionSave}
-            openSignal={directionSignal}
-          />
 
           {/* Sub-elements — a section like Comments: its heading folds the
               list (▶). Unfolded, the rows read like the Elements list
@@ -1115,7 +1116,7 @@ function ElementDetailBody({
           </section>}
 
           {/* The reader keeps changes next to their discussion. */}
-          <div className={layout === 'reader' ? '' : 'mt-4'}>
+          <div>
             {/* Comments and shared updates are one thread: a plain comment
                 sends with the button, an update from its ▾. */}
             <div className="mb-4 flex items-center gap-2">

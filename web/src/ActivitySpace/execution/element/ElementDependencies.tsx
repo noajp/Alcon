@@ -74,7 +74,9 @@ function DependencyEditor({ elementId, spaceId, onOpenElement, onChanged, openSi
   // Empty shows nothing — "Add dependency" lives in the Element's "…" menu,
   // and the picker opens from there, anchored here. Once there are
   // dependencies, the section has a heading and its own "+ Add dependency".
-  return <section className={edges.length ? 'w-full space-y-2' : ''} aria-label={t('Dependencies')}>
+  // Empty, the section is only the picker's anchor: out of the flow, so it
+  // does not open a blank line (and its row gap) in the page's wrapping row.
+  return <section className={edges.length ? 'w-full space-y-2' : 'absolute bottom-0 left-2.5'} aria-label={t('Dependencies')}>
     {edges.length > 0 && <div className="flex h-8 items-center"><h2 className={`${FONT.lg} text-foreground`}>{t('Dependencies')}</h2></div>}
     {(['incoming', 'outgoing'] as const).map((direction) => {
       const matching = edges.filter((edge) => direction === 'incoming' ? edge.to_element === elementId : edge.from_element === elementId);

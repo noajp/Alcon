@@ -101,13 +101,6 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   'Create new label': ['新しいラベルを作成', '새 라벨 만들기', 'Créer un label', 'Crear etiqueta'],
 
   // Element detail — direction, dependencies, approval
-  'Working direction': ['進め方', '진행 방향', 'Orientation', 'Orientación'],
-  'Set direction': ['進め方を設定', '진행 방향 설정', 'Définir l’orientation', 'Definir orientación'],
-  'Add approach…': ['アプローチを追加…', '접근 방식 추가…', 'Ajouter une approche…', 'Añadir enfoque…'],
-  'Acceptance criteria': ['完了条件', '완료 기준', 'Critères d’acceptation', 'Criterios de aceptación'],
-  'Done when…': ['完了とする条件…', '완료 조건…', 'Terminé quand…', 'Hecho cuando…'],
-  'Add criterion': ['条件を追加', '기준 추가', 'Ajouter un critère', 'Añadir criterio'],
-  'Add next step…': ['次のステップを追加…', '다음 단계 추가…', 'Ajouter la prochaine étape…', 'Añadir siguiente paso…'],
   'Dependencies': ['依存関係', '의존 관계', 'Dépendances', 'Dependencias'],
   'Add dependency': ['依存関係を追加', '의존 관계 추가', 'Ajouter une dépendance', 'Añadir dependencia'],
   'Waits for': ['先行', '대기 대상', 'Attend', 'Espera a'],
