@@ -15,7 +15,7 @@ import { formatAge } from '@/Function/shared/dateUtils';
 import { versionChain } from '@/Function/shared/fileVersions';
 import { useWorkers } from '@/hooks/teamData';
 import {
-  TRASH_DAYS, attachmentSource, trashDaysLeft, useAttachmentActions, useAttachments,
+  TRASH_DAYS, attachmentSource, useAttachmentActions, useAttachments,
   type Attachment, type AttachmentOwner,
 } from '@/hooks/attachmentData';
 
@@ -23,21 +23,20 @@ import {
  * The files attached to one thing — an Element, an Object, an Initiative,
  * a deal… — one row each: its kind's icon and title, then ▶ to open its
  * preview right under it (where Word and Excel can be edited and saved as
- * a new version). A bin moves a file to the trash, folded underneath with
- * the days each has left and Restore. `actions` adds the caller's own tools
- * to a preview (what the file can become in Alcon).
+ * a new version). A bin moves a file to the trash, kept out of the list
+ * for TRASH_DAYS and restored from Files. `actions` adds the caller's own
+ * tools to a preview (what the file can become in Alcon).
  */
 export function AttachmentList({ owner, actions, empty = null }: {
   owner: AttachmentOwner;
   actions?: (file: Attachment) => ReactNode;
-  /** Shown when nothing is attached (and nothing is in the trash). */
+  /** Shown when nothing is attached. */
   empty?: ReactNode;
 }) {
   const { t } = useI18n();
-  const { data: files, trashed, all } = useAttachments(owner);
+  const { data: files, all } = useAttachments(owner);
   const fileActions = useAttachmentActions(owner);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
-  const [trashOpen, setTrashOpen] = useState(false);
   const fail = (err: unknown) => void appDialog.alert(err instanceof Error ? err.message : String(err));
   const toggle = (id: string) => setOpen((prev) => {
     const next = new Set(prev);
@@ -45,7 +44,7 @@ export function AttachmentList({ owner, actions, empty = null }: {
     return next;
   });
 
-  if (!files.length && !trashed.length) return <>{empty}</>;
+  if (!files.length) return <>{empty}</>;
   return <>
     {files.length > 0 && (
       <section className="w-full" aria-label={t('Files')}>
@@ -83,31 +82,6 @@ export function AttachmentList({ owner, actions, empty = null }: {
             );
           })}
         </div>
-      </section>
-    )}
-    {trashed.length > 0 && (
-      <section className="-mt-1 w-full" aria-label={t('Deleted files')}>
-        <button type="button" onClick={() => setTrashOpen((o) => !o)} aria-expanded={trashOpen}
-          className="flex items-center gap-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground">
-          <DisclosureTriangle open={trashOpen} />
-          <Trash2 size={12} />
-          {t('Deleted files')} <span className="tabular-nums">{trashed.length}</span>
-        </button>
-        {trashOpen && (
-          <div className="-mx-2 mt-1">
-            {trashed.map((f) => (
-              <div key={f.id} className="flex min-h-[2rem] items-center gap-2 rounded-lg px-2 py-1 text-muted-foreground hover:bg-foreground/[0.06]">
-                <span className="opacity-60"><FileTypeIcon name={f.name} mime={f.mime_type} /></span>
-                <span className="min-w-0 truncate text-[13px] line-through decoration-muted-foreground/40" title={f.name}>{f.name}</span>
-                <span className="flex-1" />
-                <span className="shrink-0 text-[11.5px] tabular-nums">{t('{n} days left', { n: trashDaysLeft(f.deleted_at!) })}</span>
-                <Button type="button" variant="ghost" size="xs" className="text-muted-foreground" onClick={() => fileActions.restore.mutate(f, { onError: fail })}>
-                  <RotateCcw size={12} />{t('Restore')}
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
       </section>
     )}
   </>;

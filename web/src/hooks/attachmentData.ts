@@ -75,7 +75,7 @@ export function ownerOf(file: Attachment): AttachmentOwner {
 const listKey = (owner: AttachmentOwner) => ['attachments', owner.kind, owner.id] as const;
 
 /** Pure. Days left before a trashed file is erased (0 = due). */
-export function trashDaysLeft(deletedAt: string, now = Date.now()): number {
+function trashDaysLeft(deletedAt: string, now = Date.now()): number {
   return Math.max(0, TRASH_DAYS - Math.floor((now - new Date(deletedAt).getTime()) / DAY));
 }
 
