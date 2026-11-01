@@ -83,7 +83,6 @@ import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
-import { ElementDirectionSection } from './ElementDirectionSection';
 import { CodeChangesSection } from '../code/CodeChangesSection';
 import { SubelementRow } from './SubelementRow';
 import { SubelementBulkBar } from './SubelementBulkBar';
@@ -427,8 +426,8 @@ function ElementDetailBody({
   // Activity log — element_activity rows plus a synthetic "created" line.
   // Changes to the Element itself (status, title, description, priority,
   // dates, estimate, people, moves) are written by database triggers; log()
-  // below records only what the database cannot see (direction, sub-elements,
-  // reactions, Notes).
+  // below records only what the database cannot see (sub-elements, reactions,
+  // Notes).
   const { data: activityEntries } = useElementActivityLog(element.id);
   const activityLog = useMemo(
     () => mergeActivity(activityEntries ?? [], element),
@@ -545,13 +544,6 @@ function ElementDetailBody({
     }
   };
 
-  const handleDirectionSave = (detail: string) => {
-    // ElementDirectionSection has already persisted the merged direction;
-    // this just records the activity-log entry and refreshes the parent.
-    log('direction', detail);
-    onRefresh?.();
-  };
-
   const handleStatusChange = async (newStatus: string) => {
     // StatusPicker has already persisted the status change; this just
     // records the activity-log entry and notifies assignees.
@@ -631,7 +623,6 @@ function ElementDetailBody({
   // description; × in the embed header clears element.note_id.
   const [notePickerOpen, setNotePickerOpen] = useState(false);
   // The "…" menu opens these on the page: each bump opens its editor/picker.
-  const [directionSignal, setDirectionSignal] = useState(0);
   const [dependencySignal, setDependencySignal] = useState(0);
   const [approvalSignal, setApprovalSignal] = useState(0);
   const [linkPrSignal, setLinkPrSignal] = useState(0);
@@ -732,7 +723,6 @@ function ElementDetailBody({
           {/* ⋯ actions for the lowest breadcrumb item (this Element):
               duplicate / move / multi-home / delete. */}
           <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack}
-            onSetDirection={() => setDirectionSignal((n) => n + 1)}
             onAddDependency={() => setDependencySignal((n) => n + 1)}
             onOpenApproval={() => setApprovalSignal((n) => n + 1)} />
         </div>
@@ -841,14 +831,13 @@ function ElementDetailBody({
           </div>
 
           {/* One row under the description, as Linear keeps a single line
-              under an issue: reactions, the Note link and (once on) the
-              approval state as quiet icons. Direction, dependencies and
-              turning approval on are in the "…" menu. Below, each section
-              takes the full width with its own heading — Direction (once
-              set), Sub-elements (always, with its "+"), then Dependencies —
-              so the read order is intent → its breakdown → what it waits on.
-              Sharing an update belongs to the discussion, so it sits in the
-              Comments heading. */}
+              under an issue: reactions, attaching a file, the "…" of other
+              attachments and (once on) the approval state, as quiet icons.
+              Dependencies and turning approval on are in the Element's "…"
+              menu. Below, each section takes the full width with its own
+              heading — attached files, Sub-elements (always), then
+              Dependencies — so the read order is the breakdown → what it
+              waits on. */}
           <div className="relative -ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
           <ButtonAppearanceProvider appearance="inline">
           <div className="flex items-center gap-0.5">
@@ -997,13 +986,6 @@ function ElementDetailBody({
               </div>
             </section>
           )}
-
-          <ElementDirectionSection
-            key={`direction-${element.id}`}
-            element={element}
-            onSaved={handleDirectionSave}
-            openSignal={directionSignal}
-          />
 
           {/* Sub-elements — a section like Comments: its heading folds the
               list (▶). Unfolded, the rows read like the Elements list
