@@ -798,7 +798,7 @@ function ElementDetailBody({
               }}
               placeholder={t('Add description…')}
               rows={1}
-              className="w-full text-[14px] text-foreground bg-transparent border-none focus:outline-none min-h-[36px] resize-none overflow-hidden"
+              className="block w-full p-0 text-[14px] leading-[1.65] text-foreground bg-transparent border-none focus:outline-none min-h-[36px] resize-none overflow-hidden"
             />}
           </div>
 

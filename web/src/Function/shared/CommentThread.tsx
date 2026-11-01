@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { SendIcon } from '@/Function/shared/SendIcon';
+import { Button } from '@/ui/button';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell, MENU_SEPARATOR } from '@/Function/shared/menu/MenuShell';
@@ -241,24 +242,29 @@ export function CommentComposer({
   const taRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useI18n();
 
-  // Grow to fit, capped, and shrink back when the draft is cleared on send.
+  // Grow to fit, capped, and shrink back when the draft is cleared on send;
+  // no scrollbar until the text outgrows the cap.
   useLayoutEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
-    ta.style.height = `${Math.min(ta.scrollHeight, 132)}px`;
+    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
+    ta.style.overflowY = ta.scrollHeight > 160 ? 'auto' : 'hidden';
   }, [value]);
 
   return (
     <div className="pt-1 relative">
-      <div className="flex items-center gap-2 rounded-lg bg-[var(--surface-rail)] border border-border/30 shadow-[var(--shadow-island)] px-3 py-2">
+      {/* The same box as the AI's composer: a soft border that firms up while
+          typing, one row that grows, the primary send button at its end. */}
+      <div className="flex items-end gap-1 rounded-lg border border-border/30 bg-[var(--surface-rail)] px-1.5 py-1.5 shadow-[var(--shadow-island)] transition-colors focus-within:border-border">
         <textarea
           ref={taRef}
           value={value}
           onChange={onChange}
           placeholder={t(placeholder)}
           rows={1}
-          className="flex-1 resize-none bg-transparent outline-none text-[13px] text-foreground placeholder:text-muted-foreground/70 max-h-40 no-focus-ring"
+          className="max-h-40 min-h-[24px] flex-1 resize-none overflow-hidden bg-transparent px-1.5 py-1 text-[12.5px] leading-[1.5] text-foreground outline-none placeholder:text-muted-foreground/70 no-focus-ring"
+          style={{ fontWeight: 400 }}
           onKeyDown={(e) => {
             onKeyDown?.(e);
             if (e.defaultPrevented || e.nativeEvent.isComposing) return; // mid-IME
@@ -277,14 +283,10 @@ export function CommentComposer({
             }
           }}
         />
-        <button
-          onClick={onSubmit}
-          disabled={!value.trim() || submitting}
-          aria-label={t('Send')}
-          className="h-7 px-2.5 flex items-center justify-center rounded-lg bg-[var(--rail-active)] text-white border border-white/20 hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
-        >
+        <Button size="icon-sm" type="button" variant="primary" onClick={onSubmit}
+          disabled={!value.trim() || submitting} title={t('Send')} aria-label={t('Send')}>
           <SendIcon size={16} />
-        </button>
+        </Button>
       </div>
       {children}
     </div>
