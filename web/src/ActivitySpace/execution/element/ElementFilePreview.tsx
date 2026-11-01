@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
 import { Button } from '@/ui/button';
@@ -33,51 +33,63 @@ function kindOf(file: ElementFile): Kind {
   return 'other';
 }
 
+/** What a file reads to, for the kinds that are read rather than shown by
+ *  the browser itself. */
+interface Loaded { text?: string; office?: OfficePreview; workbook?: WorkSheet[]; doc?: DocLayout; deck?: Deck }
+
+// A file's bytes never change (each upload gets a new path), so what it
+// read to is kept for the session: reopening a preview is instant. Only the
+// few most recent are kept, so memory stays bounded.
+const READ_CACHE = new Map<string, Promise<Loaded>>();
+const READ_CACHE_SIZE = 8;
+
+/** Fetches a file through a signed link and reads it — text as text, a
+ *  workbook, document or deck into its layout (with the text-only reading
+ *  as the fallback where a layout will not read). */
+function readFile(file: ElementFile, kind: Kind): Promise<Loaded> {
+  const hit = READ_CACHE.get(file.id);
+  if (hit) { READ_CACHE.delete(file.id); READ_CACHE.set(file.id, hit); return hit; }
+  const officeKind = officeKindOf(file.name);
+  const read = (async (): Promise<Loaded> => {
+    const signed = await elementFileUrl(file);
+    if (kind === 'text' || kind === 'html') return { text: (await (await fetch(signed)).text()).slice(0, 2_000_000) };
+    const bytes = await (await fetch(signed)).arrayBuffer();
+    if (officeKind === 'xlsx') return { workbook: await readWorkbook(bytes) };
+    if (officeKind === 'docx') {
+      const doc = await readDocLayout(bytes).catch(() => null);
+      return doc ? { doc } : { office: await readOffice('docx', bytes) };
+    }
+    const deck = await readDeck(bytes).catch(() => null);
+    return deck?.slides.length ? { deck } : { office: await readOffice('pptx', bytes) };
+  })();
+  read.catch(() => READ_CACHE.delete(file.id));
+  READ_CACHE.set(file.id, read);
+  while (READ_CACHE.size > READ_CACHE_SIZE) READ_CACHE.delete(READ_CACHE.keys().next().value!);
+  return read;
+}
+
 export function ElementFilePreview({ file }: { file: ElementFile }) {
   const { t } = useI18n();
   const kind = kindOf(file);
   const officeKind = officeKindOf(file.name);
   const [url, setUrl] = useState<string | null>(null);
-  const [text, setText] = useState<string | null>(null);
-  const [office, setOffice] = useState<OfficePreview | null>(null);
-  const [workbook, setWorkbook] = useState<WorkSheet[] | null>(null);
-  const [docLayout, setDocLayout] = useState<DocLayout | null>(null);
-  const [deck, setDeck] = useState<ArrayBuffer | null>(null);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { text = null, office = null, workbook = null, doc: docLayout = null, deck = null } = loaded ?? {};
   const [fullscreen, setFullscreen] = useState(false);
   const [zoom, setZoom] = useState(1);
 
   useEffect(() => {
     let live = true;
-    elementFileUrl(file)
-      .then(async (signed) => {
-        if (!live) return;
-        setUrl(signed);
-        if (kind === 'text' || kind === 'html') {
-          const body = await (await fetch(signed)).text();
-          if (live) setText(body.slice(0, 2_000_000));
-        } else if (kind === 'office') {
-          const bytes = await (await fetch(signed)).arrayBuffer();
-          // A deck is laid out as slides (DeckView); its text is read too,
-          // as the fallback should the layout fail.
-          if (officeKind === 'xlsx') {
-            const sheets = await readWorkbook(bytes);
-            if (live) setWorkbook(sheets);
-            return;
-          }
-          if (officeKind === 'docx') {
-            // Drawn as laid out; read as text only if the layout will not read.
-            const laid = await readDocLayout(bytes).catch(() => null);
-            if (laid) { if (live) setDocLayout(laid); return; }
-          }
-          if (officeKind === 'pptx' && live) setDeck(bytes);
-          const read = await readOffice(officeKind!, bytes);
-          if (live) setOffice(read);
-        }
-      })
-      .catch((e) => { if (live) setError(e instanceof Error ? e.message : String(e)); });
+    const fail = (e: unknown) => { if (live) setError(e instanceof Error ? e.message : String(e)); };
+    if (kind === 'text' || kind === 'html' || kind === 'office') {
+      readFile(file, kind).then((l) => { if (live) setLoaded(l); }).catch(fail);
+    } else {
+      // Shown by the browser itself (image, PDF, media) — only a link is needed.
+      elementFileUrl(file).then((signed) => { if (live) setUrl(signed); }).catch(fail);
+    }
     return () => { live = false; };
-  }, [file, kind, officeKind]);
+  }, [file, kind]);
 
   // Full screen is the app's own layer over the whole window, not the
   // browser's Fullscreen API — that is refused inside embedded browsers
@@ -126,11 +138,11 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
       <div className="h-full overflow-auto">
         {error ? (
           <p className="p-6 text-[13px] text-[var(--status-danger)]">{error}</p>
-        ) : !url ? spinner : kind === 'image' ? (
+        ) : !url && !loaded ? spinner : kind === 'image' ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt={file.name} className="mx-auto max-h-full max-w-full object-contain p-4" />
+          <img src={url ?? undefined} alt={file.name} className="mx-auto max-h-full max-w-full object-contain p-4" />
         ) : kind === 'pdf' ? (
-          <iframe src={url} title={file.name} className="h-full w-full border-0" />
+          <iframe src={url ?? undefined} title={file.name} className="h-full w-full border-0" />
         ) : kind === 'html' ? (
           // The page as it is, scripts and all, in a sandbox with no origin of
           // its own: it can run, but cannot reach this app, its storage or
@@ -144,13 +156,13 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
               className="border-0 bg-[var(--sheet-paper)]" />
           )
         ) : kind === 'video' ? (
-          <video src={url} controls className="mx-auto max-h-full max-w-full p-4" />
+          <video src={url ?? undefined} controls className="mx-auto max-h-full max-w-full p-4" />
         ) : kind === 'audio' ? (
-          <div className="flex h-full items-center justify-center"><audio src={url} controls /></div>
+          <div className="flex h-full items-center justify-center"><audio src={url ?? undefined} controls /></div>
         ) : kind === 'office' ? (
           officeKind === 'xlsx' ? (workbook ? <SheetView sheets={workbook} /> : spinner)
           : docLayout ? <DocView doc={docLayout} />
-          : deck ? <DeckView bytes={deck} fallback={office ? <OfficeView preview={office} /> : spinner} />
+          : deck ? <DeckView deck={deck} />
             : office === null ? spinner : <OfficeView preview={office} />
         ) : kind === 'text' ? (
           text === null ? spinner
@@ -178,17 +190,11 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
  *  the deck puts them (deckLayout) — on the grey canvas under PowerPoint's
  *  orange bar, one after another at the width of the preview; each slide
  *  is drawn at the deck's size and scaled to fit, so it follows the
- *  preview into full screen. Should a deck not read, its text is shown. */
-function DeckView({ bytes, fallback }: { bytes: ArrayBuffer; fallback: React.ReactNode }) {
+ *  preview into full screen. (A deck that will not read is shown as its
+ *  text instead — see readFile.) */
+function DeckView({ deck }: { deck: Deck }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
-  const [deck, setDeck] = useState<Deck | null>(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    let live = true;
-    readDeck(bytes).then((d) => { if (live) setDeck(d); }).catch(() => { if (live) setFailed(true); });
-    return () => { live = false; };
-  }, [bytes]);
   useEffect(() => {
     const el = hostRef.current;
     if (!el) return;
@@ -196,13 +202,12 @@ function DeckView({ bytes, fallback }: { bytes: ArrayBuffer; fallback: React.Rea
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  if (failed || deck?.slides.length === 0) return <>{fallback}</>;
-  const scale = deck && width ? Math.min(1.5, (width - 48) / deck.width) : 0;
+  const scale = width ? Math.min(1.5, (width - 48) / deck.width) : 0;
   return (
     <div className="flex min-h-full flex-col bg-[var(--sheet-head)]">
       <div className="sticky top-0 z-20 h-1 shrink-0 bg-[var(--slide-accent)]" />
       <div ref={hostRef} className="flex flex-1 flex-col items-center gap-4 py-6">
-        {!deck || !scale ? <Loader2 size={16} className="mt-10 animate-spin text-[var(--sheet-head-text)]" /> : deck.slides.map((slide, i) => (
+        {!scale ? <Loader2 size={16} className="mt-10 animate-spin text-[var(--sheet-head-text)]" /> : deck.slides.map((slide, i) => (
           <div key={i} className="relative shrink-0 overflow-hidden shadow-md" style={{ width: deck.width * scale, height: deck.height * scale }}>
             <div className="absolute left-0 top-0 origin-top-left" style={{ width: deck.width, height: deck.height, transform: `scale(${scale})`, background: slide.background ?? 'var(--sheet-paper)' }}>
               {slide.items.map((item, j) => <DeckItemView key={j} item={item} />)}
@@ -443,10 +448,42 @@ function SheetView({ sheets }: { sheets: WorkSheet[] }) {
     return r + 2;
   })) : 0;
   const grid = sheet?.gridLines ? 'var(--sheet-grid)' : 'transparent';
+
+  // Only the rows in sight (and a margin) are drawn; spacer rows keep the
+  // scroll height true. A merge reaching into sight from above is drawn
+  // from its first row.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [view, setView] = useState({ top: 0, h: 800 });
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setView({ top: el.scrollTop, h: el.clientHeight }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [active]);
+  const rowH = (r: number) => sheet?.rows[r]?.h ?? sheet?.defaultRow ?? 20;
+  const tops = useMemo(() => {
+    const out = [0];
+    for (let r = 0; r < rowCount; r++) out.push(out[r] + (sheet?.rows[r]?.h ?? sheet?.defaultRow ?? 20));
+    return out;
+  }, [sheet, rowCount]);
+  let first = 0, last = rowCount;
+  if (rowCount > 200) {
+    const from = view.top - HEAD_H - 400, to = view.top + view.h + 400;
+    while (first < rowCount && tops[first + 1] < from) first++;
+    last = first;
+    while (last < rowCount && tops[last] < to) last++;
+    for (let r = first - 1; r >= Math.max(0, first - 200); r--) {
+      if (sheet?.rows[r]?.cells.some((c) => c && c.rowSpan > 1 && r + c.rowSpan > first)) first = r;
+    }
+  }
+  const spacer = (h: number, key: string) => h > 0 ? <tr key={key} aria-hidden><td colSpan={(sheet?.cols.length ?? 0) + 1} style={{ height: h, padding: 0, border: 0 }} /></tr> : null;
+
   return (
     <div className="flex h-full flex-col bg-[var(--sheet-paper)] text-[var(--sheet-text)]">
       <div className="h-1 shrink-0 bg-[var(--sheet-accent)]" />
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div ref={scrollRef} onScroll={(e) => setView({ top: e.currentTarget.scrollTop, h: e.currentTarget.clientHeight })} className="min-h-0 flex-1 overflow-auto">
         {!sheet ? <p className="p-4 text-[13px]">{t('This sheet is empty.')}</p> : (
           <div className="relative w-max">
             <table className="border-collapse text-[12.5px]" style={{ tableLayout: 'fixed', width: HEAD_W + sheet.cols.reduce((a, b) => a + b, 0) }}>
@@ -461,10 +498,12 @@ function SheetView({ sheets }: { sheets: WorkSheet[] }) {
                 </tr>
               </thead>
               <tbody>
-                {Array.from({ length: rowCount }, (_, r) => {
+                {spacer(tops[first], 'above')}
+                {Array.from({ length: last - first }, (_, i) => {
+                  const r = first + i;
                   const row = sheet.rows[r];
                   return (
-                    <tr key={r} style={{ height: row?.h ?? sheet.defaultRow }}>
+                    <tr key={r} style={{ height: rowH(r) }}>
                       <th className={`${head} left-0 px-1 text-center tabular-nums`}>{r + 1}</th>
                       {sheet.cols.map((_, c) => {
                         const cell = row?.cells[c];
@@ -498,6 +537,7 @@ function SheetView({ sheets }: { sheets: WorkSheet[] }) {
                     </tr>
                   );
                 })}
+                {spacer(tops[rowCount] - tops[last], 'below')}
               </tbody>
             </table>
             {sheet.charts.map((chart, i) => (

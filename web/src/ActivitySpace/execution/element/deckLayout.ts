@@ -352,6 +352,8 @@ export async function readDeck(bytes: ArrayBuffer): Promise<Deck> {
 
   const slides: DeckSlide[] = [];
   for (const p of slidePaths) {
+    // Hand the page back between slides, so a long deck never freezes it.
+    await new Promise((r) => setTimeout(r, 0));
     const doc = await xml(p);
     const cSld = doc?.getElementsByTagName('p:cSld')[0];
     const tree = kid(cSld, 'p:spTree');

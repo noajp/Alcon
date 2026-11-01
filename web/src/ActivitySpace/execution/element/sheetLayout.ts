@@ -157,6 +157,10 @@ function cellRef(ref: string): [number, number] {
 
 // ── Reading ───────────────────────────────────────────────────────────────
 
+// Rows read per sheet. The view draws only those in sight, so this bounds
+// memory, not drawing.
+const MAX_ROWS = 20000;
+
 const BORDER_CSS: Record<string, string> = {
   thin: '1px solid', hair: '1px dotted', dotted: '1px dotted', dashed: '1px dashed', dashDot: '1px dashed', dashDotDot: '1px dashed',
   medium: '2px solid', mediumDashed: '2px dashed', mediumDashDot: '2px dashed', mediumDashDotDot: '2px dashed', slantDashDot: '2px dashed',
@@ -284,6 +288,8 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
 
   const sheets: WorkSheet[] = [];
   for (const def of sheetDefs) {
+    // Hand the page back between sheets, so a big workbook never freezes it.
+    await new Promise((r) => setTimeout(r, 0));
     const doc = docs.get(def.name);
     const raw = rawBySheet.get(def.name);
     if (!doc || !raw) continue;
@@ -299,7 +305,7 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
     let maxCol = 0;
     for (const row of desc(doc, 'row')) {
       const r = Number(row.getAttribute('r')) - 1;
-      if (r > 2000) break;
+      if (r >= MAX_ROWS) break;
       const cells: Cell[] = [];
       for (const c of kids(row, 'c')) {
         const [, col] = cellRef(c.getAttribute('r') ?? 'A1');
@@ -322,6 +328,7 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
       const [a, b] = (mc.getAttribute('ref') ?? '').split(':');
       if (!a || !b) continue;
       const [r1, c1] = cellRef(a), [r2, c2] = cellRef(b);
+      maxCol = Math.max(maxCol, c2);
       for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) {
         rows[r] ??= { h: defaultRow, cells: [] };
         const cell = rows[r].cells[c] ?? { text: '', numeric: false, style: null, colSpan: 1, rowSpan: 1, hidden: false };
@@ -391,7 +398,8 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
         maxCol = Math.max(maxCol, Number(kid(kid(anchor, 'from'), 'col')?.textContent ?? 0) + Math.ceil(w / defaultCol));
       }
     }
-    while (cols.length <= maxCol) cols.push(defaultCol);
+    // A few empty columns past the last used one, as a sheet runs on.
+    while (cols.length < Math.max(maxCol + 4, 10)) cols.push(defaultCol);
     for (let i = 0; i < cols.length; i++) cols[i] ??= defaultCol;
     sheets.push({
       name: def.name, cols, rows, defaultCol, defaultRow, charts,
