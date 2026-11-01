@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from '@/Function/notebook/htmlSanitizer';
+import { patchBlocks } from '@/Function/notebook/noteMerge';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export interface NoteEditorProps {
@@ -174,8 +175,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch { /* not supported */ }
       initRef.current = true;
     }
-    el.innerHTML = html ? sanitizeHtml(html) : '';
-    savedRangeRef.current = null;
+    if (el.childNodes.length && html) {
+      // A body edited elsewhere (or merged with it) while this one is open:
+      // change only the paragraphs that differ, so the caret stays put.
+      patchBlocks(el, sanitizeHtml(html));
+    } else {
+      el.innerHTML = html ? sanitizeHtml(html) : '';
+      savedRangeRef.current = null;
+    }
     if (isEditorEmpty(el)) el.innerHTML = '<p><br></p>';
     el.setAttribute('data-empty', isEditorEmpty(el) ? 'true' : 'false');
     lastEmittedRef.current = el.innerHTML;

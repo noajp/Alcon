@@ -15,6 +15,8 @@ import { useI18n, translate } from '@/Function/i18n/I18nProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { DOCX_MIME, writeDocx } from '@/Function/office/docxWriter';
 import { downloadBytes } from '@/Function/office/downloadFile';
+import { PresenceStack } from '@/Function/shared/PresenceStack';
+import { useNotePresence } from '@/hooks/usePresence';
 
 interface PageViewProps {
   fileId: string;
@@ -52,6 +54,7 @@ interface PageViewProps {
 const isPlaceholderTitle = (title: string) => title === '' || title === 'Untitled' || title === translate('Untitled');
 
 export function PageView({
+  fileId,
   title,
   icon,
   content,
@@ -110,6 +113,9 @@ export function PageView({
     else setDraftTitle(title);
   }, [draftTitle, title, onTitleChange]);
 
+  // Others with this page open (anyone who can see what it is attached to).
+  const viewers = useNotePresence(fileId);
+
   const handleBulletContextMenu = useCallback((info: BulletContextInfo) => {
     setBulletCtx(info);
   }, []);
@@ -133,7 +139,8 @@ export function PageView({
           </div>
         )}
         <div ref={toolbarPortalRef} className="flex items-center justify-center" />
-        <div className="absolute right-2">
+        <div className="absolute right-2 flex items-center gap-2">
+          <PresenceStack viewers={viewers} />
           <ButtonAppearanceProvider appearance="navigation">
             <Button variant="ghost" size="icon-sm" title={t('Export to Word')} aria-label={t('Export to Word')}
               onClick={() => { const name = draftTitle.trim() || title || t('Untitled'); void writeDocx(content, name).then((bytes) => downloadBytes(bytes, `${name}.docx`, DOCX_MIME)); }}>

@@ -6,6 +6,7 @@ type Row = [ja: string, ko: string, fr: string, es: string];
 
 const SHARED_MESSAGES: Record<string, Row> = {
   // Built-in fields, statuses and priorities
+  'Also here: {names}': ['ほかに開いている人：{names}', '함께 보는 사람: {names}', 'Aussi ici : {names}', 'También aquí: {names}'],
   'Status': ['ステータス', '상태', 'Statut', 'Estado'],
   'Priority': ['優先度', '우선순위', 'Priorité', 'Prioridad'],
   'Due date': ['期限', '마감일', 'Échéance', 'Fecha límite'],
