@@ -90,7 +90,7 @@ import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
 import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal, Paperclip } from 'lucide-react';
-import { useElementFiles, useElementFileActions } from '@/hooks/elementFileData';
+import { useElementFiles, useElementFileActions, trashDaysLeft, TRASH_DAYS } from '@/hooks/elementFileData';
 import { ElementFilePreview } from './ElementFilePreview';
 import { FileTypeIcon } from './fileTypeIcon';
 import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckRequest';
@@ -626,7 +626,8 @@ function ElementDetailBody({
   const [linkPrSignal, setLinkPrSignal] = useState(0);
   // Files attached from this computer.
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { data: files } = useElementFiles(element.id);
+  const { data: files, trashed: trashedFiles } = useElementFiles(element.id);
+  const [trashOpen, setTrashOpen] = useState(false);
   const fileActions = useElementFileActions(element.id);
   // Files whose preview is open under their row.
   const [openFileIds, setOpenFileIds] = useState<Set<string>>(() => new Set());
@@ -967,11 +968,11 @@ function ElementDetailBody({
                         <span className="flex-1" />
                         {f.uploaded_by === user?.id && (
                           // A bin, not an ×: beside an open preview an × reads as
-                          // "close", and removing a file cannot be undone — so it
-                          // asks first.
+                          // "close". It asks first, and the file goes to the trash
+                          // below, restorable for TRASH_DAYS.
                           <button type="button" aria-label={t('Remove {name}', { name: f.name })} title={t('Remove {name}', { name: f.name })}
                             onClick={async () => {
-                              if (!await appDialog.confirm(t('Delete “{name}”? This can’t be undone.', { name: f.name }))) return;
+                              if (!await appDialog.confirm(t('Move “{name}” to the trash? It can be restored for {days} days.', { name: f.name, days: TRASH_DAYS }))) return;
                               fileActions.remove.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) });
                             }}
                             className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted/50 hover:text-[var(--status-danger)] group-hover/file:opacity-100">
@@ -984,6 +985,37 @@ function ElementDetailBody({
                   );
                 })}
               </div>
+            </section>
+          )}
+
+          {/* Deleted files — folded under the files, each with the days it
+              has left and, for its uploader, Restore. */}
+          {trashedFiles.length > 0 && (
+            <section className="-mt-1 w-full" aria-label={t('Deleted files')}>
+              <button type="button" onClick={() => setTrashOpen((o) => !o)} aria-expanded={trashOpen}
+                className="flex items-center gap-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground">
+                <DisclosureTriangle open={trashOpen} />
+                <Trash2 size={12} />
+                {t('Deleted files')} <span className="tabular-nums">{trashedFiles.length}</span>
+              </button>
+              {trashOpen && (
+                <div className="-mx-2 mt-1">
+                  {trashedFiles.map((f) => (
+                    <div key={f.id} className="flex min-h-[2rem] items-center gap-2 rounded-lg px-2 py-1 text-muted-foreground hover:bg-foreground/[0.06]">
+                      <span className="opacity-60"><FileTypeIcon name={f.name} mime={f.mime_type} /></span>
+                      <span className="min-w-0 truncate text-[13px] line-through decoration-muted-foreground/40" title={f.name}>{f.name}</span>
+                      <span className="flex-1" />
+                      <span className="shrink-0 text-[11.5px] tabular-nums">{t('{n} days left', { n: trashDaysLeft(f.deleted_at!) })}</span>
+                      {f.uploaded_by === user?.id && (
+                        <Button type="button" variant="ghost" size="xs" className="text-muted-foreground"
+                          onClick={() => fileActions.restore.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) })}>
+                          <RotateCcw size={12} />{t('Restore')}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           )}
 
