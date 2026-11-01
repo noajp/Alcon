@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { gearPath, glyph, hole } from './glyph';
 
 // The drawings. Each is exported under the Lucide name it replaces, so
@@ -167,11 +168,13 @@ const PERSON = {
 };
 export const User = glyph('User', PERSON);
 export const UserRound = glyph('UserRound', PERSON);
+// A person moved aside for a sign beside them (add, remove).
+const PERSON_BESIDE = <>
+  <circle cx="6.5" cy="5" r="2.35" />
+  <path d="M2.4 13.05c.32-2.3 1.95-3.7 4.1-3.7s3.78 1.4 4.1 3.7a.7.7 0 0 1-.7.8H3.1a.7.7 0 0 1-.7-.8Z" />
+</>;
 export const UserPlus = glyph('UserPlus', {
-  solid: <>
-    <circle cx="6.5" cy="5" r="2.35" />
-    <path d="M2.4 13.05c.32-2.3 1.95-3.7 4.1-3.7s3.78 1.4 4.1 3.7a.7.7 0 0 1-.7.8H3.1a.7.7 0 0 1-.7-.8Z" />
-  </>,
+  solid: PERSON_BESIDE,
   line: <path d="M12.75 4.25v4M10.75 6.25h4" />,
 });
 
@@ -329,3 +332,298 @@ export const Ellipsis = MoreHorizontal;
 export const Play = glyph('Play', {
   solid: <path d="M5 3.4a.75.75 0 0 1 1.13-.65l6.55 4.6a.8.8 0 0 1 0 1.3l-6.55 4.6A.75.75 0 0 1 5 12.6Z" />,
 });
+
+// ── The rest ──────────────────────────────────────────────────
+// Drawn in the same two kinds. A few outlines too intricate to redraw well
+// on 16 units (a wrench, a hand) are Lucide's own, scaled to this grid at
+// this weight.
+
+const TO16 = 'scale(0.6667)';
+const scaledLine = (displayName: string, paths: string[]) => glyph(displayName, {
+  line: <g transform={TO16} style={{ strokeWidth: 2.25 }}>{paths.map((d) => <path key={d} d={d} />)}</g>,
+});
+
+export const Home = House;
+export const SearchIcon = Search;
+export const PlayIcon = Play;
+export const TriangleAlert = AlertTriangle;
+
+// Pages of a kind: the page, its fold, and a mark for the kind.
+const FOLD = <path d="M9.5 1.5v3a.5.5 0 0 0 .5.5h3" strokeWidth={1.1} />;
+const page = (displayName: string, mark: ReactNode) => glyph(displayName, { solid: PAGE.solid, cut: <>{FOLD}{mark}</> });
+export const FilePlus = page('FilePlus', <path d="M8.5 7.5v4M6.5 9.5h4" strokeWidth={1.3} />);
+export const FileUp = page('FileUp', <path d="M8.5 11.75v-4M6.9 9.1l1.6-1.6 1.6 1.6" strokeWidth={1.25} />);
+export const FileDown = page('FileDown', <path d="M8.5 7.25v4M6.9 9.9l1.6 1.6 1.6-1.6" strokeWidth={1.25} />);
+export const FileCode2 = page('FileCode2', <path d="M7.4 7.9 6 9.5l1.4 1.6M9.6 7.9 11 9.5l-1.4 1.6" strokeWidth={1.15} />);
+export const FileJson = page('FileJson', <path d="M7.4 7.4c-.6 0-.9.3-.9.9v.45c0 .45-.2.7-.65.7.45 0 .65.25.65.7v.45c0 .6.3.9.9.9M9.6 7.4c.6 0 .9.3.9.9v.45c0 .45.2.7.65.7-.45 0-.65.25-.65.7v.45c0 .6-.3.9-.9.9" strokeWidth={1} />);
+export const FileSpreadsheet = page('FileSpreadsheet', <path d="M4 9.6h9M8.5 7v7" strokeWidth={1} />);
+export const FileVideo = page('FileVideo', <path d="M7.35 7.7v3.6l3-1.8Z" style={hole} />);
+export const FileAudio = page('FileAudio', <><path d="M8.6 11.3V7.9l1.9-.6" strokeWidth={1} /><circle cx="7.75" cy="11.4" r="1" style={hole} /></>);
+export const FileImage = page('FileImage', <><circle cx="7" cy="8.1" r=".95" style={hole} /><path d="M4 13.2 7.6 10l1.3 1.1 1.6-1.5L13 12v2H4Z" style={hole} /></>);
+export const FileArchive = page('FileArchive', <><path d="M7.5 5.6v.8M7.5 7.6v.8" strokeWidth={1} /><rect x="6.6" y="9.4" width="1.8" height="2.4" rx=".55" style={hole} /></>);
+export const FileLock2 = page('FileLock2', <><rect x="6.4" y="9.6" width="4.2" height="3.1" rx=".7" style={hole} /><path d="M7.4 9.6v-.8a1.1 1.1 0 0 1 2.2 0v.8" strokeWidth={1} /></>);
+
+export const ScrollText = glyph('ScrollText', {
+  solid: <rect x="3.75" y="2.25" width="8.5" height="11.5" rx="1.7" />,
+  cut: <path d="M6.1 5.6h3.8M6.1 8h3.8M6.1 10.4h2.3" />,
+});
+
+export const NotebookText = glyph('NotebookText', {
+  solid: <rect x="4" y="2.25" width="8.75" height="11.5" rx="1.7" />,
+  cut: <path d="M7.1 5.75h3.2M7.1 8.25h3.2" />,
+  line: <path d="M2.75 5h2.5M2.75 8h2.5M2.75 11h2.5" />,
+});
+
+export const BookMarked = glyph('BookMarked', {
+  solid: <rect x="3.25" y="2.25" width="9.5" height="11.5" rx="1.7" />,
+  cut: <path d="M8.4 1.8v4.6l1.3-1 1.3 1V1.8Z" style={hole} />,
+});
+
+export const Presentation = glyph('Presentation', {
+  solid: <rect x="2.25" y="2.5" width="11.5" height="7.75" rx="1.6" />,
+  line: <path d="M8 10.25v3M5.75 13.5h4.5" />,
+});
+
+export const Workflow = glyph('Workflow', {
+  solid: <><rect x="2.5" y="2.5" width="5" height="5" rx="1.3" /><rect x="8.5" y="8.5" width="5" height="5" rx="1.3" /></>,
+  line: <path d="M5 7.5v1.25A2.25 2.25 0 0 0 7.25 11H8.5" />,
+});
+
+const sparkle = (cx: number, cy: number, r: number) => {
+  const k = r * 0.16;
+  return `M${cx} ${cy - r}Q${cx + k} ${cy - k} ${cx + r} ${cy}Q${cx + k} ${cy + k} ${cx} ${cy + r}Q${cx - k} ${cy + k} ${cx - r} ${cy}Q${cx - k} ${cy - k} ${cx} ${cy - r}Z`;
+};
+export const Sparkles = glyph('Sparkles', {
+  solid: <><path d={sparkle(6.75, 9, 5)} /><path d={sparkle(12.1, 3.9, 2.4)} /></>,
+});
+
+export const Zap = glyph('Zap', {
+  solid: <path d="M8.95 1.85a.45.45 0 0 1 .8.32L9.15 6.5h3.3a.55.55 0 0 1 .43.9l-5.83 6.75a.45.45 0 0 1-.8-.32l.6-4.33h-3.3a.55.55 0 0 1-.43-.9Z" />,
+});
+
+export const Wrench = glyph('Wrench', {
+  solid: <path transform={TO16} d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />,
+});
+
+export const Pin = glyph('Pin', {
+  solid: <path transform={TO16} d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />,
+  line: <path d="M8 11.5v2.75" />,
+});
+
+export const Hand = scaledLine('Hand', [
+  'M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2', 'M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2', 'M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8',
+  'M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15',
+]);
+export const Handshake = scaledLine('Handshake', [
+  'm11 17 2 2a1 1 0 1 0 3-3', 'm14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4',
+  'm21 3 1 11h-2', 'M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3', 'M3 4h8',
+]);
+
+export const Building2 = glyph('Building2', {
+  solid: <><rect x="2.75" y="2.25" width="6.75" height="11.5" rx="1.4" /><rect x="8" y="6.25" width="5.25" height="7.5" rx="1.2" /></>,
+  cut: <path d="M5 5.25h2.25M5 7.75h2.25M5 10.25h2.25M9.5 9.25h-.1" strokeWidth={1.1} />,
+});
+
+export const Smile = glyph('Smile', {
+  solid: CIRCLE,
+  cut: <><circle cx="6.1" cy="6.8" r=".8" style={hole} /><circle cx="9.9" cy="6.8" r=".8" style={hole} /><path d="M5.75 9.5a2.75 2.75 0 0 0 4.5 0" strokeWidth={1.25} /></>,
+});
+
+const CLOCK = { solid: CIRCLE, cut: <path d="M8 4.75V8h2.6" strokeWidth={1.3} /> };
+export const Clock = glyph('Clock', CLOCK);
+export const Clock3 = glyph('Clock3', CLOCK);
+export const Timer = glyph('Timer', {
+  solid: <circle cx="8" cy="9" r="5" />,
+  cut: <path d="M8 9V6.4" strokeWidth={1.3} />,
+  line: <path d="M6.5 1.75h3" />,
+});
+
+export const CalendarPlus = glyph('CalendarPlus', { ...CALENDAR, cut: <>{CALENDAR.cut}<path d="M8 8.6v3.3M6.35 10.25h3.3" strokeWidth={1.25} /></> });
+export const CalendarRange = glyph('CalendarRange', { ...CALENDAR, cut: <>{CALENDAR.cut}<path d="M5.25 10.25h5.5" strokeWidth={1.4} /></> });
+export const CalendarClock = glyph('CalendarClock', {
+  solid: <><path d="M4.4 3.25h6.2c.9 0 1.65.75 1.65 1.65V7a4.25 4.25 0 0 0-5.25 6.25H4.4c-.91 0-1.65-.74-1.65-1.65V4.9c0-.9.74-1.65 1.65-1.65Z" /><circle cx="11" cy="11" r="3.1" /></>,
+  cut: <><path d="M2 6.75h12" /><circle cx="5.5" cy="3.35" r="1.35" style={hole} /><circle cx="10.5" cy="3.35" r="1.35" style={hole} /><path d="M11 9.5V11h1.1" strokeWidth={1} /></>,
+  line: <path d="M5.5 1.9v2.6M10.5 1.9v2.6" />,
+});
+
+export const Plug = glyph('Plug', {
+  solid: <path d="M4.25 5.25h7.5v2.5a3.75 3.75 0 0 1-7.5 0Z" />,
+  line: <path d="M6.25 1.9v3.35M9.75 1.9v3.35M8 11.5v2.6" />,
+});
+
+const PANEL_FRAME = <rect x="2.75" y="3.25" width="10.5" height="9.5" rx="1.75" />;
+export const PanelLeft = glyph('PanelLeft', {
+  solid: <path d="M4.5 3.25h2v9.5h-2a1.75 1.75 0 0 1-1.75-1.75V5a1.75 1.75 0 0 1 1.75-1.75Z" />,
+  line: PANEL_FRAME,
+});
+export const PanelRight = glyph('PanelRight', {
+  solid: <path d="M11.5 3.25h-2v9.5h2a1.75 1.75 0 0 0 1.75-1.75V5a1.75 1.75 0 0 0-1.75-1.75Z" />,
+  line: PANEL_FRAME,
+});
+export const PanelLeftOpen = glyph('PanelLeftOpen', { line: <>{PANEL_FRAME}<path d="M6.25 3.5v9M8.9 6.25 10.65 8 8.9 9.75" /></> });
+export const PanelLeftClose = glyph('PanelLeftClose', { line: <>{PANEL_FRAME}<path d="M6.25 3.5v9M10.65 6.25 8.9 8l1.75 1.75" /></> });
+
+const BUBBLE = <path d="M3.75 2.75h8.5c.69 0 1.25.56 1.25 1.25v6c0 .69-.56 1.25-1.25 1.25H6.5l-2.6 2.1a.5.5 0 0 1-.82-.39V11.2A1.25 1.25 0 0 1 2.5 10V4c0-.69.56-1.25 1.25-1.25Z" />;
+export const MessageSquare = glyph('MessageSquare', { solid: BUBBLE });
+export const MessageSquarePlus = glyph('MessageSquarePlus', { solid: BUBBLE, cut: <path d="M8 5v4M6 7h4" strokeWidth={1.3} /> });
+
+export const Mail = glyph('Mail', {
+  solid: <rect x="2" y="3.25" width="12" height="9.5" rx="1.8" />,
+  cut: <path d="m2.75 4.9 5.25 3.9 5.25-3.9" strokeWidth={1.2} />,
+});
+
+export const KeyRound = glyph('KeyRound', {
+  solid: <circle cx="10.1" cy="5.9" r="3.6" />,
+  cut: <circle cx="10.9" cy="5.1" r=".95" style={hole} />,
+  line: <path d="M7.6 8.4 2.75 13.25M4.4 11.6l1.6 1.6" />,
+});
+
+export const Globe = glyph('Globe', {
+  solid: CIRCLE,
+  cut: <><path d="M2 8h12" strokeWidth={1} /><path d="M8 2.25c-1.55 1.6-2.35 3.5-2.35 5.75S6.45 12.15 8 13.75c1.55-1.6 2.35-3.5 2.35-5.75S9.55 3.85 8 2.25Z" strokeWidth={1} /></>,
+});
+
+export const Compass = glyph('Compass', { solid: CIRCLE, cut: <path d="M10.6 5.4 9.2 9.2 5.4 10.6l1.4-3.8Z" style={hole} /> });
+export const CirclePlay = glyph('CirclePlay', { solid: CIRCLE, cut: <path d="M6.6 5.4v5.2L10.75 8Z" style={hole} /> });
+export const Info = glyph('Info', { solid: CIRCLE, cut: <><path d="M8 7.4v3.6" strokeWidth={1.3} /><circle cx="8" cy="5.15" r=".8" style={hole} /></> });
+export const HelpCircle = glyph('HelpCircle', { solid: CIRCLE, cut: <><path d="M6.35 6.35a1.7 1.7 0 0 1 3.3.55c0 1.1-1.65 1.35-1.65 2.4" strokeWidth={1.3} /><circle cx="8" cy="11.1" r=".8" style={hole} /></> });
+
+export const Palette = glyph('Palette', {
+  solid: <path d="M8 2.25a5.75 5.75 0 0 0 0 11.5c.75 0 1.2-.55 1.2-1.15 0-.3-.1-.55-.3-.78a1.1 1.1 0 0 1 .85-1.82h1.25a3.25 3.25 0 0 0 2.75-3.3C13.75 4.4 11.15 2.25 8 2.25Z" />,
+  cut: <><circle cx="5.1" cy="7.4" r=".85" style={hole} /><circle cx="6.75" cy="4.9" r=".85" style={hole} /><circle cx="9.6" cy="4.9" r=".85" style={hole} /><circle cx="11.25" cy="7.2" r=".85" style={hole} /></>,
+});
+
+const EYE = <path d="M8 3.5c3 0 5.1 2.2 5.9 3.95a1.3 1.3 0 0 1 0 1.1C13.1 10.3 11 12.5 8 12.5S2.9 10.3 2.1 8.55a1.3 1.3 0 0 1 0-1.1C2.9 5.7 5 3.5 8 3.5Z" />;
+export const Eye = glyph('Eye', { solid: EYE, cut: <circle cx="8" cy="8" r="2.1" strokeWidth={1.2} /> });
+export const EyeOff = glyph('EyeOff', {
+  solid: EYE,
+  cut: <><circle cx="8" cy="8" r="2.1" strokeWidth={1.2} /><path d="m2.75 2.75 10.5 10.5" strokeWidth={2.8} /></>,
+  line: <path d="m3 3 10 10" />,
+});
+
+export const Filter = glyph('Filter', {
+  solid: <path d="M2.65 3.5c-.2-.45.1-.95.6-.95h9.5c.5 0 .8.5.6.95L9.5 8.3v4.35a.6.6 0 0 1-.9.52l-1.4-.8a.6.6 0 0 1-.3-.52V8.3Z" />,
+});
+
+export const FlaskConical = glyph('FlaskConical', {
+  solid: <path d="M6.25 2.25h3.5v4.1l3.45 5.75a1.1 1.1 0 0 1-.95 1.65H3.75a1.1 1.1 0 0 1-.95-1.65l3.45-5.75Z" />,
+  cut: <path d="M4.6 9.75h6.8" strokeWidth={1} />,
+  line: <path d="M5.5 2.25h5" />,
+});
+
+export const Diamond = glyph('Diamond', {
+  solid: <path d="M7.3 2.2a1 1 0 0 1 1.4 0l5.1 5.1a1 1 0 0 1 0 1.4l-5.1 5.1a1 1 0 0 1-1.4 0L2.2 8.7a1 1 0 0 1 0-1.4Z" />,
+});
+export const Square = glyph('Square', { solid: <rect x="3" y="3" width="10" height="10" rx="2" /> });
+export const Pause = glyph('Pause', { solid: <><rect x="4" y="3" width="2.75" height="10" rx="1" /><rect x="9.25" y="3" width="2.75" height="10" rx="1" /></> });
+
+export const Save = glyph('Save', {
+  solid: <path d="M3.75 2.5h6.7c.33 0 .65.13.88.37l2.3 2.3c.24.23.37.55.37.88v6.2c0 .69-.56 1.25-1.25 1.25h-9c-.69 0-1.25-.56-1.25-1.25v-9.5c0-.69.56-1.25 1.25-1.25Z" />,
+  cut: <><rect x="5.1" y="9" width="5.8" height="3.25" rx=".6" style={hole} /><path d="M5.6 2v2.4h4V2" strokeWidth={1.1} /></>,
+});
+
+export const Image = glyph('Image', {
+  solid: <rect x="2.25" y="2.75" width="11.5" height="10.5" rx="1.9" />,
+  cut: <><circle cx="5.9" cy="6.3" r="1.1" style={hole} /><path d="M1.5 14v-1.6l4-3.6 2 1.8 3.2-3 3.8 3.4V14Z" style={hole} /></>,
+});
+export const ImagePlus = glyph('ImagePlus', {
+  solid: <rect x="2" y="4" width="9.75" height="9.5" rx="1.8" />,
+  cut: <><circle cx="5.3" cy="7.3" r="1" style={hole} /><path d="M1.5 14v-1.4l3.4-3.1 1.7 1.5 2.8-2.6 3.1 2.8V14Z" style={hole} /></>,
+  line: <path d="M13 1.75v3.5M11.25 3.5h3.5" />,
+});
+
+export const LayoutGrid = glyph('LayoutGrid', {
+  solid: <>{[[2.5, 2.5], [8.9, 2.5], [2.5, 8.9], [8.9, 8.9]].map(([x, y]) => <rect key={`${x}-${y}`} x={x} y={y} width="4.6" height="4.6" rx="1.25" />)}</>,
+});
+export const LayoutDashboard = glyph('LayoutDashboard', {
+  solid: <>
+    <rect x="2.5" y="2.5" width="5" height="6.5" rx="1.25" /><rect x="8.75" y="2.5" width="4.75" height="4" rx="1.25" />
+    <rect x="8.75" y="7.75" width="4.75" height="5.75" rx="1.25" /><rect x="2.5" y="10.25" width="5" height="3.25" rx="1.25" />
+  </>,
+});
+export const Blocks = glyph('Blocks', {
+  solid: <>
+    <rect x="2.5" y="2.75" width="4.75" height="4.75" rx="1.2" /><rect x="2.5" y="8.75" width="4.75" height="4.75" rx="1.2" />
+    <rect x="8.5" y="8.75" width="4.75" height="4.75" rx="1.2" /><rect x="9" y="2.25" width="4.5" height="4.5" rx="1.2" transform="rotate(12 11.25 4.5)" />
+  </>,
+});
+export const Columns3 = glyph('Columns3', { solid: <rect x="2.5" y="2.75" width="11" height="10.5" rx="1.9" />, cut: <path d="M6.2 2v12M9.8 2v12" /> });
+export const Rows3 = glyph('Rows3', { solid: <rect x="2.5" y="2.75" width="11" height="10.5" rx="1.9" />, cut: <path d="M2 6.3h12M2 9.7h12" /> });
+
+export const GripVertical = glyph('GripVertical', {
+  solid: <>{[4.25, 8, 11.75].flatMap((y) => [6, 10].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.05" />))}</>,
+});
+
+export const ListOrdered = glyph('ListOrdered', {
+  solid: <>{[4.5, 8, 11.5].map((y) => <rect key={y} x="2.5" y={y - 1.05} width="2.1" height="2.1" rx=".55" />)}</>,
+  line: LIST.line,
+});
+export const ListChecks = glyph('ListChecks', { line: <path d="m2.5 4.6 1.1 1.1 1.9-2.1M2.5 10.6l1.1 1.1 1.9-2.1M7.75 4.75h5.5M7.75 10.75h5.5" /> });
+export const ListTodo = glyph('ListTodo', {
+  solid: <rect x="2.25" y="2.75" width="4.25" height="4.25" rx="1.1" />,
+  cut: <path d="m3.35 4.95.8.8 1.3-1.45" strokeWidth={1} />,
+  line: <><rect x="2.85" y="9.6" width="3.05" height="3.05" rx=".8" /><path d="M8.75 4.9h4.5M8.75 11.1h4.5" /></>,
+});
+export const ListFilter = line('ListFilter', 'M2.5 4.5h11M4.5 8h7M6.5 11.5h3');
+export const Menu = line('Menu', 'M2.75 4.5h10.5M2.75 8h10.5M2.75 11.5h10.5');
+export const Hash = line('Hash', 'M3 6h10.5M2.5 10H13M6.5 2.75 5.5 13.25M10.5 2.75l-1 10.5');
+
+// Code
+const node = (cx: number, cy: number) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.75" />;
+export const GitBranch = glyph('GitBranch', { solid: <>{node(5, 3.75)}{node(5, 12.25)}{node(11, 4.25)}</>, line: <path d="M5 5.5v5M11 6c0 2.6-2 3.85-6 4.5" /> });
+export const GitMerge = glyph('GitMerge', { solid: <>{node(5, 3.75)}{node(5, 12.25)}{node(11.25, 10)}</>, line: <path d="M5 5.5v5M5 5.5c0 2.6 2.3 4.5 4.5 4.5" /> });
+export const GitCompare = glyph('GitCompare', {
+  solid: <>{node(4.5, 4)}{node(11.5, 12)}</>,
+  line: <path d="M4.5 5.75V10a2 2 0 0 0 2 2h2.5M11.5 10.25V6a2 2 0 0 0-2-2H7M7.75 10.5 9.25 12l-1.5 1.5M8.25 2.5 6.75 4l1.5 1.5" />,
+});
+export const GitPullRequest = glyph('GitPullRequest', {
+  solid: <>{node(4.5, 3.75)}{node(4.5, 12.25)}{node(11.5, 12.25)}</>,
+  line: <path d="M4.5 5.5v5M11.5 10.5V6.25a1.75 1.75 0 0 0-1.75-1.75H7.5M9 3 7.5 4.5 9 6" />,
+});
+export const GitPullRequestDraft = glyph('GitPullRequestDraft', {
+  solid: <>{node(4.5, 3.75)}{node(4.5, 12.25)}{node(11.5, 12.25)}<circle cx="11.5" cy="4" r=".85" /><circle cx="11.5" cy="7.25" r=".85" /></>,
+  line: <path d="M4.5 5.5v5" />,
+});
+export const GitPullRequestClosed = glyph('GitPullRequestClosed', {
+  solid: <>{node(4.5, 3.75)}{node(4.5, 12.25)}{node(11.5, 12.25)}</>,
+  line: <path d="M4.5 5.5v5M11.5 7.75v2.75M10 2.75l3 3M13 2.75l-3 3" />,
+});
+export const Diff = line('Diff', 'M8 2.75v5M5.5 5.25h5M5.5 12.25h5');
+
+export const Waypoints = glyph('Waypoints', {
+  solid: <>{[[8, 3.25], [3.25, 8], [12.75, 8], [8, 12.75]].map(([x, y]) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.6" />)}</>,
+  line: <path d="M6.85 4.4 4.4 6.85M9.15 4.4l2.45 2.45M4.4 9.15l2.45 2.45" />,
+});
+
+export const UserMinus = glyph('UserMinus', { solid: PERSON_BESIDE, line: <path d="M10.75 6.25h4" /> });
+
+export const ArchiveRestore = glyph('ArchiveRestore', {
+  solid: <><rect x="2.25" y="2.75" width="11.5" height="3" rx="1" /><path d="M3.25 6.75h9.5v5.5a1.5 1.5 0 0 1-1.5 1.5h-6.5a1.5 1.5 0 0 1-1.5-1.5Z" /></>,
+  cut: <path d="M8 12.1V8.6M6.5 10 8 8.5 9.5 10" strokeWidth={1.2} />,
+});
+
+export const SquarePen = glyph('SquarePen', {
+  solid: <path d="M11.6 2.1a1.35 1.35 0 0 1 1.9 1.9L8.6 8.9l-2.4.6.6-2.4Z" />,
+  line: <path d="M7.25 2.75h-3A1.25 1.25 0 0 0 3 4v7.75C3 12.44 3.56 13 4.25 13H12c.69 0 1.25-.56 1.25-1.25v-3" />,
+});
+
+export const Sun = glyph('Sun', {
+  solid: <circle cx="8" cy="8" r="2.75" />,
+  line: <path d="M8 1.75v1.1M8 13.15v1.1M1.75 8h1.1M13.15 8h1.1M3.6 3.6l.75.75M11.65 11.65l.75.75M3.6 12.4l.75-.75M11.65 4.35l.75-.75" />,
+});
+
+export const Fingerprint = line('Fingerprint', 'M4.6 12.6c.55-1.25.85-2.7.85-4.6a2.55 2.55 0 0 1 5.1 0c0 1.25-.1 2.45-.4 3.6M8 8c0 2.05-.4 3.95-1.2 5.6M3.2 9.6c.1-.5.15-1.05.15-1.6a4.65 4.65 0 0 1 8.4-2.75M12.65 8c0 1.85-.2 3.35-.6 4.5');
+export const Languages = line('Languages', 'M2.5 4h6M5.5 2.75V4M3.6 4c.5 2.4 2.1 4.1 4.6 5M7.4 4C6.9 6.4 5.3 8.1 2.8 9M8.75 13.5l2.4-6 2.4 6M9.5 11.75h3.3');
+export const LogOut = line('LogOut', 'M6 2.75H4.25C3.56 2.75 3 3.31 3 4v8c0 .69.56 1.25 1.25 1.25H6M7 8h6.5M10.5 4.75 13.75 8l-3.25 3.25');
+export const History = line('History', 'M3.25 8a4.75 4.75 0 1 0 1.4-3.35L3.25 6M3.25 2.75V6h3.25M8 5.5V8l1.75 1.25');
+export const RotateCw = line('RotateCw', 'M12.75 8a4.75 4.75 0 1 1-1.4-3.35L12.75 6M12.75 2.75V6H9.5');
+export const CheckCheck = line('CheckCheck', 'M1.75 8.5 4.5 11.25 10 5.25M7.5 10.75l.5.5 5.75-6');
+export const Unlink = line('Unlink', 'M6.5 5.25H5a2.75 2.75 0 0 0 0 5.5h1.5M9.5 5.25H11a2.75 2.75 0 0 1 0 5.5H9.5M5.5 2.25l.75 1.5M10.5 13.75l-.75-1.5');
+export const Shuffle = line('Shuffle', 'M2.5 4.5h1.75a3 3 0 0 1 2.5 1.35l2.5 4.3a3 3 0 0 0 2.5 1.35h1.75M2.5 11.5h1.75a3 3 0 0 0 2.2-.95M9.55 5.45A3 3 0 0 1 11.75 4.5h1.75M11.75 2.75l1.75 1.75-1.75 1.75M11.75 9.75l1.75 1.75-1.75 1.75');
+export const Scale = line('Scale', 'M8 2.5v11M5 13.5h6M3 4.5h10M3 4.5 1.5 8.4a1.6 1.6 0 0 0 3 0ZM13 4.5l-1.5 3.9a1.6 1.6 0 0 0 3 0Z');
+export const CornerUpRight = line('CornerUpRight', 'M3.5 13v-4a3 3 0 0 1 3-3h6.5M9.75 2.75 13 6l-3.25 3.25');
+export const CornerDownRight = line('CornerDownRight', 'M3.5 3v4a3 3 0 0 0 3 3h6.5M9.75 6.75 13 10l-3.25 3.25');
+export const ArrowRightLeft = line('ArrowRightLeft', 'M3 5h10M10 2l3 3-3 3M13 11H3M6 8l-3 3 3 3');
+export const Activity = line('Activity', 'M1.75 8h2.5L6 3.75l3.75 8.5L11.5 8h2.75');
+export const ZoomIn = glyph('ZoomIn', { line: <><circle cx="7" cy="7" r="4.1" /><path d="m10.1 10.1 3.15 3.15M5.4 7h3.2M7 5.4v3.2" /></> });
+export const ZoomOut = glyph('ZoomOut', { line: <><circle cx="7" cy="7" r="4.1" /><path d="m10.1 10.1 3.15 3.15M5.4 7h3.2" /></> });
