@@ -6,7 +6,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback, type ReactNod
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { AlconObjectWithChildren, Phase, ObjectMilestone } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
-import { CalendarDays, ZoomIn, ZoomOut } from 'lucide-react';
+import { CalendarDays, ZoomIn, ZoomOut } from '@/ui/icons';
 import { ObjectIcon } from '@/shell/icons';
 import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight, Plus } from 'lucide-react';
+import { ChevronRight, Plus } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 

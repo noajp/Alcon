@@ -4,7 +4,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { FileText, Inbox, Home, ListTodo, Settings } from 'lucide-react';
+import { FileText, Inbox, Home, ListTodo, Settings } from '@/ui/icons';
 import { ObjectIcon, ElementIcon, CrmIcon, FilesIcon } from '@/Function/shared/conceptIcons';
 import { crmRoute, routeTo } from '@/Function/crm/crmRoute';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';

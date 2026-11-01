@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
-import { MoreHorizontal, Settings, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Settings, Trash2 } from '@/ui/icons';
 import { VIEW_REGISTRY } from '@/shell/viewRegistry';
 import { SidebarRow, SidebarRowAction } from '@/Function/shared/SidebarRow';
 import { useI18n } from '@/Function/i18n/I18nProvider';

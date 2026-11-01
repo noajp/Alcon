@@ -20,7 +20,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
-import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp } from 'lucide-react';
+import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp } from '@/ui/icons';
 import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
 import { domainHasObjectsMessage, useDomainRole, type DomainRole } from '@/hooks/domainData';
 import { countDomainObjects } from '@/hooks/useObjectArchive';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2 } from '@/ui/icons';
 import {
   CommentAvatar,
   CommentEntry,

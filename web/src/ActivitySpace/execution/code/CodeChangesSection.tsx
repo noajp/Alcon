@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bot, Plus, X } from 'lucide-react';
+import { Bot, Plus, X } from '@/ui/icons';
 import { PageSection } from '@/Function/shared/PageHead';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';

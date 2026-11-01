@@ -2,7 +2,7 @@
 
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '@/shared/designTokens';
 import { useEffect, useRef, useState } from 'react';
-import { Trash2, Copy, CornerUpRight, Link2, X, CalendarIcon, CircleDashed, UserRound } from 'lucide-react';
+import { Trash2, Copy, CornerUpRight, Link2, X, CalendarIcon, CircleDashed, UserRound } from '@/ui/icons';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import type { ElementStatus, ElementPriority } from '@/types/database';

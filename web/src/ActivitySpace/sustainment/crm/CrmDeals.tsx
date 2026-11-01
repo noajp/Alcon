@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowDown, ArrowUp } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { CrmDeal } from '@/Function/crm/crmModel';
 import { HealthDot, money, relativeDay } from './crmFormat';

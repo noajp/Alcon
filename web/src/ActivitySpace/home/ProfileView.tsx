@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { FileText, Pencil, Sparkles } from 'lucide-react';
+import { FileText, Pencil, Sparkles } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';

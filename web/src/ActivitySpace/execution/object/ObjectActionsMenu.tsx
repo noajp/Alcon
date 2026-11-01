@@ -4,7 +4,7 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArchiveRestore, Pencil, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, Pencil, Trash2 } from '@/ui/icons';
 import {
   createObject,
   deleteObject,

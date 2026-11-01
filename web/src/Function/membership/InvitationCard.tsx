@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { UserPlus } from 'lucide-react';
+import { UserPlus } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Button } from '@/ui/button';
 import type { InvitationStatus, MembershipInvitation } from '@/types/database';

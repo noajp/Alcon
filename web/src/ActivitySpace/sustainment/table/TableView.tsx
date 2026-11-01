@@ -2,7 +2,7 @@
 
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import { useEffect, useRef, useState } from 'react';
-import { FileDown, FileText, Plus, Rows3, Columns3 } from 'lucide-react';
+import { FileDown, FileText, Plus, Rows3, Columns3 } from '@/ui/icons';
 import { writeWorkbook, XLSX_MIME } from '@/Function/office/xlsxWriter';
 import { sheetFromTable } from '@/Function/office/tableToSheet';
 import { downloadBytes } from '@/Function/office/downloadFile';

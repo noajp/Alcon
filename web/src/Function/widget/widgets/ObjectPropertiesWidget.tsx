@@ -2,7 +2,7 @@
 import { Button } from '@/ui/button';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Calendar, Check, User as UserIcon, X } from 'lucide-react';
+import { Calendar, Check, User as UserIcon, X } from '@/ui/icons';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import {
   fetchDomainCustomColumnsWithValues,

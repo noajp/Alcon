@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight } from '@/ui/icons';
 import type { StrategyWithObjects } from '@/types/database';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { extractStrategyIntent } from './strategyIntent';

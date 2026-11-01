@@ -1,6 +1,6 @@
 import {
   AtSign, UserPlus, RefreshCw, ShieldCheck, Calendar, CalendarClock, Bell, Plug,
-} from 'lucide-react';
+} from '@/ui/icons';
 import type { NotificationKind } from '@/hooks/useSupabase';
 import { MessageIcon } from '@/Function/shared/conceptIcons';
 import { translate } from '@/Function/i18n/I18nProvider';

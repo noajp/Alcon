@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Bot, ChevronLeft, ChevronRight, ExternalLink, FileCode2, GitMerge, ListOrdered, PanelLeft, PanelRight, RefreshCw, Search, Sparkles } from 'lucide-react';
+import { AlertTriangle, Bot, ChevronLeft, ChevronRight, ExternalLink, FileCode2, GitMerge, ListOrdered, PanelLeft, PanelRight, RefreshCw, Search, Sparkles } from '@/ui/icons';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';

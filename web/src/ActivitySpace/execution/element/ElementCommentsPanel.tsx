@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
-import { Bot, Pin, Trash2 } from 'lucide-react';
+import { Bot, Pin, Trash2 } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { agentMention, foldAgentRuns, plainFirstLine } from './agent/commentAgent';
 import { CommentAvatar, CommentComposer, CommentEntry, CommentMenu, CommentMenuItem, CommentMenuSeparator } from '@/Function/shared/CommentThread';

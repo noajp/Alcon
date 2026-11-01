@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { ImagePlus, Lock, MoreHorizontal, Pencil, Save, Shuffle } from "lucide-react";
+import { ImagePlus, Lock, MoreHorizontal, Pencil, Save, Shuffle } from '@/ui/icons';
 import { useKata } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
 import { useDeckView } from "@/ActivitySpace/sustainment/slides/kata/components/useDeckView";
 import { LOOKS } from "@/ActivitySpace/sustainment/slides/kata/theme/looks";

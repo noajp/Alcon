@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Trash2, CheckCircle2, Circle, X } from 'lucide-react';
+import { Trash2, CheckCircle2, Circle, X } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface SubelementBulkBarProps {

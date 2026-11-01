@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, ShieldCheck, X } from 'lucide-react';
+import { Check, ShieldCheck, X } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { Textarea } from '@/ui/textarea';
 import { FONT } from '@/shared/designTokens';

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { ChevronDown, Minus, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
+import { ChevronDown, Minus, PanelLeftClose, PanelLeftOpen, Plus } from '@/ui/icons';
 import { InsertMenu, ObjectFormatBar, TextFormatBar } from "./EditBar";
 import { useKata } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
 import { useDeckView } from "@/ActivitySpace/sustainment/slides/kata/components/useDeckView";
@@ -17,7 +17,7 @@ import { reviewWithSkills, titleLimit } from "@/ActivitySpace/sustainment/slides
 import { canChange, changeItems, itemAxes, setHighlight, type ItemAxis } from "@/ActivitySpace/sustainment/slides/kata/model/items";
 import { updateSlide } from "@/ActivitySpace/sustainment/slides/kata/model/deck";
 import { sectionText } from "@/ActivitySpace/sustainment/slides/kata/model/planner";
-import { FileText } from "lucide-react";
+import { FileText } from '@/ui/icons';
 import { tx, roleLabel } from "@/ActivitySpace/sustainment/slides/kata/i18n";
 
 function useSize<T extends HTMLElement>() {

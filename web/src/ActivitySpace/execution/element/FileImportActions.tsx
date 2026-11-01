@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, NotebookText, Presentation, Table2 } from 'lucide-react';
+import { Loader2, NotebookText, Presentation, Table2 } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell, MenuSectionLabel } from '@/Function/shared/menu';

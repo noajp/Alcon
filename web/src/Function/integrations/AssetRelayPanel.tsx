@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { cn } from '@/lib/utils';
 import { appDialog } from '@/Function/shared/appDialogStore';

@@ -4,7 +4,7 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { statusLabel } from '@/shared/designTokens';
 import { useEffect, useMemo, useState } from 'react';
-import { MoreHorizontal, Plus } from 'lucide-react';
+import { MoreHorizontal, Plus } from '@/ui/icons';
 import {
   useDomains,
   useElementTemplates,

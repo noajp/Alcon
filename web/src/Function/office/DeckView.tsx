@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { Deck, DeckItem, DeckSlide, TextBody } from './deckLayout';
 import { presetPath } from './presetGeometry';

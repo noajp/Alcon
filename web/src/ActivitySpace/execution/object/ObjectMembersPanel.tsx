@@ -3,7 +3,7 @@
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { UserMinus, UserPlus, X } from 'lucide-react';
+import { UserMinus, UserPlus, X } from '@/ui/icons';
 import { fetchObjectMemberAccess, removeObjectMember, type ObjectMemberCandidate, type ObjectMemberRow } from '@/hooks/objectData';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useI18n } from '@/Function/i18n/I18nProvider';

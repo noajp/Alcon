@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Activity, Bot, Box, CalendarDays, CircleDot, GitBranch, KeyRound, Layers, ListOrdered, RefreshCw, ShieldCheck, Timer, Workflow } from 'lucide-react';
+import { Activity, Bot, Box, CalendarDays, CircleDot, GitBranch, KeyRound, Layers, ListOrdered, RefreshCw, ShieldCheck, Timer, Workflow } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { FONT } from '@/shared/designTokens';
 import { PageHead, PageSection } from '@/Function/shared/PageHead';

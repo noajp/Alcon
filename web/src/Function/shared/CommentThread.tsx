@@ -1,7 +1,7 @@
 'use client';
 
 import { useLayoutEffect, useRef, useState } from 'react';
-import { ChevronDown, MoreHorizontal } from 'lucide-react';
+import { ChevronDown, MoreHorizontal } from '@/ui/icons';
 import { SendIcon } from '@/Function/shared/SendIcon';
 import { Button } from '@/ui/button';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';

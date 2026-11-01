@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Download, ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
+import { Check, Download, ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { translate, useI18n } from '@/Function/i18n/I18nProvider';
 import { officeKindOf, readOffice, type OfficePreview } from './officePreview';

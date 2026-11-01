@@ -1,6 +1,6 @@
 'use client';
 import dynamic from 'next/dynamic';
-import { FileText, ExternalLink, Unlink } from 'lucide-react';
+import { FileText, ExternalLink, Unlink } from '@/ui/icons';
 import { useNoteContent, useNoteHeader } from '@/hooks/useNotesDb';
 import { NoteContentStatus } from './NoteContentStatus';
 import { PresenceStack } from '@/Function/shared/PresenceStack';

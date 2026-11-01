@@ -3,7 +3,7 @@
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useCallback, useMemo } from 'react';
-import { ShieldCheck, Waypoints } from 'lucide-react';
+import { ShieldCheck, Waypoints } from '@/ui/icons';
 import { DropdownMenuItem } from '@/ui/dropdown-menu';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {

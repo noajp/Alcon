@@ -28,6 +28,18 @@ const eslintConfig = defineConfig([
       }],
     },
   },
+  // Icons come from ui/icons — Alcon's own drawings, with Lucide behind them
+  // for the ones not drawn yet — so a glyph drawn once shows everywhere.
+  // (Its own rule name, so it sits beside the layer rules above.)
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/ui/icons/**"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": ["error", {
+        paths: [{ name: "lucide-react", message: "Import icons from '@/ui/icons'." }],
+      }],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

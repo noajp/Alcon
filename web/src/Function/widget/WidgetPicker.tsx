@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus, LayoutGrid } from 'lucide-react';
+import { Plus, LayoutGrid } from '@/ui/icons';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Button } from '@/ui/button';
 import { MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR } from '@/Function/shared/menu';

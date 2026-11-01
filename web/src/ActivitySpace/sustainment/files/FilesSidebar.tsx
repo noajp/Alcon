@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Briefcase, Building2, File, FileImage, FileSpreadsheet, FileText, Handshake, Presentation, Target, Trash2 } from 'lucide-react';
+import { Briefcase, Building2, File, FileImage, FileSpreadsheet, FileText, Handshake, Presentation, Target, Trash2 } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ToolSidebar, type ToolNavItem } from '@/Function/shared/tool/ToolSidebar';
 import { ElementIcon, FilesIcon, ObjectIcon } from '@/Function/shared/conceptIcons';

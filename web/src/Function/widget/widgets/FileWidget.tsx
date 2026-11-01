@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, FileUp, Loader2, Settings2 } from 'lucide-react';
+import { Check, FileUp, Loader2, Settings2 } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell, MenuSectionLabel, MENU_SEPARATOR } from '@/Function/shared/menu';

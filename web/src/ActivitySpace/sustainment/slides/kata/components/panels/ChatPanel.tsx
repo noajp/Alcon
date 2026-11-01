@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { ArrowUp, FileText, Paperclip, X } from "lucide-react";
+import { ArrowUp, FileText, Paperclip, X } from '@/ui/icons';
 import { useKata } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
 import { useActiveFile } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
 import { sendToKata } from "./send";

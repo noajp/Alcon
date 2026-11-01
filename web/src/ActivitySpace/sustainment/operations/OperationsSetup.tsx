@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Check, ChevronDown, Table2 } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Table2 } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell, MENU_ROW } from '@/Function/shared/menu';

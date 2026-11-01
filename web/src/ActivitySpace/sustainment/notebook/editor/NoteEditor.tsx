@@ -10,7 +10,7 @@ import {
   AlignLeft, AlignCenter, AlignRight,
   List, ListOrdered,
   ChevronDown, Quote, Link as LinkIcon, Table as TableIcon, Plus,
-} from 'lucide-react';
+} from '@/ui/icons';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from '@/Function/notebook/htmlSanitizer';
 import { patchBlocks } from '@/Function/notebook/noteMerge';

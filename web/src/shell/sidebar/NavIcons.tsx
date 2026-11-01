@@ -18,14 +18,14 @@ import {
   Briefcase,
   Stone,
   Layers,
-} from 'lucide-react';
+  Users,
+  AiGraph,
+} from '@/ui/icons';
 import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon, FilesIcon } from '@/Function/shared/conceptIcons';
 
 // ── Nav / tab / item icons ───────────────────────────────────────────────
-// Everything uses Lucide at strokeWidth 2. Lucide draws on a 24-unit grid, so
-// the on-screen stroke = strokeWidth × renderSize / 24 — at 16px that's
-// ~1.33px, which reads cleanly without looking hairline-thin (1.5 would
-// render ~1.0px).
+// Alcon's own glyphs (ui/icons): solid shapes on a 16-unit grid, the same
+// family as every other icon in the app.
 //
 // The Execution units (Domain / Object / Element) don't redeclare their glyph
 // here — they re-export the canonical concept icons from conceptIcons.tsx so
@@ -44,18 +44,8 @@ export const NavStrategyIcon = ({ size = 20, className }: { size?: number; class
   <Target size={size} strokeWidth={2} className={className} />
 );
 export const NavWorkloadIcon = ({ size = 20 }: { size?: number }) => <ChartNoAxesColumn size={size} strokeWidth={2} />;
-// Milestone and ChartGantt ink only 18 of Lucide's 24 units where Target,
-// Layers and Box ink 20, so next to them they read a size smaller. Scaling
-// the glyph inside its box keeps the row layout and evens the optical size.
-export const NavTimelineIcon = ({ size = 20 }: { size?: number }) => <ChartGantt size={size} strokeWidth={2} className="scale-110" />;
-// Lucide's user-group, which arrived after the lucide-react version pinned
-// here; the paths are Lucide's own (ISC).
-export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M17 21v-1a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v1M19 10h1a2 2 0 0 1 2 2v1M5 10H4a2 2 0 0 0-2 2v1" />
-    <circle cx="12" cy="11" r="3" /><circle cx="18" cy="4" r="2" /><circle cx="6" cy="4" r="2" />
-  </svg>
-);
+export const NavTimelineIcon = ({ size = 20 }: { size?: number }) => <ChartGantt size={size} strokeWidth={2} />;
+export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => <Users size={size} />;
 // ModeRail layer marks.
 export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => <Stone size={size} strokeWidth={2} />;
 export const NavExecutionModeIcon = ({ size = 20 }: { size?: number }) => <Layers size={size} strokeWidth={2} />;
@@ -64,18 +54,11 @@ export const NavSustainmentModeIcon = ({ size = 20 }: { size?: number }) => <Gri
 export const NavVisionIcon = ({ size = 20 }: { size?: number }) => <Mountain size={size} strokeWidth={2} />;
 export const NavPortfolioIcon = ({ size = 20 }: { size?: number }) => <Briefcase size={size} strokeWidth={2} />;
 // Phase — a Domain's period, reachable from an Initiative rather than the nav.
-export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} className="scale-110" />;
+export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} />;
 
 export const NavCrmIcon = CrmIcon;
 export const NavFilesIcon = FilesIcon;
 // AI — the conversation, as a pop-up or a screen of its own.
-// Lucide's graph-star, also newer than the pinned lucide-react; its paths (ISC).
-export const NavAiIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="m12.342 9.316 1.764-3.527M12.59 14.545l2.35 3.759M13.982 12.332l4.03.447M5.414 17.586 8.88 14.12M9.025 9.742 5.317 5.505" />
-    <circle cx="11" cy="12" r="3" /><circle cx="15" cy="4" r="2" /><circle cx="16" cy="20" r="2" />
-    <circle cx="20" cy="13" r="2" /><circle cx="4" cy="19" r="2" /><circle cx="4" cy="4" r="2" />
-  </svg>
-);
+export const NavAiIcon = ({ size = 20 }: { size?: number }) => <AiGraph size={size} />;
 // Audit — what an AI did, checked.
 export const NavAuditIcon = ({ size = 20 }: { size?: number }) => <ShieldCheck size={size} strokeWidth={2} />;

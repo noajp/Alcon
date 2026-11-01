@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { FlaskConical, X } from 'lucide-react';
+import { FlaskConical, X } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { FONT } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';

@@ -1,6 +1,6 @@
 'use client';
 
-import { Play, Loader2, RotateCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Play, Loader2, RotateCw, CheckCircle2, AlertCircle } from '@/ui/icons';
 import { cn } from '@/lib/utils';
 import type { AgentRun } from '@/hooks/useSupabase';
 import { useI18n } from '@/Function/i18n/I18nProvider';

@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { useSyncExternalStore } from 'react';
-import { SlidersHorizontal, User, Bell, KeyRound, Plug, Globe, Users, Blocks } from 'lucide-react';
+import { SlidersHorizontal, User, Bell, KeyRound, Plug, Globe, Users, Blocks } from '@/ui/icons';
 import { DomainIcon, ObjectIcon, ElementIcon } from '@/Function/shared/conceptIcons';
 import {
   NavStrategyIcon, NavPhaseIcon, NavTimelineIcon,
