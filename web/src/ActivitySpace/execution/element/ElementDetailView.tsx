@@ -93,7 +93,8 @@ import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
 import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal, Paperclip, X } from 'lucide-react';
-import { useElementFiles, useElementFileActions, openElementFile } from '@/hooks/elementFileData';
+import { useElementFiles, useElementFileActions, type ElementFile } from '@/hooks/elementFileData';
+import { ElementFilePreview } from './ElementFilePreview';
 import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckRequest';
 import { openInApp } from '@/Function/shared/appNavigation';
 import { NavSlidesIcon } from '@/shell/sidebar/NavIcons';
@@ -638,6 +639,7 @@ function ElementDetailBody({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { data: files } = useElementFiles(element.id);
   const fileActions = useElementFileActions(element.id);
+  const [previewFile, setPreviewFile] = useState<ElementFile | null>(null);
   const handlePickNote = async (
     noteId: string,
     opts: { isNew: boolean; name: string },
@@ -972,6 +974,7 @@ function ElementDetailBody({
             })()}
           </div>
           </ButtonAppearanceProvider>
+          {previewFile && <ElementFilePreview file={previewFile} onClose={() => setPreviewFile(null)} />}
           {files.length > 0 && (
             <section className="w-full" aria-label={t('Files')}>
               <div className="flex flex-wrap gap-1.5">
@@ -979,7 +982,7 @@ function ElementDetailBody({
                   <span key={f.id} className="group/file inline-flex max-w-[260px] items-center gap-1.5 rounded-md border border-border/60 bg-[var(--surface-rail)] py-1 pl-2 pr-1 text-[12.5px]">
                     <Paperclip size={12} className="shrink-0 text-muted-foreground" />
                     <button type="button" className="truncate text-foreground hover:underline" title={f.name}
-                      onClick={() => { void openElementFile(f).catch((err) => appDialog.alert(err instanceof Error ? err.message : String(err))); }}>
+                      onClick={() => setPreviewFile(f)}>
                       {f.name}
                     </button>
                     {f.uploaded_by === user?.id && (

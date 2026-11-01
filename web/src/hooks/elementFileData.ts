@@ -41,11 +41,13 @@ export function useElementFiles(elementId: string | null) {
   return { data: query.data ?? EMPTY, loading: !!elementId && query.isPending };
 }
 
-/** Pure. A storage key for `name` under the Element: a random prefix keeps
- *  two files of the same name apart; characters storage rejects become "_". */
+/** Pure. A storage key under the Element. Storage accepts ASCII keys only
+ *  (a Japanese file name is refused as an invalid key), so the key is a
+ *  random id plus the name's extension; the name itself is kept in
+ *  element_files for display. */
 function elementFilePath(elementId: string, name: string, random: string): string {
-  const safe = name.normalize('NFC').replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(-120) || 'file';
-  return `${elementId}/${random}-${safe}`;
+  const ext = /\.([A-Za-z0-9]{1,10})$/.exec(name)?.[1]?.toLowerCase();
+  return `${elementId}/${random}${ext ? `.${ext}` : ''}`;
 }
 
 export function useElementFileActions(elementId: string) {
@@ -54,7 +56,7 @@ export function useElementFileActions(elementId: string) {
   const upload = useMutation({
     mutationFn: async (file: File) => {
       if (file.size > MAX_BYTES) throw new Error(translate('Files up to 50 MB can be attached.'));
-      const path = elementFilePath(elementId, file.name, crypto.randomUUID().slice(0, 8));
+      const path = elementFilePath(elementId, file.name, crypto.randomUUID());
       const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type || undefined });
       if (upErr) throw upErr;
       const { error } = await supabase.from('element_files').insert({
@@ -78,6 +80,13 @@ export function useElementFileActions(elementId: string) {
     onSettled: refresh,
   });
   return { upload, remove };
+}
+
+/** A short-lived signed link to a file, for previewing it in the page. */
+export async function elementFileUrl(file: ElementFile, seconds = 300): Promise<string> {
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(file.path, seconds);
+  if (error || !data?.signedUrl) throw error ?? new Error('Could not open the file.');
+  return data.signedUrl;
 }
 
 /** Opens a file through a signed link that lasts a minute. The tab opens
