@@ -158,8 +158,8 @@ export const ElementRow = memo(function ElementRow({
       {/* Status leads the row, where the eye lands — no checkbox, priority
           or id: Shift- or ⌘-click selects (the bulk bar appears), and
           priority and the id live in the Element's own page. */}
-      <td className="sticky left-0 z-10 bg-card w-7 px-1 py-2">
-        <span className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+      <td className="sticky left-0 z-10 bg-card w-13 pl-7.5 pr-1.5 py-2">
+        <span className="flex items-center" onClick={(e) => e.stopPropagation()}>
           {canUpdate ? (
             <StatusPicker
               element={el}
@@ -179,7 +179,7 @@ export const ElementRow = memo(function ElementRow({
           )}
         </span>
       </td>
-      <td className="md:sticky md:left-7 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
+      <td className="md:sticky md:left-13 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         {/* @container: the lease chip below decides how much of itself to
             show from this cell's own width, not the viewport's — the Name
             column is user-resizable and shares the row with the sidebar. */}

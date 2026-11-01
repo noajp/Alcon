@@ -87,12 +87,12 @@ export const ObjectRow = memo(function ObjectRow({
       }}
     >
       {/* No checkbox: Shift- or ⌘-click selects (the bulk bar appears). */}
-      <td className="sticky left-0 z-10 bg-card w-7 px-1 py-2">
-        <div className="flex items-center justify-center text-muted-foreground/70">
+      <td className="sticky left-0 z-10 bg-card w-13 pl-7.5 pr-1.5 py-2">
+        <div className="flex items-center text-muted-foreground/70">
           <ObjectIcon size={16} />
         </div>
       </td>
-      <td className="md:sticky md:left-7 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
+      <td className="md:sticky md:left-13 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         <div className="flex items-center min-w-0 min-h-[1.875rem]">
           <span className="text-[15px] font-medium text-foreground truncate flex-1 min-w-0">
             {obj.name}
