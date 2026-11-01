@@ -62,12 +62,11 @@ import { labelColor, labelColorKey, domainLabelNames, useLabelColors, setLabelCo
 import { LabelPaletteRows } from '@/Function/shared/LabelPaletteRows';
 import { MenuShell } from '@/Function/shared/menu';
 import { RailCard } from '@/Function/shared/RailCard';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import {
   useBoard,
   WidgetSurface,
   WidgetZone,
-  WidgetActionSlotProvider,
-  WidgetActionSlotTarget,
   ELEMENT_DETAIL_BOARD,
   type WidgetHost,
   type Zone,
@@ -284,6 +283,8 @@ function ElementDetailBody({
   useEscapeLayer(emojiPickerOpen, () => setEmojiPickerOpen(false));
   // Subelement create / detail modal — null when closed; { mode: 'create' }
   // for the new-sub-element popup; { mode: 'detail', subelement } for editing.
+  // The Sub-elements section's fold; open unless folded for this visit.
+  const [subsOpen, setSubsOpen] = useState(true);
   const [subModal, setSubModal] = useState<
     | { mode: 'create' }
     | { mode: 'detail'; subelement: Subelement }
@@ -674,7 +675,6 @@ function ElementDetailBody({
   );
 
   return (
-    <WidgetActionSlotProvider>
     <div ref={rootRef} className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Breadcrumb — data hierarchy only: Domain > Object > Element. */}
       <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
@@ -725,9 +725,6 @@ function ElementDetailBody({
             onStart: ({ workerId, prompt }) => agent.start({ workerId, prompt, triggeredFrom: 'detail', domainId }),
           }}
         />
-        {/* The rail's "Add widget" is page chrome, not content: it portals
-            here, beside the breadcrumb, instead of heading the rail. */}
-        <WidgetActionSlotTarget className="flex items-center gap-1" />
       </div>
 
       {/* Scrollable body — Linear-style two-column layout */}
@@ -811,13 +808,13 @@ function ElementDetailBody({
 
           {/* One row under the description, as Linear keeps a single line
               under an issue: reactions, the Note link and (once on) the
-              approval state as quiet icons, then "+ Add sub-element". Direction,
-              dependencies and turning approval on are in the "…" menu; a
-              section that has content takes the full width under the row with
-              its own heading — Direction first (approach / acceptance / next
-              step), then Sub-elements, then Dependencies, so the read order is
-              intent → its breakdown → what it waits on. Sharing an update
-              belongs to the discussion, so it sits in the Comments heading. */}
+              approval state as quiet icons. Direction, dependencies and
+              turning approval on are in the "…" menu. Below, each section
+              takes the full width with its own heading — Direction (once
+              set), Sub-elements (always, with its "+"), then Dependencies —
+              so the read order is intent → its breakdown → what it waits on.
+              Sharing an update belongs to the discussion, so it sits in the
+              Comments heading. */}
           <div className="-ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
           <ButtonAppearanceProvider appearance="inline">
           <div className="flex items-center gap-0.5">
@@ -917,55 +914,48 @@ function ElementDetailBody({
             openSignal={directionSignal}
           />
 
-          {/* Sub-elements — list-style (no card bg). Each row mirrors the
-              Elements list (checkbox + atom icon + title) and clicking a
-              row opens the SubelementDetailModal. New sub-elements are
-              created through the same modal — once at least one exists,
-              the only entry point is a small "+" at the right end of the
-              header. Empty state still shows a labelled "Add sub-element"
-              link so the affordance is obvious. */}
-          <div className={totalSubs > 0 ? 'w-full' : ''}>
-            {totalSubs > 0 && (
-              <div className="mb-1 flex h-8 items-center gap-2">
+          {/* Sub-elements — a section like Comments: its heading folds the
+              list (▶), with "+" right beside it to add one through the
+              SubelementDetailModal. Rows mirror the Elements list and open
+              the same modal. */}
+          <section className="w-full">
+            <div className="mb-1 flex h-8 items-center gap-1">
+              <button type="button" onClick={() => setSubsOpen((o) => !o)} aria-expanded={subsOpen}
+                className="flex items-center gap-2 rounded-md text-foreground">
                 <h2 className={`${FONT.lg} text-foreground`}>{t('Sub-elements')}</h2>
-                <span className="text-[12px] tabular-nums text-muted-foreground">{completedSubs}/{totalSubs}</span>
-                <div className="flex-1" />
-                <button
-                  type="button"
-                  onClick={() => setSubModal({ mode: 'create' })}
-                  className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
-                  title={t('New sub-element')}
-                  aria-label={t('New sub-element')}
-                >
-                  <Plus size={13} strokeWidth={2.5} />
-                </button>
+                <DisclosureTriangle open={subsOpen} className="text-muted-foreground" />
+              </button>
+              {totalSubs > 0 && <span className="ml-1 text-[12px] tabular-nums text-muted-foreground">{completedSubs}/{totalSubs}</span>}
+              <button
+                type="button"
+                onClick={() => setSubModal({ mode: 'create' })}
+                className="ml-1 inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
+                title={t('New sub-element')}
+                aria-label={t('New sub-element')}
+              >
+                <Plus size={13} strokeWidth={2.5} />
+              </button>
+            </div>
+            {subsOpen && (
+              <div
+                className="space-y-0 group/sublist"
+                data-has-selection={subSelection.selectedRowIds.size > 0 ? '' : undefined}
+              >
+                {element.subelements?.map((sub) => (
+                  <SubelementRow
+                    key={sub.id}
+                    subelement={sub}
+                    onRefresh={onRefresh}
+                    onOpen={() => setSubModal({ mode: 'detail', subelement: sub })}
+                    canRowSelect
+                    isSelected={subSelection.selectedRowIds.has(sub.id)}
+                    hasSelectionRef={hasSubSelectionRef}
+                    onRowSelect={(id, mode) => subSelection.handleRowSelect(id, mode, subIds)}
+                  />
+                ))}
               </div>
             )}
-            <div
-              className="space-y-0 group/sublist"
-              data-has-selection={subSelection.selectedRowIds.size > 0 ? '' : undefined}
-            >
-              {element.subelements?.map((sub) => (
-                <SubelementRow
-                  key={sub.id}
-                  subelement={sub}
-                  onRefresh={onRefresh}
-                  onOpen={() => setSubModal({ mode: 'detail', subelement: sub })}
-                  canRowSelect
-                  isSelected={subSelection.selectedRowIds.has(sub.id)}
-                  hasSelectionRef={hasSubSelectionRef}
-                  onRowSelect={(id, mode) => subSelection.handleRowSelect(id, mode, subIds)}
-                />
-              ))}
-              {totalSubs === 0 && (
-                <ButtonAppearanceProvider appearance="inline">
-                  <Button variant="ghost" size="sm" onClick={() => setSubModal({ mode: 'create' })}>
-                    <Plus size={13} strokeWidth={2.5} />{t('Add sub-element')}
-                  </Button>
-                </ButtonAppearanceProvider>
-              )}
-            </div>
-          </div>
+          </section>
 
           <SubelementBulkBar
             count={subSelection.selectedRowIds.size}
@@ -1053,7 +1043,7 @@ function ElementDetailBody({
                 assumptions the Initiative bound to it. Above Properties for the
                 same reason Initiative intent sits above them on an Object: why
                 it exists comes before who owns it. */}
-            <WidgetSurface board={board} host={host} zones={ELEMENT_ZONES}>
+            <WidgetSurface board={board} host={host} zones={ELEMENT_ZONES} addable={false}>
               <WidgetZone zone="rail" />
             </WidgetSurface>
 
@@ -1351,7 +1341,6 @@ function ElementDetailBody({
         />
       )}
     </div>
-    </WidgetActionSlotProvider>
   );
 }
 
