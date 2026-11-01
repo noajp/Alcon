@@ -483,7 +483,7 @@ export async function exportPptx(deck: Deck, t: LookTokens, roles: string[], fil
     const c: Ctx = { pptx, s, t, display, body: "Yu Gothic", styles: slide.styles, slides: deck.slides, lang, st: (ja, en) => (lang === "ja" ? ja : en) };
     objects(c, slide, true);
     if (slide.layout === "cover") cover(c, slide);
-    else {
+    else if (slide.layout !== "free") {
       chrome(c, slide, i, roles[i] ?? "");
       body(c, slide);
     }

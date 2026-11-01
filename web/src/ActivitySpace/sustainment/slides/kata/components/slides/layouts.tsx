@@ -48,6 +48,8 @@ export function Body({ slide }: { slide: Slide }) {
       return <Kpi slide={slide} />;
     case "closing":
       return <Closing slide={slide} />;
+    case "free":
+      return null;
   }
 }
 

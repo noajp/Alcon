@@ -12,20 +12,6 @@
       ],
       "port": 3000,
       "autoPort": true
-    },
-    {
-      "name": "alcon-web-prod",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "start",
-        "--prefix",
-        "web",
-        "--",
-        "-p",
-        "3001"
-      ],
-      "port": 3001
     }
   ]
 }
