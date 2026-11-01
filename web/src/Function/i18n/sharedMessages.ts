@@ -86,7 +86,7 @@ const SHARED_MESSAGES: Record<string, Row> = {
   'Hide column': ['列を隠す', '열 숨기기', 'Masquer la colonne', 'Ocultar columna'],
   'Resize column': ['列幅を変更', '열 너비 조정', 'Redimensionner la colonne', 'Cambiar ancho de columna'],
   'Configure fields': ['項目を設定', '항목 설정', 'Configurer les champs', 'Configurar campos'],
-  'Set a range': ['期間にする', '기간으로 설정', 'Définir une période', 'Usar un rango'],
+  'Range': ['期間', '기간', 'Période', 'Rango'],
   'Pick the start, then the due date': ['開始日、次に期日を選びます', '시작일, 그다음 마감일을 고르세요', 'Choisissez le début, puis l’échéance', 'Elige el inicio y luego la fecha límite'],
 
   // Type cell
