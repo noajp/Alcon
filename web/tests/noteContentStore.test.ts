@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createNoteContentStore } from '@/Function/notebook/noteContentStore';
 
@@ -8,13 +9,21 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+/** The queue's own behaviour, with an adapter that knows nothing of versions. */
+function storeOf(adapter: { read: (id: string) => Promise<string>; write: (id: string, html: string) => unknown }) {
+  return createNoteContentStore({
+    read: async (id) => ({ html: await adapter.read(id), stamp: null }),
+    write: async (id, html) => { await adapter.write(id, html); return { stamp: 's' }; },
+  });
+}
+
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('Note autosave queue', () => {
   it('never writes on initial load, unchanged content, subscription or cleanup', async () => {
     const write = vi.fn();
-    const store = createNoteContentStore({ read: async () => '<p>Saved</p>', write });
+    const store = storeOf({ read: async () => '<p>Saved</p>', write });
     const unsubscribe = store.subscribe('a', vi.fn());
     await store.load('a');
     store.edit('a', '<p>Saved</p>');
@@ -27,7 +36,7 @@ describe('Note autosave queue', () => {
 
   it('flushes the last A edit on an immediate A to B switch without changing B', async () => {
     const write = vi.fn(async () => {});
-    const store = createNoteContentStore({ read: async (id) => id, write });
+    const store = storeOf({ read: async (id) => id, write });
     await store.load('a');
     store.edit('a', 'A draft');
     // The hook calls flush from its old Note's effect cleanup, before the
@@ -45,7 +54,7 @@ describe('Note autosave queue', () => {
   it('shares one queue across consumers and coalesces edits behind a slow write', async () => {
     const first = deferred<void>();
     const write = vi.fn().mockImplementationOnce(() => first.promise).mockResolvedValue(undefined);
-    const store = createNoteContentStore({ read: async () => 'saved', write });
+    const store = storeOf({ read: async () => 'saved', write });
     const widget = vi.fn();
     const notebook = vi.fn();
     store.subscribe('a', widget);
@@ -71,7 +80,7 @@ describe('Note autosave queue', () => {
     const first = deferred<void>();
     const read = vi.fn(async () => 'saved');
     const write = vi.fn().mockImplementationOnce(() => first.promise).mockResolvedValue(undefined);
-    const store = createNoteContentStore({ read, write });
+    const store = storeOf({ read, write });
     await store.load('a');
     store.edit('a', 'first');
     const pending = store.flush('a');
@@ -94,7 +103,7 @@ describe('Note autosave queue', () => {
     const stale = deferred<string>();
     const read = vi.fn().mockResolvedValueOnce('saved').mockImplementationOnce(() => stale.promise);
     const write = vi.fn(async () => {});
-    const store = createNoteContentStore({ read, write });
+    const store = storeOf({ read, write });
     await store.load('a');
     const revalidation = store.load('a');
     store.edit('a', 'new body');
@@ -107,7 +116,7 @@ describe('Note autosave queue', () => {
   it('keeps a warm editor mounted during revalidation and preserves retained drafts', async () => {
     const fresh = deferred<string>();
     const read = vi.fn().mockResolvedValueOnce('cached').mockImplementationOnce(() => fresh.promise);
-    const store = createNoteContentStore({ read, write: vi.fn(async () => {}) });
+    const store = storeOf({ read, write: vi.fn(async () => {}) });
     await store.load('a');
     const reopening = store.load('a');
     expect(store.getSnapshot('a')).toMatchObject({ html: 'cached', ready: true, loading: false });
@@ -123,7 +132,7 @@ describe('Note autosave queue', () => {
   it('reports failed reads without marking the empty body ready, and retries only the read', async () => {
     const read = vi.fn().mockRejectedValueOnce(new Error('read failed')).mockResolvedValueOnce('saved');
     const write = vi.fn(async () => {});
-    const store = createNoteContentStore({ read, write });
+    const store = storeOf({ read, write });
     await store.load('a');
     expect(store.getSnapshot('a')).toMatchObject({ ready: false, errorKind: 'read' });
     await store.retry('a');
@@ -133,7 +142,7 @@ describe('Note autosave queue', () => {
 
   it('starts autosave only after the last edit has been idle for the debounce interval', async () => {
     const write = vi.fn(async () => {});
-    const store = createNoteContentStore({ read: async () => 'saved', write });
+    const store = storeOf({ read: async () => 'saved', write });
     await store.load('a');
     store.edit('a', 'first');
     await vi.advanceTimersByTimeAsync(400);
@@ -142,5 +151,73 @@ describe('Note autosave queue', () => {
     expect(write).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(write).toHaveBeenCalledExactlyOnceWith('a', 'latest');
+  });
+});
+
+/** A server row: its body and version, saved only over the version it holds. */
+function server(html: string) {
+  let row = { html, stamp: 'v0' };
+  let n = 0;
+  return {
+    get row() { return row; },
+    /** Someone else saves. */
+    set(next: string) { row = { html: next, stamp: `v${++n}` }; return row; },
+    adapter: {
+      read: vi.fn(async () => ({ ...row })),
+      write: vi.fn(async (_id: string, next: string, stamp: string | null) => {
+        if (stamp !== row.stamp) return 'conflict' as const;
+        row = { html: next, stamp: `v${++n}` };
+        return { stamp: row.stamp };
+      }),
+    },
+  };
+}
+
+describe('Note editing by several people', () => {
+  it('merges a save that lost the race with what was saved first', async () => {
+    const db = server('<p>a</p><p>b</p>');
+    const store = createNoteContentStore(db.adapter);
+    await store.load('n');
+    store.edit('n', '<p>A</p><p>b</p>');
+    db.set('<p>a</p><p>B</p>');
+    await store.flush('n');
+    expect(db.row.html).toBe('<p>A</p><p>B</p>');
+    expect(store.getSnapshot('n')).toMatchObject({ html: '<p>A</p><p>B</p>', dirty: false });
+    expect(db.adapter.write).toHaveBeenCalledTimes(2);
+  });
+
+  it('takes a live change as it is when nothing is unsaved, and merges it into a draft', async () => {
+    const db = server('<p>a</p><p>b</p>');
+    const store = createNoteContentStore(db.adapter);
+    await store.load('n');
+    store.receive('n', db.set('<p>a</p><p>B</p>'));
+    expect(store.getSnapshot('n')).toMatchObject({ html: '<p>a</p><p>B</p>', dirty: false });
+    store.edit('n', '<p>A</p><p>B</p>');
+    store.receive('n', db.set('<p>a</p><p>B</p><p>c</p>'));
+    expect(store.getSnapshot('n').html).toBe('<p>A</p><p>B</p><p>c</p>');
+    await vi.runAllTimersAsync();
+    expect(db.row.html).toBe('<p>A</p><p>B</p><p>c</p>');
+    expect(db.adapter.write).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores its own save coming back, and looks again at a change that came mid-save', async () => {
+    const db = server('<p>a</p>');
+    const gate = deferred<void>();
+    const write = db.adapter.write;
+    db.adapter.write = vi.fn(async (id: string, next: string, stamp: string | null) => { await gate.promise; return write(id, next, stamp); });
+    const store = createNoteContentStore(db.adapter);
+    await store.load('n');
+    store.edit('n', '<p>mine</p>');
+    const saving = store.flush('n');
+    await vi.advanceTimersByTimeAsync(0);
+    // Arrives while the save runs: held, then read again after it.
+    store.receive('n', { html: '<p>noise</p>', stamp: 'elsewhere' });
+    gate.resolve();
+    await saving;
+    await vi.runAllTimersAsync();
+    expect(db.adapter.read).toHaveBeenCalledTimes(2);
+    expect(store.getSnapshot('n')).toMatchObject({ html: '<p>mine</p>', dirty: false });
+    store.receive('n', { ...db.row });
+    expect(store.getSnapshot('n').html).toBe('<p>mine</p>');
   });
 });

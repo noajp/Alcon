@@ -8,17 +8,16 @@ import type { SubjectKind } from '@/Function/widget/types';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export interface BoardViewer { userId: string; name: string }
+export interface Viewer { userId: string; name: string }
 
 /**
- * Who else has this subject's board open right now. The channel is private:
- * the server lets in only people who can see the subject (ADR 0041), so
- * nobody learns who is looking at something they cannot open. A personal
- * board has no one else to show.
+ * Who else has something open right now, on a private presence channel the
+ * server lets only people who can see that thing join (ADR 0041) — so nobody
+ * learns who is looking at something they cannot open. Null: nothing to show.
  */
-export function useBoardPresence(kind: SubjectKind, subjectId: string | null): BoardViewer[] {
+function usePresence(topic: string | null): Viewer[] {
   const { userId } = useSessionUserId();
-  const enabled = !!userId && kind !== 'me' && !!subjectId && UUID.test(subjectId);
+  const enabled = !!userId && !!topic;
   const profile = useQuery({
     queryKey: ['presence-name', userId],
     enabled,
@@ -34,11 +33,11 @@ export function useBoardPresence(kind: SubjectKind, subjectId: string | null): B
     },
   });
   const name = profile.data ?? null;
-  const [viewers, setViewers] = useState<BoardViewer[]>([]);
+  const [viewers, setViewers] = useState<Viewer[]>([]);
 
   useEffect(() => {
     if (!enabled || profile.isPending) return;
-    const channel = supabase.channel(`board:${kind}:${subjectId}`, {
+    const channel = supabase.channel(topic!, {
       config: { private: true, presence: { key: userId! } },
     });
     channel.on('presence', { event: 'sync' }, () => {
@@ -55,7 +54,17 @@ export function useBoardPresence(kind: SubjectKind, subjectId: string | null): B
       setViewers([]);
       void supabase.removeChannel(channel);
     };
-  }, [enabled, profile.isPending, kind, subjectId, userId, name]);
+  }, [enabled, profile.isPending, topic, userId, name]);
 
   return enabled ? viewers : [];
+}
+
+/** Who else has this subject's board open. A personal board has no one else to show. */
+export function useBoardPresence(kind: SubjectKind, subjectId: string | null): Viewer[] {
+  return usePresence(kind !== 'me' && subjectId && UUID.test(subjectId) ? `board:${kind}:${subjectId}` : null);
+}
+
+/** Who else has this Note open (anyone who can see what it is attached to). */
+export function useNotePresence(noteId: string | null): Viewer[] {
+  return usePresence(noteId && UUID.test(noteId) ? `note:${noteId}` : null);
 }

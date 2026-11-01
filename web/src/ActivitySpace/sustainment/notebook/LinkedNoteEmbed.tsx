@@ -3,6 +3,8 @@ import dynamic from 'next/dynamic';
 import { FileText, ExternalLink, Unlink } from 'lucide-react';
 import { useNoteContent, useNoteHeader } from '@/hooks/useNotesDb';
 import { NoteContentStatus } from './NoteContentStatus';
+import { PresenceStack } from '@/Function/shared/PresenceStack';
+import { useNotePresence } from '@/hooks/usePresence';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 // Editor is heavy and only mounts when a linked note is expanded — load it
@@ -39,6 +41,7 @@ export function LinkedNoteEmbed({
   const { t } = useI18n();
   const { html, loading, saving, error, errorKind, retry, save } = useNoteContent(noteId);
   const name = useNoteHeader(noteId).data?.name;
+  const viewers = useNotePresence(noteId);
 
   return (
     <div>
@@ -47,6 +50,7 @@ export function LinkedNoteEmbed({
         <span className="text-[12px] font-semibold text-foreground truncate flex-1 min-w-0">
           {name || t('Untitled note')}
         </span>
+        <PresenceStack viewers={viewers} size={18} />
         <ButtonAppearanceProvider appearance="navigation">
           {onOpenInNotes && (
             <Button variant="ghost" size="icon-xs" onClick={onOpenInNotes} title={t('Open in Notebook')} aria-label={t('Open in Notebook')}>

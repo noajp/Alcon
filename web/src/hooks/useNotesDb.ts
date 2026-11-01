@@ -6,6 +6,7 @@ import { getQueryClient } from '@/lib/queryClient';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import { createNoteContentStore, EMPTY_NOTE_CONTENT } from '@/Function/notebook/noteContentStore';
+import { retainChannel } from './sharedRealtime';
 import type {
   NoteNode,
   NoteNodeType,
@@ -99,9 +100,12 @@ const APP_GUIDE_README_HTML = `<h1>Alcon へようこそ</h1>
  */
 export async function ensureAppGuideNotes(): Promise<void> {
   try {
+    const me = await getCurrentUserId();
+    if (!me) return;
     const { data: existing } = await supabase
       .from('notes')
       .select('id')
+      .eq('created_by', me)
       .eq('type', 'folder')
       .eq('name', 'アプリガイド')
       .limit(1)
@@ -143,9 +147,14 @@ async function ensureNoteHome(): Promise<{
   createdFolder: NoteNode | null;
   createdSection: NoteNode | null;
 }> {
+  // Own Notes only: a Note shared through an Element or Object is readable
+  // but is not a place to file new ones.
+  const me = await getCurrentUserId();
+  if (!me) throw new Error('Sign in again to create a Note.');
   const { data: existingFolder } = await supabase
     .from('notes')
     .select('*')
+    .eq('created_by', me)
     .eq('type', 'folder')
     .order('order_index', { ascending: true })
     .limit(1)
@@ -168,6 +177,7 @@ async function ensureNoteHome(): Promise<{
   const { data: existingSection } = await supabase
     .from('notes')
     .select('*')
+    .eq('created_by', me)
     .eq('type', 'section')
     .eq('parent_id', folderId)
     .order('order_index', { ascending: true })
@@ -216,9 +226,14 @@ export function useNotes() {
     if (notesInflight) return notesInflight;
     notesInflight = (async () => {
       try {
+        // The Notebook is one's own Notes; ones shared through an Element or
+        // Object open from there, not from this tree.
+        const me = await getCurrentUserId();
+        if (!me) return [];
         const { data, error } = await supabase
           .from('notes')
           .select('*')
+          .eq('created_by', me)
           .order('order_index', { ascending: true });
         if (error) throw error;
         return (data as NoteRow[]).map(rowToNode);
@@ -370,6 +385,9 @@ export function useNotes() {
 
 // ============================================
 // Note content — shared drafts and autosave queues, scoped to the signed-in user.
+// Everyone who can see a Note edits one body: each save lands only on the
+// version it started from (updated_at), and a body saved elsewhere arrives
+// live and is merged in (noteContentStore).
 // ============================================
 const contentStores = new Map<string, ReturnType<typeof createNoteContentStore>>();
 function contentStoreFor(userId: string) {
@@ -381,15 +399,26 @@ function contentStoreFor(userId: string) {
     store = createNoteContentStore({
       async read(noteId) {
         await requireSameUser();
-        const { data, error } = await supabase.from('note_contents').select('html').eq('note_id', noteId).maybeSingle();
+        const { data, error } = await supabase.from('note_contents').select('html, updated_at').eq('note_id', noteId).maybeSingle();
         if (error) throw error;
-        return (data as NoteContentRow | null)?.html ?? '';
+        const row = data as NoteContentRow | null;
+        return { html: row?.html ?? '', stamp: row?.updated_at ?? null };
       },
-      async write(noteId, html) {
+      async write(noteId, html, stamp) {
         await requireSameUser();
-        const { error } = await supabase.from('note_contents')
-          .upsert({ note_id: noteId, html }, { onConflict: 'note_id' });
+        if (stamp === null) {
+          // No body yet: the first save makes it, unless someone just did.
+          const { data, error } = await supabase.from('note_contents')
+            .insert({ note_id: noteId, html, updated_by: userId }).select('updated_at').single();
+          if (error?.code === '23505') return 'conflict';
+          if (error || !data) throw error ?? new Error('Could not save this Note.');
+          return { stamp: (data as { updated_at: string }).updated_at };
+        }
+        const { data, error } = await supabase.from('note_contents')
+          .update({ html, updated_by: userId }).eq('note_id', noteId).eq('updated_at', stamp).select('updated_at');
         if (error) throw error;
+        const saved = (data ?? []) as { updated_at: string }[];
+        return saved.length ? { stamp: saved[0].updated_at } : 'conflict';
       },
     });
     contentStores.set(userId, store);
@@ -414,6 +443,19 @@ export function useNoteContent(noteId: string | null) {
     return () => { void store.flush(noteId); };
   }, [noteId, store]);
 
+  // Bodies saved by anyone else arrive live, for as long as the Note is open.
+  useEffect(() => {
+    if (!noteId || !store || !userId) return;
+    return retainChannel(`note-contents:${userId}:${noteId}`, (channel) => channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'note_contents', filter: `note_id=eq.${noteId}` },
+      (payload) => {
+        const row = payload.new as Partial<NoteContentRow> | undefined;
+        if (row && typeof row.html === 'string' && row.updated_at) store.receive(noteId, { html: row.html, stamp: row.updated_at });
+      },
+    ));
+  }, [noteId, store, userId]);
+
   const save = useCallback((html: string) => {
     if (noteId && store?.getSnapshot(noteId).ready) store.edit(noteId, html);
   }, [noteId, store]);
@@ -434,8 +476,9 @@ export function useNoteContent(noteId: string | null) {
   };
 }
 
-/** One Note's id and name, or null when the viewer cannot see it (Notes are
- *  their author's own). Shared by every embed of the same Note. */
+/** One Note's id and name, or null when the viewer cannot see it (a Note is
+ *  its author's, and shared with whoever can see what it is attached to).
+ *  Shared by every embed of the same Note. */
 export function useNoteHeader(noteId: string | null) {
   return useQuery({
     queryKey: ['note-header', noteId],
@@ -457,9 +500,12 @@ export interface NoteFileSummary {
 
 /** Every Note file the viewer can see, most recently edited first. */
 export async function fetchNoteFiles(): Promise<NoteFileSummary[]> {
+  const me = await getCurrentUserId();
+  if (!me) return [];
   const { data, error } = await supabase
     .from('notes')
     .select('id, name, parent_id, updated_at')
+    .eq('created_by', me)
     .eq('type', 'file')
     .order('updated_at', { ascending: false });
   if (error) throw error;
