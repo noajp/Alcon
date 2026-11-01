@@ -92,7 +92,8 @@ import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
-import { Smile, FileText, FolderInput, Trash2, RotateCcw } from 'lucide-react';
+import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal } from 'lucide-react';
+import { CodeChangeIcon } from '@/ActivitySpace/execution/code/codeChangeLabels';
 import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NotePicker } from '@/ActivitySpace/sustainment/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/sustainment/notebook/LinkedNoteEmbed';
@@ -627,6 +628,7 @@ function ElementDetailBody({
   const [directionSignal, setDirectionSignal] = useState(0);
   const [dependencySignal, setDependencySignal] = useState(0);
   const [approvalSignal, setApprovalSignal] = useState(0);
+  const [linkPrSignal, setLinkPrSignal] = useState(0);
   const handlePickNote = async (
     noteId: string,
     opts: { isNew: boolean; name: string },
@@ -895,6 +897,27 @@ function ElementDetailBody({
               </div>
             )}
 
+            {/* More attachments, kept out of the page until chosen: linking
+                a pull request opens its URL field in the Code changes
+                section below. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
+                  title={t('More')}
+                  aria-label={t('More')}
+                >
+                  <MoreHorizontal size={15} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[200px]">
+                <DropdownMenuItem onSelect={() => setTimeout(() => setLinkPrSignal((n) => n + 1), 0)} className="gap-2.5 py-1.5 text-[13px]">
+                  <CodeChangeIcon size={15} className="text-muted-foreground" />{t('Link pull request')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {/* Approval — turned on from the "…" menu; once on, its state
                 icon here opens the panel to record a decision (Approve /
                 Request changes / Reject). */}
@@ -953,7 +976,7 @@ function ElementDetailBody({
             </div>
             {subsOpen && (
               <div
-                className="space-y-0 group/sublist"
+                className="-mx-2 space-y-0 group/sublist"
                 data-has-selection={subSelection.selectedRowIds.size > 0 ? '' : undefined}
               >
                 {element.subelements?.map((sub) => (
@@ -1000,7 +1023,7 @@ function ElementDetailBody({
             onOpenElement={onOpenElement} onChanged={onRefresh} openSignal={dependencySignal} />
           </div>
 
-          <CodeChangesSection elementId={element.id} />
+          <CodeChangesSection elementId={element.id} openSignal={linkPrSignal} />
 
           <AgentRunPanel
             agent={agent}

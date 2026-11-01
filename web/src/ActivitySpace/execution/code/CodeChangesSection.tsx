@@ -17,11 +17,20 @@ import { CodeReviewDialog } from './CodeReviewDialog';
 // opens; anyone can link one by its URL. Opening one shows its diff beside the
 // intent it was built for.
 
-export function CodeChangesSection({ elementId }: { elementId: string }) {
+export function CodeChangesSection({ elementId, openSignal = 0 }: {
+  elementId: string;
+  /** Bumped by the Element's row "…" menu (Link pull request) to open the URL field. */
+  openSignal?: number;
+}) {
   const { t } = useI18n();
   const { data: changes } = useCodeChanges(elementId);
   const { link, unlink } = useCodeChangeActions(elementId);
   const [adding, setAdding] = useState(false);
+  const [seenSignal, setSeenSignal] = useState(openSignal);
+  if (openSignal !== seenSignal) {
+    setSeenSignal(openSignal);
+    setAdding(true);
+  }
   const [url, setUrl] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
   const open = changes.find((c) => c.id === openId) ?? null;
@@ -54,20 +63,9 @@ export function CodeChangesSection({ elementId }: { elementId: string }) {
     </div>
   );
 
-  if (changes.length === 0) {
-    return (
-      <div>
-        {!adding && (
-          <ButtonAppearanceProvider appearance="inline">
-            <Button variant="ghost" size="sm" align="start" className="-ml-2" onClick={() => setAdding(true)}>
-              <CodeChangeIcon size={13} />{t('Link pull request')}
-            </Button>
-          </ButtonAppearanceProvider>
-        )}
-        {composer}
-      </div>
-    );
-  }
+  // None linked: nothing on the page until "Link pull request" is chosen
+  // from the row's "…" menu, which opens the URL field here.
+  if (changes.length === 0) return adding ? <div>{composer}</div> : null;
 
   return (
     <PageSection title={t('Code changes')} action={
