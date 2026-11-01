@@ -48,6 +48,7 @@ exports[`golden previews > a Google Sheets workbook 1`] = `
     "defaultCol": 96,
     "defaultRow": 20,
     "gridLines": false,
+    "images": [],
     "name": "サマリ",
     "rows": [
       {
@@ -369,6 +370,7 @@ exports[`golden previews > a Google Sheets workbook 1`] = `
     "defaultCol": 81,
     "defaultRow": 20,
     "gridLines": true,
+    "images": [],
     "name": "データ",
     "rows": [
       {

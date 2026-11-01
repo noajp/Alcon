@@ -66,3 +66,40 @@ describe('readWorkbook', () => {
     expect(summary.charts[0]).toMatchObject({ kind: 'column', x: 0, y: 40 + 20, w: 400, h: 200, categories: ['Jan', 'Feb'], series: [{ name: 'Sales', values: [10, 20] }] });
   });
 });
+
+describe('conditional formats, rich text and pictures', () => {
+  it('applies value rules, colour scales, data bars, top-N and duplicates; keeps rich text; places pictures', async () => {
+    const zip = new JSZip();
+    zip.file('xl/workbook.xml', `<workbook ${NS}><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>`);
+    zip.file('xl/_rels/workbook.xml.rels', '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>');
+    zip.file('xl/styles.xml', `<styleSheet ${NS}><fonts><font><sz val="11"/><name val="Calibri"/></font></fonts><fills><fill/></fills><borders><border/></borders><cellXfs><xf/></cellXfs>`
+      + '<dxfs><dxf><font><b/><color rgb="FF9C0006"/></font><fill><patternFill><bgColor rgb="FFFFC7CE"/></patternFill></fill></dxf></dxfs></styleSheet>');
+    zip.file('xl/sharedStrings.xml', `<sst ${NS}><si><r><rPr><b/><color rgb="FFFF0000"/></rPr><t>重要</t></r><r><t>: 確認</t></r></si></sst>`);
+    const row = (r: number, a: number, b: number, c: number) => `<row r="${r}"><c r="A${r}"><v>${a}</v></c><c r="B${r}"><v>${b}</v></c><c r="C${r}"><v>${c}</v></c></row>`;
+    zip.file('xl/worksheets/sheet1.xml', `<worksheet ${NS}><sheetData>${row(1, -5, 0, 1)}${row(2, 3, 50, 1)}${row(3, 8, 100, 2)}<row r="4"><c r="D4" t="s"><v>0</v></c></row></sheetData>`
+      + '<conditionalFormatting sqref="A1:A3"><cfRule type="cellIs" dxfId="0" priority="1" operator="lessThan"><formula>0</formula></cfRule></conditionalFormatting>'
+      + '<conditionalFormatting sqref="B1:B3"><cfRule type="colorScale" priority="2"><colorScale><cfvo type="min"/><cfvo type="max"/><color rgb="FFFFFFFF"/><color rgb="FF63BE7B"/></colorScale></cfRule></conditionalFormatting>'
+      + '<conditionalFormatting sqref="A1:A3"><cfRule type="dataBar" priority="3"><dataBar><cfvo type="min"/><cfvo type="max"/><color rgb="FF638EC6"/></dataBar></cfRule></conditionalFormatting>'
+      + '<conditionalFormatting sqref="C1:C3"><cfRule type="duplicateValues" dxfId="0" priority="4"/></conditionalFormatting>'
+      + '<drawing r:id="rId1"/></worksheet>');
+    zip.file('xl/worksheets/_rels/sheet1.xml.rels', '<Relationships><Relationship Id="rId1" Target="../drawings/drawing1.xml"/></Relationships>');
+    zip.file('xl/drawings/drawing1.xml', '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+      + '<xdr:oneCellAnchor><xdr:from><xdr:col>4</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx="952500" cy="476250"/><xdr:pic><xdr:blipFill><a:blip r:embed="rId3"/></xdr:blipFill></xdr:pic></xdr:oneCellAnchor></xdr:wsDr>');
+    zip.file('xl/drawings/_rels/drawing1.xml.rels', '<Relationships><Relationship Id="rId3" Target="../media/image1.png"/></Relationships>');
+    zip.file('xl/media/image1.png', 'png');
+    const [sheet] = await readWorkbook(await zip.generateAsync({ type: 'arraybuffer' }));
+    const at = (r: number, c: number) => sheet.rows[r].cells[c];
+    expect(at(0, 0).style).toMatchObject({ bg: '#ffc7ce', color: '#9c0006', bold: true });
+    expect(at(1, 0).style?.bg ?? null).toBeNull();
+    expect([at(0, 1), at(1, 1), at(2, 1)].map((c) => c.style?.bg)).toEqual(['#ffffff', '#b1dfbd', '#63be7b']);
+    expect([at(0, 0), at(1, 0), at(2, 0)].map((c) => c.bar?.pct)).toEqual([0, expect.closeTo(0.615, 2), 1]);
+    expect([at(0, 2), at(1, 2), at(2, 2)].map((c) => c.style?.bold ?? false)).toEqual([true, true, false]);
+    expect(at(3, 3).runs).toEqual([
+      { text: '重要', bold: true, italic: false, underline: false, color: '#ff0000', size: null, font: null },
+      { text: ': 確認', bold: false, italic: false, underline: false, color: null, size: null, font: null },
+    ]);
+    expect(sheet.images[0]).toMatchObject({ y: 0, w: 100, h: 50 });
+    expect(sheet.images[0].src.startsWith('data:image/png;base64,')).toBe(true);
+  });
+});
+

@@ -641,6 +641,8 @@ function SheetView({ sheets }: { sheets: WorkSheet[] }) {
                               borderTop: st?.borders.top ?? undefined, borderRight: st?.borders.right ?? undefined,
                               borderBottom: st?.borders.bottom ?? undefined, borderLeft: st?.borders.left ?? undefined,
                               background: st?.bg ?? undefined, color: st?.color ?? undefined,
+                              // A data bar fills the cell from the left by its share.
+                              backgroundImage: cell?.bar ? `linear-gradient(90deg, ${cell.bar.color} ${cell.bar.pct * 100}%, transparent ${cell.bar.pct * 100}%)` : undefined,
                               fontWeight: st?.bold ? 700 : undefined, fontStyle: st?.italic ? 'italic' : undefined,
                               textDecoration: [st?.underline && 'underline', st?.strike && 'line-through'].filter(Boolean).join(' ') || undefined,
                               fontSize: st?.size ? `${st.size * 4 / 3}px` : undefined,
@@ -650,7 +652,12 @@ function SheetView({ sheets }: { sheets: WorkSheet[] }) {
                               whiteSpace: st?.wrap ? 'normal' : 'nowrap',
                               fontVariantNumeric: cell?.numeric ? 'tabular-nums' : undefined,
                             }}>
-                            {cell?.text}
+                            {cell?.runs ? cell.runs.map((run, k) => (
+                              <span key={k} style={{
+                                fontWeight: run.bold ? 700 : undefined, fontStyle: run.italic ? 'italic' : undefined, textDecoration: run.underline ? 'underline' : undefined,
+                                color: run.color ?? undefined, fontSize: run.size ? `${run.size * 4 / 3}px` : undefined, fontFamily: fontStack(run.font) ?? undefined,
+                              }}>{run.text}</span>
+                            )) : cell?.text}
                           </td>
                         );
                       })}
@@ -660,6 +667,10 @@ function SheetView({ sheets }: { sheets: WorkSheet[] }) {
                 {spacer(tops[rowCount] - tops[last], 'below')}
               </tbody>
             </table>
+            {sheet.images.map((img, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={`img${i}`} src={img.src} alt="" className="absolute z-[5]" style={{ left: HEAD_W + img.x, top: HEAD_H + img.y, width: img.w, height: img.h }} />
+            ))}
             {sheet.charts.map((chart, i) => (
               <div key={i} className="absolute z-[5]" style={{ left: HEAD_W + chart.x, top: HEAD_H + chart.y, width: chart.w, height: chart.h }}>
                 <SheetChartView chart={chart} />
