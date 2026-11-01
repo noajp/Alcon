@@ -14,8 +14,11 @@ exports[`golden previews > a Google Sheets workbook 1`] = `
         "kind": "line",
         "series": [
           {
+            "axis": "left",
             "color": "#0f9d58",
+            "labels": false,
             "name": "残高",
+            "type": "line",
             "values": [
               349346,
               350153,
@@ -609,6 +612,7 @@ exports[`golden previews > a PowerPoint-made deck 1`] = `
       "background": "#NaNNaNNaN",
       "items": [
         {
+          "adj": {},
           "fill": "linear-gradient(90deg, #156082 0%, #e97132 100%)",
           "flipH": false,
           "flipV": false,
@@ -623,6 +627,7 @@ exports[`golden previews > a PowerPoint-made deck 1`] = `
           "y": 704,
         },
         {
+          "adj": {},
           "fill": null,
           "flipH": false,
           "flipV": false,
@@ -667,6 +672,7 @@ exports[`golden previews > a PowerPoint-made deck 1`] = `
           "y": 117.83338582677165,
         },
         {
+          "adj": {},
           "fill": null,
           "flipH": false,
           "flipV": false,
@@ -716,6 +722,7 @@ exports[`golden previews > a PowerPoint-made deck 1`] = `
       "background": "#NaNNaNNaN",
       "items": [
         {
+          "adj": {},
           "fill": "linear-gradient(90deg, #156082 0%, #e97132 100%)",
           "flipH": false,
           "flipV": false,
@@ -730,6 +737,7 @@ exports[`golden previews > a PowerPoint-made deck 1`] = `
           "y": 704,
         },
         {
+          "adj": {},
           "fill": null,
           "flipH": false,
           "flipV": false,
@@ -774,6 +782,7 @@ exports[`golden previews > a PowerPoint-made deck 1`] = `
           "y": 38.333333333333336,
         },
         {
+          "adj": {},
           "fill": null,
           "flipH": false,
           "flipV": false,
@@ -836,6 +845,7 @@ exports[`golden previews > a PowerPoint-made deck 1`] = `
           "y": 191.66666666666666,
         },
         {
+          "adj": {},
           "fill": "#d0dfe6",
           "flipH": false,
           "flipV": false,
@@ -846,6 +856,8 @@ exports[`golden previews > a PowerPoint-made deck 1`] = `
           "stroke": {
             "color": "#156082",
             "dash": false,
+            "head": false,
+            "tail": false,
             "width": 1.3333333333333333,
           },
           "text": {

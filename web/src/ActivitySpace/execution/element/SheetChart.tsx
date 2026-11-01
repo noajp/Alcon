@@ -1,15 +1,17 @@
 'use client';
 
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart, Pie, PieChart,
+  Area, Bar, CartesianGrid, Cell, ComposedChart, LabelList, Legend, Line, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import type { SheetChart } from './sheetLayout';
+import type { ChartData } from './chartLayout';
 
-// A chart from a workbook, drawn where the sheet places it: column / bar,
-// line, area, pie / doughnut, scatter (as points on a line) and stock
-// (candles: open, high, low, close). A series keeps the colour the file
-// gives it; one without falls back to the workbook-neutral palette.
+// A chart from a workbook or a deck, drawn where its file places it:
+// column / bar, line, area, scatter (points), combinations of these with a
+// secondary axis where the file uses one, value labels where it shows
+// them, pie / doughnut and stock (candles: open, high, low, close). A
+// series keeps the colour the file gives it; one without falls back to
+// Office's default series colours.
 
 const PALETTE = ['var(--sheet-series-1)', 'var(--sheet-series-2)', 'var(--sheet-series-3)', 'var(--sheet-series-4)', 'var(--sheet-series-5)', 'var(--sheet-series-6)'];
 const AXIS = { stroke: 'var(--sheet-head-text)', fontSize: 11, tickLine: false } as const;
@@ -45,7 +47,7 @@ function Candle(props: { x?: number; y?: number; width?: number; height?: number
   );
 }
 
-export default function SheetChartView({ chart }: { chart: SheetChart }) {
+export default function SheetChartView({ chart, framed = true }: { chart: ChartData; framed?: boolean }) {
   const { kind, categories, series } = chart;
   const color = (i: number) => series[i]?.color ?? PALETTE[i % PALETTE.length];
   const rows: Row[] = categories.map((name, i) => {
@@ -56,7 +58,6 @@ export default function SheetChartView({ chart }: { chart: SheetChart }) {
   // A category axis needs categories; a series with none is indexed.
   if (!rows.length) series[0]?.values.forEach((_, i) => rows.push(Object.fromEntries([['name', String(i + 1)], ...series.map((s, j) => [`s${j}`, s.values[i] ?? null])])));
   const legend = series.length > 1 && kind !== 'stock';
-  const lines = series.map((s, j) => ({ key: `s${j}`, name: s.name || `Series ${j + 1}`, color: color(j) }));
 
   let body: React.ReactElement;
   if (kind === 'pie' || kind === 'doughnut') {
@@ -64,7 +65,8 @@ export default function SheetChartView({ chart }: { chart: SheetChart }) {
       <PieChart>
         <Tooltip {...TIP} />
         <Legend wrapperStyle={{ fontSize: 11 }} />
-        <Pie data={rows} dataKey="s0" nameKey="name" innerRadius={kind === 'doughnut' ? '50%' : 0} outerRadius="80%" isAnimationActive={false}>
+        <Pie data={rows} dataKey="s0" nameKey="name" innerRadius={kind === 'doughnut' ? '50%' : 0} outerRadius="80%" isAnimationActive={false}
+          label={series[0]?.labels ? { fontSize: 11 } : false}>
           {rows.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
         </Pie>
       </PieChart>
@@ -86,44 +88,39 @@ export default function SheetChartView({ chart }: { chart: SheetChart }) {
         <Bar dataKey="range" shape={<Candle />} isAnimationActive={false} />
       </ComposedChart>
     );
-  } else if (kind === 'line' || kind === 'scatter') {
-    body = (
-      <LineChart data={rows}>
-        <CartesianGrid vertical={false} style={{ stroke: 'var(--sheet-grid)' }} />
-        <XAxis dataKey="name" {...AXIS} />
-        <YAxis {...AXIS} width={72} tickFormatter={grouped} />
-        <Tooltip {...TIP} />
-        {legend && <Legend wrapperStyle={{ fontSize: 11 }} />}
-        {lines.map((l) => <Line key={l.key} dataKey={l.key} name={l.name} stroke={l.color} dot={kind === 'scatter'} strokeWidth={kind === 'scatter' ? 0 : 2} isAnimationActive={false} connectNulls />)}
-      </LineChart>
-    );
-  } else if (kind === 'area') {
-    body = (
-      <AreaChart data={rows}>
-        <CartesianGrid vertical={false} style={{ stroke: 'var(--sheet-grid)' }} />
-        <XAxis dataKey="name" {...AXIS} />
-        <YAxis {...AXIS} width={72} tickFormatter={grouped} />
-        <Tooltip {...TIP} />
-        {legend && <Legend wrapperStyle={{ fontSize: 11 }} />}
-        {lines.map((l) => <Area key={l.key} dataKey={l.key} name={l.name} stroke={l.color} fill={l.color} fillOpacity={0.35} stackId={chart.stacked ? 'a' : undefined} isAnimationActive={false} />)}
-      </AreaChart>
-    );
   } else {
+    // Every other kind is one composed chart: each series drawn as its own
+    // type, against the left or the right axis.
     const horizontal = kind === 'bar';
+    const twoAxes = series.some((s) => s.axis === 'right');
     body = (
-      <BarChart data={rows} layout={horizontal ? 'vertical' : 'horizontal'}>
+      // Room above the tallest bar for its value label.
+      <ComposedChart data={rows} layout={horizontal ? 'vertical' : 'horizontal'} margin={{ top: 16, right: 8, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={horizontal} horizontal={!horizontal} style={{ stroke: 'var(--sheet-grid)' }} />
-        {horizontal ? <><XAxis type="number" {...AXIS} tickFormatter={grouped} /><YAxis type="category" dataKey="name" {...AXIS} width={80} /></>
-          : <><XAxis dataKey="name" {...AXIS} /><YAxis {...AXIS} width={72} tickFormatter={grouped} /></>}
+        {horizontal
+          ? <><XAxis type="number" {...AXIS} tickFormatter={grouped} /><YAxis type="category" dataKey="name" {...AXIS} width={80} /></>
+          : <>
+              <XAxis dataKey="name" {...AXIS} />
+              <YAxis yAxisId="left" {...AXIS} width={72} tickFormatter={grouped} />
+              {twoAxes && <YAxis yAxisId="right" orientation="right" {...AXIS} width={72} tickFormatter={grouped} />}
+            </>}
         <Tooltip {...TIP} />
         {legend && <Legend wrapperStyle={{ fontSize: 11 }} />}
-        {lines.map((l) => <Bar key={l.key} dataKey={l.key} name={l.name} fill={l.color} stackId={chart.stacked ? 'a' : undefined} isAnimationActive={false} />)}
-      </BarChart>
+        {series.map((s, j) => {
+          const common = { dataKey: `s${j}`, name: s.name || `Series ${j + 1}`, isAnimationActive: false, ...(horizontal ? {} : { yAxisId: s.axis }) };
+          const labels = s.labels && <LabelList dataKey={`s${j}`} position="top" formatter={grouped} style={{ fontSize: 10, fill: 'var(--sheet-text)' }} />;
+          if (s.type === 'line' || s.type === 'scatter') {
+            return <Line key={j} {...common} stroke={color(j)} dot={s.type === 'scatter'} strokeWidth={s.type === 'scatter' ? 0 : 2} connectNulls>{labels}</Line>;
+          }
+          if (s.type === 'area') return <Area key={j} {...common} stroke={color(j)} fill={color(j)} fillOpacity={0.35} stackId={chart.stacked ? 'a' : undefined}>{labels}</Area>;
+          return <Bar key={j} {...common} fill={color(j)} stackId={chart.stacked ? 'a' : undefined}>{labels}</Bar>;
+        })}
+      </ComposedChart>
     );
   }
 
   return (
-    <div className="flex h-full w-full flex-col border border-[var(--sheet-grid)] bg-[var(--sheet-paper)] p-2 text-[var(--sheet-text)]">
+    <div className={`flex h-full w-full flex-col p-2 text-[var(--sheet-text)] ${framed ? 'border border-[var(--sheet-grid)] bg-[var(--sheet-paper)]' : ''}`}>
       {chart.title && <div className="shrink-0 pb-1 text-center text-[13px] font-semibold">{chart.title}</div>}
       <div className="min-h-0 flex-1">
         <ResponsiveContainer width="100%" height="100%">{body}</ResponsiveContainer>

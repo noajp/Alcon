@@ -1,4 +1,6 @@
 import JSZip from 'jszip';
+import { readChart, type ChartData } from './chartLayout';
+import { presetPath } from './presetGeometry';
 
 // A PowerPoint deck read for drawing: each slide's shapes where the deck
 // puts them — rectangles, ellipses, lines, text, pictures, tables, groups —
@@ -20,9 +22,11 @@ export interface Para { align: 'left' | 'center' | 'right' | 'justify'; runs: Ru
 export interface TextBody { paras: Para[]; anchor: 'top' | 'middle' | 'bottom'; inset: [number, number, number, number]; vertical: boolean; wrap: boolean }
 interface Box { x: number; y: number; w: number; h: number; rot: number }
 export type DeckItem =
-  | ({ kind: 'shape'; geom: 'rect' | 'roundRect' | 'ellipse' | 'line'; flipH: boolean; flipV: boolean; fill: string | null; stroke: { color: string | null; width: number; dash: boolean } | null; text: TextBody | null } & Box)
+  | ({ kind: 'shape'; geom: string; adj: Record<string, number>; flipH: boolean; flipV: boolean; fill: string | null; stroke: Stroke | null; text: TextBody | null } & Box)
+  | ({ kind: 'chart'; chart: ChartData } & Box)
   | ({ kind: 'image'; src: string; crop: { l: number; t: number; r: number; b: number } } & Box)
   | ({ kind: 'table'; cols: number[]; rows: { h: number; cells: { text: TextBody; fill: string | null; span: number; skip: boolean }[] }[] } & Box);
+export interface Stroke { color: string | null; width: number; dash: boolean; head: boolean; tail: boolean }
 export interface DeckSlide { background: string | null; items: DeckItem[] }
 export interface Deck { width: number; height: number; slides: DeckSlide[] }
 
@@ -38,16 +42,21 @@ const path = (el: Element | null | undefined, ...names: string[]) =>
 interface Theme {
   colors: Record<string, string>;
   fonts: { major: string | null; minor: string | null };
+  /** The theme's format scheme: the fills and lines a shape's <p:style>
+   *  points at by index, coloured by the reference's own colour. */
+  styles: { fill: Element[]; line: Element[]; bgFill: Element[] };
 }
 const CLR_MAP: Record<string, string> = { tx1: 'dk1', tx2: 'dk2', bg1: 'lt1', bg2: 'lt2' };
 
 /** A colour element (<a:srgbClr>, <a:schemeClr>, <a:sysClr>) as CSS, with
  *  its alpha, lumMod / lumOff, tint and shade applied. */
-function colorOf(el: Element | null, theme: Theme): string | null {
+function colorOf(el: Element | null, theme: Theme, ph: string | null = null): string | null {
   const c = el ? Array.from(el.children).find((n) => ['a:srgbClr', 'a:schemeClr', 'a:sysClr', 'a:prstClr'].includes(n.tagName)) : null;
   if (!c) return null;
   const hex = c.tagName === 'a:srgbClr' ? c.getAttribute('val')
     : c.tagName === 'a:sysClr' ? c.getAttribute('lastClr')
+    // phClr: the colour a style reference supplies to the style it points at.
+    : c.tagName === 'a:schemeClr' && c.getAttribute('val') === 'phClr' ? ph
     : c.tagName === 'a:schemeClr' ? theme.colors[CLR_MAP[c.getAttribute('val') ?? ''] ?? c.getAttribute('val') ?? '']
     : ({ black: '000000', white: 'FFFFFF' } as Record<string, string>)[c.getAttribute('val') ?? ''];
   if (!hex) return null;
@@ -65,21 +74,41 @@ function colorOf(el: Element | null, theme: Theme): string | null {
 /** A shape's or background's fill as CSS: a colour, or a linear gradient
  *  (DrawingML's angle runs clockwise from left-to-right; CSS's from
  *  bottom-to-top, hence the quarter turn). */
-function fillOf(spPr: Element | null, theme: Theme): string | null {
-  const solid = kid(spPr, 'a:solidFill');
-  if (solid) return colorOf(solid, theme);
-  const grad = kid(spPr, 'a:gradFill');
-  if (grad) {
-    const stops = kids(kid(grad, 'a:gsLst'), 'a:gs')
-      .map((gs) => ({ pos: Number(gs.getAttribute('pos') ?? 0) / 1000, color: colorOf(gs, theme) }))
+function fillEl(el: Element, theme: Theme, ph: string | null = null): string | null {
+  if (el.tagName === 'a:solidFill') return colorOf(el, theme, ph);
+  if (el.tagName === 'a:pattFill') return colorOf(kid(el, 'a:fgClr'), theme, ph);
+  if (el.tagName === 'a:gradFill') {
+    const stops = kids(kid(el, 'a:gsLst'), 'a:gs')
+      .map((gs) => ({ pos: Number(gs.getAttribute('pos') ?? 0) / 1000, color: colorOf(gs, theme, ph) }))
       .filter((s) => s.color)
       .sort((a, b) => a.pos - b.pos);
     if (!stops.length) return null;
     if (stops.length === 1) return stops[0].color;
-    const ang = Number(kid(grad, 'a:lin')?.getAttribute('ang') ?? 0) / 60000;
+    const ang = Number(kid(el, 'a:lin')?.getAttribute('ang') ?? 0) / 60000;
     return `linear-gradient(${ang + 90}deg, ${stops.map((s) => `${s.color} ${s.pos}%`).join(', ')})`;
   }
   return null;
+}
+const FILLS = ['a:solidFill', 'a:gradFill', 'a:pattFill', 'a:noFill', 'a:blipFill', 'a:grpFill'];
+/** The fill a properties element sets: CSS, null for an explicit "no
+ *  fill", undefined when it says nothing (and the fill is inherited). */
+function fillOf(spPr: Element | null, theme: Theme): string | null | undefined {
+  const el = spPr ? Array.from(spPr.children).find((c) => FILLS.includes(c.tagName)) : null;
+  return el ? fillEl(el, theme) : undefined;
+}
+/** The first value that is set (null counts: it means "none"). */
+const firstSet = <T,>(...vals: (T | null | undefined)[]): T | null => vals.find((v) => v !== undefined) ?? null;
+
+/** The hex a style reference (<a:fillRef>, <a:lnRef>, <a:fontRef>) carries. */
+const refHex = (ref: Element | null, theme: Theme) => colorOf(ref, theme)?.match(/^#([0-9a-f]{6})$/i)?.[1] ?? null;
+/** A shape's fill from its <p:style>: the theme's fill at that index. */
+function styleFill(style: Element | null, theme: Theme): string | null | undefined {
+  const ref = kid(style, 'a:fillRef');
+  if (!ref) return undefined;
+  const idx = Number(ref.getAttribute('idx') ?? 0);
+  if (idx === 0) return null;
+  const el = idx >= 1001 ? theme.styles.bgFill[idx - 1001] : theme.styles.fill[idx - 1];
+  return el ? fillEl(el, theme, refHex(ref, theme)) : undefined;
 }
 
 function boxOf(xfrm: Element | null): Box | null {
@@ -146,7 +175,16 @@ function themeFont(face: string | null | undefined, theme: Theme): string | null
   return face;
 }
 
-function textOf(txBody: Element | null, theme: Theme, chain: Element[], bodyPrs: Element[]): TextBody | null {
+/** A shape's <p:style> font reference: the theme font and colour its text
+ *  takes when nothing nearer names one. */
+function styleFont(style: Element | null, theme: Theme): { font: string | null; color: string | null } | null {
+  const ref = kid(style, 'a:fontRef');
+  if (!ref) return null;
+  const idx = ref.getAttribute('idx');
+  return { font: idx === 'major' ? theme.fonts.major : idx === 'minor' ? theme.fonts.minor : null, color: colorOf(ref, theme) };
+}
+
+function textOf(txBody: Element | null, theme: Theme, chain: Element[], bodyPrs: Element[], fallback: { font: string | null; color: string | null } | null = null): TextBody | null {
   if (!txBody) return null;
   const bodies = [kid(txBody, 'a:bodyPr'), ...bodyPrs].filter((e): e is Element => !!e);
   const attr = (a: string) => bodies.map((b) => b.getAttribute(a)).find((v) => v != null) ?? null;
@@ -178,8 +216,8 @@ function textOf(txBody: Element | null, theme: Theme, chain: Element[], bodyPrs:
         bold: rAttr('b') === '1',
         italic: rAttr('i') === '1',
         underline: !!u && u !== 'none',
-        color: colorOf(colorEl, theme),
-        font: themeFont(face, theme),
+        color: colorOf(colorEl, theme) ?? fallback?.color ?? null,
+        font: themeFont(face, theme) ?? fallback?.font ?? null,
         spacing: rAttr('spc') ? Number(rAttr('spc')) / 100 : 0,
       };
     });
@@ -202,14 +240,24 @@ function textOf(txBody: Element | null, theme: Theme, chain: Element[], bodyPrs:
   };
 }
 
-function strokeOf(spPr: Element | null, theme: Theme, isLine: boolean) {
-  const ln = kid(spPr, 'a:ln');
-  if (!ln || kid(ln, 'a:noFill')) return null;
-  const color = colorOf(kid(ln, 'a:solidFill'), theme);
+/** A shape's outline: its own <a:ln>, over the line its <p:style> points
+ *  at in the theme; arrowheads where either end asks for one. */
+function strokeOf(spPr: Element | null, theme: Theme, isLine: boolean, style: Element | null): Stroke | null {
+  const own = kid(spPr, 'a:ln');
+  const ref = kid(style, 'a:lnRef');
+  const idx = Number(ref?.getAttribute('idx') ?? 0);
+  const themed = idx > 0 ? theme.styles.line[idx - 1] ?? null : null;
+  const ph = refHex(ref, theme);
+  if (own && kid(own, 'a:noFill')) return null;
+  const lns = [own, themed].filter((e): e is Element => !!e);
+  if (!lns.length) return null;
+  const color = lns.map((l) => colorOf(kid(l, 'a:solidFill'), theme, l === themed ? ph : null)).find(Boolean) ?? null;
   if (!color && !isLine) return null;
-  const dash = kid(ln, 'a:prstDash')?.getAttribute('val');
+  const width = lns.map((l) => l.getAttribute('w')).find(Boolean) ?? '9525';
+  const dash = lns.map((l) => kid(l, 'a:prstDash')?.getAttribute('val')).find(Boolean);
+  const end = (name: string) => { const t = lns.map((l) => kid(l, name)?.getAttribute('type')).find(Boolean); return !!t && t !== 'none'; };
   // No colour on a line means the deck's default ink; the view draws it.
-  return { color, width: Math.max(0.75, px(ln.getAttribute('w') ?? '9525')), dash: !!dash && dash !== 'solid' };
+  return { color, width: Math.max(0.75, px(width)), dash: !!dash && dash !== 'solid', head: end('a:headEnd'), tail: end('a:tailEnd') };
 }
 
 /** A group's children, moved and scaled from the group's child space into
@@ -226,6 +274,7 @@ function place(items: DeckItem[], grpXfrm: Element | null): DeckItem[] {
 interface ReadCtx {
   theme: Theme;
   media: (rId: string) => Promise<string | null>;
+  chart: (rId: string) => Promise<ChartData | null>;
   /** null on a layout or master: their placeholders are templates, not content. */
   inherit: Inherit | null;
 }
@@ -242,16 +291,24 @@ async function itemsOf(tree: Element, ctx: ReadCtx): Promise<DeckItem[]> {
       const xfrm = kid(spPr, 'a:xfrm');
       const box = boxOf(xfrm) ?? from.map((p) => p.box).find(Boolean) ?? null;
       if (!box) continue;
-      const prst = kid(spPr, 'a:prstGeom')?.getAttribute('prst') ?? 'rect';
-      const geom = prst === 'line' || prst.startsWith('straightConnector') || node.tagName === 'p:cxnSp' ? 'line'
-        : prst === 'ellipse' ? 'ellipse' : prst === 'roundRect' ? 'roundRect' : 'rect';
+      const prstGeom = kid(spPr, 'a:prstGeom');
+      const geom = prstGeom?.getAttribute('prst') ?? (node.tagName === 'p:cxnSp' ? 'line' : 'rect');
+      // Adjust values: <a:gd name="adj" fmla="val 16667"/>.
+      const adj: Record<string, number> = {};
+      for (const gd of kids(kid(prstGeom, 'a:avLst'), 'a:gd')) {
+        const v = /^val (-?\d+)/.exec(gd.getAttribute('fmla') ?? '')?.[1];
+        if (v != null) adj[gd.getAttribute('name') ?? ''] = Number(v);
+      }
+      const isLine = presetPath(geom, box.w, box.h, adj)?.line ?? false;
+      const style = kid(node, 'p:style');
       const txBody = kid(node, 'p:txBody');
       out.push({
-        kind: 'shape', geom, ...box,
+        kind: 'shape', geom, adj, ...box,
         flipH: xfrm?.getAttribute('flipH') === '1', flipV: xfrm?.getAttribute('flipV') === '1',
-        fill: geom === 'line' ? null : fillOf(spPr, theme) ?? from.map((p) => fillOf(p.spPr, theme)).find(Boolean) ?? null,
-        stroke: strokeOf(spPr, theme, geom === 'line'),
-        text: textOf(txBody, theme, styleChain(txBody, ph, ctx.inherit), from.map((p) => p.bodyPr).filter((e): e is Element => !!e)),
+        // Own fill, else the placeholder's it inherits, else its style's.
+        fill: isLine ? null : firstSet(fillOf(spPr, theme), ...from.map((p) => fillOf(p.spPr, theme)), styleFill(style, theme)),
+        stroke: strokeOf(spPr, theme, isLine, style),
+        text: textOf(txBody, theme, styleChain(txBody, ph, ctx.inherit), from.map((p) => p.bodyPr).filter((e): e is Element => !!e), styleFont(style, theme)),
       });
     } else if (node.tagName === 'p:pic') {
       const blipFill = kid(node, 'p:blipFill');
@@ -266,6 +323,12 @@ async function itemsOf(tree: Element, ctx: ReadCtx): Promise<DeckItem[]> {
     } else if (node.tagName === 'p:graphicFrame') {
       const tbl = node.getElementsByTagName('a:tbl')[0];
       const box = boxOf(kid(node, 'p:xfrm')) ?? from.map((p) => p.box).find(Boolean) ?? null;
+      const chartRef = node.getElementsByTagName('c:chart')[0];
+      if (chartRef && box) {
+        const chart = await ctx.chart(chartRef.getAttribute('r:id') ?? '');
+        if (chart) out.push({ kind: 'chart', chart, ...box });
+        continue;
+      }
       if (!tbl || !box) continue;
       out.push({
         kind: 'table', ...box,
@@ -275,7 +338,7 @@ async function itemsOf(tree: Element, ctx: ReadCtx): Promise<DeckItem[]> {
           cells: kids(tr, 'a:tc').map((tc) => ({
             text: textOf(kid(tc, 'a:txBody'), theme, ctx.inherit?.defaultText ? [ctx.inherit.defaultText] : [], [])
               ?? { paras: [], anchor: 'top' as const, inset: [3.6, 7.2, 3.6, 7.2] as [number, number, number, number], vertical: false, wrap: true },
-            fill: fillOf(kid(tc, 'a:tcPr'), theme),
+            fill: fillOf(kid(tc, 'a:tcPr'), theme) ?? null,
             span: Number(tc.getAttribute('gridSpan') ?? 1),
             skip: tc.getAttribute('hMerge') === '1' || tc.getAttribute('vMerge') === '1',
           })),
@@ -312,6 +375,12 @@ export async function readDeck(bytes: ArrayBuffer): Promise<Deck> {
   };
   const relOfType = (rels: Map<string, { target: string; type: string }>, type: string) =>
     [...rels.values()].find((r) => r.type.endsWith(`/${type}`) || r.target.includes(`/${type}`))?.target ?? null;
+  const chartFor = (rels: Map<string, { target: string; type: string }>, theme: Theme) => async (rId: string) => {
+    const target = rels.get(rId)?.target;
+    const doc = target ? await xml(target) : null;
+    const order = ['dk1', 'lt1', 'dk2', 'lt2', 'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6'];
+    return doc ? readChart(doc, order.map((k) => theme.colors[k] ?? '000000')) : null;
+  };
   const mediaFor = (rels: Map<string, { target: string; type: string }>) => async (rId: string) => {
     const target = rels.get(rId)?.target;
     const f = target ? zip.file(target) : null;
@@ -345,7 +414,11 @@ export async function readDeck(bytes: ArrayBuffer): Promise<Deck> {
         const g = doc?.getElementsByTagName(`a:${group}`)[0];
         return kid(g, 'a:ea')?.getAttribute('typeface') || kid(g, 'a:latin')?.getAttribute('typeface') || null;
       };
-      themes.set(key, { colors, fonts: { major: face('majorFont'), minor: face('minorFont') } });
+      const list = (name: string) => Array.from(doc?.getElementsByTagName(name)[0]?.children ?? []);
+      themes.set(key, {
+        colors, fonts: { major: face('majorFont'), minor: face('minorFont') },
+        styles: { fill: list('a:fillStyleLst'), line: list('a:lnStyleLst'), bgFill: list('a:bgFillStyleLst') },
+      });
     }
     return themes.get(key)!;
   };
@@ -382,7 +455,7 @@ export async function readDeck(bytes: ArrayBuffer): Promise<Deck> {
       if (!bgPr) return null;
       const blip = path(bgPr, 'a:blipFill', 'a:blip')?.getAttribute('r:embed');
       if (blip) { const src = await mediaFor(r)(blip); return src ? `center / cover no-repeat url("${src}")` : null; }
-      return fillOf(bgPr, theme);
+      return fillOf(bgPr, theme) ?? null;
     };
     const background = (await bgOf(doc.documentElement, rels)) ?? (await bgOf(layoutDoc?.documentElement, layoutRels)) ?? (await bgOf(masterDoc?.documentElement, masterRels));
 
@@ -390,9 +463,9 @@ export async function readDeck(bytes: ArrayBuffer): Promise<Deck> {
     // the slide's, unless the slide or its layout hides them.
     const showMaster = doc.documentElement.getAttribute('showMasterSp') !== '0' && layoutDoc?.documentElement.getAttribute('showMasterSp') !== '0';
     const items: DeckItem[] = [];
-    if (showMaster && masterTree) items.push(...await itemsOf(masterTree, { theme, media: mediaFor(masterRels), inherit: null }));
-    if (doc.documentElement.getAttribute('showMasterSp') !== '0' && layoutTree) items.push(...await itemsOf(layoutTree, { theme, media: mediaFor(layoutRels), inherit: null }));
-    items.push(...await itemsOf(tree, { theme, media: mediaFor(rels), inherit }));
+    if (showMaster && masterTree) items.push(...await itemsOf(masterTree, { theme, media: mediaFor(masterRels), chart: chartFor(masterRels, theme), inherit: null }));
+    if (doc.documentElement.getAttribute('showMasterSp') !== '0' && layoutTree) items.push(...await itemsOf(layoutTree, { theme, media: mediaFor(layoutRels), chart: chartFor(layoutRels, theme), inherit: null }));
+    items.push(...await itemsOf(tree, { theme, media: mediaFor(rels), chart: chartFor(rels, theme), inherit }));
     slides.push({ background, items });
   }
   return { width: px(size?.getAttribute('cx')) || 960, height: px(size?.getAttribute('cy')) || 540, slides };

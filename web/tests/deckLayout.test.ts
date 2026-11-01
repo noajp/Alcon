@@ -88,4 +88,37 @@ describe('readDeck', () => {
     expect(deck.slides[0].items[0]).toMatchObject({ kind: 'image', w: 100, crop: { l: 0.1, t: 0, r: 0.2, b: 0 } });
     expect((deck.slides[0].items[0] as { src: string }).src.startsWith('data:image/png;base64,')).toBe(true);
   });
+
+  it('colours a shape from its <p:style> through the theme, and reads presets, adjusts, arrowheads and charts', async () => {
+    const zip = new JSZip();
+    zip.file('ppt/presentation.xml', `<p:presentation ${ns}><p:sldIdLst><p:sldId id="256" r:id="rId2"/></p:sldIdLst><p:sldSz cx="9525000" cy="5715000"/></p:presentation>`);
+    zip.file('ppt/_rels/presentation.xml.rels', '<Relationships><Relationship Id="rId1" Target="theme/theme1.xml"/><Relationship Id="rId2" Target="slides/slide1.xml"/></Relationships>');
+    zip.file('ppt/theme/theme1.xml', `<a:theme ${ns}><a:themeElements><a:clrScheme><a:dk1><a:srgbClr val="000000"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:accent1><a:srgbClr val="4472C4"/></a:accent1><a:accent2><a:srgbClr val="ED7D31"/></a:accent2></a:clrScheme>`
+      + '<a:fontScheme><a:majorFont><a:latin typeface="Calibri Light"/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/></a:minorFont></a:fontScheme>'
+      + '<a:fmtScheme><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"><a:lumMod val="50000"/></a:schemeClr></a:solidFill></a:fillStyleLst>'
+      + '<a:lnStyleLst><a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:bgFillStyleLst/></a:fmtScheme></a:themeElements></a:theme>');
+    zip.file('ppt/slides/slide1.xml', `<p:sld ${ns} xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><p:cSld><p:spTree>`
+      + '<p:sp><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm><a:prstGeom prst="rightArrow"><a:avLst><a:gd name="adj1" fmla="val 30000"/></a:avLst></a:prstGeom></p:spPr>'
+      + '<p:style><a:lnRef idx="1"><a:schemeClr val="accent1"/></a:lnRef><a:fillRef idx="2"><a:schemeClr val="accent2"/></a:fillRef><a:effectRef idx="0"><a:schemeClr val="accent1"/></a:effectRef><a:fontRef idx="minor"><a:schemeClr val="lt1"/></a:fontRef></p:style>'
+      + '<p:txBody><a:bodyPr/><a:p><a:r><a:t>次へ</a:t></a:r></a:p></p:txBody></p:sp>'
+      + '<p:cxnSp><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="952500" cy="476250"/></a:xfrm><a:prstGeom prst="bentConnector3"/><a:ln w="19050"><a:solidFill><a:srgbClr val="333333"/></a:solidFill><a:tailEnd type="triangle"/></a:ln></p:spPr></p:cxnSp>'
+      + '<p:graphicFrame><p:xfrm><a:off x="0" y="1905000"/><a:ext cx="3810000" cy="1905000"/></p:xfrm><a:graphic><a:graphicData><c:chart r:id="rId5"/></a:graphicData></a:graphic></p:graphicFrame>'
+      + '</p:spTree></p:cSld></p:sld>');
+    zip.file('ppt/slides/_rels/slide1.xml.rels', '<Relationships><Relationship Id="rId5" Target="../charts/chart1.xml"/></Relationships>');
+    zip.file('ppt/charts/chart1.xml', '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea>'
+      + '<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:ser><c:tx><c:strRef><c:strCache><c:pt idx="0"><c:v>売上</c:v></c:pt></c:strCache></c:strRef></c:tx>'
+      + '<c:cat><c:strRef><c:strCache><c:ptCount val="2"/><c:pt idx="0"><c:v>Q1</c:v></c:pt><c:pt idx="1"><c:v>Q2</c:v></c:pt></c:strCache></c:strRef></c:cat><c:val><c:numRef><c:numCache><c:ptCount val="2"/><c:pt idx="0"><c:v>100</c:v></c:pt><c:pt idx="1"><c:v>140</c:v></c:pt></c:numCache></c:numRef></c:val></c:ser><c:axId val="1"/><c:axId val="2"/></c:barChart>'
+      + '<c:lineChart><c:grouping val="standard"/><c:ser><c:tx><c:v>利益率</c:v></c:tx><c:dLbls><c:showVal val="1"/></c:dLbls><c:val><c:numRef><c:numCache><c:ptCount val="2"/><c:pt idx="0"><c:v>0.1</c:v></c:pt><c:pt idx="1"><c:v>0.15</c:v></c:pt></c:numCache></c:numRef></c:val></c:ser><c:axId val="3"/><c:axId val="4"/></c:lineChart>'
+      + '<c:valAx><c:axId val="2"/><c:axPos val="l"/></c:valAx><c:valAx><c:axId val="4"/><c:axPos val="r"/></c:valAx></c:plotArea></c:chart></c:chartSpace>');
+    const [slide] = (await readDeck(await zip.generateAsync({ type: 'arraybuffer' }))).slides;
+    const [arrow, connector, chart] = slide.items;
+    // Fill from the theme's second fill style, coloured accent2 then darkened; outline from the first line style in accent1.
+    expect(arrow).toMatchObject({ kind: 'shape', geom: 'rightArrow', adj: { adj1: 30000 }, fill: '#773f19', stroke: { color: '#4472c4', width: expect.closeTo(1.33, 1) },
+      text: { paras: [{ runs: [{ color: '#ffffff', font: 'Calibri' }] }] } });
+    expect(connector).toMatchObject({ geom: 'bentConnector3', fill: null, stroke: { color: '#333333', tail: true, head: false } });
+    expect(chart).toMatchObject({ kind: 'chart', chart: { kind: 'combo', categories: ['Q1', 'Q2'], series: [
+      { name: '売上', type: 'bar', axis: 'left', values: [100, 140], labels: false },
+      { name: '利益率', type: 'line', axis: 'right', values: [0.1, 0.15], labels: true },
+    ] } });
+  });
 });

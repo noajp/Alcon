@@ -11,6 +11,7 @@ import { readDeck, type Deck, type DeckItem, type TextBody } from './deckLayout'
 import { readWorkbook, type WorkSheet } from './sheetLayout';
 import { readDocLayout, type DocBlock, type DocLayout, type DocRun } from './docLayout';
 import { fontStack } from './officeFonts';
+import { presetPath } from './presetGeometry';
 import SheetChartView from './SheetChart';
 
 // An attached file, previewed in place under its row (the row's ▶ opens it): images and PDFs as themselves,
@@ -338,23 +339,39 @@ function DeckItemView({ item }: { item: DeckItem }) {
       </table>
     );
   }
-  if (item.geom === 'line') {
-    const s = item.stroke ?? { color: null, width: 1, dash: false };
-    const [x1, x2] = item.flipH ? [item.w, 0] : [0, item.w];
-    const [y1, y2] = item.flipV ? [item.h, 0] : [0, item.h];
-    return (
-      <svg className="absolute overflow-visible" style={box}>
-        <line x1={x1} y1={y1} x2={x2} y2={y2} style={{ stroke: s.color ?? 'var(--sheet-text)' }} strokeWidth={s.width} strokeDasharray={s.dash ? `${s.width * 3} ${s.width * 2}` : undefined} />
-      </svg>
-    );
+  if (item.kind === 'chart') {
+    return <div className="absolute" style={box}><SheetChartView chart={item.chart} framed={false} /></div>;
   }
+  // A preset shape: its outline clips the fill (so gradients keep working),
+  // an SVG draws the outline, its inner detail and any arrowheads, flipped
+  // as the shape is; the text sits on top, unflipped.
+  const geo = presetPath(item.geom, item.w, item.h, item.adj) ?? presetPath('rect', item.w, item.h)!;
+  const stroke = item.stroke ?? (geo.line ? { color: null, width: 1, dash: false, head: false, tail: false } : null);
+  const ink = stroke?.color ?? 'var(--sheet-text)';
+  const flip = item.flipH || item.flipV ? `scale(${item.flipH ? -1 : 1}, ${item.flipV ? -1 : 1})` : undefined;
+  const markerId = `m${Math.round(item.x)}-${Math.round(item.y)}-${Math.round(item.w)}`;
   return (
-    <div className="absolute" style={{
-      ...box, background: item.fill ?? undefined,
-      border: item.stroke ? `${item.stroke.width}px ${item.stroke.dash ? 'dashed' : 'solid'} ${item.stroke.color ?? 'var(--sheet-text)'}` : undefined,
-      borderRadius: item.geom === 'ellipse' ? '50%' : item.geom === 'roundRect' ? Math.min(item.w, item.h) * 0.16 : undefined,
-      boxSizing: 'border-box',
-    }}>
+    <div className="absolute" style={box}>
+      <div className="absolute inset-0" style={{ transform: flip }}>
+        {!geo.line && item.fill && (
+          <div className="absolute inset-0" style={{ background: item.fill, clipPath: `path(${geo.evenOdd ? 'evenodd, ' : ''}"${geo.fill}")` }} />
+        )}
+        {stroke && (
+          <svg className="absolute inset-0 overflow-visible" width={item.w} height={item.h}>
+            {(stroke.head || stroke.tail) && (
+              <defs>
+                <marker id={markerId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                  <path d="M0 0 L10 5 L0 10 Z" style={{ fill: ink }} />
+                </marker>
+              </defs>
+            )}
+            <path d={geo.fill} fill="none" style={{ stroke: ink }} strokeWidth={stroke.width} strokeLinejoin="round"
+              strokeDasharray={stroke.dash ? `${stroke.width * 3} ${stroke.width * 2}` : undefined}
+              markerStart={stroke.head ? `url(#${markerId})` : undefined} markerEnd={stroke.tail ? `url(#${markerId})` : undefined} />
+            {geo.detail && <path d={geo.detail} fill="none" style={{ stroke: ink }} strokeWidth={stroke.width} />}
+          </svg>
+        )}
+      </div>
       {item.text && <DeckText text={item.text} />}
     </div>
   );

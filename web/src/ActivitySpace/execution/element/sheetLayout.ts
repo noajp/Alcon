@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { readChart, type ChartData } from './chartLayout';
 
 // An Excel workbook read for drawing it as Excel does: each sheet's cells
 // with their fills, fonts, borders, alignment and number formats, the
@@ -15,12 +16,8 @@ export interface CellStyle {
   borders: { top: string | null; right: string | null; bottom: string | null; left: string | null };
 }
 export interface Cell { text: string; numeric: boolean; style: CellStyle | null; colSpan: number; rowSpan: number; hidden: boolean }
-export interface SheetChart {
-  x: number; y: number; w: number; h: number; title: string | null;
-  kind: 'bar' | 'column' | 'line' | 'area' | 'pie' | 'doughnut' | 'scatter' | 'stock';
-  stacked: boolean; categories: string[];
-  series: { name: string; color: string | null; values: (number | null)[] }[];
-}
+/** A chart over a sheet: the chart, and where the sheet anchors it. */
+export type SheetChart = ChartData & { x: number; y: number; w: number; h: number };
 export interface WorkSheet {
   name: string; cols: number[]; rows: { h: number; cells: Cell[] }[];
   gridLines: boolean; defaultCol: number; defaultRow: number; charts: SheetChart[];
@@ -66,16 +63,6 @@ function sheetColor(el: Element | null, theme: string[]): string | null {
   if (!hex) return null;
   const tint = Number(el.getAttribute('tint') ?? 0);
   return `#${(tint ? tinted(hex, tint) : hex).toLowerCase()}`;
-}
-
-/** A DrawingML colour (charts) as CSS. */
-function drawingColor(el: Element | null, theme: string[]): string | null {
-  const fill = el ? kid(el, 'solidFill') : null;
-  const c = fill?.children[0];
-  if (!c) return null;
-  const order = ['dk1', 'lt1', 'dk2', 'lt2', 'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6'];
-  const hex = c.localName === 'srgbClr' ? c.getAttribute('val') : c.localName === 'schemeClr' ? theme[order.indexOf(c.getAttribute('val') ?? '')] : null;
-  return hex ? `#${hex.toLowerCase()}` : null;
 }
 
 // ── Number formats ────────────────────────────────────────────────────────
@@ -362,39 +349,9 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
         const to = kid(anchor, 'to') ? at(kid(anchor, 'to')) : null;
         const w = to ? to.x - from.x : Number(ext?.getAttribute('cx') ?? 0) / 9525;
         const h = to ? to.y - from.y : Number(ext?.getAttribute('cy') ?? 0) / 9525;
-        const plot = desc(chartDoc, 'plotArea')[0];
-        const typeEl = plot ? Array.from(plot.children).find((c) => c.localName.endsWith('Chart')) : null;
-        if (!typeEl) continue;
-        const t = typeEl.localName;
-        const kind: SheetChart['kind'] = t === 'barChart' || t === 'bar3DChart' ? (kid(typeEl, 'barDir')?.getAttribute('val') === 'bar' ? 'bar' : 'column')
-          : t.startsWith('line') ? 'line' : t.startsWith('area') ? 'area' : t.startsWith('pie') || t === 'ofPieChart' ? 'pie'
-          : t === 'doughnutChart' ? 'doughnut' : t === 'scatterChart' || t === 'bubbleChart' ? 'scatter' : t === 'stockChart' ? 'stock' : 'column';
-        const values = (el: Element | null): (string | number | null)[] => {
-          if (!el) return [];
-          const cache = desc(el, 'pt');
-          if (cache.length) {
-            const count = Number(desc(el, 'ptCount')[0]?.getAttribute('val') ?? cache.length);
-            const out: (string | number | null)[] = Array(count).fill(null);
-            for (const pt of cache) out[Number(pt.getAttribute('idx'))] = kid(pt, 'v')?.textContent ?? null;
-            return out;
-          }
-          const f = desc(el, 'f')[0]?.textContent;
-          return f ? range(f) : [];
-        };
-        const sers = kids(typeEl, 'ser');
-        const firstCats = values(kid(sers[0], 'cat') ?? kid(sers[0], 'xVal'));
-        const title = desc(kid(desc(chartDoc, 'chart')[0], 'title'), 't').map((x) => x.textContent ?? '').join('') || null;
-        charts.push({
-          x: from.x, y: from.y, w, h, title, kind,
-          stacked: ['stacked', 'percentStacked'].includes(kid(typeEl, 'grouping')?.getAttribute('val') ?? ''),
-          categories: firstCats.map((v) => (v == null ? '' : typeof v === 'number' ? generalNumber(v) : String(v))),
-          series: sers.map((s, i) => ({
-            name: desc(kid(s, 'tx'), 'v')[0]?.textContent ?? (() => { const f = desc(kid(s, 'tx'), 'f')[0]?.textContent; return f ? String(range(f)[0] ?? '') : ''; })() ?? `Series ${i + 1}`,
-            // A bar's colour is its fill; a line's, its outline.
-            color: drawingColor(kid(s, 'spPr'), theme) ?? drawingColor(kid(kid(s, 'spPr'), 'ln'), theme),
-            values: values(kid(s, 'val') ?? kid(s, 'yVal')).map((v) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v))),
-          })),
-        });
+        const chart = readChart(chartDoc, theme, range);
+        if (!chart) continue;
+        charts.push({ ...chart, x: from.x, y: from.y, w, h });
         maxCol = Math.max(maxCol, Number(kid(kid(anchor, 'from'), 'col')?.textContent ?? 0) + Math.ceil(w / defaultCol));
       }
     }
