@@ -22,8 +22,6 @@ import type { DateRange } from 'react-day-picker';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { isAgentRunOpen } from '@/Function/copilot/agentData';
 import { AgentRunPanel } from './agent';
-import { OpenInMenu } from '@/ActivitySpace/execution/openIn/OpenInMenu';
-import { createNoteFile } from '@/hooks/useNotesDb';
 import {
   updateElement,
   fetchElementWithDetails,
@@ -91,7 +89,7 @@ import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
-import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal, Paperclip, X } from 'lucide-react';
+import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal, Paperclip } from 'lucide-react';
 import { useElementFiles, useElementFileActions } from '@/hooks/elementFileData';
 import { ElementFilePreview } from './ElementFilePreview';
 import { FileTypeIcon } from './fileTypeIcon';
@@ -193,7 +191,6 @@ const priorityOptions = [
 // ============================================
 function ElementDetailBody({
   element,
-  objectName: _objectName,
   layout = 'full',
   objectPath,
   domainName,
@@ -734,28 +731,6 @@ function ElementDetailBody({
             onOpenApproval={() => setApprovalSignal((n) => n + 1)} />
         </div>
         <div className="flex-1" />
-        {/* Take the Element to a tool: Claude Code, the in-app agent (it
-            works with your permissions and stops for approval before
-            external writes, ADR 0027), its Note, a deck. */}
-        <OpenInMenu
-          subject={{
-            kind: 'Element', identifier: element.display_id, title: element.title,
-            description: element.description, path: [domainName, ...(objectPath ?? []).map((seg) => seg.name)].filter((x): x is string => !!x),
-          }}
-          noteId={element.note_id ?? null}
-          onCreateNote={async () => {
-            const note = await createNoteFile(element.title);
-            await updateElement(element.id, { note_id: note.id });
-            log('note', `Linked new Note “${note.name}”`);
-            onRefresh?.();
-            return note.id;
-          }}
-          agent={{
-            aiWorkers, defaultWorkerId: assignedAiWorkerId, busy: isAgentRunOpen(agent.run),
-            starting: agent.starting, error: agent.error ?? null,
-            onStart: ({ workerId, prompt }) => agent.start({ workerId, prompt, triggeredFrom: 'detail', domainId }),
-          }}
-        />
       </div>
 
       {/* Scrollable body — Linear-style two-column layout */}
@@ -991,10 +966,16 @@ function ElementDetailBody({
                         </button>
                         <span className="flex-1" />
                         {f.uploaded_by === user?.id && (
-                          <button type="button" aria-label={t('Remove {name}', { name: f.name })}
-                            onClick={() => fileActions.remove.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) })}
-                            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted/50 hover:text-foreground group-hover/file:opacity-100">
-                            <X size={12} />
+                          // A bin, not an ×: beside an open preview an × reads as
+                          // "close", and removing a file cannot be undone — so it
+                          // asks first.
+                          <button type="button" aria-label={t('Remove {name}', { name: f.name })} title={t('Remove {name}', { name: f.name })}
+                            onClick={async () => {
+                              if (!await appDialog.confirm(t('Delete “{name}”? This can’t be undone.', { name: f.name }))) return;
+                              fileActions.remove.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) });
+                            }}
+                            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted/50 hover:text-[var(--status-danger)] group-hover/file:opacity-100">
+                            <Trash2 size={12} />
                           </button>
                         )}
                       </div>

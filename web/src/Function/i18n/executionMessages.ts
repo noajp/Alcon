@@ -23,6 +23,8 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   'Add sub-element': ['Sub-element を追加', 'Sub-element 추가', 'Ajouter un sub-element', 'Añadir sub-element'],
   'Attach a file': ['ファイルを添付', '파일 첨부', 'Joindre un fichier', 'Adjuntar un archivo'],
   'Open in new tab': ['新しいタブで開く', '새 탭에서 열기', 'Ouvrir dans un nouvel onglet', 'Abrir en una pestaña nueva'],
+  'Full screen': ['全画面表示', '전체 화면', 'Plein écran', 'Pantalla completa'],
+  'Exit full screen': ['全画面表示を終了', '전체 화면 종료', 'Quitter le plein écran', 'Salir de pantalla completa'],
   'This sheet is empty.': ['このシートは空です。', '이 시트는 비어 있습니다.', 'Cette feuille est vide.', 'Esta hoja está vacía.'],
   'This file cannot be previewed here.': ['このファイルはここではプレビューできません。', '이 파일은 여기서 미리 볼 수 없습니다.', 'Ce fichier ne peut pas être prévisualisé ici.', 'Este archivo no se puede previsualizar aquí.'],
   'Document': ['ドキュメント', '문서', 'Document', 'Documento'],

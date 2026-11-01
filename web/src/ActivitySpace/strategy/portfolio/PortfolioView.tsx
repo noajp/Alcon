@@ -106,8 +106,8 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
             {vision && <span className="truncate text-[13px] text-muted-foreground">{vision.name}</span>}
             {vision && (
               <ButtonAppearanceProvider appearance="navigation">
-                <Button variant="ghost" size="icon-xs" className="ml-auto text-muted-foreground" onClick={() => setLocalNew({ parentId: null })}
-                  title={t('New Portfolio')} aria-label={t('New Portfolio')}><Plus size={14} /></Button>
+                <Button variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={() => setLocalNew({ parentId: null })}>
+                  <Plus size={14} />{t('Add Portfolio')}</Button>
               </ButtonAppearanceProvider>
             )}
           </div>

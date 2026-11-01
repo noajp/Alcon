@@ -64,6 +64,9 @@ const SHARED_MESSAGES: Record<string, Row> = {
   'Due date to': ['期限の終了日', '마감일 종료', 'Échéance jusqu’au', 'Fecha límite hasta'],
 
   // List table
+  'Add Element': ['Element を追加', 'Element 추가', 'Ajouter un Element', 'Añadir Element'],
+  'Add Initiative': ['Initiative を追加', 'Initiative 추가', 'Ajouter une Initiative', 'Añadir Initiative'],
+  'Add Portfolio': ['Portfolio を追加', 'Portfolio 추가', 'Ajouter un Portfolio', 'Añadir Portfolio'],
   'Add Object': ['Object を追加', 'Object 추가', 'Ajouter un Object', 'Añadir Object'],
   'Add Element to {name}': ['{name} に Element を追加', '{name}에 Element 추가', 'Ajouter un Element à {name}', 'Añadir Element a {name}'],
   'Select Element': ['Element を選択', 'Element 선택', 'Sélectionner l’Element', 'Seleccionar Element'],

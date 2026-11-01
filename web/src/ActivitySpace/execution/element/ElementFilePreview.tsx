@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ExternalLink, Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { elementFileUrl, openElementFile, type ElementFile } from '@/hooks/elementFileData';
 import { officeKindOf, readOffice, type OfficePreview } from './officePreview';
+import { readDeck, type Deck, type DeckItem, type TextBody } from './deckLayout';
 
 // An attached file, previewed in place under its row (the row's ▶ opens it): images and PDFs as themselves,
 // text as text, audio and video in their players, and Word / Excel /
@@ -31,10 +32,15 @@ function kindOf(file: ElementFile): Kind {
 export function ElementFilePreview({ file }: { file: ElementFile }) {
   const { t } = useI18n();
   const kind = kindOf(file);
+  const officeKind = officeKindOf(file.name);
   const [url, setUrl] = useState<string | null>(null);
   const [text, setText] = useState<string | null>(null);
   const [office, setOffice] = useState<OfficePreview | null>(null);
+  const [deck, setDeck] = useState<ArrayBuffer | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [zoom, setZoom] = useState(1);
 
   useEffect(() => {
     let live = true;
@@ -44,24 +50,58 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
         setUrl(signed);
         if (kind === 'text' || kind === 'html') {
           const body = await (await fetch(signed)).text();
-          if (live) setText(body.slice(0, 200_000));
+          if (live) setText(body.slice(0, 2_000_000));
         } else if (kind === 'office') {
-          const read = await readOffice(officeKindOf(file.name)!, await (await fetch(signed)).arrayBuffer());
+          const bytes = await (await fetch(signed)).arrayBuffer();
+          // A deck is laid out as slides (DeckView); its text is read too,
+          // as the fallback should the layout fail.
+          if (officeKind === 'pptx' && live) setDeck(bytes);
+          const read = await readOffice(officeKind!, bytes);
           if (live) setOffice(read);
         }
       })
       .catch((e) => { if (live) setError(e instanceof Error ? e.message : String(e)); });
     return () => { live = false; };
-  }, [file, kind]);
+  }, [file, kind, officeKind]);
+
+  useEffect(() => {
+    const onChange = () => setFullscreen(document.fullscreenElement === frameRef.current);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void frameRef.current?.requestFullscreen();
+  };
+  const spinner = <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>;
+  const zoomable = kind === 'html';
 
   return (
-    <div className="mt-1 h-[480px] overflow-hidden rounded-lg border border-border/60 bg-background">
+    <div ref={frameRef}
+      className="group/preview relative mt-1 h-[480px] overflow-hidden rounded-lg border border-border/60 bg-background [&:fullscreen]:mt-0 [&:fullscreen]:h-screen [&:fullscreen]:rounded-none [&:fullscreen]:border-0">
+      {/* Tools float over the preview's corner and show on hover: zoom for
+          a page, full screen for everything. */}
+      <div className={`absolute right-2 top-2.5 z-30 flex items-center gap-0.5 rounded-md border border-border/60 bg-[var(--surface-overlay)] p-0.5 shadow-sm transition-opacity ${fullscreen ? '' : 'opacity-0 group-hover/preview:opacity-100 focus-within:opacity-100'}`}>
+        {zoomable && <>
+          <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Zoom out')} title={t('Zoom out')} disabled={zoom <= 0.25}
+            onClick={() => setZoom((z) => Math.max(0.25, Math.round((z - 0.1) * 100) / 100))}><Minus size={13} /></Button>
+          <button type="button" onClick={() => setZoom(1)} title={t('Reset zoom')} aria-label={t('Reset zoom')}
+            className="h-6 min-w-11 rounded px-1 text-[11.5px] tabular-nums text-muted-foreground transition-colors hover:bg-[var(--surface-strong)] hover:text-foreground">
+            {Math.round(zoom * 100)}%
+          </button>
+          <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Zoom in')} title={t('Zoom in')} disabled={zoom >= 3}
+            onClick={() => setZoom((z) => Math.min(3, Math.round((z + 0.1) * 100) / 100))}><Plus size={13} /></Button>
+          <span className="mx-0.5 h-4 w-px bg-border/60" />
+        </>}
+        <Button type="button" variant="ghost" size="icon-xs" onClick={toggleFullscreen}
+          aria-label={t(fullscreen ? 'Exit full screen' : 'Full screen')} title={t(fullscreen ? 'Exit full screen' : 'Full screen')}>
+          {fullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+        </Button>
+      </div>
       <div className="h-full overflow-auto">
         {error ? (
           <p className="p-6 text-[13px] text-[var(--status-danger)]">{error}</p>
-        ) : !url ? (
-          <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>
-        ) : kind === 'image' ? (
+        ) : !url ? spinner : kind === 'image' ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url} alt={file.name} className="mx-auto max-h-full max-w-full object-contain p-4" />
         ) : kind === 'pdf' ? (
@@ -70,21 +110,23 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
           // The page as it is, scripts and all, in a sandbox with no origin of
           // its own: it can run, but cannot reach this app, its storage or
           // the person's session. (Storage serves HTML as text, so the page
-          // is handed over as srcdoc rather than by its link.)
-          text === null
-            ? <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>
-            : <iframe srcDoc={text} sandbox="allow-scripts" title={file.name} className="h-full w-full border-0 bg-[var(--sheet-paper)]" />
+          // is handed over as srcdoc rather than by its link.) Zoom scales
+          // the frame and gives it the room the scale takes away, so the page
+          // lays itself out for a wider or narrower window.
+          text === null ? spinner : (
+            <iframe srcDoc={text} sandbox="allow-scripts" title={file.name}
+              style={{ width: `${100 / zoom}%`, height: `${100 / zoom}%`, transform: `scale(${zoom})`, transformOrigin: '0 0' }}
+              className="border-0 bg-[var(--sheet-paper)]" />
+          )
         ) : kind === 'video' ? (
           <video src={url} controls className="mx-auto max-h-full max-w-full p-4" />
         ) : kind === 'audio' ? (
           <div className="flex h-full items-center justify-center"><audio src={url} controls /></div>
         ) : kind === 'office' ? (
-          office === null
-            ? <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>
-            : <OfficeView preview={office} />
+          deck ? <DeckView bytes={deck} fallback={office ? <OfficeView preview={office} /> : spinner} />
+            : office === null ? spinner : <OfficeView preview={office} />
         ) : kind === 'text' ? (
-          text === null
-            ? <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>
+          text === null ? spinner
             : <pre className="whitespace-pre-wrap break-words p-6 font-mono text-[12.5px] leading-relaxed text-foreground">{text}</pre>
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-[13px] text-muted-foreground">
@@ -95,6 +137,114 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** A deck as its slides — shapes, colours, pictures, type, tables, where
+ *  the deck puts them (deckLayout) — on the grey canvas under PowerPoint's
+ *  orange bar, one after another at the width of the preview; each slide
+ *  is drawn at the deck's size and scaled to fit, so it follows the
+ *  preview into full screen. Should a deck not read, its text is shown. */
+function DeckView({ bytes, fallback }: { bytes: ArrayBuffer; fallback: React.ReactNode }) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(0);
+  const [deck, setDeck] = useState<Deck | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    readDeck(bytes).then((d) => { if (live) setDeck(d); }).catch(() => { if (live) setFailed(true); });
+    return () => { live = false; };
+  }, [bytes]);
+  useEffect(() => {
+    const el = hostRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  if (failed || deck?.slides.length === 0) return <>{fallback}</>;
+  const scale = deck && width ? Math.min(1.5, (width - 48) / deck.width) : 0;
+  return (
+    <div className="flex min-h-full flex-col bg-[var(--sheet-head)]">
+      <div className="sticky top-0 z-20 h-1 shrink-0 bg-[var(--slide-accent)]" />
+      <div ref={hostRef} className="flex flex-1 flex-col items-center gap-4 py-6">
+        {!deck || !scale ? <Loader2 size={16} className="mt-10 animate-spin text-[var(--sheet-head-text)]" /> : deck.slides.map((slide, i) => (
+          <div key={i} className="relative shrink-0 overflow-hidden shadow-md" style={{ width: deck.width * scale, height: deck.height * scale }}>
+            <div className="absolute left-0 top-0 origin-top-left" style={{ width: deck.width, height: deck.height, transform: `scale(${scale})`, background: slide.background ?? 'var(--sheet-paper)' }}>
+              {slide.items.map((item, j) => <DeckItemView key={j} item={item} />)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DeckText({ text }: { text: TextBody }) {
+  const [t, r, b, l] = text.inset;
+  return (
+    <div className="absolute inset-0 flex flex-col overflow-hidden"
+      style={{ padding: `${t}px ${r}px ${b}px ${l}px`, justifyContent: text.anchor === 'middle' ? 'center' : text.anchor === 'bottom' ? 'flex-end' : 'flex-start', writingMode: text.vertical ? 'vertical-rl' : undefined }}>
+      {text.paras.map((p, i) => (
+        <p key={i} style={{ textAlign: p.align, lineHeight: p.lineHeight ?? 1.2, margin: 0, minHeight: '1em', fontSize: `${(p.runs[0]?.size ?? 18) * 4 / 3}px` }}>
+          {p.bullet && '• '}
+          {p.runs.map((run, j) => run.text === '\n' ? <br key={j} /> : (
+            <span key={j} style={{
+              fontSize: `${run.size * 4 / 3}px`, fontWeight: run.bold ? 700 : 400, fontStyle: run.italic ? 'italic' : undefined,
+              textDecoration: run.underline ? 'underline' : undefined, color: run.color ?? 'var(--sheet-text)',
+              fontFamily: run.font ? `"${run.font}", sans-serif` : undefined, letterSpacing: run.spacing ? `${run.spacing}px` : undefined,
+              whiteSpace: 'pre-wrap',
+            }}>{run.text}</span>
+          ))}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function DeckItemView({ item }: { item: DeckItem }) {
+  const box: React.CSSProperties = { left: item.x, top: item.y, width: item.w, height: item.h, transform: item.rot ? `rotate(${item.rot}deg)` : undefined };
+  if (item.kind === 'image') {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={item.src} alt="" className="absolute object-fill" style={box} />;
+  }
+  if (item.kind === 'table') {
+    return (
+      <table className="absolute border-collapse" style={{ ...box, tableLayout: 'fixed' }}>
+        <colgroup>{item.cols.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
+        <tbody>
+          {item.rows.map((row, i) => (
+            <tr key={i} style={{ height: row.h }}>
+              {row.cells.map((cell, j) => cell.skip ? null : (
+                <td key={j} colSpan={cell.span} className="relative align-top" style={{ background: cell.fill ?? undefined }}>
+                  <DeckText text={cell.text} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+  if (item.geom === 'line') {
+    const s = item.stroke ?? { color: null, width: 1, dash: false };
+    const [x1, x2] = item.flipH ? [item.w, 0] : [0, item.w];
+    const [y1, y2] = item.flipV ? [item.h, 0] : [0, item.h];
+    return (
+      <svg className="absolute overflow-visible" style={box}>
+        <line x1={x1} y1={y1} x2={x2} y2={y2} style={{ stroke: s.color ?? 'var(--sheet-text)' }} strokeWidth={s.width} strokeDasharray={s.dash ? `${s.width * 3} ${s.width * 2}` : undefined} />
+      </svg>
+    );
+  }
+  return (
+    <div className="absolute" style={{
+      ...box, background: item.fill ?? undefined,
+      border: item.stroke ? `${item.stroke.width}px ${item.stroke.dash ? 'dashed' : 'solid'} ${item.stroke.color ?? 'var(--sheet-text)'}` : undefined,
+      borderRadius: item.geom === 'ellipse' ? '50%' : item.geom === 'roundRect' ? Math.min(item.w, item.h) * 0.16 : undefined,
+      boxSizing: 'border-box',
+    }}>
+      {item.text && <DeckText text={item.text} />}
     </div>
   );
 }
@@ -113,15 +263,18 @@ function OfficeView({ preview }: { preview: OfficePreview }) {
   }
   if (preview.kind === 'xlsx') return <SheetView sheets={preview.sheets} />;
   return (
+    <div className="min-h-full bg-[var(--sheet-head)]">
+    <div className="sticky top-0 z-20 h-1 bg-[var(--slide-accent)]" />
     <div className="mx-auto grid max-w-4xl gap-3 p-6">
       {preview.slides.map((s, i) => (
-        <section key={i} className="rounded-lg border border-border/60 bg-[var(--surface-rail)] p-4">
-          <div className="mb-2 text-[11px] tabular-nums text-muted-foreground">{i + 1}</div>
+        <section key={i} className="rounded-md bg-[var(--sheet-paper)] p-4 text-[var(--sheet-text)] shadow-sm">
+          <div className="mb-2 text-[11px] tabular-nums text-[var(--sheet-head-text)]">{i + 1}</div>
           {s.lines.length === 0
-            ? <p className="text-[13px] text-muted-foreground">—</p>
-            : s.lines.map((line, j) => <p key={j} className={j === 0 ? 'text-[15px] font-semibold text-foreground' : 'text-[13px] text-foreground/90'}>{line}</p>)}
+            ? <p className="text-[13px] text-[var(--sheet-head-text)]">—</p>
+            : s.lines.map((line, j) => <p key={j} className={j === 0 ? 'text-[15px] font-semibold' : 'text-[13px]'}>{line}</p>)}
         </section>
       ))}
+    </div>
     </div>
   );
 }
