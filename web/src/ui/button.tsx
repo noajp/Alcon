@@ -134,11 +134,13 @@ function Button({
       data-size={size}
       data-shape={shape}
       className={cn(buttonVariants({ variant, size, align: resolvedAlign, shape, multiline, className }),
-        // A tab is a pill dressed like an island: the rail surface and its
-        // fine default line, the selected one a step brighter. It reads as a
-        // button even when it is not the selected one.
-        appearance === 'control' && shape === 'tab' && 'border-[var(--border-default)] hover:border-[var(--border-strong)]',
-        appearance === 'control' && shape === 'tab' && variant === 'ghost' && 'bg-[var(--surface-rail)] text-[var(--text-secondary)] hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)]',
+        // A tab is a quiet pill: no line around it. The ones not chosen are
+        // just their words, the chosen one sits on a light fill, and a hover
+        // shows the same fill — a row of tabs reads as one strip, not a row
+        // of separate buttons.
+        appearance === 'control' && shape === 'tab' && 'border-transparent hover:border-transparent aria-pressed:border-transparent aria-selected:border-transparent',
+        appearance === 'control' && shape === 'tab' && variant === 'ghost' && 'bg-transparent text-[var(--text-secondary)] hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)]',
+        appearance === 'control' && shape === 'tab' && variant === 'secondary' && 'bg-[var(--surface-strong)] text-[var(--text-primary)] hover:bg-[var(--surface-strong)]',
         appearance !== 'control' && 'rounded-[var(--control-tab-radius)] border-transparent hover:border-transparent aria-pressed:border-transparent aria-selected:border-transparent',
         appearance === 'inline' && variant === 'ghost' && 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] font-normal',
         // The one decisive action (Create, Send, the empty state's verb) is a
