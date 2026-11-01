@@ -35,7 +35,7 @@ const buttonVariants = cva(
   ].join(" "),
   {
     variants: {
-      shape: { action: CONTROL.actionRadius, tab: [CONTROL.tabRadius, "aria-pressed:border-[var(--border-strong)] aria-selected:border-[var(--border-strong)]"].join(" ") },
+      shape: { action: CONTROL.actionRadius, tab: "rounded-full" },
       variant: {
         /** Accent ground. One primary action per button group. */
         primary:
@@ -134,11 +134,16 @@ function Button({
       data-size={size}
       data-shape={shape}
       className={cn(buttonVariants({ variant, size, align: resolvedAlign, shape, multiline, className }),
-        // A tab reads as a button even when it is not the selected one: it
-        // keeps its fine outline where a ghost action drops it.
+        // A tab is a pill dressed like an island: the rail surface and its
+        // fine default line, the selected one a step brighter. It reads as a
+        // button even when it is not the selected one.
         appearance === 'control' && shape === 'tab' && 'border-[var(--border-default)] hover:border-[var(--border-strong)]',
+        appearance === 'control' && shape === 'tab' && variant === 'ghost' && 'bg-[var(--surface-rail)] text-[var(--text-secondary)] hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)]',
         appearance !== 'control' && 'rounded-[var(--control-tab-radius)] border-transparent hover:border-transparent aria-pressed:border-transparent aria-selected:border-transparent',
-        appearance === 'inline' && variant === 'ghost' && 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] font-normal'
+        appearance === 'inline' && variant === 'ghost' && 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] font-normal',
+        // The one decisive action (Create, Send, the empty state's verb) is a
+        // pill, like the tabs and the quick-create property chips beside it.
+        variant === 'primary' && 'rounded-full'
       )}
       {...props}
     >

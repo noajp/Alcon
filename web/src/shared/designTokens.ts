@@ -101,7 +101,6 @@ export const CONTROL = {
   /** One radius for every step. */
   radius: 'rounded-md',
   actionRadius: 'rounded-[var(--control-action-radius)]',
-  tabRadius: 'rounded-[var(--control-tab-radius)]',
   border: 'border border-[var(--border-default)]',
 } as const;
 
