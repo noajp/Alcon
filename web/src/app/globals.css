@@ -230,7 +230,7 @@
   --surface-muted:   #1e1e20;
   --surface-overlay: #1c1c1e;
   /* Right-rail cards lift a notch off the main island. */
-  --surface-rail:    #1b1b1d;
+  --surface-rail:    #202022;
 
   /* ---- Syntax — Dark ---- */
   --syntax-keyword:  #b9a2f5;
@@ -310,7 +310,7 @@
   --surface-strong:  #24262c;
   --surface-muted:   #1c1d22;
   --surface-overlay: #1b1c21;
-  --surface-rail:    #1a1b20;
+  --surface-rail:    #1f2025;
   --sidebar-accent:  #212228;
 }
 .theme-carbon {
@@ -320,7 +320,7 @@
   --surface-strong:  #1f1f1f;
   --surface-muted:   #1a1a1a;
   --surface-overlay: #171717;
-  --surface-rail:    #1c1c1c;
+  --surface-rail:    #212121;
   --sidebar-accent:  #1f1f1f;
 }
 .theme-graphite {
@@ -330,7 +330,7 @@
   --surface-strong:  #2b2926;
   --surface-muted:   #282622;
   --surface-overlay: #252320;
-  --surface-rail:    #232120;
+  --surface-rail:    #282624;
   --sidebar-accent:  #2b2926;
 }
 
