@@ -148,7 +148,7 @@ function EditablePara({ para, edit }: { para: DocPara & { src: number }; edit: E
         if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
         else if (e.key === 'Escape') { e.preventDefault(); e.currentTarget.textContent = shown; e.currentTarget.blur(); }
       }}
-      className="cursor-text rounded-[2px] outline-none hover:outline-1 hover:outline-dashed hover:outline-[var(--doc-accent)] focus:outline-2 focus:outline-solid focus:outline-[var(--doc-accent)]"
+      className="cursor-text rounded-[2px] outline-none focus:outline-2 focus:outline-solid focus:outline-[var(--doc-accent)]"
       style={pending ? { boxShadow: 'inset 0 -2px 0 var(--doc-accent)' } : undefined}>
       {pending ? <span style={runCss(para.runs.find((r) => r.text) ?? {})}>{pending.to}</span>
         : para.runs.map((run, j) => <DocRunView key={j} run={run} />)}

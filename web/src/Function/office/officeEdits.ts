@@ -23,6 +23,8 @@ export interface EditResult {
 
 /** Edits made in a preview and not yet saved, one per cell or paragraph. */
 export interface EditSession {
+  /** Different for each time editing is turned on (a view's selection belongs to one). */
+  id: string;
   pending: ReadonlyMap<string, OfficeEdit>;
   /** Records an edit; one that puts back what was there is dropped. */
   set: (edit: OfficeEdit) => void;
