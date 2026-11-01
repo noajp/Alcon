@@ -10,6 +10,7 @@ import { officeKindOf, readOffice, type OfficePreview } from './officePreview';
 import { readDeck, type Deck, type DeckItem, type TextBody } from './deckLayout';
 import { readWorkbook, type WorkSheet } from './sheetLayout';
 import { readDocLayout, type DocBlock, type DocLayout, type DocRun } from './docLayout';
+import { fontStack } from './officeFonts';
 import SheetChartView from './SheetChart';
 
 // An attached file, previewed in place under its row (the row's ▶ opens it): images and PDFs as themselves,
@@ -294,7 +295,7 @@ function DeckText({ text }: { text: TextBody }) {
             <span key={j} style={{
               fontSize: `${run.size * 4 / 3}px`, fontWeight: run.bold ? 700 : 400, fontStyle: run.italic ? 'italic' : undefined,
               textDecoration: run.underline ? 'underline' : undefined, color: run.color ?? 'var(--sheet-text)',
-              fontFamily: run.font ? `"${run.font}", sans-serif` : undefined, letterSpacing: run.spacing ? `${run.spacing}px` : undefined,
+              fontFamily: fontStack(run.font) ?? undefined, letterSpacing: run.spacing ? `${run.spacing}px` : undefined,
               whiteSpace: 'pre-wrap',
             }}>{run.text}</span>
           ))}
@@ -447,7 +448,7 @@ function DocRunView({ run }: { run: DocRun }) {
       fontWeight: run.bold ? 700 : undefined, fontStyle: run.italic ? 'italic' : undefined,
       textDecoration: [run.underline && 'underline', run.strike && 'line-through'].filter(Boolean).join(' ') || undefined,
       fontSize: `${run.size * 4 / 3}px`, color: run.color ?? undefined, background: run.highlight ?? undefined,
-      fontFamily: run.font ? `"${run.font}", var(--font-sans)` : undefined,
+      fontFamily: fontStack(run.font) ?? undefined,
     }}>{run.text === '\t' ? '\u2003' : run.text}</span>
   );
 }
@@ -584,7 +585,7 @@ function SheetView({ sheets }: { sheets: WorkSheet[] }) {
                               fontWeight: st?.bold ? 700 : undefined, fontStyle: st?.italic ? 'italic' : undefined,
                               textDecoration: [st?.underline && 'underline', st?.strike && 'line-through'].filter(Boolean).join(' ') || undefined,
                               fontSize: st?.size ? `${st.size * 4 / 3}px` : undefined,
-                              fontFamily: st?.font ? `"${st.font}", var(--font-sans)` : undefined,
+                              fontFamily: fontStack(st?.font) ?? undefined,
                               textAlign: st?.align ?? (cell?.numeric ? 'right' : 'left'),
                               verticalAlign: st?.valign ?? 'bottom',
                               whiteSpace: st?.wrap ? 'normal' : 'nowrap',
