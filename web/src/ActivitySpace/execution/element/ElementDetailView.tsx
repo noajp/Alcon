@@ -849,7 +849,7 @@ function ElementDetailBody({
               so the read order is intent → its breakdown → what it waits on.
               Sharing an update belongs to the discussion, so it sits in the
               Comments heading. */}
-          <div className="-ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
+          <div className="relative -ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
           <ButtonAppearanceProvider appearance="inline">
           <div className="flex items-center gap-0.5">
             {/* Smile button → quick-emoji popover that toggles a
@@ -1115,7 +1115,7 @@ function ElementDetailBody({
           </section>}
 
           {/* The reader keeps changes next to their discussion. */}
-          <div className={layout === 'reader' ? '' : 'mt-4'}>
+          <div>
             {/* Comments and shared updates are one thread: a plain comment
                 sends with the button, an update from its ▾. */}
             <div className="mb-4 flex items-center gap-2">
