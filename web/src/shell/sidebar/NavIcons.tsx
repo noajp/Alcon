@@ -19,7 +19,7 @@ import {
   Stone,
   Layers,
 } from 'lucide-react';
-import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon } from '@/Function/shared/conceptIcons';
+import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon, FilesIcon } from '@/Function/shared/conceptIcons';
 
 // ── Nav / tab / item icons ───────────────────────────────────────────────
 // Everything uses Lucide at strokeWidth 2. Lucide draws on a 24-unit grid, so
@@ -67,6 +67,7 @@ export const NavPortfolioIcon = ({ size = 20 }: { size?: number }) => <Briefcase
 export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} className="scale-110" />;
 
 export const NavCrmIcon = CrmIcon;
+export const NavFilesIcon = FilesIcon;
 // AI — the conversation, as a pop-up or a screen of its own.
 // Lucide's graph-star, also newer than the pinned lucide-react; its paths (ISC).
 export const NavAiIcon = ({ size = 20 }: { size?: number }) => (

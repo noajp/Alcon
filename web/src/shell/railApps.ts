@@ -10,6 +10,7 @@ import {
   NavTeamsIcon as NavPersonalIcon,
   NavNoteIcon,
   NavTableIcon,
+  NavFilesIcon,
   NavTeamsIcon,
   NavWorkloadIcon,
   NavStrategyModeIcon,
@@ -25,7 +26,7 @@ import type { ViewId } from '@/shell/viewRegistry';
 // Strategy and Execution are the permanent rail entries. Inbox, Calendar and
 // the AI sit at the right of the status bar, Notebook and Slides at its left.
 // Personal pages are reached through the avatar; other tools use the launcher.
-export type RailMode = 'personal' | 'inbox' | 'strategy' | 'execution' | 'reviews' | 'workload' | 'notebook' | 'tables' | 'slides' | 'team' | 'calendar' | 'crm' | 'audit' | 'ai';
+export type RailMode = 'personal' | 'inbox' | 'strategy' | 'execution' | 'reviews' | 'workload' | 'notebook' | 'tables' | 'files' | 'slides' | 'team' | 'calendar' | 'crm' | 'audit' | 'ai';
 
 export interface ModeMeta {
   label: string;
@@ -45,6 +46,7 @@ export const MODE_META: Record<RailMode, ModeMeta> = {
   workload:  { label: 'Workload',  icon: NavWorkloadIcon, defaultView: 'workload', views: ['workload'] },
   notebook:  { label: 'Notebook',  icon: NavNoteIcon, defaultView: 'note', views: ['note'] },
   tables:    { label: 'Table',     icon: NavTableIcon, defaultView: 'tables', views: ['tables'] },
+  files:     { label: 'Files',     icon: NavFilesIcon, defaultView: 'files', views: ['files'] },
   slides:    { label: 'Slides',    icon: NavSlidesIcon, defaultView: 'slides', views: ['slides'] },
   team:      { label: 'People',    icon: NavTeamsIcon, defaultView: 'team', views: ['team'] },
   calendar:  { label: 'Calendar',  icon: NavCalendarIcon, defaultView: 'calendar', views: ['calendar', 'schedule'] },
@@ -68,7 +70,7 @@ export const BAR_TOOLS: RailMode[] = ['notebook', 'slides'];
 // that keep the people doing the fighting able to keep going. The two groups
 // are a display split only: Tools serve any surface, Workload watches capacity.
 export const APP_GROUPS: { title: string; apps: RailMode[] }[] = [
-  { title: 'Tools', apps: ['tables', 'team'] },
+  { title: 'Tools', apps: ['tables', 'files', 'team'] },
   { title: 'Sustainment', apps: ['workload', 'crm', 'audit', 'reviews'] },
 ];
 

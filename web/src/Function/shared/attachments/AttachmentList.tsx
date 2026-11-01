@@ -77,7 +77,7 @@ export function AttachmentList({ owner, actions, empty = null }: {
                     <Trash2 size={12} />
                   </button>
                 </div>
-                {isOpen && <div className="px-2 pb-2"><AttachmentPreview file={f} versions={versions} owner={owner} actions={actions?.(f)} /></div>}
+                {isOpen && <div className="px-2 pb-2"><AttachmentPreview file={f} owner={owner} actions={actions?.(f)} /></div>}
               </div>
             );
           })}
@@ -115,8 +115,9 @@ export function AttachmentList({ owner, actions, empty = null }: {
 /** An attached file's preview; its edits are saved as the file's next
  *  version. With versions, a history menu shows an earlier one in place
  *  (read only) and can make it the newest again. */
-function AttachmentPreview({ file, versions, owner, actions }: { file: Attachment; versions: Attachment[]; owner: AttachmentOwner; actions?: ReactNode }) {
+export function AttachmentPreview({ file, owner, actions }: { file: Attachment; owner: AttachmentOwner; actions?: ReactNode }) {
   const { t } = useI18n();
+  const versions = versionChain(useAttachments(owner).all, file.id);
   const { saveEdits, restoreVersion } = useAttachmentActions(owner);
   const editor = useMemo<FileEditor>(() => ({ save: (edits) => saveEdits.mutateAsync({ file, edits }) }), [file, saveEdits]);
   const workers = useWorkers().data;

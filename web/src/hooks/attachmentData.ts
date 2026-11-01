@@ -67,7 +67,7 @@ const COLUMNS = 'id, path, name, size, mime_type, uploaded_by, created_at, delet
 const EMPTY: Attachment[] = [];
 
 /** Pure. What a file is attached to (exactly one owner column is set). */
-function ownerOf(file: Attachment): AttachmentOwner {
+export function ownerOf(file: Attachment): AttachmentOwner {
   const kind = (Object.keys(OWNER_COLUMN) as AttachmentOwnerKind[]).find((k) => file[OWNER_COLUMN[k] as keyof Attachment]);
   return { kind: kind ?? 'element', id: String(file[OWNER_COLUMN[kind ?? 'element'] as keyof Attachment] ?? '') };
 }
@@ -258,6 +258,30 @@ export function useAttachmentsOf(kind: AttachmentOwnerKind, ids: string[]) {
     },
   });
   return { data: query.data ?? EMPTY, loading: key.length > 0 && query.isPending };
+}
+
+/** A file in the Files app: its latest version, what it is attached to
+ *  (by name) and how many versions it has. */
+export interface SpaceFile extends Attachment {
+  owner_label: string | null;
+  /** For a file on an Element: the Object it is in, to open it there. */
+  element_object_id: string | null;
+  versions: number;
+}
+
+/** Every file attached in a Space, as its latest version (not trashed),
+ *  newest first. RLS leaves out what the viewer cannot see. */
+export function useSpaceAttachments(spaceId: string | null) {
+  const query = useQuery({
+    queryKey: ['attachments-of', 'space', spaceId],
+    enabled: !!spaceId,
+    queryFn: async (): Promise<SpaceFile[]> => {
+      const { data, error } = await supabase.rpc('space_attachments', { p_space: spaceId });
+      if (error) throw error;
+      return (data ?? []) as SpaceFile[];
+    },
+  });
+  return { data: query.data ?? (EMPTY as SpaceFile[]), loading: !!spaceId && query.isPending };
 }
 
 /** One attached file by id, as its latest version (null when gone, trashed
