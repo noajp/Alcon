@@ -29,7 +29,7 @@ export interface EditSession {
   /** Records an edit; one that puts back what was there is dropped. */
   set: (edit: OfficeEdit) => void;
 }
-export const cellKey = (sheet: string, ref: string) => `c:${sheet}!${ref.toUpperCase()}`;
+const cellKey = (sheet: string, ref: string) => `c:${sheet}!${ref.toUpperCase()}`;
 export const paraKey = (index: number) => `p:${index}`;
 const editKey = (e: OfficeEdit) => (e.kind === 'cell' ? cellKey(e.sheet, e.ref) : paraKey(e.index));
 

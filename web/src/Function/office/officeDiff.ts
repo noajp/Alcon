@@ -15,6 +15,15 @@ export function cellRef(r: number, c: number): string {
   return `${name}${r + 1}`;
 }
 
+/** Pure. A reference's row and column ("B3" → [2, 1]); null when not one. */
+export function refPosition(ref: string): [number, number] | null {
+  const m = /^\$?([A-Z]{1,3})\$?(\d{1,7})$/i.exec(ref.trim());
+  if (!m) return null;
+  let col = 0;
+  for (const ch of m[1].toUpperCase()) col = col * 26 + (ch.charCodeAt(0) - 64);
+  return [Number(m[2]) - 1, col - 1];
+}
+
 /** What a cell holds, as typed into it: a number's value, not its format. */
 export const cellValue = (cell: Cell | undefined) => (cell && !cell.hidden ? (cell.value != null ? String(cell.value) : cell.text) : '');
 

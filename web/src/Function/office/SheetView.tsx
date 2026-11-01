@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { Cell, WorkSheet } from './sheetLayout';
-import { cellKey, type EditSession } from './officeEdits';
-import { cellRef, cellValue, type SheetChanges } from './officeDiff';
+import type { EditSession } from './officeEdits';
+import { cellRef, cellValue, refPosition, type SheetChanges } from './officeDiff';
 import { runCss } from './officeViewParts';
 import SheetChartView from './SheetChart';
 
@@ -58,6 +58,15 @@ export function SheetView({ sheets, edit = null, changes = null }: {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  // Scrolling re-reads the view only every so far (the rows drawn reach well
+  // past it), not on every pixel — a redraw per pixel is what made it heavy.
+  const lastTop = useRef(0);
+  const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (Math.abs(el.scrollTop - lastTop.current) < 240) return;
+    lastTop.current = el.scrollTop;
+    setView({ top: el.scrollTop, h: el.clientHeight, w: el.clientWidth });
+  };
   const commit = (r: number, c: number, cell: Cell | undefined, value: string) => {
     if (!edit || !sheet) return;
     edit.set({ kind: 'cell', sheet: sheet.name, ref: cellRef(r, c), from: rawOf(cell), to: value });
@@ -89,8 +98,8 @@ export function SheetView({ sheets, edit = null, changes = null }: {
     return out;
   }, [sheet, rowCount]);
   let first = 0, last = rowCount;
-  if (rowCount > 200) {
-    const from = view.top - HEAD_H - 400, to = view.top + view.h + 400;
+  {
+    const from = view.top - HEAD_H - 600, to = view.top + view.h + 600;
     while (first < rowCount && tops[first + 1] < from) first++;
     last = first;
     while (last < rowCount && tops[last] < to) last++;
@@ -103,6 +112,26 @@ export function SheetView({ sheets, edit = null, changes = null }: {
   const select = (r: number, c: number, typing = false) => {
     if (edit) setSelAt((prev) => ({ session: edit.id, sheet: active, r: Math.max(0, r), c: Math.max(0, c), typing, seq: (prev?.seq ?? 0) + 1 }));
   };
+  // Rows are drawn by a memoized row, so a selection or an edit redraws only
+  // the rows it touches; the handlers it is handed never change identity.
+  const latest = useRef({ select, commit, sheet });
+  useEffect(() => { latest.current = { select, commit, sheet }; });
+  const onSelect = useCallback((r: number, c: number, typing?: boolean) => latest.current.select(r, c, typing), []);
+  const onCommit = useCallback((r: number, c: number, value: string) => latest.current.commit(r, c, latest.current.sheet?.rows[r]?.cells[c], value), []);
+  const byRow = (entries: Iterable<[string, string]>) => {
+    const out = new Map<number, Map<number, string>>();
+    for (const [ref, v] of entries) {
+      const at = refPosition(ref);
+      if (!at) continue;
+      if (!out.has(at[0])) out.set(at[0], new Map());
+      out.get(at[0])!.set(at[1], v);
+    }
+    return out;
+  };
+  const pendingByRow = useMemo(() => byRow(edit && sheet
+    ? [...edit.pending.values()].flatMap((e) => (e.kind === 'cell' && e.sheet === sheet.name ? [[e.ref, e.to] as [string, string]] : []))
+    : []), [edit, sheet]);
+  const changedByRow = useMemo(() => byRow(sheet ? changes?.cells.get(sheet.name)?.entries() ?? [] : []), [changes, sheet]);
   // The selection stays in sight.
   useEffect(() => {
     if (at) scrollRef.current?.querySelector(`[data-cell="${at.r}:${at.c}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -112,7 +141,7 @@ export function SheetView({ sheets, edit = null, changes = null }: {
     <div className="flex h-full flex-col bg-[var(--sheet-paper)] text-[var(--sheet-text)]">
       <div className="h-1 shrink-0 bg-[var(--sheet-accent)]" />
       <div ref={scrollRef}
-        onScroll={(e) => setView({ top: e.currentTarget.scrollTop, h: e.currentTarget.clientHeight, w: e.currentTarget.clientWidth })}
+        onScroll={onScroll}
         className="min-h-0 flex-1 overflow-auto outline-none">
         {!sheet ? <p className="p-4 text-[13px]">{t('This sheet is empty.')}</p> : (
           <div className="relative w-max">
@@ -131,61 +160,10 @@ export function SheetView({ sheets, edit = null, changes = null }: {
                 {spacer(tops[first], 'above')}
                 {Array.from({ length: last - first }, (_, i) => {
                   const r = first + i;
-                  const row = sheet.rows[r];
                   return (
-                    <tr key={r} style={{ height: rowH(r) }}>
-                      <th className={`${head} left-0 px-1 text-center tabular-nums`}>{r + 1}</th>
-                      {cols.map((_, c) => {
-                        const cell = row?.cells[c];
-                        if (cell?.hidden) return null;
-                        const st = cell?.style;
-                        // Text runs on over empty neighbours, as in Excel;
-                        // it is cut where the next cell holds something.
-                        const next = row?.cells[c + 1];
-                        const spill = !!cell?.text && !st?.wrap && !cell.numeric && (st?.align ?? 'left') === 'left' && !next?.text && !next?.hidden;
-                        const pending = edit?.pending.get(cellKey(sheet.name, cellRef(r, c)));
-                        const chosen = at?.r === r && at.c === c;
-                        const locked = !!cell?.formula;
-                        const was = changes?.cells.get(sheet.name)?.get(cellRef(r, c));
-                        return (
-                          <td key={c} colSpan={cell?.colSpan} rowSpan={cell?.rowSpan}
-                            title={was !== undefined ? t('Before: {value}', { value: was || t('(empty)') }) : edit && locked ? t('A formula cannot be edited here yet.') : cell?.text || undefined}
-                            data-cell={`${r}:${c}`}
-                            onClick={edit ? () => { if (!chosen) select(r, c); } : undefined}
-                            onDoubleClick={edit && !locked ? () => select(r, c, true) : undefined}
-                            className={`px-1 ${chosen ? 'relative' : spill ? 'relative z-[1] overflow-visible' : 'overflow-hidden'}`}
-                            style={{
-                              // An edited cell, until it is saved, is ringed in the sheet's colour.
-                              boxShadow: pending ? 'inset 0 0 0 2px var(--sheet-accent)'
-                                : was !== undefined ? `inset 0 0 0 2px ${was ? 'var(--status-warning)' : 'var(--status-success)'}` : undefined,
-                              cursor: edit ? 'cell' : undefined,
-                              // The selected cell, outlined as Excel does.
-                              outline: chosen ? '2px solid var(--sheet-accent)' : undefined, outlineOffset: chosen ? -2 : undefined,
-                              // Longhands only: React warns when a shorthand and its
-                              // longhands change together between renders.
-                              borderTop: st?.borders.top ?? `1px solid ${grid}`, borderRight: st?.borders.right ?? `1px solid ${grid}`,
-                              borderBottom: st?.borders.bottom ?? `1px solid ${grid}`, borderLeft: st?.borders.left ?? `1px solid ${grid}`,
-                              ...(st ? runCss(st) : {}),
-                              backgroundColor: st?.bg ?? undefined,
-                              // A data bar fills the cell from the left by its share.
-                              backgroundImage: cell?.bar ? `linear-gradient(90deg, ${cell.bar.color} ${cell.bar.pct * 100}%, transparent ${cell.bar.pct * 100}%)` : undefined,
-                              textAlign: st?.align ?? (cell?.numeric ? 'right' : 'left'),
-                              verticalAlign: st?.valign ?? 'bottom',
-                              whiteSpace: st?.wrap ? 'normal' : 'nowrap',
-                              fontVariantNumeric: cell?.numeric ? 'tabular-nums' : undefined,
-                            }}>
-                            {pending ? pending.to : cell?.runs ? cell.runs.map((run, k) => (
-                              <span key={k} style={runCss(run)}>{run.text}</span>
-                            )) : cell?.text}
-                            {chosen && (
-                              <CellBox key={at!.seq} raw={pending?.to ?? rawOf(cell)} startTyping={at!.typing} locked={locked}
-                                onCommit={(value) => commit(r, c, cell, value)}
-                                onMove={(dr, dc) => select(r + dr, c + dc)} />
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
+                    <SheetRow key={r} r={r} row={sheet.rows[r]} h={rowH(r)} cols={cols} grid={grid} head={head} editable={!!edit}
+                      chosen={at?.r === r ? at : null} pending={pendingByRow.get(r)} changed={changedByRow.get(r)}
+                      onSelect={onSelect} onCommit={onCommit} />
                   );
                 })}
                 {spacer(tops[rowCount] - tops[last], 'below')}
@@ -217,6 +195,81 @@ export function SheetView({ sheets, edit = null, changes = null }: {
   );
 }
 
+interface SheetRowProps {
+  r: number; row: WorkSheet['rows'][number] | undefined; h: number; cols: number[]; grid: string; head: string; editable: boolean;
+  /** The selection, when it is in this row. */
+  chosen: { c: number; seq: number; typing: boolean } | null;
+  /** This row's unsaved edits, and its changes from another version (column → value / value before). */
+  pending: Map<number, string> | undefined; changed: Map<number, string> | undefined;
+  onSelect: (r: number, c: number, typing?: boolean) => void;
+  onCommit: (r: number, c: number, value: string) => void;
+}
+
+/** One row of the grid. Memoized: it redraws only when its own cells, its
+ *  edits, its changes or the selection in it change. */
+const SheetRow = memo(function SheetRow({ r, row, h, cols, grid, head, editable, chosen, pending, changed, onSelect, onCommit }: SheetRowProps) {
+  const { t } = useI18n();
+  return (
+    <tr style={{ height: h }}>
+      <th className={`${head} left-0 px-1 text-center tabular-nums`}>{r + 1}</th>
+      {cols.map((_, c) => {
+        const cell = row?.cells[c];
+        if (cell?.hidden) return null;
+        const st = cell?.style;
+        // Text runs on over empty neighbours, as in Excel;
+        // it is cut where the next cell holds something.
+        const next = row?.cells[c + 1];
+        const spill = !!cell?.text && !st?.wrap && !cell.numeric && (st?.align ?? 'left') === 'left' && !next?.text && !next?.hidden;
+        const edited = pending?.get(c);
+        const isChosen = chosen?.c === c;
+        const locked = !!cell?.formula;
+        const was = changed?.get(c);
+        const look: CSSProperties = {
+          ...(st ? runCss(st) : {}),
+          textAlign: st?.align ?? (cell?.numeric ? 'right' : 'left'),
+          fontVariantNumeric: cell?.numeric ? 'tabular-nums' : undefined,
+        };
+        return (
+          <td key={c} colSpan={cell?.colSpan} rowSpan={cell?.rowSpan}
+            title={was !== undefined ? t('Before: {value}', { value: was || t('(empty)') }) : editable && locked ? t('A formula cannot be edited here yet.') : cell?.text || undefined}
+            data-cell={`${r}:${c}`}
+            onClick={editable ? () => { if (!isChosen) onSelect(r, c); } : undefined}
+            onDoubleClick={editable && !locked ? () => onSelect(r, c, true) : undefined}
+            className={`px-1 ${isChosen ? 'relative' : spill ? 'relative z-[1] overflow-visible' : 'overflow-hidden'}`}
+            style={{
+              // An edited cell, until it is saved, is ringed in the sheet's colour.
+              boxShadow: edited !== undefined ? 'inset 0 0 0 2px var(--sheet-accent)'
+                : was !== undefined ? `inset 0 0 0 2px ${was ? 'var(--status-warning)' : 'var(--status-success)'}` : undefined,
+              cursor: editable ? 'cell' : undefined,
+              // The selected cell, outlined as Excel does.
+              outline: isChosen ? '2px solid var(--sheet-accent)' : undefined, outlineOffset: isChosen ? -2 : undefined,
+              // Longhands only: React warns when a shorthand and its
+              // longhands change together between renders.
+              borderTop: st?.borders.top ?? `1px solid ${grid}`, borderRight: st?.borders.right ?? `1px solid ${grid}`,
+              borderBottom: st?.borders.bottom ?? `1px solid ${grid}`, borderLeft: st?.borders.left ?? `1px solid ${grid}`,
+              ...look,
+              backgroundColor: st?.bg ?? undefined,
+              // A data bar fills the cell from the left by its share.
+              backgroundImage: cell?.bar ? `linear-gradient(90deg, ${cell.bar.color} ${cell.bar.pct * 100}%, transparent ${cell.bar.pct * 100}%)` : undefined,
+              verticalAlign: st?.valign ?? 'bottom',
+              whiteSpace: st?.wrap ? 'normal' : 'nowrap',
+            }}>
+            {edited !== undefined ? edited : cell?.runs ? cell.runs.map((run, k) => (
+              <span key={k} style={runCss(run)}>{run.text}</span>
+            )) : cell?.text}
+            {isChosen && (
+              <CellBox key={chosen.seq} raw={edited ?? rawOf(cell)} startTyping={chosen.typing} locked={locked}
+                look={{ ...look, backgroundColor: st?.bg ?? 'var(--sheet-paper)' }}
+                onCommit={(value) => onCommit(r, c, value)}
+                onMove={(dr, dc) => onSelect(r + dr, c + dc)} />
+            )}
+          </td>
+        );
+      })}
+    </tr>
+  );
+});
+
 /**
  * The selected cell's own box, as Excel's: always there and focused, unseen
  * until something is typed. A key (or an IME composition) starts typing
@@ -225,8 +278,10 @@ export function SheetView({ sheets, edit = null, changes = null }: {
  * empties the cell; Esc then belongs to the page (ending the editing).
  * While typing, Enter and Tab keep the value and move on, Esc drops it.
  */
-function CellBox({ raw, startTyping, locked, onCommit, onMove }: {
+function CellBox({ raw, startTyping, locked, look, onCommit, onMove }: {
   raw: string; startTyping: boolean; locked: boolean;
+  /** The cell's own look, so typing shows as the cell will. */
+  look: CSSProperties;
   onCommit: (value: string) => void; onMove: (dr: number, dc: number) => void;
 }) {
   const [typing, setTyping] = useState(startTyping && !locked);
@@ -263,7 +318,7 @@ function CellBox({ raw, startTyping, locked, onCommit, onMove }: {
         else if (arrows[e.key] || step) { e.preventDefault(); onMove(...(arrows[e.key] ?? step!)); }
         else if ((e.key === 'Delete' || e.key === 'Backspace') && !locked) { e.preventDefault(); onCommit(''); }
       }}
-      style={typing ? undefined : { opacity: 0, caretColor: 'transparent', pointerEvents: 'none' }}
-      className="absolute inset-0 z-20 w-full bg-[var(--sheet-paper)] px-1 text-inherit outline outline-2 outline-[var(--sheet-accent)]" />
+      style={typing ? look : { opacity: 0, caretColor: 'transparent', pointerEvents: 'none' }}
+      className="absolute inset-0 z-20 m-0 w-full border-0 px-1 outline outline-2 -outline-offset-2 outline-[var(--sheet-accent)]" />
   );
 }
