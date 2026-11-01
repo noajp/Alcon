@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
-import { readDocLayout, type DocPara, type DocTable } from '@/ActivitySpace/execution/element/docLayout';
+import { readDocLayout, type DocPara, type DocTable } from '@/Function/office/docLayout';
 
 const w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
 

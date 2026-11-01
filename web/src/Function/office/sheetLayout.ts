@@ -20,6 +20,8 @@ export interface CellStyle {
 export interface CellRun { text: string; bold: boolean; italic: boolean; underline: boolean; color: string | null; size: number | null; font: string | null }
 export interface Cell {
   text: string; numeric: boolean; style: CellStyle | null; colSpan: number; rowSpan: number; hidden: boolean;
+  /** A number's stored value, before its format (1580783 for "¥1,580,783"). */
+  value?: number;
   /** Text in more than one format (rich text), when the cell has it. */
   runs?: CellRun[];
   /** A conditional-format data bar: its length (0–1) and colour. */
@@ -358,7 +360,10 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
           text = out.text; numeric = true;
           if (out.red) color = 'var(--sheet-negative)';
         } else if (cell?.value != null) text = String(cell.value);
-        cells[col] = { text, numeric, style: xf ? { ...xf.style, color } : null, colSpan: 1, rowSpan: 1, hidden: false, ...(cell?.runs ? { runs: cell.runs } : {}) };
+        cells[col] = {
+          text, numeric, style: xf ? { ...xf.style, color } : null, colSpan: 1, rowSpan: 1, hidden: false,
+          ...(cell?.runs ? { runs: cell.runs } : {}), ...(typeof cell?.value === 'number' ? { value: cell.value } : {}),
+        };
         if (text || xf?.style.bg) maxCol = Math.max(maxCol, col);
       }
       rows[r] = { h: row.getAttribute('ht') ? Math.round(Number(row.getAttribute('ht')) * 4 / 3) : defaultRow, cells };

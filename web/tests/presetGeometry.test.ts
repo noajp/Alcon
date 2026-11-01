@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { presetPath } from '@/ActivitySpace/execution/element/presetGeometry';
+import { presetPath } from '@/Function/office/presetGeometry';
 
 describe('presetPath', () => {
   it('draws the common shapes with their adjust values', () => {

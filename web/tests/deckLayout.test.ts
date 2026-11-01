@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
-import { readDeck } from '@/ActivitySpace/execution/element/deckLayout';
+import { readDeck } from '@/Function/office/deckLayout';
 
 const ns = 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
 

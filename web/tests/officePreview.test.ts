@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
-import { readOffice, officeKindOf } from '@/ActivitySpace/execution/element/officePreview';
+import { readOffice, officeKindOf } from '@/Function/office/officePreview';
 
 async function zipOf(files: Record<string, string>) {
   const zip = new JSZip();

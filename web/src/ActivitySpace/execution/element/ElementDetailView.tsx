@@ -92,7 +92,7 @@ import { ElementActionsMenu } from './ElementActionsMenu';
 import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal, Paperclip } from 'lucide-react';
 import { useElementFiles, useElementFileActions, trashDaysLeft, TRASH_DAYS } from '@/hooks/elementFileData';
 import { ElementFilePreview } from './ElementFilePreview';
-import { FileTypeIcon } from './fileTypeIcon';
+import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
 import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckRequest';
 import { openInApp } from '@/Function/shared/appNavigation';
 import { NavSlidesIcon } from '@/shell/sidebar/NavIcons';

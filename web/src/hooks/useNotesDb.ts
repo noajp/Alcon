@@ -466,17 +466,23 @@ export async function fetchNoteFiles(): Promise<NoteFileSummary[]> {
   return (data ?? []) as NoteFileSummary[];
 }
 
-/** A new, empty Note file. Files need a parent (DB CHECK), so it goes into a
- *  Section rather than a bare Folder — a Folder that has (or gains) Sections
- *  would hide it. The empty content row lets the editor upsert later. */
-export async function createNoteFile(name: string): Promise<NoteFileSummary> {
-  const { sectionId } = await ensureNoteHome();
+/** A new Note file, empty or with the given content. Files need a parent (DB
+ *  CHECK), so it goes into a Section rather than a bare Folder — a Folder
+ *  that has (or gains) Sections would hide it. The content row is written
+ *  now so the editor can upsert later. */
+export async function createNoteFile(name: string, html = ''): Promise<NoteFileSummary> {
+  const { sectionId, createdFolder, createdSection } = await ensureNoteHome();
   const { data, error } = await supabase
     .from('notes')
     .insert({ type: 'file', name, parent_id: sectionId })
-    .select('id, name, parent_id, updated_at')
+    .select('*')
     .single();
   if (error || !data) throw error ?? new Error('Failed to create note');
-  await supabase.from('note_contents').insert({ note_id: data.id, html: '' });
-  return data as NoteFileSummary;
+  const { error: contentError } = await supabase.from('note_contents').insert({ note_id: data.id, html });
+  if (contentError) throw contentError;
+  // Mounted note trees learn of it now (there is no realtime on `notes`).
+  const row = data as NoteRow;
+  const made = [createdFolder, createdSection, rowToNode(row)].filter((n): n is NoteNode => !!n);
+  if (notesCache) publishNotes([...notesCache, ...made]);
+  return { id: row.id, name: row.name, parent_id: row.parent_id, updated_at: row.updated_at };
 }

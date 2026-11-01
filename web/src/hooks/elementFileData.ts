@@ -117,7 +117,7 @@ export function useElementFileActions(elementId: string) {
 }
 
 /** A short-lived signed link to a file, for previewing it in the page. */
-export async function elementFileUrl(file: ElementFile, seconds = 300): Promise<string> {
+async function elementFileUrl(file: ElementFile, seconds = 300): Promise<string> {
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(file.path, seconds);
   if (error || !data?.signedUrl) throw error ?? new Error('Could not open the file.');
   return data.signedUrl;
@@ -126,7 +126,7 @@ export async function elementFileUrl(file: ElementFile, seconds = 300): Promise<
 /** Opens a file through a signed link that lasts a minute. The tab opens
  *  at once (inside the click, so no popup blocker stops it) and goes to the
  *  link when it arrives. */
-export async function openElementFile(file: ElementFile): Promise<void> {
+async function openElementFile(file: ElementFile): Promise<void> {
   const tab = window.open('', '_blank');
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(file.path, 60);
   if (error || !data?.signedUrl) { tab?.close(); throw error ?? new Error('Could not open the file.'); }
@@ -136,7 +136,7 @@ export async function openElementFile(file: ElementFile): Promise<void> {
 
 /** Saves a file to the person's computer under its own name, through a
  *  signed link that asks the browser to download rather than show it. */
-export async function downloadElementFile(file: ElementFile): Promise<void> {
+async function downloadElementFile(file: ElementFile): Promise<void> {
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(file.path, 60, { download: file.name });
   if (error || !data?.signedUrl) throw error ?? new Error('Could not download the file.');
   const a = document.createElement('a');
@@ -146,3 +146,44 @@ export async function downloadElementFile(file: ElementFile): Promise<void> {
   a.click();
   a.remove();
 }
+
+/** Every listed (not trashed) file attached to these Elements — what a
+ *  board's widget can pin. RLS leaves out what the viewer cannot see. */
+export function useElementFilesIn(elementIds: string[]) {
+  const key = [...elementIds].sort();
+  const query = useQuery({
+    queryKey: ['element-files-in', key],
+    enabled: key.length > 0,
+    queryFn: async (): Promise<ElementFile[]> => {
+      const { data, error } = await supabase.from('element_files')
+        .select('id, element_id, path, name, size, mime_type, uploaded_by, created_at, deleted_at')
+        .in('element_id', key.slice(0, 500)).is('deleted_at', null).order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as ElementFile[];
+    },
+  });
+  return { data: query.data ?? EMPTY, loading: key.length > 0 && query.isPending };
+}
+
+/** One attached file by id (null when gone, trashed or not visible). */
+export function useElementFile(fileId: string | null) {
+  return useQuery({
+    queryKey: ['element-file', fileId],
+    enabled: !!fileId,
+    queryFn: async (): Promise<ElementFile | null> => {
+      const { data, error } = await supabase.from('element_files')
+        .select('id, element_id, path, name, size, mime_type, uploaded_by, created_at, deleted_at')
+        .eq('id', fileId!).is('deleted_at', null).maybeSingle();
+      if (error) throw error;
+      return (data as ElementFile | null) ?? null;
+    },
+  });
+}
+
+/** Where an attached file's bytes come from, for the shared preview and
+ *  for anything else that reads one (a widget's chart or value). */
+export const elementFileSource = {
+  signedUrl: (f: { id: string }) => elementFileUrl(f as ElementFile),
+  download: (f: { id: string }) => downloadElementFile(f as ElementFile),
+  open: (f: { id: string }) => openElementFile(f as ElementFile),
+};
