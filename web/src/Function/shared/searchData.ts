@@ -3,14 +3,17 @@
 import { supabase } from '@/lib/supabase';
 import { displayIdOf } from '@/Function/shared/element/displayId';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { indexSpaceFiles, searchAttachments, type FoundFile } from '@/hooks/attachmentData';
 
 
 // ============================================
-// Global Search (⌘K) — searches Elements, Objects, Notes, and the active
-// Space's CRM records (deals, companies, contacts). The CRM has no search box of their own: finding a record is ⌘K's job.
+// Global Search (⌘K) — searches Elements, Objects, Notes, the active
+// Space's CRM records (deals, companies, contacts) and its attached files —
+// by name, by what they are attached to, and by the words in them. The CRM
+// has no search box of its own: finding a record is ⌘K's job.
 // ============================================
 export interface SearchResult {
-  kind: 'element' | 'object' | 'note' | 'deal' | 'company' | 'contact';
+  kind: 'element' | 'object' | 'note' | 'deal' | 'company' | 'contact' | 'file';
   id: string;
   title: string;
   snippet?: string | null;
@@ -21,7 +24,14 @@ export interface SearchResult {
   domainId?: string | null;
   /** Archived Objects are still found by search; the result says so. */
   archived?: boolean;
+  /** A file: what it is attached to and its type, to open it there. */
+  file?: FoundFile;
 }
+
+// A Space's files whose words are not kept yet are read in the background,
+// at most every few minutes, the first time ⌘K searches it.
+const INDEX_EVERY_MS = 5 * 60_000;
+const lastIndexed = new Map<string, number>();
 
 export async function globalSearch(query: string, limit = 8): Promise<SearchResult[]> {
   const q = query.trim();
@@ -30,7 +40,11 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
 
   const spaceId = getActiveSpaceId();
   const none = Promise.resolve({ data: [] as { id: string; name: string; detail: string | null }[] });
-  const [elementsRes, objectsRes, notesRes, dealsRes, companiesRes, contactsRes] = await Promise.all([
+  if (spaceId && Date.now() - (lastIndexed.get(spaceId) ?? 0) > INDEX_EVERY_MS) {
+    lastIndexed.set(spaceId, Date.now());
+    void indexSpaceFiles(spaceId);
+  }
+  const [elementsRes, objectsRes, notesRes, dealsRes, companiesRes, contactsRes, files] = await Promise.all([
     // display_id is searched as well as returned. It is the string an Element
     // is called by in a comment or a SITREP, so someone reading "ELE_MED-001 is
     // blocked" reaches for ⌘K and types exactly that.
@@ -54,6 +68,7 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
     spaceId ? supabase.from('crm_deals').select('id, name, detail:next_step').eq('activity_space_id', spaceId).ilike('name', like).limit(limit) : none,
     spaceId ? supabase.from('crm_companies').select('id, name, detail:industry').eq('activity_space_id', spaceId).ilike('name', like).limit(limit) : none,
     spaceId ? supabase.from('crm_contacts').select('id, name, detail:email').eq('activity_space_id', spaceId).or(`name.ilike.${like},email.ilike.${like}`).limit(limit) : none,
+    spaceId ? searchAttachments(spaceId, q, limit) : Promise.resolve([] as FoundFile[]),
   ]);
 
   const out: SearchResult[] = [];
@@ -70,5 +85,6 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
   for (const [kind, res] of records) {
     for (const r of (res.data || []) as { id: string; name: string; detail: string | null }[]) out.push({ kind, id: r.id, title: r.name, snippet: r.detail });
   }
+  for (const f of files) out.push({ kind: 'file', id: f.id, title: f.name, snippet: f.snippet ?? f.owner_label, file: f });
   return out;
 }
