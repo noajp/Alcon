@@ -8,6 +8,8 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { elementFileUrl, openElementFile, type ElementFile } from '@/hooks/elementFileData';
 import { officeKindOf, readOffice, type OfficePreview } from './officePreview';
 import { readDeck, type Deck, type DeckItem, type TextBody } from './deckLayout';
+import { readWorkbook, type WorkSheet } from './sheetLayout';
+import SheetChartView from './SheetChart';
 
 // An attached file, previewed in place under its row (the row's ▶ opens it): images and PDFs as themselves,
 // text as text, audio and video in their players, and Word / Excel /
@@ -37,6 +39,7 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
   const [url, setUrl] = useState<string | null>(null);
   const [text, setText] = useState<string | null>(null);
   const [office, setOffice] = useState<OfficePreview | null>(null);
+  const [workbook, setWorkbook] = useState<WorkSheet[] | null>(null);
   const [deck, setDeck] = useState<ArrayBuffer | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
@@ -55,6 +58,11 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
           const bytes = await (await fetch(signed)).arrayBuffer();
           // A deck is laid out as slides (DeckView); its text is read too,
           // as the fallback should the layout fail.
+          if (officeKind === 'xlsx') {
+            const sheets = await readWorkbook(bytes);
+            if (live) setWorkbook(sheets);
+            return;
+          }
           if (officeKind === 'pptx' && live) setDeck(bytes);
           const read = await readOffice(officeKind!, bytes);
           if (live) setOffice(read);
@@ -133,7 +141,8 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
         ) : kind === 'audio' ? (
           <div className="flex h-full items-center justify-center"><audio src={url} controls /></div>
         ) : kind === 'office' ? (
-          deck ? <DeckView bytes={deck} fallback={office ? <OfficeView preview={office} /> : spinner} />
+          officeKind === 'xlsx' ? (workbook ? <SheetView sheets={workbook} /> : spinner)
+          : deck ? <DeckView bytes={deck} fallback={office ? <OfficeView preview={office} /> : spinner} />
             : office === null ? spinner : <OfficeView preview={office} />
         ) : kind === 'text' ? (
           text === null ? spinner
@@ -277,7 +286,6 @@ function OfficeView({ preview }: { preview: OfficePreview }) {
       </article>
     );
   }
-  if (preview.kind === 'xlsx') return <SheetView sheets={preview.sheets} />;
   return (
     <div className="min-h-full bg-[var(--sheet-head)]">
     <div className="sticky top-0 z-20 h-1 bg-[var(--slide-accent)]" />
@@ -302,50 +310,90 @@ function columnName(i: number): string {
   return name;
 }
 
-const NUMERIC = /^-?[\d.,]+(e[+-]?\d+)?%?$/i;
+const HEAD_W = 40;
+const HEAD_H = 24;
 
-/** A workbook as Excel draws it: Excel's green bar along the top, white
- *  cells on a light grid with lettered columns and numbered rows, numbers
- *  flush right, and the sheets as tabs along the bottom. The grid runs a
- *  little past the data, as a sheet does. */
-function SheetView({ sheets }: { sheets: { name: string; rows: string[][] }[] }) {
+/** A workbook as Excel draws it: Excel's green bar along the top; each
+ *  cell with the workbook's own fill, font, borders, alignment and number
+ *  format, at its column width and row height, merged cells merged; the
+ *  gridlines only where the sheet shows them; its charts over the cells
+ *  where the sheet places them; lettered columns, numbered rows, and the
+ *  sheets as tabs along the bottom. */
+function SheetView({ sheets }: { sheets: WorkSheet[] }) {
   const { t } = useI18n();
   const [active, setActive] = useState(0);
-  const rows = sheets[active]?.rows ?? [];
-  const colCount = Math.max(8, ...rows.map((r) => r.length + 1));
-  const rowCount = Math.max(30, rows.length + 5);
+  const sheet = sheets[active];
   const head = 'sticky z-10 border-b border-r border-[var(--sheet-grid)] bg-[var(--sheet-head)] text-[11px] font-normal text-[var(--sheet-head-text)]';
+  const rowCount = sheet ? Math.max(sheet.rows.length + 5, 30, ...sheet.charts.map((c) => {
+    let y = 0, r = 0;
+    while (y < c.y + c.h) { y += sheet.rows[r]?.h ?? sheet.defaultRow; r++; }
+    return r + 2;
+  })) : 0;
+  const grid = sheet?.gridLines ? 'var(--sheet-grid)' : 'transparent';
   return (
     <div className="flex h-full flex-col bg-[var(--sheet-paper)] text-[var(--sheet-text)]">
       <div className="h-1 shrink-0 bg-[var(--sheet-accent)]" />
       <div className="min-h-0 flex-1 overflow-auto">
-        {rows.length === 0 && sheets.length > 0 && <p className="sr-only">{t('This sheet is empty.')}</p>}
-        <table className="border-separate border-spacing-0 text-[12.5px]">
-          <thead>
-            <tr>
-              <th className={`${head} top-0 left-0 z-20 w-10 min-w-10`} />
-              {Array.from({ length: colCount }, (_, c) => (
-                <th key={c} className={`${head} top-0 h-6 min-w-[88px] px-2 text-center`}>{columnName(c)}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: rowCount }, (_, r) => (
-              <tr key={r}>
-                <th className={`${head} left-0 w-10 min-w-10 px-1 text-center tabular-nums`}>{r + 1}</th>
-                {Array.from({ length: colCount }, (_, c) => {
-                  const cell = rows[r]?.[c] ?? '';
+        {!sheet ? <p className="p-4 text-[13px]">{t('This sheet is empty.')}</p> : (
+          <div className="relative w-max">
+            <table className="border-collapse text-[12.5px]" style={{ tableLayout: 'fixed', width: HEAD_W + sheet.cols.reduce((a, b) => a + b, 0) }}>
+              <colgroup>
+                <col style={{ width: HEAD_W }} />
+                {sheet.cols.map((w, c) => <col key={c} style={{ width: w }} />)}
+              </colgroup>
+              <thead>
+                <tr style={{ height: HEAD_H }}>
+                  <th className={`${head} top-0 left-0 z-20`} />
+                  {sheet.cols.map((w, c) => <th key={c} className={`${head} top-0 overflow-hidden text-center`}>{w > 12 ? columnName(c) : ''}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: rowCount }, (_, r) => {
+                  const row = sheet.rows[r];
                   return (
-                    <td key={c} title={cell || undefined}
-                      className={`h-6 max-w-[280px] truncate border-b border-r border-[var(--sheet-grid)] px-1.5 ${NUMERIC.test(cell) ? 'text-right tabular-nums' : ''}`}>
-                      {cell}
-                    </td>
+                    <tr key={r} style={{ height: row?.h ?? sheet.defaultRow }}>
+                      <th className={`${head} left-0 px-1 text-center tabular-nums`}>{r + 1}</th>
+                      {sheet.cols.map((_, c) => {
+                        const cell = row?.cells[c];
+                        if (cell?.hidden) return null;
+                        const st = cell?.style;
+                        // Text runs on over empty neighbours, as in Excel;
+                        // it is cut where the next cell holds something.
+                        const next = row?.cells[c + 1];
+                        const spill = !!cell?.text && !st?.wrap && !cell.numeric && (st?.align ?? 'left') === 'left' && !next?.text && !next?.hidden;
+                        return (
+                          <td key={c} colSpan={cell?.colSpan} rowSpan={cell?.rowSpan} title={cell?.text || undefined}
+                            className={`px-1 ${spill ? 'relative z-[1] overflow-visible' : 'overflow-hidden'}`}
+                            style={{
+                              border: `1px solid ${grid}`,
+                              borderTop: st?.borders.top ?? undefined, borderRight: st?.borders.right ?? undefined,
+                              borderBottom: st?.borders.bottom ?? undefined, borderLeft: st?.borders.left ?? undefined,
+                              background: st?.bg ?? undefined, color: st?.color ?? undefined,
+                              fontWeight: st?.bold ? 700 : undefined, fontStyle: st?.italic ? 'italic' : undefined,
+                              textDecoration: [st?.underline && 'underline', st?.strike && 'line-through'].filter(Boolean).join(' ') || undefined,
+                              fontSize: st?.size ? `${st.size * 4 / 3}px` : undefined,
+                              fontFamily: st?.font ? `"${st.font}", var(--font-sans)` : undefined,
+                              textAlign: st?.align ?? (cell?.numeric ? 'right' : 'left'),
+                              verticalAlign: st?.valign ?? 'bottom',
+                              whiteSpace: st?.wrap ? 'normal' : 'nowrap',
+                              fontVariantNumeric: cell?.numeric ? 'tabular-nums' : undefined,
+                            }}>
+                            {cell?.text}
+                          </td>
+                        );
+                      })}
+                    </tr>
                   );
                 })}
-              </tr>
+              </tbody>
+            </table>
+            {sheet.charts.map((chart, i) => (
+              <div key={i} className="absolute z-[5]" style={{ left: HEAD_W + chart.x, top: HEAD_H + chart.y, width: chart.w, height: chart.h }}>
+                <SheetChartView chart={chart} />
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        )}
       </div>
       <div className="flex h-8 shrink-0 items-stretch gap-px overflow-x-auto border-t border-[var(--sheet-grid)] bg-[var(--sheet-head)] pl-10">
         {sheets.map((s, i) => (
