@@ -15,6 +15,7 @@ import { SheetView } from './SheetView';
 import { OfficeTextView } from './OfficeTextView';
 import { withEdit, type EditSession, type OfficeEdit } from './officeEdits';
 import { appDialog } from '@/Function/shared/appDialogStore';
+import { useEscapeLayer } from '@/Function/shared/keyboard';
 
 // A stored file, previewed in place: images and PDFs as themselves, a page
 // as itself (sandboxed), text as text, audio and video in their players,
@@ -166,23 +167,11 @@ export function FilePreview({ file, source, height = 480, actions, editor }: {
 
   // Full screen is the app's own layer over the whole window, not the
   // browser's Fullscreen API — that is refused inside embedded browsers
-  // (the desktop app's pane among them).
-  useEffect(() => {
-    if (!fullscreen) return;
-    // Captured first and stopped, so Esc leaves full screen only — the page
-    // under it (which closes on Esc) never sees it.
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      // Esc while typing in a cell or paragraph leaves the typing, not full screen.
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.isContentEditable)) return;
-      e.stopImmediatePropagation();
-      e.preventDefault();
-      setFullscreen(false);
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [fullscreen]);
+  // (the desktop app's pane among them). Esc leaves it, and only it (the
+  // page under it, which closes on Esc, never sees the key); while editing,
+  // Esc ends the editing instead, asking first if anything is unsaved.
+  useEscapeLayer(fullscreen, () => setFullscreen(false));
+  useEscapeLayer(editing, () => { void stopEditing(); });
   const toggleFullscreen = () => setFullscreen((f) => !f);
   const spinner = <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>;
   const zoomable = kind === 'html';
