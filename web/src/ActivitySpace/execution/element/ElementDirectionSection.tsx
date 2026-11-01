@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus } from 'lucide-react';
-import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
 import { normalizeDirection, type AcceptanceLine, type ElementDirection } from '@/types/database';
@@ -80,15 +79,24 @@ interface ElementDirectionSectionProps {
   element: ElementWithDetails;
   /** Called after a change actually persisted — parent logs `detail` as the activity entry and refreshes. */
   onSaved: (detail: string) => void;
+  /** Bumped by the Element's "…" menu (Set direction) to open the editor. */
+  openSignal?: number;
 }
 
-export function ElementDirectionSection({ element, onSaved }: ElementDirectionSectionProps) {
+export function ElementDirectionSection({ element, onSaved, openSignal = 0 }: ElementDirectionSectionProps) {
   // Seed all local state once from the prop; afterwards this component owns
   // its editing session (see the key note above).
   const { t } = useI18n();
   const [initial] = useState<ElementDirection>(() => normalizeDirection(element.direction) ?? EMPTY_DIRECTION);
   const [expanded, setExpanded] = useState(() => hasContent(initial));
   const [manuallyExpanded, setManuallyExpanded] = useState(false);
+  // The menu asked for the editor: open it, as the old "+ Set direction" did.
+  const [seenSignal, setSeenSignal] = useState(openSignal);
+  if (openSignal !== seenSignal) {
+    setSeenSignal(openSignal);
+    setExpanded(true);
+    setManuallyExpanded(true);
+  }
   const [approach, setApproach] = useState(initial.approach ?? '');
   const [rows, setRows] = useState<AcceptanceRow[]>(() =>
     initial.acceptance.map((line) => ({ key: line.id, text: line.text }))
@@ -337,18 +345,10 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     focusKeyRef.current = fresh.key;
   };
 
-  // Empty state — same language as the Sub-elements block's "+ Add
-  // sub-element" affordance. Once expanded it stays expanded for the
-  // session, even if the user clears everything back out.
-  if (!expanded) {
-    return (
-      <ButtonAppearanceProvider appearance="inline">
-        <Button variant="ghost" size="sm" onClick={() => { setExpanded(true); setManuallyExpanded(true); }}>
-          <Plus size={13} strokeWidth={2.5} />{t('Set direction')}
-        </Button>
-      </ButtonAppearanceProvider>
-    );
-  }
+  // Empty: nothing on the page — "Set direction" lives in the Element's "…"
+  // menu. Once expanded it stays expanded for the session, even if the user
+  // clears everything back out.
+  if (!expanded) return null;
 
   return (
     <div className="w-full space-y-2">

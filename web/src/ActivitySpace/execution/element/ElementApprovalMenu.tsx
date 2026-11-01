@@ -16,7 +16,7 @@ import {
   type ElementWithDetails,
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
+import { Popover, PopoverAnchor, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { fetchApprovalRights } from '@/hooks/elementData';
@@ -24,6 +24,8 @@ import { fetchApprovalRights } from '@/hooks/elementData';
 interface Props {
   element: ElementWithDetails;
   onRefresh?: () => void;
+  /** Bumped by the Element's "…" menu (Approval) to open the panel. */
+  openSignal?: number;
 }
 
 const stateMeta: Record<ApprovalState, { label: string; icon: React.ComponentType<{ size?: number; className?: string }>; color: string }> = {
@@ -40,10 +42,15 @@ const stateMeta: Record<ApprovalState, { label: string; icon: React.ComponentTyp
  * note, the three decisions (Approve / Request changes / Reject) and a compact
  * decision history. Replaces the old right-rail "Approval" island.
  */
-export function ElementApprovalMenu({ element, onRefresh }: Props) {
+export function ElementApprovalMenu({ element, onRefresh, openSignal = 0 }: Props) {
   const { t } = useI18n();
   const { user, profile } = useAuthContext();
   const [open, setOpen] = useState(false);
+  const [seenSignal, setSeenSignal] = useState(openSignal);
+  if (openSignal !== seenSignal) {
+    setSeenSignal(openSignal);
+    setOpen(true);
+  }
   const [approvals, setApprovals] = useState<ElementApproval[]>([]);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -129,16 +136,20 @@ export function ElementApprovalMenu({ element, onRefresh }: Props) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          title={enabled ? t('Approval — {state}', { state: t(stateMeta[current].label) }) : t('Approval')}
-          aria-label={t('Approval')}
-          className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-        >
-          <ShieldCheck size={15} className={enabled ? stateMeta[current].color : ''} />
-        </button>
-      </PopoverTrigger>
+      {/* Turning approval on lives in the Element's "…" menu; once it is on,
+          its state shows here as an icon that opens the same panel. */}
+      {enabled ? (
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            title={t('Approval — {state}', { state: t(stateMeta[current].label) })}
+            aria-label={t('Approval')}
+            className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+          >
+            <ShieldCheck size={15} className={stateMeta[current].color} />
+          </button>
+        </PopoverTrigger>
+      ) : <PopoverAnchor asChild><span aria-hidden className="inline-block h-7 w-0" /></PopoverAnchor>}
       <PopoverContent align="end" className="w-64 p-2">
         {!enabled ? (
           <button

@@ -601,6 +601,10 @@ function ElementDetailBody({
   // existing files or spins up a fresh one. Embed renders below the
   // description; × in the embed header clears element.note_id.
   const [notePickerOpen, setNotePickerOpen] = useState(false);
+  // The "…" menu opens these on the page: each bump opens its editor/picker.
+  const [directionSignal, setDirectionSignal] = useState(0);
+  const [dependencySignal, setDependencySignal] = useState(0);
+  const [approvalSignal, setApprovalSignal] = useState(0);
   const handlePickNote = async (
     noteId: string,
     opts: { isNew: boolean; name: string },
@@ -693,7 +697,10 @@ function ElementDetailBody({
           <span className="text-foreground truncate max-w-[240px]">{element.title}</span>
           {/* ⋯ actions for the lowest breadcrumb item (this Element):
               duplicate / move / multi-home / delete. */}
-          <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack} />
+          <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack}
+            onSetDirection={() => setDirectionSignal((n) => n + 1)}
+            onAddDependency={() => setDependencySignal((n) => n + 1)}
+            onOpenApproval={() => setApprovalSignal((n) => n + 1)} />
         </div>
         <div className="flex-1" />
         {/* Take the Element to a tool: Claude Code, the in-app agent (it
@@ -802,21 +809,15 @@ function ElementDetailBody({
             />}
           </div>
 
-          {/* One row of verbs under the description, as Linear keeps a single
-              line under an issue: reactions, the Note link, the agent hand-off
-              and approval as quiet icons, then the empty Direction,
-              Sub-elements and Dependencies as "+ verb". A section that has
-              content takes the full width under the row with its own heading.
-              Sharing an update belongs to the discussion, so it sits in the
-              Comments heading. */}
-          {/* Direction — approach / acceptance criteria / next step. Sits
-              between the linked Note and the Sub-elements so the read order
-              is intent → its breakdown → discussion. Keyed by element.id so
-              switching Elements resets the editing state. */}
-          {/* Direction, sub-elements and dependencies share one wrapping row:
-              an empty one is a single quiet "+" verb that sits beside the
-              others (Linear's "+ Add sub-issues"); a filled one takes the full
-              width with its own small heading. */}
+          {/* One row under the description, as Linear keeps a single line
+              under an issue: reactions, the Note link and (once on) the
+              approval state as quiet icons, then "+ Add sub-element". Direction,
+              dependencies and turning approval on are in the "…" menu; a
+              section that has content takes the full width under the row with
+              its own heading — Direction first (approach / acceptance / next
+              step), then Sub-elements, then Dependencies, so the read order is
+              intent → its breakdown → what it waits on. Sharing an update
+              belongs to the discussion, so it sits in the Comments heading. */}
           <div className="-ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
           <ButtonAppearanceProvider appearance="inline">
           <div className="flex items-center gap-0.5">
@@ -876,10 +877,10 @@ function ElementDetailBody({
               </div>
             )}
 
-            {/* Approval — one button that opens a menu to enable the workflow
-                and record a decision (Approve / Request changes / Reject).
-                Moved here from the right rail's "Approval" island. */}
-            <ElementApprovalMenu element={element} onRefresh={onRefresh} />
+            {/* Approval — turned on from the "…" menu; once on, its state
+                icon here opens the panel to record a decision (Approve /
+                Request changes / Reject). */}
+            <ElementApprovalMenu element={element} onRefresh={onRefresh} openSignal={approvalSignal} />
 
             {/* Existing reactions as toggleable chips, aggregated by
                 emoji so two thumbs-ups read as 👍 ×2 with my own
@@ -913,6 +914,7 @@ function ElementDetailBody({
             key={`direction-${element.id}`}
             element={element}
             onSaved={handleDirectionSave}
+            openSignal={directionSignal}
           />
 
           {/* Sub-elements — list-style (no card bg). Each row mirrors the
@@ -974,7 +976,7 @@ function ElementDetailBody({
           />
 
           <ElementDependencies elementId={element.id} spaceId={coordinationSpaceId ?? null}
-            onOpenElement={onOpenElement} onChanged={onRefresh} />
+            onOpenElement={onOpenElement} onChanged={onRefresh} openSignal={dependencySignal} />
           </div>
 
           <CodeChangesSection elementId={element.id} />
@@ -1319,14 +1321,6 @@ function ElementDetailBody({
                 </div>
               )}
             </RailCard>
-
-            {/* AI Agent moved out of the right rail — it now lives as a
-                quick-toggle button next to the reaction / note actions on
-                the header. The deliverable summary still lands in the
-                comments thread below. */}
-
-            {/* Approval moved to the header action row (ElementApprovalMenu) —
-                a button-triggered menu instead of a rail island. */}
 
             {/* Activity — moved off the main column. Lives in the rail
                 as its own island so the body stays focused on title /

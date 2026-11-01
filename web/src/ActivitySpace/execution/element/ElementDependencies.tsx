@@ -6,7 +6,7 @@ import { useNowWork } from '@/hooks/useNowWork';
 import { setElementDependency } from '@/hooks/coordinationData';
 import { useCurrentUserId } from '@/providers/authContext';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
-import { Popover, PopoverTrigger } from '@/ui/popover';
+import { Popover, PopoverAnchor, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
 import { MenuShell } from '@/Function/shared/menu';
 import { FONT, STATUS } from '@/shared/designTokens';
@@ -18,6 +18,8 @@ export interface ElementDependenciesProps {
   spaceId: string | null;
   onOpenElement?: (elementId: string) => void;
   onChanged?: () => void | Promise<void>;
+  /** Bumped by the Element's "…" menu (Add dependency) to open the picker. */
+  openSignal?: number;
 }
 
 /** Context changes discard a picker/error belonging to another Element/user. */
@@ -26,10 +28,18 @@ export function ElementDependencies(props: ElementDependenciesProps) {
   return <DependencyEditor key={`${userId}:${props.spaceId}:${props.elementId}`} {...props} />;
 }
 
-function DependencyEditor({ elementId, spaceId, onOpenElement, onChanged }: ElementDependenciesProps) {
+function DependencyEditor({ elementId, spaceId, onOpenElement, onChanged, openSignal = 0 }: ElementDependenciesProps) {
   const { t } = useI18n();
   const { data, loading, error, refetch } = useNowWork(spaceId);
   const [open, setOpen] = useState(false);
+  // The menu asked for the picker: open it (and say why, if it can't be used).
+  const [seenSignal, setSeenSignal] = useState(openSignal);
+  const [asked, setAsked] = useState(false);
+  if (openSignal !== seenSignal) {
+    setSeenSignal(openSignal);
+    setAsked(true);
+    setOpen(true);
+  }
   const [relation, setRelation] = useState<'incoming' | 'outgoing'>('incoming');
   const [search, setSearch] = useState('');
   const [pending, setPending] = useState(false);
@@ -59,10 +69,11 @@ function DependencyEditor({ elementId, spaceId, onOpenElement, onChanged }: Elem
   if (loading) return null;
   if (error) return <div className="w-full flex items-center gap-2"><p role="alert" className={`${FONT.sm} text-muted-foreground`}>{error.message}</p>
     {spaceId && <Button size="xs" variant="ghost" onClick={() => { void refetch().catch(() => {}); }}>{t('Retry')}</Button>}</div>;
-  if (!elements.has(elementId)) return <p className={`${FONT.sm} w-full text-muted-foreground`}>{t('Space dependencies are available for Elements in this Space’s Objects.')}</p>;
+  if (!elements.has(elementId)) return !asked ? null : <p className={`${FONT.sm} w-full text-muted-foreground`}>{t('Space dependencies are available for Elements in this Space’s Objects.')}</p>;
 
-  // Empty reads as one quiet affordance, like "Add sub-element" — a heading
-  // and a "No dependencies recorded." line over nothing is chrome, not content.
+  // Empty shows nothing — "Add dependency" lives in the Element's "…" menu,
+  // and the picker opens from there, anchored here. Once there are
+  // dependencies, the section has a heading and its own "+ Add dependency".
   return <section className={edges.length ? 'w-full space-y-2' : ''} aria-label={t('Dependencies')}>
     {edges.length > 0 && <div className="flex h-8 items-center"><h2 className={`${FONT.lg} text-foreground`}>{t('Dependencies')}</h2></div>}
     {(['incoming', 'outgoing'] as const).map((direction) => {
@@ -88,9 +99,11 @@ function DependencyEditor({ elementId, spaceId, onOpenElement, onChanged }: Elem
       </div>;
     })}
     <Popover open={open} onOpenChange={setOpen}>
-      <ButtonAppearanceProvider appearance="inline">
-        <PopoverTrigger asChild><Button variant="ghost" size="sm" disabled={pending}><Plus size={13} strokeWidth={2.5} />{t('Add dependency')}</Button></PopoverTrigger>
-      </ButtonAppearanceProvider>
+      {edges.length > 0 ? (
+        <ButtonAppearanceProvider appearance="inline">
+          <PopoverTrigger asChild><Button variant="ghost" size="sm" disabled={pending}><Plus size={13} strokeWidth={2.5} />{t('Add dependency')}</Button></PopoverTrigger>
+        </ButtonAppearanceProvider>
+      ) : <PopoverAnchor asChild><span aria-hidden className="block h-0 w-0" /></PopoverAnchor>}
       <MenuShell align="start">
         <div className="flex gap-1 p-1">
           <Button shape="tab" size="xs" variant={relation === 'incoming' ? 'secondary' : 'ghost'} aria-pressed={relation === 'incoming'} onClick={() => setRelation('incoming')}>{t('Waits for')}</Button>
