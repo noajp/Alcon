@@ -35,6 +35,7 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   'This sheet has no table to import.': ['このシートには取り込める表がありません。', '이 시트에는 가져올 표가 없습니다.', 'Cette feuille ne contient aucun tableau à importer.', 'Esta hoja no tiene una tabla para importar.'],
   'Export to Excel': ['Excel に書き出す', 'Excel로 내보내기', 'Exporter vers Excel', 'Exportar a Excel'],
   'Export to Word': ['Word に書き出す', 'Word로 내보내기', 'Exporter vers Word', 'Exportar a Word'],
+  'Proposals, quotes and contracts sent or received, kept with the record.': ['送った・受け取った提案書・見積もり・契約書を、この記録と一緒に保管します。', '주고받은 제안서·견적·계약서를 이 기록과 함께 보관합니다.', 'Propositions, devis et contrats envoyés ou reçus, conservés avec la fiche.', 'Propuestas, presupuestos y contratos enviados o recibidos, guardados con el registro.'],
   'Save as new version': ['新しい版として保存', '새 버전으로 저장', 'Enregistrer comme nouvelle version', 'Guardar como nueva versión'],
   'Discard changes': ['変更を破棄', '변경 취소', 'Annuler les modifications', 'Descartar cambios'],
   'Discard the changes you have not saved?': ['保存していない変更を破棄しますか？', '저장하지 않은 변경을 취소할까요?', 'Annuler les modifications non enregistrées ?', '¿Descartar los cambios sin guardar?'],

@@ -11,7 +11,7 @@ import { FilePreview, readStoredFile } from '@/Function/office/FilePreview';
 import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
 import SheetChartView from '@/Function/office/SheetChart';
 import type { ChartData } from '@/Function/office/chartLayout';
-import { attachmentSource, useAttachment, useAttachmentsOf, type Attachment } from '@/hooks/attachmentData';
+import { attachmentOwnerOf, attachmentSource, useAttachment, useAttachments, useAttachmentsOf, type Attachment } from '@/hooks/attachmentData';
 import { WidgetHeaderAction, useWidgetMeta } from '../WidgetFrame';
 import type { WidgetProps } from '../types';
 
@@ -19,18 +19,21 @@ import type { WidgetProps } from '../types';
 export type FileWidgetShow = 'file' | 'chart' | 'value';
 
 /**
- * A file attached to one of the board's Elements, shown on the board: the
- * whole file (slides, pages, sheets — a deck plays full screen), one of its
- * charts, or one cell of a workbook as a key number. Which file and what of
- * it are the placement's params; the bytes stay where the Element keeps
- * them, so whoever cannot see that Element sees nothing here either.
+ * A file attached to the board's subject or one of its Elements, shown on
+ * the board: the whole file (slides, pages, sheets — a deck plays full
+ * screen), one of its charts, or one cell of a workbook as a key number.
+ * Which file and what of it are the placement's params; the bytes stay where
+ * they are attached, so whoever cannot see that sees nothing here either.
  */
 export function FileWidget({ params, setParams, host }: WidgetProps) {
   const { t } = useI18n();
   const fileId = typeof params.fileId === 'string' ? params.fileId : null;
   const show: FileWidgetShow = params.show === 'chart' || params.show === 'value' ? params.show : 'file';
   const file = useAttachment(fileId);
-  const candidates = useAttachmentsOf('element', host.elements.map((e) => e.id));
+  // What can be pinned: the subject's own files, then its Elements'.
+  const own = useAttachments(attachmentOwnerOf(host.subject));
+  const ofElements = useAttachmentsOf('element', host.elements.map((e) => e.id));
+  const candidates = useMemo(() => ({ data: [...own.data, ...ofElements.data], loading: own.loading || ofElements.loading }), [own.data, own.loading, ofElements.data, ofElements.loading]);
   const editable = !host.readOnly;
   useWidgetMeta(file.data?.name ?? t('File'));
 
@@ -38,7 +41,7 @@ export function FileWidget({ params, setParams, host }: WidgetProps) {
     return <FilePicker files={candidates.data} loading={candidates.loading} disabled={!editable} onPick={(f) => setParams({ fileId: f.id, show: 'file' })} />;
   }
   if (file.isPending) return <Spinner />;
-  if (!file.data) return <p className="py-1 text-sm text-muted-foreground">{t('This file was removed, or you cannot see the Element it is attached to.')}</p>;
+  if (!file.data) return <p className="py-1 text-sm text-muted-foreground">{t('This file was removed, or you cannot see what it is attached to.')}</p>;
 
   return (
     <>
@@ -112,7 +115,7 @@ function FileValue({ file, sheet, cell, label }: { file: Attachment; sheet: stri
 function FilePicker({ files, loading, disabled, onPick }: { files: Attachment[]; loading: boolean; disabled: boolean; onPick: (f: Attachment) => void }) {
   const { t } = useI18n();
   if (loading) return <Spinner />;
-  if (!files.length) return <p className="py-1 text-sm text-muted-foreground">{t('No files are attached to these Elements yet.')}</p>;
+  if (!files.length) return <p className="py-1 text-sm text-muted-foreground">{t('No files are attached here yet.')}</p>;
   return (
     <div className="space-y-0.5">
       <p className="pb-1 text-[12px] text-muted-foreground">{t('Choose a file to show')}</p>

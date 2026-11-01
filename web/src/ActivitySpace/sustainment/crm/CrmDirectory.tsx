@@ -14,6 +14,7 @@ import { PageHead } from '@/Function/shared/PageHead';
 import { RailCard } from '@/Function/shared/RailCard';
 import { CrmIcon } from '@/Function/shared/conceptIcons';
 import { CrmRecordPage, RecordSection } from './CrmRecordPage';
+import { CrmFiles } from './CrmFiles';
 import { CrmRelatedWork } from './CrmRelatedWork';
 
 const ACTIVITY_LABEL: Record<CrmActivityType, string> = { call: 'Call', email: 'Mail', meeting: 'Meeting', note: 'Memo' };
@@ -195,6 +196,7 @@ export function CrmCompanyPage({ crm, companyId, onBack, onOpenCompanies, onOpen
     </RecordSection>
     <DealList crm={crm} deals={crm.allDeals.filter(deal => deal.company_id === company.id)} onOpenDeal={onOpenDeal} />
     <CrmRelatedWork crm={crm} target={{ companyId: company.id }} onOpenElement={onOpenElement} />
+    <CrmFiles owner={{ kind: 'company', id: company.id }} />
     <Timeline crm={crm} entries={crm.activities.filter(entry => entry.company_id === company.id)} onLog={(type, text) => crm.logRecordActivity({ companyId: company.id }, { type, text })} />
   </CrmRecordPage>;
 }

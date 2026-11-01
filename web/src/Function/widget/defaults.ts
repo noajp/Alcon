@@ -15,6 +15,7 @@ export const OBJECT_OVERVIEW_BOARD: BoardLayout = {
   band: [{ id: 'ov-progress', type: 'progress-band' }],
   main: [
     { id: 'ov-milestones', type: 'milestones' },
+    { id: 'ov-attachments', type: 'attachments' },
   ],
   rail: [
     // Intent above Properties: opening an Object should answer what it is
@@ -85,6 +86,8 @@ export const INITIATIVE_BOARD: BoardLayout = {
     { id: 'cmp-gap', type: 'framework-gap' },
     { id: 'cmp-assumptions', type: 'campaign-assumptions' },
     { id: 'cmp-decisions', type: 'campaign-decisions' },
+    // The evidence those sections are written from.
+    { id: 'initiative-attachments', type: 'attachments' },
   ],
   rail: [],
 };
