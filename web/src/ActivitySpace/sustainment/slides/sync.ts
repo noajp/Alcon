@@ -6,6 +6,8 @@ import { useKata } from './kata/store/useKata';
 import { tx } from './kata/i18n';
 import { translate } from '@/Function/i18n/I18nProvider';
 import type { Deck, Folder, KataFile, MixState, ChatMessage } from './kata/model/types';
+import { externalizeDeck } from './deckAssets';
+import { mergeFiles, sameFile } from './kata/model/merge';
 
 // =============================================================
 // Slides ⇄ Supabase. The editor keeps its workspace in one store; the Space
@@ -20,7 +22,9 @@ import type { Deck, Folder, KataFile, MixState, ChatMessage } from './kata/model
 // works from a picture the other has since changed. Each deck carries the
 // server's updated_at as we last saw it: a write only lands on that version
 // (otherwise someone else got there first), and a change that comes back with
-// that version is our own echo.
+// that version is our own echo. A write that finds someone else got there
+// first merges the two slide by slide against the last version both had
+// (mergeFiles) and saves the merge onto theirs.
 // =============================================================
 
 export interface DeckRow {
@@ -137,22 +141,34 @@ function start(spaceId: string): Session {
   const setError = (error: string | null) => { if (alive) publish({ spaceId, ready: loaded, error }); };
   const snapshot = (): Snapshot => { const st = useKata.getState(); return { folders: st.folders, files: st.files }; };
 
-  // The deck someone else changed first: theirs is kept, and this viewer is told.
-  const takeTheirs = async (id: string, nextSynced: Snapshot): Promise<Snapshot> => {
+  // The deck someone else changed first: theirs becomes the version written
+  // onto, and this viewer's changes are merged into it slide by slide. The
+  // merge is held as an edit here, so the next write saves it on theirs.
+  const mergeTheirs = async (id: string, nextSynced: Snapshot): Promise<Snapshot> => {
     const { data } = await supabase.from('decks').select(DECK_COLUMNS).eq('id', id).maybeSingle();
     dirty.delete(id);
     const name = useKata.getState().files.find((f) => f.id === id)?.name ?? '';
     if (data) {
       const row = data as DeckRow;
-      const file = fileFromRow(row);
+      const theirs = fileFromRow(row);
+      const base = synced.files.find((f) => f.id === id);
+      const mine = useKata.getState().files.find((f) => f.id === id);
+      const merged = base && mine ? mergeFiles(base, mine, theirs) : null;
+      const next = merged && !sameFile(merged.file, theirs) ? merged.file : theirs;
       stamps.set(id, row.updated_at);
-      // Saved before the store sees it, so the store's listener does not take theirs for an edit here.
-      synced = { ...synced, files: replaceOrAdd(synced.files, file) };
+      // Theirs is what the server holds — saved before the store sees the
+      // merge, so the store's listener counts the merge (and only it) as an edit.
+      synced = { ...synced, files: replaceOrAdd(synced.files, theirs) };
       if (alive) {
-        useKata.setState((s) => ({ files: replaceOrAdd(s.files, file) }));
-        useKata.getState().notify(tx(`「${name}」は他の人が先に変えたので、その版に合わせました`, `Someone else changed “${name}” first, so it now shows their version`));
+        useKata.setState((s) => ({ files: replaceOrAdd(s.files, next) }));
+        const clashes = merged?.clashes ?? [];
+        if (clashes.length) {
+          useKata.getState().notify(tx(`「${name}」は他の人も同時に変えました。両方が変えた ${clashes.length} ページは、あなたの変更を残しました`, `Someone else changed “${name}” at the same time. On the ${clashes.length} page(s) you both changed, yours was kept`));
+        } else if (next === theirs) {
+          useKata.getState().notify(tx(`「${name}」は他の人が先に変えたので、その版に合わせました`, `Someone else changed “${name}” first, so it now shows their version`));
+        }
       }
-      return { ...nextSynced, files: replaceOrAdd(nextSynced.files, file) };
+      return { ...nextSynced, files: replaceOrAdd(nextSynced.files, theirs) };
     }
     stamps.delete(id);
     synced = { ...synced, files: synced.files.filter((f) => f.id !== id) };
@@ -172,15 +188,23 @@ function start(spaceId: string): Session {
           diff.upsertFolders.map(({ f, i }) => ({ id: f.id, activity_space_id: spaceId, name: f.name.trim().slice(0, 200) || translate('Folder'), position: i })));
         if (error) throw error;
       }
+      // Pictures placed or imported since the last write go to storage first;
+      // the row carries references only.
+      const light = new Map<string, KataFile>();
+      for (const f of diff.upsertFiles) {
+        const deck = await externalizeDeck(f.deck, spaceId);
+        light.set(f.id, deck === f.deck ? f : { ...f, deck });
+      }
+      const rowOf = (f: KataFile) => rowFromFile(light.get(f.id) ?? f, spaceId);
       const conflicts: string[] = [];
       const fresh = diff.upsertFiles.filter((f) => !stamps.has(f.id));
       if (fresh.length) {
-        const { data, error } = await supabase.from('decks').insert(fresh.map((f) => rowFromFile(f, spaceId))).select('id, updated_at');
+        const { data, error } = await supabase.from('decks').insert(fresh.map(rowOf)).select('id, updated_at');
         if (error) throw error;
         for (const r of (data ?? []) as { id: string; updated_at: string }[]) stamps.set(r.id, r.updated_at);
       }
       for (const f of diff.upsertFiles.filter((x) => stamps.has(x.id) && !fresh.includes(x))) {
-        const { data, error } = await supabase.from('decks').update(rowFromFile(f, spaceId))
+        const { data, error } = await supabase.from('decks').update(rowOf(f))
           .eq('id', f.id).eq('updated_at', stamps.get(f.id)!).select('updated_at');
         if (error) throw error;
         if (data?.length) stamps.set(f.id, (data[0] as { updated_at: string }).updated_at);
@@ -196,11 +220,20 @@ function start(spaceId: string): Session {
         if (error) throw error;
       }
       let nextSynced = next;
-      for (const id of conflicts) nextSynced = await takeTheirs(id, nextSynced);
-      synced = nextSynced;
+      for (const id of conflicts) nextSynced = await mergeTheirs(id, nextSynced);
       // Written as they are now; a deck edited again meanwhile stays pending.
       const current = new Map(useKata.getState().files.map((f) => [f.id, f]));
       for (const f of diff.upsertFiles) if (!conflicts.includes(f.id) && (!alive || current.get(f.id) === f)) dirty.delete(f.id);
+      // A deck whose pictures moved to storage is held here as written (the
+      // lighter one) — saved before the store sees it, so it is not an edit.
+      const moved = diff.upsertFiles.filter((f) => !conflicts.includes(f.id) && light.get(f.id) !== f && current.get(f.id) === f);
+      if (moved.length) {
+        const swap = (files: KataFile[]) => files.map((x) => (moved.includes(x) ? light.get(x.id)! : x));
+        nextSynced = { ...nextSynced, files: swap(nextSynced.files) };
+        synced = nextSynced;
+        if (alive) useKata.setState((s) => ({ files: swap(s.files) }));
+      }
+      synced = nextSynced;
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : translate('Could not save the deck.'));

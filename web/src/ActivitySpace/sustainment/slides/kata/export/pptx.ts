@@ -1,3 +1,4 @@
+import { inlineDeck } from "@/ActivitySpace/sustainment/slides/deckAssets";
 import type { Deck, LookTokens, Slide } from "@/ActivitySpace/sustainment/slides/kata/model/types";
 import { contrast } from "@/ActivitySpace/sustainment/slides/kata/theme/mix";
 import { isNumericHead } from "@/ActivitySpace/sustainment/slides/kata/model/figure";
@@ -470,6 +471,8 @@ function objects(c: Ctx, slide: Slide, behind: boolean) {
 }
 
 export async function exportPptx(deck: Deck, t: LookTokens, roles: string[], fileName: string) {
+  // 保存先に移した画像は、ファイルに入れるため中身に戻す
+  deck = await inlineDeck(deck);
   const { default: PptxGenJS } = await import("pptxgenjs");
   const pptx = new PptxGenJS();
   pptx.layout = "LAYOUT_WIDE";

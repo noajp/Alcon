@@ -5,6 +5,7 @@ import { ChevronDown, FileDown, FileJson, Play, Presentation } from "lucide-reac
 import { useKata } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
 import { useDeckView } from "@/ActivitySpace/sustainment/slides/kata/components/useDeckView";
 import { exportPptx } from "@/ActivitySpace/sustainment/slides/kata/export/pptx";
+import { inlineDeck } from "@/ActivitySpace/sustainment/slides/deckAssets";
 import { toKataJson } from "@/ActivitySpace/sustainment/slides/kata/model/kataFile";
 import { PresentMode } from "@/ActivitySpace/sustainment/slides/kata/components/stage/PresentMode";
 import { tx } from "@/ActivitySpace/sustainment/slides/kata/i18n";
@@ -140,10 +141,10 @@ function ExportMenu() {
             role="menuitem"
             type="button"
             className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-k-hover"
-            onClick={() => {
+            onClick={async () => {
               setOpen(false);
-              // 資料をそのまま渡せるファイルにする（Kata で開ける）
-              const blob = new Blob([toKataJson(view.file.name, view.deck, view.file.mix)], { type: "application/json" });
+              // 資料をそのまま渡せるファイルにする（Kata で開ける）。画像は中身ごと入れる
+              const blob = new Blob([toKataJson(view.file.name, await inlineDeck(view.deck), view.file.mix)], { type: "application/json" });
               const a = document.createElement("a");
               a.href = URL.createObjectURL(blob);
               a.download = `${view.file.name || "deck"}.kata.json`;
