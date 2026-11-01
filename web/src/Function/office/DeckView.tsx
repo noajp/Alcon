@@ -152,7 +152,9 @@ function DeckItemView({ item }: { item: DeckItem }) {
           <div className="absolute inset-0" style={{ background: item.fill, clipPath: `path(${geo.evenOdd ? 'evenodd, ' : ''}"${geo.fill}")` }} />
         )}
         {stroke && (
-          <svg className="absolute inset-0 overflow-visible" width={item.w} height={item.h}>
+          // A zero width or height stops an SVG drawing at all, which is every
+          // straight horizontal or vertical line; the path is unchanged.
+          <svg className="absolute inset-0 overflow-visible" width={Math.max(1, item.w)} height={Math.max(1, item.h)}>
             {(stroke.head || stroke.tail) && (
               <defs>
                 <marker id={markerId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">

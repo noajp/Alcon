@@ -38,10 +38,21 @@ function EditableLayer({ slide, objs, front }: { slide: Slide; objs: SlideObject
     if (!el) return;
     const measure = () => setScale(el.getBoundingClientRect().width / (el.offsetWidth || 1) || 1);
     measure();
+    // The slide is drawn at 1280×720 and scaled by a transform, which a
+    // ResizeObserver on the slide never sees. Watch the box the scaled slide
+    // sits in (its size is what changes), and the window.
+    let scaled: HTMLElement | null = el;
+    while (scaled && getComputedStyle(scaled).transform === "none") scaled = scaled.parentElement;
     const ro = new ResizeObserver(measure);
-    ro.observe(el.parentElement ?? el);
-    return () => ro.disconnect();
+    ro.observe(scaled?.parentElement ?? el.parentElement ?? el);
+    window.addEventListener("resize", measure);
+    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
   }, []);
+  // A selection drawn after the stage changed size still gets marks of the right size.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && selected) setScale(el.getBoundingClientRect().width / (el.offsetWidth || 1) || 1);
+  }, [selected]);
   const sel = front ? (slide.objects ?? []).find((o) => o.id === selected) : undefined;
 
   const begin = (e: RPointerEvent, o: SlideObject, handle?: Handle) => {
@@ -124,14 +135,14 @@ function EditableLayer({ slide, objs, front }: { slide: Slide; objs: SlideObject
 const SEL = "var(--k-lime)";
 
 function Selection({ o, scale, onHandle }: { o: SlideObject; scale: number; onHandle: (e: RPointerEvent, h: Handle) => void }) {
-  const size = 10 / scale;
+  const size = 8 / scale;
   const handle = (h: Handle, x: number, y: number, cursor: string) => (
     <div
       key={h}
       data-obj="handle"
       aria-hidden="true"
       onPointerDown={(e) => onHandle(e, h)}
-      style={{ position: "absolute", left: x - size / 2, top: y - size / 2, width: size, height: size, background: "var(--k-panel)", border: `${1.5 / scale}px solid ${SEL}`, borderRadius: isLineKind(o.kind) ? "50%" : 2, cursor, pointerEvents: "auto", touchAction: "none" }}
+      style={{ position: "absolute", left: x - size / 2, top: y - size / 2, width: size, height: size, background: "var(--k-panel)", border: `${1 / scale}px solid ${SEL}`, borderRadius: isLineKind(o.kind) ? "50%" : 2, cursor, pointerEvents: "auto", touchAction: "none" }}
     />
   );
   if (isLineKind(o.kind)) {
@@ -145,7 +156,7 @@ function Selection({ o, scale, onHandle }: { o: SlideObject; scale: number; onHa
   const { x, y, w, h } = o;
   return (
     <>
-      <div style={{ position: "absolute", left: x, top: y, width: w, height: h, outline: `${1.5 / scale}px solid ${SEL}`, pointerEvents: "none" }} />
+      <div style={{ position: "absolute", left: x, top: y, width: w, height: h, outline: `${1 / scale}px solid ${SEL}`, pointerEvents: "none" }} />
       {handle("nw", x, y, "nwse-resize")}
       {handle("n", x + w / 2, y, "ns-resize")}
       {handle("ne", x + w, y, "nesw-resize")}
