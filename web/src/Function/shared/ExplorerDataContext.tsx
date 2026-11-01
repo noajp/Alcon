@@ -20,3 +20,9 @@ export function useExplorerData(): ExplorerData {
   if (data === null) throw new Error('useExplorerData requires an ExplorerDataProvider');
   return data;
 }
+
+/** The snapshot when one is in scope, else null — for shared surfaces (the
+ *  list table) that enrich from it where it exists and work without it. */
+export function useOptionalExplorerData(): ExplorerData | null {
+  return useContext(ExplorerDataContext);
+}

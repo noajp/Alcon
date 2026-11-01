@@ -99,6 +99,8 @@ export const ObjectRow = memo(function ObjectRow({
           </span>
         </div>
       </td>
+      {/* The Element rows' signals cell — an Object carries none. */}
+      <td className="p-0" />
       {visibleColumns.map((col) => (
         <ObjectCell
           key={col.id}

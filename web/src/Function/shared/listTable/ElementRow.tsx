@@ -179,30 +179,26 @@ export const ElementRow = memo(function ElementRow({
           )}
         </span>
       </td>
-      <td className="md:sticky md:left-13 z-10 bg-card pl-3.5 pr-0.5 py-2 min-w-0 max-w-0">
-        {/* @container: the lease chip below decides how much of itself to
-            show from this cell's own width, not the viewport's — the Name
-            column is user-resizable and shares the row with the sidebar. */}
-        {/* One rhythm across the row: status → title → signals → labels →
-            the date column all sit 20px apart (the cell's pl-3.5 and pr-0.5
-            add up with the neighbouring cells' padding to the same 20px). */}
-        <div className="@container flex items-center gap-5 min-w-0 min-h-[1.875rem]">
-          <div className="flex flex-1 min-w-0 items-center gap-2">
-            <span className="text-[15px] font-medium truncate flex-1 min-w-0 text-foreground">{el.title}</span>
-          </div>
+      {/* The title is pinned with the status; everything after it — the
+          signals in their own cell, then the data columns — scrolls and
+          slides under it at one edge. */}
+      <td className="sticky left-13 z-10 bg-card pl-3.5 pr-0 py-2 min-w-0 max-w-0">
+        <div className="flex items-center min-w-0 min-h-[1.875rem]">
+          <span className="text-[15px] font-medium truncate flex-1 min-w-0 text-foreground">{el.title}</span>
+        </div>
+      </td>
+      {/* Signals: who holds it, comments, what it waits on, labels. One
+          cell sized by ListTable to the widest row's signals, flush right,
+          so the labels end 20px before the first data column (pl-5 is the
+          same 20px after the title). */}
+      <td className="p-0 max-w-0 overflow-hidden">
+        <div data-row-signals className="ml-auto flex w-max items-center gap-5 pl-5 pr-0.5">
           {lease && (
             // Who holds this right now. Only a live lease is shown — a lapsed
             // one is nobody, and painting a dead session's token here is how
-            // an orphan gets mistaken for staffed work. Same quiet register
-            // as the activity signal; the full token, branch and time left
-            // are one hover away.
+            // an orphan gets mistaken for staffed work. The full token,
+            // branch and time left are one hover away.
             <span
-              // The title is what a person scans, so this chip never competes
-              // with it for width: below a 28rem cell it is the icon alone
-              // (token, branch and time still one hover away), above it the
-              // label comes back. A flex-shrink approach cannot do this — the
-              // flex-1 title has basis 0, so the row never overflows and
-              // shrink never fires; review measured the title at 24px.
               className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70 max-w-32"
               title={lease.branch
                 ? t('Held by {holder} on {branch} · {time} left', { holder: lease.holder, branch: lease.branch, time: formatRemaining(lease.remainingMs) })
@@ -210,20 +206,16 @@ export const ElementRow = memo(function ElementRow({
               aria-label={t('Held by {holder}', { holder: lease.holder })}
             >
               <Fingerprint size={11} className="shrink-0" />
-              <span className="hidden @[28rem]:inline truncate">{holderLabel(lease.holder)}</span>
+              <span className="truncate">{holderLabel(lease.holder)}</span>
             </span>
           )}
-          {/* Quiet activity signal — the comment count, so discussed and
-              silent Elements read at a glance without
-              opening the detail panel. It is a stand-in for the Activity
-              column, so it steps aside when that column is on: the same
-              number twice on one row reads as two different facts. */}
+          {/* The comment count stands in for the Activity column, so it
+              steps aside when that column is on: the same number twice on
+              one row reads as two different facts. */}
           {!showsActivityColumn && <ActivitySignal activity={el.activity} />}
           {blockers && blockers.length > 0 && (
-            // Waiting on an unfinished dependency. Deliberately the same quiet
-            // register as the activity signal beside it — a row that cannot be
-            // started is not an error, and colouring it would collide with the
-            // status hue the mark already carries.
+            // Waiting on an unfinished dependency — the same quiet register:
+            // a row that cannot be started is not an error.
             <span
               className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70"
               title={t('Waiting on {list}', { list: blockers.map(describeBlocker).join(', ') })}
@@ -233,10 +225,7 @@ export const ElementRow = memo(function ElementRow({
               <span className="tabular-nums">{blockers.length}</span>
             </span>
           )}
-
-          {/* Labels last, so they line up at the cell's right edge whatever
-              signals a row carries before them. */}
-          {!!el.labels?.length && <span className="hidden @[26rem]:flex max-w-[35%] shrink-0 items-center justify-end gap-1 overflow-hidden" title={el.labels.join(', ')}>
+          {!!el.labels?.length && <span className="flex items-center gap-1" title={el.labels.join(', ')}>
             {el.labels.map(label => <LabelChip key={label} label={label} />)}
           </span>}
         </div>

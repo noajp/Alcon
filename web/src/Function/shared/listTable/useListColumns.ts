@@ -63,7 +63,7 @@ function dateColumnWidth(locale: string): number {
 export const NAME_COL_KEY = '__name__';
 // Name can shrink on compact layouts while retaining a readable title.
 const NAME_DEFAULT_WIDTH = 400;
-const NAME_MIN_WIDTH = 240;
+export const NAME_MIN_WIDTH = 240;
 const NAME_MAX_WIDTH = 1200;
 
 // Built-in (code-defined) columns per entity. 'type' is always-on (leftmost,
@@ -236,9 +236,6 @@ export interface ListColumnsState {
   setWidth: (id: ColumnId, width: number) => void;
   /** Currently active sort (or null = natural order). */
   sort: ColumnSort | null;
-  /** Cycle this column's sort: none → asc → desc → none. Sorting by a
-   *  different column always starts over at asc. */
-  cycleSort: (id: ColumnId) => void;
   /** Direct setter for the sort state — used by toolbar menus that pick
    *  both column and direction in one click rather than cycling. */
   setSort: (sort: ColumnSort | null) => void;
@@ -441,17 +438,6 @@ export function useListColumns(
     });
   }, [storageKey, catalogueById]);
 
-  const cycleSort = useCallback((id: ColumnId) => {
-    if (!storageKey) return;
-    setSnapshot(storageKey, (prev) => {
-      const cur = prev.sort;
-      let next: ColumnSort | null;
-      if (!cur || cur.id !== id) next = { id, direction: 'asc' };
-      else if (cur.direction === 'asc') next = { id, direction: 'desc' };
-      else next = null;
-      return { ...prev, sort: next };
-    });
-  }, [storageKey]);
 
   const setSortDirect = useCallback((nextSort: ColumnSort | null) => {
     if (!storageKey) return;
@@ -468,7 +454,6 @@ export function useListColumns(
     moveColumn,
     setWidth,
     sort,
-    cycleSort,
     setSort: setSortDirect,
   };
 }
