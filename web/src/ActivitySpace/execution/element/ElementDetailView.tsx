@@ -29,6 +29,8 @@ import {
   fetchElementWithDetails,
   updateSubelement,
   deleteSubelement,
+  createSubelement,
+  useAssignableWorkers,
   fetchAssignableWorkers,
   addElementAssignee,
   removeElementAssignee,
@@ -283,8 +285,27 @@ function ElementDetailBody({
   useEscapeLayer(emojiPickerOpen, () => setEmojiPickerOpen(false));
   // Subelement create / detail modal — null when closed; { mode: 'create' }
   // for the new-sub-element popup; { mode: 'detail', subelement } for editing.
-  // The Sub-elements section's fold; open unless folded for this visit.
-  const [subsOpen, setSubsOpen] = useState(true);
+  // The Sub-elements section's fold: open when there are some, folded (▶)
+  // when there are none — unfolding it offers the "Add sub-element" line.
+  const [subsOpen, setSubsOpen] = useState(() => (element.subelements?.length ?? 0) > 0);
+  const [newSubTitle, setNewSubTitle] = useState('');
+  const [addingSub, setAddingSub] = useState(false);
+  // Who a sub-element can be put on: the parent Element's assignable people.
+  const { data: subWorkers } = useAssignableWorkers({ elementId: element.id }, subsOpen);
+  const addSubelement = async () => {
+    const title = newSubTitle.trim();
+    if (!title || addingSub) return;
+    setAddingSub(true);
+    try {
+      await createSubelement({ title, element_id: element.id });
+      setNewSubTitle('');
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to add sub-element', e);
+    } finally {
+      setAddingSub(false);
+    }
+  };
   const [subModal, setSubModal] = useState<
     | { mode: 'create' }
     | { mode: 'detail'; subelement: Subelement }
@@ -915,26 +936,20 @@ function ElementDetailBody({
           />
 
           {/* Sub-elements — a section like Comments: its heading folds the
-              list (▶), with "+" right beside it to add one through the
-              SubelementDetailModal. Rows mirror the Elements list and open
-              the same modal. */}
+              list (▶). Unfolded, the rows read like the Elements list
+              (status, title, date, assignee, each set in place; the row opens
+              the SubelementDetailModal), and a grey "Add sub-element" line
+              under them takes a title and Enter. */}
           <section className="w-full">
-            <div className="mb-1 flex h-8 items-center gap-1">
+            {/* Baseline-aligned, so the small done/total count sits on the
+                heading's line rather than floating at its middle. */}
+            <div className="mb-1 flex h-8 items-baseline gap-1 pt-1.5">
               <button type="button" onClick={() => setSubsOpen((o) => !o)} aria-expanded={subsOpen}
                 className="flex items-center gap-2 rounded-md text-foreground">
                 <h2 className={`${FONT.lg} text-foreground`}>{t('Sub-elements')}</h2>
                 <DisclosureTriangle open={subsOpen} className="text-muted-foreground" />
               </button>
               {totalSubs > 0 && <span className="ml-1 text-[12px] tabular-nums text-muted-foreground">{completedSubs}/{totalSubs}</span>}
-              <button
-                type="button"
-                onClick={() => setSubModal({ mode: 'create' })}
-                className="ml-1 inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
-                title={t('New sub-element')}
-                aria-label={t('New sub-element')}
-              >
-                <Plus size={13} strokeWidth={2.5} />
-              </button>
             </div>
             {subsOpen && (
               <div
@@ -945,6 +960,7 @@ function ElementDetailBody({
                   <SubelementRow
                     key={sub.id}
                     subelement={sub}
+                    workers={subWorkers}
                     onRefresh={onRefresh}
                     onOpen={() => setSubModal({ mode: 'detail', subelement: sub })}
                     canRowSelect
@@ -953,6 +969,21 @@ function ElementDetailBody({
                     onRowSelect={(id, mode) => subSelection.handleRowSelect(id, mode, subIds)}
                   />
                 ))}
+                <div className="flex min-h-[2.125rem] items-center gap-2 px-2">
+                  <span className="flex opacity-40"><ElementProgressMark status="todo" size={16} /></span>
+                  <input
+                    value={newSubTitle}
+                    onChange={(e) => setNewSubTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); void addSubelement(); }
+                      else if (e.key === 'Escape') { e.preventDefault(); setNewSubTitle(''); e.currentTarget.blur(); }
+                    }}
+                    disabled={addingSub}
+                    placeholder={t('Add sub-element')}
+                    aria-label={t('Add sub-element')}
+                    className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground/60"
+                  />
+                </div>
               </div>
             )}
           </section>

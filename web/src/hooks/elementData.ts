@@ -345,8 +345,12 @@ export async function updateSubelement(
   updates: Partial<Omit<Subelement, 'id' | 'created_at'>>
 ): Promise<Subelement> {
   // Optimistic — toggleSubelementComplete() delegates here, so the inline
-  // checklist checkbox feels instant for free.
-  const optimisticPatch = { ...updates, updated_at: new Date().toISOString() };
+  // checklist checkbox feels instant for free. Status and completion move
+  // together on screen as the DB moves them (Done ⇔ completed).
+  const paired: Partial<Omit<Subelement, 'id' | 'created_at'>> = { ...updates };
+  if (updates.status !== undefined && updates.is_completed === undefined) paired.is_completed = updates.status === 'done';
+  else if (updates.is_completed !== undefined && updates.status === undefined) paired.status = updates.is_completed ? 'done' : 'todo';
+  const optimisticPatch = { ...paired, updated_at: new Date().toISOString() };
   const rollback = applyOptimisticExplorerPatch(data =>
     patchSubelementInExplorer(data, id, optimisticPatch)
   );

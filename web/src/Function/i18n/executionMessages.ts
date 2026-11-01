@@ -20,6 +20,8 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   'Sub-element': ['Sub-element', 'Sub-element', 'Sub-element', 'Sub-element'],
   'Sub-elements': ['Sub-elements', 'Sub-elements', 'Sub-elements', 'Sub-elements'],
   'New sub-element': ['新しい Sub-element', '새 Sub-element', 'Nouveau Sub-element', 'Nuevo Sub-element'],
+  'Add sub-element': ['Sub-element を追加', 'Sub-element 추가', 'Ajouter un sub-element', 'Añadir sub-element'],
+  'Unassign': ['担当を外す', '담당 해제', 'Retirer l’assignation', 'Quitar asignación'],
   'Sub-element title… (Enter to save)': ['Sub-element のタイトル…（Enter で保存）', 'Sub-element 제목… (Enter로 저장)', 'Titre du Sub-element… (Entrée pour enregistrer)', 'Título del Sub-element… (Intro para guardar)'],
   'Delete this sub-element?': ['この Sub-element を削除しますか？', '이 Sub-element를 삭제할까요?', 'Supprimer ce Sub-element ?', '¿Eliminar este Sub-element?'],
   'Select sub-element': ['Sub-element を選択', 'Sub-element 선택', 'Sélectionner le Sub-element', 'Seleccionar Sub-element'],
