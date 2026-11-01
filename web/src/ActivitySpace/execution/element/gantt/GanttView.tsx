@@ -8,9 +8,8 @@ import type { AlconObjectWithChildren, Phase, ObjectMilestone } from '@/types/da
 import { updateElement } from '@/hooks/useSupabase';
 import { CalendarDays, ZoomIn, ZoomOut } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
-import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
-import { getElementProgress } from '@/Function/shared/ElementProgressMark';
+import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
 import { phaseWindowMs } from '@/Function/shared/phaseWindow';
 import { MilestoneDiamond } from '@/Function/shared/MilestoneDiamond';
@@ -614,8 +613,10 @@ export function GanttView({
                         }`}
                         style={{ height: ROW_H }}
                       >
-                        <span className="shrink-0 flex items-center" style={{ color: statusColor(element.status) }}>
-                          <ElementIcon size={12} />
+                        {/* The same status mark as the list row, so a change
+                            in either reads the same here. */}
+                        <span className="shrink-0 flex items-center">
+                          <ElementProgressMark status={element.status} progress={getElementProgress(element)} size={14} />
                         </span>
                         <span className={`text-xs truncate flex-1 ${isDone ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                           {element.title}
