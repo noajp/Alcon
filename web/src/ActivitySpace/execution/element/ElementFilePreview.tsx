@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { elementFileUrl, openElementFile, type ElementFile } from '@/hooks/elementFileData';
+import { downloadElementFile, elementFileUrl, openElementFile, type ElementFile } from '@/hooks/elementFileData';
 import { officeKindOf, readOffice, type OfficePreview } from './officePreview';
 import { readDeck, type Deck, type DeckItem, type TextBody } from './deckLayout';
 import { readWorkbook, type WorkSheet } from './sheetLayout';
@@ -130,6 +130,10 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
             onClick={() => setZoom((z) => Math.min(3, Math.round((z + 0.1) * 100) / 100))}><Plus size={13} /></Button>
           <span className="mx-0.5 h-4 w-px bg-border/60" />
         </>}
+        <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Download')} title={t('Download')}
+          onClick={() => { void downloadElementFile(file).catch((e) => setError(e instanceof Error ? e.message : String(e))); }}>
+          <Download size={13} />
+        </Button>
         <Button type="button" variant="ghost" size="icon-xs" onClick={toggleFullscreen}
           aria-label={t(fullscreen ? 'Exit full screen' : 'Full screen')} title={t(fullscreen ? 'Exit full screen' : 'Full screen')}>
           {fullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
@@ -162,7 +166,7 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
         ) : kind === 'office' ? (
           officeKind === 'xlsx' ? (workbook ? <SheetView sheets={workbook} /> : spinner)
           : docLayout ? <DocView doc={docLayout} />
-          : deck ? <DeckView deck={deck} />
+          : deck ? <DeckView deck={deck} present={fullscreen} />
             : office === null ? spinner : <OfficeView preview={office} />
         ) : kind === 'text' ? (
           text === null ? spinner
@@ -192,7 +196,11 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
  *  is drawn at the deck's size and scaled to fit, so it follows the
  *  preview into full screen. (A deck that will not read is shown as its
  *  text instead — see readFile.) */
-function DeckView({ deck }: { deck: Deck }) {
+function DeckView({ deck, present }: { deck: Deck; present: boolean }) {
+  return present ? <SlideShow deck={deck} /> : <DeckList deck={deck} />;
+}
+
+function DeckList({ deck }: { deck: Deck }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
   useEffect(() => {
@@ -214,6 +222,58 @@ function DeckView({ deck }: { deck: Deck }) {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** A deck in full screen: one slide at a time, as large as the screen
+ *  allows; arrow keys, Space, Page Up / Down, Home / End and a click move
+ *  through it, with the slide number and arrows along the bottom. */
+function SlideShow({ deck }: { deck: Deck }) {
+  const { t } = useI18n();
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [index, setIndex] = useState(0);
+  const count = deck.slides.length;
+  const go = (n: number) => setIndex(Math.max(0, Math.min(count - 1, n)));
+  useEffect(() => {
+    const el = hostRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setSize({ w: entry.contentRect.width, h: entry.contentRect.height }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const next = ['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(e.key);
+      const prev = ['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(e.key);
+      if (!next && !prev && e.key !== 'Home' && e.key !== 'End') return;
+      e.preventDefault();
+      setIndex((i) => Math.max(0, Math.min(count - 1, e.key === 'Home' ? 0 : e.key === 'End' ? count - 1 : next ? i + 1 : i - 1)));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [count]);
+  const slide = deck.slides[index];
+  const scale = size.w ? Math.min((size.w - 48) / deck.width, (size.h - 24) / deck.height) : 0;
+  return (
+    <div className="flex h-full flex-col bg-[var(--sheet-text)]">
+      <div ref={hostRef} className="flex min-h-0 flex-1 items-center justify-center" onClick={() => go(index + 1)}>
+        {scale > 0 && slide && (
+          <div className="relative overflow-hidden shadow-2xl" style={{ width: deck.width * scale, height: deck.height * scale }}>
+            <div className="absolute left-0 top-0 origin-top-left" style={{ width: deck.width, height: deck.height, transform: `scale(${scale})`, background: slide.background ?? 'var(--sheet-paper)' }}>
+              {slide.items.map((item, j) => <DeckItemView key={j} item={item} />)}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="flex h-11 shrink-0 items-center justify-center gap-3 text-[var(--sheet-paper)]">
+        <button type="button" onClick={() => go(index - 1)} disabled={index === 0} aria-label={t('Previous slide')} title={t('Previous slide')}
+          className="flex size-7 items-center justify-center rounded-md opacity-80 transition-opacity hover:opacity-100 disabled:opacity-30"><ChevronLeft size={16} /></button>
+        <span className="min-w-14 text-center text-[12.5px] tabular-nums opacity-80">{index + 1} / {count}</span>
+        <button type="button" onClick={() => go(index + 1)} disabled={index === count - 1} aria-label={t('Next slide')} title={t('Next slide')}
+          className="flex size-7 items-center justify-center rounded-md opacity-80 transition-opacity hover:opacity-100 disabled:opacity-30"><ChevronRight size={16} /></button>
       </div>
     </div>
   );

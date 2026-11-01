@@ -133,3 +133,16 @@ export async function openElementFile(file: ElementFile): Promise<void> {
   if (tab) { tab.opener = null; tab.location.href = data.signedUrl; }
   else window.location.assign(data.signedUrl);
 }
+
+/** Saves a file to the person's computer under its own name, through a
+ *  signed link that asks the browser to download rather than show it. */
+export async function downloadElementFile(file: ElementFile): Promise<void> {
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(file.path, 60, { download: file.name });
+  if (error || !data?.signedUrl) throw error ?? new Error('Could not download the file.');
+  const a = document.createElement('a');
+  a.href = data.signedUrl;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
