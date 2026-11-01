@@ -76,7 +76,7 @@ export function ownerOf(file: Attachment): AttachmentOwner {
 const listKey = (owner: AttachmentOwner) => ['attachments', owner.kind, owner.id] as const;
 
 /** Pure. Days left before a trashed file is erased (0 = due). */
-function trashDaysLeft(deletedAt: string, now = Date.now()): number {
+export function trashDaysLeft(deletedAt: string, now = Date.now()): number {
   return Math.max(0, TRASH_DAYS - Math.floor((now - new Date(deletedAt).getTime()) / DAY));
 }
 
@@ -275,14 +275,15 @@ export interface SpaceFile extends Attachment {
   versions: number;
 }
 
-/** Every file attached in a Space, as its latest version (not trashed),
- *  newest first. RLS leaves out what the viewer cannot see. */
-export function useSpaceAttachments(spaceId: string | null) {
+/** Every file attached in a Space, as its latest version, newest first —
+ *  or, `trashed`, those in the trash (within their days), most recently
+ *  trashed first. RLS leaves out what the viewer cannot see. */
+export function useSpaceAttachments(spaceId: string | null, trashed = false) {
   const query = useQuery({
-    queryKey: ['attachments-of', 'space', spaceId],
+    queryKey: ['attachments-of', 'space', spaceId, trashed],
     enabled: !!spaceId,
     queryFn: async (): Promise<SpaceFile[]> => {
-      const { data, error } = await supabase.rpc('space_attachments', { p_space: spaceId });
+      const { data, error } = await supabase.rpc('space_attachments', { p_space: spaceId, p_trashed: trashed });
       if (error) throw error;
       return (data ?? []) as SpaceFile[];
     },
