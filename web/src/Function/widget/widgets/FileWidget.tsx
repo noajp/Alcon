@@ -11,7 +11,7 @@ import { FilePreview, readStoredFile } from '@/Function/office/FilePreview';
 import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
 import SheetChartView from '@/Function/office/SheetChart';
 import type { ChartData } from '@/Function/office/chartLayout';
-import { elementFileSource, useElementFile, useElementFilesIn, type ElementFile } from '@/hooks/elementFileData';
+import { attachmentSource, useAttachment, useAttachmentsOf, type Attachment } from '@/hooks/attachmentData';
 import { WidgetHeaderAction, useWidgetMeta } from '../WidgetFrame';
 import type { WidgetProps } from '../types';
 
@@ -29,8 +29,8 @@ export function FileWidget({ params, setParams, host }: WidgetProps) {
   const { t } = useI18n();
   const fileId = typeof params.fileId === 'string' ? params.fileId : null;
   const show: FileWidgetShow = params.show === 'chart' || params.show === 'value' ? params.show : 'file';
-  const file = useElementFile(fileId);
-  const candidates = useElementFilesIn(host.elements.map((e) => e.id));
+  const file = useAttachment(fileId);
+  const candidates = useAttachmentsOf('element', host.elements.map((e) => e.id));
   const editable = !host.readOnly;
   useWidgetMeta(file.data?.name ?? t('File'));
 
@@ -48,7 +48,7 @@ export function FileWidget({ params, setParams, host }: WidgetProps) {
             onChange={(next) => setParams({ ...params, ...next })} />
         </WidgetHeaderAction>
       )}
-      {show === 'file' ? <FilePreview file={file.data} source={elementFileSource} height={420} />
+      {show === 'file' ? <FilePreview file={file.data} source={attachmentSource} height={420} />
         : show === 'chart' ? <FileChart file={file.data} index={Number(params.chart ?? 0)} />
         : <FileValue file={file.data} sheet={typeof params.sheet === 'string' ? params.sheet : null} cell={typeof params.cell === 'string' ? params.cell : 'A1'}
             label={typeof params.label === 'string' ? params.label : null} />}
@@ -61,8 +61,8 @@ function Spinner() {
 }
 
 /** Reads the file once per session (shared with the Element's preview). */
-function useRead(file: ElementFile) {
-  return useQuery({ queryKey: ['stored-file', file.id], queryFn: () => readStoredFile(file, elementFileSource), staleTime: Infinity });
+function useRead(file: Attachment) {
+  return useQuery({ queryKey: ['stored-file', file.id], queryFn: () => readStoredFile(file, attachmentSource), staleTime: Infinity });
 }
 
 /** Every chart a workbook or deck holds, with where it is. */
@@ -73,7 +73,7 @@ function chartsOf(read: Awaited<ReturnType<typeof readStoredFile>> | undefined):
   return [];
 }
 
-function FileChart({ file, index }: { file: ElementFile; index: number }) {
+function FileChart({ file, index }: { file: Attachment; index: number }) {
   const { t } = useI18n();
   const read = useRead(file);
   const charts = useMemo(() => chartsOf(read.data), [read.data]);
@@ -92,7 +92,7 @@ function cellAt(ref: string): [number, number] | null {
   return [Number(m[2]) - 1, col - 1];
 }
 
-function FileValue({ file, sheet, cell, label }: { file: ElementFile; sheet: string | null; cell: string; label: string | null }) {
+function FileValue({ file, sheet, cell, label }: { file: Attachment; sheet: string | null; cell: string; label: string | null }) {
   const { t } = useI18n();
   const read = useRead(file);
   if (read.isPending) return <Spinner />;
@@ -109,7 +109,7 @@ function FileValue({ file, sheet, cell, label }: { file: ElementFile; sheet: str
   );
 }
 
-function FilePicker({ files, loading, disabled, onPick }: { files: ElementFile[]; loading: boolean; disabled: boolean; onPick: (f: ElementFile) => void }) {
+function FilePicker({ files, loading, disabled, onPick }: { files: Attachment[]; loading: boolean; disabled: boolean; onPick: (f: Attachment) => void }) {
   const { t } = useI18n();
   if (loading) return <Spinner />;
   if (!files.length) return <p className="py-1 text-sm text-muted-foreground">{t('No files are attached to these Elements yet.')}</p>;
@@ -129,7 +129,7 @@ function FilePicker({ files, loading, disabled, onPick }: { files: ElementFile[]
 
 /** The header menu: what to show, which chart, which cell, another file. */
 function FileWidgetMenu({ file, show, params, candidates, onChange }: {
-  file: ElementFile; show: FileWidgetShow; params: Record<string, unknown>; candidates: ElementFile[];
+  file: Attachment; show: FileWidgetShow; params: Record<string, unknown>; candidates: Attachment[];
   onChange: (next: Record<string, unknown>) => void;
 }) {
   const { t } = useI18n();

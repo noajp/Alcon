@@ -90,9 +90,9 @@ import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
 import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal, Paperclip } from 'lucide-react';
-import { useElementFiles, useElementFileActions, trashDaysLeft, TRASH_DAYS } from '@/hooks/elementFileData';
-import { ElementFilePreview } from './ElementFilePreview';
-import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
+import { useAttachmentActions } from '@/hooks/attachmentData';
+import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
+import { FileImportActions, canImport } from './FileImportActions';
 import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckRequest';
 import { openInApp } from '@/Function/shared/appNavigation';
 import { NavSlidesIcon } from '@/shell/sidebar/NavIcons';
@@ -626,16 +626,7 @@ function ElementDetailBody({
   const [linkPrSignal, setLinkPrSignal] = useState(0);
   // Files attached from this computer.
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { data: files, trashed: trashedFiles } = useElementFiles(element.id);
-  const [trashOpen, setTrashOpen] = useState(false);
-  const fileActions = useElementFileActions(element.id);
-  // Files whose preview is open under their row.
-  const [openFileIds, setOpenFileIds] = useState<Set<string>>(() => new Set());
-  const toggleFile = (id: string) => setOpenFileIds((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
+  const fileActions = useAttachmentActions({ kind: 'element', id: element.id });
   const handlePickNote = async (
     noteId: string,
     opts: { isNew: boolean; name: string },
@@ -859,7 +850,7 @@ function ElementDetailBody({
             </div>
 
             {/* Attach a file from this computer — it lists under the row and
-                opens through a short-lived link (element_files). */}
+                opens through a short-lived link (attachments). */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -946,78 +937,9 @@ function ElementDetailBody({
             })()}
           </div>
           </ButtonAppearanceProvider>
-          {/* Attached files — one row each: its kind's icon and its title,
-              then ▶ to open its preview right under it (images, PDF, text,
-              media, Word / Excel / PowerPoint). */}
-          {files.length > 0 && (
-            <section className="w-full" aria-label={t('Files')}>
-              <div className="-mx-2">
-                {files.map((f) => {
-                  const dot = f.name.lastIndexOf('.');
-                  const title = dot > 0 ? f.name.slice(0, dot) : f.name;
-                  const open = openFileIds.has(f.id);
-                  return (
-                    <div key={f.id} className="group/file">
-                      <div className="flex min-h-[2.125rem] items-center gap-2 rounded-lg px-2 py-1 hover:bg-foreground/[0.06]">
-                        <FileTypeIcon name={f.name} mime={f.mime_type} />
-                        <button type="button" onClick={() => toggleFile(f.id)} aria-expanded={open}
-                          className="flex min-w-0 items-center gap-2 text-left">
-                          <span className="truncate text-[14px] font-medium text-foreground" title={f.name}>{title}</span>
-                          <DisclosureTriangle open={open} className="shrink-0 text-muted-foreground" />
-                        </button>
-                        <span className="flex-1" />
-                        {f.uploaded_by === user?.id && (
-                          // A bin, not an ×: beside an open preview an × reads as
-                          // "close". It asks first, and the file goes to the trash
-                          // below, restorable for TRASH_DAYS.
-                          <button type="button" aria-label={t('Remove {name}', { name: f.name })} title={t('Remove {name}', { name: f.name })}
-                            onClick={async () => {
-                              if (!await appDialog.confirm(t('Move “{name}” to the trash? It can be restored for {days} days.', { name: f.name, days: TRASH_DAYS }))) return;
-                              fileActions.remove.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) });
-                            }}
-                            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted/50 hover:text-[var(--status-danger)] group-hover/file:opacity-100">
-                            <Trash2 size={12} />
-                          </button>
-                        )}
-                      </div>
-                      {open && <div className="px-2 pb-2"><ElementFilePreview file={f} /></div>}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* Deleted files — folded under the files, each with the days it
-              has left and, for its uploader, Restore. */}
-          {trashedFiles.length > 0 && (
-            <section className="-mt-1 w-full" aria-label={t('Deleted files')}>
-              <button type="button" onClick={() => setTrashOpen((o) => !o)} aria-expanded={trashOpen}
-                className="flex items-center gap-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground">
-                <DisclosureTriangle open={trashOpen} />
-                <Trash2 size={12} />
-                {t('Deleted files')} <span className="tabular-nums">{trashedFiles.length}</span>
-              </button>
-              {trashOpen && (
-                <div className="-mx-2 mt-1">
-                  {trashedFiles.map((f) => (
-                    <div key={f.id} className="flex min-h-[2rem] items-center gap-2 rounded-lg px-2 py-1 text-muted-foreground hover:bg-foreground/[0.06]">
-                      <span className="opacity-60"><FileTypeIcon name={f.name} mime={f.mime_type} /></span>
-                      <span className="min-w-0 truncate text-[13px] line-through decoration-muted-foreground/40" title={f.name}>{f.name}</span>
-                      <span className="flex-1" />
-                      <span className="shrink-0 text-[11.5px] tabular-nums">{t('{n} days left', { n: trashDaysLeft(f.deleted_at!) })}</span>
-                      {f.uploaded_by === user?.id && (
-                        <Button type="button" variant="ghost" size="xs" className="text-muted-foreground"
-                          onClick={() => fileActions.restore.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) })}>
-                          <RotateCcw size={12} />{t('Restore')}
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
+          {/* Attached files, and the trash under them. */}
+          <AttachmentList owner={{ kind: 'element', id: element.id }}
+            actions={(f) => (canImport(f.name) ? <FileImportActions file={f} /> : undefined)} />
 
           {/* Sub-elements — a section like Comments: its heading folds the
               list (▶). Unfolded, the rows read like the Elements list

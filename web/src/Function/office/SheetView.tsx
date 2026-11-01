@@ -2,9 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import type { WorkSheet } from './sheetLayout';
+import type { Cell, WorkSheet } from './sheetLayout';
+import { cellKey, type EditSession } from './officeEdits';
 import { runCss } from './officeViewParts';
 import SheetChartView from './SheetChart';
+
+/** What a cell holds, as typed into it: a number's value, not its format. */
+const rawOf = (cell: Cell | undefined) => (cell ? (cell.value != null ? String(cell.value) : cell.text) : '');
 
 /** Pure. A column's letters, as Excel heads it (0 → A, 26 → AA). */
 function columnName(i: number): string {
@@ -21,11 +25,20 @@ const HEAD_H = 24;
  *  format, at its column width and row height, merged cells merged; the
  *  gridlines only where the sheet shows them; its charts over the cells
  *  where the sheet places them; lettered columns, numbered rows, and the
- *  sheets as tabs along the bottom. */
-export function SheetView({ sheets }: { sheets: WorkSheet[] }) {
+ *  sheets as tabs along the bottom. With an edit session, a double-click
+ *  types into a cell (Enter goes down, Tab across, Esc leaves it as it
+ *  was); a formula's cell keeps its formula. */
+export function SheetView({ sheets, edit = null }: { sheets: WorkSheet[]; edit?: EditSession | null }) {
   const { t } = useI18n();
   const [active, setActive] = useState(0);
+  // The cell being typed in, on the sheet it belongs to.
+  const [typing, setTypingAt] = useState<{ sheet: number; r: number; c: number } | null>(null);
+  const setTyping = (at: { r: number; c: number } | null) => setTypingAt(at ? { sheet: active, ...at } : null);
   const sheet = sheets[active];
+  const commit = (r: number, c: number, cell: Cell | undefined, value: string) => {
+    if (!edit || !sheet) return;
+    edit.set({ kind: 'cell', sheet: sheet.name, ref: `${columnName(c)}${r + 1}`, from: rawOf(cell), to: value });
+  };
   const head = 'sticky z-10 border-b border-r border-[var(--sheet-grid)] bg-[var(--sheet-head)] text-[11px] font-normal text-[var(--sheet-head-text)]';
   const rowCount = sheet ? Math.max(sheet.rows.length + 5, 30, ...sheet.charts.map((c) => {
     let y = 0, r = 0;
@@ -98,10 +111,18 @@ export function SheetView({ sheets }: { sheets: WorkSheet[] }) {
                         // it is cut where the next cell holds something.
                         const next = row?.cells[c + 1];
                         const spill = !!cell?.text && !st?.wrap && !cell.numeric && (st?.align ?? 'left') === 'left' && !next?.text && !next?.hidden;
+                        const pending = edit?.pending.get(cellKey(sheet.name, `${columnName(c)}${r + 1}`));
+                        const here = !!edit && typing?.sheet === active && typing.r === r && typing.c === c;
+                        const locked = !!cell?.formula;
                         return (
-                          <td key={c} colSpan={cell?.colSpan} rowSpan={cell?.rowSpan} title={cell?.text || undefined}
-                            className={`px-1 ${spill ? 'relative z-[1] overflow-visible' : 'overflow-hidden'}`}
+                          <td key={c} colSpan={cell?.colSpan} rowSpan={cell?.rowSpan}
+                            title={edit && locked ? t('A formula cannot be edited here yet.') : cell?.text || undefined}
+                            onDoubleClick={edit && !locked ? () => setTyping({ r, c }) : undefined}
+                            className={`px-1 ${here ? 'relative' : spill ? 'relative z-[1] overflow-visible' : 'overflow-hidden'}`}
                             style={{
+                              // An edited cell, until it is saved, is ringed in the sheet's colour.
+                              boxShadow: pending ? 'inset 0 0 0 2px var(--sheet-accent)' : undefined,
+                              cursor: edit ? (locked ? 'not-allowed' : 'cell') : undefined,
                               // Longhands only: React warns when a shorthand and its
                               // longhands change together between renders.
                               borderTop: st?.borders.top ?? `1px solid ${grid}`, borderRight: st?.borders.right ?? `1px solid ${grid}`,
@@ -115,7 +136,15 @@ export function SheetView({ sheets }: { sheets: WorkSheet[] }) {
                               whiteSpace: st?.wrap ? 'normal' : 'nowrap',
                               fontVariantNumeric: cell?.numeric ? 'tabular-nums' : undefined,
                             }}>
-                            {cell?.runs ? cell.runs.map((run, k) => (
+                            {here ? (
+                              <CellInput initial={pending?.to ?? rawOf(cell)}
+                                onDone={(value, move) => {
+                                  if (value !== null) commit(r, c, cell, value);
+                                  // Moving on stops at a formula's cell, which is not typed in.
+                                  const to = move ? { r: Math.max(0, r + move[0]), c: Math.max(0, c + move[1]) } : null;
+                                  setTyping(to && !sheet.rows[to.r]?.cells[to.c]?.formula ? to : null);
+                                }} />
+                            ) : pending ? pending.to : cell?.runs ? cell.runs.map((run, k) => (
                               <span key={k} style={runCss(run)}>{run.text}</span>
                             )) : cell?.text}
                           </td>
@@ -150,5 +179,29 @@ export function SheetView({ sheets }: { sheets: WorkSheet[] }) {
         ))}
       </div>
     </div>
+  );
+}
+
+/** The box a cell is typed in. Done with the value (null: left unchanged)
+ *  and where to go next ([rows, columns]), if anywhere. */
+function CellInput({ initial, onDone }: { initial: string; onDone: (value: string | null, move?: [number, number]) => void }) {
+  const [value, setValue] = useState(initial);
+  const done = useRef(false);
+  const finish = (v: string | null, move?: [number, number]) => {
+    if (done.current) return;
+    done.current = true;
+    onDone(v, move);
+  };
+  return (
+    <input autoFocus value={value} onChange={(e) => setValue(e.target.value)}
+      onFocus={(e) => e.currentTarget.select()}
+      onBlur={() => finish(value)}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') { e.preventDefault(); finish(value, [e.shiftKey ? -1 : 1, 0]); }
+        else if (e.key === 'Tab') { e.preventDefault(); finish(value, [0, e.shiftKey ? -1 : 1]); }
+        else if (e.key === 'Escape') { e.preventDefault(); finish(null); }
+      }}
+      className="absolute inset-0 z-20 w-full bg-[var(--sheet-paper)] px-1 text-inherit outline outline-2 outline-[var(--sheet-accent)]" />
   );
 }

@@ -23,6 +23,9 @@ export interface DocPara {
   kind: 'p'; align: 'left' | 'center' | 'right' | 'justify';
   before: number; after: number; line: number | null; indent: number; firstLine: number;
   marker: string | null; runs: DocRun[]; heading: boolean;
+  /** Where the paragraph is in document.xml (its order among every w:p),
+   *  when its text is plain runs only and so can be edited as text. */
+  src?: number;
 }
 export interface DocCell { blocks: DocBlock[]; fill: string | null; span: number; rowSpan: number; skip: boolean; borders: boolean; borderColor: string | null }
 export interface DocTable { kind: 'table'; cols: number[]; rows: DocCell[][] }
@@ -71,6 +74,9 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
   const doc = await xml('word/document.xml');
   const body = doc?.getElementsByTagNameNS(W, 'body')[0] ?? null;
   if (!body) throw new Error('No document body');
+  // Every paragraph of the body part in document order: an edit names a
+  // paragraph by this index (see officeEdits).
+  const paraIndex = new Map(Array.from(doc!.getElementsByTagNameNS(W, 'p')).map((p, i) => [p, i]));
 
   /** A part's relationships: id → part path. */
   const relsOf = async (part: string) => new Map([...(await pkg.rels(part)).entries()].map(([id, r]) => [id, r.target]));
@@ -218,6 +224,9 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
     const out: DocBlock[] = [];
     if (on(pFirst('pageBreakBefore'))) out.push({ kind: 'break' });
     const runs: DocRun[] = [];
+    // Plain: nothing but text runs (no tab, break, picture or note mark), in
+    // one piece — such a paragraph can be edited as a line of text.
+    let plain = true;
     const walk = async (el: Element) => {
       for (const node of Array.from(el.children)) {
         if (node.localName === 'r') {
@@ -226,6 +235,9 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
           const rPrs = [rPr, ...rStyle, ...styleRPrs].filter((e): e is Element => !!e);
           for (const part of Array.from(node.children)) {
             if (part.localName === 't') runs.push(runOf(rPrs, part.textContent ?? ''));
+            // A field's code or result is the field's, not text to retype.
+            else if (['tab', 'br', 'drawing', 'pict', 'footnoteReference', 'fldChar', 'instrText'].includes(part.localName)) plain = false;
+            if (part.localName === 't') continue;
             else if (part.localName === 'tab') runs.push(runOf(rPrs, '\t'));
             else if (part.localName === 'br') {
               if (val(part, 'type') === 'page') { if (runs.length) { out.push(paraOf()); runs.length = 0; } out.push({ kind: 'break' }); }
@@ -243,7 +255,10 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
               runs.push({ ...runOf(rPrs, String(noteOrder.indexOf(id) + 1)), script: 'super' });
             }
           }
-        } else if (['hyperlink', 'ins', 'smartTag', 'sdtContent', 'fldSimple'].includes(node.localName)) await walk(node);
+        } else if (['hyperlink', 'ins', 'smartTag', 'sdtContent', 'fldSimple'].includes(node.localName)) {
+          if (node.localName === 'fldSimple') plain = false;
+          await walk(node);
+        }
         else if (node.localName === 'sdt') await walk(kid(node, 'sdtContent') ?? node);
       }
     };
@@ -258,7 +273,10 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
       heading: /^(heading|title|見出し)/i.test(styleId ?? '') || chain.some((s) => /^heading/i.test(val(kid(s, 'name')) ?? '')),
     });
     await walk(p);
-    out.push(paraOf());
+    const para = paraOf();
+    const index = paraIndex.get(p);
+    if (plain && index !== undefined) para.src = index;
+    out.push(para);
     return out;
   };
 
