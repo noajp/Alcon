@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -38,7 +39,6 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
   const [office, setOffice] = useState<OfficePreview | null>(null);
   const [deck, setDeck] = useState<ArrayBuffer | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const frameRef = useRef<HTMLDivElement | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [zoom, setZoom] = useState(1);
 
@@ -64,21 +64,31 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
     return () => { live = false; };
   }, [file, kind, officeKind]);
 
+  // Full screen is the app's own layer over the whole window, not the
+  // browser's Fullscreen API — that is refused inside embedded browsers
+  // (the desktop app's pane among them).
   useEffect(() => {
-    const onChange = () => setFullscreen(document.fullscreenElement === frameRef.current);
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void frameRef.current?.requestFullscreen();
-  };
+    if (!fullscreen) return;
+    // Captured first and stopped, so Esc leaves full screen only — the page
+    // under it (which closes on Esc) never sees it.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      setFullscreen(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [fullscreen]);
+  const toggleFullscreen = () => setFullscreen((f) => !f);
   const spinner = <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>;
   const zoomable = kind === 'html';
 
-  return (
-    <div ref={frameRef}
-      className="group/preview relative mt-1 h-[480px] overflow-hidden rounded-lg border border-border/60 bg-background [&:fullscreen]:mt-0 [&:fullscreen]:h-screen [&:fullscreen]:rounded-none [&:fullscreen]:border-0">
+  const frame = (
+    <div
+      className={fullscreen
+        ? 'group/preview fixed inset-0 z-[100] overflow-hidden bg-background'
+        : 'group/preview relative mt-1 h-[480px] overflow-hidden rounded-lg border border-border/60 bg-background'}>
       {/* Tools float over the preview's corner and show on hover: zoom for
           a page, full screen for everything. */}
       <div className={`absolute right-2 top-2.5 z-30 flex items-center gap-0.5 rounded-md border border-border/60 bg-[var(--surface-overlay)] p-0.5 shadow-sm transition-opacity ${fullscreen ? '' : 'opacity-0 group-hover/preview:opacity-100 focus-within:opacity-100'}`}>
@@ -139,6 +149,12 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
       </div>
     </div>
   );
+  // In full screen the frame is portalled to <body>, so no ancestor's
+  // transform or overflow can clip the fixed layer; a quiet placeholder
+  // keeps the row's place meanwhile.
+  return fullscreen
+    ? <><div className="mt-1 h-[480px] rounded-lg border border-dashed border-border/60" />{createPortal(frame, document.body)}</>
+    : frame;
 }
 
 /** A deck as its slides — shapes, colours, pictures, type, tables, where
