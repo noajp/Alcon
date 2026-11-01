@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { ExternalLink, Loader2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { elementFileUrl, openElementFile, type ElementFile } from '@/hooks/elementFileData';
 import { officeKindOf, readOffice, type OfficePreview } from './officePreview';
 
-// An attached file, previewed in the page: images and PDFs as themselves,
+// An attached file, previewed in place under its row (the row's ▶ opens it): images and PDFs as themselves,
 // text as text, audio and video in their players, and Word / Excel /
 // PowerPoint as what they say (officePreview — read here, never handed to a
 // viewer service). Anything else offers to open it in a new tab. The file
@@ -28,7 +27,7 @@ function kindOf(file: ElementFile): Kind {
   return 'other';
 }
 
-export function ElementFilePreview({ file, onClose }: { file: ElementFile; onClose: () => void }) {
+export function ElementFilePreview({ file }: { file: ElementFile }) {
   const { t } = useI18n();
   const kind = kindOf(file);
   const [url, setUrl] = useState<string | null>(null);
@@ -55,48 +54,39 @@ export function ElementFilePreview({ file, onClose }: { file: ElementFile; onClo
   }, [file, kind]);
 
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="flex h-[85vh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
-        <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border/60 px-4">
-          <DialogTitle className="min-w-0 flex-1 truncate text-[13px] font-medium">{file.name}</DialogTitle>
-          <Button variant="ghost" size="sm" className="mr-8 text-muted-foreground"
-            onClick={() => { void openElementFile(file).catch((e) => setError(e instanceof Error ? e.message : String(e))); }}>
-            <ExternalLink size={13} />{t('Open in new tab')}
-          </Button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-auto bg-background">
-          {error ? (
-            <p className="p-6 text-[13px] text-[var(--status-danger)]">{error}</p>
-          ) : !url ? (
-            <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>
-          ) : kind === 'image' ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={url} alt={file.name} className="mx-auto max-h-full max-w-full object-contain p-4" />
-          ) : kind === 'pdf' ? (
-            <iframe src={url} title={file.name} className="h-full w-full border-0" />
-          ) : kind === 'video' ? (
-            <video src={url} controls className="mx-auto max-h-full max-w-full p-4" />
-          ) : kind === 'audio' ? (
-            <div className="flex h-full items-center justify-center"><audio src={url} controls /></div>
-          ) : kind === 'office' ? (
-            office === null
-              ? <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>
-              : <OfficeView preview={office} />
-          ) : kind === 'text' ? (
-            text === null
-              ? <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>
-              : <pre className="whitespace-pre-wrap break-words p-6 font-mono text-[12.5px] leading-relaxed text-foreground">{text}</pre>
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-[13px] text-muted-foreground">
-              <p>{t('This file cannot be previewed here.')}</p>
-              <Button variant="secondary" size="sm" onClick={() => { void openElementFile(file); }}>
-                <ExternalLink size={13} />{t('Open in new tab')}
-              </Button>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <div className="mt-1 h-[480px] overflow-hidden rounded-lg border border-border/60 bg-background">
+      <div className="h-full overflow-auto">
+        {error ? (
+          <p className="p-6 text-[13px] text-[var(--status-danger)]">{error}</p>
+        ) : !url ? (
+          <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>
+        ) : kind === 'image' ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt={file.name} className="mx-auto max-h-full max-w-full object-contain p-4" />
+        ) : kind === 'pdf' ? (
+          <iframe src={url} title={file.name} className="h-full w-full border-0" />
+        ) : kind === 'video' ? (
+          <video src={url} controls className="mx-auto max-h-full max-w-full p-4" />
+        ) : kind === 'audio' ? (
+          <div className="flex h-full items-center justify-center"><audio src={url} controls /></div>
+        ) : kind === 'office' ? (
+          office === null
+            ? <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>
+            : <OfficeView preview={office} />
+        ) : kind === 'text' ? (
+          text === null
+            ? <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>
+            : <pre className="whitespace-pre-wrap break-words p-6 font-mono text-[12.5px] leading-relaxed text-foreground">{text}</pre>
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-[13px] text-muted-foreground">
+            <p>{t('This file cannot be previewed here.')}</p>
+            <Button variant="secondary" size="sm" onClick={() => { void openElementFile(file); }}>
+              <ExternalLink size={13} />{t('Open in new tab')}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
