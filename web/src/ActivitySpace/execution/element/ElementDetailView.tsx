@@ -89,14 +89,13 @@ import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
-import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal, Paperclip } from 'lucide-react';
-import { useAttachmentActions } from '@/hooks/attachmentData';
+import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal } from 'lucide-react';
 import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
+import { AttachButton } from '@/Function/shared/attachments/AttachButton';
 import { FileImportActions, canImport } from './FileImportActions';
 import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckRequest';
 import { openInApp } from '@/Function/shared/appNavigation';
 import { NavSlidesIcon } from '@/shell/sidebar/NavIcons';
-import { appDialog } from '@/Function/shared/appDialogStore';
 import { CodeChangeIcon } from '@/ActivitySpace/execution/code/codeChangeLabels';
 import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NotePicker } from '@/ActivitySpace/sustainment/notebook/NotePicker';
@@ -625,8 +624,6 @@ function ElementDetailBody({
   const [approvalSignal, setApprovalSignal] = useState(0);
   const [linkPrSignal, setLinkPrSignal] = useState(0);
   // Files attached from this computer.
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const fileActions = useAttachmentActions({ kind: 'element', id: element.id });
   const handlePickNote = async (
     noteId: string,
     opts: { isNew: boolean; name: string },
@@ -851,22 +848,8 @@ function ElementDetailBody({
 
             {/* Attach a file from this computer — it lists under the row and
                 opens through a short-lived link (attachments). */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={fileActions.upload.isPending}
-              className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors disabled:opacity-50"
-              title={t('Attach a file')}
-              aria-label={t('Attach a file')}
-            >
-              <Paperclip size={15} />
-            </button>
-            <input ref={fileInputRef} type="file" multiple hidden
-              onChange={(e) => {
-                const picked = Array.from(e.target.files ?? []);
-                e.target.value = '';
-                for (const f of picked) fileActions.upload.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) });
-              }} />
+            <AttachButton owner={{ kind: 'element', id: element.id }}
+              className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors disabled:opacity-50" />
 
             {/* More to attach, kept off the page until chosen: a Note
                 (Document), a new deck (Slide), a pull request. */}

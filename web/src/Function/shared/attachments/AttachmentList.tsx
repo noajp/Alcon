@@ -21,7 +21,12 @@ import {
  * the days each has left and Restore. `actions` adds the caller's own tools
  * to a preview (what the file can become in Alcon).
  */
-export function AttachmentList({ owner, actions }: { owner: AttachmentOwner; actions?: (file: Attachment) => ReactNode }) {
+export function AttachmentList({ owner, actions, empty = null }: {
+  owner: AttachmentOwner;
+  actions?: (file: Attachment) => ReactNode;
+  /** Shown when nothing is attached (and nothing is in the trash). */
+  empty?: ReactNode;
+}) {
   const { t } = useI18n();
   const { data: files, trashed } = useAttachments(owner);
   const fileActions = useAttachmentActions(owner);
@@ -34,6 +39,7 @@ export function AttachmentList({ owner, actions }: { owner: AttachmentOwner; act
     return next;
   });
 
+  if (!files.length && !trashed.length) return <>{empty}</>;
   return <>
     {files.length > 0 && (
       <section className="w-full" aria-label={t('Files')}>

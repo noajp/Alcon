@@ -35,6 +35,11 @@ const DAY = 86_400_000;
 /** What a file can be attached to, and the column that names it. */
 export type AttachmentOwnerKind = 'element' | 'object' | 'strategy' | 'portfolio' | 'deal' | 'company';
 export interface AttachmentOwner { kind: AttachmentOwnerKind; id: string }
+/** Pure. What a board's subject attaches files as (null: it cannot hold files). */
+export function attachmentOwnerOf(subject: { kind: string; id: string | null }): AttachmentOwner | null {
+  const kind = ({ element: 'element', object: 'object', initiative: 'strategy' } as Record<string, AttachmentOwnerKind>)[subject.kind];
+  return kind && subject.id ? { kind, id: subject.id } : null;
+}
 const OWNER_COLUMN: Record<AttachmentOwnerKind, string> = {
   element: 'element_id', object: 'object_id', strategy: 'strategy_id', portfolio: 'portfolio_id', deal: 'deal_id', company: 'company_id',
 };

@@ -45,7 +45,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   },
   'file': {
     type: 'file', label: 'File',
-    description: 'A file attached to an Element: the whole file, one of its charts, or a cell as a key number',
+    description: 'An attached file: the whole file, one of its charts, or a cell as a key number',
     group: 'core', accepts: ['domain', 'object', 'initiative'], zones: ['main', 'rail'], defaultSize: 'full',
     normalizeParams: (raw) => ({
       fileId: typeof raw?.fileId === 'string' && raw.fileId.length <= 64 ? raw.fileId : null,
@@ -56,6 +56,12 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
       label: typeof raw?.label === 'string' && raw.label.length <= 80 ? raw.label : null,
     }),
     load: async () => (await import('./widgets/FileWidget')).FileWidget,
+  },
+  'attachments': {
+    type: 'attachments', label: 'Attachments',
+    description: 'Files attached to this Object or Initiative: previewed in place, editable, and turned into Notes, Tables or decks',
+    group: 'core', accepts: ['object', 'initiative'], zones: ['main', 'rail'], defaultSize: 'full',
+    load: async () => (await import('./widgets/AttachmentsWidget')).AttachmentsWidget,
   },
   'note': {
     type: 'note', label: 'Note',
