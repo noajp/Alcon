@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowUpRight, Loader2, RotateCcw, Search, X } from 'lucide-react';
+import { ArrowUpRight, Loader2, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { AttachmentPreview } from '@/Function/shared/attachments/AttachmentList';
@@ -11,16 +11,18 @@ import { useElementSize } from '@/Function/office/officeViewParts';
 import { openAttachmentOwner } from '@/Function/shared/attachments/openOwner';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { fileKindOf } from '@/Function/files/filesRoute';
 import { TRASH_DAYS, indexSpaceFiles, ownerOf, searchAttachments, trashDaysLeft, useAttachmentActions, useSpaceAttachments, type AttachmentOwnerKind, type SpaceFile } from '@/hooks/attachmentData';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useWorkers } from '@/hooks/teamData';
 import type { NavigationState } from '@/types/navigation';
 import { FileImportActions, canImport } from '@/ActivitySpace/execution/element/FileImportActions';
-import { KINDS, WHERE } from './FilesSidebar';
+import { WHERE } from './FilesSidebar';
+import { useTrashFile } from './useTrashFile';
+import { AttachButton } from '@/Function/shared/attachments/AttachButton';
+import { useFolders } from '@/hooks/folderData';
 
 const OWNER_LABEL: Record<AttachmentOwnerKind, string> = {
-  element: 'Element', object: 'Object', strategy: 'Initiative', portfolio: 'Portfolio', deal: 'Deal', company: 'Company',
+  element: 'Element', object: 'Object', strategy: 'Initiative', portfolio: 'Portfolio', deal: 'Deal', company: 'Company', folder: 'Folder',
 };
 
 const nameOf = (f: SpaceFile) => { const dot = f.name.lastIndexOf('.'); return dot > 0 ? f.name.slice(0, dot) : f.name; };
@@ -62,14 +64,20 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
     const q = settled.toLowerCase();
     const matches = (f: SpaceFile) => !q || snippets.has(f.id) || f.name.toLowerCase().includes(q) || (f.owner_label ?? '').toLowerCase().includes(q);
     return files.filter((f) => (!route.where || ownerOf(f).kind === route.where)
-      && (!route.kind || fileKindOf(f.name, f.mime_type) === route.kind)
+      && (!route.folderId || f.folder_id === route.folderId)
       && matches(f));
-  }, [files, settled, snippets, route.where, route.kind]);
+  }, [files, settled, snippets, route.where, route.folderId]);
   const open = files.find((f) => f.id === route.fileId) ?? null;
   const select = (f: SpaceFile | null) => onNavigate({ files: { ...route, fileId: f?.id ?? null } });
-  const title = route.where ? t(WHERE.find((w) => w.id === route.where)!.label)
-    : route.kind ? (route.kind === 'pdf' ? 'PDF' : t(KINDS.find((k) => k.id === route.kind)!.label))
-    : t('All files');
+  const folder = useFolders('files').data.find((f) => f.id === route.folderId) ?? null;
+  const title = folder ? folder.name : route.where ? t(WHERE.find((w) => w.id === route.where)!.label) : t('All files');
+  const { upload } = useAttachmentActions({ kind: 'folder', id: folder?.id ?? '' });
+  // A folder takes files dropped on its list, as well as through the paperclip.
+  const [dropping, setDropping] = useState(false);
+  const drop = (list: FileList) => {
+    if (!folder) return;
+    for (const f of Array.from(list)) upload.mutate(f, { onError: (e) => void appDialog.alert(e instanceof Error ? e.message : String(e)) });
+  };
   const who = (f: SpaceFile) => workers.find((w) => w.user_id === f.uploaded_by)?.name ?? t('Someone');
 
   return (
@@ -79,6 +87,10 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
           <h1 className="text-[17px] font-semibold text-foreground">{title}</h1>
           <span className="text-[13px] tabular-nums text-muted-foreground">{shown.length}</span>
           <span className="flex-1" />
+          {folder && (
+            <AttachButton owner={{ kind: 'folder', id: folder.id }} size={14}
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50" />
+          )}
           <label className="flex h-7 w-56 items-center gap-1.5 rounded-md bg-muted/50 px-2 text-[12.5px] focus-within:bg-muted">
             <Search size={12} className="shrink-0 text-muted-foreground" />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Search names and contents')} aria-label={t('Search files')}
@@ -93,9 +105,12 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
           {!open && <span className="hidden w-32 shrink-0 lg:block">{t('Added by')}</span>}
           <span className="w-20 shrink-0 text-right">{t('Updated')}</span>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-1">
+        <div className={`min-h-0 flex-1 overflow-y-auto px-3 py-1 ${dropping ? 'bg-foreground/[0.04] outline-dashed outline-2 -outline-offset-4 outline-[var(--border-strong)]' : ''}`}
+          onDragOver={folder ? (e) => { e.preventDefault(); setDropping(true); } : undefined}
+          onDragLeave={folder ? () => setDropping(false) : undefined}
+          onDrop={folder ? (e) => { e.preventDefault(); setDropping(false); drop(e.dataTransfer.files); } : undefined}>
           {loading ? <p className="px-3 py-6 text-[13px] text-muted-foreground">{t('Loading…')}</p>
-            : !shown.length ? <p className="px-3 py-6 text-[13px] text-muted-foreground">{files.length ? t('No files match.') : t('No files are attached in this Space yet. Attach them to Elements, Objects, Initiatives or CRM records.')}</p>
+            : !shown.length ? <p className="px-3 py-6 text-[13px] text-muted-foreground">{folder ? t('This folder is empty. Drop files here, or add them with the paperclip.') : files.length ? t('No files match.') : t('No files yet. Make a folder and drop files into it, or attach them to Elements, Objects, Initiatives or CRM records.')}</p>
             : shown.map((f) => {
               const owner = ownerOf(f);
               const active = open?.id === f.id;
@@ -135,6 +150,7 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
 function FilePane({ file, who, onClose }: { file: SpaceFile; who: string; onClose: () => void }) {
   const { t } = useI18n();
   const owner = ownerOf(file);
+  const trash = useTrashFile(file);
   const [ref, size] = useElementSize<HTMLDivElement>();
   return (
     <aside className="flex w-[min(58%,880px)] shrink-0 flex-col border-l border-border/60">
@@ -149,6 +165,8 @@ function FilePane({ file, who, onClose }: { file: SpaceFile; who: string; onClos
             <span className="shrink-0 text-muted-foreground/70">· {who} · {formatAge(file.created_at, true)}</span>
           </button>
         </div>
+        <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Remove {name}', { name: file.name })} title={t('Remove {name}', { name: file.name })}
+          onClick={() => void trash().then((done) => { if (done) onClose(); })}><Trash2 size={13} /></Button>
         <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Close')} title={t('Close')} onClick={onClose}><X size={14} /></Button>
       </div>
       <div ref={ref} className="min-h-0 flex-1 px-4 pb-4">
@@ -214,3 +232,4 @@ function TrashRow({ file }: { file: SpaceFile }) {
     </div>
   );
 }
+

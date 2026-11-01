@@ -49,14 +49,15 @@ import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from
 import { SpaceSwitcher } from '@/Function/space/SpaceSwitcher';
 
 import { NavTableIcon } from '@/shell/sidebar/NavIcons';
-import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 import { useDataTables } from '@/hooks/useSupabase';
+import { updateDataTable } from '@/hooks/tableData';
 import { railModeOf } from '@/shell/ModeRail';
 import type { RailMode } from '@/shell/railApps';
 import { CREATE_ELEMENT_EVENT, type CreateElementDetail } from '@/shell/QuickAddElementLauncher';
 import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarStore';
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
+import { FolderTree } from '@/Function/shared/folders/FolderTree';
 import { FilesSidebar } from '@/ActivitySpace/sustainment/files/FilesSidebar';
 import { CrmSidebar } from '@/ActivitySpace/sustainment/crm/CrmSidebar';
 import { AuditSidebar } from '@/ActivitySpace/sustainment/audit/AuditSidebar';
@@ -140,23 +141,12 @@ function TableSidebar({
     return () => window.removeEventListener('alcon:tables-changed', h);
   }, [refetch]);
 
+  // Tables in folders of Table's own (a folder and its Tables, two levels).
   return (
-    <div className="mt-1">
-      <SidebarSectionLabel>{t('Table')}</SidebarSectionLabel>
-      <div className="mt-1 flex flex-col">
-        {tables.map((t) => (
-          <SidebarRow
-            key={t.id}
-            active={t.id === activeTableId}
-            icon={<NavTableIcon size={16} />}
-            label={t.name}
-            title={t.name}
-            meta={t.rowCount}
-            onClick={() => { onViewChange('tables'); onNavigate({ tableId: t.id }); }}
-          />
-        ))}
-      </div>
-    </div>
+    <FolderTree app="tables" title={t('Table')} activeItemId={activeTableId}
+      items={tables.map((table) => ({ id: table.id, name: table.name, folderId: table.folder_id ?? null, icon: <NavTableIcon size={16} />, meta: table.rowCount }))}
+      onOpenItem={(id) => { onViewChange('tables'); onNavigate({ tableId: id }); }}
+      onMoveItem={async (id, folderId) => { await updateDataTable(id, { folder_id: folderId }); refetch(); }} />
   );
 }
 

@@ -73,7 +73,7 @@ function NavRow({ item, nested = false }: { item: ToolNavItem; nested?: boolean 
   </div>;
 }
 
-export function ToolSidebar({ title, scope, queue, sections, footer }: {
+export function ToolSidebar({ title, scope, queue, sections, footer, children }: {
   /** The tool's name, as the heading. */
   title: string;
   scope: {
@@ -88,6 +88,8 @@ export function ToolSidebar({ title, scope, queue, sections, footer }: {
   queue?: ToolNavItem[];
   sections: { id: string; label?: string; items: ToolNavItem[] }[];
   footer?: ToolNavItem[];
+  /** The tool's own list (a folder tree), between the queue and the sections. */
+  children?: ReactNode;
 }) {
   const { t } = useI18n();
   const ScopeIcon = scope.icon;
@@ -111,6 +113,8 @@ export function ToolSidebar({ title, scope, queue, sections, footer }: {
     </div>
 
     {queue && queue.length > 0 && <div className="mt-1 space-y-px">{queue.map(item => <NavRow key={item.id} item={item} />)}</div>}
+
+    {children}
 
     {sections.map(section => <div key={section.id}>
       {section.label && <SidebarSectionLabel>{section.label}</SidebarSectionLabel>}
