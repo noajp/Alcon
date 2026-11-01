@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Download, ExternalLink, Loader2, Maximize2, Minimize2, Minus, Pencil, Plus, X } from 'lucide-react';
+import { Check, Download, ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { translate, useI18n } from '@/Function/i18n/I18nProvider';
 import { officeKindOf, readOffice, type OfficePreview } from './officePreview';
@@ -14,6 +14,7 @@ import { DocView } from './DocView';
 import { SheetView } from './SheetView';
 import { OfficeTextView } from './OfficeTextView';
 import { withEdit, type EditSession, type OfficeEdit } from './officeEdits';
+import { diffDocs, diffWorkbooks } from './officeDiff';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 
@@ -101,13 +102,15 @@ export interface FileEditor {
   save(edits: OfficeEdit[]): Promise<{ conflicts: number; skipped: number; newer: boolean }>;
 }
 
-export function FilePreview({ file, source, height = 480, actions, editor }: {
+export function FilePreview({ file, source, height = 480, actions, editor, compareTo = null }: {
   file: StoredFile; source: FileSource; height?: number;
   /** The caller's own tools for this file (import it, …), shown first. */
   actions?: React.ReactNode;
   /** Given, a workbook's cells and a Word document's paragraphs can be
    *  edited in the preview and saved through it. */
   editor?: FileEditor;
+  /** Another version of the file: what differs from it is marked. */
+  compareTo?: StoredFile | null;
 }) {
   const { t } = useI18n();
   const kind = previewKindOf(file);
@@ -116,30 +119,44 @@ export function FilePreview({ file, source, height = 480, actions, editor }: {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { text = null, office = null, workbook = null, doc: docLayout = null, deck = null } = loaded ?? {};
+  // The version compared against, read like this one; and what differs.
+  const [baseline, setBaseline] = useState<{ id: string; loaded: Loaded } | null>(null);
+  useEffect(() => {
+    if (!compareTo) return;
+    let live = true;
+    readStoredFile(compareTo, source).then((l) => { if (live) setBaseline({ id: compareTo.id, loaded: l }); }).catch(() => {});
+    return () => { live = false; };
+  }, [compareTo, source]);
+  const base = compareTo && baseline?.id === compareTo.id ? baseline.loaded : null;
+  const sheetChanges = useMemo(() => (base?.workbook && workbook ? diffWorkbooks(base.workbook, workbook) : null), [base, workbook]);
+  const docChanges = useMemo(() => (base?.doc && docLayout ? diffDocs(base.doc, docLayout) : null), [base, docLayout]);
+  const changeCount = sheetChanges?.count ?? docChanges?.count ?? null;
   const [fullscreen, setFullscreen] = useState(false);
   const [zoom, setZoom] = useState(1);
-  // Editing: on, the edits not yet saved, and a save under way.
+  // Editing, as in a spreadsheet or a document: there is no mode — a
+  // workbook's cells and a document's paragraphs can be typed into whenever
+  // the file can be saved. What is typed waits as edits until it is saved
+  // (or discarded); they belong to the version they were made on, so
+  // another version (this one saved, or a newer one listed) starts clean.
   const editable = !!editor && (officeKind === 'xlsx' || officeKind === 'docx');
-  // Both belong to the version they were made on: another version (this
-  // one saved, or a newer one listed) starts clean.
   const [editState, setEditState] = useState<{ fileId: string; pending: ReadonlyMap<string, OfficeEdit> } | null>(null);
-  const editing = editState?.fileId === file.id;
-  const pending = useMemo<ReadonlyMap<string, OfficeEdit>>(() => (editing ? editState.pending : new Map()), [editing, editState]);
+  const pending = useMemo<ReadonlyMap<string, OfficeEdit>>(() => (editState?.fileId === file.id ? editState.pending : new Map()), [editState, file.id]);
+  const dirty = pending.size > 0;
   const [saving, setSaving] = useState(false);
-  const session = useMemo<EditSession | null>(() => (editing
-    ? { pending, set: (e) => setEditState((s) => (s ? { ...s, pending: withEdit(s.pending, e) } : s)) }
-    : null), [editing, pending]);
-  const setEditing = (on: boolean) => setEditState(on ? { fileId: file.id, pending: new Map() } : null);
-  const stopEditing = async () => {
-    if (pending.size && !(await appDialog.confirm(t('Discard the changes you have not saved?')))) return;
-    setEditing(false);
+  const fileId = file.id;
+  const session = useMemo<EditSession | null>(() => (editable
+    ? { id: fileId, pending, set: (e) => setEditState((s) => ({ fileId, pending: withEdit(s?.fileId === fileId ? s.pending : new Map(), e) })) }
+    : null), [editable, fileId, pending]);
+  const discard = async () => {
+    if (dirty && !(await appDialog.confirm(t('Discard the changes you have not saved?')))) return;
+    setEditState(null);
   };
   const save = async () => {
     if (!editor || !pending.size) return;
     setSaving(true);
     try {
       const out = await editor.save([...pending.values()]);
-      setEditing(false);
+      setEditState(null);
       const notes = [
         out.newer && t('Someone saved a newer version while you were editing; your changes were added to theirs.'),
         out.conflicts > 0 && t('{n} of your changes replaced a change someone else had just made to the same place.', { n: out.conflicts }),
@@ -168,10 +185,10 @@ export function FilePreview({ file, source, height = 480, actions, editor }: {
   // Full screen is the app's own layer over the whole window, not the
   // browser's Fullscreen API — that is refused inside embedded browsers
   // (the desktop app's pane among them). Esc leaves it, and only it (the
-  // page under it, which closes on Esc, never sees the key); while editing,
-  // Esc ends the editing instead, asking first if anything is unsaved.
+  // page under it, which closes on Esc, never sees the key). With unsaved
+  // edits, Esc asks to discard them rather than closing the page under them.
   useEscapeLayer(fullscreen, () => setFullscreen(false));
-  useEscapeLayer(editing, () => { void stopEditing(); });
+  useEscapeLayer(dirty, () => { void discard(); });
   const toggleFullscreen = () => setFullscreen((f) => !f);
   const spinner = <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>;
   const zoomable = kind === 'html';
@@ -179,28 +196,34 @@ export function FilePreview({ file, source, height = 480, actions, editor }: {
   const frame = (
     <div
       className={fullscreen
-        ? 'group/preview fixed inset-0 z-[100] overflow-hidden bg-background'
-        : 'group/preview relative mt-1 overflow-hidden rounded-lg border border-border/60 bg-background'}
+        ? 'group/preview fixed inset-0 z-[100] flex flex-col overflow-hidden bg-background'
+        : 'group/preview relative mt-1 flex flex-col overflow-hidden rounded-lg border border-border/60 bg-background'}
       style={fullscreen ? undefined : { height }}>
-      {/* Tools float over the preview's corner and show on hover: zoom for
-          a page, full screen for everything. */}
-      <div className={`absolute right-2 top-2.5 z-30 flex items-center gap-0.5 rounded-md border border-border/60 bg-[var(--surface-overlay)] p-0.5 shadow-sm transition-opacity ${fullscreen || editing ? '' : 'opacity-0 group-hover/preview:opacity-100 focus-within:opacity-100'}`}>
-        {editing ? <>
-          <span className="px-1.5 text-[11.5px] tabular-nums text-muted-foreground">
-            {pending.size ? t('Unsaved changes: {n}', { n: pending.size }) : t(officeKind === 'xlsx' ? 'Double-click a cell to edit' : 'Click a paragraph to edit')}
-          </span>
-          <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Discard changes')} title={t('Discard changes')} disabled={saving} onClick={() => void stopEditing()}><X size={13} /></Button>
-          <Button type="button" variant="ghost" size="xs" disabled={saving || !pending.size} onClick={() => void save()}>
+      {/* Once something is typed, a bar above the file says so and offers to
+          save it (as the file's next version) or let it go. */}
+      {dirty && (
+        <div className="z-30 flex shrink-0 items-center gap-2 border-b border-border/60 bg-[var(--surface-overlay)] px-3 py-1.5">
+          <span className="text-[12.5px] tabular-nums text-foreground">{t('Unsaved changes: {n}', { n: pending.size })}</span>
+          <span className="flex-1" />
+          <Button type="button" variant="ghost" size="xs" disabled={saving} onClick={() => void discard()}>{t('Discard')}</Button>
+          <Button type="button" variant="primary" size="xs" disabled={saving} onClick={() => void save()}>
             {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}{t('Save as new version')}
           </Button>
-          <span className="mx-0.5 h-4 w-px bg-border/60" />
-        </> : <>
-          {actions}
-          {editable && (loaded?.workbook || loaded?.doc) && (
-            <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Edit')} title={t('Edit')} onClick={() => setEditing(true)}><Pencil size={13} /></Button>
-          )}
-          {(actions || editable) && <span className="mx-0.5 h-4 w-px bg-border/60" />}
-        </>}
+        </div>
+      )}
+      {/* Tools float over the preview's corner and show on hover: zoom for
+          a page, full screen for everything. */}
+      <div className={`absolute right-2 z-30 flex items-center gap-0.5 rounded-md border border-border/60 bg-[var(--surface-overlay)] p-0.5 shadow-sm transition-opacity ${dirty ? 'top-12' : 'top-2.5'} ${fullscreen ? '' : 'opacity-0 group-hover/preview:opacity-100 focus-within:opacity-100'}`}>
+        {compareTo && (
+          <span className="px-1.5 text-[11.5px] tabular-nums text-muted-foreground">
+            {changeCount === null ? <Loader2 size={12} className="inline animate-spin" />
+              : changeCount === 0 ? t('No changes from the version before')
+              : docChanges?.removed ? t('{n} changes ({removed} paragraphs removed)', { n: changeCount, removed: docChanges.removed })
+              : t('{n} changes', { n: changeCount })}
+          </span>
+        )}
+        {actions}
+        {(actions || compareTo) && <span className="mx-0.5 h-4 w-px bg-border/60" />}
         {zoomable && <>
           <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Zoom out')} title={t('Zoom out')} disabled={zoom <= 0.25}
             onClick={() => setZoom((z) => Math.max(0.25, Math.round((z - 0.1) * 100) / 100))}><Minus size={13} /></Button>
@@ -221,7 +244,7 @@ export function FilePreview({ file, source, height = 480, actions, editor }: {
           {fullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
         </Button>
       </div>
-      <div className="h-full overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         {error ? (
           <p className="p-6 text-[13px] text-[var(--status-danger)]">{error}</p>
         ) : !url && !loaded ? spinner : kind === 'image' ? (
@@ -246,8 +269,8 @@ export function FilePreview({ file, source, height = 480, actions, editor }: {
         ) : kind === 'audio' ? (
           <div className="flex h-full items-center justify-center"><audio src={url ?? undefined} controls /></div>
         ) : kind === 'office' ? (
-          officeKind === 'xlsx' ? (workbook ? <SheetView sheets={workbook} edit={session} /> : spinner)
-          : docLayout ? <DocView doc={docLayout} edit={session} />
+          officeKind === 'xlsx' ? (workbook ? <SheetView sheets={workbook} edit={session} changes={sheetChanges} /> : spinner)
+          : docLayout ? <DocView doc={docLayout} edit={session} changes={docChanges} />
           : deck ? <DeckView deck={deck} present={fullscreen} />
             : office === null ? spinner : <OfficeTextView preview={office} />
         ) : kind === 'text' ? (

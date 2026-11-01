@@ -23,11 +23,13 @@ export interface EditResult {
 
 /** Edits made in a preview and not yet saved, one per cell or paragraph. */
 export interface EditSession {
+  /** Different for each time editing is turned on (a view's selection belongs to one). */
+  id: string;
   pending: ReadonlyMap<string, OfficeEdit>;
   /** Records an edit; one that puts back what was there is dropped. */
   set: (edit: OfficeEdit) => void;
 }
-export const cellKey = (sheet: string, ref: string) => `c:${sheet}!${ref.toUpperCase()}`;
+const cellKey = (sheet: string, ref: string) => `c:${sheet}!${ref.toUpperCase()}`;
 export const paraKey = (index: number) => `p:${index}`;
 const editKey = (e: OfficeEdit) => (e.kind === 'cell' ? cellKey(e.sheet, e.ref) : paraKey(e.index));
 

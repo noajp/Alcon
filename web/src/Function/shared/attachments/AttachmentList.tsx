@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
-import { Check, History, Loader2, RotateCcw, Trash2 } from 'lucide-react';
+import { Check, Diff, History, Loader2, RotateCcw, Trash2 } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
@@ -9,7 +9,8 @@ import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import { FilePreview, type FileEditor } from '@/Function/office/FilePreview';
 import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
-import { MenuShell, MenuSectionLabel } from '@/Function/shared/menu';
+import { MenuShell, MenuSectionLabel, MENU_SEPARATOR } from '@/Function/shared/menu';
+import { officeKindOf } from '@/Function/office/officePreview';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { versionChain } from '@/Function/shared/fileVersions';
 import { useWorkers } from '@/hooks/teamData';
@@ -127,6 +128,10 @@ export function AttachmentPreview({ file, owner, actions }: { file: Attachment; 
   const picked = versions.find((v) => v.id === pickedId && v.id !== file.id) ?? null;
   const shown = picked ?? file;
   const number = (v: Attachment) => versions.length - versions.indexOf(v);
+  // Marking what this version changed from the one before it (Word, Excel).
+  const [comparing, setComparing] = useState(false);
+  const before = versions[versions.indexOf(shown) + 1] ?? null;
+  const canCompare = !!before && ['xlsx', 'docx'].includes(officeKindOf(file.name) ?? '');
   const fail = (err: unknown) => void appDialog.alert(err instanceof Error ? err.message : String(err));
 
   const history = versions.length > 1 && (
@@ -144,6 +149,12 @@ export function AttachmentPreview({ file, owner, actions }: { file: Attachment; 
             {v.id === shown.id && <Check size={13} />}
           </DropdownMenuItem>
         ))}
+        {['xlsx', 'docx'].includes(officeKindOf(file.name) ?? '') && <>
+          <div className={MENU_SEPARATOR} />
+          <DropdownMenuItem disabled={!before} onSelect={() => setComparing((c) => !c)}>
+            <Diff size={13} /><span className="flex-1">{t('Show changes from the version before')}</span>{comparing && canCompare && <Check size={13} />}
+          </DropdownMenuItem>
+        </>}
       </MenuShell>
     </DropdownMenu>
   );
@@ -165,7 +176,7 @@ export function AttachmentPreview({ file, owner, actions }: { file: Attachment; 
         </Button>
       </div>
     )}
-    <FilePreview file={shown} source={attachmentSource} editor={picked ? undefined : editor}
+    <FilePreview file={shown} source={attachmentSource} editor={picked ? undefined : editor} compareTo={comparing && canCompare ? before : null}
       actions={history || (!picked && actions) ? <>{history}{!picked && actions}</> : undefined} />
   </>;
 }
