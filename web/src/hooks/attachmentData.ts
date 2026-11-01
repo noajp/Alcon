@@ -67,7 +67,7 @@ const COLUMNS = 'id, path, name, size, mime_type, uploaded_by, created_at, delet
 const EMPTY: Attachment[] = [];
 
 /** Pure. What a file is attached to (exactly one owner column is set). */
-function ownerOf(file: Attachment): AttachmentOwner {
+export function ownerOf(file: Attachment): AttachmentOwner {
   const kind = (Object.keys(OWNER_COLUMN) as AttachmentOwnerKind[]).find((k) => file[OWNER_COLUMN[k] as keyof Attachment]);
   return { kind: kind ?? 'element', id: String(file[OWNER_COLUMN[kind ?? 'element'] as keyof Attachment] ?? '') };
 }
@@ -105,10 +105,13 @@ export function useAttachments(owner: AttachmentOwner | null) {
       return rows;
     },
   });
-  const latest = latestVersions(query.data ?? EMPTY);
+  const all = query.data ?? EMPTY;
+  const latest = latestVersions(all);
   return {
     data: latest.filter((f) => !f.deleted_at),
     trashed: latest.filter((f) => f.deleted_at && trashDaysLeft(f.deleted_at) > 0),
+    /** Every version of every file, for a file's history. */
+    all,
     loading: !!owner?.id && query.isPending,
   };
 }
@@ -189,7 +192,24 @@ export function useAttachmentActions(owner: AttachmentOwner) {
     },
     onSettled: refresh,
   });
-  return { upload, remove, restore, saveEdits };
+  /** Makes an earlier version the newest again, as a new version with its
+   *  bytes (the versions after it stay in the history). */
+  const restoreVersion = useMutation({
+    mutationFn: async (version: Attachment): Promise<Attachment> => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const head = versionChain(await rowsOf(owner), version.id)[0];
+        if (!head || head.deleted_at) throw new Error(translate('This file was removed.'));
+        if (head.id === version.id) return head;
+        const { data: blob, error } = await supabase.storage.from(BUCKET).download(version.path);
+        if (error || !blob) throw error ?? new Error('Could not read the file.');
+        const saved = await insertFile(owner, head.name, head.mime_type, blob, head);
+        if (saved) return saved;
+      }
+      throw new Error(translate('Someone else keeps saving this file. Try again in a moment.'));
+    },
+    onSettled: refresh,
+  });
+  return { upload, remove, restore, saveEdits, restoreVersion };
 }
 
 /** A short-lived signed link to a file, for previewing it in the page. */
@@ -238,6 +258,30 @@ export function useAttachmentsOf(kind: AttachmentOwnerKind, ids: string[]) {
     },
   });
   return { data: query.data ?? EMPTY, loading: key.length > 0 && query.isPending };
+}
+
+/** A file in the Files app: its latest version, what it is attached to
+ *  (by name) and how many versions it has. */
+export interface SpaceFile extends Attachment {
+  owner_label: string | null;
+  /** For a file on an Element: the Object it is in, to open it there. */
+  element_object_id: string | null;
+  versions: number;
+}
+
+/** Every file attached in a Space, as its latest version (not trashed),
+ *  newest first. RLS leaves out what the viewer cannot see. */
+export function useSpaceAttachments(spaceId: string | null) {
+  const query = useQuery({
+    queryKey: ['attachments-of', 'space', spaceId],
+    enabled: !!spaceId,
+    queryFn: async (): Promise<SpaceFile[]> => {
+      const { data, error } = await supabase.rpc('space_attachments', { p_space: spaceId });
+      if (error) throw error;
+      return (data ?? []) as SpaceFile[];
+    },
+  });
+  return { data: query.data ?? (EMPTY as SpaceFile[]), loading: !!spaceId && query.isPending };
 }
 
 /** One attached file by id, as its latest version (null when gone, trashed

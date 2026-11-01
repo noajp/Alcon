@@ -34,6 +34,7 @@ import { DomainOverview } from '@/ActivitySpace/execution/domain/DomainOverview'
 import { DomainView } from '@/ActivitySpace/execution/domain/DomainView'; // eager — default landing view
 const DomainsView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
 const TableView = dynamic(() => import('@/ActivitySpace/sustainment/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
+const FilesView = dynamic(() => import('@/ActivitySpace/sustainment/files').then(m => m.FilesView), { ssr: false, loading: viewLoading });
 const SlidesView = dynamic(() => import('@/ActivitySpace/sustainment/slides').then(m => m.SlidesView), { ssr: false, loading: viewLoading });
 const AuditView = dynamic(() => import('@/ActivitySpace/sustainment/audit/AuditView').then(m => m.AuditView), { ssr: false, loading: viewLoading });
 const CrmView = dynamic(() => import('@/ActivitySpace/sustainment/crm/CrmView').then(m => m.CrmView), { ssr: false, loading: viewLoading });
@@ -231,6 +232,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 activeTableId={navigation.tableId ?? null}
                 onSelectTable={(id) => onNavigate({ tableId: id })}
               />
+            </div>
+          )}
+
+          {activeActivity === 'files' && (
+            <div className="flex-1 flex flex-col overflow-hidden bg-card">
+              <FilesView />
             </div>
           )}
 
