@@ -13,6 +13,8 @@ import { TabBar } from '@/shell/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateObject, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
+import { createNoteFile } from '@/hooks/useNotesDb';
+import { OpenInMenu } from '@/ActivitySpace/execution/openIn/OpenInMenu';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from '@/ActivitySpace/execution/object/ObjectDetailView';
 import { ObjectActionsMenu } from '@/ActivitySpace/execution/object/ObjectActionsMenu';
@@ -325,6 +327,20 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
           <Plus size={14} />
         </Button>
       )}
+      {/* Take the Object to a tool: Claude Code, its Note, a deck. */}
+      <OpenInMenu
+        subject={{
+          kind: 'Object', identifier: selectedObject.display_id, title: selectedObject.name,
+          description: selectedObject.description, path: activeDomain?.name ? [activeDomain.name] : [],
+        }}
+        noteId={selectedObject.note_id ?? null}
+        onCreateNote={async () => {
+          const note = await createNoteFile(selectedObject.name);
+          await updateObject(selectedObject.id, { note_id: note.id });
+          await onRefresh?.();
+          return note.id;
+        }}
+      />
     </div>
   ) : null;
 
