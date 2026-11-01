@@ -579,9 +579,11 @@ export function ListTable({
                   <tr className="group">
                     {/* Section band — pinned to the left edge so the section
                         name stays readable during horizontal scroll. The
-                        chevron cell sticks at left:0; the band cell sticks at
-                        left:28 (one chevron-width over), and its bg-card
-                        layer hides the data columns scrolling underneath. */}
+                        leading cell (left:0) holds the chevron near the edge
+                        and the section icon 30px in, under "Name" and the
+                        rows' marks; the band cell (left:52) starts the name
+                        where the rows' names start, and its bg-card layer
+                        hides the data columns scrolling underneath. */}
                     <td className={`sticky left-0 z-10 bg-card w-13 pl-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
                       {/* Chevron lives inside the band visually — same
                           bg-muted as the colspan td next to it, with only
@@ -589,25 +591,20 @@ export function ListTable({
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); toggle(section.id); }}
-                        className="w-full min-h-[2.625rem] flex items-center pl-6.5 bg-muted/70 group-hover:bg-muted rounded-l-lg text-muted-foreground hover:text-foreground transition-colors"
+                        className="relative w-full min-h-[2.625rem] flex items-center bg-muted/70 group-hover:bg-muted rounded-l-lg text-muted-foreground hover:text-foreground transition-colors"
                         aria-label={isCollapsed ? t('Expand') : t('Collapse')}
                       >
-                        <DisclosureTriangle open={!isCollapsed} />
+                        <span className="absolute left-2 flex items-center"><DisclosureTriangle open={!isCollapsed} /></span>
+                        <span className="absolute left-6.5 flex items-center text-foreground/70">{section.icon}</span>
                       </button>
                     </td>
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className={`sticky left-13 z-10 bg-card pr-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
                       <button
                         type="button"
                         onClick={() => toggle(section.id)}
-                      className="w-full min-h-[2.625rem] flex items-center min-w-0 pr-1 py-1.5 bg-muted/70 group-hover:bg-muted rounded-r-lg transition-colors text-left"
+                      className="w-full min-h-[2.625rem] flex items-center min-w-0 pl-0.5 pr-1 py-1.5 bg-muted/70 group-hover:bg-muted rounded-r-lg transition-colors text-left"
                         aria-label={isCollapsed ? t('Expand') : t('Collapse')}
                       >
-                        {/* Icon slot — the chevron beside it sits over the
-                            rows' status marks; the section icon sits over
-                            their names' start. */}
-                        <span className="w-7 shrink-0 flex items-center justify-center text-foreground/70">
-                          {section.icon}
-                        </span>
                         <span className="text-[14px] font-medium text-foreground min-w-0 truncate">
                           {section.name}
                         </span>

@@ -447,7 +447,9 @@ function HierarchyHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="h-[50px] flex items-center gap-1 pl-4 pr-1 border-b border-border/60 bg-card flex-shrink-0">
+    // pl-6: with the crumb's own px-1.5 the Domain name starts 30px in, where
+    // the list's "Name" heading and the rows' icons do.
+    <div className="h-[50px] flex items-center gap-1 pl-6 pr-1 border-b border-border/60 bg-card flex-shrink-0">
       <button
         type="button"
         onClick={onDomainClick}
