@@ -98,7 +98,8 @@ function blocksHtml(blocks: DocBlock[], ctx: Ctx): string {
       blank = false;
       continue;
     }
-    const body = inline(b);
+    // A heading is bold already; bold on its runs is the heading's own look.
+    const body = inline(b.heading ? { ...b, runs: b.runs.map((r) => ({ ...r, bold: false })) } : b);
     if (!body) {
       // Word spaces with empty paragraphs; a run of them is one blank line.
       if (!blank && out.length) out.push('<p><br></p>');

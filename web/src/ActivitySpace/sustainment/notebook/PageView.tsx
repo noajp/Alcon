@@ -3,7 +3,7 @@
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { FileDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useDomains } from '@/hooks/useSupabase';
 import {
   NoteEditor,
@@ -13,6 +13,8 @@ import {
 import { BulletExtractDialog } from './BulletExtractDialog';
 import { useI18n, translate } from '@/Function/i18n/I18nProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
+import { DOCX_MIME, writeDocx } from '@/Function/office/docxWriter';
+import { downloadBytes } from '@/Function/office/downloadFile';
 
 interface PageViewProps {
   fileId: string;
@@ -131,6 +133,14 @@ export function PageView({
           </div>
         )}
         <div ref={toolbarPortalRef} className="flex items-center justify-center" />
+        <div className="absolute right-2">
+          <ButtonAppearanceProvider appearance="navigation">
+            <Button variant="ghost" size="icon-sm" title={t('Export to Word')} aria-label={t('Export to Word')}
+              onClick={() => { const name = draftTitle.trim() || title || t('Untitled'); void writeDocx(content, name).then((bytes) => downloadBytes(bytes, `${name}.docx`, DOCX_MIME)); }}>
+              <FileDown size={16} />
+            </Button>
+          </ButtonAppearanceProvider>
+        </div>
       </div>
       <div className="flex-1 overflow-auto">
         <div className="max-w-3xl mx-auto px-8 pt-16 pb-24">

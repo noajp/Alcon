@@ -2,7 +2,10 @@
 
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import { useEffect, useRef, useState } from 'react';
-import { FileText, Plus, Rows3, Columns3 } from 'lucide-react';
+import { FileDown, FileText, Plus, Rows3, Columns3 } from 'lucide-react';
+import { writeWorkbook, XLSX_MIME } from '@/Function/office/xlsxWriter';
+import { sheetFromTable } from '@/Function/office/tableToSheet';
+import { downloadBytes } from '@/Function/office/downloadFile';
 import { isCommitEnter, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NavTableIcon } from '@/shell/sidebar/NavIcons';
 import {
@@ -82,6 +85,11 @@ function TableSurface({ activeTableId, onSelectTable }: TableViewProps) {
               <DropdownMenuItem onSelect={() => setInsertColumnOpen(true)}><Columns3 size={14} />{t('Insert column')}</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => setImportCsvOpen(true)}><FileText size={14} />{t('Import data from CSV')}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => {
+                const d = source.data;
+                if (!d) return;
+                void writeWorkbook([sheetFromTable(d.table.name, d.columns, d.rows, d.cellsByRow)]).then((bytes) => downloadBytes(bytes, `${d.table.name}.xlsx`, XLSX_MIME));
+              }}><FileDown size={14} />{t('Export to Excel')}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}

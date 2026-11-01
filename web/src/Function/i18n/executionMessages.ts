@@ -33,6 +33,8 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   'Import into Table': ['Table に取り込む', 'Table로 가져오기', 'Importer dans Table', 'Importar a Table'],
   'Import a sheet into Table': ['Table に取り込むシート', 'Table로 가져올 시트', 'Importer une feuille dans Table', 'Importar una hoja a Table'],
   'This sheet has no table to import.': ['このシートには取り込める表がありません。', '이 시트에는 가져올 표가 없습니다.', 'Cette feuille ne contient aucun tableau à importer.', 'Esta hoja no tiene una tabla para importar.'],
+  'Export to Excel': ['Excel に書き出す', 'Excel로 내보내기', 'Exporter vers Excel', 'Exportar a Excel'],
+  'Export to Word': ['Word に書き出す', 'Word로 내보내기', 'Exporter vers Word', 'Exportar a Word'],
   'Import into Slides': ['Slides に取り込む', 'Slides로 가져오기', 'Importer dans Slides', 'Importar a Slides'],
   'This deck has no slides to import.': ['このデッキには取り込めるスライドがありません。', '이 덱에는 가져올 슬라이드가 없습니다.', 'Ce diaporama ne contient aucune diapositive à importer.', 'Esta presentación no tiene diapositivas para importar.'],
   'Import into Notebook': ['Notebook に取り込む', 'Notebook으로 가져오기', 'Importer dans Notebook', 'Importar a Notebook'],
