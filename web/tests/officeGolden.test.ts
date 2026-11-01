@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { readDeck } from '@/ActivitySpace/execution/element/deckLayout';
-import { readWorkbook } from '@/ActivitySpace/execution/element/sheetLayout';
-import { readDocLayout, type DocPara, type DocTable } from '@/ActivitySpace/execution/element/docLayout';
+import { readDeck } from '@/Function/office/deckLayout';
+import { readWorkbook } from '@/Function/office/sheetLayout';
+import { readDocLayout, type DocPara, type DocTable } from '@/Function/office/docLayout';
 import { googleSheetsWorkbook, powerPointDeck, wordDocument } from './fixtures/officeFixtures';
 
 // The previews are deterministic: the same file reads to the same layout on

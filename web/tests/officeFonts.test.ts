@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fontStack } from '@/ActivitySpace/execution/element/officeFonts';
+import { fontStack } from '@/Function/office/officeFonts';
 
 describe('fontStack', () => {
   it('maps Windows Japanese fonts to their Mac equivalents, keeping gothic and mincho apart', () => {
