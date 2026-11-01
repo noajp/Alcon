@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
-import { Check, Diff, History, Loader2, RotateCcw, Trash2 } from 'lucide-react';
+import { Check, Diff, History, Loader2, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
@@ -14,8 +14,9 @@ import { officeKindOf } from '@/Function/office/officePreview';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { versionChain } from '@/Function/shared/fileVersions';
 import { useWorkers } from '@/hooks/teamData';
+import { askAi } from '@/Function/copilot/askAi';
 import {
-  TRASH_DAYS, attachmentSource, useAttachmentActions, useAttachments,
+  TRASH_DAYS, attachmentSource, attachmentTextForAi, ownerOf, useAttachmentActions, useAttachments,
   type Attachment, type AttachmentOwner,
 } from '@/hooks/attachmentData';
 
@@ -151,6 +152,54 @@ export function AttachmentPreview({ file, owner, actions, height }: { file: Atta
       </div>
     )}
     <FilePreview file={shown} source={attachmentSource} editor={picked ? undefined : editor} compareTo={comparing && canCompare ? before : null} height={height}
-      actions={history || (!picked && actions) ? <>{history}{!picked && actions}</> : undefined} />
+      actions={<><AskAiMenu file={shown} />{history}{!picked && actions}</>} />
   </>;
+}
+
+/**
+ * Asks the AI about a file: its text goes to the AI pop-up as a document
+ * (the AI reads it as material, never as instructions). Summarize and
+ * Elements send at once — the AI asks before it creates anything; Ask
+ * leaves the file in the composer for the person's own question.
+ */
+function AskAiMenu({ file }: { file: Attachment }) {
+  const { t } = useI18n();
+  const [busy, setBusy] = useState(false);
+  const ask = async (prompt: string, send: boolean) => {
+    setBusy(true);
+    try {
+      const text = await attachmentTextForAi(file);
+      if (!text.trim()) { await appDialog.alert(t('This file has no text the AI can read.')); return; }
+      const owner = ownerOf(file);
+      askAi({
+        prompt, send, attachments: [{ name: file.name, mediaType: 'text/plain', data: text }],
+        context: owner.kind === 'element' ? { elementId: owner.id } : owner.kind === 'object' ? { objectId: owner.id } : undefined,
+      });
+    } catch (e) {
+      await appDialog.alert(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Ask AI about this file')} title={t('Ask AI about this file')} disabled={busy}>
+          {busy ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+        </Button>
+      </DropdownMenuTrigger>
+      <MenuShell as="dropdown" align="end" width="wide">
+        <MenuSectionLabel>{t('Ask AI about this file')}</MenuSectionLabel>
+        <DropdownMenuItem onSelect={() => void ask(t('Summarize this file: what it is for, its main points, and the numbers, dates and decisions that matter.'), true)}>
+          {t('Summarize')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void ask(t('Pick out the actions in this file (what to do, who, by when) and propose them as Elements here. Ask me before creating them.'), true)}>
+          {t('Turn its actions into Elements')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void ask('', false)}>
+          {t('Ask a question about it')}
+        </DropdownMenuItem>
+      </MenuShell>
+    </DropdownMenu>
+  );
 }
