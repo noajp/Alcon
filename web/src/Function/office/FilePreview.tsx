@@ -60,7 +60,7 @@ const READ_CACHE_SIZE = 8;
 /** Fetches a file through a signed link and reads it — text as text, a
  *  workbook, document or deck into its layout (with the text-only reading
  *  as the fallback where a layout will not read). */
-function readStoredFile(file: StoredFile, source: FileSource, kind: PreviewKind = previewKindOf(file)): Promise<Loaded> {
+export function readStoredFile(file: StoredFile, source: FileSource, kind: PreviewKind = previewKindOf(file)): Promise<Loaded> {
   const hit = READ_CACHE.get(file.id);
   if (hit) { READ_CACHE.delete(file.id); READ_CACHE.set(file.id, hit); return hit; }
   const officeKind = officeKindOf(file.name);
@@ -93,7 +93,7 @@ function readStoredFile(file: StoredFile, source: FileSource, kind: PreviewKind 
   return read;
 }
 
-export function FilePreview({ file, source }: { file: StoredFile; source: FileSource }) {
+export function FilePreview({ file, source, height = 480 }: { file: StoredFile; source: FileSource; height?: number }) {
   const { t } = useI18n();
   const kind = previewKindOf(file);
   const officeKind = officeKindOf(file.name);
@@ -140,7 +140,8 @@ export function FilePreview({ file, source }: { file: StoredFile; source: FileSo
     <div
       className={fullscreen
         ? 'group/preview fixed inset-0 z-[100] overflow-hidden bg-background'
-        : 'group/preview relative mt-1 h-[480px] overflow-hidden rounded-lg border border-border/60 bg-background'}>
+        : 'group/preview relative mt-1 overflow-hidden rounded-lg border border-border/60 bg-background'}
+      style={fullscreen ? undefined : { height }}>
       {/* Tools float over the preview's corner and show on hover: zoom for
           a page, full screen for everything. */}
       <div className={`absolute right-2 top-2.5 z-30 flex items-center gap-0.5 rounded-md border border-border/60 bg-[var(--surface-overlay)] p-0.5 shadow-sm transition-opacity ${fullscreen ? '' : 'opacity-0 group-hover/preview:opacity-100 focus-within:opacity-100'}`}>
@@ -211,6 +212,6 @@ export function FilePreview({ file, source }: { file: StoredFile; source: FileSo
   // transform or overflow can clip the fixed layer; a quiet placeholder
   // keeps the row's place meanwhile.
   return fullscreen
-    ? <><div className="mt-1 h-[480px] rounded-lg border border-dashed border-border/60" />{createPortal(frame, document.body)}</>
+    ? <><div className="mt-1 rounded-lg border border-dashed border-border/60" style={{ height }} />{createPortal(frame, document.body)}</>
     : frame;
 }

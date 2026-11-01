@@ -43,6 +43,20 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     normalizeParams: (raw) => ({ deckId: typeof raw?.deckId === 'string' && raw.deckId.length <= 64 ? raw.deckId : null }),
     load: async () => (await import('./widgets/DeckWidget')).DeckWidget,
   },
+  'file': {
+    type: 'file', label: 'File',
+    description: 'A file attached to an Element: the whole file, one of its charts, or a cell as a key number',
+    group: 'core', accepts: ['domain', 'object', 'initiative'], zones: ['main', 'rail'], defaultSize: 'full',
+    normalizeParams: (raw) => ({
+      fileId: typeof raw?.fileId === 'string' && raw.fileId.length <= 64 ? raw.fileId : null,
+      show: raw?.show === 'chart' || raw?.show === 'value' ? raw.show : 'file',
+      chart: Number.isInteger(raw?.chart) && Number(raw?.chart) >= 0 ? raw?.chart : 0,
+      sheet: typeof raw?.sheet === 'string' && raw.sheet.length <= 120 ? raw.sheet : null,
+      cell: typeof raw?.cell === 'string' && /^[A-Z]{1,3}\d{1,7}$/i.test(raw.cell) ? raw.cell.toUpperCase() : 'A1',
+      label: typeof raw?.label === 'string' && raw.label.length <= 80 ? raw.label : null,
+    }),
+    load: async () => (await import('./widgets/FileWidget')).FileWidget,
+  },
   'note': {
     type: 'note', label: 'Note',
     description: 'A Note from Notebook, written in place',
