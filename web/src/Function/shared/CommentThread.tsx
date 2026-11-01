@@ -287,18 +287,23 @@ export function CommentComposer({
             }
           }}
         />
-        <div className="flex shrink-0 items-stretch">
-          <Button size="sm" type="button" variant="primary" onClick={onSubmit}
+        {/* mb-0.5: the 24px buttons sit 2px above the 28px text line's foot,
+            so on one line they are centred in the box; the text grows above. */}
+        <div className="mb-0.5 flex shrink-0 items-stretch">
+          <Button size="xs" type="button" variant="primary" onClick={onSubmit}
             disabled={!value.trim() || submitting} title={t('Send')} aria-label={t('Send')}
-            className={sendOptions?.length ? 'rounded-l-md rounded-r-none px-2.5' : 'rounded-md px-2.5'}>
-            <SendIcon size={14} />
+            className={sendOptions?.length ? 'rounded-l-md rounded-r-none px-2' : 'rounded-md px-2'}>
+            <SendIcon size={13} />
           </Button>
           {sendOptions?.length ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" type="button" variant="primary" aria-label={t('More ways to send')} title={t('More ways to send')}
-                  className="rounded-l-none rounded-r-md border-l border-l-white/25 px-1.5">
-                  <ChevronDown size={13} />
+                {/* Dimmed with Send while nothing is written, so the pair reads
+                    as one quiet control; it still opens (an update needs no
+                    comment text). */}
+                <Button size="xs" type="button" variant="primary" aria-label={t('More ways to send')} title={t('More ways to send')}
+                  className={`rounded-l-none rounded-r-md border-l border-l-white/25 px-1 ${value.trim() ? '' : 'opacity-50 hover:opacity-80'}`}>
+                  <ChevronDown size={12} />
                 </Button>
               </DropdownMenuTrigger>
               <MenuShell as="dropdown" align="end">
