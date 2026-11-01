@@ -1,7 +1,6 @@
 'use client';
 
 import { memo } from 'react';
-import { Check } from 'lucide-react';
 import type { AlconObjectWithChildren, Worker } from '@/hooks/useSupabase';
 import { useSortable } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
@@ -9,7 +8,6 @@ import { ObjectIcon } from '@/shell/icons';
 import { type DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { OBJECT_DRAG_PREFIX, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, ROW_ROUND_TO_LAST, selectionSquareClass, selectionSquareClassToLast } from './shared';
 import { ObjectCell } from './cells';
-import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // Object row — sortable + selectable, mirrors ElementRow at the structural
 // level. The checkbox affordance, hover/selected bg, and sticky-left
@@ -40,7 +38,6 @@ export const ObjectRow = memo(function ObjectRow({
   elementTypes, canRowSelect, onAddType, onRemoveType, dropEdge, selPrev, selNext, onSelectObject, onRowSelect,
   onObjectUpdate, objectWorkers, onObjectCustomColumnValueChange,
 }: ObjectRowProps) {
-  const { t } = useI18n();
   const dragId = OBJECT_DRAG_PREFIX + obj.id;
   // No sortable transform — rows stay static; the DragOverlay card and blue
   // drop line carry the feedback (see ElementRow for the rationale).
@@ -89,30 +86,13 @@ export const ObjectRow = memo(function ObjectRow({
         onSelectObject(obj.id);
       }}
     >
-      {/* Selection checkbox — identical UI to ElementRow. */}
-      <td className="sticky left-0 z-10 bg-card w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
-        {canRowSelect && (
-          <button
-            type="button"
-            aria-label={isSelected ? t('Deselect Object') : t('Select Object')}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => onRowSelect(obj.id, e.shiftKey ? 'range' : 'single')}
-            className={`size-4 rounded-[5px] border flex items-center justify-center mx-auto transition-opacity ${
-              isSelected
-                ? 'bg-primary border-primary text-primary-foreground opacity-100'
-                : 'border-muted-foreground/40 text-transparent hover:border-muted-foreground opacity-0 group-hover:opacity-100 group-data-[has-selection]/list:opacity-100'
-            }`}
-          >
-            <Check size={11} strokeWidth={3} />
-          </button>
-        )}
-      </td>
-      <td className="sticky left-7 z-10 bg-card w-7 px-1 py-2">
+      {/* No checkbox: Shift- or ⌘-click selects (the bulk bar appears). */}
+      <td className="sticky left-0 z-10 bg-card w-7 px-1 py-2">
         <div className="flex items-center justify-center text-muted-foreground/70">
           <ObjectIcon size={16} />
         </div>
       </td>
-      <td className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
+      <td className="md:sticky md:left-7 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         <div className="flex items-center min-w-0 min-h-[1.875rem]">
           <span className="text-[15px] font-medium text-foreground truncate flex-1 min-w-0">
             {obj.name}

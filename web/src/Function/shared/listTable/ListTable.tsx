@@ -17,7 +17,6 @@ import { getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { useListColumns, sortElements, NAME_COL_KEY, type ColumnId, type DataColumn, type ColumnEntity } from '@/Function/shared/listTable/useListColumns';
 import { EMPTY_CUSTOM_COLUMNS, EMPTY_ELEMENT_TYPES, EMPTY_WORKERS, EMPTY_ELEMENT_IDS, type ElementUpdate, type ListSection, HEADER_DRAG_PREFIX, OBJECT_DRAG_PREFIX, ROW_ROUND_BASE, STICKY_TINT_HOVER } from './shared';
 import { ElementRow } from './ElementRow';
-import { useUniformIdWidth } from './useUniformIdWidth';
 import { ObjectRow } from './ObjectRow';
 import { ColumnHeader, ResizeHandle, ColumnMenu } from './ColumnHeaderMenu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -199,7 +198,6 @@ export function ListTable({
   // and title start at one x down the whole list (9rem cap = the chip's
   // own max-w-36).
   const tableRef = useRef<HTMLTableElement | null>(null);
-  useUniformIdWidth(tableRef, 144, useMemo(() => [sections, collapsed], [sections, collapsed]));
   const toggle = (id: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -462,7 +460,7 @@ export function ListTable({
   // the right. Once sized, Name keeps that width and the trailing column
   // soaks up the slack instead.
   const nameFluid = !cols.isSized(NAME_COL_KEY);
-  const packedWidth = 56 + cols.widthFor(NAME_COL_KEY) + visibleColumns.reduce((sum, c) => sum + cols.widthFor(c.id), 0) + (hasTrailingCol ? 80 : 0);
+  const packedWidth = 28 + cols.widthFor(NAME_COL_KEY) + visibleColumns.reduce((sum, c) => sum + cols.widthFor(c.id), 0) + (hasTrailingCol ? 80 : 0);
 
   // With no rows the table is its header alone, and a horizontal scrollbar
   // (when the columns are wider than the pane) would sit right under it as a
@@ -491,7 +489,6 @@ export function ListTable({
             track absorbs only the remaining space. */}
         <colgroup>
           <col style={{ width: 28, minWidth: 28 }} />
-          <col style={{ width: 28, minWidth: 28 }} />
           <col style={nameFluid
             ? { width: '100%', minWidth: cols.widthFor(NAME_COL_KEY) }
             : { width: cols.widthFor(NAME_COL_KEY), minWidth: cols.widthFor(NAME_COL_KEY) }} />
@@ -506,14 +503,13 @@ export function ListTable({
         </colgroup>
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
-            {/* Cols 1-3 (checkbox / priority-or-icon / Name) are frozen on
-                horizontal scroll. Both `top-0` (from thead) and `left-*` make
-                them stay in place — they're the intersection corner, so
-                z-30 keeps them above the row's sticky-left siblings and
-                above any data column header that scrolls under. */}
-            <th className="sticky top-0 left-0 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
-            <th className="sticky top-0 left-7 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
-            <th className="sticky top-0 md:left-14 z-30 relative pl-0.5 pr-3 py-2.5 text-left text-[13px] font-normal text-muted-foreground bg-card border-b border-border/60">
+            {/* "Name" heads both frozen columns (the status mark or Object
+                icon, then the name), so the word starts where the icons do —
+                6px in, a 16px icon centred in its 28px cell. Both `top-0`
+                (from thead) and `left-0` keep it in place: it is the
+                intersection corner, so z-30 keeps it above the row's
+                sticky-left cells and any data column header scrolling under. */}
+            <th colSpan={2} className="sticky top-0 left-0 z-30 relative pl-1.5 pr-3 py-2.5 text-left text-[13px] font-normal text-muted-foreground bg-card border-b border-border/60">
               {t('Name')}
               {/* Name is resizable too — same handle as the data columns,
                   persisted under NAME_COL_KEY. Fixed on the Object list
@@ -599,7 +595,7 @@ export function ListTable({
                         <DisclosureTriangle open={!isCollapsed} />
                       </button>
                     </td>
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`sticky left-7 z-10 bg-card pr-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className={`sticky left-7 z-10 bg-card pr-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
                       <button
                         type="button"
                         onClick={() => toggle(section.id)}
@@ -719,13 +715,12 @@ export function ListTable({
                     className={`group cursor-pointer [&>td]:transition-colors ${ROW_ROUND_BASE} [&:hover>td:not(.sticky):not(:last-child)]:bg-foreground/[0.06] ${STICKY_TINT_HOVER}`}
                     onClick={onAddObject}
                   >
-                    <td className="sticky left-0 z-10 bg-card w-7 px-1 py-2" />
-                    <td className="sticky left-7 z-10 bg-card w-7 px-1 py-2">
+                    <td className="sticky left-0 z-10 bg-card w-7 px-1 py-2">
                       <div className="flex items-center justify-center text-muted-foreground">
                         <ObjectIcon size={16} />
                       </div>
                     </td>
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0">
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="md:sticky md:left-7 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0">
                       <div className="flex items-center min-w-0 min-h-[1.875rem] text-muted-foreground">
                         <span className="text-[14px] group-hover:text-foreground transition-colors">
                           {t('Add Object')}

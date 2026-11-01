@@ -8,8 +8,6 @@ import { scheduleElementDetailPrefetch, cancelElementDetailPrefetch } from '@/ho
 import { deleteElement, addElementAssignee, removeElementAssignee, fetchAssignableWorkers, noticeAssignmentFailed } from '@/hooks/useSupabase';
 import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { describeBlocker, type DependencyBlocker } from '@/Function/shared/element/dependencyReadiness';
-import { displayIdOf } from '@/Function/shared/element/displayId';
-import { DisplayIdChip } from '@/Function/shared/element/DisplayIdChip';
 import { liveLease, holderLabel, formatRemaining } from '@/Function/shared/element/lease';
 import { useNow } from '@/Function/shared/useNow';
 import { useSortable } from '@dnd-kit/sortable';
@@ -18,7 +16,6 @@ import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent } from '@/ui/context-menu';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
-import { PriorityPicker } from '@/Function/shared/PriorityPicker';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '@/shared/designTokens';
 import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
@@ -83,7 +80,6 @@ export const ElementRow = memo(function ElementRow({
   const { t, locale } = useI18n();
   const overdue = isOverdue(el.due_date, el.status === 'done');
   const showsActivityColumn = visibleColumns.some((c) => c.id === 'activity');
-  const rowId = displayIdOf(el);
   // One shared 30s clock for the whole table; a lapsed lease disappears from
   // the row on the next tick without a refetch.
   const lease = liveLease(el, useNow());
@@ -159,84 +155,35 @@ export const ElementRow = memo(function ElementRow({
         onSelectElement(el.id);
       }}
     >
-      {/* Selection checkbox — hidden until row-hover, or pinned visible once
-          any row is selected / this row is selected. Sticky-left freezes
-          this column during horizontal scroll. */}
-      <td className="sticky left-0 z-10 bg-card w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
-        {canRowSelect && (
-          <button
-            type="button"
-            aria-label={isSelected ? t('Deselect Element') : t('Select Element')}
-            // preventDefault on mousedown stops the click from focusing the
-            // button (no stray focus ring on mouse-click) and stops Shift-
-            // click from starting a browser text selection. Keyboard Tab
-            // still focuses it (ring shown for a11y).
-            onMouseDown={(e) => e.preventDefault()}
-            // Shift-click extends the selection from the anchor to here
-            // (range); a plain click toggles just this row (single).
-            onClick={(e) => onRowSelect(el.id, e.shiftKey ? 'range' : 'single')}
-            className={`size-4 rounded-[5px] border flex items-center justify-center mx-auto transition-opacity ${
-              isSelected
-                ? 'bg-primary border-primary text-primary-foreground opacity-100'
-                : 'border-muted-foreground/40 text-transparent hover:border-muted-foreground opacity-0 group-hover:opacity-100 group-data-[has-selection]/list:opacity-100'
-            }`}
-          >
-            <Check size={11} strokeWidth={3} />
-          </button>
-        )}
+      {/* Status leads the row, where the eye lands — no checkbox, priority
+          or id: Shift- or ⌘-click selects (the bulk bar appears), and
+          priority and the id live in the Element's own page. */}
+      <td className="sticky left-0 z-10 bg-card w-7 px-1 py-2">
+        <span className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          {canUpdate ? (
+            <StatusPicker
+              element={el}
+              onChanged={() => { void onRefresh?.(); }}
+              trigger={
+                <button
+                  type="button"
+                  title={t('Status: {value}', { value: t(statusLabel(el.status ?? 'todo')) })}
+                  className="flex size-4 items-center justify-center rounded-md transition-colors hover:bg-muted/40"
+                >
+                  <ElementProgressMark status={el.status} progress={getElementProgress(el, allCustomColumns)} size={16} />
+                </button>
+              }
+            />
+          ) : (
+            <ElementProgressMark status={el.status} progress={getElementProgress(el, allCustomColumns)} size={16} />
+          )}
+        </span>
       </td>
-      {/* Priority — the row opens on it, ahead of the id. Urgency is what a
-          person scans a list for, so it sits at the leading edge where the
-          eye already lands, not in an optional column off to the right. */}
-      <td className="sticky left-7 z-10 bg-card w-7 pl-1 pr-1.5 py-2" onClick={(e) => e.stopPropagation()}>
-        {canUpdate ? (
-          <PriorityPicker
-            value={el.priority ?? null}
-            onChange={(p) => onElementUpdate(el.id, { priority: p as ElementWithDetails['priority'] })}
-            trigger={
-              <button
-                type="button"
-                title={el.priority ? t('Priority: {value}', { value: t(PRIORITY_OPTIONS.find((o) => o.value === el.priority)?.label ?? el.priority) }) : t('Set priority')}
-                className="flex w-full items-center justify-end rounded-md py-0.5 transition-colors hover:bg-muted/40"
-              >
-                <PriorityMark priority={el.priority ?? null} />
-              </button>
-            }
-          />
-        ) : (
-          <span className="flex items-center justify-end">
-            <PriorityMark priority={el.priority ?? null} />
-          </span>
-        )}
-      </td>
-      <td className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
+      <td className="md:sticky md:left-7 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         {/* @container: the lease chip below decides how much of itself to
             show from this cell's own width, not the viewport's — the Name
             column is user-resizable and shares the row with the sidebar. */}
         <div className="@container flex items-center gap-2 min-w-0 min-h-[1.875rem]">
-          <DisplayIdChip id={rowId} size="sm" fit="column" />
-          {/* Status — between the id and the title, so Priority · id · Status
-              read as one leading cluster: how urgent, which row, how far
-              along. Status and Priority live here rather than in duplicate columns. */}
-          <span className="shrink-0" onClick={(e) => e.stopPropagation()}>
-            {canUpdate ? (
-              <StatusPicker
-                element={el}
-                onChanged={() => { void onRefresh?.(); }}
-                trigger={
-                  <button
-                    type="button"
-                    title={t('Status: {value}', { value: t(statusLabel(el.status ?? 'todo')) })}
-                    className="flex size-4 items-center justify-center rounded-md transition-colors hover:bg-muted/40"
-                  >
-                    <ElementProgressMark status={el.status} progress={getElementProgress(el, allCustomColumns)} size={16} />
-                  </button>
-                }
-              />
-            ) : (
-              <ElementProgressMark status={el.status} progress={getElementProgress(el, allCustomColumns)} size={16} />
-            )}
-          </span>
           <div className="flex flex-1 min-w-0 items-center gap-2">
             <span className="text-[15px] font-medium truncate flex-1 min-w-0 text-foreground">{el.title}</span>
           </div>
