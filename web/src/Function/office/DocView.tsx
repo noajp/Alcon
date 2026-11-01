@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { DocBlock, DocLayout, DocPara, DocRun } from './docLayout';
 import { paraKey, type EditSession } from './officeEdits';
+import type { DocChanges } from './officeDiff';
 import { OfficeCanvas, runCss } from './officeViewParts';
 
 /** A document as Word lays it out: a white page at the document's width
@@ -10,7 +12,11 @@ import { OfficeCanvas, runCss } from './officeViewParts';
  *  the preview; page breaks start a new sheet of paper. With an edit
  *  session, a paragraph of plain text can be retyped in place (Enter or a
  *  click elsewhere keeps it, Esc puts it back). */
-export function DocView({ doc, edit = null }: { doc: DocLayout; edit?: EditSession | null }) {
+export function DocView({ doc, edit = null, changes = null }: {
+  doc: DocLayout; edit?: EditSession | null;
+  /** Paragraphs that differ from another version: changed amber, added green. */
+  changes?: DocChanges | null;
+}) {
   const pages: DocBlock[][] = [[]];
   for (const b of doc.blocks) {
     if (b.kind === 'break') pages.push([]);
@@ -39,7 +45,7 @@ export function DocView({ doc, edit = null }: { doc: DocLayout; edit?: EditSessi
               </div>
             )}
             <div className="flow-root flex-1" style={{ columnCount: doc.columns > 1 ? doc.columns : undefined, columnGap: 32 }}>
-              <DocBlocks blocks={blocks} edit={edit} />
+              <DocBlocks blocks={blocks} edit={edit} changes={changes} />
             </div>
             {i === pages.length - 1 && doc.footnotes.length > 0 && (
               <div className="mt-6 border-t border-[var(--sheet-grid)] pt-2 text-[11px]">
@@ -65,7 +71,8 @@ function isDark(hex: string): boolean {
   return 0.299 * r + 0.587 * g + 0.114 * b < 140;
 }
 
-function DocBlocks({ blocks, edit = null }: { blocks: DocBlock[]; edit?: EditSession | null }) {
+function DocBlocks({ blocks, edit = null, changes = null }: { blocks: DocBlock[]; edit?: EditSession | null; changes?: DocChanges | null }) {
+  const { t } = useI18n();
   return <>{blocks.map((b, i) => {
     if (b.kind === 'break') return null;
     if (b.kind === 'table') {
@@ -79,7 +86,7 @@ function DocBlocks({ blocks, edit = null }: { blocks: DocBlock[]; edit?: EditSes
                   // Text left on "auto" colour turns light on a dark fill, as Word does.
                   <td key={c} colSpan={cell.span} rowSpan={cell.rowSpan} className="align-top"
                     style={{ background: cell.fill ?? undefined, color: cell.fill && isDark(cell.fill) ? 'var(--sheet-paper)' : undefined, border: cell.borders ? `1px solid ${cell.borderColor ?? 'var(--sheet-text)'}` : undefined, padding: '2px 7px' }}>
-                    <DocBlocks blocks={cell.blocks} edit={edit} />
+                    <DocBlocks blocks={cell.blocks} edit={edit} changes={changes} />
                   </td>
                 ))}
               </tr>
@@ -89,9 +96,11 @@ function DocBlocks({ blocks, edit = null }: { blocks: DocBlock[]; edit?: EditSes
       );
     }
     const size = b.runs.find((r) => r.text.trim())?.size ?? b.runs[0]?.size ?? 10.5;
+    const mark = changes?.marks.get(b);
     return (
       // A div, not a p: a paragraph may hold a text box with paragraphs of its own.
-      <div key={i} style={{
+      <div key={i} title={mark?.kind === 'changed' ? t('Before: {value}', { value: mark.before || t('(empty)') }) : mark ? t('Added') : undefined} style={{
+        ...(mark ? { backgroundColor: mark.kind === 'changed' ? 'var(--status-warning-subtle)' : 'var(--status-success-subtle)', boxShadow: `-6px 0 0 ${mark.kind === 'changed' ? 'var(--status-warning)' : 'var(--status-success)'}` } : {}),
         textAlign: b.align, margin: `${b.before}px 0 ${b.after}px`, paddingLeft: b.indent || undefined, textIndent: b.firstLine || undefined,
         lineHeight: b.line ? b.line * 1.15 : 1.15, minHeight: `${size * 4 / 3 * 1.15}px`, fontSize: `${size * 4 / 3}px`, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
       }}>

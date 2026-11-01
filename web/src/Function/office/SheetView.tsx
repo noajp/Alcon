@@ -4,11 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { Cell, WorkSheet } from './sheetLayout';
 import { cellKey, type EditSession } from './officeEdits';
+import { cellRef, cellValue, type SheetChanges } from './officeDiff';
 import { runCss } from './officeViewParts';
 import SheetChartView from './SheetChart';
 
-/** What a cell holds, as typed into it: a number's value, not its format. */
-const rawOf = (cell: Cell | undefined) => (cell ? (cell.value != null ? String(cell.value) : cell.text) : '');
+const rawOf = cellValue;
 
 /** Pure. A column's letters, as Excel heads it (0 → A, 26 → AA). */
 function columnName(i: number): string {
@@ -28,7 +28,11 @@ const HEAD_H = 24;
  *  sheets as tabs along the bottom. With an edit session, a double-click
  *  types into a cell (Enter goes down, Tab across, Esc leaves it as it
  *  was); a formula's cell keeps its formula. */
-export function SheetView({ sheets, edit = null }: { sheets: WorkSheet[]; edit?: EditSession | null }) {
+export function SheetView({ sheets, edit = null, changes = null }: {
+  sheets: WorkSheet[]; edit?: EditSession | null;
+  /** Cells that differ from another version: changed ringed amber, filled-in green. */
+  changes?: SheetChanges | null;
+}) {
   const { t } = useI18n();
   const [active, setActive] = useState(0);
   // The cell being typed in, on the sheet it belongs to.
@@ -37,7 +41,7 @@ export function SheetView({ sheets, edit = null }: { sheets: WorkSheet[]; edit?:
   const sheet = sheets[active];
   const commit = (r: number, c: number, cell: Cell | undefined, value: string) => {
     if (!edit || !sheet) return;
-    edit.set({ kind: 'cell', sheet: sheet.name, ref: `${columnName(c)}${r + 1}`, from: rawOf(cell), to: value });
+    edit.set({ kind: 'cell', sheet: sheet.name, ref: cellRef(r, c), from: rawOf(cell), to: value });
   };
   const head = 'sticky z-10 border-b border-r border-[var(--sheet-grid)] bg-[var(--sheet-head)] text-[11px] font-normal text-[var(--sheet-head-text)]';
   const rowCount = sheet ? Math.max(sheet.rows.length + 5, 30, ...sheet.charts.map((c) => {
@@ -111,17 +115,19 @@ export function SheetView({ sheets, edit = null }: { sheets: WorkSheet[]; edit?:
                         // it is cut where the next cell holds something.
                         const next = row?.cells[c + 1];
                         const spill = !!cell?.text && !st?.wrap && !cell.numeric && (st?.align ?? 'left') === 'left' && !next?.text && !next?.hidden;
-                        const pending = edit?.pending.get(cellKey(sheet.name, `${columnName(c)}${r + 1}`));
+                        const pending = edit?.pending.get(cellKey(sheet.name, cellRef(r, c)));
                         const here = !!edit && typing?.sheet === active && typing.r === r && typing.c === c;
                         const locked = !!cell?.formula;
+                        const was = changes?.cells.get(sheet.name)?.get(cellRef(r, c));
                         return (
                           <td key={c} colSpan={cell?.colSpan} rowSpan={cell?.rowSpan}
-                            title={edit && locked ? t('A formula cannot be edited here yet.') : cell?.text || undefined}
+                            title={was !== undefined ? t('Before: {value}', { value: was || t('(empty)') }) : edit && locked ? t('A formula cannot be edited here yet.') : cell?.text || undefined}
                             onDoubleClick={edit && !locked ? () => setTyping({ r, c }) : undefined}
                             className={`px-1 ${here ? 'relative' : spill ? 'relative z-[1] overflow-visible' : 'overflow-hidden'}`}
                             style={{
                               // An edited cell, until it is saved, is ringed in the sheet's colour.
-                              boxShadow: pending ? 'inset 0 0 0 2px var(--sheet-accent)' : undefined,
+                              boxShadow: pending ? 'inset 0 0 0 2px var(--sheet-accent)'
+                                : was !== undefined ? `inset 0 0 0 2px ${was ? 'var(--status-warning)' : 'var(--status-success)'}` : undefined,
                               cursor: edit ? (locked ? 'not-allowed' : 'cell') : undefined,
                               // Longhands only: React warns when a shorthand and its
                               // longhands change together between renders.

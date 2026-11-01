@@ -14,6 +14,7 @@ import { DocView } from './DocView';
 import { SheetView } from './SheetView';
 import { OfficeTextView } from './OfficeTextView';
 import { withEdit, type EditSession, type OfficeEdit } from './officeEdits';
+import { diffDocs, diffWorkbooks } from './officeDiff';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 
@@ -101,13 +102,15 @@ export interface FileEditor {
   save(edits: OfficeEdit[]): Promise<{ conflicts: number; skipped: number; newer: boolean }>;
 }
 
-export function FilePreview({ file, source, height = 480, actions, editor }: {
+export function FilePreview({ file, source, height = 480, actions, editor, compareTo = null }: {
   file: StoredFile; source: FileSource; height?: number;
   /** The caller's own tools for this file (import it, …), shown first. */
   actions?: React.ReactNode;
   /** Given, a workbook's cells and a Word document's paragraphs can be
    *  edited in the preview and saved through it. */
   editor?: FileEditor;
+  /** Another version of the file: what differs from it is marked. */
+  compareTo?: StoredFile | null;
 }) {
   const { t } = useI18n();
   const kind = previewKindOf(file);
@@ -116,6 +119,18 @@ export function FilePreview({ file, source, height = 480, actions, editor }: {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { text = null, office = null, workbook = null, doc: docLayout = null, deck = null } = loaded ?? {};
+  // The version compared against, read like this one; and what differs.
+  const [baseline, setBaseline] = useState<{ id: string; loaded: Loaded } | null>(null);
+  useEffect(() => {
+    if (!compareTo) return;
+    let live = true;
+    readStoredFile(compareTo, source).then((l) => { if (live) setBaseline({ id: compareTo.id, loaded: l }); }).catch(() => {});
+    return () => { live = false; };
+  }, [compareTo, source]);
+  const base = compareTo && baseline?.id === compareTo.id ? baseline.loaded : null;
+  const sheetChanges = useMemo(() => (base?.workbook && workbook ? diffWorkbooks(base.workbook, workbook) : null), [base, workbook]);
+  const docChanges = useMemo(() => (base?.doc && docLayout ? diffDocs(base.doc, docLayout) : null), [base, docLayout]);
+  const changeCount = sheetChanges?.count ?? docChanges?.count ?? null;
   const [fullscreen, setFullscreen] = useState(false);
   const [zoom, setZoom] = useState(1);
   // Editing: on, the edits not yet saved, and a save under way.
@@ -195,11 +210,19 @@ export function FilePreview({ file, source, height = 480, actions, editor }: {
           </Button>
           <span className="mx-0.5 h-4 w-px bg-border/60" />
         </> : <>
+          {compareTo && (
+            <span className="px-1.5 text-[11.5px] tabular-nums text-muted-foreground">
+              {changeCount === null ? <Loader2 size={12} className="inline animate-spin" />
+                : changeCount === 0 ? t('No changes from the version before')
+                : docChanges?.removed ? t('{n} changes ({removed} paragraphs removed)', { n: changeCount, removed: docChanges.removed })
+                : t('{n} changes', { n: changeCount })}
+            </span>
+          )}
           {actions}
           {editable && (loaded?.workbook || loaded?.doc) && (
             <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Edit')} title={t('Edit')} onClick={() => setEditing(true)}><Pencil size={13} /></Button>
           )}
-          {(actions || editable) && <span className="mx-0.5 h-4 w-px bg-border/60" />}
+          {(actions || editable || compareTo) && <span className="mx-0.5 h-4 w-px bg-border/60" />}
         </>}
         {zoomable && <>
           <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Zoom out')} title={t('Zoom out')} disabled={zoom <= 0.25}
@@ -246,8 +269,8 @@ export function FilePreview({ file, source, height = 480, actions, editor }: {
         ) : kind === 'audio' ? (
           <div className="flex h-full items-center justify-center"><audio src={url ?? undefined} controls /></div>
         ) : kind === 'office' ? (
-          officeKind === 'xlsx' ? (workbook ? <SheetView sheets={workbook} edit={session} /> : spinner)
-          : docLayout ? <DocView doc={docLayout} edit={session} />
+          officeKind === 'xlsx' ? (workbook ? <SheetView sheets={workbook} edit={session} changes={sheetChanges} /> : spinner)
+          : docLayout ? <DocView doc={docLayout} edit={session} changes={docChanges} />
           : deck ? <DeckView deck={deck} present={fullscreen} />
             : office === null ? spinner : <OfficeTextView preview={office} />
         ) : kind === 'text' ? (
