@@ -12,6 +12,7 @@ const LOGOS: { exts: string[]; mime?: string; src: string }[] = [
   { exts: ['doc', 'docx', 'rtf', 'odt'], src: '/file-types/word.svg' },
   { exts: ['xls', 'xlsx', 'csv', 'ods'], src: '/file-types/excel.svg' },
   { exts: ['ppt', 'pptx', 'odp'], src: '/file-types/powerpoint.svg' },
+  { exts: ['html', 'htm'], mime: 'text/html', src: '/file-types/html.svg' },
 ];
 
 export function FileTypeIcon({ name, mime, size = 15 }: { name: string; mime: string | null; size?: number }) {

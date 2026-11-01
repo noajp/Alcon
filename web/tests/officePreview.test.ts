@@ -34,6 +34,16 @@ describe('Office preview', () => {
     expect(preview).toEqual({ kind: 'xlsx', sheets: [{ name: '売上', rows: [['月', '', '金額'], ['4', '', '1200']] }] });
   });
 
+  it('shows numbers as the General format of Excel does', async () => {
+    const preview = await readOffice('xlsx', await zipOf({
+      'xl/workbook.xml': '<workbook><sheets><sheet name="S" sheetId="1"/></sheets></workbook>',
+      'xl/worksheets/sheet1.xml': '<worksheet><sheetData>'
+        + '<row r="1"><c r="A1"><v>2021.0</v></c><c r="B1"><v>0.13989365340001</v></c><c r="C1"><v>-204421</v></c></row>'
+        + '</sheetData></worksheet>',
+    }));
+    expect(preview).toEqual({ kind: 'xlsx', sheets: [{ name: 'S', rows: [['2021', '0.1398936534', '-204421']] }] });
+  });
+
   it('reads PowerPoint slides in order as lines', async () => {
     const slide = (t: string[]) => `<p:sld>${t.map((x) => `<a:p><a:r><a:t>${x}</a:t></a:r></a:p>`).join('')}</p:sld>`;
     const preview = await readOffice('pptx', await zipOf({

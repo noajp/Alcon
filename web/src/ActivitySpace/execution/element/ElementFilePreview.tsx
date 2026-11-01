@@ -13,7 +13,7 @@ import { officeKindOf, readOffice, type OfficePreview } from './officePreview';
 // viewer service). Anything else offers to open it in a new tab. The file
 // is read through a short-lived signed link.
 
-type Kind = 'image' | 'pdf' | 'text' | 'video' | 'audio' | 'office' | 'other';
+type Kind = 'image' | 'pdf' | 'html' | 'text' | 'video' | 'audio' | 'office' | 'other';
 
 function kindOf(file: ElementFile): Kind {
   const mime = file.mime_type ?? '';
@@ -21,6 +21,7 @@ function kindOf(file: ElementFile): Kind {
   if (officeKindOf(file.name)) return 'office';
   if (mime.startsWith('image/')) return 'image';
   if (mime === 'application/pdf' || ext === 'pdf') return 'pdf';
+  if (mime === 'text/html' || ext === 'html' || ext === 'htm') return 'html';
   if (mime.startsWith('video/')) return 'video';
   if (mime.startsWith('audio/')) return 'audio';
   if (mime.startsWith('text/') || ['md', 'markdown', 'txt', 'csv', 'json', 'log', 'yaml', 'yml'].includes(ext)) return 'text';
@@ -41,7 +42,7 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
       .then(async (signed) => {
         if (!live) return;
         setUrl(signed);
-        if (kind === 'text') {
+        if (kind === 'text' || kind === 'html') {
           const body = await (await fetch(signed)).text();
           if (live) setText(body.slice(0, 200_000));
         } else if (kind === 'office') {
@@ -65,6 +66,14 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
           <img src={url} alt={file.name} className="mx-auto max-h-full max-w-full object-contain p-4" />
         ) : kind === 'pdf' ? (
           <iframe src={url} title={file.name} className="h-full w-full border-0" />
+        ) : kind === 'html' ? (
+          // The page as it is, scripts and all, in a sandbox with no origin of
+          // its own: it can run, but cannot reach this app, its storage or
+          // the person's session. (Storage serves HTML as text, so the page
+          // is handed over as srcdoc rather than by its link.)
+          text === null
+            ? <div className="flex h-full items-center justify-center text-muted-foreground"><Loader2 size={16} className="animate-spin" /></div>
+            : <iframe srcDoc={text} sandbox="allow-scripts" title={file.name} className="h-full w-full border-0 bg-[var(--sheet-paper)]" />
         ) : kind === 'video' ? (
           <video src={url} controls className="mx-auto max-h-full max-w-full p-4" />
         ) : kind === 'audio' ? (
@@ -93,8 +102,6 @@ export function ElementFilePreview({ file }: { file: ElementFile }) {
 /** What an Office file says: a document's paragraphs, a workbook's sheets
  *  (one tab each), a deck's slides as numbered cards. */
 function OfficeView({ preview }: { preview: OfficePreview }) {
-  const { t } = useI18n();
-  const [sheet, setSheet] = useState(0);
   if (preview.kind === 'docx') {
     return (
       <article className="mx-auto max-w-3xl space-y-2 px-8 py-8 text-[14px] leading-relaxed text-foreground">
@@ -104,35 +111,7 @@ function OfficeView({ preview }: { preview: OfficePreview }) {
       </article>
     );
   }
-  if (preview.kind === 'xlsx') {
-    const current = preview.sheets[sheet];
-    return (
-      <div className="flex h-full flex-col">
-        {preview.sheets.length > 1 && (
-          <div className="flex shrink-0 gap-1 border-b border-border/60 px-3 py-2">
-            {preview.sheets.map((s, i) => (
-              <Button key={i} shape="tab" size="xs" variant={i === sheet ? 'secondary' : 'ghost'} aria-pressed={i === sheet} onClick={() => setSheet(i)}>{s.name}</Button>
-            ))}
-          </div>
-        )}
-        <div className="min-h-0 flex-1 overflow-auto p-3">
-          {current && current.rows.length > 0 ? (
-            <table className="border-collapse text-[12.5px]">
-              <tbody>
-                {current.rows.map((row, r) => (
-                  <tr key={r}>
-                    {row.map((cell, c) => (
-                      <td key={c} className="max-w-[280px] truncate border border-border/60 px-2 py-1 text-foreground" title={cell}>{cell}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : <p className="p-3 text-[13px] text-muted-foreground">{t('This sheet is empty.')}</p>}
-        </div>
-      </div>
-    );
-  }
+  if (preview.kind === 'xlsx') return <SheetView sheets={preview.sheets} />;
   return (
     <div className="mx-auto grid max-w-4xl gap-3 p-6">
       {preview.slides.map((s, i) => (
@@ -143,6 +122,72 @@ function OfficeView({ preview }: { preview: OfficePreview }) {
             : s.lines.map((line, j) => <p key={j} className={j === 0 ? 'text-[15px] font-semibold text-foreground' : 'text-[13px] text-foreground/90'}>{line}</p>)}
         </section>
       ))}
+    </div>
+  );
+}
+
+/** Pure. A column's letters, as Excel heads it (0 → A, 26 → AA). */
+function columnName(i: number): string {
+  let name = '';
+  for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) name = String.fromCharCode(65 + ((n - 1) % 26)) + name;
+  return name;
+}
+
+const NUMERIC = /^-?[\d.,]+(e[+-]?\d+)?%?$/i;
+
+/** A workbook as Excel draws it: Excel's green bar along the top, white
+ *  cells on a light grid with lettered columns and numbered rows, numbers
+ *  flush right, and the sheets as tabs along the bottom. The grid runs a
+ *  little past the data, as a sheet does. */
+function SheetView({ sheets }: { sheets: { name: string; rows: string[][] }[] }) {
+  const { t } = useI18n();
+  const [active, setActive] = useState(0);
+  const rows = sheets[active]?.rows ?? [];
+  const colCount = Math.max(8, ...rows.map((r) => r.length + 1));
+  const rowCount = Math.max(30, rows.length + 5);
+  const head = 'sticky z-10 border-b border-r border-[var(--sheet-grid)] bg-[var(--sheet-head)] text-[11px] font-normal text-[var(--sheet-head-text)]';
+  return (
+    <div className="flex h-full flex-col bg-[var(--sheet-paper)] text-[var(--sheet-text)]">
+      <div className="h-1 shrink-0 bg-[var(--sheet-accent)]" />
+      <div className="min-h-0 flex-1 overflow-auto">
+        {rows.length === 0 && sheets.length > 0 && <p className="sr-only">{t('This sheet is empty.')}</p>}
+        <table className="border-separate border-spacing-0 text-[12.5px]">
+          <thead>
+            <tr>
+              <th className={`${head} top-0 left-0 z-20 w-10 min-w-10`} />
+              {Array.from({ length: colCount }, (_, c) => (
+                <th key={c} className={`${head} top-0 h-6 min-w-[88px] px-2 text-center`}>{columnName(c)}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: rowCount }, (_, r) => (
+              <tr key={r}>
+                <th className={`${head} left-0 w-10 min-w-10 px-1 text-center tabular-nums`}>{r + 1}</th>
+                {Array.from({ length: colCount }, (_, c) => {
+                  const cell = rows[r]?.[c] ?? '';
+                  return (
+                    <td key={c} title={cell || undefined}
+                      className={`h-6 max-w-[280px] truncate border-b border-r border-[var(--sheet-grid)] px-1.5 ${NUMERIC.test(cell) ? 'text-right tabular-nums' : ''}`}>
+                      {cell}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex h-8 shrink-0 items-stretch gap-px overflow-x-auto border-t border-[var(--sheet-grid)] bg-[var(--sheet-head)] pl-10">
+        {sheets.map((s, i) => (
+          <button key={i} type="button" onClick={() => setActive(i)} aria-pressed={i === active}
+            className={`whitespace-nowrap border-b-2 px-4 text-[12px] transition-colors ${i === active
+              ? 'border-[var(--sheet-accent)] bg-[var(--sheet-paper)] font-semibold text-[var(--sheet-accent)]'
+              : 'border-transparent text-[var(--sheet-head-text)] hover:bg-[var(--sheet-paper)]'}`}>
+            {s.name}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

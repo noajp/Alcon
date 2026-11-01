@@ -80,7 +80,7 @@ function xlsxRows(sheetXml: string, shared: string[]): string[][] {
       const value = type === 's' ? shared[Number(v)] ?? ''
         : type === 'inlineStr' ? runsOf(body, 't')
         : type === 'b' ? (v === '1' ? 'TRUE' : 'FALSE')
-        : v !== undefined ? unescapeXml(v) : '';
+        : v !== undefined ? generalNumber(unescapeXml(v)) : '';
       while (row.length < col) row.push('');
       row[col] = value;
     }
@@ -89,6 +89,14 @@ function xlsxRows(sheetXml: string, shared: string[]): string[][] {
   // Trailing empty rows say nothing.
   while (rows.length && rows[rows.length - 1].every((c) => !c)) rows.pop();
   return rows;
+}
+
+/** Pure. A stored number as Excel's General format shows it: no trailing
+ *  ".0", at most 10 significant digits (0.1398936534, not 0.13989365340001). */
+function generalNumber(raw: string): string {
+  const n = Number(raw);
+  if (raw.trim() === '' || !Number.isFinite(n)) return raw;
+  return Number.isInteger(n) ? String(n) : String(parseFloat(n.toPrecision(10)));
 }
 
 /** Pure. The shared strings of a .xlsx. */
