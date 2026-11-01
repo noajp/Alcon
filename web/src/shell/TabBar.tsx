@@ -109,7 +109,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
 
   return (
     <div className="flex items-center gap-1.5 px-4 py-2 bg-transparent">
-      {/* Tabs — outlined rectangles, folded into one menu when they do not fit */}
+      {/* Tabs — a quiet strip, folded into one menu when they do not fit */}
       <CollapsingTabs
         menuLabel={t('Views')}
         items={tabs.map((tab) => ({ id: tab.id, label: t(tab.title), icon: OBJECT_TAB_META[tab.tab_type].Icon }))}
@@ -124,7 +124,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
         }}>
           <SortableContext items={tabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
             <div className="min-w-0 overflow-x-auto">
-              <div className="flex w-max items-center gap-1.5">
+              <div className="flex w-max items-center gap-0.5">
               {tabs.map(tab => <SortableViewTab key={tab.id} tab={tab} active={tab.id === activeTabId}
                 sortable={!!onTabReorder} onSelect={() => onTabSelect(tab.id)} onContextMenu={e => handleContextMenu(e, tab)} />)}
               </div>
