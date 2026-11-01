@@ -396,16 +396,45 @@ function DocView({ doc }: { doc: DocLayout }) {
     else pages[pages.length - 1].push(b);
   }
   const scale = width ? Math.min(1, (width - 48) / doc.width) : 0;
+
+  // The document's embedded fonts, registered under the names its text
+  // asks for, for as long as the preview is open.
+  useEffect(() => {
+    const faces = doc.fonts.map((f) => new FontFace(f.family, f.data, { weight: f.bold ? '700' : '400', style: f.italic ? 'italic' : 'normal' }));
+    for (const face of faces) face.load().then(() => document.fonts.add(face)).catch(() => {});
+    return () => { for (const face of faces) document.fonts.delete(face); };
+  }, [doc.fonts]);
+
   return (
     <div className="flex min-h-full flex-col bg-[var(--sheet-head)]">
       <div className="sticky top-0 z-20 h-1 shrink-0 bg-[var(--doc-accent)]" />
       <div ref={hostRef} className="flex flex-1 flex-col items-center gap-4 py-6">
         {scale > 0 && pages.map((blocks, i) => (
           // zoom, not transform: the page's height follows the scale, so a
-          // long page still pushes the next one down.
-          <div key={i} className="shrink-0 bg-[var(--sheet-paper)] text-[var(--sheet-text)] shadow-md"
+          // long page still pushes the next one down. Header and footer sit
+          // in the margins; footnotes close the last page.
+          <div key={i} className="relative flex shrink-0 flex-col bg-[var(--sheet-paper)] text-[var(--sheet-text)] shadow-md"
             style={{ width: doc.width, zoom: scale, padding: `${doc.margin.top}px ${doc.margin.right}px ${doc.margin.bottom}px ${doc.margin.left}px`, minHeight: doc.width * 1.414 }}>
-            <DocBlocks blocks={blocks} />
+            {doc.header.length > 0 && (
+              <div className="absolute inset-x-0 top-0 overflow-hidden" style={{ padding: `${Math.min(48, doc.margin.top / 2)}px ${doc.margin.right}px 0 ${doc.margin.left}px`, maxHeight: doc.margin.top }}>
+                <DocBlocks blocks={doc.header} />
+              </div>
+            )}
+            <div className="flow-root flex-1" style={{ columnCount: doc.columns > 1 ? doc.columns : undefined, columnGap: 32 }}>
+              <DocBlocks blocks={blocks} />
+            </div>
+            {i === pages.length - 1 && doc.footnotes.length > 0 && (
+              <div className="mt-6 border-t border-[var(--sheet-grid)] pt-2 text-[11px]">
+                {doc.footnotes.map((note, n) => (
+                  <div key={n} className="flex gap-1"><sup>{n + 1}</sup><div className="min-w-0 flex-1" style={{ zoom: 0.8 }}><DocBlocks blocks={note} /></div></div>
+                ))}
+              </div>
+            )}
+            {doc.footer.length > 0 && (
+              <div className="absolute inset-x-0 bottom-0 overflow-hidden" style={{ padding: `0 ${doc.margin.right}px ${Math.min(48, doc.margin.bottom / 2)}px ${doc.margin.left}px`, maxHeight: doc.margin.bottom }}>
+                <DocBlocks blocks={doc.footer} />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -432,7 +461,7 @@ function DocBlocks({ blocks }: { blocks: DocBlock[] }) {
                 {row.map((cell, c) => cell.skip ? null : (
                   // Text left on "auto" colour turns light on a dark fill, as Word does.
                   <td key={c} colSpan={cell.span} rowSpan={cell.rowSpan} className="align-top"
-                    style={{ background: cell.fill ?? undefined, color: cell.fill && isDark(cell.fill) ? 'var(--sheet-paper)' : undefined, border: cell.borders ? '1px solid var(--sheet-text)' : undefined, padding: '2px 7px' }}>
+                    style={{ background: cell.fill ?? undefined, color: cell.fill && isDark(cell.fill) ? 'var(--sheet-paper)' : undefined, border: cell.borders ? `1px solid ${cell.borderColor ?? 'var(--sheet-text)'}` : undefined, padding: '2px 7px' }}>
                     <DocBlocks blocks={cell.blocks} />
                   </td>
                 ))}
@@ -444,27 +473,40 @@ function DocBlocks({ blocks }: { blocks: DocBlock[] }) {
     }
     const size = b.runs.find((r) => r.text.trim())?.size ?? b.runs[0]?.size ?? 10.5;
     return (
-      <p key={i} style={{
+      // A div, not a p: a paragraph may hold a text box with paragraphs of its own.
+      <div key={i} style={{
         textAlign: b.align, margin: `${b.before}px 0 ${b.after}px`, paddingLeft: b.indent || undefined, textIndent: b.firstLine || undefined,
         lineHeight: b.line ? b.line * 1.15 : 1.15, minHeight: `${size * 4 / 3 * 1.15}px`, fontSize: `${size * 4 / 3}px`, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
       }}>
         {b.marker && <span style={{ display: 'inline-block', minWidth: '1.5em' }}>{b.marker}</span>}
         {b.runs.map((run, j) => <DocRunView key={j} run={run} />)}
-      </p>
+      </div>
     );
   })}</>;
 }
 
 function DocRunView({ run }: { run: DocRun }) {
+  // A floating picture or box: floated to its side with the text running
+  // around it, as Word wraps a square-wrapped drawing.
+  const floatStyle = (f: 'left' | 'right' | null): React.CSSProperties => (f ? { float: f, margin: f === 'left' ? '0 12px 6px 0' : '0 0 6px 12px' } : {});
   if (run.image) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={run.image.src} alt="" className="inline-block max-w-full align-bottom" style={{ width: run.image.w, height: 'auto' }} />;
+    return <img src={run.image.src} alt="" className="inline-block max-w-full align-bottom" style={{ width: run.image.w || undefined, height: 'auto', ...floatStyle(run.image.float) }} />;
+  }
+  if (run.box) {
+    return (
+      <span className="inline-block border border-[var(--sheet-text)] p-2 align-top" style={{ width: run.box.w || undefined, maxWidth: '100%', ...floatStyle(run.box.float) }}>
+        <DocBlocks blocks={run.box.blocks} />
+      </span>
+    );
   }
   return (
     <span style={{
+      verticalAlign: run.script === 'super' ? 'super' : run.script === 'sub' ? 'sub' : undefined,
+      ...(run.script ? { fontSize: `${run.size * 4 / 3 * 0.65}px` } : {}),
       fontWeight: run.bold ? 700 : undefined, fontStyle: run.italic ? 'italic' : undefined,
       textDecoration: [run.underline && 'underline', run.strike && 'line-through'].filter(Boolean).join(' ') || undefined,
-      fontSize: `${run.size * 4 / 3}px`, color: run.color ?? undefined, background: run.highlight ?? undefined,
+      ...(run.script ? {} : { fontSize: `${run.size * 4 / 3}px` }), color: run.color ?? undefined, background: run.highlight ?? undefined,
       fontFamily: fontStack(run.font) ?? undefined,
     }}>{run.text === '\t' ? '\u2003' : run.text}</span>
   );

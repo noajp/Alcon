@@ -5,24 +5,36 @@ import JSZip from 'jszip';
 // basedOn to the document defaults), alignment, spacing and indents; runs
 // with weight, slant, underline, strike, size, colour, highlight and font
 // (theme fonts resolved); numbered and bulleted lists counted as Word
-// counts them; tables with column widths, cell shading, merges and
-// borders; inline pictures; page breaks. Sizes are CSS pixels (1440 twips
-// = 96px). Read with DOMParser — the browser, or jsdom in the tests.
+// counts them; tables with column widths, cell shading, merges, borders
+// and their table style (header row, banded rows); pictures inline or
+// floating, and text boxes; footnotes; the page's header and footer; its
+// columns; and the fonts the document embeds. Sizes are CSS pixels (1440
+// twips = 96px). Read with DOMParser — the browser, or jsdom in the tests.
 
 export interface DocRun {
   text: string; bold: boolean; italic: boolean; underline: boolean; strike: boolean;
   size: number; color: string | null; font: string | null; highlight: string | null;
-  image?: { src: string; w: number; h: number };
+  script?: 'super' | 'sub';
+  image?: { src: string; w: number; h: number; float: 'left' | 'right' | null };
+  /** A text box: its own paragraphs, at its width, floating or in line. */
+  box?: { blocks: DocBlock[]; w: number; float: 'left' | 'right' | null };
 }
 export interface DocPara {
   kind: 'p'; align: 'left' | 'center' | 'right' | 'justify';
   before: number; after: number; line: number | null; indent: number; firstLine: number;
   marker: string | null; runs: DocRun[]; heading: boolean;
 }
-export interface DocCell { blocks: DocBlock[]; fill: string | null; span: number; rowSpan: number; skip: boolean; borders: boolean }
+export interface DocCell { blocks: DocBlock[]; fill: string | null; span: number; rowSpan: number; skip: boolean; borders: boolean; borderColor: string | null }
 export interface DocTable { kind: 'table'; cols: number[]; rows: DocCell[][] }
 export type DocBlock = DocPara | DocTable | { kind: 'break' };
-export interface DocLayout { width: number; margin: { top: number; right: number; bottom: number; left: number }; blocks: DocBlock[] }
+export interface DocFont { family: string; data: ArrayBuffer; bold: boolean; italic: boolean }
+export interface DocLayout {
+  width: number; margin: { top: number; right: number; bottom: number; left: number }; columns: number;
+  blocks: DocBlock[]; header: DocBlock[]; footer: DocBlock[];
+  /** Footnotes in the order they are referenced, numbered from 1. */
+  footnotes: DocBlock[][];
+  fonts: DocFont[];
+}
 
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const kids = (el: Element | null | undefined, name: string) => (el ? Array.from(el.children).filter((c) => c.localName === name) : []);
@@ -66,12 +78,26 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
   const body = doc?.getElementsByTagNameNS(W, 'body')[0] ?? null;
   if (!body) throw new Error('No document body');
 
-  const relsDoc = await xml('word/_rels/document.xml.rels');
-  const rels = new Map<string, string>();
-  for (const r of Array.from(relsDoc?.getElementsByTagName('Relationship') ?? [])) {
-    const t = r.getAttribute('Target') ?? '';
-    rels.set(r.getAttribute('Id') ?? '', t.startsWith('/') ? t.slice(1) : `word/${t}`);
-  }
+  /** A part's relationships: id → part path. */
+  const relsOf = async (part: string) => {
+    const dir = part.slice(0, part.lastIndexOf('/'));
+    const doc = await xml(`${dir}/_rels/${part.slice(dir.length + 1)}.rels`);
+    const map = new Map<string, string>();
+    for (const r of Array.from(doc?.getElementsByTagName('Relationship') ?? [])) {
+      const t = r.getAttribute('Target') ?? '';
+      map.set(r.getAttribute('Id') ?? '', t.startsWith('/') ? t.slice(1) : `${dir}/${t}`);
+    }
+    return map;
+  };
+  const rels = await relsOf('word/document.xml');
+  const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const rid = (el: Element | null | undefined, name: string) => el?.getAttributeNS(R, name) ?? el?.getAttribute(`r:${name}`) ?? null;
+
+  const sect = kids(body, 'sectPr')[0] ?? null;
+  const pgSz = kid(sect, 'pgSz'), pgMar = kid(sect, 'pgMar');
+  const pageWidth = twip(val(pgSz, 'w') ?? '11906');
+  const marginL = twip(val(pgMar, 'left') ?? '1440'), marginR = twip(val(pgMar, 'right') ?? '1440');
+  const noteOrder: string[] = [];
 
   // Theme fonts and colours.
   const themeDoc = await xml([...rels.values()].find((t) => t.includes('theme/')) ?? 'word/theme/theme1.xml');
@@ -139,23 +165,52 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
       size: first('sz') ? Number(val(first('sz'))) / 2 : 10.5,
       color: color(first('color')),
       font,
+      ...(val(first('vertAlign')) === 'superscript' ? { script: 'super' as const } : val(first('vertAlign')) === 'subscript' ? { script: 'sub' as const } : {}),
       highlight: (HIGHLIGHT[val(first('highlight')) ?? ''] ? `#${HIGHLIGHT[val(first('highlight'))!]}` : null) ?? (val(first('shd'), 'fill') && val(first('shd'), 'fill') !== 'auto' ? `#${val(first('shd'), 'fill')!.toLowerCase()}` : null),
     };
   };
 
-  const imageOf = async (drawing: Element): Promise<DocRun['image'] | null> => {
-    const blip = drawing.getElementsByTagName('a:blip')[0];
-    const rId = blip?.getAttribute('r:embed') ?? blip?.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'embed');
-    const target = rId ? rels.get(rId) : null;
+  const dataUrl = async (target: string | null | undefined) => {
     const f = target ? zip.file(target) : null;
     if (!f) return null;
-    const ext = drawing.getElementsByTagName('wp:extent')[0];
     const type = target!.split('.').pop()?.toLowerCase();
-    const mime = type === 'svg' ? 'image/svg+xml' : type === 'jpg' || type === 'jpeg' ? 'image/jpeg' : `image/${type}`;
-    return { src: `data:${mime};base64,${await f.async('base64')}`, w: Number(ext?.getAttribute('cx') ?? 0) / 9525, h: Number(ext?.getAttribute('cy') ?? 0) / 9525 };
+    const mime = type === 'svg' ? 'image/svg+xml' : type === 'jpg' || type === 'jpeg' ? 'image/jpeg' : type === 'emf' || type === 'wmf' ? null : `image/${type}`;
+    return mime ? `data:${mime};base64,${await f.async('base64')}` : null;
+  };
+  /** Where a floating drawing sits: right when aligned or offset past the
+   *  middle of the text column, else left; null for one in line. */
+  const floatOf = (drawing: Element): 'left' | 'right' | null => {
+    const anchor = Array.from(drawing.children).find((c) => c.localName === 'anchor');
+    if (!anchor) return null;
+    const posH = Array.from(anchor.children).find((c) => c.localName === 'positionH');
+    const align = Array.from(posH?.children ?? []).find((c) => c.localName === 'align')?.textContent;
+    if (align) return align === 'right' || align === 'outside' ? 'right' : 'left';
+    const off = Number(Array.from(posH?.children ?? []).find((c) => c.localName === 'posOffset')?.textContent ?? 0) / 9525;
+    return off > (pageWidth - marginL - marginR) / 2 ? 'right' : 'left';
+  };
+  /** A drawing: a picture, or a text box with its own paragraphs. */
+  const drawingOf = async (drawing: Element, partRels: Map<string, string>, rPrs: Element[]): Promise<DocRun | null> => {
+    const ext = drawing.getElementsByTagName('wp:extent')[0];
+    const w = Number(ext?.getAttribute('cx') ?? 0) / 9525, h = Number(ext?.getAttribute('cy') ?? 0) / 9525;
+    const float = floatOf(drawing);
+    const txbx = Array.from(drawing.getElementsByTagName('*')).find((e) => e.localName === 'txbxContent');
+    if (txbx) return { ...runOf(rPrs, ''), box: { blocks: await blocksOf(txbx, partRels), w, float } };
+    const blip = drawing.getElementsByTagName('a:blip')[0];
+    const src = await dataUrl(partRels.get(rid(blip, 'embed') ?? ''));
+    return src ? { ...runOf(rPrs, ''), image: { src, w, h, float } } : null;
+  };
+  /** Legacy VML (<w:pict>): a text box or an image. */
+  const pictOf = async (pict: Element, partRels: Map<string, string>, rPrs: Element[]): Promise<DocRun | null> => {
+    const txbx = Array.from(pict.getElementsByTagName('*')).find((e) => e.localName === 'txbxContent');
+    const shape = Array.from(pict.getElementsByTagName('*')).find((e) => e.localName === 'shape' || e.localName === 'rect');
+    const width = Number(/width:\s*([\d.]+)pt/.exec(shape?.getAttribute('style') ?? '')?.[1] ?? 0) * 4 / 3;
+    if (txbx) return { ...runOf(rPrs, ''), box: { blocks: await blocksOf(txbx, partRels), w: width, float: null } };
+    const img = Array.from(pict.getElementsByTagName('*')).find((e) => e.localName === 'imagedata');
+    const src = await dataUrl(partRels.get(rid(img, 'id') ?? ''));
+    return src ? { ...runOf(rPrs, ''), image: { src, w: width, h: 0, float: null } } : null;
   };
 
-  const paragraph = async (p: Element): Promise<DocBlock[]> => {
+  const paragraph = async (p: Element, partRels: Map<string, string> = rels): Promise<DocBlock[]> => {
     const pPr = kid(p, 'pPr');
     const styleId = val(kid(pPr, 'pStyle')) ?? (defaultPara ? val(defaultPara, 'styleId') : null);
     const chain = chainOf(styleId);
@@ -205,8 +260,16 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
               if (val(part, 'type') === 'page') { if (runs.length) { out.push(paraOf()); runs.length = 0; } out.push({ kind: 'break' }); }
               else runs.push(runOf(rPrs, '\n'));
             } else if (part.localName === 'drawing') {
-              const image = await imageOf(part);
-              if (image) runs.push({ ...runOf(rPrs, ''), image });
+              const run = await drawingOf(part, partRels, rPrs);
+              if (run) runs.push(run);
+            } else if (part.localName === 'pict') {
+              const run = await pictOf(part, partRels, rPrs);
+              if (run) runs.push(run);
+            } else if (part.localName === 'footnoteReference') {
+              // Numbered in the order footnotes are referenced, as Word does.
+              const id = val(part, 'id') ?? '';
+              if (!noteOrder.includes(id)) noteOrder.push(id);
+              runs.push({ ...runOf(rPrs, String(noteOrder.indexOf(id) + 1)), script: 'super' });
             }
           }
         } else if (['hyperlink', 'ins', 'smartTag', 'sdtContent', 'fldSimple'].includes(node.localName)) await walk(node);
@@ -228,22 +291,49 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
     return out;
   };
 
-  const table = async (tbl: Element): Promise<DocTable> => {
+  const table = async (tbl: Element, partRels: Map<string, string> = rels): Promise<DocTable> => {
     const cols = kids(kid(tbl, 'tblGrid'), 'gridCol').map((c) => twip(val(c, 'w')));
-    const borders = !!kid(kid(tbl, 'tblPr'), 'tblBorders') || !!val(kid(kid(tbl, 'tblPr'), 'tblStyle'));
+    const tblPr = kid(tbl, 'tblPr');
+    // The table style: its borders, and what it does to the header row,
+    // first column and banded rows — as far as the table's look asks.
+    const style = chainOf(val(kid(tblPr, 'tblStyle')));
+    const tblBorders = [kid(tblPr, 'tblBorders'), ...style.map((st) => kid(kid(st, 'tblPr'), 'tblBorders'))].find(Boolean) ?? null;
+    const lines = tblBorders ? Array.from(tblBorders.children).filter((b) => !['nil', 'none'].includes(val(b) ?? '')) : [];
+    // "Table Grid" is the grid; a file that names it without defining it
+    // still means one.
+    const borders = lines.length > 0 || (!style.length && /grid/i.test(val(kid(tblPr, 'tblStyle')) ?? ''));
+    const borderColor = lines.map((b) => val(b, 'color')).filter((c) => c && c !== 'auto').map((c) => `#${c!.toLowerCase()}`)[0] ?? null;
+    const part = (type: string) => style.flatMap((st) => kids(st, 'tblStylePr')).find((x) => val(x, 'type') === type) ?? null;
+    const partFill = (x: Element | null) => { const f = val(kid(kid(x, 'tcPr'), 'shd'), 'fill'); return f && f !== 'auto' ? `#${f.toLowerCase()}` : null; };
+    const look = kid(tblPr, 'tblLook');
+    const lookVal = parseInt(val(look) ?? '04A0', 16);
+    const lookOn = (attr: string, bit: number) => (look && val(look, attr) != null ? val(look, attr) === '1' : (lookVal & bit) !== 0);
+    const firstRow = lookOn('firstRow', 0x20) ? part('firstRow') : null;
+    const firstCol = lookOn('firstColumn', 0x80) ? part('firstCol') : null;
+    const band = !lookOn('noHBand', 0x200) ? part('band1Horz') : null;
     const rows: DocCell[][] = [];
-    for (const tr of kids(tbl, 'tr')) {
+    for (const [r, tr] of kids(tbl, 'tr').entries()) {
       const row: DocCell[] = [];
-      for (const tc of kids(tr, 'tc')) {
+      for (const [c, tc] of kids(tr, 'tc').entries()) {
         const tcPr = kid(tc, 'tcPr');
-        const fill = val(kid(tcPr, 'shd'), 'fill');
+        const own = val(kid(tcPr, 'shd'), 'fill');
         const vMerge = kid(tcPr, 'vMerge');
         const blocks: DocBlock[] = [];
         for (const child of Array.from(tc.children)) {
-          if (child.localName === 'p') blocks.push(...await paragraph(child));
-          else if (child.localName === 'tbl') blocks.push(await table(child));
+          if (child.localName === 'p') blocks.push(...await paragraph(child, partRels));
+          else if (child.localName === 'tbl') blocks.push(await table(child, partRels));
         }
-        row.push({ blocks, fill: fill && fill !== 'auto' ? `#${fill.toLowerCase()}` : null, span: Number(val(kid(tcPr, 'gridSpan')) ?? 1), rowSpan: 1, skip: !!vMerge && val(vMerge) !== 'restart', borders });
+        const region = r === 0 && firstRow ? firstRow : c === 0 && firstCol ? firstCol : null;
+        if (region) {
+          const rPr = kid(region, 'rPr');
+          const bold = on(kid(rPr, 'b')), textColor = color(kid(rPr, 'color'));
+          for (const b of blocks) if (b.kind === 'p') for (const run of b.runs) {
+            if (bold) run.bold = true;
+            if (textColor && !run.color) run.color = textColor;
+          }
+        }
+        const fill = own && own !== 'auto' ? `#${own.toLowerCase()}` : partFill(region) ?? (band && (r - (firstRow ? 1 : 0)) % 2 === 0 && !(r === 0 && firstRow) ? partFill(band) : null);
+        row.push({ blocks, fill, span: Number(val(kid(tcPr, 'gridSpan')) ?? 1), rowSpan: 1, skip: !!vMerge && val(vMerge) !== 'restart', borders, borderColor });
       }
       rows.push(row);
     }
@@ -262,17 +352,61 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
     return { kind: 'table', cols, rows };
   };
 
-  const blocks: DocBlock[] = [];
-  for (const child of Array.from(body.children)) {
-    if (child.localName === 'p') blocks.push(...await paragraph(child));
-    else if (child.localName === 'tbl') blocks.push(await table(child));
-    else if (child.localName === 'sdt') for (const p of Array.from(kid(child, 'sdtContent')?.children ?? [])) if (p.localName === 'p') blocks.push(...await paragraph(p));
+  /** The blocks (paragraphs, tables) directly inside a container. */
+  async function blocksOf(container: Element, partRels: Map<string, string>): Promise<DocBlock[]> {
+    const out: DocBlock[] = [];
+    for (const child of Array.from(container.children)) {
+      if (child.localName === 'p') out.push(...await paragraph(child, partRels));
+      else if (child.localName === 'tbl') out.push(await table(child, partRels));
+      else if (child.localName === 'sdt') out.push(...await blocksOf(kid(child, 'sdtContent') ?? child, partRels));
+    }
+    return out;
   }
-  const sect = kids(body, 'sectPr')[0];
-  const pgSz = kid(sect, 'pgSz'), pgMar = kid(sect, 'pgMar');
+
+  const blocks = await blocksOf(body, rels);
+
+  // The page's header and footer: the default ones of the last section.
+  const partBlocks = async (refName: string) => {
+    const ref = kids(sect, refName).find((h) => (val(h, 'type') ?? 'default') === 'default') ?? kids(sect, refName)[0];
+    const target = ref ? rels.get(rid(ref, 'id') ?? '') : null;
+    const doc = target ? await xml(target) : null;
+    return doc?.documentElement ? blocksOf(doc.documentElement, await relsOf(target!)) : [];
+  };
+  const header = await partBlocks('headerReference');
+  const footer = await partBlocks('footerReference');
+
+  // Footnotes, in the order the text referenced them.
+  const notesDoc = await xml('word/footnotes.xml');
+  const notesRels = await relsOf('word/footnotes.xml');
+  const footnotes: DocBlock[][] = [];
+  for (const id of noteOrder) {
+    const note = Array.from(notesDoc?.getElementsByTagNameNS(W, 'footnote') ?? []).find((f) => val(f, 'id') === id);
+    if (note) footnotes.push(await blocksOf(note, notesRels));
+  }
+
+  // Embedded fonts, de-obfuscated: the first 32 bytes are XORed with the
+  // font key, a GUID read backwards (ECMA-376 Part 1, 17.8.1).
+  const fonts: DocFont[] = [];
+  const fontTable = await xml('word/fontTable.xml');
+  const fontRels = await relsOf('word/fontTable.xml');
+  for (const font of Array.from(fontTable?.getElementsByTagNameNS(W, 'font') ?? [])) {
+    for (const [name, bold, italic] of [['embedRegular', false, false], ['embedBold', true, false], ['embedItalic', false, true], ['embedBoldItalic', true, true]] as const) {
+      const e = kid(font, name);
+      const target = e ? fontRels.get(rid(e, 'id') ?? '') : null;
+      const f = target ? zip.file(target) : null;
+      const key = val(e, 'fontKey')?.replace(/[{}-]/g, '');
+      if (!f || !key || key.length !== 32) continue;
+      const data = new Uint8Array(await f.async('uint8array'));
+      const keyBytes = Array.from({ length: 16 }, (_, i) => parseInt(key.slice(30 - i * 2, 32 - i * 2), 16));
+      for (let i = 0; i < 32 && i < data.length; i++) data[i] ^= keyBytes[i % 16];
+      fonts.push({ family: val(font, 'name') ?? '', data: data.buffer, bold, italic });
+    }
+  }
+
   return {
-    width: twip(val(pgSz, 'w') ?? '11906'),
-    margin: { top: twip(val(pgMar, 'top') ?? '1440'), right: twip(val(pgMar, 'right') ?? '1440'), bottom: twip(val(pgMar, 'bottom') ?? '1440'), left: twip(val(pgMar, 'left') ?? '1440') },
-    blocks,
+    width: pageWidth,
+    margin: { top: twip(val(pgMar, 'top') ?? '1440'), right: marginR, bottom: twip(val(pgMar, 'bottom') ?? '1440'), left: marginL },
+    columns: Math.max(1, Number(val(kid(sect, 'cols'), 'num') ?? 1)),
+    blocks, header, footer, footnotes, fonts,
   };
 }

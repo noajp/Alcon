@@ -5,7 +5,7 @@ import { readDocLayout, type DocPara, type DocTable } from '@/ActivitySpace/exec
 
 const w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
 
-async function docx(body: string, extra: Record<string, string> = {}) {
+async function docx(body: string, extra: Record<string, string | Uint8Array> = {}) {
   const zip = new JSZip();
   zip.file('word/document.xml', `<w:document ${w}><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1080" w:bottom="1440" w:left="1080"/></w:sectPr></w:body></w:document>`);
   zip.file('word/styles.xml', `<w:styles ${w}><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:asciiTheme="minorHAnsi" w:eastAsiaTheme="minorEastAsia"/><w:sz w:val="21"/></w:rPr></w:rPrDefault></w:docDefaults>`
@@ -38,14 +38,71 @@ describe('readDocLayout', () => {
   it('reads tables with spans and vertical merges, and page breaks', async () => {
     const cell = (t: string, pr = '') => `<w:tc><w:tcPr>${pr}</w:tcPr><w:p><w:r><w:t>${t}</w:t></w:r></w:p></w:tc>`;
     const doc = await docx(
-      `<w:tbl><w:tblPr><w:tblBorders/></w:tblPr><w:tblGrid><w:gridCol w:w="1500"/><w:gridCol w:w="3000"/></w:tblGrid>`
+      `<w:tbl><w:tblPr><w:tblBorders><w:top w:val="single" w:color="8EAADB"/><w:insideH w:val="single"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="1500"/><w:gridCol w:w="3000"/></w:tblGrid>`
       + `<w:tr>${cell('区分', '<w:vMerge w:val="restart"/><w:shd w:fill="D9E2F3"/>')}${cell('上期')}</w:tr>`
       + `<w:tr>${cell('', '<w:vMerge/>')}${cell('下期')}</w:tr></w:tbl>`
       + '<w:p><w:r><w:br w:type="page"/></w:r></w:p><w:p><w:r><w:t>次</w:t></w:r></w:p>');
     const table = doc.blocks[0] as DocTable;
     expect(table.cols).toEqual([100, 200]);
-    expect(table.rows[0][0]).toMatchObject({ fill: '#d9e2f3', rowSpan: 2, skip: false, borders: true });
+    expect(table.rows[0][0]).toMatchObject({ fill: '#d9e2f3', rowSpan: 2, skip: false, borders: true, borderColor: '#8eaadb' });
     expect(table.rows[1][0].skip).toBe(true);
     expect(doc.blocks.some((b) => b.kind === 'break')).toBe(true);
+  });
+
+  it('reads the header, footer, footnotes, columns, a floating picture and a text box', async () => {
+    const R = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+    const wp = 'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"';
+    const zip = new JSZip();
+    zip.file('word/document.xml', `<w:document ${w} ${R} ${wp}><w:body>`
+      + '<w:p><w:r><w:t>本文</w:t></w:r><w:r><w:footnoteReference w:id="5"/></w:r><w:r><w:t>と続き</w:t></w:r><w:r><w:footnoteReference w:id="2"/></w:r></w:p>'
+      + '<w:p><w:r><w:drawing><wp:anchor><wp:positionH relativeFrom="column"><wp:align>right</wp:align></wp:positionH><wp:extent cx="952500" cy="476250"/><a:graphic><a:graphicData><a:blip r:embed="rId9"/></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p>'
+      + '<w:p><w:r><w:drawing><wp:inline><wp:extent cx="1905000" cy="476250"/><a:graphic><a:graphicData><wps:wsp><wps:txbx><w:txbxContent><w:p><w:r><w:t>囲み</w:t></w:r></w:p></w:txbxContent></wps:txbx></wps:wsp></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>'
+      + '<w:sectPr><w:headerReference w:type="default" r:id="rId1"/><w:footerReference w:type="default" r:id="rId2"/><w:pgSz w:w="11906"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/><w:cols w:num="2"/></w:sectPr></w:body></w:document>');
+    zip.file('word/_rels/document.xml.rels', '<Relationships><Relationship Id="rId1" Target="header1.xml"/><Relationship Id="rId2" Target="footer1.xml"/><Relationship Id="rId9" Target="media/image1.png"/></Relationships>');
+    zip.file('word/media/image1.png', 'png');
+    zip.file('word/header1.xml', `<w:hdr ${w}><w:p><w:r><w:t>社外秘</w:t></w:r></w:p></w:hdr>`);
+    zip.file('word/footer1.xml', `<w:ftr ${w}><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>- 1 -</w:t></w:r></w:p></w:ftr>`);
+    zip.file('word/footnotes.xml', `<w:footnotes ${w}><w:footnote w:id="2"><w:p><w:r><w:t>出典 B</w:t></w:r></w:p></w:footnote><w:footnote w:id="5"><w:p><w:r><w:t>出典 A</w:t></w:r></w:p></w:footnote></w:footnotes>`);
+    const doc = await readDocLayout(await zip.generateAsync({ type: 'arraybuffer' }));
+    expect(doc.columns).toBe(2);
+    expect((doc.header[0] as DocPara).runs[0].text).toBe('社外秘');
+    expect(doc.footer[0]).toMatchObject({ align: 'center', runs: [{ text: '- 1 -' }] });
+    // Footnotes numbered by first reference: id 5 is 1, id 2 is 2.
+    const [p1, p2, p3] = doc.blocks as DocPara[];
+    expect(p1.runs.filter((r) => r.script === 'super').map((r) => r.text)).toEqual(['1', '2']);
+    expect(doc.footnotes.map((n) => (n[0] as DocPara).runs[0].text)).toEqual(['出典 A', '出典 B']);
+    expect(p2.runs[0].image).toMatchObject({ w: 100, h: 50, float: 'right' });
+    expect(p3.runs[0].box).toMatchObject({ w: 200, float: null, blocks: [{ runs: [{ text: '囲み' }] }] });
+  });
+
+  it('applies a table style: header row bold and shaded, banded rows, borders', async () => {
+    const styles = `<w:styles ${w}><w:style w:type="paragraph" w:default="1" w:styleId="Normal"/>`
+      + '<w:style w:type="table" w:styleId="GridAccent"><w:tblPr><w:tblBorders><w:top w:val="single" w:color="4472C4"/><w:insideH w:val="single" w:color="4472C4"/></w:tblBorders></w:tblPr>'
+      + '<w:tblStylePr w:type="firstRow"><w:rPr><w:b/><w:color w:val="FFFFFF"/></w:rPr><w:tcPr><w:shd w:fill="4472C4"/></w:tcPr></w:tblStylePr>'
+      + '<w:tblStylePr w:type="band1Horz"><w:tcPr><w:shd w:fill="D9E2F3"/></w:tcPr></w:tblStylePr></w:style></w:styles>';
+    const cell = (t: string) => `<w:tc><w:p><w:r><w:t>${t}</w:t></w:r></w:p></w:tc>`;
+    const doc = await docx(`<w:tbl><w:tblPr><w:tblStyle w:val="GridAccent"/><w:tblLook w:firstRow="1" w:noHBand="0"/></w:tblPr><w:tblGrid><w:gridCol w:w="1500"/></w:tblGrid>`
+      + `<w:tr>${cell('見出し')}</w:tr><w:tr>${cell('1行目')}</w:tr><w:tr>${cell('2行目')}</w:tr></w:tbl>`, { 'word/styles.xml': styles });
+    const t = doc.blocks[0] as DocTable;
+    expect(t.rows[0][0]).toMatchObject({ fill: '#4472c4', borders: true, borderColor: '#4472c4', blocks: [{ runs: [{ bold: true, color: '#ffffff' }] }] });
+    expect(t.rows[1][0].fill).toBe('#d9e2f3');
+    expect(t.rows[2][0].fill).toBeNull();
+  });
+
+  it('de-obfuscates an embedded font with its key', async () => {
+    const R = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+    const key = '{01234567-89AB-CDEF-0123-456789ABCDEF}';
+    const hex = key.replace(/[{}-]/g, '');
+    const keyBytes = Array.from({ length: 16 }, (_, i) => parseInt(hex.slice(30 - i * 2, 32 - i * 2), 16));
+    const font = new Uint8Array(40).map((_, i) => i);
+    const stored = font.map((b, i) => (i < 32 ? b ^ keyBytes[i % 16] : b));
+    const doc = await docx('<w:p/>', {
+      'word/fontTable.xml': `<w:fonts ${w} ${R}><w:font w:name="Brand Sans"><w:embedRegular r:id="rId1" w:fontKey="${key}"/></w:font></w:fonts>`,
+      'word/_rels/fontTable.xml.rels': '<Relationships><Relationship Id="rId1" Target="fonts/font1.odttf"/></Relationships>',
+      'word/fonts/font1.odttf': stored,
+    });
+    expect(doc.fonts).toHaveLength(1);
+    expect(doc.fonts[0]).toMatchObject({ family: 'Brand Sans', bold: false, italic: false });
+    expect(Array.from(new Uint8Array(doc.fonts[0].data))).toEqual(Array.from(font));
   });
 });
