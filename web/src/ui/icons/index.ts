@@ -5,6 +5,7 @@
 
 export * from 'lucide-react';
 export {
+  CodeXml,
   Grid2x2,
   Table2,
   House,
