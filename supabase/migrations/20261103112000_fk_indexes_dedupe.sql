@@ -22,9 +22,14 @@ begin
         select 1 from pg_index i
         where i.indrelid = c.conrelid
           and (i.indkey::int2[])[0:array_length(c.conkey, 1) - 1] = c.conkey
+          and (i.indpred is null
+               or pg_get_expr(i.indpred, i.indrelid) ~ '^\(*\w+ IS NOT NULL\)*$')
       )
   loop
-    idx_name := left(fk.relname || '_' || fk.col_names, 54) || '_fk_idx';
+    idx_name := fk.relname || '_' || fk.col_names || '_fk_idx';
+    if length(idx_name) > 63 then
+      idx_name := left(fk.relname || '_' || fk.col_names, 48) || '_' || left(md5(idx_name), 6) || '_fk_idx';
+    end if;
     execute format('create index if not exists %I on %s (%s)', idx_name, fk.tbl, fk.cols);
   end loop;
 end $$;
