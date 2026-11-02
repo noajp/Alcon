@@ -26,9 +26,13 @@ begin
         with recursive below(id) as (
           select sc.child_strategy_id from public.strategy_children sc
           where sc.parent_strategy_id = new.child_strategy_id
+            and (tg_op = 'INSERT' or (sc.parent_strategy_id, sc.child_strategy_id)
+                 is distinct from (old.parent_strategy_id, old.child_strategy_id))
           union
           select sc.child_strategy_id from public.strategy_children sc
           join below b on sc.parent_strategy_id = b.id
+          where tg_op = 'INSERT' or (sc.parent_strategy_id, sc.child_strategy_id)
+                is distinct from (old.parent_strategy_id, old.child_strategy_id)
         )
         select 1 from below where id = new.parent_strategy_id
       ) then

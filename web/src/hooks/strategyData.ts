@@ -262,9 +262,9 @@ export async function setStrategyObjects(strategyId: string, objectIds: string[]
 }
 
 // Strategy nesting (Asana-portfolio style — a Strategy can hold other
-// Strategies as children, DAG so multi-parent is allowed). The DB only
-// rejects a literal self-reference; deeper-cycle prevention is the picker's
-// job (StrategyShell excludes the current Strategy's ancestors).
+// Strategies as children, DAG so multi-parent is allowed). The DB refuses
+// any edge that would close a cycle (23514); the picker also hides the
+// current Strategy's ancestors so that is rarely reached.
 export async function addStrategyChild(parentStrategyId: string, childStrategyId: string): Promise<void> {
   const { error } = await supabase
     .from('strategy_children')
