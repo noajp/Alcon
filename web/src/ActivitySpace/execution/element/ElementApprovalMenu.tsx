@@ -111,10 +111,12 @@ export function ElementApprovalMenu({ element, onRefresh, openSignal = 0 }: Prop
     catch (e) { setError(e instanceof Error ? e.message : t('Could not remove the reviewer.')); }
   };
 
+  // approval_state moves when a decision lands (here or from the banner at
+  // the top of the Element), so the history is read again then too.
   useEffect(() => {
     if (!element.is_approval) { setApprovals([]); return; }
     fetchElementApprovals(element.id).then(setApprovals).catch(console.error);
-  }, [element.id, element.is_approval]);
+  }, [element.id, element.is_approval, element.approval_state]);
 
   const toggleApproval = async () => {
     setBusy(true);

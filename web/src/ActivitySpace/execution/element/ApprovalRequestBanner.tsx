@@ -18,19 +18,25 @@ export function ApprovalRequestBanner({ element, onRefresh }: { element: Element
   const { t } = useI18n();
   const { user, profile } = useAuthContext();
   const pending = !!element.is_approval && (element.approval_state ?? 'pending') === 'pending';
-  // The answer belongs to this Element: a stale one for another is ignored.
-  const [rights, setRights] = useState<{ elementId: string; decide: boolean } | null>(null);
+  // Who decides depends on who works on it and who reviews it, so the
+  // answer belongs to this Element and these people; a stale one is ignored.
+  const peopleKey = (element.assignees ?? []).map((a) => `${a.worker_id}:${a.role}`).sort().join(',');
+  const rightsKey = `${element.id}|${peopleKey}`;
+  const [rights, setRights] = useState<{ key: string; decide: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  // Set once a decision lands, until the Element's refreshed state says it
+  // is no longer pending — so a second click cannot record a second one.
+  const [decidedKey, setDecidedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!pending) return;
     let live = true;
-    void fetchApprovalRights(element.id).then((r) => { if (live) setRights({ elementId: element.id, decide: r.decide }); });
+    void fetchApprovalRights(element.id).then((r) => { if (live) setRights({ key: rightsKey, decide: r.decide }); });
     return () => { live = false; };
-  }, [pending, element.id]);
+  }, [pending, element.id, rightsKey]);
 
-  if (!pending || rights?.elementId !== element.id || !rights.decide) return null;
+  if (!pending || decidedKey === element.id || rights?.key !== rightsKey || !rights.decide) return null;
 
   const decide = async (state: ApprovalState) => {
     if (busy) return;
@@ -39,6 +45,7 @@ export function ApprovalRequestBanner({ element, onRefresh }: { element: Element
     try {
       const approverName = profile?.display_name || user?.email?.split('@')[0] || 'You';
       await recordApprovalDecision({ elementId: element.id, approverId: user?.id ?? null, approverName, state, note: null });
+      setDecidedKey(element.id);
       onRefresh?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('Could not record the decision.'));
