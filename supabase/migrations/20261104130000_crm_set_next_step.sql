@@ -32,7 +32,7 @@ begin
         raise exception 'Describe the next step.' using errcode = '22023';
       end if;
       if v_element is not null then
-        update public.elements set title = v_title, due_date = p_due where id = v_element;
+        update public.elements set title = v_title, due_date = p_due, updated_at = now() where id = v_element;
         if not found then raise exception 'The next step''s Element could not be changed.' using errcode = '42501'; end if;
       elsif p_create then
         select coalesce(max(order_index), -1) + 1 into v_order from public.elements
@@ -43,6 +43,9 @@ begin
                 case when p_object_id is null then (select auth.uid()) end,
                 p_description, '["crm"]'::jsonb, v_order)
         returning id into v_element;
+        -- The elements trigger made the junction row; it carries the position.
+        update public.element_objects set order_index = v_order
+         where element_id = v_element and object_id = p_object_id;
         if p_owner_worker is not null then
           begin
             insert into public.element_assignees (element_id, worker_id, role)
