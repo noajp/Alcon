@@ -62,8 +62,10 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
       .limit(limit),
     supabase
       .from('notes')
-      .select('id, title, parent_id')
-      .ilike('title', like)
+      // A Note's title is its `name`; folders and sections hold pages, not text.
+      .select('id, title:name, parent_id')
+      .eq('type', 'file')
+      .ilike('name', like)
       .limit(limit),
     spaceId ? supabase.from('crm_deals').select('id, name, detail:next_step').eq('activity_space_id', spaceId).ilike('name', like).limit(limit) : none,
     spaceId ? supabase.from('crm_companies').select('id, name, detail:industry').eq('activity_space_id', spaceId).ilike('name', like).limit(limit) : none,

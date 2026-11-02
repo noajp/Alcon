@@ -155,7 +155,7 @@ export function AttachmentPreview({ file, owner, actions, height }: { file: Atta
       </div>
     )}
     <FilePreview file={shown} source={attachmentSource} editor={picked ? undefined : editor} compareTo={comparing && canCompare ? before : null} height={height}
-      actions={viewers.length || history || (!picked && actions)
-        ? <>{viewers.length > 0 && <span className="px-1"><PresenceStack viewers={viewers} size={18} /></span>}{history}{!picked && actions}</> : undefined} />
+      presence={viewers.length > 0 ? <PresenceStack viewers={viewers} size={18} /> : undefined}
+      actions={history || (!picked && actions) ? <>{history}{!picked && actions}</> : undefined} />
   </>;
 }
