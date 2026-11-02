@@ -128,6 +128,8 @@ export async function ensureAppGuideNotes(): Promise<void> {
     if (fileErr) throw fileErr;
 
     await supabase.from('note_contents').insert({ note_id: file.id, html: APP_GUIDE_README_HTML });
+    // Written outside the shared list: let the next mount fetch it again.
+    notesFetchedAt = 0;
   } catch (e) {
     // Onboarding is best-effort; a seeding hiccup must never block login.
     console.error('Failed to seed App Guide notes', e);
@@ -272,7 +274,7 @@ export function useNotes() {
 
   useEffect(() => {
     let live = true;
-    void getCurrentUserId().then((me) => {
+    void getCurrentUserId().catch(() => null).then((me) => {
       if (!live) return;
       if (notesCache !== null && me === notesUser && Date.now() - notesFetchedAt < NOTES_FRESH_MS) {
         setLoading(false);
