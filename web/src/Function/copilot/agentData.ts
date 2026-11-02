@@ -169,6 +169,17 @@ async function startAgentRun(opts: StartOptions, retried = false): Promise<{ run
 /** What became of a request to start a run. */
 export type AgentStartOutcome = 'started' | 'busy' | 'failed';
 
+/** Starts an Element's run from outside its page (an Initiative's Execute
+ *  tab): 'busy' when it already has an open run. */
+export async function startElementRun(elementId: string, domainId?: string | null): Promise<AgentStartOutcome> {
+  try {
+    const { existing } = await startAgentRun({ elementId, domainId: domainId ?? null, triggeredFrom: 'board' });
+    return existing ? 'busy' : 'started';
+  } catch {
+    return 'failed';
+  }
+}
+
 async function cancelAgentRun(runId: string): Promise<void> {
   const { error } = await supabase
     .from('agent_runs')

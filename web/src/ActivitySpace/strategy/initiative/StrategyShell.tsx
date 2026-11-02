@@ -41,6 +41,7 @@ import { ObjectIcon } from '@/shell/icons';
 import { InitiativeIntentProvider } from '@/ActivitySpace/strategy/initiative/InitiativeIntent';
 import { StrategyCommentsPanel } from '@/ActivitySpace/strategy/initiative/StrategyCommentsPanel';
 import { InitiativeCodeChanges } from '@/ActivitySpace/execution/code/InitiativeCodeChanges';
+import { InitiativeMission } from './mission/InitiativeMission';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { canEditInitiative } from '@/Function/strategy/initiativeAccess';
@@ -541,6 +542,14 @@ function StrategyDetailView({
     [strategy.id, initiativeElements, onSaved, onOpenObject, onOpenDomain],
   );
   const grouped = useObjectPicker(query);
+  const missionProps = {
+    initiativeId: strategy.id,
+    initiativeName: strategy.name,
+    spaceId: strategy.activity_space_id ?? null,
+    objects: allObjects.filter((o) => selectedIds.has(o.id)),
+    onChanged: () => { void refetchObjects(); onSaved(); },
+    onOpenObject,
+  };
 
   const childStrategies = useMemo(
     () => allStrategies.filter((s) => s.parentIds.includes(strategy.id)),
@@ -904,6 +913,9 @@ function StrategyDetailView({
 
           {tab === 'plan' && (
             <InitiativeBoard surface="initiative-plan" defaults={INITIATIVE_PLAN_BOARD} subjectId={strategy.id} host={host} zones={MAIN_ZONES}>
+              {/* The mission: the Planner's draft, or the objectives and
+                  actions as they stand. */}
+              <InitiativeMission tab="plan" {...missionProps} />
               {/* What the plan rests on and what was chosen on top of it. */}
               <WidgetZone zone="main" columns={1} />
             {/* Nested Initiatives. With none, the section keeps no heading — only
@@ -988,6 +1000,8 @@ function StrategyDetailView({
 
           {tab === 'execution' && (
             <div className="space-y-5">
+              {/* What is running, waiting and blocked, and what it costs. */}
+              <InitiativeMission tab="execution" {...missionProps} />
             {selectedIds.size > 0 || pickerMode !== 'closed' ? (
               <PageSection title={t('Objects')} action={canEdit ? (
                 <ButtonAppearanceProvider appearance="navigation">
@@ -1130,6 +1144,9 @@ function StrategyDetailView({
 
           {tab === 'audit' && (
             <InitiativeBoard surface="initiative-audit" defaults={INITIATIVE_AUDIT_BOARD} subjectId={strategy.id} host={host} zones={MAIN_ZONES}>
+              {/* What was achieved, what stands in the way, what was produced
+                  and approved. */}
+              <InitiativeMission tab="audit" {...missionProps} />
               {/* The evidence, then the discussion — last, because it grows. */}
               <WidgetZone zone="main" columns={1} />
               <PageSection title={t('Activity')}>
