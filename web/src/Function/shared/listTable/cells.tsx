@@ -712,7 +712,8 @@ export function ObjectCell({
   if (column.id === 'elements') {
     const count = obj.elements?.length ?? 0;
     return (
-      <td className="table-cell px-1.5 py-2 max-w-0 overflow-hidden text-[13px] text-muted-foreground tabular-nums">
+      // pl-3: the read-only roll-ups start where their heading's label does.
+      <td className="table-cell pl-3 pr-1.5 py-2 max-w-0 overflow-hidden text-[13px] text-muted-foreground tabular-nums">
         {count === 0 ? <EmptyCellMark /> : count}
       </td>
     );
@@ -721,10 +722,10 @@ export function ObjectCell({
   if (column.id === 'progress') {
     const { pct } = completionOf(obj.elements ?? []);
     return (
-      <td className="table-cell px-1.5 py-2 max-w-0 overflow-hidden">
+      <td className="table-cell pl-3 pr-1.5 py-2 max-w-0 overflow-hidden">
         <div className="flex items-center gap-2">
           <SegmentedProgress value={pct} className="flex-1" />
-          <span className="text-[12px] text-muted-foreground w-8 text-right tabular-nums shrink-0">{pct}%</span>
+          <span className="text-[12px] text-muted-foreground w-9 text-right tabular-nums shrink-0">{pct}%</span>
         </div>
       </td>
     );
