@@ -1,14 +1,15 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ChevronRight, FolderInput, FolderPlus } from '@/ui/icons';
+import { FolderInput } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { DropdownMenu, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
-import { FolderList, MoveToFolderItems, useNewFolder } from '@/Function/shared/folders/FolderList';
+import { FolderList, MoveToFolderItems, NewFolderButton } from '@/Function/shared/folders/FolderList';
+import { IslandColumns, MainIsland, type IslandCrumb } from '@/Function/shared/MainIsland';
 import { NavTableIcon } from '@/shell/sidebar/NavIcons';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { useFolders } from '@/hooks/folderData';
@@ -33,8 +34,9 @@ export function TableBrowser({ tables, browse, onBrowse, onOpenTable, onRefresh 
   const { t } = useI18n();
   const domainId = browse.domainId ?? null;
   const domainName = useSustainmentDomains().data.find((d) => d.id === domainId)?.name ?? '';
-  const folder = useFolders('tables', domainId).data.find((f) => f.id === browse.folderId) ?? null;
-  const newFolder = useNewFolder('tables', domainId);
+  const domainFolders = useFolders('tables', domainId).data;
+  const folder = domainFolders.find((f) => f.id === browse.folderId) ?? null;
+  const folderCount = domainFolders.length;
   const inDomain = useMemo(() => (domainId ? tables.filter((tb) => tb.domain_id === domainId) : tables), [tables, domainId]);
   const counts = useMemo(() => {
     const m = new Map<string, number>();
@@ -42,13 +44,13 @@ export function TableBrowser({ tables, browse, onBrowse, onOpenTable, onRefresh 
     return m;
   }, [tables]);
   const recent = useMemo(() => [...inDomain].sort((a, b) => b.updated_at.localeCompare(a.updated_at)), [inDomain]);
-  const crumb = (rest?: React.ReactNode) => <>
-    <button type="button" onClick={() => onBrowse({ domainId })} className={rest ? 'font-normal text-muted-foreground hover:text-foreground' : ''}>{domainName}</button>
-    {rest && <><ChevronRight size={14} className="shrink-0 text-muted-foreground" />{rest}</>}
-  </>;
+  // The path: the Domain (opening its home), then the page.
+  const path = (...rest: IslandCrumb[]): IslandCrumb[] => [{ id: 'domain', label: domainName, onClick: () => onBrowse({ domainId }) }, ...rest];
+  const openFolder = (id: string) => onBrowse({ domainId, folderId: id });
+  const newFolder = <NewFolderButton app="tables" domainId={domainId} onOpen={openFolder} />;
 
   const rows = (list: DataTableWithRowCount[]) => list.map((tb) => (
-    <div key={tb.id} className="group/table flex h-9 items-center gap-3 rounded-md px-3 hover:bg-foreground/[0.05]">
+    <div key={tb.id} className="group/table flex h-9 items-center gap-3 rounded-md px-[18px] hover:bg-foreground/[0.05]">
       <button type="button" onClick={() => onOpenTable(tb.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
         <NavTableIcon size={15} />
         <span className="truncate text-[13.5px] text-foreground">{tb.name}</span>
@@ -67,54 +69,44 @@ export function TableBrowser({ tables, browse, onBrowse, onOpenTable, onRefresh 
       </DropdownMenu>
     </div>
   ));
-  const head = (title: React.ReactNode, count: number, action?: React.ReactNode) => (
-    <div className="flex shrink-0 items-center gap-3 px-6 pb-3 pt-5">
-      <h1 className="flex min-w-0 items-center gap-1 text-[17px] font-semibold text-foreground">{title}</h1>
-      <span className="text-[13px] tabular-nums text-muted-foreground">{count}</span>
-      <span className="flex-1" />
-      {action}
-    </div>
-  );
-  const listPage = (title: React.ReactNode, list: DataTableWithRowCount[], empty: string) => (
-    <div className="flex h-full min-h-0 flex-col">
-      {head(title, list.length)}
-      <div className="flex shrink-0 items-center gap-3 border-b border-border/60 px-6 pb-1.5 text-[11.5px] text-muted-foreground">
+  const listPage = (crumbs: IslandCrumb[], list: DataTableWithRowCount[], empty: string, actions?: React.ReactNode) => (
+    <MainIsland crumbs={crumbs} count={list.length} actions={actions}>
+      <IslandColumns>
         <span className="min-w-0 flex-1">{t('Name')}</span>
         <span className="w-20 shrink-0 text-right">{t('Rows')}</span>
         <span className="w-20 shrink-0 text-right">{t('Updated')}</span>
         <span className="w-6 shrink-0" />
-      </div>
+      </IslandColumns>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-1">
-        {list.length ? rows(list) : <p className="px-3 py-6 text-[13px] text-muted-foreground">{empty}</p>}
+        {list.length ? rows(list) : <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{empty}</p>}
       </div>
-    </div>
+    </MainIsland>
   );
 
-  if (!domainId) return listPage(t('All Tables'), [...tables].sort((a, b) => b.updated_at.localeCompare(a.updated_at)), t('No Tables yet.'));
+  if (!domainId) return listPage([{ id: 'all', label: t('All Tables') }], [...tables].sort((a, b) => b.updated_at.localeCompare(a.updated_at)), t('No Tables yet.'));
   if (folder) {
-    return listPage(crumb(<>
-      <button type="button" onClick={() => onBrowse({ domainId, view: 'folders' })} className="font-normal text-muted-foreground hover:text-foreground">{t('Folders')}</button>
-      <ChevronRight size={14} className="shrink-0 text-muted-foreground" />
-      <span className="truncate">{folder.name}</span>
-    </>), tables.filter((tb) => tb.folder_id === folder.id), t('No Tables in this folder. Move one here from its menu.'));
+    return listPage(path({ id: 'folders', label: t('Folders'), onClick: () => onBrowse({ domainId, view: 'folders' }) }, { id: 'folder', label: folder.name }), tables.filter((tb) => tb.folder_id === folder.id), t('No Tables in this folder. Move one here from its menu.'));
   }
-  if (browse.view === 'folders') return <FolderList app="tables" domainId={domainId} title={crumb(<span>{t('Folders')}</span>)} counts={counts} onOpen={(id) => onBrowse({ domainId, folderId: id })} />;
-  if (browse.view === 'tables') return listPage(crumb(<span>{t('Tables')}</span>), recent, t('No Tables in this Domain yet.'));
+  if (browse.view === 'folders') {
+    return (
+      <MainIsland crumbs={path({ id: 'folders', label: t('Folders') })} count={folderCount} actions={newFolder}>
+        <FolderList app="tables" domainId={domainId} counts={counts} onOpen={openFolder} />
+      </MainIsland>
+    );
+  }
+  if (browse.view === 'tables') return listPage(path({ id: 'tables', label: t('Tables') }), recent, t('No Tables in this Domain yet.'));
 
   // A Domain's home: its folders, then its Tables touched last.
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="px-6 pb-8 pt-5">
-        <h1 className="text-[17px] font-semibold text-foreground">{domainName}</h1>
-        <div className="mt-6 flex items-center gap-2">
-          <button type="button" onClick={() => onBrowse({ domainId, view: 'folders' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Folders')}</button>
-          <span className="flex-1" />
-          <Button type="button" variant="ghost" size="xs" onClick={() => { void newFolder().then((id) => { if (id) onBrowse({ domainId, folderId: id }); }); }}><FolderPlus size={13} />{t('New folder')}</Button>
+    <MainIsland crumbs={[{ id: 'domain', label: domainName }]} actions={newFolder}>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="px-3 pb-8 pt-5">
+          <div className="px-[18px]"><button type="button" onClick={() => onBrowse({ domainId, view: 'folders' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Folders')}</button></div>
+          <div className="mt-1"><FolderList app="tables" domainId={domainId} counts={counts} onOpen={openFolder} compact /></div>
+          <div className="mt-8 px-[18px]"><button type="button" onClick={() => onBrowse({ domainId, view: 'tables' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Recent Tables')}</button></div>
+          <div className="mt-1">{rows(recent.slice(0, 8))}</div>
         </div>
-        <div className="-mx-3 mt-1"><FolderList app="tables" domainId={domainId} counts={counts} onOpen={(id) => onBrowse({ domainId, folderId: id })} compact /></div>
-        <div className="mt-8"><button type="button" onClick={() => onBrowse({ domainId, view: 'tables' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Recent Tables')}</button></div>
-        <div className="-mx-3 mt-1">{rows(recent.slice(0, 8))}</div>
       </div>
-    </div>
+    </MainIsland>
   );
 }

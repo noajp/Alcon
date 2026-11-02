@@ -8,6 +8,8 @@ import { sheetFromTable } from '@/Function/office/tableToSheet';
 import { downloadBytes } from '@/Function/office/downloadFile';
 import { isCommitEnter, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NavTableIcon } from '@/shell/sidebar/NavIcons';
+import { IslandHeader } from '@/Function/shared/MainIsland';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import {
   useDataTables, createDataTable, addDataTableColumn, addDataTableColumns,
   bulkInsertDataTableRows,
@@ -44,6 +46,8 @@ export function TableView(props: TableViewProps) {
 
 function TableSurface({ activeTableId, onSelectTable, browse, onBrowse }: TableViewProps) {
   const { t } = useI18n();
+  const domains = useSustainmentDomains().data;
+  const domainName = (id: string) => domains.find((d) => d.id === id)?.name ?? '';
   const { data: tables, loading, error: listError, refetch } = useDataTables();
   const activeTable = tables.find((table) => table.id === activeTableId) ?? null;
   const source = useTableData(activeTableId);
@@ -72,10 +76,15 @@ function TableSurface({ activeTableId, onSelectTable, browse, onBrowse }: TableV
 
   return (
     <div className="flex flex-col h-full bg-card">
-      <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
-        <NavTableIcon size={14} />
-        <span className="text-xs font-semibold text-foreground truncate">{activeTable?.name ?? t('Table')}</span>
-        <div className="flex-1" />
+      {/* The browser draws its own header; a Table, or no list yet, has this one. */}
+      {(activeTable || loading || listError || tables.length === 0) && <IslandHeader
+        crumbs={activeTable ? [
+          activeTable.domain_id
+            ? { id: 'domain', label: domainName(activeTable.domain_id), onClick: () => onBrowse({ domainId: activeTable.domain_id }) }
+            : { id: 'all', label: t('All Tables'), onClick: () => onBrowse({}) },
+          { id: 'table', label: activeTable.name },
+        ] : [{ id: 'table', label: t('Table') }]}
+        actions={<>
         {source.saving && <span role="status" className="text-xs text-muted-foreground">{t('Saving…')}</span>}
         {activeTable && (
           <DropdownMenu>
@@ -99,7 +108,7 @@ function TableSurface({ activeTableId, onSelectTable, browse, onBrowse }: TableV
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-      </div>
+        </>} />}
       {listError && <TableError message={t('Could not load Tables.')} onRetry={refetch} />}
       {writeError && <TableError message={writeError} onRetry={() => void handleInsertRow()} />}
       <div className="flex-1 min-h-0 overflow-hidden">
