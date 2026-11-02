@@ -41,7 +41,7 @@ export interface QuickAddContext {
 }
 
 /** Where a line lands: personal wins, then the popup's pick, then the surface. */
-export function resolveQuickAddObjectId(input: QuickAddInput, fallbackObjectId: string | null): string | null {
+function resolveQuickAddObjectId(input: QuickAddInput, fallbackObjectId: string | null): string | null {
   if (input.personal) return null;
   return input.objectId !== undefined ? input.objectId : fallbackObjectId;
 }
