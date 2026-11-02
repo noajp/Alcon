@@ -606,32 +606,33 @@ export const Activity = line('Activity', 'M1.75 8h2.5L6 3.75l3.75 8.5L11.5 8h2.7
 export const ZoomIn = glyph('ZoomIn', { line: <><circle cx="7" cy="7" r="4.1" /><path d="m10.1 10.1 3.15 3.15M5.4 7h3.2M7 5.4v3.2" /></> });
 export const ZoomOut = glyph('ZoomOut', { line: <><circle cx="7" cy="7" r="4.1" /><path d="m10.1 10.1 3.15 3.15M5.4 7h3.2" /></> });
 
-// Strategy — sharp, geometric marks, no rounded corners: the layer that sets
-// direction, and its units under it.
+// Strategy — geometric marks, their corners softened (SOFT): the layer that
+// sets direction, and its units under it.
+const SOFT = { stroke: 'currentColor', strokeWidth: 1.1, strokeLinejoin: 'round' } as const;
 
 // Strategy itself: a compass rose, four long points and four short.
 export const CompassRose = glyph('CompassRose', {
   solid: <>
-    <path d="M8 .9 9.45 6.55 15.1 8 9.45 9.45 8 15.1 6.55 9.45.9 8l5.65-1.45Z" />
-    <path d="M12.6 3.4 10.1 7.1 8.9 5.9ZM12.6 12.6 8.9 10.1 10.1 8.9ZM3.4 12.6 5.9 8.9 7.1 10.1ZM3.4 3.4 7.1 5.9 5.9 7.1Z" />
+    <path d="M8 1.5 9.35 6.65 14.5 8 9.35 9.35 8 14.5 6.65 9.35 1.5 8l5.15-1.35Z" {...SOFT} />
+    <path d="M12.2 3.8 10 7.1 8.9 6ZM12.2 12.2 8.9 10 10 8.9ZM3.8 12.2 6 8.9 7.1 10ZM3.8 3.8 7.1 6 6 7.1Z" {...SOFT} />
   </>,
   cut: <circle cx="8" cy="8" r="1.05" style={hole} />,
 });
 
 // The Vision: the guiding star over the horizon.
 export const GuidingStar = glyph('GuidingStar', {
-  solid: <path d="M8 1.1 9.2 5.55 13.65 6.75 9.2 7.95 8 12.4 6.8 7.95 2.35 6.75 6.8 5.55Z" />,
+  solid: <path d="M8 1.7 9.1 5.65 13.05 6.75 9.1 7.85 8 11.8 6.9 7.85 2.95 6.75 6.9 5.65Z" {...SOFT} />,
   line: <path d="M1.75 14.25h12.5" />,
 });
 
 // A Portfolio: one diamond quartered — a set of bets held as one.
 export const Quartered = glyph('Quartered', {
-  solid: <path d="M8 1.1 14.9 8 8 14.9 1.1 8Z" />,
-  cut: <path d="M4.55 4.55 11.45 11.45M11.45 4.55 4.55 11.45" />,
+  solid: <path d="M8 1.7 14.3 8 8 14.3 1.7 8Z" {...SOFT} />,
+  cut: <path d="M4.4 4.4 11.6 11.6M11.6 4.4 4.4 11.6" />,
 });
 
 // An Initiative: a spearhead, the axis of advance.
 export const Spearhead = glyph('Spearhead', {
-  solid: <path d="M8 1.25 14.1 13.6 8 10.35 1.9 13.6Z" />,
+  solid: <path d="M8 1.9 13.55 13.1 8 10.2 2.45 13.1Z" {...SOFT} />,
 });
 
