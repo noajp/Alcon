@@ -22,7 +22,7 @@ export function StrategyNavigation({ visions, activeVisionId, activeView, onSele
   /** The Vision the Strategy pages are showing. */
   activeVisionId: string | null;
   activeView: string;
-  onSelect: (visionId: string, view: 'vision' | 'portfolio' | 'strategy') => void;
+  onSelect: (visionId: string, view: 'vision' | 'portfolio' | 'strategy' | 'timeline') => void;
   onOpenSettings: (visionId: string) => void;
 }) {
   const { t } = useI18n();
@@ -31,7 +31,7 @@ export function StrategyNavigation({ visions, activeVisionId, activeView, onSele
   const [seen, setSeen] = useState(`${activeVisionId}:${activeView}`);
   if (seen !== `${activeVisionId}:${activeView}`) {
     setSeen(`${activeVisionId}:${activeView}`);
-    if (activeVisionId && (activeView === 'portfolio' || activeView === 'strategy') && folded.has(activeVisionId)) {
+    if (activeVisionId && (activeView === 'portfolio' || activeView === 'strategy' || activeView === 'timeline') && folded.has(activeVisionId)) {
       setFolded((prev) => { const n = new Set(prev); n.delete(activeVisionId); return n; });
     }
   }
@@ -69,7 +69,7 @@ export function StrategyNavigation({ visions, activeVisionId, activeView, onSele
         </ContextMenuContent>
         </ContextMenu>
         {expanded && <div className="mt-0.5 pl-7">
-          {(['portfolio', 'strategy'] as const).map((id) => {
+          {(['portfolio', 'strategy', 'timeline'] as const).map((id) => {
             const { icon: Icon, label } = VIEW_REGISTRY[id];
             return <SidebarRow key={id} active={active && activeView === id} icon={Icon && <Icon size={16} />} label={t(label)}
               onClick={() => onSelect(vision.id, id)} />;

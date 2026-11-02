@@ -546,9 +546,9 @@ export function GanttView({
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden" ref={containerRef}>
         {/* Left panel — Element list */}
-        <div className="w-64 min-w-64 border-r border-border flex flex-col bg-card">
+        <div className="w-64 min-w-64 border-r border-border/60 flex flex-col bg-card">
           {/* Header */}
-          <div className="flex items-center px-3 border-b border-border bg-muted/20" style={{ height: HEADER_TIER1_H + HEADER_TIER2_H }}>
+          <div className="flex items-center px-3 border-b border-border/60" style={{ height: HEADER_TIER1_H + HEADER_TIER2_H }}>
             <span className="text-[11px] font-semibold text-muted-foreground">{t(leftHeaderLabel)}</span>
           </div>
 
@@ -574,7 +574,7 @@ export function GanttView({
                   {name && (
                     <button
                       onClick={() => toggleSection(key)}
-                      className="w-full flex items-center gap-1.5 px-2.5 h-8 text-left bg-muted/40 hover:bg-muted/60 border-b border-border/60 transition-colors group"
+                      className="w-full flex items-center gap-1.5 px-2.5 h-8 text-left bg-foreground/[0.025] hover:bg-foreground/[0.05] transition-colors group"
                       title={isCollapsed ? t('Expand') : t('Collapse')}
                     >
                       <span className="w-3.5 h-3.5 flex items-center justify-center text-muted-foreground shrink-0">
@@ -595,7 +595,7 @@ export function GanttView({
                       <div
                         key={element.id}
                         onClick={() => setSelectedElement(selectedElement === element.id ? null : element.id)}
-                        className={`flex items-center gap-2 px-3 border-b border-border/40 cursor-pointer transition-colors ${
+                        className={`flex items-center gap-2 px-3 cursor-pointer transition-colors ${
                           selectedElement === element.id ? 'bg-primary/10' : 'hover:bg-muted/30'
                         }`}
                         style={{ height: ROW_H }}
@@ -627,7 +627,7 @@ export function GanttView({
         <div className="flex-1 overflow-hidden flex flex-col">
           {/* Timeline header — tier 1: month/year context band, tier 2: units */}
           <div
-            className="border-b border-border overflow-x-hidden bg-muted/20"
+            className="border-b border-border/60 overflow-x-hidden"
             ref={timelineRef}
             style={{ scrollbarWidth: 'none', height: HEADER_TIER1_H + HEADER_TIER2_H }}
           >
@@ -636,7 +636,7 @@ export function GanttView({
                 {headerSpans.map((span, idx) => (
                   <div
                     key={idx}
-                    className="flex-shrink-0 flex items-center border-r border-border/60 overflow-hidden"
+                    className="flex-shrink-0 flex items-center border-l border-border/40 first:border-l-0 overflow-hidden"
                     style={{ width: span.days * pxPerDay }}
                   >
                     <span className="sticky left-0 px-2 text-[10px] font-semibold text-muted-foreground whitespace-nowrap">
@@ -645,30 +645,30 @@ export function GanttView({
                   </div>
                 ))}
               </div>
-              <div className="flex border-t border-border/40" style={{ height: HEADER_TIER2_H }}>
+              <div className="flex" style={{ height: HEADER_TIER2_H }}>
                 {headerUnits.map((unit, idx) => (
                   <div
                     key={idx}
-                    className={`flex-shrink-0 flex flex-col items-center justify-center border-r border-border/40 leading-none ${
-                      unit.isWeekend && !unit.isToday ? 'bg-muted/40' : ''
+                    className={`flex-shrink-0 flex flex-col items-center justify-center leading-none ${
+                      unit.isWeekend && !unit.isToday ? 'opacity-60' : ''
                     }`}
                     style={{ width: unit.days * pxPerDay }}
                   >
                     {zoom === 'day' ? (
                       <>
-                        <span className={`text-[9px] mb-0.5 ${unit.isToday ? 'text-[var(--status-danger)] font-semibold' : 'text-muted-foreground/70'}`}>
+                        <span className={`text-[9px] mb-0.5 ${unit.isToday ? 'text-[var(--accent-default)] font-semibold' : 'text-muted-foreground/70'}`}>
                           {unit.sub}
                         </span>
                         {unit.isToday ? (
-                          <span className="w-[18px] h-[18px] rounded-full bg-[var(--status-danger)] text-white text-[11px] font-semibold flex items-center justify-center">
+                          <span className="min-w-[20px] h-[18px] px-1 rounded-md bg-[var(--accent-default)] text-white text-[11px] font-semibold flex items-center justify-center">
                             {unit.label}
                           </span>
                         ) : (
-                          <span className="text-[11px] font-medium text-foreground/90">{unit.label}</span>
+                          <span className="text-[11px] font-medium text-muted-foreground">{unit.label}</span>
                         )}
                       </>
                     ) : (
-                      <span className="text-[11px] font-medium text-foreground/80 whitespace-nowrap px-1 truncate max-w-full">
+                      <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap px-1 truncate max-w-full">
                         {unit.label}
                       </span>
                     )}
@@ -704,8 +704,8 @@ export function GanttView({
                 {headerUnits.map((unit, idx) => (
                   <div
                     key={idx}
-                    className={`flex-shrink-0 border-r border-border/40 ${
-                      unit.isWeekend ? 'bg-muted/20' : ''
+                    className={`flex-shrink-0 border-r border-border/25 ${
+                      unit.isWeekend ? 'bg-foreground/[0.015]' : ''
                     }`}
                     style={{ width: unit.days * pxPerDay }}
                   />
@@ -749,7 +749,7 @@ export function GanttView({
                 return (
                   <div
                     key={`tint-${key}`}
-                    className="absolute left-0 right-0 bg-muted/30 pointer-events-none"
+                    className="absolute left-0 right-0 bg-foreground/[0.025] pointer-events-none"
                     style={{ top, height: SECTION_HEADER_H, width: timelineWidth }}
                   />
                 );
@@ -764,13 +764,13 @@ export function GanttView({
                     <>
                       <div
                         className="absolute top-0 bottom-0 z-10 pointer-events-none"
-                        style={{ left: leftPos - 1, width: 2, backgroundColor: 'var(--gantt-today-line)' }}
+                        style={{ left: leftPos - 0.5, width: 1, backgroundColor: 'color-mix(in oklab, var(--accent-default) 70%, transparent)' }}
                       />
                       <div
                         className="absolute z-20 pointer-events-none"
                         style={{ left: leftPos, top: 4, transform: 'translateX(-50%)' }}
                       >
-                        <span className="inline-block text-[10px] font-semibold text-white bg-[var(--status-danger)] px-1.5 py-0.5 rounded-full shadow-sm whitespace-nowrap">
+                        <span className="inline-block text-[10px] font-semibold text-white bg-[var(--accent-default)] px-1.5 py-0.5 rounded-md shadow-sm whitespace-nowrap">
                           Today · {todayStr}
                         </span>
                       </div>
@@ -794,7 +794,7 @@ export function GanttView({
                   <React.Fragment key={m.id}>
                     <div
                       className="absolute top-0 bottom-0 z-10 pointer-events-none"
-                      style={{ left: left - 1, width: 2, borderLeft: '2px dashed var(--status-danger)', opacity: 0.5 }}
+                      style={{ left: left - 0.5, width: 1, borderLeft: '1px dashed var(--border-strong)' }}
                     />
                     <MilestoneDiamond left={left} top={4} label={m.label} date={m.date} className="z-20" />
                   </React.Fragment>
@@ -861,16 +861,18 @@ export function GanttView({
 
                   return (
                     <React.Fragment key={element.id}>
+                    {/* A bar is a quiet surface with a fine edge, as a card is:
+                        the status speaks through its mark and the wash of
+                        its progress, not by painting the whole bar. */}
                     <div
-                      className={`absolute h-6 rounded-md cursor-pointer group ring-1 ring-inset ring-white/10 transition-shadow overflow-hidden ${
-                        selectedElement === element.id ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' : ''
-                      } ${isBlocked ? 'ring-2 ring-[var(--status-danger)]/40' : ''} ${isDraggingThis ? 'opacity-80 shadow-lg' : 'hover:shadow-md'}`}
+                      className={`absolute h-6 rounded-md cursor-pointer group border bg-[var(--surface-strong)] transition-[border-color,box-shadow] overflow-hidden ${
+                        selectedElement === element.id ? 'border-[var(--accent-default)] ring-1 ring-[var(--accent-default)]/40'
+                          : isBlocked ? 'border-[var(--status-danger)]/50' : 'border-border/70 hover:border-[var(--border-strong)]'
+                      } ${isDraggingThis ? 'opacity-80 shadow-lg' : ''}`}
                       style={{
                         left: barPos.left,
                         width: barWidth,
                         top: top + (ROW_H - 24) / 2,
-                        backgroundColor: barColor,
-                        opacity: isDone ? 0.7 : 1,
                         boxShadow: isDraggingThis ? undefined : '0 1px 2px var(--gantt-bar-shadow)',
                       }}
                       onClick={() => setSelectedElement(selectedElement === element.id ? null : element.id)}
@@ -890,10 +892,11 @@ export function GanttView({
                       {/* Progress fill — a lighter wash over the status color,
                           not a second hue, so the bar's color keeps meaning
                           "status" and the fill alone reads as "how much". */}
-                      {progress > 0 && (
+                      {/* Done needs no wash: its mark and muted title say so. */}
+                      {progress > 0 && !isDone && (
                         <div
-                          className="absolute inset-y-0 left-0 bg-white/30 pointer-events-none"
-                          style={{ width: `${Math.min(100, progress)}%` }}
+                          className="absolute inset-y-0 left-0 pointer-events-none"
+                          style={{ width: `${Math.min(100, progress)}%`, backgroundColor: `color-mix(in oklab, ${barColor} 16%, transparent)` }}
                         />
                       )}
 
@@ -912,11 +915,14 @@ export function GanttView({
                       {/* Inner label + optional due date */}
                       {showLabel && (
                         <div className="absolute inset-0 flex items-center justify-between px-2 overflow-hidden gap-2 pointer-events-none">
-                          <span className={`text-[11px] font-medium text-white/95 truncate ${isDone ? 'line-through' : ''}`}>
-                            {element.title}
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <ElementProgressMark status={element.status} progress={progress} size={12} />
+                            <span className={`text-[11.5px] font-medium truncate ${isDone ? 'text-muted-foreground' : 'text-foreground'}`}>
+                              {element.title}
+                            </span>
                           </span>
                           {showDueDate && element.due_date && (
-                            <span className="text-[10px] text-white/80 flex-shrink-0 tabular-nums">
+                            <span className="text-[10px] text-muted-foreground flex-shrink-0 tabular-nums">
                               {formatDate(parseDateOnly(element.due_date, null)!, 'pill', locale)}
                             </span>
                           )}
@@ -951,17 +957,14 @@ export function GanttView({
                 <defs>
                   <marker
                     id="arrowhead"
-                    markerWidth="10"
-                    markerHeight="7"
-                    refX="9"
-                    refY="3.5"
+                    markerWidth="6"
+                    markerHeight="6"
+                    refX="5"
+                    refY="3"
                     orient="auto"
                   >
-                    <polygon
-                      points="0 0, 10 3.5, 0 7"
-                      fill="currentColor"
-                      className="text-muted-foreground/50"
-                    />
+                    <path d="M0.5 0.5 5 3 0.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"
+                      className="text-muted-foreground/60" />
                   </marker>
                 </defs>
                 {elements.map(element => {
@@ -983,11 +986,12 @@ export function GanttView({
                     return (
                       <g key={`${dep.id}-${element.id}`}>
                         <path
-                          d={`M ${sourceX} ${sourceY} C ${sourceX + 20} ${sourceY}, ${targetX - 20} ${targetY}, ${targetX} ${targetY}`}
+                          d={elbowPath(sourceX, sourceY, targetX, targetY, ROW_H)}
                           fill="none"
                           stroke="currentColor"
-                          strokeWidth="1.5"
-                          className="text-muted-foreground/50"
+                          strokeWidth="1.25"
+                          strokeLinejoin="round"
+                          className="text-muted-foreground/45"
                           markerEnd="url(#arrowhead)"
                         />
                       </g>
@@ -1028,3 +1032,30 @@ export function GanttView({
     </div>
   );
 }
+
+/** A dependency drawn as an elbow with rounded corners: out of the source's
+ *  end, down (or up) to the target's row, into its start. A target that
+ *  starts before the source ends is reached by going round, between rows. */
+function elbowPath(sx: number, sy: number, tx: number, ty: number, rowH: number): string {
+  const out = 10;
+  const pts: [number, number][] = tx - out >= sx + out
+    ? [[sx, sy], [Math.round((sx + tx) / 2), sy], [Math.round((sx + tx) / 2), ty], [tx, ty]]
+    : (() => {
+        const midY = sy + Math.sign(ty - sy || 1) * rowH / 2;
+        return [[sx, sy], [sx + out, sy], [sx + out, midY], [tx - out, midY], [tx - out, ty], [tx, ty]];
+      })();
+  const radius = 6;
+  let d = `M ${pts[0][0]} ${pts[0][1]}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [px, py] = pts[i - 1];
+    const [cx, cy] = pts[i];
+    const [nx, ny] = pts[i + 1];
+    const r1 = Math.min(radius, Math.hypot(cx - px, cy - py) / 2, Math.hypot(nx - cx, ny - cy) / 2);
+    const ax = cx - Math.sign(cx - px) * r1, ay = cy - Math.sign(cy - py) * r1;
+    const bx = cx + Math.sign(nx - cx) * r1, by = cy + Math.sign(ny - cy) * r1;
+    d += ` L ${ax} ${ay} Q ${cx} ${cy} ${bx} ${by}`;
+  }
+  const [ex, ey] = pts[pts.length - 1];
+  return `${d} L ${ex} ${ey}`;
+}
+
