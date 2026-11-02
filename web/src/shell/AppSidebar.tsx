@@ -1,7 +1,7 @@
 'use client';
 
 import { SidebarFold } from '@/Function/shared/SidebarFold';
-import { FollowList } from '@/shell/sidebar/FollowSection';
+import { FollowSection } from '@/shell/sidebar/FollowSection';
 import { requestElementDetail, requestObjectPage } from '@/Function/shared/element/elementDetailRequest';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Input } from '@/ui/input';
@@ -466,16 +466,12 @@ export function AppSidebar({
           <>
           <SidebarModeLabel label={t('Execution')} />
 
-          {/* Follow: the Objects and Elements kept at hand (the star beside
-              their "…"); each opens where it lives. */}
-          <SidebarFold id="execution-follow" label={t('Follow')}>
-            <FollowList activeObjectId={navigation.objectId ?? null} onOpen={(f) => {
-              if (f.domainId) setActiveDomainId(f.domainId);
-              if (f.kind === 'element') requestElementDetail(f.id); else requestObjectPage();
-              onNavigate({ objectId: f.objectId, objectDomainId: f.domainId ?? undefined });
-              onViewChange('objects');
-            }} />
-          </SidebarFold>
+          <FollowSection activeObjectId={navigation.objectId ?? null} onOpen={(f) => {
+            if (f.domainId) setActiveDomainId(f.domainId);
+            if (f.kind === 'element') requestElementDetail(f.id); else requestObjectPage();
+            onNavigate({ objectId: f.objectId, objectDomainId: f.domainId ?? undefined });
+            onViewChange('objects');
+          }} />
 
           <SidebarFold id="execution-domains" label={t('Your Domains')}>
 
