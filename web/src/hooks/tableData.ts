@@ -277,7 +277,12 @@ export async function bulkInsertDataTableRows(
   for (let i = 0; i < cellInserts.length; i += CELL_CHUNK) {
     const chunk = cellInserts.slice(i, i + CELL_CHUNK);
     const { error } = await supabase.from('table_cells').insert(chunk);
-    if (error) throw error;
+    if (error) {
+      // Take the rows back out (their cells go with them), so a failed
+      // import does not leave blank rows behind.
+      await selectIn(createdRows.map((r) => r.id), (ids) => supabase.from('table_rows').delete().in('id', ids).select('id'));
+      throw error;
+    }
   }
   return { rows: createdRows };
 }
@@ -290,8 +295,14 @@ export async function importDataTable(
   rows: (string | number | null)[][],
 ): Promise<string> {
   const table = await createDataTable({ name });
-  const created = await addDataTableColumns(table.id, columns);
-  const byOrder = [...created].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-  await bulkInsertDataTableRows(table.id, rows.map((row) => Object.fromEntries(byOrder.map((col, k) => [col.id, row[k] ?? null]))));
+  try {
+    const created = await addDataTableColumns(table.id, columns);
+    const byOrder = [...created].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    await bulkInsertDataTableRows(table.id, rows.map((row) => Object.fromEntries(byOrder.map((col, k) => [col.id, row[k] ?? null]))));
+  } catch (error) {
+    // A half-imported Table is worse than none: remove it and report.
+    await supabase.from('tables').delete().eq('id', table.id);
+    throw error;
+  }
   return table.id;
 }
