@@ -141,7 +141,9 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
         if (!(e.target instanceof Node) || !e.currentTarget.contains(e.target)) return;
         onOpen?.(element);
       }}
-      className="group/card rounded-lg border border-[var(--border-subtle)] bg-card dark:bg-muted shadow-[var(--shadow-island)] hover:border-[var(--border-default)] transition-colors cursor-grab active:cursor-grabbing"
+      // Hover tints the card as a list row is tinted (the foreground at 6%,
+      // laid over the card's own ground as an image so the ground stays).
+      className="group/card rounded-lg border border-[var(--border-subtle)] bg-card dark:bg-muted shadow-[var(--shadow-island)] hover:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))] transition-colors cursor-grab active:cursor-grabbing"
     >
       <div className="px-3 py-2.5">
         {editingTitle ? (
@@ -163,7 +165,7 @@ function ElementCard({ element, onRefresh, onOpen }: ElementCardProps) {
           />
         ) : (
           <p
-            className="text-[13px] font-medium text-foreground leading-5 -mx-1 px-1 rounded cursor-text hover:bg-muted/30 transition-colors line-clamp-3 break-words"
+            className="text-[13px] font-medium text-foreground leading-5 -mx-1 px-1 rounded cursor-text line-clamp-3 break-words"
             title={t('Click to rename')}
             onPointerDown={stop}
             onClick={(e) => { stop(e); setEditingTitle(true); }}
