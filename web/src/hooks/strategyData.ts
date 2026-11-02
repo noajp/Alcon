@@ -226,11 +226,12 @@ export async function createStrategy(
   // don't have to pass it (a missed `created_by` previously 23502'd out of the
   // insert with "null value in column created_by ... violates not-null
   // constraint"). Mirrors how createObject backfills its creator.
-  const creatorId = await getCurrentUserId();
+  const createdBy = input.created_by ?? await getCurrentUserId();
+  if (!createdBy) throw new Error('Not signed in');
   const { data, error } = await supabase
     .from('strategies')
     // The Space it is created in; a Portfolio or Vision overrides it (DB trigger).
-    .insert({ ...input, created_by: input.created_by ?? creatorId, activity_space_id: input.activity_space_id ?? getActiveSpaceId() })
+    .insert({ ...input, created_by: createdBy, activity_space_id: input.activity_space_id ?? getActiveSpaceId() })
     .select()
     .single();
   if (error) throw error;
@@ -588,7 +589,7 @@ const NO_LINEAGE: IntentLineage[] = []
 
 /** The header the intent_measure_readings trigger reads to label where a
  *  reading came from. Sent only when a write carries a reading. */
-export const READING_SOURCE_HEADER = 'x-alcon-reading-source'
+const READING_SOURCE_HEADER = 'x-alcon-reading-source'
 
 export async function createIntent(
   input: IntentInsert,

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import type { TableInsert } from '@/types/db';
 import { translate } from '@/Function/i18n/I18nProvider';
 import { getQueryClient } from '@/lib/queryClient';
 import { applyOfficeEdits, type OfficeEdit } from '@/Function/office/officeEdits';
@@ -42,7 +43,8 @@ export function attachmentOwnerOf(subject: { kind: string; id: string | null }):
   const kind = ({ element: 'element', object: 'object', initiative: 'strategy' } as Record<string, AttachmentOwnerKind>)[subject.kind];
   return kind && subject.id ? { kind, id: subject.id } : null;
 }
-const OWNER_COLUMN: Record<AttachmentOwnerKind, string> = {
+type OwnerColumn = 'element_id' | 'object_id' | 'strategy_id' | 'portfolio_id' | 'deal_id' | 'company_id' | 'folder_id';
+const OWNER_COLUMN: Record<AttachmentOwnerKind, OwnerColumn> = {
   element: 'element_id', object: 'object_id', strategy: 'strategy_id', portfolio: 'portfolio_id', deal: 'deal_id', company: 'company_id',
   folder: 'folder_id',
 };
@@ -144,9 +146,9 @@ async function insertFile(owner: AttachmentOwner, name: string, mime: string | n
   const path = attachmentPath(owner, name, crypto.randomUUID());
   const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, bytes, { contentType: mime || undefined });
   if (upErr) throw upErr;
-  const { data, error } = await supabase.from('attachments').insert({
-    [OWNER_COLUMN[owner.kind]]: owner.id, path, name, size: bytes.size, mime_type: mime, previous_id: previous?.id ?? null,
-  }).select(COLUMNS).single();
+  const row: TableInsert<'attachments'> = { path, name, size: bytes.size, mime_type: mime, previous_id: previous?.id ?? null };
+  row[OWNER_COLUMN[owner.kind]] = owner.id;
+  const { data, error } = await supabase.from('attachments').insert(row).select(COLUMNS).single();
   if (!error && data) {
     // Its words, for finding it (in the background; a file that cannot be
     // read is found by its name only).
@@ -312,6 +314,7 @@ export function useSpaceAttachments(spaceId: string | null, trashed = false) {
     queryKey: ['attachments-of', 'space', spaceId, trashed],
     enabled: !!spaceId,
     queryFn: async (): Promise<SpaceFile[]> => {
+      if (!spaceId) return [];
       const { data, error } = await supabase.rpc('space_attachments', { p_space: spaceId, p_trashed: trashed });
       if (error) throw error;
       return (data ?? []) as SpaceFile[];

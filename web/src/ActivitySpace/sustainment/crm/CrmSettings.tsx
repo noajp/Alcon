@@ -140,7 +140,7 @@ function Connections({ crm }: { crm: Crm }) {
     : t('This success condition is an amount. Choose an amount won or in the pipeline.');
   const [error, setError] = useState<string | null>(null);
   const save = (patch: Parameters<Crm['savePipeline']>[1]) => { setError(null); crm.savePipeline(pipeline.id, patch).catch(cause => setError(message(cause))); };
-  return <Section title={t('Connections')} description={t('How this pipeline meets Execution and Strategy. Next steps become Elements in the Object you choose, assigned to each deal’s owner. The figure you choose is written into an Initiative’s success condition when its owner opens the CRM.')}>
+  return <Section title={t('Connections')} description={t('How this pipeline meets Execution and Strategy. Next steps become Elements in the Object you choose, assigned to each deal’s owner. The figure you choose is written into an Initiative’s success condition whenever a deal changes, whoever changes it.')}>
     <div className="max-w-2xl space-y-2">
       <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-2">
         <span className="text-xs text-muted-foreground">{t('Next steps go to')}</span>
@@ -170,8 +170,8 @@ function Connections({ crm }: { crm: Crm }) {
       {pipeline.measure_intent_id && metricKind(metric) === 'field' && unit.kind === 'money' && <p className="text-xs text-muted-foreground">{t('A field reported as money is read in the pipeline’s currency, in whole units (yen, dollars), and only deals in that currency count.')}</p>}
       {pipeline.measure_intent_id && mismatch && <p role="alert" className="text-xs text-[var(--status-warning)]">{mismatch} {t('Nothing is written until they match.')}</p>}
       {pipeline.measure_intent_id && linked && written !== null && <p className="text-xs text-muted-foreground">{t('Currently reporting {value}.', { value: unit.kind === 'money' || unit.kind === 'count' ? `${written.toLocaleString(locale)} ${linked?.unit ?? ''}`.trim() : metricKind(metric) === 'amount' ? money(written, pipeline.currency, locale) : written.toLocaleString(locale) })}</p>}
-      {crm.measureError && <p role="alert" className="text-xs text-[var(--status-danger)]">{t(crm.measureError)}</p>}
-      {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{error}</p>}
+      {pipeline.measure_intent_id && pipeline.measure_error && <p role="alert" className="text-xs text-[var(--status-danger)]">{t('Updating the success condition is failing: {error}', { error: pipeline.measure_error })}</p>}
+      {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{t(error)}</p>}
     </div>
   </Section>;
 }
@@ -248,17 +248,18 @@ function PipelinesList({ crm, onSelect, domainId }: { crm: Crm; onSelect: (id: s
 
 function Import({ crm }: { crm: Crm }) {
   const { t } = useI18n();
-  const [state, setState] = useState<{ busy: boolean; done?: number; error?: string }>({ busy: false });
+  const [state, setState] = useState<{ busy: boolean; done?: number; error?: string; measureError?: string | null }>({ busy: false });
   if (!crm.legacyTable) return null;
   return <Section title={t('Bring in your earlier pipeline')} description={t('Your CRM used to read a Table. Import its deals, companies, contacts and activity into this pipeline. The Table itself is not changed.')}>
     <div className="flex items-center gap-2">
       <Button size="sm" variant="secondary" disabled={state.busy || state.done !== undefined} onClick={() => {
         setState({ busy: true });
-        crm.importFromTable(crm.legacyTable!.tableId, crm.legacyTable!.fields).then(done => setState({ busy: false, done }))
+        crm.importFromTable(crm.legacyTable!.tableId, crm.legacyTable!.fields).then(({ count, measureError }) => setState({ busy: false, done: count, measureError }))
           .catch(cause => setState({ busy: false, error: cause instanceof Error ? cause.message : t('Could not import.') }));
       }}>{state.busy ? t('Importing…') : t('Import from Table')}</Button>
       {state.done !== undefined && <span role="status" className="text-xs text-muted-foreground">{t('{n} deals imported.', { n: state.done })}</span>}
       {state.error && <span role="alert" className="text-xs text-[var(--status-danger)]">{state.error}</span>}
+      {state.measureError && <span role="alert" className="text-xs text-[var(--status-danger)]">{t('The success condition was not updated after the import: {error}', { error: state.measureError })}</span>}
     </div>
   </Section>;
 }

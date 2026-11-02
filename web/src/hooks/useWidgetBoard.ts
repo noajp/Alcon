@@ -90,21 +90,24 @@ async function persistEdit(target: BoardTarget, defaults: BoardLayout, edit: Boa
   }
 
   const found = findInstance(layout, edit.id);
-  if (!found?.instance.placementId) return;
+  // A placed instance carries both ids (boardModel reads them from one row).
+  const placementId = found?.instance.placementId;
+  const widgetId = found?.instance.widgetId;
+  if (!found || !placementId || !widgetId) return;
   const { zone, instance } = found;
   if (edit.op === 'remove') {
     if (instance.hidden) return;
-    check(await supabase.from('board_placements').delete().eq('id', instance.placementId));
+    check(await supabase.from('board_placements').delete().eq('id', placementId));
   } else if (edit.op === 'move') {
     if (!fitsZone(instance, zone, edit.zone)) return;
     check(await supabase.from('board_placements')
       .update({ zone: edit.zone, position: movePosition(layout, edit.id, edit.zone, edit.index) })
-      .eq('id', instance.placementId));
+      .eq('id', placementId));
   } else if (edit.op === 'size') {
-    check(await supabase.from('board_placements').update({ size: edit.size }).eq('id', instance.placementId));
+    check(await supabase.from('board_placements').update({ size: edit.size }).eq('id', placementId));
   } else if (!instance.hidden) {
     check(await supabase.rpc('merge_widget_params', {
-      p_widget_id: instance.widgetId,
+      p_widget_id: widgetId,
       p_patch: paramsPatch(instance, edit.params),
     }));
   }

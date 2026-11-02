@@ -38,6 +38,7 @@ import { ELEMENT_DETAIL_EVENT, clearElementDetail, pendingElementDetail } from '
 import { ObjectElementsView } from '@/ActivitySpace/execution/object/ObjectElementsView';
 import type { ListSection } from '@/Function/shared/listTable/shared';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
+import { useFilteredElements } from '@/ActivitySpace/execution/element/useFilteredElements';
 import { sectionGroupValues, type ListControlsState, type SectionGroup } from '@/Function/shared/listControls';
 import { createQuickAddElements, toQuickAddTemplates } from '@/Function/shared/element/quickAdd';
 
@@ -430,6 +431,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
   // Single-sheet model: every element on the Object shows up in the list.
   const allElements = object.elements || [];
   const elements = allElements;
+  // Board / Calendar / Gantt narrow by the same Filter / Display as the
+  // Elements tab, so switching tabs keeps what the user filtered to.
+  const { sections: filteredSections, elements: filteredElements, filtering } = useFilteredElements(allElements, undefined, elementsControls);
 
 
   // (Inline add helpers removed alongside section grouping. Element / Object
@@ -560,15 +564,16 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
           </div>
         )}
 
-        {/* Gantt Tab Content — this Object's Elements as a flat bar list.
-            We deliberately do NOT pass `object`: passing it triggers
-            GanttView's parent-Object grouping, but here every Element already
-            belongs to the same Object, so the grouping just adds a noisy
-            single-section header above the bars. Flat reads cleaner. */}
+        {/* Gantt Tab Content — this Object's Elements, banded the way the
+            Elements tab's Display groups them (status / assignee / …). We
+            deliberately do NOT pass `object`: every Element already belongs
+            to this Object, so its name as a band header would only be noise;
+            the ungrouped default is one unnamed band, which renders flat. */}
         {activeTab?.tab_type === 'gantt' && (
           <div className="flex-1 overflow-hidden bg-card">
             <GanttView
-              elements={allElements}
+              elements={filteredElements}
+              sections={filteredSections}
               onRefresh={onRefresh}
               phases={domainPhases}
               milestones={objectMilestones}
@@ -581,7 +586,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         {activeTab?.tab_type === 'board' && (
           <div className="flex-1 overflow-hidden bg-card">
             <ElementBoardView
-              elements={allElements}
+              elements={filteredElements}
+              canAdd={!filtering}
               onRefresh={onRefresh}
               objectId={object.id}
               onElementClick={(el) => setDetailElementId(el.id)}
@@ -589,11 +595,11 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
           </div>
         )}
 
-        {/* Calendar Tab Content — uses all descendants */}
+        {/* Calendar Tab Content */}
         {activeTab?.tab_type === 'calendar' && (
           <div className="flex-1 overflow-hidden bg-card">
             <CalendarView
-              elements={allElements}
+              elements={filteredElements}
               onRefresh={onRefresh}
               onElementClick={(el) => setDetailElementId(el.id)}
             />

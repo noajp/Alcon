@@ -79,6 +79,8 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   note: { domainTitle: 'Note', objectTitle: 'Note' },
 };
 const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'board', 'gantt', 'calendar', 'resource', 'workers', 'custom_view'];
+// Object tabs that show its Elements through the Elements tab's Filter / Display.
+const OBJECT_FILTERED_TABS: ObjectTabType[] = ['elements', 'board', 'gantt', 'calendar'];
 
 function titleForTab(type: ObjectTabType, objectScoped: boolean): string {
   const meta = VIEW_META[type];
@@ -285,7 +287,12 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
   const [objectElementsControls, setObjectElementsControls] = useState<ListControlsState>(() => loadState('object-elements'));
   useEffect(() => { saveState('object-elements', objectElementsControls); }, [objectElementsControls]);
 
-  const objListControlsNode = effectiveActiveType === 'elements'
+  // Inside an Object, Board / Calendar / Gantt narrow by the same Element
+  // controls as the Elements tab, so the buttons follow them there.
+  const showsElementControls = selectedObject
+    ? OBJECT_FILTERED_TABS.includes(effectiveActiveType)
+    : effectiveActiveType === 'elements';
+  const objListControlsNode = showsElementControls
     ? selectedObject
       ? (
           <ListControls
@@ -626,7 +633,7 @@ function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails {
     progress: null,
     direction: null,
     order_index: o.order_index ?? null,
-    is_approval: null,
+    is_approval: false,
     approval_state: null,
     note_id: null,
     phase_id: o.phase_id ?? null,
