@@ -65,7 +65,7 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   'Completion across the whole subject, as a bar': ['全体の完了率を棒で表示', '전체 완료율을 막대로', 'L’avancement global, en barre', 'El avance total, como barra'],
   'Completion, active, overdue, hours': ['完了率・進行中・期限切れ・工数', '완료율, 진행 중, 기한 초과, 시간', 'Avancement, en cours, en retard, heures', 'Avance, en curso, vencidos, horas'],
   'A bar per Object in the Space': ['Space の Object ごとの棒', 'Space의 Object별 막대', 'Une barre par Object du Space', 'Una barra por Object del Space'],
-  'High-priority Elements with due dates': ['期限のある優先度の高い Element', '마감일이 있는 우선순위 높은 Element', 'Elements prioritaires avec échéance', 'Elements prioritarios con fecha límite'],
+  'Dated markers on this Object, the ◇ on its Gantt': ['この Object の日付の節目。Gantt の ◇', '이 Object의 날짜 표식, Gantt의 ◇', 'Repères datés de cet Object, les ◇ de son Gantt', 'Marcas con fecha de este Object, los ◇ de su Gantt'],
   'Compact timeline preview': ['コンパクトなタイムライン', '간단한 타임라인', 'Aperçu compact de la chronologie', 'Vista previa compacta de la cronología'],
   'Current month, with due dates marked': ['今月と期限の印', '이번 달과 마감일 표시', 'Le mois en cours, avec les échéances', 'El mes actual, con las fechas límite marcadas'],
   'How many, counted by whichever column you choose': ['選んだ列ごとの件数', '선택한 열 기준 개수', 'Combien, compté selon la colonne de votre choix', 'Cuántos, contados por la columna que elijas'],

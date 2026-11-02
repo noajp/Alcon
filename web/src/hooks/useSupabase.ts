@@ -211,5 +211,8 @@ export {
 } from '@/hooks/phaseData';
 
 export {
+  createObjectMilestone,
+  deleteObjectMilestone,
+  updateObjectMilestone,
   useObjectMilestones,
 } from '@/hooks/milestoneData';
