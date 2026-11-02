@@ -745,7 +745,7 @@ function StrategyDetailView({
     <WidgetActionSlotProvider>
     <div ref={rootRef} className="flex-1 flex flex-col overflow-hidden bg-card h-full">
       {/* Drawn as the shared IslandHeader is (Function/shared/MainIsland). */}
-      <div className="h-[50px] flex flex-shrink-0 items-center gap-1 bg-card pl-6 pr-2">
+      <div className="h-[50px] flex flex-shrink-0 items-center gap-1 border-b border-border/60 bg-card pl-6 pr-2">
         <button
           type="button"
           onClick={onBack}
