@@ -92,6 +92,22 @@ describe('mentionedUserIds', () => {
     expect(mentionedUserIds('＠中野貴慶 さん', workers)).toEqual(['u1']);
   });
 
+  it('ignores an @ inside an e-mail address or a URL', () => {
+    const ws = [{ name: 'nakano', user_id: 'u3' }];
+    expect(mentionedUserIds('連絡先は info@nakano です', ws)).toEqual([]);
+    expect(mentionedUserIds('https://user@nakano.jp/x', ws)).toEqual([]);
+    expect(mentionedUserIds('確認@nakano', ws)).toEqual(['u3']);
+  });
+
+  it('prefers the longest name and drops a shorter name inside it', () => {
+    const ws = [
+      { name: 'Takanori', user_id: 'short' },
+      { name: 'Takanori Nakano', user_id: 'long' },
+    ];
+    expect(mentionedUserIds('@Takanori Nakano please', ws)).toEqual(['long']);
+    expect(mentionedUserIds('@Takanori Nakano and @Takanori', ws).sort()).toEqual(['long', 'short']);
+  });
+
   it('ignores a name that continues and Workers without a user', () => {
     expect(mentionedUserIds('@中野貴慶さん', workers)).toEqual([]);
     expect(mentionedUserIds('@Bot', workers)).toEqual([]);

@@ -79,6 +79,9 @@ export function StrategyCommentsPanel({
       (w) => ({ name: w.name, extra: w.email }),
     ).slice(0, 6);
   }, [mentionQuery, workers]);
+  // An @ with nothing to pick (an e-mail address, "@名前さん") must not hold
+  // Enter or Escape — the list is not on screen.
+  const mentionListOpen = mentionOpen && mentionCandidates.length > 0;
 
   const handleDraftChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -187,19 +190,19 @@ export function StrategyCommentsPanel({
         onChange={handleDraftChange}
         onSubmit={submit}
         submitting={submitting}
-        enterHeldBy={mentionOpen}
+        enterHeldBy={mentionListOpen}
         sendShortcut={sendShortcut}
         placeholder={t('Comment on {name}…', { name: strategyName })}
         onKeyDown={(e) => {
           // Escape drops the mention list first; a second one is the
           // surrounding page's to handle.
-          if (e.key === 'Escape' && mentionOpen) {
+          if (e.key === 'Escape' && mentionListOpen) {
             e.preventDefault();
             setMentionOpen(false);
           }
         }}
       >
-        {mentionOpen && mentionCandidates.length > 0 && (
+        {mentionListOpen && (
           <div className="absolute left-0 bottom-full mb-1 z-20 w-64 bg-popover border border-border rounded-md shadow-lg overflow-hidden">
             {mentionCandidates.map((w) => (
               <button

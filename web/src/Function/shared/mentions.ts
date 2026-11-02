@@ -82,19 +82,37 @@ export function insertMentionText(text: string, at: MentionQuery, insert: string
   return `${before}@${insert} ${after}`;
 }
 
-/** The user ids of the people a comment names with @<name>. A name ends at
- *  whitespace, punctuation or the end of the text — not \b, which only knows
- *  ASCII word characters and misses Japanese names. */
+/**
+ * The user ids of the people a comment names with @<name>.
+ *
+ * - A name ends at whitespace, punctuation or the end of the text — not \b,
+ *   which only knows ASCII word characters and misses Japanese names.
+ * - An @ right after a character of an e-mail local part (info@nakano.jp,
+ *   a URL's user@host) is not a mention, as in detectMentionQuery.
+ * - The longest name wins: "@Takanori Nakano" names Takanori Nakano, not
+ *   also a Worker called "Takanori".
+ */
 export function mentionedUserIds(
   text: string,
   workers: readonly { name: string; user_id?: string | null }[],
 ): string[] {
+  const named = workers
+    .filter((w): w is { name: string; user_id: string } => !!w.user_id && !!w.name)
+    .slice()
+    .sort((a, b) => b.name.length - a.name.length);
+  const claimed: [number, number][] = [];
   const ids = new Set<string>();
-  for (const w of workers) {
-    if (!w.user_id || !w.name) continue;
+  for (const w of named) {
     const name = w.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(`[@＠]${name}(?=$|[\\s、。,.!?！？:：)）])`);
-    if (re.test(text)) ids.add(w.user_id);
+    const re = new RegExp(`[@＠]${name}(?=$|[\\s、。,.!?！？:：)）])`, 'g');
+    for (const m of text.matchAll(re)) {
+      const start = m.index;
+      const end = start + m[0].length;
+      if (start > 0 && EMAIL_LOCAL_CHAR.test(text[start - 1])) continue;
+      if (claimed.some(([s, e]) => start < e && s < end)) continue;
+      claimed.push([start, end]);
+      ids.add(w.user_id);
+    }
   }
   return Array.from(ids);
 }
