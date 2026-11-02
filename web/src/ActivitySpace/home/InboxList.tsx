@@ -92,15 +92,19 @@ function InboxRow({ notification: n, selected, locale, onSelect, onToggleRead, o
           {n.actor_name?.trim().slice(0, 2) || <Inbox size={14} />}
           <span className="absolute -bottom-1 -right-1 rounded bg-card p-px text-[var(--text-secondary)]"><Icon size={10} /></span>
         </span>
+        {/* What the notification is about leads; who sent it and what kind
+            it is follow, small — a list of seven "Status" rows says nothing. */}
         <span className="min-w-0 flex-1">
-          {n.body && <span className="sr-only">{t(meta.label)}</span>}
           <span className="flex items-center gap-2">
-            <span className={`min-w-0 flex-1 truncate text-[12px] ${n.is_read ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>{n.actor_name || t(meta.label)}</span>
+            <span className={`min-w-0 flex-1 truncate text-[12px] ${n.is_read ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>{n.title}</span>
             <time dateTime={n.created_at} title={new Date(n.created_at).toLocaleString(locale)} className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{relativeTime(n.created_at, locale, t)}</time>
             {!n.is_read && <span aria-label={t('Unread')} className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent-default)]" />}
           </span>
-          <span className={`block truncate text-[12px] ${n.is_read ? 'text-muted-foreground' : 'text-foreground'}`}>{n.title}</span>
-          {n.body && <span className="block truncate text-[11px] text-muted-foreground">{n.body}</span>}
+          <span className="block truncate text-[11px] text-muted-foreground">
+            {n.actor_name && <><span>{n.actor_name}</span> · </>}
+            <span>{t(meta.label)}</span>
+            {n.body && <> · <span>{n.body}</span></>}
+          </span>
         </span>
       </button>
       <DropdownMenu>
