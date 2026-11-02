@@ -60,10 +60,10 @@ describe('createQuickAddElements', () => {
     expect(alert).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects when nothing landed so the popup keeps the text', async () => {
+  it('rejects when nothing landed so the popup keeps the text, and still says so', async () => {
     createElement.mockRejectedValue(new Error('no'));
     await expect(createQuickAddElements([{ title: 'a' }], { fallbackObjectId: 'o1', userId: null })).rejects.toThrow('no');
-    expect(alert).not.toHaveBeenCalled();
+    expect(alert).toHaveBeenCalledTimes(1);
   });
 });
 

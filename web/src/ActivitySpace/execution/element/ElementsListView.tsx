@@ -466,7 +466,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   const handleQuickAddSubmit = async (inputs: NewElementInput[]) => {
     // A line the popup names no Object for lands in the section it was opened from.
     try {
-      await createQuickAddElements(inputs, { fallbackObjectId: quickAddTargetObjectId, userId });
+      return await createQuickAddElements(inputs, { fallbackObjectId: quickAddTargetObjectId, userId });
     } finally {
       await onRefresh?.();
     }

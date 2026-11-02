@@ -177,10 +177,11 @@ export function QuickAddElementLauncher({
   // has exactly one home; the database refuses one with neither.
   const handleSubmit = async (inputs: NewElementInput[]) => {
     try {
-      await createQuickAddElements(inputs, { fallbackObjectId: null, userId, dueDate: presetDueDate });
+      const landed = await createQuickAddElements(inputs, { fallbackObjectId: null, userId, dueDate: presetDueDate });
       // Remember the landing Object so the next context-less C targets it too.
       const first = inputs[0];
       if (first && !first.personal && first.objectId) writeLastObjectId(first.objectId);
+      return landed;
     } finally {
       // The Calendar and My Elements read react-query caches, not the Domain
       // refetch below — drop them so a just-added Element shows at once.

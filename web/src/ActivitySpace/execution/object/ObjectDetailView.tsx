@@ -648,7 +648,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         defaultLabels={quickAddDefaults.labels}
         onSubmit={async (inputs: NewElementInput[]) => {
           try {
-            await createQuickAddElements(inputs, { fallbackObjectId: object.id, userId: null });
+            return await createQuickAddElements(inputs, { fallbackObjectId: object.id, userId: null });
           } finally {
             await onRefresh?.();
           }

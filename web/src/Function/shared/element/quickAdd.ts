@@ -80,11 +80,11 @@ export async function createQuickAddElements(inputs: readonly QuickAddInput[], c
   }
   noticeSkippedAssignees(skippedAssignees);
   const failed = inputs.length - created;
-  if (created === 0 && inputs.length > 0) {
-    throw lastError ?? new Error('No Elements were created');
-  }
   if (failed > 0) {
     void appDialog.alert(translate('{failed} of {total} Elements could not be created.', { failed, total: inputs.length }));
+  }
+  if (created === 0 && inputs.length > 0) {
+    throw lastError ?? new Error('No Elements were created');
   }
   return created;
 }

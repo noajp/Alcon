@@ -260,7 +260,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
     // Worker so the row stays in My Elements via the assignee scope even if
     // owner_id is ever cleared.
     try {
-      await createQuickAddElements(inputs, {
+      return await createQuickAddElements(inputs, {
         fallbackObjectId: null,
         userId,
         fallbackAssigneeIds: myWorkers[0] ? [myWorkers[0].id] : [],
