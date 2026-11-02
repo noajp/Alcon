@@ -7,14 +7,15 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { fetchMyElements, type MyElementsData } from '@/hooks/myElementsData';
 import { useAuthContext } from '@/providers/AuthProvider';
 import {
-  assignWorkersToElement,
-  noticeSkippedAssignees,
   createElement,
   updateElement,
   deleteElement,
   useDomains,
+  useElementTemplates,
   useWorkers,
 } from '@/hooks/useSupabase';
+import { createQuickAddElements, toQuickAddTemplates } from '@/Function/shared/element/quickAdd';
+import { useActiveDomainId } from '@/Function/space/domainsStore';
 import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
@@ -151,6 +152,12 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
   // active Space.
   const { data: spaceWorkers } = useWorkers();
   const popupWorkers = useMemo(() => withCurrentWorkers(myWorkers, spaceWorkers), [myWorkers, spaceWorkers]);
+  // My Elements has no Domain of its own; templates come from the active one.
+  const { templates: elementTemplates } = useElementTemplates(useActiveDomainId());
+  const quickAddTemplates = useMemo(
+    () => toQuickAddTemplates(elementTemplates, popupWorkers),
+    [elementTemplates, popupWorkers],
+  );
 
   const handleElementUpdate = useCallback(async (
     elementId: string,
@@ -249,34 +256,19 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
 
   const handleQuickAddSubmit = useCallback(async (inputs: NewElementInput[]) => {
     if (!userId) return;
-    let skippedAssignees = 0;
-    for (const input of inputs) {
-      try {
-        // Personal Element: no object, owner = me. Honor the popup's shared
-        // description / status / priority / labels. Assignees come from the
-        // pill picker; fall back to my own worker so the row stays in My
-        // Elements via the assignee scope even if owner_id is ever cleared.
-        const created = await createElement({
-          title: input.title,
-          object_id: input.objectId ?? null,
-          owner_id: input.objectId ? null : userId,
-          description: input.description ?? null,
-          type: input.type ?? null,
-          labels: input.labels ?? [],
-          status: input.status ?? undefined,
-          priority: input.priority ?? undefined,
-        });
-        const assigneeIds = input.assigneeWorkerIds && input.assigneeWorkerIds.length > 0
-          ? input.assigneeWorkerIds
-          : (myWorkers[0] ? [myWorkers[0].id] : []);
-        skippedAssignees += (await assignWorkersToElement(created.id, assigneeIds)).skipped.length;
-      } catch (e) {
-        console.error('Failed to create personal Element', e);
-      }
+    // Personal unless the popup named an Object. An unassigned line gets my own
+    // Worker so the row stays in My Elements via the assignee scope even if
+    // owner_id is ever cleared.
+    try {
+      return await createQuickAddElements(inputs, {
+        fallbackObjectId: null,
+        userId,
+        fallbackAssigneeIds: myWorkers[0] ? [myWorkers[0].id] : [],
+      });
+    } finally {
+      await fetchMine();
+      await onRefresh?.();
     }
-    noticeSkippedAssignees(skippedAssignees);
-    await fetchMine();
-    await onRefresh?.();
   }, [userId, myWorkers, fetchMine, onRefresh]);
 
   if (detailElement) {
@@ -366,6 +358,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
         types={elementTypes}
         workers={popupWorkers.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
         availableLabels={labelOptions}
+        templates={quickAddTemplates}
       />
 
       <BulkActionBar
