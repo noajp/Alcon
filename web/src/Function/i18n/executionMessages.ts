@@ -74,6 +74,8 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   'Choose a Space first.': ['先に Space を選んでください。', '먼저 Space를 선택하세요.', 'Choisissez d’abord un Espace.', 'Elige primero un Espacio.'],
   'Recent files': ['最近のファイル', '최근 파일', 'Fichiers récents', 'Archivos recientes'],
   'Recent Tables': ['最近の Table', '최근 Table', 'Tables récentes', 'Tables recientes'],
+  'All Tables': ['すべての Table', '모든 Table', 'Toutes les tables', 'Todas las tablas'],
+  'No Tables in this Domain yet.': ['この Domain にはまだ Table がありません。', '이 Domain에는 아직 Table이 없습니다.', 'Aucune table dans ce Domain pour l’instant.', 'Todavía no hay tablas en este Domain.'],
   'Tables': ['Table', 'Table', 'Tables', 'Tables'],
   'Rows': ['行', '행', 'Lignes', 'Filas'],
   'Items': ['件数', '항목', 'Éléments', 'Elementos'],

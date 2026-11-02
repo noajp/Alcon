@@ -9,9 +9,9 @@ export interface NavigationState {
   audit?: AuditRoute;
   /** The Files App's page and open file within this window tab. */
   files?: FilesRoute;
-  /** The Table App's page when no Table is open: the Space's home, its
-   *  folders (or one folder), or every Table. */
-  tableBrowse?: { view?: 'home' | 'folders' | 'tables'; folderId?: string | null };
+  /** The Table App's page when no Table is open: every Table in the Space,
+   *  or a Domain's home, its folders (or one folder), its Tables. */
+  tableBrowse?: { domainId?: string | null; view?: 'home' | 'folders' | 'tables'; folderId?: string | null };
   objectId: string | null;
   /** Domain accompanying an explicit Object route. Keeps the destination
    * Object selected while the shell changes its active Domain. */

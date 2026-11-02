@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight, ChevronRight, FolderInput, FolderPlus, Loader2, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { Button } from '@/ui/button';
@@ -23,7 +23,7 @@ import { moveFileToFolder } from '@/hooks/attachmentData';
 import { FolderList, MoveToFolderItems, useNewFolder } from '@/Function/shared/folders/FolderList';
 import { DropdownMenu, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
-import { useActivitySpaces } from '@/Function/space/data';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { FilesRoute } from '@/Function/files/filesRoute';
 
 const OWNER_LABEL: Record<AttachmentOwnerKind, string> = {
@@ -33,24 +33,47 @@ const OWNER_LABEL: Record<AttachmentOwnerKind, string> = {
 const nameOf = (f: SpaceFile) => { const dot = f.name.lastIndexOf('.'); return dot > 0 ? f.name.slice(0, dot) : f.name; };
 
 /**
- * Files, laid out as Execution is: the Space's home (its folders and the
- * latest files), Folders (each opening onto what it holds), Files (every
- * file in the Space — those in folders and those attached to work — newest
- * first) and the trash. A file stays where it is (a folder's, or the
- * evidence of what it is attached to, seen by whoever can see that); a row
- * opens it beside the list (Word and Excel editable, with versions).
+ * Files, laid out as Execution is: every file in the Space; each Domain's
+ * home (its folders and its latest files), its Folders (each opening onto
+ * what it holds) and its Files (those in its folders and those attached to
+ * its Elements and Objects); and the trash. A file stays where it is (a
+ * folder's, or the evidence of what it is attached to, seen by whoever can
+ * see that); a row opens it beside the list (Word and Excel editable, with
+ * versions).
  */
 export function FilesView({ navigation, onNavigate }: { navigation: NavigationState; onNavigate: (nav: Partial<NavigationState>) => void }) {
-  const route = navigation.files ?? {};
+  const route = useMemo(() => navigation.files ?? {}, [navigation.files]);
   const go = (next: FilesRoute) => onNavigate({ files: next });
+  // A folder opened from elsewhere (search, a file's owner) names only the
+  // folder: fill in its Domain, so the page and the sidebar sit under it.
+  const folderDomain = useFolders('files').data.find((f) => f.id === route.folderId)?.domain_id ?? null;
+  useEffect(() => {
+    if (route.folderId && !route.domainId && folderDomain) onNavigate({ files: { ...route, domainId: folderDomain } });
+  }, [route, folderDomain, onNavigate]);
   if (route.view === 'trash') return <TrashList />;
-  if (route.folderId || route.view === 'files') return <FileList navigation={navigation} onNavigate={onNavigate} />;
-  if (route.view === 'folders') return <FoldersPage go={go} />;
-  return <FilesHome go={go} />;
+  if (!route.domainId || route.folderId || route.view === 'files') return <FileList navigation={navigation} onNavigate={onNavigate} />;
+  if (route.view === 'folders') return <FoldersPage domainId={route.domainId} go={go} />;
+  return <FilesHome domainId={route.domainId} go={go} />;
 }
 
-function FoldersPage({ go }: { go: (next: FilesRoute) => void }) {
-  return <FolderList app="files" counts={useFolderCounts()} onOpen={(id) => go({ folderId: id })} />;
+/** A Domain's name, for titles. */
+function useDomainName(domainId: string | null | undefined) {
+  return useSustainmentDomains().data.find((d) => d.id === domainId)?.name ?? '';
+}
+
+/** "Domain › Page", the Domain opening its home. */
+function Crumbs({ domainId, go, children }: { domainId: string; go: (next: FilesRoute) => void; children?: ReactNode }) {
+  const name = useDomainName(domainId);
+  return <>
+    <button type="button" onClick={() => go({ domainId })} className={children ? 'font-normal text-muted-foreground hover:text-foreground' : ''}>{name}</button>
+    {children && <><ChevronRight size={14} className="shrink-0 text-muted-foreground" />{children}</>}
+  </>;
+}
+
+function FoldersPage({ domainId, go }: { domainId: string; go: (next: FilesRoute) => void }) {
+  const { t } = useI18n();
+  return <FolderList app="files" domainId={domainId} counts={useFolderCounts()} onOpen={(id) => go({ domainId, folderId: id })}
+    title={<Crumbs domainId={domainId} go={go}><span>{t('Folders')}</span></Crumbs>} />;
 }
 
 /** How many live files each folder holds. */
@@ -63,30 +86,30 @@ function useFolderCounts() {
   }, [files]);
 }
 
-/** The Space's home in Files: its folders, and the files added last. */
-function FilesHome({ go }: { go: (next: FilesRoute) => void }) {
+/** A Domain's home in Files: its folders, and its files added last. */
+function FilesHome({ domainId, go }: { domainId: string; go: (next: FilesRoute) => void }) {
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
-  const space = useActivitySpaces().data.find((s) => s.id === spaceId);
-  const { data: files } = useSpaceAttachments(spaceId);
+  const name = useDomainName(domainId);
+  const files = useSpaceAttachments(spaceId).data.filter((f) => f.domain_id === domainId);
   const counts = useFolderCounts();
-  const newFolder = useNewFolder('files');
+  const newFolder = useNewFolder('files', domainId);
   return (
     <div className="h-full overflow-y-auto">
       <div className="px-6 pb-8 pt-5">
-        <h1 className="text-[17px] font-semibold text-foreground">{space?.name ?? t('Files')}</h1>
+        <h1 className="text-[17px] font-semibold text-foreground">{name}</h1>
         <div className="mt-6 flex items-center gap-2">
-          <button type="button" onClick={() => go({ view: 'folders' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Folders')}</button>
+          <button type="button" onClick={() => go({ domainId, view: 'folders' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Folders')}</button>
           <span className="flex-1" />
-          <Button type="button" variant="ghost" size="xs" onClick={() => { void newFolder().then((id) => { if (id) go({ folderId: id }); }); }}><FolderPlus size={13} />{t('New folder')}</Button>
+          <Button type="button" variant="ghost" size="xs" onClick={() => { void newFolder().then((id) => { if (id) go({ domainId, folderId: id }); }); }}><FolderPlus size={13} />{t('New folder')}</Button>
         </div>
-        <div className="-mx-3 mt-1"><FolderList app="files" counts={counts} onOpen={(id) => go({ folderId: id })} compact /></div>
+        <div className="-mx-3 mt-1"><FolderList app="files" domainId={domainId} counts={counts} onOpen={(id) => go({ domainId, folderId: id })} compact /></div>
         <div className="mt-8 flex items-center gap-2">
-          <button type="button" onClick={() => go({ view: 'files' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Recent files')}</button>
+          <button type="button" onClick={() => go({ domainId, view: 'files' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Recent files')}</button>
         </div>
         <div className="-mx-3 mt-1">
           {files.slice(0, 8).map((f) => (
-            <button key={f.id} type="button" onClick={() => go({ view: 'files', fileId: f.id })}
+            <button key={f.id} type="button" onClick={() => go({ domainId, view: 'files', fileId: f.id })}
               className="flex h-9 w-full items-center gap-3 rounded-md px-3 text-left hover:bg-foreground/[0.05]">
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 <FileTypeIcon name={f.name} mime={f.mime_type} />
@@ -128,8 +151,8 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
   const shown = useMemo(() => {
     const q = settled.toLowerCase();
     const matches = (f: SpaceFile) => !q || snippets.has(f.id) || f.name.toLowerCase().includes(q) || (f.owner_label ?? '').toLowerCase().includes(q);
-    return files.filter((f) => (!route.folderId || f.folder_id === route.folderId) && matches(f));
-  }, [files, settled, snippets, route.folderId]);
+    return files.filter((f) => (!route.domainId || f.domain_id === route.domainId) && (!route.folderId || f.folder_id === route.folderId) && matches(f));
+  }, [files, settled, snippets, route.domainId, route.folderId]);
   const open = files.find((f) => f.id === route.fileId) ?? null;
   const select = (f: SpaceFile | null) => onNavigate({ files: { ...route, fileId: f?.id ?? null } });
   const folder = useFolders('files').data.find((f) => f.id === route.folderId) ?? null;
@@ -147,13 +170,17 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
     <div className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-3 px-6 pb-3 pt-5">
-          {folder ? (
-            <h1 className="flex min-w-0 items-center gap-1 text-[17px] font-semibold text-foreground">
-              <button type="button" onClick={() => onNavigate({ files: { view: 'folders' } })} className="font-normal text-muted-foreground hover:text-foreground">{t('Folders')}</button>
-              <ChevronRight size={14} className="shrink-0 text-muted-foreground" />
-              <span className="truncate">{folder.name}</span>
-            </h1>
-          ) : <h1 className="text-[17px] font-semibold text-foreground">{t('Files')}</h1>}
+          <h1 className="flex min-w-0 items-center gap-1 text-[17px] font-semibold text-foreground">
+            {!route.domainId ? t('All files') : (
+              <Crumbs domainId={route.domainId} go={(next) => onNavigate({ files: next })}>
+                {folder ? <>
+                  <button type="button" onClick={() => onNavigate({ files: { domainId: route.domainId, view: 'folders' } })} className="font-normal text-muted-foreground hover:text-foreground">{t('Folders')}</button>
+                  <ChevronRight size={14} className="shrink-0 text-muted-foreground" />
+                  <span className="truncate">{folder.name}</span>
+                </> : <span>{t('Files')}</span>}
+              </Crumbs>
+            )}
+          </h1>
           <span className="text-[13px] tabular-nums text-muted-foreground">{shown.length}</span>
           <span className="flex-1" />
           {folder && (
@@ -240,7 +267,7 @@ function FilePane({ file, who, onClose }: { file: SpaceFile; who: string; onClos
               <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Move to')} title={t('Move to')}><FolderInput size={13} /></Button>
             </DropdownMenuTrigger>
             <MenuShell as="dropdown" align="end">
-              <MoveToFolderItems app="files" current={file.folder_id} onMove={(id) => { if (id) void moveFileToFolder(file, id).catch((e) => void appDialog.alert(e instanceof Error ? e.message : String(e))); }} />
+              <MoveToFolderItems app="files" domainId={file.domain_id} current={file.folder_id} onMove={(id) => { if (id) void moveFileToFolder(file, id).catch((e) => void appDialog.alert(e instanceof Error ? e.message : String(e))); }} />
             </MenuShell>
           </DropdownMenu>
         )}

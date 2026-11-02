@@ -288,6 +288,8 @@ export interface SpaceFile extends Attachment {
   owner_label: string | null;
   /** For a file on an Element: the Object it is in, to open it there. */
   element_object_id: string | null;
+  /** The Domain it sits in (through its Element, Object or folder); none for an Initiative's or a CRM record's. */
+  domain_id: string | null;
   versions: number;
 }
 

@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Folder as FolderIcon, FolderPlus, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -11,9 +12,9 @@ import { useFolderActions, useFolders, type FolderApp } from '@/hooks/folderData
 const fail = (e: unknown) => void appDialog.alert(e instanceof Error ? e.message : String(e));
 
 /** Asks for a name and makes a folder; resolves the new folder's id. */
-export function useNewFolder(app: FolderApp) {
+export function useNewFolder(app: FolderApp, domainId: string | null) {
   const { t } = useI18n();
-  const { create } = useFolderActions(app);
+  const { create } = useFolderActions(app, domainId);
   return async () => {
     const name = (await appDialog.prompt(t('Folder name')))?.trim();
     if (!name) return null;
@@ -27,17 +28,21 @@ export function useNewFolder(app: FolderApp) {
  * "…" renames or deletes it. `compact` draws only the rows (a home page's
  * section).
  */
-export function FolderList({ app, counts, onOpen, compact = false }: {
+export function FolderList({ app, domainId, title, counts, onOpen, compact = false }: {
   app: FolderApp;
+  /** The Domain whose folders these are. */
+  domainId: string | null;
+  /** The page's title (the Domain's name and "Folders"). */
+  title?: ReactNode;
   /** How many things each folder holds. */
   counts: Map<string, number>;
   onOpen: (folderId: string) => void;
   compact?: boolean;
 }) {
   const { t } = useI18n();
-  const { data: folders, loading } = useFolders(app);
-  const { rename, remove } = useFolderActions(app);
-  const newFolder = useNewFolder(app);
+  const { data: folders, loading } = useFolders(app, domainId);
+  const { rename, remove } = useFolderActions(app, domainId);
+  const newFolder = useNewFolder(app, domainId);
 
   const rows = folders.map((f) => (
     <div key={f.id} className="group/folder flex h-9 items-center gap-3 rounded-md px-3 hover:bg-foreground/[0.05]">
@@ -69,7 +74,7 @@ export function FolderList({ app, counts, onOpen, compact = false }: {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-3 px-6 pb-3 pt-5">
-        <h1 className="text-[17px] font-semibold text-foreground">{t('Folders')}</h1>
+        <h1 className="flex min-w-0 items-center gap-1 text-[17px] font-semibold text-foreground">{title ?? t('Folders')}</h1>
         <span className="text-[13px] tabular-nums text-muted-foreground">{folders.length}</span>
         <span className="flex-1" />
         <Button type="button" variant="ghost" size="xs" onClick={() => { void newFolder().then((id) => { if (id) onOpen(id); }); }}>
@@ -90,13 +95,13 @@ export function FolderList({ app, counts, onOpen, compact = false }: {
   );
 }
 
-/** The items of a "Move to" menu: every other folder (and, where an item
- *  may sit in none, out of its folder). */
-export function MoveToFolderItems({ app, current, onMove, allowNone = false }: {
-  app: FolderApp; current: string | null; onMove: (folderId: string | null) => void; allowNone?: boolean;
+/** The items of a "Move to" menu: every other folder of the Domain (and,
+ *  where an item may sit in none, out of its folder). */
+export function MoveToFolderItems({ app, domainId, current, onMove, allowNone = false }: {
+  app: FolderApp; domainId: string | null; current: string | null; onMove: (folderId: string | null) => void; allowNone?: boolean;
 }) {
   const { t } = useI18n();
-  const { data: folders } = useFolders(app);
+  const { data: folders } = useFolders(app, domainId);
   const others = folders.filter((f) => f.id !== current);
   return <>
     <MenuSectionLabel>{t('Move to')}</MenuSectionLabel>
