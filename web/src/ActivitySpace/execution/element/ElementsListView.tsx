@@ -40,10 +40,13 @@ import dynamic from 'next/dynamic';
 
 // The Gantt / Calendar / Custom tabs are split out of this view's
 // chunk and fetched only when one of those tabs is opened.
-const tabLoading = () => <div className="flex-1 flex items-center justify-center text-[13px] text-muted-foreground">Loading…</div>;
-const GanttView = dynamic(() => import('@/ActivitySpace/execution/element/gantt').then((m) => m.GanttView), { ssr: false, loading: tabLoading });
-const CalendarView = dynamic(() => import('@/ActivitySpace/sustainment/calendar/CalendarView').then((m) => m.CalendarView), { ssr: false, loading: tabLoading });
-const CustomView = dynamic(() => import('@/ActivitySpace/execution/element/custom').then((m) => m.CustomView), { ssr: false, loading: tabLoading });
+function TabLoading() {
+  const { t } = useI18n();
+  return <div className="flex-1 flex items-center justify-center text-[13px] text-muted-foreground">{t('Loading…')}</div>;
+}
+const GanttView = dynamic(() => import('@/ActivitySpace/execution/element/gantt').then((m) => m.GanttView), { ssr: false, loading: () => <TabLoading /> });
+const CalendarView = dynamic(() => import('@/ActivitySpace/sustainment/calendar/CalendarView').then((m) => m.CalendarView), { ssr: false, loading: () => <TabLoading /> });
+const CustomView = dynamic(() => import('@/ActivitySpace/execution/element/custom').then((m) => m.CustomView), { ssr: false, loading: () => <TabLoading /> });
 
 
 // View modes for the Domain-wide Elements view. We reuse the same

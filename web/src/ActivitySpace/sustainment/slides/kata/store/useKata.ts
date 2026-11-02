@@ -10,6 +10,7 @@ import * as D from "@/ActivitySpace/sustainment/slides/kata/model/deck";
 import { DEFAULT_SKILL, type Skill } from "@/ActivitySpace/sustainment/slides/kata/model/skill";
 import { setUiLocale, tx, type Lang } from "@/ActivitySpace/sustainment/slides/kata/i18n";
 import type { Locale } from "@/Function/i18n/locales";
+import { MESSAGES } from "@/Function/i18n/messages";
 import { toggleLook } from "@/ActivitySpace/sustainment/slides/kata/theme/mix";
 
 export type Panel = "chat" | "design" | "logic";
@@ -118,10 +119,8 @@ interface KataState {
 
 /** 既定のファイル名（今の言語）。どちらの言語の既定名も「まだ名付けていない」とみなす */
 const defaultFileName = () => tx("無題の資料", "Untitled deck");
-// A deck still wearing the name it was made with, in whichever language that was
-// (the app dictionary's "Untitled deck"; listed here so the editor does not pull
-// in every language's dictionary).
-const DEFAULT_FILE_NAMES = new Set(["無題の資料", "Untitled deck", "제목 없는 자료", "Présentation sans titre", "Presentación sin título"]);
+// A deck still wearing the name it was made with, in whichever language that was.
+const DEFAULT_FILE_NAMES = new Set(["無題の資料", "Untitled deck", ...(["ko", "fr", "es"] as const).map((l) => MESSAGES[l]["Untitled deck"]).filter(Boolean)]);
 const isDefaultFileName = (n: string) => DEFAULT_FILE_NAMES.has(n);
 
 // 保存先がいっぱいでも画面は止めない。保存できなかったことだけを一度知らせる

@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { MESSAGES } from './messages';
 import {
   DEFAULT_LOCALE,
   LOCALE_STORAGE_KEY,
@@ -11,31 +12,6 @@ import {
 
 const LOCALE_CHANGE_EVENT = 'alcon:locale-change';
 
-type TranslationMap = Record<string, string>;
-type Dictionaries = Record<Exclude<Locale, 'en'>, TranslationMap>;
-
-// The dictionaries (ja / ko / fr / es, ~800KB of source) are fetched only when
-// the viewer's language is not English, so English viewers never download
-// them. Until they arrive, messages fall back to the English source text.
-let dictionaries: Dictionaries | null = null;
-let dictionariesRequest: Promise<void> | null = null;
-
-function loadDictionaries(): Promise<void> {
-  dictionariesRequest ??= import('./messages').then((m) => {
-    dictionaries = m.MESSAGES;
-    window.dispatchEvent(new CustomEvent(LOCALE_CHANGE_EVENT));
-  }).catch((error) => {
-    dictionariesRequest = null;
-    console.error('Failed to load translations', error);
-  });
-  return dictionariesRequest;
-}
-
-/** The app dictionary's entry for `message` in `locale`, if it has arrived. */
-export function appMessage(locale: Locale, message: string): string | undefined {
-  return locale === 'en' ? message : dictionaries?.[locale][message];
-}
-
 let cachedLocale: Locale | null = null;
 
 function readLocale(): Locale {
@@ -44,13 +20,13 @@ function readLocale(): Locale {
   let saved: string | null = null;
   try { saved = window.localStorage.getItem(LOCALE_STORAGE_KEY); } catch { /* storage may be disabled */ }
   cachedLocale = resolveLocale(saved, window.navigator.languages ?? [window.navigator.language]);
-  if (cachedLocale !== 'en') void loadDictionaries();
   return cachedLocale;
 }
 
 /** The viewer's language outside React (data-layer notices); `t` inside it. */
 export function translate(message: string, values?: Record<string, string | number>): string {
-  return interpolate(appMessage(readLocale(), message) ?? message, values);
+  const locale = readLocale();
+  return interpolate(locale === 'en' ? message : (MESSAGES[locale][message] ?? message), values);
 }
 
 function subscribe(listener: () => void): () => void {
@@ -88,12 +64,9 @@ const I18nContext = createContext<I18nContextValue>(defaultValue);
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const locale = useSyncExternalStore(subscribe, readLocale, () => DEFAULT_LOCALE);
-  // Re-render once the dictionaries arrive so `t` picks them up.
-  const loadedDictionaries = useSyncExternalStore(subscribe, () => dictionaries, () => null);
 
   const setLocale = useCallback((nextLocale: Locale) => {
     cachedLocale = nextLocale;
-    if (nextLocale !== 'en') void loadDictionaries();
     try { window.localStorage.setItem(LOCALE_STORAGE_KEY, nextLocale); } catch { /* ignore */ }
     document.documentElement.lang = nextLocale;
     window.dispatchEvent(new CustomEvent(LOCALE_CHANGE_EVENT));
@@ -104,9 +77,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   }, [locale]);
 
   const t = useCallback<Translate>((message, values) => {
-    const translated = locale === 'en' ? message : (loadedDictionaries?.[locale][message] ?? message);
+    const translated = locale === 'en' ? message : (MESSAGES[locale][message] ?? message);
     return interpolate(translated, values);
-  }, [locale, loadedDictionaries]);
+  }, [locale]);
 
   const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

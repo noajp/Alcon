@@ -6,7 +6,7 @@
 // 値を埋める文は tx("{n} 枚", "{n} slides", { n }) と書く。
 // 言語が変わると AppShell が全体を描き直す。
 import type { Locale } from "@/Function/i18n/locales";
-import { appMessage } from "@/Function/i18n/I18nProvider";
+import { MESSAGES } from "@/Function/i18n/messages";
 import { KATA_TRANSLATIONS } from "./kataMessages";
 
 /** 資料・AI・書き出しで使う言語。日本語以外の画面では英語で作る */
@@ -34,7 +34,7 @@ export function getLang(): Lang {
 export function tx(ja: string, en: string, values?: Record<string, string | number>): string {
   const text = uiLocale === "ja" ? ja
     : uiLocale === "en" ? en
-    : KATA_TRANSLATIONS[uiLocale]?.[en] ?? appMessage(uiLocale, en) ?? en;
+    : KATA_TRANSLATIONS[uiLocale]?.[en] ?? MESSAGES[uiLocale]?.[en] ?? en;
   return values ? text.replace(/\{(\w+)\}/g, (all, key: string) => (key in values ? String(values[key]) : all)) : text;
 }
 
