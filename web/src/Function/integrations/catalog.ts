@@ -3,14 +3,18 @@
 // catalog is filtered, what an `integrations` row looks like when created
 // from a preset or a custom form, and how a stored `last_test` is read.
 //
+// A `model` connection is an AI model provider with a Messages API in
+// Anthropic's format. It is not an agent's tool: an AI Worker picks one as the
+// model it runs on (Settings › Team).
+//
 // Pure — no React, no Supabase — so the rules are unit-tested in
 // tests/integrationsCatalog.test.ts. Display strings here are English source
 // strings; the screen passes them through t().
 
-export type IntegrationKind = 'mcp' | 'http';
+export type IntegrationKind = 'mcp' | 'http' | 'model';
 export type IntegrationAuthType = 'none' | 'bearer' | 'header' | 'oauth';
 export type IntegrationDelegation = 'approve_each' | 'full_delegation';
-export type IntegrationCategory = 'project' | 'files' | 'communication' | 'development' | 'custom';
+export type IntegrationCategory = 'project' | 'files' | 'communication' | 'development' | 'models' | 'custom';
 export type IntegrationSource = 'official' | 'community' | 'custom';
 
 export interface IntegrationPreset {
@@ -63,6 +67,19 @@ export const INTEGRATION_PRESETS: readonly IntegrationPreset[] = [
     description: 'Read channels and post messages through the Slack Web API.',
     credentialLabel: 'Bot token (xoxb-)', category: 'communication', source: 'official', builtBy: 'Slack', featured: false, custom: false,
   },
+  // Model providers. Each serves Anthropic's Messages format under the base
+  // URL its own docs give for that format; any other such provider (GLM on
+  // https://api.z.ai/api/anthropic, say) connects as a Custom model API.
+  {
+    id: 'deepseek', name: 'DeepSeek', icon: '/integrations/deepseek.svg', kind: 'model', endpoint: 'https://api.deepseek.com/anthropic', auth: 'bearer',
+    description: 'Run AI agents on DeepSeek models.',
+    credentialLabel: 'API key', category: 'models', source: 'official', builtBy: 'DeepSeek', featured: false, custom: false,
+  },
+  {
+    id: 'kimi', name: 'Kimi', icon: '/integrations/kimi.svg', kind: 'model', endpoint: 'https://api.moonshot.ai/anthropic', auth: 'bearer',
+    description: 'Run AI agents on Moonshot AI\'s Kimi models.',
+    credentialLabel: 'API key', category: 'models', source: 'official', builtBy: 'Moonshot AI', featured: false, custom: false,
+  },
   {
     id: 'custom-mcp', name: 'Custom MCP', icon: null, kind: 'mcp', endpoint: null, auth: 'bearer',
     description: 'Connect any remote MCP server that speaks Streamable HTTP.',
@@ -73,17 +90,28 @@ export const INTEGRATION_PRESETS: readonly IntegrationPreset[] = [
     description: 'Connect any HTTPS API by its base URL. Agents can call paths under it.',
     credentialLabel: 'Credential', category: 'custom', source: 'custom', builtBy: 'You', featured: false, custom: true,
   },
+  {
+    id: 'custom-model', name: 'Custom model API', icon: null, kind: 'model', endpoint: null, auth: 'bearer',
+    description: 'Connect any model provider that serves the Anthropic Messages API format.',
+    credentialLabel: 'API key', category: 'custom', source: 'custom', builtBy: 'You', featured: false, custom: true,
+  },
 ];
+
+/** The custom preset an integration without a known preset is shown as. */
+export function customPresetFor(kind: IntegrationKind): IntegrationPreset {
+  return presetById(kind === 'mcp' ? 'custom-mcp' : kind === 'model' ? 'custom-model' : 'custom-http')!;
+}
 
 export const CATEGORY_LABELS: Record<IntegrationCategory, string> = {
   project: 'Project management',
   files: 'Files',
   communication: 'Communication',
   development: 'Development',
+  models: 'AI models',
   custom: 'Custom',
 };
 
-export const KIND_LABELS: Record<IntegrationKind, string> = { mcp: 'MCP', http: 'API' };
+export const KIND_LABELS: Record<IntegrationKind, string> = { mcp: 'MCP', http: 'API', model: 'AI model' };
 
 export const SOURCE_LABELS: Record<IntegrationSource, string> = {
   official: 'Official',
@@ -227,7 +255,8 @@ export function buildIntegrationRow(preset: IntegrationPreset, spaceId: string, 
   if (!name) return { ok: false, error: 'Enter a name.' };
   const endpoint = (draft.endpoint ?? '').trim();
   if (!isSafeEndpoint(endpoint)) return { ok: false, error: 'Enter an https URL on a public host.' };
-  const auth = draft.auth ?? 'bearer';
+  // A model provider always takes its key as a bearer credential.
+  const auth = preset.kind === 'model' ? 'bearer' : draft.auth ?? 'bearer';
   if (auth === 'oauth') return { ok: false, error: 'OAuth is not available for custom connections.' };
   let authHeader: string | null = null;
   if (auth === 'header') {

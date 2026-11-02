@@ -135,6 +135,8 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
   const unavailable = preset.unavailableReason;
   const readOnly = !canEdit || !!unavailable;
   const oauth = signsInWithOAuth(preset);
+  // A model provider is not a tool agents call, so it has no delegation.
+  const isModel = preset.kind === 'model';
   const provider = oauthProviderOf(preset) ?? 'google';
   const copy = OAUTH_COPY[provider];
   const oauthStatus = useIntegrationOAuthStatus(oauth && canEdit, provider);
@@ -287,7 +289,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
         <div className="space-y-4">
           {preset.custom && (
             <Field label={t('Name')}>
-              <Input value={name} onChange={(e) => setName(e.target.value)} disabled={readOnly} placeholder={preset.kind === 'mcp' ? t('My MCP server') : t('My API')} className="h-8 text-[13px] md:text-[13px]" />
+              <Input value={name} onChange={(e) => setName(e.target.value)} disabled={readOnly} placeholder={preset.kind === 'mcp' ? t('My MCP server') : isModel ? t('My model provider') : t('My API')} className="h-8 text-[13px] md:text-[13px]" />
             </Field>
           )}
 
@@ -300,7 +302,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
             )}
           </Field>
 
-          {preset.custom && (
+          {preset.custom && !isModel && (
             <Field label={t('Authentication')}>
               <div className="flex flex-wrap items-center gap-2">
                 <DropdownMenu>
@@ -395,7 +397,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
             </Field>
           )}
 
-          <Field label={t('Delegation')}>
+          {!isModel && <Field label={t('Delegation')}>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <ChoiceCard selected={delegation === 'approve_each'} label={t('Approve each time (recommended)')}
                 disabled={readOnly} onClick={() => setLive({ delegation: 'approve_each' })}>
@@ -411,10 +413,16 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
                 {t('With full delegation, agents send, update and delete in this service without asking. Use it only for services you trust.')}
               </p>
             )}
-          </Field>
+          </Field>}
+
+          {isModel && (
+            <p className="text-[12px] text-muted-foreground">
+              {t('Choose this connection as an AI agent\'s model in Settings › Team. Element content is sent to this provider when the agent runs.')}
+            </p>
+          )}
 
           <div className="-my-1">
-            <ToggleRow label={t('Enabled')} desc={t('When off, agents do not see this connection.')} value={enabled}
+            <ToggleRow label={t('Enabled')} desc={isModel ? t('When off, AI agents on this connection do not run.') : t('When off, agents do not see this connection.')} value={enabled}
               disabled={readOnly} onChange={(v) => setLive({ enabled: v })} />
           </div>
 

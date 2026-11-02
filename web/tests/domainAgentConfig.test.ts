@@ -40,6 +40,8 @@ describe('resolveAgentConfig', () => {
   it('runs as the default agent with no Worker and no Domain settings', () => {
     expect(resolveAgentConfig(null, null)).toEqual({
       disabledReason: null, agentName: 'Alcon Agent', model: pricing.DEFAULT_AGENT_MODEL,
+      providerId: null, price: pricing.AGENT_MODELS[pricing.DEFAULT_AGENT_MODEL],
+      modelLabel: pricing.AGENT_MODELS[pricing.DEFAULT_AGENT_MODEL].label,
       maxTotalTurns: cfg.DEFAULT_MAX_TOTAL_TURNS, instructions: null, domainInstructions: null,
     });
   });
@@ -57,6 +59,35 @@ describe('resolveAgentConfig', () => {
     expect(resolveAgentConfig(worker({}, 'claude-opus-5-5'), domain({ model: 'claude-haiku-4-5' })).model).toBe('claude-opus-5-5');
     expect(resolveAgentConfig(worker({}), domain({ model: 'claude-haiku-4-5' })).model).toBe('claude-haiku-4-5');
     expect(resolveAgentConfig(null, domain({ model: 'claude-sonnet-4-6' })).model).toBe(pricing.DEFAULT_AGENT_MODEL);
+  });
+
+  it('runs on the Worker\'s model connection with the model it names', () => {
+    const r = resolveAgentConfig(worker({ provider: 'int-1', price_input: 0.3, price_output: 1.2 }, 'deepseek-chat'), domain({ model: 'claude-haiku-4-5' }));
+    expect(r.disabledReason).toBeNull();
+    expect(r.providerId).toBe('int-1');
+    expect(r.model).toBe('deepseek-chat');
+    expect(r.modelLabel).toBe('deepseek-chat');
+    expect(r.price).toEqual({ input: 0.3, output: 1.2, cacheRead: 0.3 });
+  });
+
+  it('charges a connection without a price at Claude Sonnet\'s price', () => {
+    expect(resolveAgentConfig(worker({ provider: 'int-1' }, 'kimi-k3'), null).price).toEqual(pricing.UNPRICED_MODEL);
+    expect(resolveAgentConfig(worker({ provider: 'int-1', price_input: 1 }, 'kimi-k3'), null).price).toEqual(pricing.UNPRICED_MODEL);
+    expect(resolveAgentConfig(worker({ provider: 'int-1', price_input: -1, price_output: 2 }, 'kimi-k3'), null).price).toEqual(pricing.UNPRICED_MODEL);
+  });
+
+  it('does not run on a connection without a model name', () => {
+    expect(resolveAgentConfig(worker({ provider: 'int-1' }), null).disabledReason).toContain('モデル名');
+  });
+
+  it('does not quietly run another provider\'s model on Claude', () => {
+    const r = resolveAgentConfig({ name: 'DeepSeek', ai_config: null, ai_model: 'deepseek' }, null);
+    expect(r.disabledReason).toContain('「deepseek」');
+    expect(r.disabledReason).toContain('接続先');
+    // A Claude model the engine does not list still runs on the default Claude model.
+    expect(resolveAgentConfig(worker({}, 'claude-opus-4-7'), null)).toMatchObject({ disabledReason: null, model: pricing.DEFAULT_AGENT_MODEL, providerId: null });
+    // The Domain being switched off is the reason given first.
+    expect(resolveAgentConfig({ name: 'DeepSeek', ai_config: null, ai_model: 'deepseek' }, domain({ enabled: false })).disabledReason).toContain('無効');
   });
 
   it('takes the turn limit from the Worker, else the Domain, within the engine range', () => {
