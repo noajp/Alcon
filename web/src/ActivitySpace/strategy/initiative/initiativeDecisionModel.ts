@@ -14,7 +14,7 @@
 // =============================================================
 
 import { translate } from '@/Function/i18n/I18nProvider';
-import { dayNumberIfDate } from '@/Function/shared/dateUtils';
+import { dayNumberIfDate, toDateOnlyString as localDay } from '@/Function/shared/dateUtils';
 /** Mirrors the `intents.status` check constraint. */
 export type DecisionStatus = 'on_track' | 'at_risk' | 'off_track' | 'done';
 
@@ -121,13 +121,6 @@ function answeredOnOrAfter(lastReviewedAt: string | null | undefined, horizon: s
   const reviewed = dayNumberIfDate(localDay(at));
   const owed = dayNumberIfDate(horizon);
   return reviewed !== null && owed !== null && reviewed >= owed;
-}
-
-/** Today in the reader's own timezone, as `yyyy-MM-dd`. */
-function localDay(now: Date): string {
-  const m = `${now.getMonth() + 1}`.padStart(2, '0');
-  const d = `${now.getDate()}`.padStart(2, '0');
-  return `${now.getFullYear()}-${m}-${d}`;
 }
 
 export function toDecision(input: DecisionInput, now: Date): Decision {

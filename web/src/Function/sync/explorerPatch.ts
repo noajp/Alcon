@@ -334,6 +334,18 @@ export function insertElementIntoExplorer(data: ExplorerData, el: ElementWithDet
   return { objects: data.objects, rootElements: [...data.rootElements, el] };
 }
 
+/** Whether a new Element↔Object link changes nothing the cached lists show:
+ *  every cached list that holds the Object already lists the Element under
+ *  it (the elements INSERT that made the link was patched in first), or no
+ *  cached list holds the Object at all. Then the whole tree need not be
+ *  fetched again for it. */
+export function linkAlreadyShown(caches: readonly ExplorerData[], elementId: string, objectId: string): boolean {
+  return caches.every((data) => {
+    const obj = data.objects.find((o) => o.id === objectId);
+    return !obj || (obj.elements ?? []).some((e) => e.id === elementId);
+  });
+}
+
 // ---------- Reorder (drag-to-reorder lands before the write returns) ----------
 
 export interface OrderUpdate { id: string; order_index: number }

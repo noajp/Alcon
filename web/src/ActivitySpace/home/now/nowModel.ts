@@ -1,5 +1,5 @@
 import { normalizeDirection, type ElementEdge, type ElementWithDetails } from '@/types/database';
-import { dayIndexOf } from '@/Function/shared/dateUtils';
+import { dayIndexOf, toDateOnlyString } from '@/Function/shared/dateUtils';
 
 export type NowLane = 'attention' | 'ready' | 'waiting' | 'later';
 export type NowScope = 'mine' | 'team';
@@ -27,7 +27,7 @@ export function validWorkDate(value: string | null | undefined): string | null {
 }
 
 export function localWorkDate(date = new Date()): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return toDateOnlyString(date);
 }
 
 function isMyWork(element: ElementWithDetails, userId: string): boolean {
