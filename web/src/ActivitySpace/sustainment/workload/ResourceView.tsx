@@ -61,6 +61,8 @@ import {
   useWorkloadRange,
   type WorkloadRange,
 } from '@/Function/workload/workloadStore';
+import { IslandHeader } from '@/Function/shared/MainIsland';
+import { WorkloadDomainsMenu } from './WorkloadDomainsMenu';
 import { WorkloadPlanPanel } from '@/ActivitySpace/sustainment/workload/WorkloadPlanPanel';
 
 // =============================================================
@@ -104,14 +106,16 @@ export interface ResourceViewProps {
   workerId?: string;
   /** Clears `workerId`; shown as the × on the focus chip. */
   onClearWorker?: () => void;
-  /** The standalone surface publishes its readings for the Workload sidebar. */
+  /** The standalone surface publishes its readings for the People sidebar. */
   publish?: boolean;
+  /** Under the chart, with its own scroll — a focused Worker's profile. */
+  below?: React.ReactNode;
 }
 
 type Row = { worker: Worker; elements: ElementWithDetails[]; daily: number[] };
 type LoadedRow = Row & { capacity: number[]; spans: WorkerAvailability[]; utilization: number | null; overDays: number; dueAway: number };
 
-export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', onElementClick, roster, workerId, onClearWorker, publish = false }: ResourceViewProps = {}) {
+export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', onElementClick, roster, workerId, onClearWorker, publish = false, below }: ResourceViewProps = {}) {
   const { t } = useI18n();
   const { contextKey, domains, selectedDomainIds, elements, loading, error, retry } = useWorkloadData(scopeOverride);
   const { range, anchor } = useWorkloadRange();
@@ -287,12 +291,6 @@ export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', on
         focusName={focusName ?? null}
         onClearWorker={onClearWorker}
       />
-      {publish && !hideHeader && (
-        <div className="flex-shrink-0 px-4 pt-6 sm:px-8">
-          <h1 className={`${FONT.xl} text-foreground`}>{t(title)}</h1>
-          <p className={`${FONT.sm} mt-1 text-muted-foreground`}>{t('Who holds how much work against the hours they have, and what to change when it is too much.')}</p>
-        </div>
-      )}
       <KpiStrip
         loading={busy || failed}
         ahead={ahead}
@@ -302,7 +300,7 @@ export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', on
         unassignedCount={unassignedAll.length}
       />
 
-      <div className="flex min-h-0 flex-1">
+      <div className={`flex min-h-0 ${below ? 'max-h-[45%] shrink-0' : 'flex-1'}`}>
         <div className="min-w-0 flex-1 overflow-auto" aria-busy={busy}>
           {failed ? (
             <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-[13px] text-muted-foreground">
@@ -400,6 +398,7 @@ export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', on
           />
         )}
       </div>
+      {below && <div className="min-h-0 flex-1 overflow-y-auto border-t border-border/60">{below}</div>}
     </div>
   );
 }
@@ -442,21 +441,14 @@ function Header({
   onClearWorker?: () => void;
 }) {
   const { t } = useI18n();
+  // The path, as every island's: the surface (everyone), then the Worker in focus.
+  const crumbs = [
+    ...(title ? [{ id: 'all', label: t(title), onClick: focusName ? onClearWorker : undefined }] : []),
+    ...(focusName ? [{ id: 'worker', label: focusName }] : []),
+  ];
   return (
-    <div className="flex h-[50px] flex-shrink-0 items-center gap-2 overflow-hidden border-b border-border/60 bg-card px-4">
-      {title && <span className="text-[13px] font-semibold text-foreground">{t(title)}</span>}
-      {focusName && (
-        <span className="flex min-w-0 items-center gap-1 rounded-full bg-[var(--surface-strong)] py-0.5 pl-2.5 pr-1 text-[12px] text-foreground">
-          <span className="truncate">{focusName}</span>
-          {onClearWorker && (
-            <button type="button" onClick={onClearWorker} aria-label={t('Show everyone')} title={t('Show everyone')}
-              className="flex size-4 items-center justify-center rounded-full text-muted-foreground hover:text-foreground">
-              <X size={11} />
-            </button>
-          )}
-        </span>
-      )}
-      <div className="flex-1" />
+    <IslandHeader crumbs={crumbs} actions={<>
+      {!embedded && <WorkloadDomainsMenu />}
 
       <div className="flex items-center gap-1" role="group" aria-label={t('Zoom')}>
         {RANGE_LABELS.map((r) => (
@@ -495,7 +487,7 @@ function Header({
           )}
         </Button>
       )}
-    </div>
+    </>} />
   );
 }
 

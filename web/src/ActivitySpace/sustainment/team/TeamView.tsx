@@ -220,6 +220,22 @@ function TeamContent({ roster, onOpenWorkload, onOpenElement, onManageTeam }: Te
   </div>;
 }
 
+/** One Worker's profile — standing capacity, skills, what they are on —
+ *  under their load when People focuses on them. */
+export function PersonProfile({ workerId, onOpenElement }: { workerId: string; onOpenElement?: (elementId: string) => void }) {
+  const roster = useTeamRoster();
+  const workerIds = useMemo(() => roster.entries.map((entry) => entry.worker.id), [roster.entries]);
+  const skills = useWorkerSkills(workerIds);
+  const index = useMemo(() => skillIndex(skills.data.skills, skills.data.evidence, new Set(workerIds)), [skills.data, workerIds]);
+  const entry = roster.entries.find((e) => e.worker.id === workerId);
+  if (!entry) return null;
+  return <div className="max-w-3xl py-5 pl-[30px] pr-6">
+    <PersonPanel key={entry.worker.id} entry={entry} skills={skills} objectNames={roster.objectNames}
+      skillSuggestions={index.map((row) => row.name)} onOpenElement={onOpenElement}
+      capacity={<CapacityField worker={entry.worker} canManage={entry.canManage} onSave={roster.saveCapacity} />} />
+  </div>;
+}
+
 export function TeamView(props: TeamViewProps = {}) {
   const { t } = useI18n();
   const roster = useTeamRoster();
