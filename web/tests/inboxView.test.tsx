@@ -94,6 +94,9 @@ vi.mock('@/Function/membership/invitations', () => ({
 // What the active Space shows (ADR 0048); 'full' unless a test says otherwise.
 let scope: 'audit' | 'full' = 'full';
 vi.mock('@/Function/space/data', () => ({ useActiveSpaceScope: () => scope }));
+// Resolving an Object's Domain reads the Domain lists; these tests follow
+// notifications, so the lookup finds nothing and the plain route is taken.
+vi.mock('@/ActivitySpace/home/useOpenObject', () => ({ useOpenObject: () => async () => false }));
 
 vi.mock('@/providers/AuthProvider', () => ({
   useAuthContext: () => ({ user: { id: USER_ID }, profile: { display_name: 'Me' } }),
