@@ -372,3 +372,16 @@ export async function searchAttachments(spaceId: string, query: string, limit = 
   if (error) return [];
   return (data ?? []) as FoundFile[];
 }
+
+/** A file's text, to hand to the AI: the stored text, or — for a file not
+ *  read yet — read now (and stored). */
+export async function attachmentText(file: Pick<Attachment, 'id' | 'name' | 'mime_type' | 'path'>): Promise<string> {
+  const { data } = await supabase.from('attachment_texts').select('body').eq('attachment_id', file.id).maybeSingle();
+  const stored = (data as { body: string } | null)?.body;
+  if (stored) return stored;
+  const { data: blob, error } = await supabase.storage.from(BUCKET).download(file.path);
+  if (error || !blob) throw error ?? new Error('Could not read the file.');
+  const body = (await fileText(await blob.arrayBuffer(), file.name, file.mime_type)) ?? '';
+  void supabase.from('attachment_texts').upsert({ attachment_id: file.id, body });
+  return body;
+}
