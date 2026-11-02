@@ -1,9 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { countCompletedSince, latestDoneAt } from '../src/Function/shared/completion';
+import { countCompletedSince, isMoveIntoDone, latestDoneAt } from '../src/Function/shared/completion';
 import { addDays, startOfDay } from '../src/Function/shared/dateUtils';
 
 const status = (element_id: string, detail: string, created_at: string) =>
   ({ element_id, kind: 'status', detail, created_at });
+
+describe('isMoveIntoDone', () => {
+  it('is true only for a status row whose target is done', () => {
+    expect(isMoveIntoDone({ kind: 'status', detail: 'in_progress → done' })).toBe(true);
+    expect(isMoveIntoDone({ kind: 'status', detail: 'done → todo' })).toBe(false);
+    expect(isMoveIntoDone({ kind: 'renamed', detail: 'x → done' })).toBe(false);
+    expect(isMoveIntoDone({ kind: 'status', detail: null })).toBe(false);
+  });
+});
 
 describe('latestDoneAt', () => {
   it('reads the move into done from the trigger row, ignoring other moves and kinds', () => {

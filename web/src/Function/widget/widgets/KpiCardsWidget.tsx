@@ -12,7 +12,6 @@ interface Props { elements: ElementWithDetails[]; }
 
 /** The window "{n} done in the last 14 days" counts, today included. */
 const RECENT_DAYS = 14;
-const NO_DONE_TIMES: ReadonlyMap<string, string> = new Map();
 
 function Figure({ label, value, detail, alarm = false }: {
   label: string; value: number | string; detail: string; alarm?: boolean;
@@ -38,18 +37,24 @@ export function KpiCardsWidget({ elements }: Props) {
   // actually moved into done — not its due date or its last edit.
   const today = startOfDay(new Date()).getTime();
   const since = useMemo(() => addDays(new Date(today), -(RECENT_DAYS - 1)), [today]);
-  const { data: doneAt } = useDoneTimesSince(since);
+  const doneTimes = useDoneTimesSince(since);
   const recentDone = useMemo(
-    () => countCompletedSince(elements, doneAt ?? NO_DONE_TIMES, since),
-    [elements, doneAt, since],
+    () => doneTimes.data ? countCompletedSince(elements, doneTimes.data.doneAt, since) : null,
+    [elements, doneTimes.data, since],
   );
+  // Never a 0 that only means "not read yet" or "could not read".
+  const recentDetail = recentDone === null
+    ? (doneTimes.isError ? t('Recent completions unavailable') : t('Counting recent completions…'))
+    : doneTimes.data?.truncated
+      ? t('{n}+ done in the last 14 days', { n: recentDone })
+      : t('{n} done in the last 14 days', { n: recentDone });
   const hoursEfficiency = totalEstimated > 0 ? Math.round((totalActual / totalEstimated) * 100) : null;
   const oldest = overdueElements[0]?.due_date;
 
   return (
     <div className="grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-4">
       <Figure label={t('Completion')} value={`${completionRate}%`} detail={t('{done} done · {todo} todo · {active} active', { done: completedCount, todo: todoCount, active: inProgressCount })} />
-      <Figure label={t('In Progress')} value={inProgressCount} detail={t('{n} done in the last 14 days', { n: recentDone })} />
+      <Figure label={t('In Progress')} value={inProgressCount} detail={recentDetail} />
       <Figure label={t('Overdue')} value={overdueElements.length} alarm={overdueElements.length > 0}
         detail={oldest ? t('Oldest {n}d ago', { n: daysOverdue(oldest) }) : t('All on track')} />
       <Figure label={t('Hours')} value={hoursEfficiency !== null ? `${hoursEfficiency}%` : '—'}

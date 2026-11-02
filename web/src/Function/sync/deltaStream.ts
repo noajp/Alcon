@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
 import { retainChannel } from '@/hooks/sharedRealtime';
 import { archiveStateChanged } from '@/Function/shared/objectArchive';
+import { isMoveIntoDone } from '@/Function/shared/completion';
 import {
   type ExplorerData,
   patchElementInExplorer,
@@ -261,11 +262,11 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
       // Append-only; a DELETE carries only its id. A new row — a status the
       // trigger recorded for an agent, a note another client left — asks the
       // one Element's rail to look again. The key is elementActivity.ts's.
-      // A status row also moves the KPI's "done in the last 14 days"
-      // (elementActivity.ts's useDoneTimesSince).
-      const a = row as { element_id?: string; kind?: string };
+      // A move into done also moves the KPI's "done in the last 14 days"
+      // (elementActivity.ts's useDoneTimesSince); no other row does.
+      const a = row as { element_id?: string; kind?: string; detail?: string };
       if (d.type === 'INSERT' && a.element_id) invalidateSoon(qc, ['elementActivity', a.element_id]);
-      if (d.type === 'INSERT' && a.kind === 'status') invalidateSoon(qc, ['elementDoneTimes']);
+      if (d.type === 'INSERT' && isMoveIntoDone(a)) invalidateSoon(qc, ['elementDoneTimes']);
       return;
     }
 

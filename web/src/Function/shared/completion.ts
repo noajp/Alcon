@@ -50,18 +50,18 @@ interface StatusActivityRow {
   created_at: string;
 }
 
-/** The status a status row moved to, or null for any other row. */
-function statusMovedTo(row: StatusActivityRow): string | null {
-  if (row.kind !== 'status') return null;
+/** Whether an activity row records a move into done. */
+export function isMoveIntoDone(row: { kind?: string | null; detail?: string | null }): boolean {
+  if (row.kind !== 'status' || !row.detail) return false;
   const at = row.detail.lastIndexOf('→');
-  return at < 0 ? null : row.detail.slice(at + 1).trim();
+  return at >= 0 && row.detail.slice(at + 1).trim() === 'done';
 }
 
 /** Each Element's latest move into done, as an ISO instant. */
 export function latestDoneAt(rows: readonly StatusActivityRow[]): Map<string, string> {
   const out = new Map<string, string>();
   for (const row of rows) {
-    if (statusMovedTo(row) !== 'done') continue;
+    if (!isMoveIntoDone(row)) continue;
     const prev = out.get(row.element_id);
     if (!prev || Date.parse(row.created_at) > Date.parse(prev)) out.set(row.element_id, row.created_at);
   }
