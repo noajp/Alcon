@@ -2,7 +2,8 @@
 //
 // Two kinds, matching the integrations table:
 //   mcp   a remote MCP server over Streamable HTTP. Its tools become the
-//         agent's tools; readOnlyHint decides read vs write.
+//         agent's tools; readOnlyHint decides read vs write, believed only
+//         from vetted presets (trustsReadOnlyHint).
 //   http  a REST API under one base URL. The agent gets one http_request tool
 //         confined to that base; GET / HEAD are reads, the rest are writes.
 //
@@ -246,6 +247,23 @@ export function parseRpcBody(contentType: string, body: string, id: number): Rec
   return null;
 }
 
+// A remote server labels its own tools: readOnlyHint is whatever it says.
+// A connection to an arbitrary server could mark a write tool read-only and
+// so skip "approve each" (ELE_OBJ-025). The label is believed only from the
+// vetted presets at their catalog endpoints, and never for a tool whose name
+// says it writes; every other tool counts as a write.
+const VETTED_MCP: readonly { preset: string; endpoint: RegExp }[] = [
+  { preset: "github", endpoint: /^https:\/\/api\.githubcopilot\.com\/mcp\/?$/ },
+  { preset: "linear", endpoint: /^https:\/\/mcp\.linear\.app\/mcp\/?$/ },
+];
+const WRITE_VERB = /(^|[_\-.])(create|update|delete|remove|merge|push|send|post|put|patch|write|add|set|assign|close|archive|move|edit|rename|upload|invite|approve|reject|cancel|comment|reply|publish|run|execute|trigger|save|share|restore|resolve|submit|fork|star|dismiss|lock|request|mark|retire)([_\-.]|$)/i;
+
+/** Pure. Whether a tool's readOnlyHint may be believed for this connection. */
+export function trustsReadOnlyHint(row: Pick<IntegrationRow, "preset" | "endpoint">, toolName: string): boolean {
+  const vetted = VETTED_MCP.some((v) => v.preset === row.preset && v.endpoint.test(row.endpoint));
+  return vetted && !WRITE_VERB.test(toolName);
+}
+
 export class McpSession {
   private sessionId: string | null = null;
   private nextId = 1;
@@ -300,7 +318,7 @@ export class McpSession {
           name: t.name,
           description: typeof t.description === "string" ? t.description : "",
           inputSchema: (t.inputSchema as Record<string, unknown>) ?? { type: "object", properties: {} },
-          readOnly: ann.readOnlyHint === true,
+          readOnly: ann.readOnlyHint === true && trustsReadOnlyHint(this.row, t.name),
         });
       }
       cursor = typeof r?.nextCursor === "string" ? r.nextCursor : undefined;

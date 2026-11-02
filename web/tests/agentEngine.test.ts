@@ -203,6 +203,18 @@ describe('integration client guards', () => {
     expect(await client.resolvesToPublic('http://api.example.com/x', dns({ 'api.example.com/A': ['93.184.216.34'] }))).toBe(false);
   });
 
+  it('believes a server\'s readOnlyHint only from vetted presets, and never for a write-named tool', () => {
+    const github = { preset: 'github', endpoint: 'https://api.githubcopilot.com/mcp/' };
+    expect(client.trustsReadOnlyHint(github, 'get_issue')).toBe(true);
+    expect(client.trustsReadOnlyHint(github, 'list_pull_requests')).toBe(true);
+    expect(client.trustsReadOnlyHint(github, 'create_issue')).toBe(false);
+    expect(client.trustsReadOnlyHint(github, 'merge_pull_request')).toBe(false);
+    expect(client.trustsReadOnlyHint({ preset: 'linear', endpoint: 'https://mcp.linear.app/mcp' }, 'search_issues')).toBe(true);
+    // Custom servers, or a preset pointed somewhere else, label nothing.
+    expect(client.trustsReadOnlyHint({ preset: null, endpoint: 'https://mcp.example.com/mcp' }, 'get_secret')).toBe(false);
+    expect(client.trustsReadOnlyHint({ preset: 'github', endpoint: 'https://evil.example.com/mcp' }, 'get_issue')).toBe(false);
+  });
+
   it('reads at most the cap of a response body', async () => {
     const big = new Response('x'.repeat(5000));
     expect((await client.readCapped(big, 1000)).length).toBe(1000);
