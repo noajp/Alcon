@@ -417,6 +417,9 @@ const APP_MESSAGES: Record<string, Row> = {
   "Custom model API": ["カスタムモデル API", "사용자 지정 모델 API", "API de modèle personnalisée", "API de modelo personalizada"],
   "Connect any model provider that serves the Anthropic Messages API format.": ["Anthropic の Messages API 形式に対応した任意のモデル接続先をつなぎます。", "Anthropic Messages API 형식을 지원하는 모델 제공자를 연결합니다.", "Connectez tout fournisseur de modèles compatible avec le format de l’API Messages d’Anthropic.", "Conecta cualquier proveedor de modelos compatible con el formato de la API Messages de Anthropic."],
   "API key": ["API キー", "API 키", "Clé d’API", "Clave de API"],
+  "Initiative views": ["Initiative の表示", "Initiative 보기", "Vues de l’Initiative", "Vistas de la Initiative"],
+  "Execute": ["実行", "실행", "Exécution", "Ejecución"],
+  "Evaluate": ["評価", "평가", "Évaluation", "Evaluación"],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(APP_MESSAGES).map(([key, row]) => [key, row[index]]));
