@@ -71,7 +71,8 @@ export const ObjectRow = memo(function ObjectRow({
           ? (hasTrailingCol
               ? '[&>td:not(:first-child):not(:last-child)]:bg-[var(--accent-default)]/15 dark:[&>td:not(:first-child):not(:last-child)]:bg-[var(--accent-default)]/20 [&:hover>td:not(:first-child):not(:last-child)]:bg-[var(--accent-default)]/20 dark:[&:hover>td:not(:first-child):not(:last-child)]:bg-[var(--accent-default)]/25'
               : '[&>td:not(:first-child)]:bg-[var(--accent-default)]/15 dark:[&>td:not(:first-child)]:bg-[var(--accent-default)]/20 [&:hover>td:not(:first-child)]:bg-[var(--accent-default)]/20 dark:[&:hover>td:not(:first-child)]:bg-[var(--accent-default)]/25')
-          : ''
+          // Hover tints the cells after the lead one, which paints its own part (LEAD_CELL).
+          : (hasTrailingCol ? '[&:hover>td:not(:first-child):not(:last-child)]:bg-foreground/[0.06]' : '[&:hover>td:not(:first-child)]:bg-foreground/[0.06]')
       }`}
       onClick={(e) => {
         if (canRowSelect && (e.shiftKey || e.metaKey || e.ctrlKey)) {

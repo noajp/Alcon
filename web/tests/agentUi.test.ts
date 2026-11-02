@@ -21,7 +21,7 @@ describe('markdown for agent reports', () => {
   });
 
   it('keeps fenced code as is', () => {
-    expect(parseMarkdown('```json\n{"a": 1}\n```')).toEqual([{ t: 'code', v: '{"a": 1}' }]);
+    expect(parseMarkdown('```json\n{"a": 1}\n```')).toEqual([{ t: 'code', v: '{"a": 1}', lang: 'json' }]);
   });
 });
 
