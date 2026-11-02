@@ -1,4 +1,4 @@
-import { ListChecks, CircleDot, Loader } from 'lucide-react';
+import { ListChecks, CircleDot, Loader } from '@/ui/icons';
 import { ReactNode } from 'react';
 import type { CustomColumnType } from '@/types/database';
 

@@ -32,7 +32,7 @@ import { pushUndo } from '@/Function/shared/element/bulkUndo';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
-import { Trash2 } from 'lucide-react';
+import { Trash2 } from '@/ui/icons';
 import { ObjectMembersPanel } from '@/ActivitySpace/execution/object/ObjectMembersPanel';
 import { ObjectElementsView } from '@/ActivitySpace/execution/object/ObjectElementsView';
 import type { ListSection } from '@/Function/shared/listTable/shared';

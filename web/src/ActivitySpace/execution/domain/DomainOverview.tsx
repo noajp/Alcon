@@ -4,7 +4,7 @@ import { useDomainOverview } from '@/hooks/useDomainOverview';
 import { useBoard, WidgetSurface, WidgetZone, WidgetActionSlotProvider, WidgetActionSlotTarget, type WidgetHost } from '@/Function/widget';
 import { DOMAIN_OVERVIEW_BOARD } from '@/Function/widget/defaults';
 import { DomainIcon, ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
-import { Hash, Lock, Users } from 'lucide-react';
+import { Hash, Lock, Users } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { PageHead, PageLayout } from '@/Function/shared/PageHead';
 import { RailCard } from '@/Function/shared/RailCard';

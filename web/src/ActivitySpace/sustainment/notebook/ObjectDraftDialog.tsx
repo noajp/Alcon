@@ -7,7 +7,7 @@ import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from '@/hooks/objectDraft';
 import type { Brief } from '@/types/notes';
 import { useDomains } from '@/hooks/useSupabase';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface ObjectDraftDialogProps {

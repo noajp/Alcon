@@ -5,7 +5,7 @@ import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { Button } from '@/ui/button';
 import { useCallback, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { Menu, Plus, Check, X } from 'lucide-react';
+import { Menu, Plus, Check, X } from '@/ui/icons';
 import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { addElementAssignee, removeElementAssignee, fetchAssignableWorkers, useWorkerById, noticeAssignmentFailed } from '@/hooks/useSupabase';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';

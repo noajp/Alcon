@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye } from 'lucide-react';
+import { Eye } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /** Page-header mark for a Domain viewer: they read everything here and change

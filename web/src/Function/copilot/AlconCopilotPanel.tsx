@@ -3,7 +3,7 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/ui/button';
 
 import { useEffect, useRef, useState } from 'react';
-import { X, Maximize2, Minimize2, Paperclip } from 'lucide-react';
+import { X, Maximize2, Minimize2, Paperclip } from '@/ui/icons';
 import { SendIcon } from '@/Function/shared/SendIcon';
 import { type CopilotAttachment, type CopilotContext } from './useAlconCopilot';
 import { CopilotMessageView, AttachmentChips } from './CopilotMessages';

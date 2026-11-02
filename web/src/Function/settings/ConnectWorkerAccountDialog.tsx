@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X } from '@/ui/icons';
 import { supabase } from '@/lib/supabase';
 import { updateWorker } from '@/hooks/useSupabase';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';

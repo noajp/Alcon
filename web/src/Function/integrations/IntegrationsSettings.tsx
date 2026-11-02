@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, ChevronDown, ExternalLink, LayoutGrid, List, Search } from 'lucide-react';
+import { Check, ChevronDown, ExternalLink, LayoutGrid, List, Search } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';

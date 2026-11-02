@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2 } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { TextComposer } from '@/ui/text-composer';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';

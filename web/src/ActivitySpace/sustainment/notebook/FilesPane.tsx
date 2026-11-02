@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { FileText, Pencil, Plus, Trash2 } from 'lucide-react';
+import { FileText, Pencil, Plus, Trash2 } from '@/ui/icons';
 import type { NoteNode } from '@/types/notes';
 import { RenameInput } from './RenameInput';
 import { useI18n } from '@/Function/i18n/I18nProvider';

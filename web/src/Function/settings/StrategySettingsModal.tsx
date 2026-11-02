@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { NavStrategyIcon, NavPhaseIcon, NavTimelineIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';

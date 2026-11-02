@@ -8,7 +8,7 @@ import { ElementDependencies } from './ElementDependencies';
 import { CheckInDialog } from '../../home/now/CheckInDialog';
 import { STATUS, PRIORITY, FONT } from '@/shared/designTokens';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Calendar, User, Link2, Plus, CheckCircle2, Tag, Circle, Flag, History, Timer, ChevronRight, ChevronLeft, Pencil, Check, Compass } from 'lucide-react';
+import { Calendar, User, Link2, Plus, CheckCircle2, Tag, Circle, Flag, History, Timer, ChevronRight, ChevronLeft, Pencil, Check, Compass } from '@/ui/icons';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,7 +57,7 @@ import { workerTriggerLabel } from '@/Function/shared/workerReach';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
 import { liveLease, holderLabel, formatRemaining } from '@/Function/shared/element/lease';
 import { useNow } from '@/Function/shared/useNow';
-import { Fingerprint, Copy } from 'lucide-react';
+import { Fingerprint, Copy } from '@/ui/icons';
 import { labelColor, labelColorKey, domainLabelNames, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/Function/shared/labelColor';
 import { LabelPaletteRows } from '@/Function/shared/LabelPaletteRows';
 import { MenuShell } from '@/Function/shared/menu';
@@ -89,7 +89,7 @@ import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
-import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal } from 'lucide-react';
+import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal } from '@/ui/icons';
 import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
 import { AttachButton } from '@/Function/shared/attachments/AttachButton';
 import { FileImportActions, canImport } from './FileImportActions';

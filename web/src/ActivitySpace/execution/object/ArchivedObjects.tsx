@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
-import { Archive } from 'lucide-react';
+import { Archive } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { canManageObject } from '@/Function/shared/objectArchive';

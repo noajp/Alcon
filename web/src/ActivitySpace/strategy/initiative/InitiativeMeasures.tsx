@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { MoreHorizontal, Plus, X } from "lucide-react";
+import { MoreHorizontal, Plus, X } from '@/ui/icons';
 import {
   createIntent,
   deleteIntent,

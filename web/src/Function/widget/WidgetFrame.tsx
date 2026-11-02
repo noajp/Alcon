@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Minus } from 'lucide-react';
+import { Minus } from '@/ui/icons';
 import { FONT } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 import { RailCard } from '@/Function/shared/RailCard';

@@ -9,7 +9,7 @@ import {
 
   X,
   Search, CircleDashed, Flag, Tag, UserRound, Box, CalendarDays, Shapes, ArrowDownWideNarrow, ArrowUpNarrowWide, RotateCcw, Play,
-} from 'lucide-react';
+} from '@/ui/icons';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuItem,
 } from '@/ui/dropdown-menu';

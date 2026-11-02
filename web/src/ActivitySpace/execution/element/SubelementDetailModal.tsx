@@ -15,7 +15,7 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 // priority / assignee / comments live.
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Check, Trash2, X } from 'lucide-react';
+import { ArrowUp, Check, Trash2, X } from '@/ui/icons';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import {
   createSubelement,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
-import { Check, FolderInput, Trash2 } from 'lucide-react';
+import { Check, FolderInput, Trash2 } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { ActionsButton, ActionsContextMenu, type ActionItem } from '@/Function/shared/ActionMenus';

@@ -1,6 +1,6 @@
 'use client';
 
-import { Calendar as CalendarIcon, Check, UserRound } from 'lucide-react';
+import { Calendar as CalendarIcon, Check, UserRound } from '@/ui/icons';
 import { updateSubelement, type Worker } from '@/hooks/useSupabase';
 import type { Subelement } from '@/types/database';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';

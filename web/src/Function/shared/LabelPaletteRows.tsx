@@ -1,6 +1,6 @@
 'use client';
 
-import { Check } from 'lucide-react';
+import { Check } from '@/ui/icons';
 import { LABEL_PALETTE } from './labelColor';
 import { MENU_ROW } from './menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';

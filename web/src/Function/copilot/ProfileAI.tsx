@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
-import { ArrowUp, Square } from 'lucide-react';
+import { ArrowUp, Square } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { useAlconCopilot } from './useAlconCopilot';
 import { useI18n } from '@/Function/i18n/I18nProvider';

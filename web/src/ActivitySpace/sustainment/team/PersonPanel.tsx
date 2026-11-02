@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
-import { Bot, X } from 'lucide-react';
+import { Bot, X } from '@/ui/icons';
 import { ReachHint, WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { formatElementDate, toDateOnlyString } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';

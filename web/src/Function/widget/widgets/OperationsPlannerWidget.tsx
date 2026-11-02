@@ -1,7 +1,7 @@
 'use client';
 
 import { useContext, useMemo, useState } from 'react';
-import { ArrowUpRight, Plus, RefreshCw, Settings2, SlidersHorizontal } from 'lucide-react';
+import { ArrowUpRight, Plus, RefreshCw, Settings2, SlidersHorizontal } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
 import { useOperationsTables } from '@/hooks/useOperationsTemplate';

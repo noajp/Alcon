@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { LayoutGrid } from 'lucide-react';
+import { LayoutGrid } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';

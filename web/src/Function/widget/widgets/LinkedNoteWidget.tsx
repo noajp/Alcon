@@ -3,7 +3,7 @@
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus } from '@/ui/icons';
 import { updateObject } from '@/hooks/useSupabase';
 import { NotePicker } from '@/ActivitySpace/sustainment/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/sustainment/notebook/LinkedNoteEmbed';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { MoreHorizontal, Plus } from 'lucide-react';
+import { MoreHorizontal, Plus } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';

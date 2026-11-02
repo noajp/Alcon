@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { WidgetHeaderAction, useWidgetMeta } from '@/Function/widget/WidgetFrame';

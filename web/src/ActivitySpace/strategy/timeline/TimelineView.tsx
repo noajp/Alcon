@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight } from '@/ui/icons';
 import {
   fetchStrategyElements,
   useObjects,

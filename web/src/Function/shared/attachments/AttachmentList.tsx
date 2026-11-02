@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
-import { Check, Diff, History, Loader2, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
+import { Check, Diff, History, Loader2, RotateCcw, Sparkles, Trash2 } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';

@@ -32,7 +32,7 @@
 // and a date opened from a filter panel are the same object.
 
 import * as React from 'react';
-import { CalendarIcon, Check } from 'lucide-react';
+import { CalendarIcon, Check } from '@/ui/icons';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/ui/button';

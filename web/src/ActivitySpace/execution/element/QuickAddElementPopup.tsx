@@ -14,7 +14,7 @@ import {
   Tag as TagIcon,
   User as UserIcon,
   X,
-} from 'lucide-react';
+} from '@/ui/icons';
 import { ElementIcon, ObjectIcon as BoxIcon } from '@/Function/shared/conceptIcons';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { PriorityMark } from '@/Function/shared/PriorityMark';

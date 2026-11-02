@@ -18,7 +18,7 @@ import {
   Upload,
   Video,
   X,
-} from 'lucide-react';
+} from '@/ui/icons';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { TYPE_META, OVERLAY_COLOR_SWATCHES, DEFAULT_OVERLAY_COLOR, type FlagType } from './customColorScheme';
 import { useI18n } from '@/Function/i18n/I18nProvider';

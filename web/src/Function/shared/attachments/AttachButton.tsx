@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
-import { Loader2, Paperclip } from 'lucide-react';
+import { Loader2, Paperclip } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useAttachmentActions, type AttachmentOwner } from '@/hooks/attachmentData';

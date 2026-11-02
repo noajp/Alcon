@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, type ReactNode } from 'react';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from '@/ui/icons';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/ui/context-menu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 

@@ -4,7 +4,7 @@ import { useFocusTrap } from "@/ActivitySpace/sustainment/slides/kata/components
 
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { X } from '@/ui/icons';
 import { useDeckView } from "@/ActivitySpace/sustainment/slides/kata/components/useDeckView";
 import { useKata } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
 import { STORYLINE_BY_ID } from "@/ActivitySpace/sustainment/slides/kata/model/storyline";

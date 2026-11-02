@@ -1,6 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check } from '@/ui/icons';
 import { useKata } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
 
 /** 終わった操作を、画面の下で短く知らせる */

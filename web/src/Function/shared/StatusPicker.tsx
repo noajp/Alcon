@@ -2,7 +2,7 @@
 
 import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
 import { useRef, useState, type ReactNode } from 'react';
-import { Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp } from '@/ui/icons';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { updateElement } from '@/hooks/useSupabase';

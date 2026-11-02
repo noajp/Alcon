@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { AlertCircle, Check, CheckCheck, ChevronRight, Copy, FileText, Loader2, Pencil, RotateCcw } from 'lucide-react';
+import { AlertCircle, Check, CheckCheck, ChevronRight, Copy, FileText, Loader2, Pencil, RotateCcw } from '@/ui/icons';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';

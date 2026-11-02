@@ -3,7 +3,7 @@
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Plus, Search, X } from '@/ui/icons';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { IndexList, IndexRow } from '@/Function/shared/IndexList';

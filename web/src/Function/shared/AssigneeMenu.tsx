@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, X } from '@/ui/icons';
 import {
   DropdownMenuContent,
   DropdownMenuItem,

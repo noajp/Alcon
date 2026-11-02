@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowRight, CalendarClock, UserPlus, X } from 'lucide-react';
+import { ArrowRight, CalendarClock, UserPlus, X } from '@/ui/icons';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { CONTROL } from '@/shared/designTokens';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';

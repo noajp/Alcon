@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
-import { Plus } from 'lucide-react';
+import { Plus } from '@/ui/icons';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { reorderElements, reorderObjects, useElementCommentActivity, useElementBlockers, withCommentActivity } from '@/hooks/useSupabase';
 import { type DependencyBlocker } from '@/Function/shared/element/dependencyReadiness';

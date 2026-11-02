@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId } from '@/Function/space/domainsStore';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight } from '@/ui/icons';
 
 const DomainIconSvg = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

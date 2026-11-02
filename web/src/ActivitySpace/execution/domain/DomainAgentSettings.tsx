@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bot, Check, AlertTriangle, Loader2, Zap, ShieldCheck } from 'lucide-react';
+import { Bot, Check, AlertTriangle, Loader2, Zap, ShieldCheck } from '@/ui/icons';
 import { cn } from '@/lib/utils';
 import { updateDomain, pingAgentRuntime } from '@/hooks/useSupabase';
 import type { Domain, DomainAIConfig } from '@/hooks/useSupabase';

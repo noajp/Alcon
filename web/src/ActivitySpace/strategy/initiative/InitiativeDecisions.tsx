@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { MoreHorizontal, Plus, X } from 'lucide-react';
+import { MoreHorizontal, Plus, X } from '@/ui/icons';
 import {
   addIntentBinding,
   addIntentLineage,

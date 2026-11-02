@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowRight, Plus, X } from 'lucide-react';
+import { ArrowRight, Plus, X } from '@/ui/icons';
 import { useNowWork } from '@/hooks/useNowWork';
 import { setElementDependency } from '@/hooks/coordinationData';
 import { useCurrentUserId } from '@/providers/authContext';

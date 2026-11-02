@@ -1,6 +1,6 @@
 'use client';
 
-import { File, FileArchive, FileAudio, FileImage, FileText, FileVideo } from 'lucide-react';
+import { File, FileArchive, FileAudio, FileImage, FileText, FileVideo } from '@/ui/icons';
 
 // An attached file's kind, said by its icon, so its row needs only the title.
 // PDF, Word, Excel and PowerPoint show their own marks (from svgl.app, kept in

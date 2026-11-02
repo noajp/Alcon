@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus } from '@/ui/icons';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';

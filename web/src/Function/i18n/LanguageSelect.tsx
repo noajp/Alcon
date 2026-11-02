@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, ChevronDown, Languages } from 'lucide-react';
+import { Check, ChevronDown, Languages } from '@/ui/icons';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { Button } from '@/ui/button';
 import { LOCALE_NAMES, SUPPORTED_LOCALES } from './locales';

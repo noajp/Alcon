@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown } from '@/ui/icons';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from '@/ui/dropdown-menu';

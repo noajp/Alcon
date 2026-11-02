@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Diamond } from 'lucide-react';
+import { Diamond } from '@/ui/icons';
 import { daysUntil, parseDateOnly } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { STATUS } from '@/shared/designTokens';

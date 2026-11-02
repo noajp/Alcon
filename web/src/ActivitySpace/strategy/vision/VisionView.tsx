@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Calendar, Plus, X } from 'lucide-react';
+import { Calendar, Plus, X } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';

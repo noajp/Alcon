@@ -12,7 +12,7 @@ import {
   ChevronDown,
   User as UserIcon,
   X,
-} from 'lucide-react';
+} from '@/ui/icons';
 import { ObjectIcon as BoxIcon, DomainIcon } from '@/Function/shared/conceptIcons';
 import { DatePopover } from '@/Function/shared/date';
 import { useI18n } from '@/Function/i18n/I18nProvider';

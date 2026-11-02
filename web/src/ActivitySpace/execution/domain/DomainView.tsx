@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchCustomColumnsWithValues } from '@/hooks/useSupabase';
 
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
-import { ChevronRight, Plus } from 'lucide-react';
+import { ChevronRight, Plus } from '@/ui/icons';
 import { TabBar } from '@/shell/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';

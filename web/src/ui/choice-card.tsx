@@ -1,7 +1,7 @@
 'use client';
 
 import type { ComponentProps, ReactNode } from 'react';
-import { Check } from 'lucide-react';
+import { Check } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { cn } from '@/lib/utils';
 

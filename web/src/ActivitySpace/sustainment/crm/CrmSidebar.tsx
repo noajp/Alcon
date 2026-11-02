@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { BarChart3, Building2, Columns3, Layers, List, Settings2, Sun, Users } from 'lucide-react';
+import { BarChart3, Building2, Columns3, Layers, List, Settings2, Sun, Users } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ToolSidebar, type ToolNavItem } from '@/Function/shared/tool/ToolSidebar';
 import type { NavigationState } from '@/types/navigation';

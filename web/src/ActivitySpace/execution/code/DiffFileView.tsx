@@ -1,7 +1,7 @@
 'use client';
 
 import { forwardRef, useMemo, useState, type ReactNode } from 'react';
-import { AlertTriangle, Check, ChevronsUpDown, FileCode2, Github, MessageSquarePlus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
+import { AlertTriangle, Check, ChevronsUpDown, FileCode2, Github, MessageSquarePlus, RefreshCw, RotateCcw, Trash2 } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { isSubmitChord, isCancelKey } from '@/Function/shared/keyboard';

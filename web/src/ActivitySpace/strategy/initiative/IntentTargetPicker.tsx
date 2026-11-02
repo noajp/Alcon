@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Milestone, Plus, User, X } from 'lucide-react';
+import { Milestone, Plus, User, X } from '@/ui/icons';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';

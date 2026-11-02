@@ -9,7 +9,7 @@ import {
   Scale,
   UserRound,
   X,
-} from 'lucide-react';
+} from '@/ui/icons';
 import {
   useWorkerAvailability,
   type ElementWithDetails,

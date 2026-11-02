@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { TextComposer } from '@/ui/text-composer';
 import { useGeneratedApp } from '@/hooks/useGeneratedApp';

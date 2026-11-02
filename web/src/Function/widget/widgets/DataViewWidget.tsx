@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ChevronDown, Settings2, Trash2 } from "lucide-react";
+import { ChevronDown, Settings2, Trash2 } from '@/ui/icons';
 import {
   Bar,
   BarChart,

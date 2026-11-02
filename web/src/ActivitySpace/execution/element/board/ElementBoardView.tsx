@@ -13,7 +13,7 @@ import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
-import { Plus, Calendar, User, Check } from 'lucide-react';
+import { Plus, Calendar, User, Check } from '@/ui/icons';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as CalendarPicker } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';

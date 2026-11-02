@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Link2, X } from 'lucide-react';
+import { Link2, X } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { Crm } from '@/hooks/useCrm';

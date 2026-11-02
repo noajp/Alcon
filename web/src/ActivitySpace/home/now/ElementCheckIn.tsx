@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
-import { Loader2 } from 'lucide-react';
+import { Loader2 } from '@/ui/icons';
 import type { ElementWithDetails } from '@/types/database';
 import { fetchElementWithDetails } from '@/hooks/useSupabase';
 import { useCurrentUserId } from '@/providers/authContext';

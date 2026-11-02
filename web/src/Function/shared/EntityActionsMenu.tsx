@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { MoreHorizontal, Copy, Trash2, ArrowRightLeft, GitBranch, Check } from 'lucide-react';
+import { MoreHorizontal, Copy, Trash2, ArrowRightLeft, GitBranch, Check } from '@/ui/icons';
 import {
   DropdownMenu,
   DropdownMenuTrigger,

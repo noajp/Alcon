@@ -24,7 +24,7 @@ import {
   Trash2,
   Type,
   Underline,
-} from "lucide-react";
+} from '@/ui/icons';
 import { useKata } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
 import { useDeckView } from "@/ActivitySpace/sustainment/slides/kata/components/useDeckView";
 import { updateSlide } from "@/ActivitySpace/sustainment/slides/kata/model/deck";

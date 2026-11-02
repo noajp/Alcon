@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext } from 'react';
-import { LayoutDashboard, List, ListChecks, CircleAlert } from 'lucide-react';
+import { LayoutDashboard, List, ListChecks, CircleAlert } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { OPERATIONS_QUEUES, operationsQueueLabel, type OperationsQueue } from './operationsQueues';
