@@ -6,6 +6,10 @@ type Row = [ja: string, ko: string, fr: string, es: string];
 
 const STRATEGY_MESSAGES: Record<string, Row> = {
   // Initiative list and page
+  'This Object contributes to no Initiative yet.': ['この Object はまだどの Initiative にも貢献していません。', '이 Object는 아직 어떤 Initiative에도 기여하지 않습니다.', 'Cet Object ne contribue encore à aucune Initiative.', 'Este Object aún no contribuye a ninguna Initiative.'],
+  'Link to an Initiative': ['Initiative に紐づける', 'Initiative에 연결', 'Lier à une Initiative', 'Vincular a una Initiative'],
+  'Link to an Initiative…': ['Initiative に紐づける…', 'Initiative에 연결…', 'Lier à une Initiative…', 'Vincular a una Initiative…'],
+  'Only the Initiative’s owner or an owner of its Space can link Objects to it.': ['Object を紐づけられるのは、Initiative の作成者か Space のオーナーだけです。', 'Initiative 작성자 또는 Space 소유자만 Object를 연결할 수 있습니다.', 'Seul le créateur de l’Initiative ou un propriétaire de son Space peut y lier des Objects.', 'Solo el creador de la Initiative o un propietario de su Space puede vincularle Objects.'],
   '{count} Elements could not be moved, so the Phase was not closed.': ['{count} 件の Element を移せなかったため、Phase は閉じていません。', 'Element {count}개를 옮기지 못해 Phase를 닫지 않았습니다.', '{count} Elements n’ont pas pu être déplacés : la Phase n’a pas été clôturée.', 'No se pudieron mover {count} Elements, así que la Phase no se cerró.'],
   'Some Objects could not be unlinked from this Initiative.': ['一部の Object をこの Initiative から外せませんでした。', '일부 Object를 이 Initiative에서 해제하지 못했습니다.', 'Certains Objects n’ont pas pu être détachés de cette Initiative.', 'Algunos Objects no se pudieron desvincular de esta Initiative.'],
   'Create your first Initiative': ['最初の Initiative を作成', '첫 Initiative 만들기', 'Créez votre première Initiative', 'Crea tu primera Initiative'],
