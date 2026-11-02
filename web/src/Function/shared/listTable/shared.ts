@@ -79,13 +79,21 @@ export function dropLineVar(edge: 'before' | 'after' | undefined): string | unde
   return undefined;
 }
 
-// Row hover / selection highlight is a rounded pill on the data cells (2nd …
-// 2nd-last). A single hovered/selected row reads as a full rounded chip.
-export const ROW_ROUND_BASE = '[&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg';
+// Row hover / selection highlight is a rounded pill from the lead mark (the
+// status, the Object icon) to the 2nd-last cell. The lead cell keeps its 30px
+// inset, so it paints its part as a ::before starting just before the mark
+// (LEAD_CELL), rounded on the left; the last data cell rounds the right.
+export const ROW_ROUND_BASE = '[&>td:nth-last-child(2)]:rounded-r-lg';
+
+/** The lead cell's share of the row highlight (see ROW_ROUND_BASE). Behind
+ *  the mark (-z), so the mark stays crisp. */
+export const LEAD_CELL = "before:pointer-events-none before:absolute before:inset-y-0 before:left-5 before:right-0 before:-z-10 before:rounded-l-lg before:transition-colors before:content-['']";
+export const LEAD_CELL_HOVER = 'group-hover:before:bg-foreground/[0.06]';
+export const LEAD_CELL_SELECTED = 'before:bg-[var(--accent-default)]/15 dark:before:bg-[var(--accent-default)]/20 group-hover:before:bg-[var(--accent-default)]/20 dark:group-hover:before:bg-[var(--accent-default)]/25';
 
 // Object rows on the Objects list carry no trailing "+" column, so the pill
 // runs all the way to the LAST cell (Elements) instead of stopping one short.
-export const ROW_ROUND_TO_LAST = '[&>td:nth-child(2)]:rounded-l-lg [&>td:last-child]:rounded-r-lg';
+export const ROW_ROUND_TO_LAST = '[&>td:last-child]:rounded-r-lg';
 
 // For a CONTIGUOUS block of selected rows, square off the corners that touch
 // the neighbour so the block reads as one continuous pill instead of a stack
@@ -93,16 +101,16 @@ export const ROW_ROUND_TO_LAST = '[&>td:nth-child(2)]:rounded-l-lg [&>td:last-ch
 // the row immediately above / below is also selected.
 export function selectionSquareClass(selPrev?: boolean, selNext?: boolean): string {
   let s = '';
-  if (selPrev) s += ' [&>td:nth-child(2)]:!rounded-tl-none [&>td:nth-last-child(2)]:!rounded-tr-none';
-  if (selNext) s += ' [&>td:nth-child(2)]:!rounded-bl-none [&>td:nth-last-child(2)]:!rounded-br-none';
+  if (selPrev) s += ' [&>td:first-child]:before:!rounded-tl-none [&>td:nth-last-child(2)]:!rounded-tr-none';
+  if (selNext) s += ' [&>td:first-child]:before:!rounded-bl-none [&>td:nth-last-child(2)]:!rounded-br-none';
   return s;
 }
 
 // ROW_ROUND_TO_LAST's counterpart — squares the last cell's corners instead.
 export function selectionSquareClassToLast(selPrev?: boolean, selNext?: boolean): string {
   let s = '';
-  if (selPrev) s += ' [&>td:nth-child(2)]:!rounded-tl-none [&>td:last-child]:!rounded-tr-none';
-  if (selNext) s += ' [&>td:nth-child(2)]:!rounded-bl-none [&>td:last-child]:!rounded-br-none';
+  if (selPrev) s += ' [&>td:first-child]:before:!rounded-tl-none [&>td:last-child]:!rounded-tr-none';
+  if (selNext) s += ' [&>td:first-child]:before:!rounded-bl-none [&>td:last-child]:!rounded-br-none';
   return s;
 }
 

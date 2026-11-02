@@ -15,7 +15,7 @@ import { ObjectIcon } from '@/shell/icons';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { useListColumns, sortElements, NAME_COL_KEY, NAME_MIN_WIDTH, type ColumnId, type DataColumn, type ColumnEntity } from '@/Function/shared/listTable/useListColumns';
-import { EMPTY_CUSTOM_COLUMNS, EMPTY_ELEMENT_TYPES, EMPTY_WORKERS, EMPTY_ELEMENT_IDS, type ElementUpdate, type ListSection, HEADER_DRAG_PREFIX, OBJECT_DRAG_PREFIX, ROW_ROUND_BASE, STICKY_TINT_HOVER } from './shared';
+import { EMPTY_CUSTOM_COLUMNS, EMPTY_ELEMENT_TYPES, EMPTY_WORKERS, EMPTY_ELEMENT_IDS, type ElementUpdate, type ListSection, HEADER_DRAG_PREFIX, OBJECT_DRAG_PREFIX, ROW_ROUND_BASE, STICKY_TINT_HOVER, LEAD_CELL, LEAD_CELL_HOVER } from './shared';
 import { ElementRow } from './ElementRow';
 import { reorderWithinSections } from './rowReorder';
 import { ObjectRow } from './ObjectRow';
@@ -785,7 +785,7 @@ export function ListTable({
                     className={`group cursor-pointer [&>td]:transition-colors ${ROW_ROUND_BASE} [&:hover>td:not(.sticky):not(:last-child)]:bg-foreground/[0.06] ${STICKY_TINT_HOVER}`}
                     onClick={onAddObject}
                   >
-                    <td className="sticky left-0 z-10 bg-card w-13 pl-7.5 pr-1.5 py-2">
+                    <td className={`sticky left-0 z-10 bg-card w-13 pl-7.5 pr-1.5 py-2 ${LEAD_CELL} ${LEAD_CELL_HOVER}`}>
                       <div className="flex items-center text-muted-foreground">
                         <ObjectIcon size={16} />
                       </div>
