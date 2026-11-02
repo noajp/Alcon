@@ -15,7 +15,7 @@ import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
 import type { ElementActivity } from '@/types/database';
-import { latestDoneAt } from '@/Function/shared/completion';
+import { latestClosedAt, latestDoneAt } from '@/Function/shared/completion';
 
 export type ActivityKind =
   | 'created'
@@ -103,28 +103,66 @@ export function useDoneTimesSince(since: Date) {
   return useQuery({
     queryKey: ['elementDoneTimes', sinceIso],
     queryFn: async (): Promise<DoneTimes> => {
-      type Row = Pick<ElementActivity, 'element_id' | 'kind' | 'detail' | 'created_at'>;
-      const rows: Row[] = [];
-      for (let page = 0; page < DONE_TIMES_MAX_PAGES; page++) {
-        const from = page * DONE_TIMES_PAGE;
-        const { data, error } = await supabase
-          .from('element_activity')
-          .select('element_id, kind, detail, created_at')
-          .eq('kind', 'status')
-          .like('detail', '%→ done')
-          .gte('created_at', sinceIso)
-          .order('created_at', { ascending: false })
-          .order('id', { ascending: false })
-          .range(from, from + DONE_TIMES_PAGE - 1);
-        if (error) throw error;
-        const got = (data ?? []) as Row[];
-        rows.push(...got);
-        if (got.length < DONE_TIMES_PAGE) return { doneAt: latestDoneAt(rows), truncated: false };
-      }
-      return { doneAt: latestDoneAt(rows), truncated: true };
+      const { rows, truncated } = await fetchMovesIntoSince('done', sinceIso);
+      return { doneAt: latestDoneAt(rows), truncated };
     },
     staleTime: 60_000,
   });
+}
+
+interface ClosedTimes {
+  /** Each Element's latest move into done or cancelled in the window (ISO). */
+  closedAt: Map<string, string>;
+  truncated: boolean;
+}
+
+/**
+ * When each visible Element last moved into done or cancelled, for moves at
+ * or after `since` — the list's "Completed Elements" window. Off while
+ * `enabled` is false (the window is 'all' or 'none' and needs no times).
+ * deltaStream invalidates the `elementClosedTimes` key on such a move.
+ */
+export function useClosedTimesSince(since: Date, enabled: boolean) {
+  const sinceIso = since.toISOString();
+  return useQuery({
+    queryKey: ['elementClosedTimes', sinceIso],
+    queryFn: async (): Promise<ClosedTimes> => {
+      const [done, cancelled] = await Promise.all([
+        fetchMovesIntoSince('done', sinceIso),
+        fetchMovesIntoSince('cancelled', sinceIso),
+      ]);
+      return {
+        closedAt: latestClosedAt([...done.rows, ...cancelled.rows]),
+        truncated: done.truncated || cancelled.truncated,
+      };
+    },
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+type StatusRow = Pick<ElementActivity, 'element_id' | 'kind' | 'detail' | 'created_at'>;
+
+/** Status rows that end in `status`, at or after `sinceIso`, newest first. */
+async function fetchMovesIntoSince(status: 'done' | 'cancelled', sinceIso: string): Promise<{ rows: StatusRow[]; truncated: boolean }> {
+  const rows: StatusRow[] = [];
+  for (let page = 0; page < DONE_TIMES_MAX_PAGES; page++) {
+    const from = page * DONE_TIMES_PAGE;
+    const { data, error } = await supabase
+      .from('element_activity')
+      .select('element_id, kind, detail, created_at')
+      .eq('kind', 'status')
+      .like('detail', `%→ ${status}`)
+      .gte('created_at', sinceIso)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + DONE_TIMES_PAGE - 1);
+    if (error) throw error;
+    const got = (data ?? []) as StatusRow[];
+    rows.push(...got);
+    if (got.length < DONE_TIMES_PAGE) return { rows, truncated: false };
+  }
+  return { rows, truncated: true };
 }
 
 /** Append an entry and refresh the rail. actor_id is stamped by the database. */

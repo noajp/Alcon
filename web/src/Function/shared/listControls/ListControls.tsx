@@ -128,8 +128,8 @@ interface ListControlsProps {
    *  Elements tab, where grouping by Object is redundant — you're already
    *  scoped to one). */
   hideObjectGrouping?: boolean;
-  /** Offer the "Completed Elements" window — only where the list applies
-   *  it (ElementsList). */
+  /** Offer the "Completed Elements" window — on Element lists (buildSections
+   *  applies it to List, Board, Calendar and Gantt alike), not Object lists. */
   showClosedWindow?: boolean;
 }
 

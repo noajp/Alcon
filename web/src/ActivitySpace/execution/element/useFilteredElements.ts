@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { useElementBlockers } from '@/hooks/useSupabase';
 import type { ListSection } from '@/Function/shared/listTable/shared';
-import { buildSections, type ListControlsState } from '@/Function/shared/listControls';
+import { buildSections, useClosedWindow, type ListControlsState } from '@/Function/shared/listControls';
 import { hasActiveFilter } from '@/Function/shared/listControls/types';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { sectionElements } from './sectionElements';
@@ -23,11 +23,12 @@ export function useFilteredElements(
   const elementIds = useMemo(() => (controls ? elements.map((e) => e.id) : []), [elements, controls]);
   const blockers = useElementBlockers(elementIds);
   const blockedElementIds = useMemo(() => new Set(Object.keys(blockers)), [blockers]);
+  const closedTimes = useClosedWindow(controls?.display.closed);
   return useMemo(() => {
     if (!controls) return { sections: objectSections, elements, filtering: false };
-    const sections = buildSections(elements, objectSections, controls, user?.id ?? null, blockedElementIds);
+    const sections = buildSections(elements, objectSections, controls, user?.id ?? null, blockedElementIds, closedTimes);
     // `filtering` lets a view drop quick-create affordances whose new Element
     // the filter could hide the moment it is made.
     return { sections, elements: sectionElements(sections), filtering: hasActiveFilter(controls.filter) };
-  }, [elements, objectSections, controls, user?.id, blockedElementIds]);
+  }, [elements, objectSections, controls, user?.id, blockedElementIds, closedTimes]);
 }

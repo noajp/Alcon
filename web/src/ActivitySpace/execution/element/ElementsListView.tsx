@@ -592,8 +592,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
             showOwnerFilter={false}
             onReset={() => setControls(DEFAULT_STATE)}
             sortColumnsStorageKey="domain-elements"
-            // The window applies to the List tab (ElementsList).
-            showClosedWindow={effectiveViewMode === 'elements'}
+            showClosedWindow
           />
         }
       />

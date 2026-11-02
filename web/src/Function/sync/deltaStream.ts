@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
 import { retainChannel } from '@/hooks/sharedRealtime';
 import { archiveStateChanged } from '@/Function/shared/objectArchive';
-import { isMoveIntoDone } from '@/Function/shared/completion';
+import { isMoveIntoClosed, isMoveIntoDone } from '@/Function/shared/completion';
 import {
   type ExplorerData,
   patchElementInExplorer,
@@ -267,6 +267,9 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
       const a = row as { element_id?: string; kind?: string; detail?: string };
       if (d.type === 'INSERT' && a.element_id) invalidateSoon(qc, ['elementActivity', a.element_id]);
       if (d.type === 'INSERT' && isMoveIntoDone(a)) invalidateSoon(qc, ['elementDoneTimes']);
+      // A move into done or cancelled moves the lists' "Completed Elements"
+      // window (useClosedTimesSince).
+      if (d.type === 'INSERT' && isMoveIntoClosed(a)) invalidateSoon(qc, ['elementClosedTimes']);
       return;
     }
 

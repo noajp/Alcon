@@ -172,8 +172,12 @@ export function buildSections(
   controls: ListControlsState,
   currentUserId: string | null,
   blockedElementIds?: ReadonlySet<string>,
+  /** Clock and close times for the Display's "Completed Elements" window
+   *  (useClosedWindow). Absent → closed Elements are not windowed. */
+  closedTimes?: { now: number; closedAt: ReadonlyMap<string, string> | undefined },
 ): ListSection[] {
-  const opts = { currentUserId, blockedElementIds };
+  const closedWindow = closedTimes ? { window: controls.display.closed, ...closedTimes } : undefined;
+  const opts = { currentUserId, blockedElementIds, closedWindow };
   const effGroupBy = effectiveGroupBy(controls.filter, controls.display.groupBy);
   if (effGroupBy === 'object') {
     if (objectSections && objectSections.length > 0) {
