@@ -59,7 +59,7 @@ export function WidgetPicker({
     const q = query.trim().toLowerCase();
     const entries: { def: WidgetDefinition; zone: Zone }[] = [];
     for (const def of Object.values(WIDGET_REGISTRY)) {
-      if (!def.accepts.includes(subjectKind)) continue;
+      if (def.retired || !def.accepts.includes(subjectKind)) continue;
       const zone = def.zones.find((z) => availableZones.includes(z));
       if (!zone) continue;
       if (def.singleton && placedTypes.has(def.type)) continue;

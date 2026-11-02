@@ -143,6 +143,8 @@ export interface WidgetDefinition {
    * board deletes those contents for everyone, so removing it asks first.
    */
   holdsContents?: boolean;
+  /** No longer offered in the picker; boards that placed it still draw it. */
+  retired?: boolean;
   /**
    * Lazy component. The definition owning its own import is what removed the
    * central `renderWidget` switch — every widget now code-splits by default

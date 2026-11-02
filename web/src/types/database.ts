@@ -1424,7 +1424,7 @@ export interface AgentAction {
   created_at: string
 }
 
-export interface AgentArtifact {
+export interface AgentOutput {
   id: string
   element_id: string
   run_id: string | null

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, FileUp, Loader2, Settings2 } from '@/ui/icons';
+import { Check, FileUp, Files, Loader2, Settings2 } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell, MenuSectionLabel, MENU_SEPARATOR } from '@/Function/shared/menu';
@@ -12,6 +12,9 @@ import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
 import SheetChartView from '@/Function/office/SheetChart';
 import type { ChartData } from '@/Function/office/chartLayout';
 import { attachmentOwnerOf, attachmentSource, useAttachment, useAttachments, useAttachmentsOf, type Attachment } from '@/hooks/attachmentData';
+import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
+import { AttachButton } from '@/Function/shared/attachments/AttachButton';
+import { FileImportActions, canImport } from '@/ActivitySpace/execution/element/FileImportActions';
 import { WidgetHeaderAction, useWidgetMeta } from '../WidgetFrame';
 import type { WidgetProps } from '../types';
 
@@ -19,24 +22,45 @@ import type { WidgetProps } from '../types';
 export type FileWidgetShow = 'file' | 'chart' | 'value';
 
 /**
- * A file attached to the board's subject or one of its Elements, shown on
- * the board: the whole file (slides, pages, sheets — a deck plays full
- * screen), one of its charts, or one cell of a workbook as a key number.
- * Which file and what of it are the placement's params; the bytes stay where
- * they are attached, so whoever cannot see that sees nothing here either.
+ * The board subject's artifacts — an Object's or an Initiative's own
+ * evidence: the proposal, the analysis, the minutes. By default every one,
+ * each previewed in place (Word and Excel editable, saved as versions) and
+ * able to become a Note, a Table or a deck; the paperclip attaches more.
+ *
+ * Or one of them pinned (its own or its Elements'): the whole file (slides,
+ * pages, sheets — a deck plays full screen), one of its charts, or one cell
+ * of a workbook as a key number. Which file and what of it are the
+ * placement's params; the bytes stay where they are attached, so whoever
+ * cannot see that sees nothing here either. A Domain has no artifacts of its
+ * own, so there the widget always shows one.
  */
-export function FileWidget({ params, setParams, host }: WidgetProps) {
+export function ArtifactsWidget({ params, setParams, host }: WidgetProps) {
   const { t } = useI18n();
   const fileId = typeof params.fileId === 'string' ? params.fileId : null;
+  const owner = attachmentOwnerOf(host.subject);
   const show: FileWidgetShow = params.show === 'chart' || params.show === 'value' ? params.show : 'file';
   const file = useAttachment(fileId);
   // What can be pinned: the subject's own files, then its Elements'.
-  const own = useAttachments(attachmentOwnerOf(host.subject));
+  const own = useAttachments(owner);
   const ofElements = useAttachmentsOf('element', host.elements.map((e) => e.id));
   const candidates = useMemo(() => ({ data: [...own.data, ...ofElements.data], loading: own.loading || ofElements.loading }), [own.data, own.loading, ofElements.data, ofElements.loading]);
   const editable = !host.readOnly;
-  useWidgetMeta(file.data?.name ?? t('File'));
+  useWidgetMeta(fileId ? file.data?.name ?? t('Artifacts') : own.data.length ? String(own.data.length) : null);
 
+  // Every artifact, with the paperclip and a way to pin one.
+  if (!fileId && owner) {
+    return <>
+      {editable && (
+        <WidgetHeaderAction>
+          <AttachButton owner={owner} size={13}
+            className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50" />
+          {candidates.data.length > 0 && <PinMenu files={candidates.data} onPick={(f) => setParams({ fileId: f.id, show: 'file' })} />}
+        </WidgetHeaderAction>
+      )}
+      <AttachmentList owner={owner} actions={(f) => (canImport(f.name) ? <FileImportActions file={f} /> : undefined)}
+        empty={<p className="py-1 text-sm text-muted-foreground">{t('No artifacts yet. Attach a proposal, an analysis or minutes with the paperclip.')}</p>} />
+    </>;
+  }
   if (!fileId) {
     return <FilePicker files={candidates.data} loading={candidates.loading} disabled={!editable} onPick={(f) => setParams({ fileId: f.id, show: 'file' })} />;
   }
@@ -47,7 +71,7 @@ export function FileWidget({ params, setParams, host }: WidgetProps) {
     <>
       {editable && (
         <WidgetHeaderAction>
-          <FileWidgetMenu file={file.data} show={show} params={params} candidates={candidates.data}
+          <FileWidgetMenu file={file.data} show={show} params={params} candidates={candidates.data} listsAll={!!owner}
             onChange={(next) => setParams({ ...params, ...next })} />
         </WidgetHeaderAction>
       )}
@@ -115,7 +139,7 @@ function FileValue({ file, sheet, cell, label }: { file: Attachment; sheet: stri
 function FilePicker({ files, loading, disabled, onPick }: { files: Attachment[]; loading: boolean; disabled: boolean; onPick: (f: Attachment) => void }) {
   const { t } = useI18n();
   if (loading) return <Spinner />;
-  if (!files.length) return <p className="py-1 text-sm text-muted-foreground">{t('No files are attached here yet.')}</p>;
+  if (!files.length) return <p className="py-1 text-sm text-muted-foreground">{t('No artifacts here yet.')}</p>;
   return (
     <div className="space-y-0.5">
       <p className="pb-1 text-[12px] text-muted-foreground">{t('Choose a file to show')}</p>
@@ -131,8 +155,10 @@ function FilePicker({ files, loading, disabled, onPick }: { files: Attachment[];
 }
 
 /** The header menu: what to show, which chart, which cell, another file. */
-function FileWidgetMenu({ file, show, params, candidates, onChange }: {
+function FileWidgetMenu({ file, show, params, candidates, listsAll, onChange }: {
   file: Attachment; show: FileWidgetShow; params: Record<string, unknown>; candidates: Attachment[];
+  /** The subject has artifacts of its own: leaving the pinned file shows them all. */
+  listsAll: boolean;
   onChange: (next: Record<string, unknown>) => void;
 }) {
   const { t } = useI18n();
@@ -147,7 +173,7 @@ function FileWidgetMenu({ file, show, params, candidates, onChange }: {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="icon-xs" aria-label={t('File widget settings')} title={t('File widget settings')}><Settings2 size={13} /></Button>
+        <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Artifacts settings')} title={t('Artifacts settings')}><Settings2 size={13} /></Button>
       </DropdownMenuTrigger>
       <MenuShell as="dropdown" align="end" width="wide">
         <MenuSectionLabel>{t('Show')}</MenuSectionLabel>
@@ -176,8 +202,31 @@ function FileWidgetMenu({ file, show, params, candidates, onChange }: {
           {candidates.slice(0, 20).map((f) => item(f.id === file.id, f.name, () => onChange({ fileId: f.id, show: 'file' }), f.id))}
         </>}
         <div className={MENU_SEPARATOR} />
-        <DropdownMenuItem onSelect={() => onChange({ fileId: null })}><FileUp size={13} />{t('Choose another file')}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => onChange({ fileId: null })}>
+          {listsAll ? <><Files size={13} />{t('Show every artifact')}</> : <><FileUp size={13} />{t('Choose another file')}</>}
+        </DropdownMenuItem>
       </MenuShell>
     </DropdownMenu>
   );
 }
+
+/** From every artifact to one of them on the board — its whole file, a chart or a value. */
+function PinMenu({ files, onPick }: { files: Attachment[]; onPick: (f: Attachment) => void }) {
+  const { t } = useI18n();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Show one artifact')} title={t('Show one artifact')}><Settings2 size={13} /></Button>
+      </DropdownMenuTrigger>
+      <MenuShell as="dropdown" align="end" width="wide">
+        <MenuSectionLabel>{t('Show one artifact')}</MenuSectionLabel>
+        {files.slice(0, 20).map((f) => (
+          <DropdownMenuItem key={f.id} onSelect={() => onPick(f)}>
+            <FileTypeIcon name={f.name} mime={f.mime_type} size={13} /><span className="flex-1 truncate">{f.name}</span>
+          </DropdownMenuItem>
+        ))}
+      </MenuShell>
+    </DropdownMenu>
+  );
+}
+

@@ -106,7 +106,7 @@ function FilesHome({ domainId, go }: { domainId: string; go: (next: FilesRoute) 
         </div>
         <div className="mt-1"><FolderList app="files" domainId={domainId} counts={counts} onOpen={(id) => go({ domainId, folderId: id })} compact /></div>
         <div className="mt-8 flex items-center gap-2 px-[18px]">
-          <button type="button" onClick={() => go({ domainId, view: 'files' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Recent files')}</button>
+          <button type="button" onClick={() => go({ domainId, view: 'files' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Recent artifacts')}</button>
         </div>
         <div className="mt-1">
           {files.slice(0, 8).map((f) => (
@@ -122,7 +122,7 @@ function FilesHome({ domainId, go }: { domainId: string; go: (next: FilesRoute) 
               <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(f.created_at, true)}</span>
             </button>
           ))}
-          {!files.length && <p className="px-[18px] py-4 text-[13px] text-muted-foreground">{t('No files yet. Make a folder and drop files into it, or attach them to Elements, Objects, Initiatives or CRM records.')}</p>}
+          {!files.length && <p className="px-[18px] py-4 text-[13px] text-muted-foreground">{t('No artifacts yet. Make a folder and drop files into it, or attach them to Elements, Objects, Initiatives or CRM records.')}</p>}
         </div>
       </div>
     </div>
@@ -170,10 +170,10 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
 
   const go = (next: FilesRoute) => onNavigate({ files: next });
   const domainName = useDomainName(route.domainId);
-  const crumbs: IslandCrumb[] = !route.domainId ? [{ id: 'all', label: t('All files') }] : [
+  const crumbs: IslandCrumb[] = !route.domainId ? [{ id: 'all', label: t('All artifacts') }] : [
     { id: 'domain', label: domainName, onClick: () => go({ domainId: route.domainId }) },
     ...(folder ? [{ id: 'folders', label: t('Folders'), onClick: () => go({ domainId: route.domainId, view: 'folders' as const }) }, { id: 'folder', label: folder.name }]
-      : [{ id: 'files', label: t('Files') }]),
+      : [{ id: 'files', label: t('Artifacts') }]),
   ];
 
   return (
@@ -184,7 +184,7 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
       )}
       <label className="flex h-7 w-56 items-center gap-1.5 rounded-md bg-muted/50 px-2 text-[12.5px] focus-within:bg-muted">
         <Search size={12} className="shrink-0 text-muted-foreground" />
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Search names and contents')} aria-label={t('Search files')}
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Search names and contents')} aria-label={t('Search artifacts')}
           className="min-w-0 flex-1 bg-transparent outline-none" />
       </label>
     </>}>
@@ -202,7 +202,7 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
           onDragLeave={folder ? () => setDropping(false) : undefined}
           onDrop={folder ? (e) => { e.preventDefault(); setDropping(false); drop(e.dataTransfer.files); } : undefined}>
           {loading ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{t('Loading…')}</p>
-            : !shown.length ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{folder ? t('This folder is empty. Drop files here, or add them with the paperclip.') : files.length ? t('No files match.') : t('No files yet. Make a folder and drop files into it, or attach them to Elements, Objects, Initiatives or CRM records.')}</p>
+            : !shown.length ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{folder ? t('This folder is empty. Drop files here, or add them with the paperclip.') : files.length ? t('No files match.') : t('No artifacts yet. Make a folder and drop files into it, or attach them to Elements, Objects, Initiatives or CRM records.')}</p>
             : shown.map((f) => {
               const owner = ownerOf(f);
               const active = open?.id === f.id;

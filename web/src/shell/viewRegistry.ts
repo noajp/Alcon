@@ -86,7 +86,7 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   domains:       { label: 'Domains',     icon: NavDomainIcon },
   reviews:       { label: 'Reviews',     icon: GitCompare },
   tables:        { label: 'Table',       icon: NavTableIcon },
-  files:         { label: 'Files',       icon: NavFilesIcon },
+  files:         { label: 'Artifacts',   icon: NavFilesIcon },
   slides:        { label: 'Slides',      icon: NavSlidesIcon },
   team:          { label: 'People',      icon: NavTeamsIcon },
   crm:           { label: 'CRM',         icon: NavCrmIcon },
