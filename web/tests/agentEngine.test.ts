@@ -175,6 +175,27 @@ describe('integration client guards', () => {
     expect(client.isSafeEndpoint('https://app.asana.com/api/1.0')).toBe(true);
   });
 
+  it('judges resolved addresses, not just the host name', () => {
+    for (const ok of ['8.8.8.8', '151.101.1.69', '2606:4700::6810:84e5', '2001:4860:4860::8888']) expect(client.isPublicAddress(ok)).toBe(true);
+    for (const bad of ['10.0.0.1', '127.0.0.1', '169.254.169.254', '172.16.3.4', '192.168.0.1', '100.64.0.1', '0.0.0.0', '224.0.0.1',
+      '::1', '::', 'fd00::1', 'fe80::1', 'fec0::1', 'ff02::1', '::ffff:10.0.0.1', '::ffff:127.0.0.1', '64:ff9b::a00:1', '2001:db8::1']) {
+      expect(client.isPublicAddress(bad)).toBe(false);
+    }
+  });
+
+  it('refuses a public name that resolves to a private address', async () => {
+    const dns = (table: Record<string, string[]>) => async (host: string, type: 'A' | 'AAAA') => {
+      const hit = table[`${host}/${type}`];
+      if (!hit) throw new Error('NXDOMAIN');
+      return hit;
+    };
+    expect(await client.resolvesToPublic('https://api.example.com/x', dns({ 'api.example.com/A': ['93.184.216.34'] }))).toBe(true);
+    expect(await client.resolvesToPublic('https://evil.example.com/x', dns({ 'evil.example.com/A': ['169.254.169.254'] }))).toBe(false);
+    expect(await client.resolvesToPublic('https://mixed.example.com/x', dns({ 'mixed.example.com/A': ['93.184.216.34'], 'mixed.example.com/AAAA': ['::1'] }))).toBe(false);
+    expect(await client.resolvesToPublic('https://nothing.example.com/x', dns({}))).toBe(false);
+    expect(await client.resolvesToPublic('http://api.example.com/x', dns({ 'api.example.com/A': ['93.184.216.34'] }))).toBe(false);
+  });
+
   it('reads at most the cap of a response body', async () => {
     const big = new Response('x'.repeat(5000));
     expect((await client.readCapped(big, 1000)).length).toBe(1000);
