@@ -63,6 +63,77 @@ export function isSafeEndpoint(raw: string): boolean {
   return true;
 }
 
+/** Pure. True when an IPv4 address is in a private, loopback, link-local,
+ *  CGNAT, benchmark, metadata, multicast or reserved range. */
+function isPrivateV4(ip: string): boolean {
+  const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return true;
+  const [a, b, c] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || (a === 198 && (b === 18 || b === 19))
+    || (a === 192 && b === 0 && (c === 0 || c === 2))             // IETF protocol / documentation
+    || (a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113) // documentation
+    || a >= 224;
+}
+
+/** Pure. True when a resolved address (IPv4 or IPv6) is one the server may
+ *  call: public unicast. IPv6 forms that embed an IPv4 address (mapped,
+ *  compatible, NAT64) are judged by that address. */
+export function isPublicAddress(raw: string): boolean {
+  const ip = raw.toLowerCase().replace(/^\[|\]$/g, "").split("%")[0];
+  if (!ip.includes(":")) return !isPrivateV4(ip);
+  const embedded = ip.match(/^(?:::ffff:|::|64:ff9b::)(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (embedded) return !isPrivateV4(embedded[1]);
+  if (ip === "::" || ip === "::1") return false;
+  const first = parseInt(ip.split(":")[0] || "0", 16);
+  if ((first & 0xfe00) === 0xfc00) return false;   // fc00::/7 unique local
+  if ((first & 0xffc0) === 0xfe80) return false;   // fe80::/10 link-local
+  if ((first & 0xffc0) === 0xfec0) return false;   // fec0::/10 site-local
+  if ((first & 0xff00) === 0xff00) return false;   // ff00::/8 multicast
+  if (first === 0x64 && ip.startsWith("64:ff9b:")) return false; // NAT64 in hex form
+  if (first === 0x2001 && /^2001:0*db8:/.test(ip)) return false; // documentation
+  return (first & 0xe000) === 0x2000;               // 2000::/3 global unicast
+}
+
+type Resolve = (host: string, type: "A" | "AAAA") => Promise<string[]>;
+
+/** Deno's resolver, or null where the runtime does not offer one. */
+function denoResolver(): Resolve | null {
+  const deno = (globalThis as unknown as { Deno?: { resolveDns?(h: string, t: string): Promise<string[]> } }).Deno;
+  return deno?.resolveDns ? (host, type) => deno.resolveDns!(host, type) : null;
+}
+
+/** A lookup that failed because the name has no such record, as opposed to
+ *  the resolver itself being unavailable or not permitted. */
+function isNoRecord(error: unknown): boolean {
+  const name = (error as { name?: string } | null)?.name ?? "";
+  return name === "NotFound" || /no (?:such|data)|nxdomain|not found/i.test(String((error as Error)?.message ?? ''));
+}
+
+/**
+ * True when every address the endpoint's host resolves to is public. The
+ * hostname check alone let a public name that resolves to 10.x / 169.254.x
+ * through (ELE_OBJ-024); this asks DNS just before the request. A name with
+ * no addresses is refused. Where the runtime has no resolver, or every lookup
+ * fails for a reason other than "no such record", the host-name check stands
+ * alone, as before. (A rebinding answer that changes between this check and
+ * the request is not covered.)
+ */
+export async function resolvesToPublic(raw: string, resolve: Resolve | null = denoResolver()): Promise<boolean> {
+  if (!isSafeEndpoint(raw)) return false;
+  const host = new URL(raw).hostname.toLowerCase().replace(/\.+$/, "");
+  // An address literal is judged as written; isSafeEndpoint already did.
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return isPublicAddress(host);
+  // Where the runtime offers no resolver (or refuses it), fall back to the
+  // host-name check rather than stopping every integration.
+  if (!resolve) return true;
+  const lookups = await Promise.allSettled([resolve(host, "A"), resolve(host, "AAAA")]);
+  if (lookups.every((r) => r.status === "rejected" && !isNoRecord(r.reason))) return true;
+  const addresses = lookups.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+  if (addresses.length === 0) return false;
+  return addresses.every(isPublicAddress);
+}
+
 /**
  * Pure. True when an integration points at this Alcon project itself — its
  * Supabase host or the legacy `<ref>.functions.supabase.co` host, which also
@@ -192,6 +263,7 @@ export class McpSession {
     };
     if (this.sessionId) headers["mcp-session-id"] = this.sessionId;
     const body = notify ? { jsonrpc: "2.0", method, params } : { jsonrpc: "2.0", id, method, params };
+    if (!(await resolvesToPublic(this.row.endpoint))) throw new Error("integration endpoint resolves to a non-public address");
     const res = await fetchWithTimeout(this.row.endpoint, { method: "POST", headers, body: JSON.stringify(body) });
     const sid = res.headers.get("mcp-session-id");
     if (sid) this.sessionId = sid;
@@ -276,6 +348,7 @@ export async function callHttp(row: IntegrationRow, secret: string | null, input
     headers["content-type"] = "application/json";
     body = typeof input.body === "string" ? input.body : JSON.stringify(input.body);
   }
+  if (!(await resolvesToPublic(url))) throw new Error("integration endpoint resolves to a non-public address");
   const res = await fetchWithTimeout(url, { method, headers, body });
   const text = method === "HEAD" ? "" : await readCapped(res);
   return { text: truncate(`HTTP ${res.status}\n${text}`), isError: !res.ok };
