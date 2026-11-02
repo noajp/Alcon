@@ -630,8 +630,10 @@ export function ListTable({
               ))}
             </SortableContext>
             {hasTrailingCol && (
-              // Keep column controls at the right edge of the flexible spacer.
-              <th className="table-cell w-8 px-1 py-2.5 bg-card text-center">
+              // Keep column controls at the right edge of the flexible spacer,
+              // and pinned there while the list slides sideways (z-30 above
+              // the data column headers scrolling under it).
+              <th className="table-cell sticky top-0 right-0 z-30 w-8 px-1 py-2.5 bg-card text-center">
                 {/* Trailing "+": which fields show as columns, and a new
                     field where the list has a scope to create one in. */}
                 <div className="flex items-center justify-end">
