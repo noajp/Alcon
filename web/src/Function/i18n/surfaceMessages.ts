@@ -5,6 +5,9 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const SURFACE_MESSAGES: Record<string, Row> = {
+  'Follow': ['フォロー', '팔로우', 'Suivre', 'Seguir'],
+  'Unfollow': ['フォローをやめる', '팔로우 취소', 'Ne plus suivre', 'Dejar de seguir'],
+  'Your Domains': ['あなたの Domain', '내 Domain', 'Vos Domains', 'Tus Domains'],
   'Show as': ['表示', '표시', 'Afficher en', 'Mostrar como'],
   'Preview': ['プレビュー', '미리보기', 'Aperçu', 'Vista previa'],
   'Code': ['コード', '코드', 'Code', 'Código'],

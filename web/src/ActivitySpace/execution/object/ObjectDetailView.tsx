@@ -8,7 +8,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import {
-  createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement,
+  createElement, addElementToObject, removeElementFromObject, updateElement, updateElements, restoreElementsField, deleteElement,
   fetchAllWorkers,
   useObjectTabs, reorderObjectTabs, useDomains, useElementTemplates, usePhases, useObjectMilestones, createObjectTab, deleteObjectTab,
   deleteObject, addDomainElementType, removeDomainElementType,
@@ -141,7 +141,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
   useEffect(() => { latestElements.current = object.elements ?? []; });
   useEffect(() => {
     const onRequest = (e: Event) => {
-      const id = (e as CustomEvent<string>).detail;
+      const id = (e as CustomEvent<string | null>).detail;
+      if (id === null) { setDetailElementIdRaw(null); onElementDetailChange?.(false); return; }
       if (!latestElements.current.some((el) => el.id === id)) return;
       clearElementDetail(id);
       setDetailElementIdRaw(id);
@@ -408,15 +409,14 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
     const els = object.elements ?? [];
     const prev = new Map<string, unknown>();
     for (const id of selectedRowIds) prev.set(id, (els.find((e) => e.id === id) as Record<string, unknown> | undefined)?.[field] ?? null);
-    for (const id of selectedRowIds) {
-      try { await updateElement(id, { [field]: value }); } catch (e) { console.error('Bulk edit failed', id, e); }
-    }
+    // One batched write for the whole selection, not a round trip each.
+    try { await updateElements([...selectedRowIds], { [field]: value }); } catch (e) { console.error('Bulk edit failed', e); }
     clearSelection();
     await onRefresh?.();
     pushUndo({
       label,
       undo: async () => {
-        for (const [id, original] of prev) { try { await updateElement(id, { [field]: original }); } catch (e) { console.error(e); } }
+        try { await restoreElementsField(field, prev); } catch (e) { console.error(e); }
         await onRefresh?.();
       },
     });

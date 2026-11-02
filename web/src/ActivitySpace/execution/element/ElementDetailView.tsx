@@ -1,5 +1,6 @@
 'use client';
 
+import { FollowButton } from '@/Function/shared/FollowButton';
 import { AiWorkingMark } from '@/Function/shared/element/AiWorkingMark';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUserId } from '@/providers/authContext';
@@ -754,7 +755,9 @@ function ElementDetailBody({
   return (
     <div ref={rootRef} className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Breadcrumb — data hierarchy only: Domain > Object > Element. */}
-      <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
+      {/* pl-6 + the crumb's px-1.5: the path starts 30px in, as on every
+          island, and the page below starts under it. */}
+      <div className="h-[50px] flex items-center gap-1 pl-6 pr-2 border-b border-border/60 bg-card flex-shrink-0">
         <div className="flex items-center gap-1 min-w-0 text-[13px] font-medium">
           {rootSegment}
           <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
@@ -804,13 +807,14 @@ function ElementDetailBody({
                 onStarted={() => setDelegateOpen(false)} />
             </PopoverContent>
           </Popover>
+          <FollowButton kind="element" id={element.id} />
         </div>
         <div className="flex-1" />
       </div>
 
       {/* Scrollable body — Linear-style two-column layout */}
       <div className="flex-1 overflow-auto">
-        <div className={layout === 'reader' ? "mx-auto w-full max-w-4xl px-5 py-7 flex flex-col gap-8" : "max-w-7xl mx-auto px-8 py-8 flex gap-8"}>
+        <div className={layout === 'reader' ? "mx-auto w-full max-w-4xl px-5 py-7 flex flex-col gap-8" : "max-w-7xl pl-[30px] pr-8 py-8 flex gap-8"}>
           <div className="flex-1 min-w-0 flex flex-col gap-8">
 
           {/* Title & description — under the concept's icon, like every concept page */}

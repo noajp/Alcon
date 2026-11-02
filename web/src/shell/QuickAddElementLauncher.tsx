@@ -147,10 +147,12 @@ export function QuickAddElementLauncher({
   // derivation as the list surfaces).
   const availableLabels = useMemo<string[]>(() => {
     if (!explorerData) return [];
+    // A label list that came back as anything but an array adds nothing.
     const s = new Set<string>();
-    for (const el of explorerData.rootElements) for (const l of el.labels ?? []) s.add(l);
-    for (const obj of explorerData.objects) {
-      for (const el of obj.elements ?? []) for (const l of el.labels ?? []) s.add(l);
+    const add = (labels: unknown) => { if (Array.isArray(labels)) for (const l of labels) if (typeof l === 'string') s.add(l); };
+    for (const el of explorerData.rootElements ?? []) add(el.labels);
+    for (const obj of explorerData.objects ?? []) {
+      for (const el of obj.elements ?? []) add(el.labels);
     }
     return Array.from(s).sort();
   }, [explorerData]);

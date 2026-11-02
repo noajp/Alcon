@@ -6,7 +6,7 @@ import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 import { useState, useEffect, useMemo } from 'react';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
-import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains, useElementTemplates, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
+import { updateElement, updateElements, restoreElementsField, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains, useElementTemplates, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
@@ -370,15 +370,14 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   ) => {
     const prev = new Map<string, unknown>();
     for (const id of selectedRowIds) prev.set(id, (allElementsForLookup.get(id) as Record<string, unknown> | undefined)?.[field] ?? null);
-    for (const id of selectedRowIds) {
-      try { await updateElement(id, { [field]: value }); } catch (e) { console.error('Bulk edit failed', id, e); }
-    }
+    // One batched write for the whole selection, not a round trip each.
+    try { await updateElements([...selectedRowIds], { [field]: value }); } catch (e) { console.error('Bulk edit failed', e); }
     clearSelection();
     await onRefresh?.();
     pushUndo({
       label,
       undo: async () => {
-        for (const [id, original] of prev) { try { await updateElement(id, { [field]: original }); } catch (e) { console.error(e); } }
+        try { await restoreElementsField(field, prev); } catch (e) { console.error(e); }
         await onRefresh?.();
       },
     });

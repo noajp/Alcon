@@ -210,6 +210,51 @@ export async function updateElement(
   }
 }
 
+/** Many Elements given the same change in one write per hundred — a bulk
+ *  edit from the selection bar — instead of one round trip each. The same
+ *  status → progress rule as updateElement; the cache shows the change at
+ *  once and is put back if a write fails. */
+export async function updateElements(
+  ids: readonly string[],
+  updates: Partial<Omit<Element, 'id' | 'created_at'>>,
+): Promise<void> {
+  if (!ids.length) return;
+  const normalized: Partial<Omit<Element, 'id' | 'created_at'>> = { ...updates };
+  if ('status' in updates && !('progress' in updates)) {
+    if (updates.status === 'done') normalized.progress = 100;
+    else if (updates.status === 'backlog' || updates.status === 'todo') normalized.progress = null;
+  }
+  const patch = { ...normalized, updated_at: new Date().toISOString() };
+  const rollback = applyOptimisticExplorerPatch(data => ids.reduce((d, id) => patchElementInExplorer(d, id, patch), data));
+  try {
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
+    throwOnFailedWrites(await Promise.all(chunks.map(chunk =>
+      supabase.from('elements').update(patch).in('id', chunk).select('id')
+    )), 'updateElements');
+  } catch (err) {
+    rollback();
+    throw err;
+  }
+}
+
+/** Puts one field of many Elements back to what each had (a bulk edit's
+ *  undo): one batched write per distinct earlier value. */
+export async function restoreElementsField(
+  field: 'status' | 'priority' | 'due_date',
+  previous: ReadonlyMap<string, unknown>,
+): Promise<void> {
+  const byValue = new Map<string, { value: unknown; ids: string[] }>();
+  for (const [id, value] of previous) {
+    const key = JSON.stringify(value ?? null);
+    const group = byValue.get(key) ?? { value: value ?? null, ids: [] };
+    group.ids.push(id);
+    byValue.set(key, group);
+  }
+  await Promise.all([...byValue.values()].map(({ value, ids }) =>
+    updateElements(ids, { [field]: value } as Partial<Omit<Element, 'id' | 'created_at'>>)));
+}
+
 /**
  * Tell the person an edit to an Element did not land. updateElement has
  * already put the old value back, so without this the field would quietly

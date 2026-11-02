@@ -8,7 +8,7 @@ import { fetchMyElements, type MyElementsData } from '@/hooks/myElementsData';
 import { useAuthContext } from '@/providers/AuthProvider';
 import {
   createElement,
-  updateElement,
+  updateElement, updateElements, restoreElementsField,
   deleteElement,
   useDomains,
   useElementTemplates,
@@ -238,16 +238,15 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
   ) => {
     const prev = new Map<string, unknown>();
     for (const id of selectedRowIds) prev.set(id, (elements.find((e) => e.id === id) as Record<string, unknown> | undefined)?.[field] ?? null);
-    for (const id of selectedRowIds) {
-      try { await updateElement(id, { [field]: value }); } catch (e) { console.error('Bulk edit failed', id, e); }
-    }
+    // One batched write for the whole selection, not a round trip each.
+    try { await updateElements([...selectedRowIds], { [field]: value }); } catch (e) { console.error('Bulk edit failed', e); }
     clearSelection();
     await fetchMine();
     await onRefresh?.();
     pushUndo({
       label,
       undo: async () => {
-        for (const [id, original] of prev) { try { await updateElement(id, { [field]: original }); } catch (e) { console.error(e); } }
+        try { await restoreElementsField(field, prev); } catch (e) { console.error(e); }
         await fetchMine();
         await onRefresh?.();
       },
