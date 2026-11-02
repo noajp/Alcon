@@ -72,9 +72,6 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
     }
   };
 
-  const initial = (active?.name ?? '?').charAt(0).toUpperCase();
-  const activeLogo = active?.logo ?? null;
-  const isLogoEmoji = activeLogo ? /^\p{Emoji}/u.test(activeLogo) && activeLogo.length <= 4 : false;
 
   const menuItem = 'w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[13px] text-left transition-colors';
 
@@ -86,17 +83,7 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
           className="w-full flex items-center gap-2 px-1 h-7 rounded-md hover:bg-sidebar-accent/50 transition-colors"
           title="Switch Space"
         >
-          {activeLogo && isLogoEmoji ? (
-            <span className="w-6 h-6 rounded-md bg-muted/60 text-[14px] flex items-center justify-center shrink-0">
-              {activeLogo}
-            </span>
-          ) : activeLogo ? (
-            <img src={activeLogo} alt="" className="w-6 h-6 rounded-md object-cover shrink-0" />
-          ) : (
-            <span className="w-6 h-6 rounded-md bg-primary/15 text-primary text-[12px] font-bold flex items-center justify-center shrink-0">
-              {initial}
-            </span>
-          )}
+          <SpaceMark space={active} size={24} />
           <span className="text-left text-[13px] font-medium text-foreground truncate max-w-[100px]">
             {active?.name ?? 'Space'}
           </span>
@@ -131,9 +118,7 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
               onClick={() => setPanel('spaces')}
               className={`${menuItem} text-foreground hover:bg-muted/40`}
             >
-              <span className="w-[15px] h-[15px] rounded bg-primary/15 text-primary text-[9px] font-bold flex items-center justify-center shrink-0">
-                {initial}
-              </span>
+              <SpaceMark space={active} size={15} />
               <span className="flex-1 truncate">Switch workspace</span>
               <ChevronRight size={14} className="text-muted-foreground shrink-0" />
             </button>
@@ -167,9 +152,7 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
                 onClick={() => switchTo(s.id)}
                 className={`${menuItem} hover:bg-muted/40`}
               >
-                <span className="w-5 h-5 rounded bg-primary/15 text-primary text-[11px] font-bold flex items-center justify-center shrink-0">
-                  {s.name.charAt(0).toUpperCase()}
-                </span>
+                <SpaceMark space={s} size={20} />
                 <span className="flex-1 truncate text-foreground">{s.name}</span>
                 {s.id === active?.id && <Check size={13} className="shrink-0 text-muted-foreground" />}
               </button>
@@ -224,3 +207,23 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
     </Popover>
   );
 }
+
+/** A Space's mark — its logo (an emoji or an image) where it has one, else
+ *  its initial — drawn the same at every size, so the switcher's button and
+ *  its list agree. */
+function SpaceMark({ space, size }: { space: { name: string; logo?: string | null } | null | undefined; size: number }) {
+  const logo = space?.logo ?? null;
+  const box = { width: size, height: size };
+  const radius = size >= 22 ? 'rounded-md' : 'rounded';
+  if (logo && /^\p{Emoji}/u.test(logo) && logo.length <= 4) {
+    return <span style={{ ...box, fontSize: Math.round(size * 0.58) }} className={`${radius} flex shrink-0 items-center justify-center bg-muted/60`}>{logo}</span>;
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  if (logo) return <img src={logo} alt="" style={box} className={`${radius} shrink-0 object-cover`} />;
+  return (
+    <span style={{ ...box, fontSize: Math.round(size * 0.5) }} className={`${radius} flex shrink-0 items-center justify-center bg-primary/15 font-bold text-primary`}>
+      {(space?.name ?? '?').charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
