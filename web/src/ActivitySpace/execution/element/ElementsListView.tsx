@@ -274,7 +274,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   // Board / Gantt / Calendar honour the same Group / Sort / Filter controls
   // as the list (default groupBy='object' → per-Object bands), so a filter
   // set on one tab narrows them all.
-  const { sections: groupedSections, elements: filteredElements } =
+  const { sections: groupedSections, elements: filteredElements, filtering } =
     useFilteredElements(allElementsFlat, objectSections, controls);
 
   // Multi-select + bulk operations (shared with the other element lists).
@@ -624,7 +624,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
       {effectiveViewMode === 'board' && (
         <div className="flex-1 overflow-hidden">
           <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Board')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName}>
-            {openElement => <ElementBoardView elements={filteredElements} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
+            {openElement => <ElementBoardView elements={filteredElements} canAdd={!filtering} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
           </ElementDrilldown>
         </div>
       )}
