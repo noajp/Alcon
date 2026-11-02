@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseDynamicTable } from '@/lib/supabase';
+import type { TableUpdate } from '@/types/db';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useCurrentUserId } from '@/providers/authContext';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
@@ -20,11 +21,18 @@ import {
 } from '@/Function/crm/crmModel';
 
 const EMPTY: never[] = [];
+
+/** A new row needs the columns its table requires; a partial patch is only an
+ *  update. Fails before the write the database would refuse (23502). */
+function assertInsertable<P extends object, K extends keyof P>(patch: P, keys: readonly K[]): asserts patch is P & { [Q in K]-?: Exclude<P[Q], undefined> } {
+  const missing = keys.filter((key) => patch[key] === undefined);
+  if (missing.length) throw new Error(`Missing ${missing.join(', ')}`);
+}
 const ACTIVITY_WINDOW = 3000;
 
 function all<Row extends { id: string }>(label: string, table: string, spaceId: string, order = 'created_at') {
-  return readAllPages<Row>(label, (from, to) => supabase.from(table).select('*', { count: 'exact' })
-    .eq('activity_space_id', spaceId).order(order, { ascending: true }).order('id').range(from, to) as never, row => row.id);
+  return readAllPages<Row>(label, (from, to) => supabaseDynamicTable.from(table).select('*', { count: 'exact' })
+    .eq('activity_space_id', spaceId).order(order, { ascending: true }).order('id').range(from, to), row => row.id);
 }
 
 /** Deal values the App writes. Company and contact may be given by name; a
@@ -233,7 +241,7 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
 
   /** Creates or updates a deal in one row write (company / contact rows first when named). */
   const saveDeal = async (dealId: string | null, patch: CrmDealPatch, extra?: { activity?: { type: CrmActivityType; text: string; date?: string }; quiet?: boolean; onNotice?: (notice: string) => void }): Promise<string> => {
-    const row: Record<string, unknown> = {};
+    const row: TableUpdate<'crm_deals'> = {};
     let stepKept = false;
     if (patch.name !== undefined) row.name = patch.name.trim();
     if (patch.stage !== undefined) {
@@ -275,6 +283,8 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
         }
       }
       else {
+        // crm_deals.pipeline_id is NOT NULL: without a pipeline the insert cannot succeed.
+        if (!pipeline) throw new Error('Choose a pipeline before adding a deal.');
         const first = normalizeCrmStages(pipeline?.stages)[0];
         const stage = (row.stage as string | undefined) ?? first.id;
         id = check(await supabase.from('crm_deals').insert({
@@ -439,6 +449,7 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
   const savePipeline = async (id: string | null, patch: Partial<Omit<CrmPipelineRecord, 'id'>>): Promise<string> => {
     try {
       if (id) { check(await supabase.from('crm_pipelines').update(patch).eq('id', id).select('id').single()); return id; }
+      assertInsertable(patch, ['name']);
       return check(await supabase.from('crm_pipelines').insert({ activity_space_id: space(), ...patch }).select('id').single()).id;
     } finally { await invalidate(); }
   };
@@ -447,6 +458,7 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
   const saveCompany = async (id: string | null, patch: Partial<Omit<CrmCompanyRecord, 'id' | 'created_at'>>): Promise<string> => {
     try {
       if (id) { check(await supabase.from('crm_companies').update(patch).eq('id', id).select('id').single()); return id; }
+      assertInsertable(patch, ['name']);
       return check(await supabase.from('crm_companies').insert({ activity_space_id: space(), owner_worker_id: me, ...patch }).select('id').single()).id;
     } finally { await invalidate(); }
   };
@@ -454,6 +466,7 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
   const saveContact = async (id: string | null, patch: Partial<Omit<CrmContactRecord, 'id' | 'created_at'>>): Promise<string> => {
     try {
       if (id) { check(await supabase.from('crm_contacts').update(patch).eq('id', id).select('id').single()); return id; }
+      assertInsertable(patch, ['name']);
       return check(await supabase.from('crm_contacts').insert({ activity_space_id: space(), owner_worker_id: me, ...patch }).select('id').single()).id;
     } finally { await invalidate(); }
   };
@@ -463,10 +476,11 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
     try {
       if (id) check(await supabase.from('crm_fields').update(patch).eq('id', id).select('id').single());
       else {
+        assertInsertable(patch, ['entity', 'key', 'label', 'type']);
         // A key may already be taken in a Domain this writer cannot see; the
         // database refuses it, and the field takes the next free suffix.
         for (let attempt = 0; ; attempt += 1) {
-          const key = attempt && patch.key ? `${patch.key}_${attempt + 1}` : patch.key;
+          const key = attempt ? `${patch.key}_${attempt + 1}` : patch.key;
           const result = await supabase.from('crm_fields').insert({ activity_space_id: space(), ...patch, key }).select('id').single();
           if (result.error?.code === '23505' && attempt < 5) continue;
           check(result);

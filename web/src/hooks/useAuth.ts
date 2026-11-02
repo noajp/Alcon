@@ -59,11 +59,12 @@ export function useAuth() {
   const fetchProfile = useCallback(async (userId: string, force = false) => {
     if (!force && profiledUserRef.current === userId) return;
     profiledUserRef.current = userId;
-    let { data } = await supabase
+    const { data: found } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
+    let data: Profile | null = found;
     // A signed-in person without a profile row (it was lost, or predates the
     // sign-up trigger) gets one, named as they already appear in the Space.
     const repaired = !data && !force;
