@@ -12,7 +12,7 @@ import {
   type StrategyWithObjects,
 } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
-import { NavStrategyIcon, NavTimelineIcon } from '@/shell/sidebar/NavIcons';
+import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { EmptyState } from '@/Function/shared/EmptyState';
@@ -231,10 +231,9 @@ export function TimelineView({
   return (
     <div className="flex flex-col h-full bg-card">
       {/* Top bar — mirrors the other Strategy-layer surfaces */}
-      <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-        <NavTimelineIcon size={14} />
-        <span className="text-[13px] font-medium text-foreground">{t('Timeline')}</span>
-        <span className="text-[11px] text-muted-foreground ml-1">
+      <div className="h-[50px] flex flex-shrink-0 items-center gap-1 bg-card pl-6 pr-2">
+        <span className="px-1.5 py-0.5 text-[13px] font-semibold text-foreground">{t('Timeline')}</span>
+        <span className="ml-0.5 text-[12px] text-muted-foreground">
           {loading ? t('Loading…') : rootStrategies.length === 1 ? t('1 Initiative') : t('{n} Initiatives', { n: rootStrategies.length })}
         </span>
         <div className="flex-1" />

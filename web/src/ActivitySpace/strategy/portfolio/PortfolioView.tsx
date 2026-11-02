@@ -1,8 +1,9 @@
 'use client';
 
+import { IslandHeader } from '@/Function/shared/MainIsland';
 import { useEffect, useMemo, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
-import { ChevronRight, CornerDownRight, FolderInput, FolderPlus, Pencil, Plus, Trash2, X } from '@/ui/icons';
+import { CornerDownRight, FolderInput, FolderPlus, Pencil, Plus, Trash2, X } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverAnchor, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
@@ -100,17 +101,13 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
           onNewInside={() => setLocalNew({ parentId: open.portfolio.id })} />
       ) : (
         <>
-          <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-            <NavPortfolioIcon size={14} />
-            <span className="text-[13px] font-medium text-foreground">{t('Portfolios')}</span>
-            {vision && <span className="truncate text-[13px] text-muted-foreground">{vision.name}</span>}
-            {vision && (
+          <IslandHeader crumbs={[...(vision ? [{ id: 'vision', label: vision.name }] : []), { id: 'portfolios', label: t('Portfolios') }]}
+            actions={vision && (
               <ButtonAppearanceProvider appearance="navigation">
-                <Button variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={() => setLocalNew({ parentId: null })}>
+                <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setLocalNew({ parentId: null })}>
                   <Plus size={14} />{t('Add Portfolio')}</Button>
               </ButtonAppearanceProvider>
-            )}
-          </div>
+            )} />
           <div className="flex-1 overflow-y-auto">
             {loading ? null : !vision ? (
               <EmptyState art="vision" title="Start with a Vision"
@@ -415,27 +412,12 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
 
   return (
     <>
-      <div className="h-[50px] flex items-center gap-1 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-        <button type="button" onClick={() => onOpenPortfolio(null)}
-          className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">
-          <NavPortfolioIcon size={14} />{t('Portfolio')}
-        </button>
-        {path.map((p) => (
-          <span key={p.id} className="flex min-w-0 items-center gap-1">
-            <ChevronRight size={12} className="shrink-0 text-muted-foreground/60" />
-            {p.id === portfolio.id ? (
-              <>
-                <span className="truncate px-1.5 text-[13px] font-medium text-foreground">{p.name}</span>
-                <ActionsButton items={items} label={t('Portfolio actions')} />
-                {picker}
-              </>
-            ) : (
-              <button type="button" onClick={() => onOpenPortfolio(p.id)}
-                className="truncate rounded px-1.5 py-0.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">{p.name}</button>
-            )}
-          </span>
-        ))}
-      </div>
+      <IslandHeader
+        crumbs={[
+          { id: 'portfolios', label: t('Portfolio'), onClick: () => onOpenPortfolio(null) },
+          ...path.map((p) => p.id === portfolio.id ? { id: p.id, label: p.name } : { id: p.id, label: p.name, onClick: () => onOpenPortfolio(p.id) }),
+        ]}
+        after={<><ActionsButton items={items} label={t('Portfolio actions')} />{picker}</>} />
       <div className="flex-1 overflow-y-auto">
         <PageLayout rail={
           <RailCard title={t('Properties')}>

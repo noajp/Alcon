@@ -115,7 +115,7 @@ export function ToolPage({
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
       <IslandHeader crumbs={crumbs} actions={actions} />
 
-      <div className="flex flex-shrink-0 items-center gap-1.5 px-4 py-2">
+      <div className="flex flex-shrink-0 items-center gap-1.5 py-2 pl-[19px] pr-4">
         <CollapsingTabs
           menuLabel={t('Views')}
           items={strip.map((view) => ({ id: view.id, label: t(view.label), icon: view.icon, badge: view.badge !== undefined && view.badge !== null && view.badge !== false

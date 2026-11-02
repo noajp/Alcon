@@ -170,9 +170,8 @@ export function PhaseView({
 
   return (
     <div className="flex flex-col h-full bg-card">
-      <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-        <NavPhaseIcon size={14} />
-        <span className="text-[13px] font-medium text-foreground">{t('Phase')}</span>
+      <div className="h-[50px] flex flex-shrink-0 items-center gap-1 bg-card pl-6 pr-2">
+        <span className="px-1.5 py-0.5 text-[13px] font-semibold text-foreground">{t('Phase')}</span>
         <div className="flex-1" />
         <button
           type="button"
@@ -439,7 +438,8 @@ function PhaseDetailView({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card h-full">
-      <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
+      {/* Drawn as the shared IslandHeader is (Function/shared/MainIsland). */}
+      <div className="h-[50px] flex flex-shrink-0 items-center gap-1 bg-card pl-6 pr-2">
         <button
           type="button"
           onClick={onBack}
@@ -448,7 +448,7 @@ function PhaseDetailView({
           {t('Phase')}
         </button>
         <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
-        <span className="px-1.5 py-0.5 text-[13px] font-medium text-foreground truncate max-w-[240px]">
+        <span className="px-1.5 py-0.5 text-[13px] font-semibold text-foreground truncate max-w-[240px]">
           {phase.name}
         </span>
         <div className="flex-1" />
