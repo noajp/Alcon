@@ -24,7 +24,6 @@ import {
   type WorkloadPerson,
 } from '@/Function/workload/workloadStore';
 
-const fail = (e: unknown) => void appDialog.alert(e instanceof Error ? e.message : String(e));
 
 /**
  * People, laid out as Execution is: everyone (the team's load) and the plan
@@ -81,7 +80,7 @@ export function PeopleSidebar({ navigation, onNavigate, onOpen }: {
   const newUnit = async (parentId: string | null) => {
     const name = (await appDialog.prompt(t('Unit name')))?.trim();
     if (!name) return;
-    actions.create.mutate({ name, parentId }, { onSuccess: (u) => go({ unitId: u.id, workerId: null }), onError: fail });
+    actions.create.mutate({ name, parentId }, { onSuccess: (u) => go({ unitId: u.id, workerId: null }) });
   };
 
   return (
@@ -185,12 +184,12 @@ function UnitBranch({ unit, units, unitFocus, focusWorker, canArrange, membersOf
                 <DropdownMenuItem onSelect={() => onNew(unit.id)}>{t('New unit inside')}</DropdownMenuItem>
                 <DropdownMenuItem onSelect={async () => {
                   const name = (await appDialog.prompt(t('Unit name'), unit.name))?.trim();
-                  if (name && name !== unit.name) update.mutate({ id: unit.id, patch: { name } }, { onError: fail });
+                  if (name && name !== unit.name) update.mutate({ id: unit.id, patch: { name } });
                 }}>{t('Rename')}</DropdownMenuItem>
                 <div className={MENU_SEPARATOR} />
                 <DropdownMenuItem onSelect={async () => {
                   if (!await appDialog.confirm(t('Delete the unit “{name}”? Its members stay in the Space.', { name: unit.name }))) return;
-                  remove.mutate(unit.id, { onError: fail });
+                  remove.mutate(unit.id);
                 }}>{t('Delete')}</DropdownMenuItem>
               </MenuShell>
             </DropdownMenu>

@@ -11,6 +11,6 @@ export function useTrashFile(file: SpaceFile | null) {
   return async () => {
     if (!file) return false;
     if (!await appDialog.confirm(t('Move “{name}” to the trash? It can be restored for {days} days.', { name: file.name, days: TRASH_DAYS }))) return false;
-    try { await remove.mutateAsync(file); return true; } catch (e) { await appDialog.alert(e instanceof Error ? e.message : String(e)); return false; }
+    try { await remove.mutateAsync(file); return true; } catch { return false; }
   };
 }
