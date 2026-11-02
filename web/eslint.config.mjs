@@ -19,9 +19,17 @@ const eslintConfig = defineConfig([
   },
   // Surfaces read and write through hooks/, so a query has one home.
   // Slides keeps the data access Kata brought with it (ADR 0042).
+  // The same holds for every UI component outside ActivitySpace/ — the shell
+  // and Function/'s .tsx parts (settings, OAuth consent, Discover).
   {
-    files: ["src/ActivitySpace/**/*.{ts,tsx}"],
-    ignores: ["src/ActivitySpace/sustainment/slides/**"],
+    files: ["src/ActivitySpace/**/*.{ts,tsx}", "src/shell/**/*.tsx", "src/Function/**/*.tsx"],
+    ignores: [
+      "src/ActivitySpace/sustainment/slides/**",
+      // Settings and OAuth consent still query directly; each comes off this
+      // list when its data moves into hooks/.
+      "src/Function/settings/{AccountSettings,ActivitySpaceSettings,ConnectWorkerAccountDialog,InviteUserDialog,MemberSettings,ProfileSettings,TeamSettings}.tsx",
+      "src/Function/oauth/OAuthConsentScreen.tsx",
+    ],
     rules: {
       "no-restricted-imports": ["error", {
         patterns: [{ group: ["**/lib/supabase"], importNames: ["supabase"], message: "Surfaces go through hooks/ for data. Add the query there." }],
