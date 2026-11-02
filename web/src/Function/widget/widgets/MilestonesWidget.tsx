@@ -53,7 +53,7 @@ export function MilestonesWidget({ elements }: Props) {
               return (
                 <div key={m.id} className="py-1.5">
                   <div className="flex items-center gap-2">
-                    <Diamond size={12} className="shrink-0 text-muted-foreground" />
+                    <Diamond size={12} className="shrink-0 text-[var(--status-danger)]" />
                     <span className="text-[13px] font-medium text-foreground truncate">{m.title}</span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 pl-5 text-[12px] text-muted-foreground">
