@@ -5,8 +5,9 @@
 -- creator could write its intents. An Initiative with no Objects yet could
 -- not be shared with the team.
 --
--- Now: every Initiative has a Space — its Portfolio's, else its Vision's,
--- else the one it was created in. Everyone in that Space reads it (with its
+-- Now: an Initiative has a Space — its Portfolio's, else its Vision's, else
+-- the one it was created in. Existing ones with neither keep none (and stay
+-- private to their creator) rather than being shown to a guessed Space. Everyone in that Space reads it (with its
 -- intents, links and nesting); its creator and the Space's owners change it.
 -- The Space follows the Portfolio / Vision when those are set, so the three
 -- cannot disagree. alcon_internal.user_can_edit_strategy is the one write
@@ -33,14 +34,14 @@ begin
   execute $sql$
     update public.strategies s set activity_space_id = coalesce(
       (select p.activity_space_id from public.portfolios p where p.id = s.portfolio_id),
-      (select v.activity_space_id from public.visions v where v.id = s.vision_id),
-      (select m.activity_space_id from public.activity_space_members m
-        where m.user_id = s.created_by order by (m.role = 'owner') desc, m.activity_space_id limit 1))
+      (select v.activity_space_id from public.visions v where v.id = s.vision_id))
     where s.activity_space_id is null
   $sql$;
 
   -- The Space follows the Portfolio, else the Vision; otherwise whatever the
-  -- writer gave, which must be a Space they belong to (checked by RLS).
+  -- writer gave, which must be a Space they belong to (checked by RLS). Once
+  -- set it is never cleared: an editor who could empty it would take it out
+  -- of the Space whose owners may change it.
   execute $f$
     create or replace function public.strategies_follow_space()
     returns trigger language plpgsql security definer set search_path = public, pg_temp as $b$
@@ -53,6 +54,9 @@ begin
         select activity_space_id into v_space from public.visions where id = new.vision_id;
       end if;
       if v_space is not null then new.activity_space_id := v_space; end if;
+      if tg_op = 'UPDATE' and new.activity_space_id is null then
+        new.activity_space_id := old.activity_space_id;
+      end if;
       return new;
     end;
     $b$
@@ -154,7 +158,8 @@ begin
   execute 'create policy strategy_objects_delete on public.strategy_objects for delete
     using (alcon_internal.user_can_edit_strategy(strategy_id) and public.user_can_see_object(object_id))';
 
-  -- strategy_children: the parent is changed; the child must be readable.
+  -- strategy_children: nesting changes both, so the caller must be able to
+  -- edit both; either side's editor may take the link apart.
   execute 'drop policy if exists strategy_children_select on public.strategy_children';
   execute 'drop policy if exists strategy_children_select_via_boundary on public.strategy_children';
   execute 'drop policy if exists strategy_children_insert on public.strategy_children';
@@ -163,7 +168,8 @@ begin
     using (public.user_can_read_strategy(parent_strategy_id) and public.user_can_read_strategy(child_strategy_id))';
   execute 'create policy strategy_children_insert on public.strategy_children for insert
     with check (alcon_internal.user_can_edit_strategy(parent_strategy_id)
-                and public.user_can_read_strategy(child_strategy_id))';
+                and alcon_internal.user_can_edit_strategy(child_strategy_id))';
   execute 'create policy strategy_children_delete on public.strategy_children for delete
-    using (alcon_internal.user_can_edit_strategy(parent_strategy_id))';
+    using (alcon_internal.user_can_edit_strategy(parent_strategy_id)
+           or alcon_internal.user_can_edit_strategy(child_strategy_id))';
 end $mig$;

@@ -36,7 +36,8 @@ import type {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
-import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { getActiveSpaceId, useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { useActivitySpaces } from '@/Function/space/data';
 
 // ============================================
 // Strategy: aggregate elements across multiple Domains and/or Objects
@@ -188,10 +189,27 @@ function invalidateStrategies() {
 
 const EMPTY_STRATEGIES: StrategyWithObjects[] = [];
 
+/** Whether an Initiative shows in the active Space. Every Space the viewer
+ *  belongs to can now read its Initiatives, so those of the viewer's other
+ *  Spaces stay in them; one reached only through a shared Object (a Space
+ *  the viewer is not in) or with no Space stays visible as before. */
+export function showsInSpace(s: { activity_space_id: string | null }, activeSpaceId: string | null, mySpaceIds: readonly string[]): boolean {
+  return !s.activity_space_id || s.activity_space_id === activeSpaceId || !mySpaceIds.includes(s.activity_space_id);
+}
+
 export function useStrategies() {
   const query = useQuery({ queryKey: STRATEGIES_QUERY_KEY, queryFn: fetchStrategies });
+  const activeSpaceId = useActiveSpaceId();
+  const { data: spaces, loading: spacesLoading } = useActivitySpaces();
+  const mySpaceIds = useMemo(() => spaces.map((space) => space.id), [spaces]);
+  const data = useMemo(() => {
+    const all = query.data ?? EMPTY_STRATEGIES;
+    if (spacesLoading) return all;
+    const shown = all.filter((s) => showsInSpace(s, activeSpaceId, mySpaceIds));
+    return shown.length === all.length ? all : shown;
+  }, [query.data, activeSpaceId, mySpaceIds, spacesLoading]);
   return {
-    data: query.data ?? EMPTY_STRATEGIES,
+    data,
     loading: query.isPending,
     error: (query.error as Error | null) ?? null,
     refetch: invalidateStrategies,

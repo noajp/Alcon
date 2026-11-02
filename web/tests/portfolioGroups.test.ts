@@ -111,3 +111,14 @@ describe('an Initiative with a Space of its own is placed by it', () => {
     expect(initiativesOfVision([mine, theirs], 'v1', 'S1').unplaced.map((s) => s.id)).toEqual(['mine']);
   });
 });
+
+describe('the Strategy list of a Space', () => {
+  it('keeps the viewer’s other Spaces’ Initiatives out, but not ones shared through an Object', async () => {
+    const { showsInSpace } = await import('@/hooks/strategyData');
+    const mine = ['S1', 'S2'];
+    expect(showsInSpace({ activity_space_id: 'S1' }, 'S1', mine)).toBe(true);
+    expect(showsInSpace({ activity_space_id: 'S2' }, 'S1', mine)).toBe(false);
+    expect(showsInSpace({ activity_space_id: 'S9' }, 'S1', mine)).toBe(true);
+    expect(showsInSpace({ activity_space_id: null }, 'S1', mine)).toBe(true);
+  });
+});
