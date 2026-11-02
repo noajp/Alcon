@@ -27,7 +27,7 @@ const StrategyShell = dynamic(() => import('@/ActivitySpace/strategy/initiative/
 const VisionView = dynamic(() => import('@/ActivitySpace/strategy/vision/VisionView').then(m => m.VisionView), { ssr: false, loading: viewLoading });
 const PortfolioView = dynamic(() => import('@/ActivitySpace/strategy/portfolio/PortfolioView').then(m => m.PortfolioView), { ssr: false, loading: viewLoading });
 const PhaseView = dynamic(() => import('@/ActivitySpace/strategy/phase/PhaseView').then(m => m.PhaseView), { ssr: false, loading: viewLoading });
-const WorkloadView = dynamic(() => import('@/ActivitySpace/sustainment/workload/WorkloadView').then(m => m.WorkloadView), { ssr: false, loading: viewLoading });
+const PeopleView = dynamic(() => import('@/ActivitySpace/sustainment/team/PeopleView').then(m => m.PeopleView), { ssr: false, loading: viewLoading });
 const TimelineView = dynamic(() => import('@/ActivitySpace/strategy/timeline/TimelineView').then(m => m.TimelineView), { ssr: false, loading: viewLoading });
 const HomeScreen = dynamic(() => import('@/shell/HomeScreen').then(m => m.HomeScreen), { ssr: false, loading: viewLoading });
 import { DomainOverview } from '@/ActivitySpace/execution/domain/DomainOverview';
@@ -163,11 +163,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {/* Workload — the per-Worker load surface (ResourceView) promoted
               to a standalone Sustainment view. Domain scope comes from
               its own filter button. */}
-          {activeActivity === 'workload' && (
-            <div className="flex-1 overflow-hidden bg-card">
-              <WorkloadView workerId={navigation.workerId} onNavigate={onNavigate} onViewChange={onViewChange} />
-            </div>
-          )}
 
           {activeActivity === 'timeline' && (
             <div className="flex-1 overflow-hidden bg-card">
@@ -266,16 +261,11 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
-          {activeActivity === 'team' && (
+          {(activeActivity === 'team' || activeActivity === 'workload') && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
               {/* An audit Space (ADR 0048) shows its people without opening
-                  their Elements or Workload. */}
-              {scope === 'audit' ? <TeamView /> : <ElementDrilldown label="People" onNavigate={onNavigate} onViewChange={onViewChange}>
-                {openElement => <TeamView onOpenElement={openElement} onOpenWorkload={(workerId) => {
-                  onNavigate({ workerId: workerId ?? null });
-                  onViewChange?.('workload');
-                }} />}
-              </ElementDrilldown>}
+                  their Elements or their load. */}
+              {scope === 'audit' ? <TeamView /> : <PeopleView workerId={navigation.workerId} unitId={navigation.unitId} onNavigate={onNavigate} onViewChange={onViewChange} />}
             </div>
           )}
 

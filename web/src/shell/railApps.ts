@@ -12,7 +12,6 @@ import {
   NavTableIcon,
   NavFilesIcon,
   NavTeamsIcon,
-  NavWorkloadIcon,
   NavStrategyModeIcon,
   NavExecutionModeIcon,
   NavCalendarIcon,
@@ -26,7 +25,7 @@ import type { ViewId } from '@/shell/viewRegistry';
 // Strategy and Execution are the permanent rail entries. Inbox, Calendar and
 // the AI sit at the right of the status bar, Notebook and Slides at its left.
 // Personal pages are reached through the avatar; other tools use the launcher.
-export type RailMode = 'personal' | 'inbox' | 'strategy' | 'execution' | 'reviews' | 'workload' | 'notebook' | 'tables' | 'files' | 'slides' | 'team' | 'calendar' | 'crm' | 'audit' | 'ai';
+export type RailMode = 'personal' | 'inbox' | 'strategy' | 'execution' | 'reviews' | 'notebook' | 'tables' | 'files' | 'slides' | 'team' | 'calendar' | 'crm' | 'audit' | 'ai';
 
 export interface ModeMeta {
   label: string;
@@ -43,12 +42,12 @@ export const MODE_META: Record<RailMode, ModeMeta> = {
   strategy:  { label: 'Strategy',  icon: NavStrategyModeIcon, defaultView: 'vision', views: ['vision', 'portfolio', 'strategy', 'phase', 'timeline'] },
   execution: { label: 'Execution', icon: NavExecutionModeIcon, defaultView: 'objects', views: ['objects', 'domain-elements', 'domains', 'domain-overview'] },
   reviews:   { label: 'Reviews',   icon: GitCompare, defaultView: 'reviews', views: ['reviews'] },
-  workload:  { label: 'Workload',  icon: NavWorkloadIcon, defaultView: 'workload', views: ['workload'] },
   notebook:  { label: 'Notebook',  icon: NavNoteIcon, defaultView: 'note', views: ['note'] },
   tables:    { label: 'Table',     icon: NavTableIcon, defaultView: 'tables', views: ['tables'] },
   files:     { label: 'Files',     icon: NavFilesIcon, defaultView: 'files', views: ['files'] },
   slides:    { label: 'Slides',    icon: NavSlidesIcon, defaultView: 'slides', views: ['slides'] },
-  team:      { label: 'People',    icon: NavTeamsIcon, defaultView: 'team', views: ['team'] },
+  // People holds the team's load too ('workload' still opens it).
+  team:      { label: 'People',    icon: NavTeamsIcon, defaultView: 'team', views: ['team', 'workload'] },
   calendar:  { label: 'Calendar',  icon: NavCalendarIcon, defaultView: 'calendar', views: ['calendar', 'schedule'] },
   crm:       { label: 'CRM',       icon: NavCrmIcon, defaultView: 'crm', views: ['crm'] },
   audit:     { label: 'Audit',     icon: NavAuditIcon, defaultView: 'audit', views: ['audit'] },
@@ -71,7 +70,7 @@ export const BAR_TOOLS: RailMode[] = ['notebook', 'slides'];
 // are a display split only: Tools serve any surface, Workload watches capacity.
 export const APP_GROUPS: { title: string; apps: RailMode[] }[] = [
   { title: 'Tools', apps: ['tables', 'files', 'team'] },
-  { title: 'Sustainment', apps: ['workload', 'crm', 'audit', 'reviews'] },
+  { title: 'Sustainment', apps: ['crm', 'audit', 'reviews'] },
 ];
 
 const APP_MODES: RailMode[] = APP_GROUPS.flatMap((g) => g.apps);

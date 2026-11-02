@@ -77,6 +77,7 @@ const WORKLOAD_MESSAGES: Record<string, Row> = {
   '{p}% of capacity ahead': ['今後の稼働率 {p}%', '앞으로의 가동률 {p}%', '{p} % de la capacité à venir', '{p} % de la capacidad por delante'],
   'No hours ahead': ['今後の稼働時間なし', '앞으로 가용 시간 없음', 'Aucune heure à venir', 'Sin horas por delante'],
   'All Domains': ['すべての Domain', '모든 Domain', 'Tous les Domains', 'Todos los Domains'],
+  '{n} Domains': ['{n} 件の Domain', 'Domain {n}개', '{n} Domains', '{n} Domains'],
   'Rebalancing reads everyone’s whole load. Choose All Domains to plan.': ['平準化は全員の負荷全体を読みます。プランを出すには「すべての Domain」を選んでください。', '평준화는 모든 사람의 전체 부하를 읽습니다. 계획하려면 모든 Domain을 선택하세요.', 'Le rééquilibrage lit toute la charge de chacun. Choisissez tous les Domains pour planifier.', 'El reequilibrio lee toda la carga de cada persona. Elige todos los Domains para planificar.'],
   'Move to {date}': ['{date} に移す', '{date}로 옮기기', 'Déplacer au {date}', 'Mover al {date}'],
   'The start moves {n} days. Nobody has room on the current day.': ['開始が {n} 日動きます。今の日付には空きのある人がいません。', '시작이 {n}일 이동합니다. 현재 날짜에는 여유 있는 사람이 없습니다.', 'Le début recule de {n} jours. Personne n’a de place ce jour-là.', 'El inicio se mueve {n} días. Nadie tiene hueco ese día.'],
