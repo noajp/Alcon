@@ -14,6 +14,7 @@ import {
 import { selectIn } from '@/hooks/chunkedIn';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 import { throwOnFailedWrites } from './writeResults';
+import { deleteElementAssignees, insertElementAssignee } from './elementAssigneeWrites';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
 import type {
@@ -392,16 +393,7 @@ export async function addElementAssignee(assignee: {
     })),
   );
   try {
-    const { data, error } = await supabase
-      .from('element_assignees')
-      .insert({
-        element_id: assignee.element_id,
-        worker_id: assignee.worker_id,
-        role: assignee.role || 'assignee',
-      })
-      .select()
-      .single();
-    if (error) throw error;
+    const data = await insertElementAssignee(assignee);
     // Swap temp id → real id (keep the worker we already have).
     applyOptimisticExplorerPatch(d =>
       mapElementInExplorer(d, assignee.element_id, el => ({
@@ -440,15 +432,9 @@ export async function removeElementAssignee(id: string): Promise<void> {
     return any ? { objects, rootElements } : data;
   });
   try {
-    const { data, error } = await supabase
-      .from('element_assignees')
-      .delete()
-      .eq('id', id)
-      .select('id');
-    if (error) throw error;
     // RLS turns a refused delete into "no rows" (the Element is no longer
     // visible); say so rather than leave the chip gone until the next read.
-    if (!data?.length) throw new Error(translate('This assignee could not be removed.'));
+    if (!(await deleteElementAssignees([id]))) throw new Error(translate('This assignee could not be removed.'));
   } catch (err) {
     rollback();
     throw err;

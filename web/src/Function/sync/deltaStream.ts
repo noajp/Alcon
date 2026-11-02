@@ -26,6 +26,7 @@ import {
   patchWorkerInExplorer,
   patchWorkerInList,
   patchObjectInExplorer,
+  linkAlreadyShown,
 } from '@/Function/sync/explorerPatch';
 import type {
   Element,
@@ -303,8 +304,15 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
 
     case 'element_objects': {
       // Membership: which lists an Element appears in. Structural, so refetch
-      // the tree; the Element's own facets that read homes go too.
-      invalidateSoon(qc, ['explorer']);
+      // the tree; the Element's own facets that read homes go too. The link
+      // the database makes for every new Element in an Object arrives right
+      // after that Element, already patched in — that one needs no refetch.
+      const linkElement = row.element_id as string | undefined;
+      const linkObject = row.object_id as string | undefined;
+      const explorerCaches = qc.getQueriesData<ExplorerData>({ queryKey: ['explorer'] }).flatMap(([, data]) => data ? [data] : []);
+      if (!(d.type === 'INSERT' && linkElement && linkObject && linkAlreadyShown(explorerCaches, linkElement, linkObject))) {
+        invalidateSoon(qc, ['explorer']);
+      }
       const elementId = (row.element_id ?? d.old.element_id) as string | undefined;
       if (elementId) invalidateSoon(qc, ['element', elementId]);
       else invalidateSoon(qc, ['element']);

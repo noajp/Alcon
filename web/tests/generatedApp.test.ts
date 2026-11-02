@@ -22,6 +22,14 @@ describe('generated application boundary', () => {
     expect(document).toContain("connect-src 'none'");
     expect(document).toContain("form-action 'none'");
   });
+  it('takes WebRTC away before any app code runs', () => {
+    const doc = appDocument({ title: 'x', html: '<div></div>', css: '', js: 'window.appRan=1' } as never, {} as never, { objectId: 'o', objectName: 'O' }, 'c', {});
+    expect(doc).toContain("webrtc 'block'");
+    const prelude = doc.indexOf('RTCPeerConnection');
+    expect(prelude).toBeGreaterThan(-1);
+    expect(prelude).toBeLessThan(doc.indexOf('window.appRan=1'));
+  });
+
   it('does not let CSS close the style element and inject HTML', () => {
     const document = appDocument({ ...source, css: '</style><script>evil()</script>' }, {}, { objectId: 'id', objectName: '' }, 'channel', {});
     expect((document.match(/<script>/g) ?? []).length).toBe(1);

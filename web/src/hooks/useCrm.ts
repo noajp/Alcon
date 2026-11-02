@@ -9,6 +9,7 @@ import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { useWorkers } from '@/hooks/teamData';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { updateElement } from '@/hooks/elementData';
+import { deleteElementAssigneeOf, insertElementAssignee } from '@/hooks/elementAssigneeWrites';
 import { fetchDataTableSchema } from '@/hooks/tableData';
 import { readAllPages } from '@/hooks/readAllPages';
 import {
@@ -202,10 +203,14 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
     if (!element || ['done', 'cancelled'].includes(element.status)) return true;
     // The new owner first, so a step that cannot be reassigned keeps its old owner.
     if (to) {
-      const { error } = await supabase.from('element_assignees').insert({ element_id: element.id, worker_id: to, role: 'assignee' });
-      if (error && error.code !== '23505') return false;
+      try {
+        await insertElementAssignee({ element_id: element.id, worker_id: to, role: 'assignee' });
+      } catch (error) {
+        // Already on it (23505) counts as assigned.
+        if ((error as { code?: string } | null)?.code !== '23505') return false;
+      }
     }
-    if (from) await supabase.from('element_assignees').delete().eq('element_id', element.id).eq('worker_id', from).eq('role', 'assignee');
+    if (from) await deleteElementAssigneeOf(element.id, from, 'assignee').catch(() => 0);
     return true;
   }
 
