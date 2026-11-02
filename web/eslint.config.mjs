@@ -2,6 +2,9 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
+const NO_SURFACE_IMPORT = { group: ["@/ActivitySpace/*"], message: "Only surfaces depend on ActivitySpace/. Move the shared piece into Function/ or hooks/." };
+const NO_DIRECT_QUERY = { group: ["**/lib/supabase"], importNames: ["supabase"], message: "Surfaces go through hooks/ for data. Add the query there." };
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -13,27 +16,33 @@ const eslintConfig = defineConfig([
     ignores: ["src/Function/widget/widgets/**"],
     rules: {
       "no-restricted-imports": ["error", {
-        patterns: [{ group: ["@/ActivitySpace/*"], message: "Only surfaces depend on ActivitySpace/. Move the shared piece into Function/ or hooks/." }],
+        patterns: [NO_SURFACE_IMPORT],
       }],
     },
   },
   // Surfaces read and write through hooks/, so a query has one home.
-  // Slides keeps the data access Kata brought with it (ADR 0042).
-  // The same holds for every UI component outside ActivitySpace/ — the shell
-  // and Function/'s .tsx parts (settings, OAuth consent, Discover).
+  // Slides keeps the data access Kata brought with it (ADR 0042). The same
+  // holds for every UI component outside ActivitySpace/: the shell and
+  // Function/'s .tsx parts. A later block with this rule replaces an earlier
+  // one's options, so Function/'s UI states both of its restrictions at once.
   {
-    files: ["src/ActivitySpace/**/*.{ts,tsx}", "src/shell/**/*.tsx", "src/Function/**/*.tsx"],
+    files: ["src/ActivitySpace/**/*.{ts,tsx}", "src/shell/**/*.tsx", "src/Function/widget/widgets/**/*.tsx"],
+    ignores: ["src/ActivitySpace/sustainment/slides/**"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [NO_DIRECT_QUERY] }],
+    },
+  },
+  {
+    files: ["src/Function/**/*.tsx"],
     ignores: [
-      "src/ActivitySpace/sustainment/slides/**",
+      "src/Function/widget/widgets/**",
       // Settings and OAuth consent still query directly; each comes off this
-      // list when its data moves into hooks/.
+      // list when its data moves into hooks/ (the layer rule above still holds).
       "src/Function/settings/{AccountSettings,ActivitySpaceSettings,ConnectWorkerAccountDialog,InviteUserDialog,MemberSettings,ProfileSettings,TeamSettings}.tsx",
       "src/Function/oauth/OAuthConsentScreen.tsx",
     ],
     rules: {
-      "no-restricted-imports": ["error", {
-        patterns: [{ group: ["**/lib/supabase"], importNames: ["supabase"], message: "Surfaces go through hooks/ for data. Add the query there." }],
-      }],
+      "no-restricted-imports": ["error", { patterns: [NO_SURFACE_IMPORT, NO_DIRECT_QUERY] }],
     },
   },
   // Icons come from ui/icons — Alcon's own drawings, with Lucide behind them

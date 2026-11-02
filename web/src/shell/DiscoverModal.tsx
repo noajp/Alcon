@@ -50,8 +50,7 @@ export function DiscoverModal({ open, onOpenChange }: DiscoverModalProps) {
     if (open) void refresh();
   }, [open, refresh]);
 
-  // A refused join used to drop the row as if it had worked; now the row
-  // stays and the refusal is said.
+  // A refused join keeps its row and says so.
   const joinDomain = async (domainId: string) => {
     if (!user) return;
     setError(null);
