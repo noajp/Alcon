@@ -20,7 +20,7 @@ interface InboxViewProps {
  *  that picks it lives in the AppSidebar (`InboxList`). */
 export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
   const { t, locale } = useI18n();
-  const { selected, revision, toggleRead, archive } = useInbox({ onNavigate, onViewChange });
+  const { selected, revision, toggleRead, archive, openObject } = useInbox({ onNavigate, onViewChange });
   // An audit Space (ADR 0048) does not open Elements: their notifications
   // say so instead of opening the Element in the reader.
   const audit = useActiveSpaceScope() === 'audit';
@@ -60,7 +60,13 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
           domainName={null} objectPath={detail.element.objects ?? []} focusCommentId={selected.comment_id}
           onBack={() => selectInboxNotification(null)} onNavigateRoot={() => selectInboxNotification(null)}
           onRefresh={refresh}
-          onNavigateObject={objectId => { onViewChange?.('objects'); onNavigate?.({ objectId }); }}
+          onNavigateObject={objectId => {
+            void openObject(objectId).catch(error => { console.error(error); return false; }).then(found => {
+              if (found) return;
+              onViewChange?.('objects');
+              onNavigate?.({ objectId });
+            });
+          }}
         />
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-[13px] text-muted-foreground" role="status">

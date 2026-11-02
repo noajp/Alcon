@@ -809,59 +809,6 @@ export interface ObjectTabUpdate {
 }
 
 // =====================================================
-// Documents - Notion-like global documents
-// =====================================================
-
-export type DocumentType = 'folder' | 'page'
-
-export interface Document {
-  id: string
-  parent_id: string | null
-  type: DocumentType
-  title: string
-  content: Json
-  icon: string | null
-  cover_image: string | null
-  is_favorite: boolean
-  order_index: number
-  created_at: string | null
-  updated_at: string | null
-}
-
-export interface DocumentInsert {
-  id?: string
-  parent_id?: string | null
-  type: DocumentType
-  title?: string
-  content?: Json
-  icon?: string | null
-  cover_image?: string | null
-  is_favorite?: boolean
-  order_index?: number
-  created_at?: string | null
-  updated_at?: string | null
-}
-
-export interface DocumentUpdate {
-  id?: string
-  parent_id?: string | null
-  type?: DocumentType
-  title?: string
-  content?: Json
-  icon?: string | null
-  cover_image?: string | null
-  is_favorite?: boolean
-  order_index?: number
-  created_at?: string | null
-  updated_at?: string | null
-}
-
-// Document with children (for tree structure)
-export interface DocumentWithChildren extends Document {
-  children?: DocumentWithChildren[]
-}
-
-// =====================================================
 // Extended Types with Relations
 // =====================================================
 
@@ -1177,7 +1124,6 @@ export interface Notification {
   intent_id: string | null
   strategy_comment_id: string | null
   object_id: string | null
-  brief_id: string | null
   /** The membership invitation an 'invite' notification is about. */
   invitation_id?: string | null
   /** The gateway's approval request an 'approval_requested' notification is about. */

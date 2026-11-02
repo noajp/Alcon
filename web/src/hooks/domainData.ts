@@ -8,6 +8,7 @@ import { membershipErrorMessage } from '@/Function/membership/membershipErrors';
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase, getCurrentUserId } from '@/lib/supabase';
+import { throwOnFailedWrites } from './writeResults';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { Domain, DomainInsert, DomainUpdate } from '@/types/database';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
@@ -73,11 +74,11 @@ export function useDomainRole(domainId: string | null) {
 // desired 0..N order_index; we write them all in parallel. Mirrors
 // reorderObjects but for the sidebar Domain list.
 export async function reorderDomains(updates: { id: string; order_index: number }[]): Promise<void> {
-  await Promise.all(
+  throwOnFailedWrites(await Promise.all(
     updates.map((u) =>
-      supabase.from('domains').update({ order_index: u.order_index }).eq('id', u.id)
+      supabase.from('domains').update({ order_index: u.order_index }).eq('id', u.id).select('id')
     )
-  );
+  ), 'reorderDomains');
   void invalidateDomains();
 }
 

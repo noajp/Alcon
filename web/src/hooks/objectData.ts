@@ -2,7 +2,9 @@
 
 import { suggestObjectPrefix } from '@/Function/shared/objectPrefix';
 import { applyOptimisticExplorerPatch } from '@/Function/sync/explorerCache';
+import { reorderObjectsInExplorer } from '@/Function/sync/explorerPatch';
 import { translate } from '@/Function/i18n/I18nProvider';
+import { throwOnFailedWrites } from './writeResults';
 import { supabase } from '@/lib/supabase';
 import type { AlconObject, ObjectTab, ObjectTabInsert } from '@/types/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -355,22 +357,11 @@ export async function deleteObject(id: string): Promise<void> {
 // optimistic explorer-cache patch so a drag lands instantly instead of
 // snapping back until the next refetch.
 export async function reorderObjects(updates: { id: string; order_index: number }[]) {
-  const orderById = new Map(updates.map(u => [u.id, u.order_index]));
-  const rollback = applyOptimisticExplorerPatch(data => {
-    let touched = false;
-    const next = data.objects.map(obj => {
-      const oi = orderById.get(obj.id);
-      if (oi === undefined || oi === obj.order_index) return obj;
-      touched = true;
-      return { ...obj, order_index: oi };
-    });
-    if (!touched) return data;
-    return { ...data, objects: [...next].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)) };
-  });
+  const rollback = applyOptimisticExplorerPatch(data => reorderObjectsInExplorer(data, updates));
   try {
-    await Promise.all(updates.map(u =>
-      supabase.from('objects').update({ order_index: u.order_index }).eq('id', u.id)
-    ));
+    throwOnFailedWrites(await Promise.all(updates.map(u =>
+      supabase.from('objects').update({ order_index: u.order_index }).eq('id', u.id).select('id')
+    )), 'reorderObjects');
   } catch (err) {
     rollback();
     throw err;
@@ -390,20 +381,29 @@ export async function moveObject(
   newIndex: number
 ): Promise<void> {
   void _newParentId;
-  const { data: siblings } = await supabase
+  // Siblings are the Objects of the same Domain — numbering every Object the
+  // viewer can see would rewrite other Domains' (and Spaces') order too.
+  const { data: self, error: selfError } = await supabase
+    .from('objects').select('domain_id').eq('id', objectId).maybeSingle();
+  if (selfError) throw selfError;
+  if (!self?.domain_id) return;
+  const { data: siblings, error } = await supabase
     .from('objects')
     .select('id, order_index')
+    .eq('domain_id', self.domain_id)
     .order('order_index');
+  if (error) throw error;
 
-  const otherSiblings = (siblings || []).filter(s => s.id !== objectId);
-  otherSiblings.splice(newIndex, 0, { id: objectId, order_index: newIndex });
+  const ordered = (siblings || []).filter(s => s.id !== objectId);
+  ordered.splice(newIndex, 0, { id: objectId, order_index: newIndex });
 
-  for (let i = 0; i < otherSiblings.length; i++) {
-    await supabase
-      .from('objects')
-      .update({ order_index: i })
-      .eq('id', otherSiblings[i].id);
-  }
+  // Write only the rows whose number changes.
+  const changed = ordered
+    .map((s, i) => ({ id: s.id, order_index: i, before: s.order_index }))
+    .filter(s => s.id === objectId || s.before !== s.order_index);
+  throwOnFailedWrites(await Promise.all(changed.map(s =>
+    supabase.from('objects').update({ order_index: s.order_index }).eq('id', s.id).select('id')
+  )), 'moveObject');
 }
 
 // ============================================

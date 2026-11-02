@@ -8,6 +8,7 @@ import {
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import type { NavigationState } from '@/types/navigation';
+import { useOpenObject } from './useOpenObject';
 
 // The Inbox is split across two panes that do not share a parent below the
 // shell: the AppSidebar lists the notifications, the main pane reads the one
@@ -59,6 +60,7 @@ export function useInbox({ onNavigate, onViewChange }: InboxNavigation = {}) {
   const { notifications, unreadCount, loading, reload, setNotifications } = useNotifications(user?.id ?? null);
   const { selectedId, unreadOnly, revision } = useInboxSelection();
   const selected = notifications.find(n => n.id === selectedId) ?? null;
+  const openObject = useOpenObject({ onNavigate, onViewChange });
 
   /** Opens a notification. Returns true when it opened in the Inbox reader,
    *  false when it navigated to the surface it is about instead. */
@@ -66,20 +68,24 @@ export function useInbox({ onNavigate, onViewChange }: InboxNavigation = {}) {
     // Element notifications open in the reader; the rest jump to the surface
     // they are about.
     let opened = false;
-    if (n.element_id || !(n.strategy_id || n.object_id || n.brief_id)) { selectInboxNotification(n.id); opened = true; }
+    if (n.element_id || !(n.strategy_id || n.object_id)) { selectInboxNotification(n.id); opened = true; }
     else if (n.strategy_id) {
       onViewChange?.('strategy');
       onNavigate?.({ strategyId: n.strategy_id });
     } else if (n.object_id) {
-      onViewChange?.('objects');
-      onNavigate?.({ objectId: n.object_id });
-    } else if (n.brief_id) onViewChange?.('note');
+      const objectId = n.object_id;
+      void openObject(objectId).catch(error => { console.error(error); return false; }).then(found => {
+        if (found) return;
+        onViewChange?.('objects');
+        onNavigate?.({ objectId });
+      });
+    }
     if (!n.is_read) {
       setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
       void markNotificationRead(n.id, true).catch(error => { console.error(error); reload(); });
     }
     return opened;
-  }, [onNavigate, onViewChange, reload, setNotifications]);
+  }, [onNavigate, onViewChange, openObject, reload, setNotifications]);
 
   const archive = useCallback(async (n: Notification) => {
     setNotifications(prev => prev.filter(x => x.id !== n.id));
@@ -100,7 +106,7 @@ export function useInbox({ onNavigate, onViewChange }: InboxNavigation = {}) {
 
   const setUnreadOnly = useCallback((value: boolean) => emit({ ...selection, unreadOnly: value }), []);
 
-  return { notifications, unreadCount, loading, selected, selectedId, revision, unreadOnly, select, archive, toggleRead, markAllRead, setUnreadOnly };
+  return { notifications, unreadCount, loading, selected, selectedId, revision, unreadOnly, select, openObject, archive, toggleRead, markAllRead, setUnreadOnly };
 }
 
 /** The Element a notification points at, re-read when the reader asks. */

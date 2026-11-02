@@ -9,7 +9,7 @@ import { type DependencyBlocker } from '@/Function/shared/element/dependencyRead
 import { displayIdOf } from '@/Function/shared/element/displayId';
 import { DisplayIdChip } from '@/Function/shared/element/DisplayIdChip';
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter, pointerWithin, type DragEndEvent, type DragStartEvent, type DragMoveEvent, type CollisionDetection } from '@dnd-kit/core';
-import { SortableContext, arrayMove, verticalListSortingStrategy, horizontalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, verticalListSortingStrategy, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
@@ -17,6 +17,7 @@ import { getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { useListColumns, sortElements, NAME_COL_KEY, NAME_MIN_WIDTH, type ColumnId, type DataColumn, type ColumnEntity } from '@/Function/shared/listTable/useListColumns';
 import { EMPTY_CUSTOM_COLUMNS, EMPTY_ELEMENT_TYPES, EMPTY_WORKERS, EMPTY_ELEMENT_IDS, type ElementUpdate, type ListSection, HEADER_DRAG_PREFIX, OBJECT_DRAG_PREFIX, ROW_ROUND_BASE, STICKY_TINT_HOVER } from './shared';
 import { ElementRow } from './ElementRow';
+import { reorderWithinSections } from './rowReorder';
 import { ObjectRow } from './ObjectRow';
 import { ColumnHeader, ResizeHandle, FieldsMenu } from './ColumnHeaderMenu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -462,15 +463,9 @@ export function ListTable({
       const oId = overId.slice(OBJECT_DRAG_PREFIX.length);
       // Reorder against the DISPLAYED (sorted) order so the new order_index
       // matches where the user dropped, not the raw fetch order.
-      for (const sec of sortedSections) {
-        const objs = sec.objects ?? [];
-        const from = objs.findIndex((x) => x.id === aId);
-        const to = objs.findIndex((x) => x.id === oId);
-        if (from === -1 || to === -1) continue;
-        const reordered = arrayMove(objs, from, to);
-        void reorderObjects(reordered.map((x, i) => ({ id: x.id, order_index: i + 1 })));
-        return;
-      }
+      const updates = reorderWithinSections(sortedSections.map((sec) => sec.objects ?? []), aId, oId);
+      // A refused write rolls the rows back to where they were.
+      if (updates) reorderObjects(updates).catch(err => console.error('Failed to reorder Objects:', err));
       return;
     }
     // Element row reorder branch — scoped to within the section that holds
@@ -478,15 +473,8 @@ export function ListTable({
     // sorts by). Element ids are raw UUIDs (no prefix).
     if (!activeId.startsWith(HEADER_DRAG_PREFIX) && !overId.startsWith(HEADER_DRAG_PREFIX) &&
         !activeId.startsWith(OBJECT_DRAG_PREFIX) && !overId.startsWith(OBJECT_DRAG_PREFIX)) {
-      for (const sec of sortedSections) {
-        const els = sec.elements ?? [];
-        const from = els.findIndex((x) => x.id === activeId);
-        const to = els.findIndex((x) => x.id === overId);
-        if (from === -1 || to === -1) continue;
-        const reordered = arrayMove(els, from, to);
-        void reorderElements(reordered.map((x, i) => ({ id: x.id, order_index: i + 1 })));
-        return;
-      }
+      const updates = reorderWithinSections(sortedSections.map((sec) => sec.elements ?? []), activeId, overId);
+      if (updates) reorderElements(updates).catch(err => console.error('Failed to reorder Elements:', err));
     }
   };
 
