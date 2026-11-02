@@ -1,81 +1,198 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Diamond } from '@/ui/icons';
-import { daysUntil, parseDateOnly } from '@/Function/shared/dateUtils';
+import { useMemo, useState } from 'react';
+import { Diamond, MoreHorizontal, Plus } from '@/ui/icons';
+import { Button } from '@/ui/button';
+import { Input } from '@/ui/input';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { MenuShell } from '@/Function/shared/menu';
+import { DateField } from '@/Function/shared/date';
+import { daysUntil, parseDateOnly, toDateOnlyString } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { STATUS } from '@/shared/designTokens';
-import type { ElementWithDetails } from '@/types/database';
-import { useWidgetEmpty } from '../WidgetFrame';
+import {
+  createObjectMilestone,
+  deleteObjectMilestone,
+  updateObjectMilestone,
+  useObjectMilestones,
+} from '@/hooks/useSupabase';
+import type { ObjectMilestone } from '@/types/database';
+import { WidgetHeaderAction, useWidgetEmpty, useWidgetMeta } from '../WidgetFrame';
+import type { WidgetProps } from '../types';
 
-interface Props {
-  elements: ElementWithDetails[];
+/** The Objects a board's milestones come from: the Object itself, or — on a
+ *  Home or Initiative board — the Objects its Elements sit in. */
+function scopeObjects(host: WidgetProps['host']): { ids: string[]; names: Map<string, string> } {
+  const names = new Map<string, string>();
+  if (host.subject.kind === 'object' && host.subject.id) {
+    return { ids: [host.subject.id], names };
+  }
+  const ids = new Set<string>();
+  for (const el of host.elements) {
+    if (el.object_id) ids.add(el.object_id);
+    for (const id of el.objectIds ?? []) ids.add(id);
+    for (const o of el.objects ?? []) names.set(o.id, o.name);
+  }
+  return { ids: [...ids], names };
 }
 
 /**
- * Milestones = high-priority Elements with due dates.
- * Sorted by due date, grouped by month.
+ * Milestones = the Object's `object_milestones` rows — the same ◇ the Gantt
+ * draws. On an Object board they are added, renamed, moved and deleted here;
+ * elsewhere they are read across the Objects in scope.
  */
-export function MilestonesWidget({ elements }: Props) {
+export function MilestonesWidget({ host }: WidgetProps) {
   const { t, locale } = useI18n();
-  const milestones = useMemo(() => {
-    return elements
-      .filter((e) => e.due_date && (e.priority === 'high' || e.priority === 'urgent'))
-      .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime());
-  }, [elements]);
+  const { ids, names } = useMemo(() => scopeObjects(host), [host]);
+  const { data: milestones, loading } = useObjectMilestones(ids);
+  const objectId = host.subject.kind === 'object' ? host.subject.id : null;
+  const editable = !!objectId && !host.readOnly;
 
-  // Derived, not entered: with no dated high-priority Elements there is
-  // nothing to show, so the frame hides the widget (it reappears in arrange
-  // mode, where it can still be removed) instead of boxing an apology.
-  useWidgetEmpty(milestones.length === 0);
-  if (milestones.length === 0) return null;
+  const [adding, setAdding] = useState(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Group by month
-  const grouped = milestones.reduce<Record<string, ElementWithDetails[]>>((acc, el) => {
-    const key = (parseDateOnly(el.due_date) ?? new Date(el.due_date!)).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
-    (acc[key] ||= []).push(el);
+  const run = (write: () => Promise<unknown>) => {
+    setError(null);
+    write().catch((e: unknown) => setError(e instanceof Error ? e.message : t('Could not save the milestone.')));
+  };
+
+  useWidgetMeta(milestones.length > 0 ? String(milestones.length) : null);
+  // Read-only boards hide an empty widget; an Object's keeps its `+`.
+  useWidgetEmpty(!editable && !loading && milestones.length === 0);
+
+  const grouped = milestones.reduce<Array<[string, ObjectMilestone[]]>>((acc, m) => {
+    const key = (parseDateOnly(m.date) ?? new Date()).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+    const last = acc[acc.length - 1];
+    if (last && last[0] === key) last[1].push(m);
+    else acc.push([key, [m]]);
     return acc;
-  }, {});
+  }, []);
 
   return (
     <div className="space-y-4 max-h-[360px] overflow-y-auto">
-      {Object.entries(grouped).map(([month, items]) => (
+      {editable && (
+        <WidgetHeaderAction>
+          <Button variant="ghost" size="icon-xs" aria-label={t('Add milestone')} onClick={() => setAdding(true)}>
+            <Plus size={14} />
+          </Button>
+        </WidgetHeaderAction>
+      )}
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+      {adding && objectId && (
+        <MilestoneComposer
+          onCancel={() => setAdding(false)}
+          onSubmit={(label, date) => {
+            setAdding(false);
+            run(() => createObjectMilestone({ object_id: objectId, label, date }));
+          }}
+        />
+      )}
+      {editable && !adding && !loading && milestones.length === 0 && (
+        <p className="text-[12px] text-muted-foreground">{t('No milestones yet.')}</p>
+      )}
+      {grouped.map(([month, items]) => (
         <div key={month}>
           <div className="text-[12px] text-muted-foreground pb-1">{month}</div>
-          <div>
-            {items.map((m) => {
-              const days = daysUntil(m.due_date!);
-              const statusMeta = STATUS[m.status as keyof typeof STATUS];
-              const isOverdue = days < 0 && m.status !== 'done';
-              const isDone = m.status === 'done';
-              const due = parseDateOnly(m.due_date) ?? new Date(m.due_date!);
-
-              return (
-                <div key={m.id} className="py-1.5">
-                  <div className="flex items-center gap-2">
-                    <Diamond size={12} className="shrink-0 text-[var(--status-danger)]" />
-                    <span className="text-[13px] font-medium text-foreground truncate">{m.title}</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5 pl-5 text-[12px] text-muted-foreground">
-                    <span>{due.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}</span>
-                    {/* Only a milestone already missed asks for action, so only it is red. */}
-                    <span className={isOverdue ? 'text-[var(--status-danger)]' : undefined}>
-                      {isDone
-                        ? t('Done')
-                        : isOverdue
-                          ? t('{n}d overdue', { n: Math.abs(days) })
-                          : days === 0
-                            ? t('Today')
-                            : t('in {n}d', { n: days })}
-                    </span>
-                    {statusMeta && !isDone && <span>{t(statusMeta.label)}</span>}
-                  </div>
+          {items.map((m) => {
+            const days = daysUntil(m.date);
+            const label = m.label?.trim() || t('Untitled');
+            return (
+              <div key={m.id} className="group py-1.5">
+                <div className="flex items-center gap-2">
+                  <Diamond size={12} className="shrink-0 text-[var(--status-danger)]" />
+                  {renaming === m.id ? (
+                    <Input
+                      autoFocus
+                      defaultValue={m.label ?? ''}
+                      aria-label={t('Milestone name')}
+                      className="h-7 text-[13px]"
+                      onBlur={(e) => {
+                        setRenaming(null);
+                        const next = e.currentTarget.value.trim() || null;
+                        if (next !== (m.label ?? null)) run(() => updateObjectMilestone(m, { label: next }));
+                      }}
+                      onKeyDown={(e) => {
+                        // Enter and Escape both save and close: this is the
+                        // milestone's own name, written in place.
+                        if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur();
+                      }}
+                    />
+                  ) : editable ? (
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 truncate text-left text-[13px] font-medium text-foreground"
+                      onClick={() => setRenaming(m.id)}
+                    >
+                      {label}
+                    </button>
+                  ) : (
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">{label}</span>
+                  )}
+                  {editable && renaming !== m.id && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon-xs" aria-label={t('Milestone actions')} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100">
+                          <MoreHorizontal size={14} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <MenuShell as="dropdown" align="end">
+                        <DropdownMenuItem onSelect={() => setRenaming(m.id)}>{t('Rename')}</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => run(() => deleteObjectMilestone(m))}>{t('Delete')}</DropdownMenuItem>
+                      </MenuShell>
+                    </DropdownMenu>
+                  )}
                 </div>
-              );
-            })}
-          </div>
+                <div className="flex items-center gap-2 mt-0.5 pl-5 text-[12px] text-muted-foreground">
+                  {editable ? (
+                    <DateField
+                      size="xs"
+                      value={m.date}
+                      clearable={false}
+                      aria-label={t('Milestone date')}
+                      onChange={(next) => { if (next && next !== m.date) run(() => updateObjectMilestone(m, { date: next })); }}
+                    />
+                  ) : (
+                    <span>{(parseDateOnly(m.date) ?? new Date()).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}</span>
+                  )}
+                  {/* Only a milestone already passed asks for attention, so only it is red. */}
+                  <span className={days < 0 ? 'text-[var(--status-danger)]' : undefined}>
+                    {days < 0 ? t('{n}d ago', { n: Math.abs(days) }) : days === 0 ? t('Today') : t('in {n}d', { n: days })}
+                  </span>
+                  {!objectId && names.get(m.object_id) && <span className="truncate">{names.get(m.object_id)}</span>}
+                </div>
+              </div>
+            );
+          })}
         </div>
       ))}
     </div>
+  );
+}
+
+/** A new milestone: a name and a day. Escape abandons it. */
+function MilestoneComposer({ onSubmit, onCancel }: { onSubmit: (label: string | null, date: string) => void; onCancel: () => void }) {
+  const { t } = useI18n();
+  const [label, setLabel] = useState('');
+  const [date, setDate] = useState(() => toDateOnlyString(new Date()));
+  const submit = () => onSubmit(label.trim() || null, date);
+  return (
+    <form
+      className="flex items-center gap-2"
+      onSubmit={(e) => { e.preventDefault(); submit(); }}
+      onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); onCancel(); } }}
+    >
+      <Diamond size={12} className="shrink-0 text-[var(--status-danger)]" />
+      <Input
+        autoFocus
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        placeholder={t('Milestone name')}
+        aria-label={t('Milestone name')}
+        className="h-7 flex-1 text-[13px]"
+      />
+      <DateField size="xs" value={date} clearable={false} aria-label={t('Milestone date')} onChange={(next) => { if (next) setDate(next); }} />
+      <Button type="submit" size="xs">{t('Add')}</Button>
+      <Button type="button" variant="ghost" size="xs" onClick={onCancel}>{t('Cancel')}</Button>
+    </form>
   );
 }
