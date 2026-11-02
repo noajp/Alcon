@@ -134,11 +134,12 @@ function Button({
       data-size={size}
       data-shape={shape}
       className={cn(buttonVariants({ variant, size, align: resolvedAlign, shape, multiline, className }),
-        // A tab is a quiet pill: no line around it. The ones not chosen are
-        // just their words, the chosen one sits on a light fill, and a hover
-        // shows the same fill — a row of tabs reads as one strip, not a row
-        // of separate buttons.
+        // A tab is a pill. The ones not chosen are outlined — each its own
+        // enclosed choice — the chosen one sits on a light fill with no line,
+        // and a hover shows that fill. An icon-only tab sits inside a group
+        // that is outlined already, so it keeps no line of its own.
         appearance === 'control' && shape === 'tab' && 'border-transparent hover:border-transparent aria-pressed:border-transparent aria-selected:border-transparent',
+        appearance === 'control' && shape === 'tab' && variant === 'ghost' && !String(size ?? '').startsWith('icon') && 'border-[var(--border-default)] hover:border-[var(--border-default)]',
         appearance === 'control' && shape === 'tab' && variant === 'ghost' && 'bg-transparent text-[var(--text-secondary)] hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)]',
         appearance === 'control' && shape === 'tab' && variant === 'secondary' && 'bg-[var(--surface-strong)] text-[var(--text-primary)] hover:bg-[var(--surface-strong)]',
         appearance !== 'control' && 'rounded-[var(--control-tab-radius)] border-transparent hover:border-transparent aria-pressed:border-transparent aria-selected:border-transparent',
