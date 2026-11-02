@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchCustomColumnsWithValues } from '@/hooks/useSupabase';
 
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
-import { ChevronRight, Plus } from '@/ui/icons';
+import { Plus } from '@/ui/icons';
 import { TabBar } from '@/shell/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
@@ -39,6 +39,7 @@ import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrill
 import { ResourceView } from '@/ActivitySpace/sustainment/workload/ResourceView';
 import { CustomView } from '@/ActivitySpace/execution/element/custom';
 import { ObjectIcon } from '@/shell/icons';
+import { IslandHeader } from '@/Function/shared/MainIsland';
 import { useDomains } from '@/hooks/useSupabase';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { useCurrentUserId } from '@/providers/authContext';
@@ -438,28 +439,14 @@ function HierarchyHeader({
   actions?: ReactNode;
 }) {
   return (
-    // pl-6: with the crumb's own px-1.5 the Domain name starts 30px in, where
-    // the list's "Name" heading and the rows' icons do.
-    <div className="h-[50px] flex items-center gap-1 pl-6 pr-1 border-b border-border/60 bg-card flex-shrink-0">
-      <button
-        type="button"
-        onClick={onDomainClick}
-        className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[13px] font-medium truncate max-w-[220px] transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/40"
-      >
-        <span className="truncate">{domainName}</span>
-      </button>
-      {objectName && (
-        <>
-          <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />
-          <span className="flex items-center gap-1 px-1.5 py-0.5 text-[12px] font-semibold truncate max-w-[220px] text-foreground">
-            <ObjectIcon size={12} />
-            <span className="truncate">{objectName}</span>
-          </span>
-          {objectSlot}
-        </>
-      )}
-      {actions}
-    </div>
+    <IslandHeader
+      crumbs={[
+        { id: 'domain', label: domainName, onClick: onDomainClick },
+        ...(objectName ? [{ id: 'object', label: objectName, icon: <ObjectIcon size={12} /> }] : []),
+      ]}
+      after={objectName ? objectSlot : undefined}
+      actions={actions}
+    />
   );
 }
 

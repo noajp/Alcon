@@ -4,7 +4,6 @@ import { CircleAlert, RefreshCw, ScrollText } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { FONT } from '@/shared/designTokens';
 import { ToolPage, type ToolView } from '@/Function/shared/tool/ToolPage';
-import { NavAuditIcon } from '@/shell/sidebar/NavIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { AUDIT_RUN_LIMIT, AUDIT_WINDOW_DAYS } from '@/hooks/useAudit';
 import type { useAuditScope } from './auditScope';
@@ -38,7 +37,7 @@ export function AuditLog({ source, scoped, status, attention, runId, onAttention
     badge: view.id === 'attention' && scoped.attention.length ? scoped.attention.length : undefined,
   }));
   return (
-    <ToolPage icon={NavAuditIcon} tool={t('Audit')} crumb={t('Audit log')} storageKey="audit-log" home="all"
+    <ToolPage crumbs={[{ id: 'tool', label: t('Audit') }, { id: 'page', label: t('Audit log') }]} storageKey="audit-log" home="all"
       views={views} activeView={attention ? 'attention' : 'all'} onSelectView={id => onAttention(id === 'attention')}
       actions={<>{source.sample && <SampleBadge />}<Button size="icon-sm" variant="ghost" onClick={() => void source.refetch()} aria-label={t('Refresh')} title={t('Refresh')}><RefreshCw size={14} /></Button></>}
       panel={run ? <RunPanel source={source} run={run} deployment={scoped.deploymentOf.get(run.deployment_id) ?? null} onClose={onCloseRun} /> : undefined}>

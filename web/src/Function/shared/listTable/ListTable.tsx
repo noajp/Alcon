@@ -593,10 +593,10 @@ export function ListTable({
                 the row's sticky-left cells and any data column header
                 scrolling under. The signals track's header after it is
                 blank and scrolls; Name's resize edge is at its end. */}
-            <th colSpan={2} className="sticky top-0 left-0 z-30 relative pl-7.5 pr-3 py-2.5 text-left text-[13px] font-normal text-muted-foreground bg-card border-b border-border/60">
+            <th colSpan={2} className="sticky top-0 left-0 z-30 relative pl-7.5 pr-3 py-2.5 text-left text-[13px] font-normal text-muted-foreground bg-card">
               {t('Name')}
             </th>
-            <th className="relative p-0 bg-card border-b border-border/60">
+            <th className="relative p-0 bg-card">
               {/* Name is resizable too — same handle as the data columns,
                   persisted under NAME_COL_KEY. Fixed on the Object list
                   instead (see the colgroup above), so no handle there. */}
@@ -630,8 +630,10 @@ export function ListTable({
               ))}
             </SortableContext>
             {hasTrailingCol && (
-              // Keep column controls at the right edge of the flexible spacer.
-              <th className="table-cell w-8 px-1 py-2.5 bg-card text-center border-b border-border/60">
+              // Keep column controls at the right edge of the flexible spacer,
+              // and pinned there while the list slides sideways (z-30 above
+              // the data column headers scrolling under it).
+              <th className="table-cell sticky top-0 right-0 z-30 w-8 px-1 py-2.5 bg-card text-center">
                 {/* Trailing "+": which fields show as columns, and a new
                     field where the list has a scope to create one in. */}
                 <div className="flex items-center justify-end">

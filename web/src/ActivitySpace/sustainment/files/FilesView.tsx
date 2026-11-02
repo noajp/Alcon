@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowUpRight, ChevronRight, FolderInput, FolderPlus, Loader2, RotateCcw, Search, Trash2, X } from '@/ui/icons';
+import { ArrowUpRight, FolderInput, Loader2, RotateCcw, Search, Trash2, X } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { AttachmentPreview } from '@/Function/shared/attachments/AttachmentList';
@@ -20,7 +20,8 @@ import { useTrashFile } from './useTrashFile';
 import { AttachButton } from '@/Function/shared/attachments/AttachButton';
 import { useFolders } from '@/hooks/folderData';
 import { moveFileToFolder } from '@/hooks/attachmentData';
-import { FolderList, MoveToFolderItems, useNewFolder } from '@/Function/shared/folders/FolderList';
+import { FolderList, MoveToFolderItems, NewFolderButton } from '@/Function/shared/folders/FolderList';
+import { IslandColumns, MainIsland, type IslandCrumb } from '@/Function/shared/MainIsland';
 import { DropdownMenu, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
@@ -61,19 +62,21 @@ function useDomainName(domainId: string | null | undefined) {
   return useSustainmentDomains().data.find((d) => d.id === domainId)?.name ?? '';
 }
 
-/** "Domain › Page", the Domain opening its home. */
-function Crumbs({ domainId, go, children }: { domainId: string; go: (next: FilesRoute) => void; children?: ReactNode }) {
-  const name = useDomainName(domainId);
-  return <>
-    <button type="button" onClick={() => go({ domainId })} className={children ? 'font-normal text-muted-foreground hover:text-foreground' : ''}>{name}</button>
-    {children && <><ChevronRight size={14} className="shrink-0 text-muted-foreground" />{children}</>}
-  </>;
+/** The path's first step: the Domain, opening its home. */
+function useDomainCrumb(domainId: string, go: (next: FilesRoute) => void): IslandCrumb {
+  return { id: 'domain', label: useDomainName(domainId), onClick: () => go({ domainId }) };
 }
 
 function FoldersPage({ domainId, go }: { domainId: string; go: (next: FilesRoute) => void }) {
   const { t } = useI18n();
-  return <FolderList app="files" domainId={domainId} counts={useFolderCounts()} onOpen={(id) => go({ domainId, folderId: id })}
-    title={<Crumbs domainId={domainId} go={go}><span>{t('Folders')}</span></Crumbs>} />;
+  const domain = useDomainCrumb(domainId, go);
+  const open = (id: string) => go({ domainId, folderId: id });
+  return (
+    <MainIsland crumbs={[domain, { id: 'folders', label: t('Folders') }]} count={useFolders('files', domainId).data.length}
+      actions={<NewFolderButton app="files" domainId={domainId} onOpen={open} />}>
+      <FolderList app="files" domainId={domainId} counts={useFolderCounts()} onOpen={open} />
+    </MainIsland>
+  );
 }
 
 /** How many live files each folder holds. */
@@ -93,24 +96,22 @@ function FilesHome({ domainId, go }: { domainId: string; go: (next: FilesRoute) 
   const name = useDomainName(domainId);
   const files = useSpaceAttachments(spaceId).data.filter((f) => f.domain_id === domainId);
   const counts = useFolderCounts();
-  const newFolder = useNewFolder('files', domainId);
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="px-6 pb-8 pt-5">
-        <h1 className="text-[17px] font-semibold text-foreground">{name}</h1>
-        <div className="mt-6 flex items-center gap-2">
+    <MainIsland crumbs={[{ id: 'domain', label: name }]}
+      actions={<NewFolderButton app="files" domainId={domainId} onOpen={(id) => go({ domainId, folderId: id })} />}>
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="px-3 pb-8 pt-5">
+        <div className="flex items-center gap-2 px-[18px]">
           <button type="button" onClick={() => go({ domainId, view: 'folders' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Folders')}</button>
-          <span className="flex-1" />
-          <Button type="button" variant="ghost" size="xs" onClick={() => { void newFolder().then((id) => { if (id) go({ domainId, folderId: id }); }); }}><FolderPlus size={13} />{t('New folder')}</Button>
         </div>
-        <div className="-mx-3 mt-1"><FolderList app="files" domainId={domainId} counts={counts} onOpen={(id) => go({ domainId, folderId: id })} compact /></div>
-        <div className="mt-8 flex items-center gap-2">
+        <div className="mt-1"><FolderList app="files" domainId={domainId} counts={counts} onOpen={(id) => go({ domainId, folderId: id })} compact /></div>
+        <div className="mt-8 flex items-center gap-2 px-[18px]">
           <button type="button" onClick={() => go({ domainId, view: 'files' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Recent files')}</button>
         </div>
-        <div className="-mx-3 mt-1">
+        <div className="mt-1">
           {files.slice(0, 8).map((f) => (
             <button key={f.id} type="button" onClick={() => go({ domainId, view: 'files', fileId: f.id })}
-              className="flex h-9 w-full items-center gap-3 rounded-md px-3 text-left hover:bg-foreground/[0.05]">
+              className="flex h-9 w-full items-center gap-3 rounded-md px-[18px] text-left hover:bg-foreground/[0.05]">
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 <FileTypeIcon name={f.name} mime={f.mime_type} />
                 <span className="truncate text-[13.5px] text-foreground">{nameOf(f)}</span>
@@ -121,10 +122,11 @@ function FilesHome({ domainId, go }: { domainId: string; go: (next: FilesRoute) 
               <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(f.created_at, true)}</span>
             </button>
           ))}
-          {!files.length && <p className="px-3 py-4 text-[13px] text-muted-foreground">{t('No files yet. Make a folder and drop files into it, or attach them to Elements, Objects, Initiatives or CRM records.')}</p>}
+          {!files.length && <p className="px-[18px] py-4 text-[13px] text-muted-foreground">{t('No files yet. Make a folder and drop files into it, or attach them to Elements, Objects, Initiatives or CRM records.')}</p>}
         </div>
       </div>
     </div>
+    </MainIsland>
   );
 }
 
@@ -166,53 +168,47 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
   };
   const who = (f: SpaceFile) => workers.find((w) => w.user_id === f.uploaded_by)?.name ?? t('Someone');
 
-  return (
-    <div className="flex h-full min-h-0">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex shrink-0 items-center gap-3 px-6 pb-3 pt-5">
-          <h1 className="flex min-w-0 items-center gap-1 text-[17px] font-semibold text-foreground">
-            {!route.domainId ? t('All files') : (
-              <Crumbs domainId={route.domainId} go={(next) => onNavigate({ files: next })}>
-                {folder ? <>
-                  <button type="button" onClick={() => onNavigate({ files: { domainId: route.domainId, view: 'folders' } })} className="font-normal text-muted-foreground hover:text-foreground">{t('Folders')}</button>
-                  <ChevronRight size={14} className="shrink-0 text-muted-foreground" />
-                  <span className="truncate">{folder.name}</span>
-                </> : <span>{t('Files')}</span>}
-              </Crumbs>
-            )}
-          </h1>
-          <span className="text-[13px] tabular-nums text-muted-foreground">{shown.length}</span>
-          <span className="flex-1" />
-          {folder && (
-            <AttachButton owner={{ kind: 'folder', id: folder.id }} size={14}
-              className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50" />
-          )}
-          <label className="flex h-7 w-56 items-center gap-1.5 rounded-md bg-muted/50 px-2 text-[12.5px] focus-within:bg-muted">
-            <Search size={12} className="shrink-0 text-muted-foreground" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Search names and contents')} aria-label={t('Search files')}
-              className="min-w-0 flex-1 bg-transparent outline-none" />
-          </label>
-        </div>
+  const go = (next: FilesRoute) => onNavigate({ files: next });
+  const domainName = useDomainName(route.domainId);
+  const crumbs: IslandCrumb[] = !route.domainId ? [{ id: 'all', label: t('All files') }] : [
+    { id: 'domain', label: domainName, onClick: () => go({ domainId: route.domainId }) },
+    ...(folder ? [{ id: 'folders', label: t('Folders'), onClick: () => go({ domainId: route.domainId, view: 'folders' as const }) }, { id: 'folder', label: folder.name }]
+      : [{ id: 'files', label: t('Files') }]),
+  ];
 
+  return (
+    <MainIsland crumbs={crumbs} count={shown.length} actions={<>
+      {folder && (
+        <AttachButton owner={{ kind: 'folder', id: folder.id }} size={14}
+          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50" />
+      )}
+      <label className="flex h-7 w-56 items-center gap-1.5 rounded-md bg-muted/50 px-2 text-[12.5px] focus-within:bg-muted">
+        <Search size={12} className="shrink-0 text-muted-foreground" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Search names and contents')} aria-label={t('Search files')}
+          className="min-w-0 flex-1 bg-transparent outline-none" />
+      </label>
+    </>}>
+    <div className="flex min-h-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-col">
         {/* Column heads; the list scrolls under them. */}
-        <div className="flex shrink-0 items-center gap-3 border-b border-border/60 px-6 pb-1.5 text-[11.5px] text-muted-foreground">
+        <IslandColumns>
           <span className="min-w-0 flex-1">{t('Name')}</span>
           {!open && <span className="hidden w-56 shrink-0 md:block">{t('Attached to')}</span>}
           {!open && <span className="hidden w-32 shrink-0 lg:block">{t('Added by')}</span>}
           <span className="w-20 shrink-0 text-right">{t('Updated')}</span>
-        </div>
+        </IslandColumns>
         <div className={`min-h-0 flex-1 overflow-y-auto px-3 py-1 ${dropping ? 'bg-foreground/[0.04] outline-dashed outline-2 -outline-offset-4 outline-[var(--border-strong)]' : ''}`}
           onDragOver={folder ? (e) => { e.preventDefault(); setDropping(true); } : undefined}
           onDragLeave={folder ? () => setDropping(false) : undefined}
           onDrop={folder ? (e) => { e.preventDefault(); setDropping(false); drop(e.dataTransfer.files); } : undefined}>
-          {loading ? <p className="px-3 py-6 text-[13px] text-muted-foreground">{t('Loading…')}</p>
-            : !shown.length ? <p className="px-3 py-6 text-[13px] text-muted-foreground">{folder ? t('This folder is empty. Drop files here, or add them with the paperclip.') : files.length ? t('No files match.') : t('No files yet. Make a folder and drop files into it, or attach them to Elements, Objects, Initiatives or CRM records.')}</p>
+          {loading ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{t('Loading…')}</p>
+            : !shown.length ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{folder ? t('This folder is empty. Drop files here, or add them with the paperclip.') : files.length ? t('No files match.') : t('No files yet. Make a folder and drop files into it, or attach them to Elements, Objects, Initiatives or CRM records.')}</p>
             : shown.map((f) => {
               const owner = ownerOf(f);
               const active = open?.id === f.id;
               return (
                 <button key={f.id} type="button" onClick={() => select(active ? null : f)} aria-pressed={active}
-                  className={`flex min-h-9 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left transition-colors ${active ? 'bg-foreground/[0.08]' : 'hover:bg-foreground/[0.05]'}`}>
+                  className={`flex min-h-9 w-full items-center gap-3 rounded-md px-[18px] py-1.5 text-left transition-colors ${active ? 'bg-foreground/[0.08]' : 'hover:bg-foreground/[0.05]'}`}>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
                       <FileTypeIcon name={f.name} mime={f.mime_type} />
@@ -239,6 +235,7 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
 
       {open && <FilePane file={open} who={who(open)} onClose={() => select(null)} />}
     </div>
+    </MainIsland>
   );
 }
 
@@ -292,26 +289,20 @@ function TrashList() {
   const { t } = useI18n();
   const { data: files, loading } = useSpaceAttachments(useActiveSpaceId(), true);
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 px-6 pb-3 pt-5">
-        <div className="flex items-center gap-3">
-          <h1 className="text-[17px] font-semibold text-foreground">{t('Deleted')}</h1>
-          <span className="text-[13px] tabular-nums text-muted-foreground">{files.length}</span>
-        </div>
-        <p className="mt-0.5 text-[12.5px] text-muted-foreground">{t('Removed files can be restored for {days} days, then they are erased.', { days: TRASH_DAYS })}</p>
-      </div>
-      <div className="flex shrink-0 items-center gap-3 border-b border-border/60 px-6 pb-1.5 text-[11.5px] text-muted-foreground">
+    <MainIsland crumbs={[{ id: 'trash', label: t('Deleted') }]} count={files.length}
+      actions={<span className="pr-1 text-[12px] text-muted-foreground">{t('Removed files can be restored for {days} days, then they are erased.', { days: TRASH_DAYS })}</span>}>
+      <IslandColumns>
         <span className="min-w-0 flex-1">{t('Name')}</span>
         <span className="hidden w-56 shrink-0 md:block">{t('Attached to')}</span>
         <span className="w-24 shrink-0 text-right">{t('Erased in')}</span>
         <span className="w-24 shrink-0" />
-      </div>
+      </IslandColumns>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-1">
-        {loading ? <p className="px-3 py-6 text-[13px] text-muted-foreground">{t('Loading…')}</p>
-          : !files.length ? <p className="px-3 py-6 text-[13px] text-muted-foreground">{t('Nothing has been removed.')}</p>
+        {loading ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{t('Loading…')}</p>
+          : !files.length ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{t('Nothing has been removed.')}</p>
           : files.map((f) => <TrashRow key={f.id} file={f} />)}
       </div>
-    </div>
+    </MainIsland>
   );
 }
 
@@ -320,7 +311,7 @@ function TrashRow({ file }: { file: SpaceFile }) {
   const owner = ownerOf(file);
   const { restore } = useAttachmentActions(owner);
   return (
-    <div className="flex h-9 items-center gap-3 rounded-md px-3 hover:bg-foreground/[0.05]">
+    <div className="flex h-9 items-center gap-3 rounded-md px-[18px] hover:bg-foreground/[0.05]">
       <span className="flex min-w-0 flex-1 items-center gap-2">
         <span className="opacity-60"><FileTypeIcon name={file.name} mime={file.mime_type} /></span>
         <span className="truncate text-[13.5px] text-muted-foreground" title={file.name}>{nameOf(file)}</span>

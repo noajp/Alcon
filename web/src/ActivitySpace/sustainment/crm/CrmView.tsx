@@ -14,6 +14,7 @@ import { RailRow } from '@/Function/shared/RailRow';
 import { IndexList, IndexRow } from '@/Function/shared/IndexList';
 import { ToolPage, type ToolView } from '@/Function/shared/tool/ToolPage';
 import { PlacePage as SharedPlacePage } from '@/Function/shared/tool/PlacePage';
+import { IslandHeader } from '@/Function/shared/MainIsland';
 import { CrmIcon } from '@/Function/shared/conceptIcons';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
@@ -128,8 +129,8 @@ function CrmMount(props: SurfaceProps) {
 }
 
 /** A place in the CRM that is not a record. */
-function PlacePage(props: Omit<React.ComponentProps<typeof SharedPlacePage>, 'icon' | 'container'>) {
-  return <SharedPlacePage icon={CrmIcon} container="crm" {...props} />;
+function PlacePage(props: Omit<React.ComponentProps<typeof SharedPlacePage>, 'container'>) {
+  return <SharedPlacePage container="crm" {...props} />;
 }
 
 function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }: SurfaceProps & { crm: Crm }) {
@@ -214,6 +215,8 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
     {dialogs}
   </>;
 
+  // The scope opens its overview, first in every page's path.
+  const scopeCrumb = { id: 'scope', label: scoped.scopeName, onClick: () => go({ view: 'home' }) };
   // Loading and failing, for every page; the ledgers need no pipeline.
   const loadStatus = <>
     {crm.loading && <p role="status" className="py-6 text-sm text-muted-foreground">{t('Loading your pipeline…')}</p>}
@@ -232,12 +235,7 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
   // ── The scope's overview ────────────────────────────────────────────
   if (route.view === 'home') return <>
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
-      <header className="flex h-[50px] flex-shrink-0 items-center gap-1.5 border-b border-border/60 bg-card pl-4 pr-2">
-        <CrmIcon size={14} /><span className="text-[13px] font-medium text-foreground">{t('CRM')}</span>
-        <span className="min-w-0 truncate text-[13px] text-muted-foreground">{scoped.scopeName}</span>
-        <div className="flex-1" />
-        {headerActions && <div className="flex shrink-0 items-center gap-1.5">{headerActions}</div>}
-      </header>
+      <IslandHeader crumbs={[{ id: 'scope', label: scoped.scopeName }]} actions={headerActions} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <PageLayout rail={<RailCard title={t('Properties')}>
           <RailRow icon={<Layers className="size-3.5 text-muted-foreground" />} name={t('Scope')} dense label={scoped.scopeName} placeholder={scoped.scope === null} />
@@ -261,7 +259,7 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
 
   // ── Today ───────────────────────────────────────────────────────────
   if (route.view === 'today') return <>
-    <PlacePage title={t('Today')} actions={<>
+    <PlacePage parent={scopeCrumb} title={t('Today')} actions={<>
       {pooled && crm.me && <div role="group" aria-label={t('Whose deals')} className="mr-2 flex gap-1">
         <Button shape="tab" size="sm" variant={!everyone ? 'secondary' : 'ghost'} aria-pressed={!everyone} onClick={() => setEveryone(false)}>{t('Mine')}</Button>
         <Button shape="tab" size="sm" variant={everyone ? 'secondary' : 'ghost'} aria-pressed={everyone} onClick={() => setEveryone(true)}>{t('Everyone')}</Button>
@@ -277,17 +275,17 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
 
   // ── The ledgers ─────────────────────────────────────────────────────
   if (route.view === 'companies') return <>
-    <PlacePage title={t('Companies')}>{loadStatus}{loaded && <CrmCompanies crm={{ ...crm, companies: scoped.companies }} query={route.query ?? ''} selectedId={null} domainId={scoped.domainId} onOpen={companyId => go({ companyId })} />}</PlacePage>
+    <PlacePage parent={scopeCrumb} title={t('Companies')}>{loadStatus}{loaded && <CrmCompanies crm={{ ...crm, companies: scoped.companies }} query={route.query ?? ''} selectedId={null} domainId={scoped.domainId} onOpen={companyId => go({ companyId })} />}</PlacePage>
     {dialogs}
   </>;
   if (route.view === 'contacts') return <>
-    <PlacePage title={t('Contacts')}>{loadStatus}{loaded && <CrmContacts crm={{ ...crm, contacts: scoped.contacts }} query={route.query ?? ''} selectedId={null} domainId={scoped.domainId} onOpen={contactId => go({ contactId })} />}</PlacePage>
+    <PlacePage parent={scopeCrumb} title={t('Contacts')}>{loadStatus}{loaded && <CrmContacts crm={{ ...crm, contacts: scoped.contacts }} query={route.query ?? ''} selectedId={null} domainId={scoped.domainId} onOpen={contactId => go({ contactId })} />}</PlacePage>
     {dialogs}
   </>;
 
   // ── Forecast: each pipeline in the scope, in its own currency ───────
   if (route.view === 'forecast') return <>
-    <PlacePage title={t('Forecast')} actions={headerActions}>
+    <PlacePage parent={scopeCrumb} title={t('Forecast')} actions={headerActions}>
       {status}
       <div className="space-y-12">{scoped.workspaces.map(item => <section key={item.pipeline.id} className="space-y-4">
         {scoped.workspaces.length > 1 && <h2 className={`${FONT.lg} text-foreground`}>{item.pipeline.name}</h2>}
@@ -339,7 +337,7 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
   </DropdownMenu>;
 
   return <>
-    <ToolPage icon={CrmIcon} tool={t('CRM')} crumb={boardOf ? pipeline?.name : scoped.scopeName} storageKey="crm-deals" home="deals"
+    <ToolPage crumbs={[scopeCrumb, { id: 'page', label: boardOf ? pipeline?.name ?? t('Deals') : t('Deals') }]} storageKey="crm-deals" home="deals"
       views={DEAL_TABS.map(tab => ({ ...tab, label: tab.id === 'deals' && recordLabel ? recordLabel : tab.label }))} activeView={view}
       onSelectView={id => go({ view: id as CrmViewId })}
       actions={headerActions}

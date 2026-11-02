@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNod
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, horizontalListSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronRight, EyeOff, Plus } from '@/ui/icons';
+import { EyeOff, Plus } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/ui/context-menu';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
@@ -14,6 +14,7 @@ import { CollapsingTabs } from '@/Function/shared/CollapsingTabs';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { constrainTabDrag } from '@/shell/tabDrag';
 import { arrangeViews, nextViewTabState, parseViewTabState, type ViewTabState } from './viewTabs';
+import { IslandHeader, type IslandCrumb } from '@/Function/shared/MainIsland';
 
 // =============================================================
 // ToolPage — the page of a Sustainment tool (CRM).
@@ -68,14 +69,11 @@ function useViewTabs(storageKey: string, views: readonly ToolView[], home: strin
 }
 
 export function ToolPage({
-  icon: Icon, tool, crumb, actions, views, storageKey, home, activeView, onSelectView, viewControls,
+  crumbs, actions, views, storageKey, home, activeView, onSelectView, viewControls,
   head, properties, panel, record, scrollKey, children,
 }: {
-  /** The tool's icon and name, at the start of the header. */
-  icon: ComponentType<{ size?: number }>;
-  tool: string;
-  /** The subject, after the tool name — the pipeline, the supply scope. */
-  crumb?: ReactNode;
+  /** Where the page is, as a path: the tool or scope, then the subject (a pipeline, a workflow). */
+  crumbs: IslandCrumb[];
   /** Header verbs at the right (Capture, New deal, Refresh). */
   actions?: ReactNode;
   views: readonly ToolView[];
@@ -115,13 +113,7 @@ export function ToolPage({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
-      <header className="flex h-[50px] flex-shrink-0 items-center gap-1.5 border-b border-border/60 bg-card pl-4 pr-2">
-        <Icon size={12} />
-        <span className="text-[13px] font-medium text-foreground">{tool}</span>
-        {crumb && <><ChevronRight size={12} className="shrink-0 text-muted-foreground/60" /><span className="min-w-0 truncate text-[13px] text-muted-foreground">{crumb}</span></>}
-        <div className="flex-1" />
-        {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
-      </header>
+      <IslandHeader crumbs={crumbs} actions={actions} />
 
       <div className="flex flex-shrink-0 items-center gap-1.5 px-4 py-2">
         <CollapsingTabs
