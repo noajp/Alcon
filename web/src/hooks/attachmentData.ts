@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
 import { applyOfficeEdits, type OfficeEdit } from '@/Function/office/officeEdits';
-import { latestVersions, versionChain } from '@/Function/shared/fileVersions';
+import { latestVersions, versionChain, versionsPastKeeping } from '@/Function/shared/fileVersions';
 import { fileText } from '@/Function/office/fileText';
 
 // Files attached to one thing in the Space — an Element, an Object, an
@@ -89,6 +89,14 @@ async function purgeExpired(rows: Attachment[]) {
   if (!error) await supabase.from('attachments').delete().in('id', due.map((f) => f.id));
 }
 
+/** Erases versions past keeping (fileVersions) the same way; best effort. */
+async function pruneOldVersions(rows: Attachment[]) {
+  const old = versionsPastKeeping(rows);
+  if (!old.length) return;
+  const { error } = await supabase.storage.from(BUCKET).remove(old.map((v) => v.path));
+  if (!error) await supabase.from('attachments').delete().in('id', old.map((v) => v.id));
+}
+
 async function rowsOf(owner: AttachmentOwner): Promise<Attachment[]> {
   const { data, error } = await supabase.from('attachments').select(COLUMNS).eq(OWNER_COLUMN[owner.kind], owner.id).order('created_at');
   if (error) throw error;
@@ -103,6 +111,7 @@ export function useAttachments(owner: AttachmentOwner | null) {
     queryFn: async () => {
       const rows = await rowsOf(owner!);
       void purgeExpired(rows);
+      void pruneOldVersions(rows);
       return rows;
     },
   });
