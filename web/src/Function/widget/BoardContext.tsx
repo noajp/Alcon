@@ -151,11 +151,16 @@ export function WidgetSurface({
 
   return (
     <BoardContext.Provider value={value}>
-      {(board.loading || board.saving || board.error) && (
-        <div role={board.error ? 'alert' : 'status'} className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-          {board.error ?? (board.loading ? 'Loading widgets…' : 'Saving layout…')}
-          {board.error && <Button variant="ghost" size="sm" onClick={board.retry}>Reload</Button>}
+      {/* Loading and saving take a moment and no room: a line that comes
+          and goes would shove everything under it (the rail's islands
+          jumped as the board arrived). Only a failure is shown. */}
+      {board.error ? (
+        <div role="alert" className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+          {board.error}
+          <Button variant="ghost" size="sm" onClick={board.retry}>Reload</Button>
         </div>
+      ) : (board.loading || board.saving) && (
+        <span role="status" className="sr-only">{board.loading ? 'Loading widgets…' : 'Saving layout…'}</span>
       )}
       {/* One + for the whole surface. A widget knows its own zone, so there
           is nothing to choose before choosing the widget. It renders in the

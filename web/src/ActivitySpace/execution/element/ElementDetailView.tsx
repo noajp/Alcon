@@ -78,7 +78,8 @@ import { RailRow } from '@/Function/shared/RailRow';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { ElementTypeIcon, ObjectIcon } from '@/shell/icons';
 import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
-import { MarkdownLite } from '@/Function/shared/MarkdownLite';
+import { htmlToMarkdown, markdownToHtml } from '@/Function/shared/markdownHtml';
+import { NoteEditor } from '@/ActivitySpace/sustainment/notebook/editor/NoteEditor';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { CodeChangesSection } from '../code/CodeChangesSection';
@@ -230,36 +231,17 @@ function ElementDetailBody({
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   }, [title]);
-  // Same auto-grow for the description — otherwise a long description
-  // clips at min-h and scrolls inside its own tiny box instead of letting
-  // the page grow, which reads as a broken nested-scroll region.
-  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
-  // A written description is read as formatted text (headings, lists, bold)
-  // and turns into its source when clicked — the way a document reads until
-  // you put the cursor in it. An empty one is the field straight away.
   const { t } = useI18n();
-  // Keyed by Element, so opening another one starts it formatted again.
-  const [editingDescriptionFor, setEditingDescriptionFor] = useState<string | null>(null);
-  const editingDescription = editingDescriptionFor === element.id;
-  const setEditingDescription = (on: boolean) => setEditingDescriptionFor(on ? element.id : null);
-  const showDescriptionSource = editingDescription || !description.trim();
-  useEffect(() => {
-    const el = descriptionRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [description, showDescriptionSource]);
-  useEffect(() => {
-    if (!editingDescription) return;
-    const el = descriptionRef.current;
-    if (!el) return;
-    el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
-  }, [editingDescription]);
+  // The description editor starts from the Markdown as HTML. It restarts
+  // when the Element changes, or its description changes elsewhere while
+  // nobody here is typing in it (an agent's edit, a teammate's).
+  const descriptionFocused = useRef(false);
+  const [descriptionRev, setDescriptionRev] = useState(0);
+  const descriptionHtml = useMemo(() => markdownToHtml(element.description || ''), [element.id, descriptionRev]); // eslint-disable-line react-hooks/exhaustive-deps -- restarts only on purpose (above)
 
   // Readers can resize independently of the viewport (sidebar or split pane).
   useEffect(() => {
-    const fields = [titleRef.current, descriptionRef.current].filter((el): el is HTMLTextAreaElement => !!el);
+    const fields = [titleRef.current].filter((el): el is HTMLTextAreaElement => !!el);
     const widths = new WeakMap<Element, number>();
     const observer = new ResizeObserver(entries => {
       for (const entry of entries) {
@@ -468,6 +450,7 @@ function ElementDetailBody({
   useEffect(() => {
     setTitle(element.title);
     setDescription(element.description || '');
+    if (!descriptionFocused.current) setDescriptionRev((n) => n + 1);
     setEstimatedHours(element.estimated_hours?.toString() || '');
   }, [element.id, element.title, element.description, element.estimated_hours]);
 
@@ -770,35 +753,15 @@ function ElementDetailBody({
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>}
-            {!showDescriptionSource && (
-              <div
-                role="button"
-                tabIndex={0}
-                aria-label={t('Edit description')}
-                onClick={(e) => { if (!(e.target as HTMLElement).closest('a')) setEditingDescription(true); }}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setEditingDescription(true); } }}
-                className="min-h-[36px] cursor-text outline-none"
-              >
-                <MarkdownLite text={description} className="space-y-3 text-[14px] leading-[1.65]" />
-              </div>
-            )}
-            {showDescriptionSource && <textarea
-              ref={descriptionRef}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              onBlur={() => { setEditingDescription(false); void handleDescriptionSave(); }}
-              onKeyDown={(e) => {
-                // Multi-line: Enter is a newline; Cmd/Ctrl+Enter and
-                // Escape end the edit and save.
-                if (isSubmitChord(e) || isCancelKey(e)) {
-                  e.preventDefault();
-                  e.currentTarget.blur();
-                }
-              }}
-              placeholder={t('Add description…')}
-              rows={1}
-              className="block w-full p-0 text-[14px] leading-[1.65] text-foreground bg-transparent border-none focus:outline-none min-h-[36px] resize-none overflow-hidden"
-            />}
+            {/* Read and edited in one place: the Markdown is shown formatted and
+                typed into as it is shown, so a click never swaps it for its
+                source. Saved as Markdown when the editor is left. */}
+            <div onFocus={() => { descriptionFocused.current = true; }}
+              onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) { descriptionFocused.current = false; void handleDescriptionSave(); } }}>
+              <NoteEditor key={`${element.id}:${descriptionRev}`} compact initialHtml={descriptionHtml}
+                placeholder={t('Add description…')}
+                onChange={(html) => setDescription(htmlToMarkdown(html))} />
+            </div>
           </div>
 
           {/* One row under the description, as Linear keeps a single line

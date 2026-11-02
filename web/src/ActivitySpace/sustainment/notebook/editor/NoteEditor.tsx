@@ -30,6 +30,11 @@ export interface NoteEditorProps {
   /** When provided, the formatting toolbar is portaled into this element
    *  as a centered island instead of floating near the selection. */
   toolbarPortalRef?: React.RefObject<HTMLDivElement | null>;
+  /** A short body inside another page (an Element's description): no
+   *  page-tall minimum, the page's text size, smaller headings. */
+  compact?: boolean;
+  /** What an empty body says. */
+  placeholder?: string;
 }
 
 export interface BulletContextInfo {
@@ -74,6 +79,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   onBulletContextMenu,
   elementStatusById,
   toolbarPortalRef,
+  compact = false,
+  placeholder,
 }, handleRef) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
@@ -889,8 +896,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           onKeyDown={handleKeyDown}
           onContextMenu={handleContextMenu}
           spellCheck={false}
-          data-placeholder={t('Start writing…')}
-          className="note-editor no-focus-ring outline-none min-h-[300px] text-[15px] leading-[1.65] text-foreground"
+          data-placeholder={placeholder ?? t('Start writing…')}
+          className={`note-editor no-focus-ring outline-none leading-[1.65] text-foreground ${compact ? 'note-compact min-h-[36px] text-[14px]' : 'min-h-[300px] text-[15px]'}`}
         />
         {editable && tableHandles && (
           <TableInsertHandles
@@ -980,6 +987,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           margin: 0.85rem 0 0.25rem;
         }
         .note-editor p { margin: 0.25rem 0; min-height: 1em; }
+        .note-compact h1 { font-size: 1.15rem; margin: 0.9rem 0 0.3rem; }
+        .note-compact h2 { font-size: 1rem; margin: 0.8rem 0 0.25rem; }
+        .note-compact h3 { font-size: 0.95rem; margin: 0.7rem 0 0.2rem; }
+        .note-compact > :first-child { margin-top: 0; }
         .note-editor blockquote {
           border-left: 3px solid var(--border);
           padding-left: 0.8rem;
