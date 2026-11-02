@@ -6,7 +6,7 @@ import { ChevronDown, ChevronLeft, ChevronRight } from '@/ui/icons';
 import {
   fetchStrategyElements,
   useObjects,
-  useStrategies,
+  useStrategiesInSpace,
   type AlconObject,
   type ElementWithDetails,
   type StrategyWithObjects,
@@ -60,7 +60,7 @@ export function TimelineView({
   /** Jump to an Object's detail (the Execution "objects" view). */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
 } = {}) {
-  const { data: strategies, loading: strategiesLoading } = useStrategies();
+  const { data: strategies, loading: strategiesLoading } = useStrategiesInSpace();
   const { data: { objects: explorerObjects } } = useObjects(null);
 
   const objectsById = useMemo(() => {
@@ -285,17 +285,20 @@ export function TimelineView({
                 {axisCells.map((m, i) => (
                   <div
                     key={i}
-                    className="absolute top-0 bottom-0 flex items-center overflow-hidden whitespace-nowrap px-2 text-[11px] text-muted-foreground font-medium border-l border-border/30 first:border-l-0"
+                    className="absolute top-0 bottom-0 flex items-center overflow-hidden whitespace-nowrap px-2 text-[10px] text-muted-foreground font-semibold border-l border-border/30 first:border-l-0"
                     style={{ left: m.x, width: m.w }}
                   >
                     {m.label}
                   </div>
                 ))}
+                {/* Today, as on the Gantt: a small accent pill over its line. */}
                 {todayX !== null && (
-                  <div
-                    className="absolute top-1.5 w-1.5 h-1.5 rounded-full bg-[var(--accent-default)]"
-                    style={{ left: todayX - 3 }}
-                  />
+                  <span
+                    className="absolute top-1/2 z-[1] -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-[var(--accent-default)] px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                    style={{ left: todayX }}
+                  >
+                    {t('Today')}
+                  </span>
                 )}
               </div>
             </div>
@@ -354,7 +357,7 @@ export function TimelineView({
                       />
                     ))}
                     {expanded.has(row.strategy.id) && row.objects.length === 0 && (
-                      <div className="flex items-stretch border-b border-border/20 bg-muted/5" style={{ height: OBJECT_ROW_H }}>
+                      <div className="flex items-stretch bg-muted/5" style={{ height: OBJECT_ROW_H }}>
                         <div
                           className="sticky left-0 z-[1] bg-card flex items-center text-[11px] text-muted-foreground border-r border-border/30 flex-shrink-0"
                           style={{ width: LEFT_COL_W, paddingLeft: 36 }}
@@ -414,7 +417,7 @@ function InitiativeTimelineRow({
   const color = strategy.color ?? 'var(--accent-default)';
 
   return (
-    <div className="flex items-stretch border-b border-border/30 group/row" style={{ height: INITIATIVE_ROW_H }}>
+    <div className="flex items-stretch group/row hover:bg-foreground/[0.02]" style={{ height: INITIATIVE_ROW_H }}>
       <div
         className="sticky left-0 z-[1] bg-card flex items-center gap-1.5 pl-2 pr-3 border-r border-border/40 flex-shrink-0"
         style={{ width: LEFT_COL_W }}
@@ -448,7 +451,7 @@ function InitiativeTimelineRow({
         <GridLines months={months} todayX={todayX} />
         {bar && (
           <div
-            className="absolute overflow-hidden rounded-md border border-[var(--timeline-bar-border)] bg-[var(--timeline-bar-fill-bg)]"
+            className="absolute overflow-hidden rounded-md border border-border/70 bg-[var(--surface-strong)] shadow-[0_1px_2px_var(--gantt-bar-shadow)]"
             style={{
               left: bar.left,
               width: Math.max(bar.width, 16),
@@ -459,11 +462,11 @@ function InitiativeTimelineRow({
             {progressFill && (
               <div
                 className="absolute inset-y-0 left-0"
-                style={{ width: `${progress}%`, background: color, opacity: 0.35 }}
+                style={{ width: `${progress}%`, background: `color-mix(in oklab, ${color} 18%, transparent)` }}
               />
             )}
             <span
-              className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-foreground/90 truncate pr-2"
+              className="absolute left-2 top-1/2 -translate-y-1/2 text-[11.5px] font-medium text-foreground truncate pr-2"
               style={{ maxWidth: Math.max(bar.width - 12, 0) }}
             >
               {strategy.name}
@@ -504,7 +507,7 @@ function ObjectTimelineRow({
   const color = obj.color ?? 'var(--accent-default)';
 
   return (
-    <div className="flex items-stretch border-b border-border/20 bg-muted/5 hover:bg-muted/10" style={{ height: OBJECT_ROW_H }}>
+    <div className="flex items-stretch bg-muted/5 hover:bg-muted/10" style={{ height: OBJECT_ROW_H }}>
       <div
         className="sticky left-0 z-[1] bg-card flex items-center gap-1.5 pr-3 border-r border-border/30 flex-shrink-0"
         style={{ width: LEFT_COL_W, paddingLeft: 24 }}
@@ -523,14 +526,13 @@ function ObjectTimelineRow({
         <GridLines months={months} todayX={todayX} />
         {bar ? (
           <div
-            className="absolute rounded border border-[var(--timeline-bar-border)]"
+            className="absolute rounded border border-border/60"
             style={{
               left: bar.left,
               width: Math.max(bar.width, 12),
               top: (OBJECT_ROW_H - OBJECT_BAR_H) / 2,
               height: OBJECT_BAR_H,
-              background: color,
-              opacity: 0.3,
+              background: `color-mix(in oklab, ${color} 22%, var(--surface-strong))`,
             }}
             title={obj.name}
           />
@@ -559,7 +561,7 @@ function GridLines({ months, todayX }: { months: { x: number; w: number }[]; tod
       ))}
       {todayX !== null && (
         <div
-          className="absolute top-0 bottom-0 border-l border-[var(--accent-default)]/40"
+          className="absolute top-0 bottom-0 border-l border-[var(--accent-default)]/70"
           style={{ left: todayX }}
         />
       )}

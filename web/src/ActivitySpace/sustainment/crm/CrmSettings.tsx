@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
-import { useStrategies } from '@/hooks/strategyData';
+import { useStrategiesInSpace } from '@/hooks/strategyData';
 import { useInitiativeMeasures } from '@/hooks/useInitiativeMeasures';
 import type { Crm } from '@/hooks/useCrm';
 import { fieldKey, fieldOptions, fieldsFor, measureValue, metricKind, metricValue, normalizeCrmStages, readUnit, stageSlug, type CrmFieldRecord, type CrmMetric, type CrmStage } from '@/Function/crm/crmModel';
@@ -120,7 +120,7 @@ function Connections({ crm }: { crm: Crm }) {
   const { t, locale } = useI18n();
   const pipeline = crm.pipeline!;
   const { objects } = useExplorerData();
-  const strategies = useStrategies();
+  const strategies = useStrategiesInSpace();
   const { measures } = useInitiativeMeasures(strategies.data.map(item => item.id));
   const names = new Map(strategies.data.map(item => [item.id, item.name]));
   const metric = pipeline.measure_metric ?? 'won_quarter';
