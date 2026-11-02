@@ -32,7 +32,8 @@ export interface NoteEditorProps {
    *  as a centered island instead of floating near the selection. */
   toolbarPortalRef?: React.RefObject<HTMLDivElement | null>;
   /** A short body inside another page (an Element's description): no
-   *  page-tall minimum, the page's text size, smaller headings. */
+   *  page-tall minimum, the page's text size, smaller headings. Its text is
+   *  kept as Markdown, so it offers no underline or alignment. */
   compact?: boolean;
   /** What an empty body says. */
   placeholder?: string;
@@ -453,8 +454,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     const key = e.key.toLowerCase();
     if (key === 'b') { e.preventDefault(); exec('bold'); }
     else if (key === 'i') { e.preventDefault(); exec('italic'); }
-    else if (key === 'u') { e.preventDefault(); exec('underline'); }
-  }, [exec, breakOutOfStickyBlock, handleTableTab]);
+    else if (key === 'u') { e.preventDefault(); if (!compact) exec('underline'); }
+  }, [exec, breakOutOfStickyBlock, handleTableTab, compact]);
 
   // Restore caret into the editor when triggering commands from the
   // header toolbar — execCommand only runs against the focused
@@ -631,11 +632,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   // Cell-selection drag wiring (attached to the editor in the JSX below).
   const handleEditorMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return; // right-click keeps an existing cell selection
+    // A click on an un-linked checklist item's box checks or unchecks it.
+    const li = (e.target as HTMLElement).closest('li');
+    if (li && !li.hasAttribute('data-element-id') && li.parentElement?.getAttribute('data-checklist') === 'true'
+      && e.clientX - li.getBoundingClientRect().left < CHECK_BOX_HIT_PX) {
+      e.preventDefault();
+      li.setAttribute('data-checked', li.getAttribute('data-checked') === 'true' ? 'false' : 'true');
+      emit();
+      return;
+    }
     clearCellSelection();
     cellDraggingRef.current = false;
     const cell = (e.target as HTMLElement).closest('td, th') as HTMLTableCellElement | null;
     cellDragAnchorRef.current = cell && cell.closest('table[data-note-table="true"]') ? cell : null;
-  }, [clearCellSelection]);
+  }, [clearCellSelection, emit]);
 
   const handleEditorMouseDrag = useCallback((e: React.MouseEvent) => {
     const anchor = cellDragAnchorRef.current;
@@ -919,6 +929,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       {editable && mounted && toolbarPortalRef?.current &&
         createPortal(
           <HeaderToolbar
+            markdownOnly={compact}
             onCommand={exec}
             onChecklist={toggleChecklist}
             onLink={insertLink}
@@ -935,6 +946,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         <FloatingToolbar
           x={toolbar.x}
           y={toolbar.y}
+          markdownOnly={compact}
           onCommand={exec}
           onChecklist={toggleChecklist}
           onLink={insertLink}
@@ -1149,6 +1161,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           background-size: contain;
           pointer-events: none;
           background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M15.536 11.293a1 1 0 0 0 0 1.414l2.376 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z'/><path d='M2.297 11.293a1 1 0 0 0 0 1.414l2.377 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414L6.088 8.916a1 1 0 0 0-1.414 0z'/><path d='M8.916 17.912a1 1 0 0 0 0 1.415l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.415l-2.377-2.376a1 1 0 0 0-1.414 0z'/><path d='M8.916 4.674a1 1 0 0 0 0 1.414l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z'/></svg>");
+        }
+        /* An un-linked item's box is clicked to check it; checked, it fills
+           with a tick and the text recedes. */
+        .note-editor ul[data-checklist="true"] > li:not([data-element-id])::before {
+          cursor: pointer;
+        }
+        .note-editor ul[data-checklist="true"] > li[data-checked="true"]:not([data-element-id]) {
+          color: var(--muted-foreground);
+        }
+        .note-editor ul[data-checklist="true"] > li[data-checked="true"]:not([data-element-id])::before {
+          background-image: none;
+          background-color: var(--status-success);
+          -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><mask id='m'><rect width='16' height='16' fill='white'/><path d='M4.5 8.3 L7 10.8 L11.5 5.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></mask><circle cx='8' cy='8' r='7.4' mask='url(%23m)'/></svg>") center / contain no-repeat;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><mask id='m'><rect width='16' height='16' fill='white'/><path d='M4.5 8.3 L7 10.8 L11.5 5.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></mask><circle cx='8' cy='8' r='7.4' mask='url(%23m)'/></svg>") center / contain no-repeat;
         }
         /* Linked bullet — set by → Element 化. The checkbox ::before is
            replaced by a read-only ○ mirroring the linked Element's status
@@ -1652,6 +1678,7 @@ function TblDivider() {
 function FloatingToolbar({
   x,
   y,
+  markdownOnly,
   onCommand,
   onChecklist,
   onLink,
@@ -1659,13 +1686,15 @@ function FloatingToolbar({
 }: {
   x: number;
   y: number;
+  /** Text kept as Markdown: no underline or alignment, which it cannot say. */
+  markdownOnly?: boolean;
   onCommand: (cmd: string, value?: string) => void;
   onChecklist: () => void;
   onLink: () => void;
   onToggleBlock: (tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => void;
 }) {
   // Constrain the toolbar to the viewport horizontally.
-  const width = 444;
+  const width = markdownOnly ? 330 : 444;
   const left = Math.max(8, Math.min(window.innerWidth - width - 8, x - width / 2));
   const top = Math.max(8, y - 40);
 
@@ -1679,13 +1708,15 @@ function FloatingToolbar({
       <TbDivider />
       <TbBtn icon={Bold} title="Bold (⌘B)" onClick={() => onCommand('bold')} />
       <TbBtn icon={Italic} title="Italic (⌘I)" onClick={() => onCommand('italic')} />
-      <TbBtn icon={UnderlineIcon} title="Underline (⌘U)" onClick={() => onCommand('underline')} />
+      {!markdownOnly && <TbBtn icon={UnderlineIcon} title="Underline (⌘U)" onClick={() => onCommand('underline')} />}
       <TbBtn icon={Strikethrough} title="Strikethrough" onClick={() => onCommand('strikeThrough')} />
       <TbDivider />
-      <TbBtn icon={AlignLeft} title="Align left" onClick={() => onCommand('justifyLeft')} />
-      <TbBtn icon={AlignCenter} title="Align center" onClick={() => onCommand('justifyCenter')} />
-      <TbBtn icon={AlignRight} title="Align right" onClick={() => onCommand('justifyRight')} />
-      <TbDivider />
+      {!markdownOnly && <>
+        <TbBtn icon={AlignLeft} title="Align left" onClick={() => onCommand('justifyLeft')} />
+        <TbBtn icon={AlignCenter} title="Align center" onClick={() => onCommand('justifyCenter')} />
+        <TbBtn icon={AlignRight} title="Align right" onClick={() => onCommand('justifyRight')} />
+        <TbDivider />
+      </>}
       <TbBtn icon={List} title="Bulleted list" onClick={() => onCommand('insertUnorderedList')} />
       <TbBtn icon={ListOrdered} title="Numbered list" onClick={() => onCommand('insertOrderedList')} />
       <TbBtn icon={ElementIcon} title="Checklist" onClick={onChecklist} />
@@ -1697,6 +1728,7 @@ function FloatingToolbar({
 }
 
 function HeaderToolbar({
+  markdownOnly,
   onCommand,
   onChecklist,
   onLink,
@@ -1704,6 +1736,7 @@ function HeaderToolbar({
   onInsertTable,
   onCaptureSelection,
 }: {
+  markdownOnly?: boolean;
   onCommand: (cmd: string, value?: string) => void;
   onChecklist: () => void;
   onLink: () => void;
@@ -1723,13 +1756,15 @@ function HeaderToolbar({
       <TbDivider />
       <TbBtn icon={Bold} title="Bold (⌘B)" onClick={() => onCommand('bold')} />
       <TbBtn icon={Italic} title="Italic (⌘I)" onClick={() => onCommand('italic')} />
-      <TbBtn icon={UnderlineIcon} title="Underline (⌘U)" onClick={() => onCommand('underline')} />
+      {!markdownOnly && <TbBtn icon={UnderlineIcon} title="Underline (⌘U)" onClick={() => onCommand('underline')} />}
       <TbBtn icon={Strikethrough} title="Strikethrough" onClick={() => onCommand('strikeThrough')} />
       <TbDivider />
-      <TbBtn icon={AlignLeft} title="Align left" onClick={() => onCommand('justifyLeft')} />
-      <TbBtn icon={AlignCenter} title="Align center" onClick={() => onCommand('justifyCenter')} />
-      <TbBtn icon={AlignRight} title="Align right" onClick={() => onCommand('justifyRight')} />
-      <TbDivider />
+      {!markdownOnly && <>
+        <TbBtn icon={AlignLeft} title="Align left" onClick={() => onCommand('justifyLeft')} />
+        <TbBtn icon={AlignCenter} title="Align center" onClick={() => onCommand('justifyCenter')} />
+        <TbBtn icon={AlignRight} title="Align right" onClick={() => onCommand('justifyRight')} />
+        <TbDivider />
+      </>}
       <TbBtn icon={List} title="Bulleted list" onClick={() => onCommand('insertUnorderedList')} />
       <TbBtn icon={ListOrdered} title="Numbered list" onClick={() => onCommand('insertOrderedList')} />
       <TbBtn icon={ElementIcon} title="Checklist" onClick={onChecklist} />
@@ -1877,6 +1912,10 @@ function liIsRegularText(li: HTMLLIElement): boolean {
   }
   return true;
 }
+
+// How far from a checklist item's left edge a click lands on its box
+// (the 1rem box at the item's start, with a little slack).
+const CHECK_BOX_HIT_PX = 20;
 
 // True when the editor holds no user content — blank text and no embedded
 // media. Empty paragraphs, empty headings, and stray empty bullets all

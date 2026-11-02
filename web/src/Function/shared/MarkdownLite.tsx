@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { parseMarkdown, type Block, type Inline } from './markdownParse';
+import { parseMarkdown, type Block, type Inline, type ListBlock } from './markdownParse';
 import { MermaidDiagram } from './MermaidDiagram';
 
 // Renders agent-written Markdown (reports, deliverables) as React elements.
@@ -16,12 +16,25 @@ function InlineNodes({ nodes }: { nodes: Inline[] }) {
           case 'text': return <Fragment key={i}>{n.v}</Fragment>;
           case 'strong': return <strong key={i} className="font-semibold text-foreground"><InlineNodes nodes={n.c} /></strong>;
           case 'em': return <em key={i}><InlineNodes nodes={n.c} /></em>;
+          case 'del': return <s key={i}><InlineNodes nodes={n.c} /></s>;
           case 'code': return <code key={i} className="rounded bg-muted/60 px-1 py-px text-[12px] font-mono">{n.v}</code>;
           case 'link': return <a key={i} href={n.href} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-default)] underline underline-offset-2"><InlineNodes nodes={n.c} /></a>;
         }
       })}
     </>
   );
+}
+
+function ListNode({ b }: { b: ListBlock }) {
+  const items = b.items.map((it, i) => (
+    <li key={i}>
+      {b.task && <span aria-hidden className="mr-1.5 font-mono text-muted-foreground">{it.checked ? '☑' : '☐'}</span>}
+      <InlineNodes nodes={it.c} />
+      {it.sub && <ListNode b={it.sub} />}
+    </li>
+  ));
+  if (b.task) return <ul className="list-none pl-1 space-y-0.5">{items}</ul>;
+  return b.t === 'ol' ? <ol className="list-decimal pl-5 space-y-0.5">{items}</ol> : <ul className="list-disc pl-5 space-y-0.5">{items}</ul>;
 }
 
 function BlockNode({ b }: { b: Block }) {
@@ -31,8 +44,7 @@ function BlockNode({ b }: { b: Block }) {
       return <div className={`${cls} text-foreground mt-3 first:mt-0`}><InlineNodes nodes={b.c} /></div>;
     }
     case 'p': return <p className="whitespace-pre-wrap"><InlineNodes nodes={b.c} /></p>;
-    case 'ul': return <ul className="list-disc pl-5 space-y-0.5">{b.items.map((it, i) => <li key={i}><InlineNodes nodes={it} /></li>)}</ul>;
-    case 'ol': return <ol className="list-decimal pl-5 space-y-0.5">{b.items.map((it, i) => <li key={i}><InlineNodes nodes={it} /></li>)}</ol>;
+    case 'ul': case 'ol': return <ListNode b={b} />;
     case 'code': return b.lang === 'mermaid' ? <MermaidDiagram code={b.v} />
       : <pre className="overflow-x-auto rounded-md bg-muted/50 p-2 text-[12px] font-mono leading-relaxed">{b.v}</pre>;
     case 'quote': return <blockquote className="border-l-2 border-border pl-3 text-muted-foreground whitespace-pre-wrap"><InlineNodes nodes={b.c} /></blockquote>;
