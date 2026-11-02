@@ -175,6 +175,46 @@ describe('integration client guards', () => {
     expect(client.isSafeEndpoint('https://app.asana.com/api/1.0')).toBe(true);
   });
 
+  it('judges resolved addresses, not just the host name', () => {
+    for (const ok of ['8.8.8.8', '151.101.1.69', '192.0.78.9', '2606:4700::6810:84e5', '2001:4860:4860::8888']) expect(client.isPublicAddress(ok)).toBe(true);
+    for (const bad of ['10.0.0.1', '127.0.0.1', '169.254.169.254', '172.16.3.4', '192.168.0.1', '100.64.0.1', '0.0.0.0', '224.0.0.1', '192.0.2.1', '198.51.100.1', '203.0.113.1',
+      '::1', '::', 'fd00::1', 'fe80::1', 'fec0::1', 'ff02::1', '::ffff:10.0.0.1', '::ffff:127.0.0.1', '64:ff9b::a00:1', '2001:db8::1']) {
+      expect(client.isPublicAddress(bad)).toBe(false);
+    }
+  });
+
+  it('refuses a public name that resolves to a private address', async () => {
+    const dns = (table: Record<string, string[]>) => async (host: string, type: 'A' | 'AAAA') => {
+      const hit = table[`${host}/${type}`];
+      if (!hit) throw new Error('NXDOMAIN');
+      return hit;
+    };
+    expect(await client.resolvesToPublic('https://api.example.com/x', dns({ 'api.example.com/A': ['93.184.216.34'] }))).toBe(true);
+    expect(await client.resolvesToPublic('https://evil.example.com/x', dns({ 'evil.example.com/A': ['169.254.169.254'] }))).toBe(false);
+    expect(await client.resolvesToPublic('https://mixed.example.com/x', dns({ 'mixed.example.com/A': ['93.184.216.34'], 'mixed.example.com/AAAA': ['::1'] }))).toBe(false);
+    const nx = async () => { const e = new Error('no record'); e.name = 'NotFound'; throw e; };
+    expect(await client.resolvesToPublic('https://nothing.example.com/x', nx)).toBe(false);
+    // No usable resolver: the host-name check alone decides, as before.
+    expect(await client.resolvesToPublic('https://api.example.com/x', null)).toBe(true);
+    expect(await client.resolvesToPublic('https://api.example.com/x', async () => { throw new Error('PermissionDenied'); })).toBe(true);
+    // Address literals are judged as written, without DNS.
+    expect(await client.resolvesToPublic('https://93.184.216.34/x', nx)).toBe(true);
+    expect(await client.resolvesToPublic('https://10.0.0.1/x', nx)).toBe(false);
+    expect(await client.resolvesToPublic('http://api.example.com/x', dns({ 'api.example.com/A': ['93.184.216.34'] }))).toBe(false);
+  });
+
+  it('believes a server\'s readOnlyHint only from vetted presets, and never for a write-named tool', () => {
+    const github = { preset: 'github', endpoint: 'https://api.githubcopilot.com/mcp/' };
+    expect(client.trustsReadOnlyHint(github, 'get_issue')).toBe(true);
+    expect(client.trustsReadOnlyHint(github, 'list_pull_requests')).toBe(true);
+    expect(client.trustsReadOnlyHint(github, 'create_issue')).toBe(false);
+    expect(client.trustsReadOnlyHint(github, 'merge_pull_request')).toBe(false);
+    expect(client.trustsReadOnlyHint({ preset: 'linear', endpoint: 'https://mcp.linear.app/mcp' }, 'search_issues')).toBe(true);
+    // Custom servers, or a preset pointed somewhere else, label nothing.
+    expect(client.trustsReadOnlyHint({ preset: null, endpoint: 'https://mcp.example.com/mcp' }, 'get_secret')).toBe(false);
+    expect(client.trustsReadOnlyHint({ preset: 'github', endpoint: 'https://evil.example.com/mcp' }, 'get_issue')).toBe(false);
+  });
+
   it('reads at most the cap of a response body', async () => {
     const big = new Response('x'.repeat(5000));
     expect((await client.readCapped(big, 1000)).length).toBe(1000);

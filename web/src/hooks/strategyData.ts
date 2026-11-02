@@ -308,6 +308,14 @@ export function diffLinks(current: readonly string[], next: readonly string[]): 
   };
 }
 
+/** Adds one Object to an Initiative (a link that already exists is kept). */
+export async function linkObjectToStrategy(strategyId: string, objectId: string): Promise<void> {
+  const { error } = await supabase.from('strategy_objects')
+    .upsert({ strategy_id: strategyId, object_id: objectId }, { onConflict: 'strategy_id,object_id', ignoreDuplicates: true });
+  if (error) throw error;
+  invalidateStrategies();
+}
+
 // Strategy nesting (Asana-portfolio style — a Strategy can hold other
 // Strategies as children, DAG so multi-parent is allowed). The DB refuses
 // any edge that would close a cycle (23514); the picker also hides the

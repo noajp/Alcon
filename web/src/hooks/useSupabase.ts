@@ -187,6 +187,7 @@ export {
   removeIntentBinding,
   removeStrategyChild,
   setStrategyObjects,
+  linkObjectToStrategy,
   updateIntent,
   updateStrategy,
   useIntentBindingsForTargets,

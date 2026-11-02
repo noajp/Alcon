@@ -106,6 +106,8 @@ export function useCodeChangeActions(elementId: string) {
   ]);
 
   const link = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: (url: string) => invoke<{ id: string | null }>({ action: 'link', elementId, url }),
     onSettled: refresh,
   });
@@ -120,6 +122,8 @@ export function useCodeChangeActions(elementId: string) {
   });
 
   const check = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: (changeId: string) => invoke<{ intent_check: Json }>({ action: 'check', changeId }),
     onSuccess: ({ intent_check }, changeId) => {
       qc.setQueryData<CodeChange[]>(changesKey(elementId), (rows) => rows?.map((r) => (r.id === changeId ? { ...r, intent_check } : r)));
@@ -128,6 +132,8 @@ export function useCodeChangeActions(elementId: string) {
   });
 
   const guide = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: (changeId: string) => invoke<{ guide: Json }>({ action: 'guide', changeId }),
     onSuccess: ({ guide: g }, changeId) => {
       qc.setQueryData<CodeChange[]>(changesKey(elementId), (rows) => rows?.map((r) => (r.id === changeId ? { ...r, guide: g } : r)));
@@ -136,6 +142,8 @@ export function useCodeChangeActions(elementId: string) {
   });
 
   const merge = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: ({ changeId, method }: { changeId: string; method: 'merge' | 'squash' | 'rebase' }) =>
       invoke<{ change: Partial<CodeChange> }>({ action: 'merge', changeId, method }),
     onSettled: refresh,
@@ -203,6 +211,8 @@ export function useCodeChangeReviews(changeId: string | null) {
 export function useSubmitCodeReview(changeId: string) {
   const qc = useQueryClient();
   return useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: async (input: Pick<CodeChangeReview, 'verdict' | 'body' | 'head_sha' | 'reviewer_name'>) => {
       const { data, error } = await supabase.from('code_change_reviews').insert({ code_change_id: changeId, ...input }).select('id').single();
       if (error) throw error;
@@ -235,6 +245,8 @@ export function useCodeCommentActions(changeId: string) {
   const qc = useQueryClient();
   const refresh = () => qc.invalidateQueries({ queryKey: commentsKey(changeId) });
   const add = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: async (input: Pick<CodeChangeComment, 'path' | 'line' | 'side' | 'body' | 'head_sha' | 'author_name'>) => {
       const { data, error } = await supabase.from('code_change_comments').insert({ code_change_id: changeId, ...input }).select('id').single();
       if (error) throw error;

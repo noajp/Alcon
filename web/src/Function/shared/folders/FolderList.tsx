@@ -9,7 +9,6 @@ import { MenuShell, MenuSectionLabel, MENU_SEPARATOR } from '@/Function/shared/m
 import { useFolderActions, useFolders, type FolderApp } from '@/hooks/folderData';
 import { IslandColumns } from '@/Function/shared/MainIsland';
 
-const fail = (e: unknown) => void appDialog.alert(e instanceof Error ? e.message : String(e));
 
 /** Asks for a name and makes a folder; resolves the new folder's id. */
 function useNewFolder(app: FolderApp, domainId: string | null) {
@@ -18,7 +17,7 @@ function useNewFolder(app: FolderApp, domainId: string | null) {
   return async () => {
     const name = (await appDialog.prompt(t('Folder name')))?.trim();
     if (!name) return null;
-    try { return (await create.mutateAsync(name)).id; } catch (e) { fail(e); return null; }
+    try { return (await create.mutateAsync(name)).id; } catch { return null; }
   };
 }
 
@@ -66,12 +65,12 @@ export function FolderList({ app, domainId, counts, onOpen, compact = false }: {
         <MenuShell as="dropdown" align="end">
           <DropdownMenuItem onSelect={async () => {
             const name = (await appDialog.prompt(t('Folder name'), f.name))?.trim();
-            if (name && name !== f.name) rename.mutate({ id: f.id, name }, { onError: fail });
+            if (name && name !== f.name) rename.mutate({ id: f.id, name });
           }}>{t('Rename')}</DropdownMenuItem>
           <div className={MENU_SEPARATOR} />
           <DropdownMenuItem onSelect={async () => {
             if (!await appDialog.confirm(t('Delete the folder “{name}”?', { name: f.name }))) return;
-            remove.mutate(f.id, { onError: fail });
+            remove.mutate(f.id);
           }}>{t('Delete')}</DropdownMenuItem>
         </MenuShell>
       </DropdownMenu>

@@ -44,7 +44,7 @@ export const MODE_META: Record<RailMode, ModeMeta> = {
   reviews:   { label: 'Reviews',   icon: GitCompare, defaultView: 'reviews', views: ['reviews'] },
   notebook:  { label: 'Notebook',  icon: NavNoteIcon, defaultView: 'note', views: ['note'] },
   tables:    { label: 'Table',     icon: NavTableIcon, defaultView: 'tables', views: ['tables'] },
-  files:     { label: 'Files',     icon: NavFilesIcon, defaultView: 'files', views: ['files'] },
+  files:     { label: 'Artifacts', icon: NavFilesIcon, defaultView: 'files', views: ['files'] },
   slides:    { label: 'Slides',    icon: NavSlidesIcon, defaultView: 'slides', views: ['slides'] },
   // People holds the team's load too ('workload' still opens it).
   team:      { label: 'People',    icon: NavTeamsIcon, defaultView: 'team', views: ['team', 'workload'] },

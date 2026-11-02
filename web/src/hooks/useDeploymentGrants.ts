@@ -36,6 +36,8 @@ export function useDeploymentGrants(deploymentId: string | null, spaceId: string
     staleTime: 15_000,
   });
   const mutation = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: async ({ grant, allowed }: { grant: DeploymentGrant; allowed: boolean }) => {
       const { error } = allowed
         ? await supabase.from('deployment_grants').insert({ deployment_id: deploymentId!, ...grant })

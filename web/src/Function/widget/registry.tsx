@@ -23,6 +23,18 @@ const DEFAULT_FLOW: Dimension[] = ['assignee', 'object', 'campaign'];
 // of them reaching into a host object it mostly ignores.
 // =============================================================
 
+/** An Artifacts placement's params: no file is every artifact; a file is that one, shown whole, as a chart or as a value. */
+function artifactParams(raw: Record<string, unknown> | undefined) {
+  return {
+    fileId: typeof raw?.fileId === 'string' && raw.fileId.length <= 64 ? raw.fileId : null,
+    show: raw?.show === 'chart' || raw?.show === 'value' ? raw.show : 'file',
+    chart: Number.isInteger(raw?.chart) && Number(raw?.chart) >= 0 ? raw?.chart : 0,
+    sheet: typeof raw?.sheet === 'string' && raw.sheet.length <= 120 ? raw.sheet : null,
+    cell: typeof raw?.cell === 'string' && /^[A-Z]{1,3}\d{1,7}$/i.test(raw.cell) ? raw.cell.toUpperCase() : 'A1',
+    label: typeof raw?.label === 'string' && raw.label.length <= 80 ? raw.label : null,
+  };
+}
+
 export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'generated-app': {
     type: 'generated-app', label: 'AI app',
@@ -43,25 +55,21 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     normalizeParams: (raw) => ({ deckId: typeof raw?.deckId === 'string' && raw.deckId.length <= 64 ? raw.deckId : null }),
     load: async () => (await import('./widgets/DeckWidget')).DeckWidget,
   },
-  'file': {
-    type: 'file', label: 'File',
-    description: 'An attached file: the whole file, one of its charts, or a cell as a key number',
-    group: 'core', accepts: ['domain', 'object', 'initiative'], zones: ['main', 'rail'], defaultSize: 'full',
-    normalizeParams: (raw) => ({
-      fileId: typeof raw?.fileId === 'string' && raw.fileId.length <= 64 ? raw.fileId : null,
-      show: raw?.show === 'chart' || raw?.show === 'value' ? raw.show : 'file',
-      chart: Number.isInteger(raw?.chart) && Number(raw?.chart) >= 0 ? raw?.chart : 0,
-      sheet: typeof raw?.sheet === 'string' && raw.sheet.length <= 120 ? raw.sheet : null,
-      cell: typeof raw?.cell === 'string' && /^[A-Z]{1,3}\d{1,7}$/i.test(raw.cell) ? raw.cell.toUpperCase() : 'A1',
-      label: typeof raw?.label === 'string' && raw.label.length <= 80 ? raw.label : null,
-    }),
-    load: async () => (await import('./widgets/FileWidget')).FileWidget,
-  },
+  // One widget for a subject's artifacts: every one, or one pinned (the
+  // whole file, a chart, a value). 'file' is the same widget under the type
+  // boards placed before the two were one; it is no longer offered.
   'attachments': {
-    type: 'attachments', label: 'Attachments',
-    description: 'Files attached to this Object or Initiative: previewed in place, editable, and turned into Notes, Tables or decks',
-    group: 'core', accepts: ['object', 'initiative'], zones: ['main', 'rail'], defaultSize: 'full',
-    load: async () => (await import('./widgets/AttachmentsWidget')).AttachmentsWidget,
+    type: 'attachments', label: 'Artifacts',
+    description: 'The artifacts of this Object or Initiative — previewed in place, editable, turned into Notes, Tables or decks — or one of them pinned: the whole file, a chart, or a cell as a key number',
+    group: 'core', accepts: ['domain', 'object', 'initiative'], zones: ['main', 'rail'], defaultSize: 'full',
+    normalizeParams: artifactParams,
+    load: async () => (await import('./widgets/ArtifactsWidget')).ArtifactsWidget,
+  },
+  'file': {
+    type: 'file', label: 'Artifacts', retired: true,
+    group: 'core', accepts: ['domain', 'object', 'initiative'], zones: ['main', 'rail'], defaultSize: 'full',
+    normalizeParams: artifactParams,
+    load: async () => (await import('./widgets/ArtifactsWidget')).ArtifactsWidget,
   },
   'note': {
     type: 'note', label: 'Note',
@@ -510,10 +518,17 @@ function adapt(render: (host: WidgetHost) => React.ReactNode): WidgetComponent {
 // One lazy component per type, built at module load. `lazy()` does not fetch
 // until the component renders, so building the map eagerly costs nothing —
 // and it means a zone looks a component up rather than creating one mid-render.
+const lazyWidget = (def: WidgetDefinition): WidgetComponent => lazy(async () => ({ default: await def.load() }));
 export const WIDGET_COMPONENTS: Record<string, WidgetComponent> =
-  Object.fromEntries(
-    Object.entries(WIDGET_REGISTRY).map(([type, def]) => [
-      type,
-      lazy(async () => ({ default: await def.load() })),
-    ]),
-  );
+  Object.fromEntries(Object.entries(WIDGET_REGISTRY).map(([type, def]) => [type, lazyWidget(def)]));
+
+/**
+ * A fresh lazy component for one widget instance's Retry. `lazy()` keeps a
+ * rejected load forever, so retrying through the shared component would only
+ * rethrow the same failed chunk; a new one calls `load()` again. Built per
+ * instance, so other widgets of the same type keep their component (and state).
+ */
+export function reloadWidgetComponent(type: string): WidgetComponent | null {
+  const def = WIDGET_REGISTRY[type];
+  return def ? lazyWidget(def) : null;
+}

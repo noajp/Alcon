@@ -1,11 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { del } from 'idb-keyval';
 import { supabase } from '@/lib/supabase';
 import { ensureAppGuideNotes } from './useNotesDb';
-import { getQueryClient } from '@/lib/queryClient';
-import { QUERY_CACHE_IDB_KEY } from '@/providers/QueryProvider';
+import { clearQueryCache, setQueryCacheUser } from '@/lib/queryCachePersistence';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthState {
@@ -83,13 +81,17 @@ export function useAuth() {
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      setQueryCacheUser(session?.user?.id ?? null);
       setState({ user: session?.user ?? null, session, loading: false });
       if (session?.user) fetchProfile(session.user.id);
     });
 
-    // Listen for auth changes
+    // Listen for auth changes. A null session here is also a sign-out in
+    // another tab or an expired session — the query cache follows the user,
+    // so the previous user's data is dropped from memory and IndexedDB.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
+        setQueryCacheUser(session?.user?.id ?? null);
         setState({ user: session?.user ?? null, session, loading: false });
         if (session?.user) fetchProfile(session.user.id);
         else { setProfile(null); profiledUserRef.current = null; }
@@ -133,8 +135,7 @@ export function useAuth() {
     // tears down the session, so the next user (or anonymous viewer) on
     // this browser can never see the previous user's domains, members,
     // assignee photos, etc. — even for a frame.
-    getQueryClient().clear();
-    try { await del(QUERY_CACHE_IDB_KEY); } catch { /* best effort */ }
+    await clearQueryCache();
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };

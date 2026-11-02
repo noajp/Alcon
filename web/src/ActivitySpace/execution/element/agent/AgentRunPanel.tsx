@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { FONT } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
-import type { AgentArtifact, AgentRunStatus, AgentRunStep, AgentRunStepType } from '@/types/database';
+import type { AgentOutput, AgentRunStatus, AgentRunStep, AgentRunStepType } from '@/types/database';
 import type { useAgentRun } from '@/hooks/useSupabase';
 import { approvalRows, sharedColumns } from './approvalView';
 
@@ -208,12 +208,12 @@ function FragmentRow({ children, open, colSpan, raw, rawLabel }: { children: Rea
   );
 }
 
-function ArtifactItem({ artifact }: { artifact: AgentArtifact }) {
+function OutputItem({ output }: { output: AgentOutput }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const copy = async () => {
-    try { await navigator.clipboard.writeText(artifact.content); setCopied(true); setTimeout(() => setCopied(false), 1200); } catch { /* clipboard denied */ }
+    try { await navigator.clipboard.writeText(output.content); setCopied(true); setTimeout(() => setCopied(false), 1200); } catch { /* clipboard denied */ }
   };
   return (
     <li>
@@ -221,8 +221,8 @@ function ArtifactItem({ artifact }: { artifact: AgentArtifact }) {
         <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
           <DisclosureTriangle open={open} className="text-muted-foreground" />
           <FileText size={13} className="shrink-0 text-muted-foreground" />
-          <span className="truncate text-[13px] text-foreground">{artifact.title}</span>
-          <span className="shrink-0 text-[11px] text-muted-foreground">{artifact.format}</span>
+          <span className="truncate text-[13px] text-foreground">{output.title}</span>
+          <span className="shrink-0 text-[11px] text-muted-foreground">{output.format}</span>
         </button>
         <Button variant="ghost" size="xs" onClick={() => void copy()} aria-label={t('Copy')}>
           {copied ? <Check size={12} /> : <Copy size={12} />}{copied ? t('Copied') : t('Copy')}
@@ -230,9 +230,9 @@ function ArtifactItem({ artifact }: { artifact: AgentArtifact }) {
       </div>
       {open && (
         <div className="py-2 pl-6 pr-1">
-          {artifact.format === 'markdown' || artifact.format === 'text'
-            ? <MarkdownLite text={artifact.content} />
-            : <pre className="max-h-96 overflow-auto font-mono text-[12px] leading-relaxed">{artifact.content}</pre>}
+          {output.format === 'markdown' || output.format === 'text'
+            ? <MarkdownLite text={output.content} />
+            : <pre className="max-h-96 overflow-auto font-mono text-[12px] leading-relaxed">{output.content}</pre>}
         </div>
       )}
     </li>
@@ -242,7 +242,7 @@ function ArtifactItem({ artifact }: { artifact: AgentArtifact }) {
 export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain: () => void }) {
   const { t } = useI18n();
   const run = agent.run;
-  if (!run && !agent.artifacts.length && !agent.error) return null;
+  if (!run && !agent.outputs.length && !agent.error) return null;
   const status = run ? STATUS[run.status] ?? STATUS.completed : null;
   const finished = run && ['awaiting_review', 'completed', 'failed', 'cancelled'].includes(run.status);
   const cost = run ? Number(run.cost_usd || 0) : 0;
@@ -282,10 +282,10 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
         </div>
       )}
 
-      {agent.artifacts.length > 0 && (
+      {agent.outputs.length > 0 && (
         <div>
-          <h2 className={`${FONT.lg} mb-1 px-1 text-foreground`}>{t('Deliverables')}</h2>
-          <ul className="space-y-px">{agent.artifacts.map((a) => <ArtifactItem key={a.id} artifact={a} />)}</ul>
+          <h2 className={`${FONT.lg} mb-1 px-1 text-foreground`}>{t('Outputs')}</h2>
+          <ul className="space-y-px">{agent.outputs.map((a) => <OutputItem key={a.id} output={a} />)}</ul>
         </div>
       )}
     </section>
