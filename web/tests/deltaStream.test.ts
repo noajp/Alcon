@@ -60,6 +60,24 @@ describe('applyWorkspaceDelta', () => {
     } finally { vi.useRealTimers(); }
   });
 
+  it('ignores another Space\'s Object DELETE, and a cell edit leaves the Table list alone', () => {
+    vi.useFakeTimers();
+    try {
+      const qc = seed();
+      qc.setQueryData(['data-tables'], []);
+      applyWorkspaceDelta(qc, ctx, delta('objects', 'DELETE', {}, { id: 'obj-elsewhere' }));
+      applyWorkspaceDelta(qc, ctx, delta('table_cells', 'UPDATE', { id: 'c1', value: 1 }));
+      vi.advanceTimersByTime(160);
+      expect(qc.getQueryState(['explorer', '__all__'])?.isInvalidated).toBe(false);
+      expect(qc.getQueryState(['data-tables'])?.isInvalidated).toBe(false);
+      applyWorkspaceDelta(qc, ctx, delta('objects', 'DELETE', {}, { id: 'obj-a' }));
+      applyWorkspaceDelta(qc, ctx, delta('table_rows', 'INSERT', { id: 'r1', table_id: 't1' }));
+      vi.advanceTimersByTime(160);
+      expect(qc.getQueryState(['explorer', '__all__'])?.isInvalidated).toBe(true);
+      expect(qc.getQueryState(['data-tables'])?.isInvalidated).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
   it('rechecks visible scopes when Space membership changes', () => {
     vi.useFakeTimers();
     try {
@@ -183,7 +201,8 @@ it('invalidates widget data after external cell writes and primary-key-only boar
     expect(qc.getQueryState(['widget-board', 'object-summary', 'a', null])?.isInvalidated).toBe(true);
     expect(qc.getQueryState(['widget-document', 'w', 'data'])?.isInvalidated).toBe(true);
     expect(qc.getQueryState(['widget-table-data', 'table-a'])?.isInvalidated).toBe(true);
-    expect(qc.getQueryState(['data-tables'])?.isInvalidated).toBe(true);
+    // The Table list holds Tables and their row counts; a cell edit changes neither.
+    expect(qc.getQueryState(['data-tables'])?.isInvalidated).toBe(false);
     qc.clear();
   } finally { vi.useRealTimers(); }
 });

@@ -418,6 +418,10 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
         forEachExplorer(qc, (data) => patchObjectInExplorer(data, id, row as Record<string, unknown>));
         return;
       }
+      // A DELETE reaches every subscriber with only its id, row-level
+      // security or not; one that no cached list holds is someone else's.
+      if (d.type === 'DELETE' && id && !qc.getQueriesData<ExplorerData>({ queryKey: ['explorer'] })
+        .some(([, data]) => data?.objects.some((o) => o.id === id))) return;
       invalidateSoon(qc, ['explorer']);
       invalidateSoon(qc, ['action-targets']);
       return;
@@ -500,7 +504,8 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
     case 'table_rows':
     case 'table_cells':
       invalidateSoon(qc, ['widget-table-data']);
-      invalidateSoon(qc, ['data-tables']);
+      // The Table list shows row counts: a cell edit leaves them as they are.
+      if (d.table === 'table_rows' && d.type !== 'UPDATE') invalidateSoon(qc, ['data-tables']);
       return;
 
     case 'phases':
