@@ -61,17 +61,22 @@ export function useAuth() {
   const fetchProfile = useCallback(async (userId: string, force = false) => {
     if (!force && profiledUserRef.current === userId) return;
     profiledUserRef.current = userId;
-    const { data } = await supabase
+    let { data } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
+    // A signed-in person without a profile row (it was lost, or predates the
+    // sign-up trigger) gets one, named as they already appear in the Space.
+    const repaired = !data && !force;
+    if (repaired) data = await createOwnProfile(userId);
     if (data) {
       setProfile(data);
       if (force) return;
       void ensureSelfWorker(userId, data);
-      // Seed the default "App Guide" note for new users (idempotent).
-      void ensureAppGuideNotes();
+      // Seed the default "App Guide" note for new users (idempotent) — not
+      // for someone whose profile was only repaired: they are not new.
+      if (!repaired) void ensureAppGuideNotes();
     }
   }, [ensureSelfWorker]);
 
@@ -179,4 +184,17 @@ export function useAuth() {
     signOut,
     updateProfile,
   };
+}
+
+/** The signed-in person's missing profile row, named as their own Worker
+ *  is, else as their sign-in says, else by their email's local part. */
+async function createOwnProfile(userId: string): Promise<Profile | null> {
+  const [{ data: worker }, { data: auth }] = await Promise.all([
+    supabase.from('workers').select('name').eq('user_id', userId).eq('type', 'human').is('object_id', null).limit(1).maybeSingle(),
+    supabase.auth.getUser(),
+  ]);
+  const meta = auth.user?.user_metadata as { full_name?: string; name?: string } | undefined;
+  const display_name = (worker as { name?: string } | null)?.name || meta?.full_name || meta?.name || auth.user?.email?.split('@')[0] || null;
+  const { data } = await supabase.from('profiles').insert({ id: userId, display_name }).select('*').maybeSingle();
+  return (data as Profile | null) ?? null;
 }
