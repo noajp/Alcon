@@ -347,7 +347,9 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
         <HierarchyHeader
           domainName={activeDomain?.name ?? 'Objects'}
           objectName={selectedObject?.name ?? null}
-          onDomainClick={() => { onNavigate({ objectId: null }); onViewChange?.('domain-overview'); }}
+          // One step back: from an Object to the Domain's Objects; from the
+          // list, on to the Domain's own page.
+          onDomainClick={() => { onNavigate({ objectId: null }); if (!selectedObject) onViewChange?.('domain-overview'); }}
           objectSlot={selectedObject ? (
             <ObjectActionsMenu
               object={selectedObject}

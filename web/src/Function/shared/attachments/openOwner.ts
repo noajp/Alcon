@@ -9,6 +9,8 @@ export interface FileOwnerRef {
   folder_id?: string | null;
   /** For a file on an Element: the Object it is in. */
   element_object_id: string | null;
+  /** The Domain it sits in, so the Object opens under its own Domain. */
+  domain_id?: string | null;
 }
 
 /** Opens what a file is attached to, where it lives in Alcon: an Element's
@@ -16,9 +18,9 @@ export interface FileOwnerRef {
 export function openAttachmentOwner(f: FileOwnerRef): void {
   if (f.element_id) {
     requestElementDetail(f.element_id);
-    openInApp('objects', { objectId: f.element_object_id ?? null });
+    openInApp('objects', { objectId: f.element_object_id ?? null, objectDomainId: f.domain_id ?? undefined });
   }
-  else if (f.object_id) openInApp('objects', { objectId: f.object_id });
+  else if (f.object_id) openInApp('objects', { objectId: f.object_id, objectDomainId: f.domain_id ?? undefined });
   else if (f.strategy_id) openInApp('strategy', { strategyId: f.strategy_id });
   else if (f.portfolio_id) openInApp('portfolio', { portfolioId: f.portfolio_id });
   else if (f.deal_id) openInApp('crm', { crm: routeTo(crmRoute(undefined), { view: 'deals', dealId: f.deal_id }) });

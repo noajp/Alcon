@@ -380,6 +380,8 @@ export async function indexSpaceFiles(spaceId: string): Promise<void> {
 export interface FoundFile extends Pick<Attachment, 'id' | 'name' | 'mime_type' | 'element_id' | 'object_id' | 'strategy_id' | 'portfolio_id' | 'deal_id' | 'company_id' | 'folder_id'> {
   owner_label: string | null;
   element_object_id: string | null;
+  /** The Domain it sits in (none for an Initiative's or a CRM record's). */
+  domain_id: string | null;
   /** The words around where the text matched (null when the name did). */
   snippet: string | null;
 }
