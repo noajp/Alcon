@@ -633,7 +633,7 @@ function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails {
     progress: null,
     direction: null,
     order_index: o.order_index ?? null,
-    is_approval: null,
+    is_approval: false,
     approval_state: null,
     note_id: null,
     phase_id: o.phase_id ?? null,

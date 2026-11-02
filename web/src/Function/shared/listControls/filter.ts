@@ -13,7 +13,7 @@ const includes = <T>(set: T[] | undefined, value: T | null | undefined): boolean
   return set.includes(value);
 };
 
-const intersects = <T>(set: T[] | undefined, values: T[] | undefined): boolean => {
+const intersects = <T>(set: T[] | undefined, values: T[] | null | undefined): boolean => {
   if (!set || set.length === 0) return true;
   if (!values || values.length === 0) return false;
   for (const v of values) if (set.includes(v)) return true;

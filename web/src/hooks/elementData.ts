@@ -99,7 +99,7 @@ export async function createElement(element: {
       id: tempId,
       display_id: null, seq_number: null,
       color: null, actual_hours: null, progress: null, direction: null,
-      is_approval: null, approval_state: null, note_id: null, phase_id: null,
+      is_approval: false, approval_state: null, note_id: null, phase_id: null,
       carried_over_count: 0,
       claimed_by: null, claim_expires_at: null, branch: null,
       created_at: nowIso, updated_at: nowIso,

@@ -24,7 +24,7 @@ function element(id: string, extra: Partial<ElementWithDetails> = {}): ElementWi
     owner_id: null, display_id: null, seq_number: null, status: 'todo', priority: 'medium',
     start_date: null, start_time: null, due_date: TODAY, due_time: null, color: null,
     estimated_hours: 8, actual_hours: null, progress: null, direction: null, order_index: null,
-    is_approval: null, approval_state: null, note_id: null, phase_id: null,
+    is_approval: false, approval_state: null, note_id: null, phase_id: null,
     carried_over_count: 0, claimed_by: null, claim_expires_at: null, branch: null,
     created_at: null, updated_at: null,
     assignees: [{ id: `as-${id}`, element_id: id, worker_id: 'w', role: 'assignee', assigned_at: null }],

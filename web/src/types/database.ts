@@ -1,12 +1,9 @@
 import type { ListControlsState } from '@/Function/shared/listControls/types'
 
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+// The schema itself is generated (./supabase.ts) and narrowed in ./db.ts;
+// the types here are the domain views of those rows the app works with.
+import type { Json } from './supabase'
+export type { Json }
 
 // =====================================================
 // 3-Layer Structure: Objects (nestable) → Elements → Subelements
@@ -177,7 +174,7 @@ export interface ActivitySpaceInsert {
   identifier?: string | null
   color?: string | null
   logo?: string | null
-  order_index?: number | null
+  order_index?: number
 }
 
 export interface ActivitySpaceUpdate {
@@ -185,7 +182,7 @@ export interface ActivitySpaceUpdate {
   identifier?: string | null
   color?: string | null
   logo?: string | null
-  order_index?: number | null
+  order_index?: number
   scope?: 'audit' | 'full'
 }
 
@@ -417,7 +414,7 @@ export interface Element {
   title: string
   description: string | null
   type: string | null             // ユーザー定義の型 (Task / Human ...)。domains.element_types から選ぶ
-  labels: string[]                // 自由文字列ラベル（任意・複数可、型なし）
+  labels: string[] | null              // 自由文字列ラベル（任意・複数可、型なし）
   owner_id: string | null         // auth.users.id。NOT NULL なら "My Elements" の個人所有 Element。Domain クエリは除外する。
   display_id: string | null       // e.g. "ELE_PH1-001"
   seq_number: number | null
@@ -433,7 +430,7 @@ export interface Element {
   progress: number | null  // 0-100, set explicitly via the status picker
   direction: ElementDirection | null  // 方針・受け入れ条件・次の一手。読む側は normalizeDirection を通す
   order_index: number | null
-  is_approval: boolean | null
+  is_approval: boolean
   approval_state: ApprovalState | null
   note_id: string | null          // Optional pinned Note (Note style HTML in note_contents.html)
   phase_id: string | null         // UUID FK → phases.id。所属 Phase (Linear の Cycle 相当、高々1つ)
@@ -471,7 +468,7 @@ export interface ElementInsert {
   progress?: number | null
   direction?: ElementDirection | null
   order_index?: number | null
-  is_approval?: boolean | null
+  is_approval?: boolean
   approval_state?: ApprovalState | null
   note_id?: string | null
   phase_id?: string | null
@@ -499,7 +496,7 @@ export interface ElementUpdate {
   progress?: number | null
   direction?: ElementDirection | null
   order_index?: number | null
-  is_approval?: boolean | null
+  is_approval?: boolean
   approval_state?: ApprovalState | null
   note_id?: string | null
   phase_id?: string | null
@@ -725,8 +722,8 @@ export interface ElementObject {
   id: string;
   element_id: string;
   object_id: string;
-  order_index: number;
-  is_primary: boolean;
+  order_index: number | null;
+  is_primary: boolean | null;
   created_at: string | null;
 }
 
@@ -777,7 +774,7 @@ export interface ObjectTab {
   content: Json  // For Note: HTML string (legacy: structured-block JSON), For others: view settings
   note_id: string | null    // when tab_type='note', the linked notes.id (NOT NULL by DB CHECK)
   order_index: number
-  is_pinned: boolean
+  is_pinned: boolean | null
   created_at: string | null
   updated_at: string | null
 }
@@ -1464,7 +1461,7 @@ export interface Strategy {
   id: string
   name: string
   description: string | null
-  status: StrategyStatus
+  status: StrategyStatus | null
   scope: StrategyScope
   color: string | null
   icon: string | null
@@ -1550,7 +1547,7 @@ export interface StrategyInsert {
   portfolio_id?: string | null
   vision_id?: string | null
   activity_space_id?: string | null
-  created_by?: string | null
+  created_by?: string
 }
 
 export interface StrategyUpdate {
@@ -2075,230 +2072,4 @@ export interface DataTableCellInsert {
   row_id: string
   column_id: string
   value?: Json | null
-}
-
-// =====================================================
-// Supabase Database Type
-// =====================================================
-
-export interface Database {
-  public: {
-    Tables: {
-      activity_spaces: {
-        Row: ActivitySpace
-        Insert: ActivitySpaceInsert
-        Update: ActivitySpaceUpdate
-      }
-      activity_space_members: {
-        Row: ActivitySpaceMember
-        Insert: ActivitySpaceMember
-        Update: Partial<ActivitySpaceMember>
-      }
-      domains: {
-        Row: Domain
-        Insert: DomainInsert
-        Update: DomainUpdate
-      }
-      membership_invitations: {
-        Row: MembershipInvitation
-        Insert: never
-        Update: never
-      }
-      object_domains: {
-        Row: ObjectDomain
-        Insert: ObjectDomainInsert
-        Update: Partial<ObjectDomainInsert>
-      }
-      objects: {
-        Row: AlconObject
-        Insert: AlconObjectInsert
-        Update: AlconObjectUpdate
-      }
-      elements: {
-        Row: Element
-        Insert: ElementInsert
-        Update: ElementUpdate
-      }
-      subelements: {
-        Row: Subelement
-        Insert: SubelementInsert
-        Update: SubelementUpdate
-      }
-      workers: {
-        Row: Worker
-        Insert: WorkerInsert
-        Update: WorkerUpdate
-      }
-      element_assignees: {
-        Row: ElementAssignee
-        Insert: ElementAssigneeInsert
-        Update: ElementAssigneeUpdate
-      }
-      element_edges: {
-        Row: ElementEdge
-        Insert: ElementEdgeInsert
-        Update: ElementEdgeUpdate
-      }
-      custom_columns: {
-        Row: CustomColumn
-        Insert: CustomColumnInsert
-        Update: CustomColumnUpdate
-      }
-      custom_column_values: {
-        Row: CustomColumnValue
-        Insert: CustomColumnValueInsert
-        Update: CustomColumnValueUpdate
-      }
-      custom_column_placements: {
-        Row: CustomColumnPlacement
-        Insert: CustomColumnPlacementInsert
-        Update: Partial<CustomColumnPlacementInsert>
-      }
-      object_tabs: {
-        Row: ObjectTab
-        Insert: ObjectTabInsert
-        Update: ObjectTabUpdate
-      }
-      strategies: {
-        Row: Strategy
-        Insert: StrategyInsert
-        Update: StrategyUpdate
-      }
-      visions: {
-        Row: Vision
-        Insert: VisionInsert
-        Update: VisionUpdate
-      }
-      portfolios: {
-        Row: Portfolio
-        Insert: PortfolioInsert
-        Update: PortfolioUpdate
-      }
-      strategy_objects: {
-        Row: StrategyObject
-        Insert: Omit<StrategyObject, 'id' | 'created_at'>
-      }
-      strategy_comments: {
-        Row: StrategyComment
-        Insert: StrategyCommentInsert
-        Update: StrategyCommentUpdate
-      }
-      phases: {
-        Row: Phase
-        Insert: PhaseInsert
-        Update: PhaseUpdate
-      }
-      tables: {
-        Row: DataTable
-        Insert: DataTableInsert
-        Update: DataTableUpdate
-      }
-      table_columns: {
-        Row: DataTableColumn
-        Insert: DataTableColumnInsert
-        Update: DataTableColumnUpdate
-      }
-      table_rows: {
-        Row: DataTableRow
-        Insert: DataTableRowInsert
-        Update: Partial<Omit<DataTableRow, 'id' | 'created_at'>>
-      }
-      table_cells: {
-        Row: DataTableCell
-        Insert: DataTableCellInsert
-        Update: Partial<Omit<DataTableCell, 'row_id' | 'column_id'>>
-      }
-      strategy_children: {
-        Row: StrategyChild
-        Insert: StrategyChildInsert
-      }
-      intents: {
-        Row: Intent
-        Insert: IntentInsert
-        Update: IntentUpdate
-      }
-      intent_bindings: {
-        Row: IntentBinding
-        Insert: IntentBindingInsert
-      }
-      intent_audits: {
-        Row: IntentAudit
-        Insert: Omit<IntentAudit, 'id' | 'ran_at'> & { ran_at?: string }
-      }
-      intent_predictions: {
-        Row: IntentPrediction
-        Insert: Omit<IntentPrediction, 'id' | 'voted_at' | 'archived_at'> & {
-          voted_at?: string
-          archived_at?: string | null
-        }
-      }
-      intent_lineage: {
-        Row: IntentLineage
-        Insert: Omit<IntentLineage, 'id' | 'created_at' | 'created_by'> & {
-          created_by?: string | null
-        }
-      }
-      intent_measure_readings: {
-        Row: IntentMeasureReading
-        Insert: never
-      }
-      intent_resources: {
-        Row: IntentResource
-        Insert: Omit<IntentResource, 'id' | 'captured_at'> & { captured_at?: string }
-      }
-      intent_alignments: {
-        Row: IntentAlignment
-        Insert: Omit<IntentAlignment, 'id' | 'detected_at' | 'resolved_at'> & {
-          detected_at?: string
-          resolved_at?: string | null
-        }
-      }
-      intent_escalations: {
-        Row: IntentEscalation
-        Insert: Omit<IntentEscalation, 'id' | 'triggered_at' | 'decided_at' | 'decided_by'> & {
-          triggered_at?: string
-          decided_at?: string | null
-          decided_by?: string | null
-        }
-      }
-      intent_next_actions: {
-        Row: IntentNextAction
-        Insert: Omit<IntentNextAction, 'id' | 'generated_at'> & { generated_at?: string }
-      }
-      object_milestones: {
-        Row: ObjectMilestone
-        Insert: ObjectMilestoneInsert
-        Update: ObjectMilestoneUpdate
-      }
-      agent_runs: {
-        Row: AgentRun
-        Insert: AgentRunInsert
-        Update: AgentRunUpdate
-      }
-      agent_run_steps: {
-        Row: AgentRunStep
-        Insert: Omit<AgentRunStep, 'id' | 'created_at'>
-      }
-      integrations: {
-        Row: Integration
-        Insert: Omit<Integration, 'id' | 'secret_id' | 'last_test' | 'external_account' | 'created_by' | 'created_at' | 'updated_at'>
-        Update: IntegrationUpdate
-      }
-      code_changes: {
-        Row: CodeChange
-        Insert: never
-        Update: never
-      }
-      code_change_reviews: {
-        Row: CodeChangeReview
-        Insert: Pick<CodeChangeReview, 'code_change_id' | 'verdict'> & Partial<Pick<CodeChangeReview, 'reviewer_name' | 'body' | 'head_sha'>>
-        Update: never
-      }
-      code_change_comments: {
-        Row: CodeChangeComment
-        Insert: Pick<CodeChangeComment, 'code_change_id' | 'path' | 'line' | 'side' | 'body'> & Partial<Pick<CodeChangeComment, 'author_name' | 'head_sha'>>
-        Update: Pick<CodeChangeComment, 'resolved'>
-      }
-    }
-  }
 }

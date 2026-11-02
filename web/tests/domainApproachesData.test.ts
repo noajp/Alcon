@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mock = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
-vi.mock('@/lib/supabase', () => ({ supabase: mock }));
+vi.mock('@/lib/supabase', () => ({ supabase: mock, supabaseDynamicTable: mock }));
 import { fetchDomainApproaches, saveDomainApproach } from '@/hooks/useDomainApproaches';
 let tables: Record<string, Record<string, unknown>[]>;
 let fail: string | null;
