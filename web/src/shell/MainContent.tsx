@@ -5,18 +5,13 @@ import { useActiveSpaceScope } from '@/Function/space/data';
 import dynamic from 'next/dynamic';
 import type { NavigationState } from '@/types/navigation';
 import { setActiveDomainId } from '@/Function/space/domainsStore';
-import { NotebookSurface } from '@/ActivitySpace/sustainment/notebook/NotebookSurface';
-import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
+import { useState } from 'react';
 
-import { ElementsListView } from '@/ActivitySpace/execution/element/ElementsListView';
-import { MyElementsView } from '@/ActivitySpace/home/MyElementsView';
-
-// Lazy-loaded views — the landing view is 'objects' (DomainView), and the
-// core list views (DomainView / ElementsListView / MyElementsView) stay
-// eager. Everything else is split into its own chunk and fetched only when
-// the user actually opens that activity, so the first paint ships less JS.
-// These views also pull the heaviest leaf deps (note editor, DAG/charts,
-// data widgets), which is exactly what we don't want in the entry bundle.
+// Every view is split into its own chunk and fetched only when the user
+// opens that activity, so the first paint ships less JS. The landing view
+// is 'inbox'; the Object / Element views pull the heaviest leaf deps (Gantt,
+// Calendar, Resource, Element detail, the note editor), which is exactly
+// what we don't want in the entry bundle.
 const viewLoading = () => (
   <div className="flex-1 flex items-center justify-center bg-card text-[13px] text-muted-foreground">
     Loading…
@@ -30,8 +25,12 @@ const PhaseView = dynamic(() => import('@/ActivitySpace/strategy/phase/PhaseView
 const PeopleView = dynamic(() => import('@/ActivitySpace/sustainment/team/PeopleView').then(m => m.PeopleView), { ssr: false, loading: viewLoading });
 const TimelineView = dynamic(() => import('@/ActivitySpace/strategy/timeline/TimelineView').then(m => m.TimelineView), { ssr: false, loading: viewLoading });
 const HomeScreen = dynamic(() => import('@/shell/HomeScreen').then(m => m.HomeScreen), { ssr: false, loading: viewLoading });
-import { DomainOverview } from '@/ActivitySpace/execution/domain/DomainOverview';
-import { DomainView } from '@/ActivitySpace/execution/domain/DomainView'; // eager — default landing view
+const NotebookSurface = dynamic(() => import('@/ActivitySpace/sustainment/notebook/NotebookSurface').then(m => m.NotebookSurface), { ssr: false, loading: viewLoading });
+const ElementDrilldown = dynamic(() => import('@/ActivitySpace/execution/element/ElementDrilldown').then(m => m.ElementDrilldown), { ssr: false, loading: viewLoading });
+const ElementsListView = dynamic(() => import('@/ActivitySpace/execution/element/ElementsListView').then(m => m.ElementsListView), { ssr: false, loading: viewLoading });
+const MyElementsView = dynamic(() => import('@/ActivitySpace/home/MyElementsView').then(m => m.MyElementsView), { ssr: false, loading: viewLoading });
+const DomainOverview = dynamic(() => import('@/ActivitySpace/execution/domain/DomainOverview').then(m => m.DomainOverview), { ssr: false, loading: viewLoading });
+const DomainView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainView').then(m => m.DomainView), { ssr: false, loading: viewLoading });
 const DomainsView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
 const TableView = dynamic(() => import('@/ActivitySpace/sustainment/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
 const FilesView = dynamic(() => import('@/ActivitySpace/sustainment/files').then(m => m.FilesView), { ssr: false, loading: viewLoading });
@@ -62,12 +61,17 @@ interface MainContentProps {
 
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId, onMinimizeAi }: MainContentProps) {
   const scope = useActiveSpaceScope();
+  const notebookVisible = activeActivity === 'note' || (activeActivity === 'home' && navigation.homeSelection?.type === 'note_folder');
+  // The notebook stays mounted once opened (it keeps its editor state while
+  // hidden), but it is not loaded until the user first opens it.
+  const [notebookOpened, setNotebookOpened] = useState(notebookVisible);
+  if (notebookVisible && !notebookOpened) setNotebookOpened(true);
 
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">
-          <NotebookSurface
-            visible={activeActivity === 'note' || (activeActivity === 'home' && navigation.homeSelection?.type === 'note_folder')}
+          {notebookOpened && <NotebookSurface
+            visible={notebookVisible}
             navigation={navigation}
             onNavigate={onNavigate}
             onViewChange={onViewChange}
@@ -75,7 +79,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             pendingNewNote={pendingNewNote}
             onNewNoteHandled={onNewNoteHandled}
             activeDomainId={activeDomainId}
-          />
+          />}
 
           {activeActivity === 'home' && navigation.homeSelection?.type !== 'note_folder' && <HomeScreen spaceId={activeSpaceId ?? null} onNavigate={onNavigate} onViewChange={onViewChange} />}
 
