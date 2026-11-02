@@ -5,6 +5,10 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const SURFACE_MESSAGES: Record<string, Row> = {
+  'Show as': ['表示', '표시', 'Afficher en', 'Mostrar como'],
+  'Preview': ['プレビュー', '미리보기', 'Aperçu', 'Vista previa'],
+  'Code': ['コード', '코드', 'Code', 'Código'],
+  'AI is working on this': ['AI が作業中です', 'AI가 작업 중입니다', 'Une IA y travaille', 'Una IA está trabajando en esto'],
   'Could not draw the diagram.': ['図を描けませんでした。', '다이어그램을 그릴 수 없습니다.', 'Impossible de dessiner le diagramme.', 'No se pudo dibujar el diagrama.'],
   'Could not draw the diagram. Click to edit its source.': ['図を描けませんでした。クリックしてソースを直してください。', '다이어그램을 그릴 수 없습니다. 클릭해 소스를 수정하세요.', 'Impossible de dessiner le diagramme. Cliquez pour modifier sa source.', 'No se pudo dibujar el diagrama. Haz clic para editar su código.'],
   'Edit the diagram': ['図を編集', '다이어그램 편집', 'Modifier le diagramme', 'Editar el diagrama'],

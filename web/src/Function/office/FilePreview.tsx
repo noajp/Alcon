@@ -1,8 +1,9 @@
 'use client';
 
+import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Download, ExternalLink, Loader2, Maximize2, Minimize2, Minus, Plus } from '@/ui/icons';
+import { Check, CodeXml, Download, ExternalLink, Eye, Loader2, Maximize2, Minimize2, Minus, Plus } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { translate, useI18n } from '@/Function/i18n/I18nProvider';
 import { officeKindOf, readOffice, type OfficePreview } from './officePreview';
@@ -53,6 +54,33 @@ function previewKindOf(file: StoredFile): PreviewKind {
 
 /** What a file reads to, for the kinds that are read rather than shown by
  *  the browser itself. */
+/** A Markdown file, read formatted or as its source. The switch sits at
+ *  the top left on a band of its own, always in view as the document's own
+ *  control — clear of the preview's tools, which float at the top right. */
+function MarkdownFile({ text }: { text: string }) {
+  const { t } = useI18n();
+  const [source, setSource] = useState(false);
+  return (
+    <div>
+      <div className="sticky top-0 z-20 flex h-10 items-center bg-background px-2">
+        <div role="group" aria-label={t('Show as')} className="flex gap-0.5 rounded-md border border-border/60 p-0.5">
+          <Button type="button" shape="tab" size="icon-xs" variant={source ? 'ghost' : 'secondary'} aria-pressed={!source} aria-label={t('Preview')} title={t('Preview')} onClick={() => setSource(false)}><Eye size={14} /></Button>
+          <Button type="button" shape="tab" size="icon-xs" variant={source ? 'secondary' : 'ghost'} aria-pressed={source} aria-label={t('Code')} title={t('Code')} onClick={() => setSource(true)}><CodeXml size={14} /></Button>
+        </div>
+      </div>
+      {source
+        ? <pre className="whitespace-pre-wrap break-words px-6 pb-6 pt-2 font-mono text-[12.5px] leading-relaxed text-foreground">{text}</pre>
+        : <div className="mx-auto max-w-3xl px-6 pb-6 pt-2"><MarkdownLite text={text} className="space-y-3 text-[14px] leading-[1.7]" /></div>}
+    </div>
+  );
+}
+
+/** A Markdown file, by its name or its type. */
+function isMarkdown(file: { name: string; mime_type?: string | null }): boolean {
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return ['md', 'markdown', 'mdx'].includes(ext) || file.mime_type === 'text/markdown';
+}
+
 export interface Loaded { text?: string; office?: OfficePreview; workbook?: WorkSheet[]; doc?: DocLayout; deck?: Deck }
 
 // A file's bytes never change (each upload gets a new path), so what it
@@ -283,6 +311,8 @@ export function FilePreview({ file, source, height = 480, actions, presence, edi
             : office === null ? spinner : <OfficeTextView preview={office} />
         ) : kind === 'text' ? (
           text === null ? spinner
+            // Markdown reads formatted — headings, lists, tables, code, diagrams; other text as written.
+            : isMarkdown(file) ? <MarkdownFile text={text} />
             : <pre className="whitespace-pre-wrap break-words p-6 font-mono text-[12.5px] leading-relaxed text-foreground">{text}</pre>
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-[13px] text-muted-foreground">

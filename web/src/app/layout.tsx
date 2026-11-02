@@ -5,6 +5,7 @@ import { AuthProvider } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import "./globals.css";
 import { AppDialogHost } from "@/Function/shared/AppDialogHost";
+import { Toaster } from "@/Function/shared/Toaster";
 import { I18nProvider } from "@/Function/i18n/I18nProvider";
 
 // Primary sans-serif - Inter for clean UI typography
@@ -78,6 +79,7 @@ export default function RootLayout({
               <AuthProvider>
                 {children}
                 <AppDialogHost />
+                <Toaster />
               </AuthProvider>
             </QueryProvider>
           </ThemeProvider>

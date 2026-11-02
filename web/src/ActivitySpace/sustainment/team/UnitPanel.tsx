@@ -4,14 +4,12 @@ import { Network, X } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { FONT } from '@/shared/designTokens';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
-import { appDialog } from '@/Function/shared/appDialogStore';
 import { childUnits, membersBelow, unitsOf } from '@/Function/team/orgUnits';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useSpaceRole } from '@/Function/space/data';
 import { useOrgUnitActions, useOrgUnits } from '@/hooks/orgUnitData';
 import { useTeamRoster } from '@/hooks/useTeamRoster';
 
-const fail = (e: unknown) => void appDialog.alert(e instanceof Error ? e.message : String(e));
 const SELECT = `${FONT.sm} h-7 rounded-md bg-transparent px-2 text-foreground hover:bg-muted/40 focus:bg-[var(--surface-raised)]`;
 
 /**
@@ -51,7 +49,7 @@ export function UnitPanel({ unitId, onOpenUnit, onOpenWorker }: {
         <h3 className={`${FONT.sm} font-medium text-foreground`}>{t('Lead')}</h3>
         {canArrange ? (
           <select aria-label={t('Lead')} className={SELECT} value={unit.lead_worker_id ?? ''}
-            onChange={(e) => update.mutate({ id: unit.id, patch: { lead_worker_id: e.target.value || null } }, { onError: fail })}>
+            onChange={(e) => update.mutate({ id: unit.id, patch: { lead_worker_id: e.target.value || null } })}>
             <option value="">{t('No lead')}</option>
             {[...workers].sort((a, b) => a.name.localeCompare(b.name)).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
@@ -81,7 +79,7 @@ export function UnitPanel({ unitId, onOpenUnit, onOpenWorker }: {
           <span className="flex-1" />
           {canArrange && outside.length > 0 && (
             <select aria-label={t('Add a member')} className={SELECT} value=""
-              onChange={(e) => { if (e.target.value) addMember.mutate({ unitId: unit.id, workerId: e.target.value }, { onError: fail }); }}>
+              onChange={(e) => { if (e.target.value) addMember.mutate({ unitId: unit.id, workerId: e.target.value }); }}>
               <option value="">{t('Add a member…')}</option>
               {outside.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
@@ -101,7 +99,7 @@ export function UnitPanel({ unitId, onOpenUnit, onOpenWorker }: {
                 </button>
                 {canArrange && (
                   <button type="button" aria-label={t('Remove {name} from the unit', { name: w!.name })} title={t('Remove from the unit')}
-                    onClick={() => removeMember.mutate({ unitId: unit.id, workerId: w!.id }, { onError: fail })}
+                    onClick={() => removeMember.mutate({ unitId: unit.id, workerId: w!.id })}
                     className="flex size-6 items-center justify-center rounded text-muted-foreground opacity-0 hover:text-foreground group-hover/member:opacity-100">
                     <X size={13} />
                   </button>

@@ -1,5 +1,8 @@
 'use client';
 
+import { AiWorkingMark } from '@/Function/shared/element/AiWorkingMark';
+import { liveLease } from '@/Function/shared/element/lease';
+import { useNow } from '@/Function/shared/useNow';
 import { parseDateOnly, toDateOnlyString as formatDateOnly } from '@/Function/shared/dateUtils';
 import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { Button } from '@/ui/button';
@@ -568,6 +571,7 @@ function AssigneeCell({
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [workers, setWorkers] = useState<Worker[]>([]);
+  const lease = liveLease(el, useNow());
   const all = el.assignees ?? [];
   const empty = all.length === 0;
 
@@ -616,9 +620,11 @@ function AssigneeCell({
         <button
           type="button"
           aria-label={workerTriggerLabel(t('Assignees'), all.map((a) => a.worker ?? null).filter((w): w is NonNullable<typeof w> => !!w))}
-          className="inline-flex items-center max-w-full text-left"
+          className="inline-flex items-center gap-1.5 max-w-full text-left"
         >
           {display}
+          {/* An AI holding it now: a spinner beside who it is assigned to. */}
+          {lease && <AiWorkingMark lease={lease} />}
         </button>
       </DropdownMenuTrigger>
       <AssigneeMenuContent

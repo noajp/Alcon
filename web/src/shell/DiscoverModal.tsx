@@ -1,35 +1,19 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { fetchDiscoverable, joinDomain as joinDomainRow, joinObject as joinObjectRow, type DiscoverableDomain, type DiscoverableObject } from '@/hooks/discoverData';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { ObjectIcon } from '@/shell/icons';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { notifyDomainsChanged } from '@/Function/space/domainsStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 
 // "Things I haven't joined yet." Opens from the 🔍 in the ModeStrip and
 // lists Domains / Objects whose member tables don't yet have a row for the
 // current user. Joining writes a `role='member'` row, after which the item
 // drops out of the list (and will appear in the sidebar once the sidebar
 // fetch is scoped to memberships — that work is a follow-up).
-
-interface DiscoverableDomain {
-  id: string;
-  name: string;
-  color: string | null;
-  description: string | null;
-}
-
-interface DiscoverableObject {
-  id: string;
-  name: string;
-  color: string | null;
-  domain_id: string | null;
-  domain_name: string | null;
-}
 
 interface DiscoverModalProps {
   open: boolean;
@@ -44,98 +28,52 @@ export function DiscoverModal({ open, onOpenChange }: DiscoverModalProps) {
   const [objects, setObjects] = useState<DiscoverableObject[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const [error, setError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+    setError(null);
     try {
-      // Domains the user is NOT a member of.
-      const { data: myDomainRows } = await supabase
-        .from('domain_members')
-        .select('domain_id')
-        .eq('user_id', user.id);
-      const myDomainIds = new Set((myDomainRows ?? []).map((r) => r.domain_id));
-
-      const { data: allDomains } = await supabase
-        .from('domains')
-        .select('id, name, color, description')
-        .order('created_at');
-
-      const unjoinedDomains: DiscoverableDomain[] = (allDomains ?? [])
-        .filter((d) => !myDomainIds.has(d.id))
-        .map((d) => ({
-          id: d.id,
-          name: d.name,
-          color: d.color,
-          description: d.description ?? null,
-        }));
-      setDomains(unjoinedDomains);
-
-      // Objects the user is NOT a member of. Domain name is looked up
-      // client-side to avoid relying on the FK-typed join.
-      const domainNameById = new Map<string, string>(
-        (allDomains ?? []).map((d) => [d.id, d.name]),
-      );
-
-      const { data: myObjectRows } = await supabase
-        .from('object_members')
-        .select('object_id')
-        .eq('user_id', user.id);
-      const myObjectIds = new Set((myObjectRows ?? []).map((r) => r.object_id));
-
-      // Archived Objects are not offered to join.
-      const { data: allObjects } = await onlyActiveObjects(supabase
-        .from('objects')
-        .select('id, name, color, domain_id'))
-        .order('created_at');
-
-      const unjoinedObjects: DiscoverableObject[] = (allObjects ?? [])
-        .filter((o) => !myObjectIds.has(o.id))
-        .map((o) => ({
-          id: o.id,
-          name: o.name,
-          color: o.color,
-          domain_id: o.domain_id,
-          domain_name: o.domain_id ? domainNameById.get(o.domain_id) ?? null : null,
-        }));
-      setObjects(unjoinedObjects);
+      const found = await fetchDiscoverable(user.id);
+      setDomains(found.domains);
+      setObjects(found.objects);
+    } catch (e) {
+      console.error('Failed to load Discover', e);
+      setError(t('Could not load what you can join. Try again.'));
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, t]);
 
   useEffect(() => {
     if (open) void refresh();
   }, [open, refresh]);
 
+  // A refused join keeps its row and says so.
   const joinDomain = async (domainId: string) => {
     if (!user) return;
+    setError(null);
     try {
-      await supabase.from('domain_members').insert({
-        domain_id: domainId,
-        user_id: user.id,
-        role: 'member',
-      });
-      // Domain access only — joining a Domain must NOT make you a member of its
-      // ActivitySpace (that would expose the whole company). It surfaces as a
-      // "guest" Domain in the sidebar instead.
+      await joinDomainRow(user.id, domainId);
+      // It surfaces as a "guest" Domain in the sidebar.
       setDomains((prev) => prev.filter((d) => d.id !== domainId));
       notifyDomainsChanged();
     } catch (e) {
       console.error('Failed to join domain', e);
+      setError(t('Could not join. You may not have access to it.'));
     }
   };
 
   const joinObject = async (objectId: string) => {
     if (!user) return;
+    setError(null);
     try {
-      await supabase.from('object_members').insert({
-        object_id: objectId,
-        user_id: user.id,
-        role: 'member',
-      });
+      await joinObjectRow(user.id, objectId);
       setObjects((prev) => prev.filter((o) => o.id !== objectId));
     } catch (e) {
       console.error('Failed to join object', e);
+      setError(t('Could not join. You may not have access to it.'));
     }
   };
 
@@ -171,6 +109,7 @@ export function DiscoverModal({ open, onOpenChange }: DiscoverModalProps) {
           </button>
         </div>
 
+        {error && <p role="alert" className="px-4 pt-2 text-[12px] text-[var(--status-danger)]">{error}</p>}
         <div className="max-h-[420px] overflow-y-auto divide-y divide-border/40">
           {loading ? (
             <div className="p-6 text-center text-xs text-muted-foreground">{t('Loading…')}</div>

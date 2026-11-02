@@ -3,7 +3,6 @@
 import { useRef } from 'react';
 import { Loader2, Paperclip } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { appDialog } from '@/Function/shared/appDialogStore';
 import { useAttachmentActions, type AttachmentOwner } from '@/hooks/attachmentData';
 
 /** A paperclip that attaches files from this computer to `owner` — they
@@ -21,7 +20,7 @@ export function AttachButton({ owner, className, size = 15 }: { owner: Attachmen
       onChange={(e) => {
         const picked = Array.from(e.target.files ?? []);
         e.target.value = '';
-        for (const f of picked) upload.mutate(f, { onError: (err) => void appDialog.alert(err instanceof Error ? err.message : String(err)) });
+        for (const f of picked) upload.mutate(f);
       }} />
   </>;
 }

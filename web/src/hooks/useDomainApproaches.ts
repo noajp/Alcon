@@ -75,6 +75,8 @@ export function useDomainApproaches(domainId: string | null) {
   const qc = useQueryClient();
   const query = useQuery({ queryKey: ['domain-approaches', userId, domainId], queryFn: () => fetchDomainApproaches(domainId!), enabled: Boolean(userId && domainId), staleTime: 0, gcTime: 60_000 });
   const mutation = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: (command: ApproachCommand) => saveDomainApproach(domainId!, command),
     onError: () => { void qc.invalidateQueries({ queryKey: ['domain-approaches', userId, domainId] }); },
     onSuccess: async () => {

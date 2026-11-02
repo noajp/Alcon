@@ -164,7 +164,7 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
   const [dropping, setDropping] = useState(false);
   const drop = (list: FileList) => {
     if (!folder) return;
-    for (const f of Array.from(list)) upload.mutate(f, { onError: (e) => void appDialog.alert(e instanceof Error ? e.message : String(e)) });
+    for (const f of Array.from(list)) upload.mutate(f);
   };
   const who = (f: SpaceFile) => workers.find((w) => w.user_id === f.uploaded_by)?.name ?? t('Someone');
 
@@ -322,7 +322,7 @@ function TrashRow({ file }: { file: SpaceFile }) {
       <span className="w-24 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{t('{n} days left', { n: trashDaysLeft(file.deleted_at!) })}</span>
       <span className="flex w-24 shrink-0 justify-end">
         <Button type="button" variant="ghost" size="xs" disabled={restore.isPending}
-          onClick={() => restore.mutate(file, { onError: (e) => void appDialog.alert(e instanceof Error ? e.message : String(e)) })}>
+          onClick={() => restore.mutate(file)}>
           {restore.isPending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}{t('Restore')}
         </Button>
       </span>

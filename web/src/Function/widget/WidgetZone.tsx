@@ -13,8 +13,8 @@ import { useBoardContext, zoneDroppableId } from './BoardContext';
 import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { WidgetFrame } from './WidgetFrame';
-import { WIDGET_COMPONENTS, WIDGET_REGISTRY } from './registry';
-import { ZONE_VARIANT, type WidgetInstance, type WidgetParams, type Zone } from './types';
+import { WIDGET_COMPONENTS, WIDGET_REGISTRY, reloadWidgetComponent } from './registry';
+import { ZONE_VARIANT, type WidgetComponent, type WidgetInstance, type WidgetParams, type Zone } from './types';
 
 /** Shared so a widget without configuration gets one stable object. */
 const EMPTY_PARAMS: WidgetParams = {};
@@ -103,6 +103,8 @@ function SortableWidget({
   const { t } = useI18n();
   const def = WIDGET_REGISTRY[instance.type];
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  // Set by Retry after a failure: this instance's own fresh lazy component.
+  const [retriedBody, setRetriedBody] = useState<WidgetComponent | null>(null);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: instance.id,
@@ -152,7 +154,8 @@ function SortableWidget({
   // the belt to that braces.
   if (!def) return null;
 
-  const Body = WIDGET_COMPONENTS[instance.type];
+  const Body = retriedBody ?? WIDGET_COMPONENTS[instance.type];
+  const bodyKey = `${host.subject.kind}:${host.subject.id ?? 'me'}:${String(params.tableId ?? '')}`;
   const size = instance.size ?? def.defaultSize ?? 'half';
   const spanClass = columns === 2 && size === 'full' ? 'lg:col-span-2' : '';
 
@@ -173,10 +176,13 @@ function SortableWidget({
         isDragging={isDragging}
         onLongPress={() => setArranging(true)}
         onRemove={() => (def.holdsContents ? setConfirmingRemove(true) : board.removeWidget(instance.id))}
+        // New params or a new subject are a new attempt: a caught error clears on its own.
+        resetKey={`${bodyKey}|${JSON.stringify(params)}`}
+        onRetry={() => setRetriedBody(() => reloadWidgetComponent(instance.type))}
       >
         <Suspense fallback={<div className="h-16 rounded-md bg-muted/30 animate-pulse" />}>
           <Body
-            key={`${host.subject.kind}:${host.subject.id ?? 'me'}:${String(params.tableId ?? '')}`}
+            key={bodyKey}
             host={host}
             instanceId={instance.widgetId ?? instance.id}
             params={params}

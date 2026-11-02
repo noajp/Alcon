@@ -39,7 +39,6 @@ export function AttachmentList({ owner, actions, empty = null }: {
   const { data: files, all } = useAttachments(owner);
   const fileActions = useAttachmentActions(owner);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
-  const fail = (err: unknown) => void appDialog.alert(err instanceof Error ? err.message : String(err));
   const toggle = (id: string) => setOpen((prev) => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -73,7 +72,7 @@ export function AttachmentList({ owner, actions, empty = null }: {
                   <button type="button" aria-label={t('Remove {name}', { name: f.name })} title={t('Remove {name}', { name: f.name })}
                     onClick={async () => {
                       if (!await appDialog.confirm(t('Move “{name}” to the trash? It can be restored for {days} days.', { name: f.name, days: TRASH_DAYS }))) return;
-                      fileActions.remove.mutate(f, { onError: fail });
+                      fileActions.remove.mutate(f);
                     }}
                     className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted/50 hover:text-[var(--status-danger)] group-hover/file:opacity-100">
                     <Trash2 size={12} />
@@ -110,7 +109,6 @@ export function AttachmentPreview({ file, owner, actions, height }: { file: Atta
   const [comparing, setComparing] = useState(false);
   const before = versions[versions.indexOf(shown) + 1] ?? null;
   const canCompare = !!before && ['xlsx', 'docx', 'pptx'].includes(officeKindOf(file.name) ?? '');
-  const fail = (err: unknown) => void appDialog.alert(err instanceof Error ? err.message : String(err));
 
   const history = versions.length > 1 && (
     <DropdownMenu>
@@ -148,7 +146,7 @@ export function AttachmentPreview({ file, owner, actions, height }: { file: Atta
         <Button type="button" variant="secondary" size="xs" disabled={restoreVersion.isPending}
           onClick={async () => {
             if (!await appDialog.confirm(t('Make version {n} the latest? The versions after it stay in the history.', { n: number(picked) }))) return;
-            restoreVersion.mutate(picked, { onSuccess: () => setPickedId(null), onError: fail });
+            restoreVersion.mutate(picked, { onSuccess: () => setPickedId(null) });
           }}>
           {restoreVersion.isPending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}{t('Restore this version')}
         </Button>

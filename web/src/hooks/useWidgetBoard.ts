@@ -154,6 +154,8 @@ export function useWidgetBoard(surface: string, defaults: BoardLayout, subjectRe
   useEffect(() => { storedRef.current = stored; }, [stored]);
 
   const mutation = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     // Serial per board: each edit reads the board the one before it left.
     mutationKey: ['widget-board-write', scope],
     scope: { id: `widget-board:${scope}` },
