@@ -51,12 +51,18 @@ export type ListOrderBy =
   | 'updated'
   | 'title';
 
+/** How far back done / cancelled Elements stay in the list. */
+export type ListClosedWindow = 'all' | 'day' | 'week' | 'month' | 'none';
+
 export interface ListDisplay {
   groupBy: ListGroupBy;
   orderBy: ListOrderBy;
   /** Direction for `orderBy`. 'asc' reads naturally for due / title /
    *  created / updated; 'desc' makes priority list Urgent → Low. */
   orderDir: 'asc' | 'desc';
+  /** Which closed Elements show — all, those closed in the past day / week /
+   *  month, or none. Unset reads as 'all'. */
+  closed?: ListClosedWindow;
 }
 
 export interface ListControlsState {
@@ -84,6 +90,7 @@ const DEFAULT_DISPLAY: ListDisplay = {
   groupBy: 'object',
   orderBy: 'manual',
   orderDir: 'asc',
+  closed: 'all',
 };
 
 export const DEFAULT_STATE: ListControlsState = {

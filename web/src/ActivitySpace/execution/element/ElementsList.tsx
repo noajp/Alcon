@@ -8,6 +8,7 @@ import type { ListSection } from '@/Function/shared/listTable/shared';
 import type { ColumnId, DataColumn } from '@/Function/shared/listTable/useListColumns';
 import type { ElementUpdate, Json } from '@/types/database';
 import {
+  applyClosedWindow,
   buildSections,
   type ListControlsState,
 } from '@/Function/shared/listControls';
@@ -116,10 +117,15 @@ export function ElementsList({
   //   - anything  → flatten then re-bucket by the chosen field.
   // Filter / group / order — shared with the Gantt via buildSections so both
   // surfaces bucket identically.
-  const sections = useMemo<ListSection[]>(
-    () => buildSections(elements, objectSections, controls, user?.id ?? null, blockedElementIds),
-    [elements, objectSections, controls, user?.id, blockedElementIds],
-  );
+  // Closed Elements are trimmed to the Display's window first, so every
+  // grouping sees the same rows.
+  const sections = useMemo<ListSection[]>(() => {
+    const closed = controls.display.closed;
+    const now = new Date();
+    const inWindow = applyClosedWindow(elements, closed, now);
+    const sectionsInWindow = objectSections?.map((sec) => ({ ...sec, elements: applyClosedWindow(sec.elements ?? [], closed, now) }));
+    return buildSections(inWindow, sectionsInWindow, controls, user?.id ?? null, blockedElementIds);
+  }, [elements, objectSections, controls, user?.id, blockedElementIds]);
 
   // Hide the band whenever there's a single anonymous section (no group name)
   // — e.g. default 'object' grouping with no Object partition, or 'none'. A

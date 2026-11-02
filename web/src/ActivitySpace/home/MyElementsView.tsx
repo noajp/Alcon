@@ -309,6 +309,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
           showOwnerFilter={false}
           onReset={() => setControls(DEFAULT_STATE)}
           sortColumnsStorageKey="my-elements"
+          showClosedWindow
         />
         <ButtonAppearanceProvider appearance="navigation">
           {userId && (
