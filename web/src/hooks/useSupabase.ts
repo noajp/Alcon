@@ -68,6 +68,7 @@ export {
   setElementIsApproval,
   toggleSubelementComplete,
   updateElement,
+  noticeElementSaveFailed,
   updateSubelement,
   useElementBlockers,
 } from '@/hooks/elementData';
