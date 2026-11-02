@@ -28,6 +28,7 @@ export function ApprovalRequestBanner({ element, onRefresh }: { element: Element
   // is no longer pending — so a second click cannot record a second one.
   const [decidedKey, setDecidedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  if (!pending && decidedKey !== null) setDecidedKey(null);
 
   useEffect(() => {
     if (!pending) return;
