@@ -515,8 +515,9 @@ function ElementDetailBody({
     }
   };
 
-  const handleDescriptionSave = async () => {
-    if (description !== (element.description || '')) {
+  const handleDescriptionSave = async (next = description) => {
+    if (next !== (element.description || '')) {
+      const description = next;
       sentRef.current = { ...sentRef.current, description };
       try {
         await updateElement(element.id, { description: description || null });
@@ -763,7 +764,8 @@ function ElementDetailBody({
               onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) { descriptionFocused.current = false; void handleDescriptionSave(); } }}>
               <NoteEditor key={`${element.id}:${descriptionRev}`} compact initialHtml={descriptionHtml}
                 placeholder={t('Add description…')}
-                onChange={(html) => setDescription(htmlToMarkdown(html))} />
+                onChange={(html) => setDescription(htmlToMarkdown(html))}
+                onCommit={(html) => { void handleDescriptionSave(htmlToMarkdown(html)); }} />
             </div>
           </div>
 

@@ -22,6 +22,10 @@ export interface NoteEditorProps {
   /** Shared body. External changes reconcile the DOM; own edits preserve the caret. */
   value?: string;
   onChange?: (html: string) => void;
+  /** A one-click edit that can land while the editor is not focused (a
+   *  checklist box), so no blur follows to save it: called right after its
+   *  onChange, for a host that saves on blur to save now. */
+  onCommit?: (html: string) => void;
   editable?: boolean;
   /** Called when the user right-clicks on a list item (bullet/check). */
   onBulletContextMenu?: (info: BulletContextInfo) => void;
@@ -77,6 +81,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   initialHtml,
   value,
   onChange,
+  onCommit,
   editable = true,
   onBulletContextMenu,
   elementStatusById,
@@ -633,19 +638,26 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const handleEditorMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return; // right-click keeps an existing cell selection
     // A click on an un-linked checklist item's box checks or unchecks it.
-    const li = (e.target as HTMLElement).closest('li');
-    if (li && !li.hasAttribute('data-element-id') && li.parentElement?.getAttribute('data-checklist') === 'true'
-      && e.clientX - li.getBoundingClientRect().left < CHECK_BOX_HIT_PX) {
-      e.preventDefault();
-      li.setAttribute('data-checked', li.getAttribute('data-checked') === 'true' ? 'false' : 'true');
-      emit();
-      return;
+    // The box sits on the item's first line, so a click lower down (beside
+    // a nested list) is not on this item's box.
+    const target = e.target as HTMLElement;
+    const li = target.tagName === 'UL' || target.tagName === 'OL' ? null : target.closest('li');
+    if (li && !li.hasAttribute('data-element-id') && li.parentElement?.getAttribute('data-checklist') === 'true') {
+      const rect = li.getBoundingClientRect();
+      const lineHeight = parseFloat(getComputedStyle(li).lineHeight) || CHECK_BOX_HIT_PX;
+      if (e.clientX - rect.left < CHECK_BOX_HIT_PX && e.clientY - rect.top < lineHeight) {
+        e.preventDefault();
+        li.setAttribute('data-checked', li.getAttribute('data-checked') === 'true' ? 'false' : 'true');
+        emit();
+        if (ref.current) onCommit?.(ref.current.innerHTML);
+        return;
+      }
     }
     clearCellSelection();
     cellDraggingRef.current = false;
     const cell = (e.target as HTMLElement).closest('td, th') as HTMLTableCellElement | null;
     cellDragAnchorRef.current = cell && cell.closest('table[data-note-table="true"]') ? cell : null;
-  }, [clearCellSelection, emit]);
+  }, [clearCellSelection, emit, onCommit]);
 
   const handleEditorMouseDrag = useCallback((e: React.MouseEvent) => {
     const anchor = cellDragAnchorRef.current;
@@ -1164,7 +1176,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         }
         /* An un-linked item's box is clicked to check it; checked, it fills
            with a tick and the text recedes. */
-        .note-editor ul[data-checklist="true"] > li:not([data-element-id])::before {
+        .note-editor[contenteditable="true"] ul[data-checklist="true"] > li:not([data-element-id])::before {
           cursor: pointer;
         }
         .note-editor ul[data-checklist="true"] > li[data-checked="true"]:not([data-element-id]) {
