@@ -82,7 +82,7 @@ export async function invalidateElementActivity(elementId: string): Promise<void
 }
 
 /** Key prefix of useDoneTimesSince — deltaStream invalidates it on a new status row. */
-export const DONE_TIMES_PREFIX = ['elementDoneTimes'] as const;
+const DONE_TIMES_PREFIX = ['elementDoneTimes'] as const;
 const DONE_TIMES_LIMIT = 5000;
 
 /**
