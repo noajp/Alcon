@@ -31,6 +31,8 @@ describe('detectMentionQuery', () => {
     expect(detectMentionQuery('a@b')).toBeNull();
     expect(detectMentionQuery('a@b.com')).toBeNull();
     expect(detectMentionQuery('taro.y@')).toBeNull();
+    expect(detectMentionQuery('https://x.com/@nak')).toBeNull();
+    expect(detectMentionQuery('mailto:@nak')).toBeNull();
   });
 
   it('closes once the name has ended', () => {
@@ -96,6 +98,7 @@ describe('mentionedUserIds', () => {
     const ws = [{ name: 'nakano', user_id: 'u3' }];
     expect(mentionedUserIds('連絡先は info@nakano です', ws)).toEqual([]);
     expect(mentionedUserIds('https://user@nakano.jp/x', ws)).toEqual([]);
+    expect(mentionedUserIds('https://x.com/@nakano', ws)).toEqual([]);
     expect(mentionedUserIds('確認@nakano', ws)).toEqual(['u3']);
   });
 
@@ -106,6 +109,16 @@ describe('mentionedUserIds', () => {
     ];
     expect(mentionedUserIds('@Takanori Nakano please', ws)).toEqual(['long']);
     expect(mentionedUserIds('@Takanori Nakano and @Takanori', ws).sort()).toEqual(['long', 'short']);
+  });
+
+  it('names every Worker who shares the exact name', () => {
+    const ws = [
+      { name: '佐藤', user_id: 's1' },
+      { name: '佐藤', user_id: 's2' },
+      { name: '佐藤花子', user_id: 'h' },
+    ];
+    expect(mentionedUserIds('@佐藤 お願いします', ws).sort()).toEqual(['s1', 's2']);
+    expect(mentionedUserIds('@佐藤花子 お願いします', ws)).toEqual(['h']);
   });
 
   it('ignores a name that continues and Workers without a user', () => {

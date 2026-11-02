@@ -3,13 +3,14 @@
  * Workers it matches, and which people a finished comment names.
  *
  * Names may be Japanese (漢字・かな), and Japanese prose has no spaces, so an
- * @ counts as a mention after any character that could not be part of an
- * e-mail address's local part — "確認お願いします@中" opens the list,
- * "a@b.com" does not. A full-width ＠ (what a Japanese IME types) counts too.
+ * @ counts as a mention after any character that could not come right
+ * before the @ of an address — "確認お願いします@中" opens the list,
+ * "a@b.com" and "https://x.com/@nakano" do not. A full-width ＠ (what a Japanese IME types) counts too.
  */
 
-/** Characters that can sit right before the @ of an e-mail address. */
-const EMAIL_LOCAL_CHAR = /[A-Za-z0-9._%+\-]/;
+/** Characters that, right before an @, make it part of an address rather
+ *  than a mention: an e-mail local part, or a URL (https://x.com/@nakano). */
+const NOT_BEFORE_MENTION = /[A-Za-z0-9._%+\-/:]/;
 /** Characters a query cannot contain: whitespace, another @, and the
  *  punctuation that ends a name in prose. */
 const QUERY_STOP = /[\s@＠、。，,!?！？「」『』（）()[\]:：]/;
@@ -34,7 +35,7 @@ export function detectMentionQuery(textBeforeCursor: string): MentionQuery | nul
   if (i === 0) return null;
   const start = i - 1;
   const prev = start > 0 ? textBeforeCursor[start - 1] : '';
-  if (prev && EMAIL_LOCAL_CHAR.test(prev)) return null;
+  if (prev && NOT_BEFORE_MENTION.test(prev)) return null;
   return { start, query: textBeforeCursor.slice(start + 1) };
 }
 
@@ -87,10 +88,11 @@ export function insertMentionText(text: string, at: MentionQuery, insert: string
  *
  * - A name ends at whitespace, punctuation or the end of the text — not \b,
  *   which only knows ASCII word characters and misses Japanese names.
- * - An @ right after a character of an e-mail local part (info@nakano.jp,
- *   a URL's user@host) is not a mention, as in detectMentionQuery.
+ * - An @ inside an address (info@nakano.jp, user@host, https://x.com/@nakano)
+ *   is not a mention, as in detectMentionQuery.
  * - The longest name wins: "@Takanori Nakano" names Takanori Nakano, not
- *   also a Worker called "Takanori".
+ *   also a Worker called "Takanori". Workers who share the exact name are
+ *   all named.
  */
 export function mentionedUserIds(
   text: string,
@@ -108,8 +110,13 @@ export function mentionedUserIds(
     for (const m of text.matchAll(re)) {
       const start = m.index;
       const end = start + m[0].length;
-      if (start > 0 && EMAIL_LOCAL_CHAR.test(text[start - 1])) continue;
-      if (claimed.some(([s, e]) => start < e && s < end)) continue;
+      if (start > 0 && NOT_BEFORE_MENTION.test(text[start - 1])) continue;
+      const overlap = claimed.find(([s, e]) => start < e && s < end);
+      if (overlap) {
+        // The same span again: another Worker with this very name.
+        if (overlap[0] === start && overlap[1] === end) ids.add(w.user_id);
+        continue;
+      }
       claimed.push([start, end]);
       ids.add(w.user_id);
     }
