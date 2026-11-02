@@ -23,9 +23,20 @@ export interface ModelUsage {
   cache_read_input_tokens?: number | null;
 }
 
+/** USD per million tokens. */
+export interface ModelPrice { input: number; output: number; cacheRead: number }
+
+/** What a model on another provider is charged at when its Worker states no
+ *  price: Claude Sonnet's, so a budget errs on stopping early. */
+export const UNPRICED_MODEL: ModelPrice = { input: AGENT_MODELS["claude-sonnet-5-5"].input, output: AGENT_MODELS["claude-sonnet-5-5"].output, cacheRead: AGENT_MODELS["claude-sonnet-5-5"].cacheRead };
+
 /** Pure. USD for one response's usage on a model. */
 export function costOf(model: AgentModel, usage: ModelUsage): number {
-  const p = AGENT_MODELS[model];
+  return costAt(AGENT_MODELS[model], usage);
+}
+
+/** Pure. USD for one response's usage at a price. */
+export function costAt(p: ModelPrice, usage: ModelUsage): number {
   const n = (v: number | null | undefined) => (typeof v === "number" && v > 0 ? v : 0);
   const usd =
     (n(usage.input_tokens) * p.input +

@@ -1321,7 +1321,7 @@ export interface Integration {
   id: string
   activity_space_id: string
   preset: string | null
-  kind: 'mcp' | 'http'
+  kind: 'mcp' | 'http' | 'model'
   name: string
   description: string | null
   icon: string | null

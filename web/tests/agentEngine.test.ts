@@ -250,6 +250,7 @@ describe('pricing and prompts', () => {
     expect(pricing.costOf('claude-sonnet-5-5', { output_tokens: 100_000 })).toBe(1);
     expect(pricing.costOf('claude-haiku-4-5', { cache_creation_input_tokens: 1_000_000, cache_read_input_tokens: 1_000_000 })).toBe(1.35);
     expect(pricing.costOf('claude-opus-5-5', { cache_read_input_tokens: 1_000_000 })).toBe(0.2);
+    expect(pricing.costAt({ input: 0.3, output: 1.2, cacheRead: 0.3 }, { input_tokens: 1_000_000, output_tokens: 500_000 })).toBe(0.9);
     expect(pricing.isAgentModel('claude-opus-5-5')).toBe(true);
     expect(pricing.isAgentModel('gpt-5')).toBe(false);
   });

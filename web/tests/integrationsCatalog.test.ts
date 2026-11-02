@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EMPTY_FILTER, INTEGRATION_PRESETS, buildIntegrationRow, darkIconFor, filterPresets, installedPresetIds,
+  EMPTY_FILTER, INTEGRATION_PRESETS, buildIntegrationRow, customPresetFor, darkIconFor, filterPresets, installedPresetIds,
   isSafeEndpoint, presetById, readLastTest, signsInWithOAuth, testOutcomeLabel, type IntegrationDraft,
 } from '@/Function/integrations/catalog';
 
@@ -50,7 +50,9 @@ describe('filterPresets', () => {
     expect(ids({ query: 'project management' })).toEqual(['linear', 'asana']);
     expect(ids({ category: 'project', kind: 'http' })).toEqual(['asana']);
     expect(ids({ kind: 'mcp', source: 'official' })).toEqual(['linear', 'github']);
-    expect(ids({ source: 'custom' })).toEqual(['custom-mcp', 'custom-http']);
+    expect(ids({ source: 'custom' })).toEqual(['custom-mcp', 'custom-http', 'custom-model']);
+    expect(ids({ kind: 'model' })).toEqual(['deepseek', 'kimi', 'custom-model']);
+    expect(ids({ category: 'models' })).toEqual(['deepseek', 'kimi']);
     expect(ids({ query: 'zzz' })).toEqual([]);
   });
 });
@@ -121,6 +123,24 @@ describe('buildIntegrationRow', () => {
       ok: true,
       row: expect.objectContaining({ preset: 'custom-http', kind: 'http', name: 'Billing', endpoint: 'https://billing.example.com/api', auth_type: 'header', auth_header: 'X-API-Key' }),
     });
+  });
+
+  it('builds a model provider row that always sends its key as a bearer credential', () => {
+    const r = buildIntegrationRow(presetById('custom-model')!, SPACE, { ...draft, name: 'GLM', endpoint: 'https://api.z.ai/api/anthropic', auth: 'header', authHeader: 'X-Key' });
+    expect(r).toEqual({
+      ok: true,
+      row: expect.objectContaining({ preset: 'custom-model', kind: 'model', name: 'GLM', endpoint: 'https://api.z.ai/api/anthropic', auth_type: 'bearer', auth_header: null }),
+    });
+    expect(buildIntegrationRow(presetById('deepseek')!, SPACE, draft)).toEqual({
+      ok: true,
+      row: expect.objectContaining({ preset: 'deepseek', kind: 'model', endpoint: 'https://api.deepseek.com/anthropic', auth_type: 'bearer' }),
+    });
+  });
+
+  it('shows a row without a known preset as the custom preset of its kind', () => {
+    expect(customPresetFor('mcp').id).toBe('custom-mcp');
+    expect(customPresetFor('http').id).toBe('custom-http');
+    expect(customPresetFor('model').id).toBe('custom-model');
   });
 
   it('drops the header name unless auth is header', () => {

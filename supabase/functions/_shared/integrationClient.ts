@@ -1,11 +1,13 @@
 // Calling a Space's external services on an agent's behalf.
 //
-// Two kinds, matching the integrations table:
+// Two kinds of the integrations table are called here:
 //   mcp   a remote MCP server over Streamable HTTP. Its tools become the
 //         agent's tools; readOnlyHint decides read vs write, believed only
 //         from vetted presets (trustsReadOnlyHint).
 //   http  a REST API under one base URL. The agent gets one http_request tool
 //         confined to that base; GET / HEAD are reads, the rest are writes.
+// The third, model, is an AI model provider: run-agent talks to it as the
+// model itself and never offers it as a tool.
 //
 // The secret is passed in by the caller (read from Vault with the service
 // role) and only ever goes into the outgoing request's header. An OAuth
@@ -22,7 +24,7 @@ import { isGithubOAuthRow, parseGithubSecret } from "./githubOAuth.ts";
 export interface IntegrationRow {
   id: string;
   preset?: string | null;
-  kind: "mcp" | "http";
+  kind: "mcp" | "http" | "model";
   name: string;
   description: string | null;
   endpoint: string;
