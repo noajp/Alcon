@@ -1,5 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import { mergeNavigation, navigationAfterDomainChange, objectDomainRoute } from '@/shell/navigationState';
+import { mergeNavigation, navigationAfterDomainChange, navigationForView, objectDomainRoute } from '@/shell/navigationState';
+
+describe('An Element opened from ⌘K', () => {
+  const back = { view: 'note', objectId: 'prev-obj', objectDomainId: 'current-domain', domainId: 'current-domain' };
+  const opened = mergeNavigation({ objectId: null }, { elementId: 'el', elementReturn: back, objectId: 'obj', objectDomainId: 'other-domain' }, 'current-domain');
+
+  it("carries its Object's Domain, so the shell switches there before opening it", () => {
+    expect(opened).toMatchObject({ elementId: 'el', objectId: 'obj', objectDomainId: 'other-domain' });
+    expect(navigationAfterDomainChange(opened, 'other-domain')).toBe(opened);
+  });
+  it('stays open on the Domain Elements view and is forgotten on any other', () => {
+    expect(navigationForView(opened, 'domain-elements')).toBe(opened);
+    expect(navigationForView(opened, 'note')).toMatchObject({ elementId: null, elementReturn: null, objectId: 'obj' });
+    const plain = { objectId: null };
+    expect(navigationForView(plain, 'note')).toBe(plain);
+  });
+  it('keeps where Back returns to while it is open', () => {
+    expect(opened.elementReturn).toEqual(back);
+  });
+  it('closes when another Domain is chosen while it is open', () => {
+    expect(navigationAfterDomainChange(opened, 'third-domain')).toMatchObject({ elementId: null, elementReturn: null, objectId: null, objectDomainId: null });
+    // A personal Element has no Object, and still closes on a Domain switch.
+    const personal = mergeNavigation({ objectId: null }, { elementId: 'mine', elementReturn: back, objectId: null }, 'current-domain');
+    expect(navigationAfterDomainChange(personal, 'third-domain')).toMatchObject({ elementId: null, elementReturn: null });
+  });
+});
 
 describe('Object navigation across Domains', () => {
   it('preserves an explicit Object target when its Domain change is processed', () => {
