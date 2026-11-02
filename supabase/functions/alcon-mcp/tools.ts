@@ -15,7 +15,7 @@ export const MCP_READ_TOOLS = EXTERNAL_READ_TOOLS;
 export const MCP_WRITE_TOOLS = EXTERNAL_WRITE_TOOLS;
 
 // Writes that land the same state when repeated.
-const IDEMPOTENT = new Set(["updateElement", "addElementAssignee", "setElementLabels"]);
+const IDEMPOTENT = new Set(["updateElement", "addElementAssignee", "setElementLabels", "claimElement", "releaseElement"]);
 // Writes that overwrite what was there (a title, a description, the whole
 // label set) — a client should confirm these the way it confirms a delete.
 const OVERWRITES = new Set(["updateElement", "setElementLabels"]);

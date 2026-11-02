@@ -1,12 +1,15 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { BOARD_TOOLS, runBoardTool, type BoardActor, type ToolDef, type ToolResult } from "./boardTools.ts";
 import { STRATEGY_TOOLS, runStrategyTool } from "./strategyTools.ts";
+import { AGENT_REPORT_TOOLS, isAgentReportTool, runAgentReportTool } from "./agentReportTools.ts";
 import type { CallerAccess } from "./callerAuth.ts";
 
 // What a caller outside the app may do — through MCP (alcon-mcp) or REST
 // (alcon-api); both read this one list. Reads, plus the writes a person
 // delegates day to day: create and update Elements, comment, assign, label,
-// and tick subelements. Deletes, bulk writes, moving between Objects and
+// and tick subelements — and how an agent reports on the Element it works:
+// take and return the lease, log progress, close with an outcome
+// (agentReportTools.ts). Deletes, bulk writes, moving between Objects and
 // Object edits stay in the app, where the person sees what they touch.
 // A read-only personal access token reaches the reads alone.
 
@@ -31,6 +34,10 @@ export const EXTERNAL_WRITE_TOOLS = [
   "setElementLabels",
   "createSubelement",
   "toggleSubelementComplete",
+  "claimElement",
+  "releaseElement",
+  "logProgress",
+  "reportOutcome",
 ] as const;
 
 export type ExternalTool = (typeof EXTERNAL_READ_TOOLS)[number] | (typeof EXTERNAL_WRITE_TOOLS)[number];
@@ -44,7 +51,7 @@ export function isReadTool(name: string): boolean {
 
 /** The tool definitions a caller with `access` is offered, reads first. */
 export function externalToolDefs(access: CallerAccess = "read_write"): ToolDef[] {
-  const byName = new Map([...BOARD_TOOLS, ...STRATEGY_TOOLS].map((t) => [t.name, t]));
+  const byName = new Map([...BOARD_TOOLS, ...STRATEGY_TOOLS, ...AGENT_REPORT_TOOLS].map((t) => [t.name, t]));
   const names: readonly string[] = access === "read_write"
     ? [...EXTERNAL_READ_TOOLS, ...EXTERNAL_WRITE_TOOLS]
     : EXTERNAL_READ_TOOLS;
@@ -68,7 +75,7 @@ export async function runExternalTool(
 ): Promise<ToolResult> {
   const offered = externalToolDefs(access).some((t) => t.name === name);
   if (!offered) return { ok: false, error: `Tool ${name} is not available to this connection` };
-  return STRATEGY_NAMES.has(name)
-    ? await runStrategyTool(supabase, name, args)
-    : await runBoardTool(supabase, name, args, actor);
+  if (STRATEGY_NAMES.has(name)) return await runStrategyTool(supabase, name, args);
+  if (isAgentReportTool(name)) return await runAgentReportTool(supabase, name, args, actor);
+  return await runBoardTool(supabase, name, args, actor);
 }
