@@ -589,7 +589,7 @@ const NO_LINEAGE: IntentLineage[] = []
 
 /** The header the intent_measure_readings trigger reads to label where a
  *  reading came from. Sent only when a write carries a reading. */
-export const READING_SOURCE_HEADER = 'x-alcon-reading-source'
+const READING_SOURCE_HEADER = 'x-alcon-reading-source'
 
 export async function createIntent(
   input: IntentInsert,
