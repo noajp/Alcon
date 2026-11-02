@@ -67,7 +67,7 @@ const WORKSPACE_TABLES = [
   'phases', 'domain_approaches', 'approach_conditions', 'approach_contributions', 'approach_assessments', 'approach_reviews',
   'intents', 'intent_bindings', 'intent_lineage', 'intent_next_actions',
   'intent_escalations', 'intent_alignments', 'intent_audits', 'intent_predictions', 'intent_resources',
-  'attachments', 'folders',
+  'attachments', 'folders', 'org_units', 'org_unit_members',
 ] as const;
 
 export type WorkspaceTable = (typeof WORKSPACE_TABLES)[number];
@@ -183,6 +183,7 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
   // pinned file reads again (a version is a new row, so no row to patch).
   // A folder made, renamed or removed by anyone in the Space.
   if (d.table === 'folders') invalidateSoon(qc, ['folders']);
+  if (d.table === 'org_units' || d.table === 'org_unit_members') invalidateSoon(qc, ['org-units']);
   if (d.table === 'attachments') {
     invalidateSoon(qc, ['attachments']);
     invalidateSoon(qc, ['attachments-of']);

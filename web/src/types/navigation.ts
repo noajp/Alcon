@@ -18,6 +18,8 @@ export interface NavigationState {
   objectDomainId?: string | null;
   /** A Worker selected from Team; Workload keeps the filter in this tab. */
   workerId?: string | null;
+  /** People: the unit in focus (its members' load and its page). */
+  unitId?: string | null;
   noteId?: string | null;
   /** Note Folder currently focused in the middle pane (a root folder id). */
   noteFolderId?: string | null;

@@ -35,11 +35,11 @@ export function IslandHeader({ crumbs, count, after, actions }: {
             {i > 0 && <ChevronRight size={12} className="flex-shrink-0 text-muted-foreground/50" />}
             {c.onClick ? (
               <button type="button" onClick={c.onClick}
-                className="flex max-w-[220px] items-center gap-1.5 truncate rounded px-1.5 py-0.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">
+                className="flex max-w-[220px] shrink-0 items-center gap-1.5 truncate rounded px-1.5 py-0.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">
                 {c.icon}<span className="truncate">{c.label}</span>
               </button>
             ) : (
-              <span className={`flex max-w-[260px] items-center gap-1 truncate px-1.5 py-0.5 ${last ? 'text-[13px] font-semibold text-foreground' : 'text-[13px] font-medium text-muted-foreground'}`}>
+              <span className={`flex max-w-[260px] shrink-0 items-center gap-1 truncate px-1.5 py-0.5 ${last ? 'text-[13px] font-semibold text-foreground' : 'text-[13px] font-medium text-muted-foreground'}`}>
                 {c.icon}<span className="truncate">{c.label}</span>
               </span>
             )}
@@ -48,7 +48,8 @@ export function IslandHeader({ crumbs, count, after, actions }: {
       })}
       {count !== undefined && <span className="ml-0.5 text-[12px] tabular-nums text-muted-foreground">{count}</span>}
       {after}
-      {actions && <div className="ml-auto flex shrink-0 items-center gap-1.5">{actions}</div>}
+      {/* The path keeps its room; on a narrow pane the verbs give way first. */}
+      {actions && <div className="ml-auto flex min-w-0 items-center justify-end gap-1.5 overflow-hidden pl-3">{actions}</div>}
     </header>
   );
 }

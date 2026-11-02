@@ -11,7 +11,7 @@ import { SettingsModal } from '@/Function/settings/SettingsModal';
 import { StrategySettingsModal } from '@/Function/settings/StrategySettingsModal';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { resolveVision, useVisions } from '@/hooks/visionData';
-import { useSpaceRole } from '@/Function/space/data';
+import { useActiveSpaceScope, useSpaceRole } from '@/Function/space/data';
 import { useCurrentUserId } from '@/providers/authContext';
 import { NavPortfolioIcon, NavStrategyIcon, NavVisionIcon } from './sidebar/NavIcons';
 import { NotebookTree } from './sidebar/NotebookTree';
@@ -67,7 +67,7 @@ import { SlidesSidebar, createDeckHere, createFolderHere, pickDeckFile } from '@
 import { useSlidesReady } from '@/ActivitySpace/sustainment/slides/sync';
 import { InboxList } from '@/ActivitySpace/home/InboxList';
 import { CalendarSidebar } from '@/ActivitySpace/sustainment/calendar/CalendarSidebar';
-import { WorkloadSidebar } from '@/ActivitySpace/sustainment/workload/WorkloadSidebar';
+import { PeopleSidebar } from '@/ActivitySpace/sustainment/team/PeopleSidebar';
 import type { NavigationState } from '@/types/navigation';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
@@ -175,6 +175,8 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { openCreate } = useWorkspaceActions();
   const { t } = useI18n();
+  // An audit Space (ADR 0048) lists its people without their load.
+  const spaceScope = useActiveSpaceScope();
   const { guestDomains, refetch: refetchMemberDomains } = useDomains();
   const { data: visibleDomains, refetch: refetchVisibleDomains } = useSustainmentDomains();
   const domains = useMemo(() => [...visibleDomains].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)), [visibleDomains]);
@@ -536,13 +538,14 @@ export function AppSidebar({
           )}
           {/* ── Workload ── the team's load, the plan that fixes it, and
               each person, narrowing the chart to them. */}
-          {railMode === 'workload' && <WorkloadSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'workload') onViewChange('workload'); }} />}
           {/* ── Team ── a single full surface in the main pane. */}
           {/* ── Inbox ── the notification list; the main pane reads the open one. */}
           {railMode === 'inbox' && <InboxList onNavigate={onNavigate} onViewChange={onViewChange} onOpen={() => onViewChange('inbox')} />}
           {/* ── Calendar ── today, a mini month that moves the grid, and who is shown. */}
           {railMode === 'calendar' && <><SidebarModeLabel label={t('Calendar')} /><CalendarSidebar /></>}
-          {railMode === 'team' && <SidebarModeLabel label={t('People')} />}
+          {railMode === 'team' && (spaceScope === 'audit'
+            ? <SidebarModeLabel label={t('People')} />
+            : <PeopleSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'team' && activeView !== 'workload') onViewChange('team'); }} />)}
           {railMode === 'files' && <FilesSidebar navigation={navigation} onNavigate={onNavigate} domains={sidebarDomains} />}
           {/* ── Reviews ── the Space's pull requests; the main pane reviews the open one. */}
           {railMode === 'reviews' && <ReviewsSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'reviews') onViewChange('reviews'); }} />}

@@ -5,8 +5,15 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import { SidebarRow, SidebarRowAction } from '@/Function/shared/SidebarRow';
 
-/** One place under a group's row ("Folders", "Files"). */
-export interface GroupTreeItem { id: string; label: string; icon: ComponentType<{ size?: number }>; active: boolean; onClick: () => void }
+/** One place under a group's row ("Folders", "Files"), or one member of it
+ *  (a person, with their avatar as `mark` and their load as `meta`). */
+export interface GroupTreeItem {
+  id: string; label: string; active: boolean; onClick: () => void;
+  icon?: ComponentType<{ size?: number }>;
+  mark?: ReactNode;
+  meta?: ReactNode;
+  title?: string;
+}
 
 /**
  * One group in a tool's sidebar, the way Execution draws a Domain: its row
@@ -27,8 +34,8 @@ export function GroupTree({ name, mark, homeActive, onOpenHome, items, defaultOp
           <DisclosureTriangle open={open} />
         </SidebarRowAction>} />
       {open && <div className="mt-0.5 pl-7">
-        {items.map(({ id, label, icon: Icon, active, onClick }) => (
-          <SidebarRow key={id} active={active} icon={<Icon size={16} />} label={label} onClick={onClick} />
+        {items.map(({ id, label, icon: Icon, mark, meta, title, active, onClick }) => (
+          <SidebarRow key={id} active={active} icon={mark ?? (Icon && <Icon size={16} />)} label={label} meta={meta} title={title} onClick={onClick} />
         ))}
       </div>}
     </div>
