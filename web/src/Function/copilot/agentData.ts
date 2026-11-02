@@ -1,6 +1,6 @@
 'use client';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
-import type { AgentAction, AgentArtifact, AgentRun, AgentRunMode, AgentRunStatus, AgentRunStep } from '@/types/database';
+import type { AgentAction, AgentOutput, AgentRun, AgentRunMode, AgentRunStatus, AgentRunStep } from '@/types/database';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ============================================
@@ -79,14 +79,14 @@ async function fetchPendingAgentAction(runId: string): Promise<AgentAction | nul
   return (data as AgentAction) ?? null;
 }
 
-async function fetchAgentArtifacts(elementId: string): Promise<AgentArtifact[]> {
+async function fetchAgentOutputs(elementId: string): Promise<AgentOutput[]> {
   const { data, error } = await supabase
     .from('agent_artifacts')
     .select('*')
     .eq('element_id', elementId)
     .order('created_at', { ascending: true });
   if (error) throw error;
-  return (data || []) as AgentArtifact[];
+  return (data || []) as AgentOutput[];
 }
 
 /** Ask the engine to act on a run. The user's session goes with the call. */
@@ -222,7 +222,7 @@ export function useAgentRun(
   const [run, setRun] = useState<AgentRun | null>(null);
   const [steps, setSteps] = useState<AgentRunStep[]>([]);
   const [pending, setPending] = useState<AgentAction | null>(null);
-  const [artifacts, setArtifacts] = useState<AgentArtifact[]>([]);
+  const [outputs, setOutputs] = useState<AgentOutput[]>([]);
   const [loading, setLoading] = useState(autoLoad);
   const [starting, setStarting] = useState(false);
   const [deciding, setDeciding] = useState(false);
@@ -242,7 +242,7 @@ export function useAgentRun(
     const [latestSteps, latestPending, latestArtifacts] = await Promise.all([
       latest ? fetchAgentRunSteps(latest.id) : Promise.resolve([]),
       latest?.status === 'awaiting_approval' ? fetchPendingAgentAction(latest.id) : Promise.resolve(null),
-      id ? fetchAgentArtifacts(id) : Promise.resolve([]),
+      id ? fetchAgentOutputs(id) : Promise.resolve([]),
     ]);
     return { latest, latestSteps, latestPending, latestArtifacts };
   }, []);
@@ -257,7 +257,7 @@ export function useAgentRun(
         setRun(r.latest);
         setSteps(r.latestSteps);
         setPending(r.latestPending);
-        setArtifacts(r.latestArtifacts);
+        setOutputs(r.latestArtifacts);
       } catch (e) {
         console.error('useAgentRun load failed', e);
       } finally {
@@ -283,7 +283,7 @@ export function useAgentRun(
         if (r.latest) setRun(r.latest);
         setSteps(r.latestSteps);
         setPending(r.latestPending);
-        setArtifacts(r.latestArtifacts);
+        setOutputs(r.latestArtifacts);
       } catch (e) {
         console.error('useAgentRun poll failed', e);
       }
@@ -398,5 +398,5 @@ export function useAgentRun(
   const isActive = isAgentRunActive(run);
   /** Only the run's starter may approve, reject or resume it (ADR 0027); others watch and may stop it. */
   const isMine = !!run && !!me && run.triggered_by === me;
-  return { run, steps, pending, artifacts, loading, starting, deciding, error, isActive, isMine, start, cancel, resume, decide };
+  return { run, steps, pending, outputs, loading, starting, deciding, error, isActive, isMine, start, cancel, resume, decide };
 }

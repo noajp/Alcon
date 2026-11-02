@@ -48,7 +48,7 @@ export function AttachmentList({ owner, actions, empty = null }: {
   if (!files.length) return <>{empty}</>;
   return <>
     {files.length > 0 && (
-      <section className="w-full" aria-label={t('Files')}>
+      <section className="w-full" aria-label={t('Artifacts')}>
         <div className="-mx-2">
           {files.map((f) => {
             const dot = f.name.lastIndexOf('.');

@@ -25,9 +25,9 @@ export function FilesSidebar({ navigation, onNavigate, domains }: {
   const page = route.view === 'trash' ? 'trash' : !route.domainId ? 'all' : route.folderId ? 'folders' : route.view ?? 'home';
   return (
     <div className="mt-1 pb-4">
-      <SidebarSectionLabel>{t('Files')}</SidebarSectionLabel>
+      <SidebarSectionLabel>{t('Artifacts')}</SidebarSectionLabel>
       <div className="mt-1">
-        <SidebarRow active={page === 'all'} icon={<FilesIcon size={16} />} label={t('All files')} onClick={() => go({})} />
+        <SidebarRow active={page === 'all'} icon={<FilesIcon size={16} />} label={t('All artifacts')} onClick={() => go({})} />
         {/* Removed files stay restorable for their days; the way back is here. */}
         <SidebarRow active={page === 'trash'} icon={<Trash2 size={16} />} label={t('Deleted')} onClick={() => go({ view: 'trash' })} />
       </div>
@@ -37,7 +37,7 @@ export function FilesSidebar({ navigation, onNavigate, domains }: {
             homeActive={route.domainId === d.id && page === 'home'} onOpenHome={() => go({ domainId: d.id })}
             items={[
               { id: 'folders', label: t('Folders'), icon: FolderIcon, active: route.domainId === d.id && page === 'folders', onClick: () => go({ domainId: d.id, view: 'folders' }) },
-              { id: 'files', label: t('Files'), icon: FilesIcon, active: route.domainId === d.id && page === 'files', onClick: () => go({ domainId: d.id, view: 'files' }) },
+              { id: 'files', label: t('Artifacts'), icon: FilesIcon, active: route.domainId === d.id && page === 'files', onClick: () => go({ domainId: d.id, view: 'files' }) },
             ]} />
         ))}
       </div>

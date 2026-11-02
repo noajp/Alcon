@@ -303,7 +303,7 @@ export function CommandPalette({ scope, onNavigate, onViewChange, onOpenSettings
         {grouped.file.length > 0 && (
           <>
             <CommandSeparator />
-            <CommandGroup heading={t('Files')}>
+            <CommandGroup heading={t('Artifacts')}>
               {grouped.file.map(r => (
                 // A file opens what it is attached to; the line under its name
                 // is where its words matched (or what it is attached to).
