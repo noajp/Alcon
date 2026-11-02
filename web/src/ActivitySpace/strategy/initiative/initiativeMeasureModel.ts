@@ -256,3 +256,62 @@ export function parseMeasureValue(text: string): ParsedValue {
   const value = Number(trimmed);
   return Number.isFinite(value) ? { ok: true, value } : { ok: false };
 }
+
+// ── Lists ────────────────────────────────────────────────────────────────
+// A list of Initiatives reads every measure in one query and splits it here,
+// so the row can say "2 missed" without a query per row. An Initiative with no
+// measure gets an empty tally rather than none at all: "no success conditions"
+// is a fact about it, and an absent entry means only "not loaded yet".
+
+export const EMPTY_TALLY: MeasureTally = { met: 0, missed: 0, unmeasured: 0, unstated: 0, total: 0 };
+
+/** Every listed Initiative's tally from one batch of measures. Rows for
+ *  Initiatives outside `initiativeIds` are ignored. */
+export function talliesByInitiative(
+  initiativeIds: string[],
+  rows: Array<MeasureInput & { initiativeId: string }>,
+): Map<string, MeasureTally> {
+  const grouped = new Map<string, Measure[]>(initiativeIds.map((id) => [id, []]));
+  for (const row of rows) grouped.get(row.initiativeId)?.push(evaluateMeasure(row));
+  return new Map([...grouped].map(([id, measures]) => [id, tallyMeasures(measures)]));
+}
+
+export function addTallies(a: MeasureTally, b: MeasureTally): MeasureTally {
+  return {
+    met: a.met + b.met,
+    missed: a.missed + b.missed,
+    unmeasured: a.unmeasured + b.unmeasured,
+    unstated: a.unstated + b.unstated,
+    total: a.total + b.total,
+  };
+}
+
+export type MeasureSummaryTone = 'none' | 'missed' | 'open' | 'met';
+
+/**
+ * What a list row prints for its success conditions, and how loudly.
+ *
+ * A miss or an unread condition is named by count against the total
+ * ("2 missed · 1 not measured / 5"), because those are the ones somebody has
+ * to act on. When neither is left the row reports the met share instead. The
+ * tone follows the Measures section header, so the row and the page it opens
+ * colour the same tally the same way: a miss is the alarm, anything short of
+ * all-met is the caution, all-met is quiet.
+ */
+export function measureSummary(tally: MeasureTally): { text: string; tone: MeasureSummaryTone } {
+  if (tally.total === 0) return { text: translate('No success conditions'), tone: 'none' };
+  const parts: string[] = [];
+  if (tally.missed > 0) parts.push(translate('{n} missed', { n: tally.missed }));
+  if (tally.unmeasured > 0) parts.push(translate('{n} not measured', { n: tally.unmeasured }));
+  const tone: MeasureSummaryTone = tally.missed > 0 ? 'missed' : tally.met < tally.total ? 'open' : 'met';
+  if (parts.length === 0) return { text: translate('{met}/{total} met', { met: tally.met, total: tally.total }), tone };
+  return { text: `${parts.join(' · ')} / ${tally.total}`, tone };
+}
+
+/** Every band spelled out, for the hover title. */
+export function measureTallyDetail(tally: MeasureTally): string {
+  return (['met', 'missed', 'unmeasured', 'unstated'] as const)
+    .filter((state) => tally[state] > 0)
+    .map((state) => `${measureStateLabel(state)} ${tally[state]}`)
+    .join(' · ');
+}

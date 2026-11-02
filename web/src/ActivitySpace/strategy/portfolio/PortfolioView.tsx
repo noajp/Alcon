@@ -26,6 +26,9 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useStrategies, useDomains, useObjects } from '@/hooks/useSupabase';
 import { useInitiativeHealth } from '@/ActivitySpace/strategy/initiative/useInitiativeHealth';
 import type { InitiativeHealth } from '@/ActivitySpace/strategy/initiative/initiativeHealthModel';
+import { useInitiativeMeasureTallies } from '@/ActivitySpace/strategy/initiative/useInitiativeMeasureTallies';
+import { MeasureStatus } from '@/ActivitySpace/strategy/initiative/MeasureStatus';
+import type { MeasureTally } from '@/ActivitySpace/strategy/initiative/initiativeMeasureModel';
 import { NavPortfolioIcon, NavStrategyIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
 import type { Portfolio, StrategyWithObjects } from '@/types/database';
 import { createPortfolio, deletePortfolio, movePortfolio, PortfolioMoveRefused, setStrategyPortfolio, updatePortfolio, usePortfolios } from '@/hooks/portfolioData';
@@ -76,6 +79,8 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
   const tree = useMemo(() => buildPortfolioTree(portfolios), [portfolios]);
   const roots = useMemo(() => strategies.filter((s) => s.parentIds.length === 0), [strategies]);
   const { byId: healthById } = useInitiativeHealth(roots);
+  // Success conditions for every root Initiative, from one read.
+  const talliesById = useInitiativeMeasureTallies(roots.map((s) => s.id));
 
   // Creating: the sidebar "+" (or the empty page's "+ Create Portfolio") makes
   // a top-level Portfolio; a row's menu or the detail page makes one inside.
@@ -94,7 +99,7 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
   return (
     <div className="flex flex-col h-full bg-card">
       {open ? (
-        <PortfolioDetail node={open} tree={tree} visionName={vision?.name ?? null} portfolios={portfolios} byPortfolio={byPortfolio} healthById={healthById}
+        <PortfolioDetail node={open} tree={tree} visionName={vision?.name ?? null} portfolios={portfolios} byPortfolio={byPortfolio} healthById={healthById} talliesById={talliesById}
           candidates={roots.filter((s) => s.portfolio_id !== open.portfolio.id)}
           onOpenPortfolio={onSelectPortfolio} onSelectStrategy={onSelectStrategy}
           onNewInside={() => setLocalNew({ parentId: open.portfolio.id })} />
@@ -119,7 +124,7 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
             ) : (
               <div className="h-full overflow-auto">
                 <IndexList headers={[t('Name'), t('Health'), t('Initiatives')]} withActions>
-                  <PortfolioTree tree={tree} byPortfolio={byPortfolio} healthById={healthById}
+                  <PortfolioTree tree={tree} byPortfolio={byPortfolio} healthById={healthById} talliesById={talliesById}
                     onOpen={onSelectPortfolio} onNewInside={(id) => setLocalNew({ parentId: id })} />
                 </IndexList>
                 {unassigned.length > 0 && (
@@ -127,7 +132,7 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
                     <div className="px-6 pt-4 text-[12px] font-medium text-muted-foreground/80">{t('Not in a Portfolio')}</div>
                     <IndexList headers={[t('Name'), t('Health'), t('Objects')]} showHeader={false} withActions>
                       {unassigned.map((s) => (
-                        <InitiativeIndexRow key={s.id} strategy={s} health={healthById.get(s.id)} onOpen={() => onSelectStrategy(s.id)} />
+                        <InitiativeIndexRow key={s.id} strategy={s} health={healthById.get(s.id)} measures={talliesById.get(s.id)} onOpen={() => onSelectStrategy(s.id)} />
                       ))}
                     </IndexList>
                   </>
@@ -171,10 +176,11 @@ function useGuardedWrite() {
 }
 
 // ── The tree ────────────────────────────────────────────────────────────
-function PortfolioTree({ tree, byPortfolio, healthById, onOpen, onNewInside }: {
+function PortfolioTree({ tree, byPortfolio, healthById, talliesById, onOpen, onNewInside }: {
   tree: PortfolioNode[];
   byPortfolio: Map<string, StrategyWithObjects[]>;
   healthById: Map<string, InitiativeHealth>;
+  talliesById: Map<string, MeasureTally>;
   onOpen: (id: string) => void;
   onNewInside: (id: string) => void;
 }) {
@@ -189,7 +195,7 @@ function PortfolioTree({ tree, byPortfolio, healthById, onOpen, onNewInside }: {
     <>
       {rows.map((node) => (
         <PortfolioTreeRow key={node.portfolio.id} node={node} tree={tree} gutter={gutter}
-          rollup={rollupPortfolio(node, byPortfolio, healthById)}
+          rollup={rollupPortfolio(node, byPortfolio, healthById, talliesById)}
           open={isOpen(node.portfolio.id)}
           onToggle={() => setFolded((prev) => { const n = new Set(prev); if (n.has(node.portfolio.id)) n.delete(node.portfolio.id); else n.add(node.portfolio.id); return n; })}
           onOpen={() => onOpen(node.portfolio.id)} onNewInside={() => onNewInside(node.portfolio.id)} />
@@ -314,6 +320,7 @@ function PortfolioHealthCell({ rollup }: { rollup: PortfolioRollup }) {
   const { t } = useI18n();
   return (
     <div className="flex min-w-0 items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
+      {rollup.initiatives > 0 && <MeasureStatus tally={rollup.measures} />}
       {rollup.progressPct === null ? (
         <span className="shrink-0 text-muted-foreground/60">{t('No Initiatives')}</span>
       ) : (
@@ -329,8 +336,8 @@ function PortfolioHealthCell({ rollup }: { rollup: PortfolioRollup }) {
 
 // An Initiative that sits in no Portfolio, listed under the Portfolios in the
 // same row.
-function InitiativeIndexRow({ strategy, health, onOpen }: {
-  strategy: StrategyWithObjects; health: InitiativeHealth | undefined; onOpen: () => void;
+function InitiativeIndexRow({ strategy, health, measures, onOpen }: {
+  strategy: StrategyWithObjects; health: InitiativeHealth | undefined; measures: MeasureTally | undefined; onOpen: () => void;
 }) {
   const { t } = useI18n();
   const countObjects = useActiveObjectCount();
@@ -343,6 +350,7 @@ function InitiativeIndexRow({ strategy, health, onOpen }: {
       actions={<InitiativeActionsButton initiative={strategy} />}
       health={
         <div className="flex min-w-0 items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
+          <MeasureStatus tally={measures} />
           {health?.progressPct != null && (
             <span className="flex w-24 shrink-0 items-center gap-1.5">
               <SegmentedProgress value={health.progressPct} className="flex-1" />
@@ -361,6 +369,7 @@ function RollupFigures({ rollup }: { rollup: PortfolioRollup }) {
   const { t } = useI18n();
   return (
     <>
+      {rollup.initiatives > 0 && <MeasureStatus tally={rollup.measures} />}
       {rollup.progressPct !== null && (
         <span className="flex w-24 items-center gap-1.5">
           <SegmentedProgress value={rollup.progressPct} className="flex-1" />
@@ -374,7 +383,7 @@ function RollupFigures({ rollup }: { rollup: PortfolioRollup }) {
 }
 
 // ── One Portfolio, opened ───────────────────────────────────────────────
-function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, healthById, candidates, onOpenPortfolio, onSelectStrategy, onNewInside }: {
+function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, healthById, talliesById, candidates, onOpenPortfolio, onSelectStrategy, onNewInside }: {
   node: PortfolioNode;
   tree: PortfolioNode[];
   /** The Vision this Portfolio sits under. */
@@ -382,6 +391,7 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
   portfolios: Portfolio[];
   byPortfolio: Map<string, StrategyWithObjects[]>;
   healthById: Map<string, InitiativeHealth>;
+  talliesById: Map<string, MeasureTally>;
   candidates: StrategyWithObjects[];
   onOpenPortfolio: (id: string | null) => void;
   onSelectStrategy: (id: string) => void;
@@ -391,7 +401,7 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
   const { portfolio } = node;
   const path = useMemo(() => portfolioPath(portfolios, portfolio.id), [portfolios, portfolio.id]);
   const initiatives = byPortfolio.get(portfolio.id) ?? [];
-  const rollup = rollupPortfolio(node, byPortfolio, healthById);
+  const rollup = rollupPortfolio(node, byPortfolio, healthById, talliesById);
   const [query, setQuery] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -437,6 +447,10 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
                 </span>
               } />
             )}
+            {rollup.initiatives > 0 && rollup.measures && (
+              <RailRow name={t('Success conditions')} dense
+                label={<MeasureStatus tally={rollup.measures} className="text-[12px]" />} />
+            )}
             {rollup.alerts > 0 && (
               <RailRow name={t('Alerts')} dense label={<span className="text-destructive">{t('{n} alerts', { n: String(rollup.alerts) })}</span>} />
             )}
@@ -460,7 +474,7 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
               {node.children.map((child) => (
                 <ContentRow key={child.portfolio.id} icon={<NavPortfolioIcon size={16} />} name={child.portfolio.name}
                   onOpen={() => onOpenPortfolio(child.portfolio.id)}
-                  meta={<RollupFigures rollup={rollupPortfolio(child, byPortfolio, healthById)} />} />
+                  meta={<RollupFigures rollup={rollupPortfolio(child, byPortfolio, healthById, talliesById)} />} />
               ))}
             </PageSection>
           ) : (
@@ -476,7 +490,7 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
               <p className="px-2 py-2 text-[12px] text-muted-foreground">{t('No Initiatives in this Portfolio yet.')}</p>
             )}
             {initiatives.map((s) => (
-              <InitiativeRow key={s.id} strategy={s} health={healthById.get(s.id)} onOpen={() => onSelectStrategy(s.id)} onRemove={() => void move(s.id, null)} />
+              <InitiativeRow key={s.id} strategy={s} health={healthById.get(s.id)} measures={talliesById.get(s.id)} onOpen={() => onSelectStrategy(s.id)} onRemove={() => void move(s.id, null)} />
             ))}
             <ButtonAppearanceProvider appearance="inline">
               <Popover open={pickerOpen} onOpenChange={(v) => { setPickerOpen(v); if (!v) setQuery(''); }}>
@@ -507,8 +521,8 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
   );
 }
 
-function InitiativeRow({ strategy, health, onOpen, onRemove }: {
-  strategy: StrategyWithObjects; health: InitiativeHealth | undefined; onOpen: () => void; onRemove?: () => void;
+function InitiativeRow({ strategy, health, measures, onOpen, onRemove }: {
+  strategy: StrategyWithObjects; health: InitiativeHealth | undefined; measures: MeasureTally | undefined; onOpen: () => void; onRemove?: () => void;
 }) {
   const { t } = useI18n();
   // Archived Objects stay linked but are not counted.
@@ -518,6 +532,7 @@ function InitiativeRow({ strategy, health, onOpen, onRemove }: {
   return (
     <ContentRow icon={<NavStrategyIcon size={16} />} name={strategy.name} onOpen={onOpen}
       meta={<>
+        <MeasureStatus tally={measures} />
         {health?.progressPct != null && (
           <span className="flex w-24 items-center gap-1.5">
             <SegmentedProgress value={health.progressPct} className="flex-1" />

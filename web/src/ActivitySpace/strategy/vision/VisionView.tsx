@@ -21,6 +21,8 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useCurrentUserId } from '@/providers/authContext';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useInitiativeHealth } from '@/ActivitySpace/strategy/initiative/useInitiativeHealth';
+import { useInitiativeMeasureTallies } from '@/ActivitySpace/strategy/initiative/useInitiativeMeasureTallies';
+import { MeasureStatus } from '@/ActivitySpace/strategy/initiative/MeasureStatus';
 import { usePortfolios } from '@/hooks/portfolioData';
 import { buildPortfolioTree, groupByPortfolio, initiativesInSpace, rollupPortfolio } from '@/ActivitySpace/strategy/portfolio/portfolioGroups';
 import { NavPortfolioIcon, NavStrategyIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
@@ -283,13 +285,14 @@ function useVisionScope(spaceId: string | null) {
   }, [allStrategies, explorer.objects, domains, spaceId]);
   const roots = useMemo(() => strategies.filter((s) => s.parentIds.length === 0), [strategies]);
   const { byId: healthById } = useInitiativeHealth(roots);
-  return { portfolios, roots, healthById };
+  const talliesById = useInitiativeMeasureTallies(roots.map((s) => s.id));
+  return { portfolios, roots, healthById, talliesById };
 }
 
 // The Portfolios under the Vision, top level, with what each adds up to.
 function PortfoliosTowardVision({ spaceId, visionId, onOpenPortfolio }: { spaceId: string; visionId: string; onOpenPortfolio: (id: string) => void }) {
   const { t } = useI18n();
-  const { portfolios: all, roots, healthById } = useVisionScope(spaceId);
+  const { portfolios: all, roots, healthById, talliesById } = useVisionScope(spaceId);
   const portfolios = useMemo(() => all.filter((p) => p.vision_id === visionId), [all, visionId]);
   const { byPortfolio } = useMemo(() => groupByPortfolio(portfolios, roots.filter((s) => s.vision_id === visionId)), [portfolios, roots, visionId]);
   const tree = useMemo(() => buildPortfolioTree(portfolios), [portfolios]);
@@ -297,11 +300,12 @@ function PortfoliosTowardVision({ spaceId, visionId, onOpenPortfolio }: { spaceI
   return (
     <PageSection title={t('Portfolios')}>
       {tree.map((node) => {
-        const r = rollupPortfolio(node, byPortfolio, healthById);
+        const r = rollupPortfolio(node, byPortfolio, healthById, talliesById);
         return (
           <ContentRow key={node.portfolio.id} icon={<NavPortfolioIcon size={16} />} name={node.portfolio.name} description={node.portfolio.description}
             onOpen={() => onOpenPortfolio(node.portfolio.id)}
             meta={<>
+              {r.initiatives > 0 && <MeasureStatus tally={r.measures} />}
               {r.progressPct !== null && (
                 <span className="flex w-24 items-center gap-1.5"><SegmentedProgress value={r.progressPct} className="flex-1" /><span className="w-7 text-right">{r.progressPct}%</span></span>
               )}
@@ -319,7 +323,7 @@ function PortfoliosTowardVision({ spaceId, visionId, onOpenPortfolio }: { spaceI
 function DirectInitiatives({ visionId, onSelectStrategy }: { visionId: string; onSelectStrategy: (id: string) => void }) {
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
-  const { roots, healthById } = useVisionScope(spaceId);
+  const { roots, healthById, talliesById } = useVisionScope(spaceId);
   const direct = roots.filter((s) => s.vision_id === visionId && !s.portfolio_id);
   const candidates = roots.filter((s) => s.vision_id !== visionId);
   const [open, setOpen] = useState(false);
@@ -338,9 +342,12 @@ function DirectInitiatives({ visionId, onSelectStrategy }: { visionId: string; o
         const h = healthById.get(s.id);
         return (
           <ContentRow key={s.id} icon={<NavStrategyIcon size={16} />} name={s.name} onOpen={() => onSelectStrategy(s.id)}
-            meta={h?.progressPct != null ? (
-              <span className="flex w-24 items-center gap-1.5"><SegmentedProgress value={h.progressPct} className="flex-1" /><span className="w-7 text-right">{h.progressPct}%</span></span>
-            ) : undefined}
+            meta={<>
+              <MeasureStatus tally={talliesById.get(s.id)} />
+              {h?.progressPct != null && (
+                <span className="flex w-24 items-center gap-1.5"><SegmentedProgress value={h.progressPct} className="flex-1" /><span className="w-7 text-right">{h.progressPct}%</span></span>
+              )}
+            </>}
             actions={<ContentRowAction label={t('Remove from Vision')} onClick={() => void move(s, null)}><X size={12} /></ContentRowAction>} />
         );
       })}
