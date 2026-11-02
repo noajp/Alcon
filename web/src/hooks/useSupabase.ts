@@ -65,9 +65,11 @@ export {
   removeElementAssignee,
   removeElementFromObject,
   reorderElements,
+  restoreElementsField,
   setElementIsApproval,
   toggleSubelementComplete,
   updateElement,
+  updateElements,
   updateSubelement,
   useElementBlockers,
 } from '@/hooks/elementData';
