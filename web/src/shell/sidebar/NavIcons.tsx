@@ -12,11 +12,11 @@ import {
   ChartNoAxesColumn,
   ChartGantt,
   Grip,
-  Launch,
+  Spearhead,
   Milestone,
-  Summit,
-  CardStack,
-  Stone,
+  GuidingStar,
+  Quartered,
+  CompassRose,
   Layers,
   Users,
   AiGraph,
@@ -41,18 +41,18 @@ export const NavCalendarIcon = ({ size = 20 }: { size?: number }) => <Calendar s
 export const NavNoteIcon = ({ size = 20 }: { size?: number }) => <BookOpen size={size} strokeWidth={2} />;
 export const NavDomainIcon = DomainIcon;
 export const NavStrategyIcon = ({ size = 20, className }: { size?: number; className?: string }) => (
-  <Launch size={size} className={className} />
+  <Spearhead size={size} className={className} />
 );
 export const NavWorkloadIcon = ({ size = 20 }: { size?: number }) => <ChartNoAxesColumn size={size} strokeWidth={2} />;
 export const NavTimelineIcon = ({ size = 20 }: { size?: number }) => <ChartGantt size={size} strokeWidth={2} />;
 export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => <Users size={size} />;
 // ModeRail layer marks.
-export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => <Stone size={size} strokeWidth={2} />;
+export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => <CompassRose size={size} />;
 export const NavExecutionModeIcon = ({ size = 20 }: { size?: number }) => <Layers size={size} strokeWidth={2} />;
 export const NavSustainmentModeIcon = ({ size = 20 }: { size?: number }) => <Grip size={size} strokeWidth={2} />;
 // Strategy's units: the Vision above, its Portfolios of Initiatives below.
-export const NavVisionIcon = ({ size = 20 }: { size?: number }) => <Summit size={size} />;
-export const NavPortfolioIcon = ({ size = 20 }: { size?: number }) => <CardStack size={size} />;
+export const NavVisionIcon = ({ size = 20 }: { size?: number }) => <GuidingStar size={size} />;
+export const NavPortfolioIcon = ({ size = 20 }: { size?: number }) => <Quartered size={size} />;
 // Phase — a Domain's period, reachable from an Initiative rather than the nav.
 export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} />;
 

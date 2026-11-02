@@ -92,11 +92,6 @@ export const Milestone = glyph('Milestone', {
   line: <path d="M6.5 9.75v4.25M6.5 1.75v1.5" />,
 });
 
-export const Stone = glyph('Stone', {
-  solid: <path d="M7.35 2.3a.85.85 0 0 1 1.3 0l4.55 5.15a.85.85 0 0 1 0 1.1L8.65 13.7a.85.85 0 0 1-1.3 0L2.8 8.55a.85.85 0 0 1 0-1.1Z" />,
-  cut: <path d="M2 8h12" />,
-});
-
 export const Layers = glyph('Layers', {
   solid: <path d="M8 2.1 12.6 4.65 8 7.2 3.4 4.65Z" />,
   line: <path d="M3.5 8.1 8 10.6 12.5 8.1M3.5 11.35 8 13.85 12.5 11.35" />,
@@ -611,28 +606,32 @@ export const Activity = line('Activity', 'M1.75 8h2.5L6 3.75l3.75 8.5L11.5 8h2.7
 export const ZoomIn = glyph('ZoomIn', { line: <><circle cx="7" cy="7" r="4.1" /><path d="m10.1 10.1 3.15 3.15M5.4 7h3.2M7 5.4v3.2" /></> });
 export const ZoomOut = glyph('ZoomOut', { line: <><circle cx="7" cy="7" r="4.1" /><path d="m10.1 10.1 3.15 3.15M5.4 7h3.2" /></> });
 
-// Strategy's units. The Vision: a summit, its snowline cut, a star over it —
-// where the Space is headed.
-export const Summit = glyph('Summit', {
+// Strategy — sharp, geometric marks, no rounded corners: the layer that sets
+// direction, and its units under it.
+
+// Strategy itself: a compass rose, four long points and four short.
+export const CompassRose = glyph('CompassRose', {
   solid: <>
-    <path d="M1.9 13.25 6.3 5.2a.8.8 0 0 1 1.4 0l2.4 4.3 1.05-1.75a.8.8 0 0 1 1.37 0l3.08 5.5Z" />
-    <path d="m12.75 1.5.5 1.25 1.25.5-1.25.5-.5 1.25-.5-1.25-1.25-.5 1.25-.5Z" />
+    <path d="M8 .9 9.45 6.55 15.1 8 9.45 9.45 8 15.1 6.55 9.45.9 8l5.65-1.45Z" />
+    <path d="M12.6 3.4 10.1 7.1 8.9 5.9ZM12.6 12.6 8.9 10.1 10.1 8.9ZM3.4 12.6 5.9 8.9 7.1 10.1ZM3.4 3.4 7.1 5.9 5.9 7.1Z" />
   </>,
-  cut: <path d="M4.85 8.5 5.95 9.35 7 8.45l1.1.9.65-.5" />,
+  cut: <circle cx="8" cy="8" r="1.05" style={hole} />,
 });
 
-// A Portfolio: Initiatives bundled, a stack of cards.
-export const CardStack = glyph('CardStack', {
-  solid: <rect x="2.25" y="6.5" width="11.5" height="7.25" rx="1.7" />,
-  line: <path d="M3.5 4.4h9M4.9 2.35h6.2" />,
+// The Vision: the guiding star over the horizon.
+export const GuidingStar = glyph('GuidingStar', {
+  solid: <path d="M8 1.1 9.2 5.55 13.65 6.75 9.2 7.95 8 12.4 6.8 7.95 2.35 6.75 6.8 5.55Z" />,
+  line: <path d="M1.75 14.25h12.5" />,
 });
 
-// An Initiative: a bet launched, a rocket climbing.
-export const Launch = glyph('Launch', {
-  solid: <g transform="rotate(45 8 8)">
-    <path d="M8 1.6c1.95 1.55 2.9 3.8 2.9 6.45v2.75H5.1V8.05c0-2.65.95-4.9 2.9-6.45Z" />
-    <path d="M5.1 8.6 3.3 10.55v2.1h1.8ZM10.9 8.6l1.8 1.95v2.1h-1.8Z" />
-  </g>,
-  cut: <g transform="rotate(45 8 8)"><circle cx="8" cy="6.3" r="1.25" style={hole} /></g>,
-  line: <g transform="rotate(45 8 8)"><path d="M8 12.6v1.8" /></g>,
+// A Portfolio: one diamond quartered — a set of bets held as one.
+export const Quartered = glyph('Quartered', {
+  solid: <path d="M8 1.1 14.9 8 8 14.9 1.1 8Z" />,
+  cut: <path d="M4.55 4.55 11.45 11.45M11.45 4.55 4.55 11.45" />,
 });
+
+// An Initiative: a spearhead, the axis of advance.
+export const Spearhead = glyph('Spearhead', {
+  solid: <path d="M8 1.25 14.1 13.6 8 10.35 1.9 13.6Z" />,
+});
+
