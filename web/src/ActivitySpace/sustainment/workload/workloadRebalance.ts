@@ -18,7 +18,7 @@
 
 import { daysInSpan, elementHours, elementSpan, type LoadElement } from '@/Function/shared/assignmentLoad';
 import { isOpenStatus } from '@/Function/shared/completion';
-import { fromDateOnlyString, toDateOnlyString } from '@/Function/shared/dateUtils';
+import { fromDateOnlyString, shiftDateOnly } from '@/Function/shared/dateUtils';
 import { capacityOnDay, standingCapacity, type CapacitySpan } from '@/Function/shared/workerCapacity';
 
 /** Days ahead a plan looks at, starting today. Six weeks is past the point
@@ -141,11 +141,9 @@ type Board = {
 type Holder = { assigneeId: string; role: string };
 type SimElement = PlanElement & { holders: Map<string, Holder> };
 
+/** `shiftDateOnly`, leaving a value that is not a date as it was. */
 function addDays(day: string, n: number): string {
-  const d = fromDateOnlyString(day);
-  if (!d) return day;
-  d.setDate(d.getDate() + n);
-  return toDateOnlyString(d);
+  return fromDateOnlyString(day) ? shiftDateOnly(day, n) : day;
 }
 
 /** Saturday or Sunday. The capacity model does not know weekends, but a plan

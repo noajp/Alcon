@@ -11,10 +11,11 @@
 // `hooks/useSupabase.ts`; this module only decides what they should be.
 
 import type { ElementStatus, Phase, PhaseStatus } from '@/types/database';
+import { toDateOnlyString } from '@/Function/shared/dateUtils';
 
 /** Today on the viewer's own calendar, as the 'YYYY-MM-DD' the columns hold. */
 export function todayYMD(now: Date = new Date()): string {
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return toDateOnlyString(now);
 }
 
 /**
