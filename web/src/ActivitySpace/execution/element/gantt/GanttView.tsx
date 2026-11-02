@@ -45,6 +45,9 @@ interface GanttViewProps {
   /** object_milestones rows to draw as ◇ markers across the timeline. Read-only
    *  here — the Strategy Timeline (StrategyTimelineView) owns add/delete. */
   milestones?: ObjectMilestone[];
+  /** Opens an Element's detail from its row or bar. A drag on the bar never
+   *  opens it. Omit and a click only selects the row. */
+  onElementOpen?: (element: ElementWithDetails) => void;
 }
 
 type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
@@ -58,6 +61,8 @@ const PX_PER_DAY: Record<ZoomLevel, number> = { day: 40, week: 12, month: 4.5, q
 // Phase-band memo a fresh reference (and a re-render) every render.
 const EMPTY_PHASES: Phase[] = [];
 const EMPTY_MILESTONES: ObjectMilestone[] = [];
+// Pointer travel under this many pixels still counts as a click on a bar.
+const DRAG_CLICK_TOLERANCE_PX = 3;
 
 function formatDate(date: Date, format: 'short' | 'full' | 'pill', locale: string): string {
   if (format === 'full') {
@@ -195,6 +200,7 @@ export function GanttView({
   onRefresh,
   leftHeaderLabel = 'Elements',
   onItemUpdate,
+  onElementOpen,
   phases = EMPTY_PHASES,
   milestones = EMPTY_MILESTONES,
 }: GanttViewProps) {
@@ -213,6 +219,17 @@ export function GanttView({
   const [zoomScale, setZoomScale] = useState(1);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
+  // Set on a mouseup that moved the bar, so the click that follows the drag
+  // does not also open the Element. Cleared on the next mousedown on a bar.
+  const draggedRef = useRef(false);
+  const activateElement = (element: ElementWithDetails) => {
+    if (onElementOpen) {
+      setSelectedElement(element.id);
+      onElementOpen(element);
+    } else {
+      setSelectedElement(selectedElement === element.id ? null : element.id);
+    }
+  };
   const [dragging, setDragging] = useState<{ elementId: string; type: 'move' | 'resize-start' | 'resize-end'; startX: number; originalStart: Date | null; originalEnd: Date | null } | null>(null);
   const [dragDaysDelta, setDragDaysDelta] = useState(0);
   // Drag-to-schedule an undated row: anchor day + current day while dragging
@@ -321,6 +338,7 @@ export function GanttView({
   const handleDragStart = (e: React.MouseEvent, elementId: string, type: 'move' | 'resize-start' | 'resize-end') => {
     e.preventDefault();
     e.stopPropagation();
+    draggedRef.current = false;
 
     const element = elements.find(el => el.id === elementId);
     if (!element) return;
@@ -348,6 +366,7 @@ export function GanttView({
       if (!dragging) return;
 
       const deltaX = e.clientX - dragging.startX;
+      draggedRef.current = Math.abs(deltaX) > DRAG_CLICK_TOLERANCE_PX;
       const daysDelta = Math.round(deltaX / pxPerDay);
 
       if (daysDelta !== 0) {
@@ -594,8 +613,13 @@ export function GanttView({
                     return (
                       <div
                         key={element.id}
-                        onClick={() => setSelectedElement(selectedElement === element.id ? null : element.id)}
-                        className={`flex items-center gap-2 px-3 cursor-pointer transition-colors ${
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => activateElement(element)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activateElement(element); }
+                        }}
+                        className={`flex items-center gap-2 px-3 cursor-pointer transition-colors outline-none focus-visible:bg-muted/30 ${
                           selectedElement === element.id ? 'bg-primary/10' : 'hover:bg-muted/30'
                         }`}
                         style={{ height: ROW_H }}
@@ -875,7 +899,7 @@ export function GanttView({
                         top: top + (ROW_H - 24) / 2,
                         boxShadow: isDraggingThis ? undefined : '0 1px 2px var(--gantt-bar-shadow)',
                       }}
-                      onClick={() => setSelectedElement(selectedElement === element.id ? null : element.id)}
+                      onClick={() => { if (!draggedRef.current) activateElement(element); }}
                       onMouseDown={(e) => handleDragStart(e, element.id, 'move')}
                       onMouseEnter={(e) => {
                         if (!dragging) {
@@ -905,11 +929,13 @@ export function GanttView({
                         className="absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-l-md"
                         style={{ backgroundColor: 'var(--gantt-resize-handle-tint)' }}
                         onMouseDown={(e) => { e.stopPropagation(); handleDragStart(e, element.id, 'resize-start'); }}
+                        onClick={(e) => e.stopPropagation()}
                       />
                       <div
                         className="absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-r-md"
                         style={{ backgroundColor: 'var(--gantt-resize-handle-tint)' }}
                         onMouseDown={(e) => { e.stopPropagation(); handleDragStart(e, element.id, 'resize-end'); }}
+                        onClick={(e) => e.stopPropagation()}
                       />
 
                       {/* Inner label + optional due date */}

@@ -26,6 +26,7 @@ import { ResourceView } from '@/ActivitySpace/sustainment/workload/ResourceView'
 import { CustomView } from '@/ActivitySpace/execution/element/custom';
 import { useCustomColumns } from '@/Function/property/useCustomColumns';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
+import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
 import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
 import { pushUndo } from '@/Function/shared/element/bulkUndo';
@@ -576,33 +577,48 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
             single-section header above the bars. Flat reads cleaner. */}
         {activeTab?.tab_type === 'gantt' && (
           <div className="flex-1 overflow-hidden bg-card">
-            <GanttView
-              elements={allElements}
-              onRefresh={onRefresh}
-              phases={domainPhases}
-              milestones={objectMilestones}
-            />
+            <ElementDrilldown key={object.id} label={t('Gantt')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
+              {openElement => (
+                <GanttView
+                  elements={allElements}
+                  onRefresh={onRefresh}
+                  phases={domainPhases}
+                  milestones={objectMilestones}
+                  onElementOpen={(el) => openElement(el.id)}
+                />
+              )}
+            </ElementDrilldown>
           </div>
         )}
 
         {/* Board (Kanban) Tab Content */}
         {activeTab?.tab_type === 'board' && (
           <div className="flex-1 overflow-hidden bg-card">
-            <ElementBoardView
-              elements={allElements}
-              onRefresh={onRefresh}
-              objectId={object.id}
-            />
+            <ElementDrilldown key={object.id} label={t('Board')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
+              {openElement => (
+                <ElementBoardView
+                  elements={allElements}
+                  onRefresh={onRefresh}
+                  objectId={object.id}
+                  onElementClick={(el) => openElement(el.id)}
+                />
+              )}
+            </ElementDrilldown>
           </div>
         )}
 
         {/* Calendar Tab Content — uses all descendants */}
         {activeTab?.tab_type === 'calendar' && (
           <div className="flex-1 overflow-hidden bg-card">
-            <CalendarView
-              elements={allElements}
-              onRefresh={onRefresh}
-            />
+            <ElementDrilldown key={object.id} label={t('Calendar')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
+              {openElement => (
+                <CalendarView
+                  elements={allElements}
+                  onRefresh={onRefresh}
+                  onElementClick={(el) => openElement(el.id)}
+                />
+              )}
+            </ElementDrilldown>
           </div>
         )}
 
