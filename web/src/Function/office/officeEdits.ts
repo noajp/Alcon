@@ -94,12 +94,50 @@ function closestPara(el: Element): Element | null {
   for (let e = el.parentElement; e; e = e.parentElement) if (e.localName === 'p' && e.namespaceURI === W) return e;
   return null;
 }
-const paraText = (p: Element) => ownTexts(p).map((t) => t.textContent ?? '').join('');
+/** A paragraph's own text, tabs and line breaks, in order: what its text reads. */
+const ownPieces = (p: Element) => Array.from(p.getElementsByTagName('*')).filter((el) => el.namespaceURI === W && ['t', 'tab', 'br'].includes(el.localName)
+  // In a run: a <w:tab> in the paragraph's properties is a tab stop, not text.
+  && el.parentElement?.localName === 'r' && closestPara(el) === p);
+const pieceText = (el: Element) => (el.localName === 't' ? el.textContent ?? '' : el.localName === 'tab' ? '\t' : '\n');
+const paraText = (p: Element) => ownPieces(p).map(pieceText).join('');
+const separators = (s: string) => s.replace(/[^\t\n]/g, '');
 
-function setParaText(doc: Document, p: Element, to: string) {
+/** Rewrites a paragraph to read `to`. Its tabs and line breaks stay where
+ *  they are, so `to` must have the same ones in the same order (false when
+ *  it does not — the edit is not applied); each stretch between them is
+ *  rewritten in its own runs. */
+function setParaText(doc: Document, p: Element, to: string): boolean {
+  const pieces = ownPieces(p);
+  if (pieces.some((el) => el.localName !== 't')) {
+    const seps = pieces.filter((el) => el.localName !== 't');
+    if (separators(pieces.map(pieceText).join('')) !== separators(to)) return false;
+    const stretches = to.split(/[\t\n]/);
+    const groups: Element[][] = [[]];
+    for (const el of pieces) {
+      if (el.localName === 't') groups[groups.length - 1].push(el);
+      else groups.push([]);
+    }
+    groups.forEach((texts, k) => {
+      const want = stretches[k] ?? '';
+      if (texts.length) { writeTexts(texts, want); return; }
+      if (!want) return;
+      // A stretch with no text yet: a run of its own, in the look of the run
+      // holding the tab or break beside it.
+      const beside = (seps[k] ?? seps[k - 1]).parentElement!;
+      const run = make(doc, p, 'r');
+      const rPr = Array.from(beside.children).find((c) => c.localName === 'rPr');
+      if (rPr) run.appendChild(rPr.cloneNode(true));
+      const t = make(doc, p, 't');
+      t.textContent = want;
+      preserve(t);
+      run.appendChild(t);
+      beside.parentNode!.insertBefore(run, seps[k] ? beside : beside.nextSibling);
+    });
+    return true;
+  }
   const texts = ownTexts(p);
   if (!texts.length) {
-    if (!to) return;
+    if (!to) return true;
     // An empty paragraph: one run, in the paragraph mark's look.
     const run = make(doc, p, 'r');
     const markRPr = byLocal(p, 'pPr')[0]?.getElementsByTagNameNS(W, 'rPr')[0];
@@ -109,6 +147,12 @@ function setParaText(doc: Document, p: Element, to: string) {
     p.appendChild(run);
     texts.push(t);
   }
+  writeTexts(texts, to);
+  return true;
+}
+
+/** Sets text elements so together they read `to`, each keeping its run. */
+function writeTexts(texts: Element[], to: string) {
   const next = distributeText(texts.map((t) => t.textContent ?? ''), to);
   texts.forEach((t, i) => {
     if (t.textContent === next[i]) return;
@@ -132,7 +176,8 @@ function editWord(doc: Document, edits: ParaEdit[]) {
       else if (!p) { skipped.push(e); continue; }
       else conflicts.push(e);
     }
-    setParaText(doc, p, e.to);
+    // Tabs or line breaks added or taken out: not something to retype here.
+    if (!setParaText(doc, p, e.to)) { skipped.push(e); if (conflicts.at(-1) === e) conflicts.pop(); }
   }
   return { conflicts, skipped };
 }
