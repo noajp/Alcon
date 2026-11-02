@@ -68,10 +68,12 @@ export function isSafeEndpoint(raw: string): boolean {
 function isPrivateV4(ip: string): boolean {
   const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (!m) return true;
-  const [a, b] = [Number(m[1]), Number(m[2])];
+  const [a, b, c] = [Number(m[1]), Number(m[2]), Number(m[3])];
   return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)
-    || (a === 192 && b === 168) || (a === 192 && b === 0) || (a === 100 && b >= 64 && b <= 127)
-    || (a === 198 && (b === 18 || b === 19)) || a >= 224;
+    || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || (a === 198 && (b === 18 || b === 19))
+    || (a === 192 && b === 0 && (c === 0 || c === 2))             // IETF protocol / documentation
+    || (a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113) // documentation
+    || a >= 224;
 }
 
 /** Pure. True when a resolved address (IPv4 or IPv6) is one the server may
@@ -95,20 +97,38 @@ export function isPublicAddress(raw: string): boolean {
 
 type Resolve = (host: string, type: "A" | "AAAA") => Promise<string[]>;
 
-const denoResolve: Resolve = (host, type) =>
-  (globalThis as unknown as { Deno: { resolveDns(h: string, t: string): Promise<string[]> } }).Deno.resolveDns(host, type);
+/** Deno's resolver, or null where the runtime does not offer one. */
+function denoResolver(): Resolve | null {
+  const deno = (globalThis as unknown as { Deno?: { resolveDns?(h: string, t: string): Promise<string[]> } }).Deno;
+  return deno?.resolveDns ? (host, type) => deno.resolveDns!(host, type) : null;
+}
+
+/** A lookup that failed because the name has no such record, as opposed to
+ *  the resolver itself being unavailable or not permitted. */
+function isNoRecord(error: unknown): boolean {
+  const name = (error as { name?: string } | null)?.name ?? "";
+  return name === "NotFound" || /no (?:such|data)|nxdomain|not found/i.test(String((error as Error)?.message ?? ''));
+}
 
 /**
  * True when every address the endpoint's host resolves to is public. The
  * hostname check alone let a public name that resolves to 10.x / 169.254.x
  * through (ELE_OBJ-024); this asks DNS just before the request. A name with
- * no addresses, or a lookup that fails, is refused. (A rebinding answer that
- * changes between this check and the request is not covered.)
+ * no addresses is refused. Where the runtime has no resolver, or every lookup
+ * fails for a reason other than "no such record", the host-name check stands
+ * alone, as before. (A rebinding answer that changes between this check and
+ * the request is not covered.)
  */
-export async function resolvesToPublic(raw: string, resolve: Resolve = denoResolve): Promise<boolean> {
+export async function resolvesToPublic(raw: string, resolve: Resolve | null = denoResolver()): Promise<boolean> {
   if (!isSafeEndpoint(raw)) return false;
   const host = new URL(raw).hostname.toLowerCase().replace(/\.+$/, "");
+  // An address literal is judged as written; isSafeEndpoint already did.
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return isPublicAddress(host);
+  // Where the runtime offers no resolver (or refuses it), fall back to the
+  // host-name check rather than stopping every integration.
+  if (!resolve) return true;
   const lookups = await Promise.allSettled([resolve(host, "A"), resolve(host, "AAAA")]);
+  if (lookups.every((r) => r.status === "rejected" && !isNoRecord(r.reason))) return true;
   const addresses = lookups.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
   if (addresses.length === 0) return false;
   return addresses.every(isPublicAddress);
