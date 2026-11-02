@@ -6,7 +6,7 @@ import { Button } from '@/ui/button';
 import { FONT } from '@/shared/designTokens';
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { useStrategies } from '@/hooks/strategyData';
+import { useStrategiesInSpace } from '@/hooks/strategyData';
 import { forecastFor, type CrmDeal, type CrmWorkspace } from '@/Function/crm/crmModel';
 import { money } from './crmFormat';
 import { Metric } from './CrmToday';
@@ -47,7 +47,7 @@ function group(deals: readonly CrmDeal[], key: (deal: CrmDeal) => string | null,
 }
 
 export function CrmForecast({ workspace, onOpenInitiative }: { workspace: CrmWorkspace; onOpenInitiative?: (id: string) => void }) {
-  const strategies = useStrategies();
+  const strategies = useStrategiesInSpace();
   const { t, locale } = useI18n();
   const currencies = workspace.totals.map(total => total.currency);
   const [chosen, setChosen] = useState<string | null>(null);

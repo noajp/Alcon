@@ -38,6 +38,7 @@ import { useCallback, useMemo } from 'react';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 import { getActiveSpaceId, useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useActivitySpaces } from '@/Function/space/data';
+import { showsInSpace } from '@/Function/strategy/initiativeAccess';
 
 // ============================================
 // Strategy: aggregate elements across multiple Domains and/or Objects
@@ -189,31 +190,30 @@ function invalidateStrategies() {
 
 const EMPTY_STRATEGIES: StrategyWithObjects[] = [];
 
-/** Whether an Initiative shows in the active Space. Every Space the viewer
- *  belongs to can now read its Initiatives, so those of the viewer's other
- *  Spaces stay in them; one reached only through a shared Object (a Space
- *  the viewer is not in) or with no Space stays visible as before. */
-export function showsInSpace(s: { activity_space_id: string | null }, activeSpaceId: string | null, mySpaceIds: readonly string[]): boolean {
-  return !s.activity_space_id || s.activity_space_id === activeSpaceId || !mySpaceIds.includes(s.activity_space_id);
-}
-
 export function useStrategies() {
   const query = useQuery({ queryKey: STRATEGIES_QUERY_KEY, queryFn: fetchStrategies });
-  const activeSpaceId = useActiveSpaceId();
-  const { data: spaces, loading: spacesLoading } = useActivitySpaces();
-  const mySpaceIds = useMemo(() => spaces.map((space) => space.id), [spaces]);
-  const data = useMemo(() => {
-    const all = query.data ?? EMPTY_STRATEGIES;
-    if (spacesLoading) return all;
-    const shown = all.filter((s) => showsInSpace(s, activeSpaceId, mySpaceIds));
-    return shown.length === all.length ? all : shown;
-  }, [query.data, activeSpaceId, mySpaceIds, spacesLoading]);
   return {
-    data,
+    data: query.data ?? EMPTY_STRATEGIES,
     loading: query.isPending,
     error: (query.error as Error | null) ?? null,
     refetch: invalidateStrategies,
   };
+}
+
+/** The Initiatives a Space-wide list shows: useStrategies without those of
+ *  the viewer's other Spaces (showsInSpace). Lookups by id or by Object use
+ *  useStrategies, so an Object still shows an Initiative of another Space. */
+export function useStrategiesInSpace() {
+  const strategies = useStrategies();
+  const activeSpaceId = useActiveSpaceId();
+  const { data: spaces, loading: spacesLoading } = useActivitySpaces();
+  const data = useMemo(() => {
+    if (spacesLoading) return strategies.data;
+    const mine = spaces.map((space) => space.id);
+    const shown = strategies.data.filter((s) => showsInSpace(s, activeSpaceId, mine));
+    return shown.length === strategies.data.length ? strategies.data : shown;
+  }, [strategies.data, activeSpaceId, spaces, spacesLoading]);
+  return { ...strategies, data };
 }
 
 export async function createStrategy(

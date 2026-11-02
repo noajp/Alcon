@@ -19,3 +19,11 @@ export function canEditInitiative(
 ): boolean {
   return !!userId && ((!!createdBy && userId === createdBy) || ownsItsSpace);
 }
+
+/** Whether an Initiative belongs in the active Space's lists. Every Space the
+ *  viewer belongs to reads its Initiatives, so those of the viewer's other
+ *  Spaces stay there; one reached only through a shared Object (a Space the
+ *  viewer is not in) or with no Space still shows, as before. */
+export function showsInSpace(s: { activity_space_id: string | null }, activeSpaceId: string | null, mySpaceIds: readonly string[]): boolean {
+  return !s.activity_space_id || s.activity_space_id === activeSpaceId || !mySpaceIds.includes(s.activity_space_id);
+}

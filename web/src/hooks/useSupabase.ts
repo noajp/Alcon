@@ -191,6 +191,7 @@ export {
   updateStrategy,
   useIntentBindingsForTargets,
   useStrategies,
+  useStrategiesInSpace,
   useStrategyComments,
   useStrategyIntentBundle,
   type IntentBundle,
