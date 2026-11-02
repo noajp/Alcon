@@ -9,7 +9,6 @@ import { RailCard } from '@/Function/shared/RailCard';
 import { RailRow } from '@/Function/shared/RailRow';
 import { ToolPage, type ToolView } from '@/Function/shared/tool/ToolPage';
 import { addDays } from '@/Function/shared/dateUtils';
-import { NavAuditIcon } from '@/shell/sidebar/NavIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { AUDIT_WINDOW_DAYS } from '@/hooks/useAudit';
 import { flowObservation, NEEDS_PERSON, runOutcome, templateSteps, type DeploymentSummary, type WorkflowDeploymentRecord } from '@/Function/audit/auditModel';
@@ -77,7 +76,7 @@ export function AuditWorkflowPage({ source, deployment, summary, tab, runId, onT
   </RailCard>;
 
   return (
-    <ToolPage icon={NavAuditIcon} tool={t('Audit')} crumb={deployment.name} storageKey="audit-workflow" home="overview"
+    <ToolPage crumbs={[{ id: 'tool', label: t('Audit') }, { id: 'page', label: deployment.name }]} storageKey="audit-workflow" home="overview"
       views={views} activeView={tab} onSelectView={id => onTab(id as WorkflowTab)}
       actions={<>{source.sample && <SampleBadge />}<Button size="icon-sm" variant="ghost" onClick={() => void source.refetch()} aria-label={t('Refresh')} title={t('Refresh')}><RefreshCw size={14} /></Button></>}
       head={<PageHead icon={<Workflow size={18} />} title={deployment.name} description={template?.purpose ?? ''}
