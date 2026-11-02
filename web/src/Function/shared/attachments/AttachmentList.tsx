@@ -109,7 +109,7 @@ export function AttachmentPreview({ file, owner, actions, height }: { file: Atta
   // Marking what this version changed from the one before it (Word, Excel).
   const [comparing, setComparing] = useState(false);
   const before = versions[versions.indexOf(shown) + 1] ?? null;
-  const canCompare = !!before && ['xlsx', 'docx'].includes(officeKindOf(file.name) ?? '');
+  const canCompare = !!before && ['xlsx', 'docx', 'pptx'].includes(officeKindOf(file.name) ?? '');
   const fail = (err: unknown) => void appDialog.alert(err instanceof Error ? err.message : String(err));
 
   const history = versions.length > 1 && (
@@ -127,7 +127,7 @@ export function AttachmentPreview({ file, owner, actions, height }: { file: Atta
             {v.id === shown.id && <Check size={13} />}
           </DropdownMenuItem>
         ))}
-        {['xlsx', 'docx'].includes(officeKindOf(file.name) ?? '') && <>
+        {['xlsx', 'docx', 'pptx'].includes(officeKindOf(file.name) ?? '') && <>
           <div className={MENU_SEPARATOR} />
           <DropdownMenuItem disabled={!before} onSelect={() => setComparing((c) => !c)}>
             <Diff size={13} /><span className="flex-1">{t('Show changes from the version before')}</span>{comparing && canCompare && <Check size={13} />}
