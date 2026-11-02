@@ -61,7 +61,7 @@ import {
   useWorkloadRange,
   type WorkloadRange,
 } from '@/Function/workload/workloadStore';
-import { IslandHeader } from '@/Function/shared/MainIsland';
+import { IslandHeader, type IslandCrumb } from '@/Function/shared/MainIsland';
 import { WorkloadDomainsMenu } from './WorkloadDomainsMenu';
 import { WorkloadPlanPanel } from '@/ActivitySpace/sustainment/workload/WorkloadPlanPanel';
 
@@ -104,6 +104,10 @@ export interface ResourceViewProps {
   roster?: Worker[];
   /** Narrows the chart to one Worker (chosen in the sidebar or from Team). */
   workerId?: string;
+  /** Narrows the chart to a group of Workers (a unit's members). */
+  memberIds?: string[];
+  /** The header's path, when the caller has a deeper one (People › a unit › a Worker). */
+  path?: IslandCrumb[];
   /** Clears `workerId`; shown as the × on the focus chip. */
   onClearWorker?: () => void;
   /** The standalone surface publishes its readings for the People sidebar. */
@@ -115,7 +119,7 @@ export interface ResourceViewProps {
 type Row = { worker: Worker; elements: ElementWithDetails[]; daily: number[] };
 type LoadedRow = Row & { capacity: number[]; spans: WorkerAvailability[]; utilization: number | null; overDays: number; dueAway: number };
 
-export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', onElementClick, roster, workerId, onClearWorker, publish = false, below }: ResourceViewProps = {}) {
+export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', onElementClick, roster, workerId, memberIds, path, onClearWorker, publish = false, below }: ResourceViewProps = {}) {
   const { t } = useI18n();
   const { contextKey, domains, selectedDomainIds, elements, loading, error, retry } = useWorkloadData(scopeOverride);
   const { range, anchor } = useWorkloadRange();
@@ -200,11 +204,13 @@ export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', on
     });
     return out;
   }, [grouped, availability, days, today, from]);
-  const rows = useMemo(() => workerId ? allRows.filter((r) => r.worker.id === workerId) : allRows, [allRows, workerId]);
+  const group = useMemo(() => memberIds ? new Set(memberIds) : null, [memberIds]);
+  const rows = useMemo(() => workerId ? allRows.filter((r) => r.worker.id === workerId)
+    : group ? allRows.filter((r) => group.has(r.worker.id)) : allRows, [allRows, workerId, group]);
 
   // Unstaffed work stays visible, including Elements still needing dates.
   const unassignedAll = useMemo(() => elements.filter((el) => (el.assignees ?? []).length === 0), [elements]);
-  const unassigned = workerId ? [] : unassignedAll;
+  const unassigned = workerId || group ? [] : unassignedAll;
   const unassignedDaily = useMemo(() => computeDailyHours(unassignedAll, days), [unassignedAll, days]);
   const unassignedHours = unassignedDaily.reduce((s, h) => s + h, 0);
 
@@ -290,6 +296,7 @@ export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', on
         proposals={plan ? plan.proposals.length : null}
         focusName={focusName ?? null}
         onClearWorker={onClearWorker}
+        path={path}
       />
       <KpiStrip
         loading={busy || failed}
@@ -425,6 +432,7 @@ function Header({
   proposals,
   focusName,
   onClearWorker,
+  path,
 }: {
   title: string | null;
   range: WorkloadRange;
@@ -439,10 +447,11 @@ function Header({
   proposals: number | null;
   focusName: string | null;
   onClearWorker?: () => void;
+  path?: IslandCrumb[];
 }) {
   const { t } = useI18n();
   // The path, as every island's: the surface (everyone), then the Worker in focus.
-  const crumbs = [
+  const crumbs = path ?? [
     ...(title ? [{ id: 'all', label: t(title), onClick: focusName ? onClearWorker : undefined }] : []),
     ...(focusName ? [{ id: 'worker', label: focusName }] : []),
   ];

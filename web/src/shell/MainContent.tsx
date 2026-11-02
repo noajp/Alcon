@@ -265,7 +265,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
               {/* An audit Space (ADR 0048) shows its people without opening
                   their Elements or their load. */}
-              {scope === 'audit' ? <TeamView /> : <PeopleView workerId={navigation.workerId} onNavigate={onNavigate} onViewChange={onViewChange} />}
+              {scope === 'audit' ? <TeamView /> : <PeopleView workerId={navigation.workerId} unitId={navigation.unitId} onNavigate={onNavigate} onViewChange={onViewChange} />}
             </div>
           )}
 
