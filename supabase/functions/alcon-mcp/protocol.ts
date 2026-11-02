@@ -19,6 +19,7 @@ export const INSTRUCTIONS = [
   "書き込む前に listElements / findByText / getElement で対象の UUID を確かめる。ELE_PLT-003 のような display_id も受け付けるが、曖昧なら候補をユーザーに示す。",
   "Element に着手する前に、所属 Object に紐づく Initiative（getInitiative）で目的と成功条件を確かめる。",
   "ステータス: backlog / todo / in_progress / review / done / blocked / cancelled。優先度: urgent / high / medium / low。日付は YYYY-MM-DD。",
+  "Element を進めるときは claimElement で着手を宣言し（断られたらその Element は進めない）、節目ごとに logProgress、最後に reportOutcome（completed / partial / blocked）で締める。権限を超える判断が要るときは blocked で人に判断を求める。session には作業ごとの名前を渡し、同じ値を使い続ける。",
   "書き込みは Element の Activity に接続元の AI 名で記録される。削除・一括変更はこのサーバーからはできない。",
 ].join("\n");
 

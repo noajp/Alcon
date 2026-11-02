@@ -1,4 +1,5 @@
 import type { Portfolio } from '@/types/database';
+import { addTallies, EMPTY_TALLY, type MeasureTally } from '@/ActivitySpace/strategy/initiative/initiativeMeasureModel';
 
 // The Portfolio page's shapes, kept pure so the rules are testable:
 // - which Initiatives belong on this Space's page,
@@ -127,17 +128,24 @@ export interface PortfolioRollup {
   alerts: number;
   /** Initiatives whose health is not loaded yet. */
   pending: number;
+  /** The success conditions of those Initiatives, summed; null until every
+   *  Initiative's measures are loaded (a partial sum would undercount misses). */
+  measures: MeasureTally | null;
 }
 
 export function rollupPortfolio<T extends { id: string }>(
   node: PortfolioNode,
   byPortfolio: Map<string, T[]>,
   healthById: Map<string, HealthLike>,
+  talliesById: Map<string, MeasureTally> = new Map(),
 ): PortfolioRollup {
   let initiatives = 0, alerts = 0, pending = 0, measuredSum = 0, measured = 0;
+  let measures: MeasureTally | null = EMPTY_TALLY;
   const walk = (n: PortfolioNode) => {
     for (const s of byPortfolio.get(n.portfolio.id) ?? []) {
       initiatives += 1;
+      const tally = talliesById.get(s.id);
+      measures = measures && tally ? addTallies(measures, tally) : null;
       const h = healthById.get(s.id);
       if (!h) { pending += 1; continue; }
       if (h.progressPct !== null) { measuredSum += h.progressPct; measured += 1; }
@@ -146,7 +154,7 @@ export function rollupPortfolio<T extends { id: string }>(
     n.children.forEach(walk);
   };
   walk(node);
-  return { initiatives, progressPct: measured > 0 ? Math.round(measuredSum / measured) : null, alerts, pending };
+  return { initiatives, progressPct: measured > 0 ? Math.round(measuredSum / measured) : null, alerts, pending, measures };
 }
 
 /** Root Initiatives split by where they stand relative to a Vision: under

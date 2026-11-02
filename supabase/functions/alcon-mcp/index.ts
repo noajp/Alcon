@@ -4,7 +4,8 @@
 // Streamable HTTP and read / write the board as the person who connected
 // them. Every call runs with that person's Supabase JWT, so RLS decides what
 // the AI can see and change — the same boundary the app draws. The service
-// role only resolves a personal access token's hash, never board data. Writes are recorded on the Element's Activity
+// role only resolves a personal access token's hash and sends the caller
+// their own report notification (callerNotify.ts), never board data. Writes are recorded on the Element's Activity
 // under the client's name (see protocol.ts clientLabel).
 //
 // Transport: stateless. POST one JSON-RPC message → JSON response; a
@@ -23,6 +24,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { authenticateCaller, MISSING_TOKEN } from "../_shared/callerAuth.ts";
+import { callerNotifier } from "../_shared/callerNotify.ts";
 import { isProtectedResourcePath, protectedResourceMetadata, wwwAuthenticate } from "./oauth.ts";
 import { acceptsProtocolHeader, clientLabel, clientName, handleBody } from "./protocol.ts";
 import { mcpHost } from "./tools.ts";
@@ -78,6 +80,6 @@ Deno.serve(async (req: Request) => {
     ),
     userId: caller.userId,
   };
-  const { status, body } = await handleBody(await req.text(), mcpHost(caller.db, actor, caller.access));
+  const { status, body } = await handleBody(await req.text(), mcpHost(caller.db, actor, caller.access, callerNotifier(caller.userId)));
   return body === undefined ? new Response(null, { status, headers: corsHeaders }) : json(status, body);
 });

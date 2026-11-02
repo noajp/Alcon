@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
 import { retainChannel } from '@/hooks/sharedRealtime';
 import { archiveStateChanged } from '@/Function/shared/objectArchive';
+import { isMoveIntoClosed, isMoveIntoDone } from '@/Function/shared/completion';
 import {
   type ExplorerData,
   patchElementInExplorer,
@@ -261,8 +262,14 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
       // Append-only; a DELETE carries only its id. A new row — a status the
       // trigger recorded for an agent, a note another client left — asks the
       // one Element's rail to look again. The key is elementActivity.ts's.
-      const a = row as { element_id?: string };
+      // A move into done also moves the KPI's "done in the last 14 days"
+      // (elementActivity.ts's useDoneTimesSince); no other row does.
+      const a = row as { element_id?: string; kind?: string; detail?: string };
       if (d.type === 'INSERT' && a.element_id) invalidateSoon(qc, ['elementActivity', a.element_id]);
+      if (d.type === 'INSERT' && isMoveIntoDone(a)) invalidateSoon(qc, ['elementDoneTimes']);
+      // A move into done or cancelled moves the lists' "Completed Elements"
+      // window (useClosedTimesSince).
+      if (d.type === 'INSERT' && isMoveIntoClosed(a)) invalidateSoon(qc, ['elementClosedTimes']);
       return;
     }
 
@@ -418,6 +425,10 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
         forEachExplorer(qc, (data) => patchObjectInExplorer(data, id, row as Record<string, unknown>));
         return;
       }
+      // A DELETE reaches every subscriber with only its id, row-level
+      // security or not; one that no cached list holds is someone else's.
+      if (d.type === 'DELETE' && id && !qc.getQueriesData<ExplorerData>({ queryKey: ['explorer'] })
+        .some(([, data]) => data?.objects.some((o) => o.id === id))) return;
       invalidateSoon(qc, ['explorer']);
       invalidateSoon(qc, ['action-targets']);
       return;
@@ -500,7 +511,10 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
     case 'table_rows':
     case 'table_cells':
       invalidateSoon(qc, ['widget-table-data']);
-      invalidateSoon(qc, ['data-tables']);
+      // The Table list shows each Table (name, folder, updated) and its row
+      // count: Table changes and added / removed rows move it, a cell edit or
+      // a column change does not.
+      if (d.table === 'tables' || (d.table === 'table_rows' && d.type !== 'UPDATE')) invalidateSoon(qc, ['data-tables']);
       return;
 
     case 'phases':

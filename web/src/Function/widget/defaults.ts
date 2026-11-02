@@ -57,38 +57,50 @@ export const HOME_BOARD: BoardLayout = {
 };
 
 /**
- * Initiative detail. The readings sit where the hand-written Situation and Risk
- * sections did — between the description and the Initiative's own structure
- * (Frameworks / Initiatives / Objects / Activity), which is not a board.
+ * Initiative detail, Overview tab: how it is going. The summary line under
+ * the name, then whether it lands (Situation), where it hurts (Risk), and the
+ * conditions it is held to with the frameworks that read them back.
  */
 export const INITIATIVE_BOARD: BoardLayout = {
   // The summary line under the name: how much of the work under it is done,
   // and what is still open or late.
   band: [{ id: 'initiative-progress', type: 'progress-band' }],
   main: [
-    { id: 'initiative-approaches', type: 'approach-references' },
-    { id: 'initiative-domains', type: 'initiative-domains' },
     // Situation before Risk: whether it lands is the question someone opened
     // the page with; where it hurts is only actionable once that is known.
     { id: 'cmp-situation', type: 'campaign-situation' },
-    { id: 'cmp-decision-lab', type: 'decision-lab' },
     { id: 'cmp-risk', type: 'campaign-risk' },
-    // …and then why. The two above are readings taken off the execution;
-    // these three are the only sections anyone writes by hand, and they are
-    // the ones that survive the people who wrote them. Outward-in: the
-    // conditions the Initiative is held to, then what the plan rests on, then
-    // what was chosen on top of it.
     { id: 'cmp-measures', type: 'campaign-measures' },
     // The frameworks read those same measures back — OKR as a cascade of
     // Objectives, Gap as the distance to each condition — so they sit under
     // the section that records them.
     { id: 'cmp-okr', type: 'framework-okr' },
     { id: 'cmp-gap', type: 'framework-gap' },
+    { id: 'initiative-domains', type: 'initiative-domains' },
+  ],
+  rail: [],
+};
+
+/**
+ * Initiative detail, Plan tab: what the plan rests on and what was chosen on
+ * top of it — the sections written by hand that outlive the people who wrote
+ * them, with the approaches they draw on.
+ */
+export const INITIATIVE_PLAN_BOARD: BoardLayout = {
+  band: [],
+  main: [
+    { id: 'initiative-approaches', type: 'approach-references' },
     { id: 'cmp-assumptions', type: 'campaign-assumptions' },
     { id: 'cmp-decisions', type: 'campaign-decisions' },
-    // The evidence those sections are written from.
-    { id: 'initiative-attachments', type: 'attachments' },
+    { id: 'cmp-decision-lab', type: 'decision-lab' },
   ],
+  rail: [],
+};
+
+/** Initiative detail, Audit tab: the evidence the Initiative is judged on. */
+export const INITIATIVE_AUDIT_BOARD: BoardLayout = {
+  band: [],
+  main: [{ id: 'initiative-attachments', type: 'attachments' }],
   rail: [],
 };
 

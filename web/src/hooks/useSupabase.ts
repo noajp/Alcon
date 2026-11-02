@@ -70,6 +70,8 @@ export {
   toggleSubelementComplete,
   updateElement,
   updateElements,
+  noticeElementSaveFailed,
+  isElementSaveRefused,
   updateSubelement,
   useElementBlockers,
 } from '@/hooks/elementData';
@@ -213,5 +215,8 @@ export {
 } from '@/hooks/phaseData';
 
 export {
+  createObjectMilestone,
+  deleteObjectMilestone,
+  updateObjectMilestone,
   useObjectMilestones,
 } from '@/hooks/milestoneData';

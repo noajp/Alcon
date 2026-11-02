@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffWorkspace, fileFromRow, mergeFolders, rowFromFile, sameStamp } from '@/ActivitySpace/sustainment/slides/sync';
+import { deckRow, diffWorkspace, fileFromRow, mergeFolders, rowFromFile, sameStamp } from '@/ActivitySpace/sustainment/slides/sync';
 import type { KataFile } from '@/ActivitySpace/sustainment/slides/kata/model/types';
 
 const file = (id: string, name = id): KataFile => ({
@@ -28,11 +28,11 @@ describe('Slides ⇄ the Space', () => {
     const f = { ...file('a', 'Plan'), chat: [{ id: 'm', from: 'me' as const, text: 'hi', at: 1 }] };
     const row = rowFromFile(f, 'space');
     expect(row).toMatchObject({ id: 'a', activity_space_id: 'space', folder_id: 'f1', name: 'Plan' });
-    const back = fileFromRow({ ...row, folder_id: row.folder_id, updated_at: '2026-10-25T00:00:00Z' });
+    const back = fileFromRow(deckRow({ ...row, updated_at: '2026-10-25T00:00:00Z' }));
     expect(back.deck).toEqual(f.deck);
     expect(back.chat).toEqual(f.chat);
     // A row from an older writer without every mix field still gives a complete mix.
-    expect(fileFromRow({ ...row, mix: { selected: ['forest'] } as never, updated_at: 'x' }).mix).toEqual({ selected: ['forest'], pins: {}, offset: 0 });
+    expect(fileFromRow(deckRow({ ...row, mix: { selected: ['forest'] }, updated_at: 'x' })).mix).toEqual({ selected: ['forest'], pins: {}, offset: 0 });
   });
 
   it('merges the Space\'s folders with the ones made or deleted here and not yet written', () => {

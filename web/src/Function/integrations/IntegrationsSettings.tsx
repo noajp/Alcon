@@ -12,7 +12,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import type { Integration } from '@/types/database';
 import {
-  CATEGORY_LABELS, EMPTY_FILTER, INTEGRATION_PRESETS, KIND_LABELS, SOURCE_LABELS,
+  CATEGORY_LABELS, EMPTY_FILTER, INTEGRATION_PRESETS, KIND_LABELS, SOURCE_LABELS, customPresetFor,
   filterPresets, installedPresetIds, presetById, readLastTest, testOutcomeLabel,
   type CatalogFilter, type IntegrationPreset,
 } from './catalog';
@@ -70,7 +70,7 @@ function ExternalServicesPanel() {
     setOpened({ preset, integration: existing });
   };
   const openIntegration = (integration: Integration) => {
-    const preset = presetById(integration.preset) ?? presetById(integration.kind === 'mcp' ? 'custom-mcp' : 'custom-http')!;
+    const preset = presetById(integration.preset) ?? customPresetFor(integration.kind);
     setOpened({ preset, integration });
   };
   // Keep the open dialog on the live row (test results, optimistic edits);
@@ -282,7 +282,7 @@ function ConnectedRow({ integration, onOpen }: { integration: Integration; onOpe
         <div className="truncate text-[12px] text-muted-foreground">
           {[
             t(KIND_LABELS[integration.kind]),
-            integration.delegation === 'full_delegation' ? t('Full delegation') : t('Approve each time'),
+            integration.kind === 'model' ? null : integration.delegation === 'full_delegation' ? t('Full delegation') : t('Approve each time'),
             last?.toolCount != null ? t('{count} tools', { count: last.toolCount }) : null,
           ].filter(Boolean).join(' · ')}
         </div>

@@ -17,6 +17,7 @@ import {
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { detectMentionQuery, insertMentionText, mentionedUserIds, rankMentionCandidates } from '@/Function/shared/mentions';
 import { getCachedSendCommentShortcut, getCachedDisplayNames, getCachedConvertEmoticons, formatDisplayName, convertEmoticons, usePreference } from '@/Function/settings/preferencesStore';
 
 // =============================================================
@@ -72,22 +73,24 @@ export function StrategyCommentsPanel({
   }, [workers]);
 
   const mentionCandidates = useMemo(() => {
-    const q = mentionQuery.toLowerCase();
-    return workers
-      .filter((w) => w.type === 'human' && w.user_id)
-      .filter((w) => !q || w.name.toLowerCase().includes(q) || (w.email || '').toLowerCase().includes(q))
-      .slice(0, 6);
+    return rankMentionCandidates(
+      workers.filter((w) => w.type === 'human' && w.user_id),
+      mentionQuery,
+      (w) => ({ name: w.name, extra: w.email }),
+    ).slice(0, 6);
   }, [mentionQuery, workers]);
+  // An @ with nothing to pick (an e-mail address, "@名前さん") must not hold
+  // Enter or Escape — the list is not on screen.
+  const mentionListOpen = mentionOpen && mentionCandidates.length > 0;
 
   const handleDraftChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setDraft(value);
-    const upto = value.slice(0, e.target.selectionStart);
-    const m = upto.match(/(^|\s)@([\w.\-]*)$/);
+    const m = detectMentionQuery(value.slice(0, e.target.selectionStart));
     if (m) {
       setMentionOpen(true);
-      setMentionQuery(m[2]);
-      setMentionStart(e.target.selectionStart - m[2].length - 1); // the '@'
+      setMentionQuery(m.query);
+      setMentionStart(m.start);
     } else {
       setMentionOpen(false);
     }
@@ -95,21 +98,9 @@ export function StrategyCommentsPanel({
 
   const insertMention = (worker: Worker) => {
     if (!mentionOpen) return;
-    const before = draft.slice(0, mentionStart);
-    const after = draft.slice(mentionStart + 1 + mentionQuery.length);
-    setDraft(`${before}@${worker.name} ${after}`);
+    setDraft(insertMentionText(draft, { start: mentionStart, query: mentionQuery }, worker.name));
     setMentionOpen(false);
     setMentionQuery('');
-  };
-
-  const extractMentions = (text: string): string[] => {
-    const ids = new Set<string>();
-    for (const w of workers) {
-      if (!w.user_id) continue;
-      const re = new RegExp(`@${w.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
-      if (re.test(text)) ids.add(w.user_id);
-    }
-    return Array.from(ids);
   };
 
   const submit = async () => {
@@ -125,7 +116,7 @@ export function StrategyCommentsPanel({
         author_kind: 'human',
         author_name: formatDisplayName(profile?.display_name, user?.email, getCachedDisplayNames()),
         content,
-        mentions: extractMentions(content),
+        mentions: mentionedUserIds(content, workers),
       });
       // Only clear the draft once the row exists — a failed post that wiped
       // what you typed would be worse than the failure.
@@ -199,19 +190,19 @@ export function StrategyCommentsPanel({
         onChange={handleDraftChange}
         onSubmit={submit}
         submitting={submitting}
-        enterHeldBy={mentionOpen}
+        enterHeldBy={mentionListOpen}
         sendShortcut={sendShortcut}
         placeholder={t('Comment on {name}…', { name: strategyName })}
         onKeyDown={(e) => {
           // Escape drops the mention list first; a second one is the
           // surrounding page's to handle.
-          if (e.key === 'Escape' && mentionOpen) {
+          if (e.key === 'Escape' && mentionListOpen) {
             e.preventDefault();
             setMentionOpen(false);
           }
         }}
       >
-        {mentionOpen && mentionCandidates.length > 0 && (
+        {mentionListOpen && (
           <div className="absolute left-0 bottom-full mb-1 z-20 w-64 bg-popover border border-border rounded-md shadow-lg overflow-hidden">
             {mentionCandidates.map((w) => (
               <button

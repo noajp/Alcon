@@ -5,7 +5,7 @@ import { useSyncExternalStore } from 'react';
 import { SlidersHorizontal, User, Bell, KeyRound, Plug, Globe, Users, Blocks } from '@/ui/icons';
 import { DomainIcon, ObjectIcon, ElementIcon } from '@/Function/shared/conceptIcons';
 import {
-  NavStrategyIcon, NavPhaseIcon, NavTimelineIcon,
+  NavStrategyIcon, NavPhaseIcon,
   NavNoteIcon, NavTableIcon, NavTeamsIcon, NavCalendarIcon, NavWorkloadIcon,
 } from '@/shell/sidebar/NavIcons';
 
@@ -55,7 +55,6 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     items: [
       { id: 'initiative', label: 'Initiative', icon: NavStrategyIcon },
       { id: 'phase', label: 'Phase', icon: NavPhaseIcon },
-      { id: 'timeline', label: 'Timeline', icon: NavTimelineIcon },
     ],
   },
   {

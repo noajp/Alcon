@@ -66,6 +66,7 @@ import {
   hasActiveFilter,
   labelForPriority,
   labelForStatus,
+  type ListClosedWindow,
   type ListControlsState,
   type ListDisplay,
   type ListFilter,
@@ -73,6 +74,7 @@ import {
   type ListOrderBy,
 } from './types';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { useClosedWindow } from './useClosedWindow';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { fieldDisplayLabel } from '@/Function/property/fieldModel';
@@ -81,8 +83,8 @@ import { useListColumns, type ColumnId } from '@/Function/shared/listTable/useLi
 
 // Two pill buttons at the top of a list view. The Filter button opens a
 // menu of filter facets; the Display button opens grouping / ordering /
-// closed-toggle / display-property toggles. Active filters show a dot on
-// the Filter button.
+// completed-Elements window / display-property toggles. Active filters show
+// a dot on the Filter button.
 
 export interface DisplayPropertiesAPI<TPropKey extends string> {
   options: { id: TPropKey; label: string }[];
@@ -127,6 +129,9 @@ interface ListControlsProps {
    *  Elements tab, where grouping by Object is redundant — you're already
    *  scoped to one). */
   hideObjectGrouping?: boolean;
+  /** Offer the "Completed Elements" window — on Element lists (buildSections
+   *  applies it to List, Board, Calendar and Gantt alike), not Object lists. */
+  showClosedWindow?: boolean;
 }
 
 const ORDER_OPTIONS: { id: ListOrderBy; label: string }[] = [
@@ -153,6 +158,15 @@ const SORTABLE_ELEMENT_FIELDS: { id: ColumnId; label: string }[] = [
   { id: 'created_at', label: 'Created' },
   { id: 'updated_at', label: 'Updated' },
   { id: 'assignee',  label: 'Assignee' },
+];
+
+// Linear's "Completed issues": how far back done / cancelled Elements stay.
+const CLOSED_OPTIONS: { id: ListClosedWindow; label: string }[] = [
+  { id: 'all',   label: 'All' },
+  { id: 'day',   label: 'Past day' },
+  { id: 'week',  label: 'Past week' },
+  { id: 'month', label: 'Past month' },
+  { id: 'none',  label: 'None' },
 ];
 
 const GROUP_OPTIONS_BASE: { id: ListGroupBy; label: string }[] = [
@@ -187,6 +201,7 @@ export function ListControls({
   sortColumnsCustom,
   onAddColumn,
   hideObjectGrouping,
+  showClosedWindow,
 }: ListControlsProps) {
   const groupOptions = useMemo(() => {
     const opts = buildGroupOptions(groupNoneLabel);
@@ -265,6 +280,7 @@ export function ListControls({
             propertiesStorageKey={sortColumnsStorageKey}
             propertiesCustom={sortColumnsCustom}
             onAddColumn={onAddColumn}
+            showClosedWindow={showClosedWindow}
           />
         </MenuShell>
       </Popover>
@@ -501,6 +517,7 @@ function DisplayPanel({
   propertiesStorageKey,
   propertiesCustom,
   onAddColumn,
+  showClosedWindow,
 }: {
   display: ListDisplay;
   setDisplay: (patch: Partial<ListDisplay>) => void;
@@ -510,6 +527,7 @@ function DisplayPanel({
   propertiesStorageKey?: string;
   propertiesCustom?: CustomColumnWithValues[];
   onAddColumn?: () => void;
+  showClosedWindow?: boolean;
 }) {
   const { t } = useI18n();
   const orderingColumns = useListColumns(propertiesStorageKey, propertiesCustom ?? EMPTY_CUSTOM, { entity: propertiesStorageKey === 'domain' ? 'object' : 'element' });
@@ -534,6 +552,9 @@ function DisplayPanel({
           <LabeledSelect label="Ordering" value={display.orderBy}
             leading={display.orderBy !== 'manual' ? <DirectionToggle direction={display.orderDir} onChange={(orderDir) => setDisplay({ orderDir })} /> : undefined}
             options={ORDER_OPTIONS.map(option => ({ ...option, label: fieldDisplayLabel(t, option) }))} onSelect={(id) => setDisplay({ orderBy: id })} />}
+        {showClosedWindow && (
+          <ClosedWindowSelect value={display.closed ?? 'all'} onSelect={(closed) => setDisplay({ closed })} />
+        )}
       </div>
 
       {/* Which properties show — the same store the list header's "+"
@@ -573,6 +594,29 @@ function DisplayPanel({
         </>
       )}
     </div>
+  );
+}
+
+// The "Completed Elements" row. When the close times could not be read the
+// window cannot apply — every closed Element stays — so the row says so
+// rather than look like it is working.
+function ClosedWindowSelect({ value, onSelect }: { value: ListClosedWindow; onSelect: (closed: ListClosedWindow) => void }) {
+  const { t } = useI18n();
+  const { failed } = useClosedWindow(value);
+  return (
+    <>
+      <LabeledSelect
+        label="Completed Elements"
+        value={value}
+        options={CLOSED_OPTIONS.map(option => ({ ...option, label: t(option.label) }))}
+        onSelect={onSelect}
+      />
+      {failed && (
+        <p role="status" className="px-1 pb-1 text-[11px] text-muted-foreground">
+          {t('Completion times could not be read, so all completed Elements are shown.')}
+        </p>
+      )}
+    </>
   );
 }
 

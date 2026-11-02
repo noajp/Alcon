@@ -16,6 +16,10 @@
 //           endpoint → connected. No token → oauth_required; a refresh token
 //           Google refuses → oauth_expired.
 //           GitHub: the signed-in token opens the MCP server as above.
+//     model a one-token Messages request (Anthropic format) with the key →
+//           connected on success, auth_failed on 401 / 403. Any other answer
+//           under 500 (an unknown model name, say) is only "reachable": the
+//           key is not refused, but the request was not served.
 //
 // Who may test: a Space owner. The integration must be visible to the caller
 // (RLS: Space member) and the caller must hold the owner role in that Space —
@@ -71,10 +75,34 @@ const VERIFY: Record<string, { path: string; okWhen: (status: number, body: stri
   slack: { path: "auth.test", okWhen: (status, body) => status === 200 && /"ok"\s*:\s*true/.test(body) },
 };
 
+/** A model provider: one token from its Messages API. The key goes in both
+ *  headers providers use for it (x-api-key, Authorization). */
+async function runModelTest(row: IntegrationRow, secret: string | null, at: string): Promise<LastTest> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 20_000);
+  const res = await fetch(`${row.endpoint.replace(/\/+$/, "")}/v1/messages`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json", "anthropic-version": "2023-06-01",
+      ...(secret ? { "x-api-key": secret, Authorization: `Bearer ${secret}` } : {}),
+    },
+    body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 1, messages: [{ role: "user", content: "ping" }] }),
+    signal: ctl.signal, redirect: "manual",
+  }).finally(() => clearTimeout(timer));
+  const body = await readCapped(res, 100_000);
+  const status = res.status;
+  if (status === 401 || status === 403) return { ok: false, at, code: "auth_failed", status, detail: "" };
+  if (status >= 200 && status < 300) return { ok: true, at, code: "connected", status, detail: "" };
+  const reason = scrub(body.match(/"message"\s*:\s*"([^"]{1,120})"/)?.[1] ?? "", secret);
+  if (status >= 500 || status < 200 || (status >= 300 && status < 400)) return { ok: false, at, code: "http_error", status, detail: reason };
+  return { ok: true, at, code: "reachable", status, detail: reason };
+}
+
 async function runTest(row: IntegrationRow & { preset: string | null }, secret: string | null): Promise<LastTest> {
   const at = new Date().toISOString();
   if (!isSafeEndpoint(row.endpoint)) return { ok: false, at, code: "blocked", detail: "" };
   try {
+    if (row.kind === "model") return await runModelTest(row, secret, at);
     if (row.kind === "mcp") {
       const session = new McpSession(row, secret);
       await session.initialize();

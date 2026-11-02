@@ -8,7 +8,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import {
-  createElement, addElementToObject, removeElementFromObject, updateElement, updateElements, restoreElementsField, deleteElement, assignWorkersToElement, noticeSkippedAssignees,
+  createElement, addElementToObject, removeElementFromObject, updateElement, updateElements, restoreElementsField, deleteElement,
   fetchAllWorkers,
   useObjectTabs, reorderObjectTabs, useDomains, useElementTemplates, usePhases, useObjectMilestones, createObjectTab, deleteObjectTab,
   deleteObject, addDomainElementType, removeDomainElementType,
@@ -38,8 +38,9 @@ import { ELEMENT_DETAIL_EVENT, clearElementDetail, pendingElementDetail } from '
 import { ObjectElementsView } from '@/ActivitySpace/execution/object/ObjectElementsView';
 import type { ListSection } from '@/Function/shared/listTable/shared';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
+import { useFilteredElements } from '@/ActivitySpace/execution/element/useFilteredElements';
 import { sectionGroupValues, type ListControlsState, type SectionGroup } from '@/Function/shared/listControls';
-import { partitionAssignable } from '@/Function/shared/assignableWorkers';
+import { createQuickAddElements, toQuickAddTemplates } from '@/Function/shared/element/quickAdd';
 
 export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls, onViewChange }: {
   object: AlconObjectWithChildren;
@@ -103,19 +104,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
 
   // A template keeps only the assignees that are on that list.
   const quickAddTemplates = useMemo<QuickAddTemplate[]>(
-    () => elementTemplates.map((t) => ({
-      id: t.id,
-      name: t.name,
-      type: t.type,
-      status: t.status,
-      priority: t.priority,
-      labels: t.labels,
-      assigneeWorkerIds: partitionAssignable(t.assignee_worker_ids, popupWorkers).assignable,
-      description: t.description,
-      estimatedHours: t.estimated_hours,
-    })),
+    () => toQuickAddTemplates(elementTemplates, popupWorkers),
     [elementTemplates, popupWorkers],
   );
+
 
   // Labels already used on this Object's Elements — surface them as
   // selectable suggestions in the QuickAdd popup's Labels pill.
@@ -439,6 +431,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
   // Single-sheet model: every element on the Object shows up in the list.
   const allElements = object.elements || [];
   const elements = allElements;
+  // Board / Calendar / Gantt narrow by the same Filter / Display as the
+  // Elements tab, so switching tabs keeps what the user filtered to.
+  const { sections: filteredSections, elements: filteredElements, filtering } = useFilteredElements(allElements, undefined, elementsControls);
 
 
   // (Inline add helpers removed alongside section grouping. Element / Object
@@ -569,18 +564,20 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
           </div>
         )}
 
-        {/* Gantt Tab Content — this Object's Elements as a flat bar list.
-            We deliberately do NOT pass `object`: passing it triggers
-            GanttView's parent-Object grouping, but here every Element already
-            belongs to the same Object, so the grouping just adds a noisy
-            single-section header above the bars. Flat reads cleaner. */}
+        {/* Gantt Tab Content — this Object's Elements, banded the way the
+            Elements tab's Display groups them (status / assignee / …). We
+            deliberately do NOT pass `object`: every Element already belongs
+            to this Object, so its name as a band header would only be noise;
+            the ungrouped default is one unnamed band, which renders flat. */}
         {activeTab?.tab_type === 'gantt' && (
           <div className="flex-1 overflow-hidden bg-card">
             <GanttView
-              elements={allElements}
+              elements={filteredElements}
+              sections={filteredSections}
               onRefresh={onRefresh}
               phases={domainPhases}
               milestones={objectMilestones}
+              onElementOpen={(el) => setDetailElementId(el.id)}
             />
           </div>
         )}
@@ -589,19 +586,22 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         {activeTab?.tab_type === 'board' && (
           <div className="flex-1 overflow-hidden bg-card">
             <ElementBoardView
-              elements={allElements}
+              elements={filteredElements}
+              canAdd={!filtering}
               onRefresh={onRefresh}
               objectId={object.id}
+              onElementClick={(el) => setDetailElementId(el.id)}
             />
           </div>
         )}
 
-        {/* Calendar Tab Content — uses all descendants */}
+        {/* Calendar Tab Content */}
         {activeTab?.tab_type === 'calendar' && (
           <div className="flex-1 overflow-hidden bg-card">
             <CalendarView
-              elements={allElements}
+              elements={filteredElements}
               onRefresh={onRefresh}
+              onElementClick={(el) => setDetailElementId(el.id)}
             />
           </div>
         )}
@@ -656,24 +656,11 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         defaultAssigneeWorkerIds={quickAddDefaults.assigneeWorkerIds}
         defaultLabels={quickAddDefaults.labels}
         onSubmit={async (inputs: NewElementInput[]) => {
-          let skippedAssignees = 0;
-          for (const input of inputs) {
-            try {
-              const created = await createElement({
-                title: input.title,
-                object_id: input.objectId !== undefined ? input.objectId : object.id,
-                description: input.description ?? null,
-                type: input.type ?? null,
-                labels: input.labels ?? [],
-                status: input.status ?? undefined,
-                priority: input.priority ?? undefined,
-                estimated_hours: input.estimatedHours ?? null,
-              });
-              skippedAssignees += (await assignWorkersToElement(created.id, input.assigneeWorkerIds ?? [])).skipped.length;
-            } catch (e) { console.error('Failed to create Element', e); }
+          try {
+            return await createQuickAddElements(inputs, { fallbackObjectId: object.id, userId: null });
+          } finally {
+            await onRefresh?.();
           }
-          noticeSkippedAssignees(skippedAssignees);
-          await onRefresh?.();
         }}
       />
 

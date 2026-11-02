@@ -290,6 +290,16 @@ export function mapElementInExplorer(
   return { objects, rootElements };
 }
 
+/** The Element's status as this cache holds it; undefined when the cache does
+ *  not carry the Element at all (null is a real, unset status). */
+export function elementStatusInExplorer(data: ExplorerData, id: string): string | null | undefined {
+  for (const el of data.rootElements) if (el.id === id) return el.status ?? null;
+  for (const obj of data.objects) {
+    for (const el of obj.elements ?? []) if (el.id === id) return el.status ?? null;
+  }
+  return undefined;
+}
+
 // Remove an element by id from every object list + rootElements. Same `data`
 // ref when nothing matched.
 export function removeElementFromExplorer(data: ExplorerData, id: string): ExplorerData {

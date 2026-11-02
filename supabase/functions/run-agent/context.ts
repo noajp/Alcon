@@ -6,6 +6,8 @@
 export interface AgentProfile {
   name: string;
   instructions: string | null;
+  /** The Domain's instructions, for every agent working in it; they come before the agent's own. */
+  domainInstructions?: string | null;
 }
 
 export interface TaskContext {
@@ -51,7 +53,7 @@ export function systemPrompt(agent: AgentProfile): string {
 
 # 書き方
 - 日本語で、簡潔に、具体的に。
-${agent.instructions ? `\n# このエージェントへの指示（設定）\n${agent.instructions}\n` : ""}`;
+${agent.domainInstructions ? `\n# この Domain の指示（設定）\n${agent.domainInstructions}\n` : ""}${agent.instructions ? `\n# このエージェントへの指示（設定）\n${agent.instructions}\n` : ""}`;
 }
 
 function bullet(lines: string[], empty = "(なし)"): string {

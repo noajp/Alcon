@@ -98,9 +98,8 @@ interface AppSidebarProps {
 
 // Strategy — what we're trying to achieve and how we intend to win. Vision
 // (view id 'vision') is what the Space aims for; a Portfolio ('portfolio')
-// bundles Initiatives; Initiative ('strategy') is the unit; Timeline
-// ('timeline') lays the Initiatives out in time. Phase is reached from an
-// Initiative or a Domain, not from here.
+// bundles Initiatives; Initiative ('strategy') is the unit. Phase is reached
+// from an Initiative or a Domain, not from here.
 // Execution — the fighting: the Domain tree, whose rows carry the D/O/E
 // surfaces below.
 

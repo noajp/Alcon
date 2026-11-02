@@ -22,17 +22,20 @@ import {
 import { globalSearch, type SearchResult } from '@/hooks/useSupabase';
 import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
 import { openAttachmentOwner } from '@/Function/shared/attachments/openOwner';
-import type { NavigationState } from '@/types/navigation';
+import type { ElementReturn, NavigationState } from '@/types/navigation';
 import type { ViewId } from '@/shell/viewRegistry';
 import { CREATE_ELEMENT_EVENT } from '@/shell/QuickAddElementLauncher';
 import { filterCreateCommands, type CreateCommandId } from '@/shell/paletteCreateCommands';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { viewInScope, type SpaceScope } from '@/Function/space/spaceScope';
+import { usePageCommands } from '@/Function/shared/pageCommands';
 
 interface CommandPaletteProps {
   /** An audit Space (ADR 0048) offers only the views it shows: no search
    *  into Elements, Objects, Notes or records, and nothing to create. */
   scope: SpaceScope;
+  /** Where an opened Element's Back returns to: what is open now. */
+  returnTo: ElementReturn;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
   /** Settings opens in its own tab rather than overwriting the active
@@ -74,7 +77,7 @@ function createCommandIcon(id: CreateCommandId): React.ComponentType<{ size?: nu
   }
 }
 
-export function CommandPalette({ scope, onNavigate, onViewChange, onOpenSettings }: CommandPaletteProps) {
+export function CommandPalette({ scope, returnTo, onNavigate, onViewChange, onOpenSettings }: CommandPaletteProps) {
   const full = scope === 'full';
   const { t } = useI18n();
   const { openCreate } = useWorkspaceActions();
@@ -83,6 +86,8 @@ export function CommandPalette({ scope, onNavigate, onViewChange, onOpenSettings
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<number | null>(null);
+  // What the open page offers to do to the thing on screen (the open Element).
+  const pageCommands = usePageCommands();
 
   // ⌘K / Ctrl+K toggle
   useEffect(() => {
@@ -174,6 +179,24 @@ export function CommandPalette({ scope, onNavigate, onViewChange, onOpenSettings
           {t(searching ? 'Searching…' : query ? 'No results.' : full ? 'Type to search.' : 'Type to filter.')}
         </CommandEmpty>
 
+        {full && pageCommands.length > 0 && (
+          <>
+            <CommandGroup heading={t('On this page')}>
+              {pageCommands.map(({ icon: Icon, ...c }) => (
+                <CommandItem
+                  key={c.id}
+                  value={`${c.id} ${c.label} ${t(c.label)} ${(c.keywords ?? []).join(' ')}`}
+                  onSelect={() => { close(); c.run(); }}
+                >
+                  <Icon />
+                  <span className="flex-1">{t(c.label)}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            <CommandSeparator />
+          </>
+        )}
+
         {visibleCreateCommands.length > 0 && (
           <>
             <CommandGroup heading={t('Create')}>
@@ -207,7 +230,14 @@ export function CommandPalette({ scope, onNavigate, onViewChange, onOpenSettings
                   // `ELE_MED-001` keeps its own row rather than every row whose
                   // title happens to share a word with it.
                   value={`element-${r.displayId ?? ''} ${r.title}`}
-                  onSelect={() => handleNav('domain-elements', { objectId: r.objectId ?? null })}
+                  // Opens the Element itself over its Domain's Elements,
+                  // switching to that Domain first; Back returns here.
+                  onSelect={() => handleNav('domain-elements', {
+                    elementId: r.id,
+                    elementReturn: returnTo,
+                    objectId: r.objectId ?? null,
+                    ...(r.objectId && r.domainId ? { objectDomainId: r.domainId } : {}),
+                  })}
                 >
                   <Icon />
                   <div className="flex-1 min-w-0 flex items-baseline gap-2">

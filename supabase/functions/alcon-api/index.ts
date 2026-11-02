@@ -21,6 +21,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { authenticateCaller } from "../_shared/callerAuth.ts";
 import { sanitizeName } from "../_shared/callerName.ts";
+import { callerNotifier } from "../_shared/callerNotify.ts";
 import { runExternalTool } from "../_shared/externalTools.ts";
 import { apiActorLabel, apiPath, openApiDocument, planRequest, ROUTES, toResponse, type ApiError } from "./routes.ts";
 
@@ -87,7 +88,7 @@ Deno.serve(async (req: Request) => {
     agent: apiActorLabel(client, caller.via === "pat" ? caller.label : null, caller.via === "oauth" ? caller.label : null),
     userId: caller.userId,
   };
-  const result = await runExternalTool(caller.db, plan.call.tool, plan.call.args, actor, caller.access);
+  const result = await runExternalTool(caller.db, plan.call.tool, plan.call.args, actor, caller.access, callerNotifier(caller.userId));
   const { status, body } = toResponse(result, plan.call.successStatus);
   return json(status, body);
 });

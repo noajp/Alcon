@@ -13,9 +13,12 @@ export {
   HOME_BOARD,
   OBJECT_SUMMARY_BOARD,
   INITIATIVE_BOARD,
+  INITIATIVE_PLAN_BOARD,
+  INITIATIVE_AUDIT_BOARD,
   ELEMENT_DETAIL_BOARD,
 } from './defaults';
 export type {
+  BoardLayout,
   WidgetHost,
   Zone,
 } from './types';

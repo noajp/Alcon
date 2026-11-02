@@ -18,12 +18,11 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
-import { GanttView } from '@/ActivitySpace/execution/element/gantt';
-import { CalendarView } from '@/ActivitySpace/sustainment/calendar/CalendarView';
-import { CustomView } from '@/ActivitySpace/execution/element/custom';
+import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
+import { useFilteredElements } from '@/ActivitySpace/execution/element/useFilteredElements';
 import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
-import { assignWorkersToElement, noticeSkippedAssignees, useAssignableWorkers } from '@/hooks/useSupabase';
-import { partitionAssignable } from '@/Function/shared/assignableWorkers';
+import { useAssignableWorkers } from '@/hooks/useSupabase';
+import { createQuickAddElements, toQuickAddTemplates } from '@/Function/shared/element/quickAdd';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import type { ListSection } from '@/Function/shared/listTable/shared';
 import { TabBar } from '@/shell/TabBar';
@@ -31,7 +30,6 @@ import type { NavigationState } from '@/types/navigation';
 import type { Worker, ObjectTab, ObjectTabType, Json } from '@/types/database';
 import {
   ListControls,
-  buildSections,
   loadState,
   saveState,
   sectionGroupValues,
@@ -39,6 +37,21 @@ import {
   type ListControlsState,
   type SectionGroup,
 } from '@/Function/shared/listControls';
+import dynamic from 'next/dynamic';
+import { useQuery } from '@tanstack/react-query';
+import { fetchElementWithDetails } from '@/hooks/elementData';
+import { Button } from '@/ui/button';
+
+// The Gantt / Calendar / Custom tabs are split out of this view's
+// chunk and fetched only when one of those tabs is opened.
+function TabLoading() {
+  const { t } = useI18n();
+  return <div className="flex-1 flex items-center justify-center text-[13px] text-muted-foreground">{t('Loading…')}</div>;
+}
+const GanttView = dynamic(() => import('@/ActivitySpace/execution/element/gantt').then((m) => m.GanttView), { ssr: false, loading: () => <TabLoading /> });
+const CalendarView = dynamic(() => import('@/ActivitySpace/sustainment/calendar/CalendarView').then((m) => m.CalendarView), { ssr: false, loading: () => <TabLoading /> });
+const CustomView = dynamic(() => import('@/ActivitySpace/execution/element/custom').then((m) => m.CustomView), { ssr: false, loading: () => <TabLoading /> });
+
 
 // View modes for the Domain-wide Elements view. We reuse the same
 // `ObjectTabType` union as Object detail tabs so this view can share
@@ -82,6 +95,11 @@ interface ElementsListViewProps {
   activeDomainId?: string | null;
   onNavigate?: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
+  /** An Element opened by id (⌘K): shown over the list until its Back, which
+   *  calls onCloseOpenElement. It may belong to no Object in this Domain's
+   *  list yet (the Domain is still loading), so it is fetched by id. */
+  openElementId?: string | null;
+  onCloseOpenElement?: () => void;
 }
 
 /**
@@ -93,10 +111,15 @@ interface ElementsListViewProps {
  * The page only owns the toolbar, the empty-state, the Element-detail
  * drill-in, and the Domain-direct quick-add popup.
  */
-export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onViewChange }: ElementsListViewProps) {
+export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onViewChange, openElementId = null, onCloseOpenElement }: ElementsListViewProps) {
   const { t } = useI18n();
   const explorerData = useExplorerData();
   const [detailId, setDetailId] = useState<string | null>(null);
+  const openedQuery = useQuery({
+    queryKey: ['element-detail', openElementId],
+    enabled: !!openElementId,
+    queryFn: () => fetchElementWithDetails(openElementId!),
+  });
   const [visibleTabs, setVisibleTabs] = useState<ObjectTabType[]>(loadVisibleTabs);
   const [viewMode, setViewMode] = useState<ObjectTabType>(() => {
     if (typeof window === 'undefined') return 'elements';
@@ -194,19 +217,10 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   const { data: popupWorkers } = useAssignableWorkers({ spaceId: activeSpaceId, domainId: activeDomainId ?? null });
   // A template keeps only the assignees that are on that list.
   const quickAddTemplates = useMemo<QuickAddTemplate[]>(
-    () => elementTemplates.map((t) => ({
-      id: t.id,
-      name: t.name,
-      type: t.type,
-      status: t.status,
-      priority: t.priority,
-      labels: t.labels,
-      assigneeWorkerIds: partitionAssignable(t.assignee_worker_ids, popupWorkers).assignable,
-      description: t.description,
-      estimatedHours: t.estimated_hours,
-    })),
+    () => toQuickAddTemplates(elementTemplates, popupWorkers),
     [elementTemplates, popupWorkers],
   );
+
 
   const objectsWithElements = useMemo<AlconObjectWithChildren[]>(() => {
     if (!explorerData) return [];
@@ -257,13 +271,11 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
     return m;
   }, [allElementsFlat]);
 
-  // Board / Gantt sections honour the same Group / Sort / Filter controls as
-  // the list (default groupBy='object' → per-Object bands). Owner filter is
-  // off in this view, so currentUserId isn't needed.
-  const groupedSections = useMemo(
-    () => buildSections(allElementsFlat, objectSections, controls, null),
-    [allElementsFlat, objectSections, controls],
-  );
+  // Board / Gantt / Calendar honour the same Group / Sort / Filter controls
+  // as the list (default groupBy='object' → per-Object bands), so a filter
+  // set on one tab narrows them all.
+  const { sections: groupedSections, elements: filteredElements, filtering } =
+    useFilteredElements(allElementsFlat, objectSections, controls);
 
   // Multi-select + bulk operations (shared with the other element lists).
   const { selectedRowIds, handleRowSelect, clearSelection, selectOnly } = useElementSelection();
@@ -397,6 +409,40 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
     ? explorerData?.objects.find((obj) => obj.id === detailElement.object_id) ?? null
     : null;
 
+  if (openElementId) {
+    // The list's copy follows live edits; the fetched one covers the moment
+    // before this Domain's list has loaded.
+    const opened = allElementsForLookup.get(openElementId) ?? openedQuery.data ?? null;
+    const openedObject = opened?.object_id
+      ? explorerData?.objects.find((obj) => obj.id === opened.object_id) ?? null
+      : null;
+    const close = () => onCloseOpenElement?.();
+    if (!opened) {
+      return (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-[13px] text-muted-foreground" role="status">
+          <p>{t(openedQuery.isPending || openedQuery.isFetching ? 'Opening…' : 'This Element is no longer available.')}</p>
+          {!openedQuery.isPending && <Button variant="ghost" onClick={close}>{t('Back')}</Button>}
+        </div>
+      );
+    }
+    return (
+      <ElementDetailView
+        key={opened.id}
+        element={opened}
+        domainName={opened.owner_id ? null : activeDomainName}
+        objectPath={openedObject ? [{ id: openedObject.id, name: openedObject.name }] : opened.objects ?? []}
+        onBack={close}
+        onRefresh={() => { void openedQuery.refetch(); onRefresh?.(); }}
+        onNavigateRoot={close}
+        onNavigateObject={(id: string) => {
+          close();
+          onViewChange?.('objects');
+          onNavigate?.({ objectId: id });
+        }}
+      />
+    );
+  }
+
   if (detailElement) {
     return (
       <ElementDetailView
@@ -463,48 +509,11 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   const quickAddDefaults = sectionGroupValues(quickAddGroup);
 
   const handleQuickAddSubmit = async (inputs: NewElementInput[]) => {
-    // Two save scopes the popup can produce:
-    //   - Object:                  object_id = input.objectId
-    //   - personal (My Elements): owner_id = me, object_id = null — also when
-    //     no Object is named, since an Element always has exactly one home
-    // Fallback for objectId-undefined: the per-section target the user opened
-    // the popup from.
-    // Per-Element failures stay non-fatal — one bad row in a pasted batch
-    // should not discard the rest — but a batch where nothing landed has to
-    // reach the caller. The popup reports what it created and clears the
-    // title for the next one, and it can only tell the truth about that if a
-    // total failure comes back as a rejection instead of a quiet resolve.
-    let createdAny = false;
-    let lastError: unknown = null;
-    let skippedAssignees = 0;
-
-    for (const input of inputs) {
-      try {
-        const objectId = input.personal
-          ? null
-          : (input.objectId !== undefined ? input.objectId : quickAddTargetObjectId);
-        const created = await createElement({
-          title: input.title,
-          object_id: objectId,
-          owner_id: objectId ? null : userId,
-          description: input.description ?? null,
-          type: input.type ?? null,
-          labels: input.labels ?? [],
-          status: input.status ?? undefined,
-          priority: input.priority ?? undefined,
-          estimated_hours: input.estimatedHours ?? null,
-        });
-        createdAny = true;
-        skippedAssignees += (await assignWorkersToElement(created.id, input.assigneeWorkerIds ?? [])).skipped.length;
-      } catch (e) {
-        lastError = e;
-        console.error('Failed to create Element', e);
-      }
-    }
-    noticeSkippedAssignees(skippedAssignees);
-    await onRefresh?.();
-    if (!createdAny && inputs.length > 0) {
-      throw lastError ?? new Error('No Elements were created');
+    // A line the popup names no Object for lands in the section it was opened from.
+    try {
+      return await createQuickAddElements(inputs, { fallbackObjectId: quickAddTargetObjectId, userId });
+    } finally {
+      await onRefresh?.();
     }
   };
 
@@ -582,6 +591,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
             showOwnerFilter={false}
             onReset={() => setControls(DEFAULT_STATE)}
             sortColumnsStorageKey="domain-elements"
+            showClosedWindow
           />
         }
       />
@@ -613,21 +623,23 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
       )}
       {effectiveViewMode === 'board' && (
         <div className="flex-1 overflow-hidden">
-          <ElementBoardView elements={allElementsFlat} onRefresh={onRefresh} />
+          <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Board')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName}>
+            {openElement => <ElementBoardView elements={filteredElements} canAdd={!filtering} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
+          </ElementDrilldown>
         </div>
       )}
       {effectiveViewMode === 'gantt' && (
         <div className="flex-1 overflow-hidden">
-          <GanttView elements={allElementsFlat} sections={groupedSections} onRefresh={onRefresh} phases={domainPhases} milestones={objectMilestones} />
+          <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Gantt')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName}>
+            {openElement => <GanttView elements={filteredElements} sections={groupedSections} onRefresh={onRefresh} phases={domainPhases} milestones={objectMilestones} onElementOpen={(el) => openElement(el.id)} />}
+          </ElementDrilldown>
         </div>
       )}
       {effectiveViewMode === 'calendar' && (
         <div className="flex-1 overflow-hidden">
-          <CalendarView
-            elements={allElementsFlat}
-            onElementClick={(el) => setDetailId(el.id)}
-            onRefresh={onRefresh}
-          />
+          <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Calendar')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName}>
+            {openElement => <CalendarView elements={filteredElements} onElementClick={(el) => openElement(el.id)} onRefresh={onRefresh} />}
+          </ElementDrilldown>
         </div>
       )}
       {effectiveViewMode === 'custom_view' && (

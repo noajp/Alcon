@@ -298,9 +298,12 @@ interface ElementBoardViewProps {
    *  omitted the new Element is Domain-direct (Domain board and the
    *  sidebar Elements view). */
   objectId?: string | null;
+  /** Show the column "+". Hosts turn it off while a filter is active, since
+   *  an Element made there could be filtered out of sight at once. */
+  canAdd?: boolean;
 }
 
-export function ElementBoardView({ elements, loading = false, onRefresh, objectId, onElementClick }: ElementBoardViewProps) {
+export function ElementBoardView({ elements, loading = false, onRefresh, objectId, onElementClick, canAdd = true }: ElementBoardViewProps) {
   const { t } = useI18n();
   const [items, setItems] = useState<ElementWithDetails[]>(elements);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -372,7 +375,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
                 <span className="text-[13px] font-medium">{t(col.label)}</span>
                 <span className="text-[12px] tabular-nums text-muted-foreground">{colItems.length}</span>
               </div>
-              <Button variant="ghost" size="icon-xs"
+              {canAdd && <Button variant="ghost" size="icon-xs"
                 type="button"
                 onClick={async () => {
                   try {
@@ -390,7 +393,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
                 aria-label={t('Add Element to {column}', { column: t(col.label) })}
               >
                 <Plus className="h-3.5 w-3.5" />
-              </Button>
+              </Button>}
             </div>
 
             {/* Cards */}

@@ -8,7 +8,7 @@ import { queryCacheKey, queryCacheKeysToDrop } from './queryCacheKeys';
 // Bump when the on-disk cache shape changes — e.g. ExplorerData adds a
 // field, or a query key is renamed. Previously persisted entries are then
 // dropped instead of restored stale.
-const CACHE_BUSTER = 'alcon-v1';
+const CACHE_BUSTER = 'alcon-v2';
 
 // Drop persisted entries older than 7 days — beyond that the membership /
 // status / etc. has drifted too far to trust without a fresh fetch.

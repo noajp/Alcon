@@ -10,11 +10,24 @@
 
 | 読み取り | 書き込み |
 |---|---|
-| listMyDomains / listObjects / listElements / getElement / findByText / getProgress / getRecentActivity / listWorkers / listInitiatives / getInitiative | createElement / updateElement / addElementComment / addElementAssignee / setElementLabels / createSubelement / toggleSubelementComplete |
+| listMyDomains / listObjects / listElements / getElement / findByText / getProgress / getRecentActivity / listWorkers / listInitiatives / getInitiative | createElement / updateElement / addElementComment / addElementAssignee / setElementLabels / createSubelement / toggleSubelementComplete / claimElement / releaseElement / logProgress / reportOutcome |
 
 削除、一括変更、Object 間の移動、Object の編集はできない。この許可リスト（`_shared/externalTools.ts`）は REST API（[api.md](api.md)）と共通。見える範囲と書ける範囲は、アプリでの本人の権限（RLS）と同じ。書き込みは Element の Activity に「… — via Claude Code (MCP · token: laptop)」の形で、どのトークン経由かまで記録され、コメントは AI 名で投稿される。
 
 担当にできるのは、Element と同じ Space の Worker だけ。`listWorkers` は `elementId` を渡すとその Element に割り当てられる Worker を、`objectId` / `domainId` を渡すとその Domain を見られる人を、引数なしなら本人が属する Space 全体の Worker を返す。`addElementAssignee` は Space の外の Worker を `Worker is outside this Element's Space` で断り、`createElement` の `assigneeWorkerIds` は割り当てられない Worker を飛ばして `assigneeError` に名前を返す。
+
+## Element を進めるとき（着手・報告）
+
+外部のエージェントは、Element を進めるあいだ、何をしているかを次の4つで Element に残す。人はアプリの Element の行・コメント・Activity で、誰（どのクライアント）がどこまで進めたかを確かめられる。
+
+| ツール | すること |
+|---|---|
+| `claimElement` | 着手を宣言する。Element に lease（担い手・ブランチ・40 分の期限）が付き、一覧の行に出る。別のセッション（`.claude/ops/lease.mjs` や他の外部エージェント）が lease を持っている間は、持ち主と期限を添えて断られるので、その Element は進めない |
+| `logProgress` | 計画（`steps`）や進捗をコメントに残す。このセッションが lease を持っていれば期限を延ばす。報告が途絶えれば lease は切れる |
+| `reportOutcome` | 締めくくる。`completed` は Element をレビュー待ちへ、`blocked`（権限を超える判断・資格情報が要る）はブロック中へ移し、`partial` はステータスを変えない（完了・取り消し済みの Element は動かさない）。`message` は「完了報告／対応が必要です／途中報告」のコメントになり、担当者・Element の owner・Domain の owner に通知される。接続した本人にも「<クライアント名>: 対応が必要です」などの通知が1件届く（担当が本人だけの Element でも判断依頼が埋もれない）。lease は返す |
+| `releaseElement` | 報告せずに手を引くときに lease を返す |
+
+lease は `claim_element()` / `release_element()` だけを通して書く。担い手は `<記録名>@<接続した人の ID の先頭 8 文字>.<session>`（例 `Claude Code (MCP · token: laptop)@1a2b3c4d.feat-x`）で、別の人のエージェントが同じクライアント名を名乗っても、他人の lease を取ったり返したりできない。同じトークンで複数のセッションを動かすときは、`session` に作業ごとの名前（worktree 名・ブランチ名）を渡し、4つのツールで同じ値を使う。読み取りのみのトークンには4つとも出ない。
 
 ## 認証
 

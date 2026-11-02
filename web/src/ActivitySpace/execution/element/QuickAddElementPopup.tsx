@@ -85,7 +85,7 @@ interface QuickAddElementPopupProps {
   /** Receives one NewElementInput per non-empty line of the textarea. Shared
    *  rich fields (description / status / …) are copied into every entry so
    *  the caller can persist them on every created Element. */
-  onSubmit: (inputs: NewElementInput[]) => void | Promise<void>;
+  onSubmit: (inputs: NewElementInput[]) => void | number | Promise<void | number>;
   /** Domain-shared Element types for the Type pill (`domains.element_types`).
    *  Empty array hides the pill. */
   types?: string[];
@@ -282,14 +282,16 @@ export function QuickAddElementPopup({
         estimatedHours,
       };
       const inputs: NewElementInput[] = titles.map((title) => ({ title, ...shared }));
-      await onSubmit(inputs);
+      // A caller that reports how many landed keeps the "N added" count true
+      // when some lines failed.
+      const landed = await onSubmit(inputs);
       if (closeAfter) {
         setText('');
         setDescription('');
         onClose();
         return;
       }
-      setCreatedCount((n) => n + inputs.length);
+      setCreatedCount((n) => n + (typeof landed === 'number' ? landed : inputs.length));
       setText('');
       // Focus survives the re-render on its own, but not if the click came from
       // the Create button — put the caret back where the next title goes.

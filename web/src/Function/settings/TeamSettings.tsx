@@ -17,6 +17,7 @@ import { isUnreachableWorker } from '@/Function/shared/workerReach';
 import { SettingsSection } from './SettingsSection';
 import { InviteUserDialog } from './InviteUserDialog';
 import { ConnectWorkerAccountDialog } from './ConnectWorkerAccountDialog';
+import { AgentModelDialog } from './AgentModelDialog';
 import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -49,6 +50,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   const [showAdd, setShowAdd] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [connecting, setConnecting] = useState<Worker | null>(null);
+  const [modelFor, setModelFor] = useState<Worker | null>(null);
   // Invited to this Domain but not yet accepted: listed, not a Worker here.
   const { invitees, refetch: refetchInvitees } = useScopeInvitations('domain', domainId);
 
@@ -265,6 +267,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
               worker={w}
               onDelete={canRemove(w) ? () => handleDelete(w.id) : undefined}
               onToggleStatus={canToggle(w) ? () => handleStatusToggle(w) : undefined}
+              onEditModel={canToggle(w) && w.type === 'ai_agent' ? () => setModelFor(w) : undefined}
             />
           ))
         )}
@@ -294,6 +297,18 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
         />
       )}
 
+      {modelFor && (
+        <AgentModelDialog
+          worker={modelFor}
+          spaceId={modelFor.activity_space_id ?? workerSpaceId ?? activeSpaceId}
+          onClose={() => setModelFor(null)}
+          onSaved={(updated) => {
+            setWorkers((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
+            setModelFor(null);
+          }}
+        />
+      )}
+
       {connecting && (
         <ConnectWorkerAccountDialog
           worker={connecting}
@@ -313,9 +328,12 @@ function WorkerRow({
   onDelete,
   onToggleStatus,
   onConnect,
+  onEditModel,
   roleAction,
 }: {
   worker: Worker;
+  /** AI agents: choose the model it runs on, for those who may change it. */
+  onEditModel?: () => void;
   /** Change this person's role in the Domain, for its owners and admins. */
   roleAction?: { label: string; busy: boolean; run: () => void };
   /** Omitted when the viewer may not remove / (de)activate this Worker. */
@@ -349,6 +367,11 @@ function WorkerRow({
         <Button type="button" variant="ghost" size="xs" onClick={onConnect}
           title={t('Connect this Worker to an account so assignments and notifications reach them')}>
           {t('Connect')}
+        </Button>
+      )}
+      {onEditModel && (
+        <Button type="button" variant="ghost" size="xs" onClick={onEditModel}>
+          {t('Model')}
         </Button>
       )}
       {roleAction && (

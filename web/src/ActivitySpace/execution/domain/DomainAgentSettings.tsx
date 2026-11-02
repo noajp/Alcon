@@ -5,12 +5,7 @@ import { Bot, Check, AlertTriangle, Loader2, Zap, ShieldCheck } from '@/ui/icons
 import { cn } from '@/lib/utils';
 import { updateDomain, pingAgentRuntime } from '@/hooks/useSupabase';
 import type { Domain, DomainAIConfig } from '@/hooks/useSupabase';
-
-const MODELS = [
-  { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 — 高速・低コスト' },
-  { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 — 高品質' },
-];
-const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+import { DOMAIN_AGENT_MODELS, DOMAIN_AGENT_TURNS, clampAgentTurns, domainAgentModel } from '@/Function/domain/domainAgentConfig';
 
 type PingState =
   | { status: 'idle' }
@@ -36,30 +31,33 @@ export function DomainAgentSettings({
 }) {
   const initial: DomainAIConfig = domain.ai_config ?? {};
   const [enabled, setEnabled] = useState(initial.enabled !== false);
-  const [model, setModel] = useState(initial.model ?? DEFAULT_MODEL);
-  const [maxSteps, setMaxSteps] = useState(String(initial.max_steps ?? 6));
+  const [model, setModel] = useState(domainAgentModel(initial.model));
+  const [maxTurns, setMaxTurns] = useState(String(initial.max_turns ?? DOMAIN_AGENT_TURNS.default));
   const [instructions, setInstructions] = useState(initial.instructions ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [ping, setPing] = useState<PingState>({ status: 'idle' });
 
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
+    setSaveError(null);
     try {
-      const parsedSteps = parseInt(maxSteps, 10);
+      const turns = clampAgentTurns(maxTurns);
       const ai_config: DomainAIConfig = {
         enabled,
         model,
-        max_steps: Math.min(12, Math.max(1, Number.isFinite(parsedSteps) ? parsedSteps : 6)),
+        max_turns: turns,
         instructions: instructions.trim() || undefined,
       };
       await updateDomain(domain.id, { ai_config });
+      setMaxTurns(String(turns));
       setSaved(true);
       onSaved?.();
       setTimeout(() => setSaved(false), 2500);
     } catch (e) {
-      console.error('Failed to save agent config', e);
+      setSaveError((e as { message?: string } | null)?.message || '不明なエラー');
     } finally {
       setSaving(false);
     }
@@ -85,7 +83,7 @@ export function DomainAgentSettings({
         <div className="flex-1 min-w-0">
           <h3 className="text-[13px] font-medium text-foreground">AI エージェント</h3>
           <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">
-            看板ボードや Element 詳細の「開始 ▶︎」を押すと、エージェントがこの設定でタスクを自動実行します。
+            看板ボードや Element 詳細の「開始 ▶︎」を押すと、エージェントがこの設定で Element の任務を実行します。
           </p>
         </div>
       </div>
@@ -123,7 +121,7 @@ export function DomainAgentSettings({
           onChange={(e) => setModel(e.target.value)}
           className="w-full text-[13px] bg-muted/40 rounded-md px-2.5 py-1.5 border border-border/60 focus:outline-none"
         >
-          {MODELS.map((m) => (
+          {DOMAIN_AGENT_MODELS.map((m) => (
             <option key={m.value} value={m.value}>
               {m.label}
             </option>
@@ -133,16 +131,16 @@ export function DomainAgentSettings({
 
       {/* Max steps */}
       <div className="space-y-1.5">
-        <label className="text-[12px] font-medium text-foreground">最大ステップ数</label>
+        <label className="text-[12px] font-medium text-foreground">最大ターン数</label>
         <input
           type="number"
-          min={1}
-          max={12}
-          value={maxSteps}
-          onChange={(e) => setMaxSteps(e.target.value)}
+          min={DOMAIN_AGENT_TURNS.min}
+          max={DOMAIN_AGENT_TURNS.max}
+          value={maxTurns}
+          onChange={(e) => setMaxTurns(e.target.value)}
           className="w-24 text-[13px] bg-muted/40 rounded-md px-2.5 py-1.5 border border-border/60 focus:outline-none"
         />
-        <p className="text-[11.5px] text-muted-foreground">エージェントの思考ループ上限（1〜12、既定 6）。</p>
+        <p className="text-[11.5px] text-muted-foreground">1 回の実行でモデルを呼べる回数の上限（{DOMAIN_AGENT_TURNS.min}〜{DOMAIN_AGENT_TURNS.max}、既定 {DOMAIN_AGENT_TURNS.default}）。AI Worker に個別の上限があればそちらが優先されます。</p>
       </div>
 
       {/* Instructions */}
@@ -156,7 +154,7 @@ export function DomainAgentSettings({
           className="w-full text-[13px] bg-muted/40 rounded-md px-2.5 py-2 border border-border/60 focus:outline-none resize-none leading-snug"
         />
         <p className="text-[11.5px] text-muted-foreground">
-          この Domain のタスクすべてに適用される、エージェント共通のルール（Symphony の WORKFLOW 相当）。
+          この Domain の Element すべてに適用される、エージェント共通のルール。AI Worker 個別の指示より先に渡されます。
         </p>
       </div>
 
@@ -217,6 +215,11 @@ export function DomainAgentSettings({
         {saved && (
           <span className="inline-flex items-center gap-1 text-[12px] text-emerald-500">
             <Check size={13} /> 保存しました
+          </span>
+        )}
+        {saveError && (
+          <span role="alert" className="inline-flex items-center gap-1 text-[12px] text-destructive">
+            <AlertTriangle size={13} /> 保存できませんでした: {saveError}
           </span>
         )}
       </div>

@@ -2,7 +2,7 @@
 
 import type { DependencyBlocker } from '@/Function/shared/element/dependencyReadiness';
 import { computeBlockers, upstreamIdsOf } from '@/Function/shared/element/dependencyReadiness';
-import { applyOptimisticExplorerPatch, invalidateElementDetail } from '@/Function/sync/explorerCache';
+import { applyOptimisticExplorerPatch, cachedElementStatus, invalidateElementDetail } from '@/Function/sync/explorerCache';
 import {
   insertElementIntoExplorer,
   mapElementInExplorer,
@@ -15,8 +15,11 @@ import { selectIn } from '@/hooks/chunkedIn';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 import { throwOnFailedWrites } from './writeResults';
 import { deleteElementAssignees, insertElementAssignee } from './elementAssigneeWrites';
+import { noteElementClosed, refreshClosedTimes } from './elementActivity';
+import { isClosingMove } from '@/Function/shared/completion';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
+import { appDialog } from '@/Function/shared/appDialogStore';
 import type {
   ApprovalState,
   Element,
@@ -98,7 +101,7 @@ export async function createElement(element: {
       id: tempId,
       display_id: null, seq_number: null,
       color: null, actual_hours: null, progress: null, direction: null,
-      is_approval: null, approval_state: null, note_id: null, phase_id: null,
+      is_approval: false, approval_state: null, note_id: null, phase_id: null,
       carried_over_count: 0,
       claimed_by: null, claim_expires_at: null, branch: null,
       created_at: nowIso, updated_at: nowIso,
@@ -182,6 +185,12 @@ export async function updateElement(
   // UI reflects the change instantly (board drag-drop, inline rename, status
   // change, etc.). Rollback to the pre-patch snapshot on error.
   const optimisticPatch = { ...normalized, updated_at: new Date().toISOString() };
+  // Every status edit — picker, board drop, bulk bar — lands here, so this
+  // is where a close reaches the lists' "Completed Elements" window: stamped
+  // with the optimistic patch (read the old status before it), read back
+  // once written.
+  const closing = 'status' in updates && isClosingMove(cachedElementStatus(id), updates.status);
+  if (closing) noteElementClosed(id, optimisticPatch.updated_at);
   const rollback = applyOptimisticExplorerPatch(data =>
     patchElementInExplorer(data, id, optimisticPatch)
   );
@@ -193,6 +202,7 @@ export async function updateElement(
       .select()
       .single();
     if (error) throw error;
+    if (closing) refreshClosedTimes();
     return data;
   } catch (err) {
     rollback();
@@ -243,6 +253,25 @@ export async function restoreElementsField(
   }
   await Promise.all([...byValue.values()].map(({ value, ids }) =>
     updateElements(ids, { [field]: value } as Partial<Omit<Element, 'id' | 'created_at'>>)));
+}
+
+/**
+ * Tell the person an edit to an Element did not land. updateElement has
+ * already put the old value back, so without this the field would quietly
+ * revert. A write the database refuses (RLS: 42501, or no row returned to
+ * .single(): PGRST116) says so; anything else (offline, timeout) asks to try
+ * again.
+ */
+export function isElementSaveRefused(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  return code === '42501' || code === 'PGRST116';
+}
+
+export function noticeElementSaveFailed(error: unknown): void {
+  console.error('Element change was not saved:', error);
+  void appDialog.alert(translate(isElementSaveRefused(error)
+    ? 'You cannot change this Element. It is outside your access.'
+    : 'The change could not be saved. Try again.'));
 }
 
 export async function reorderElements(updates: { id: string; order_index: number }[]) {

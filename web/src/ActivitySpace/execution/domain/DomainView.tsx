@@ -32,12 +32,8 @@ import {
 import { DomainOverview } from './DomainOverview';
 import { HomeView } from '@/ActivitySpace/home/HomeView';
 import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/Function/widget';
-import { GanttView } from '@/ActivitySpace/execution/element/gantt';
-import { CalendarView } from '@/ActivitySpace/sustainment/calendar/CalendarView';
 import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
 import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
-import { ResourceView } from '@/ActivitySpace/sustainment/workload/ResourceView';
-import { CustomView } from '@/ActivitySpace/execution/element/custom';
 import { ObjectIcon } from '@/shell/icons';
 import { IslandHeader } from '@/Function/shared/MainIsland';
 import { FollowButton } from '@/Function/shared/FollowButton';
@@ -48,6 +44,19 @@ import { useDomainRole } from '@/hooks/domainData';
 import { useMyObjectMemberships } from '@/hooks/useMyMemberships';
 import { isViewOnly } from '@/ActivitySpace/execution/object/objectAccess';
 import { ViewOnlyBadge } from '@/Function/shared/ViewOnlyBadge';
+import dynamic from 'next/dynamic';
+
+// The Gantt / Calendar / Resource / Custom tabs are split out of this view's
+// chunk and fetched only when one of those tabs is opened.
+function TabLoading() {
+  const { t } = useI18n();
+  return <div className="flex-1 flex items-center justify-center text-[13px] text-muted-foreground">{t('Loading…')}</div>;
+}
+const GanttView = dynamic(() => import('@/ActivitySpace/execution/element/gantt').then((m) => m.GanttView), { ssr: false, loading: () => <TabLoading /> });
+const CalendarView = dynamic(() => import('@/ActivitySpace/sustainment/calendar/CalendarView').then((m) => m.CalendarView), { ssr: false, loading: () => <TabLoading /> });
+const ResourceView = dynamic(() => import('@/ActivitySpace/sustainment/workload/ResourceView').then((m) => m.ResourceView), { ssr: false, loading: () => <TabLoading /> });
+const CustomView = dynamic(() => import('@/ActivitySpace/execution/element/custom').then((m) => m.CustomView), { ssr: false, loading: () => <TabLoading /> });
+
 
 // Per-Domain — each Domain remembers its own active tab + visible tabs (keyed
 // by Domain id). Previously these were single global keys, which made every
@@ -71,6 +80,8 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   note: { domainTitle: 'Note', objectTitle: 'Note' },
 };
 const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'board', 'gantt', 'calendar', 'resource', 'workers', 'custom_view'];
+// Object tabs that show its Elements through the Elements tab's Filter / Display.
+const OBJECT_FILTERED_TABS: ObjectTabType[] = ['elements', 'board', 'gantt', 'calendar'];
 
 function titleForTab(type: ObjectTabType, objectScoped: boolean): string {
   const meta = VIEW_META[type];
@@ -277,7 +288,12 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
   const [objectElementsControls, setObjectElementsControls] = useState<ListControlsState>(() => loadState('object-elements'));
   useEffect(() => { saveState('object-elements', objectElementsControls); }, [objectElementsControls]);
 
-  const objListControlsNode = effectiveActiveType === 'elements'
+  // Inside an Object, Board / Calendar / Gantt narrow by the same Element
+  // controls as the Elements tab, so the buttons follow them there.
+  const showsElementControls = selectedObject
+    ? OBJECT_FILTERED_TABS.includes(effectiveActiveType)
+    : effectiveActiveType === 'elements';
+  const objListControlsNode = showsElementControls
     ? selectedObject
       ? (
           <ListControls
@@ -292,6 +308,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
             sortColumnsCustom={objectFields}
             // Inside one Object, grouping by Object is redundant.
             hideObjectGrouping
+            showClosedWindow
           />
         )
       : (
@@ -619,7 +636,7 @@ function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails {
     progress: null,
     direction: null,
     order_index: o.order_index ?? null,
-    is_approval: null,
+    is_approval: false,
     approval_state: null,
     note_id: null,
     phase_id: o.phase_id ?? null,

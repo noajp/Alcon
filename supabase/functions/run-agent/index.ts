@@ -29,7 +29,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import Anthropic from "npm:@anthropic-ai/sdk@0.110.0";
 import { runBoardTool, errorMessage, type BoardActor, type ToolDef } from "../_shared/boardTools.ts";
 import { runStrategyTool } from "../_shared/strategyTools.ts";
-import { AGENT_MODELS, DEFAULT_AGENT_MODEL, costOf, isAgentModel, type AgentModel, type ModelUsage } from "../_shared/aiPricing.ts";
+import { AGENT_MODELS, DEFAULT_AGENT_MODEL, costAt, type ModelUsage } from "../_shared/aiPricing.ts";
 import {
   McpSession, callHttp, httpIsRead, HTTP_REQUEST_SCHEMA, isSafeEndpoint, pointsAtAlcon, resolveCredential, type IntegrationRow, type RemoteTool,
 } from "../_shared/integrationClient.ts";
@@ -38,6 +38,7 @@ import { fetchPull, pullUrlsIn, upsertCodeChange, withGithubToken } from "../_sh
 import { DRIVE_TOOLS, driveOperationLabel, runDriveTool } from "../_shared/googleDrive.ts";
 import { approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR } from "./agentTools.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
+import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import {
   runLoop, appendDecisionResults, canonicalCalls,
   type LoopState, type ToolCall, type ToolKind, type ToolResult, type PendingApproval, type FinishPayload, type Msg,
@@ -51,7 +52,6 @@ const corsHeaders = {
 
 const MAX_TURNS_PER_SLICE = 14;
 const SLICE_MS = 110_000;          // stay well inside the platform's wall clock
-const DEFAULT_MAX_TOTAL_TURNS = 60;
 const MAX_CONTINUATIONS = 30;
 const MAX_TOOLS = 120;
 /** A person's own monthly budget for runs on Elements outside any Space. */
@@ -119,7 +119,6 @@ Deno.serve(async (req: Request) => {
   if (body.ping) {
     return json({ ok: !!anthropicKey, key_configured: !!anthropicKey, model_default: DEFAULT_AGENT_MODEL, allowed_models: Object.keys(AGENT_MODELS) });
   }
-  if (!anthropicKey) return json({ error: "ANTHROPIC_API_KEY が設定されていません。" }, 500);
 
   const authHeader = req.headers.get("Authorization") ?? "";
   const jwt = authHeader.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
@@ -176,7 +175,7 @@ Deno.serve(async (req: Request) => {
   const { data: claimed } = await claim.select("id").maybeSingle();
   if (!claimed) return json({ error: `この実行は今その操作を受け付けません（${run.status}）。` }, 409);
 
-  const work = execute({ req, run, user: { id: user.id, email: user.email ?? null }, jwt, admin, userDb, anthropicKey, body, supabaseUrl })
+  const work = execute({ req, run, user: { id: user.id, email: user.email ?? null }, jwt, admin, userDb, anthropicKey: anthropicKey ?? null, body, supabaseUrl })
     .catch(async (e) => {
       console.error("run-agent error", e);
       await pauseOnError(admin, run, errorMessage(e));
@@ -237,7 +236,7 @@ async function addStep(admin: SupabaseClient, runId: string, type: string, title
 
 interface ExecArgs {
   req: Request; run: Run; user: { id: string; email: string | null }; jwt: string;
-  admin: SupabaseClient; userDb: SupabaseClient; anthropicKey: string; supabaseUrl: string;
+  admin: SupabaseClient; userDb: SupabaseClient; anthropicKey: string | null; supabaseUrl: string;
   body: { continue?: boolean; resume?: boolean; token?: string; decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string } };
 }
 
@@ -245,10 +244,6 @@ async function execute(a: ExecArgs): Promise<void> {
   const { run, admin, userDb, user } = a;
 
   // ── Agent profile ───────────────────────────────────────────────────────
-  let agentName = "Alcon Agent";
-  let instructions: string | null = null;
-  let model: AgentModel = DEFAULT_AGENT_MODEL;
-  let maxTotalTurns = DEFAULT_MAX_TOTAL_TURNS;
   // An AI Worker's profile (its instructions above all) loads only when that
   // Worker is assignable to this Element for the person running it — the
   // Space boundary. Anything else runs as the default agent.
@@ -266,15 +261,59 @@ async function execute(a: ExecArgs): Promise<void> {
       if (w.type === "ai_agent" && await assignable(w.id)) { workerId = w.id; break; }
     }
   }
+  let worker: WorkerConfigRow | null = null;
   if (workerId) {
     const { data: w } = await userDb.from("workers").select("name, ai_config, ai_model").eq("id", workerId).maybeSingle();
-    if (w) {
-      agentName = w.name || agentName;
-      const cfg = (w.ai_config && typeof w.ai_config === "object" ? w.ai_config : {}) as Record<string, unknown>;
-      if (typeof cfg.instructions === "string" && cfg.instructions.trim()) instructions = cfg.instructions.trim();
-      if (isAgentModel(cfg.model)) model = cfg.model; else if (isAgentModel(w.ai_model)) model = w.ai_model;
-      if (typeof cfg.max_turns === "number" && cfg.max_turns >= 5 && cfg.max_turns <= 200) maxTotalTurns = Math.floor(cfg.max_turns);
+    worker = (w as WorkerConfigRow | null) ?? null;
+  }
+  // The Domain's settings frame every run on its Elements. They are read
+  // from the Element's own Domain (not the run's client-supplied domain_id)
+  // with the service role, so a switch-off holds whatever the starter's
+  // role lets them read.
+  let domain: DomainConfigRow | null = null;
+  {
+    const { data: el } = await admin.from("elements").select("object_id").eq("id", run.element_id).maybeSingle();
+    if (el?.object_id) {
+      const { data: obj } = await admin.from("objects").select("domain_id").eq("id", el.object_id).maybeSingle();
+      if (obj?.domain_id) {
+        const { data: d } = await admin.from("domains").select("name, ai_config").eq("id", obj.domain_id).maybeSingle();
+        domain = (d as DomainConfigRow | null) ?? null;
+      }
     }
+  }
+  const config = resolveAgentConfig(worker, domain);
+  const { agentName, model, maxTotalTurns, instructions, domainInstructions } = config;
+  const refuse = async (reason: string) => {
+    await admin.from("element_comments").insert({
+      element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+      content: `**実行できません** — ${reason}`,
+    });
+    await failRun(admin, run, reason);
+  };
+  if (config.disabledReason) { await refuse(config.disabledReason); return; }
+
+  // ── Model provider ──────────────────────────────────────────────────────
+  // Anthropic with the server's key, or the Worker's model integration in
+  // this run's Space with that integration's own key from Vault. The row is
+  // read with the starter's JWT, so it must be one they can see.
+  let modelClient: Anthropic;
+  const external = !!config.providerId;
+  if (config.providerId) {
+    const { data: p } = run.activity_space_id
+      ? await userDb.from("integrations").select("id, name, endpoint, enabled")
+        .eq("id", config.providerId).eq("activity_space_id", run.activity_space_id).eq("kind", "model").maybeSingle()
+      : { data: null };
+    const provider = p as { id: string; name: string; endpoint: string; enabled: boolean } | null;
+    if (!provider) { await refuse(`${agentName} の接続先が、この Space の AI モデルの接続に見つかりません。チーム設定で接続先を選び直してください。`); return; }
+    if (!provider.enabled) { await refuse(`接続先「${provider.name}」は無効になっています。設定 › 連携で有効にすると実行できます。`); return; }
+    if (!isSafeEndpoint(provider.endpoint)) { await refuse(`接続先「${provider.name}」のアドレスは使えません（https の公開ホストだけが使えます）。`); return; }
+    const { data: key } = await admin.rpc("get_integration_secret", { p_integration_id: provider.id });
+    if (!key) { await refuse(`接続先「${provider.name}」の API キーが設定されていません。設定 › 連携で入力すると実行できます。`); return; }
+    // Providers differ in which header carries the key; both carry it.
+    modelClient = new Anthropic({ apiKey: key as string, authToken: key as string, baseURL: provider.endpoint.replace(/\/+$/, "") });
+  } else {
+    if (!a.anthropicKey) { await refuse("ANTHROPIC_API_KEY が設定されていません。"); return; }
+    modelClient = new Anthropic({ apiKey: a.anthropicKey });
   }
   await admin.from("agent_runs").update({ model, worker_id: workerId }).eq("id", run.id);
   const actor: BoardActor = { agent: `${agentName}（AI）`, userId: user.id };
@@ -303,7 +342,7 @@ async function execute(a: ExecArgs): Promise<void> {
   if (run.activity_space_id) {
     const { data: rows } = await userDb.from("integrations")
       .select("id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled")
-      .eq("activity_space_id", run.activity_space_id).eq("enabled", true).order("created_at");
+      .eq("activity_space_id", run.activity_space_id).eq("enabled", true).in("kind", ["mcp", "http"]).order("created_at");
     for (const row of (rows ?? []) as (IntegrationRow & { enabled: boolean })[]) {
       if (!isSafeEndpoint(row.endpoint)) continue;
       // Never Alcon itself: the board tools already act as the starter, and a
@@ -483,7 +522,7 @@ async function execute(a: ExecArgs): Promise<void> {
   } else {
     state = { messages: [{ role: "user", content: taskMessage(await loadContext(userDb, run, integrationSummary)) }], turns: 0, nudges: 0 };
     turnBudget = maxTotalTurns;
-    await addStep(admin, run.id, "status", run.mode === "reply" ? "依頼を受けて実行を開始" : "任務の実行を開始", `${agentName} / ${AGENT_MODELS[model].label}`);
+    await addStep(admin, run.id, "status", run.mode === "reply" ? "依頼を受けて実行を開始" : "任務の実行を開始", `${agentName} / ${config.modelLabel}`);
   }
 
   const saveTranscript = async (p?: SavedPending) => {
@@ -584,17 +623,31 @@ async function execute(a: ExecArgs): Promise<void> {
   }
 
   // ── Model ───────────────────────────────────────────────────────────────
-  const client = new Anthropic({ apiKey: a.anthropicKey });
-  const system = [{ type: "text" as const, text: systemPrompt({ name: agentName, instructions }), cache_control: { type: "ephemeral" as const } }];
+  // Another provider gets the plain Messages API: no betas, no cache marks.
+  const cache = external ? {} : { cache_control: { type: "ephemeral" as const } };
+  const system = [{ type: "text" as const, text: systemPrompt({ name: agentName, instructions, domainInstructions }), ...cache }];
   const toolParams = tools.map((t, i) => ({
     name: t.name, description: t.description, input_schema: t.input_schema,
-    ...(i === tools.length - 1 ? { cache_control: { type: "ephemeral" as const } } : {}),
+    ...(i === tools.length - 1 ? cache : {}),
   }));
 
   const outcome = await runLoop(state, {
     callModel: async (messages) => {
+      if (external) {
+        // deno-lint-ignore no-explicit-any
+        const res: any = await modelClient.messages.create({
+          model,
+          max_tokens: 8192,
+          system,
+          // deno-lint-ignore no-explicit-any
+          tools: toolParams as any,
+          // deno-lint-ignore no-explicit-any
+          messages: messages as any,
+        });
+        return { content: res.content, stop_reason: res.stop_reason, usage: res.usage };
+      }
       // deno-lint-ignore no-explicit-any
-      const res: any = await client.beta.messages.create({
+      const res: any = await modelClient.beta.messages.create({
         model,
         max_tokens: 16000,
         system,
@@ -620,7 +673,7 @@ async function execute(a: ExecArgs): Promise<void> {
       usage = {
         input: usage.input + (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
         output: usage.output + (u.output_tokens ?? 0),
-        cost: Math.round((usage.cost + costOf(model, u)) * 1_000_000) / 1_000_000,
+        cost: Math.round((usage.cost + costAt(config.price, u)) * 1_000_000) / 1_000_000,
       };
       await admin.from("agent_runs").update({ input_tokens: usage.input, output_tokens: usage.output, cost_usd: usage.cost }).eq("id", run.id);
     },

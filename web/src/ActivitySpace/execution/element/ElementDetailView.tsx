@@ -17,13 +17,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/ui/dropdown-menu';
-import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as DateCalendar } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
 import type { DateRange } from 'react-day-picker';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { isAgentRunOpen } from '@/Function/copilot/agentData';
-import { AgentRunPanel } from './agent';
+import { AgentRunPanel, DelegateToAiForm } from './agent';
+import { useRegisterPageCommand } from '@/Function/shared/pageCommands';
 import {
   updateElement,
   fetchElementWithDetails,
@@ -37,6 +38,8 @@ import {
   noticeAssignmentFailed,
   setCustomColumnValue,
   noticePropertyValueFailed,
+  noticeElementSaveFailed,
+  isElementSaveRefused,
   notifyAboutElement,
   useAgentRun,
   useDomains,
@@ -59,7 +62,8 @@ import { workerTriggerLabel } from '@/Function/shared/workerReach';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
 import { liveLease, holderLabel, formatRemaining } from '@/Function/shared/element/lease';
 import { useNow } from '@/Function/shared/useNow';
-import { Fingerprint, Copy } from '@/ui/icons';
+import { clearUnsavedDraft, pendingDraft, readUnsavedDraft, stashUnsavedDraft } from '@/Function/shared/element/unsavedDraft';
+import { Fingerprint, Copy, Bot } from '@/ui/icons';
 import { labelColor, labelColorKey, domainLabelNames, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/Function/shared/labelColor';
 import { LabelPaletteRows } from '@/Function/shared/LabelPaletteRows';
 import { MenuShell } from '@/Function/shared/menu';
@@ -240,7 +244,29 @@ function ElementDetailBody({
   // nobody here is typing in it (an agent's edit, a teammate's).
   const descriptionFocused = useRef(false);
   const [descriptionRev, setDescriptionRev] = useState(0);
-  const descriptionHtml = useMemo(() => markdownToHtml(element.description || ''), [element.id, descriptionRev]); // eslint-disable-line react-hooks/exhaustive-deps -- restarts only on purpose (above)
+  // A description put back from an unsaved draft seeds the next restart
+  // instead of the saved one; any change from outside clears it again.
+  const [restoredDescription, setRestoredDescription] = useState<string | null>(null);
+  const descriptionHtml = useMemo(() => markdownToHtml(restoredDescription ?? element.description ?? ''), [element.id, descriptionRev]); // eslint-disable-line react-hooks/exhaustive-deps -- restarts only on purpose (above)
+
+  // What was typed but did not save (offline, refused) — kept in this
+  // browser so it can be put back and saved again rather than lost to the
+  // rollback, including when the failure happened as the view closed.
+  // Kept per signed-in user, and only when the write could have landed: a
+  // refused one would be refused again.
+  const viewerId = useCurrentUserId();
+  const [unsavedRev, setUnsavedRev] = useState(0);
+  const unsaved = useMemo(() => readUnsavedDraft(viewerId, element.id), [viewerId, element.id, unsavedRev]); // eslint-disable-line react-hooks/exhaustive-deps -- unsavedRev re-reads the store
+  const keepUnsaved = (error: unknown, field: 'title' | 'description', text: string, base: string) => {
+    if (isElementSaveRefused(error)) return;
+    stashUnsavedDraft(viewerId, element.id, field, text, base);
+    setUnsavedRev((n) => n + 1);
+  };
+  const forgetUnsaved = (fields?: ('title' | 'description')[]) => {
+    clearUnsavedDraft(viewerId, element.id, fields);
+    setUnsavedRev((n) => n + 1);
+  };
+  const offeredDraft = pendingDraft(unsaved, { title: element.title, description: element.description || '' });
 
   // Readers can resize independently of the viewport (sidebar or split pane).
   useEffect(() => {
@@ -289,7 +315,7 @@ function ElementDetailBody({
       setNewSubTitle('');
       onRefresh?.();
     } catch (e) {
-      console.error('Failed to add sub-element', e);
+      noticeElementSaveFailed(e);
     } finally {
       setAddingSub(false);
     }
@@ -334,7 +360,7 @@ function ElementDetailBody({
     try {
       await updateElement(element.id, { type: newType });
       onRefresh?.();
-    } catch (e) { console.error('Failed to update type:', e); }
+    } catch (e) { noticeElementSaveFailed(e); }
   };
 
   const handleCreateType = async (name: string) => {
@@ -342,14 +368,14 @@ function ElementDetailBody({
     try {
       await addDomainElementType(domainId, name);
       await refetchDomains();
-    } catch (e) { console.error('Failed to add element type:', e); }
+    } catch (e) { noticeElementSaveFailed(e); }
   };
 
   const handleLabelsChange = async (labels: string[]) => {
     try {
       await updateElement(element.id, { labels });
       onRefresh?.();
-    } catch (e) { console.error('Failed to update labels:', e); }
+    } catch (e) { noticeElementSaveFailed(e); }
   };
 
   // Auth context for notifications + comment authorship
@@ -366,7 +392,7 @@ function ElementDetailBody({
       log('note', action === 'added' ? `Reacted ${emoji}` : `Removed reaction ${emoji}`);
       await refreshReactions();
     } catch (e) {
-      console.error('Toggle reaction failed', e);
+      noticeElementSaveFailed(e);
     }
   };
 
@@ -387,6 +413,20 @@ function ElementDetailBody({
   // handed to it (agent_runs refuses any other); otherwise the assigned AI.
   const rerunWorkerId = (previous: string | null | undefined) =>
     previous && aiWorkers.some((ai) => ai.id === previous) ? previous : assignedAiWorkerId;
+  // Handing the Element to an AI Worker with instructions — opened from the
+  // Element's "…" menu or ⌘K, never a standing button (AI on demand). It
+  // starts from the previous run's AI and instructions; while a run is open
+  // it says so and starts nothing.
+  const [delegateOpen, setDelegateOpen] = useState(false);
+  const delegateRef = useRef<HTMLDivElement>(null);
+  const delegateAnchorRef = useRef<HTMLSpanElement>(null);
+  const agentBusy = isAgentRunOpen(agent.run);
+  const previousPrompt = agent.run && agent.run.mode !== 'reply' ? agent.run.prompt : null;
+  useRegisterPageCommand({
+    id: 'element-delegate-to-ai', label: 'Delegate to AI…', icon: Bot,
+    keywords: ['agent', 'ai', 'claude', 'run', 'delegate', 'エージェント', '委ねる', '実行'],
+    run: () => setTimeout(() => setDelegateOpen(true), 0),
+  });
   // When a run finishes it moves the Element to "review" and posts its
   // deliverable as a comment — refresh the parent so the status updates.
   // (The comments panel re-reads its thread as the run moves on: refreshKey.)
@@ -453,6 +493,7 @@ function ElementDetailBody({
   useEffect(() => {
     setTitle(element.title);
     setDescription(element.description || '');
+    setRestoredDescription(null);
     if (!descriptionFocused.current) setDescriptionRev((n) => n + 1);
     setEstimatedHours(element.estimated_hours?.toString() || '');
   }, [element.id, element.title, element.description, element.estimated_hours]);
@@ -478,8 +519,8 @@ function ElementDetailBody({
   // What a close-time save needs after the view is gone: who to credit on
   // the Activity rail and whom to tell the list changed (a dialog's owner
   // reads its own query, not the explorer cache updateElement patches).
-  const closeRef = useRef({ author, onRefresh });
-  useEffect(() => { closeRef.current = { author, onRefresh }; }, [author, onRefresh]);
+  const closeRef = useRef({ author, onRefresh, viewerId });
+  useEffect(() => { closeRef.current = { author, onRefresh, viewerId }; }, [author, onRefresh, viewerId]);
   useEffect(() => {
     sentRef.current = { id: element.id, title: element.title, description: element.description || '' };
   }, [element.id, element.title, element.description]);
@@ -490,7 +531,7 @@ function ElementDetailBody({
     if (draft.title.trim() && draft.title.trim() !== sent.title) patch.title = draft.title.trim();
     if (draft.description !== sent.description) patch.description = draft.description || null;
     if (!Object.keys(patch).length) return;
-    const { onRefresh: refresh } = closeRef.current;
+    const { onRefresh: refresh, viewerId: closingViewerId } = closeRef.current;
     void updateElement(sent.id, patch)
       .then(() => {
         // The list first: the save landed, whatever happens to the rail.
@@ -498,32 +539,65 @@ function ElementDetailBody({
         // The database records the rename and the description change itself.
         void invalidateElementActivity(sent.id);
       })
-      .catch((e) => console.error('Failed to save on close', e));
+      .catch((e) => {
+        // Gone from the screen, so keep what was typed for the next opening.
+        if (!isElementSaveRefused(e)) {
+          if (patch.title !== undefined) stashUnsavedDraft(closingViewerId, sent.id, 'title', patch.title, sent.title);
+          if (patch.description !== undefined) stashUnsavedDraft(closingViewerId, sent.id, 'description', patch.description ?? '', sent.description);
+        }
+        noticeElementSaveFailed(e);
+      });
   }, []);
 
   // Handlers
-  const handleTitleSave = async () => {
+  const handleTitleSave = async (typed = title) => {
     // An emptied title is not saved; show the saved one again rather than
     // leaving the field blank until the next navigation.
-    if (!title.trim()) { setTitle(element.title); return; }
-    if (title !== element.title) {
-      sentRef.current = { ...sentRef.current, title: title.trim() };
+    if (!typed.trim()) { setTitle(element.title); return; }
+    if (typed !== element.title) {
+      const next = typed.trim();
+      sentRef.current = { ...sentRef.current, title: next };
       try {
-        await updateElement(element.id, { title: title.trim() });
+        await updateElement(element.id, { title: next });
+        forgetUnsaved(['title']);
         void invalidateElementActivity(element.id);
         onRefresh?.();
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        keepUnsaved(e, 'title', next, element.title);
+        noticeElementSaveFailed(e);
+      }
     }
   };
 
-  const handleDescriptionSave = async () => {
-    if (description !== (element.description || '')) {
+  const handleDescriptionSave = async (next = description) => {
+    if (next !== (element.description || '')) {
+      const description = next;
       sentRef.current = { ...sentRef.current, description };
       try {
         await updateElement(element.id, { description: description || null });
+        forgetUnsaved(['description']);
         void invalidateElementActivity(element.id);
         onRefresh?.();
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        keepUnsaved(e, 'description', description, element.description || '');
+        noticeElementSaveFailed(e);
+      }
+    }
+  };
+
+  // Put an unsaved draft back into the fields and try saving it again.
+  const restoreUnsaved = () => {
+    const draft = offeredDraft;
+    if (!draft) return;
+    if (draft.title !== undefined) {
+      setTitle(draft.title);
+      void handleTitleSave(draft.title);
+    }
+    if (draft.description !== undefined) {
+      setRestoredDescription(draft.description);
+      setDescription(draft.description);
+      setDescriptionRev((n) => n + 1);
+      void handleDescriptionSave(draft.description);
     }
   };
 
@@ -539,7 +613,7 @@ function ElementDetailBody({
       // written (done / blocked come from the notify_element_status trigger).
       if (newStatus !== element.status) await notifyAboutElement(element.id, 'status_change');
       onRefresh?.();
-    } catch (e) { console.error(e); }
+    } catch (e) { noticeElementSaveFailed(e); }
   };
 
   const handlePriorityChange = async (newPriority: string) => {
@@ -547,7 +621,7 @@ function ElementDetailBody({
       await updateElement(element.id, { priority: newPriority as 'medium' });
       void invalidateElementActivity(element.id);
       onRefresh?.();
-    } catch (e) { console.error(e); }
+    } catch (e) { noticeElementSaveFailed(e); }
   };
 
   const handleDateChange = async (field: 'start_date' | 'due_date', value: string) => {
@@ -555,7 +629,7 @@ function ElementDetailBody({
       await updateElement(element.id, { [field]: value || null });
       void invalidateElementActivity(element.id);
       onRefresh?.();
-    } catch (e) { console.error(e); }
+    } catch (e) { noticeElementSaveFailed(e); }
   };
 
   const handleHoursSave = async (field: 'estimated_hours', value: string) => {
@@ -564,7 +638,7 @@ function ElementDetailBody({
       await updateElement(element.id, { [field]: numVal });
       void invalidateElementActivity(element.id);
       onRefresh?.();
-    } catch (e) { console.error(e); }
+    } catch (e) { noticeElementSaveFailed(e); }
   };
 
   // Sub-element create / save now lives inside SubelementDetailModal. The
@@ -620,7 +694,7 @@ function ElementDetailBody({
       log('note', opts.isNew ? `Linked new Note “${opts.name}”` : `Linked Note “${opts.name}”`);
       onRefresh?.();
     } catch (e) {
-      console.error('Failed to link note to element', e);
+      noticeElementSaveFailed(e);
     }
   };
   const handleUnlinkNote = async () => {
@@ -629,7 +703,7 @@ function ElementDetailBody({
       log('note', 'Unlinked Note');
       onRefresh?.();
     } catch (e) {
-      console.error('Failed to unlink note from element', e);
+      noticeElementSaveFailed(e);
     }
   };
 
@@ -701,9 +775,36 @@ function ElementDetailBody({
           <span className="text-foreground truncate max-w-[240px]">{element.title}</span>
           {/* ⋯ actions for the lowest breadcrumb item (this Element):
               duplicate / move / multi-home / delete. */}
-          <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack}
-            onAddDependency={() => setDependencySignal((n) => n + 1)}
-            onOpenApproval={() => setApprovalSignal((n) => n + 1)} />
+          <Popover open={delegateOpen} onOpenChange={setDelegateOpen}>
+            <PopoverAnchor asChild>
+              <span ref={delegateAnchorRef} className="inline-flex">
+                <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack}
+                  onAddDependency={() => setDependencySignal((n) => n + 1)}
+                  onOpenApproval={() => setApprovalSignal((n) => n + 1)}
+                  onDelegateToAi={() => setDelegateOpen(true)} agentBusy={agentBusy} />
+              </span>
+            </PopoverAnchor>
+            {/* It opens just as the "…" menu (or ⌘K's dialog) closes and hands
+                focus back to what opened it — the "…" button, or nowhere. That
+                focus move alone does not close it; the focus comes back to the
+                note. Focus going anywhere else (a click on another field) still
+                closes it and stays where the person put it. */}
+            <PopoverContent ref={delegateRef} align="start" className="w-[380px] p-3"
+              onFocusOutside={(e) => {
+                const to = e.target instanceof Node ? e.target : null;
+                const handBack = !to || to === document.body || !!delegateAnchorRef.current?.contains(to);
+                if (!handBack) return;
+                e.preventDefault();
+                requestAnimationFrame(() => delegateRef.current?.querySelector<HTMLElement>('textarea')?.focus());
+              }}>
+              <DelegateToAiForm aiWorkers={aiWorkers}
+                defaultWorkerId={rerunWorkerId(agent.run?.worker_id)}
+                defaultPrompt={previousPrompt}
+                busy={agentBusy} starting={agent.starting} error={agent.error ?? null}
+                onStart={({ workerId, prompt }) => agent.start({ workerId, prompt, triggeredFrom: 'detail', domainId })}
+                onStarted={() => setDelegateOpen(false)} />
+            </PopoverContent>
+          </Popover>
           <FollowButton kind="element" id={element.id} />
         </div>
         <div className="flex-1" />
@@ -734,7 +835,7 @@ function ElementDetailBody({
                 value={title}
                 rows={1}
                 onChange={(e) => setTitle(e.target.value)}
-                onBlur={handleTitleSave}
+                onBlur={() => { void handleTitleSave(); }}
                 onKeyDown={(e) => {
                   if (isCommitEnter(e) || isSubmitChord(e) || isCancelKey(e)) {
                     e.preventDefault();
@@ -761,11 +862,27 @@ function ElementDetailBody({
             {/* Read and edited in one place: the Markdown is shown formatted and
                 typed into as it is shown, so a click never swaps it for its
                 source. Saved as Markdown when the editor is left. */}
+            {offeredDraft && (
+              <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+                <span className="mr-auto text-[13px]">{t(offeredDraft.description !== undefined
+                  ? 'This Element has a description that was not saved.'
+                  : 'This Element has a title that was not saved.')}{offeredDraft.changedSince && ` ${t('It has been changed since. Saving yours replaces that change.')}`}</span>
+                {offeredDraft.changedSince && (
+                  <div className={`w-full max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-background px-2 py-1.5 ${FONT.sm}`}>
+                    {offeredDraft.title !== undefined && <p className="font-medium">{offeredDraft.title}</p>}
+                    {offeredDraft.description !== undefined && <p>{offeredDraft.description}</p>}
+                  </div>
+                )}
+                <Button variant="primary" size="sm" onClick={restoreUnsaved}>{t('Restore and save')}</Button>
+                <Button variant="ghost" size="sm" onClick={() => forgetUnsaved()}>{t('Discard')}</Button>
+              </div>
+            )}
             <div onFocus={() => { descriptionFocused.current = true; }}
               onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) { descriptionFocused.current = false; void handleDescriptionSave(); } }}>
               <NoteEditor key={`${element.id}:${descriptionRev}`} compact initialHtml={descriptionHtml}
                 placeholder={t('Add description…')}
-                onChange={(html) => setDescription(htmlToMarkdown(html))} />
+                onChange={(html) => setDescription(htmlToMarkdown(html))}
+                onCommit={(html) => { void handleDescriptionSave(htmlToMarkdown(html)); }} />
             </div>
           </div>
 
@@ -1477,11 +1594,13 @@ function EditableLabelChip({ label }: { label: string }) {
     setOpen(false);
     const domainId = getActiveDomainId();
     if (!domainId) return;
+    const previous = labelColorKey(label, domainId);
     setLabelColorLocal(domainId, label, colorKey); // optimistic
     try {
       await setDomainLabelColor(domainId, label, colorKey);
     } catch (e) {
-      console.error('Failed to set label colour', e);
+      if (previous) setLabelColorLocal(domainId, label, previous);
+      noticeElementSaveFailed(e);
     }
   };
   return (
@@ -1561,8 +1680,12 @@ function LabelAddButton({
     setPool((p) => (p.some((l) => l.toLowerCase() === name.toLowerCase()) ? p : [...p, name]));
     const domainId = getActiveDomainId();
     if (domainId) {
+      const previous = labelColorKey(name, domainId);
       setLabelColorLocal(domainId, name, colorKey); // optimistic
-      setDomainLabelColor(domainId, name, colorKey).catch(console.error);
+      setDomainLabelColor(domainId, name, colorKey).catch((e) => {
+        if (previous) setLabelColorLocal(domainId, name, previous);
+        noticeElementSaveFailed(e);
+      });
     }
     reset();
   };

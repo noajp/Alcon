@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseDynamicTable } from '@/lib/supabase';
+import type { TableUpdate } from '@/types/db';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useCurrentUserId } from '@/providers/authContext';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
@@ -13,17 +14,29 @@ import { deleteElementAssigneeOf, insertElementAssignee } from '@/hooks/elementA
 import { fetchDataTableSchema } from '@/hooks/tableData';
 import { readAllPages } from '@/hooks/readAllPages';
 import {
-  buildCrmWorkspace, fieldsFor, measureValue, metricKind, metricValue, normalizeCrmStages, parseActivityLog, resolveStage,
+  buildCrmWorkspace, normalizeCrmStages, parseActivityLog, resolveStage,
   type CrmActivityRecord, type CrmActivityType, type CrmCompanyRecord, type CrmContactRecord, type CrmDeal,
   type CrmDealContactRecord, type CrmDealRecord, type CrmElementLinkRecord, type CrmLinkedElement, type CrmDealRole, type CrmFieldRecord, type CrmNextElement, type CrmPerson, type CrmPipelineRecord, type CrmWorkspace,
 } from '@/Function/crm/crmModel';
 
 const EMPTY: never[] = [];
+
+/** A deal write that leaves the pipeline's success condition to be
+ * recomputed later (once, by crm_refresh_pipeline_measure), for bulk imports. */
+const deferring = <Q extends { setHeader: (name: string, value: string) => Q }>(query: Q, defer: boolean | undefined): Q =>
+  defer ? query.setHeader('x-alcon-crm-defer-measure', '1') : query;
+
+/** A new row needs the columns its table requires; a partial patch is only an
+ *  update. Fails before the write the database would refuse (23502). */
+function assertInsertable<P extends object, K extends keyof P>(patch: P, keys: readonly K[]): asserts patch is P & { [Q in K]-?: Exclude<P[Q], undefined> } {
+  const missing = keys.filter((key) => patch[key] === undefined);
+  if (missing.length) throw new Error(`Missing ${missing.join(', ')}`);
+}
 const ACTIVITY_WINDOW = 3000;
 
 function all<Row extends { id: string }>(label: string, table: string, spaceId: string, order = 'created_at') {
-  return readAllPages<Row>(label, (from, to) => supabase.from(table).select('*', { count: 'exact' })
-    .eq('activity_space_id', spaceId).order(order, { ascending: true }).order('id').range(from, to) as never, row => row.id);
+  return readAllPages<Row>(label, (from, to) => supabaseDynamicTable.from(table).select('*', { count: 'exact' })
+    .eq('activity_space_id', spaceId).order(order, { ascending: true }).order('id').range(from, to), row => row.id);
 }
 
 /** Deal values the App writes. Company and contact may be given by name; a
@@ -124,7 +137,13 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
   const people: CrmPerson[] = useMemo(() => workers.data.map(worker => ({ id: worker.id, name: worker.name, type: worker.type, user_id: worker.user_id ?? null })), [workers.data]);
   const me = people.find(person => person.user_id === userId)?.id ?? null;
 
-  const invalidate = useCallback(() => qc.invalidateQueries({ queryKey: ['crm', spaceId] }), [qc, spaceId]);
+  // A pipeline's figure is written into its success condition by the database
+  // as deals change, so the measures re-read with the CRM.
+  const invalidate = useCallback(() => Promise.all([
+    qc.invalidateQueries({ queryKey: ['crm', spaceId] }),
+    qc.invalidateQueries({ queryKey: ['initiative-measures'] }),
+    qc.invalidateQueries({ queryKey: ['measure-readings'] }),
+  ]).then(() => undefined), [qc, spaceId]);
 
   // Every Space starts with one pipeline, so the App always has somewhere to put
   // a deal. Only the main pane seeds, so two readers never create two. When the
@@ -231,8 +250,8 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
   };
 
   /** Creates or updates a deal in one row write (company / contact rows first when named). */
-  const saveDeal = async (dealId: string | null, patch: CrmDealPatch, extra?: { activity?: { type: CrmActivityType; text: string; date?: string }; quiet?: boolean; onNotice?: (notice: string) => void }): Promise<string> => {
-    const row: Record<string, unknown> = {};
+  const saveDeal = async (dealId: string | null, patch: CrmDealPatch, extra?: { activity?: { type: CrmActivityType; text: string; date?: string }; quiet?: boolean; deferMeasure?: boolean; onNotice?: (notice: string) => void }): Promise<string> => {
+    const row: TableUpdate<'crm_deals'> = {};
     let stepKept = false;
     if (patch.name !== undefined) row.name = patch.name.trim();
     if (patch.stage !== undefined) {
@@ -266,7 +285,7 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
       let id = dealId;
       if (id) {
         const before = deals.data?.find(item => item.id === id);
-        if (Object.keys(row).length) check(await supabase.from('crm_deals').update(row).eq('id', id).select('id').single());
+        if (Object.keys(row).length) check(await deferring(supabase.from('crm_deals').update(row), extra?.deferMeasure).eq('id', id).select('id').single());
         // A new owner takes the open next step with the deal.
         if (patch.ownerId !== undefined && before && before.owner_worker_id !== patch.ownerId) {
           stepKept = !(await moveStep(before.next_element_id, before.owner_worker_id, patch.ownerId));
@@ -274,15 +293,17 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
         }
       }
       else {
+        // crm_deals.pipeline_id is NOT NULL: without a pipeline the insert cannot succeed.
+        if (!pipeline) throw new Error('Choose a pipeline before adding a deal.');
         const first = normalizeCrmStages(pipeline?.stages)[0];
         const stage = (row.stage as string | undefined) ?? first.id;
-        id = check(await supabase.from('crm_deals').insert({
+        id = check(await deferring(supabase.from('crm_deals').insert({
           activity_space_id: space(), pipeline_id: pipeline?.id, currency: pipeline?.currency ?? 'JPY',
           owner_worker_id: me, probability: resolveStage(stage, normalizeCrmStages(pipeline?.stages))?.probability ?? null,
           ...row, stage, name: (row.name as string | undefined) || pipeline?.record_label || 'New deal',
-        }).select('id').single()).id;
+        }), extra?.deferMeasure).select('id').single()).id;
       }
-      if (extra?.activity) await logActivity(id!, extra.activity, { companyId: (row.company_id as string | null | undefined), contactId: (row.contact_id as string | null | undefined), quiet: true });
+      if (extra?.activity) await logActivity(id!, extra.activity, { companyId: (row.company_id as string | null | undefined), contactId: (row.contact_id as string | null | undefined), quiet: true, deferMeasure: extra?.deferMeasure });
       if (stepKept) extra?.onNotice?.('The new owner cannot see the next step’s Object, so the next step stays with the previous owner.');
       return id!;
     } finally { if (!extra?.quiet) await invalidate(); }
@@ -367,19 +388,21 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
   };
 
   const logActivity = async (dealId: string, entry: { type: CrmActivityType; text: string; date?: string },
-    links: { companyId?: string | null; contactId?: string | null; quiet?: boolean } = {}) => {
+    links: { companyId?: string | null; contactId?: string | null; quiet?: boolean; deferMeasure?: boolean } = {}) => {
     const deal = deals.data?.find(item => item.id === dealId);
     const author = people.find(person => person.id === me)?.name ?? null;
     // Links taken from the deal are kept only when this writer can see them: a
     // deal can still point at a company or contact that has since moved into a
     // Domain this writer is not in. Links passed in were just chosen or created.
     const visible = (rows: { id: string }[] | undefined, id: string | null) => id && (rows ?? []).some(item => item.id === id) ? id : null;
-    check(await supabase.from('crm_activities').insert({
+    // A call or meeting moves the deal's last contact (crm_advance_contact), which
+    // would recompute the pipeline's figure; an import defers that to its end.
+    check(await deferring(supabase.from('crm_activities').insert({
       activity_space_id: space(), deal_id: dealId,
       company_id: links.companyId !== undefined ? links.companyId : visible(companies.data, deal?.company_id ?? null),
       contact_id: links.contactId !== undefined ? links.contactId : visible(contacts.data, deal?.contact_id ?? null),
       kind: entry.type, body: entry.text.trim().slice(0, 8000), occurred_on: entry.date ?? today, author_name: author,
-    }).select('id').single());
+    }), links.deferMeasure).select('id').single());
     if (!links.quiet) await invalidate();
   };
 
@@ -435,9 +458,10 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
 
   const deleteDeal = async (dealId: string) => { check(await supabase.from('crm_deals').delete().eq('id', dealId).select('id').single()); await invalidate(); };
 
-  const savePipeline = async (id: string | null, patch: Partial<Omit<CrmPipelineRecord, 'id'>>): Promise<string> => {
+  const savePipeline = async (id: string | null, patch: Partial<Omit<CrmPipelineRecord, 'id' | 'measure_error' | 'measure_refreshed_at'>>): Promise<string> => {
     try {
       if (id) { check(await supabase.from('crm_pipelines').update(patch).eq('id', id).select('id').single()); return id; }
+      assertInsertable(patch, ['name']);
       return check(await supabase.from('crm_pipelines').insert({ activity_space_id: space(), ...patch }).select('id').single()).id;
     } finally { await invalidate(); }
   };
@@ -446,6 +470,7 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
   const saveCompany = async (id: string | null, patch: Partial<Omit<CrmCompanyRecord, 'id' | 'created_at'>>): Promise<string> => {
     try {
       if (id) { check(await supabase.from('crm_companies').update(patch).eq('id', id).select('id').single()); return id; }
+      assertInsertable(patch, ['name']);
       return check(await supabase.from('crm_companies').insert({ activity_space_id: space(), owner_worker_id: me, ...patch }).select('id').single()).id;
     } finally { await invalidate(); }
   };
@@ -453,6 +478,7 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
   const saveContact = async (id: string | null, patch: Partial<Omit<CrmContactRecord, 'id' | 'created_at'>>): Promise<string> => {
     try {
       if (id) { check(await supabase.from('crm_contacts').update(patch).eq('id', id).select('id').single()); return id; }
+      assertInsertable(patch, ['name']);
       return check(await supabase.from('crm_contacts').insert({ activity_space_id: space(), owner_worker_id: me, ...patch }).select('id').single()).id;
     } finally { await invalidate(); }
   };
@@ -462,10 +488,11 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
     try {
       if (id) check(await supabase.from('crm_fields').update(patch).eq('id', id).select('id').single());
       else {
+        assertInsertable(patch, ['entity', 'key', 'label', 'type']);
         // A key may already be taken in a Domain this writer cannot see; the
         // database refuses it, and the field takes the next free suffix.
         for (let attempt = 0; ; attempt += 1) {
-          const key = attempt && patch.key ? `${patch.key}_${attempt + 1}` : patch.key;
+          const key = attempt ? `${patch.key}_${attempt + 1}` : patch.key;
           const result = await supabase.from('crm_fields').insert({ activity_space_id: space(), ...patch, key }).select('id').single();
           if (result.error?.code === '23505' && attempt < 5) continue;
           check(result);
@@ -476,43 +503,11 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
   };
   const deleteField = async (id: string) => { check(await supabase.from('crm_fields').delete().eq('id', id).select('id').single()); await invalidate(); };
 
-  // ── Strategy: report the pipeline's figure into its Initiative measure ──
-  const [measureError, setMeasureError] = useState<string | null>(null);
-  const reported = useRef<string | null>(null);
-  useEffect(() => {
-    const p = workspace?.pipeline;
-    // One writer (the main pane), and only from fresh data, never a cached stale view.
-    if (!seed || !p?.measure_intent_id || !p.measure_metric || !workspace || deals.isFetching) return;
-    // A field metric reports only while its field is one of this pipeline's number fields.
-    const byField = metricKind(p.measure_metric) === 'field';
-    if (byField && !fieldsFor(fields.data ?? [], 'deal', p.domain_id).some(field => field.type === 'number' && field.key === p.measure_field)) return;
-    const value = metricValue(workspace.deals, p.measure_metric, p.currency, today, p.measure_field);
-    // A field total reported as money depends on which currencies the won deals are in.
-    const currencies = byField ? workspace.deals.filter(deal => deal.outcome === 'won').map(deal => `${deal.id}=${deal.currency}`).join(',') : '';
-    const stamp = `${p.measure_intent_id}:${p.measure_metric}:${p.measure_field ?? ''}:${value}:${currencies}`;
-    if (reported.current === stamp) return;
-    reported.current = stamp;
-    void (async () => {
-      const { data, error } = await supabase.from('intents').select('actual_value,unit').eq('id', p.measure_intent_id!).maybeSingle();
-      if (error || !data) { setMeasureError(error?.message ?? 'The linked success condition is not visible to you.'); return; }
-      // Money goes only into the pipeline's own currency, at the condition's scale
-      // (万円…); counts only into count units. Anything else is not written.
-      // A field reported as money counts only deals in the pipeline's currency.
-      const figure = byField ? metricValue(workspace.deals, p.measure_metric!, p.currency, today, p.measure_field, data.unit as string | null) : value;
-      const written = measureValue(data.unit as string | null, p.measure_metric!, p.currency, figure);
-      // Not written now; a later refresh tries again (the unit may have been corrected).
-      if (written === null) { reported.current = null; setMeasureError(null); return; }
-      if (Number(data.actual_value) === written) { setMeasureError(null); return; }
-      const { error: writeError } = await supabase.from('intents').update({ actual_value: written, measured_at: new Date().toISOString() }).eq('id', p.measure_intent_id!).select('id').single();
-      // Success conditions are written by the Initiative's owner; for anyone else the figure updates when they open the CRM.
-      setMeasureError(writeError ? 'Only the Initiative’s owner can update this success condition. It updates when they open the CRM.' : null);
-      if (!writeError) void qc.invalidateQueries({ queryKey: ['initiative-measures'] });
-    })();
-  }, [seed, workspace, deals.isFetching, today, qc, fields.data]);
-
   /** Moves a Table-based pipeline (the CRM's former store) into this Space's
-   * records. Safe to run again: deals it already imported are skipped. */
-  const importFromTable = async (tableId: string, mapping: Record<string, string>): Promise<number> => {
+   * records. Safe to run again: deals it already imported are skipped. Returns
+   * how many deals came in, and why the success condition could not be
+   * updated afterwards, if it could not. */
+  const importFromTable = async (tableId: string, mapping: Record<string, string>): Promise<{ count: number; measureError: string | null }> => {
     const schema = await fetchDataTableSchema(tableId);
     const cell = (rowId: string, field: string) => mapping[field] ? schema.cellsByRow[rowId]?.[mapping[field]] ?? null : null;
     const text = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null;
@@ -523,6 +518,7 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
     const imported = new Set(done.map(row => row.custom?.imported_from).filter(value => typeof value === 'string' && value.startsWith(marker)));
     const stages = normalizeCrmStages(pipeline?.stages);
     let count = 0;
+    let refreshError: string | null = null;
     try {
       for (const row of schema.rows) {
         const name = text(cell(row.id, 'name'));
@@ -542,16 +538,23 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
           // A historical win keeps its own date rather than today's.
           closedOn: date(cell(row.id, 'closeDate')),
           nextStep: text(cell(row.id, 'nextStep')), nextStepOn: date(cell(row.id, 'nextActionDate')),
-        }, { quiet: true });
+        }, { quiet: true, deferMeasure: true });
         for (const entry of [...parseActivityLog(cell(row.id, 'activity'))].reverse()) {
-          if (entry.type !== 'stage' && entry.type !== 'change') await logActivity(dealId, { type: entry.type, text: entry.text, date: entry.date ?? today }, { companyId, contactId, quiet: true });
+          if (entry.type !== 'stage' && entry.type !== 'change') await logActivity(dealId, { type: entry.type, text: entry.text, date: entry.date ?? today }, { companyId, contactId, quiet: true, deferMeasure: true });
         }
         const last = date(cell(row.id, 'lastContact'));
-        if (last) check(await supabase.from('crm_deals').update({ last_contact_on: last }).eq('id', dealId).select('id').single());
+        if (last) check(await deferring(supabase.from('crm_deals').update({ last_contact_on: last }), true).eq('id', dealId).select('id').single());
         count += 1;
       }
-    } finally { await invalidate(); }
-    return count;
+    } finally {
+      // The deals went in without recomputing the pipeline's figure each time;
+      // it is recomputed once, here. (Untyped until the generated types include
+      // this function: they are regenerated from the live schema after the
+      // migration that adds it is applied.)
+      if (pipeline?.id) refreshError = (await supabaseDynamicTable.rpc('crm_refresh_pipeline_measure', { p_pipeline: pipeline.id })).error?.message ?? null;
+      await invalidate();
+    }
+    return { count, measureError: refreshError };
   };
 
   const error = pipelines.error ?? deals.error ?? companies.error ?? contacts.error ?? activities.error ?? fields.error ?? elements.error ?? null;
@@ -570,7 +573,7 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
     loading: enabled && !workspace && !error,
     /** Whether the list of pipelines this reader can see has been read at least once. */
     pipelinesLoaded: pipelines.isFetched,
-    error, measureError,
+    error,
     refetch: invalidate,
     saveDeal, handOver, linkElement, unlinkElement, searchElements, startRenewal, declineRenewal, addDealContact, updateDealContact, removeDealContact, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
     savePipeline, deletePipeline, saveCompany, deleteCompany, saveContact, deleteContact, saveField, deleteField,

@@ -22,7 +22,7 @@ import { LanguageSelect } from '@/Function/i18n/LanguageSelect';
 import { Group, Row, SelectRow, ToggleRow } from './SettingsControls';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { SettingsComingSoon } from './SettingsSection';
-import { InitiativeJudgementSettings, PhaseDefaultsSettings, TimelineDisplaySettings } from './StrategySettingsPanels';
+import { InitiativeJudgementSettings, PhaseDefaultsSettings } from './StrategySettingsPanels';
 
 // =============================================================
 // SettingsView — content pane only. The settings NAV lives in
@@ -77,8 +77,6 @@ export function SettingsView() {
           <PanelShell title={t('Initiative')}><InitiativeJudgementSettings /></PanelShell>
         ) : active === 'phase' ? (
           <PanelShell title={t('Phase')}><PhaseDefaultsSettings /></PanelShell>
-        ) : active === 'timeline' ? (
-          <PanelShell title={t('Timeline')}><TimelineDisplaySettings /></PanelShell>
         ) : active === 'objects' ? (
           <TabbedPanel id="objects" tab={tab}><SettingsComingSoon title={t(SETTINGS_ITEMS.objects.tabs!.find((x) => x.id === tab)?.label ?? 'Objects')} /></TabbedPanel>
         ) : (
