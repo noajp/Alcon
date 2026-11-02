@@ -39,6 +39,8 @@ export function useConnectedAppActions() {
   const refresh = () => queryClient.invalidateQueries({ queryKey: appsKey(userId) });
 
   const setAccess = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: async ({ clientId, access }: { clientId: string; access: OAuthAccess }) => {
       const { error } = await supabase.rpc('set_oauth_client_access', { p_client_id: clientId, p_access: access });
       if (error) throw error;
@@ -49,6 +51,8 @@ export function useConnectedAppActions() {
   // Revoking the grant ends the client's sessions and refresh tokens; the
   // access row goes with it so a later reconnect starts from the consent.
   const disconnect = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: async (clientId: string) => {
       const { error } = await supabase.auth.oauth.revokeGrant({ clientId });
       if (error) throw error;

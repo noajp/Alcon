@@ -136,6 +136,8 @@ export function useIntegrationActions(spaceId: string | null) {
   const refresh = () => qc.invalidateQueries({ queryKey: key });
 
   const create = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: async ({ row, secret }: { row: IntegrationInsertRow; secret: string }) => {
       const { data, error } = await supabase.from('integrations').insert(row).select(COLUMNS).single();
       if (error) throw error;
@@ -156,6 +158,8 @@ export function useIntegrationActions(spaceId: string | null) {
   });
 
   const update = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: async ({ id, patch }: { id: string; patch: IntegrationUpdate }) => {
       const { data, error } = await supabase
         .from('integrations')
@@ -197,13 +201,15 @@ export function useIntegrationActions(spaceId: string | null) {
   });
 
   const test = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: async (id: string) => ({ id, lastTest: await testIntegration(id) }),
     onSuccess: ({ id, lastTest }) => {
       qc.setQueryData<Integration[]>(key, (rows) => rows?.map((r) => (r.id === id ? { ...r, last_test: lastTest } : r)));
     },
   });
 
-  const signIn = useMutation({ mutationFn: (id: string) => startIntegrationOAuth(id) });
+  const signIn = useMutation({ mutationFn: (id: string) => startIntegrationOAuth(id), meta: { silent: true } });
 
   const revoke = useMutation({
     mutationFn: (id: string) => revokeIntegrationOAuth(id),

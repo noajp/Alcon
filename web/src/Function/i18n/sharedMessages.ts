@@ -232,6 +232,13 @@ const SHARED_MESSAGES: Record<string, Row> = {
   'Approval decision': ['承認の結果', '승인 결정', 'Décision d’approbation', 'Decisión de aprobación'],
   'Due soon': ['期限間近', '마감 임박', 'Échéance proche', 'Vence pronto'],
   'Invitation': ['招待', '초대', 'Invitation', 'Invitación'],
+  // Failures (error boundaries and the toast)
+  'Something went wrong.': ['問題が発生しました。', '문제가 발생했습니다.', 'Un problème est survenu.', 'Algo salió mal.'],
+  'This screen stopped because of an error. Try again, or reload the page.': ['エラーのため、この画面を表示できなくなりました。もう一度試すか、ページを再読み込みしてください。', '오류로 인해 이 화면이 중단되었습니다. 다시 시도하거나 페이지를 새로 고치세요.', 'Cet écran s’est arrêté à cause d’une erreur. Réessayez ou rechargez la page.', 'Esta pantalla se detuvo por un error. Inténtalo de nuevo o recarga la página.'],
+  'Reload': ['再読み込み', '새로 고침', 'Recharger', 'Recargar'],
+  'Try again': ['もう一度試す', '다시 시도', 'Réessayer', 'Intentar de nuevo'],
+  'This widget failed to load.': ['このウィジェットを表示できませんでした。', '이 위젯을 표시하지 못했습니다.', 'Ce widget n’a pas pu s’afficher.', 'No se pudo mostrar este widget.'],
+  'Could not save your change.': ['変更を保存できませんでした。', '변경 사항을 저장하지 못했습니다.', 'Impossible d’enregistrer votre modification.', 'No se pudo guardar tu cambio.'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(SHARED_MESSAGES).map(([key, row]) => [key, row[index]]));

@@ -61,6 +61,8 @@ export function usePersonalAccessTokenActions() {
   const key = tokensKey(userId);
 
   const issue = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     // The result is the plaintext token: never let the cache outlive the dialog.
     gcTime: 0,
     mutationFn: async (input: { name: string; expiresDays: TokenExpiryDays; access: PersonalAccessTokenAccess }) => {
@@ -76,6 +78,8 @@ export function usePersonalAccessTokenActions() {
   });
 
   const revoke = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: async (id: string) => {
       const { error } = await supabase.rpc('revoke_personal_access_token', { p_id: id });
       if (error) throw error;

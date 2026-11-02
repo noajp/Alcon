@@ -75,6 +75,8 @@ export function useAssetActions(spaceId: string | null) {
     void qc.invalidateQueries({ queryKey: ['asset-events'] });
   };
   const accept = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: async (assetId: string) => {
       const { error } = await supabase.rpc('accept_asset', { p_asset_id: assetId });
       if (error) throw error;
@@ -82,6 +84,8 @@ export function useAssetActions(spaceId: string | null) {
     onSettled: invalidate,
   });
   const revoke = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: async (assetId: string) => {
       const { error } = await supabase.rpc('revoke_asset', { p_asset_id: assetId });
       if (error) throw error;

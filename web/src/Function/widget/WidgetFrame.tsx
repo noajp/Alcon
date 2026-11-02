@@ -6,6 +6,8 @@ import { Minus } from '@/ui/icons';
 import { FONT } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 import { RailCard } from '@/Function/shared/RailCard';
+import { ErrorBoundary } from '@/Function/shared/ErrorBoundary';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { FrameVariant } from './types';
 
 // =============================================================
@@ -78,6 +80,19 @@ const HeaderSlotContext = createContext<HTMLElement | null>(null);
 export function WidgetHeaderAction({ children }: { children: React.ReactNode }) {
   const node = useContext(HeaderSlotContext);
   return node ? createPortal(children, node) : null;
+}
+
+// ─── Failure ─────────────────────────────────────────────────
+// A widget that throws while rendering stays inside its own frame: the board
+// and the rest of the app keep working, and the box says what happened.
+function WidgetFailed({ reset }: { reset: () => void }) {
+  const { t } = useI18n();
+  return (
+    <div role="alert" className={`${FONT.sm} flex items-center justify-between gap-3 py-1 text-muted-foreground`}>
+      <span className="min-w-0">{t('This widget failed to load.')}</span>
+      <Button variant="secondary" size="xs" onClick={reset}>{t('Retry')}</Button>
+    </div>
+  );
 }
 
 export interface WidgetFrameProps {
@@ -201,7 +216,9 @@ export function WidgetFrame({
   const body = (
     <EmptyContext.Provider value={reportEmpty}>
       <MetaContext.Provider value={reportMeta}>
-        <HeaderSlotContext.Provider value={headerSlot}>{children}</HeaderSlotContext.Provider>
+        <HeaderSlotContext.Provider value={headerSlot}>
+          <ErrorBoundary fallback={({ reset }) => <WidgetFailed reset={reset} />}>{children}</ErrorBoundary>
+        </HeaderSlotContext.Provider>
       </MetaContext.Provider>
     </EmptyContext.Provider>
   );
