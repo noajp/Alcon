@@ -1,5 +1,6 @@
 import { openInApp } from '@/Function/shared/appNavigation';
 import { crmRoute, routeTo } from '@/Function/crm/crmRoute';
+import { requestElementDetail } from '@/Function/shared/element/elementDetailRequest';
 
 /** What a file is attached to, as a search result or a list row has it. */
 export interface FileOwnerRef {
@@ -10,11 +11,13 @@ export interface FileOwnerRef {
   element_object_id: string | null;
 }
 
-/** Opens what a file is attached to, where it lives in Alcon. An Element's
- *  file opens its Object's Elements (an Element has no page of its own to
- *  go to), as ⌘K's Elements do. */
+/** Opens what a file is attached to, where it lives in Alcon: an Element's
+ *  file opens that Element's page (through its Object's). */
 export function openAttachmentOwner(f: FileOwnerRef): void {
-  if (f.element_id) openInApp('domain-elements', { objectId: f.element_object_id ?? null });
+  if (f.element_id) {
+    requestElementDetail(f.element_id);
+    openInApp('objects', { objectId: f.element_object_id ?? null });
+  }
   else if (f.object_id) openInApp('objects', { objectId: f.object_id });
   else if (f.strategy_id) openInApp('strategy', { strategyId: f.strategy_id });
   else if (f.portfolio_id) openInApp('portfolio', { portfolioId: f.portfolio_id });

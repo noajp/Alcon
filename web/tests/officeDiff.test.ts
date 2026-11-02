@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cellRef, diffDocs, diffWorkbooks } from '@/Function/office/officeDiff';
+import { cellRef, diffDecks, diffDocs, diffWorkbooks } from '@/Function/office/officeDiff';
 import type { Cell, WorkSheet } from '@/Function/office/sheetLayout';
 import type { DocBlock, DocLayout, DocPara } from '@/Function/office/docLayout';
 
@@ -46,5 +46,22 @@ describe('diffDocs', () => {
     const d = diffDocs(before, doc([p('Keep'), { kind: 'table', cols: [1], rows: [[{ ...cellOf(''), blocks: [inTable] }]] }]));
     expect(d.marks.get(inTable)).toEqual({ kind: 'changed', before: 'Drop me' });
     expect(d.removed).toBe(1);
+  });
+});
+
+describe('diffDecks', () => {
+  const para = (text: string) => ({ align: 'left' as const, runs: [{ text, size: 18, bold: false, italic: false, underline: false, color: null, font: null, spacing: 0 }], bullet: null, indent: 0, lineHeight: null });
+  const shape = (spId: string, texts: string[]) => ({ kind: 'shape' as const, spId, geom: 'rect', adj: {}, flipH: false, flipV: false, fill: null, stroke: null, x: 0, y: 0, w: 10, h: 10, rot: 0,
+    text: { paras: texts.map(para), anchor: 'top' as const, inset: [0, 0, 0, 0] as [number, number, number, number], vertical: false, wrap: true } });
+  const deck = (...slides: ReturnType<typeof shape>[][]) => ({ width: 960, height: 540, slides: slides.map((items) => ({ background: null, items })) });
+
+  it('matches shapes by id on each slide and paragraphs in order', () => {
+    const before = deck([shape('2', ['Title', 'Point A']), shape('3', ['Gone'])], [shape('5', ['Slide two'])]);
+    const after = deck([shape('2', ['Title', 'Point A!', 'Point B'])], [shape('5', ['Slide two'])], [shape('9', ['New slide'])]);
+    const d = diffDecks(before, after);
+    const marks = [...d.marks.entries()].map(([p, m]) => [p.runs[0].text, m.kind]);
+    expect(marks).toEqual([['Point A!', 'changed'], ['Point B', 'added'], ['New slide', 'added']]);
+    expect(d.removed).toBe(1);
+    expect(d.count).toBe(4);
   });
 });

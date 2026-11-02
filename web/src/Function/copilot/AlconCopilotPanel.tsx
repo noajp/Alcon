@@ -8,6 +8,7 @@ import { SendIcon } from '@/Function/shared/SendIcon';
 import { type CopilotAttachment, type CopilotContext } from './useAlconCopilot';
 import { CopilotMessageView, AttachmentChips } from './CopilotMessages';
 import { ATTACH_ACCEPT, AttachError, MAX_FILES, MAX_PDF_BYTES, readAttachment } from './copilotFiles';
+import { AlconFilePicker } from './AlconFilePicker';
 import { useCopilotConversation } from './CopilotProvider';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
@@ -318,6 +319,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
               title={t('Attach a file (PDF, Markdown, text)')} aria-label={t('Attach a file (PDF, Markdown, text)')} className="text-muted-foreground">
               <Paperclip size={14} />
             </Button>
+            <AlconFilePicker disabled={streaming || files.length >= MAX_FILES} onPick={(f) => { setFileError(null); setFiles((prev) => [...prev, f]); }} />
             <textarea
               ref={inputRef}
               value={input}

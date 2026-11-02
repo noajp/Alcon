@@ -1,4 +1,4 @@
-import { first, kid, kids, openPackage, relId, relOfType, themeColors as readThemeColors, twip } from './ooxml';
+import { breather, first, kid, kids, openPackage, relId, relOfType, themeColors as readThemeColors, twip } from './ooxml';
 
 // A Word document read for drawing it as Word lays it out: the page's
 // width and margins; paragraphs with their style (followed through
@@ -224,8 +224,8 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
     const out: DocBlock[] = [];
     if (on(pFirst('pageBreakBefore'))) out.push({ kind: 'break' });
     const runs: DocRun[] = [];
-    // Plain: nothing but text runs (no tab, break, picture or note mark), in
-    // one piece — such a paragraph can be edited as a line of text.
+    // Plain: text runs only — tabs and line breaks included, but no picture,
+    // note mark or field — in one piece: such a paragraph can be edited as text.
     let plain = true;
     const walk = async (el: Element) => {
       for (const node of Array.from(el.children)) {
@@ -235,8 +235,10 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
           const rPrs = [rPr, ...rStyle, ...styleRPrs].filter((e): e is Element => !!e);
           for (const part of Array.from(node.children)) {
             if (part.localName === 't') runs.push(runOf(rPrs, part.textContent ?? ''));
-            // A field's code or result is the field's, not text to retype.
-            else if (['tab', 'br', 'drawing', 'pict', 'footnoteReference', 'fldChar', 'instrText'].includes(part.localName)) plain = false;
+            // A field's code or result is the field's, not text to retype; a
+            // picture or note mark has no text. Tabs and line breaks are text.
+            else if (['drawing', 'pict', 'footnoteReference', 'fldChar', 'instrText'].includes(part.localName)
+              || (part.localName === 'br' && val(part, 'type') === 'page')) plain = false;
             if (part.localName === 't') continue;
             else if (part.localName === 'tab') runs.push(runOf(rPrs, '\t'));
             else if (part.localName === 'br') {
@@ -354,9 +356,11 @@ export async function readDocLayout(bytes: ArrayBuffer): Promise<DocLayout> {
   };
 
   /** The blocks (paragraphs, tables) directly inside a container. */
+  const breathe = breather(150);
   async function blocksOf(container: Element, partRels: Map<string, string>): Promise<DocBlock[]> {
     const out: DocBlock[] = [];
     for (const child of Array.from(container.children)) {
+      await breathe();
       if (child.localName === 'p') out.push(...await paragraph(child, partRels));
       else if (child.localName === 'tbl') out.push(await table(child, partRels));
       else if (child.localName === 'sdt') out.push(...await blocksOf(kid(child, 'sdtContent') ?? child, partRels));

@@ -140,3 +140,11 @@ export function drawingColor(el: Element | null, colors: Record<string, string>,
   const alpha = mod('alpha');
   return alpha != null ? `rgba(${r}, ${g}, ${b}, ${alpha})` : `#${[r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')}`;
 }
+
+/** A pause to call inside a long loop: every `every` calls it hands the
+ *  page back for a moment, so reading a big file never freezes the screen
+ *  (the readers need DOMParser, which a worker does not have). */
+export function breather(every: number): () => Promise<void> {
+  let n = 0;
+  return async () => { if (++n % every === 0) await new Promise((r) => setTimeout(r, 0)); };
+}

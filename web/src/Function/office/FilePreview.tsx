@@ -14,7 +14,7 @@ import { DocView } from './DocView';
 import { SheetView } from './SheetView';
 import { OfficeTextView } from './OfficeTextView';
 import { withEdit, type EditSession, type OfficeEdit } from './officeEdits';
-import { diffDocs, diffWorkbooks } from './officeDiff';
+import { diffDecks, diffDocs, diffWorkbooks } from './officeDiff';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 
@@ -130,7 +130,9 @@ export function FilePreview({ file, source, height = 480, actions, editor, compa
   const base = compareTo && baseline?.id === compareTo.id ? baseline.loaded : null;
   const sheetChanges = useMemo(() => (base?.workbook && workbook ? diffWorkbooks(base.workbook, workbook) : null), [base, workbook]);
   const docChanges = useMemo(() => (base?.doc && docLayout ? diffDocs(base.doc, docLayout) : null), [base, docLayout]);
-  const changeCount = sheetChanges?.count ?? docChanges?.count ?? null;
+  const deckChanges = useMemo(() => (base?.deck && deck ? diffDecks(base.deck, deck) : null), [base, deck]);
+  const changeCount = sheetChanges?.count ?? docChanges?.count ?? deckChanges?.count ?? null;
+  const removedParas = docChanges?.removed ?? deckChanges?.removed ?? 0;
   const [fullscreen, setFullscreen] = useState(false);
   const [zoom, setZoom] = useState(1);
   // Editing, as in a spreadsheet or a document: there is no mode — a
@@ -218,7 +220,7 @@ export function FilePreview({ file, source, height = 480, actions, editor, compa
           <span className="px-1.5 text-[11.5px] tabular-nums text-muted-foreground">
             {changeCount === null ? <Loader2 size={12} className="inline animate-spin" />
               : changeCount === 0 ? t('No changes from the version before')
-              : docChanges?.removed ? t('{n} changes ({removed} paragraphs removed)', { n: changeCount, removed: docChanges.removed })
+              : removedParas ? t('{n} changes ({removed} paragraphs removed)', { n: changeCount, removed: removedParas })
               : t('{n} changes', { n: changeCount })}
           </span>
         )}
@@ -271,7 +273,7 @@ export function FilePreview({ file, source, height = 480, actions, editor, compa
         ) : kind === 'office' ? (
           officeKind === 'xlsx' ? (workbook ? <SheetView sheets={workbook} edit={session} changes={sheetChanges} /> : spinner)
           : docLayout ? <DocView doc={docLayout} edit={session} changes={docChanges} />
-          : deck ? <DeckView deck={deck} present={fullscreen} edit={session} />
+          : deck ? <DeckView deck={deck} present={fullscreen} edit={session} changes={deckChanges} />
             : office === null ? spinner : <OfficeTextView preview={office} />
         ) : kind === 'text' ? (
           text === null ? spinner

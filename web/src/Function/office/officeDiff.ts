@@ -1,5 +1,6 @@
 import type { Cell, WorkSheet } from './sheetLayout';
 import type { DocBlock, DocLayout, DocPara } from './docLayout';
+import type { Deck, DeckSlide, Para as SlidePara } from './deckLayout';
 
 // What changed between two versions of a file, for marking it in the
 // preview: a workbook's cells (what each changed one held before), a Word
@@ -99,27 +100,64 @@ function commonSubsequence(a: string[], b: string[]): [number, number][] {
   return pairs;
 }
 
-/** Pure. The paragraphs that changed, were added or went between two
- *  versions of a Word document. Between two paragraphs that match, the
- *  ones left over are paired in order as changed; the rest were added (in
- *  the newer) or removed (from the older). */
-export function diffDocs(before: DocLayout, after: DocLayout): DocChanges {
-  const was = paragraphs(before.blocks);
-  const now = paragraphs(after.blocks);
-  const a = was.map(textOf);
-  const b = now.map(textOf);
-  const marks = new Map<DocPara, ParaMark>();
+/** Pure. Paragraph texts of an older version against a newer one's
+ *  paragraphs, matched in order: between two that match, the ones left over
+ *  are paired as changed; the rest were added (in the newer) or removed
+ *  (from the older). */
+function diffParagraphs<P>(was: string[], now: P[], textOfNew: (p: P) => string, marks: Map<P, ParaMark>): number {
+  const b = now.map(textOfNew);
   let removed = 0;
   let i = 0, j = 0;
-  for (const [mi, mj] of [...commonSubsequence(a, b), [a.length, b.length] as [number, number]]) {
-    const gone = a.slice(i, mi);
+  for (const [mi, mj] of [...commonSubsequence(was, b), [was.length, b.length] as [number, number]]) {
+    const gone = was.slice(i, mi);
     const come = now.slice(j, mj);
     come.forEach((p, k) => {
       if (k < gone.length) marks.set(p, { kind: 'changed', before: gone[k] });
-      else if (textOf(p).trim()) marks.set(p, { kind: 'added' });
+      else if (textOfNew(p).trim()) marks.set(p, { kind: 'added' });
     });
     removed += gone.slice(come.length).filter((t) => t.trim()).length;
     i = mi + 1; j = mj + 1;
+  }
+  return removed;
+}
+
+/** Pure. The paragraphs that changed, were added or went between two
+ *  versions of a Word document. */
+export function diffDocs(before: DocLayout, after: DocLayout): DocChanges {
+  const marks = new Map<DocPara, ParaMark>();
+  const removed = diffParagraphs(paragraphs(before.blocks).map(textOf), paragraphs(after.blocks), textOf, marks);
+  return { marks, removed, count: marks.size + removed };
+}
+
+export interface DeckChanges {
+  /** Each paragraph of the newer version's slides that changed or was added. */
+  marks: Map<SlidePara, ParaMark>;
+  removed: number;
+  count: number;
+}
+
+/** A slide's text by shape: its own shapes' paragraphs, keyed by shape id. */
+function shapeTexts(slide: DeckSlide | undefined): Map<string, SlidePara[]> {
+  const out = new Map<string, SlidePara[]>();
+  for (const item of slide?.items ?? []) {
+    if (item.kind === 'shape' && item.spId && item.text) out.set(item.spId, item.text.paras);
+  }
+  return out;
+}
+const slideText = (p: SlidePara) => p.runs.map((r) => r.text).join('');
+
+/** Pure. The paragraphs that changed, were added or went between two
+ *  versions of a PowerPoint deck: slide by slide (in order), shape by
+ *  shape (by its id), paragraphs matched in order as in a document. */
+export function diffDecks(before: Deck, after: Deck): DeckChanges {
+  const marks = new Map<SlidePara, ParaMark>();
+  let removed = 0;
+  const slides = Math.max(before.slides.length, after.slides.length);
+  for (let n = 0; n < slides; n++) {
+    const was = shapeTexts(before.slides[n]);
+    const now = shapeTexts(after.slides[n]);
+    for (const [id, paras] of now) removed += diffParagraphs((was.get(id) ?? []).map(slideText), paras, slideText, marks);
+    for (const [id, paras] of was) if (!now.has(id)) removed += paras.filter((p) => slideText(p).trim()).length;
   }
   return { marks, removed, count: marks.size + removed };
 }

@@ -100,7 +100,7 @@ function DocBlocks({ blocks, edit = null, changes = null }: { blocks: DocBlock[]
     return (
       // A div, not a p: a paragraph may hold a text box with paragraphs of its own.
       <div key={i} title={mark?.kind === 'changed' ? t('Before: {value}', { value: mark.before || t('(empty)') }) : mark ? t('Added')
-        : edit && b.src === undefined && b.runs.some((r) => r.text.trim()) ? t('This paragraph has a tab, line break, picture, note or field, so it cannot be edited here yet.') : undefined} style={{
+        : edit && b.src === undefined && b.runs.some((r) => r.text.trim()) ? t('This paragraph has a picture, note or field, so it cannot be edited here yet.') : undefined} style={{
         ...(mark ? { backgroundColor: mark.kind === 'changed' ? 'var(--status-warning-subtle)' : 'var(--status-success-subtle)', boxShadow: `-6px 0 0 ${mark.kind === 'changed' ? 'var(--status-warning)' : 'var(--status-success)'}` } : {}),
         textAlign: b.align, margin: `${b.before}px 0 ${b.after}px`, paddingLeft: b.indent || undefined, textIndent: b.firstLine || undefined,
         lineHeight: b.line ? b.line * 1.15 : 1.15, minHeight: `${size * 4 / 3 * 1.15}px`, fontSize: `${size * 4 / 3}px`, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
@@ -140,7 +140,8 @@ function EditablePara({ para, edit }: { para: DocPara & { src: number }; edit: E
   return (
     <EditableRuns original={original} edited={edit.pending.get(paraKey(para.src))?.to} accent="var(--doc-accent)"
       look={runCss(para.runs.find((r) => r.text) ?? {})}
-      onChange={(to) => edit.set({ kind: 'para', index: para.src, from: original, to })}>
+      // A tab shows as a wide space; it is a tab again in the file.
+      onChange={(to) => edit.set({ kind: 'para', index: para.src, from: original, to: to.replace(/\u2003/g, '\t') })}>
       {para.runs.map((run, j) => <DocRunView key={j} run={run} />)}
     </EditableRuns>
   );
