@@ -10,7 +10,7 @@
 // reactions and Note links. Reads go through the
 // query cache like every other Element read (ADR 0018).
 
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
@@ -137,8 +137,27 @@ export function useClosedTimesSince(since: Date, enabled: boolean) {
       };
     },
     enabled,
+    // The key moves at midnight; keep the day's times until the new read lands.
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
+}
+
+/**
+ * Record a close this client just made, before the read catches up: put
+ * `elementId → at` into every cached close-time map, then read again. Without
+ * it the window judges the Element by its created_at until the delta stream
+ * arrives — and keeps it hidden if the stream never does.
+ */
+export function noteElementClosed(elementId: string, at: string): void {
+  const qc = getQueryClient();
+  qc.setQueriesData<ClosedTimes>({ queryKey: ['elementClosedTimes'] }, (old) => {
+    if (!old) return old;
+    const closedAt = new Map(old.closedAt);
+    closedAt.set(elementId, at);
+    return { ...old, closedAt };
+  });
+  void qc.invalidateQueries({ queryKey: ['elementClosedTimes'] });
 }
 
 type StatusRow = Pick<ElementActivity, 'element_id' | 'kind' | 'detail' | 'created_at'>;

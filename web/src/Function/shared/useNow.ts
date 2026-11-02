@@ -48,3 +48,16 @@ const getServerSnapshot = () => Number.POSITIVE_INFINITY;
 export function useNow(): number {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
+
+const MINUTE_MS = 60_000;
+const getMinuteSnapshot = () => Math.floor(now / MINUTE_MS) * MINUTE_MS;
+const subscribeNone = () => () => {};
+
+/**
+ * The current time floored to the minute — the component re-renders once a
+ * minute, not on every tick. While `active` is false it does not subscribe
+ * at all, and the value is not meant to be read.
+ */
+export function useNowMinute(active: boolean): number {
+  return useSyncExternalStore(active ? subscribe : subscribeNone, getMinuteSnapshot, getServerSnapshot);
+}

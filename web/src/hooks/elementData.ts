@@ -15,6 +15,8 @@ import { selectIn } from '@/hooks/chunkedIn';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 import { throwOnFailedWrites } from './writeResults';
 import { deleteElementAssignees, insertElementAssignee } from './elementAssigneeWrites';
+import { noteElementClosed } from './elementActivity';
+import { isOpenStatus } from '@/Function/shared/completion';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
@@ -194,6 +196,9 @@ export async function updateElement(
       .select()
       .single();
     if (error) throw error;
+    // Every status edit — picker, board drop, bulk bar — lands here, so this
+    // is where a close reaches the lists' "Completed Elements" window.
+    if (updates.status && !isOpenStatus(updates.status)) noteElementClosed(id, new Date().toISOString());
     return data;
   } catch (err) {
     rollback();

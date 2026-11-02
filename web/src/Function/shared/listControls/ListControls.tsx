@@ -74,6 +74,7 @@ import {
   type ListOrderBy,
 } from './types';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { useClosedWindow } from './useClosedWindow';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { fieldDisplayLabel } from '@/Function/property/fieldModel';
@@ -552,12 +553,7 @@ function DisplayPanel({
             leading={display.orderBy !== 'manual' ? <DirectionToggle direction={display.orderDir} onChange={(orderDir) => setDisplay({ orderDir })} /> : undefined}
             options={ORDER_OPTIONS.map(option => ({ ...option, label: fieldDisplayLabel(t, option) }))} onSelect={(id) => setDisplay({ orderBy: id })} />}
         {showClosedWindow && (
-          <LabeledSelect
-            label="Completed Elements"
-            value={display.closed ?? 'all'}
-            options={CLOSED_OPTIONS.map(option => ({ ...option, label: t(option.label) }))}
-            onSelect={(closed) => setDisplay({ closed })}
-          />
+          <ClosedWindowSelect value={display.closed ?? 'all'} onSelect={(closed) => setDisplay({ closed })} />
         )}
       </div>
 
@@ -598,6 +594,29 @@ function DisplayPanel({
         </>
       )}
     </div>
+  );
+}
+
+// The "Completed Elements" row. When the close times could not be read the
+// window cannot apply — every closed Element stays — so the row says so
+// rather than look like it is working.
+function ClosedWindowSelect({ value, onSelect }: { value: ListClosedWindow; onSelect: (closed: ListClosedWindow) => void }) {
+  const { t } = useI18n();
+  const { failed } = useClosedWindow(value);
+  return (
+    <>
+      <LabeledSelect
+        label="Completed Elements"
+        value={value}
+        options={CLOSED_OPTIONS.map(option => ({ ...option, label: t(option.label) }))}
+        onSelect={onSelect}
+      />
+      {failed && (
+        <p role="status" className="px-1 pb-1 text-[11px] text-muted-foreground">
+          {t('Completion times could not be read, so all completed Elements are shown.')}
+        </p>
+      )}
+    </>
   );
 }
 
