@@ -15,7 +15,7 @@ import {
   Spearhead,
   Milestone,
   GuidingStar,
-  Chevrons,
+  Portfolio,
   CompassRose,
   Layers,
   Users,
@@ -52,7 +52,7 @@ export const NavExecutionModeIcon = ({ size = 20 }: { size?: number }) => <Layer
 export const NavSustainmentModeIcon = ({ size = 20 }: { size?: number }) => <Grip size={size} strokeWidth={2} />;
 // Strategy's units: the Vision above, its Portfolios of Initiatives below.
 export const NavVisionIcon = ({ size = 20 }: { size?: number }) => <GuidingStar size={size} />;
-export const NavPortfolioIcon = ({ size = 20 }: { size?: number }) => <Chevrons size={size} />;
+export const NavPortfolioIcon = ({ size = 20 }: { size?: number }) => <Portfolio size={size} />;
 // Phase — a Domain's period, reachable from an Initiative rather than the nav.
 export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} />;
 
