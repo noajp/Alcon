@@ -677,10 +677,10 @@ export function ListTable({
                             and count stick inside it instead, at the x the
                             row titles stay at. */}
                         <span className="sticky left-[66px] flex min-w-0 items-center">
-                          <span className="text-[14px] font-medium text-foreground min-w-0 truncate">
+                          <span className="text-[15px] font-medium text-foreground min-w-0 truncate">
                             {section.name}
                           </span>
-                          <span className="text-muted-foreground/60 font-normal tabular-nums text-[14px] ml-2">
+                          <span className="text-muted-foreground/60 font-normal tabular-nums text-[15px] ml-2">
                             {itemCount}
                           </span>
                         </span>
