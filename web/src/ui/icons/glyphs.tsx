@@ -59,13 +59,6 @@ export const BookOpen = glyph('BookOpen', {
   </>,
 });
 
-export const Target = glyph('Target', {
-  solid: <>
-    <path fillRule="evenodd" d="M8 2.75a5.25 5.25 0 1 0 0 10.5 5.25 5.25 0 0 0 0-10.5Zm0 1.3a3.95 3.95 0 1 1 0 7.9 3.95 3.95 0 0 1 0-7.9Z" />
-    <circle cx="8" cy="8" r="2.1" />
-  </>,
-});
-
 const BARS = {
   solid: <>
     <rect x="3.4" y="9" width="2.2" height="4.25" rx="1.1" />
@@ -97,21 +90,6 @@ export const Grip = glyph('Grip', {
 export const Milestone = glyph('Milestone', {
   solid: <path d="M3 4.25a.75.75 0 0 1 .75-.75h7.05c.2 0 .4.08.54.23l2.05 2.1a.75.75 0 0 1 0 1.04l-2.05 2.1a.75.75 0 0 1-.54.23H3.75A.75.75 0 0 1 3 8.45Z" />,
   line: <path d="M6.5 9.75v4.25M6.5 1.75v1.5" />,
-});
-
-export const Mountain = glyph('Mountain', {
-  solid: <path d="M6.3 4.4a.8.8 0 0 1 1.4 0l1.65 2.85 1.05-1.65a.8.8 0 0 1 1.36.02l2.8 4.55a.8.8 0 0 1-.68 1.23H2.12a.8.8 0 0 1-.69-1.2Z" />,
-});
-
-export const Briefcase = glyph('Briefcase', {
-  solid: <rect x="2.5" y="5" width="11" height="8.25" rx="1.8" />,
-  cut: <path d="M2 8.75h12" />,
-  line: <path d="M6 5V3.9a.9.9 0 0 1 .9-.9h2.2a.9.9 0 0 1 .9.9V5" />,
-});
-
-export const Stone = glyph('Stone', {
-  solid: <path d="M7.35 2.3a.85.85 0 0 1 1.3 0l4.55 5.15a.85.85 0 0 1 0 1.1L8.65 13.7a.85.85 0 0 1-1.3 0L2.8 8.55a.85.85 0 0 1 0-1.1Z" />,
-  cut: <path d="M2 8h12" />,
 });
 
 export const Layers = glyph('Layers', {
@@ -627,3 +605,33 @@ export const ArrowRightLeft = line('ArrowRightLeft', 'M3 5h10M10 2l3 3-3 3M13 11
 export const Activity = line('Activity', 'M1.75 8h2.5L6 3.75l3.75 8.5L11.5 8h2.75');
 export const ZoomIn = glyph('ZoomIn', { line: <><circle cx="7" cy="7" r="4.1" /><path d="m10.1 10.1 3.15 3.15M5.4 7h3.2M7 5.4v3.2" /></> });
 export const ZoomOut = glyph('ZoomOut', { line: <><circle cx="7" cy="7" r="4.1" /><path d="m10.1 10.1 3.15 3.15M5.4 7h3.2" /></> });
+
+// Strategy — sharp, geometric marks, no rounded corners: the layer that sets
+// direction, and its units under it.
+
+// Strategy itself: a compass rose, four long points and four short.
+export const CompassRose = glyph('CompassRose', {
+  solid: <>
+    <path d="M8 .9 9.45 6.55 15.1 8 9.45 9.45 8 15.1 6.55 9.45.9 8l5.65-1.45Z" />
+    <path d="M12.6 3.4 10.1 7.1 8.9 5.9ZM12.6 12.6 8.9 10.1 10.1 8.9ZM3.4 12.6 5.9 8.9 7.1 10.1ZM3.4 3.4 7.1 5.9 5.9 7.1Z" />
+  </>,
+  cut: <circle cx="8" cy="8" r="1.05" style={hole} />,
+});
+
+// The Vision: the guiding star over the horizon.
+export const GuidingStar = glyph('GuidingStar', {
+  solid: <path d="M8 1.1 9.2 5.55 13.65 6.75 9.2 7.95 8 12.4 6.8 7.95 2.35 6.75 6.8 5.55Z" />,
+  line: <path d="M1.75 14.25h12.5" />,
+});
+
+// A Portfolio: one diamond quartered — a set of bets held as one.
+export const Quartered = glyph('Quartered', {
+  solid: <path d="M8 1.1 14.9 8 8 14.9 1.1 8Z" />,
+  cut: <path d="M4.55 4.55 11.45 11.45M11.45 4.55 4.55 11.45" />,
+});
+
+// An Initiative: a spearhead, the axis of advance.
+export const Spearhead = glyph('Spearhead', {
+  solid: <path d="M8 1.25 14.1 13.6 8 10.35 1.9 13.6Z" />,
+});
+

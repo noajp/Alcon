@@ -41,6 +41,11 @@ const KEEP = '#fff';
 // design-lint-ignore — a mask is luminance: white keeps, black cuts; not a UI colour.
 const CUT = '#000';
 
+// The drawing's 16-unit grid, framed a little inside its edges so every mark
+// draws about 14% larger than the box it is given (no layout changes); what
+// reaches past the frame still shows (overflow visible).
+const VIEW_BOX = '1 1 14 14';
+
 /** Makes a glyph component from its drawing. */
 export function glyph(displayName: string, drawing: Drawing) {
   const Glyph = forwardRef<SVGSVGElement, IconProps>(function Glyph(
@@ -51,7 +56,7 @@ export function glyph(displayName: string, drawing: Drawing) {
     const id = useId();
     const mask = drawing.cut ? `alcon-icon-${id.replace(/:/g, '')}` : null;
     return (
-      <svg ref={ref} width={size} height={size} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"
+      <svg ref={ref} width={size} height={size} viewBox={VIEW_BOX} overflow="visible" fill="currentColor" aria-hidden="true"
         style={color ? { color, ...style } : style} {...rest}>
         {mask && (
           <defs>
