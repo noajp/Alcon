@@ -213,6 +213,8 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   'Optional note…': ['メモ（任意）…', '메모 (선택)…', 'Note facultative…', 'Nota opcional…'],
   'You are working on this, so someone else decides it. Add a reviewer, or step off it.': ['担当しているため、この承認はほかの人が判断します。レビュアーを追加するか、担当を外れてください。', '이 작업을 맡고 있어 다른 사람이 결정합니다. 검토자를 추가하거나 담당에서 빠지세요.', 'Vous y travaillez : quelqu’un d’autre en décide. Ajoutez un relecteur ou retirez-vous.', 'Trabajas en esto, así que lo decide otra persona. Añade un revisor o deja de participar.'],
   'Your decision is needed': ['あなたの判断待ちです', '당신의 결정이 필요합니다', 'Votre décision est attendue', 'Se necesita tu decisión'],
+  'An Element needs at least one Object. Move it before taking it out of this one.': ['Element には少なくとも1つの Object が必要です。外す前に別の Object へ移してください。', 'Element에는 적어도 하나의 Object가 필요합니다. 빼기 전에 다른 Object로 옮기세요.', 'Un Element doit appartenir à au moins un Object. Déplacez-le avant de le retirer de celui-ci.', 'Un Element necesita al menos un Object. Muévelo antes de sacarlo de este.'],
+  'You cannot change where this Element lives.': ['この Element の置き場を変更する権限がありません。', '이 Element의 위치를 바꿀 수 없습니다.', 'Vous ne pouvez pas changer l’emplacement de cet Element.', 'No puedes cambiar dónde está este Element.'],
   'You cannot decide this approval.': ['この承認を判断する権限がありません。', '이 승인을 결정할 수 없습니다.', 'Vous ne pouvez pas trancher cette approbation.', 'No puedes decidir esta aprobación.'],
   'Could not add the reviewer.': ['レビュアーを追加できませんでした。', '검토자를 추가하지 못했습니다.', 'Impossible d’ajouter le relecteur.', 'No se pudo añadir al revisor.'],
   'Could not remove the reviewer.': ['レビュアーを外せませんでした。', '검토자를 제거하지 못했습니다.', 'Impossible de retirer le relecteur.', 'No se pudo quitar al revisor.'],
