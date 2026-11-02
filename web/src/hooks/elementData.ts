@@ -590,43 +590,41 @@ export function useElementBlockers(elementIds: string[]) {
 // ============================================
 
 export async function addElementToObject(elementId: string, objectId: string, isPrimary = false) {
+  // A primary row moves elements.object_id with it (DB trigger
+  // element_objects_follow_primary); the old primary stays a secondary home.
   const { data, error } = await supabase
     .from('element_objects')
     .insert({ element_id: elementId, object_id: objectId, is_primary: isPrimary })
     .select()
     .single();
   if (error) throw error;
-  if (isPrimary) {
-    await supabase.from('elements').update({ object_id: objectId }).eq('id', elementId);
-  }
   invalidateElementDetail(elementId);
   return data;
 }
 
+/** Takes an Element out of one Object. Its primary home cannot just be
+ *  deleted — the Element would point at an Object that no longer holds it,
+ *  or, as its only home, be left with none — so the Element first moves to
+ *  another home (the elements trigger then drops the old primary row), and
+ *  an Element's only home is refused. */
 export async function removeElementFromObject(elementId: string, objectId: string) {
-  const { data: row } = await supabase
-    .from('element_objects')
-    .select('is_primary')
-    .eq('element_id', elementId)
-    .eq('object_id', objectId)
-    .single();
-
-  await supabase.from('element_objects').delete()
-    .eq('element_id', elementId).eq('object_id', objectId);
-
-  if (row?.is_primary) {
-    const { data: remaining } = await supabase
-      .from('element_objects')
-      .select('object_id')
-      .eq('element_id', elementId)
-      .order('created_at', { ascending: true })
-      .limit(1);
-    const newPrimary = remaining?.[0]?.object_id ?? null;
-    await supabase.from('elements').update({ object_id: newPrimary }).eq('id', elementId);
-    if (newPrimary) {
-      await supabase.from('element_objects').update({ is_primary: true })
-        .eq('element_id', elementId).eq('object_id', newPrimary);
-    }
+  const [{ data: element, error: elementError }, { data: links, error: linksError }] = await Promise.all([
+    supabase.from('elements').select('object_id').eq('id', elementId).maybeSingle(),
+    supabase.from('element_objects').select('object_id, created_at').eq('element_id', elementId).order('created_at', { ascending: true }),
+  ]);
+  if (elementError) throw elementError;
+  if (linksError) throw linksError;
+  if (element?.object_id === objectId) {
+    const next = (links ?? []).find((l) => l.object_id !== objectId)?.object_id;
+    if (!next) throw new Error(translate('An Element needs at least one Object. Move it before taking it out of this one.'));
+    const { data: moved, error } = await supabase.from('elements').update({ object_id: next }).eq('id', elementId).select('id');
+    if (error) throw error;
+    if (!moved?.length) throw new Error(translate('You cannot change where this Element lives.'));
+  } else {
+    const { data: gone, error } = await supabase.from('element_objects').delete()
+      .eq('element_id', elementId).eq('object_id', objectId).select('id');
+    if (error) throw error;
+    if (!gone?.length) throw new Error(translate('You cannot change where this Element lives.'));
   }
   invalidateElementDetail(elementId);
 }

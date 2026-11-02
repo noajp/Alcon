@@ -317,24 +317,30 @@ export async function setObjectDomains(objectId: string, domainIds: string[]): P
 
 export async function deleteObject(id: string): Promise<void> {
   // Detach Elements that this Object owns. Multi-homed Elements (registered
-  // in another Object via element_objects) just lose this link; sole-parent
-  // Elements get hard-deleted along with the Object.
+  // in another Object via element_objects) just lose this link — moving to
+  // another home first when this is their primary one, since the primary row
+  // cannot be deleted on its own; sole-parent Elements get hard-deleted along
+  // with the Object.
   const { data: elementRelations } = await supabase
     .from('element_objects')
-    .select('element_id')
+    .select('element_id, is_primary')
     .eq('object_id', id);
 
   if (elementRelations && elementRelations.length > 0) {
     for (const rel of elementRelations) {
       const { data: otherObjects } = await supabase
         .from('element_objects')
-        .select('id')
+        .select('object_id')
         .eq('element_id', rel.element_id)
         .neq('object_id', id);
 
       if (otherObjects && otherObjects.length > 0) {
-        await supabase.from('element_objects').delete()
-          .eq('element_id', rel.element_id).eq('object_id', id);
+        if (rel.is_primary) {
+          await supabase.from('elements').update({ object_id: otherObjects[0].object_id }).eq('id', rel.element_id);
+        } else {
+          await supabase.from('element_objects').delete()
+            .eq('element_id', rel.element_id).eq('object_id', id);
+        }
       } else {
         await supabase.from('elements').delete().eq('id', rel.element_id);
       }
