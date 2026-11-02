@@ -16,6 +16,7 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   'Element title…': ['Element のタイトル…', 'Element 제목…', 'Titre de l’Element…', 'Título del Element…'],
   'This Element has a description that was not saved.': ['この Element には保存されていない説明があります。', '이 Element에 저장되지 않은 설명이 있습니다.', 'Cet Element a une description qui n’a pas été enregistrée.', 'Este Element tiene una descripción que no se guardó.'],
   'This Element has a title that was not saved.': ['この Element には保存されていないタイトルがあります。', '이 Element에 저장되지 않은 제목이 있습니다.', 'Cet Element a un titre qui n’a pas été enregistré.', 'Este Element tiene un título que no se guardó.'],
+  'It has been changed since. Saving yours replaces that change.': ['その後に変更されています。保存するとその変更を置き換えます。', '그 후에 변경되었습니다. 저장하면 그 변경을 대체합니다.', 'Il a été modifié depuis. Enregistrer le vôtre remplace cette modification.', 'Se ha cambiado desde entonces. Guardar el tuyo reemplaza ese cambio.'],
   'Restore and save': ['戻して保存', '복원하고 저장', 'Restaurer et enregistrer', 'Restaurar y guardar'],
   'You cannot change this Element. It is outside your access.': ['この Element は変更できません。アクセスできる範囲の外です。', '이 Element를 변경할 수 없습니다. 접근 범위 밖입니다.', 'Vous ne pouvez pas modifier cet Element. Il est hors de votre accès.', 'No puedes cambiar este Element. Está fuera de tu acceso.'],
   'The change could not be saved. Try again.': ['変更を保存できませんでした。もう一度お試しください。', '변경 사항을 저장하지 못했습니다. 다시 시도하세요.', 'Impossible d’enregistrer la modification. Réessayez.', 'No se pudo guardar el cambio. Inténtalo de nuevo.'],

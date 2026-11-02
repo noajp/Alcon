@@ -208,10 +208,14 @@ export async function updateElement(
  * .single(): PGRST116) says so; anything else (offline, timeout) asks to try
  * again.
  */
+export function isElementSaveRefused(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  return code === '42501' || code === 'PGRST116';
+}
+
 export function noticeElementSaveFailed(error: unknown): void {
   console.error('Element change was not saved:', error);
-  const code = (error as { code?: string } | null)?.code;
-  void appDialog.alert(translate(code === '42501' || code === 'PGRST116'
+  void appDialog.alert(translate(isElementSaveRefused(error)
     ? 'You cannot change this Element. It is outside your access.'
     : 'The change could not be saved. Try again.'));
 }
