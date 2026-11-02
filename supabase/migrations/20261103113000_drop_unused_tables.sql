@@ -22,3 +22,4 @@ drop table if exists public.custom_view_shapes;
 drop table if exists public.custom_views;
 drop table if exists public.time_entries;
 drop function if exists public.roll_time_entry_to_element();
+drop function if exists public.close_time_entry();
