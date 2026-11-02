@@ -102,10 +102,13 @@ export interface FileEditor {
   save(edits: OfficeEdit[]): Promise<{ conflicts: number; skipped: number; newer: boolean }>;
 }
 
-export function FilePreview({ file, source, height = 480, actions, editor, compareTo = null }: {
+export function FilePreview({ file, source, height = 480, actions, presence, editor, compareTo = null }: {
   file: StoredFile; source: FileSource; height?: number;
   /** The caller's own tools for this file (import it, …), shown first. */
   actions?: React.ReactNode;
+  /** Who else has the file open. Always in view (the tools show only on
+   *  hover, which a PDF's own viewer takes), at the preview's foot. */
+  presence?: React.ReactNode;
   /** Given, a workbook's cells and a Word document's paragraphs can be
    *  edited in the preview and saved through it. */
   editor?: FileEditor;
@@ -212,6 +215,9 @@ export function FilePreview({ file, source, height = 480, actions, editor, compa
             {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}{t('Save as new version')}
           </Button>
         </div>
+      )}
+      {presence && (
+        <div className="absolute bottom-2.5 right-2 z-30 rounded-full border border-border/60 bg-[var(--surface-overlay)] p-0.5 shadow-sm">{presence}</div>
       )}
       {/* Tools float over the preview's corner and show on hover: zoom for
           a page, full screen for everything. */}
