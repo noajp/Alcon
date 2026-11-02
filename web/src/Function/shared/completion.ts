@@ -53,7 +53,7 @@ interface StatusActivityRow {
 const DONE_ONLY: ReadonlySet<string> = new Set(['done']);
 
 /** Whether an activity row records a move into one of `statuses`. */
-export function isMoveInto(
+function isMoveInto(
   row: { kind?: string | null; detail?: string | null },
   statuses: ReadonlySet<string>,
 ): boolean {
