@@ -27,7 +27,7 @@ export function IslandHeader({ crumbs, count, after, actions }: {
   return (
     // pl-6: with the crumb's own px-1.5 the path starts 30px in, where the
     // list's first column heading does.
-    <header className="flex h-[50px] flex-shrink-0 items-center gap-1 bg-card pl-6 pr-2">
+    <header className="flex h-[50px] flex-shrink-0 items-center gap-1 border-b border-border/60 bg-card pl-6 pr-2">
       {crumbs.map((c, i) => {
         const last = i === crumbs.length - 1;
         return (

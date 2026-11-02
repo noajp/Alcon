@@ -170,7 +170,7 @@ export function PhaseView({
 
   return (
     <div className="flex flex-col h-full bg-card">
-      <div className="h-[50px] flex flex-shrink-0 items-center gap-1 bg-card pl-6 pr-2">
+      <div className="h-[50px] flex flex-shrink-0 items-center gap-1 border-b border-border/60 bg-card pl-6 pr-2">
         <span className="px-1.5 py-0.5 text-[13px] font-semibold text-foreground">{t('Phase')}</span>
         <div className="flex-1" />
         <button
@@ -439,7 +439,7 @@ function PhaseDetailView({
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card h-full">
       {/* Drawn as the shared IslandHeader is (Function/shared/MainIsland). */}
-      <div className="h-[50px] flex flex-shrink-0 items-center gap-1 bg-card pl-6 pr-2">
+      <div className="h-[50px] flex flex-shrink-0 items-center gap-1 border-b border-border/60 bg-card pl-6 pr-2">
         <button
           type="button"
           onClick={onBack}
