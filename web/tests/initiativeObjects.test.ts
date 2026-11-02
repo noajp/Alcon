@@ -21,6 +21,7 @@ function strategy(id: string, scope: Record<string, unknown> = {}): Strategy {
     icon: null,
     portfolio_id: null,
     vision_id: null,
+    activity_space_id: null,
     created_by: null,
     created_at: '2026-08-31T00:00:00Z',
     updated_at: '2026-08-31T00:00:00Z',

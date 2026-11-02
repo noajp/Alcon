@@ -95,3 +95,19 @@ describe('initiativesOfVision', () => {
     expect(unplaced.map((i) => i.id)).toEqual(['loose']);
   });
 });
+
+describe('an Initiative with a Space of its own is placed by it', () => {
+  const base = { name: 'x', portfolio_id: null, vision_id: null, parentIds: [] as string[], objectIds: [] as string[] };
+  it('lists only this Space’s Initiatives; one without a Space falls back to its Objects', () => {
+    const here = { ...base, id: 'here', activity_space_id: 'S1' };
+    const there = { ...base, id: 'there', activity_space_id: 'S2', objectIds: ['o1'] };
+    const legacy = { ...base, id: 'legacy', activity_space_id: null, objectIds: ['o1'] };
+    const objectDomain = new Map<string, string | null>([['o1', 'd1']]);
+    expect(initiativesInSpace([here, there, legacy], objectDomain, new Set(['d1']), 'S1').map((s) => s.id)).toEqual(['here', 'legacy']);
+  });
+  it('keeps another Space’s loose Initiatives out of this Vision’s unplaced list', () => {
+    const mine = { ...base, id: 'mine', activity_space_id: 'S1' };
+    const theirs = { ...base, id: 'theirs', activity_space_id: 'S2' };
+    expect(initiativesOfVision([mine, theirs], 'v1', 'S1').unplaced.map((s) => s.id)).toEqual(['mine']);
+  });
+});

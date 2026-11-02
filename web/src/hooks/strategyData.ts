@@ -36,6 +36,7 @@ import type {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
+import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 
 // ============================================
 // Strategy: aggregate elements across multiple Domains and/or Objects
@@ -208,7 +209,8 @@ export async function createStrategy(
   const creatorId = await getCurrentUserId();
   const { data, error } = await supabase
     .from('strategies')
-    .insert({ ...input, created_by: input.created_by ?? creatorId })
+    // The Space it is created in; a Portfolio or Vision overrides it (DB trigger).
+    .insert({ ...input, created_by: input.created_by ?? creatorId, activity_space_id: input.activity_space_id ?? getActiveSpaceId() })
     .select()
     .single();
   if (error) throw error;

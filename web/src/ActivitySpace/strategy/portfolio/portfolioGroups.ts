@@ -7,22 +7,30 @@ import type { Portfolio } from '@/types/database';
 // Nested Initiatives (with a parent Initiative) belong to their parent, not
 // to a Portfolio, and are left out here.
 
-export interface PortfolioMember { id: string; name: string; portfolio_id: string | null; vision_id: string | null; parentIds: string[]; objectIds: string[] }
+export interface PortfolioMember { id: string; name: string; portfolio_id: string | null; vision_id: string | null; activity_space_id?: string | null; parentIds: string[]; objectIds: string[] }
 
-/** Initiatives that belong on this Space's Portfolio page. An Initiative has
- *  no Space of its own — it reaches a Space through its Objects' Domains — so
- *  those with an Object in one of the Space's Domains count, and so do
- *  Initiatives with no Object yet (nothing places them elsewhere). */
+/** Whether an Initiative belongs to this Space. One with a Space of its own
+ *  answers directly; one without (written before Initiatives had a Space)
+ *  is placed by the caller's fallback. */
+export function inSpace(s: { activity_space_id?: string | null }, spaceId: string | null, fallback: () => boolean): boolean {
+  return s.activity_space_id ? s.activity_space_id === spaceId : fallback();
+}
+
+/** Initiatives that belong on this Space's Portfolio page: those whose Space
+ *  it is. One without a Space reaches it through its Objects' Domains — an
+ *  Object in one of the Space's Domains counts, and so does having no Object
+ *  yet (nothing places it elsewhere). */
 export function initiativesInSpace<T extends PortfolioMember>(
   initiatives: T[],
   objectDomain: Map<string, string | null>,
   spaceDomainIds: Set<string>,
+  spaceId: string | null = null,
 ): T[] {
-  return initiatives.filter((s) =>
+  return initiatives.filter((s) => inSpace(s, spaceId, () =>
     s.objectIds.length === 0 || s.objectIds.some((oid) => {
       const d = objectDomain.get(oid);
       return !!d && spaceDomainIds.has(d);
-    }));
+    })));
 }
 
 /** Root Initiatives keyed by the Portfolio they sit in; `unassigned` holds
@@ -144,10 +152,11 @@ export function rollupPortfolio<T extends { id: string }>(
 /** Root Initiatives split by where they stand relative to a Vision: under
  *  it, or under no Vision at all (still to be placed). Initiatives of other
  *  Visions are neither. */
-export function initiativesOfVision<T extends PortfolioMember>(initiatives: T[], visionId: string): { inVision: T[]; unplaced: T[] } {
+export function initiativesOfVision<T extends PortfolioMember>(initiatives: T[], visionId: string, spaceId: string | null = null): { inVision: T[]; unplaced: T[] } {
   const roots = initiatives.filter((s) => s.parentIds.length === 0);
   return {
     inVision: roots.filter((s) => s.vision_id === visionId),
-    unplaced: roots.filter((s) => !s.vision_id),
+    // Unplaced in this Space: another Space's loose Initiatives stay there.
+    unplaced: roots.filter((s) => !s.vision_id && inSpace(s, spaceId, () => true)),
   };
 }
