@@ -809,59 +809,6 @@ export interface ObjectTabUpdate {
 }
 
 // =====================================================
-// Documents - Notion-like global documents
-// =====================================================
-
-export type DocumentType = 'folder' | 'page'
-
-export interface Document {
-  id: string
-  parent_id: string | null
-  type: DocumentType
-  title: string
-  content: Json
-  icon: string | null
-  cover_image: string | null
-  is_favorite: boolean
-  order_index: number
-  created_at: string | null
-  updated_at: string | null
-}
-
-export interface DocumentInsert {
-  id?: string
-  parent_id?: string | null
-  type: DocumentType
-  title?: string
-  content?: Json
-  icon?: string | null
-  cover_image?: string | null
-  is_favorite?: boolean
-  order_index?: number
-  created_at?: string | null
-  updated_at?: string | null
-}
-
-export interface DocumentUpdate {
-  id?: string
-  parent_id?: string | null
-  type?: DocumentType
-  title?: string
-  content?: Json
-  icon?: string | null
-  cover_image?: string | null
-  is_favorite?: boolean
-  order_index?: number
-  created_at?: string | null
-  updated_at?: string | null
-}
-
-// Document with children (for tree structure)
-export interface DocumentWithChildren extends Document {
-  children?: DocumentWithChildren[]
-}
-
-// =====================================================
 // Extended Types with Relations
 // =====================================================
 
