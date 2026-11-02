@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { ChevronDown, MoreHorizontal } from '@/ui/icons';
 import { SendIcon } from '@/Function/shared/SendIcon';
 import { Button } from '@/ui/button';
+import { aiProviderOf } from '@/Function/team/aiAgents';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell, MENU_SEPARATOR } from '@/Function/shared/menu/MenuShell';
@@ -45,39 +46,26 @@ function renderWithMentions(text: string): React.ReactNode {
   );
 }
 
-// Local copies of the providers' official icons keep historical comments
-// independent of external image availability. Sources: github.com/openai.png;
-// assets.claude.com/95a868946ac8a31e5ff832e2899f294aa368b836.png.
-const AI_COMMENT_LOGOS = new Map([
-  ['claude', '/ai-logos/claude.png'],
-  ['chatgpt', '/ai-logos/chatgpt.png'],
-  ['codex', '/ai-logos/chatgpt.png'],
-]);
-
-/** Prefer the Worker's configured photo. Historical AI comments often have
- *  no author_id, so recognized provider names get a logo as a visual fallback.
- *  This never resolves identity or permissions, and never applies to humans. */
+/** Prefer the Worker's configured photo; an AI agent of a known provider
+ *  wears that provider's mark (Function/team/aiAgents), by its model or —
+ *  for historical comments with no author_id — its name. The mark never
+ *  resolves identity or permissions, and never applies to humans. */
 export function CommentAvatar({
   name,
   kind,
   isMine,
   avatarUrl,
+  aiModel,
 }: {
   name: string | null;
   kind: CommentAuthorKind;
   isMine: boolean;
   avatarUrl?: string | null;
+  aiModel?: string | null;
 }) {
-  const logo = kind === 'ai_agent' ? AI_COMMENT_LOGOS.get(name?.trim().toLowerCase() ?? '') : undefined;
-  const imageUrl = avatarUrl || logo;
-  if (imageUrl) {
-    return (
-      <WorkerAvatar
-        worker={{ name: name ?? '', avatar_url: imageUrl }}
-        size={20}
-        className="flex-shrink-0"
-      />
-    );
+  const subject = { name: name ?? '', avatar_url: avatarUrl, type: kind === 'ai_agent' ? 'ai_agent' as const : undefined, ai_model: aiModel };
+  if (avatarUrl || aiProviderOf(subject)) {
+    return <WorkerAvatar worker={subject} size={20} className="flex-shrink-0" />;
   }
   return (
     <div
