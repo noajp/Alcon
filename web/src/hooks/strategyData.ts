@@ -236,7 +236,12 @@ export async function createStrategy(
   if (objectIds.length > 0) {
     const rows = objectIds.map((object_id) => ({ strategy_id: strategy.id, object_id }));
     const { error: linkErr } = await supabase.from('strategy_objects').insert(rows);
-    if (linkErr) throw linkErr;
+    if (linkErr) {
+      // Take the half-made Initiative back out, so trying again does not
+      // leave two of it.
+      await supabase.from('strategies').delete().eq('id', strategy.id);
+      throw linkErr;
+    }
   }
   return strategy;
 }
@@ -265,20 +270,38 @@ export async function deleteStrategy(id: string): Promise<void> {
   invalidateStrategies();
 }
 
+/** Makes an Initiative's Objects exactly `objectIds`, writing only the
+ *  difference: links to add first, then links to drop — so a failure part
+ *  way leaves extra links rather than none (the old delete-all-then-insert
+ *  lost every link when the insert failed). */
 export async function setStrategyObjects(strategyId: string, objectIds: string[]): Promise<void> {
-  // Replace the link set in one transaction-ish flow. For V1 a delete+insert
-  // is acceptable; the unique (strategy_id, object_id) constraint prevents
-  // duplicates if a race occurs.
-  const { error: delErr } = await supabase
+  const { data: current, error: readErr } = await supabase
     .from('strategy_objects')
-    .delete()
+    .select('object_id')
     .eq('strategy_id', strategyId);
-  if (delErr) throw delErr;
-  if (objectIds.length > 0) {
-    const rows = objectIds.map((object_id) => ({ strategy_id: strategyId, object_id }));
-    const { error: insErr } = await supabase.from('strategy_objects').insert(rows);
-    if (insErr) throw insErr;
+  if (readErr) throw readErr;
+  const { toAdd, toRemove } = diffLinks((current ?? []).map((r) => r.object_id as string), objectIds);
+  if (toAdd.length > 0) {
+    const rows = toAdd.map((object_id) => ({ strategy_id: strategyId, object_id }));
+    const { error } = await supabase.from('strategy_objects')
+      .upsert(rows, { onConflict: 'strategy_id,object_id', ignoreDuplicates: true });
+    if (error) throw error;
   }
+  if (toRemove.length > 0) {
+    const { error } = await supabase.from('strategy_objects').delete()
+      .eq('strategy_id', strategyId).in('object_id', toRemove);
+    if (error) throw error;
+  }
+}
+
+/** The links to add and to drop to turn `current` into `next`. */
+export function diffLinks(current: readonly string[], next: readonly string[]): { toAdd: string[]; toRemove: string[] } {
+  const have = new Set(current);
+  const want = new Set(next);
+  return {
+    toAdd: [...want].filter((id) => !have.has(id)),
+    toRemove: [...have].filter((id) => !want.has(id)),
+  };
 }
 
 // Strategy nesting (Asana-portfolio style — a Strategy can hold other
