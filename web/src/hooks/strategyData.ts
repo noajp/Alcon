@@ -18,6 +18,7 @@ import type {
   IntentBindingInsert,
   IntentEscalation,
   IntentInsert,
+  MeasureReadingSource,
   IntentLineage,
   IntentNextAction,
   IntentPrediction,
@@ -585,24 +586,32 @@ const NO_LINEAGE: IntentLineage[] = []
 
 // Master / Sub-Intent CRUD ────────────────────────────────────────────
 
-export async function createIntent(input: IntentInsert): Promise<Intent> {
+/** The header the intent_measure_readings trigger reads to label where a
+ *  reading came from. Sent only when a write carries a reading. */
+export const READING_SOURCE_HEADER = 'x-alcon-reading-source'
+
+export async function createIntent(
+  input: IntentInsert,
+  readingSource?: MeasureReadingSource,
+): Promise<Intent> {
   const userId = await getCurrentUserId()
-  const { data, error } = await supabase
+  let query = supabase
     .from('intents')
     .insert({ ...input, created_by: input.created_by ?? userId ?? undefined })
-    .select()
-    .single()
+  if (readingSource) query = query.setHeader(READING_SOURCE_HEADER, readingSource)
+  const { data, error } = await query.select().single()
   if (error) throw error
   return data as Intent
 }
 
-export async function updateIntent(id: string, updates: IntentUpdate): Promise<Intent> {
-  const { data, error } = await supabase
-    .from('intents')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
+export async function updateIntent(
+  id: string,
+  updates: IntentUpdate,
+  readingSource?: MeasureReadingSource,
+): Promise<Intent> {
+  let query = supabase.from('intents').update(updates)
+  if (readingSource) query = query.setHeader(READING_SOURCE_HEADER, readingSource)
+  const { data, error } = await query.eq('id', id).select().single()
   if (error) throw error
   return data as Intent
 }

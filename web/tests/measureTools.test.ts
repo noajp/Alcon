@@ -15,12 +15,15 @@ describe('Initiative measure Copilot boundaries', () => {
   });
   it('scopes writes by both Initiative and kind without replacing omitted values', async () => {
     const filters: unknown[] = [];
+    const headers: unknown[] = [];
     let written: unknown;
-    const query = {select:()=>query,eq:(key: string,value: unknown)=>{filters.push([key,value]);return query;},single:async()=>({data:{id},error:null})};
+    const query = {select:()=>query,setHeader:(name: string,value: string)=>{headers.push([name,value]);return query;},eq:(key: string,value: unknown)=>{filters.push([key,value]);return query;},single:async()=>({data:{id},error:null})};
     const db = {from:(table: string)=>{expect(table).toBe('intents');return {update:(patch: unknown)=>{written=patch;return query;}};}};
     await runMeasureTool(db as never,{action:'update',strategyId:id,id,patch:{unit:'件'}});
     expect(written).toEqual({unit:'件'});
     expect(filters).toEqual([['id',id],['strategy_id',id],['kind','measure']]);
+    // The reading-history trigger labels Copilot's writes by this header.
+    expect(headers).toEqual([['x-alcon-reading-source','copilot']]);
   });
   it('reports denied or missing mutations as failures', async () => {
     const query = {select:()=>query,eq:()=>query,single:async()=>({data:null,error:{message:'No rows'}})};
