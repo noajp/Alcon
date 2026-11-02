@@ -13,6 +13,7 @@ import {
 } from '@/Function/sync/explorerPatch';
 import { selectIn } from '@/hooks/chunkedIn';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
+import { throwOnFailedWrites } from './writeResults';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
 import type {
@@ -205,9 +206,9 @@ export async function reorderElements(updates: { id: string; order_index: number
   // by elements.order_index, so persisting these values keeps the order.
   const rollback = applyOptimisticExplorerPatch(data => reorderElementsInExplorer(data, updates));
   try {
-    await Promise.all(updates.map(u =>
-      supabase.from('elements').update({ order_index: u.order_index }).eq('id', u.id)
-    ));
+    throwOnFailedWrites(await Promise.all(updates.map(u =>
+      supabase.from('elements').update({ order_index: u.order_index }).eq('id', u.id).select('id')
+    )), 'reorderElements');
   } catch (err) {
     rollback();
     throw err;

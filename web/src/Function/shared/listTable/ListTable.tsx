@@ -464,7 +464,8 @@ export function ListTable({
       // Reorder against the DISPLAYED (sorted) order so the new order_index
       // matches where the user dropped, not the raw fetch order.
       const updates = reorderWithinSections(sortedSections.map((sec) => sec.objects ?? []), aId, oId);
-      if (updates) void reorderObjects(updates);
+      // A refused write rolls the rows back to where they were.
+      if (updates) reorderObjects(updates).catch(err => console.error('Failed to reorder Objects:', err));
       return;
     }
     // Element row reorder branch — scoped to within the section that holds
@@ -473,7 +474,7 @@ export function ListTable({
     if (!activeId.startsWith(HEADER_DRAG_PREFIX) && !overId.startsWith(HEADER_DRAG_PREFIX) &&
         !activeId.startsWith(OBJECT_DRAG_PREFIX) && !overId.startsWith(OBJECT_DRAG_PREFIX)) {
       const updates = reorderWithinSections(sortedSections.map((sec) => sec.elements ?? []), activeId, overId);
-      if (updates) void reorderElements(updates);
+      if (updates) reorderElements(updates).catch(err => console.error('Failed to reorder Elements:', err));
     }
   };
 
