@@ -3,13 +3,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
+import { getQueryClient } from '@/lib/queryClient';
 import { applyOfficeEdits, type OfficeEdit } from '@/Function/office/officeEdits';
 import { latestVersions, versionChain, versionsPastKeeping } from '@/Function/shared/fileVersions';
 import { fileText } from '@/Function/office/fileText';
 
 // Files attached to one thing in the Space — an Element, an Object, an
-// Initiative, a Portfolio, a CRM deal or company — from the person's
-// computer. The file is evidence for what it is attached to: it is seen by
+// Initiative, a Portfolio, a CRM deal or company, or one of the Space's
+// folders — from the person's computer. The file is evidence for what it is attached to: it is seen by
 // exactly those who can see that thing (attachments' RLS asks the owner's),
 // and goes with it. The bytes live in the private `element-files` bucket
 // under "<owner kind>/<owner id>/…", opened through a short-lived signed
@@ -34,7 +35,7 @@ export const TRASH_DAYS = 30;
 const DAY = 86_400_000;
 
 /** What a file can be attached to, and the column that names it. */
-export type AttachmentOwnerKind = 'element' | 'object' | 'strategy' | 'portfolio' | 'deal' | 'company';
+export type AttachmentOwnerKind = 'element' | 'object' | 'strategy' | 'portfolio' | 'deal' | 'company' | 'folder';
 export interface AttachmentOwner { kind: AttachmentOwnerKind; id: string }
 /** Pure. What a board's subject attaches files as (null: it cannot hold files). */
 export function attachmentOwnerOf(subject: { kind: string; id: string | null }): AttachmentOwner | null {
@@ -43,6 +44,7 @@ export function attachmentOwnerOf(subject: { kind: string; id: string | null }):
 }
 const OWNER_COLUMN: Record<AttachmentOwnerKind, string> = {
   element: 'element_id', object: 'object_id', strategy: 'strategy_id', portfolio: 'portfolio_id', deal: 'deal_id', company: 'company_id',
+  folder: 'folder_id',
 };
 
 export interface Attachment {
@@ -62,9 +64,10 @@ export interface Attachment {
   portfolio_id: string | null;
   deal_id: string | null;
   company_id: string | null;
+  folder_id: string | null;
 }
 
-const COLUMNS = 'id, path, name, size, mime_type, uploaded_by, created_at, deleted_at, previous_id, element_id, object_id, strategy_id, portfolio_id, deal_id, company_id';
+const COLUMNS = 'id, path, name, size, mime_type, uploaded_by, created_at, deleted_at, previous_id, element_id, object_id, strategy_id, portfolio_id, deal_id, company_id, folder_id';
 const EMPTY: Attachment[] = [];
 
 /** Pure. What a file is attached to (exactly one owner column is set). */
@@ -186,9 +189,11 @@ export function useAttachmentActions(owner: AttachmentOwner) {
       .update(deleted ? { deleted_at: new Date().toISOString(), deleted_by: auth.user?.id ?? null } : { deleted_at: null, deleted_by: null })
       .in('id', ids.length ? ids : [file.id]);
     if (error) throw error;
+    // A file restored into a deleted folder brings the folder back.
+    if (!deleted && file.folder_id) await supabase.from('folders').update({ deleted_at: null }).eq('id', file.folder_id).not('deleted_at', 'is', null);
   };
   const remove = useMutation({ mutationFn: (file: Attachment) => mark(file, true), onSettled: refresh });
-  const restore = useMutation({ mutationFn: (file: Attachment) => mark(file, false), onSettled: refresh });
+  const restore = useMutation({ mutationFn: (file: Attachment) => mark(file, false), onSettled: () => { refresh(); void qc.invalidateQueries({ queryKey: ['folders'] }); } });
   /** Saves edits as the file's next version, under the same name: applied
    *  to whatever version is newest when saving. */
   const saveEdits = useMutation({
@@ -225,6 +230,17 @@ export function useAttachmentActions(owner: AttachmentOwner) {
     onSettled: refresh,
   });
   return { upload, remove, restore, saveEdits, restoreVersion };
+}
+
+/** Puts a folder's file — every version of it — in another folder. */
+export async function moveFileToFolder(file: Attachment, folderId: string): Promise<void> {
+  if (!file.folder_id) throw new Error(translate('Only a file kept in a folder can move between folders.'));
+  const ids = versionChain(await rowsOf({ kind: 'folder', id: file.folder_id }), file.id).map((v) => v.id);
+  const { error } = await supabase.from('attachments').update({ folder_id: folderId }).in('id', ids.length ? ids : [file.id]);
+  if (error) throw error;
+  const qc = getQueryClient();
+  void qc.invalidateQueries({ queryKey: ['attachments'] });
+  void qc.invalidateQueries({ queryKey: ['attachments-of'] });
 }
 
 /** A short-lived signed link to a file, for previewing it in the page. */
@@ -281,6 +297,8 @@ export interface SpaceFile extends Attachment {
   owner_label: string | null;
   /** For a file on an Element: the Object it is in, to open it there. */
   element_object_id: string | null;
+  /** The Domain it sits in (through its Element, Object or folder); none for an Initiative's or a CRM record's. */
+  domain_id: string | null;
   versions: number;
 }
 
@@ -359,7 +377,7 @@ export async function indexSpaceFiles(spaceId: string): Promise<void> {
 }
 
 /** A file found by its name, what it is attached to, or its words. */
-export interface FoundFile extends Pick<Attachment, 'id' | 'name' | 'mime_type' | 'element_id' | 'object_id' | 'strategy_id' | 'portfolio_id' | 'deal_id' | 'company_id'> {
+export interface FoundFile extends Pick<Attachment, 'id' | 'name' | 'mime_type' | 'element_id' | 'object_id' | 'strategy_id' | 'portfolio_id' | 'deal_id' | 'company_id' | 'folder_id'> {
   owner_label: string | null;
   element_object_id: string | null;
   /** The words around where the text matched (null when the name did). */

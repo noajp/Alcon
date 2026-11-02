@@ -10,15 +10,14 @@ import { scopeWorkspace, type CrmWorkspace } from '@/Function/crm/crmModel';
  *  companies and contacts — read the same way by the sidebar and the pages. */
 export function useCrmScope(crm: Crm, pipelineId: string | null | undefined) {
   const { t } = useI18n();
-  // The Domains worth offering: those holding CRM records.
-  const domainIds = useMemo(() => {
-    const used = new Set<string>();
-    for (const record of [...crm.pipelines, ...crm.companies, ...crm.contacts]) if (record.domain_id) used.add(record.domain_id);
-    return [...used];
-  }, [crm.pipelines, crm.companies, crm.contacts]);
+  // Any Domain of the Space can be the scope — an empty one too, to start its CRM there.
+  const domainIds = useMemo(() => crm.domains.map(domain => domain.id), [crm.domains]);
   const [scope, setScope] = useToolScope('crm', domainIds);
   const name = (id: ToolScope) => id === null ? t('Everything') : id === SPACE_SCOPE ? t('Shared by the Space') : crm.domains.find(domain => domain.id === id)?.name ?? t('Unknown Domain');
-  const options = domainIds.length ? [null, SPACE_SCOPE, ...[...domainIds].sort((a, b) => name(a).localeCompare(name(b)))].map(id => ({ id, name: name(id) })) : [];
+  // Whether some records belong to no Domain (shared by the Space): only then is that scope offered.
+  const hasShared = useMemo(() => [...crm.pipelines, ...crm.companies, ...crm.contacts].some(record => !record.domain_id), [crm.pipelines, crm.companies, crm.contacts]);
+  /** The Domain new records made in this scope go into. */
+  const domainId = scope && scope !== SPACE_SCOPE ? scope : null;
 
   const pipelines = useMemo(() => crm.pipelines.filter(item => inToolScope(scope, item.domain_id)), [crm.pipelines, scope]);
   const workspaces = useMemo(() => crm.workspaces.filter(workspace => inToolScope(scope, workspace.pipeline.domain_id)), [crm.workspaces, scope]);
@@ -28,5 +27,5 @@ export function useCrmScope(crm: Crm, pipelineId: string | null | undefined) {
   const pooled = useMemo(() => workspace ? scopeWorkspace(workspaces, workspace) : null, [workspaces, workspace]);
   const companies = useMemo(() => crm.companies.filter(item => inToolScope(scope, item.domain_id)), [crm.companies, scope]);
   const contacts = useMemo(() => crm.contacts.filter(item => inToolScope(scope, item.domain_id)), [crm.contacts, scope]);
-  return { scope, setScope, scopeName: name(scope), options, pipelines, workspaces, pipeline, workspace, pooled, companies, contacts };
+  return { scope, setScope, scopeName: name(scope), hasShared, domainId, pipelines, workspaces, pipeline, workspace, pooled, companies, contacts };
 }
