@@ -1108,6 +1108,7 @@ export type NotificationKind =
   | 'review_due'
   | 'invite'
   | 'asset_announced'
+  | 'measure_missed'
 
 export interface Notification {
   id: string
@@ -1120,7 +1121,8 @@ export interface Notification {
   /** Initiative thread: comment_id's FK points at element_comments, so a
    *  Initiative comment hangs off these two instead. */
   strategy_id: string | null
-  /** The decision a review-due notification is about. */
+  /** The decision a review-due notification is about, or the success
+   *  condition a measure-missed one is about. */
   intent_id: string | null
   strategy_comment_id: string | null
   object_id: string | null
