@@ -392,6 +392,7 @@ function ElementDetailBody({
   // starts from the previous run's AI and instructions; while a run is open
   // it says so and starts nothing.
   const [delegateOpen, setDelegateOpen] = useState(false);
+  const delegateRef = useRef<HTMLDivElement>(null);
   const agentBusy = isAgentRunOpen(agent.run);
   const previousPrompt = agent.run && agent.run.mode !== 'reply' ? agent.run.prompt : null;
   useRegisterPageCommand({
@@ -722,7 +723,15 @@ function ElementDetailBody({
                   onDelegateToAi={() => setDelegateOpen(true)} agentBusy={agentBusy} />
               </span>
             </PopoverAnchor>
-            <PopoverContent align="start" className="w-[380px] p-3">
+            {/* It opens just as the "…" menu (or ⌘K's dialog) closes and hands
+                focus back to what opened it — outside this popover. A focus
+                move alone does not close it; the focus comes back to the note.
+                A click or Escape still does. */}
+            <PopoverContent ref={delegateRef} align="start" className="w-[380px] p-3"
+              onFocusOutside={(e) => {
+                e.preventDefault();
+                requestAnimationFrame(() => delegateRef.current?.querySelector<HTMLElement>('textarea')?.focus());
+              }}>
               <DelegateToAiForm aiWorkers={aiWorkers}
                 defaultWorkerId={rerunWorkerId(agent.run?.worker_id)}
                 defaultPrompt={previousPrompt}
