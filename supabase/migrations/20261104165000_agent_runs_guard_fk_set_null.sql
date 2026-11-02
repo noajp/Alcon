@@ -24,7 +24,8 @@ begin
         -- A referenced Domain or Worker being deleted (on delete set null).
         if (to_jsonb(new) - 'domain_id' - 'worker_id') = (to_jsonb(old) - 'domain_id' - 'worker_id')
            and (new.domain_id is null or new.domain_id is not distinct from old.domain_id)
-           and (new.worker_id is null or new.worker_id is not distinct from old.worker_id) then
+           and (new.worker_id is null or new.worker_id is not distinct from old.worker_id)
+           and (new.domain_id is distinct from old.domain_id or new.worker_id is distinct from old.worker_id) then
           return new;
         end if;
         if old.status not in ('queued', 'running', 'awaiting_approval', 'paused') or new.status <> 'cancelled' then
