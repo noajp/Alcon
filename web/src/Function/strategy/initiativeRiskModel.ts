@@ -15,6 +15,7 @@
 
 import { isOpenStatus } from '@/Function/shared/completion';
 import { translate } from '@/Function/i18n/I18nProvider';
+import { toDateOnlyString } from '@/Function/shared/dateUtils';
 
 /** The newest progress signal for one Element, already resolved by the caller. */
 export interface RiskElement {
@@ -178,10 +179,7 @@ function isOpen(el: RiskElement): boolean {
  *  so comparing them against a UTC instant would make work "overdue" for the
  *  last hours of the day in every timezone west of UTC. */
 export function dateKey(now: number): string {
-  const d = new Date(now);
-  const m = `${d.getMonth() + 1}`.padStart(2, '0');
-  const day = `${d.getDate()}`.padStart(2, '0');
-  return `${d.getFullYear()}-${m}-${day}`;
+  return toDateOnlyString(new Date(now));
 }
 
 /**

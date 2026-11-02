@@ -20,6 +20,7 @@ import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { type DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { type ElementUpdate, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, selectionSquareClass, STICKY_TINT_SELECTED, STICKY_TINT_HOVER, LEAD_CELL, LEAD_CELL_HOVER, LEAD_CELL_SELECTED } from './shared';
 import { ElementCell, LabelChip } from './cells';
+import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { statusLabel } from '@/shared/designTokens';
 import { isOverdue } from '@/Function/shared/dateUtils';
@@ -354,12 +355,7 @@ function elementScopedColumns(cols: CustomColumnWithValues[]): CustomColumnWithV
 // Quick-set presets for the Due date submenu; a precise date is a cell /
 // detail-panel edit.
 function dueDatePresets(locale: string): { label: string; hint: string; value: string }[] {
-  const fmt = (d: Date) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  };
+  const fmt = toDateOnlyString;
   const short = (d: Date) => d.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
   const today = new Date();
   const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
