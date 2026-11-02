@@ -19,8 +19,8 @@ import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
 import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
-import { assignWorkersToElement, noticeSkippedAssignees, useAssignableWorkers } from '@/hooks/useSupabase';
-import { partitionAssignable } from '@/Function/shared/assignableWorkers';
+import { useAssignableWorkers } from '@/hooks/useSupabase';
+import { createQuickAddElements, toQuickAddTemplates } from '@/Function/shared/element/quickAdd';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import type { ListSection } from '@/Function/shared/listTable/shared';
 import { TabBar } from '@/shell/TabBar';
@@ -203,19 +203,10 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   const { data: popupWorkers } = useAssignableWorkers({ spaceId: activeSpaceId, domainId: activeDomainId ?? null });
   // A template keeps only the assignees that are on that list.
   const quickAddTemplates = useMemo<QuickAddTemplate[]>(
-    () => elementTemplates.map((t) => ({
-      id: t.id,
-      name: t.name,
-      type: t.type,
-      status: t.status,
-      priority: t.priority,
-      labels: t.labels,
-      assigneeWorkerIds: partitionAssignable(t.assignee_worker_ids, popupWorkers).assignable,
-      description: t.description,
-      estimatedHours: t.estimated_hours,
-    })),
+    () => toQuickAddTemplates(elementTemplates, popupWorkers),
     [elementTemplates, popupWorkers],
   );
+
 
   const objectsWithElements = useMemo<AlconObjectWithChildren[]>(() => {
     if (!explorerData) return [];
@@ -473,48 +464,11 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   const quickAddDefaults = sectionGroupValues(quickAddGroup);
 
   const handleQuickAddSubmit = async (inputs: NewElementInput[]) => {
-    // Two save scopes the popup can produce:
-    //   - Object:                  object_id = input.objectId
-    //   - personal (My Elements): owner_id = me, object_id = null — also when
-    //     no Object is named, since an Element always has exactly one home
-    // Fallback for objectId-undefined: the per-section target the user opened
-    // the popup from.
-    // Per-Element failures stay non-fatal — one bad row in a pasted batch
-    // should not discard the rest — but a batch where nothing landed has to
-    // reach the caller. The popup reports what it created and clears the
-    // title for the next one, and it can only tell the truth about that if a
-    // total failure comes back as a rejection instead of a quiet resolve.
-    let createdAny = false;
-    let lastError: unknown = null;
-    let skippedAssignees = 0;
-
-    for (const input of inputs) {
-      try {
-        const objectId = input.personal
-          ? null
-          : (input.objectId !== undefined ? input.objectId : quickAddTargetObjectId);
-        const created = await createElement({
-          title: input.title,
-          object_id: objectId,
-          owner_id: objectId ? null : userId,
-          description: input.description ?? null,
-          type: input.type ?? null,
-          labels: input.labels ?? [],
-          status: input.status ?? undefined,
-          priority: input.priority ?? undefined,
-          estimated_hours: input.estimatedHours ?? null,
-        });
-        createdAny = true;
-        skippedAssignees += (await assignWorkersToElement(created.id, input.assigneeWorkerIds ?? [])).skipped.length;
-      } catch (e) {
-        lastError = e;
-        console.error('Failed to create Element', e);
-      }
-    }
-    noticeSkippedAssignees(skippedAssignees);
-    await onRefresh?.();
-    if (!createdAny && inputs.length > 0) {
-      throw lastError ?? new Error('No Elements were created');
+    // A line the popup names no Object for lands in the section it was opened from.
+    try {
+      return await createQuickAddElements(inputs, { fallbackObjectId: quickAddTargetObjectId, userId });
+    } finally {
+      await onRefresh?.();
     }
   };
 

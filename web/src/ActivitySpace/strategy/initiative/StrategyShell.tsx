@@ -49,6 +49,9 @@ import { canEditObject, canManageDomainTypes } from '@/ActivitySpace/execution/o
 import { useMyDomainRoles, useMyObjectMemberships } from '@/hooks/useMyMemberships';
 import { useInitiativeHealth } from './useInitiativeHealth';
 import type { InitiativeHealth } from './initiativeHealthModel';
+import { useInitiativeMeasureTallies } from './useInitiativeMeasureTallies';
+import { MeasureStatus } from './MeasureStatus';
+import type { MeasureTally } from './initiativeMeasureModel';
 import { useNow } from '@/Function/shared/useNow';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import {
@@ -215,7 +218,7 @@ export function StrategyShell({
 // the same predicates the Initiative page uses (initiativeRiskModel), so the
 // row never disagrees with the page it opens. Quiet register throughout — a
 // row is not the place to shout; the number is the signal.
-function InitiativeHealthCell({ health }: { health: InitiativeHealth | undefined }) {
+function InitiativeHealthCell({ health, measures }: { health: InitiativeHealth | undefined; measures: MeasureTally | undefined }) {
   const { t } = useI18n();
   if (!health) {
     return <span className="text-[11px] text-muted-foreground/50">…</span>;
@@ -231,6 +234,9 @@ function InitiativeHealthCell({ health }: { health: InitiativeHealth | undefined
   const unmeasured = health.risk.openTotal > 0 && !health.scheduleMeasured;
   return (
     <div className="flex items-center gap-3 min-w-0 text-[11px] text-muted-foreground tabular-nums">
+      {/* Outcome before effort: the success conditions lead, the Element
+          completion that follows is only how much work has been done. */}
+      <MeasureStatus tally={measures} />
       {health.progressPct === null ? (
         <span className="shrink-0 text-muted-foreground/60">{t('No Elements')}</span>
       ) : (
@@ -276,6 +282,8 @@ function StrategyListView({
   const { t } = useI18n();
   // Health for every row from one read (progress / last movement / risk).
   const { byId: health } = useInitiativeHealth(strategies);
+  // Success-condition tallies for every row from one read of their measures.
+  const tallies = useInitiativeMeasureTallies(strategies.map((s) => s.id));
   // Archived Objects stay linked but are not counted.
   const countObjects = useActiveObjectCount();
   // Subscribe to the shared tick so "Today" / "3m ago" in the cells ages
@@ -287,7 +295,7 @@ function StrategyListView({
         <InitiativeMenu key={s.id} initiative={s}>
           <div>
             <IndexRow icon={<NavStrategyIcon size={16} />} name={s.name}
-              health={<InitiativeHealthCell health={health.get(s.id)} />}
+              health={<InitiativeHealthCell health={health.get(s.id)} measures={tallies.get(s.id)} />}
               count={countObjects(s.objectIds)}
               onOpen={() => onSelectStrategy(s)}
               actions={<InitiativeActionsButton initiative={s} />} />

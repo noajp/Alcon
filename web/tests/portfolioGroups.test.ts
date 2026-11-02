@@ -77,12 +77,29 @@ describe('rollupPortfolio', () => {
       ['i2', { progressPct: 100, risk: { overdue: 0, stalled: 2, blocked: 0 } }],
       ['i3', { progressPct: null, risk: { overdue: 0, stalled: 0, blocked: 0 } }],
     ]);
-    expect(rollupPortfolio(tree[0], byPortfolio, health)).toEqual({ initiatives: 3, progressPct: 75, alerts: 3, pending: 0 });
-    expect(rollupPortfolio(tree[0].children[0], byPortfolio, health)).toEqual({ initiatives: 2, progressPct: 100, alerts: 2, pending: 0 });
+    expect(rollupPortfolio(tree[0], byPortfolio, health)).toEqual({ initiatives: 3, progressPct: 75, alerts: 3, pending: 0, measures: null });
+    expect(rollupPortfolio(tree[0].children[0], byPortfolio, health)).toEqual({ initiatives: 2, progressPct: 100, alerts: 2, pending: 0, measures: null });
   });
   it('counts Initiatives whose health has not arrived', () => {
     const tree = buildPortfolioTree([p('A')]);
-    expect(rollupPortfolio(tree[0], new Map([['A', [s('i1', 'A')]]]), new Map())).toEqual({ initiatives: 1, progressPct: null, alerts: 0, pending: 1 });
+    expect(rollupPortfolio(tree[0], new Map([['A', [s('i1', 'A')]]]), new Map())).toEqual({ initiatives: 1, progressPct: null, alerts: 0, pending: 1, measures: null });
+  });
+  it('sums the success conditions of every Initiative underneath', () => {
+    const tree = buildPortfolioTree([p('A'), p('A1', 'A')]);
+    const byPortfolio = new Map([['A', [s('i1', 'A')]], ['A1', [s('i2', 'A1')]]]);
+    const tallies = new Map([
+      ['i1', { met: 1, missed: 2, unmeasured: 0, unstated: 0, total: 3 }],
+      ['i2', { met: 0, missed: 1, unmeasured: 1, unstated: 1, total: 3 }],
+    ]);
+    expect(rollupPortfolio(tree[0], byPortfolio, new Map(), tallies).measures)
+      .toEqual({ met: 1, missed: 3, unmeasured: 1, unstated: 1, total: 6 });
+  });
+  it('holds the condition sum back until every Initiative has loaded', () => {
+    const tree = buildPortfolioTree([p('A')]);
+    const byPortfolio = new Map([['A', [s('i1', 'A'), s('i2', 'A')]]]);
+    const partial = new Map([['i1', { met: 0, missed: 2, unmeasured: 0, unstated: 0, total: 2 }]]);
+    expect(rollupPortfolio(tree[0], byPortfolio, new Map(), partial).measures).toBeNull();
+    expect(rollupPortfolio(buildPortfolioTree([p('B')])[0], new Map(), new Map()).measures).toEqual({ met: 0, missed: 0, unmeasured: 0, unstated: 0, total: 0 });
   });
 });
 

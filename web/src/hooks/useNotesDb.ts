@@ -128,6 +128,8 @@ export async function ensureAppGuideNotes(): Promise<void> {
     if (fileErr) throw fileErr;
 
     await supabase.from('note_contents').insert({ note_id: file.id, html: APP_GUIDE_README_HTML });
+    // Written outside the shared list: let the next mount fetch it again.
+    notesFetchedAt = 0;
   } catch (e) {
     // Onboarding is best-effort; a seeding hiccup must never block login.
     console.error('Failed to seed App Guide notes', e);
@@ -204,6 +206,13 @@ async function ensureNoteHome(): Promise<{
 // each remount while the fetch was in flight. Seeding state from the last
 // known list makes a re-open instant; reload() below still revalidates.
 let notesCache: NoteNode[] | null = null;
+// When the shared list was last fetched. A remount within NOTES_FRESH_MS
+// (the sidebar's tree mounts on every Note-row toggle) reuses it instead of
+// asking again; the list's own mutations keep it current meanwhile.
+let notesFetchedAt = 0;
+// Whose list it is: a different user signing in on this tab must not reuse it.
+let notesUser: string | null = null;
+const NOTES_FRESH_MS = 30_000;
 // The sidebar, the Notes view and the note picker each mount useNotes, so a
 // boot fired the same `notes` select three times. Concurrent callers share
 // one in-flight request.
@@ -229,6 +238,7 @@ export function useNotes() {
         // The Notebook is one's own Notes; ones shared through an Element or
         // Object open from there, not from this tree.
         const me = await getCurrentUserId();
+        notesUser = me ?? null;
         if (!me) return [];
         const { data, error } = await supabase
           .from('notes')
@@ -252,6 +262,7 @@ export function useNotes() {
   const reload = useCallback(async () => {
     try {
       const list = await fetchAll();
+      notesFetchedAt = Date.now();
       publishNotes(list);
       setError(null);
     } catch (err) {
@@ -262,7 +273,16 @@ export function useNotes() {
   }, [fetchAll]);
 
   useEffect(() => {
-    reload();
+    let live = true;
+    void getCurrentUserId().catch(() => null).then((me) => {
+      if (!live) return;
+      if (notesCache !== null && me === notesUser && Date.now() - notesFetchedAt < NOTES_FRESH_MS) {
+        setLoading(false);
+        return;
+      }
+      void reload();
+    });
+    return () => { live = false; };
   }, [reload]);
 
   // Every optimistic update below goes through the shared list, so each

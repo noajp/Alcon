@@ -127,6 +127,8 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   'Missed': ['未達', '미달', 'Manquée', 'No cumplida'],
   'Not measured': ['未測定', '측정 안 됨', 'Non mesurée', 'Sin medir'],
   'No target set': ['目標未設定', '목표 미설정', 'Aucune cible', 'Sin objetivo'],
+  'No success conditions': ['成功条件なし', '성공 조건 없음', 'Aucune condition de succès', 'Sin condiciones de éxito'],
+  '{n} not measured': ['{n} 件未測定', '{n}건 미측정', '{n} non mesurés', '{n} sin medir'],
   'At least': ['以上', '이상', 'Au moins', 'Al menos'],
   'At most': ['以下', '이하', 'Au plus', 'Como máximo'],
   'at least {value}': ['{value} 以上', '{value} 이상', 'au moins {value}', 'al menos {value}'],
