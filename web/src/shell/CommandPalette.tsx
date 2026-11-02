@@ -28,6 +28,7 @@ import { CREATE_ELEMENT_EVENT } from '@/shell/QuickAddElementLauncher';
 import { filterCreateCommands, type CreateCommandId } from '@/shell/paletteCreateCommands';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { viewInScope, type SpaceScope } from '@/Function/space/spaceScope';
+import { usePageCommands } from '@/Function/shared/pageCommands';
 
 interface CommandPaletteProps {
   /** An audit Space (ADR 0048) offers only the views it shows: no search
@@ -83,6 +84,8 @@ export function CommandPalette({ scope, onNavigate, onViewChange, onOpenSettings
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<number | null>(null);
+  // What the open page offers to do to the thing on screen (the open Element).
+  const pageCommands = usePageCommands();
 
   // ⌘K / Ctrl+K toggle
   useEffect(() => {
@@ -173,6 +176,24 @@ export function CommandPalette({ scope, onNavigate, onViewChange, onOpenSettings
         <CommandEmpty>
           {t(searching ? 'Searching…' : query ? 'No results.' : full ? 'Type to search.' : 'Type to filter.')}
         </CommandEmpty>
+
+        {full && pageCommands.length > 0 && (
+          <>
+            <CommandGroup heading={t('On this page')}>
+              {pageCommands.map(({ icon: Icon, ...c }) => (
+                <CommandItem
+                  key={c.id}
+                  value={`${c.id} ${c.label} ${t(c.label)} ${(c.keywords ?? []).join(' ')}`}
+                  onSelect={() => { close(); c.run(); }}
+                >
+                  <Icon />
+                  <span className="flex-1">{t(c.label)}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            <CommandSeparator />
+          </>
+        )}
 
         {visibleCreateCommands.length > 0 && (
           <>

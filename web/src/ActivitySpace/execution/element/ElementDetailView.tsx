@@ -16,13 +16,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/ui/dropdown-menu';
-import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as DateCalendar } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
 import type { DateRange } from 'react-day-picker';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { isAgentRunOpen } from '@/Function/copilot/agentData';
-import { AgentRunPanel } from './agent';
+import { AgentRunPanel, DelegateToAiForm } from './agent';
+import { useRegisterPageCommand } from '@/Function/shared/pageCommands';
 import {
   updateElement,
   fetchElementWithDetails,
@@ -58,7 +59,7 @@ import { workerTriggerLabel } from '@/Function/shared/workerReach';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
 import { liveLease, holderLabel, formatRemaining } from '@/Function/shared/element/lease';
 import { useNow } from '@/Function/shared/useNow';
-import { Fingerprint, Copy } from '@/ui/icons';
+import { Fingerprint, Copy, Bot } from '@/ui/icons';
 import { labelColor, labelColorKey, domainLabelNames, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/Function/shared/labelColor';
 import { LabelPaletteRows } from '@/Function/shared/LabelPaletteRows';
 import { MenuShell } from '@/Function/shared/menu';
@@ -386,6 +387,20 @@ function ElementDetailBody({
   // handed to it (agent_runs refuses any other); otherwise the assigned AI.
   const rerunWorkerId = (previous: string | null | undefined) =>
     previous && aiWorkers.some((ai) => ai.id === previous) ? previous : assignedAiWorkerId;
+  // Handing the Element to an AI Worker with instructions — opened from the
+  // Element's "…" menu or ⌘K, never a standing button (AI on demand). It
+  // starts from the previous run's AI and instructions; while a run is open
+  // it says so and starts nothing.
+  const [delegateOpen, setDelegateOpen] = useState(false);
+  const delegateRef = useRef<HTMLDivElement>(null);
+  const delegateAnchorRef = useRef<HTMLSpanElement>(null);
+  const agentBusy = isAgentRunOpen(agent.run);
+  const previousPrompt = agent.run && agent.run.mode !== 'reply' ? agent.run.prompt : null;
+  useRegisterPageCommand({
+    id: 'element-delegate-to-ai', label: 'Delegate to AI…', icon: Bot,
+    keywords: ['agent', 'ai', 'claude', 'run', 'delegate', 'エージェント', '委ねる', '実行'],
+    run: () => setTimeout(() => setDelegateOpen(true), 0),
+  });
   // When a run finishes it moves the Element to "review" and posts its
   // deliverable as a comment — refresh the parent so the status updates.
   // (The comments panel re-reads its thread as the run moves on: refreshKey.)
@@ -701,9 +716,36 @@ function ElementDetailBody({
           <span className="text-foreground truncate max-w-[240px]">{element.title}</span>
           {/* ⋯ actions for the lowest breadcrumb item (this Element):
               duplicate / move / multi-home / delete. */}
-          <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack}
-            onAddDependency={() => setDependencySignal((n) => n + 1)}
-            onOpenApproval={() => setApprovalSignal((n) => n + 1)} />
+          <Popover open={delegateOpen} onOpenChange={setDelegateOpen}>
+            <PopoverAnchor asChild>
+              <span ref={delegateAnchorRef} className="inline-flex">
+                <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack}
+                  onAddDependency={() => setDependencySignal((n) => n + 1)}
+                  onOpenApproval={() => setApprovalSignal((n) => n + 1)}
+                  onDelegateToAi={() => setDelegateOpen(true)} agentBusy={agentBusy} />
+              </span>
+            </PopoverAnchor>
+            {/* It opens just as the "…" menu (or ⌘K's dialog) closes and hands
+                focus back to what opened it — the "…" button, or nowhere. That
+                focus move alone does not close it; the focus comes back to the
+                note. Focus going anywhere else (a click on another field) still
+                closes it and stays where the person put it. */}
+            <PopoverContent ref={delegateRef} align="start" className="w-[380px] p-3"
+              onFocusOutside={(e) => {
+                const to = e.target instanceof Node ? e.target : null;
+                const handBack = !to || to === document.body || !!delegateAnchorRef.current?.contains(to);
+                if (!handBack) return;
+                e.preventDefault();
+                requestAnimationFrame(() => delegateRef.current?.querySelector<HTMLElement>('textarea')?.focus());
+              }}>
+              <DelegateToAiForm aiWorkers={aiWorkers}
+                defaultWorkerId={rerunWorkerId(agent.run?.worker_id)}
+                defaultPrompt={previousPrompt}
+                busy={agentBusy} starting={agent.starting} error={agent.error ?? null}
+                onStart={({ workerId, prompt }) => agent.start({ workerId, prompt, triggeredFrom: 'detail', domainId })}
+                onStarted={() => setDelegateOpen(false)} />
+            </PopoverContent>
+          </Popover>
         </div>
         <div className="flex-1" />
       </div>

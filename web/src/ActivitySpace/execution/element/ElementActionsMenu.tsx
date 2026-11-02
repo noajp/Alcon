@@ -3,7 +3,7 @@
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useCallback, useMemo } from 'react';
-import { ShieldCheck, Waypoints } from '@/ui/icons';
+import { Bot, ShieldCheck, Waypoints } from '@/ui/icons';
 import { DropdownMenuItem } from '@/ui/dropdown-menu';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -22,7 +22,8 @@ import { fetchElementMoveTargets, fetchElementObjectIds } from '@/hooks/elementD
 /**
  * "⋯" menu for an Element, wired to the breadcrumb in ElementDetailView.
  * Duplicate / Move to Object / Multi-home to Object, then what the page can
- * add to the Element — a dependency, approval — then Delete.
+ * add to the Element — a dependency, approval — handing it to an AI Worker
+ * with instructions, then Delete.
  * Targets are the
  * sibling Objects in the Element's primary Domain, fetched here so the menu is
  * self-contained across every mount (Object detail, Elements list, My Elements).
@@ -37,6 +38,8 @@ export function ElementActionsMenu({
   onDeleted,
   onAddDependency,
   onOpenApproval,
+  onDelegateToAi,
+  agentBusy,
 }: {
   element: ElementWithDetails;
   onRefresh?: () => void | Promise<void>;
@@ -46,6 +49,10 @@ export function ElementActionsMenu({
   onAddDependency?: () => void;
   /** Opens the page's approval panel. */
   onOpenApproval?: () => void;
+  /** Opens the page's form for handing the Element to an AI Worker. */
+  onDelegateToAi?: () => void;
+  /** An AI Worker is already working on it: the item says so and is off. */
+  agentBusy?: boolean;
 }) {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -137,6 +144,11 @@ export function ElementActionsMenu({
       {onOpenApproval && (
         <DropdownMenuItem onSelect={() => setTimeout(onOpenApproval, 0)} className="gap-2.5 py-1.5 text-[13px]">
           <ShieldCheck size={15} className="text-muted-foreground" /> {t('Approval')}
+        </DropdownMenuItem>
+      )}
+      {onDelegateToAi && (
+        <DropdownMenuItem disabled={agentBusy} onSelect={() => setTimeout(onDelegateToAi, 0)} className="gap-2.5 py-1.5 text-[13px]">
+          <Bot size={15} className="text-muted-foreground" /> {t(agentBusy ? 'AI is working on it' : 'Delegate to AI…')}
         </DropdownMenuItem>
       )}
     </EntityActionsMenu>
