@@ -14,6 +14,8 @@ import { officeKindOf } from '@/Function/office/officePreview';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { versionChain } from '@/Function/shared/fileVersions';
 import { useWorkers } from '@/hooks/teamData';
+import { useFilePresence } from '@/hooks/usePresence';
+import { PresenceStack } from '@/Function/shared/PresenceStack';
 import {
   TRASH_DAYS, attachmentSource, useAttachmentActions, useAttachments,
   type Attachment, type AttachmentOwner,
@@ -93,6 +95,8 @@ export function AttachmentList({ owner, actions, empty = null }: {
 export function AttachmentPreview({ file, owner, actions, height }: { file: Attachment; owner: AttachmentOwner; actions?: ReactNode; height?: number }) {
   const { t } = useI18n();
   const versions = versionChain(useAttachments(owner).all, file.id);
+  // Who else has this file open, beside its tools.
+  const viewers = useFilePresence(file.id);
   const { saveEdits, restoreVersion } = useAttachmentActions(owner);
   const editor = useMemo<FileEditor>(() => ({ save: (edits) => saveEdits.mutateAsync({ file, edits }) }), [file, saveEdits]);
   const workers = useWorkers().data;
@@ -151,6 +155,7 @@ export function AttachmentPreview({ file, owner, actions, height }: { file: Atta
       </div>
     )}
     <FilePreview file={shown} source={attachmentSource} editor={picked ? undefined : editor} compareTo={comparing && canCompare ? before : null} height={height}
-      actions={history || (!picked && actions) ? <>{history}{!picked && actions}</> : undefined} />
+      actions={viewers.length || history || (!picked && actions)
+        ? <>{viewers.length > 0 && <span className="px-1"><PresenceStack viewers={viewers} size={18} /></span>}{history}{!picked && actions}</> : undefined} />
   </>;
 }
