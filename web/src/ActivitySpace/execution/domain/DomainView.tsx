@@ -32,12 +32,8 @@ import {
 import { DomainOverview } from './DomainOverview';
 import { HomeView } from '@/ActivitySpace/home/HomeView';
 import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/Function/widget';
-import { GanttView } from '@/ActivitySpace/execution/element/gantt';
-import { CalendarView } from '@/ActivitySpace/sustainment/calendar/CalendarView';
 import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
 import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
-import { ResourceView } from '@/ActivitySpace/sustainment/workload/ResourceView';
-import { CustomView } from '@/ActivitySpace/execution/element/custom';
 import { ObjectIcon } from '@/shell/icons';
 import { IslandHeader } from '@/Function/shared/MainIsland';
 import { useDomains } from '@/hooks/useSupabase';
@@ -47,6 +43,19 @@ import { useDomainRole } from '@/hooks/domainData';
 import { useMyObjectMemberships } from '@/hooks/useMyMemberships';
 import { isViewOnly } from '@/ActivitySpace/execution/object/objectAccess';
 import { ViewOnlyBadge } from '@/Function/shared/ViewOnlyBadge';
+import dynamic from 'next/dynamic';
+
+// The Gantt / Calendar / Resource / Custom tabs are split out of this view's
+// chunk and fetched only when one of those tabs is opened.
+function TabLoading() {
+  const { t } = useI18n();
+  return <div className="flex-1 flex items-center justify-center text-[13px] text-muted-foreground">{t('Loading…')}</div>;
+}
+const GanttView = dynamic(() => import('@/ActivitySpace/execution/element/gantt').then((m) => m.GanttView), { ssr: false, loading: () => <TabLoading /> });
+const CalendarView = dynamic(() => import('@/ActivitySpace/sustainment/calendar/CalendarView').then((m) => m.CalendarView), { ssr: false, loading: () => <TabLoading /> });
+const ResourceView = dynamic(() => import('@/ActivitySpace/sustainment/workload/ResourceView').then((m) => m.ResourceView), { ssr: false, loading: () => <TabLoading /> });
+const CustomView = dynamic(() => import('@/ActivitySpace/execution/element/custom').then((m) => m.CustomView), { ssr: false, loading: () => <TabLoading /> });
+
 
 // Per-Domain — each Domain remembers its own active tab + visible tabs (keyed
 // by Domain id). Previously these were single global keys, which made every
