@@ -74,7 +74,7 @@ Initiative のコメントで `@Claude` を含むものだけが依頼。それ�
 - Element を SQL で作るときは `element_objects` と `element_assignees` を両方書く。`display_id` はトリガが付け直すので、`insert ... returning id` を CTE で受けてその id で関連を張る。display_id で引き直さない
 - 同じ文の CTE やトリガで入れた行は外から見えない。確認の SELECT は別に打つ
 - Domain を SQL で作ったら `domain_members`（owner）も書く。ないとどこにも表示されない
-- RLS の判定関数を新しく作るときは、API に露出しない `alcon_internal` スキーマに置く。public の既存の判定関数は移さず、EXECUTE も revoke しない（RLS が動かなくなる）
+- RLS の判定関数を新しく作るときは、API に露出しない `alcon_internal` スキーマに置き、`authenticated` に EXECUTE を grant する。public の既存の判定関数は移さず、EXECUTE も revoke しない（RLS が動かなくなる）
 - 既存のテーブルに触る migration は `to_regclass` で囲む。PR のプレビュー用ブランチは、基になるスキーマのない空の DB に migrations を流すため。本番への適用は MCP の `apply_migration`（ファイルと同じ内容）
 
   ```sql
