@@ -1,7 +1,7 @@
 // The Audit App's own strings, one row per message: [ja, ko, fr, es].
 // Words shared with the rest of the product (Approved, Failed, Close…) keep
 // their existing translations in Function/i18n/messages.ts. "Audit" is the
-// App's name and stays as written, as CRM does.
+// App's name and stays as written.
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const AUDIT_MESSAGES: Record<string, Row> = {

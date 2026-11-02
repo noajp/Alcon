@@ -63,7 +63,6 @@ import type { SidebarDomain } from '@/ActivitySpace/sustainment/files/FilesSideb
 import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 import { Folder as FolderIcon } from '@/ui/icons';
 import { FilesSidebar } from '@/ActivitySpace/sustainment/files/FilesSidebar';
-import { CrmSidebar } from '@/ActivitySpace/sustainment/crm/CrmSidebar';
 import { AuditSidebar } from '@/ActivitySpace/sustainment/audit/AuditSidebar';
 import { AiSidebar } from '@/ActivitySpace/home/ai/AiSidebar';
 import { SlidesSidebar, createDeckHere, createFolderHere, pickDeckFile } from '@/ActivitySpace/sustainment/slides/SlidesSidebar';
@@ -561,7 +560,6 @@ export function AppSidebar({
           {railMode === 'files' && <FilesSidebar navigation={navigation} onNavigate={onNavigate} domains={sidebarDomains} />}
           {/* ── Reviews ── the Space's pull requests; the main pane reviews the open one. */}
           {railMode === 'reviews' && <ReviewsSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'reviews') onViewChange('reviews'); }} />}
-          {railMode === 'crm' && <CrmSidebar navigation={navigation} onNavigate={onNavigate} domains={sidebarDomains} />}
           {/* ── Audit ── what needs a person, the workflows, and the log. */}
           {railMode === 'audit' && <AuditSidebar navigation={navigation} onNavigate={onNavigate} />}
           {/* ── AI ── this person's conversations, in folders. */}

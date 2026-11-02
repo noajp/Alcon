@@ -10,12 +10,12 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { ToolScope } from './toolScope';
 
 // =============================================================
-// ToolSidebar — the one sidebar every Sustainment tool is built on (CRM,
-// and the tools that come after them). Five slots, top to bottom:
+// ToolSidebar — the one sidebar every Sustainment tool is built on (Audit,
+// and the tools that come after it). Five slots, top to bottom:
 //
 //   scope    whose records: the row opens the scope's overview (as a
 //            Domain's row opens the Domain), its ▾ only switches scope
-//   queue    what needs me now (CRM's Today)
+//   queue    what needs me now (Audit's "Needs a person")
 //   sections the collections, each with saved filters as children. A
 //            child opens its parent's page with the filter applied — no
 //            new screen to learn

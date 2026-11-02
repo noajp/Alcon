@@ -3,7 +3,6 @@ import { GitCompare } from '@/ui/icons';
 import {
   NavAiIcon,
   NavAuditIcon,
-  NavCrmIcon,
   NavHomeIcon,
   NavInboxIcon,
   NavCalendarIcon,
@@ -53,7 +52,6 @@ export type ViewId =
   | 'files'
   | 'slides'
   | 'team'
-  | 'crm'
   | 'audit'
   | 'settings'
   | 'profile'
@@ -89,7 +87,6 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   files:         { label: 'Artifacts',   icon: NavFilesIcon },
   slides:        { label: 'Slides',      icon: NavSlidesIcon },
   team:          { label: 'People',      icon: NavTeamsIcon },
-  crm:           { label: 'CRM',         icon: NavCrmIcon },
   audit:         { label: 'Audit',       icon: NavAuditIcon },
   settings:      { label: 'Settings',    icon: NavSettingsIcon },
   profile:       { label: 'Profile', icon: NavTeamsIcon },

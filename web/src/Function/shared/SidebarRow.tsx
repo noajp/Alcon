@@ -4,7 +4,7 @@ import type { ComponentProps, ReactNode, Ref } from 'react';
 
 // =============================================================
 // SidebarRow — the one row every sidebar list is made of (Domains, Strategy,
-// Notebook, Tables, CRM, Settings).
+// Notebook, Tables, Audit, Settings).
 //
 // The ROW is the hover and selection target, not the button inside it. A row
 // with trailing controls (a Domain's chevron and "…") therefore lights up as

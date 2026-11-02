@@ -50,7 +50,7 @@ export function fieldValueText(value: Json, options: CustomColumnOptions = {}): 
 }
 
 /** English words that mean something else elsewhere in the product ("Lead" is
- *  a CRM lead, "Title" a job title) are translated through a context key; in
+ *  a sales lead, "Title" a job title) are translated through a context key; in
  *  English, or when the key has no translation, the plain label stays. */
 const FIELD_CONTEXT_KEYS: Record<string, string> = {
   lead: 'Lead (Object owner)',

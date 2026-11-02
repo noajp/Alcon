@@ -5,8 +5,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import { FileText, Inbox, Home, ListTodo, Settings } from '@/ui/icons';
-import { ObjectIcon, ElementIcon, CrmIcon, FilesIcon } from '@/Function/shared/conceptIcons';
-import { crmRoute, routeTo } from '@/Function/crm/crmRoute';
+import { ObjectIcon, ElementIcon, FilesIcon } from '@/Function/shared/conceptIcons';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { APP_GROUPS, BAR_TOOLS, MODE_META } from '@/shell/railApps';
 import {
@@ -32,7 +31,7 @@ import { usePageCommands } from '@/Function/shared/pageCommands';
 
 interface CommandPaletteProps {
   /** An audit Space (ADR 0048) offers only the views it shows: no search
-   *  into Elements, Objects, Notes or records, and nothing to create. */
+   *  into Elements, Objects, Notes or artifacts, and nothing to create. */
   scope: SpaceScope;
   /** Where an opened Element's Back returns to: what is open now. */
   returnTo: ElementReturn;
@@ -64,7 +63,6 @@ function kindIcon(kind: SearchResult['kind']): React.ComponentType<{ size?: numb
     case 'element': return ElementIcon;
     case 'object':  return ObjectIcon;
     case 'note':    return FileText;
-    case 'deal': case 'company': case 'contact': return CrmIcon;
     case 'file': return FilesIcon;
   }
 }
@@ -153,12 +151,8 @@ export function CommandPalette({ scope, returnTo, onNavigate, onViewChange, onOp
     element: results.filter(r => r.kind === 'element'),
     object:  results.filter(r => r.kind === 'object'),
     note:    results.filter(r => r.kind === 'note'),
-    record:  results.filter(r => r.kind === 'deal' || r.kind === 'company' || r.kind === 'contact'),
     file:    results.filter(r => r.kind === 'file'),
   };
-  // A CRM record opens its page in the CRM, as its sidebar row would.
-  const openRecord = (r: SearchResult) => handleNav('crm', { crm: routeTo(crmRoute(undefined), r.kind === 'deal' ? { view: 'deals', dealId: r.id } : r.kind === 'company' ? { view: 'companies', companyId: r.id } : { view: 'contacts', contactId: r.id }) });
-  const RECORD_KIND: Partial<Record<SearchResult['kind'], string>> = { deal: 'Deal', company: 'Company', contact: 'Contact' };
   const visibleCreateCommands = full ? filterCreateCommands(query) : [];
   const navCommands = NAV_COMMANDS.filter(c => viewInScope(c.view, scope));
 
@@ -167,10 +161,10 @@ export function CommandPalette({ scope, returnTo, onNavigate, onViewChange, onOp
       open={open}
       onOpenChange={setOpen}
       title={t(full ? 'Search' : 'Go to')}
-      description={t(full ? 'Search elements, objects, notes and records. Press ⌘K to open.' : 'Go to Inbox, People, Audit or Settings. Press ⌘K to open.')}
+      description={t(full ? 'Search elements, objects, notes and artifacts. Press ⌘K to open.' : 'Go to Inbox, People, Audit or Settings. Press ⌘K to open.')}
     >
       <CommandInput
-        placeholder={t(full ? 'Search elements, objects, notes, records…' : 'Go to Inbox, People, Audit or Settings…')}
+        placeholder={t(full ? 'Search elements, objects, notes, artifacts…' : 'Go to Inbox, People, Audit or Settings…')}
         value={query}
         onValueChange={setQuery}
       />
@@ -302,27 +296,6 @@ export function CommandPalette({ scope, returnTo, onNavigate, onViewChange, onOp
                   >
                     <Icon />
                     <span className="truncate">{r.title}</span>
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </>
-        )}
-
-        {grouped.record.length > 0 && (
-          <>
-            <CommandSeparator />
-            <CommandGroup heading={t('Records')}>
-              {grouped.record.map(r => {
-                const Icon = kindIcon(r.kind);
-                return (
-                  <CommandItem key={`${r.kind}-${r.id}`} value={`${r.kind}-${r.id} ${r.title} ${r.snippet ?? ''}`} onSelect={() => openRecord(r)}>
-                    <Icon />
-                    <div className="flex-1 min-w-0">
-                      <div className="truncate">{r.title}</div>
-                      {r.snippet && <div className="text-[11px] text-muted-foreground truncate">{r.snippet}</div>}
-                    </div>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{t(RECORD_KIND[r.kind] ?? '')}</span>
                   </CommandItem>
                 );
               })}

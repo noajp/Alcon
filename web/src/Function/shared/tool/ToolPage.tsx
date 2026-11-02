@@ -17,21 +17,19 @@ import { arrangeViews, nextViewTabState, parseViewTabState, type ViewTabState } 
 import { IslandHeader, type IslandCrumb } from '@/Function/shared/MainIsland';
 
 // =============================================================
-// ToolPage — the page of a Sustainment tool (CRM).
+// ToolPage — the page of a Sustainment tool (Audit).
 //
 // A tool is read the way an Object is: ONE SUBJECT seen through SEVERAL
 // VIEWS.
 //
-//   subject  what the tool is about — a CRM pipeline or scope.
+//   subject  what the tool is about — a workflow or a scope.
 //            It has a title and a description, and Properties: the facts
-//            and settings that decide what every view shows (the pipeline's
-//            currency and what it calls a deal, the supply scope and
-//            location, whether the autopilot runs).
-//   views    the tabs — different readings of that subject (Today,
-//            Pipeline, Deals… / Control tower, Exceptions, Orders…). The
-//            viewer chooses which are tabs and in what order.
-//   records  what is inside (a deal, an item) — opened in a panel or a
-//            dialog over the view, never as a tab.
+//            and settings that decide what every view shows (what the
+//            workflow may do, who approves it).
+//   views    the tabs — different readings of that subject (Overview,
+//            Runs…). The viewer chooses which are tabs and in what order.
+//   records  what is inside (a run) — opened in a panel or a dialog over
+//            the view, never as a tab.
 //
 // The home view is the subject's Overview: the icon, title and description
 // on the left, the Properties as islands on the right — the same page an
@@ -72,12 +70,12 @@ export function ToolPage({
   crumbs, actions, views, storageKey, home, activeView, onSelectView, viewControls,
   head, properties, panel, record, scrollKey, children,
 }: {
-  /** Where the page is, as a path: the tool or scope, then the subject (a pipeline, a workflow). */
+  /** Where the page is, as a path: the tool or scope, then the subject (a workflow). */
   crumbs: IslandCrumb[];
-  /** Header verbs at the right (Capture, New deal, Refresh). */
+  /** Header verbs at the right (Refresh). */
   actions?: ReactNode;
   views: readonly ToolView[];
-  /** Where the viewer's tab choice is kept ("crm-deals"). */
+  /** Where the viewer's tab choice is kept ("audit-workflow"). */
   storageKey: string;
   /** The Overview view: first, cannot be hidden, and the only one with the head and Properties. */
   home: string;
@@ -86,14 +84,14 @@ export function ToolPage({
   /** Controls for the active view, at the right of the tab strip. */
   viewControls?: ReactNode;
   /** The subject's icon, title and description (a PageHead) — on the
-   *  Overview. Without one, the first tab is a view like the others (a
-   *  pipeline opens on its board). */
+   *  Overview. Without one, the first tab is a view like the others (the
+   *  log opens on its runs). */
   head?: ReactNode;
   /** The subject's Properties islands — on the Overview. */
   properties?: ReactNode;
-  /** A record opened beside the view (a deal, a company). */
+  /** A record opened beside the view (a run). */
   panel?: ReactNode;
-  /** A record opened in place of the view (a deal), full width, with its own way back. */
+  /** A record opened in place of the view, full width, with its own way back. */
   record?: ReactNode;
   /** Changes when a different record opens, so the page starts at the top. */
   scrollKey?: string | null;
@@ -101,7 +99,7 @@ export function ToolPage({
 }) {
   const { t } = useI18n();
   const tabs = useViewTabs(storageKey, views, home);
-  // A view reached from elsewhere (a sidebar filter opens Deals) is shown as
+  // A view reached from elsewhere (a sidebar filter opens a view) is shown as
   // a tab while it is open, even when the viewer has taken it off the strip.
   const strip = tabs.shown.some((v) => v.id === activeView) ? tabs.shown : [...tabs.shown, ...tabs.hidden.filter((v) => v.id === activeView)];
   const active = views.find((v) => v.id === activeView) ?? views.find((v) => v.id === home)!;

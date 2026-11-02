@@ -1,9 +1,8 @@
 import { displayIdOf } from '@/Function/shared/element/displayId';
 import type { SearchResult } from '@/Function/shared/searchData';
 
-// ⌘K finds Elements in the Space that is open, as it finds CRM records: an
-// Element lives in a Domain through its Object, and a Domain belongs to one
-// Space. Rows come with that chain embedded; this keeps only the ones whose
+// ⌘K finds Elements in the Space that is open: an Element lives in a Domain
+// through its Object, and a Domain belongs to one Space. Rows come with that chain embedded; this keeps only the ones whose
 // Domain is in the Space and remembers the Domain, so opening a result can
 // switch to it first. The viewer's own personal Elements (no Object, owned by
 // them) belong to no Space and are found from every Space.

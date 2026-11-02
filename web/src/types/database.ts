@@ -1782,7 +1782,7 @@ export interface IntentUpdate {
 // Semantic edge from an Intent to a Domain/Object/Element.
 // relationship_type captures *why* the binding exists (Popper's
 // falsifiability requires this — a bare tag isn't enough).
-export type IntentBindingTarget = 'domain' | 'object' | 'element' | 'phase' | 'worker' | 'crm_deal'
+export type IntentBindingTarget = 'domain' | 'object' | 'element' | 'phase' | 'worker'
 export type IntentRelationship =
   | 'evidences'       // target supports the intent's hypothesis
   | 'measures'        // target operationalizes a dimension
@@ -1861,7 +1861,7 @@ export interface IntentLineage {
 
 /** Where a measure reading came from (intent_measure_readings.source). */
 export type MeasureReadingSource =
-  | 'manual' | 'crm' | 'copilot' | 'api' | 'mcp' | 'agent' | 'system' | 'backfill' | 'other'
+  | 'manual' | 'copilot' | 'api' | 'mcp' | 'agent' | 'system' | 'backfill' | 'other'
 
 /** One reading of a success condition, appended by the database whenever
  *  intents.actual_value / measured_at change. value null = the reading was cleared. */

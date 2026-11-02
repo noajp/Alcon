@@ -21,7 +21,7 @@ import {
   Users,
   AiGraph,
 } from '@/ui/icons';
-import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon, FilesIcon } from '@/Function/shared/conceptIcons';
+import { DomainIcon, ObjectIcon, ElementIcon, FilesIcon } from '@/Function/shared/conceptIcons';
 
 // ── Nav / tab / item icons ───────────────────────────────────────────────
 // Alcon's own glyphs (ui/icons): solid shapes on a 16-unit grid, the same
@@ -56,7 +56,6 @@ export const NavPortfolioIcon = ({ size = 20 }: { size?: number }) => <Portfolio
 // Phase — a Domain's period, reachable from an Initiative rather than the nav.
 export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} />;
 
-export const NavCrmIcon = CrmIcon;
 export const NavFilesIcon = FilesIcon;
 // AI — the conversation, as a pop-up or a screen of its own.
 export const NavAiIcon = ({ size = 20 }: { size?: number }) => <AiGraph size={size} />;

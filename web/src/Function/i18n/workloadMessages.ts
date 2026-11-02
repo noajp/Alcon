@@ -10,7 +10,6 @@ const WORKLOAD_MESSAGES: Record<string, Row> = {
   'Choose a Domain to see its workload.': ['Domain を選ぶと負荷が表示されます。', 'Domain을 선택하면 부하가 표시됩니다.', 'Choisissez un Domain pour voir sa charge.', 'Elige un Domain para ver su carga.'],
   'This Worker has no assignments in the selected scope.': ['この Worker には選択範囲の担当がありません。', '이 Worker는 선택한 범위에 담당이 없습니다.', 'Ce Worker n’a aucune affectation dans ce périmètre.', 'Este Worker no tiene asignaciones en este ámbito.'],
   'No Workers or Elements in this scope yet.': ['この範囲にはまだ Worker も Element もありません。', '이 범위에는 아직 Worker나 Element가 없습니다.', 'Aucun Worker ni Element dans ce périmètre pour l’instant.', 'Todavía no hay Workers ni Elements en este ámbito.'],
-  'Show everyone': ['全員を表示', '전체 보기', 'Afficher tout le monde', 'Mostrar a todos'],
   'Zoom': ['表示期間', '표시 기간', 'Zoom', 'Zoom'],
   'Earlier': ['前へ', '이전', 'Plus tôt', 'Antes'],
   'Later': ['後へ', '이후', 'Plus tard', 'Después'],

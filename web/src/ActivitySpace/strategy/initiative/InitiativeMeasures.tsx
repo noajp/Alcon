@@ -571,8 +571,6 @@ function readingSourceLabel(
   switch (source) {
     case "manual":
       return t("Entered by hand");
-    case "crm":
-      return t("From CRM");
     case "copilot":
       return t("By Copilot");
     case "api":

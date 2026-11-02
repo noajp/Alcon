@@ -5,9 +5,8 @@ import { useCallback, useSyncExternalStore } from 'react';
 // =============================================================
 // Whose records a Sustainment tool shows — its scope.
 //
-// A tool's records belong to a Domain or to the Space (the CRM's pipelines,
-// companies and contacts carry a `domain_id`), so a tool is read through
-// three scopes:
+// A tool's records belong to a Domain or to the Space (Audit's workflows
+// carry a `domain_id`), so a tool is read through three scopes:
 //
 //   null      everything the viewer can see
 //   'space'   the records shared by the Space (no Domain)
@@ -17,7 +16,7 @@ import { useCallback, useSyncExternalStore } from 'react';
 // kept per tool in localStorage, shared by the tool's sidebar and pages.
 // =============================================================
 
-export type ToolApp = 'crm' | 'audit';
+export type ToolApp = 'audit';
 export type ToolScope = string | null;
 export const SPACE_SCOPE = 'space';
 
@@ -26,7 +25,7 @@ const EVENT = 'alcon:tool-scope-change';
 
 /** The stored scope, made valid against what can be chosen now: a Domain the
  *  viewer can no longer see (or one from another Space) falls back to all. */
-export function resolveToolScope(stored: string | null, domainIds: readonly string[]): ToolScope {
+function resolveToolScope(stored: string | null, domainIds: readonly string[]): ToolScope {
   if (stored === null || stored === '') return null;
   if (stored === SPACE_SCOPE) return SPACE_SCOPE;
   return domainIds.includes(stored) ? stored : null;

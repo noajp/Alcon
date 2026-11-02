@@ -22,7 +22,6 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   'Approaches': ['アプローチ', '접근 방식', 'Approches', 'Enfoques'],
   'Related Domains': ['関連する Domain', '관련 Domain', 'Domains liés', 'Domains relacionados'],
   'Related Initiatives': ['関連する Initiative', '관련 Initiative', 'Initiatives liées', 'Initiatives relacionadas'],
-  'Operations planner': ['業務プランナー', '운영 플래너', 'Planificateur d’opérations', 'Planificador de operaciones'],
   'Initiative intent': ['Initiative の意図', 'Initiative 의도', 'Intention de l’Initiative', 'Intención de la Initiative'],
   'Linked Note': ['リンクしたノート', '연결된 노트', 'Note liée', 'Nota vinculada'],
   'Situation': ['状況', '상황', 'Situation', 'Situación'],
@@ -49,8 +48,6 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   'Create a persistent calculator, checklist or mini app with AI': ['計算機・チェックリスト・ミニアプリを AI で作って置いておく', 'AI로 계산기, 체크리스트, 미니 앱을 만들어 두기', 'Créez avec l’IA une calculatrice, une checklist ou une mini-app durable', 'Crea con IA una calculadora, una lista o una mini app que se quede aquí'],
   'A Slides deck: its pages here, the full editor when opened full screen': ['スライド：ここではページを表示し、全画面で開くと編集できる', '슬라이드: 여기서는 페이지를 보여 주고, 전체 화면에서 편집', 'Une présentation : ses pages ici, l’éditeur complet en plein écran', 'Una presentación: sus páginas aquí y el editor completo a pantalla completa'],
   'A Note from Notebook, written in place': ['Notebook のノートを、その場で書く', 'Notebook의 노트를 그 자리에서 작성', 'Une note du Notebook, écrite sur place', 'Una nota del Notebook, escrita aquí mismo'],
-  'A CRM deal: stage, amount, health and next step, changed in place': ['CRM の商談：ステージ・金額・状態・次のステップをその場で変更', 'CRM 거래: 단계, 금액, 상태, 다음 단계를 그 자리에서 변경', 'Une affaire CRM : étape, montant, santé et prochaine étape, modifiables sur place', 'Un trato del CRM: etapa, importe, salud y siguiente paso, editables aquí'],
-  'CRM forecasts and follow-ups from a pipeline Table': ['パイプラインの Table から CRM の予測とフォローアップを出す', '파이프라인 Table에서 CRM 예측과 후속 조치', 'Prévisions et relances CRM à partir d’une Table de pipeline', 'Previsiones y seguimientos de CRM a partir de una Table de pipeline'],
   'Your table data as editable rows, grouped cards, or a chart': ['Table のデータを、編集できる行・グループ化したカード・グラフで表示', 'Table 데이터를 편집 가능한 행, 그룹 카드, 차트로', 'Les données de votre Table en lignes modifiables, cartes groupées ou graphique', 'Los datos de tu Table como filas editables, tarjetas agrupadas o gráfico'],
   'Type, dates, lead, progress': ['種類・日付・担当・進捗', '유형, 날짜, 책임자, 진행률', 'Type, dates, responsable, progression', 'Tipo, fechas, responsable, progreso'],
   'Why this exists, from the Initiative it feeds': ['これがある理由を、貢献先の Initiative から示す', '기여하는 Initiative에서 본 존재 이유', 'Pourquoi il existe, d’après l’Initiative qu’il sert', 'Por qué existe, según la Initiative a la que contribuye'],
@@ -149,7 +146,6 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   'Add personal Element': ['個人の Element を追加', '개인 Element 추가', 'Ajouter un Element personnel', 'Añadir un Element personal'],
 
   // ── Tool pages ────────────────────────────────────────────────
-  'Delete this record?': ['この記録を削除しますか？', '이 기록을 삭제할까요?', 'Supprimer cet enregistrement ?', '¿Eliminar este registro?'],
   'Change scope': ['範囲を切り替える', '범위 변경', 'Changer de périmètre', 'Cambiar el ámbito'],
 
   // ── Names the app writes ──────────────────────────────────────

@@ -5,7 +5,7 @@ import { Milestone, Plus, User, X } from '@/ui/icons';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { CrmIcon, ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
+import { ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
 import { MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR } from '@/Function/shared/menu';
 
 // =============================================================
@@ -35,7 +35,7 @@ import { MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR } from '@/Functio
 
 /** The kinds a binding surface offers. `intent_bindings.target_type` also takes
  *  `domain`; nothing writes one, so nothing here offers one. */
-export type PickerTargetType = 'object' | 'element' | 'worker' | 'phase' | 'deal';
+export type PickerTargetType = 'object' | 'element' | 'worker' | 'phase';
 
 export interface PickerTarget {
   type: PickerTargetType;
@@ -54,7 +54,6 @@ const GLYPH = {
   element: ElementIcon,
   worker: User,
   phase: Milestone,
-  deal: CrmIcon,
 } as const;
 
 /** Group order, and the heading each group carries. */
@@ -63,7 +62,6 @@ const GROUPS: { type: PickerTargetType; label: string }[] = [
   { type: 'element', label: 'Elements' },
   { type: 'worker', label: 'Workers' },
   { type: 'phase', label: 'Phases' },
-  { type: 'deal', label: 'Deals' },
 ];
 
 /**
