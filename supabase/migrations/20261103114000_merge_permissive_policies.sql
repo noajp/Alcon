@@ -64,13 +64,13 @@ begin
       roles_clause := case when all_auth then 'authenticated' else 'public' end;
 
       select string_agg('(' || case when not all_auth and roles = array['authenticated']::name[]
-                                    then 'pg_has_role(''authenticated'', ''member'') and (' || qual || ')'
+                                    then 'pg_has_role(''authenticated'', ''usage'') and (' || qual || ')'
                                     else qual end || ')', ' or ')
         into using_expr
       from _merge_pol where cmd in (c, 'ALL') and qual is not null;
 
       select string_agg('(' || case when not all_auth and roles = array['authenticated']::name[]
-                                    then 'pg_has_role(''authenticated'', ''member'') and (' || coalesce(with_check, qual) || ')'
+                                    then 'pg_has_role(''authenticated'', ''usage'') and (' || coalesce(with_check, qual) || ')'
                                     else coalesce(with_check, qual) end || ')', ' or ')
         into check_expr
       from _merge_pol where cmd in (c, 'ALL') and coalesce(with_check, qual) is not null;
