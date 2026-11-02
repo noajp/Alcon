@@ -1124,7 +1124,6 @@ export interface Notification {
   intent_id: string | null
   strategy_comment_id: string | null
   object_id: string | null
-  brief_id: string | null
   /** The membership invitation an 'invite' notification is about. */
   invitation_id?: string | null
   /** The gateway's approval request an 'approval_requested' notification is about. */

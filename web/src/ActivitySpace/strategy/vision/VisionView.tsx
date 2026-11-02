@@ -91,7 +91,7 @@ export function VisionView({ visionId, createRequested, onCreateHandled, onSelec
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
-// vision_conditions is jsonb with no shape constraint: read it as a list of
+// visions.conditions is jsonb with no shape constraint: read it as a list of
 // strings whatever was written, and keep one empty list so an absent value
 // is the same array on every render.
 const NO_CONDITIONS: string[] = [];

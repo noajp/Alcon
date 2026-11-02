@@ -35,7 +35,6 @@ function notification(over: Partial<Notification> = {}): Notification {
     intent_id: null,
     strategy_comment_id: null,
     object_id: null,
-    brief_id: null,
     title: 'Claude commented on Wire the Inbox',
     body: 'progress',
     is_read: false,

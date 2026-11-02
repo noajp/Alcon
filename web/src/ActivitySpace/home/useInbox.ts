@@ -66,14 +66,14 @@ export function useInbox({ onNavigate, onViewChange }: InboxNavigation = {}) {
     // Element notifications open in the reader; the rest jump to the surface
     // they are about.
     let opened = false;
-    if (n.element_id || !(n.strategy_id || n.object_id || n.brief_id)) { selectInboxNotification(n.id); opened = true; }
+    if (n.element_id || !(n.strategy_id || n.object_id)) { selectInboxNotification(n.id); opened = true; }
     else if (n.strategy_id) {
       onViewChange?.('strategy');
       onNavigate?.({ strategyId: n.strategy_id });
     } else if (n.object_id) {
       onViewChange?.('objects');
       onNavigate?.({ objectId: n.object_id });
-    } else if (n.brief_id) onViewChange?.('note');
+    }
     if (!n.is_read) {
       setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
       void markNotificationRead(n.id, true).catch(error => { console.error(error); reload(); });
