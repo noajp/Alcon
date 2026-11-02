@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/db'
 
 // Defensive: never allow empty/whitespace strings through. These dummy values keep
 // the module evaluable at build-time (SSG of /_not-found etc. imports this indirectly)
@@ -16,7 +17,15 @@ const supabaseAnonKey =
     ? rawKey.trim()
     : 'placeholder-anon-key'
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
+
+/**
+ * The same client without the schema types, for a query whose table name is
+ * chosen at runtime (a helper shared by several tables). The generated types
+ * cannot follow a variable table name; the caller names the row type it reads.
+ * Use `supabase` whenever the table is a literal.
+ */
+export const supabaseDynamicTable = supabase as unknown as SupabaseClient
 
 
 

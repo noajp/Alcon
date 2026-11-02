@@ -120,9 +120,12 @@ export function useUserPreferences() {
     const previousValue = preferences[key];
     setPreferences((prev) => ({ ...prev, [key]: value }));
     mirrorFieldToCache(key, value);
+    const patch: Partial<UserPreferences> = {};
+    patch[key] = value;
+    const row = { ...patch, user_id: user.id };
     const { error: saveError } = await supabase
       .from('user_preferences')
-      .upsert({ user_id: user.id, [key]: value }, { onConflict: 'user_id' });
+      .upsert(row, { onConflict: 'user_id' });
     if (saveError) {
       // The cache rollback isn't React state — it must happen even if this
       // component has since unmounted, or a value that never persisted

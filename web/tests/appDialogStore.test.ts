@@ -27,6 +27,19 @@ describe('in-app dialogs', () => {
     cancelAppDialogs();
     expect(await confirm).toBe(false);expect(await prompt).toBeNull();unsubscribe();
   });
+  it('shows the same alert once while it is showing or waiting', async () => {
+    const unsubscribe=subscribeAppDialog(()=>{});
+    const first=appDialog.alert('Could not save.');
+    const other=appDialog.alert('Something else.');
+    const repeat=appDialog.alert('Could not save.');
+    const again=appDialog.alert('Something else.');
+    answerAppDialog(getAppDialog()!.id,null);
+    await first;await repeat;
+    expect(getAppDialog()?.message).toBe('Something else.');
+    answerAppDialog(getAppDialog()!.id,null);
+    await other;await again;
+    expect(getAppDialog()).toBeNull();unsubscribe();
+  });
   it('distinguishes a cancelled prompt from an entered value', async () => {
     const unsubscribe=subscribeAppDialog(()=>{});
     const result=appDialog.prompt('URL','https://');

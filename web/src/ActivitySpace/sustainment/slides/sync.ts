@@ -2,6 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { Json, TableRow } from '@/types/db';
 import { useKata } from './kata/store/useKata';
 import { tx } from './kata/i18n';
 import { translate } from '@/Function/i18n/I18nProvider';
@@ -55,15 +56,22 @@ export function fileFromRow(row: DeckRow): KataFile {
   };
 }
 
+// decks.deck / mix / chat are jsonb that only this file writes (rowFromFile)
+// and reads (fileFromRow). The generated column type is `Json`; the Kata model
+// types are the shape. The two crossings below are the only place that changes.
+type DeckJson = Deck | MixState | ChatMessage[];
+const jsonOf = (value: DeckJson): Json => value as unknown as Json;
+export const deckRow = (row: Omit<TableRow<'decks'>, 'created_by' | 'updated_by'>): DeckRow => row as unknown as DeckRow;
+
 export function rowFromFile(file: KataFile, spaceId: string) {
   return {
     id: file.id,
     activity_space_id: spaceId,
     folder_id: file.folderId || null,
     name: file.name.trim().slice(0, 200) || translate('Untitled deck'),
-    deck: file.deck,
-    mix: file.mix,
-    chat: file.chat,
+    deck: jsonOf(file.deck),
+    mix: jsonOf(file.mix),
+    chat: jsonOf(file.chat),
   };
 }
 
@@ -149,7 +157,7 @@ function start(spaceId: string): Session {
     dirty.delete(id);
     const name = useKata.getState().files.find((f) => f.id === id)?.name ?? '';
     if (data) {
-      const row = data as DeckRow;
+      const row = deckRow(data);
       const theirs = fileFromRow(row);
       const base = synced.files.find((f) => f.id === id);
       const mine = useKata.getState().files.find((f) => f.id === id);
@@ -253,7 +261,7 @@ function start(spaceId: string): Session {
     if (!here && synced.files.some((f) => f.id === id)) return; // deleted here, not yet written
     const { data } = await supabase.from('decks').select(DECK_COLUMNS).eq('id', id).eq('activity_space_id', spaceId).maybeSingle();
     if (!data || !alive || dirty.has(id)) return;
-    const row = data as DeckRow;
+    const row = deckRow(data);
     if (sameStamp(row.updated_at, stamps.get(id))) return;
     const file = fileFromRow(row);
     stamps.set(id, row.updated_at);
@@ -288,7 +296,7 @@ function start(spaceId: string): Session {
     ]);
     if (!alive) return;
     if (folders.error || decks.error) { setError((folders.error ?? decks.error)!.message || translate('Could not load decks.')); return; }
-    const rows = (decks.data ?? []) as DeckRow[];
+    const rows = (decks.data ?? []).map(deckRow);
     for (const r of rows) stamps.set(r.id, r.updated_at);
     synced = {
       folders: ((folders.data ?? []) as FolderRow[]).map((f) => ({ id: f.id, name: f.name, open: true })),

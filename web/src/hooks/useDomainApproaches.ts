@@ -1,9 +1,9 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseDynamicTable } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
-import { readAllPages, type CountedRows } from './readAllPages';
+import { readAllPages } from './readAllPages';
 import { chunkIds } from './chunkedIn';
 import type { ApproachData, DomainApproach, ApproachCondition, ApproachContribution, ApproachAssessment, ApproachReview } from '@/Function/domain/approachModel';
 
@@ -16,7 +16,7 @@ export interface DomainApproachData extends ApproachData {
 async function relatedRows<T extends { id: string }>(table: string, column: string, ids: string[], select = '*') {
   const rows: T[] = [];
   for (const chunk of chunkIds([...new Set(ids)])) rows.push(...await readAllPages<T>(table,
-    (from, to) => supabase.from(table).select(select, { count: 'exact' }).in(column, chunk).order('id').range(from, to) as unknown as PromiseLike<CountedRows<T>>, r => r.id));
+    (from, to) => supabaseDynamicTable.from(table).select<string, T>(select, { count: 'exact' }).in(column, chunk).order('id').range(from, to), r => r.id));
   return rows;
 }
 export async function fetchDomainApproaches(domainId: string): Promise<DomainApproachData> {
@@ -66,7 +66,7 @@ export async function saveDomainApproach(domainId: string, command: ApproachComm
     if (error) throw error;
   } else {
     const table = { condition: 'approach_conditions', contribution: 'approach_contributions', assessment: 'approach_assessments', review: 'approach_reviews' }[command.kind];
-    const { error } = await supabase.from(table).insert({ ...command.values, approach_id: command.approachId }).select('id').single();
+    const { error } = await supabaseDynamicTable.from(table).insert({ ...command.values, approach_id: command.approachId }).select('id').single();
     if (error) throw error;
   }
 }

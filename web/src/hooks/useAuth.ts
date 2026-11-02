@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ensureAppGuideNotes } from './useNotesDb';
 import { clearQueryCache, setQueryCacheUser } from '@/lib/queryCachePersistence';
+import { dropOtherUnsavedDrafts } from '@/Function/shared/element/unsavedDraft';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthState {
@@ -59,11 +60,12 @@ export function useAuth() {
   const fetchProfile = useCallback(async (userId: string, force = false) => {
     if (!force && profiledUserRef.current === userId) return;
     profiledUserRef.current = userId;
-    let { data } = await supabase
+    const { data: found } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
+    let data: Profile | null = found;
     // A signed-in person without a profile row (it was lost, or predates the
     // sign-up trigger) gets one, named as they already appear in the Space.
     const repaired = !data && !force;
@@ -82,6 +84,7 @@ export function useAuth() {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setQueryCacheUser(session?.user?.id ?? null);
+      dropOtherUnsavedDrafts(session?.user?.id ?? null);
       setState({ user: session?.user ?? null, session, loading: false });
       if (session?.user) fetchProfile(session.user.id);
     });
@@ -92,6 +95,7 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setQueryCacheUser(session?.user?.id ?? null);
+        dropOtherUnsavedDrafts(session?.user?.id ?? null);
         setState({ user: session?.user ?? null, session, loading: false });
         if (session?.user) fetchProfile(session.user.id);
         else { setProfile(null); profiledUserRef.current = null; }
@@ -134,8 +138,9 @@ export function useAuth() {
     // Wipe the in-memory + IndexedDB-persisted query cache BEFORE Supabase
     // tears down the session, so the next user (or anonymous viewer) on
     // this browser can never see the previous user's domains, members,
-    // assignee photos, etc. — even for a frame.
+    // assignee photos, etc. — even for a frame. Unsaved Element drafts go too.
     await clearQueryCache();
+    dropOtherUnsavedDrafts(null);
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };

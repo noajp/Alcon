@@ -282,6 +282,7 @@ begin
       v_written numeric;
       v_previous_source text;
       v_error text;
+      v_wrote boolean := false;
     begin
       select * into p from public.crm_pipelines where id = p_pipeline;
       if not found then return; end if;
@@ -304,10 +305,16 @@ begin
         -- An empty condition reads as 0, as the CRM settings show it: a pipeline
         -- with nothing won yet does not stamp a first reading of 0.
         if v_written is null or coalesce(i.actual_value, 0) = v_written then exit compute; end if;
+        -- Lock the pipeline before the condition, as savePipeline's own update
+        -- (pipeline, then its trigger's write to intents) does, so a deal write
+        -- and a settings change never wait on each other in opposite orders.
+        -- Taken only when there is something to write.
+        perform 1 from public.crm_pipelines where id = p_pipeline for no key update;
         v_previous_source := current_setting('alcon.reading_source', true);
         perform set_config('alcon.reading_source', 'crm', true);
         update public.intents set actual_value = v_written, measured_at = now()
           where id = i.id and actual_value is distinct from v_written;
+        v_wrote := found;
         perform set_config('alcon.reading_source', coalesce(v_previous_source, ''), true);
       exception when others then
         -- A figure that cannot be computed never blocks the deal write or the
@@ -315,12 +322,17 @@ begin
         v_error := left(sqlerrm, 500);
       end;
       -- The outcome stays on the pipeline, where CRM settings show it: a
-      -- failure is never silent, and the next success clears it.
+      -- failure is never silent, and the next success clears it. The row is
+      -- written only when that changes (an error appears or clears, or a new
+      -- figure went in), so ordinary deal writes do not queue on it.
       if v_error is not null then
         raise warning 'crm measure refresh failed for pipeline %: %', p_pipeline, v_error;
-        update public.crm_pipelines set measure_error = v_error where id = p_pipeline;
-      else
-        update public.crm_pipelines set measure_error = null, measure_refreshed_at = now() where id = p_pipeline;
+      end if;
+      if v_error is distinct from p.measure_error or v_wrote then
+        update public.crm_pipelines
+           set measure_error = v_error,
+               measure_refreshed_at = case when v_wrote then now() else measure_refreshed_at end
+         where id = p_pipeline;
       end if;
     end $b$
   $f$;
@@ -364,6 +376,26 @@ begin
       -- writers (service role, migrations, cron) have no auth.uid().
       if auth.uid() is not null and not alcon_internal.user_can_edit_strategy(v_strategy) then
         raise exception 'Only someone who can edit the Initiative can connect a pipeline to its success condition.' using errcode = '42501';
+      end if;
+      return new;
+    end $b$
+  $f$;
+
+  -- measure_error / measure_refreshed_at are the database's to write: a
+  -- member's insert or update leaves them as they were. Runs as the caller,
+  -- so crm_refresh_measure (security definer) is not a member here.
+  execute $f$
+    create or replace function alcon_internal.crm_pipelines_keep_measure_status()
+    returns trigger language plpgsql security invoker set search_path = '' as $b$
+    begin
+      if current_user in ('anon', 'authenticated') then
+        if tg_op = 'INSERT' then
+          new.measure_error := null;
+          new.measure_refreshed_at := null;
+        else
+          new.measure_error := old.measure_error;
+          new.measure_refreshed_at := old.measure_refreshed_at;
+        end if;
       end if;
       return new;
     end $b$
@@ -468,7 +500,7 @@ begin
       alcon_internal.crm_refresh_measure(uuid), alcon_internal.crm_refresh_all_measures(),
       alcon_internal.crm_deals_refresh_measures(), alcon_internal.crm_pipelines_refresh_measure(),
       alcon_internal.crm_fields_refresh_measures(), alcon_internal.intents_refresh_crm_measures(),
-      alcon_internal.crm_pipelines_check_measure(),
+      alcon_internal.crm_pipelines_check_measure(), alcon_internal.crm_pipelines_keep_measure_status(),
       alcon_internal.crm_metric_value(uuid, date, text)
     from public, anon, authenticated';
 
@@ -493,6 +525,10 @@ begin
       select 1 from public.intents it join public.strategies s on s.id = it.strategy_id
       where it.id = p.measure_intent_id and it.kind = 'measure' and s.activity_space_id = p.activity_space_id)
   $u$;
+  execute 'drop trigger if exists crm_pipelines_keep_measure_status on public.crm_pipelines';
+  execute 'create trigger crm_pipelines_keep_measure_status
+             before insert or update on public.crm_pipelines
+             for each row execute function alcon_internal.crm_pipelines_keep_measure_status()';
   execute 'drop trigger if exists crm_pipelines_check_measure on public.crm_pipelines';
   execute 'create trigger crm_pipelines_check_measure
              before insert or update of measure_intent_id, activity_space_id on public.crm_pipelines
