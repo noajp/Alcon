@@ -17,16 +17,19 @@ export function mergeNavigation(
 /** An Element opened by id shows over the Domain Elements list only; leaving
  * that view for any other forgets it, so coming back shows the list. */
 export function navigationForView(navigation: NavigationState, view: string): NavigationState {
-  if (view === 'domain-elements' || (!navigation.elementId && !navigation.elementReturnView)) return navigation;
-  return { ...navigation, elementId: null, elementReturnView: null };
+  if (view === 'domain-elements' || (!navigation.elementId && !navigation.elementReturn)) return navigation;
+  return { ...navigation, elementId: null, elementReturn: null };
 }
 
-/** A normal Domain switch returns to the Object list. An explicit route into
- * this Domain already chose its Object, so that selection must survive. */
+/** A normal Domain switch returns to the Object list and closes an Element
+ * opened over the old Domain. An explicit route into this Domain already chose
+ * its Object (and the Element opened in it), so that selection must survive. */
 export function navigationAfterDomainChange(navigation: NavigationState, domainId: string): NavigationState {
   if (navigation.objectId && navigation.objectDomainId === domainId) return navigation;
-  if (!navigation.objectId && !navigation.objectDomainId) return navigation;
-  return { ...navigation, objectId: null, objectDomainId: null };
+  if (!navigation.objectId && !navigation.objectDomainId && !navigation.elementId && !navigation.elementReturn) return navigation;
+  const next: NavigationState = { ...navigation, objectId: null, objectDomainId: null };
+  if (navigation.elementId || navigation.elementReturn) Object.assign(next, { elementId: null, elementReturn: null });
+  return next;
 }
 
 /** Prefer an Object's home in the Domain already open, then another visible

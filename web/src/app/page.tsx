@@ -642,7 +642,7 @@ function WorkspaceContent({
       />
 
       {/* Global ⌘K command palette */}
-      <CommandPalette scope={scope} activeView={activeTab.activeView} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} />
+      <CommandPalette scope={scope} returnTo={{ view: activeTab.activeView, objectId: activeTab.navigation.objectId ?? null, objectDomainId: activeTab.navigation.objectDomainId ?? null, domainId: activeDomainId || null }} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} />
       {scope === 'full' && <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />}
 
       {/* Global C → quick-add Element popup. Context Object = the one open in

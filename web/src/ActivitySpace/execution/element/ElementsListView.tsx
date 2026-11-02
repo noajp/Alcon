@@ -432,7 +432,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
       <ElementDetailView
         key={opened.id}
         element={opened}
-        domainName={activeDomainName}
+        domainName={opened.owner_id ? null : activeDomainName}
         objectPath={openedObject ? [{ id: openedObject.id, name: openedObject.name }] : opened.objects ?? []}
         onBack={close}
         onRefresh={() => { void openedQuery.refetch(); onRefresh?.(); }}

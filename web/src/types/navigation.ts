@@ -2,6 +2,15 @@ import type { CrmRoute } from '@/Function/crm/crmRoute';
 import type { AuditRoute } from '@/Function/audit/auditRoute';
 import type { FilesRoute } from '@/Function/files/filesRoute';
 
+/** Where an Element opened from ⌘K goes back to: the view, its Object and
+ *  the Domain that were open when it was opened. */
+export interface ElementReturn {
+  view: string;
+  objectId: string | null;
+  objectDomainId: string | null;
+  domainId: string | null;
+}
+
 export interface NavigationState {
   /** The CRM App's view, filters and open deal within this window tab. */
   crm?: CrmRoute;
@@ -20,10 +29,10 @@ export interface NavigationState {
   workerId?: string | null;
   /** People: the unit in focus (its members' load and its page). */
   unitId?: string | null;
-  /** An Element opened by id (⌘K) over the Domain Elements list, and the
-   *  view its Back returns to. */
+  /** An Element opened by id (⌘K) over the Domain Elements list, and where
+   *  its Back returns to. */
   elementId?: string | null;
-  elementReturnView?: string | null;
+  elementReturn?: ElementReturn | null;
   noteId?: string | null;
   /** Note Folder currently focused in the middle pane (a root folder id). */
   noteFolderId?: string | null;

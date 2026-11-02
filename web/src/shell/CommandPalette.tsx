@@ -22,7 +22,7 @@ import {
 import { globalSearch, type SearchResult } from '@/hooks/useSupabase';
 import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
 import { openAttachmentOwner } from '@/Function/shared/attachments/openOwner';
-import type { NavigationState } from '@/types/navigation';
+import type { ElementReturn, NavigationState } from '@/types/navigation';
 import type { ViewId } from '@/shell/viewRegistry';
 import { CREATE_ELEMENT_EVENT } from '@/shell/QuickAddElementLauncher';
 import { filterCreateCommands, type CreateCommandId } from '@/shell/paletteCreateCommands';
@@ -34,8 +34,8 @@ interface CommandPaletteProps {
   /** An audit Space (ADR 0048) offers only the views it shows: no search
    *  into Elements, Objects, Notes or records, and nothing to create. */
   scope: SpaceScope;
-  /** The view an opened Element's Back returns to. */
-  activeView: string;
+  /** Where an opened Element's Back returns to: what is open now. */
+  returnTo: ElementReturn;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
   /** Settings opens in its own tab rather than overwriting the active
@@ -77,7 +77,7 @@ function createCommandIcon(id: CreateCommandId): React.ComponentType<{ size?: nu
   }
 }
 
-export function CommandPalette({ scope, activeView, onNavigate, onViewChange, onOpenSettings }: CommandPaletteProps) {
+export function CommandPalette({ scope, returnTo, onNavigate, onViewChange, onOpenSettings }: CommandPaletteProps) {
   const full = scope === 'full';
   const { t } = useI18n();
   const { openCreate } = useWorkspaceActions();
@@ -234,7 +234,7 @@ export function CommandPalette({ scope, activeView, onNavigate, onViewChange, on
                   // switching to that Domain first; Back returns here.
                   onSelect={() => handleNav('domain-elements', {
                     elementId: r.id,
-                    elementReturnView: activeView,
+                    elementReturn: returnTo,
                     objectId: r.objectId ?? null,
                     ...(r.objectId && r.domainId ? { objectDomainId: r.domainId } : {}),
                   })}
