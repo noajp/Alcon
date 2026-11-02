@@ -1,5 +1,6 @@
 'use client';
 
+import { FollowButton } from '@/Function/shared/FollowButton';
 import { AiWorkingMark } from '@/Function/shared/element/AiWorkingMark';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUserId } from '@/providers/authContext';
@@ -703,6 +704,7 @@ function ElementDetailBody({
           <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack}
             onAddDependency={() => setDependencySignal((n) => n + 1)}
             onOpenApproval={() => setApprovalSignal((n) => n + 1)} />
+          <FollowButton kind="element" id={element.id} />
         </div>
         <div className="flex-1" />
       </div>

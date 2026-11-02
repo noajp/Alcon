@@ -11,6 +11,12 @@ export function requestElementDetail(elementId: string): void {
   window.dispatchEvent(new CustomEvent<string>(ELEMENT_DETAIL_EVENT, { detail: elementId }));
 }
 
+/** Show the Object's own page: an open Element's page closes. */
+export function requestObjectPage(): void {
+  pending = null;
+  window.dispatchEvent(new CustomEvent<string | null>(ELEMENT_DETAIL_EVENT, { detail: null }));
+}
+
 /** The Element waiting to be opened, if any (left in place). */
 export const pendingElementDetail = (): string | null => pending;
 

@@ -1,5 +1,8 @@
 'use client';
 
+import { SidebarFold } from '@/Function/shared/SidebarFold';
+import { FollowList } from '@/shell/sidebar/FollowSection';
+import { requestElementDetail, requestObjectPage } from '@/Function/shared/element/elementDetailRequest';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { FONT } from '@/shared/designTokens';
@@ -462,7 +465,19 @@ export function AppSidebar({
           {railMode === 'execution' && (
           <>
           <SidebarModeLabel label={t('Execution')} />
-          <div className="mt-1" />
+
+          {/* Follow: the Objects and Elements kept at hand (the star beside
+              their "…"); each opens where it lives. */}
+          <SidebarFold id="execution-follow" label={t('Follow')}>
+            <FollowList activeObjectId={navigation.objectId ?? null} onOpen={(f) => {
+              if (f.domainId) setActiveDomainId(f.domainId);
+              if (f.kind === 'element') requestElementDetail(f.id); else requestObjectPage();
+              onNavigate({ objectId: f.objectId, objectDomainId: f.domainId ?? undefined });
+              onViewChange('objects');
+            }} />
+          </SidebarFold>
+
+          <SidebarFold id="execution-domains" label={t('Your Domains')}>
 
           {/* All domains — the name opens the overview; the chevron expands the tree.
               Opening one does NOT collapse the others (multiple expanded at a time).
@@ -511,6 +526,7 @@ export function AppSidebar({
             onSelect={view => { setActiveDomainId(d.id); onNavigate({ objectId: null }); onViewChange(view); }}
             onSettings={() => setSettingsDomain(d)}
           />)}
+          </SidebarFold>
 
           </>
           )}

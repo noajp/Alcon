@@ -149,7 +149,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
   useEffect(() => { latestElements.current = object.elements ?? []; });
   useEffect(() => {
     const onRequest = (e: Event) => {
-      const id = (e as CustomEvent<string>).detail;
+      const id = (e as CustomEvent<string | null>).detail;
+      if (id === null) { setDetailElementIdRaw(null); onElementDetailChange?.(false); return; }
       if (!latestElements.current.some((el) => el.id === id)) return;
       clearElementDetail(id);
       setDetailElementIdRaw(id);

@@ -40,6 +40,7 @@ import { ResourceView } from '@/ActivitySpace/sustainment/workload/ResourceView'
 import { CustomView } from '@/ActivitySpace/execution/element/custom';
 import { ObjectIcon } from '@/shell/icons';
 import { IslandHeader } from '@/Function/shared/MainIsland';
+import { FollowButton } from '@/Function/shared/FollowButton';
 import { useDomains } from '@/hooks/useSupabase';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { useCurrentUserId } from '@/providers/authContext';
@@ -350,13 +351,14 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
           // One step back: from an Object to the Domain's Objects; from the
           // list, on to the Domain's own page.
           onDomainClick={() => { onNavigate({ objectId: null }); if (!selectedObject) onViewChange?.('domain-overview'); }}
-          objectSlot={selectedObject ? (
+          objectSlot={selectedObject ? (<>
             <ObjectActionsMenu
               object={selectedObject}
               onRefresh={onRefresh}
               onDeleted={() => onNavigate({ objectId: null })}
             />
-          ) : undefined}
+            <FollowButton kind="object" id={selectedObject.id} />
+          </>) : undefined}
           actions={headerActions}
         />
       )}
