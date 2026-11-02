@@ -45,6 +45,8 @@ export function useTableData(tableId: string | null) {
   // write cannot leave an optimistic value masquerading as saved data.
   const mutationKey = ['table-write', tableId] as const;
   const mutation = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationKey,
     scope: { id: `table:${tableId}` },
     mutationFn: (operation: () => Promise<unknown>) => operation(),

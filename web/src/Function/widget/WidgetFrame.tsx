@@ -85,12 +85,20 @@ export function WidgetHeaderAction({ children }: { children: React.ReactNode }) 
 // ─── Failure ─────────────────────────────────────────────────
 // A widget that throws while rendering stays inside its own frame: the board
 // and the rest of the app keep working, and the box says what happened.
-function WidgetFailed({ reset }: { reset: () => void }) {
+// A chunk that failed to download usually means a new build was deployed;
+// only a reload fetches the new chunk names.
+const isChunkLoadError = (error: Error) =>
+  error.name === 'ChunkLoadError' || /loading (css )?chunk|dynamically imported module|importing a module script failed/i.test(error.message);
+
+function WidgetFailed({ error, reset }: { error: Error; reset: () => void }) {
   const { t } = useI18n();
   return (
     <div role="alert" className={`${FONT.sm} flex items-center justify-between gap-3 py-1 text-muted-foreground`}>
       <span className="min-w-0">{t('This widget failed to load.')}</span>
-      <Button variant="secondary" size="xs" onClick={reset}>{t('Retry')}</Button>
+      <span className="flex shrink-0 gap-2">
+        {isChunkLoadError(error) && <Button variant="secondary" size="xs" onClick={() => window.location.reload()}>{t('Reload')}</Button>}
+        <Button variant="secondary" size="xs" onClick={reset}>{t('Retry')}</Button>
+      </span>
     </div>
   );
 }
@@ -105,6 +113,10 @@ export interface WidgetFrameProps {
   onLongPress: () => void;
   /** Absent when this viewer may not take the widget off the board. */
   onRemove?: () => void;
+  /** A change here clears a caught render error (the widget's params, its subject). */
+  resetKey?: unknown;
+  /** Runs before a failed body is mounted again, e.g. to rebuild a lazy component whose load failed. */
+  onRetry?: () => void;
   children: React.ReactNode;
 }
 
@@ -145,6 +157,8 @@ export function WidgetFrame({
   padded = true,
   onLongPress,
   onRemove,
+  resetKey,
+  onRetry,
   children,
 }: WidgetFrameProps) {
   const [empty, setEmpty] = useState(false);
@@ -217,7 +231,12 @@ export function WidgetFrame({
     <EmptyContext.Provider value={reportEmpty}>
       <MetaContext.Provider value={reportMeta}>
         <HeaderSlotContext.Provider value={headerSlot}>
-          <ErrorBoundary fallback={({ reset }) => <WidgetFailed reset={reset} />}>{children}</ErrorBoundary>
+          <ErrorBoundary
+            resetKey={resetKey}
+            fallback={({ error, reset }) => <WidgetFailed error={error} reset={() => { onRetry?.(); reset(); }} />}
+          >
+            {children}
+          </ErrorBoundary>
         </HeaderSlotContext.Provider>
       </MetaContext.Provider>
     </EmptyContext.Provider>

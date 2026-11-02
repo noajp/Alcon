@@ -180,6 +180,8 @@ export function useIntegrationActions(spaceId: string | null) {
   });
 
   const remove = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: async (id: string) => {
       // Deleting the row also deletes its Vault entry (a database trigger).
       const { data, error } = await supabase.from('integrations').delete().eq('id', id).select('id');
@@ -196,6 +198,8 @@ export function useIntegrationActions(spaceId: string | null) {
   });
 
   const secret = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: ({ id, value }: { id: string; value: string }) => setIntegrationSecret(id, value),
     onSettled: refresh,
   });
@@ -212,6 +216,8 @@ export function useIntegrationActions(spaceId: string | null) {
   const signIn = useMutation({ mutationFn: (id: string) => startIntegrationOAuth(id), meta: { silent: true } });
 
   const revoke = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: (id: string) => revokeIntegrationOAuth(id),
     onSettled: refresh,
   });

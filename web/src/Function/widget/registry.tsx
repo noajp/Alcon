@@ -510,10 +510,17 @@ function adapt(render: (host: WidgetHost) => React.ReactNode): WidgetComponent {
 // One lazy component per type, built at module load. `lazy()` does not fetch
 // until the component renders, so building the map eagerly costs nothing —
 // and it means a zone looks a component up rather than creating one mid-render.
+const lazyWidget = (def: WidgetDefinition): WidgetComponent => lazy(async () => ({ default: await def.load() }));
 export const WIDGET_COMPONENTS: Record<string, WidgetComponent> =
-  Object.fromEntries(
-    Object.entries(WIDGET_REGISTRY).map(([type, def]) => [
-      type,
-      lazy(async () => ({ default: await def.load() })),
-    ]),
-  );
+  Object.fromEntries(Object.entries(WIDGET_REGISTRY).map(([type, def]) => [type, lazyWidget(def)]));
+
+/**
+ * A fresh lazy component for one widget instance's Retry. `lazy()` keeps a
+ * rejected load forever, so retrying through the shared component would only
+ * rethrow the same failed chunk; a new one calls `load()` again. Built per
+ * instance, so other widgets of the same type keep their component (and state).
+ */
+export function reloadWidgetComponent(type: string): WidgetComponent | null {
+  const def = WIDGET_REGISTRY[type];
+  return def ? lazyWidget(def) : null;
+}

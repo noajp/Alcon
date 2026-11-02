@@ -29,6 +29,8 @@ export function useWorkflowApproval(approvalId: string | null) {
     staleTime: 5_000,
   });
   const mutation = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: async ({ approve, note }: { approve: boolean; note?: string }) => {
       const { data, error } = await supabase.rpc('decide_workflow_approval', { _approval_id: approvalId!, _approve: approve, _note: note?.trim() || null });
       if (error) throw new Error(`Unable to decide the approval: ${error.message}`);

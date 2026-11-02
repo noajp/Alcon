@@ -197,6 +197,8 @@ export function useAttachmentActions(owner: AttachmentOwner) {
   /** Saves edits as the file's next version, under the same name: applied
    *  to whatever version is newest when saving. */
   const saveEdits = useMutation({
+    // The caller shows this failure inline.
+    meta: { silent: true },
     mutationFn: async ({ file, edits }: { file: Attachment; edits: OfficeEdit[] }): Promise<SavedEdits> => {
       for (let attempt = 0; attempt < 3; attempt++) {
         const head = versionChain(await rowsOf(owner), file.id)[0];
