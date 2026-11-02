@@ -16,13 +16,15 @@ import type { ToolScope } from './toolScope';
 //   scope    whose records: the row opens the scope's overview (as a
 //            Domain's row opens the Domain), its ▾ only switches scope
 //   queue    what needs me now (CRM's Today)
-//   groups   the tool's own groups, as Files has them: each Domain
-//            unfolding onto its pages (opening one makes it the scope)
 //   sections the collections, each with saved filters as children. A
 //            child opens its parent's page with the filter applied — no
 //            new screen to learn
 //   footer   what changes how the tool behaves (settings, the autopilot):
 //            visited to change, not daily
+//   groups   the tool's own groups, as Files has them: each Domain
+//            unfolding onto its pages (opening one makes it the scope).
+//            Always last — nothing of the tool's sits below them; with
+//            groups, the footer comes up above them
 //
 // One rule for numbers: a count means "acting would make this smaller".
 // It is red, and hidden at zero — so a row with a number is a row worth
@@ -116,15 +118,16 @@ export function ToolSidebar({ title, scope, queue, sections, footer, groups }: {
 
     {queue && queue.length > 0 && <div className="mt-1 space-y-px">{queue.map(item => <NavRow key={item.id} item={item} />)}</div>}
 
-    {groups}
 
     {sections.map(section => <div key={section.id}>
       {section.label && <SidebarSectionLabel>{section.label}</SidebarSectionLabel>}
       <div className={`${section.label ? 'mt-1' : 'mt-3'} space-y-px`}>{section.items.map(item => <NavRow key={item.id} item={item} />)}</div>
     </div>)}
 
-    {footer && footer.length > 0 && <div className="mt-auto space-y-px border-t border-[var(--border-subtle)] pt-3">
+    {footer && footer.length > 0 && <div className={groups ? 'mt-1 space-y-px' : 'mt-auto space-y-px border-t border-[var(--border-subtle)] pt-3'}>
       {footer.map(item => <NavRow key={item.id} item={item} />)}
     </div>}
+
+    {groups}
   </div>;
 }

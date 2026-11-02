@@ -14,10 +14,9 @@ import { crmRoute, routeTo, type CrmRoute } from '@/Function/crm/crmRoute';
 import { useCrmScope } from './crmScope';
 
 // The CRM sidebar, on the shared ToolSidebar, laid out as Files and Table
-// are: everything in the Space and Today (my queue) first, then each Domain
-// unfolding onto its Companies (each opening onto its deals) and its Deals
-// (with the saved lists), and the settings at the foot. See ToolSidebar for
-// the rules.
+// are: everything in the Space, Today (my queue), the lists and the
+// settings first, then each Domain unfolding onto its Companies (each
+// opening onto its deals) and its Deals. See ToolSidebar for the rules.
 
 interface SidebarProps {
   navigation: NavigationState;
