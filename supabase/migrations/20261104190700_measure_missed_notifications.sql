@@ -141,6 +141,11 @@ begin
       if v_owner is null or not exists (select 1 from auth.users u where u.id = v_owner) then
         return new;
       end if;
+      -- The owner who entered the reading is looking at it; telling them
+      -- would also leave an unread row that silences the next real alert.
+      if new.recorded_by is not null and new.recorded_by = v_owner then
+        return new;
+      end if;
 
       if exists (
         select 1 from public.notifications n
