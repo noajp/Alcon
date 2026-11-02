@@ -54,20 +54,23 @@ function previewKindOf(file: StoredFile): PreviewKind {
 
 /** What a file reads to, for the kinds that are read rather than shown by
  *  the browser itself. */
-/** A Markdown file, read formatted or as its source — the switch stays in
- *  view at the top right, as a document's own control, not a hover tool. */
+/** A Markdown file, read formatted or as its source. The switch sits at
+ *  the top left on a band of its own, always in view as the document's own
+ *  control — clear of the preview's tools, which float at the top right. */
 function MarkdownFile({ text }: { text: string }) {
   const { t } = useI18n();
   const [source, setSource] = useState(false);
   return (
-    <div className="relative">
-      <div role="group" aria-label={t('Show as')} className="sticky top-2 z-20 float-right mr-2 mt-2 flex gap-0.5 rounded-md border border-border/60 bg-[var(--surface-overlay)] p-0.5 shadow-sm">
-        <Button type="button" shape="tab" size="icon-xs" variant={source ? 'ghost' : 'secondary'} aria-pressed={!source} aria-label={t('Preview')} title={t('Preview')} onClick={() => setSource(false)}><Eye size={14} /></Button>
-        <Button type="button" shape="tab" size="icon-xs" variant={source ? 'secondary' : 'ghost'} aria-pressed={source} aria-label={t('Code')} title={t('Code')} onClick={() => setSource(true)}><CodeXml size={14} /></Button>
+    <div>
+      <div className="sticky top-0 z-20 flex h-10 items-center bg-background px-2">
+        <div role="group" aria-label={t('Show as')} className="flex gap-0.5 rounded-md border border-border/60 p-0.5">
+          <Button type="button" shape="tab" size="icon-xs" variant={source ? 'ghost' : 'secondary'} aria-pressed={!source} aria-label={t('Preview')} title={t('Preview')} onClick={() => setSource(false)}><Eye size={14} /></Button>
+          <Button type="button" shape="tab" size="icon-xs" variant={source ? 'secondary' : 'ghost'} aria-pressed={source} aria-label={t('Code')} title={t('Code')} onClick={() => setSource(true)}><CodeXml size={14} /></Button>
+        </div>
       </div>
       {source
-        ? <pre className="whitespace-pre-wrap break-words p-6 font-mono text-[12.5px] leading-relaxed text-foreground">{text}</pre>
-        : <div className="mx-auto max-w-3xl p-6"><MarkdownLite text={text} className="space-y-3 text-[14px] leading-[1.7]" /></div>}
+        ? <pre className="whitespace-pre-wrap break-words px-6 pb-6 pt-2 font-mono text-[12.5px] leading-relaxed text-foreground">{text}</pre>
+        : <div className="mx-auto max-w-3xl px-6 pb-6 pt-2"><MarkdownLite text={text} className="space-y-3 text-[14px] leading-[1.7]" /></div>}
     </div>
   );
 }
