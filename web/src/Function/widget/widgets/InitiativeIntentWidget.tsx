@@ -51,10 +51,11 @@ function NoInitiative({ objectId }: { objectId: string }) {
     try {
       await linkObjectToStrategy(strategyId, objectId);
     } catch (e) {
-      const refused = (e as { code?: string } | null)?.code === '42501';
-      setError(refused
+      // A PostgREST error is a plain object: read its code and message.
+      const failure = e as { code?: string; message?: string } | null;
+      setError(failure?.code === '42501'
         ? t('Only the Initiative’s owner or an owner of its Space can link Objects to it.')
-        : e instanceof Error ? e.message : String(e));
+        : failure?.message ?? String(e));
     } finally {
       setBusy(false);
     }
