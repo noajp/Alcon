@@ -6,6 +6,7 @@ import { Bot, Pin, Trash2 } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { agentMention, foldAgentRuns, plainFirstLine } from './agent/commentAgent';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
+import { detectMentionQuery, insertMentionText, mentionedUserIds, rankMentionCandidates } from '@/Function/shared/mentions';
 import { CommentAvatar, CommentComposer, CommentEntry, CommentMenu, CommentMenuItem, CommentMenuSeparator } from '@/Function/shared/CommentThread';
 import {
   useElementComments,
@@ -93,9 +94,10 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
     return m;
   }, [workers]);
 
-  // Load reactions for visible comments
+  // Load reactions for visible comments. Reactions are read per comment id,
+  // so with no comments left there is nothing to clear.
   useEffect(() => {
-    if (comments.length === 0) { setReactions({}); return; }
+    if (comments.length === 0) return;
     let cancelled = false;
     fetchCommentReactions(comments.map(c => c.id))
       .then(rows => {
@@ -115,19 +117,18 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
   // name), then people. Picking an agent turns the comment into its next
   // instruction (agentMention); picking a person notifies them.
   const mentionCandidates = useMemo(() => {
-    const q = mentionQuery.toLowerCase();
-    const matches = (name: string, extra?: string | null) =>
-      !q || name.toLowerCase().includes(q) || (extra || '').toLowerCase().includes(q);
     const agents: MentionCandidate[] = onAskAgent
-      ? [
+      ? rankMentionCandidates([
           { key: 'ai', label: 'AI', insert: 'AI', kind: 'agent' as const, hint: t('Ask the agent') },
           ...workers.filter(w => w.type === 'ai_agent')
             .map(w => ({ key: w.id, label: w.name, insert: w.name, kind: 'agent' as const, hint: t('Ask the agent'), worker: w })),
-        ].filter(c => matches(c.label))
+        ], mentionQuery, c => ({ name: c.label }))
       : [];
-    const people: MentionCandidate[] = workers
-      .filter(w => w.type === 'human' && w.user_id && matches(w.name, w.email))
-      .map(w => ({ key: w.id, label: w.name, insert: w.name, kind: 'person' as const, hint: w.email ?? null, worker: w }));
+    const people: MentionCandidate[] = rankMentionCandidates(
+      workers.filter(w => w.type === 'human' && w.user_id),
+      mentionQuery,
+      w => ({ name: w.name, extra: w.email }),
+    ).map(w => ({ key: w.id, label: w.name, insert: w.name, kind: 'person' as const, hint: w.email ?? null, worker: w }));
     return [...agents, ...people].slice(0, 7);
   }, [mentionQuery, workers, onAskAgent, t]);
   const mentionListOpen = mentionOpen && mentionCandidates.length > 0;
@@ -135,14 +136,12 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
   const handleDraftChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setDraft(value);
-    const cursor = e.target.selectionStart;
-    const upto = value.slice(0, cursor);
-    const m = upto.match(/(^|\s)@([\w.\-]*)$/);
+    const m = detectMentionQuery(value.slice(0, e.target.selectionStart));
     if (m) {
       setMentionOpen(true);
-      setMentionQuery(m[2]);
+      setMentionQuery(m.query);
       setMentionIndex(0);
-      setMentionStart(cursor - m[2].length - 1); // position of '@'
+      setMentionStart(m.start);
     } else {
       setMentionOpen(false);
     }
@@ -150,10 +149,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
 
   const insertMention = (candidate: MentionCandidate) => {
     if (!mentionOpen) return;
-    const before = draft.slice(0, mentionStart);
-    const afterStart = mentionStart + 1 + mentionQuery.length;
-    const after = draft.slice(afterStart);
-    setDraft(`${before}@${candidate.insert} ${after}`);
+    setDraft(insertMentionText(draft, { start: mentionStart, query: mentionQuery }, candidate.insert));
     setMentionOpen(false);
     setMentionQuery('');
   };
@@ -175,23 +171,11 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
     }
   };
 
-  const extractMentions = (text: string): string[] => {
-    const ids = new Set<string>();
-    for (const w of workers) {
-      if (!w.user_id) continue;
-      // A name ends at whitespace, punctuation or the end of the text — not \b,
-      // which only knows ASCII word characters and misses Japanese names.
-      const re = new RegExp(`@${w.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[\\s、。,.!?！？:：)）])`);
-      if (re.test(text)) ids.add(w.user_id);
-    }
-    return Array.from(ids);
-  };
-
   const submit = async () => {
     if (!draft.trim() || submitting) return;
     setSubmitting(true);
     try {
-      const mentions = extractMentions(draft);
+      const mentions = mentionedUserIds(draft, workers);
       const authorName = formatDisplayName(profile?.display_name, user?.email, getCachedDisplayNames());
       const content = getCachedConvertEmoticons() ? convertEmoticons(draft.trim()) : draft.trim();
       const created = await createElementComment({

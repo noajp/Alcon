@@ -17,6 +17,7 @@ import { throwOnFailedWrites } from './writeResults';
 import { deleteElementAssignees, insertElementAssignee } from './elementAssigneeWrites';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
+import { appDialog } from '@/Function/shared/appDialogStore';
 import type {
   ApprovalState,
   Element,
@@ -198,6 +199,25 @@ export async function updateElement(
     rollback();
     throw err;
   }
+}
+
+/**
+ * Tell the person an edit to an Element did not land. updateElement has
+ * already put the old value back, so without this the field would quietly
+ * revert. A write the database refuses (RLS: 42501, or no row returned to
+ * .single(): PGRST116) says so; anything else (offline, timeout) asks to try
+ * again.
+ */
+export function isElementSaveRefused(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  return code === '42501' || code === 'PGRST116';
+}
+
+export function noticeElementSaveFailed(error: unknown): void {
+  console.error('Element change was not saved:', error);
+  void appDialog.alert(translate(isElementSaveRefused(error)
+    ? 'You cannot change this Element. It is outside your access.'
+    : 'The change could not be saved. Try again.'));
 }
 
 export async function reorderElements(updates: { id: string; order_index: number }[]) {

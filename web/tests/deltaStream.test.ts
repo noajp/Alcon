@@ -60,6 +60,21 @@ describe('applyWorkspaceDelta', () => {
     } finally { vi.useRealTimers(); }
   });
 
+  it('only a move into done re-reads the KPI\'s recent completions', () => {
+    vi.useFakeTimers();
+    try {
+      const qc = seed();
+      qc.setQueryData(['elementDoneTimes', 'since'], { doneAt: new Map(), truncated: false });
+      applyWorkspaceDelta(qc, ctx, delta('element_activity', 'INSERT', { id: 'a1', element_id: 'e1', kind: 'renamed', detail: 'Renamed' }));
+      applyWorkspaceDelta(qc, ctx, delta('element_activity', 'INSERT', { id: 'a2', element_id: 'e1', kind: 'status', detail: 'done → todo' }));
+      vi.advanceTimersByTime(160);
+      expect(qc.getQueryState(['elementDoneTimes', 'since'])?.isInvalidated).toBe(false);
+      applyWorkspaceDelta(qc, ctx, delta('element_activity', 'INSERT', { id: 'a3', element_id: 'e1', kind: 'status', detail: 'review → done' }));
+      vi.advanceTimersByTime(160);
+      expect(qc.getQueryState(['elementDoneTimes', 'since'])?.isInvalidated).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
   it('ignores another Space\'s Object DELETE, and a cell edit leaves the Table list alone', () => {
     vi.useFakeTimers();
     try {

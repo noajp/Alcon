@@ -25,6 +25,15 @@ export function cancelAppDialogs() {
 function request(kind: AppDialogRequest['kind'], message: string, initialValue = '') {
   // Fail closed when no host is mounted, including after app teardown.
   if (!listeners.size) return Promise.resolve(kind === 'confirm' ? false : null);
+  // The same alert already showing or waiting is not stacked again (a burst
+  // of failed saves says so once); the repeat settles when that one does.
+  const same = kind === 'alert' ? [active, ...queue].find(item => item?.request.kind === 'alert' && item.request.message === message) : undefined;
+  if (same) {
+    return new Promise<string | boolean | null>(resolve => {
+      const settle = same.resolve;
+      same.resolve = value => { settle(value); resolve(value); };
+    });
+  }
   return new Promise<string | boolean | null>(resolve => {
     const pending = { request: { id: ++nextId, kind, message, initialValue }, resolve };
     if (active) queue.push(pending); else { active = pending; emit(); }
