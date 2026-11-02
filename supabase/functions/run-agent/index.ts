@@ -29,7 +29,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import Anthropic from "npm:@anthropic-ai/sdk@0.110.0";
 import { runBoardTool, errorMessage, type BoardActor, type ToolDef } from "../_shared/boardTools.ts";
 import { runStrategyTool } from "../_shared/strategyTools.ts";
-import { AGENT_MODELS, DEFAULT_AGENT_MODEL, costOf, isAgentModel, type AgentModel, type ModelUsage } from "../_shared/aiPricing.ts";
+import { AGENT_MODELS, DEFAULT_AGENT_MODEL, costOf, type ModelUsage } from "../_shared/aiPricing.ts";
 import {
   McpSession, callHttp, httpIsRead, HTTP_REQUEST_SCHEMA, isSafeEndpoint, pointsAtAlcon, resolveCredential, type IntegrationRow, type RemoteTool,
 } from "../_shared/integrationClient.ts";
@@ -38,6 +38,7 @@ import { fetchPull, pullUrlsIn, upsertCodeChange, withGithubToken } from "../_sh
 import { DRIVE_TOOLS, driveOperationLabel, runDriveTool } from "../_shared/googleDrive.ts";
 import { approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR } from "./agentTools.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
+import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import {
   runLoop, appendDecisionResults, canonicalCalls,
   type LoopState, type ToolCall, type ToolKind, type ToolResult, type PendingApproval, type FinishPayload, type Msg,
@@ -51,7 +52,6 @@ const corsHeaders = {
 
 const MAX_TURNS_PER_SLICE = 14;
 const SLICE_MS = 110_000;          // stay well inside the platform's wall clock
-const DEFAULT_MAX_TOTAL_TURNS = 60;
 const MAX_CONTINUATIONS = 30;
 const MAX_TOOLS = 120;
 /** A person's own monthly budget for runs on Elements outside any Space. */
@@ -245,10 +245,6 @@ async function execute(a: ExecArgs): Promise<void> {
   const { run, admin, userDb, user } = a;
 
   // ── Agent profile ───────────────────────────────────────────────────────
-  let agentName = "Alcon Agent";
-  let instructions: string | null = null;
-  let model: AgentModel = DEFAULT_AGENT_MODEL;
-  let maxTotalTurns = DEFAULT_MAX_TOTAL_TURNS;
   // An AI Worker's profile (its instructions above all) loads only when that
   // Worker is assignable to this Element for the person running it — the
   // Space boundary. Anything else runs as the default agent.
@@ -266,15 +262,35 @@ async function execute(a: ExecArgs): Promise<void> {
       if (w.type === "ai_agent" && await assignable(w.id)) { workerId = w.id; break; }
     }
   }
+  let worker: WorkerConfigRow | null = null;
   if (workerId) {
     const { data: w } = await userDb.from("workers").select("name, ai_config, ai_model").eq("id", workerId).maybeSingle();
-    if (w) {
-      agentName = w.name || agentName;
-      const cfg = (w.ai_config && typeof w.ai_config === "object" ? w.ai_config : {}) as Record<string, unknown>;
-      if (typeof cfg.instructions === "string" && cfg.instructions.trim()) instructions = cfg.instructions.trim();
-      if (isAgentModel(cfg.model)) model = cfg.model; else if (isAgentModel(w.ai_model)) model = w.ai_model;
-      if (typeof cfg.max_turns === "number" && cfg.max_turns >= 5 && cfg.max_turns <= 200) maxTotalTurns = Math.floor(cfg.max_turns);
+    worker = (w as WorkerConfigRow | null) ?? null;
+  }
+  // The Domain's settings frame every run on its Elements. They are read
+  // from the Element's own Domain (not the run's client-supplied domain_id)
+  // with the service role, so a switch-off holds whatever the starter's
+  // role lets them read.
+  let domain: DomainConfigRow | null = null;
+  {
+    const { data: el } = await admin.from("elements").select("object_id").eq("id", run.element_id).maybeSingle();
+    if (el?.object_id) {
+      const { data: obj } = await admin.from("objects").select("domain_id").eq("id", el.object_id).maybeSingle();
+      if (obj?.domain_id) {
+        const { data: d } = await admin.from("domains").select("name, ai_config").eq("id", obj.domain_id).maybeSingle();
+        domain = (d as DomainConfigRow | null) ?? null;
+      }
     }
+  }
+  const config = resolveAgentConfig(worker, domain);
+  const { agentName, model, maxTotalTurns, instructions, domainInstructions } = config;
+  if (config.disabledReason) {
+    await admin.from("element_comments").insert({
+      element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+      content: `**実行できません** — ${config.disabledReason}`,
+    });
+    await failRun(admin, run, config.disabledReason);
+    return;
   }
   await admin.from("agent_runs").update({ model, worker_id: workerId }).eq("id", run.id);
   const actor: BoardActor = { agent: `${agentName}（AI）`, userId: user.id };
@@ -585,7 +601,7 @@ async function execute(a: ExecArgs): Promise<void> {
 
   // ── Model ───────────────────────────────────────────────────────────────
   const client = new Anthropic({ apiKey: a.anthropicKey });
-  const system = [{ type: "text" as const, text: systemPrompt({ name: agentName, instructions }), cache_control: { type: "ephemeral" as const } }];
+  const system = [{ type: "text" as const, text: systemPrompt({ name: agentName, instructions, domainInstructions }), cache_control: { type: "ephemeral" as const } }];
   const toolParams = tools.map((t, i) => ({
     name: t.name, description: t.description, input_schema: t.input_schema,
     ...(i === tools.length - 1 ? { cache_control: { type: "ephemeral" as const } } : {}),

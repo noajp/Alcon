@@ -22,9 +22,9 @@ export type Json =
 // edited from the Domain's "API Settings" screen.
 export interface DomainAIConfig {
   enabled?: boolean        // master switch for agent execution in this Domain
-  model?: string           // 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6'
-  instructions?: string    // extra system instructions for this Domain's agent
-  max_steps?: number       // cap on agent loop turns (1–12, default 6)
+  model?: string           // an AGENT_MODELS key (Function/domain/domainAgentConfig.ts)
+  instructions?: string    // instructions for every agent in this Domain, before the Worker's own
+  max_turns?: number       // turns a run may take in all (5–200, default 60); an AI Worker's own limit wins
 }
 
 // Per-Domain thresholds for the Initiative risk cross-section, stored in
