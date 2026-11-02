@@ -43,18 +43,11 @@ async function fetchDataTablesWithCounts(): Promise<DataTableWithRowCount[]> {
     tableRows.push(...page);
     if (page.length < pageSize) break;
   }
+  // Counted in the database (table_row_counts), not by fetching every row.
   const counts: Record<string, number> = {};
-  const rowIds = await selectIn(tableRows.map((t) => t.id), async chunk => {
-    const rows: { table_id: string }[] = [];
-    for (let from = 0; ; from += pageSize) {
-      const { data, error } = await supabase.from('table_rows').select('table_id')
-        .in('table_id', chunk).order('id').range(from, from + pageSize - 1);
-      if (error) return { data: null, error };
-      rows.push(...(data ?? []));
-      if ((data ?? []).length < pageSize) return { data: rows, error: null };
-    }
-  });
-  for (const row of rowIds) counts[row.table_id] = (counts[row.table_id] ?? 0) + 1;
+  const tally = await selectIn(tableRows.map((t) => t.id), async chunk =>
+    supabase.rpc('table_row_counts', { p_table_ids: chunk }));
+  for (const row of tally as { table_id: string; row_count: number }[]) counts[row.table_id] = Number(row.row_count);
   return tableRows.map((t) => ({ ...t, rowCount: counts[t.id] ?? 0 }));
 }
 
