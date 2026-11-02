@@ -21,6 +21,29 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { fetchApprovalRights } from '@/hooks/elementData';
 
+/** Records one decision and tells the people working on it. Shared by the
+ *  approval menu and the banner a decider sees at the top of the Element. */
+export async function recordApprovalDecision(input: {
+  elementId: string; approverId: string | null; approverName: string; state: ApprovalState; note: string | null;
+}): Promise<void> {
+  await decideApproval({
+    element_id: input.elementId,
+    approver_id: input.approverId,
+    approver_name: input.approverName,
+    state: input.state,
+    note: input.note,
+  });
+  // The RPC tells the assignees, using the decision row written above.
+  await notifyAboutElement(input.elementId, 'approval_decided');
+}
+
+/** Whether the signed-in person is among the Element's assignees or
+ *  collaborators — the people the approval rule never lets decide. */
+function isWorkingOn(element: ElementWithDetails, userId: string | null | undefined): boolean {
+  return !!userId && (element.assignees ?? []).some((a) =>
+    (a.role === 'assignee' || a.role === 'collaborator') && a.worker?.user_id === userId);
+}
+
 interface Props {
   element: ElementWithDetails;
   onRefresh?: () => void;
@@ -88,10 +111,12 @@ export function ElementApprovalMenu({ element, onRefresh, openSignal = 0 }: Prop
     catch (e) { setError(e instanceof Error ? e.message : t('Could not remove the reviewer.')); }
   };
 
+  // approval_state moves when a decision lands (here or from the banner at
+  // the top of the Element), so the history is read again then too.
   useEffect(() => {
     if (!element.is_approval) { setApprovals([]); return; }
     fetchElementApprovals(element.id).then(setApprovals).catch(console.error);
-  }, [element.id, element.is_approval]);
+  }, [element.id, element.is_approval, element.approval_state]);
 
   const toggleApproval = async () => {
     setBusy(true);
@@ -109,16 +134,7 @@ export function ElementApprovalMenu({ element, onRefresh, openSignal = 0 }: Prop
     setBusy(true);
     try {
       const approverName = profile?.display_name || user?.email?.split('@')[0] || 'You';
-      await decideApproval({
-        element_id: element.id,
-        approver_id: user?.id ?? null,
-        approver_name: approverName,
-        state,
-        note: note.trim() || null,
-      });
-
-      // The RPC tells the assignees, using the decision row written above.
-      await notifyAboutElement(element.id, 'approval_decided');
+      await recordApprovalDecision({ elementId: element.id, approverId: user?.id ?? null, approverName, state, note: note.trim() || null });
 
       setNote('');
       const fresh = await fetchElementApprovals(element.id);
@@ -228,7 +244,9 @@ export function ElementApprovalMenu({ element, onRefresh, openSignal = 0 }: Prop
               </Button>
             </div>
 
-            {currentRights && !canDecide && <p className="px-1 text-[11px] text-muted-foreground">{t('You cannot decide this approval.')}</p>}
+            {currentRights && !canDecide && <p className="px-1 text-[11px] text-muted-foreground">
+              {t(isWorkingOn(element, user?.id) ? 'You are working on this, so someone else decides it. Add a reviewer, or step off it.' : 'You cannot decide this approval.')}
+            </p>}
             {error && <p role="alert" className="px-1 text-[11px] text-[var(--status-danger)]">{error}</p>}
 
             {/* Compact decision history */}

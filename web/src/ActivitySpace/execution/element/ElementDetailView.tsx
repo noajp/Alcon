@@ -89,6 +89,7 @@ import { useElementSelection } from './useElementSelection';
 import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
+import { ApprovalRequestBanner } from './ApprovalRequestBanner';
 import { ElementActionsMenu } from './ElementActionsMenu';
 import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal } from '@/ui/icons';
 import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
@@ -742,6 +743,7 @@ function ElementDetailBody({
                 placeholder={t('Element title')}
               />
             </div>
+            <ApprovalRequestBanner element={element} onRefresh={onRefresh} />
             {layout === 'reader' && <div className="mb-5 flex flex-wrap items-center gap-2">
               <StatusPicker element={element} onChanged={handleStatusChange} trigger={
                 <Button variant="secondary"><ElementProgressMark status={element.status} progress={getElementProgress(element, customColumns)} size={14} />{t(currentStatus.label)}</Button>
