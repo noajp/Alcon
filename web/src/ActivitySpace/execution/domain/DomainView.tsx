@@ -307,6 +307,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
             sortColumnsCustom={objectFields}
             // Inside one Object, grouping by Object is redundant.
             hideObjectGrouping
+            showClosedWindow
           />
         )
       : (

@@ -1,6 +1,6 @@
 'use client';
 
-import { type ExplorerData } from '@/Function/sync/explorerPatch';
+import { elementStatusInExplorer, type ExplorerData } from '@/Function/sync/explorerPatch';
 import { getQueryClient } from '@/lib/queryClient';
 
 
@@ -38,6 +38,17 @@ export function invalidateElementDetail(elementId: string): void {
 // on list rows (Phase 3) this re-renders only the rows whose entity actually
 // changed — Linear's "one delta, one cell", adapted.
 
+
+/** The Element's status in the first cached explorer that carries it;
+ *  undefined when none does (e.g. a personal Element, held by My Elements). */
+export function cachedElementStatus(id: string): string | null | undefined {
+  for (const [, data] of getQueryClient().getQueriesData<ExplorerData>({ queryKey: EXPLORER_QUERY_PREFIX })) {
+    if (!data) continue;
+    const status = elementStatusInExplorer(data, id);
+    if (status !== undefined) return status;
+  }
+  return undefined;
+}
 
 // Apply a patch to every cached explorer query and return a rollback that
 // restores the pre-patch snapshot. Used by mutation helpers from non-hook

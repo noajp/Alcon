@@ -17,6 +17,20 @@ export function isOpenStatus(status: string | null | undefined): boolean {
   return !CLOSED_STATUSES.has(status ?? '');
 }
 
+/**
+ * Whether setting `next` takes an open Element off the plate — the moment the
+ * client may stamp as its close before the audit trail is read back. An
+ * Element already closed is not stamped (re-setting done must not read as
+ * "done just now"); the read that follows settles any exact time. `previous`
+ * is undefined when the caller does not know it (the Element is in no cache
+ * it can read); that counts as a close, so a close the client did make is
+ * never left out of the window.
+ */
+export function isClosingMove(previous: string | null | undefined, next: string | null | undefined): boolean {
+  if (isOpenStatus(next)) return false;
+  return previous === undefined || isOpenStatus(previous);
+}
+
 interface Completion {
   /** Elements marked done. */
   done: number;
@@ -38,7 +52,7 @@ export function completionOf(elements: readonly { status?: string | null }[]): C
   return { done, total, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
 }
 
-// When an Element was done. `updated_at` moves on any edit after completion,
+// When an Element was done (or closed). `updated_at` moves on any edit after completion,
 // and the due date says when it was meant to be done, not when it was — so the
 // moment comes from the audit trail: the status row the database trigger
 // (record_element_status_change) writes as "<from> → <to>".
@@ -50,22 +64,47 @@ interface StatusActivityRow {
   created_at: string;
 }
 
-/** Whether an activity row records a move into done. */
-export function isMoveIntoDone(row: { kind?: string | null; detail?: string | null }): boolean {
+const DONE_ONLY: ReadonlySet<string> = new Set(['done']);
+
+/** Whether an activity row records a move into one of `statuses`. */
+function isMoveInto(
+  row: { kind?: string | null; detail?: string | null },
+  statuses: ReadonlySet<string>,
+): boolean {
   if (row.kind !== 'status' || !row.detail) return false;
   const at = row.detail.lastIndexOf('→');
-  return at >= 0 && row.detail.slice(at + 1).trim() === 'done';
+  return at >= 0 && statuses.has(row.detail.slice(at + 1).trim());
 }
 
-/** Each Element's latest move into done, as an ISO instant. */
-export function latestDoneAt(rows: readonly StatusActivityRow[]): Map<string, string> {
+/** Whether an activity row records a move into done. */
+export function isMoveIntoDone(row: { kind?: string | null; detail?: string | null }): boolean {
+  return isMoveInto(row, DONE_ONLY);
+}
+
+/** Whether an activity row records a move off the plate (done or cancelled). */
+export function isMoveIntoClosed(row: { kind?: string | null; detail?: string | null }): boolean {
+  return isMoveInto(row, CLOSED_STATUSES);
+}
+
+/** Each Element's latest move into one of `statuses`, as an ISO instant. */
+export function latestMoveInto(rows: readonly StatusActivityRow[], statuses: ReadonlySet<string>): Map<string, string> {
   const out = new Map<string, string>();
   for (const row of rows) {
-    if (!isMoveIntoDone(row)) continue;
+    if (!isMoveInto(row, statuses)) continue;
     const prev = out.get(row.element_id);
     if (!prev || Date.parse(row.created_at) > Date.parse(prev)) out.set(row.element_id, row.created_at);
   }
   return out;
+}
+
+/** Each Element's latest move into done, as an ISO instant. */
+export function latestDoneAt(rows: readonly StatusActivityRow[]): Map<string, string> {
+  return latestMoveInto(rows, DONE_ONLY);
+}
+
+/** Each Element's latest move into done or cancelled, as an ISO instant. */
+export function latestClosedAt(rows: readonly StatusActivityRow[]): Map<string, string> {
+  return latestMoveInto(rows, CLOSED_STATUSES);
 }
 
 /**

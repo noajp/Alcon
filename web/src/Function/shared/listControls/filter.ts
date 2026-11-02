@@ -6,6 +6,7 @@
 
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { ListFilter } from './types';
+import { isWithinClosedWindow, type ClosedWindowContext } from './closedWindow';
 
 const includes = <T>(set: T[] | undefined, value: T | null | undefined): boolean => {
   if (!set || set.length === 0) return true; // unconstrained
@@ -39,13 +40,20 @@ const matchesDateRange = (
 export function applyFilter(
   elements: ElementWithDetails[],
   filter: ListFilter,
-  options?: { currentUserId?: string | null; blockedElementIds?: ReadonlySet<string> },
+  options?: {
+    currentUserId?: string | null;
+    blockedElementIds?: ReadonlySet<string>;
+    /** The Display's "Completed Elements" window. Absent → no constraint. */
+    closedWindow?: ClosedWindowContext;
+  },
 ): ElementWithDetails[] {
   const me = options?.currentUserId ?? null;
   const blocked = options?.blockedElementIds;
+  const closedWindow = options?.closedWindow;
   const q = filter.query?.trim().toLowerCase() ?? '';
 
   return elements.filter((e) => {
+    if (closedWindow && !isWithinClosedWindow(e, closedWindow)) return false;
     if (!includes(filter.status,   e.status))   return false;
     if (!includes(filter.priority, e.priority)) return false;
     if (!includes(filter.types,    e.type))     return false;
