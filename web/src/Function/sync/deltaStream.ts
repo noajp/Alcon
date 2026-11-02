@@ -261,8 +261,11 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
       // Append-only; a DELETE carries only its id. A new row — a status the
       // trigger recorded for an agent, a note another client left — asks the
       // one Element's rail to look again. The key is elementActivity.ts's.
-      const a = row as { element_id?: string };
+      // A status row also moves the KPI's "done in the last 14 days"
+      // (elementActivity.ts's useDoneTimesSince).
+      const a = row as { element_id?: string; kind?: string };
       if (d.type === 'INSERT' && a.element_id) invalidateSoon(qc, ['elementActivity', a.element_id]);
+      if (d.type === 'INSERT' && a.kind === 'status') invalidateSoon(qc, ['elementDoneTimes']);
       return;
     }
 

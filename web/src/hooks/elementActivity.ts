@@ -15,6 +15,7 @@ import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
 import type { ElementActivity } from '@/types/database';
+import { latestDoneAt } from '@/Function/shared/completion';
 
 export type ActivityKind =
   | 'created'
@@ -73,7 +74,41 @@ export function useElementActivityLog(elementId: string) {
  * just changed the status should not wait on a round trip to see it.
  */
 export async function invalidateElementActivity(elementId: string): Promise<void> {
-  await getQueryClient().invalidateQueries({ queryKey: KEY(elementId) });
+  const qc = getQueryClient();
+  await Promise.all([
+    qc.invalidateQueries({ queryKey: KEY(elementId) }),
+    qc.invalidateQueries({ queryKey: DONE_TIMES_PREFIX }),
+  ]);
+}
+
+/** Key prefix of useDoneTimesSince — deltaStream invalidates it on a new status row. */
+export const DONE_TIMES_PREFIX = ['elementDoneTimes'] as const;
+const DONE_TIMES_LIMIT = 5000;
+
+/**
+ * When each visible Element last moved into done, for moves at or after
+ * `since` (feed it to countCompletedSince). Only status rows that end in done
+ * are read, and RLS limits them to Elements the viewer can see; the window
+ * keeps the read small without listing ids in the URL.
+ */
+export function useDoneTimesSince(since: Date) {
+  const sinceIso = since.toISOString();
+  return useQuery({
+    queryKey: [...DONE_TIMES_PREFIX, sinceIso],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('element_activity')
+        .select('element_id, kind, detail, created_at')
+        .eq('kind', 'status')
+        .like('detail', '%→ done')
+        .gte('created_at', sinceIso)
+        .order('created_at', { ascending: false })
+        .limit(DONE_TIMES_LIMIT);
+      if (error) throw error;
+      return latestDoneAt((data ?? []) as Pick<ElementActivity, 'element_id' | 'kind' | 'detail' | 'created_at'>[]);
+    },
+    staleTime: 60_000,
+  });
 }
 
 /** Append an entry and refresh the rail. actor_id is stamped by the database. */
