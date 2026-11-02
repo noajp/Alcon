@@ -397,15 +397,12 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   milestones: {
     type: 'milestones',
     label: 'Milestones',
-    description: 'High-priority Elements with due dates',
+    description: 'Dated markers on this Object, the ◇ on its Gantt',
     group: 'plan',
     accepts: ['object', 'me', 'initiative'],
     zones: ['main', 'rail'],
     defaultSize: 'full',
-    load: async () => {
-      const { MilestonesWidget } = await import('./widgets/MilestonesWidget');
-      return adapt((host) => <MilestonesWidget elements={host.elements} />);
-    },
+    load: async () => (await import('./widgets/MilestonesWidget')).MilestonesWidget,
   },
   'mini-gantt': {
     type: 'mini-gantt',

@@ -43,7 +43,7 @@ interface GanttViewProps {
    *  simply don't render. */
   phases?: Phase[];
   /** object_milestones rows to draw as ◇ markers across the timeline. Read-only
-   *  here — the Strategy Timeline (StrategyTimelineView) owns add/delete. */
+   *  here — the Object Overview's Milestones widget owns add/rename/move/delete. */
   milestones?: ObjectMilestone[];
 }
 
