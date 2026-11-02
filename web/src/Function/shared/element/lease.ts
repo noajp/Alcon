@@ -46,6 +46,13 @@ export function liveLease(el: Leased, now: number): LiveLease | null {
  * keep the tail of the suffix (worktree names differ at the end: a random
  * hash, a slug), elide the middle. The full token always travels in `title`.
  */
+/** Pure. Who holds a lease, by name only — the agent before the '@' of its
+ *  session token ("Claude@keen-dubinsky-d0692f" → "Claude"). */
+export function holderName(token: string): string {
+  const at = token.indexOf('@');
+  return at > 0 ? token.slice(0, at) : token;
+}
+
 export function holderLabel(token: string, keep = 8): string {
   const at = token.indexOf('@');
   if (at === -1) return token;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { liveLease, holderLabel, formatRemaining } from '@/Function/shared/element/lease';
+import { liveLease, holderLabel, holderName, formatRemaining } from '@/Function/shared/element/lease';
 import { bucketsOf, DIMENSIONS, DIMENSION_LABEL } from '../src/Function/shared/dimensions';
 import type { ElementWithDetails } from '../src/types/database';
 
@@ -76,5 +76,13 @@ describe("dimension 'holder'", () => {
     const [b] = bucketsOf(row({}), 'holder');
     expect(b.id).toBe('__none__');
     expect(b.label).toBe('Unclaimed');
+  });
+});
+
+describe('holderName', () => {
+  it('names the agent holding a lease, without its session', () => {
+    expect(holderName('Claude@keen-dubinsky-d0692f')).toBe('Claude');
+    expect(holderName('codex')).toBe('codex');
+    expect(holderName('@odd')).toBe('@odd');
   });
 });

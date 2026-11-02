@@ -1,14 +1,14 @@
 'use client';
 
 import { memo, useState } from 'react';
-import { Grip, Lock, Check, Trash2, Fingerprint } from '@/ui/icons';
+import { Grip, Lock, Check, Trash2 } from '@/ui/icons';
 import { BUILTIN_COLUMN_ICONS } from '@/Function/property/columnTypes';
 import type { CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { scheduleElementDetailPrefetch, cancelElementDetailPrefetch } from '@/hooks/elementDetailQueries';
 import { deleteElement, addElementAssignee, removeElementAssignee, fetchAssignableWorkers, noticeAssignmentFailed } from '@/hooks/useSupabase';
 import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { describeBlocker, type DependencyBlocker } from '@/Function/shared/element/dependencyReadiness';
-import { liveLease, holderLabel, formatRemaining } from '@/Function/shared/element/lease';
+import { liveLease, holderName, formatRemaining } from '@/Function/shared/element/lease';
 import { useNow } from '@/Function/shared/useNow';
 import { useSortable } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
@@ -197,16 +197,17 @@ export const ElementRow = memo(function ElementRow({
             // Who holds this right now. Only a live lease is shown — a lapsed
             // one is nobody, and painting a dead session's token here is how
             // an orphan gets mistaken for staffed work. The full token,
-            // branch and time left are one hover away.
+            // branch and time left are one hover away; the row says only who
+            // (the agent's name and mark), so it never crowds the labels out.
             <span
-              className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70 max-w-32"
+              className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70 max-w-24"
               title={lease.branch
                 ? t('Held by {holder} on {branch} · {time} left', { holder: lease.holder, branch: lease.branch, time: formatRemaining(lease.remainingMs) })
                 : t('Held by {holder} · {time} left', { holder: lease.holder, time: formatRemaining(lease.remainingMs) })}
               aria-label={t('Held by {holder}', { holder: lease.holder })}
             >
-              <Fingerprint size={11} className="shrink-0" />
-              <span className="truncate">{holderLabel(lease.holder)}</span>
+              <WorkerAvatar worker={{ name: holderName(lease.holder), type: 'ai_agent' }} size={14} className="ring-0" />
+              <span className="truncate">{holderName(lease.holder)}</span>
             </span>
           )}
           {/* The comment count stands in for the Activity column, so it
