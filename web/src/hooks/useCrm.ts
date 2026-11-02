@@ -8,7 +8,7 @@ import { useCurrentUserId } from '@/providers/authContext';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { useWorkers } from '@/hooks/teamData';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
-import { createElement, updateElement } from '@/hooks/elementData';
+import { updateElement } from '@/hooks/elementData';
 import { fetchDataTableSchema } from '@/hooks/tableData';
 import { readAllPages } from '@/hooks/readAllPages';
 import {
@@ -401,23 +401,21 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
     // pipeline this screen happens to be on.
     const objectId = ((deal.pipelineId ? (pipelines.data ?? []).find(item => item.id === deal.pipelineId) : null) ?? pipeline)?.object_id ?? null;
     const mine = !deal.ownerId || deal.ownerId === me;
-    let elementId = element?.id ?? null;
-    let notice: string | null = null;
-    if (element) await updateElement(element.id, { title, due_date: step.due });
-    else if (objectId || mine) {
-      const created = await createElement({
-        title, due_date: step.due, start_date: step.due, status: 'todo', priority: 'medium',
-        object_id: objectId, owner_id: objectId ? null : userId,
-        description: `CRM${deal.number ? ` D-${deal.number}` : ''} · ${deal.name}${deal.account ? ` · ${deal.account}` : ''}`,
-        labels: ['crm'],
-      });
-      elementId = created.id;
-      if (deal.ownerId) {
-        const { error } = await supabase.from('element_assignees').insert({ element_id: created.id, worker_id: deal.ownerId, role: 'assignee' });
-        if (error) notice = 'The owner cannot see the pipeline’s Object, so the next step is unassigned. Give them access to the Object.';
-      }
-    } else notice = 'Saved on the deal. Choose an Object in Pipeline settings to make next steps Elements for their owners.';
-    check(await supabase.from('crm_deals').update({ next_element_id: elementId, next_step: title, next_step_on: step.due }).eq('id', deal.id).select('id').single());
+    // One transaction in the database (crm_set_next_step): the Element, its
+    // owner, and the deal pointing at it — no Element left behind if a step fails.
+    const { data, error } = await supabase.rpc('crm_set_next_step', {
+      p_deal: deal.id, p_title: title, p_due: step.due,
+      p_element: element?.id ?? null, p_object_id: objectId, p_create: !element && (!!objectId || mine),
+      p_description: `CRM${deal.number ? ` D-${deal.number}` : ''} · ${deal.name}${deal.account ? ` · ${deal.account}` : ''}`,
+      p_owner_worker: !element && deal.ownerId ? deal.ownerId : null,
+    });
+    if (error) throw new Error(error.message);
+    const result = data as { element_id: string | null; notice: 'owner_unassignable' | 'saved_on_deal' | null };
+    const notice = result.notice === 'owner_unassignable'
+      ? 'The owner cannot see the pipeline’s Object, so the next step is unassigned. Give them access to the Object.'
+      : result.notice === 'saved_on_deal'
+        ? 'Saved on the deal. Choose an Object in Pipeline settings to make next steps Elements for their owners.'
+        : null;
     await Promise.all([invalidate(), qc.invalidateQueries({ queryKey: ['my-elements'] })]);
     return notice;
   };
