@@ -20,6 +20,10 @@ export interface NavigationState {
   workerId?: string | null;
   /** People: the unit in focus (its members' load and its page). */
   unitId?: string | null;
+  /** An Element opened by id (⌘K) over the Domain Elements list, and the
+   *  view its Back returns to. */
+  elementId?: string | null;
+  elementReturnView?: string | null;
   noteId?: string | null;
   /** Note Folder currently focused in the middle pane (a root folder id). */
   noteFolderId?: string | null;

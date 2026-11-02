@@ -16,7 +16,7 @@ import { QuickAddElementLauncher } from '@/shell/QuickAddElementLauncher';
 import { AlconCopilotPanel } from '@/Function/copilot/AlconCopilotPanel';
 import { CopilotProvider } from '@/Function/copilot/CopilotProvider';
 import type { AppTab } from '@/shell/appTab';
-import { mergeNavigation, navigationAfterDomainChange } from '@/shell/navigationState';
+import { mergeNavigation, navigationAfterDomainChange, navigationForView } from '@/shell/navigationState';
 import type { NavigationState } from '@/types/navigation';
 import { useDomains, useObjects, createObject, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
 import { QuickAddObjectPopup } from '@/ActivitySpace/execution/object/QuickAddObjectPopup';
@@ -285,7 +285,11 @@ function WorkspaceContent({
   // bound to its own id so background tabs can keep their state correctly.
   const updateTab = (id: string, partial: Partial<Omit<AppTab, 'id'>>) => {
     const next = partial.activeView === undefined ? partial : { ...partial, activeView: scopedView(partial.activeView, scope) };
-    setTabs(prev => prev.map(t => (t.id === id ? { ...t, ...next } : t)));
+    setTabs(prev => prev.map(t => {
+      if (t.id !== id) return t;
+      const merged = { ...t, ...next };
+      return next.activeView === undefined ? merged : { ...merged, navigation: navigationForView(merged.navigation, merged.activeView) };
+    }));
   };
   const updateTabNavigation = (id: string, partial: Partial<NavigationState>) => {
     if (partial.objectId && partial.objectDomainId && partial.objectDomainId !== activeDomainId) {
@@ -638,7 +642,7 @@ function WorkspaceContent({
       />
 
       {/* Global ⌘K command palette */}
-      <CommandPalette scope={scope} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} />
+      <CommandPalette scope={scope} activeView={activeTab.activeView} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} />
       {scope === 'full' && <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />}
 
       {/* Global C → quick-add Element popup. Context Object = the one open in

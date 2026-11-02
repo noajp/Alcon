@@ -14,6 +14,13 @@ export function mergeNavigation(
   return next;
 }
 
+/** An Element opened by id shows over the Domain Elements list only; leaving
+ * that view for any other forgets it, so coming back shows the list. */
+export function navigationForView(navigation: NavigationState, view: string): NavigationState {
+  if (view === 'domain-elements' || (!navigation.elementId && !navigation.elementReturnView)) return navigation;
+  return { ...navigation, elementId: null, elementReturnView: null };
+}
+
 /** A normal Domain switch returns to the Object list. An explicit route into
  * this Domain already chose its Object, so that selection must survive. */
 export function navigationAfterDomainChange(navigation: NavigationState, domainId: string): NavigationState {

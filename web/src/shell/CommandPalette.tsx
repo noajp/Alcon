@@ -34,6 +34,8 @@ interface CommandPaletteProps {
   /** An audit Space (ADR 0048) offers only the views it shows: no search
    *  into Elements, Objects, Notes or records, and nothing to create. */
   scope: SpaceScope;
+  /** The view an opened Element's Back returns to. */
+  activeView: string;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
   /** Settings opens in its own tab rather than overwriting the active
@@ -75,7 +77,7 @@ function createCommandIcon(id: CreateCommandId): React.ComponentType<{ size?: nu
   }
 }
 
-export function CommandPalette({ scope, onNavigate, onViewChange, onOpenSettings }: CommandPaletteProps) {
+export function CommandPalette({ scope, activeView, onNavigate, onViewChange, onOpenSettings }: CommandPaletteProps) {
   const full = scope === 'full';
   const { t } = useI18n();
   const { openCreate } = useWorkspaceActions();
@@ -228,7 +230,14 @@ export function CommandPalette({ scope, onNavigate, onViewChange, onOpenSettings
                   // `ELE_MED-001` keeps its own row rather than every row whose
                   // title happens to share a word with it.
                   value={`element-${r.displayId ?? ''} ${r.title}`}
-                  onSelect={() => handleNav('domain-elements', { objectId: r.objectId ?? null })}
+                  // Opens the Element itself over its Domain's Elements,
+                  // switching to that Domain first; Back returns here.
+                  onSelect={() => handleNav('domain-elements', {
+                    elementId: r.id,
+                    elementReturnView: activeView,
+                    objectId: r.objectId ?? null,
+                    ...(r.objectId && r.domainId ? { objectDomainId: r.domainId } : {}),
+                  })}
                 >
                   <Icon />
                   <div className="flex-1 min-w-0 flex items-baseline gap-2">

@@ -199,6 +199,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               <ElementsListView
                 onRefresh={onRefresh}
                 activeDomainId={activeDomainId}
+                openElementId={navigation.elementId ?? null}
+                onCloseOpenElement={() => {
+                  const back = navigation.elementReturnView;
+                  onNavigate({ elementId: null, elementReturnView: null });
+                  if (back && back !== 'domain-elements') onViewChange?.(back);
+                }}
                 onNavigate={onNavigate}
                 onViewChange={onViewChange}
               />

@@ -1,7 +1,7 @@
 'use client';
 
 import { supabase } from '@/lib/supabase';
-import { displayIdOf } from '@/Function/shared/element/displayId';
+import { ELEMENT_SEARCH_SELECT, elementSearchResults, type ElementSearchRow } from '@/Function/shared/elementSearch';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { indexSpaceFiles, searchAttachments, type FoundFile } from '@/hooks/attachmentData';
 
@@ -20,7 +20,8 @@ export interface SearchResult {
   objectId?: string | null;
   /** The quotable id — `ELE_MED-001`. Absent for kinds that have none. */
   displayId?: string | null;
-  /** An Object's primary Domain, so opening it switches to that Domain. */
+  /** An Object's primary Domain (an Element's: its Object's), so opening it
+   *  switches to that Domain. */
   domainId?: string | null;
   /** Archived Objects are still found by search; the result says so. */
   archived?: boolean;
@@ -48,11 +49,14 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
     // display_id is searched as well as returned. It is the string an Element
     // is called by in a comment or a SITREP, so someone reading "ELE_MED-001 is
     // blocked" reaches for ⌘K and types exactly that.
-    supabase
+    // Only the open Space's Elements, as with CRM records below: one from
+    // another Space cannot be opened from here.
+    spaceId ? supabase
       .from('elements')
-      .select('id, title, description, object_id, display_id')
+      .select(ELEMENT_SEARCH_SELECT)
+      .eq('object.domain.activity_space_id', spaceId)
       .or(`title.ilike.${like},description.ilike.${like},display_id.ilike.${like}`)
-      .limit(limit),
+      .limit(limit) : Promise.resolve({ data: [] as ElementSearchRow[] }),
     // Archived Objects stay searchable: search is how an Object that left
     // every list is found again.
     supabase
@@ -74,9 +78,7 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
   ]);
 
   const out: SearchResult[] = [];
-  for (const r of (elementsRes.data || [])) {
-    out.push({ kind: 'element', id: r.id, title: r.title, snippet: r.description, objectId: r.object_id, displayId: displayIdOf(r) });
-  }
+  out.push(...elementSearchResults((elementsRes.data || []) as unknown as ElementSearchRow[], spaceId));
   for (const r of (objectsRes.data || [])) {
     out.push({ kind: 'object', id: r.id, title: r.name, snippet: r.description, domainId: r.domain_id, archived: !!r.archived_at });
   }
