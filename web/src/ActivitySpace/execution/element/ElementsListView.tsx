@@ -18,10 +18,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
-import { GanttView } from '@/ActivitySpace/execution/element/gantt';
-import { CalendarView } from '@/ActivitySpace/sustainment/calendar/CalendarView';
 import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
-import { CustomView } from '@/ActivitySpace/execution/element/custom';
 import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
 import { assignWorkersToElement, noticeSkippedAssignees, useAssignableWorkers } from '@/hooks/useSupabase';
 import { partitionAssignable } from '@/Function/shared/assignableWorkers';
@@ -40,6 +37,18 @@ import {
   type ListControlsState,
   type SectionGroup,
 } from '@/Function/shared/listControls';
+import dynamic from 'next/dynamic';
+
+// The Gantt / Calendar / Custom tabs are split out of this view's
+// chunk and fetched only when one of those tabs is opened.
+function TabLoading() {
+  const { t } = useI18n();
+  return <div className="flex-1 flex items-center justify-center text-[13px] text-muted-foreground">{t('Loading…')}</div>;
+}
+const GanttView = dynamic(() => import('@/ActivitySpace/execution/element/gantt').then((m) => m.GanttView), { ssr: false, loading: () => <TabLoading /> });
+const CalendarView = dynamic(() => import('@/ActivitySpace/sustainment/calendar/CalendarView').then((m) => m.CalendarView), { ssr: false, loading: () => <TabLoading /> });
+const CustomView = dynamic(() => import('@/ActivitySpace/execution/element/custom').then((m) => m.CustomView), { ssr: false, loading: () => <TabLoading /> });
+
 
 // View modes for the Domain-wide Elements view. We reuse the same
 // `ObjectTabType` union as Object detail tabs so this view can share

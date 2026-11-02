@@ -366,8 +366,10 @@ export function GanttView({
       if (!dragging) return;
 
       const deltaX = e.clientX - dragging.startX;
-      draggedRef.current = Math.abs(deltaX) > DRAG_CLICK_TOLERANCE_PX;
       const daysDelta = Math.round(deltaX / pxPerDay);
+      // At month/quarter zoom a few pixels already move the dates; any move
+      // of the dates is a drag, never a click.
+      draggedRef.current = daysDelta !== 0 || Math.abs(deltaX) > DRAG_CLICK_TOLERANCE_PX;
 
       if (daysDelta !== 0) {
         const { start: newStartDate, end: newEndDate } = dragRange(
