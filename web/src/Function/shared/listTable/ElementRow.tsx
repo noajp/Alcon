@@ -20,7 +20,7 @@ import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '@/shared/designTokens';
 import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { type DataColumn } from '@/Function/shared/listTable/useListColumns';
-import { type ElementUpdate, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, selectionSquareClass, STICKY_TINT_SELECTED, STICKY_TINT_HOVER } from './shared';
+import { type ElementUpdate, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, selectionSquareClass, STICKY_TINT_SELECTED, STICKY_TINT_HOVER, LEAD_CELL, LEAD_CELL_HOVER, LEAD_CELL_SELECTED } from './shared';
 import { ElementCell, LabelChip } from './cells';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { statusLabel } from '@/shared/designTokens';
@@ -158,7 +158,7 @@ export const ElementRow = memo(function ElementRow({
       {/* Status leads the row, where the eye lands — no checkbox, priority
           or id: Shift- or ⌘-click selects (the bulk bar appears), and
           priority and the id live in the Element's own page. */}
-      <td className="sticky left-0 z-10 bg-card w-13 pl-7.5 pr-1.5 py-2">
+      <td className={`sticky left-0 z-10 bg-card w-13 pl-7.5 pr-1.5 py-2 ${LEAD_CELL} ${isSelected ? LEAD_CELL_SELECTED : LEAD_CELL_HOVER}`}>
         <span className="flex items-center" onClick={(e) => e.stopPropagation()}>
           {canUpdate ? (
             <StatusPicker
