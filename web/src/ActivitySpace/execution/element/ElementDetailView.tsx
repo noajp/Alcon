@@ -1,5 +1,6 @@
 'use client';
 
+import { AiWorkingMark } from '@/Function/shared/element/AiWorkingMark';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUserId } from '@/providers/authContext';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
@@ -1189,9 +1190,13 @@ function ElementDetailBody({
                           : <User className="size-3.5 text-muted-foreground" />
                       }
                       name={t('Assignee')}
-                      label={element.assignees?.length
-                        ? element.assignees.map(a => a.worker?.name || '?').join(', ')
-                        : t('Assign')}
+                      label={<span className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate">{element.assignees?.length
+                          ? element.assignees.map(a => a.worker?.name || '?').join(', ')
+                          : t('Assign')}</span>
+                        {/* An AI working on it in the background (a run here, or a session's lease). */}
+                        {(agent.isActive || lease) && <AiWorkingMark lease={lease} />}
+                      </span>}
                       placeholder={!element.assignees?.length}
                     />
                   </button>

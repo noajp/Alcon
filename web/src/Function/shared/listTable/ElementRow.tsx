@@ -1,15 +1,13 @@
 'use client';
 
 import { memo, useState } from 'react';
-import { Grip, Lock, Check, Trash2, Fingerprint } from '@/ui/icons';
+import { Grip, Lock, Check, Trash2 } from '@/ui/icons';
 import { BUILTIN_COLUMN_ICONS } from '@/Function/property/columnTypes';
 import type { CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { scheduleElementDetailPrefetch, cancelElementDetailPrefetch } from '@/hooks/elementDetailQueries';
 import { deleteElement, addElementAssignee, removeElementAssignee, fetchAssignableWorkers, noticeAssignmentFailed } from '@/hooks/useSupabase';
 import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { describeBlocker, type DependencyBlocker } from '@/Function/shared/element/dependencyReadiness';
-import { liveLease, holderLabel, formatRemaining } from '@/Function/shared/element/lease';
-import { useNow } from '@/Function/shared/useNow';
 import { useSortable } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
@@ -80,9 +78,6 @@ export const ElementRow = memo(function ElementRow({
   const { t, locale } = useI18n();
   const overdue = isOverdue(el.due_date, el.status === 'done');
   const showsActivityColumn = visibleColumns.some((c) => c.id === 'activity');
-  // One shared 30s clock for the whole table; a lapsed lease disappears from
-  // the row on the next tick without a refetch.
-  const lease = liveLease(el, useNow());
   // Drag-to-reorder: the whole row is the handle. PointerSensor's distance
   // constraint (set on the DndContext) keeps clicks/selection working — only
   // a real drag moves the row. We DON'T apply the sortable transform: rows
@@ -193,22 +188,6 @@ export const ElementRow = memo(function ElementRow({
           same 20px after the title). */}
       <td className="p-0 max-w-0 overflow-hidden">
         <div data-row-signals className="ml-auto flex w-max items-center gap-5 pl-5 pr-0.5">
-          {lease && (
-            // Who holds this right now. Only a live lease is shown — a lapsed
-            // one is nobody, and painting a dead session's token here is how
-            // an orphan gets mistaken for staffed work. The full token,
-            // branch and time left are one hover away.
-            <span
-              className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70 max-w-32"
-              title={lease.branch
-                ? t('Held by {holder} on {branch} · {time} left', { holder: lease.holder, branch: lease.branch, time: formatRemaining(lease.remainingMs) })
-                : t('Held by {holder} · {time} left', { holder: lease.holder, time: formatRemaining(lease.remainingMs) })}
-              aria-label={t('Held by {holder}', { holder: lease.holder })}
-            >
-              <Fingerprint size={11} className="shrink-0" />
-              <span className="truncate">{holderLabel(lease.holder)}</span>
-            </span>
-          )}
           {/* The comment count stands in for the Activity column, so it
               steps aside when that column is on: the same number twice on
               one row reads as two different facts. */}

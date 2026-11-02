@@ -637,3 +637,7 @@ export const Spearhead = glyph('Spearhead', {
   solid: <path d="M8 1.9 13.55 13.1 8 10.2 2.45 13.1Z" {...SOFT} />,
 });
 
+// Code: a file's source — the two angle brackets with a slash between.
+export const CodeXml = glyph('CodeXml', {
+  line: <path d="M5.25 4.5 1.75 8l3.5 3.5M10.75 4.5 14.25 8l-3.5 3.5M9.1 3.25 6.9 12.75" />,
+});
