@@ -115,29 +115,6 @@ export interface WorkerWatch extends WorkerWatchInput {
   away: boolean;
 }
 
-/** A CRM deal bound to an assumption whose subject is a customer or a
- *  counterpart: "the large customer renews". Read with the reader's rights.
- *  `read` says whether the deal could be read: not yet, not at all (the CRM
- *  failed), or not by this reader — none of which is "fine". */
-export interface DealWatchInput {
-  bindingId: string;
-  dealId: string;
-  label: string;
-  read: 'ok' | 'loading' | 'failed' | 'hidden';
-  outcome: 'open' | 'won' | 'lost' | null;
-  /** The CRM's own reading of the deal. */
-  atRisk: boolean;
-  /** `yyyy-MM-dd`; for an open deal, the expected close. */
-  closeDate: string | null;
-  /** A won deal whose contract renewed or ended with no renewal started. */
-  renewalOverdue: boolean;
-}
-
-export interface DealWatch extends DealWatchInput {
-  /** What went wrong, worst first; null when the deal is fine or unreadable. */
-  trouble: 'lost' | 'renewal overdue' | 'at risk' | 'close date passed' | null;
-}
-
 /** One `intents` row with `kind = 'assumption'`, plus what it watches. */
 export interface AssumptionInput {
   id: string;
@@ -151,15 +128,11 @@ export interface AssumptionInput {
   orderIndex: number;
   watches: WatchInput[];
   workers: WorkerWatchInput[];
-  deals?: DealWatchInput[];
 }
 
-export interface Assumption extends Omit<AssumptionInput, 'watches' | 'workers' | 'deals'> {
+export interface Assumption extends Omit<AssumptionInput, 'watches' | 'workers'> {
   watches: Watch[];
   workers: WorkerWatch[];
-  deals: DealWatch[];
-  /** Bound deals that went wrong. */
-  troubled: number;
   blocked: number;
   overdue: number;
   /** Bound Workers with no hours somewhere in the window. */
@@ -237,43 +210,21 @@ export function evaluateWorkerWatch(input: WorkerWatchInput, now: Date): WorkerW
   };
 }
 
-/**
- * One deal's reading. A lost deal, a contract past renewal with nothing
- * started, a deal the CRM rates at risk, an open deal past its close date —
- * each is the customer side of the plan moving away from what was assumed.
- * A deal the reader cannot see reports nothing, for the same reason a Worker
- * off the roster does.
- */
-export function evaluateDealWatch(input: DealWatchInput, now: Date): DealWatch {
-  if (input.read !== 'ok') return { ...input, trouble: null };
-  const today = toDateOnlyString(now);
-  const trouble = input.outcome === 'lost' ? 'lost'
-    : input.renewalOverdue ? 'renewal overdue'
-    : input.outcome === 'open' && input.atRisk ? 'at risk'
-    : input.outcome === 'open' && input.closeDate !== null && input.closeDate < today ? 'close date passed'
-    : null;
-  return { ...input, trouble };
-}
-
 export function evaluateAssumption(input: AssumptionInput, now: Date): Assumption {
   const watches = input.watches.map((w) => evaluateWatch(w, now));
   const workers = input.workers.map((w) => evaluateWorkerWatch(w, now));
-  const deals = (input.deals ?? []).map((d) => evaluateDealWatch(d, now));
   const blocked = watches.filter((w) => w.blocked).length;
   const overdue = watches.filter((w) => w.overdue).length;
   const absent = workers.filter((w) => w.away).length;
-  const troubled = deals.filter((d) => d.trouble).length;
   return {
     ...input,
     watches,
     workers,
-    deals,
     blocked,
     overdue,
     absent,
-    troubled,
-    shaken: blocked > 0 || overdue > 0 || absent > 0 || troubled > 0,
-    unwatched: watches.length === 0 && workers.length === 0 && deals.length === 0,
+    shaken: blocked > 0 || overdue > 0 || absent > 0,
+    unwatched: watches.length === 0 && workers.length === 0,
   };
 }
 
@@ -296,7 +247,7 @@ export function orderAssumptions(inputs: AssumptionInput[], now: Date): Assumpti
       const band = (a.shaken ? 0 : 1) - (b.shaken ? 0 : 1);
       if (band !== 0) return band;
       if (a.shaken) {
-        const hurt = b.blocked + b.overdue + b.absent + b.troubled - (a.blocked + a.overdue + a.absent + a.troubled);
+        const hurt = b.blocked + b.overdue + b.absent - (a.blocked + a.overdue + a.absent);
         if (hurt !== 0) return hurt;
       }
       // Compared for equality before subtracting: both ranks are −Infinity when
@@ -334,11 +285,6 @@ export function shakenLabel(assumption: Assumption): string {
   if (assumption.blocked > 0) parts.push(translate('{n} blocked', { n: assumption.blocked }));
   if (assumption.overdue > 0) parts.push(translate('{n} overdue', { n: assumption.overdue }));
   if (assumption.absent > 0) parts.push(translate('{n} away', { n: assumption.absent }));
-  if (assumption.troubled > 0) {
-    parts.push(assumption.troubled === 1
-      ? translate('1 deal in trouble')
-      : translate('{n} deals in trouble', { n: assumption.troubled }));
-  }
   return parts.join(', ');
 }
 

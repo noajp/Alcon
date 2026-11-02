@@ -26,7 +26,6 @@ const PeopleView = dynamic(() => import('@/ActivitySpace/sustainment/team/People
 const TimelineView = dynamic(() => import('@/ActivitySpace/strategy/timeline/TimelineView').then(m => m.TimelineView), { ssr: false, loading: viewLoading });
 const HomeScreen = dynamic(() => import('@/shell/HomeScreen').then(m => m.HomeScreen), { ssr: false, loading: viewLoading });
 const NotebookSurface = dynamic(() => import('@/ActivitySpace/sustainment/notebook/NotebookSurface').then(m => m.NotebookSurface), { ssr: false, loading: viewLoading });
-const ElementDrilldown = dynamic(() => import('@/ActivitySpace/execution/element/ElementDrilldown').then(m => m.ElementDrilldown), { ssr: false, loading: viewLoading });
 const ElementsListView = dynamic(() => import('@/ActivitySpace/execution/element/ElementsListView').then(m => m.ElementsListView), { ssr: false, loading: viewLoading });
 const MyElementsView = dynamic(() => import('@/ActivitySpace/home/MyElementsView').then(m => m.MyElementsView), { ssr: false, loading: viewLoading });
 const DomainOverview = dynamic(() => import('@/ActivitySpace/execution/domain/DomainOverview').then(m => m.DomainOverview), { ssr: false, loading: viewLoading });
@@ -36,7 +35,6 @@ const TableView = dynamic(() => import('@/ActivitySpace/sustainment/table').then
 const FilesView = dynamic(() => import('@/ActivitySpace/sustainment/files').then(m => m.FilesView), { ssr: false, loading: viewLoading });
 const SlidesView = dynamic(() => import('@/ActivitySpace/sustainment/slides').then(m => m.SlidesView), { ssr: false, loading: viewLoading });
 const AuditView = dynamic(() => import('@/ActivitySpace/sustainment/audit/AuditView').then(m => m.AuditView), { ssr: false, loading: viewLoading });
-const CrmView = dynamic(() => import('@/ActivitySpace/sustainment/crm/CrmView').then(m => m.CrmView), { ssr: false, loading: viewLoading });
 const TeamView = dynamic(() => import('@/ActivitySpace/sustainment/team/TeamView').then(m => m.TeamView), { ssr: false, loading: viewLoading });
 const MyCalendarView = dynamic(() => import('@/ActivitySpace/home/MyCalendarView').then(m => m.MyCalendarView), { ssr: false, loading: viewLoading });
 const ProfileView = dynamic(() => import('@/ActivitySpace/home/ProfileView').then(m => m.ProfileView), { ssr: false, loading: viewLoading });
@@ -259,14 +257,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {activeActivity === 'slides' && (
             <div className="flex-1 flex flex-col overflow-hidden">
               <SlidesView />
-            </div>
-          )}
-
-          {activeActivity === 'crm' && (
-            <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <ElementDrilldown label="CRM" onNavigate={onNavigate} onViewChange={onViewChange}>
-                {openElement => <CrmView navigation={navigation} onNavigate={onNavigate} onViewChange={onViewChange} onOpenElement={openElement} />}
-              </ElementDrilldown>
             </div>
           )}
 

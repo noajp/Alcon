@@ -1,4 +1,3 @@
-import type { CrmRoute } from '@/Function/crm/crmRoute';
 import type { AuditRoute } from '@/Function/audit/auditRoute';
 import type { FilesRoute } from '@/Function/files/filesRoute';
 
@@ -12,8 +11,6 @@ export interface ElementReturn {
 }
 
 export interface NavigationState {
-  /** The CRM App's view, filters and open deal within this window tab. */
-  crm?: CrmRoute;
   /** The Audit App's view and open deployment or run within this window tab. */
   audit?: AuditRoute;
   /** The Files App's page and open file within this window tab. */

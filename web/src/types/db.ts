@@ -33,7 +33,6 @@ import type { ElementImportResult, ElementImportRow } from '@/Function/shared/el
 import type { DeploymentGrant, GrantOperation } from '@/Function/audit/auditModel'
 import type { DefaultPlacement } from '@/Function/widget/boardModel'
 import type { WidgetParams, WidgetSize } from '@/Function/widget/types'
-import type { CrmActivityKind, CrmDealRole, CrmFieldRecord, CrmMetric } from '@/Function/crm/crmModel'
 
 type WorkerType = 'human' | 'ai_agent' | 'robot'
 type WorkerStatus = 'active' | 'inactive' | 'busy'
@@ -121,15 +120,6 @@ interface ColumnOverrides {
     observed: Record<string, Json>
   }
   personal_access_tokens: { access: PersonalAccessTokenAccess }
-  crm_pipelines: { stages: unknown; measure_metric: CrmMetric }
-  // Free-form custom field values per record; readers normalise them.
-  crm_companies: { custom: Record<string, unknown> }
-  crm_contacts: { custom: Record<string, unknown> }
-  // numeric: PostgREST accepts a number or a decimal string.
-  crm_deals: { custom: Record<string, unknown>; amount: number | string }
-  crm_activities: { kind: CrmActivityKind }
-  crm_deal_contacts: { role: CrmDealRole }
-  crm_fields: { entity: CrmFieldRecord['entity']; type: CrmFieldRecord['type']; options: unknown }
   // A widget's own contents: a JSON object per part, merged key by key.
   widget_documents: { value: Record<string, unknown> }
   widget_viewer_state: { value: Record<string, unknown> }
@@ -146,8 +136,6 @@ interface ColumnOverrides {
 interface TriggerFilledColumns {
   // deployment_grants_fill_space: copied from the deployment.
   deployment_grants: 'activity_space_id'
-  // crm_number_deal: the next number in the Space.
-  crm_deals: 'number'
 }
 
 /**
@@ -175,9 +163,6 @@ interface FunctionOverrides {
   }
   list_assignable_workers: {
     Args: { p_space_id?: string | null; p_domain_id?: string | null; p_element_id?: string | null }
-  }
-  crm_set_next_step: {
-    Args: { p_due: string | null; p_element: string | null; p_object_id: string | null; p_owner_worker: string | null }
   }
   ensure_board: {
     Args: { p_instances?: DefaultPlacement[]; p_space_id?: string | null; p_subject_id?: string | null }

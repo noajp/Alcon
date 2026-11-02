@@ -4,7 +4,7 @@ import { Fragment, type ReactNode } from 'react';
 import { ChevronRight } from '@/ui/icons';
 
 // The main island — the pane right of the sidebar — drawn the same way in
-// every app (Execution, CRM, Files, Table): a 50px header naming where you
+// every app (Execution, Audit, Files, Table): a 50px header naming where you
 // are as a path (Domain › Folders › a folder), the page's verbs at its
 // right, then the page. A list page puts its column heads right under it.
 

@@ -1,4 +1,4 @@
-// ⌘K finds the open Space's Elements only — as it does CRM records — and keeps
+// ⌘K finds the open Space's Elements only, and keeps
 // each one's Domain so opening it can switch there first. The viewer's own
 // personal Elements belong to no Space and are found from every Space.
 

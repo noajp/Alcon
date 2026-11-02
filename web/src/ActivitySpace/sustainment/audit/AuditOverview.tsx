@@ -18,7 +18,7 @@ import type { AuditSource } from './auditSource';
 import { Empty, RunRows, SampleBadge, SampleNotice, Stat, STATE_LABEL, pct } from './auditParts';
 
 // Audit's first page: what needs a person now, how much of the work the AI
-// finishes on its own, and each workflow — read the way a CRM scope or an
+// finishes on its own, and each workflow — read the way a Domain or an
 // Object opens (a head, figures, sections, and the Properties beside them).
 
 export function AuditOverview({ source, scoped, status, onOpenWorkflow, onOpenRun, onOpenLog }: {

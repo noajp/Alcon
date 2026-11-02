@@ -7,13 +7,12 @@ import { indexSpaceFiles, searchAttachments, type FoundFile } from '@/hooks/atta
 
 
 // ============================================
-// Global Search (⌘K) — searches Elements, Objects, Notes, the active
-// Space's CRM records (deals, companies, contacts) and its attached files —
-// by name, by what they are attached to, and by the words in them. The CRM
-// has no search box of its own: finding a record is ⌘K's job.
+// Global Search (⌘K) — searches Elements, Objects, Notes and the active
+// Space's attached files — by name, by what they are attached to, and by the
+// words in them.
 // ============================================
 export interface SearchResult {
-  kind: 'element' | 'object' | 'note' | 'deal' | 'company' | 'contact' | 'file';
+  kind: 'element' | 'object' | 'note' | 'file';
   id: string;
   title: string;
   snippet?: string | null;
@@ -40,7 +39,6 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
   const like = `%${q.replace(/[%_]/g, '\\$&')}%`;
 
   const spaceId = getActiveSpaceId();
-  const none = Promise.resolve({ data: [] as { id: string; name: string; detail: string | null }[] });
   if (spaceId && Date.now() - (lastIndexed.get(spaceId) ?? 0) > INDEX_EVERY_MS) {
     lastIndexed.set(spaceId, Date.now());
     void indexSpaceFiles(spaceId);
@@ -48,12 +46,12 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
   const { data: auth } = await supabase.auth.getSession();
   const userId = auth.session?.user.id ?? null;
   const elementMatch = `title.ilike.${like},description.ilike.${like},display_id.ilike.${like}`;
-  const [elementsRes, personalRes, objectsRes, notesRes, dealsRes, companiesRes, contactsRes, files] = await Promise.all([
+  const [elementsRes, personalRes, objectsRes, notesRes, files] = await Promise.all([
     // display_id is searched as well as returned. It is the string an Element
     // is called by in a comment or a SITREP, so someone reading "ELE_MED-001 is
     // blocked" reaches for ⌘K and types exactly that.
-    // Only the open Space's Elements, as with CRM records below: one from
-    // another Space cannot be opened from here.
+    // Only the open Space's Elements: one from another Space cannot be
+    // opened from here.
     spaceId ? supabase
       .from('elements')
       .select(ELEMENT_SEARCH_SELECT)
@@ -82,9 +80,6 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
       .eq('type', 'file')
       .ilike('name', like)
       .limit(limit),
-    spaceId ? supabase.from('crm_deals').select('id, name, detail:next_step').eq('activity_space_id', spaceId).ilike('name', like).limit(limit) : none,
-    spaceId ? supabase.from('crm_companies').select('id, name, detail:industry').eq('activity_space_id', spaceId).ilike('name', like).limit(limit) : none,
-    spaceId ? supabase.from('crm_contacts').select('id, name, detail:email').eq('activity_space_id', spaceId).or(`name.ilike.${like},email.ilike.${like}`).limit(limit) : none,
     spaceId ? searchAttachments(spaceId, q, limit) : Promise.resolve([] as FoundFile[]),
   ]);
 
@@ -96,10 +91,6 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
   }
   for (const r of (notesRes.data || [])) {
     out.push({ kind: 'note', id: r.id, title: r.title || 'Untitled' });
-  }
-  const records = [['deal', dealsRes], ['company', companiesRes], ['contact', contactsRes]] as const;
-  for (const [kind, res] of records) {
-    for (const r of (res.data || []) as { id: string; name: string; detail: string | null }[]) out.push({ kind, id: r.id, title: r.name, snippet: r.detail });
   }
   for (const f of files) out.push({ kind: 'file', id: f.id, title: f.name, snippet: f.snippet ?? f.owner_label, file: f });
   return out;

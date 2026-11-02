@@ -372,7 +372,6 @@ const APP_MESSAGES: Record<string, Row> = {
   'Expand {name}': ['{name} を展開', '{name} 펼치기', 'Développer {name}', 'Expandir {name}'],
   'Collapse {name}': ['{name} を折りたたむ', '{name} 접기', 'Réduire {name}', 'Contraer {name}'],
   'Open Slides': ['Slides を開く', 'Slides 열기', 'Ouvrir Slides', 'Abrir Slides'],
-  'Open CRM': ['CRM を開く', 'CRM 열기', 'Ouvrir CRM', 'Abrir CRM'],
   'Add tab': ['タブを追加', '탭 추가', 'Ajouter un onglet', 'Añadir pestaña'],
   'Delete tab': ['タブを削除', '탭 삭제', 'Supprimer l’onglet', 'Eliminar pestaña'],
   'The List tab cannot be deleted': ['リストタブは削除できません', '목록 탭은 삭제할 수 없습니다', 'L’onglet List ne peut pas être supprimé', 'La pestaña List no se puede eliminar'],

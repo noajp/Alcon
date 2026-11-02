@@ -6,8 +6,8 @@ import type { ElementAssignee } from '@/types/database';
 /**
  * The one place that writes `element_assignees`. Every surface that changes
  * who is on an Element — the single-Element chips (with their optimistic
- * cache), the bulk hand-over and its undo, the CRM next-step owner — goes
- * through these, so the checks are the same everywhere:
+ * cache), the bulk hand-over and its undo — goes through these, so the
+ * checks are the same everywhere:
  *
  * - a database error is thrown as-is, so callers can read its `code`
  *   (42501 = the Worker cannot be assigned, 23505 = already on it);
@@ -52,19 +52,6 @@ export async function deleteElementAssignees(ids: readonly string[]): Promise<nu
     .from('element_assignees')
     .delete()
     .in('id', [...ids])
-    .select('id');
-  if (error) throw error;
-  return data?.length ?? 0;
-}
-
-/** Remove one Worker's row of a given role from one Element. Returns how many were removed. */
-export async function deleteElementAssigneeOf(elementId: string, workerId: string, role: AssigneeRole): Promise<number> {
-  const { data, error } = await supabase
-    .from('element_assignees')
-    .delete()
-    .eq('element_id', elementId)
-    .eq('worker_id', workerId)
-    .eq('role', role)
     .select('id');
   if (error) throw error;
   return data?.length ?? 0;
