@@ -228,7 +228,7 @@
   --surface-raised:  #161617;
   --surface-strong:  #252527;
   --surface-muted:   #1e1e20;
-  --surface-overlay: #1c1c1e;
+  --surface-overlay: #262628; /* menus and popovers: a light notch above the island, not a dark hole */
   /* Right-rail cards lift a notch off the main island. */
   --surface-rail:    #202022;
 
@@ -309,7 +309,7 @@
   --surface-raised:  #15161a;
   --surface-strong:  #24262c;
   --surface-muted:   #1c1d22;
-  --surface-overlay: #1b1c21;
+  --surface-overlay: #25262c;
   --surface-rail:    #1f2025;
   --sidebar-accent:  #212228;
 }
@@ -319,7 +319,7 @@
   --surface-raised:  #131313;
   --surface-strong:  #1f1f1f;
   --surface-muted:   #1a1a1a;
-  --surface-overlay: #171717;
+  --surface-overlay: #212121;
   --surface-rail:    #212121;
   --sidebar-accent:  #1f1f1f;
 }
@@ -329,7 +329,7 @@
   --surface-raised:  #1f1d1b;
   --surface-strong:  #2b2926;
   --surface-muted:   #282622;
-  --surface-overlay: #252320;
+  --surface-overlay: #2e2c29;
   --surface-rail:    #282624;
   --sidebar-accent:  #2b2926;
 }

@@ -48,7 +48,7 @@ order by (e.phase_id is not null) desc,
 
 それ以外は決めて進め、どう判断したかを一行で報告する。止まるときは「Decisions — 判断」に Element を作り、判断する人（`workers.user_id` を持つ human Worker）に割り当てて、その判断に関係しない仕事を先に進める。
 
-- `is_approval=true` / `approval_state='pending'` / `status='todo'` / `labels=['decision']`。`element_objects` と `element_assignees` を書き、`notifications` に `approval_requested`、コメントの `mentions` に判断する人の uuid
+- `is_approval=true` / `approval_state='pending'` / `status='todo'` / `labels=['decision']`。`element_objects` と `element_assignees` を書く。判断する人は `role='reviewer'` で割り当てる（assignee にすると、担当者は自分の仕事を承認できない規則で承認ボタンが押せない）。`notifications` に `approval_requested`、コメントの `mentions` に判断する人の uuid
 - description は「何を決めるか / 選択肢（推奨を先頭）/ なぜ判断が要るか / 承認後に起きること」
 - 返事がないことは承認ではない。決まったら `✔ 完了 — 何を選んだか` を書いて `done`
 

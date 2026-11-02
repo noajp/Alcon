@@ -3,6 +3,7 @@
 import { Fragment, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { parseMarkdown, type Block, type Inline } from './markdownParse';
+import { MermaidDiagram } from './MermaidDiagram';
 
 // Renders agent-written Markdown (reports, deliverables) as React elements.
 // The parser never produces HTML, so nothing in the text can inject markup.
@@ -32,9 +33,11 @@ function BlockNode({ b }: { b: Block }) {
     case 'p': return <p className="whitespace-pre-wrap"><InlineNodes nodes={b.c} /></p>;
     case 'ul': return <ul className="list-disc pl-5 space-y-0.5">{b.items.map((it, i) => <li key={i}><InlineNodes nodes={it} /></li>)}</ul>;
     case 'ol': return <ol className="list-decimal pl-5 space-y-0.5">{b.items.map((it, i) => <li key={i}><InlineNodes nodes={it} /></li>)}</ol>;
-    case 'code': return <pre className="overflow-x-auto rounded-md bg-muted/50 p-2 text-[12px] font-mono leading-relaxed">{b.v}</pre>;
+    case 'code': return b.lang === 'mermaid' ? <MermaidDiagram code={b.v} />
+      : <pre className="overflow-x-auto rounded-md bg-muted/50 p-2 text-[12px] font-mono leading-relaxed">{b.v}</pre>;
     case 'quote': return <blockquote className="border-l-2 border-border pl-3 text-muted-foreground whitespace-pre-wrap"><InlineNodes nodes={b.c} /></blockquote>;
-    case 'hr': return <hr className="border-border" />;
+    // A break in the text, not a frame: a faint rule with room around it.
+    case 'hr': return <hr className="my-5 border-0 border-t border-border/50" />;
     case 'table':
       return (
         <div className="overflow-x-auto">
