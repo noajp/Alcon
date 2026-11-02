@@ -5,7 +5,7 @@ import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { Button } from '@/ui/button';
 import { useCallback, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { Menu, Plus, Check, X } from '@/ui/icons';
+import { Menu, Plus, Check, Tag, X } from '@/ui/icons';
 import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { addElementAssignee, removeElementAssignee, fetchAssignableWorkers, useWorkerById, noticeAssignmentFailed } from '@/hooks/useSupabase';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
@@ -393,8 +393,8 @@ function DateRangeCellPopover({
   );
 }
 
-// Label chip — a coloured dot + label text in an outlined pill, shown left of
-// the Type column. The mark colour comes from the Domain colour catalogue
+// Label chip — the label's coloured tag (the same mark as the Element page's
+// Label island) + its text in an outlined pill, shown left of the Type column. The mark colour comes from the Domain colour catalogue
 // (picked colour, else an auto colour derived from the name).
 export function LabelChip({ label }: { label: string }) {
   useLabelColors(); // re-render when a colour is picked / the catalogue loads
@@ -403,7 +403,7 @@ export function LabelChip({ label }: { label: string }) {
       className="inline-flex h-[22px] items-center gap-1.5 shrink-0 max-w-[140px] px-2 rounded-full border border-[var(--border-default)] text-[12px] font-normal text-[var(--text-secondary)]"
       title={label}
     >
-      <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: labelColor(label) }} />
+      <Tag aria-hidden size={10} className="shrink-0" style={{ color: labelColor(label) }} />
       <span className="truncate">{label}</span>
     </span>
   );
