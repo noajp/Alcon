@@ -28,7 +28,7 @@ function blockHtml(b: Block): string {
     case 'h': return `<h${b.level}>${inlineHtml(b.c)}</h${b.level}>`;
     case 'p': return `<p>${inlineHtml(b.c)}</p>`;
     case 'ul': case 'ol': return `<${b.t}>${b.items.map((it) => `<li>${inlineHtml(it)}</li>`).join('')}</${b.t}>`;
-    case 'code': return `<pre>${esc(b.v)}</pre>`;
+    case 'code': return b.lang ? `<pre data-lang="${esc(b.lang)}">${esc(b.v)}</pre>` : `<pre>${esc(b.v)}</pre>`;
     case 'quote': return `<blockquote>${inlineHtml(b.c)}</blockquote>`;
     case 'hr': return '<hr>';
     case 'table': return `<table data-note-table="true"><thead><tr>${b.head.map((c) => `<th>${inlineHtml(c)}</th>`).join('')}</tr></thead><tbody>${
@@ -79,7 +79,8 @@ function blockMd(el: Element): string | null {
     }
     case 'pre': {
       const text = (el.textContent ?? '').replace(/\n+$/, '');
-      return text ? `\`\`\`\n${text}\n\`\`\`` : null;
+      const lang = el.getAttribute('data-lang') ?? '';
+      return text ? `\`\`\`${lang}\n${text}\n\`\`\`` : null;
     }
     case 'blockquote': {
       const text = inlineMd(el).trim();

@@ -15,6 +15,7 @@ import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from '@/Function/notebook/htmlSanitizer';
 import { patchBlocks } from '@/Function/notebook/noteMerge';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { MermaidLayer } from './MermaidLayer';
 
 export interface NoteEditorProps {
   initialHtml?: string;
@@ -84,6 +85,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 }, handleRef) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
+  const frameRef = useRef<HTMLDivElement | null>(null);
   const [toolbar, setToolbar] = useState<{ x: number; y: number } | null>(null);
   // Right-click menu for table cells — anchored at the click point. The
   // target cell is held in a ref so menu actions act on it regardless of
@@ -879,6 +881,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           editable as a sibling — doesn't fire the editable's mouseleave and
           make the handles flicker out from under the pointer. */}
       <div
+        ref={frameRef}
         className="relative"
         onMouseDown={editable ? handleEditorMouseDown : undefined}
         onMouseMove={editable ? (e) => { if (colResizeRef.current) return; handleEditorMouseDrag(e); refreshTableHandles(e.clientX, e.clientY); } : undefined}
@@ -899,6 +902,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           data-placeholder={placeholder ?? t('Start writing…')}
           className={`note-editor no-focus-ring outline-none leading-[1.65] text-foreground ${compact ? 'note-compact min-h-[36px] text-[14px]' : 'min-h-[300px] text-[15px]'}`}
         />
+        {/* ```mermaid blocks drawn over their source. */}
+        <MermaidLayer root={ref} frame={frameRef} />
         {editable && tableHandles && (
           <TableInsertHandles
             geom={tableHandles}
@@ -996,6 +1001,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           padding-left: 0.8rem;
           margin: 0.5rem 0;
           color: var(--muted-foreground);
+        }
+        /* A break in the text, not a frame: a faint rule with room around it. */
+        .note-editor hr {
+          border: 0;
+          border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+          margin: 1.25rem 0;
         }
         .note-editor pre {
           background: color-mix(in srgb, var(--muted) 60%, transparent);
