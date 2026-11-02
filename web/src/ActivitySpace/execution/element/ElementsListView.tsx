@@ -18,6 +18,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
+import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
 import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
 import { useAssignableWorkers } from '@/hooks/useSupabase';
 import { createQuickAddElements, toQuickAddTemplates } from '@/Function/shared/element/quickAdd';
@@ -577,21 +578,23 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
       )}
       {effectiveViewMode === 'board' && (
         <div className="flex-1 overflow-hidden">
-          <ElementBoardView elements={allElementsFlat} onRefresh={onRefresh} />
+          <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Board')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName}>
+            {openElement => <ElementBoardView elements={allElementsFlat} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
+          </ElementDrilldown>
         </div>
       )}
       {effectiveViewMode === 'gantt' && (
         <div className="flex-1 overflow-hidden">
-          <GanttView elements={allElementsFlat} sections={groupedSections} onRefresh={onRefresh} phases={domainPhases} milestones={objectMilestones} />
+          <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Gantt')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName}>
+            {openElement => <GanttView elements={allElementsFlat} sections={groupedSections} onRefresh={onRefresh} phases={domainPhases} milestones={objectMilestones} onElementOpen={(el) => openElement(el.id)} />}
+          </ElementDrilldown>
         </div>
       )}
       {effectiveViewMode === 'calendar' && (
         <div className="flex-1 overflow-hidden">
-          <CalendarView
-            elements={allElementsFlat}
-            onElementClick={(el) => setDetailId(el.id)}
-            onRefresh={onRefresh}
-          />
+          <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Calendar')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName}>
+            {openElement => <CalendarView elements={allElementsFlat} onElementClick={(el) => openElement(el.id)} onRefresh={onRefresh} />}
+          </ElementDrilldown>
         </div>
       )}
       {effectiveViewMode === 'custom_view' && (

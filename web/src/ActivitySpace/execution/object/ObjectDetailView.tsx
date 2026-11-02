@@ -572,6 +572,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
               onRefresh={onRefresh}
               phases={domainPhases}
               milestones={objectMilestones}
+              onElementOpen={(el) => setDetailElementId(el.id)}
             />
           </div>
         )}
@@ -583,6 +584,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
               elements={allElements}
               onRefresh={onRefresh}
               objectId={object.id}
+              onElementClick={(el) => setDetailElementId(el.id)}
             />
           </div>
         )}
@@ -593,6 +595,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
             <CalendarView
               elements={allElements}
               onRefresh={onRefresh}
+              onElementClick={(el) => setDetailElementId(el.id)}
             />
           </div>
         )}
