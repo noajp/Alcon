@@ -333,3 +333,49 @@ export function insertElementIntoExplorer(data: ExplorerData, el: ElementWithDet
   if (exists(data.rootElements)) return data;
   return { objects: data.objects, rootElements: [...data.rootElements, el] };
 }
+
+// ---------- Reorder (drag-to-reorder lands before the write returns) ----------
+
+export interface OrderUpdate { id: string; order_index: number }
+
+/** Give the listed Elements their new order_index in every Object list and in
+ *  rootElements, re-sorting only the lists that actually changed. Rows that
+ *  are not listed, or whose order_index is already the asked one, are left
+ *  alone — an untouched list keeps its reference (and its current order). */
+export function reorderElementsInExplorer(data: ExplorerData, updates: OrderUpdate[]): ExplorerData {
+  const orderById = new Map(updates.map(u => [u.id, u.order_index]));
+  const bump = (els: ElementWithDetails[]): ElementWithDetails[] => {
+    let touched = false;
+    const next = els.map(e => {
+      const oi = orderById.get(e.id);
+      if (oi === undefined || oi === e.order_index) return e;
+      touched = true;
+      return { ...e, order_index: oi };
+    });
+    if (!touched) return els;
+    return [...next].sort(byOrder);
+  };
+  return {
+    objects: data.objects.map(obj => {
+      const els = obj.elements ?? [];
+      const nextEls = bump(els);
+      return nextEls === els ? obj : { ...obj, elements: nextEls };
+    }),
+    rootElements: bump(data.rootElements),
+  };
+}
+
+/** Give the listed Objects their new order_index and re-sort them. Same
+ *  `data` when no Object's order_index changes. */
+export function reorderObjectsInExplorer(data: ExplorerData, updates: OrderUpdate[]): ExplorerData {
+  const orderById = new Map(updates.map(u => [u.id, u.order_index]));
+  let touched = false;
+  const next = data.objects.map(obj => {
+    const oi = orderById.get(obj.id);
+    if (oi === undefined || oi === obj.order_index) return obj;
+    touched = true;
+    return { ...obj, order_index: oi };
+  });
+  if (!touched) return data;
+  return { ...data, objects: [...next].sort(byOrder) };
+}
