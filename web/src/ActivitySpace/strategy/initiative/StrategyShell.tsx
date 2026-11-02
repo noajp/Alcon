@@ -823,6 +823,19 @@ function StrategyDetailView({
         </div>
       </div>
 
+      {/* One Initiative, four readings — under the header, as the views of a
+          Domain or Object sit: how it is going (Overview), what the plan
+          rests on (Plan), the work carrying it out (Execute), and the
+          evidence it is judged on (Evaluate). */}
+      <div role="tablist" aria-label={t('Initiative views')} className="flex flex-shrink-0 items-center gap-0.5 py-2 pl-[19px] pr-4">
+        {INITIATIVE_TABS.map((v) => (
+          <Button key={v.id} type="button" shape="tab" role="tab" aria-selected={tab === v.id}
+            variant={tab === v.id ? 'secondary' : 'ghost'} onClick={() => setTab(v.id)}>
+            {t(v.label)}
+          </Button>
+        ))}
+      </div>
+
       <div className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto px-8 py-8">
         {/* The Intent read is mounted here, above the board, because the
@@ -877,17 +890,6 @@ function StrategyDetailView({
             className="w-full text-[14px] text-[var(--text-secondary)] leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
           />
 
-          {/* One Initiative, four readings: how it is going (Overview), what
-              the plan rests on (Plan), the work carrying it out (Execute),
-              and the evidence it is judged on (Evaluate). */}
-          <div role="tablist" aria-label={t('Initiative views')} className="flex items-center gap-1 border-b border-border/60 pb-2">
-            {INITIATIVE_TABS.map((v) => (
-              <Button key={v.id} shape="tab" role="tab" aria-selected={tab === v.id}
-                variant={tab === v.id ? 'secondary' : 'ghost'} onClick={() => setTab(v.id)}>
-                {t(v.label)}
-              </Button>
-            ))}
-          </div>
 
           {tab === 'overview' && (
             <InitiativeBoard surface="campaign" defaults={INITIATIVE_BOARD} subjectId={strategy.id} host={host} zones={OVERVIEW_ZONES}>
