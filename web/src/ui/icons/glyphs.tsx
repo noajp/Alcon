@@ -59,13 +59,6 @@ export const BookOpen = glyph('BookOpen', {
   </>,
 });
 
-export const Target = glyph('Target', {
-  solid: <>
-    <path fillRule="evenodd" d="M8 2.75a5.25 5.25 0 1 0 0 10.5 5.25 5.25 0 0 0 0-10.5Zm0 1.3a3.95 3.95 0 1 1 0 7.9 3.95 3.95 0 0 1 0-7.9Z" />
-    <circle cx="8" cy="8" r="2.1" />
-  </>,
-});
-
 const BARS = {
   solid: <>
     <rect x="3.4" y="9" width="2.2" height="4.25" rx="1.1" />
@@ -97,16 +90,6 @@ export const Grip = glyph('Grip', {
 export const Milestone = glyph('Milestone', {
   solid: <path d="M3 4.25a.75.75 0 0 1 .75-.75h7.05c.2 0 .4.08.54.23l2.05 2.1a.75.75 0 0 1 0 1.04l-2.05 2.1a.75.75 0 0 1-.54.23H3.75A.75.75 0 0 1 3 8.45Z" />,
   line: <path d="M6.5 9.75v4.25M6.5 1.75v1.5" />,
-});
-
-export const Mountain = glyph('Mountain', {
-  solid: <path d="M6.3 4.4a.8.8 0 0 1 1.4 0l1.65 2.85 1.05-1.65a.8.8 0 0 1 1.36.02l2.8 4.55a.8.8 0 0 1-.68 1.23H2.12a.8.8 0 0 1-.69-1.2Z" />,
-});
-
-export const Briefcase = glyph('Briefcase', {
-  solid: <rect x="2.5" y="5" width="11" height="8.25" rx="1.8" />,
-  cut: <path d="M2 8.75h12" />,
-  line: <path d="M6 5V3.9a.9.9 0 0 1 .9-.9h2.2a.9.9 0 0 1 .9.9V5" />,
 });
 
 export const Stone = glyph('Stone', {
@@ -627,3 +610,29 @@ export const ArrowRightLeft = line('ArrowRightLeft', 'M3 5h10M10 2l3 3-3 3M13 11
 export const Activity = line('Activity', 'M1.75 8h2.5L6 3.75l3.75 8.5L11.5 8h2.75');
 export const ZoomIn = glyph('ZoomIn', { line: <><circle cx="7" cy="7" r="4.1" /><path d="m10.1 10.1 3.15 3.15M5.4 7h3.2M7 5.4v3.2" /></> });
 export const ZoomOut = glyph('ZoomOut', { line: <><circle cx="7" cy="7" r="4.1" /><path d="m10.1 10.1 3.15 3.15M5.4 7h3.2" /></> });
+
+// Strategy's units. The Vision: a summit, its snowline cut, a star over it —
+// where the Space is headed.
+export const Summit = glyph('Summit', {
+  solid: <>
+    <path d="M1.9 13.25 6.3 5.2a.8.8 0 0 1 1.4 0l2.4 4.3 1.05-1.75a.8.8 0 0 1 1.37 0l3.08 5.5Z" />
+    <path d="m12.75 1.5.5 1.25 1.25.5-1.25.5-.5 1.25-.5-1.25-1.25-.5 1.25-.5Z" />
+  </>,
+  cut: <path d="M4.85 8.5 5.95 9.35 7 8.45l1.1.9.65-.5" />,
+});
+
+// A Portfolio: Initiatives bundled, a stack of cards.
+export const CardStack = glyph('CardStack', {
+  solid: <rect x="2.25" y="6.5" width="11.5" height="7.25" rx="1.7" />,
+  line: <path d="M3.5 4.4h9M4.9 2.35h6.2" />,
+});
+
+// An Initiative: a bet launched, a rocket climbing.
+export const Launch = glyph('Launch', {
+  solid: <g transform="rotate(45 8 8)">
+    <path d="M8 1.6c1.95 1.55 2.9 3.8 2.9 6.45v2.75H5.1V8.05c0-2.65.95-4.9 2.9-6.45Z" />
+    <path d="M5.1 8.6 3.3 10.55v2.1h1.8ZM10.9 8.6l1.8 1.95v2.1h-1.8Z" />
+  </g>,
+  cut: <g transform="rotate(45 8 8)"><circle cx="8" cy="6.3" r="1.25" style={hole} /></g>,
+  line: <g transform="rotate(45 8 8)"><path d="M8 12.6v1.8" /></g>,
+});
