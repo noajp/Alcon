@@ -16,6 +16,7 @@ begin
      or to_regclass('public.element_objects') is null
      or to_regclass('public.workers') is null
      or to_regprocedure('public.user_can_read_object(uuid)') is null
+     or to_regprocedure('public.user_can_read_domain(uuid)') is null
      or to_regprocedure('public.is_activity_space_member(uuid)') is null
      or to_regprocedure('alcon_internal.user_can_see_worker(uuid)') is null then
     raise notice 'explorer_data_visibility_once skipped: base schema not present'; return;
@@ -43,10 +44,11 @@ returns jsonb language sql stable security definer set search_path = public as $
                    and (
                      p_domain_id is null
                      or o.domain_id = p_domain_id
-                     or exists (
+                     -- object_domains' SELECT policy: the Domain must be readable.
+                     or (public.user_can_read_domain(p_domain_id) and exists (
                           select 1 from public.object_domains od
                           where od.object_id = o.id and od.domain_id = p_domain_id
-                        )
+                        ))
                    )
             end
     ),
