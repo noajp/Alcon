@@ -31,8 +31,9 @@ function loadDictionaries(): Promise<void> {
   return dictionariesRequest;
 }
 
-function lookup(locale: Locale, message: string): string {
-  return locale === 'en' ? message : (dictionaries?.[locale][message] ?? message);
+/** The app dictionary's entry for `message` in `locale`, if it has arrived. */
+export function appMessage(locale: Locale, message: string): string | undefined {
+  return locale === 'en' ? message : dictionaries?.[locale][message];
 }
 
 let cachedLocale: Locale | null = null;
@@ -49,7 +50,7 @@ function readLocale(): Locale {
 
 /** The viewer's language outside React (data-layer notices); `t` inside it. */
 export function translate(message: string, values?: Record<string, string | number>): string {
-  return interpolate(lookup(readLocale(), message), values);
+  return interpolate(appMessage(readLocale(), message) ?? message, values);
 }
 
 function subscribe(listener: () => void): () => void {
