@@ -18,6 +18,13 @@
 -- rule changes there, it changes here too. Two deliberate differences:
 --   * every deal of the pipeline counts, not only those the viewer can see;
 --   * "today" is current_date (UTC), as closed_on's own default is.
+-- A pipeline reports only into a success condition of an Initiative in its
+-- own Space, connected by someone who can edit that Initiative (checked when
+-- the binding is set, and the Space again at every write). A bulk import
+-- sends x-alcon-crm-defer-measure: 1 and calls crm_refresh_pipeline_measure
+-- once at its end, so it neither recomputes per deal nor floods the history.
+-- A failure to compute is a warning, never a failed deal write or sweep.
+--
 -- A unit that does not match the metric (money vs count, another currency, a
 -- rate, a unit Alcon cannot read) writes nothing; CRM settings says why.
 --
@@ -32,7 +39,9 @@ do $migration$
 begin
   if to_regclass('public.crm_pipelines') is null or to_regclass('public.crm_deals') is null
      or to_regclass('public.crm_fields') is null or to_regclass('public.intents') is null
-     or to_regnamespace('alcon_internal') is null then
+     or to_regclass('public.strategies') is null or to_regnamespace('alcon_internal') is null
+     or to_regprocedure('alcon_internal.user_can_edit_strategy(uuid)') is null
+     or to_regprocedure('public.crm_scope_visible(uuid, uuid)') is null then
     raise notice 'crm measure server refresh skipped: base tables or alcon_internal not present';
     return;
   end if;
@@ -177,16 +186,26 @@ begin
     declare
       v_raw jsonb := case when p_field is null then null else p_custom -> p_field end;
       v_text text;
+      v_number numeric;
     begin
       if v_raw is null then return 0; end if;
-      if jsonb_typeof(v_raw) = 'number' then return (v_raw #>> '{}')::numeric; end if;
-      if jsonb_typeof(v_raw) <> 'string' then return 0; end if;
-      v_text := v_raw #>> '{}';
-      if regexp_replace(v_text, '^\s+|\s+$', '', 'g') = '' then return 0; end if;
-      v_text := regexp_replace(v_text, '[,\s]', '', 'g');
-      if v_text = '' then return 0; end if;
-      if v_text ~ '^[+-]?([0-9]+\.?[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?$' then return v_text::numeric; end if;
-      return 0;
+      if jsonb_typeof(v_raw) = 'number' then v_text := v_raw #>> '{}';
+      elsif jsonb_typeof(v_raw) = 'string' then
+        v_text := v_raw #>> '{}';
+        if regexp_replace(v_text, '^\s+|\s+$', '', 'g') = '' then return 0; end if;
+        v_text := regexp_replace(v_text, '[,\s]', '', 'g');
+        if v_text = '' then return 0; end if;
+        if v_text !~ '^[+-]?([0-9]+\.?[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?$' then return 0; end if;
+      else return 0;
+      end if;
+      -- Beyond a double, Number() is Infinity and the field counts 0; so does
+      -- anything numeric cannot hold ("1e200000").
+      begin
+        v_number := v_text::numeric;
+      exception when others then
+        return 0;
+      end;
+      return case when abs(v_number) > 1.7976931348623157e308 then 0 else v_number end;
     end $b$
   $f$;
 
@@ -207,7 +226,8 @@ begin
       v_stages := alcon_internal.crm_normalize_stages(p.stages);
       with d as (
         select x.*,
-               case x.key when 'won' then 'won' when 'lost' then 'lost' else 'open' end as outcome,
+               -- An empty stage resolves to no stage and counts nowhere, as in resolveStage.
+               case x.key when '' then null when 'won' then 'won' when 'lost' then 'lost' else 'open' end as outcome,
                coalesce(x.closed_on, x.close_date) as closed
         from (select dl.*, alcon_internal.crm_stage_key(dl.stage) as key
               from public.crm_deals dl where dl.pipeline_id = p_pipeline) x
@@ -258,7 +278,10 @@ begin
     begin
       select * into p from public.crm_pipelines where id = p_pipeline;
       if not found or p.measure_intent_id is null or p.measure_metric is null then return; end if;
-      select id, unit, actual_value into i from public.intents where id = p.measure_intent_id and kind = 'measure';
+      -- Only a success condition of an Initiative in the pipeline's own Space.
+      select it.id, it.unit, it.actual_value into i
+        from public.intents it join public.strategies s on s.id = it.strategy_id
+        where it.id = p.measure_intent_id and it.kind = 'measure' and s.activity_space_id = p.activity_space_id;
       if not found then return; end if;
       -- A field metric reports only while its field is one of this pipeline's number fields.
       if p.measure_metric like 'won\_field%' and not exists (
@@ -276,6 +299,10 @@ begin
       update public.intents set actual_value = v_written, measured_at = now()
         where id = i.id and actual_value is distinct from v_written;
       perform set_config('alcon.reading_source', coalesce(v_previous_source, ''), true);
+    exception when others then
+      -- A figure that cannot be computed never blocks the deal write or the
+      -- sweep; the subtransaction rolls back, reading_source included.
+      raise warning 'crm measure refresh failed for pipeline %: %', p_pipeline, sqlerrm;
     end $b$
   $f$;
 
@@ -285,11 +312,58 @@ begin
     declare
       v_id uuid;
     begin
+      -- crm_refresh_measure contains its own failures, so one pipeline never
+      -- stops the sweep.
       for v_id in select id from public.crm_pipelines where measure_intent_id is not null and measure_metric is not null loop
         perform alcon_internal.crm_refresh_measure(v_id);
       end loop;
     end $b$
   $f$;
+
+  -- Binding a pipeline to a success condition is editing that condition: the
+  -- person must be able to edit its Initiative, and the Initiative must be in
+  -- the pipeline's Space. crm_pipelines' own policy checks only that the
+  -- pipeline is visible, and crm_refresh_measure writes past RLS.
+  execute $f$
+    create or replace function alcon_internal.crm_pipelines_check_measure()
+    returns trigger language plpgsql security definer set search_path = '' as $b$
+    declare
+      v_strategy uuid;
+    begin
+      if new.measure_intent_id is null then return new; end if;
+      if tg_op = 'UPDATE' and new.measure_intent_id is not distinct from old.measure_intent_id
+         and new.activity_space_id is not distinct from old.activity_space_id then
+        return new;
+      end if;
+      select it.strategy_id into v_strategy
+        from public.intents it join public.strategies s on s.id = it.strategy_id
+        where it.id = new.measure_intent_id and it.kind = 'measure' and s.activity_space_id = new.activity_space_id;
+      if v_strategy is null then
+        raise exception 'This success condition is not in the pipeline’s Space.' using errcode = '42501';
+      end if;
+      -- A signed-in person must be able to edit the Initiative; server-side
+      -- writers (service role, migrations, cron) have no auth.uid().
+      if auth.uid() is not null and not alcon_internal.user_can_edit_strategy(v_strategy) then
+        raise exception 'Only someone who can edit the Initiative can connect a pipeline to its success condition.' using errcode = '42501';
+      end if;
+      return new;
+    end $b$
+  $f$;
+
+  -- Recomputes one pipeline the caller can see (after a deferred import).
+  execute $f$
+    create or replace function public.crm_refresh_pipeline_measure(p_pipeline uuid)
+    returns void language plpgsql security definer set search_path = '' as $b$
+    begin
+      if not exists (select 1 from public.crm_pipelines p
+                     where p.id = p_pipeline and public.crm_scope_visible(p.activity_space_id, p.domain_id)) then
+        return;
+      end if;
+      perform alcon_internal.crm_refresh_measure(p_pipeline);
+    end $b$
+  $f$;
+  execute 'revoke all on function public.crm_refresh_pipeline_measure(uuid) from public, anon';
+  execute 'grant execute on function public.crm_refresh_pipeline_measure(uuid) to authenticated';
 
   -- Deals: once per statement, for each bound pipeline the statement touched.
   execute $f$
@@ -297,7 +371,17 @@ begin
     returns trigger language plpgsql security definer set search_path = '' as $b$
     declare
       v_id uuid;
+      v_defer text;
     begin
+      -- A bulk import defers to one public.crm_refresh_pipeline_measure call at
+      -- its end. Deferring only delays a figure (the daily sweep catches up),
+      -- so the header grants nothing.
+      begin
+        v_defer := nullif(current_setting('request.headers', true), '')::json ->> 'x-alcon-crm-defer-measure';
+      exception when others then
+        v_defer := null;
+      end;
+      if v_defer = '1' then return null; end if;
       if tg_op = 'INSERT' then
         for v_id in select distinct n.pipeline_id from new_rows n
                     join public.crm_pipelines p on p.id = n.pipeline_id and p.measure_intent_id is not null loop
@@ -362,6 +446,7 @@ begin
       alcon_internal.crm_refresh_measure(uuid), alcon_internal.crm_refresh_all_measures(),
       alcon_internal.crm_deals_refresh_measures(), alcon_internal.crm_pipelines_refresh_measure(),
       alcon_internal.crm_fields_refresh_measures(), alcon_internal.intents_refresh_crm_measures(),
+      alcon_internal.crm_pipelines_check_measure(),
       alcon_internal.crm_metric_value(uuid, date, text)
     from public, anon, authenticated';
 
@@ -377,6 +462,19 @@ begin
   execute 'create trigger crm_deals_refresh_measures_del after delete on public.crm_deals
              referencing old table as old_rows
              for each statement execute function alcon_internal.crm_deals_refresh_measures()';
+
+  -- A binding that would fail the check now is dropped rather than kept
+  -- writing into another Space's Initiative.
+  execute $u$
+    update public.crm_pipelines p set measure_intent_id = null, measure_metric = null, measure_field = null
+    where p.measure_intent_id is not null and not exists (
+      select 1 from public.intents it join public.strategies s on s.id = it.strategy_id
+      where it.id = p.measure_intent_id and it.kind = 'measure' and s.activity_space_id = p.activity_space_id)
+  $u$;
+  execute 'drop trigger if exists crm_pipelines_check_measure on public.crm_pipelines';
+  execute 'create trigger crm_pipelines_check_measure
+             before insert or update of measure_intent_id, activity_space_id on public.crm_pipelines
+             for each row execute function alcon_internal.crm_pipelines_check_measure()';
 
   execute 'drop trigger if exists crm_pipelines_refresh_measure on public.crm_pipelines';
   execute 'create trigger crm_pipelines_refresh_measure

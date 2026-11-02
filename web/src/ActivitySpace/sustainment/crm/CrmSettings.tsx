@@ -170,7 +170,7 @@ function Connections({ crm }: { crm: Crm }) {
       {pipeline.measure_intent_id && metricKind(metric) === 'field' && unit.kind === 'money' && <p className="text-xs text-muted-foreground">{t('A field reported as money is read in the pipeline’s currency, in whole units (yen, dollars), and only deals in that currency count.')}</p>}
       {pipeline.measure_intent_id && mismatch && <p role="alert" className="text-xs text-[var(--status-warning)]">{mismatch} {t('Nothing is written until they match.')}</p>}
       {pipeline.measure_intent_id && linked && written !== null && <p className="text-xs text-muted-foreground">{t('Currently reporting {value}.', { value: unit.kind === 'money' || unit.kind === 'count' ? `${written.toLocaleString(locale)} ${linked?.unit ?? ''}`.trim() : metricKind(metric) === 'amount' ? money(written, pipeline.currency, locale) : written.toLocaleString(locale) })}</p>}
-      {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{error}</p>}
+      {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{t(error)}</p>}
     </div>
   </Section>;
 }

@@ -19,6 +19,11 @@ import {
 } from '@/Function/crm/crmModel';
 
 const EMPTY: never[] = [];
+
+/** A deal write that leaves the pipeline's success condition to be
+ * recomputed later (once, by crm_refresh_pipeline_measure), for bulk imports. */
+const deferring = <Q extends { setHeader: (name: string, value: string) => Q }>(query: Q, defer: boolean | undefined): Q =>
+  defer ? query.setHeader('x-alcon-crm-defer-measure', '1') : query;
 const ACTIVITY_WINDOW = 3000;
 
 function all<Row extends { id: string }>(label: string, table: string, spaceId: string, order = 'created_at') {
@@ -237,7 +242,7 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
   };
 
   /** Creates or updates a deal in one row write (company / contact rows first when named). */
-  const saveDeal = async (dealId: string | null, patch: CrmDealPatch, extra?: { activity?: { type: CrmActivityType; text: string; date?: string }; quiet?: boolean; onNotice?: (notice: string) => void }): Promise<string> => {
+  const saveDeal = async (dealId: string | null, patch: CrmDealPatch, extra?: { activity?: { type: CrmActivityType; text: string; date?: string }; quiet?: boolean; deferMeasure?: boolean; onNotice?: (notice: string) => void }): Promise<string> => {
     const row: Record<string, unknown> = {};
     let stepKept = false;
     if (patch.name !== undefined) row.name = patch.name.trim();
@@ -272,7 +277,7 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
       let id = dealId;
       if (id) {
         const before = deals.data?.find(item => item.id === id);
-        if (Object.keys(row).length) check(await supabase.from('crm_deals').update(row).eq('id', id).select('id').single());
+        if (Object.keys(row).length) check(await deferring(supabase.from('crm_deals').update(row), extra?.deferMeasure).eq('id', id).select('id').single());
         // A new owner takes the open next step with the deal.
         if (patch.ownerId !== undefined && before && before.owner_worker_id !== patch.ownerId) {
           stepKept = !(await moveStep(before.next_element_id, before.owner_worker_id, patch.ownerId));
@@ -282,11 +287,11 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
       else {
         const first = normalizeCrmStages(pipeline?.stages)[0];
         const stage = (row.stage as string | undefined) ?? first.id;
-        id = check(await supabase.from('crm_deals').insert({
+        id = check(await deferring(supabase.from('crm_deals').insert({
           activity_space_id: space(), pipeline_id: pipeline?.id, currency: pipeline?.currency ?? 'JPY',
           owner_worker_id: me, probability: resolveStage(stage, normalizeCrmStages(pipeline?.stages))?.probability ?? null,
           ...row, stage, name: (row.name as string | undefined) || pipeline?.record_label || 'New deal',
-        }).select('id').single()).id;
+        }), extra?.deferMeasure).select('id').single()).id;
       }
       if (extra?.activity) await logActivity(id!, extra.activity, { companyId: (row.company_id as string | null | undefined), contactId: (row.contact_id as string | null | undefined), quiet: true });
       if (stepKept) extra?.onNotice?.('The new owner cannot see the next step’s Object, so the next step stays with the previous owner.');
@@ -514,15 +519,20 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
           // A historical win keeps its own date rather than today's.
           closedOn: date(cell(row.id, 'closeDate')),
           nextStep: text(cell(row.id, 'nextStep')), nextStepOn: date(cell(row.id, 'nextActionDate')),
-        }, { quiet: true });
+        }, { quiet: true, deferMeasure: true });
         for (const entry of [...parseActivityLog(cell(row.id, 'activity'))].reverse()) {
           if (entry.type !== 'stage' && entry.type !== 'change') await logActivity(dealId, { type: entry.type, text: entry.text, date: entry.date ?? today }, { companyId, contactId, quiet: true });
         }
         const last = date(cell(row.id, 'lastContact'));
-        if (last) check(await supabase.from('crm_deals').update({ last_contact_on: last }).eq('id', dealId).select('id').single());
+        if (last) check(await deferring(supabase.from('crm_deals').update({ last_contact_on: last }), true).eq('id', dealId).select('id').single());
         count += 1;
       }
-    } finally { await invalidate(); }
+    } finally {
+      // The deals went in without recomputing the pipeline's figure each time;
+      // it is recomputed once, here.
+      if (pipeline?.id) await supabase.rpc('crm_refresh_pipeline_measure', { p_pipeline: pipeline.id });
+      await invalidate();
+    }
     return count;
   };
 
