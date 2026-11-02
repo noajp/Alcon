@@ -144,20 +144,25 @@ export function useClosedTimesSince(since: Date, enabled: boolean) {
 }
 
 /**
- * Record a close this client just made, before the read catches up: put
- * `elementId → at` into every cached close-time map, then read again. Without
- * it the window judges the Element by its created_at until the delta stream
- * arrives — and keeps it hidden if the stream never does.
+ * Record a close this client is making, alongside the optimistic status
+ * patch: put `elementId → at` into every cached close-time map. Without it
+ * the window judges the Element by its created_at until the read catches up —
+ * and keeps it hidden if the delta stream never arrives. Not rolled back: if
+ * the write fails the Element is open again, and the window ignores open
+ * Elements.
  */
 export function noteElementClosed(elementId: string, at: string): void {
-  const qc = getQueryClient();
-  qc.setQueriesData<ClosedTimes>({ queryKey: ['elementClosedTimes'] }, (old) => {
+  getQueryClient().setQueriesData<ClosedTimes>({ queryKey: ['elementClosedTimes'] }, (old) => {
     if (!old) return old;
     const closedAt = new Map(old.closedAt);
     closedAt.set(elementId, at);
     return { ...old, closedAt };
   });
-  void qc.invalidateQueries({ queryKey: ['elementClosedTimes'] });
+}
+
+/** Read the close times again — after a close has been written. */
+export function refreshClosedTimes(): void {
+  void getQueryClient().invalidateQueries({ queryKey: ['elementClosedTimes'] });
 }
 
 type StatusRow = Pick<ElementActivity, 'element_id' | 'kind' | 'detail' | 'created_at'>;

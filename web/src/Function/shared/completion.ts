@@ -17,6 +17,20 @@ export function isOpenStatus(status: string | null | undefined): boolean {
   return !CLOSED_STATUSES.has(status ?? '');
 }
 
+/**
+ * Whether setting `next` takes an open Element off the plate — the moment the
+ * client may stamp as its close before the audit trail is read back. An
+ * Element already closed is not stamped (re-setting done must not read as
+ * "done just now"); the read that follows settles any exact time. `previous`
+ * is undefined when the caller does not know it (the Element is in no cache
+ * it can read); that counts as a close, so a close the client did make is
+ * never left out of the window.
+ */
+export function isClosingMove(previous: string | null | undefined, next: string | null | undefined): boolean {
+  if (isOpenStatus(next)) return false;
+  return previous === undefined || isOpenStatus(previous);
+}
+
 interface Completion {
   /** Elements marked done. */
   done: number;

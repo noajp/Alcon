@@ -2,7 +2,7 @@
 
 import type { DependencyBlocker } from '@/Function/shared/element/dependencyReadiness';
 import { computeBlockers, upstreamIdsOf } from '@/Function/shared/element/dependencyReadiness';
-import { applyOptimisticExplorerPatch, invalidateElementDetail } from '@/Function/sync/explorerCache';
+import { applyOptimisticExplorerPatch, cachedElementStatus, invalidateElementDetail } from '@/Function/sync/explorerCache';
 import {
   insertElementIntoExplorer,
   mapElementInExplorer,
@@ -15,8 +15,8 @@ import { selectIn } from '@/hooks/chunkedIn';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 import { throwOnFailedWrites } from './writeResults';
 import { deleteElementAssignees, insertElementAssignee } from './elementAssigneeWrites';
-import { noteElementClosed } from './elementActivity';
-import { isOpenStatus } from '@/Function/shared/completion';
+import { noteElementClosed, refreshClosedTimes } from './elementActivity';
+import { isClosingMove } from '@/Function/shared/completion';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
@@ -185,6 +185,12 @@ export async function updateElement(
   // UI reflects the change instantly (board drag-drop, inline rename, status
   // change, etc.). Rollback to the pre-patch snapshot on error.
   const optimisticPatch = { ...normalized, updated_at: new Date().toISOString() };
+  // Every status edit — picker, board drop, bulk bar — lands here, so this
+  // is where a close reaches the lists' "Completed Elements" window: stamped
+  // with the optimistic patch (read the old status before it), read back
+  // once written.
+  const closing = 'status' in updates && isClosingMove(cachedElementStatus(id), updates.status);
+  if (closing) noteElementClosed(id, optimisticPatch.updated_at);
   const rollback = applyOptimisticExplorerPatch(data =>
     patchElementInExplorer(data, id, optimisticPatch)
   );
@@ -196,9 +202,7 @@ export async function updateElement(
       .select()
       .single();
     if (error) throw error;
-    // Every status edit — picker, board drop, bulk bar — lands here, so this
-    // is where a close reaches the lists' "Completed Elements" window.
-    if (updates.status && !isOpenStatus(updates.status)) noteElementClosed(id, new Date().toISOString());
+    if (closing) refreshClosedTimes();
     return data;
   } catch (err) {
     rollback();
