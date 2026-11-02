@@ -56,7 +56,7 @@ export function ColumnHeader({
       style={{ width, minWidth: width, maxWidth: width }}
       {...attributes}
       {...listeners}
-      className={`table-cell group/col relative ${end ? 'px-0.5' : 'px-1'} py-1.5 text-left text-[13px] font-normal text-muted-foreground bg-card whitespace-nowrap select-none border-b border-border/60 transition-opacity ${isDragging ? 'opacity-40' : ''}`}
+      className={`table-cell group/col relative ${end ? 'px-0.5' : 'px-1'} py-1.5 text-left text-[13px] font-normal text-muted-foreground bg-card whitespace-nowrap select-none transition-opacity ${isDragging ? 'opacity-40' : ''}`}
     >
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
