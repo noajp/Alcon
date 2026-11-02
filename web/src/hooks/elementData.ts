@@ -9,6 +9,7 @@ import {
   patchElementInExplorer,
   patchSubelementInExplorer,
   removeElementFromExplorer,
+  reorderElementsInExplorer,
 } from '@/Function/sync/explorerPatch';
 import { selectIn } from '@/hooks/chunkedIn';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
@@ -202,28 +203,7 @@ export async function reorderElements(updates: { id: string; order_index: number
   // re-sort each object's elements (+ rootElements) so the drag lands
   // instantly instead of snapping back until the next refetch. The RPC sorts
   // by elements.order_index, so persisting these values keeps the order.
-  const orderById = new Map(updates.map(u => [u.id, u.order_index]));
-  const rollback = applyOptimisticExplorerPatch(data => {
-    const bump = (els: ElementWithDetails[]): ElementWithDetails[] => {
-      let touched = false;
-      const next = els.map(e => {
-        const oi = orderById.get(e.id);
-        if (oi === undefined || oi === e.order_index) return e;
-        touched = true;
-        return { ...e, order_index: oi };
-      });
-      if (!touched) return els;
-      return [...next].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-    };
-    return {
-      objects: data.objects.map(obj => {
-        const els = obj.elements ?? [];
-        const nextEls = bump(els);
-        return nextEls === els ? obj : { ...obj, elements: nextEls };
-      }),
-      rootElements: bump(data.rootElements),
-    };
-  });
+  const rollback = applyOptimisticExplorerPatch(data => reorderElementsInExplorer(data, updates));
   try {
     await Promise.all(updates.map(u =>
       supabase.from('elements').update({ order_index: u.order_index }).eq('id', u.id)
