@@ -248,7 +248,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
       out.push({
         id: obj.id,
         name: obj.name,
-        icon: <ObjectIcon size={14} />,
+        icon: <ObjectIcon size={16} />,
         objects: [],
         elements: obj.elements ?? [],
       });
