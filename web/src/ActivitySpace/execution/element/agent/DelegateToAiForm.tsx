@@ -11,11 +11,14 @@ import type { AgentStartOutcome, Worker } from '@/hooks/useSupabase';
 // Handing an Element to the in-app agent (Claude): an optional note and,
 // when the Space has more than one AI Worker, which one. The AI Worker
 // already assigned to the Element is preselected. Opened from the Element's
-// "Open in" menu.
+// "…" menu and from ⌘K while the Element is open; while a run is going it
+// says so and starts nothing.
 
 export function DelegateToAiForm({
   aiWorkers,
   defaultWorkerId,
+  defaultPrompt,
+  busy,
   starting,
   error,
   onStart,
@@ -23,6 +26,10 @@ export function DelegateToAiForm({
 }: {
   aiWorkers: Worker[];
   defaultWorkerId: string | null;
+  /** The note to start from — the previous run's instructions. */
+  defaultPrompt?: string | null;
+  /** A run is already going on this Element. */
+  busy?: boolean;
   starting?: boolean;
   /** Why the last start failed, shown under the form. */
   error?: string | null;
@@ -32,12 +39,13 @@ export function DelegateToAiForm({
   onStarted: () => void;
 }) {
   const { t } = useI18n();
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState(defaultPrompt ?? '');
   const [outcome, setOutcome] = useState<AgentStartOutcome | null>(null);
   const [workerId, setWorkerId] = useState<string | null>(defaultWorkerId ?? aiWorkers[0]?.id ?? null);
   const chosen = aiWorkers.find((w) => w.id === workerId) ?? null;
 
   const run = async () => {
+    if (busy || starting) return;
     const result = await onStart({ workerId, prompt });
     setOutcome(result);
     if (result !== 'started') return;
@@ -71,12 +79,12 @@ export function DelegateToAiForm({
           </DropdownMenu>
         ) : chosen ? <span>{t('Agent')}: {chosen.name}</span> : null}
         action={
-          <Button variant="primary" size="sm" disabled={starting} onClick={() => void run()}>
+          <Button variant="primary" size="sm" disabled={starting || busy} onClick={() => void run()}>
             {starting && <Loader2 size={13} className="animate-spin" />}{t('Run')}
           </Button>
         }
       />
-      {outcome === 'busy' && (
+      {(busy || outcome === 'busy') && (
         <p className="mt-2 text-[12px] text-muted-foreground">{t('The agent is already working on this Element. Stop it or wait for it to finish, then ask again.')}</p>
       )}
       {outcome === 'failed' && error && <p className="mt-2 text-[12px] text-[var(--status-danger)]">{error}</p>}
