@@ -26,7 +26,7 @@ export {
   Milestone,
   CompassRose,
   GuidingStar,
-  Quartered,
+  Chevrons,
   Spearhead,
   Layers,
   Box,

@@ -625,10 +625,12 @@ export const GuidingStar = glyph('GuidingStar', {
   line: <path d="M1.75 14.25h12.5" />,
 });
 
-// A Portfolio: one diamond quartered — a set of bets held as one.
-export const Quartered = glyph('Quartered', {
-  solid: <path d="M8 1.7 14.3 8 8 14.3 1.7 8Z" {...SOFT} />,
-  cut: <path d="M4.4 4.4 11.6 11.6M11.6 4.4 4.4 11.6" />,
+// A Portfolio: chevrons stacked, an insignia — Initiatives advancing as one.
+export const Chevrons = glyph('Chevrons', {
+  solid: <>
+    <path d="M2.9 7.2 8 3l5.1 4.2v2.1L8 5.1 2.9 9.3Z" {...SOFT} />
+    <path d="M2.9 11.7 8 7.5l5.1 4.2v2.1L8 9.6 2.9 13.8Z" {...SOFT} />
+  </>,
 });
 
 // An Initiative: a spearhead, the axis of advance.
