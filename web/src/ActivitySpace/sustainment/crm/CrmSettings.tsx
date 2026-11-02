@@ -140,7 +140,7 @@ function Connections({ crm }: { crm: Crm }) {
     : t('This success condition is an amount. Choose an amount won or in the pipeline.');
   const [error, setError] = useState<string | null>(null);
   const save = (patch: Parameters<Crm['savePipeline']>[1]) => { setError(null); crm.savePipeline(pipeline.id, patch).catch(cause => setError(message(cause))); };
-  return <Section title={t('Connections')} description={t('How this pipeline meets Execution and Strategy. Next steps become Elements in the Object you choose, assigned to each deal’s owner. The figure you choose is written into an Initiative’s success condition when its owner opens the CRM.')}>
+  return <Section title={t('Connections')} description={t('How this pipeline meets Execution and Strategy. Next steps become Elements in the Object you choose, assigned to each deal’s owner. The figure you choose is written into an Initiative’s success condition whenever a deal changes, whoever changes it.')}>
     <div className="max-w-2xl space-y-2">
       <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-2">
         <span className="text-xs text-muted-foreground">{t('Next steps go to')}</span>
@@ -170,7 +170,6 @@ function Connections({ crm }: { crm: Crm }) {
       {pipeline.measure_intent_id && metricKind(metric) === 'field' && unit.kind === 'money' && <p className="text-xs text-muted-foreground">{t('A field reported as money is read in the pipeline’s currency, in whole units (yen, dollars), and only deals in that currency count.')}</p>}
       {pipeline.measure_intent_id && mismatch && <p role="alert" className="text-xs text-[var(--status-warning)]">{mismatch} {t('Nothing is written until they match.')}</p>}
       {pipeline.measure_intent_id && linked && written !== null && <p className="text-xs text-muted-foreground">{t('Currently reporting {value}.', { value: unit.kind === 'money' || unit.kind === 'count' ? `${written.toLocaleString(locale)} ${linked?.unit ?? ''}`.trim() : metricKind(metric) === 'amount' ? money(written, pipeline.currency, locale) : written.toLocaleString(locale) })}</p>}
-      {crm.measureError && <p role="alert" className="text-xs text-[var(--status-danger)]">{t(crm.measureError)}</p>}
       {error && <p role="alert" className="text-xs text-[var(--status-danger)]">{error}</p>}
     </div>
   </Section>;

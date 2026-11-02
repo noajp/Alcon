@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
@@ -12,9 +12,8 @@ import { updateElement } from '@/hooks/elementData';
 import { deleteElementAssigneeOf, insertElementAssignee } from '@/hooks/elementAssigneeWrites';
 import { fetchDataTableSchema } from '@/hooks/tableData';
 import { readAllPages } from '@/hooks/readAllPages';
-import { READING_SOURCE_HEADER } from '@/hooks/strategyData';
 import {
-  buildCrmWorkspace, fieldsFor, measureValue, metricKind, metricValue, normalizeCrmStages, parseActivityLog, resolveStage,
+  buildCrmWorkspace, normalizeCrmStages, parseActivityLog, resolveStage,
   type CrmActivityRecord, type CrmActivityType, type CrmCompanyRecord, type CrmContactRecord, type CrmDeal,
   type CrmDealContactRecord, type CrmDealRecord, type CrmElementLinkRecord, type CrmLinkedElement, type CrmDealRole, type CrmFieldRecord, type CrmNextElement, type CrmPerson, type CrmPipelineRecord, type CrmWorkspace,
 } from '@/Function/crm/crmModel';
@@ -125,7 +124,13 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
   const people: CrmPerson[] = useMemo(() => workers.data.map(worker => ({ id: worker.id, name: worker.name, type: worker.type, user_id: worker.user_id ?? null })), [workers.data]);
   const me = people.find(person => person.user_id === userId)?.id ?? null;
 
-  const invalidate = useCallback(() => qc.invalidateQueries({ queryKey: ['crm', spaceId] }), [qc, spaceId]);
+  // A pipeline's figure is written into its success condition by the database
+  // as deals change, so the measures re-read with the CRM.
+  const invalidate = useCallback(() => Promise.all([
+    qc.invalidateQueries({ queryKey: ['crm', spaceId] }),
+    qc.invalidateQueries({ queryKey: ['initiative-measures'] }),
+    qc.invalidateQueries({ queryKey: ['measure-readings'] }),
+  ]).then(() => undefined), [qc, spaceId]);
 
   // Every Space starts with one pipeline, so the App always has somewhere to put
   // a deal. Only the main pane seeds, so two readers never create two. When the
@@ -477,43 +482,6 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
   };
   const deleteField = async (id: string) => { check(await supabase.from('crm_fields').delete().eq('id', id).select('id').single()); await invalidate(); };
 
-  // ── Strategy: report the pipeline's figure into its Initiative measure ──
-  const [measureError, setMeasureError] = useState<string | null>(null);
-  const reported = useRef<string | null>(null);
-  useEffect(() => {
-    const p = workspace?.pipeline;
-    // One writer (the main pane), and only from fresh data, never a cached stale view.
-    if (!seed || !p?.measure_intent_id || !p.measure_metric || !workspace || deals.isFetching) return;
-    // A field metric reports only while its field is one of this pipeline's number fields.
-    const byField = metricKind(p.measure_metric) === 'field';
-    if (byField && !fieldsFor(fields.data ?? [], 'deal', p.domain_id).some(field => field.type === 'number' && field.key === p.measure_field)) return;
-    const value = metricValue(workspace.deals, p.measure_metric, p.currency, today, p.measure_field);
-    // A field total reported as money depends on which currencies the won deals are in.
-    const currencies = byField ? workspace.deals.filter(deal => deal.outcome === 'won').map(deal => `${deal.id}=${deal.currency}`).join(',') : '';
-    const stamp = `${p.measure_intent_id}:${p.measure_metric}:${p.measure_field ?? ''}:${value}:${currencies}`;
-    if (reported.current === stamp) return;
-    reported.current = stamp;
-    void (async () => {
-      const { data, error } = await supabase.from('intents').select('actual_value,unit').eq('id', p.measure_intent_id!).maybeSingle();
-      if (error || !data) { setMeasureError(error?.message ?? 'The linked success condition is not visible to you.'); return; }
-      // Money goes only into the pipeline's own currency, at the condition's scale
-      // (万円…); counts only into count units. Anything else is not written.
-      // A field reported as money counts only deals in the pipeline's currency.
-      const figure = byField ? metricValue(workspace.deals, p.measure_metric!, p.currency, today, p.measure_field, data.unit as string | null) : value;
-      const written = measureValue(data.unit as string | null, p.measure_metric!, p.currency, figure);
-      // Not written now; a later refresh tries again (the unit may have been corrected).
-      if (written === null) { reported.current = null; setMeasureError(null); return; }
-      if (Number(data.actual_value) === written) { setMeasureError(null); return; }
-      const { error: writeError } = await supabase.from('intents').update({ actual_value: written, measured_at: new Date().toISOString() }).setHeader(READING_SOURCE_HEADER, 'crm').eq('id', p.measure_intent_id!).select('id').single();
-      // Success conditions are written by the Initiative's owner; for anyone else the figure updates when they open the CRM.
-      setMeasureError(writeError ? 'Only the Initiative’s owner can update this success condition. It updates when they open the CRM.' : null);
-      if (!writeError) {
-        void qc.invalidateQueries({ queryKey: ['initiative-measures'] });
-        void qc.invalidateQueries({ queryKey: ['measure-readings', p.measure_intent_id] });
-      }
-    })();
-  }, [seed, workspace, deals.isFetching, today, qc, fields.data]);
-
   /** Moves a Table-based pipeline (the CRM's former store) into this Space's
    * records. Safe to run again: deals it already imported are skipped. */
   const importFromTable = async (tableId: string, mapping: Record<string, string>): Promise<number> => {
@@ -574,7 +542,7 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
     loading: enabled && !workspace && !error,
     /** Whether the list of pipelines this reader can see has been read at least once. */
     pipelinesLoaded: pipelines.isFetched,
-    error, measureError,
+    error,
     refetch: invalidate,
     saveDeal, handOver, linkElement, unlinkElement, searchElements, startRenewal, declineRenewal, addDealContact, updateDealContact, removeDealContact, logActivity, logRecordActivity, setNextStep, completeNextStep, deleteDeal,
     savePipeline, deletePipeline, saveCompany, deleteCompany, saveContact, deleteContact, saveField, deleteField,
