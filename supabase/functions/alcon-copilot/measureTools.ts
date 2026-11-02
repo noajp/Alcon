@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const READING_SOURCE_HEADER = 'x-alcon-reading-source';
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const MEASURE_TOOLS = [{
   name: 'campaignMeasure',
@@ -71,12 +72,13 @@ export async function runMeasureTool(db: SupabaseClient, input: Record<string,un
       } else root = inserted.data;
     }
     if (!root) throw new Error('Initiative root could not be resolved');
-    const {data,error} = await db.from('intents').insert({...patch,strategy_id:strategyId,parent_intent_id:root.id,kind:'measure',created_by:auth.user.id}).select().single();
+    const {data,error} = await db.from('intents').insert({...patch,strategy_id:strategyId,parent_intent_id:root.id,kind:'measure',created_by:auth.user.id}).setHeader(READING_SOURCE_HEADER,'copilot').select().single();
     if (error) throw new Error(error.message);
     return {ok:true,data};
   }
   const id = uuid(input.id);
-  const query = action === 'get' ? db.from('intents').select('*') : action === 'delete' ? db.from('intents').delete().select() : db.from('intents').update(validateMeasurePatch(input.patch,false)).select();
+  // The intent_measure_readings trigger labels the reading with this header.
+  const query = action === 'get' ? db.from('intents').select('*') : action === 'delete' ? db.from('intents').delete().select() : db.from('intents').update(validateMeasurePatch(input.patch,false)).setHeader(READING_SOURCE_HEADER,'copilot').select();
   const {data,error} = await query.eq('id',id).eq('strategy_id',strategyId).eq('kind','measure').single();
   if (error) throw new Error(error.message);
   return {ok:true,data};

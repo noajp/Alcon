@@ -12,6 +12,7 @@ import { updateElement } from '@/hooks/elementData';
 import { deleteElementAssigneeOf, insertElementAssignee } from '@/hooks/elementAssigneeWrites';
 import { fetchDataTableSchema } from '@/hooks/tableData';
 import { readAllPages } from '@/hooks/readAllPages';
+import { READING_SOURCE_HEADER } from '@/hooks/strategyData';
 import {
   buildCrmWorkspace, fieldsFor, measureValue, metricKind, metricValue, normalizeCrmStages, parseActivityLog, resolveStage,
   type CrmActivityRecord, type CrmActivityType, type CrmCompanyRecord, type CrmContactRecord, type CrmDeal,
@@ -503,10 +504,13 @@ export function useCrm(pipelineId?: string | null, { seed = false, active = true
       // Not written now; a later refresh tries again (the unit may have been corrected).
       if (written === null) { reported.current = null; setMeasureError(null); return; }
       if (Number(data.actual_value) === written) { setMeasureError(null); return; }
-      const { error: writeError } = await supabase.from('intents').update({ actual_value: written, measured_at: new Date().toISOString() }).eq('id', p.measure_intent_id!).select('id').single();
+      const { error: writeError } = await supabase.from('intents').update({ actual_value: written, measured_at: new Date().toISOString() }).setHeader(READING_SOURCE_HEADER, 'crm').eq('id', p.measure_intent_id!).select('id').single();
       // Success conditions are written by the Initiative's owner; for anyone else the figure updates when they open the CRM.
       setMeasureError(writeError ? 'Only the Initiative’s owner can update this success condition. It updates when they open the CRM.' : null);
-      if (!writeError) void qc.invalidateQueries({ queryKey: ['initiative-measures'] });
+      if (!writeError) {
+        void qc.invalidateQueries({ queryKey: ['initiative-measures'] });
+        void qc.invalidateQueries({ queryKey: ['measure-readings', p.measure_intent_id] });
+      }
     })();
   }, [seed, workspace, deals.isFetching, today, qc, fields.data]);
 

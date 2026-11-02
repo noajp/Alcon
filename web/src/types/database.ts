@@ -1860,6 +1860,27 @@ export interface IntentLineage {
   created_at: string
 }
 
+/** Where a measure reading came from (intent_measure_readings.source). */
+export type MeasureReadingSource =
+  | 'manual' | 'crm' | 'copilot' | 'api' | 'mcp' | 'agent' | 'system' | 'backfill' | 'other'
+
+/** One reading of a success condition, appended by the database whenever
+ *  intents.actual_value / measured_at change. value null = the reading was cleared. */
+export interface IntentMeasureReading {
+  id: string
+  intent_id: string
+  value: number | null
+  previous_value: number | null
+  measured_at: string | null
+  target_value: number | null
+  direction: MeasureDirection | null
+  unit: string | null
+  source: MeasureReadingSource
+  recorded_by: string | null
+  recorded_by_name: string | null
+  recorded_at: string
+}
+
 // Declared-vs-actual allocation snapshot. breakdown is the
 // jsonb {"bucket name": headcount} that drives the Resource card.
 export interface IntentResource {
@@ -2214,6 +2235,10 @@ export interface Database {
         Insert: Omit<IntentLineage, 'id' | 'created_at' | 'created_by'> & {
           created_by?: string | null
         }
+      }
+      intent_measure_readings: {
+        Row: IntentMeasureReading
+        Insert: never
       }
       intent_resources: {
         Row: IntentResource

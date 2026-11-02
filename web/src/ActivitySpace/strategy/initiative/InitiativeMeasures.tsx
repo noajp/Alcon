@@ -9,7 +9,13 @@ import {
   updateIntent,
   type IntentBundle,
 } from "@/hooks/useSupabase";
-import type { Intent, IntentUpdate, MeasureDirection } from "@/types/database";
+import type {
+  Intent,
+  IntentMeasureReading,
+  IntentUpdate,
+  MeasureDirection,
+} from "@/types/database";
+import { useMeasureReadings } from "@/hooks/useMeasureReadings";
 import { Button, ButtonAppearanceProvider } from "@/ui/button";
 import { useI18n } from "@/Function/i18n/I18nProvider";
 import { MenuShell, MENU_ROW } from "@/Function/shared/menu";
@@ -92,6 +98,8 @@ function InitiativeMeasuresContent({
       };
     });
     void qc.invalidateQueries({ queryKey: ["initiative-measures"] });
+    // The database appended a reading if the value changed.
+    if (row) void qc.invalidateQueries({ queryKey: ["measure-readings", row.id] });
     refetch();
   }
   const measures = useMemo(
@@ -179,7 +187,7 @@ function InitiativeMeasuresContent({
             parsedR.value === null ? null : new Date().toISOString();
         }
         if (Object.keys(patch).length)
-          await confirmed(await updateIntent(editing.id, patch));
+          await confirmed(await updateIntent(editing.id, patch, "manual"));
         setComposing(false);
       } else {
         const parent = await ensureRoot();
@@ -197,7 +205,7 @@ function InitiativeMeasuresContent({
           order_index:
             Math.max(0, ...(data?.subs ?? []).map((i) => i.order_index ?? 0)) +
             1,
-        });
+        }, "manual");
         await confirmed(row);
         setTitle("");
         setTarget("");
@@ -223,10 +231,14 @@ function InitiativeMeasuresContent({
     setFailure(null);
     try {
       await confirmed(
-        await updateIntent(id, {
-          actual_value: value,
-          measured_at: value === null ? null : new Date().toISOString(),
-        }),
+        await updateIntent(
+          id,
+          {
+            actual_value: value,
+            measured_at: value === null ? null : new Date().toISOString(),
+          },
+          "manual",
+        ),
       );
     } finally {
       pending.current = false;
@@ -398,6 +410,7 @@ function MeasureRow({
   onDelete: () => void;
 }) {
   const { t } = useI18n();
+  const [showHistory, setShowHistory] = useState(false);
   const required = targetLabel(measure);
   const requires = targetSentence(measure);
   const measured = formatElementDate(measure.measuredAt);
@@ -477,15 +490,104 @@ function MeasureRow({
           {t("Target")} <span className="tabular-nums">{required ?? "—"}</span>
         </span>
       </div>
-      <p className="mt-1 pl-4 text-xs text-muted-foreground">
-        {measure.state === "unstated"
-          ? t("Set a target and direction to evaluate this condition.")
-          : measured
-            ? t("Measured {date}", { date: measured })
-            : t("No reading yet")}
-      </p>
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 pl-4 text-xs text-muted-foreground">
+        <span>
+          {measure.state === "unstated"
+            ? t("Set a target and direction to evaluate this condition.")
+            : measured
+              ? t("Measured {date}", { date: measured })
+              : t("No reading yet")}
+        </span>
+        <ButtonAppearanceProvider appearance="inline">
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            aria-expanded={showHistory}
+            aria-label={t("Reading history for {title}", { title: measure.title })}
+            onClick={() => setShowHistory((open) => !open)}
+          >
+            {showHistory ? t("Hide reading history") : t("Reading history")}
+          </Button>
+        </ButtonAppearanceProvider>
+      </div>
+      {showHistory && <ReadingHistory measure={measure} />}
     </div>
   );
+}
+
+/** Every reading of one condition, newest first, as the database kept them. */
+function ReadingHistory({ measure }: { measure: Measure }) {
+  const { t } = useI18n();
+  const { data, error, isPending, refetch } = useMeasureReadings(measure.id, true);
+  if (error)
+    return (
+      <p role="alert" className="mt-1 pl-4 text-xs text-[var(--status-danger)]">
+        {t("Could not read the reading history.")}
+        <Button variant="ghost" size="xs" onClick={() => void refetch()}>
+          {t("Retry")}
+        </Button>
+      </p>
+    );
+  if (isPending)
+    return (
+      <p role="status" className="mt-1 pl-4 text-xs text-muted-foreground">
+        {t("Loading readings…")}
+      </p>
+    );
+  if (data.length === 0)
+    return (
+      <p className="mt-1 pl-4 text-xs text-muted-foreground">
+        {t("No readings recorded yet.")}
+      </p>
+    );
+  return (
+    <ol className="mt-1 flex flex-col gap-1 pl-4 text-xs">
+      {data.map((reading) => (
+        <li key={reading.id} className="flex flex-wrap items-baseline gap-x-2">
+          <span className="tabular-nums text-muted-foreground">
+            {formatElementDate(reading.measured_at ?? reading.recorded_at) ?? "—"}
+          </span>
+          <span className="tabular-nums text-foreground">
+            {reading.value === null
+              ? t("Reading cleared")
+              : `${reading.value}${reading.unit ? ` ${reading.unit}` : ""}`}
+          </span>
+          <span className="min-w-0 break-words text-muted-foreground">
+            {[reading.recorded_by_name, readingSourceLabel(reading.source, t)]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function readingSourceLabel(
+  source: IntentMeasureReading["source"],
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  switch (source) {
+    case "manual":
+      return t("Entered by hand");
+    case "crm":
+      return t("From CRM");
+    case "copilot":
+      return t("By Copilot");
+    case "api":
+      return t("Via API");
+    case "mcp":
+      return t("Via MCP");
+    case "agent":
+      return t("By an agent");
+    case "system":
+      return t("By the system");
+    case "backfill":
+      return t("Before history was kept");
+    default:
+      return t("Other source");
+  }
 }
 
 function ReadingField({
