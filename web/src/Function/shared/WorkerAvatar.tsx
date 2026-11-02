@@ -11,6 +11,7 @@ import {
 } from '@/ui/avatar';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/ui/tooltip';
 import { translate } from '@/Function/i18n/I18nProvider';
+import { AiMark, aiProviderOf } from '@/Function/team/aiAgents';
 import {
   UNREACHABLE_WORKER_LABEL,
   UNREACHABLE_WORKER_RING_CLASS,
@@ -36,6 +37,8 @@ import {
 export interface WorkerAvatarSubject extends ReachSubject {
   name?: string | null;
   avatar_url?: string | null;
+  /** An AI agent's model: with its type, says whose logo it wears. */
+  ai_model?: string | null;
 }
 
 interface WorkerAvatarProps {
@@ -49,6 +52,7 @@ interface WorkerAvatarProps {
 export function WorkerAvatar({ worker, size = 20, className, title }: WorkerAvatarProps) {
   const initial = (worker?.name ?? '?').trim().charAt(0).toUpperCase() || '?';
   const unreachable = isUnreachableWorker(worker);
+  const provider = aiProviderOf(worker);
   return (
     <Avatar
       style={{ width: size, height: size }}
@@ -80,9 +84,16 @@ export function WorkerAvatar({ worker, size = 20, className, title }: WorkerAvat
       {worker?.avatar_url ? (
         <AvatarImage src={worker.avatar_url} alt="" className="object-cover" />
       ) : null}
-      <AvatarFallback className="bg-muted text-foreground/70 text-[10px] font-semibold">
-        {initial}
-      </AvatarFallback>
+      {/* An AI agent of a known provider wears its logo; anyone else, their initial. */}
+      {provider ? (
+        <AvatarFallback className="bg-[var(--surface-raised)] text-foreground">
+          <AiMark provider={provider} size={Math.round(size * 0.68)} />
+        </AvatarFallback>
+      ) : (
+        <AvatarFallback className="bg-muted text-foreground/70 text-[10px] font-semibold">
+          {initial}
+        </AvatarFallback>
+      )}
     </Avatar>
   );
 }

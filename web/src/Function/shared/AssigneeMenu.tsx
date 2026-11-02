@@ -18,6 +18,9 @@ import {
 } from '@/Function/shared/assignmentLoad';
 import { ReachHint, WorkerAvatar, type WorkerAvatarSubject } from './WorkerAvatar';
 import { translate, useI18n } from '@/Function/i18n/I18nProvider';
+import { AI_AGENT_PRESETS, aiProviderOf, type AiAgentPreset } from '@/Function/team/aiAgents';
+import { appDialog } from '@/Function/shared/appDialogStore';
+import { createWorker } from '@/hooks/teamData';
 
 // Single source of truth for the assignee picker dropdown CONTENT. Triggers
 // legitimately differ per view (avatar stack in table rows, RailRow in the
@@ -103,6 +106,7 @@ export function AssigneeMenuContent({
             </DropdownMenuItem>
           );
         })}
+        <AiPresetItems workers={workers} onAdd={onAdd} />
       </DropdownMenuContent>
     );
   }
@@ -154,6 +158,7 @@ export function AssigneeMenuContent({
       ) : (
         <div className="px-3 py-2 text-[12px] text-muted-foreground">{t('All assigned')}</div>
       )}
+      {workers.length > 0 && <AiPresetItems workers={workers} onAdd={onAdd} />}
     </DropdownMenuContent>
   );
 }
@@ -271,3 +276,33 @@ function useAssignmentReadings(
     return out;
   }, [dated, workers, availability, commitments]);
 }
+
+/** The AI agents Alcon knows that the Space has not made yet — Claude,
+ *  ChatGPT, Gemini, DeepSeek… — offered under the Workers; picking one makes
+ *  it a Worker of the Space (with its mark) and assigns it. */
+function AiPresetItems({ workers, onAdd }: { workers: AssignableWorker[]; onAdd: (workerId: string) => void }) {
+  const { t } = useI18n();
+  const missing = AI_AGENT_PRESETS.filter((p) => !workers.some((w) => aiProviderOf(w) === p.provider));
+  if (!missing.length) return null;
+  const add = async (p: AiAgentPreset) => {
+    try {
+      const created = await createWorker({ name: p.name, type: 'ai_agent', ai_model: p.model });
+      onAdd(created.id);
+    } catch (e) {
+      void appDialog.alert(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return (
+    <>
+      <DropdownMenuSeparator />
+      <div className="px-2 pb-0.5 pt-1 text-[11px] text-muted-foreground">{t('AI agents')}</div>
+      {missing.map((p) => (
+        <DropdownMenuItem key={p.provider} onClick={() => void add(p)} className="flex items-center gap-2 text-[12px]">
+          <WorkerAvatar worker={{ name: p.name, type: 'ai_agent', ai_model: p.model }} size={20} />
+          <span className="flex-1 truncate">{p.name}</span>
+        </DropdownMenuItem>
+      ))}
+    </>
+  );
+}
+

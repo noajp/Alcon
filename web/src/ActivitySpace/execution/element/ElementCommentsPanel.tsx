@@ -5,6 +5,7 @@ import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import { Bot, Pin, Trash2 } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { agentMention, foldAgentRuns, plainFirstLine } from './agent/commentAgent';
+import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { CommentAvatar, CommentComposer, CommentEntry, CommentMenu, CommentMenuItem, CommentMenuSeparator } from '@/Function/shared/CommentThread';
 import {
   useElementComments,
@@ -45,6 +46,8 @@ interface MentionCandidate {
   insert: string;
   kind: 'agent' | 'person';
   hint: string | null;
+  /** The Worker named, for its avatar (an AI agent's mark, a person's photo). */
+  worker?: Worker;
 }
 
 const QUICK_EMOJI = ['👍', '🎉', '❤️', '👀', '🚀', '✅'];
@@ -119,12 +122,12 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
       ? [
           { key: 'ai', label: 'AI', insert: 'AI', kind: 'agent' as const, hint: t('Ask the agent') },
           ...workers.filter(w => w.type === 'ai_agent')
-            .map(w => ({ key: w.id, label: w.name, insert: w.name, kind: 'agent' as const, hint: t('Ask the agent') })),
+            .map(w => ({ key: w.id, label: w.name, insert: w.name, kind: 'agent' as const, hint: t('Ask the agent'), worker: w })),
         ].filter(c => matches(c.label))
       : [];
     const people: MentionCandidate[] = workers
       .filter(w => w.type === 'human' && w.user_id && matches(w.name, w.email))
-      .map(w => ({ key: w.id, label: w.name, insert: w.name, kind: 'person' as const, hint: w.email ?? null }));
+      .map(w => ({ key: w.id, label: w.name, insert: w.name, kind: 'person' as const, hint: w.email ?? null, worker: w }));
     return [...agents, ...people].slice(0, 7);
   }, [mentionQuery, workers, onAskAgent, t]);
   const mentionListOpen = mentionOpen && mentionCandidates.length > 0;
@@ -321,6 +324,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
                       kind={c.author_kind}
                       isMine={isMine}
                       avatarUrl={authorWorker?.avatar_url}
+                      aiModel={authorWorker?.ai_model}
                     />
                   }
                   meta={c.is_pinned ? <Pin size={9} className="text-muted-foreground" aria-label={t('Pinned')} /> : null}
@@ -448,9 +452,11 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
                 onClick={() => insertMention(c)}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left ${i === mentionIndex ? 'bg-accent' : 'hover:bg-accent'}`}
               >
-                <div className="w-6 h-6 rounded-full bg-primary/10 text-[11px] font-medium text-primary flex items-center justify-center shrink-0">
-                  {c.kind === 'agent' ? <Bot size={13} /> : c.label.charAt(0)}
-                </div>
+                {c.worker ? <WorkerAvatar worker={c.worker} size={24} className="shrink-0" /> : (
+                  <div className="w-6 h-6 rounded-full bg-primary/10 text-[11px] font-medium text-primary flex items-center justify-center shrink-0">
+                    {c.kind === 'agent' ? <Bot size={13} /> : c.label.charAt(0)}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-foreground truncate">{c.label}</div>
                   {c.hint && <div className="text-[11px] text-muted-foreground truncate">{c.hint}</div>}
