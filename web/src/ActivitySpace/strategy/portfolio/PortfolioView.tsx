@@ -99,7 +99,7 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
   return (
     <div className="flex flex-col h-full bg-card">
       {open ? (
-        <PortfolioDetail node={open} tree={tree} visionName={vision?.name ?? null} portfolios={portfolios} byPortfolio={byPortfolio} healthById={healthById} talliesById={talliesById}
+        <PortfolioDetail key={open.portfolio.id} node={open} tree={tree} visionName={vision?.name ?? null} portfolios={portfolios} byPortfolio={byPortfolio} healthById={healthById} talliesById={talliesById}
           candidates={roots.filter((s) => s.portfolio_id !== open.portfolio.id)}
           onOpenPortfolio={onSelectPortfolio} onSelectStrategy={onSelectStrategy}
           onNewInside={() => setLocalNew({ parentId: open.portfolio.id })} />
@@ -405,7 +405,25 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
   const [query, setQuery] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<'initiatives' | 'portfolios'>('initiatives');
+  const [portfolioQuery, setPortfolioQuery] = useState('');
+  const [portfolioPickerOpen, setPortfolioPickerOpen] = useState(false);
   const q = query.trim().toLowerCase();
+  // Portfolios it can take in: any outside its own subtree that is not
+  // already directly inside it and does not hold it (no loops).
+  const portfolioCandidates = useMemo(() => {
+    const own = subtreeIds(node);
+    const above = new Set(path.map((p) => p.id));
+    const pq = portfolioQuery.trim().toLowerCase();
+    return flattenTree(tree, () => true).filter((n) => !own.has(n.portfolio.id) && !above.has(n.portfolio.id)
+      && (!pq || n.portfolio.name.toLowerCase().includes(pq)));
+  }, [tree, node, path, portfolioQuery]);
+  const nest = async (id: string, parentId: string | null) => {
+    setPortfolioPickerOpen(false);
+    setError(null);
+    try { await movePortfolio(id, parentId); }
+    catch (e) { setError(e instanceof Error ? e.message : t("Couldn't save")); }
+  };
   const matches = candidates.filter((s) => !q || s.name.toLowerCase().includes(q));
   const parent = path.length > 1 ? path[path.length - 2] : null;
   // The page's own actions; after a delete it goes back to the list.
@@ -427,6 +445,16 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
           ...path.map((p) => p.id === portfolio.id ? { id: p.id, label: p.name } : { id: p.id, label: p.name, onClick: () => onOpenPortfolio(p.id) }),
         ]}
         after={<><ActionsButton items={items} label={t('Portfolio actions')} />{picker}</>} />
+      {/* What it bundles, one kind per tab — its Initiatives, and the
+          Portfolios it holds — under the header, as Initiative's views sit. */}
+      <div role="tablist" aria-label={t('Portfolio views')} className="flex flex-shrink-0 items-center gap-0.5 py-2 pl-[19px] pr-4">
+        {([['initiatives', t('Initiatives'), initiatives.length], ['portfolios', t('Portfolios'), node.children.length]] as const).map(([id, label, n]) => (
+          <Button key={id} type="button" shape="tab" role="tab" aria-selected={tab === id}
+            variant={tab === id ? 'secondary' : 'ghost'} onClick={() => setTab(id)}>
+            {label}<span className="tabular-nums text-muted-foreground">{n}</span>
+          </Button>
+        ))}
+      </div>
       <div className="flex-1 overflow-y-auto">
         <PageLayout rail={
           <RailCard title={t('Properties')}>
@@ -462,29 +490,45 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
             onSaveTitle={(name) => void updatePortfolio(portfolio.id, { name })}
             onSaveDescription={(description) => void updatePortfolio(portfolio.id, { description: description || null })} />
 
-          {/* Nesting is made where it lands: a "+" on the section once it has
-              Portfolios, and only the "+ verb" while it has none. */}
-          {node.children.length > 0 ? (
-            <PageSection title={t('Portfolios inside')} action={
-              <ButtonAppearanceProvider appearance="navigation">
-                <Button variant="ghost" size="icon-xs" className="text-muted-foreground" onClick={onNewInside}
-                  title={t('New Portfolio inside')} aria-label={t('New Portfolio inside')}><Plus size={13} /></Button>
-              </ButtonAppearanceProvider>
-            }>
-              {node.children.map((child) => (
-                <ContentRow key={child.portfolio.id} icon={<NavPortfolioIcon size={16} />} name={child.portfolio.name}
-                  onOpen={() => onOpenPortfolio(child.portfolio.id)}
-                  meta={<RollupFigures rollup={rollupPortfolio(child, byPortfolio, healthById, talliesById)} />} />
-              ))}
-            </PageSection>
-          ) : (
+          {tab === 'portfolios' ? (
+          <PageSection title={t('Portfolios inside')}>
+            {node.children.length === 0 && (
+              <p className="px-2 py-2 text-[12px] text-muted-foreground">{t('No Portfolios inside this one yet.')}</p>
+            )}
+            {node.children.map((child) => (
+              <ContentRow key={child.portfolio.id} icon={<NavPortfolioIcon size={16} />} name={child.portfolio.name}
+                onOpen={() => onOpenPortfolio(child.portfolio.id)}
+                meta={<RollupFigures rollup={rollupPortfolio(child, byPortfolio, healthById, talliesById)} />}
+                actions={<ContentRowAction label={t('Take out of this Portfolio')} onClick={() => void nest(child.portfolio.id, portfolio.parent_id)}><X size={12} /></ContentRowAction>} />
+            ))}
             <ButtonAppearanceProvider appearance="inline">
-              <Button variant="ghost" size="sm" align="start" className="-ml-2 self-start text-muted-foreground" onClick={onNewInside}>
-                <Plus size={13} strokeWidth={2.5} />{t('New Portfolio inside')}
-              </Button>
+              <div className="flex items-center">
+                <Popover open={portfolioPickerOpen} onOpenChange={(v) => { setPortfolioPickerOpen(v); if (!v) setPortfolioQuery(''); }}>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" align="start" className="text-muted-foreground"><Plus size={13} strokeWidth={2.5} />{t('Add Portfolio')}</Button>
+                  </PopoverTrigger>
+                  <MenuShell width="wide" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput value={portfolioQuery} onValueChange={setPortfolioQuery} placeholder={t('Find a Portfolio…')} />
+                      <CommandList>
+                        <CommandEmpty>{t('No matches.')}</CommandEmpty>
+                        {portfolioCandidates.filter((n) => n.portfolio.parent_id !== portfolio.id).map((n) => (
+                          <CommandItem key={n.portfolio.id} value={`${n.portfolio.name} ${n.portfolio.id}`} onSelect={() => void nest(n.portfolio.id, portfolio.id)}>
+                            <NavPortfolioIcon size={12} /><span className="flex-1 truncate">{n.portfolio.name}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandList>
+                    </Command>
+                  </MenuShell>
+                </Popover>
+                <Button variant="ghost" size="sm" align="start" className="text-muted-foreground" onClick={onNewInside}>
+                  <Plus size={13} strokeWidth={2.5} />{t('New Portfolio inside')}
+                </Button>
+              </div>
             </ButtonAppearanceProvider>
-          )}
-
+            {error && <div className="px-2 py-1 text-[11px] text-destructive">{error}</div>}
+          </PageSection>
+          ) : (
           <PageSection title={t('Initiatives')}>
             {initiatives.length === 0 && (
               <p className="px-2 py-2 text-[12px] text-muted-foreground">{t('No Initiatives in this Portfolio yet.')}</p>
@@ -515,6 +559,7 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
             </ButtonAppearanceProvider>
             {error && <div className="px-2 py-1 text-[11px] text-destructive">{error}</div>}
           </PageSection>
+          )}
         </PageLayout>
       </div>
     </>
