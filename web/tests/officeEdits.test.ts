@@ -86,6 +86,25 @@ describe('applyOfficeEdits — Word', () => {
     expect(p.runs.map((r) => [r.text, r.bold, r.italic])).toEqual([['Hello big ', true, false], ['world', false, true], ['!', false, false]]);
   });
 
+  it('edits around tabs and line breaks, and will not add or remove them', async () => {
+    const zip = await JSZip.loadAsync(await wordDocument());
+    const xml = (await zip.file('word/document.xml')!.async('string')).replace('<w:body>',
+      '<w:body><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Name</w:t><w:tab/></w:r><w:r><w:t>Alcon</w:t><w:br/><w:t>v1</w:t></w:r></w:p>');
+    zip.file('word/document.xml', xml);
+    const before = await zip.generateAsync({ type: 'arraybuffer' });
+    const [p0] = await paras(before);
+    expect(p0.src).toBe(0);
+    expect(textOf(p0)).toBe('Name\tAlcon\nv1');
+    const out = await applyOfficeEdits(before, [{ kind: 'para', index: 0, from: 'Name\tAlcon\nv1', to: 'Name\tAlcon Pro\nv2' }]);
+    expect(out.skipped).toEqual([]);
+    const [after] = await paras(buf(out.bytes));
+    expect(textOf(after)).toBe('Name\tAlcon Pro\nv2');
+    expect(after.runs[0]).toMatchObject({ text: 'Name', bold: true });
+    const refused = await applyOfficeEdits(before, [{ kind: 'para', index: 0, from: 'Name\tAlcon\nv1', to: 'Name Alcon v1' }]);
+    expect(refused.skipped).toHaveLength(1);
+    expect(textOf((await paras(buf(refused.bytes)))[0])).toBe('Name\tAlcon\nv1');
+  });
+
   it('finds a paragraph that moved, and skips one that is gone', async () => {
     const before = await wordDocument();
     const out = await applyOfficeEdits(before, [

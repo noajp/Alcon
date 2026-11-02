@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
 import { getQueryClient } from '@/lib/queryClient';
 import { applyOfficeEdits, type OfficeEdit } from '@/Function/office/officeEdits';
-import { latestVersions, versionChain } from '@/Function/shared/fileVersions';
+import { latestVersions, versionChain, versionsPastKeeping } from '@/Function/shared/fileVersions';
 import { fileText } from '@/Function/office/fileText';
 
 // Files attached to one thing in the Space — an Element, an Object, an
@@ -92,6 +92,14 @@ async function purgeExpired(rows: Attachment[]) {
   if (!error) await supabase.from('attachments').delete().in('id', due.map((f) => f.id));
 }
 
+/** Erases versions past keeping (fileVersions) the same way; best effort. */
+async function pruneOldVersions(rows: Attachment[]) {
+  const old = versionsPastKeeping(rows);
+  if (!old.length) return;
+  const { error } = await supabase.storage.from(BUCKET).remove(old.map((v) => v.path));
+  if (!error) await supabase.from('attachments').delete().in('id', old.map((v) => v.id));
+}
+
 async function rowsOf(owner: AttachmentOwner): Promise<Attachment[]> {
   const { data, error } = await supabase.from('attachments').select(COLUMNS).eq(OWNER_COLUMN[owner.kind], owner.id).order('created_at');
   if (error) throw error;
@@ -106,6 +114,7 @@ export function useAttachments(owner: AttachmentOwner | null) {
     queryFn: async () => {
       const rows = await rowsOf(owner!);
       void purgeExpired(rows);
+      void pruneOldVersions(rows);
       return rows;
     },
   });
@@ -380,4 +389,17 @@ export async function searchAttachments(spaceId: string, query: string, limit = 
   const { data, error } = await supabase.rpc('search_attachments', { p_space: spaceId, p_query: query.normalize('NFKC'), p_limit: limit });
   if (error) return [];
   return (data ?? []) as FoundFile[];
+}
+
+/** A file's text, to hand to the AI: the stored text, or — for a file not
+ *  read yet — read now (and stored). */
+export async function attachmentText(file: Pick<Attachment, 'id' | 'name' | 'mime_type' | 'path'>): Promise<string> {
+  const { data } = await supabase.from('attachment_texts').select('body').eq('attachment_id', file.id).maybeSingle();
+  const stored = (data as { body: string } | null)?.body;
+  if (stored) return stored;
+  const { data: blob, error } = await supabase.storage.from(BUCKET).download(file.path);
+  if (error || !blob) throw error ?? new Error('Could not read the file.');
+  const body = (await fileText(await blob.arrayBuffer(), file.name, file.mime_type)) ?? '';
+  void supabase.from('attachment_texts').upsert({ attachment_id: file.id, body });
+  return body;
 }

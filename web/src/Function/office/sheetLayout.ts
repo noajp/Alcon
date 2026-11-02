@@ -1,5 +1,5 @@
 import { readChart, type ChartData } from './chartLayout';
-import { desc, kid, kids, openPackage, relId, relOfType, SCHEME_ORDER, themeColors } from './ooxml';
+import { desc, kid, kids, openPackage, relId, relOfType, SCHEME_ORDER, themeColors, breather } from './ooxml';
 
 // An Excel workbook read for drawing it as Excel does: each sheet's cells
 // with their fills, fonts, borders, alignment and number formats, the
@@ -295,12 +295,14 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
   // First pass: every sheet's raw cells, so a chart can read another sheet.
   const rawBySheet = new Map<string, Map<string, Raw>>();
   const docs = new Map<string, Document>();
+  const breathe = breather(4000);
   for (const def of sheetDefs) {
     const doc = await xml(def.path);
     if (!doc) continue;
     docs.set(def.name, doc);
     const cells = new Map<string, Raw>();
     for (const c of desc(doc, 'c')) {
+      await breathe();
       const t = c.getAttribute('t');
       const v = kid(c, 'v')?.textContent ?? null;
       const value = t === 's' ? shared[Number(v)] ?? ''
@@ -348,6 +350,7 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
     const rows: { h: number; cells: Cell[] }[] = [];
     let maxCol = 0;
     for (const row of desc(doc, 'row')) {
+      await breathe();
       const r = Number(row.getAttribute('r')) - 1;
       if (r >= MAX_ROWS) break;
       const cells: Cell[] = [];

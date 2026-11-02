@@ -68,3 +68,8 @@ export function useBoardPresence(kind: SubjectKind, subjectId: string | null): V
 export function useNotePresence(noteId: string | null): Viewer[] {
   return usePresence(noteId && UUID.test(noteId) ? `note:${noteId}` : null);
 }
+
+/** Who else has this attached file open (anyone who can see what it is attached to). */
+export function useFilePresence(fileId: string | null): Viewer[] {
+  return usePresence(fileId && UUID.test(fileId) ? `file:${fileId}` : null);
+}

@@ -4,7 +4,7 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import {
@@ -34,6 +34,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { Trash2 } from '@/ui/icons';
 import { ObjectMembersPanel } from '@/ActivitySpace/execution/object/ObjectMembersPanel';
+import { ELEMENT_DETAIL_EVENT, clearElementDetail, pendingElementDetail } from '@/Function/shared/element/elementDetailRequest';
 import { ObjectElementsView } from '@/ActivitySpace/execution/object/ObjectElementsView';
 import type { ListSection } from '@/Function/shared/listTable/shared';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
@@ -126,14 +127,37 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
 
   // Element detail view state. Notifies the Domain shell so it can hide
   // its breadcrumb + TabBar while the detail panel is open.
-  const [detailElementId, setDetailElementIdRaw] = useState<string | null>(null);
+  // An Element asked for from elsewhere (a file found in Files or ⌘K) opens
+  // with the page when it is one of this Object's.
+  const [requestedOnOpen] = useState(() => {
+    const id = pendingElementDetail();
+    return id && (object.elements ?? []).some((e) => e.id === id) ? id : null;
+  });
+  const [detailElementId, setDetailElementIdRaw] = useState<string | null>(requestedOnOpen);
   const setDetailElementId = (id: string | null) => {
     setDetailElementIdRaw(id);
     onElementDetailChange?.(id !== null);
   };
   // The Domain shell remounts this component (via key) on Object change, so
-  // a mount-only effect is enough to clear the parent flag for the new Object.
-  useEffect(() => { onElementDetailChange?.(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // a mount-only effect is enough to set the parent flag for the new Object.
+  useEffect(() => {
+    onElementDetailChange?.(requestedOnOpen !== null);
+    if (requestedOnOpen) clearElementDetail(requestedOnOpen);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // …or at once, when this Object's page is already open.
+  const latestElements = useRef(object.elements ?? []);
+  useEffect(() => { latestElements.current = object.elements ?? []; });
+  useEffect(() => {
+    const onRequest = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (!latestElements.current.some((el) => el.id === id)) return;
+      clearElementDetail(id);
+      setDetailElementIdRaw(id);
+      onElementDetailChange?.(true);
+    };
+    window.addEventListener(ELEMENT_DETAIL_EVENT, onRequest);
+    return () => window.removeEventListener(ELEMENT_DETAIL_EVENT, onRequest);
+  }, [onElementDetailChange]);
 
   // Breadcrumb right-click delete
   const [breadcrumbCtx, setBreadcrumbCtx] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
