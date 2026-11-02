@@ -8,7 +8,6 @@ import { SendIcon } from '@/Function/shared/SendIcon';
 import { type CopilotAttachment, type CopilotContext } from './useAlconCopilot';
 import { CopilotMessageView, AttachmentChips } from './CopilotMessages';
 import { ATTACH_ACCEPT, AttachError, MAX_FILES, MAX_PDF_BYTES, readAttachment } from './copilotFiles';
-import { ASK_AI_EVENT, type AskAiDetail } from './askAi';
 import { useCopilotConversation } from './CopilotProvider';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
@@ -67,10 +66,6 @@ export interface AlconCopilotPanelProps {
  * its own; on Slides the pop-up is the open deck's assistant. Phase 1 ships
  * read-only tools.
  */
-/** How many AI screens (page panels) are mounted: while one is, it — not the
- *  pop-up — takes a question asked from elsewhere. */
-let pagePanels = 0;
-
 export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant = 'floating', onExpand, onMinimize }: AlconCopilotPanelProps) {
   const { t } = useI18n();
   const floating = variant === 'floating';
@@ -193,29 +188,6 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
     today: toDateOnlyString(new Date()),
   });
 
-  // Asked from elsewhere (a file's "Ask AI"): the question and its files
-  // come into the composer, and are sent when asked to be. The AI screen's
-  // panel takes it while that screen is open; otherwise the pop-up does.
-  const askRef = useRef<(d: AskAiDetail) => void>(() => {});
-  // A question left in the composer still goes out about its file's Element / Object.
-  const askedAbout = useRef<AskAiDetail['context']>(undefined);
-  useEffect(() => {
-    askRef.current = (d) => {
-      if (d.send && !streaming) { send(d.prompt, { context: { ...contextNow(), ...d.context }, attachments: d.attachments }); return; }
-      setInput(d.prompt);
-      setFiles(d.attachments);
-      askedAbout.current = d.context;
-      window.setTimeout(() => inputRef.current?.focus(), 0);
-    };
-  });
-  useEffect(() => {
-    if (page) pagePanels++;
-    const onAsk = (e: Event) => { if (page || pagePanels === 0) askRef.current((e as CustomEvent<AskAiDetail>).detail); };
-    window.addEventListener(ASK_AI_EVENT, onAsk);
-    return () => { window.removeEventListener(ASK_AI_EVENT, onAsk); if (page) pagePanels--; };
-  }, [page]);
-
-
   const addFiles = async (list: FileList | File[]) => {
     setFileError(null);
     const picked = Array.from(list);
@@ -242,8 +214,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
     if (inputRef.current) { inputRef.current.style.height = ''; inputRef.current.style.overflowY = ''; }
     setFiles([]);
     setFileError(null);
-    send(text, { context: { ...contextNow(), ...askedAbout.current }, attachments });
-    askedAbout.current = undefined;
+    send(text, { context: contextNow(), attachments });
   };
 
   // Editing the latest question puts it back in the composer and starts over

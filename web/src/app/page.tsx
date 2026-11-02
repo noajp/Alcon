@@ -14,7 +14,6 @@ import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateVi
 import { CommandPalette } from '@/shell/CommandPalette';
 import { QuickAddElementLauncher } from '@/shell/QuickAddElementLauncher';
 import { AlconCopilotPanel } from '@/Function/copilot/AlconCopilotPanel';
-import { ASK_AI_EVENT } from '@/Function/copilot/askAi';
 import { CopilotProvider } from '@/Function/copilot/CopilotProvider';
 import type { AppTab } from '@/shell/appTab';
 import { mergeNavigation, navigationAfterDomainChange } from '@/shell/navigationState';
@@ -364,13 +363,6 @@ function WorkspaceContent({
   // pop-up's own close. It starts closed, so the work has the whole page
   // until someone asks for it. On Slides it is the open deck's assistant.
   const [copilotOpen, handleCopilotOpenChange] = useState(false);
-  // A question asked from elsewhere ("Ask AI" on a file) opens the pop-up,
-  // which takes the question itself (AlconCopilotPanel).
-  useEffect(() => {
-    const open = () => { if (activeTab.activeView !== 'ai') handleCopilotOpenChange(true); };
-    window.addEventListener(ASK_AI_EVENT, open);
-    return () => window.removeEventListener(ASK_AI_EVENT, open);
-  }, [activeTab.activeView]);
   const onSlides = activeTab.activeView === 'slides';
   // The pop-up's expand button opens the AI screen; the screen's shrink
   // button goes back to where the person was, with the pop-up open.
