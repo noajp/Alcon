@@ -334,15 +334,16 @@ export async function deleteObject(id: string): Promise<void> {
         .eq('element_id', rel.element_id)
         .neq('object_id', id);
 
+      // A refused or failed step stops the delete: going on would cascade
+      // the Object away with Elements that were meant to stay elsewhere.
       if (otherObjects && otherObjects.length > 0) {
-        if (rel.is_primary) {
-          await supabase.from('elements').update({ object_id: otherObjects[0].object_id }).eq('id', rel.element_id);
-        } else {
-          await supabase.from('element_objects').delete()
-            .eq('element_id', rel.element_id).eq('object_id', id);
-        }
+        const { error: detachError } = rel.is_primary
+          ? await supabase.from('elements').update({ object_id: otherObjects[0].object_id }).eq('id', rel.element_id)
+          : await supabase.from('element_objects').delete().eq('element_id', rel.element_id).eq('object_id', id);
+        if (detachError) throw detachError;
       } else {
-        await supabase.from('elements').delete().eq('id', rel.element_id);
+        const { error: deleteError } = await supabase.from('elements').delete().eq('id', rel.element_id);
+        if (deleteError) throw deleteError;
       }
     }
   }

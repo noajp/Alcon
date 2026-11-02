@@ -6,7 +6,7 @@
 --   * at most one primary row per Element (partial unique index);
 --   * marking a row primary moves elements.object_id there; the old primary
 --     stays as a secondary home;
---   * the primary row cannot be deleted on its own: deleting it would leave
+--   * the primary row cannot be deleted, demoted or repointed on its own: deleting it would leave
 --     object_id pointing at an Object the junction no longer records, and
 --     deleting an Element's only home would leave it with none. Move the
 --     Element (update elements.object_id) first; the trigger then removes
@@ -24,26 +24,35 @@ begin
   execute $f$
     create or replace function public.element_objects_follow_primary()
     returns trigger language plpgsql security definer set search_path = public, pg_temp as $b$
+    declare
+      is_home boolean;
     begin
       if pg_trigger_depth() > 1 then
         return coalesce(new, old);
       end if;
-      if tg_op = 'DELETE' then
-        if old.is_primary and exists (
-          select 1 from public.elements e where e.id = old.element_id and e.object_id = old.object_id
-        ) then
-          raise exception 'move the Element to another Object before removing its primary home'
+      if tg_op in ('DELETE', 'UPDATE') then
+        -- The row elements.object_id points at: it may not be removed,
+        -- demoted, or pointed elsewhere on its own — move the Element instead.
+        select exists (select 1 from public.elements e where e.id = old.element_id and e.object_id = old.object_id)
+          into is_home;
+        if old.is_primary and is_home and (
+             tg_op = 'DELETE'
+             or not new.is_primary
+             or new.object_id is distinct from old.object_id
+             or new.element_id is distinct from old.element_id) then
+          raise exception 'move the Element to another Object before changing its primary home'
             using errcode = '23514';
         end if;
-        return old;
+        if tg_op = 'DELETE' then return old; end if;
       end if;
-      -- INSERT / UPDATE marking this row primary. Before the write, the
-      -- other primary steps down (it stays as a secondary home) so the
-      -- unique index holds; after it, the Element moves here.
+      -- Marking a row primary. Before the write, another Object's primary row
+      -- steps down (it stays a secondary home) so the unique index holds —
+      -- never the same Object's row, which an upsert is about to update; after
+      -- it, the Element moves here.
       if new.is_primary and (tg_op = 'INSERT' or not old.is_primary) then
         if tg_when = 'BEFORE' then
           update public.element_objects set is_primary = false
-           where element_id = new.element_id and is_primary and id is distinct from new.id;
+           where element_id = new.element_id and is_primary and object_id <> new.object_id;
         else
           update public.elements set object_id = new.object_id
            where id = new.element_id and object_id is distinct from new.object_id;
@@ -57,7 +66,7 @@ begin
 
   execute 'drop trigger if exists element_objects_guard_primary on public.element_objects';
   execute 'create trigger element_objects_guard_primary
-    before insert or update of is_primary or delete on public.element_objects
+    before insert or update or delete on public.element_objects
     for each row execute function public.element_objects_follow_primary()';
   execute 'drop trigger if exists element_objects_follow_primary on public.element_objects';
   execute 'create trigger element_objects_follow_primary
