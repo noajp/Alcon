@@ -11,7 +11,7 @@ import type { ToolScope } from './toolScope';
 
 // =============================================================
 // ToolSidebar — the one sidebar every Sustainment tool is built on (CRM,
-// and the tools that come after them). Four slots, top to bottom:
+// and the tools that come after them). Five slots, top to bottom:
 //
 //   scope    whose records: the row opens the scope's overview (as a
 //            Domain's row opens the Domain), its ▾ only switches scope
@@ -21,6 +21,10 @@ import type { ToolScope } from './toolScope';
 //            new screen to learn
 //   footer   what changes how the tool behaves (settings, the autopilot):
 //            visited to change, not daily
+//   groups   the tool's own groups, as Files has them: each Domain
+//            unfolding onto its pages (opening one makes it the scope).
+//            Always last — nothing of the tool's sits below them; with
+//            groups, the footer comes up above them
 //
 // One rule for numbers: a count means "acting would make this smaller".
 // It is red, and hidden at zero — so a row with a number is a row worth
@@ -73,7 +77,7 @@ function NavRow({ item, nested = false }: { item: ToolNavItem; nested?: boolean 
   </div>;
 }
 
-export function ToolSidebar({ title, scope, queue, sections, footer }: {
+export function ToolSidebar({ title, scope, queue, sections, footer, groups }: {
   /** The tool's name, as the heading. */
   title: string;
   scope: {
@@ -88,6 +92,8 @@ export function ToolSidebar({ title, scope, queue, sections, footer }: {
   queue?: ToolNavItem[];
   sections: { id: string; label?: string; items: ToolNavItem[] }[];
   footer?: ToolNavItem[];
+  /** The tool's groups (each Domain unfolding onto its pages), between the queue and the sections. */
+  groups?: ReactNode;
 }) {
   const { t } = useI18n();
   const ScopeIcon = scope.icon;
@@ -112,13 +118,16 @@ export function ToolSidebar({ title, scope, queue, sections, footer }: {
 
     {queue && queue.length > 0 && <div className="mt-1 space-y-px">{queue.map(item => <NavRow key={item.id} item={item} />)}</div>}
 
+
     {sections.map(section => <div key={section.id}>
       {section.label && <SidebarSectionLabel>{section.label}</SidebarSectionLabel>}
       <div className={`${section.label ? 'mt-1' : 'mt-3'} space-y-px`}>{section.items.map(item => <NavRow key={item.id} item={item} />)}</div>
     </div>)}
 
-    {footer && footer.length > 0 && <div className="mt-auto space-y-px border-t border-[var(--border-subtle)] pt-3">
+    {footer && footer.length > 0 && <div className={groups ? 'mt-1 space-y-px' : 'mt-auto space-y-px border-t border-[var(--border-subtle)] pt-3'}>
       {footer.map(item => <NavRow key={item.id} item={item} />)}
     </div>}
+
+    {groups}
   </div>;
 }

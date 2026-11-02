@@ -1,64 +1,46 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Briefcase, Building2, File, FileImage, FileSpreadsheet, FileText, Handshake, Presentation, Target, Trash2 } from '@/ui/icons';
+import type { ReactNode } from 'react';
+import { Folder as FolderIcon, Trash2 } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { ToolSidebar, type ToolNavItem } from '@/Function/shared/tool/ToolSidebar';
-import { ElementIcon, FilesIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
-import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { fileKindOf, type FileKind, type FilesRoute } from '@/Function/files/filesRoute';
-import { ownerOf, useSpaceAttachments, type AttachmentOwnerKind } from '@/hooks/attachmentData';
+import { FilesIcon } from '@/Function/shared/conceptIcons';
+import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
+import { GroupTree } from '@/Function/shared/folders/GroupTree';
+import type { FilesRoute } from '@/Function/files/filesRoute';
 import type { NavigationState } from '@/types/navigation';
 
-// The Files sidebar, on the shared ToolSidebar: every file, then the files
-// by what they are attached to and by their kind — only what the Space has,
-// so no empty filter to click into — and, at the foot, the trash.
+/** A Domain as the sidebar shows it. */
+export interface SidebarDomain { id: string; name: string; mark: ReactNode }
 
-export const WHERE: { id: AttachmentOwnerKind; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
-  { id: 'element', label: 'Elements', icon: ElementIcon },
-  { id: 'object', label: 'Objects', icon: ObjectIcon },
-  { id: 'strategy', label: 'Initiatives', icon: Target },
-  { id: 'portfolio', label: 'Portfolios', icon: Briefcase },
-  { id: 'deal', label: 'Deals', icon: Handshake },
-  { id: 'company', label: 'Companies', icon: Building2 },
-];
-export const KINDS: { id: FileKind; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
-  { id: 'doc', label: 'Documents', icon: FileText },
-  { id: 'sheet', label: 'Spreadsheets', icon: FileSpreadsheet },
-  { id: 'deck', label: 'Presentations', icon: Presentation },
-  { id: 'pdf', label: 'PDF', icon: FileText },
-  { id: 'image', label: 'Images', icon: FileImage },
-  { id: 'other', label: 'Other', icon: File },
-];
+// The Files sidebar, as Execution's: every file in the Space and the trash,
+// then each Domain unfolding onto its Folders and Files (pages of the main
+// pane). The Domains come last; nothing sits below them.
 
-export function FilesSidebar({ navigation, onNavigate }: { navigation: NavigationState; onNavigate: (nav: Partial<NavigationState>) => void }) {
+export function FilesSidebar({ navigation, onNavigate, domains }: {
+  navigation: NavigationState; onNavigate: (nav: Partial<NavigationState>) => void; domains: SidebarDomain[];
+}) {
   const { t } = useI18n();
   const route = navigation.files ?? {};
-  const { data: files } = useSpaceAttachments(useActiveSpaceId());
-  const present = useMemo(() => ({
-    where: new Set(files.map((f) => ownerOf(f).kind)),
-    kind: new Set(files.map((f) => fileKindOf(f.name, f.mime_type))),
-  }), [files]);
-  const go = (next: FilesRoute) => onNavigate({ files: { ...next, fileId: null } });
-
-  const whereItems: ToolNavItem[] = WHERE.filter((w) => present.where.has(w.id)).map((w) => ({
-    id: `where:${w.id}`, label: t(w.label), icon: w.icon, active: route.where === w.id, onClick: () => go({ where: w.id }),
-  }));
-  const kindItems: ToolNavItem[] = KINDS.filter((k) => present.kind.has(k.id)).map((k) => ({
-    id: `kind:${k.id}`, label: k.id === 'pdf' ? 'PDF' : t(k.label), icon: k.icon, active: route.kind === k.id, onClick: () => go({ kind: k.id }),
-  }));
-
-  return <ToolSidebar
-    title={t('Files')}
-    scope={{
-      value: null, options: [{ id: null, name: t('All files') }], label: t('All files'), icon: FilesIcon,
-      active: !route.where && !route.kind && !route.trash, onOpen: () => go({}), onChange: () => go({}),
-    }}
-    // Removed files stay restorable for their days; the way back is here.
-    footer={[{ id: 'trash', label: t('Deleted'), icon: Trash2, active: !!route.trash, onClick: () => go({ trash: true }) }]}
-    sections={[
-      ...(whereItems.length ? [{ id: 'where', label: t('Attached to'), items: whereItems }] : []),
-      ...(kindItems.length ? [{ id: 'kind', label: t('Kind'), items: kindItems }] : []),
-    ]}
-  />;
+  const go = (next: FilesRoute) => onNavigate({ files: next });
+  const page = route.view === 'trash' ? 'trash' : !route.domainId ? 'all' : route.folderId ? 'folders' : route.view ?? 'home';
+  return (
+    <div className="mt-1 pb-4">
+      <SidebarSectionLabel>{t('Files')}</SidebarSectionLabel>
+      <div className="mt-1">
+        <SidebarRow active={page === 'all'} icon={<FilesIcon size={16} />} label={t('All files')} onClick={() => go({})} />
+        {/* Removed files stay restorable for their days; the way back is here. */}
+        <SidebarRow active={page === 'trash'} icon={<Trash2 size={16} />} label={t('Deleted')} onClick={() => go({ view: 'trash' })} />
+      </div>
+      <div className="mt-3">
+        {domains.map((d) => (
+          <GroupTree key={d.id} name={d.name} mark={d.mark} defaultOpen={route.domainId === d.id}
+            homeActive={route.domainId === d.id && page === 'home'} onOpenHome={() => go({ domainId: d.id })}
+            items={[
+              { id: 'folders', label: t('Folders'), icon: FolderIcon, active: route.domainId === d.id && page === 'folders', onClick: () => go({ domainId: d.id, view: 'folders' }) },
+              { id: 'files', label: t('Files'), icon: FilesIcon, active: route.domainId === d.id && page === 'files', onClick: () => go({ domainId: d.id, view: 'files' }) },
+            ]} />
+        ))}
+      </div>
+    </div>
+  );
 }

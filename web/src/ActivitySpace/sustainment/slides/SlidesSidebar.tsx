@@ -115,7 +115,12 @@ export function SlidesSidebar({ onOpen }: { onOpen: () => void }) {
   return (
     <div className="mt-1">
       <SidebarSectionLabel>{t('Slides')}</SidebarSectionLabel>
+      {/* The tools first; the folders come last, nothing below them. */}
       <div className="mt-1 flex flex-col">
+        <SidebarRow icon={<BookMarked size={15} />} label={t('My skills')} meta={skillCount} onClick={() => setSkillsOpen(true)} />
+        <SidebarRow icon={<Palette size={15} />} label={t('Look library')} onClick={() => { st().setPanel('design'); onOpen(); }} />
+      </div>
+      <div className="mt-3 flex flex-col">
         {ready && folders.map((folder) => {
           const inside = files.filter((f) => f.folderId === folder.id);
           return (
@@ -165,10 +170,6 @@ export function SlidesSidebar({ onOpen }: { onOpen: () => void }) {
         })}
       </div>
 
-      <div className="mt-4 flex flex-col">
-        <SidebarRow icon={<BookMarked size={15} />} label={t('My skills')} meta={skillCount} onClick={() => setSkillsOpen(true)} />
-        <SidebarRow icon={<Palette size={15} />} label={t('Look library')} onClick={() => { st().setPanel('design'); onOpen(); }} />
-      </div>
       {/* The dialog is the editor's own, drawn with its tokens. */}
       {skillsOpen && createPortal(<div className="kata-root"><SkillsDialog onClose={() => setSkillsOpen(false)} /></div>, document.body)}
     </div>

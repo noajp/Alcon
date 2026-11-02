@@ -34,7 +34,9 @@ function rollup(deals: readonly CrmDealRecord[]) {
 
 const lastTouch = (activities: readonly CrmActivityRecord[]) => activities.filter(entry => entry.kind !== 'stage' && entry.kind !== 'change').reduce<string | null>((latest, entry) => !latest || entry.occurred_on > latest ? entry.occurred_on : latest, null);
 
-export function CrmCompanies({ crm, query, onOpen, selectedId }: { crm: Crm; query: string; onOpen: (id: string) => void; selectedId: string | null }) {
+export function CrmCompanies({ crm, query, onOpen, selectedId, domainId }: { crm: Crm; query: string; onOpen: (id: string) => void; selectedId: string | null;
+  /** The Domain a company added here goes into. */
+  domainId: string | null }) {
   const { t, locale } = useI18n();
   const [name, setName] = useState('');
   const rows = useMemo(() => {
@@ -47,7 +49,7 @@ export function CrmCompanies({ crm, query, onOpen, selectedId }: { crm: Crm; que
     }).sort((a, b) => b.openCount - a.openCount || a.company.name.localeCompare(b.company.name));
   }, [crm.companies, crm.allDeals, crm.contacts, crm.people, crm.activities, query]);
   return <div className="space-y-4">
-    <form className="flex max-w-md gap-2" onSubmit={event => { event.preventDefault(); if (name.trim()) void crm.saveCompany(null, { name: name.trim() }).then(id => { setName(''); onOpen(id); }); }}>
+    <form className="flex max-w-md gap-2" onSubmit={event => { event.preventDefault(); if (name.trim()) void crm.saveCompany(null, { name: name.trim(), domain_id: domainId }).then(id => { setName(''); onOpen(id); }); }}>
       <input aria-label={t('New company')} placeholder={t('Add a company…')} value={name} onChange={event => setName(event.target.value)} className="h-8 min-w-0 flex-1 rounded-sm bg-muted/30 px-2 text-sm outline-none focus:bg-muted/60" />
       <Button type="submit" variant="ghost" disabled={!name.trim()}><Plus size={14} />{t('Add')}</Button>
     </form>
@@ -69,7 +71,9 @@ export function CrmCompanies({ crm, query, onOpen, selectedId }: { crm: Crm; que
   </div>;
 }
 
-export function CrmContacts({ crm, query, onOpen, selectedId }: { crm: Crm; query: string; onOpen: (id: string) => void; selectedId: string | null }) {
+export function CrmContacts({ crm, query, onOpen, selectedId, domainId }: { crm: Crm; query: string; onOpen: (id: string) => void; selectedId: string | null;
+  /** The Domain a contact added here goes into. */
+  domainId: string | null }) {
   const { t, locale } = useI18n();
   const [name, setName] = useState('');
   const companies = new Map(crm.companies.map(company => [company.id, company.name]));
@@ -80,7 +84,7 @@ export function CrmContacts({ crm, query, onOpen, selectedId }: { crm: Crm; quer
       last: lastTouch(crm.activities.filter(entry => entry.contact_id === contact.id)) }))
     .sort((a, b) => a.contact.name.localeCompare(b.contact.name));
   return <div className="space-y-4">
-    <form className="flex max-w-md gap-2" onSubmit={event => { event.preventDefault(); if (name.trim()) void crm.saveContact(null, { name: name.trim() }).then(id => { setName(''); onOpen(id); }); }}>
+    <form className="flex max-w-md gap-2" onSubmit={event => { event.preventDefault(); if (name.trim()) void crm.saveContact(null, { name: name.trim(), domain_id: domainId }).then(id => { setName(''); onOpen(id); }); }}>
       <input aria-label={t('New contact')} placeholder={t('Add a contact…')} value={name} onChange={event => setName(event.target.value)} className="h-8 min-w-0 flex-1 rounded-sm bg-muted/30 px-2 text-sm outline-none focus:bg-muted/60" />
       <Button type="submit" variant="ghost" disabled={!name.trim()}><Plus size={14} />{t('Add')}</Button>
     </form>

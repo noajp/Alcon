@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, Check, ChevronDown, Columns3, Filter, Layers, List, PenLine, Plus, Settings2, Users, X } from '@/ui/icons';
+import { BarChart3, Building2, Check, ChevronDown, Columns3, Filter, Layers, List, PenLine, Plus, Settings2, Users, X } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { FONT } from '@/shared/designTokens';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
@@ -187,7 +187,7 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
         <DialogTitle>{t('Pipeline settings')}</DialogTitle>
         <DialogDescription>{t('The pipeline’s stages, currency and rhythm.')}</DialogDescription>
-        {crm.pipeline ? <CrmSettings crm={crm} onSelectPipeline={pipelineId => go({ pipelineId })} /> : <p className="text-sm text-muted-foreground">{t('Loading your pipeline…')}</p>}
+        {crm.pipeline ? <CrmSettings crm={crm} domainId={scoped.domainId} onSelectPipeline={pipelineId => go({ pipelineId })} /> : <p className="text-sm text-muted-foreground">{t('Loading your pipeline…')}</p>}
       </DialogContent>
     </Dialog>}
   </>;
@@ -214,10 +214,15 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
     {dialogs}
   </>;
 
-  const status = <>
+  // Loading and failing, for every page; the ledgers need no pipeline.
+  const loadStatus = <>
     {crm.loading && <p role="status" className="py-6 text-sm text-muted-foreground">{t('Loading your pipeline…')}</p>}
     {crm.error && <div role="alert" className="space-y-2"><p className="text-sm text-[var(--status-danger)]">{t('Could not load your pipeline.')} {crm.error instanceof Error ? crm.error.message : ''}</p>
       <Button onClick={() => void crm.refetch()}>{t('Retry')}</Button></div>}
+  </>;
+  const loaded = !crm.loading && !crm.error;
+  const status = <>
+    {loadStatus}
     {!crm.loading && !crm.error && !scoped.pipelines.length && <div className="space-y-2 py-6">
       <p className={`${FONT.base} text-muted-foreground`}>{t('No pipeline in this scope yet.')}</p>
       <ButtonAppearanceProvider appearance="inline"><Button variant="ghost" size="sm" className="-ml-2.5" onClick={() => go({ settings: true })}><Settings2 size={14} />{t('Pipeline settings')}</Button></ButtonAppearanceProvider>
@@ -239,6 +244,7 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
           <RailRow icon={<Columns3 className="size-3.5 text-muted-foreground" />} name={t('Pipelines')} dense label={String(scoped.pipelines.length)} placeholder={!scoped.pipelines.length} />
           <button type="button" className="w-full" onClick={() => go({ view: 'companies' })}><RailRow icon={<Building2 className="size-3.5 text-muted-foreground" />} name={t('Companies')} dense label={String(scoped.companies.length)} placeholder={!scoped.companies.length} /></button>
           <button type="button" className="w-full" onClick={() => go({ view: 'contacts' })}><RailRow icon={<Users className="size-3.5 text-muted-foreground" />} name={t('Contacts')} dense label={String(scoped.contacts.length)} placeholder={!scoped.contacts.length} /></button>
+          <button type="button" className="w-full" onClick={() => go({ view: 'forecast' })}><RailRow icon={<BarChart3 className="size-3.5 text-muted-foreground" />} name={t('Forecast')} dense label={String(scoped.workspaces.length)} placeholder={!scoped.workspaces.length} /></button>
         </RailCard>}>
           <PageHead icon={<CrmIcon size={18} />} title={scoped.scopeName === t('Everything') ? t('CRM') : scoped.scopeName}
             description={t('Where every deal in this scope stands, pipeline by pipeline.')} canEdit={false}
@@ -271,11 +277,11 @@ function CrmSurface({ crm, navigation, onNavigate, onViewChange, onOpenElement }
 
   // ── The ledgers ─────────────────────────────────────────────────────
   if (route.view === 'companies') return <>
-    <PlacePage title={t('Companies')}>{status}{pooled && <CrmCompanies crm={{ ...crm, companies: scoped.companies }} query={route.query ?? ''} selectedId={null} onOpen={companyId => go({ companyId })} />}</PlacePage>
+    <PlacePage title={t('Companies')}>{loadStatus}{loaded && <CrmCompanies crm={{ ...crm, companies: scoped.companies }} query={route.query ?? ''} selectedId={null} domainId={scoped.domainId} onOpen={companyId => go({ companyId })} />}</PlacePage>
     {dialogs}
   </>;
   if (route.view === 'contacts') return <>
-    <PlacePage title={t('Contacts')}>{status}{pooled && <CrmContacts crm={{ ...crm, contacts: scoped.contacts }} query={route.query ?? ''} selectedId={null} onOpen={contactId => go({ contactId })} />}</PlacePage>
+    <PlacePage title={t('Contacts')}>{loadStatus}{loaded && <CrmContacts crm={{ ...crm, contacts: scoped.contacts }} query={route.query ?? ''} selectedId={null} domainId={scoped.domainId} onOpen={contactId => go({ contactId })} />}</PlacePage>
     {dialogs}
   </>;
 

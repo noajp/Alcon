@@ -2023,6 +2023,8 @@ export interface DataTable {
   color: string | null
   status: DataTableStatus
   order_index: number | null
+  /** The Table folder it sits in (none: at the top of the list). */
+  folder_id: string | null
   created_by: string
   created_at: string
   updated_at: string
@@ -2042,6 +2044,7 @@ export interface DataTableInsert {
 
 export interface DataTableUpdate {
   domain_id?: string | null
+  folder_id?: string | null
   name?: string
   description?: string | null
   icon?: string | null

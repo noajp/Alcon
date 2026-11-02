@@ -49,14 +49,16 @@ import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from
 import { SpaceSwitcher } from '@/Function/space/SpaceSwitcher';
 
 import { NavTableIcon } from '@/shell/sidebar/NavIcons';
-import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
-import { useDataTables } from '@/hooks/useSupabase';
 import { railModeOf } from '@/shell/ModeRail';
 import type { RailMode } from '@/shell/railApps';
 import { CREATE_ELEMENT_EVENT, type CreateElementDetail } from '@/shell/QuickAddElementLauncher';
 import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarStore';
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
+import { GroupTree } from '@/Function/shared/folders/GroupTree';
+import type { SidebarDomain } from '@/ActivitySpace/sustainment/files/FilesSidebar';
+import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
+import { Folder as FolderIcon } from '@/ui/icons';
 import { FilesSidebar } from '@/ActivitySpace/sustainment/files/FilesSidebar';
 import { CrmSidebar } from '@/ActivitySpace/sustainment/crm/CrmSidebar';
 import { AuditSidebar } from '@/ActivitySpace/sustainment/audit/AuditSidebar';
@@ -123,37 +125,36 @@ function SidebarModeLabel({ label }: { label: string }) {
 // until a table is chosen here.
 function TableSidebar({
   activeTableId,
+  browse,
+  domains,
   onNavigate,
   onViewChange,
 }: {
   activeTableId: string | null;
+  browse: NonNullable<NavigationState['tableBrowse']>;
+  domains: SidebarDomain[];
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
 }) {
   const { t } = useI18n();
-  const { data: tables, refetch } = useDataTables();
-  // The New Table dialog lives in TableView; when it creates a table it
-  // dispatches this so our separate list instance refreshes.
-  useEffect(() => {
-    const h = () => void refetch();
-    window.addEventListener('alcon:tables-changed', h);
-    return () => window.removeEventListener('alcon:tables-changed', h);
-  }, [refetch]);
 
+  // As Execution's: every Table in the Space, then each Domain unfolding
+  // onto its Folders and Tables, each a page of the main pane (a Table opens
+  // from those pages).
+  const go = (next: NonNullable<NavigationState['tableBrowse']>) => { onViewChange('tables'); onNavigate({ tableId: null, tableBrowse: next }); };
+  const page = activeTableId ? null : !browse.domainId ? 'all' : browse.folderId ? 'folders' : browse.view ?? 'home';
   return (
     <div className="mt-1">
       <SidebarSectionLabel>{t('Table')}</SidebarSectionLabel>
-      <div className="mt-1 flex flex-col">
-        {tables.map((t) => (
-          <SidebarRow
-            key={t.id}
-            active={t.id === activeTableId}
-            icon={<NavTableIcon size={16} />}
-            label={t.name}
-            title={t.name}
-            meta={t.rowCount}
-            onClick={() => { onViewChange('tables'); onNavigate({ tableId: t.id }); }}
-          />
+      <div className="mt-1">
+        <SidebarRow active={page === 'all'} icon={<NavTableIcon size={16} />} label={t('All Tables')} onClick={() => go({})} />
+        {domains.map((d) => (
+          <GroupTree key={d.id} name={d.name} mark={d.mark} defaultOpen={browse.domainId === d.id}
+            homeActive={browse.domainId === d.id && page === 'home'} onOpenHome={() => go({ domainId: d.id })}
+            items={[
+              { id: 'folders', label: t('Folders'), icon: FolderIcon, active: browse.domainId === d.id && page === 'folders', onClick: () => go({ domainId: d.id, view: 'folders' }) },
+              { id: 'tables', label: t('Tables'), icon: NavTableIcon, active: browse.domainId === d.id && page === 'tables', onClick: () => go({ domainId: d.id, view: 'tables' }) },
+            ]} />
         ))}
       </div>
     </div>
@@ -177,6 +178,8 @@ export function AppSidebar({
   const { guestDomains, refetch: refetchMemberDomains } = useDomains();
   const { data: visibleDomains, refetch: refetchVisibleDomains } = useSustainmentDomains();
   const domains = useMemo(() => [...visibleDomains].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)), [visibleDomains]);
+  // The Domains as Files and Table list them, each with its mark, as Execution does.
+  const sidebarDomains = useMemo<SidebarDomain[]>(() => domains.map((d) => ({ id: d.id, name: d.name, mark: <DomainMark domain={d} size={16} /> })), [domains]);
   const refetchDomains = useCallback(async () => {
     await Promise.all([refetchMemberDomains(), refetchVisibleDomains()]);
   }, [refetchMemberDomains, refetchVisibleDomains]);
@@ -525,6 +528,8 @@ export function AppSidebar({
           {railMode === 'tables' && (
             <TableSidebar
               activeTableId={navigation.tableId ?? null}
+              browse={navigation.tableBrowse ?? {}}
+              domains={sidebarDomains}
               onNavigate={onNavigate}
               onViewChange={onViewChange}
             />
@@ -538,10 +543,10 @@ export function AppSidebar({
           {/* ── Calendar ── today, a mini month that moves the grid, and who is shown. */}
           {railMode === 'calendar' && <><SidebarModeLabel label={t('Calendar')} /><CalendarSidebar /></>}
           {railMode === 'team' && <SidebarModeLabel label={t('People')} />}
-          {railMode === 'files' && <FilesSidebar navigation={navigation} onNavigate={onNavigate} />}
+          {railMode === 'files' && <FilesSidebar navigation={navigation} onNavigate={onNavigate} domains={sidebarDomains} />}
           {/* ── Reviews ── the Space's pull requests; the main pane reviews the open one. */}
           {railMode === 'reviews' && <ReviewsSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'reviews') onViewChange('reviews'); }} />}
-          {railMode === 'crm' && <CrmSidebar navigation={navigation} onNavigate={onNavigate} />}
+          {railMode === 'crm' && <CrmSidebar navigation={navigation} onNavigate={onNavigate} domains={sidebarDomains} />}
           {/* ── Audit ── what needs a person, the workflows, and the log. */}
           {railMode === 'audit' && <AuditSidebar navigation={navigation} onNavigate={onNavigate} />}
           {/* ── AI ── this person's conversations, in folders. */}
