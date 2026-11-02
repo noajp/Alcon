@@ -504,8 +504,10 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
     case 'table_rows':
     case 'table_cells':
       invalidateSoon(qc, ['widget-table-data']);
-      // The Table list shows row counts: a cell edit leaves them as they are.
-      if (d.table === 'table_rows' && d.type !== 'UPDATE') invalidateSoon(qc, ['data-tables']);
+      // The Table list shows each Table (name, folder, updated) and its row
+      // count: Table changes and added / removed rows move it, a cell edit or
+      // a column change does not.
+      if (d.table === 'tables' || (d.table === 'table_rows' && d.type !== 'UPDATE')) invalidateSoon(qc, ['data-tables']);
       return;
 
     case 'phases':

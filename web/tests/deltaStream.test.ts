@@ -72,6 +72,7 @@ describe('applyWorkspaceDelta', () => {
       expect(qc.getQueryState(['data-tables'])?.isInvalidated).toBe(false);
       applyWorkspaceDelta(qc, ctx, delta('objects', 'DELETE', {}, { id: 'obj-a' }));
       applyWorkspaceDelta(qc, ctx, delta('table_rows', 'INSERT', { id: 'r1', table_id: 't1' }));
+      applyWorkspaceDelta(qc, ctx, delta('tables', 'UPDATE', { id: 't1', name: 'Renamed' }));
       vi.advanceTimersByTime(160);
       expect(qc.getQueryState(['explorer', '__all__'])?.isInvalidated).toBe(true);
       expect(qc.getQueryState(['data-tables'])?.isInvalidated).toBe(true);
