@@ -6,6 +6,10 @@ describe('canEditInitiative', () => {
     expect(canEditInitiative('u1', 'u1')).toBe(true);
     expect(canEditInitiative('u2', 'u1')).toBe(false);
   });
+  it('an owner of the Initiative’s Space edits it too', () => {
+    expect(canEditInitiative('u2', 'u1', true)).toBe(true);
+    expect(canEditInitiative(null, 'u1', true)).toBe(false);
+  });
   it('nobody edits an Initiative with no recorded creator, and a signed-out viewer edits nothing', () => {
     expect(canEditInitiative('u1', null)).toBe(false);
     expect(canEditInitiative(null, 'u1')).toBe(false);

@@ -11,6 +11,7 @@ import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@
 import { NavPortfolioIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { useSpaceRole } from '@/Function/space/data';
 import { canEditInitiative } from '@/Function/strategy/initiativeAccess';
 import { deleteStrategy } from '@/hooks/strategyData';
 import { PortfolioMoveRefused, setStrategyPortfolio, usePortfolios } from '@/hooks/portfolioData';
@@ -23,6 +24,7 @@ interface InitiativeRef {
   vision_id: string | null;
   portfolio_id: string | null;
   created_by: string | null;
+  activity_space_id?: string | null;
 }
 
 /**
@@ -36,7 +38,8 @@ function useInitiativeActions(initiative: InitiativeRef, opts: { onDelete?: () =
   const { t } = useI18n();
   const { user } = useAuthContext();
   const [moving, setMoving] = useState(false);
-  const canEdit = canEditInitiative(user?.id, initiative.created_by);
+  const ownsItsSpace = useSpaceRole(initiative.activity_space_id ?? null) === 'owner';
+  const canEdit = canEditInitiative(user?.id, initiative.created_by, ownsItsSpace);
 
   const remove = async () => {
     const ok = await appDialog.confirm(

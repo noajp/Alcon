@@ -61,14 +61,13 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
   // Portfolios belong to a Vision: the page is one Vision's tree.
   const portfolios = useMemo(() => allPortfolios.filter((p) => !!vision && p.vision_id === vision.id), [allPortfolios, vision]);
   const { data: allStrategies, loading: strategiesLoading } = useStrategies();
-  // An Initiative reaches a Space through its Objects' Domains — the page
-  // lists the ones with an Object in this Space (or none yet).
+  // The page lists this Space's Initiatives (initiativesInSpace).
   const { data: domains } = useDomains();
   const { data: explorer } = useObjects();
   const strategies = useMemo(() => {
     const objectDomain = new Map<string, string | null>(explorer.objects.map((o) => [o.id, o.domain_id]));
-    return initiativesInSpace(allStrategies, objectDomain, new Set(domains.map((d) => d.id)));
-  }, [allStrategies, explorer.objects, domains]);
+    return initiativesInSpace(allStrategies, objectDomain, new Set(domains.map((d) => d.id)), spaceId);
+  }, [allStrategies, explorer.objects, domains, spaceId]);
   // Inside the Vision: its Initiatives by Portfolio, and the ones placed
   // directly under the Vision.
   const { byPortfolio, unassigned } = useMemo(

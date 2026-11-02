@@ -1468,6 +1468,7 @@ export interface Strategy {
   icon: string | null
   portfolio_id: string | null  // Strategy > Portfolio the Initiative belongs to (at most one)
   vision_id: string | null     // Strategy > Vision the Initiative works toward
+  activity_space_id: string | null  // the Space it belongs to — its Portfolio's or Vision's when those are set
   created_by: string | null
   created_at: string
   updated_at: string
@@ -1546,6 +1547,7 @@ export interface StrategyInsert {
   icon?: string | null
   portfolio_id?: string | null
   vision_id?: string | null
+  activity_space_id?: string | null
   created_by?: string | null
 }
 

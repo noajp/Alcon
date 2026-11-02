@@ -279,8 +279,8 @@ function useVisionScope(spaceId: string | null) {
   const { data: explorer } = useObjects();
   const strategies = useMemo(() => {
     const objectDomain = new Map<string, string | null>(explorer.objects.map((o) => [o.id, o.domain_id]));
-    return initiativesInSpace(allStrategies, objectDomain, new Set(domains.map((d) => d.id)));
-  }, [allStrategies, explorer.objects, domains]);
+    return initiativesInSpace(allStrategies, objectDomain, new Set(domains.map((d) => d.id)), spaceId);
+  }, [allStrategies, explorer.objects, domains, spaceId]);
   const roots = useMemo(() => strategies.filter((s) => s.parentIds.length === 0), [strategies]);
   const { byId: healthById } = useInitiativeHealth(roots);
   return { portfolios, roots, healthById };

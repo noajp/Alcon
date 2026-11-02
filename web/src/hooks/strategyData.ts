@@ -36,6 +36,9 @@ import type {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
+import { getActiveSpaceId, useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { useActivitySpaces } from '@/Function/space/data';
+import { showsInSpace } from '@/Function/strategy/initiativeAccess';
 
 // ============================================
 // Strategy: aggregate elements across multiple Domains and/or Objects
@@ -197,6 +200,22 @@ export function useStrategies() {
   };
 }
 
+/** The Initiatives a Space-wide list shows: useStrategies without those of
+ *  the viewer's other Spaces (showsInSpace). Lookups by id or by Object use
+ *  useStrategies, so an Object still shows an Initiative of another Space. */
+export function useStrategiesInSpace() {
+  const strategies = useStrategies();
+  const activeSpaceId = useActiveSpaceId();
+  const { data: spaces, loading: spacesLoading } = useActivitySpaces();
+  const data = useMemo(() => {
+    if (spacesLoading) return strategies.data;
+    const mine = spaces.map((space) => space.id);
+    const shown = strategies.data.filter((s) => showsInSpace(s, activeSpaceId, mine));
+    return shown.length === strategies.data.length ? strategies.data : shown;
+  }, [strategies.data, activeSpaceId, spaces, spacesLoading]);
+  return { ...strategies, data };
+}
+
 export async function createStrategy(
   input: StrategyInsert,
   objectIds: string[] = [],
@@ -208,7 +227,8 @@ export async function createStrategy(
   const creatorId = await getCurrentUserId();
   const { data, error } = await supabase
     .from('strategies')
-    .insert({ ...input, created_by: input.created_by ?? creatorId })
+    // The Space it is created in; a Portfolio or Vision overrides it (DB trigger).
+    .insert({ ...input, created_by: input.created_by ?? creatorId, activity_space_id: input.activity_space_id ?? getActiveSpaceId() })
     .select()
     .single();
   if (error) throw error;

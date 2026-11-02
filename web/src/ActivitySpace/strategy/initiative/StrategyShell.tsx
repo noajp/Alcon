@@ -44,6 +44,7 @@ import { InitiativeCodeChanges } from '@/ActivitySpace/execution/code/Initiative
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { canEditInitiative } from '@/Function/strategy/initiativeAccess';
+import { useSpaceRole } from '@/Function/space/data';
 import { canEditObject, canManageDomainTypes } from '@/ActivitySpace/execution/object/objectAccess';
 import { useMyDomainRoles, useMyObjectMemberships } from '@/hooks/useMyMemberships';
 import { useInitiativeHealth } from './useInitiativeHealth';
@@ -71,7 +72,7 @@ import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { resolveVision, useVisions } from '@/hooks/visionData';
-import { initiativesOfVision } from '@/ActivitySpace/strategy/portfolio/portfolioGroups';
+import { initiativesOfVision, inSpace } from '@/ActivitySpace/strategy/portfolio/portfolioGroups';
 import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 
 /** A Initiative page has a band and one column of readings; no side rail. */
@@ -142,8 +143,10 @@ export function StrategyShell({
   const { data: visions } = useVisions(spaceId);
   const vision = resolveVision(visions, visionId);
   const { inVision, unplaced } = useMemo(
-    () => (vision ? initiativesOfVision(strategies, vision.id) : { inVision: rootStrategies, unplaced: [] }),
-    [strategies, rootStrategies, vision]);
+    () => (vision
+      ? initiativesOfVision(strategies, vision.id, spaceId)
+      : { inVision: rootStrategies.filter((s) => inSpace(s, spaceId, () => true)), unplaced: [] }),
+    [strategies, rootStrategies, vision, spaceId]);
 
   if (openStrategy) {
     return (
@@ -445,7 +448,8 @@ function StrategyDetailView({
   // edit take and vanish on reload (ELE_STR-021).
   const { user } = useAuthContext();
   const userId = user?.id ?? null;
-  const canEdit = canEditInitiative(userId, strategy.created_by);
+  const ownsItsSpace = useSpaceRole(strategy.activity_space_id) === 'owner';
+  const canEdit = canEditInitiative(userId, strategy.created_by, ownsItsSpace);
   // The Object rows write to objects / domains, which answer to Object
   // membership and Domain role — not to who owns the Initiative.
   const { data: myObjects } = useMyObjectMemberships(userId);
@@ -524,15 +528,15 @@ function StrategyDetailView({
   const childCandidates = useMemo(() => {
     const existingChildIds = new Set(childStrategies.map((c) => c.id));
     const q = childQuery.trim().toLowerCase();
-    // strategy_children's INSERT policy needs the caller to own the child as
-    // well as the parent, so a colleague's Initiative — visible since the
-    // Space-wide SELECT — is not something this picker may offer.
+    // strategy_children's INSERT policy needs the caller to be able to edit
+    // the child as well as the parent, so a colleague's Initiative — readable
+    // Space-wide — is offered only to an owner of its Space.
     return allStrategies.filter((s) =>
       !ancestorIds.has(s.id) &&
       !existingChildIds.has(s.id) &&
-      canEditInitiative(userId, s.created_by) &&
+      canEditInitiative(userId, s.created_by, ownsItsSpace && s.activity_space_id === strategy.activity_space_id) &&
       (q === '' || s.name.toLowerCase().includes(q)));
-  }, [allStrategies, ancestorIds, childStrategies, childQuery, userId]);
+  }, [allStrategies, ancestorIds, childStrategies, childQuery, userId, ownsItsSpace, strategy.activity_space_id]);
 
   const linkChild = async (childId: string) => {
     if (!canEdit) return;

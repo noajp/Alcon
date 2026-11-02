@@ -6,7 +6,7 @@ import { ChevronDown, ChevronLeft, ChevronRight } from '@/ui/icons';
 import {
   fetchStrategyElements,
   useObjects,
-  useStrategies,
+  useStrategiesInSpace,
   type AlconObject,
   type ElementWithDetails,
   type StrategyWithObjects,
@@ -60,7 +60,7 @@ export function TimelineView({
   /** Jump to an Object's detail (the Execution "objects" view). */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
 } = {}) {
-  const { data: strategies, loading: strategiesLoading } = useStrategies();
+  const { data: strategies, loading: strategiesLoading } = useStrategiesInSpace();
   const { data: { objects: explorerObjects } } = useObjects(null);
 
   const objectsById = useMemo(() => {

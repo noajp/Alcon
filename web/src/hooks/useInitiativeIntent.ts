@@ -4,6 +4,7 @@ import { useCallback, useRef } from 'react';
 import { createIntent, useStrategyIntentBundle, type IntentBundle } from '@/hooks/useSupabase';
 import { useInitiativeScope, type InitiativeScope } from '@/hooks/useInitiativeScope';
 import { useCurrentUserId } from '@/providers/authContext';
+import { useSpaceRole } from '@/Function/space/data';
 import { canEditInitiative } from '@/Function/strategy/initiativeAccess';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -51,18 +52,21 @@ export function useInitiativeIntent(initiativeId: string, initiativeName: string
   // widget that only knows the id asks once. Until either answers, nobody
   // can write — a composer that appears and then locks reads as a flicker,
   // but one that opens and then refuses reads as a broken promise.
+  // The Space comes from the row too: an owner of the Initiative's Space
+  // edits it as well as its creator.
   const owner = useQuery({
     queryKey: ['strategy-owner', initiativeId],
-    enabled: createdBy === undefined && !!initiativeId,
+    enabled: !!initiativeId,
     staleTime: 60_000,
-    queryFn: async (): Promise<string | null> => {
-      const { data, error } = await supabase.from('strategies').select('created_by').eq('id', initiativeId).maybeSingle();
+    queryFn: async (): Promise<{ createdBy: string | null; spaceId: string | null }> => {
+      const { data, error } = await supabase.from('strategies').select('created_by, activity_space_id').eq('id', initiativeId).maybeSingle();
       if (error) throw error;
-      return (data?.created_by as string | null) ?? null;
+      return { createdBy: (data?.created_by as string | null) ?? null, spaceId: (data?.activity_space_id as string | null) ?? null };
     },
   });
-  const resolvedOwner = createdBy === undefined ? owner.data : createdBy;
-  const canEdit = resolvedOwner !== undefined && canEditInitiative(userId, resolvedOwner);
+  const ownsItsSpace = useSpaceRole(owner.data?.spaceId ?? null) === 'owner';
+  const resolvedOwner = createdBy === undefined ? owner.data?.createdBy : createdBy;
+  const canEdit = resolvedOwner !== undefined && canEditInitiative(userId, resolvedOwner, ownsItsSpace);
   const lockReason = canEdit
     ? null
     : owner.isError
