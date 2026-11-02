@@ -17,7 +17,7 @@ export function getQueryClient(): QueryClient {
         // without serving wildly stale data.
         staleTime: 30_000,
         // 24h gcTime so queries survive long enough to be serialised to
-        // IndexedDB by PersistQueryClientProvider on tab close. The default
+        // IndexedDB by queryCachePersistence on tab close. The default
         // 5 min would garbage-collect them before persistence and defeat
         // the whole point of cache survival.
         gcTime: 24 * 60 * 60 * 1000,
