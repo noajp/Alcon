@@ -4,6 +4,8 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const APP_MESSAGES: Record<string, Row> = {
+  'Could not load what you can join. Try again.': ['参加できるものを読み込めませんでした。もう一度お試しください。', '참여할 수 있는 항목을 불러오지 못했습니다. 다시 시도하세요.', 'Impossible de charger ce que vous pouvez rejoindre. Réessayez.', 'No se pudo cargar lo que puedes unirte. Inténtalo de nuevo.'],
+  'Could not join. You may not have access to it.': ['参加できませんでした。アクセス権がない可能性があります。', '참여하지 못했습니다. 접근 권한이 없을 수 있습니다.', 'Impossible de rejoindre. Vous n’y avez peut-être pas accès.', 'No se pudo unir. Es posible que no tengas acceso.'],
   'No notification selected': ['通知が選択されていません', '선택된 알림이 없습니다', 'Aucune notification sélectionnée', 'Ninguna notificación seleccionada'],
   'Mark all read': ['すべて既読にする', '모두 읽음으로 표시', 'Tout marquer comme lu', 'Marcar todo como leído'],
   'Unread only': ['未読のみ', '읽지 않음만', 'Non lues uniquement', 'Solo no leídas'],
