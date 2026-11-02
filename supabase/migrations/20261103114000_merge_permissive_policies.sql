@@ -8,8 +8,10 @@
 -- applied and whose WITH CHECK is the OR of the WITH CHECKs (a policy without
 -- one checks with its USING, as Postgres does). A policy that was limited to
 -- `authenticated` while others were open to `public` keeps that limit through
--- a role guard, so who can do what is unchanged. Restrictive policies are
--- left alone. Idempotent, and a no-op on an empty database.
+-- a role-membership guard, so who can do what is unchanged. A table with a
+-- permissive policy for any other role set is skipped rather than widened.
+-- Restrictive policies are left alone. Idempotent, and a no-op on an empty
+-- database.
 do $$
 declare
   t record;
@@ -32,6 +34,15 @@ begin
     group by x.schemaname, x.tablename, x.c
     having count(*) > 1
   loop
+    if exists (
+      select 1 from pg_policies
+      where schemaname = t.schemaname and tablename = t.tablename and permissive = 'PERMISSIVE'
+        and roles not in (array['public']::name[], array['authenticated']::name[])
+    ) then
+      raise notice 'permissive policies on %.% not merged: a policy targets another role', t.schemaname, t.tablename;
+      continue;
+    end if;
+
     create temp table if not exists _merge_pol (cmd text, roles name[], qual text, with_check text) on commit drop;
     truncate _merge_pol;
     insert into _merge_pol
@@ -53,13 +64,13 @@ begin
       roles_clause := case when all_auth then 'authenticated' else 'public' end;
 
       select string_agg('(' || case when not all_auth and roles = array['authenticated']::name[]
-                                    then '(select auth.role()) = ''authenticated'' and (' || qual || ')'
+                                    then 'pg_has_role(''authenticated'', ''member'') and (' || qual || ')'
                                     else qual end || ')', ' or ')
         into using_expr
       from _merge_pol where cmd in (c, 'ALL') and qual is not null;
 
       select string_agg('(' || case when not all_auth and roles = array['authenticated']::name[]
-                                    then '(select auth.role()) = ''authenticated'' and (' || coalesce(with_check, qual) || ')'
+                                    then 'pg_has_role(''authenticated'', ''member'') and (' || coalesce(with_check, qual) || ')'
                                     else coalesce(with_check, qual) end || ')', ' or ')
         into check_expr
       from _merge_pol where cmd in (c, 'ALL') and coalesce(with_check, qual) is not null;
