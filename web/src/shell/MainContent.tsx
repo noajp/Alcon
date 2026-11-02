@@ -199,6 +199,20 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               <ElementsListView
                 onRefresh={onRefresh}
                 activeDomainId={activeDomainId}
+                openElementId={navigation.elementId ?? null}
+                onCloseOpenElement={() => {
+                  // Back puts the Domain, Object and view open before ⌘K back.
+                  const back = navigation.elementReturn;
+                  onNavigate({ elementId: null, elementReturn: null });
+                  if (!back) return;
+                  if (back.objectId && back.objectDomainId) {
+                    onNavigate({ objectId: back.objectId, objectDomainId: back.objectDomainId });
+                  } else {
+                    if (back.domainId && back.domainId !== activeDomainId) setActiveDomainId(back.domainId);
+                    onNavigate({ objectId: back.objectId });
+                  }
+                  if (back.view !== 'domain-elements') onViewChange?.(back.view);
+                }}
                 onNavigate={onNavigate}
                 onViewChange={onViewChange}
               />

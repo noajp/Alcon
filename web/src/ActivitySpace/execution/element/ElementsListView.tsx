@@ -38,6 +38,9 @@ import {
   type SectionGroup,
 } from '@/Function/shared/listControls';
 import dynamic from 'next/dynamic';
+import { useQuery } from '@tanstack/react-query';
+import { fetchElementWithDetails } from '@/hooks/elementData';
+import { Button } from '@/ui/button';
 
 // The Gantt / Calendar / Custom tabs are split out of this view's
 // chunk and fetched only when one of those tabs is opened.
@@ -92,6 +95,11 @@ interface ElementsListViewProps {
   activeDomainId?: string | null;
   onNavigate?: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
+  /** An Element opened by id (⌘K): shown over the list until its Back, which
+   *  calls onCloseOpenElement. It may belong to no Object in this Domain's
+   *  list yet (the Domain is still loading), so it is fetched by id. */
+  openElementId?: string | null;
+  onCloseOpenElement?: () => void;
 }
 
 /**
@@ -103,10 +111,15 @@ interface ElementsListViewProps {
  * The page only owns the toolbar, the empty-state, the Element-detail
  * drill-in, and the Domain-direct quick-add popup.
  */
-export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onViewChange }: ElementsListViewProps) {
+export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onViewChange, openElementId = null, onCloseOpenElement }: ElementsListViewProps) {
   const { t } = useI18n();
   const explorerData = useExplorerData();
   const [detailId, setDetailId] = useState<string | null>(null);
+  const openedQuery = useQuery({
+    queryKey: ['element-detail', openElementId],
+    enabled: !!openElementId,
+    queryFn: () => fetchElementWithDetails(openElementId!),
+  });
   const [visibleTabs, setVisibleTabs] = useState<ObjectTabType[]>(loadVisibleTabs);
   const [viewMode, setViewMode] = useState<ObjectTabType>(() => {
     if (typeof window === 'undefined') return 'elements';
@@ -398,6 +411,40 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   const detailObject = detailElement?.object_id
     ? explorerData?.objects.find((obj) => obj.id === detailElement.object_id) ?? null
     : null;
+
+  if (openElementId) {
+    // The list's copy follows live edits; the fetched one covers the moment
+    // before this Domain's list has loaded.
+    const opened = allElementsForLookup.get(openElementId) ?? openedQuery.data ?? null;
+    const openedObject = opened?.object_id
+      ? explorerData?.objects.find((obj) => obj.id === opened.object_id) ?? null
+      : null;
+    const close = () => onCloseOpenElement?.();
+    if (!opened) {
+      return (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-[13px] text-muted-foreground" role="status">
+          <p>{t(openedQuery.isPending || openedQuery.isFetching ? 'Opening…' : 'This Element is no longer available.')}</p>
+          {!openedQuery.isPending && <Button variant="ghost" onClick={close}>{t('Back')}</Button>}
+        </div>
+      );
+    }
+    return (
+      <ElementDetailView
+        key={opened.id}
+        element={opened}
+        domainName={opened.owner_id ? null : activeDomainName}
+        objectPath={openedObject ? [{ id: openedObject.id, name: openedObject.name }] : opened.objects ?? []}
+        onBack={close}
+        onRefresh={() => { void openedQuery.refetch(); onRefresh?.(); }}
+        onNavigateRoot={close}
+        onNavigateObject={(id: string) => {
+          close();
+          onViewChange?.('objects');
+          onNavigate?.({ objectId: id });
+        }}
+      />
+    );
+  }
 
   if (detailElement) {
     return (

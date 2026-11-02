@@ -1,7 +1,7 @@
 'use client';
 
 import { supabase } from '@/lib/supabase';
-import { displayIdOf } from '@/Function/shared/element/displayId';
+import { ELEMENT_SEARCH_SELECT, PERSONAL_ELEMENT_SEARCH_SELECT, elementSearchResults, type ElementSearchRow } from '@/Function/shared/elementSearch';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { indexSpaceFiles, searchAttachments, type FoundFile } from '@/hooks/attachmentData';
 
@@ -20,7 +20,8 @@ export interface SearchResult {
   objectId?: string | null;
   /** The quotable id — `ELE_MED-001`. Absent for kinds that have none. */
   displayId?: string | null;
-  /** An Object's primary Domain, so opening it switches to that Domain. */
+  /** An Object's primary Domain (an Element's: its Object's), so opening it
+   *  switches to that Domain. */
   domainId?: string | null;
   /** Archived Objects are still found by search; the result says so. */
   archived?: boolean;
@@ -44,15 +45,29 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
     lastIndexed.set(spaceId, Date.now());
     void indexSpaceFiles(spaceId);
   }
-  const [elementsRes, objectsRes, notesRes, dealsRes, companiesRes, contactsRes, files] = await Promise.all([
+  const { data: auth } = await supabase.auth.getSession();
+  const userId = auth.session?.user.id ?? null;
+  const elementMatch = `title.ilike.${like},description.ilike.${like},display_id.ilike.${like}`;
+  const [elementsRes, personalRes, objectsRes, notesRes, dealsRes, companiesRes, contactsRes, files] = await Promise.all([
     // display_id is searched as well as returned. It is the string an Element
     // is called by in a comment or a SITREP, so someone reading "ELE_MED-001 is
     // blocked" reaches for ⌘K and types exactly that.
-    supabase
+    // Only the open Space's Elements, as with CRM records below: one from
+    // another Space cannot be opened from here.
+    spaceId ? supabase
       .from('elements')
-      .select('id, title, description, object_id, display_id')
-      .or(`title.ilike.${like},description.ilike.${like},display_id.ilike.${like}`)
-      .limit(limit),
+      .select(ELEMENT_SEARCH_SELECT)
+      .eq('object.domain.activity_space_id', spaceId)
+      .or(elementMatch)
+      .limit(limit) : Promise.resolve({ data: [] as ElementSearchRow[] }),
+    // The viewer's personal Elements belong to no Space: found from any.
+    userId ? supabase
+      .from('elements')
+      .select(PERSONAL_ELEMENT_SEARCH_SELECT)
+      .is('object_id', null)
+      .eq('owner_id', userId)
+      .or(elementMatch)
+      .limit(limit) : Promise.resolve({ data: [] as ElementSearchRow[] }),
     // Archived Objects stay searchable: search is how an Object that left
     // every list is found again.
     supabase
@@ -74,9 +89,8 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
   ]);
 
   const out: SearchResult[] = [];
-  for (const r of (elementsRes.data || [])) {
-    out.push({ kind: 'element', id: r.id, title: r.title, snippet: r.description, objectId: r.object_id, displayId: displayIdOf(r) });
-  }
+  const elementRows = [...(elementsRes.data || []), ...(personalRes.data || [])] as unknown as ElementSearchRow[];
+  out.push(...elementSearchResults(elementRows, spaceId, userId));
   for (const r of (objectsRes.data || [])) {
     out.push({ kind: 'object', id: r.id, title: r.name, snippet: r.description, domainId: r.domain_id, archived: !!r.archived_at });
   }
