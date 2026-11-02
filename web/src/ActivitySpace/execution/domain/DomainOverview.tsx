@@ -1,5 +1,6 @@
 'use client';
 
+import { IslandHeader } from '@/Function/shared/MainIsland';
 import { useDomainOverview } from '@/hooks/useDomainOverview';
 import { useBoard, WidgetSurface, WidgetZone, WidgetActionSlotProvider, WidgetActionSlotTarget, type WidgetHost } from '@/Function/widget';
 import { DOMAIN_OVERVIEW_BOARD } from '@/Function/widget/defaults';
@@ -41,14 +42,11 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
     onViewChange,
   };
   return <WidgetActionSlotProvider><div className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
-    <header className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
-      <DomainIcon size={14} />
-      <span className="truncate text-xs font-semibold">{domain.name}</span>
-      <div className="flex-1" />
+    <IslandHeader crumbs={[{ id: 'domain', label: domain.name }]} actions={<>
       {viewOnly && <ViewOnlyBadge />}
       {/* "Add widget" is page chrome: it sits in the header, as on Element detail. */}
       <WidgetActionSlotTarget className="flex items-center gap-1" />
-    </header>
+    </>} />
     <div className="min-h-0 flex-1 overflow-y-auto">
       <PageLayout rail={
         <RailCard title={t('Properties')}>

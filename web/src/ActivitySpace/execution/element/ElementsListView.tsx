@@ -696,7 +696,7 @@ function ElementsHierarchyHeader({
   onDomainClick?: () => void;
 }) {
   return (
-    <div className="h-[50px] flex items-center gap-1 pl-6 pr-4 border-b border-border/60 bg-card flex-shrink-0">
+    <div className="h-[50px] flex flex-shrink-0 items-center gap-1 bg-card pl-6 pr-2">
       <button
         type="button"
         onClick={onDomainClick}

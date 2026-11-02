@@ -1,5 +1,6 @@
 'use client';
 
+import { IslandHeader } from '@/Function/shared/MainIsland';
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -160,14 +161,12 @@ export function StrategyShell({
 
   return (
     <div className="flex flex-col h-full bg-card">
-      <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-        <NavStrategyIcon size={14} />
-        <span className="text-[13px] font-medium text-foreground">{t('Initiatives')}</span>
+      <IslandHeader crumbs={[{ id: 'initiatives', label: t('Initiatives') }]} actions={
         <ButtonAppearanceProvider appearance="navigation">
-          <Button variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={() => setNewOpen(true)}>
+          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setNewOpen(true)}>
             <Plus size={14} />{t('Add Initiative')}</Button>
         </ButtonAppearanceProvider>
-      </div>
+      } />
 
       <div className="flex-1 overflow-hidden">
         {loading ? null : inVision.length === 0 && unplaced.length === 0 ? (
@@ -745,7 +744,8 @@ function StrategyDetailView({
     />
     <WidgetActionSlotProvider>
     <div ref={rootRef} className="flex-1 flex flex-col overflow-hidden bg-card h-full">
-      <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
+      {/* Drawn as the shared IslandHeader is (Function/shared/MainIsland). */}
+      <div className="h-[50px] flex flex-shrink-0 items-center gap-1 bg-card pl-6 pr-2">
         <button
           type="button"
           onClick={onBack}
@@ -754,7 +754,7 @@ function StrategyDetailView({
           {t('Initiative')}
         </button>
         <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
-        <span className="px-1.5 py-0.5 text-[13px] font-medium text-foreground truncate max-w-[240px]">
+        <span className="px-1.5 py-0.5 text-[13px] font-semibold text-foreground truncate max-w-[240px]">
           {strategy.name}
         </span>
         {/* Beside the name, as on an Object: move it, or delete it. */}

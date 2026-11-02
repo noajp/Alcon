@@ -28,7 +28,7 @@ export function IndexList({ headers, showHeader = true, withActions = false, chi
   return (
     <div className="px-2 pb-2 pt-2">
       {showHeader && (
-        <div className={`sticky top-0 z-10 grid ${COLUMNS} gap-3 bg-card px-4 py-2 text-[13px] font-normal text-muted-foreground ${withActions ? 'mr-7' : ''}`}>
+        <div className={`sticky top-0 z-10 grid ${COLUMNS} gap-3 bg-card py-2.5 pl-[22px] pr-4 text-[13px] font-normal text-muted-foreground ${withActions ? 'mr-7' : ''}`}>
           <span>{headers[0]}</span>
           <span>{headers[1]}</span>
           <span className="text-right">{headers[2]}</span>
@@ -56,15 +56,15 @@ export function IndexRow({ icon, name, description, health, count, onOpen, inden
   /** After the card — a "…" that shows while the row is hovered or its menu is open. */
   actions?: ReactNode;
 }) {
-  const card = `grid min-h-11 min-w-0 flex-1 ${COLUMNS} items-center gap-3 rounded-md px-4 py-2.5 text-left transition-colors`;
+  const card = `grid min-h-11 min-w-0 flex-1 ${COLUMNS} items-center gap-3 rounded-md py-2.5 pl-[22px] pr-4 text-left transition-colors`;
   const content = (
     <>
       <div className="flex min-w-0 items-center gap-2">
         <span className="shrink-0 text-muted-foreground">{icon}</span>
         {renameField ?? (
           <>
-            <span className="truncate text-[15px] font-medium text-foreground">{name}</span>
-            {description && <span className="hidden min-w-0 truncate text-[14px] font-normal text-muted-foreground sm:inline">{description}</span>}
+            <span className="truncate text-[14px] font-medium text-foreground">{name}</span>
+            {description && <span className="hidden min-w-0 truncate text-[13px] font-normal text-muted-foreground sm:inline">{description}</span>}
           </>
         )}
       </div>

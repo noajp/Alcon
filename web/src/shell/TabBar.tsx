@@ -108,7 +108,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
   };
 
   return (
-    <div className="flex items-center gap-1.5 px-4 py-2 bg-transparent">
+    <div className="flex items-center gap-1.5 py-2 pl-[19px] pr-4 bg-transparent">
       {/* Tabs — a quiet strip, folded into one menu when they do not fit */}
       <CollapsingTabs
         menuLabel={t('Views')}
