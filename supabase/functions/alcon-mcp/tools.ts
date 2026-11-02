@@ -4,6 +4,7 @@ import {
   EXTERNAL_READ_TOOLS, EXTERNAL_WRITE_TOOLS, externalToolDefs, isReadTool, runExternalTool,
 } from "../_shared/externalTools.ts";
 import type { CallerAccess } from "../_shared/callerAuth.ts";
+import type { CallerNotifier } from "../_shared/agentReportTools.ts";
 import type { McpTool, ToolHost } from "./protocol.ts";
 
 // The tools an external AI is offered over MCP: the outside-caller allowlist
@@ -39,11 +40,16 @@ export function mcpTools(access: CallerAccess = "read_write"): McpTool[] {
   return externalToolDefs(access).map(toMcp);
 }
 
-export function mcpHost(supabase: SupabaseClient, actor: BoardActor, access: CallerAccess = "read_write"): ToolHost {
+export function mcpHost(
+  supabase: SupabaseClient,
+  actor: BoardActor,
+  access: CallerAccess = "read_write",
+  notify?: CallerNotifier,
+): ToolHost {
   return {
     tools: mcpTools(access),
     // protocol.ts already refuses tools that are not listed; runExternalTool
     // keeps a read-only host read-only even if called directly.
-    call: (name, args) => runExternalTool(supabase, name, args, actor, access),
+    call: (name, args) => runExternalTool(supabase, name, args, actor, access, notify),
   };
 }

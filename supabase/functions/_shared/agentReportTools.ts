@@ -90,6 +90,32 @@ export function isAgentReportTool(name: string): boolean {
 
 export type Outcome = "completed" | "partial" | "blocked";
 
+/** A notification to the person who connected the caller (whoever builds the notifier fixes the recipient). */
+export interface CallerNotice {
+  actorName: string;
+  elementId: string;
+  title: string;
+  body: string;
+}
+export type CallerNotifier = (notice: CallerNotice) => Promise<void>;
+
+/**
+ * Pure. What the connecting person is told when their agent closes work. The
+ * triggers that notify on the comment and the status skip the actor — that
+ * person — so without this, an Element they alone are assigned to would tell
+ * nobody that it needs them.
+ */
+export function outcomeNotice(
+  actorName: string,
+  outcome: Outcome,
+  el: { id: string; display_id?: string | null; title?: string | null },
+  summary: string,
+): CallerNotice {
+  const label = outcome === "blocked" ? "対応が必要です" : outcome === "completed" ? "完了報告" : "途中報告";
+  const name = [el.display_id, el.title].filter(Boolean).join(" ") || "Element";
+  return { actorName, elementId: el.id, title: `${actorName}: ${label}`, body: `${name} — ${summary}`.slice(0, 200) };
+}
+
 const SESSION_UNSAFE = /[^A-Za-z0-9._-]/g;
 
 /**
@@ -155,6 +181,7 @@ export async function runAgentReportTool(
   name: string,
   input: Record<string, unknown>,
   actor: BoardActor,
+  notify?: CallerNotifier,
 ): Promise<ToolResult> {
   try {
     const id = await resolveElementId(supabase, String(input.elementId ?? ""));
@@ -201,8 +228,9 @@ export async function runAgentReportTool(
 
         // The status moves first, so the comment's notification lands on an
         // Element that already shows where the work went.
-        const { data: el } = await supabase.from("elements").select("status").eq("id", id).maybeSingle();
-        const next = outcomeStatus(outcome, (el as { status?: string | null } | null)?.status ?? null);
+        const { data: elRow } = await supabase.from("elements").select("status, display_id, title").eq("id", id).maybeSingle();
+        const el = elRow as { status?: string | null; display_id?: string | null; title?: string | null } | null;
+        const next = outcomeStatus(outcome, el?.status ?? null);
         if (next) {
           const moved = await runBoardTool(supabase, "updateElement", { id, status: next }, actor);
           if (!moved.ok) return moved;
@@ -210,6 +238,11 @@ export async function runAgentReportTool(
         const posted = await runBoardTool(supabase, "addElementComment", { elementId: id, body: outcomeComment(outcome, summary, message) }, actor);
         if (!posted.ok) return posted;
         const released = await releaseIfHeld(supabase, id, holder);
+        // A failed notification does not undo a report that already landed.
+        if (notify) {
+          await notify(outcomeNotice(actor.agent, outcome, { id, display_id: el?.display_id, title: el?.title }, summary))
+            .catch((e) => console.error("caller notification failed:", errorMessage(e)));
+        }
         return { ok: true, data: { comment: posted.data, status: next, released }, meta: { rows: 1 } };
       }
     }

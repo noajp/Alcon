@@ -4,7 +4,7 @@ const report = await import(new URL('../../supabase/functions/_shared/agentRepor
 const { mcpTools } = await import(new URL('../../supabase/functions/alcon-mcp/tools.ts', import.meta.url).pathname);
 const { runExternalTool } = await import(new URL('../../supabase/functions/_shared/externalTools.ts', import.meta.url).pathname);
 
-const { leaseHolder, progressComment, outcomeComment, outcomeStatus, sanitizeBranch, runAgentReportTool, AGENT_REPORT_TOOL_NAMES } = report;
+const { leaseHolder, progressComment, outcomeComment, outcomeNotice, outcomeStatus, sanitizeBranch, runAgentReportTool, AGENT_REPORT_TOOL_NAMES } = report;
 
 const UUID = '93fb2fb0-a7a1-434e-9211-af4db709a247';
 const USER = '1a2b3c4d-0000-0000-0000-000000000000';
@@ -151,12 +151,33 @@ describe('runAgentReportTool', () => {
     const holder = leaseHolder(actor, 's1');
     const tables = { elements: [{ id: UUID, display_id: 'ELE_PLT-003', status: 'in_progress', claimed_by: holder, claim_expires_at: new Date(Date.now() + 60_000).toISOString(), branch: 'b' }] };
     const { db, writes } = fakeDb(tables);
-    const res = await runAgentReportTool(db, 'reportOutcome', { elementId: UUID, outcome: 'blocked', summary: '判断が要る', message: 'A か B か', session: 's1' }, actor);
+    const notices: unknown[] = [];
+    const notify = async (n: unknown) => { notices.push(n); };
+    const res = await runAgentReportTool(db, 'reportOutcome', { elementId: UUID, outcome: 'blocked', summary: '判断が要る', message: 'A か B か', session: 's1' }, actor, notify);
     expect(res).toMatchObject({ ok: true, data: { status: 'blocked', released: true } });
+    // The triggers skip the actor, so the connecting person is told directly.
+    expect(notices).toEqual([{ actorName: actor.agent, elementId: UUID, title: `${actor.agent}: 対応が必要です`, body: 'ELE_PLT-003 — 判断が要る' }]);
     expect(writes.find(w => w.table === 'elements')!.row).toMatchObject({ status: 'blocked' });
     expect(writes.find(w => w.table === 'element_activity')!.row).toMatchObject({ detail: `Updated status — via ${actor.agent}` });
     expect(writes.find(w => w.table === 'element_comments')!.row).toMatchObject({ content: '**対応が必要です** — 判断が要る\n\nA か B か' });
     expect(tables.elements[0]).toMatchObject({ claimed_by: null, branch: null });
+  });
+
+  it('tells the connecting person about completed work, and keeps the report when telling fails', async () => {
+    const { db, writes } = fakeDb({ elements: [{ id: UUID, display_id: 'ELE_PLT-003', title: '請求書の照合', status: 'in_progress' }] });
+    const failing = async () => { throw new Error('down'); };
+    const res = await runAgentReportTool(db, 'reportOutcome', { elementId: UUID, outcome: 'completed', summary: '照合済み', message: '根拠: 120 件一致' }, actor, failing);
+    expect(res).toMatchObject({ ok: true, data: { status: 'review', released: false } });
+    expect(writes.some(w => w.table === 'element_comments')).toBe(true);
+    expect(outcomeNotice('X (MCP)', 'completed', { id: UUID, display_id: 'ELE_PLT-003', title: '請求書の照合' }, '照合済み'))
+      .toEqual({ actorName: 'X (MCP)', elementId: UUID, title: 'X (MCP): 完了報告', body: 'ELE_PLT-003 請求書の照合 — 照合済み' });
+  });
+
+  it('sends no notification for a refused report', async () => {
+    const { db } = fakeDb({ elements: [{ id: UUID, display_id: 'ELE_PLT-003', status: 'todo' }] });
+    const notices: unknown[] = [];
+    await runAgentReportTool(db, 'reportOutcome', { elementId: UUID, outcome: 'blocked', summary: '', message: 'm' }, actor, async (n: unknown) => { notices.push(n); });
+    expect(notices).toEqual([]);
   });
 
   it('refuses an unknown outcome and an Element the caller cannot see', async () => {
