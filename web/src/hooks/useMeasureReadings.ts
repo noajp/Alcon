@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import type { IntentMeasureReading } from '@/types/database';
 
 /** How many readings the history shows; older ones stay in the table. */
-export const MEASURE_READINGS_LIMIT = 50;
+const MEASURE_READINGS_LIMIT = 50;
 
 /**
  * The reading history of one success condition, newest first. The database
