@@ -16,6 +16,7 @@ const WIDGET_MESSAGES: Record<string, Row> = {
   'Milestone name': ['マイルストーン名', '마일스톤 이름', 'Nom du jalon', 'Nombre del hito'],
   'Milestone date': ['マイルストーンの日付', '마일스톤 날짜', 'Date du jalon', 'Fecha del hito'],
   'Milestone actions': ['マイルストーンの操作', '마일스톤 작업', 'Actions du jalon', 'Acciones del hito'],
+  'Could not load milestones.': ['マイルストーンを読み込めませんでした。', '마일스톤을 불러오지 못했습니다.', 'Impossible de charger les jalons.', 'No se pudieron cargar los hitos.'],
   'Could not save the milestone.': ['マイルストーンを保存できませんでした。', '마일스톤을 저장하지 못했습니다.', 'Impossible d’enregistrer le jalon.', 'No se pudo guardar el hito.'],
   'You do not have permission to change this milestone.': ['このマイルストーンを変更する権限がありません。', '이 마일스톤을 변경할 권한이 없습니다.', 'Vous n’avez pas l’autorisation de modifier ce jalon.', 'No tienes permiso para cambiar este hito.'],
   '+{n} more': ['ほか {n} 件', '외 {n}건', '+{n} de plus', '+{n} más'],

@@ -51,7 +51,10 @@ export function useObjectMilestones(objectIds: string[]) {
 //
 // Every cached id set holding the Object is patched first, so the widget and
 // the Gantt's ◇ move together, then the server's answer replaces the guess.
-// On failure the snapshot comes back and the error is thrown to the caller.
+// In-flight reads are cancelled first so a stale answer cannot land on top of
+// the patch. On failure the snapshot comes back, the cache is still refetched
+// (a write that landed meanwhile must not be rolled back with it), and the
+// error is thrown to the caller.
 //
 // RLS hides rows the writer may not touch instead of refusing them: an update
 // or delete that matched nothing would otherwise "succeed" and the change
@@ -59,8 +62,9 @@ export function useObjectMilestones(objectIds: string[]) {
 
 type Snapshot = Array<[QueryKey, ObjectMilestone[] | undefined]>;
 
-function patchMilestones(objectId: string, patch: (rows: ObjectMilestone[]) => ObjectMilestone[]): Snapshot {
+async function patchMilestones(objectId: string, patch: (rows: ObjectMilestone[]) => ObjectMilestone[]): Promise<Snapshot> {
   const qc = getQueryClient();
+  await qc.cancelQueries({ queryKey: OBJECT_MILESTONES_QUERY_PREFIX });
   const snapshot = qc.getQueriesData<ObjectMilestone[]>({ queryKey: OBJECT_MILESTONES_QUERY_PREFIX });
   for (const [key, rows] of snapshot) {
     const ids = String(key[1] ?? '').split(',');
@@ -73,6 +77,7 @@ function patchMilestones(objectId: string, patch: (rows: ObjectMilestone[]) => O
 function restore(snapshot: Snapshot) {
   const qc = getQueryClient();
   for (const [key, rows] of snapshot) qc.setQueryData(key, rows);
+  invalidateMilestones();
 }
 
 function invalidateMilestones() {
@@ -91,7 +96,7 @@ export async function createObjectMilestone(input: ObjectMilestoneInsert): Promi
   const draft: ObjectMilestone = {
     id, object_id: input.object_id, date: input.date, label: input.label ?? null, created_at: now, updated_at: now,
   };
-  const snapshot = patchMilestones(input.object_id, rows => [...rows, draft].sort(byDate));
+  const snapshot = await patchMilestones(input.object_id, rows => [...rows, draft].sort(byDate));
   const { data, error } = await supabase
     .from('object_milestones')
     .insert({ ...input, id })
@@ -109,7 +114,7 @@ export async function updateObjectMilestone(
   milestone: Pick<ObjectMilestone, 'id' | 'object_id'>,
   updates: ObjectMilestoneUpdate,
 ): Promise<ObjectMilestone> {
-  const snapshot = patchMilestones(milestone.object_id, rows =>
+  const snapshot = await patchMilestones(milestone.object_id, rows =>
     rows.map(r => (r.id === milestone.id ? { ...r, ...updates } : r)).sort(byDate));
   const { data, error } = await supabase
     .from('object_milestones')
@@ -125,7 +130,7 @@ export async function updateObjectMilestone(
 }
 
 export async function deleteObjectMilestone(milestone: Pick<ObjectMilestone, 'id' | 'object_id'>): Promise<void> {
-  const snapshot = patchMilestones(milestone.object_id, rows => rows.filter(r => r.id !== milestone.id));
+  const snapshot = await patchMilestones(milestone.object_id, rows => rows.filter(r => r.id !== milestone.id));
   const { data, error } = await supabase
     .from('object_milestones')
     .delete()

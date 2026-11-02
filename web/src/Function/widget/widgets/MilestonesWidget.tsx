@@ -43,7 +43,7 @@ function scopeObjects(host: WidgetProps['host']): { ids: string[]; names: Map<st
 export function MilestonesWidget({ host }: WidgetProps) {
   const { t, locale } = useI18n();
   const { ids, names } = useMemo(() => scopeObjects(host), [host]);
-  const { data: milestones, loading } = useObjectMilestones(ids);
+  const { data: milestones, loading, error: loadError } = useObjectMilestones(ids);
   const objectId = host.subject.kind === 'object' ? host.subject.id : null;
   const editable = !!objectId && !host.readOnly;
 
@@ -57,8 +57,10 @@ export function MilestonesWidget({ host }: WidgetProps) {
   };
 
   useWidgetMeta(milestones.length > 0 ? String(milestones.length) : null);
-  // Read-only boards hide an empty widget; an Object's keeps its `+`.
-  useWidgetEmpty(!editable && !loading && milestones.length === 0);
+  // Read-only boards hide an empty widget; an Object's keeps its `+`. A read
+  // that failed is not "no milestones", so it stays visible and says so.
+  const empty = !loading && !loadError && milestones.length === 0;
+  useWidgetEmpty(!editable && empty);
 
   const grouped = milestones.reduce<Array<[string, ObjectMilestone[]]>>((acc, m) => {
     const key = (parseDateOnly(m.date) ?? new Date()).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
@@ -78,6 +80,7 @@ export function MilestonesWidget({ host }: WidgetProps) {
         </WidgetHeaderAction>
       )}
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+      {loadError && <p role="alert" className="text-xs text-destructive">{t('Could not load milestones.')}</p>}
       {adding && objectId && (
         <MilestoneComposer
           onCancel={() => setAdding(false)}
@@ -87,7 +90,7 @@ export function MilestonesWidget({ host }: WidgetProps) {
           }}
         />
       )}
-      {editable && !adding && !loading && milestones.length === 0 && (
+      {editable && !adding && empty && (
         <p className="text-[12px] text-muted-foreground">{t('No milestones yet.')}</p>
       )}
       {grouped.map(([month, items]) => (
@@ -179,7 +182,12 @@ function MilestoneComposer({ onSubmit, onCancel }: { onSubmit: (label: string | 
     <form
       className="flex items-center gap-2"
       onSubmit={(e) => { e.preventDefault(); submit(); }}
-      onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); onCancel(); } }}
+      onKeyDown={(e) => {
+        // The date picker renders in a portal, but React still bubbles its
+        // keys here: its Escape closes the picker, not the new milestone.
+        if (!e.currentTarget.contains(e.target as Node)) return;
+        if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+      }}
     >
       <Diamond size={12} className="shrink-0 text-[var(--status-danger)]" />
       <Input
