@@ -61,6 +61,9 @@ import {
   WidgetActionSlotProvider,
   WidgetActionSlotTarget,
   INITIATIVE_BOARD,
+  INITIATIVE_PLAN_BOARD,
+  INITIATIVE_AUDIT_BOARD,
+  type BoardLayout,
   type WidgetHost,
   type Zone,
 } from '@/Function/widget';
@@ -78,8 +81,33 @@ import { resolveVision, useVisions } from '@/hooks/visionData';
 import { initiativesOfVision, inSpace } from '@/ActivitySpace/strategy/portfolio/portfolioGroups';
 import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 
-/** A Initiative page has a band and one column of readings; no side rail. */
-const INITIATIVE_ZONES: Zone[] = ['band', 'main'];
+/** The Overview tab has a band and one column of readings; the other boards
+ *  one column; none has a side rail. */
+const OVERVIEW_ZONES: Zone[] = ['band', 'main'];
+const MAIN_ZONES: Zone[] = ['main'];
+
+type InitiativeTab = 'overview' | 'plan' | 'execution' | 'audit';
+const INITIATIVE_TABS: { id: InitiativeTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'plan', label: 'Plan' },
+  { id: 'execution', label: 'Execute' },
+  { id: 'audit', label: 'Evaluate' },
+];
+
+/** One tab's widget board. Each tab keeps its own board, so a widget placed
+ *  on Plan stays on Plan. The Overview's surface key stays 'campaign' — it is
+ *  the persisted boards.surface, not a display string. */
+function InitiativeBoard({ surface, defaults, subjectId, host, zones, children }: {
+  surface: string;
+  defaults: BoardLayout;
+  subjectId: string;
+  host: WidgetHost;
+  zones: Zone[];
+  children: React.ReactNode;
+}) {
+  const board = useBoard(surface, defaults, subjectId);
+  return <WidgetSurface board={board} host={host} zones={zones} className="space-y-5">{children}</WidgetSurface>;
+}
 
 // =============================================================
 // StrategyShell — the Strategy layer's "Initiative" app (code keeps the
@@ -496,9 +524,10 @@ function StrategyDetailView({
     return allObjects.filter((o) => scope.has(o.id)).flatMap((o) => o.elements ?? []);
   }, [allObjects, strategy.objectIds]);
 
-  // Surface key stays 'campaign' — it is the persisted boards.surface, not a
-  // display string. Renaming it would orphan every board saved under it.
-  const board = useBoard('campaign', INITIATIVE_BOARD, strategy.id);
+  // Another Initiative opens on its Overview.
+  const [tab, setTab] = useState<InitiativeTab>('overview');
+  const [tabFor, setTabFor] = useState(strategy.id);
+  if (tabFor !== strategy.id) { setTabFor(strategy.id); setTab('overview'); }
   const host = useMemo<WidgetHost>(
     () => ({
       subject: { kind: 'initiative', id: strategy.id },
@@ -799,7 +828,7 @@ function StrategyDetailView({
         {/* The Intent read is mounted here, above the board, because the
             three sections that use it must share one — see InitiativeIntent. */}
         <InitiativeIntentProvider key={strategy.id} initiativeId={strategy.id} initiativeName={strategy.name} createdBy={strategy.created_by}>
-        <WidgetSurface board={board} host={host} zones={INITIATIVE_ZONES} className="space-y-5">
+        <div className="space-y-5">
           <div>
             <PageIcon><NavStrategyIcon size={18} /></PageIcon>
             <textarea
@@ -826,9 +855,6 @@ function StrategyDetailView({
               className={`w-full bg-transparent border-none resize-none overflow-hidden ${PAGE_TITLE}`}
               style={PAGE_TITLE_WEIGHT}
             />
-            {/* Band — how it is going, right under the name (a progress line
-                by default), before the sections below are read. */}
-            <WidgetZone zone="band" className="mt-3" />
           </div>
           <textarea
             ref={descriptionRef}
@@ -851,245 +877,270 @@ function StrategyDetailView({
             className="w-full text-[14px] text-[var(--text-secondary)] leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
           />
 
-          {/* The board. Everything a Initiative says about itself that is not
-              its own structure lives here: the readings taken off the
-              execution (Situation, Risk) and the sections someone writes by
-              hand (Measures, Assumptions, Decisions). The sections below this
-              — nested Initiatives, Objects, Activity — are how the Initiative is
-              composed rather than how it is going, so they stay the page's
-              spine and are not placeable. Frameworks used to sit among them;
-              it is two widgets now (OKR, Gap analysis), because a framework is
-              a reading of the board rather than a part of it. */}
-          <WidgetZone zone="main" columns={1} />
+          {/* One Initiative, four readings: how it is going (Overview), what
+              the plan rests on (Plan), the work carrying it out (Execute),
+              and the evidence it is judged on (Evaluate). */}
+          <div role="tablist" aria-label={t('Initiative views')} className="flex items-center gap-1 border-b border-border/60 pb-2">
+            {INITIATIVE_TABS.map((v) => (
+              <Button key={v.id} shape="tab" role="tab" aria-selected={tab === v.id}
+                variant={tab === v.id ? 'secondary' : 'ghost'} onClick={() => setTab(v.id)}>
+                {t(v.label)}
+              </Button>
+            ))}
+          </div>
 
-          {/* Nested Initiatives. With none, the section keeps no heading — only
-              its "+ verb", like every concept page. */}
-          {childStrategies.length > 0 || childPickerOpen ? (
-            <PageSection title={t('Initiatives')} action={canEdit ? (
-              <ButtonAppearanceProvider appearance="navigation">
+          {tab === 'overview' && (
+            <InitiativeBoard surface="campaign" defaults={INITIATIVE_BOARD} subjectId={strategy.id} host={host} zones={OVERVIEW_ZONES}>
+              {/* Band — how it is going (a progress line by default), before
+                  the readings below. */}
+              <WidgetZone zone="band" />
+              {/* Whether it lands, where it hurts, the conditions it is held
+                  to and the frameworks that read them back. */}
+              <WidgetZone zone="main" columns={1} />
+            </InitiativeBoard>
+          )}
+
+          {tab === 'plan' && (
+            <InitiativeBoard surface="initiative-plan" defaults={INITIATIVE_PLAN_BOARD} subjectId={strategy.id} host={host} zones={MAIN_ZONES}>
+              {/* What the plan rests on and what was chosen on top of it. */}
+              <WidgetZone zone="main" columns={1} />
+            {/* Nested Initiatives. With none, the section keeps no heading — only
+                its "+ verb", like every concept page. */}
+            {childStrategies.length > 0 || childPickerOpen ? (
+              <PageSection title={t('Initiatives')} action={canEdit ? (
+                <ButtonAppearanceProvider appearance="navigation">
+                  {nestedMenu(
+                    <Button variant="ghost" size="icon-xs" aria-label={t('Add nested Initiative')} className="text-muted-foreground">
+                      <Plus size={13} />
+                    </Button>,
+                  )}
+                </ButtonAppearanceProvider>
+              ) : undefined}>
+                {childStrategies.map((child) => {
+                  const n = countObjects(child.objectIds);
+                  return (
+                    <ContentRow key={child.id} icon={<NavStrategyIcon size={13} />} name={child.name}
+                      onOpen={() => onOpenStrategy(child.id)}
+                      meta={<span>{n === 1 ? t('1 Object') : t('{n} Objects', { n })}</span>}
+                      actions={canEdit ? (
+                        <ContentRowAction label={t('Remove {name} from this Initiative', { name: child.name })} onClick={() => void unlinkChild(child.id)}>
+                          <X size={12} />
+                        </ContentRowAction>
+                      ) : undefined} />
+                  );
+                })}
+
+                {childPickerOpen && (
+                  <div className="mt-1">
+                    <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-1">
+                      <Search size={12} className="text-muted-foreground" />
+                      <input
+                        value={childQuery}
+                        onChange={(e) => setChildQuery(e.target.value)}
+                        placeholder={t('Search Initiatives…')}
+                        className="flex-1 bg-transparent text-[13px] outline-none"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setChildPickerOpen(false); setChildQuery(''); }}
+                        aria-label={t('Close')}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                    <div className="max-h-72 overflow-auto">
+                      {childCandidates.length === 0 && (
+                        <div className="px-3 py-3 text-[12px] text-muted-foreground">
+                          {t('No Initiatives match.')}
+                        </div>
+                      )}
+                      {childCandidates.map((s) => (
+                        <button
+                          type="button"
+                          key={s.id}
+                          disabled={linkingChildId === s.id}
+                          onClick={() => linkChild(s.id)}
+                          className="w-full flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] hover:bg-muted/40 text-left disabled:opacity-50"
+                        >
+                          <NavStrategyIcon size={11} />
+                          <span className="flex-1 truncate text-foreground">{s.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </PageSection>
+            ) : canEdit ? (
+              <ButtonAppearanceProvider appearance="inline">
                 {nestedMenu(
-                  <Button variant="ghost" size="icon-xs" aria-label={t('Add nested Initiative')} className="text-muted-foreground">
-                    <Plus size={13} />
+                  <Button variant="ghost" size="sm" align="start" className="-ml-2 self-start">
+                    <Plus size={13} strokeWidth={2.5} />{t('Add nested Initiative')}
                   </Button>,
                 )}
               </ButtonAppearanceProvider>
-            ) : undefined}>
-              {childStrategies.map((child) => {
-                const n = countObjects(child.objectIds);
-                return (
-                  <ContentRow key={child.id} icon={<NavStrategyIcon size={13} />} name={child.name}
-                    onOpen={() => onOpenStrategy(child.id)}
-                    meta={<span>{n === 1 ? t('1 Object') : t('{n} Objects', { n })}</span>}
-                    actions={canEdit ? (
-                      <ContentRowAction label={t('Remove {name} from this Initiative', { name: child.name })} onClick={() => void unlinkChild(child.id)}>
-                        <X size={12} />
-                      </ContentRowAction>
-                    ) : undefined} />
-                );
-              })}
+            ) : null}
+            </InitiativeBoard>
+          )}
 
-              {childPickerOpen && (
-                <div className="mt-1">
+          {tab === 'execution' && (
+            <div className="space-y-5">
+            {selectedIds.size > 0 || pickerMode !== 'closed' ? (
+              <PageSection title={t('Objects')} action={canEdit ? (
+                <ButtonAppearanceProvider appearance="navigation">
+                  {objectsMenu(
+                    <Button variant="ghost" size="icon-xs" aria-label={t('Add Objects')} className="text-muted-foreground">
+                      <Plus size={13} />
+                    </Button>,
+                  )}
+                </ButtonAppearanceProvider>
+              ) : undefined}>
+              {selectedIds.size > 0 && (
+                <div className="mb-2">
+                  {Array.from(selectedIds).map((id) => {
+                    const obj = allObjects.find((o) => o.id === id);
+                    if (!obj) return null;
+                    const domain = obj.domain_id ? domains.find((d) => d.id === obj.domain_id) : undefined;
+                    const progress = completionOf(obj.elements ?? []).pct;
+                    const editable = canEditObject(myObjects, obj.id);
+                    const canTypes = editable && canManageDomainTypes(myDomainRoles, obj.domain_id);
+                    const why = editable ? undefined : t('Only members of this Object can change it');
+                    return (
+                      <div
+                        key={id}
+                        onClick={() => onOpenObject?.(obj.id, obj.domain_id ?? null)}
+                        // min-h locks the row against the Lead avatar's async
+                        // image swap (Fallback initial -> loaded photo mounts a
+                        // fraction of a px taller and visibly nudged the row).
+                        className={`flex items-center gap-2 px-2 py-1 min-h-[2.375rem] rounded-md hover:bg-muted/40 transition-colors ${onOpenObject ? 'cursor-pointer' : ''}`}
+                      >
+                        <ObjectIcon size={13} className="text-muted-foreground shrink-0" />
+                        <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{obj.name}</span>
+                        {/* The cells already draw read-only when handed no handler;
+                            membership decides whether they get one. */}
+                        <div className="w-20 shrink-0" title={why} onClick={(e) => e.stopPropagation()}>
+                          <TypeCell
+                            value={obj.type ?? null}
+                            types={domain?.object_types ?? []}
+                            onChange={editable ? (type) => handleObjectUpdate(obj.id, { type }) : undefined}
+                            onAddType={canTypes && obj.domain_id ? (name) => handleAddType(obj.domain_id as string, name) : undefined}
+                          />
+                        </div>
+                        <div className="w-24 shrink-0" title={why} onClick={(e) => e.stopPropagation()}>
+                          <DueDateCell obj={obj} onObjectUpdate={editable ? handleObjectUpdate : undefined} />
+                        </div>
+                        <div className="w-28 shrink-0" title={why} onClick={(e) => e.stopPropagation()}>
+                          <LeadCell obj={obj} workers={workers} onObjectUpdate={editable ? handleObjectUpdate : undefined} />
+                        </div>
+                        <div className="w-24 shrink-0 flex items-center gap-1.5">
+                          <SegmentedProgress value={progress} className="flex-1" />
+                          <span className="text-[10px] text-muted-foreground w-7 text-right tabular-nums shrink-0">{progress}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {pickerMode === 'search' && (
+                <>
                   <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-1">
                     <Search size={12} className="text-muted-foreground" />
                     <input
-                      value={childQuery}
-                      onChange={(e) => setChildQuery(e.target.value)}
-                      placeholder={t('Search Initiatives…')}
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder={t('Search Objects across Domains…')}
                       className="flex-1 bg-transparent text-[13px] outline-none"
                       autoFocus
                     />
                     <button
                       type="button"
-                      onClick={() => { setChildPickerOpen(false); setChildQuery(''); }}
+                      onClick={closePicker}
                       aria-label={t('Close')}
                       className="text-muted-foreground hover:text-foreground"
                     >
                       <X size={12} />
                     </button>
                   </div>
-                  <div className="max-h-72 overflow-auto">
-                    {childCandidates.length === 0 && (
-                      <div className="px-3 py-3 text-[12px] text-muted-foreground">
-                        {t('No Initiatives match.')}
-                      </div>
-                    )}
-                    {childCandidates.map((s) => (
-                      <button
-                        type="button"
-                        key={s.id}
-                        disabled={linkingChildId === s.id}
-                        onClick={() => linkChild(s.id)}
-                        className="w-full flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] hover:bg-muted/40 text-left disabled:opacity-50"
-                      >
-                        <NavStrategyIcon size={11} />
-                        <span className="flex-1 truncate text-foreground">{s.name}</span>
-                      </button>
-                    ))}
+                  <div className="max-h-[420px] overflow-auto">
+                    <ObjectPickerList grouped={grouped} selectedIds={selectedIds} onToggle={toggleObject} />
+                  </div>
+                </>
+              )}
+
+              {pickerMode === 'create' && (
+                <div className="space-y-2 py-1">
+                  <input
+                    value={newObjectName}
+                    onChange={(e) => setNewObjectName(e.target.value)}
+                    placeholder={t('Object name')}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (isCommitEnter(e)) {
+                        e.preventDefault();
+                        handleCreateObject();
+                      } else if (isCancelKey(e)) {
+                        e.preventDefault();
+                        closePicker();
+                      }
+                    }}
+                    className="w-full rounded-md bg-transparent px-2 py-1.5 text-[13px] outline-none transition-colors focus:bg-muted/30"
+                  />
+                  {domains.length > 1 && (
+                    <select
+                      value={newObjectDomainId ?? domains[0]?.id ?? ''}
+                      onChange={(e) => setNewObjectDomainId(e.target.value || null)}
+                      aria-label={t('Domain')}
+                      className="w-full bg-muted/30 rounded-md px-2 py-1.5 text-[12px] outline-none border-none"
+                    >
+                      {domains.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  <div className="flex items-center justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={closePicker}>
+                      {t('Cancel')}
+                    </Button>
+                    <Button variant="primary" size="sm" disabled={!newObjectName.trim() || creatingObject} onClick={handleCreateObject}>
+                      {t('Create')}
+                    </Button>
                   </div>
                 </div>
               )}
-            </PageSection>
-          ) : canEdit ? (
-            <ButtonAppearanceProvider appearance="inline">
-              {nestedMenu(
-                <Button variant="ghost" size="sm" align="start" className="-ml-2 self-start">
-                  <Plus size={13} strokeWidth={2.5} />{t('Add nested Initiative')}
-                </Button>,
-              )}
-            </ButtonAppearanceProvider>
-          ) : null}
-
-          {selectedIds.size > 0 || pickerMode !== 'closed' ? (
-            <PageSection title={t('Objects')} action={canEdit ? (
-              <ButtonAppearanceProvider appearance="navigation">
+              </PageSection>
+            ) : canEdit ? (
+              <ButtonAppearanceProvider appearance="inline">
                 {objectsMenu(
-                  <Button variant="ghost" size="icon-xs" aria-label={t('Add Objects')} className="text-muted-foreground">
-                    <Plus size={13} />
+                  <Button variant="ghost" size="sm" align="start" className="-ml-2 self-start">
+                    <Plus size={13} strokeWidth={2.5} />{t('Add Objects')}
                   </Button>,
                 )}
               </ButtonAppearanceProvider>
-            ) : undefined}>
-            {selectedIds.size > 0 && (
-              <div className="mb-2">
-                {Array.from(selectedIds).map((id) => {
-                  const obj = allObjects.find((o) => o.id === id);
-                  if (!obj) return null;
-                  const domain = obj.domain_id ? domains.find((d) => d.id === obj.domain_id) : undefined;
-                  const progress = completionOf(obj.elements ?? []).pct;
-                  const editable = canEditObject(myObjects, obj.id);
-                  const canTypes = editable && canManageDomainTypes(myDomainRoles, obj.domain_id);
-                  const why = editable ? undefined : t('Only members of this Object can change it');
-                  return (
-                    <div
-                      key={id}
-                      onClick={() => onOpenObject?.(obj.id, obj.domain_id ?? null)}
-                      // min-h locks the row against the Lead avatar's async
-                      // image swap (Fallback initial -> loaded photo mounts a
-                      // fraction of a px taller and visibly nudged the row).
-                      className={`flex items-center gap-2 px-2 py-1 min-h-[2.375rem] rounded-md hover:bg-muted/40 transition-colors ${onOpenObject ? 'cursor-pointer' : ''}`}
-                    >
-                      <ObjectIcon size={13} className="text-muted-foreground shrink-0" />
-                      <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{obj.name}</span>
-                      {/* The cells already draw read-only when handed no handler;
-                          membership decides whether they get one. */}
-                      <div className="w-20 shrink-0" title={why} onClick={(e) => e.stopPropagation()}>
-                        <TypeCell
-                          value={obj.type ?? null}
-                          types={domain?.object_types ?? []}
-                          onChange={editable ? (type) => handleObjectUpdate(obj.id, { type }) : undefined}
-                          onAddType={canTypes && obj.domain_id ? (name) => handleAddType(obj.domain_id as string, name) : undefined}
-                        />
-                      </div>
-                      <div className="w-24 shrink-0" title={why} onClick={(e) => e.stopPropagation()}>
-                        <DueDateCell obj={obj} onObjectUpdate={editable ? handleObjectUpdate : undefined} />
-                      </div>
-                      <div className="w-28 shrink-0" title={why} onClick={(e) => e.stopPropagation()}>
-                        <LeadCell obj={obj} workers={workers} onObjectUpdate={editable ? handleObjectUpdate : undefined} />
-                      </div>
-                      <div className="w-24 shrink-0 flex items-center gap-1.5">
-                        <SegmentedProgress value={progress} className="flex-1" />
-                        <span className="text-[10px] text-muted-foreground w-7 text-right tabular-nums shrink-0">{progress}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            ) : null}
 
-            {pickerMode === 'search' && (
-              <>
-                <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-1">
-                  <Search size={12} className="text-muted-foreground" />
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder={t('Search Objects across Domains…')}
-                    className="flex-1 bg-transparent text-[13px] outline-none"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={closePicker}
-                    aria-label={t('Close')}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-                <div className="max-h-[420px] overflow-auto">
-                  <ObjectPickerList grouped={grouped} selectedIds={selectedIds} onToggle={toggleObject} />
-                </div>
-              </>
-            )}
+              {/* What the work under these Objects has shipped as code, read
+                  against this Initiative's intent. */}
+              <InitiativeCodeChanges objects={allObjects.filter((o) => selectedIds.has(o.id))} />
+            </div>
+          )}
 
-            {pickerMode === 'create' && (
-              <div className="space-y-2 py-1">
-                <input
-                  value={newObjectName}
-                  onChange={(e) => setNewObjectName(e.target.value)}
-                  placeholder={t('Object name')}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (isCommitEnter(e)) {
-                      e.preventDefault();
-                      handleCreateObject();
-                    } else if (isCancelKey(e)) {
-                      e.preventDefault();
-                      closePicker();
-                    }
-                  }}
-                  className="w-full rounded-md bg-transparent px-2 py-1.5 text-[13px] outline-none transition-colors focus:bg-muted/30"
+          {tab === 'audit' && (
+            <InitiativeBoard surface="initiative-audit" defaults={INITIATIVE_AUDIT_BOARD} subjectId={strategy.id} host={host} zones={MAIN_ZONES}>
+              {/* The evidence, then the discussion — last, because it grows. */}
+              <WidgetZone zone="main" columns={1} />
+              <PageSection title={t('Activity')}>
+                <StrategyCommentsPanel
+                  strategyId={strategy.id}
+                  strategyName={strategy.name}
+                  strategyOwnerId={strategy.created_by}
+                  workers={workers}
                 />
-                {domains.length > 1 && (
-                  <select
-                    value={newObjectDomainId ?? domains[0]?.id ?? ''}
-                    onChange={(e) => setNewObjectDomainId(e.target.value || null)}
-                    aria-label={t('Domain')}
-                    className="w-full bg-muted/30 rounded-md px-2 py-1.5 text-[12px] outline-none border-none"
-                  >
-                    {domains.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                )}
-                <div className="flex items-center justify-end gap-2">
-                  <Button variant="ghost" size="sm" onClick={closePicker}>
-                    {t('Cancel')}
-                  </Button>
-                  <Button variant="primary" size="sm" disabled={!newObjectName.trim() || creatingObject} onClick={handleCreateObject}>
-                    {t('Create')}
-                  </Button>
-                </div>
-              </div>
-            )}
-            </PageSection>
-          ) : canEdit ? (
-            <ButtonAppearanceProvider appearance="inline">
-              {objectsMenu(
-                <Button variant="ghost" size="sm" align="start" className="-ml-2 self-start">
-                  <Plus size={13} strokeWidth={2.5} />{t('Add Objects')}
-                </Button>,
-              )}
-            </ButtonAppearanceProvider>
-          ) : null}
-
-          {/* What the work under these Objects has shipped as code, read
-              against this Initiative's intent. */}
-          <InitiativeCodeChanges objects={allObjects.filter((o) => selectedIds.has(o.id))} />
-
-          {/* Activity — last, because it accumulates: the sections above are
-              the Initiative's current state and stay a fixed height, while this
-              one grows downward as the Initiative is discussed. */}
-          <PageSection title={t('Activity')}>
-            <StrategyCommentsPanel
-              strategyId={strategy.id}
-              strategyName={strategy.name}
-              strategyOwnerId={strategy.created_by}
-              workers={workers}
-            />
-          </PageSection>
-        </WidgetSurface>
+              </PageSection>
+            </InitiativeBoard>
+          )}
+        </div>
         </InitiativeIntentProvider>
         </div>
       </div>

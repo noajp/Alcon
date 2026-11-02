@@ -3,20 +3,20 @@
 import { useState } from 'react';
 import { Settings } from '@/ui/icons';
 import { Button } from '@/ui/button';
-import { NavStrategyIcon, NavPhaseIcon, NavTimelineIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
+import { NavStrategyIcon, NavPhaseIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { deleteVision, updateVision } from '@/hooks/visionData';
 import type { Vision } from '@/types/database';
 import { SettingsModal } from './SettingsModal';
 import { FONT } from '@/shared/designTokens';
-import { InitiativeJudgementSettings, PhaseDefaultsSettings, TimelineDisplaySettings } from './StrategySettingsPanels';
+import { InitiativeJudgementSettings, PhaseDefaultsSettings } from './StrategySettingsPanels';
 
-type VisionTab = 'general' | 'initiative' | 'phase' | 'timeline';
+type VisionTab = 'general' | 'initiative' | 'phase';
 
 // Opened from a Vision row's "…" in the sidebar — the Strategy counterpart
 // of a Domain's settings modal: the Vision itself (name, delete), then how
-// Initiatives are judged, Phases seeded and the Timeline drawn.
+// Initiatives are judged and Phases seeded.
 export function StrategySettingsModal({ vision, canEdit, onClose, onDeleted }: {
   vision: Vision;
   /** The viewer wrote the Vision or owns the Space — the rule RLS enforces. */
@@ -26,7 +26,7 @@ export function StrategySettingsModal({ vision, canEdit, onClose, onDeleted }: {
 }) {
   const { t } = useI18n();
   const [tab, setTab] = useState<VisionTab>('general');
-  const titles: Record<VisionTab, string> = { general: t('General'), initiative: t('Initiative'), phase: t('Phase'), timeline: t('Timeline') };
+  const titles: Record<VisionTab, string> = { general: t('General'), initiative: t('Initiative'), phase: t('Phase') };
   return (
     <SettingsModal
       mark={<NavVisionIcon size={20} />}
@@ -37,7 +37,6 @@ export function StrategySettingsModal({ vision, canEdit, onClose, onDeleted }: {
         { id: 'general', icon: <Settings size={15} />, title: titles.general, description: t('Name and deletion') },
         { id: 'initiative', icon: <NavStrategyIcon size={15} />, title: titles.initiative, description: t('How Initiatives are judged') },
         { id: 'phase', icon: <NavPhaseIcon size={15} />, title: titles.phase, description: t('How Phases divide time') },
-        { id: 'timeline', icon: <NavTimelineIcon size={15} />, title: titles.timeline, description: t('How the Timeline is drawn') },
       ]}
       active={tab}
       onSelect={(id) => setTab(id as VisionTab)}
@@ -45,8 +44,7 @@ export function StrategySettingsModal({ vision, canEdit, onClose, onDeleted }: {
       <h3 className={`mb-4 ${FONT.lg} text-foreground`}>{titles[tab]}</h3>
       {tab === 'general' ? <VisionGeneral key={vision.id} vision={vision} canEdit={canEdit} onDeleted={onDeleted} />
         : tab === 'initiative' ? <InitiativeJudgementSettings />
-        : tab === 'phase' ? <PhaseDefaultsSettings />
-        : <TimelineDisplaySettings />}
+        : <PhaseDefaultsSettings />}
     </SettingsModal>
   );
 }

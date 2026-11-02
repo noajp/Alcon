@@ -1,17 +1,15 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useDomains, updateDomain } from '@/hooks/useSupabase';
 import type { Domain, DomainPhaseDefaults } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { PHASE_DEFAULTS_MAX } from '@/Function/shared/phaseDefaults';
 import { SlaSettings } from './SlaSettings';
 import { SettingsSection, SettingsRow } from './SettingsSection';
-import { Group, SelectRow, SelectControl, ToggleRow } from './SettingsControls';
-import { useUserPreferences, type UserPreferences } from './useUserPreferences';
-import { TIMELINE_MONTHS_BACK_RANGE, TIMELINE_MONTHS_AHEAD_RANGE } from './preferencesStore';
+import { SelectControl } from './SettingsControls';
 
-// The three Strategy settings panels, shared by Settings > Strategy and the
+// The two Strategy settings panels, shared by Settings > Strategy and the
 // Initiatives row's settings modal.
 
 // ── Initiative — how Initiatives are judged ────────────────────────────
@@ -120,39 +118,6 @@ function DaysInput({ value, max, unit, disabled, onCommit }: {
         }}
         className="w-20 rounded-md bg-muted/40 px-2 py-1 text-right text-[12px] tabular-nums text-foreground placeholder:text-muted-foreground/60 focus:bg-muted/70 disabled:opacity-50" />
       <span className="w-10 text-[11px] text-muted-foreground">{unit}</span>
-    </div>
-  );
-}
-
-// ── Timeline — how the Timeline is drawn (personal) ─────────────────────
-const SCALE_LABEL: Record<UserPreferences['timeline_scale'], string> = { month: 'Month', quarter: 'Quarter' };
-const range = (r: { min: number; max: number }) => Array.from({ length: r.max - r.min + 1 }, (_, i) => String(r.min + i));
-
-export function TimelineDisplaySettings() {
-  const { t } = useI18n();
-  const { preferences, error, savePreference } = useUserPreferences();
-  const backOptions = useMemo(() => range(TIMELINE_MONTHS_BACK_RANGE), []);
-  const aheadOptions = useMemo(() => range(TIMELINE_MONTHS_AHEAD_RANGE), []);
-  return (
-    <div className="space-y-6">
-      {error && <div className="-mt-2 text-[12px] text-destructive">{t("Couldn't save: {error}", { error })}</div>}
-      <Group title={t('Window')}>
-        <SelectRow label={t('Scale')} desc={t('How much of the year one screen shows')}
-          value={SCALE_LABEL[preferences.timeline_scale]} options={Object.values(SCALE_LABEL)}
-          onChange={(label) => savePreference('timeline_scale', label === 'Quarter' ? 'quarter' : 'month')} />
-        <SelectRow label={t('Months back')} desc={t('How far before this month the window starts')}
-          value={String(preferences.timeline_months_back)} options={backOptions}
-          onChange={(v) => savePreference('timeline_months_back', Number(v))} />
-        <SelectRow label={t('Months ahead')} desc={t('How far after this month the window runs')}
-          value={String(preferences.timeline_months_ahead)} options={aheadOptions}
-          onChange={(v) => savePreference('timeline_months_ahead', Number(v))} />
-      </Group>
-      <Group title={t('Marks')}>
-        <ToggleRow label={t('Today marker')} desc={t('A line through today across every row')}
-          value={preferences.timeline_today_marker} onChange={(v) => savePreference('timeline_today_marker', v)} />
-        <ToggleRow label={t('Progress fill')} desc={t('Shade each band by how much of its work is done')}
-          value={preferences.timeline_progress_fill} onChange={(v) => savePreference('timeline_progress_fill', v)} />
-      </Group>
     </div>
   );
 }
