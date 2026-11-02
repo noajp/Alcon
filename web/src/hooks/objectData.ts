@@ -321,10 +321,11 @@ export async function deleteObject(id: string): Promise<void> {
   // another home first when this is their primary one, since the primary row
   // cannot be deleted on its own; sole-parent Elements get hard-deleted along
   // with the Object.
-  const { data: elementRelations } = await supabase
+  const { data: elementRelations, error: relationsError } = await supabase
     .from('element_objects')
     .select('element_id, is_primary')
     .eq('object_id', id);
+  if (relationsError) throw relationsError;
 
   if (elementRelations && elementRelations.length > 0) {
     for (const rel of elementRelations) {
@@ -337,10 +338,11 @@ export async function deleteObject(id: string): Promise<void> {
       // A refused or failed step stops the delete: going on would cascade
       // the Object away with Elements that were meant to stay elsewhere.
       if (otherObjects && otherObjects.length > 0) {
-        const { error: detachError } = rel.is_primary
-          ? await supabase.from('elements').update({ object_id: otherObjects[0].object_id }).eq('id', rel.element_id)
-          : await supabase.from('element_objects').delete().eq('element_id', rel.element_id).eq('object_id', id);
+        const { data: detached, error: detachError } = rel.is_primary
+          ? await supabase.from('elements').update({ object_id: otherObjects[0].object_id }).eq('id', rel.element_id).select('id')
+          : await supabase.from('element_objects').delete().eq('element_id', rel.element_id).eq('object_id', id).select('id');
         if (detachError) throw detachError;
+        if (!detached?.length) throw new Error(translate(DELETE_REFUSED));
       } else {
         const { error: deleteError } = await supabase.from('elements').delete().eq('id', rel.element_id);
         if (deleteError) throw deleteError;
