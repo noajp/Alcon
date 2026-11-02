@@ -5,6 +5,9 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const SURFACE_MESSAGES: Record<string, Row> = {
+  'Could not draw the diagram.': ['図を描けませんでした。', '다이어그램을 그릴 수 없습니다.', 'Impossible de dessiner le diagramme.', 'No se pudo dibujar el diagrama.'],
+  'Could not draw the diagram. Click to edit its source.': ['図を描けませんでした。クリックしてソースを直してください。', '다이어그램을 그릴 수 없습니다. 클릭해 소스를 수정하세요.', 'Impossible de dessiner le diagramme. Cliquez pour modifier sa source.', 'No se pudo dibujar el diagrama. Haz clic para editar su código.'],
+  'Edit the diagram': ['図を編集', '다이어그램 편집', 'Modifier le diagramme', 'Editar el diagrama'],
   // ── Widget names ──────────────────────────────────────────────
   'AI app': ['AI アプリ', 'AI 앱', 'App IA', 'App de IA'],
   'Deck': ['スライド', '슬라이드', 'Présentation', 'Presentación'],

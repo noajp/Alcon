@@ -12,12 +12,14 @@ const md = [
   '```\nconst a = 1;\n```',
   '| a | b |\n| --- | --- |\n| 1 | 2 |',
   '[link](https://example.com) and *em*',
+  '```mermaid\ngraph TD\n  A --> B\n```',
 ].join('\n\n');
 
 describe('markdown ↔ note html', () => {
   it('renders markdown as the note editor’s html, escaping text', () => {
     expect(markdownToHtml('## T\n\na <b>&')).toBe('<h2>T</h2><p>a &lt;b&gt;&amp;</p>');
     expect(markdownToHtml('- x\n- y')).toBe('<ul><li>x</li><li>y</li></ul>');
+    expect(markdownToHtml('```Mermaid\ngraph TD\n```')).toBe('<pre data-lang="mermaid">graph TD</pre>');
   });
 
   it('comes back to the same markdown', () => {

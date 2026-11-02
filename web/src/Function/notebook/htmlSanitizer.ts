@@ -62,6 +62,11 @@ function cleanElement(node: Element, doc: Document): Node | null {
       if (Number.isFinite(v) && v > 1) out.setAttribute(attr, String(v));
     }
   }
+  // A code block's language (a ```mermaid block drawn as its diagram).
+  if (tag === 'pre') {
+    const lang = node.getAttribute('data-lang');
+    if (lang && /^[a-z0-9+#-]{1,20}$/.test(lang)) out.setAttribute('data-lang', lang);
+  }
   // Preserve a column's pixel width (from drag-resize) on <col>.
   if (tag === 'col') {
     const m = node.getAttribute('style')?.match(/width\s*:\s*([\d.]+)px/i);

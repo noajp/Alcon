@@ -16,7 +16,8 @@ export type Block =
   | { t: 'p'; c: Inline[] }
   | { t: 'ul' | 'ol'; items: Inline[][] }
   | { t: 'table'; head: Inline[][]; rows: Inline[][][] }
-  | { t: 'code'; v: string }
+  /** `lang`: the fence's language (```mermaid → 'mermaid'), lower-cased. */
+  | { t: 'code'; v: string; lang?: string }
   | { t: 'quote'; c: Inline[] }
   | { t: 'hr' };
 
@@ -65,11 +66,12 @@ export function parseMarkdown(src: string): Block[] {
     const line = lines[i];
     if (/^```/.test(line)) {
       flushPara();
+      const lang = line.slice(3).trim().toLowerCase().match(/^[a-z0-9+#-]{1,20}/)?.[0];
       const body: string[] = [];
       i++;
       while (i < lines.length && !/^```/.test(lines[i])) body.push(lines[i++]);
       i++;
-      blocks.push({ t: 'code', v: body.join('\n') });
+      blocks.push(lang ? { t: 'code', v: body.join('\n'), lang } : { t: 'code', v: body.join('\n') });
       continue;
     }
     const h = line.match(/^(#{1,6})\s+(.*)$/);

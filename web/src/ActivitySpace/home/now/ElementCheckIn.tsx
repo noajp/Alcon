@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
-import { Loader2 } from '@/ui/icons';
+import { Check, ChevronDown, Loader2 } from '@/ui/icons';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { MenuShell } from '@/Function/shared/menu';
+import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import type { ElementWithDetails } from '@/types/database';
 import { fetchElementWithDetails } from '@/hooks/useSupabase';
 import { useCurrentUserId } from '@/providers/authContext';
@@ -246,22 +249,28 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
     >
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor={`${fieldId}-status`} className={cn(FONT.sm, 'text-muted-foreground')}>{t('Status')}</label>
-        <select
-          id={`${fieldId}-status`}
-          value={selectedStatus ?? ''}
-          disabled={disabled || writeLocked}
-          onChange={event => edit({ status: event.target.value as NonNullable<CheckInDraft['status']> })}
-          className={cn('max-w-full rounded-md bg-transparent px-2 focus:bg-[var(--surface-strong)] disabled:opacity-50', CONTROL.height.md, FONT.base,
-            selectedStatus ? STATUS[selectedStatus].textColor : 'text-muted-foreground')}
-          aria-describedby={base.approvalPending ? `${fieldId}-approval` : undefined}
-        >
-          <option value="" disabled>{t('Not set')}</option>
-          {STATUS_ORDER.map(status => (
-            <option key={status} value={status} disabled={status === 'done' && base.approvalPending}>
-              {t(STATUS[status].label)}
-            </option>
-          ))}
-        </select>
+        {/* The app's own menu, not the system's (which drew its own colours). */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button id={`${fieldId}-status`} type="button" variant="ghost" size="sm" disabled={disabled || writeLocked}
+              aria-describedby={base.approvalPending ? `${fieldId}-approval` : undefined}
+              className={cn(FONT.base, selectedStatus ? 'text-foreground' : 'text-muted-foreground')}>
+              {selectedStatus && <ElementProgressMark status={selectedStatus} size={14} />}
+              {selectedStatus ? t(STATUS[selectedStatus].label) : t('Not set')}
+              <ChevronDown size={13} className="text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <MenuShell as="dropdown" align="start">
+            {STATUS_ORDER.map(status => (
+              <DropdownMenuItem key={status} disabled={status === 'done' && base.approvalPending}
+                onSelect={() => edit({ status: status as NonNullable<CheckInDraft['status']> })}>
+                <ElementProgressMark status={status} size={14} />
+                <span className="flex-1">{t(STATUS[status].label)}</span>
+                {selectedStatus === status && <Check size={13} className="text-muted-foreground" />}
+              </DropdownMenuItem>
+            ))}
+          </MenuShell>
+        </DropdownMenu>
       </div>
 
       {base.approvalPending && (
