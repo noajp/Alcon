@@ -6,6 +6,7 @@ type Row = [ja: string, ko: string, fr: string, es: string];
 
 const STRATEGY_MESSAGES: Record<string, Row> = {
   // Initiative list and page
+  'Some Objects could not be unlinked from this Initiative.': ['一部の Object をこの Initiative から外せませんでした。', '일부 Object를 이 Initiative에서 해제하지 못했습니다.', 'Certains Objects n’ont pas pu être détachés de cette Initiative.', 'Algunos Objects no se pudieron desvincular de esta Initiative.'],
   'Create your first Initiative': ['最初の Initiative を作成', '첫 Initiative 만들기', 'Créez votre première Initiative', 'Crea tu primera Initiative'],
   'An Initiative groups Objects across Domains around one outcome.': ['Initiative は、Domain をまたいで Object を一つの成果のもとにまとめます。', 'Initiative는 Domain을 넘나들며 Object를 하나의 성과 아래 묶습니다.', 'Une Initiative regroupe des Objects de plusieurs Domains autour d’un résultat.', 'Una Initiative agrupa Objects de varios Domains en torno a un resultado.'],
   '{n} stalled': ['{n} 件が停滞', '{n}개 정체', '{n} au point mort', '{n} estancados'],

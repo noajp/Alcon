@@ -4,6 +4,7 @@ import { assembleStrategies } from '@/hooks/initiativeObjects';
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
+import { translate } from '@/Function/i18n/I18nProvider';
 import type {
   AlconObject,
   Element,
@@ -288,9 +289,12 @@ export async function setStrategyObjects(strategyId: string, objectIds: string[]
     if (error) throw error;
   }
   if (toRemove.length > 0) {
-    const { error } = await supabase.from('strategy_objects').delete()
-      .eq('strategy_id', strategyId).in('object_id', toRemove);
+    // A link RLS refuses to drop (a Domain viewer's) matches no row; say so
+    // rather than let the page show it gone until the next refetch.
+    const { data: dropped, error } = await supabase.from('strategy_objects').delete()
+      .eq('strategy_id', strategyId).in('object_id', toRemove).select('object_id');
     if (error) throw error;
+    if ((dropped?.length ?? 0) < toRemove.length) throw new Error(translate('Some Objects could not be unlinked from this Initiative.'));
   }
 }
 
