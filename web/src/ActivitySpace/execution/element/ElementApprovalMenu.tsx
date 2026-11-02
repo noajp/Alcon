@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/ui/button';
-import { Check, X, AlertCircle, Clock, ShieldCheck } from 'lucide-react';
+import { Check, X, AlertCircle, Clock, ShieldCheck } from '@/ui/icons';
 import { useAssignableWorkers } from '@/hooks/teamData';
 import {
   fetchElementApprovals,

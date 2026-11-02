@@ -1,6 +1,6 @@
 'use client';
 
-import { Archive, Check, Inbox } from 'lucide-react';
+import { Archive, Check, Inbox } from '@/ui/icons';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { InvitationCard } from '@/Function/membership/InvitationCard';

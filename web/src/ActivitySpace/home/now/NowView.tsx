@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Clock3, GitBranch, RefreshCw, Upload } from 'lucide-react';
+import { ArrowRight, Clock3, GitBranch, RefreshCw, Upload } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { FONT, statusColor, statusLabel } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';

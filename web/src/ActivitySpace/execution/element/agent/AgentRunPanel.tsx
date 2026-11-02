@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
-import { AlertCircle, ArrowRight, Check, CheckCircle2, Copy, FileText, Flag, Hand, ListChecks, Loader2, MessageSquare, Pause, ShieldCheck, Wrench, CircleDot } from 'lucide-react';
+import { AlertCircle, ArrowRight, Check, CheckCircle2, Copy, FileText, Flag, Hand, ListChecks, Loader2, MessageSquare, Pause, ShieldCheck, Wrench, CircleDot } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { TextComposer } from '@/ui/text-composer';
 import { cn } from '@/lib/utils';

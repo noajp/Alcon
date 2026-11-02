@@ -1,6 +1,6 @@
 'use client';
 
-import { GitCompare, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from 'lucide-react';
+import { GitCompare, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from '@/ui/icons';
 import type { CodeChange } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { CriterionVerdict, IntentVerdict, ReviewState } from '@/Function/codeReview/diffModel';

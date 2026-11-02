@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Bot, LoaderCircle, Search } from 'lucide-react';
+import { Bot, LoaderCircle, Search } from '@/ui/icons';
 import { useTeamRoster } from '@/hooks/useTeamRoster';
 import { useWorkerSkills } from '@/hooks/useWorkerSkills';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';

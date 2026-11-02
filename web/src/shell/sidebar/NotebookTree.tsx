@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { FilePlus, FolderPlus, Pencil, Trash2 } from 'lucide-react';
+import { FilePlus, FolderPlus, Pencil, Trash2 } from '@/ui/icons';
 import { NavNoteIcon } from '@/shell/sidebar/NavIcons';
 import { useNotes } from '@/hooks/useNotesDb';
 import { useI18n } from '@/Function/i18n/I18nProvider';

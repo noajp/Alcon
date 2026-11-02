@@ -2,7 +2,7 @@
 
 import { useState, type ComponentType, type ReactNode } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown } from '@/ui/icons';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
 import { SidebarRow, SidebarRowAction, SidebarSectionLabel } from '@/Function/shared/SidebarRow';

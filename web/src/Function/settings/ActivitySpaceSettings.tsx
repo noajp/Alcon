@@ -3,7 +3,7 @@
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Smile, Image as ImageIcon, UserPlus, Trash2 } from 'lucide-react';
+import { Smile, Image as ImageIcon, UserPlus, Trash2 } from '@/ui/icons';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { useActivitySpaces, updateActivitySpace, deleteActivitySpace } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';

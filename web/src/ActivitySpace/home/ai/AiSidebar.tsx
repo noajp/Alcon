@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronRight, Folder as FolderIcon, FolderInput, FolderPlus, MessageSquare, Pencil, SquarePen, Trash2 } from 'lucide-react';
+import { ChevronRight, Folder as FolderIcon, FolderInput, FolderPlus, MessageSquare, Pencil, SquarePen, Trash2 } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';

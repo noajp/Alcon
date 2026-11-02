@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Archive, Check, CheckCheck, Inbox, ListFilter, MoreHorizontal } from 'lucide-react';
+import { Archive, Check, CheckCheck, Inbox, ListFilter, MoreHorizontal } from '@/ui/icons';
 import type { Notification } from '@/hooks/useSupabase';
 import { notificationKindMeta } from '@/Function/shared/notificationKinds';
 import { useI18n } from '@/Function/i18n/I18nProvider';

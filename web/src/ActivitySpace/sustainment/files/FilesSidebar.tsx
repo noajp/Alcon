@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Folder as FolderIcon, Trash2 } from 'lucide-react';
+import { Folder as FolderIcon, Trash2 } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { FilesIcon } from '@/Function/shared/conceptIcons';
 import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';

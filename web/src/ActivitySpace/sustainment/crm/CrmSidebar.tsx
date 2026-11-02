@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, type ReactNode } from 'react';
-import { Building2, Layers, List, Settings2, Sun } from 'lucide-react';
+import { Building2, Layers, List, Settings2, Sun } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ToolSidebar, type ToolNavItem } from '@/Function/shared/tool/ToolSidebar';
 import { GroupTree } from '@/Function/shared/folders/GroupTree';

@@ -2,7 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from 'react';
 import type React from 'react';
-import { GitCompare } from 'lucide-react';
+import { GitCompare } from '@/ui/icons';
 import {
   NavAuditIcon,
   NavCrmIcon,

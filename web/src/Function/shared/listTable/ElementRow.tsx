@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
-import { Grip, Lock, Check, Trash2, Fingerprint } from 'lucide-react';
+import { Grip, Lock, Check, Trash2, Fingerprint } from '@/ui/icons';
 import { BUILTIN_COLUMN_ICONS } from '@/Function/property/columnTypes';
 import type { CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { scheduleElementDetailPrefetch, cancelElementDetailPrefetch } from '@/hooks/elementDetailQueries';

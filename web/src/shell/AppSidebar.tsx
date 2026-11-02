@@ -20,7 +20,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
-import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp } from 'lucide-react';
+import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp } from '@/ui/icons';
 import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
 import { domainHasObjectsMessage, useDomainRole, type DomainRole } from '@/hooks/domainData';
 import { countDomainObjects } from '@/hooks/useObjectArchive';
@@ -58,7 +58,7 @@ import { TeamSettings } from '@/Function/settings/TeamSettings';
 import { GroupTree } from '@/Function/shared/folders/GroupTree';
 import type { SidebarDomain } from '@/ActivitySpace/sustainment/files/FilesSidebar';
 import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
-import { Folder as FolderIcon } from 'lucide-react';
+import { Folder as FolderIcon } from '@/ui/icons';
 import { FilesSidebar } from '@/ActivitySpace/sustainment/files/FilesSidebar';
 import { CrmSidebar } from '@/ActivitySpace/sustainment/crm/CrmSidebar';
 import { AuditSidebar } from '@/ActivitySpace/sustainment/audit/AuditSidebar';

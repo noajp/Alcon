@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, FileDown, FileJson, Play, Presentation } from "lucide-react";
+import { ChevronDown, FileDown, FileJson, Play, Presentation } from '@/ui/icons';
 import { useKata } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
 import { useDeckView } from "@/ActivitySpace/sustainment/slides/kata/components/useDeckView";
 import { exportPptx } from "@/ActivitySpace/sustainment/slides/kata/export/pptx";

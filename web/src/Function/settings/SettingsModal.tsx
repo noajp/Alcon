@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { useId } from 'react';
-import { ChevronRight, X } from 'lucide-react';
+import { ChevronRight, X } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 

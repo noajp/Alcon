@@ -1,6 +1,6 @@
 'use client';
 
-import { CircleAlert, RefreshCw, ScrollText } from 'lucide-react';
+import { CircleAlert, RefreshCw, ScrollText } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { FONT } from '@/shared/designTokens';
 import { ToolPage, type ToolView } from '@/Function/shared/tool/ToolPage';

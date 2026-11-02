@@ -3,7 +3,7 @@
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { FileDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { FileDown, PanelLeftClose, PanelLeftOpen } from '@/ui/icons';
 import { useDomains } from '@/hooks/useSupabase';
 import {
   NoteEditor,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, Check, Copy, Mail, PenLine, X } from 'lucide-react';
+import { ArrowUpRight, Check, Copy, Mail, PenLine, X } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { TextComposer } from '@/ui/text-composer';
 import { Textarea } from '@/ui/textarea';

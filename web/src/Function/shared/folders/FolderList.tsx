@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Folder as FolderIcon, FolderPlus, MoreHorizontal } from 'lucide-react';
+import { Folder as FolderIcon, FolderPlus, MoreHorizontal } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';

@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from '@/ui/icons';
 import { useKata } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
 import { updateSlide } from "@/ActivitySpace/sustainment/slides/kata/model/deck";
 import { CHART_PURPOSES, parseNumber } from "@/ActivitySpace/sustainment/slides/kata/model/chart";

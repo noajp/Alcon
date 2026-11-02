@@ -9,7 +9,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { createDomain } from '@/hooks/useSupabase';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { suggestObjectPrefix } from '@/Function/shared/objectPrefix';
-import { Globe, Lock } from 'lucide-react';
+import { Globe, Lock } from '@/ui/icons';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { useAuthContext } from '@/providers/AuthProvider';
 import type { DomainPrivacy } from '@/types/database';

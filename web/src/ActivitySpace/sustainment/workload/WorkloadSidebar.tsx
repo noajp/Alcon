@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Check, Scale, Users } from 'lucide-react';
+import { Check, Scale, Users } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';

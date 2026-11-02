@@ -2,7 +2,7 @@
 
 import { PRIORITY_OPTIONS } from '@/shared/designTokens';
 import type { ReactNode } from 'react';
-import { Check } from 'lucide-react';
+import { Check } from '@/ui/icons';
 import {
   DropdownMenu,
   DropdownMenuTrigger,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Plus, Search, X } from 'lucide-react';
+import { FileText, Plus, Search, X } from '@/ui/icons';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { createNoteFile, fetchNoteFiles, type NoteFileSummary } from '@/hooks/useNotesDb';
 import { useI18n } from '@/Function/i18n/I18nProvider';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check } from '@/ui/icons';
 import { NavSustainmentModeIcon } from '@/shell/sidebar/NavIcons';
 import {
   APP_GROUPS,

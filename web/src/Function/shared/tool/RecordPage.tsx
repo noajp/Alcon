@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ComponentType, type ReactNode } from 'react';
-import { ChevronRight, MoreHorizontal, Trash2 } from 'lucide-react';
+import { ChevronRight, MoreHorizontal, Trash2 } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';

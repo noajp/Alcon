@@ -1,4 +1,4 @@
-import { Layers, Box, Component, MessageCircle, HeartHandshake, Files } from 'lucide-react';
+import { Layers, Box, Component, MessageCircle, HeartHandshake, Files } from '@/ui/icons';
 
 /**
  * Canonical concept → glyph mapping for the Execution layer's three units.

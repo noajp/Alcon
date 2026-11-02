@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowUpRight, ChevronRight, FolderInput, FolderPlus, Loader2, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { ArrowUpRight, ChevronRight, FolderInput, FolderPlus, Loader2, RotateCcw, Search, Trash2, X } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { AttachmentPreview } from '@/Function/shared/attachments/AttachmentList';

@@ -5,7 +5,7 @@ import { useFocusTrap } from "@/ActivitySpace/sustainment/slides/kata/components
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X } from '@/ui/icons';
 import { useKata } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
 import { applyTerms } from "@/ActivitySpace/sustainment/slides/kata/model/skill";
 import { tx } from "@/ActivitySpace/sustainment/slides/kata/i18n";

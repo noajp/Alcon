@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { ArrowRight, RefreshCw } from 'lucide-react';
+import { ArrowRight, RefreshCw } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { ChoiceCard } from '@/ui/choice-card';
 import { formatElementDate, parseDateOnly } from '@/Function/shared/dateUtils';

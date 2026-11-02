@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight } from '@/ui/icons';
 import { useIntentBindingsForTargets, useStrategies } from '@/hooks/useSupabase';
 import { collectDecisionReviews } from '@/ActivitySpace/strategy/initiative/initiativeReviewModel';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';

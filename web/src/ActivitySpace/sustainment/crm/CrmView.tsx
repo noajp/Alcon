@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { BarChart3, Building2, Check, ChevronDown, Columns3, Filter, Layers, List, PenLine, Plus, Settings2, Users, X } from 'lucide-react';
+import { BarChart3, Building2, Check, ChevronDown, Columns3, Filter, Layers, List, PenLine, Plus, Settings2, Users, X } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { FONT } from '@/shared/designTokens';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';

@@ -1,6 +1,6 @@
 'use client';
 
-import { TriangleAlert } from 'lucide-react';
+import { TriangleAlert } from '@/ui/icons';
 import { cn } from '@/lib/utils';
 import { PRIORITY } from '@/shared/designTokens';
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { LogOut } from 'lucide-react';
+import { LogOut } from '@/ui/icons';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { SettingsSection, SettingsRow } from './SettingsSection';

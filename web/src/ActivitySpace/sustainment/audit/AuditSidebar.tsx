@@ -1,6 +1,6 @@
 'use client';
 
-import { CircleAlert, LayoutDashboard, ScrollText, Workflow } from 'lucide-react';
+import { CircleAlert, LayoutDashboard, ScrollText, Workflow } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ToolSidebar } from '@/Function/shared/tool/ToolSidebar';
 import type { NavigationState } from '@/types/navigation';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X } from '@/ui/icons';
 import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { inviteMember } from '@/Function/membership/invitations';

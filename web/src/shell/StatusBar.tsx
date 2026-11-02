@@ -1,6 +1,6 @@
 'use client';
 
-import { PanelLeft } from 'lucide-react';
+import { PanelLeft } from '@/ui/icons';
 import { MODE_META, railModeOf, BAR_TOOLS, type RailMode } from '@/shell/railApps';
 import { useNotifications } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';

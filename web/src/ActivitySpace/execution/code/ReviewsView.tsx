@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Bot, CheckCircle2, Github, Inbox, ListOrdered, RefreshCw } from 'lucide-react';
+import { Bot, CheckCircle2, Github, Inbox, ListOrdered, RefreshCw } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useAuthContext } from '@/providers/AuthProvider';
