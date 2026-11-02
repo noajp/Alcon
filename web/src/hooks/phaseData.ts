@@ -2,6 +2,7 @@
 
 import { ascNullsLast } from '@/hooks/strategyData';
 import type { PhaseCloseWrite } from '@/Function/strategy/phaseClose';
+import { translate } from '@/Function/i18n/I18nProvider';
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
@@ -211,9 +212,13 @@ export async function closePhase(
   for (const write of input.elementWrites) {
     const patch: ElementUpdate = { phase_id: write.phase_id, updated_at: new Date().toISOString() };
     if (write.carried_over_count !== undefined) patch.carried_over_count = write.carried_over_count;
-    await selectIn(write.ids, chunk =>
+    // A write RLS refuses matches no row; count what came back, so a Phase
+    // does not close with Elements silently left where they were.
+    const written = await selectIn(write.ids, chunk =>
       supabase.from('elements').update(patch).in('id', chunk).select('id'),
     );
+    const missed = new Set(write.ids).size - written.length;
+    if (missed > 0) throw new Error(translate('{count} Elements could not be moved, so the Phase was not closed.', { count: missed }));
   }
   return updatePhase(phaseId, {
     status: 'complete',

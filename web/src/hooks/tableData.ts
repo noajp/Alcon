@@ -255,29 +255,40 @@ export async function bulkInsertDataTableRows(
   // Insert in 1000-row chunks too (defensive: PostgREST request body cap).
   const ROW_CHUNK = 1000;
   const createdRows: DataTableRow[] = [];
-  for (let i = 0; i < rowInserts.length; i += ROW_CHUNK) {
-    const slice = rowInserts.slice(i, i + ROW_CHUNK);
-    const { data, error } = await supabase.from('table_rows').insert(slice).select();
-    if (error) throw error;
-    createdRows.push(...((data || []) as DataTableRow[]));
-  }
-  // Sort by order_index to align with the original `values` order — Supabase
-  // doesn't guarantee returning rows in insert order across chunks.
-  createdRows.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-
-  const cellInserts: { row_id: string; column_id: string; value: Json | null }[] = [];
-  for (let i = 0; i < createdRows.length; i++) {
-    const row = createdRows[i];
-    const vals = values[i] ?? {};
-    for (const [columnId, val] of Object.entries(vals)) {
-      cellInserts.push({ row_id: row.id, column_id: columnId, value: val });
+  try {
+    for (let i = 0; i < rowInserts.length; i += ROW_CHUNK) {
+      const slice = rowInserts.slice(i, i + ROW_CHUNK);
+      const { data, error } = await supabase.from('table_rows').insert(slice).select();
+      if (error) throw error;
+      createdRows.push(...((data || []) as DataTableRow[]));
     }
-  }
-  const CELL_CHUNK = 1000;
-  for (let i = 0; i < cellInserts.length; i += CELL_CHUNK) {
-    const chunk = cellInserts.slice(i, i + CELL_CHUNK);
-    const { error } = await supabase.from('table_cells').insert(chunk);
-    if (error) throw error;
+    // Sort by order_index to align with the original `values` order — Supabase
+    // doesn't guarantee returning rows in insert order across chunks.
+    createdRows.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+    const cellInserts: { row_id: string; column_id: string; value: Json | null }[] = [];
+    for (let i = 0; i < createdRows.length; i++) {
+      const row = createdRows[i];
+      const vals = values[i] ?? {};
+      for (const [columnId, val] of Object.entries(vals)) {
+        cellInserts.push({ row_id: row.id, column_id: columnId, value: val });
+      }
+    }
+    const CELL_CHUNK = 1000;
+    for (let i = 0; i < cellInserts.length; i += CELL_CHUNK) {
+      const chunk = cellInserts.slice(i, i + CELL_CHUNK);
+      const { error } = await supabase.from('table_cells').insert(chunk);
+      if (error) throw error;
+    }
+  } catch (error) {
+    // Take back the rows this call made (their cells go with them), so a
+    // failed import does not leave blank rows behind. A failed clean-up must
+    // not hide why the import failed.
+    if (createdRows.length > 0) {
+      await selectIn(createdRows.map((r) => r.id), (ids) => supabase.from('table_rows').delete().in('id', ids).select('id'))
+        .catch((cleanup) => console.error('Could not remove the rows of a failed import:', cleanup));
+    }
+    throw error;
   }
   return { rows: createdRows };
 }
@@ -290,8 +301,15 @@ export async function importDataTable(
   rows: (string | number | null)[][],
 ): Promise<string> {
   const table = await createDataTable({ name });
-  const created = await addDataTableColumns(table.id, columns);
-  const byOrder = [...created].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-  await bulkInsertDataTableRows(table.id, rows.map((row) => Object.fromEntries(byOrder.map((col, k) => [col.id, row[k] ?? null]))));
+  try {
+    const created = await addDataTableColumns(table.id, columns);
+    const byOrder = [...created].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    await bulkInsertDataTableRows(table.id, rows.map((row) => Object.fromEntries(byOrder.map((col, k) => [col.id, row[k] ?? null]))));
+  } catch (error) {
+    // A half-imported Table is worse than none: remove it and report.
+    const { error: cleanup } = await supabase.from('tables').delete().eq('id', table.id);
+    if (cleanup) console.error('Could not remove the half-imported Table:', cleanup);
+    throw error;
+  }
   return table.id;
 }
