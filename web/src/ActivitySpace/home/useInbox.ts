@@ -106,7 +106,7 @@ export function useInbox({ onNavigate, onViewChange }: InboxNavigation = {}) {
 
   const setUnreadOnly = useCallback((value: boolean) => emit({ ...selection, unreadOnly: value }), []);
 
-  return { notifications, unreadCount, loading, selected, selectedId, revision, unreadOnly, select, archive, toggleRead, markAllRead, setUnreadOnly };
+  return { notifications, unreadCount, loading, selected, selectedId, revision, unreadOnly, select, openObject, archive, toggleRead, markAllRead, setUnreadOnly };
 }
 
 /** The Element a notification points at, re-read when the reader asks. */

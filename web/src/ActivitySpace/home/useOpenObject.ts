@@ -16,7 +16,8 @@ import type { NavigationState } from '@/types/navigation';
  * list until it loads on its own). This looks the Object's Domains up first
  * and switches to one the viewer can see — the active one when the Object is
  * in it. Resolves to false when no visible Domain holds the Object; a newer
- * call, or a Space switch in between, drops the older one silently.
+ * call, or a Space switch in between, drops the older one silently — its
+ * failure included, so a stale error cannot trigger the caller's fallback.
  */
 export function useOpenObject({ onNavigate, onViewChange }: {
   onNavigate?: (nav: Partial<NavigationState>) => void;
@@ -36,8 +37,15 @@ export function useOpenObject({ onNavigate, onViewChange }: {
   return useCallback(async (objectId: string): Promise<boolean> => {
     const mine = ++request.current;
     const space = getActiveSpaceId();
-    const domainIds = await fetchObjectDomainIds(objectId);
-    if (mine !== request.current || getActiveSpaceId() !== space) return true;
+    const superseded = () => mine !== request.current || getActiveSpaceId() !== space;
+    let domainIds: string[];
+    try {
+      domainIds = await fetchObjectDomainIds(objectId);
+    } catch (error) {
+      if (superseded()) return true;
+      throw error;
+    }
+    if (superseded()) return true;
     const domainId = objectDomainRoute(domainIds, visibleIds, getActiveDomainId());
     if (!domainId) return false;
     onNavigate?.({ objectId, objectDomainId: domainId });

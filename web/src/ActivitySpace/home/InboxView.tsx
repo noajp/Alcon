@@ -10,7 +10,6 @@ import { useInvitation } from '@/Function/membership/invitations';
 import { Button } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';
 import { selectInboxNotification, useInbox, useNotificationElement } from './useInbox';
-import { useOpenObject } from './useOpenObject';
 
 interface InboxViewProps {
   onNavigate?: (nav: Partial<NavigationState>) => void;
@@ -21,8 +20,7 @@ interface InboxViewProps {
  *  that picks it lives in the AppSidebar (`InboxList`). */
 export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
   const { t, locale } = useI18n();
-  const { selected, revision, toggleRead, archive } = useInbox({ onNavigate, onViewChange });
-  const openObject = useOpenObject({ onNavigate, onViewChange });
+  const { selected, revision, toggleRead, archive, openObject } = useInbox({ onNavigate, onViewChange });
   // An audit Space (ADR 0048) does not open Elements: their notifications
   // say so instead of opening the Element in the reader.
   const audit = useActiveSpaceScope() === 'audit';
