@@ -107,7 +107,7 @@ interface ColumnOverrides {
     result: Record<string, unknown> | null
   }
   integrations: {
-    kind: 'mcp' | 'http'
+    kind: 'mcp' | 'http' | 'model'
     auth_type: 'none' | 'bearer' | 'header' | 'oauth'
     delegation: 'approve_each' | 'full_delegation'
   }
