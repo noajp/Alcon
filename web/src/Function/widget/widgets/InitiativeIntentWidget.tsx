@@ -50,8 +50,11 @@ function NoInitiative({ objectId }: { objectId: string }) {
     setError(null);
     try {
       await linkObjectToStrategy(strategyId, objectId);
-    } catch {
-      setError(t('Only the Initiative’s owner or an owner of its Space can link Objects to it.'));
+    } catch (e) {
+      const refused = (e as { code?: string } | null)?.code === '42501';
+      setError(refused
+        ? t('Only the Initiative’s owner or an owner of its Space can link Objects to it.')
+        : e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
