@@ -8,7 +8,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import {
-  createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, assignWorkersToElement, noticeSkippedAssignees,
+  createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement,
   fetchAllWorkers,
   useObjectTabs, reorderObjectTabs, useDomains, useElementTemplates, usePhases, useObjectMilestones, createObjectTab, deleteObjectTab,
   deleteObject, addDomainElementType, removeDomainElementType,
@@ -39,7 +39,7 @@ import { ObjectElementsView } from '@/ActivitySpace/execution/object/ObjectEleme
 import type { ListSection } from '@/Function/shared/listTable/shared';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { sectionGroupValues, type ListControlsState, type SectionGroup } from '@/Function/shared/listControls';
-import { partitionAssignable } from '@/Function/shared/assignableWorkers';
+import { createQuickAddElements, toQuickAddTemplates } from '@/Function/shared/element/quickAdd';
 
 export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls, onViewChange }: {
   object: AlconObjectWithChildren;
@@ -103,19 +103,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
 
   // A template keeps only the assignees that are on that list.
   const quickAddTemplates = useMemo<QuickAddTemplate[]>(
-    () => elementTemplates.map((t) => ({
-      id: t.id,
-      name: t.name,
-      type: t.type,
-      status: t.status,
-      priority: t.priority,
-      labels: t.labels,
-      assigneeWorkerIds: partitionAssignable(t.assignee_worker_ids, popupWorkers).assignable,
-      description: t.description,
-      estimatedHours: t.estimated_hours,
-    })),
+    () => toQuickAddTemplates(elementTemplates, popupWorkers),
     [elementTemplates, popupWorkers],
   );
+
 
   // Labels already used on this Object's Elements — surface them as
   // selectable suggestions in the QuickAdd popup's Labels pill.
@@ -656,24 +647,11 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         defaultAssigneeWorkerIds={quickAddDefaults.assigneeWorkerIds}
         defaultLabels={quickAddDefaults.labels}
         onSubmit={async (inputs: NewElementInput[]) => {
-          let skippedAssignees = 0;
-          for (const input of inputs) {
-            try {
-              const created = await createElement({
-                title: input.title,
-                object_id: input.objectId !== undefined ? input.objectId : object.id,
-                description: input.description ?? null,
-                type: input.type ?? null,
-                labels: input.labels ?? [],
-                status: input.status ?? undefined,
-                priority: input.priority ?? undefined,
-                estimated_hours: input.estimatedHours ?? null,
-              });
-              skippedAssignees += (await assignWorkersToElement(created.id, input.assigneeWorkerIds ?? [])).skipped.length;
-            } catch (e) { console.error('Failed to create Element', e); }
+          try {
+            await createQuickAddElements(inputs, { fallbackObjectId: object.id, userId: null });
+          } finally {
+            await onRefresh?.();
           }
-          noticeSkippedAssignees(skippedAssignees);
-          await onRefresh?.();
         }}
       />
 

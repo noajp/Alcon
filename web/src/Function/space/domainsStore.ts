@@ -1,5 +1,7 @@
 'use client';
 
+import { useSyncExternalStore } from 'react';
+
 const ACTIVE_KEY = 'alcon:active-domain';
 export const ACTIVE_DOMAIN_CHANGE_EVENT = 'alcon:active-domain-change';
 export const CREATE_DOMAIN_EVENT = 'alcon:create-domain';
@@ -33,4 +35,14 @@ export function getActiveDomainId(): string | null {
 export function setActiveDomainId(id: string) {
   localStorage.setItem(ACTIVE_KEY, id);
   window.dispatchEvent(new CustomEvent(ACTIVE_DOMAIN_CHANGE_EVENT, { detail: id }));
+}
+
+function subscribeActiveDomain(onChange: () => void) {
+  window.addEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, onChange);
+  return () => window.removeEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, onChange);
+}
+
+/** The active Domain for a surface that has none of its own (My Elements). */
+export function useActiveDomainId(): string | null {
+  return useSyncExternalStore(subscribeActiveDomain, getActiveDomainId, () => null);
 }

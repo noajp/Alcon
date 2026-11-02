@@ -5,13 +5,12 @@ import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { QuickAddElementPopup, type NewElementInput } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
 import {
-  assignWorkersToElement,
-  noticeSkippedAssignees,
-  createElement,
   fetchAllWorkers,
   useDomains,
+  useElementTemplates,
   type Worker,
 } from '@/hooks/useSupabase';
+import { createQuickAddElements, toQuickAddTemplates } from '@/Function/shared/element/quickAdd';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getQueryClient } from '@/lib/queryClient';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -156,6 +155,14 @@ export function QuickAddElementLauncher({
     return Array.from(s).sort();
   }, [explorerData]);
 
+  // The Domain's saved templates, so C and ⌘K offer the same Template pill
+  // as an Object's own quick-add.
+  const { templates: elementTemplates } = useElementTemplates(activeDomainId || null);
+  const quickAddTemplates = useMemo(
+    () => toQuickAddTemplates(elementTemplates, workers),
+    [elementTemplates, workers],
+  );
+
   const objectOptions = useMemo<{ id: string; name: string }[]>(
     () => (explorerData?.objects ?? []).map((o) => ({ id: o.id, name: o.name })),
     [explorerData],
@@ -169,33 +176,19 @@ export function QuickAddElementLauncher({
   // personal (owner_id = me) when the popup names no Object. An Element always
   // has exactly one home; the database refuses one with neither.
   const handleSubmit = async (inputs: NewElementInput[]) => {
-    let skippedAssignees = 0;
-    for (const input of inputs) {
-      try {
-        const objectId = input.personal ? null : input.objectId ?? null;
-        const created = await createElement({
-          title: input.title,
-          object_id: objectId,
-          owner_id: objectId ? null : userId,
-          description: input.description ?? null,
-          type: input.type ?? null,
-          status: input.status ?? undefined,
-          priority: input.priority ?? undefined,
-          due_date: presetDueDate ?? undefined,
-        });
-        skippedAssignees += (await assignWorkersToElement(created.id, input.assigneeWorkerIds ?? [])).skipped.length;
-      } catch (e) { console.error('Failed to create Element', e); }
+    try {
+      await createQuickAddElements(inputs, { fallbackObjectId: null, userId, dueDate: presetDueDate });
+      // Remember the landing Object so the next context-less C targets it too.
+      const first = inputs[0];
+      if (first && !first.personal && first.objectId) writeLastObjectId(first.objectId);
+    } finally {
+      // The Calendar and My Elements read react-query caches, not the Domain
+      // refetch below — drop them so a just-added Element shows at once.
+      const qc = getQueryClient();
+      void qc.invalidateQueries({ queryKey: ['my-elements'] });
+      void qc.invalidateQueries({ queryKey: ['explorer'] });
+      await onRefresh?.();
     }
-    noticeSkippedAssignees(skippedAssignees);
-    // Remember the landing Object so the next context-less C targets it too.
-    const first = inputs[0];
-    if (first && !first.personal && first.objectId) writeLastObjectId(first.objectId);
-    // The Calendar and My Elements read react-query caches, not the Domain
-    // refetch below — drop them so a just-added Element shows at once.
-    const qc = getQueryClient();
-    void qc.invalidateQueries({ queryKey: ['my-elements'] });
-    void qc.invalidateQueries({ queryKey: ['explorer'] });
-    await onRefresh?.();
   };
 
   return (
@@ -209,6 +202,7 @@ export function QuickAddElementLauncher({
       workers={workers.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
       objects={objectOptions}
       availableLabels={availableLabels}
+      templates={quickAddTemplates}
       defaultObjectId={defaultObjectId}
       canSaveToPersonal
     />
