@@ -11,11 +11,13 @@ import type { ToolScope } from './toolScope';
 
 // =============================================================
 // ToolSidebar — the one sidebar every Sustainment tool is built on (CRM,
-// and the tools that come after them). Four slots, top to bottom:
+// and the tools that come after them). Five slots, top to bottom:
 //
 //   scope    whose records: the row opens the scope's overview (as a
 //            Domain's row opens the Domain), its ▾ only switches scope
 //   queue    what needs me now (CRM's Today)
+//   groups   the tool's own groups, as Files has them: each Domain
+//            unfolding onto its pages (opening one makes it the scope)
 //   sections the collections, each with saved filters as children. A
 //            child opens its parent's page with the filter applied — no
 //            new screen to learn
@@ -73,7 +75,7 @@ function NavRow({ item, nested = false }: { item: ToolNavItem; nested?: boolean 
   </div>;
 }
 
-export function ToolSidebar({ title, scope, queue, sections, footer, children }: {
+export function ToolSidebar({ title, scope, queue, sections, footer, groups }: {
   /** The tool's name, as the heading. */
   title: string;
   scope: {
@@ -88,8 +90,8 @@ export function ToolSidebar({ title, scope, queue, sections, footer, children }:
   queue?: ToolNavItem[];
   sections: { id: string; label?: string; items: ToolNavItem[] }[];
   footer?: ToolNavItem[];
-  /** The tool's own list (a folder tree), between the queue and the sections. */
-  children?: ReactNode;
+  /** The tool's groups (each Domain unfolding onto its pages), between the queue and the sections. */
+  groups?: ReactNode;
 }) {
   const { t } = useI18n();
   const ScopeIcon = scope.icon;
@@ -114,7 +116,7 @@ export function ToolSidebar({ title, scope, queue, sections, footer, children }:
 
     {queue && queue.length > 0 && <div className="mt-1 space-y-px">{queue.map(item => <NavRow key={item.id} item={item} />)}</div>}
 
-    {children}
+    {groups}
 
     {sections.map(section => <div key={section.id}>
       {section.label && <SidebarSectionLabel>{section.label}</SidebarSectionLabel>}

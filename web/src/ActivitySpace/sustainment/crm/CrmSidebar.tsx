@@ -1,33 +1,37 @@
 'use client';
 
-import { useMemo } from 'react';
-import { BarChart3, Building2, Columns3, Layers, List, Settings2, Sun, Users } from 'lucide-react';
+import { useMemo, type ReactNode } from 'react';
+import { Building2, Layers, List, Settings2, Sun } from 'lucide-react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ToolSidebar, type ToolNavItem } from '@/Function/shared/tool/ToolSidebar';
+import { GroupTree } from '@/Function/shared/folders/GroupTree';
+import { SPACE_SCOPE, type ToolScope } from '@/Function/shared/tool/toolScope';
+import type { SidebarDomain } from '@/ActivitySpace/sustainment/files/FilesSidebar';
 import type { NavigationState } from '@/types/navigation';
 import { useCrm } from '@/hooks/useCrm';
 import { inList, todayQueue, type CrmList } from '@/Function/crm/crmModel';
 import { crmRoute, routeTo, type CrmRoute } from '@/Function/crm/crmRoute';
 import { useCrmScope } from './crmScope';
 
-// The CRM sidebar, on the shared ToolSidebar: the scope (whose records), Today
-// (my queue), the deals with their pipelines and saved lists, the forecast,
-// the ledgers, and the settings at the foot. See ToolSidebar for the rules.
+// The CRM sidebar, on the shared ToolSidebar, laid out as Files and Table
+// are: everything in the Space and Today (my queue) first, then each Domain
+// unfolding onto its Companies (each opening onto its deals) and its Deals
+// (with the saved lists), and the settings at the foot. See ToolSidebar for
+// the rules.
 
 interface SidebarProps {
   navigation: NavigationState;
   onNavigate: (navigation: Partial<NavigationState>) => void;
+  domains: SidebarDomain[];
 }
 
-// Lists that act on the deals: shown with their counts. The rest fold under "More".
+// Lists that act on the scope's deals, with their counts. The others are in
+// the Deals page's list filter.
 const ACTION_LISTS: { id: CrmList; label: string }[] = [
   { id: 'at-risk', label: 'At risk' }, { id: 'renewing', label: 'Renewing' }, { id: 'no-next-step', label: 'No next step' }, { id: 'incomplete', label: 'Missing details' },
 ];
-const OTHER_LISTS: { id: CrmList; label: string }[] = [
-  { id: 'closing-soon', label: 'Closing soon' }, { id: 'stale', label: 'Going quiet' }, { id: 'mine', label: 'My deals' }, { id: 'won', label: 'Won' }, { id: 'lost', label: 'Lost' },
-];
 
-export function CrmSidebar({ navigation, onNavigate }: SidebarProps) {
+export function CrmSidebar({ navigation, onNavigate, domains }: SidebarProps) {
   const { t } = useI18n();
   const route = crmRoute(navigation.crm);
   const crm = useCrm(route.pipelineId);
@@ -41,25 +45,36 @@ export function CrmSidebar({ navigation, onNavigate }: SidebarProps) {
   const queue = useMemo(() => todayQueue(mine), [mine]);
   const due = queue.filter(deal => deal.action!.urgency === 'overdue' || deal.action!.urgency === 'today').length;
   const listCount = (list: CrmList) => pooled ? pooled.deals.filter(deal => inList(deal, list, pooled.today, pooled.params.horizonDays, crm.me)).length : 0;
-  const listItem = (list: { id: CrmList; label: string }, counted: boolean): ToolNavItem => ({
-    id: `list:${list.id}`, label: t(list.label), count: counted ? listCount(list.id) : null,
+  const listItem = (list: { id: CrmList; label: string }): ToolNavItem => ({
+    id: `list:${list.id}`, label: t(list.label), count: listCount(list.id),
     active: !onRecord && route.view === 'deals' && route.list === list.id,
     onClick: () => go({ view: 'deals', list: list.id, pipelineId: null }),
   });
 
-  const pipelineItems: ToolNavItem[] = scoped.pipelines.length > 1 ? scoped.pipelines.map(item => ({
-    id: `pipeline:${item.id}`, label: item.name, icon: Columns3,
-    active: !onRecord && route.view === 'board' && scoped.pipeline?.id === item.id,
-    onClick: () => go({ view: 'board', pipelineId: item.id }),
-  })) : [];
+  // A group's pages: its home, its Companies, its Deals (a board when it has one pipeline).
+  const open = (scope: ToolScope, patch: Partial<CrmRoute>) => { scoped.setScope(scope); go({ pipelineId: null, ...patch }); };
+  const dealsView = (scope: ToolScope) => crm.pipelines.filter(item => scope === SPACE_SCOPE ? !item.domain_id : item.domain_id === scope).length <= 1 ? 'board' : 'deals';
+  const here = (scope: ToolScope, ...views: CrmRoute['view'][]) => !onRecord && scoped.scope === scope && views.includes(route.view);
+  const group = (scope: ToolScope, name: string, mark: ReactNode) => (
+    <GroupTree key={scope ?? 'all'} name={name} mark={mark} defaultOpen={scoped.scope === scope}
+      homeActive={here(scope, 'home')} onOpenHome={() => open(scope, { view: 'home' })}
+      items={[
+        { id: 'companies', label: t('Companies'), icon: Building2, active: here(scope, 'companies'), onClick: () => open(scope, { view: 'companies' }) },
+        { id: 'deals', label: t('Deals'), icon: List, active: here(scope, 'deals', 'board') && !route.list, onClick: () => open(scope, { view: dealsView(scope) }) },
+      ]} />
+  );
 
   return <ToolSidebar
     title={t('CRM')}
+    groups={<div className="mt-3">
+      {domains.map(d => group(d.id, d.name, d.mark))}
+      {scoped.hasShared && group(SPACE_SCOPE, t('Shared by the Space'), <Layers size={16} />)}
+    </div>}
     scope={{
-      value: scoped.scope, options: scoped.options, label: scoped.scopeName, icon: Layers,
-      active: !onRecord && route.view === 'home',
-      onOpen: () => go({ view: 'home' }),
-      onChange: next => { scoped.setScope(next); go({ view: 'home', pipelineId: null }); },
+      value: scoped.scope, options: [], label: t('Everything'), icon: Layers,
+      active: here(null, 'home'),
+      onOpen: () => open(null, { view: 'home' }),
+      onChange: () => {},
     }}
     queue={[{
       id: 'today', label: t('Today'), icon: Sun, count: due, active: !onRecord && route.view === 'today', collapsed: true,
@@ -71,20 +86,7 @@ export function CrmSidebar({ navigation, onNavigate }: SidebarProps) {
       })),
     }]}
     sections={[
-      { id: 'work', items: [
-        {
-          id: 'deals', label: t('Deals'), icon: List,
-          active: !onRecord && (route.view === 'deals' && !route.list || route.view === 'board' && scoped.pipelines.length <= 1),
-          onClick: () => go({ view: scoped.pipelines.length <= 1 ? 'board' : 'deals', pipelineId: null }),
-          children: [...pipelineItems, ...ACTION_LISTS.map(list => listItem(list, true))],
-          more: OTHER_LISTS.map(list => listItem(list, false)),
-        },
-        { id: 'forecast', label: t('Forecast'), icon: BarChart3, active: !onRecord && route.view === 'forecast', onClick: () => go({ view: 'forecast' }) },
-      ] },
-      { id: 'records', label: t('Records'), items: [
-        { id: 'companies', label: t('Companies'), icon: Building2, active: !onRecord && route.view === 'companies', onClick: () => go({ view: 'companies' }) },
-        { id: 'contacts', label: t('Contacts'), icon: Users, active: !onRecord && route.view === 'contacts', onClick: () => go({ view: 'contacts' }) },
-      ] },
+      { id: 'lists', label: t('Lists'), items: ACTION_LISTS.map(listItem) },
     ]}
     footer={[{ id: 'settings', label: t('Pipeline settings'), icon: Settings2, active: !!route.settings, onClick: () => go({ settings: true }) }]}
   />;

@@ -546,7 +546,7 @@ export function AppSidebar({
           {railMode === 'files' && <FilesSidebar navigation={navigation} onNavigate={onNavigate} domains={sidebarDomains} />}
           {/* ── Reviews ── the Space's pull requests; the main pane reviews the open one. */}
           {railMode === 'reviews' && <ReviewsSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'reviews') onViewChange('reviews'); }} />}
-          {railMode === 'crm' && <CrmSidebar navigation={navigation} onNavigate={onNavigate} />}
+          {railMode === 'crm' && <CrmSidebar navigation={navigation} onNavigate={onNavigate} domains={sidebarDomains} />}
           {/* ── Audit ── what needs a person, the workflows, and the log. */}
           {railMode === 'audit' && <AuditSidebar navigation={navigation} onNavigate={onNavigate} />}
           {/* ── AI ── this person's conversations, in folders. */}

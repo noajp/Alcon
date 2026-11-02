@@ -222,7 +222,7 @@ function Fields({ crm }: { crm: Crm }) {
   </Section>;
 }
 
-function PipelinesList({ crm, onSelect }: { crm: Crm; onSelect: (id: string) => void }) {
+function PipelinesList({ crm, onSelect, domainId }: { crm: Crm; onSelect: (id: string) => void; domainId: string | null }) {
   const { t } = useI18n();
   const [name, setName] = useState('');
   const [confirm, setConfirm] = useState(false);
@@ -232,7 +232,7 @@ function PipelinesList({ crm, onSelect }: { crm: Crm; onSelect: (id: string) => 
   return <Section title={t('Pipelines')}>
     <div className="flex flex-wrap items-center gap-2">
       {crm.pipelines.map(item => <Button key={item.id} shape="tab" size="sm" variant={item.id === pipeline.id ? 'secondary' : 'ghost'} aria-pressed={item.id === pipeline.id} onClick={() => onSelect(item.id)}>{item.name}</Button>)}
-      <form className="flex items-center gap-2" onSubmit={event => { event.preventDefault(); if (!name.trim()) return; setError(null); crm.savePipeline(null, { name: name.trim(), currency: pipeline.currency, order_index: Math.max(1, ...crm.pipelines.map(item => item.order_index + 1)) }).then(id => { setName(''); onSelect(id); }).catch(cause => setError(message(cause))); }}>
+      <form className="flex items-center gap-2" onSubmit={event => { event.preventDefault(); if (!name.trim()) return; setError(null); crm.savePipeline(null, { name: name.trim(), domain_id: domainId, currency: pipeline.currency, order_index: Math.max(1, ...crm.pipelines.map(item => item.order_index + 1)) }).then(id => { setName(''); onSelect(id); }).catch(cause => setError(message(cause))); }}>
         <input aria-label={t('New pipeline')} placeholder={t('New pipeline…')} className={`${INPUT} w-44`} value={name} onChange={event => setName(event.target.value)} />
         <Button type="submit" size="sm" variant="ghost" disabled={!name.trim()}><Plus size={14} />{t('Add')}</Button>
       </form>
@@ -316,10 +316,12 @@ function HandOver({ crm }: { crm: Crm }) {
 
 /** What an organisation may shape: pipelines, stages, words, links and fields.
  * The record types and calculations stay standard. */
-export function CrmSettings({ crm, onSelectPipeline }: { crm: Crm; onSelectPipeline: (id: string) => void }) {
+export function CrmSettings({ crm, onSelectPipeline, domainId }: { crm: Crm; onSelectPipeline: (id: string) => void;
+  /** The Domain a pipeline added here goes into: the CRM's scope. */
+  domainId: string | null }) {
   if (!crm.pipeline) return null;
   return <div className="max-w-3xl space-y-10">
-    <PipelinesList crm={crm} onSelect={onSelectPipeline} />
+    <PipelinesList crm={crm} onSelect={onSelectPipeline} domainId={domainId} />
     <Basics key={`basics:${crm.pipeline.id}`} crm={crm} />
     <Stages key={`stages:${crm.pipeline.id}:${JSON.stringify(crm.pipeline.stages)}`} crm={crm} />
     <Connections crm={crm} />
