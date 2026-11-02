@@ -23,7 +23,9 @@
 -- the binding is set, and the Space again at every write). A bulk import
 -- sends x-alcon-crm-defer-measure: 1 and calls crm_refresh_pipeline_measure
 -- once at its end, so it neither recomputes per deal nor floods the history.
--- A failure to compute is a warning, never a failed deal write or sweep.
+-- A failure to compute never fails a deal write or the sweep; it is kept on
+-- the pipeline (measure_error, cleared by the next success, with
+-- measure_refreshed_at) and shown in CRM settings.
 --
 -- A unit that does not match the metric (money vs count, another currency, a
 -- rate, a unit Alcon cannot read) writes nothing; CRM settings says why.
@@ -45,6 +47,10 @@ begin
     raise notice 'crm measure server refresh skipped: base tables or alcon_internal not present';
     return;
   end if;
+
+  -- The last refresh's outcome, shown in CRM settings.
+  execute 'alter table public.crm_pipelines add column if not exists measure_error text';
+  execute 'alter table public.crm_pipelines add column if not exists measure_refreshed_at timestamptz';
 
   -- stageKey: trimmed, lower case.
   execute $f$
@@ -275,34 +281,47 @@ begin
       v_value numeric;
       v_written numeric;
       v_previous_source text;
+      v_error text;
     begin
       select * into p from public.crm_pipelines where id = p_pipeline;
-      if not found or p.measure_intent_id is null or p.measure_metric is null then return; end if;
-      -- Only a success condition of an Initiative in the pipeline's own Space.
-      select it.id, it.unit, it.actual_value into i
-        from public.intents it join public.strategies s on s.id = it.strategy_id
-        where it.id = p.measure_intent_id and it.kind = 'measure' and s.activity_space_id = p.activity_space_id;
       if not found then return; end if;
-      -- A field metric reports only while its field is one of this pipeline's number fields.
-      if p.measure_metric like 'won\_field%' and not exists (
-        select 1 from public.crm_fields f
-        where f.activity_space_id = p.activity_space_id and f.entity = 'deal' and f.type = 'number'
-          and f.key = p.measure_field and (f.domain_id is null or f.domain_id = p.domain_id)
-      ) then return; end if;
-      v_value := alcon_internal.crm_metric_value(p.id, current_date, i.unit);
-      v_written := alcon_internal.crm_measure_value(i.unit, p.measure_metric, p.currency, v_value);
-      -- An empty condition reads as 0, as the CRM settings show it: a pipeline
-      -- with nothing won yet does not stamp a first reading of 0.
-      if v_written is null or coalesce(i.actual_value, 0) = v_written then return; end if;
-      v_previous_source := current_setting('alcon.reading_source', true);
-      perform set_config('alcon.reading_source', 'crm', true);
-      update public.intents set actual_value = v_written, measured_at = now()
-        where id = i.id and actual_value is distinct from v_written;
-      perform set_config('alcon.reading_source', coalesce(v_previous_source, ''), true);
-    exception when others then
-      -- A figure that cannot be computed never blocks the deal write or the
-      -- sweep; the subtransaction rolls back, reading_source included.
-      raise warning 'crm measure refresh failed for pipeline %: %', p_pipeline, sqlerrm;
+      <<compute>>
+      begin
+        if p.measure_intent_id is null or p.measure_metric is null then exit compute; end if;
+        -- Only a success condition of an Initiative in the pipeline's own Space.
+        select it.id, it.unit, it.actual_value into i
+          from public.intents it join public.strategies s on s.id = it.strategy_id
+          where it.id = p.measure_intent_id and it.kind = 'measure' and s.activity_space_id = p.activity_space_id;
+        if not found then exit compute; end if;
+        -- A field metric reports only while its field is one of this pipeline's number fields.
+        if p.measure_metric like 'won\_field%' and not exists (
+          select 1 from public.crm_fields f
+          where f.activity_space_id = p.activity_space_id and f.entity = 'deal' and f.type = 'number'
+            and f.key = p.measure_field and (f.domain_id is null or f.domain_id = p.domain_id)
+        ) then exit compute; end if;
+        v_value := alcon_internal.crm_metric_value(p.id, current_date, i.unit);
+        v_written := alcon_internal.crm_measure_value(i.unit, p.measure_metric, p.currency, v_value);
+        -- An empty condition reads as 0, as the CRM settings show it: a pipeline
+        -- with nothing won yet does not stamp a first reading of 0.
+        if v_written is null or coalesce(i.actual_value, 0) = v_written then exit compute; end if;
+        v_previous_source := current_setting('alcon.reading_source', true);
+        perform set_config('alcon.reading_source', 'crm', true);
+        update public.intents set actual_value = v_written, measured_at = now()
+          where id = i.id and actual_value is distinct from v_written;
+        perform set_config('alcon.reading_source', coalesce(v_previous_source, ''), true);
+      exception when others then
+        -- A figure that cannot be computed never blocks the deal write or the
+        -- sweep; the subtransaction rolls back, reading_source included.
+        v_error := left(sqlerrm, 500);
+      end;
+      -- The outcome stays on the pipeline, where CRM settings show it: a
+      -- failure is never silent, and the next success clears it.
+      if v_error is not null then
+        raise warning 'crm measure refresh failed for pipeline %: %', p_pipeline, v_error;
+        update public.crm_pipelines set measure_error = v_error where id = p_pipeline;
+      else
+        update public.crm_pipelines set measure_error = null, measure_refreshed_at = now() where id = p_pipeline;
+      end if;
     end $b$
   $f$;
 
@@ -406,7 +425,10 @@ begin
     create or replace function alcon_internal.crm_pipelines_refresh_measure()
     returns trigger language plpgsql security definer set search_path = '' as $b$
     begin
-      if new.measure_intent_id is not null then perform alcon_internal.crm_refresh_measure(new.id); end if;
+      -- Unbinding runs it too, so an earlier failure does not stay on show.
+      if new.measure_intent_id is not null or new.measure_error is not null then
+        perform alcon_internal.crm_refresh_measure(new.id);
+      end if;
       return null;
     end $b$
   $f$;

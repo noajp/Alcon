@@ -178,6 +178,8 @@ const CRM_MESSAGES: Record<string, Row> = {
   'Could not move the deal.': ['商談を移動できませんでした。', '거래를 옮기지 못했습니다.', 'Impossible de déplacer l’affaire.', 'No se pudo mover el negocio.'],
   'This success condition is not in the pipeline’s Space.': ['この成功条件は、パイプラインと同じ Space にありません。', '이 성공 조건은 파이프라인과 같은 Space에 있지 않습니다.', 'Cette condition de succès n’est pas dans le Space du pipeline.', 'Esta condición de éxito no está en el Space del pipeline.'],
   'Only someone who can edit the Initiative can connect a pipeline to its success condition.': ['パイプラインを成功条件につなげられるのは、その Initiative を編集できる人だけです。', '파이프라인을 성공 조건에 연결할 수 있는 사람은 그 Initiative를 편집할 수 있는 사람뿐입니다.', 'Seules les personnes qui peuvent modifier l’Initiative peuvent relier un pipeline à sa condition de succès.', 'Solo quien puede editar la Initiative puede conectar un pipeline a su condición de éxito.'],
+  'Updating the success condition is failing: {error}': ['成功条件の更新に失敗しています：{error}', '성공 조건 업데이트에 실패하고 있습니다: {error}', 'La mise à jour de la condition de succès échoue : {error}', 'La actualización de la condición de éxito está fallando: {error}'],
+  'The success condition was not updated after the import: {error}': ['取り込み後に成功条件を更新できませんでした：{error}', '가져온 뒤 성공 조건을 업데이트하지 못했습니다: {error}', 'La condition de succès n’a pas été mise à jour après l’import : {error}', 'La condición de éxito no se actualizó después de la importación: {error}'],
   'Could not save. Try again.': ['保存できませんでした。もう一度お試しください。', '저장하지 못했습니다. 다시 시도하세요.', 'Enregistrement impossible. Réessayez.', 'No se pudo guardar. Inténtalo de nuevo.'],
   'Create deal': ['商談を作成', '거래 만들기', 'Créer l’affaire', 'Crear negocio'],
   'Currency': ['通貨', '통화', 'Devise', 'Moneda'],

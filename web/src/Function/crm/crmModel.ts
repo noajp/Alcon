@@ -118,6 +118,10 @@ export interface CrmPipelineRecord {
   renewal_days: number;
   /** Where renewal deals go; null = this pipeline. */
   renewal_pipeline_id: string | null;
+  /** Why the database could not update the linked success condition last time; null = it could. */
+  measure_error?: string | null;
+  /** When the database last recomputed the linked success condition. */
+  measure_refreshed_at?: string | null;
 }
 export interface CrmCompanyRecord {
   id: string; name: string; domain: string | null; industry: string | null; owner_worker_id: string | null;
