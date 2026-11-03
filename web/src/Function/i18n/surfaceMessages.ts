@@ -5,10 +5,12 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const SURFACE_MESSAGES: Record<string, Row> = {
-  'Portfolio views': ['Portfolio の表示', 'Portfolio 보기', 'Vues du Portfolio', 'Vistas del Portfolio'],
+  'Sub-portfolios': ['Sub-portfolio', 'Sub-portfolio', 'Sub-portfolios', 'Sub-portfolios'],
+  'Add sub-portfolio': ['Sub-portfolio を追加', 'Sub-portfolio 추가', 'Ajouter un sub-portfolio', 'Añadir sub-portfolio'],
+  'Add existing…': ['既存から追加…', '기존에서 추가…', 'Ajouter un existant…', 'Añadir existente…'],
+  'Sub-portfolio of': ['親 Portfolio', '상위 Portfolio', 'Sous-portfolio de', 'Sub-portfolio de'],
   'Find a Portfolio…': ['Portfolio を探す…', 'Portfolio 찾기…', 'Trouver un Portfolio…', 'Buscar un Portfolio…'],
   'Take out of this Portfolio': ['この Portfolio から外す', '이 Portfolio에서 빼기', 'Sortir de ce Portfolio', 'Sacar de este Portfolio'],
-  'No Portfolios inside this one yet.': ['この中にはまだ Portfolio がありません。', '이 안에는 아직 Portfolio가 없습니다.', 'Aucun Portfolio à l’intérieur pour l’instant.', 'Todavía no hay Portfolios dentro.'],
   'Follow': ['フォロー', '팔로우', 'Suivre', 'Seguir'],
   'Unfollow': ['フォローをやめる', '팔로우 취소', 'Ne plus suivre', 'Dejar de seguir'],
   'Your Domains': ['あなたの Domain', '내 Domain', 'Vos Domains', 'Tus Domains'],

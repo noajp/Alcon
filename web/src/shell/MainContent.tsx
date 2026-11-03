@@ -111,6 +111,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               <PortfolioView
                 visionId={navigation.visionId ?? null}
                 onRequestVision={() => { onNavigate({ visionCreate: true }); onViewChange?.('vision'); }}
+                onOpenVision={() => onViewChange?.('vision')}
                 activePortfolioId={navigation.portfolioId ?? null}
                 onSelectPortfolio={(id) => onNavigate({ portfolioId: id })}
                 createRequested={!!navigation.portfolioCreate}

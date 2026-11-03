@@ -28,9 +28,9 @@ export function PageIcon({ children }: { children: ReactNode }) {
   );
 }
 
-/** The page frame: centred, one width and one set of margins for every
- *  concept page. */
-const PAGE_BODY = 'mx-auto w-full max-w-7xl px-8 py-8';
+/** The page frame: one width and one set of margins for every concept page,
+ *  Element detail's — the text starts 30px in, under the header's path. */
+const PAGE_BODY = 'w-full max-w-7xl py-8 pl-[30px] pr-8';
 
 /** A concept page's title type — the one place its size, tracking and colour
  *  are set. Pages that edit their title in a field of their own (Element,
@@ -107,8 +107,11 @@ const message = (e: unknown, fallback: string) => (e instanceof Error ? e.messag
 
 export function PageHead({
   icon, title, description, canEdit, titleLabel, titlePlaceholder, descriptionLabel, descriptionPlaceholder, emptyDescription,
-  onSaveTitle, onSaveDescription,
+  onSaveTitle, onSaveDescription, under,
 }: {
+  /** A line between the title and the description — where it sits
+   *  ("Sub-portfolio of …"). */
+  under?: ReactNode;
   /** The concept's icon, shown above the title (18px). */
   icon?: ReactNode;
   title: string;
@@ -150,6 +153,7 @@ export function PageHead({
       <div>
         {icon && <PageIcon>{icon}</PageIcon>}
         <h1 className={PAGE_TITLE} style={PAGE_TITLE_WEIGHT}>{title}</h1>
+        {under && <div className="mt-2">{under}</div>}
         <div className="mt-4">
           <DescriptionEditor readOnly value={description} emptyText={emptyDescription} placeholder="" onSave={() => {}} />
         </div>
@@ -169,6 +173,7 @@ export function PageHead({
         }}
         className={`w-full resize-none overflow-hidden border-none bg-transparent focus:outline-none ${PAGE_TITLE}`}
         style={PAGE_TITLE_WEIGHT} />
+      {under && <div className="mt-2">{under}</div>}
       <div className="mt-3" aria-label={descriptionLabel}>
         <DescriptionEditor value={description} readOnly={!onSaveDescription}
           placeholder={descriptionPlaceholder} onSave={commitDescription} />
