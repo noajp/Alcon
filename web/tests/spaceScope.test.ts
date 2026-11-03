@@ -13,8 +13,8 @@ describe('space scope', () => {
     expect(spaceScope('other')).toBe('full');
   });
 
-  it('keeps every Strategy and Execution view out of an audit Space', () => {
-    for (const view of [...MODE_META.strategy.views, ...MODE_META.execution.views, 'workload', 'my-elements', 'home']) {
+  it('keeps every Workspace view out of an audit Space', () => {
+    for (const view of [...MODE_META.workspace.views, 'workload', 'my-elements', 'home']) {
       expect(viewInScope(view, 'audit')).toBe(false);
       expect(scopedView(view, 'audit')).toBe('audit');
       expect(viewInScope(view, 'full')).toBe(true);
