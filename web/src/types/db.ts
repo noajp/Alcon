@@ -68,7 +68,6 @@ interface ColumnOverrides {
     labels: string[]
     assignee_worker_ids: string[]
   }
-  subelements: { status: ElementStatus }
   workers: { type: WorkerType; status: WorkerStatus }
   worker_availability: { kind: WorkerAvailabilityKind }
   worker_skills: { level: WorkerSkillLevel }
@@ -273,7 +272,6 @@ interface RowChecks {
   object_domains: Compatible<TableRow<'object_domains'>, H.ObjectDomain>
   objects: Compatible<TableRow<'objects'>, H.AlconObject>
   elements: Compatible<TableRow<'elements'>, H.Element>
-  subelements: Compatible<TableRow<'subelements'>, H.Subelement>
   workers: Compatible<TableRow<'workers'>, H.Worker>
   element_assignees: Compatible<TableRow<'element_assignees'>, H.ElementAssignee>
   element_edges: Compatible<TableRow<'element_edges'>, H.ElementEdge>

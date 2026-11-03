@@ -48,11 +48,11 @@ export function IntentPanel({ change, onCheck, checking, checkError, onOpenFile 
               {intent.data.element.description?.trim() && (
                 <p className="mt-1 line-clamp-6 whitespace-pre-wrap text-[12px] text-[var(--text-secondary)]">{intent.data.element.description}</p>
               )}
-              {intent.data.subelements.length > 0 && (
+              {intent.data.subElements.length > 0 && (
                 <ul className="mt-1.5 space-y-0.5">
-                  {intent.data.subelements.map((s, i) => (
+                  {intent.data.subElements.map((s, i) => (
                     <li key={i} className="flex gap-1.5 text-[12px] text-[var(--text-secondary)]">
-                      <span className="text-muted-foreground">{s.is_completed ? '☑' : '☐'}</span>{s.title}
+                      <span className="text-muted-foreground">{s.done ? '☑' : '☐'}</span>{s.title}
                     </li>
                   ))}
                 </ul>

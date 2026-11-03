@@ -30,13 +30,13 @@ export const ROUTES: readonly Route[] = [
   { method: "GET", path: "/objects", tool: "listObjects", summary: "Objects (archived ones excluded)" },
   { method: "GET", path: "/elements", tool: "listElements", summary: "Elements, filtered" },
   { method: "POST", path: "/elements", tool: "createElement", creates: true, summary: "Create an Element" },
-  { method: "GET", path: "/elements/{id}", tool: "getElement", idArg: "id", summary: "One Element with subelements, labels, assignees and recent comments" },
+  { method: "GET", path: "/elements/{id}", tool: "getElement", idArg: "id", summary: "One Element with its Sub-elements, labels, assignees and recent comments" },
   { method: "PATCH", path: "/elements/{id}", tool: "updateElement", idArg: "id", summary: "Update an Element's fields" },
   { method: "POST", path: "/elements/{id}/comments", tool: "addElementComment", idArg: "elementId", creates: true, summary: "Comment on an Element" },
   { method: "POST", path: "/elements/{id}/assignees", tool: "addElementAssignee", idArg: "elementId", summary: "Assign a Worker to an Element" },
   { method: "PUT", path: "/elements/{id}/labels", tool: "setElementLabels", idArg: "id", summary: "Replace an Element's labels" },
-  { method: "POST", path: "/elements/{id}/subelements", tool: "createSubelement", idArg: "elementId", creates: true, summary: "Add a subelement" },
-  { method: "PATCH", path: "/subelements/{id}", tool: "toggleSubelementComplete", idArg: "id", idIsUuid: true, summary: "Complete or reopen a subelement" },
+  { method: "POST", path: "/elements/{id}/subelements", tool: "createSubelement", idArg: "elementId", creates: true, summary: "Add a Sub-element (an Element under this one)" },
+  { method: "PATCH", path: "/subelements/{id}", tool: "toggleSubelementComplete", idArg: "id", idIsUuid: true, summary: "Complete or reopen a Sub-element" },
   { method: "POST", path: "/elements/{id}/claim", tool: "claimElement", idArg: "elementId", summary: "Take the lease on an Element (who is working on it, on which branch)" },
   { method: "POST", path: "/elements/{id}/release", tool: "releaseElement", idArg: "elementId", summary: "Return the lease on an Element" },
   { method: "POST", path: "/elements/{id}/progress", tool: "logProgress", idArg: "elementId", creates: true, summary: "Report a plan or progress on an Element" },
@@ -228,7 +228,7 @@ export function planRequest(input: {
     return err(403, "forbidden", "This token is read-only");
   }
   if (route.idIsUuid && id !== null && !UUID_RE.test(id)) {
-    return err(404, "not_found", `${route.tool === "getInitiative" ? "Initiative" : "Subelement"} not found`);
+    return err(404, "not_found", `${route.tool === "getInitiative" ? "Initiative" : "Sub-element"} not found`);
   }
 
   const schema = toolDef(route.tool).input_schema as Schema;

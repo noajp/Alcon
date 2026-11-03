@@ -30,7 +30,7 @@ export const INTERNAL_TOOLS: ToolDef[] = [
   },
   {
     name: "complete_subelement",
-    description: "この Element のサブ要素（チェックリスト）のうち、終えたものを完了にする。新しいサブ要素は作らない。",
+    description: "この Element の Sub-element（この Element を親に持つ Element）のうち、終えたものを完了（status done）にする。新しい Sub-element は作らない。",
     input_schema: {
       type: "object",
       properties: { subelement_id: { type: "string" }, note: { type: "string" } },

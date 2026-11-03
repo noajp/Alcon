@@ -6,8 +6,6 @@ import {
   patchElementInExplorer,
   insertElementIntoExplorer,
   removeElementFromExplorer,
-  upsertSubelementInExplorer,
-  removeSubelementFromExplorer,
   upsertAssigneeInExplorer,
   removeAssigneeFromExplorer,
   patchWorkerInExplorer,
@@ -15,12 +13,10 @@ import {
   patchElementInList,
   appendElementToList,
 } from '@/Function/sync/explorerPatch';
-import type { ElementWithDetails, Subelement, Worker } from '@/types/database';
+import type { ElementWithDetails, Worker } from '@/types/database';
 
 const el = (id: string, extra: Partial<ElementWithDetails> = {}): ElementWithDetails =>
-  ({ id, title: id, object_id: 'obj-a', subelements: [], assignees: [], ...extra }) as ElementWithDetails;
-const sub = (id: string, element_id: string, order_index = 0): Subelement =>
-  ({ id, element_id, title: id, order_index, is_completed: false }) as Subelement;
+  ({ id, title: id, object_id: 'obj-a', assignees: [], ...extra }) as ElementWithDetails;
 const worker = (id: string): Worker => ({ id, name: id, type: 'human' }) as Worker;
 
 function tree(): ExplorerData {
@@ -48,7 +44,6 @@ describe('explorer patches keep every untouched reference', () => {
     const before = tree();
     expect(patchElementInExplorer(before, 'nope', { title: 'x' })).toBe(before);
     expect(removeElementFromExplorer(before, 'nope')).toBe(before);
-    expect(removeSubelementFromExplorer(before, 'nope')).toBe(before);
     expect(removeAssigneeFromExplorer(before, 'nope')).toBe(before);
     expect(patchWorkerInExplorer(before, 'nope', { name: 'x' })).toBe(before);
     expect(patchObjectInExplorer(before, 'nope', { name: 'x' })).toBe(before);
@@ -61,18 +56,6 @@ describe('explorer patches keep every untouched reference', () => {
     expect(once.objects[1].elements!.map((e) => e.id)).toEqual(['e3', 'e9']);
     expect(twice).toBe(once);
     expect(once.objects[0]).toBe(before.objects[0]);
-  });
-
-  it('subelements land on their parent, sorted by order, and leave by id alone', () => {
-    const before = tree();
-    const a = upsertSubelementInExplorer(before, sub('s2', 'e1', 2));
-    const b = upsertSubelementInExplorer(a, sub('s1', 'e1', 1));
-    expect(b.objects[0].elements![0].subelements!.map((s) => s.id)).toEqual(['s1', 's2']);
-    expect(b.objects[0].elements![1]).toBe(before.objects[0].elements![1]);
-    const c = upsertSubelementInExplorer(b, sub('s1', 'e1', 1));
-    expect(c.objects[0].elements![0].subelements!.length).toBe(2);
-    const d = removeSubelementFromExplorer(c, 's2');
-    expect(d.objects[0].elements![0].subelements!.map((s) => s.id)).toEqual(['s1']);
   });
 
   it('assignees upsert with their worker and a worker patch reaches every chip', () => {
@@ -117,7 +100,6 @@ describe('flat Explorer RPC normalization', () => {
     expect(after.objects.map((object) => object.id)).toEqual(['obj-a', 'obj-b']);
     expect(after.objects.every((object) => !('children' in object))).toBe(true);
     expect(after.objects[0].elements).toBe(before.objects[0].elements);
-    expect(after.objects[0].elements![0].subelements).toBe(before.objects[0].elements![0].subelements);
     expect(after.objects[0].elements![0].assignees).toBe(before.objects[0].elements![0].assignees);
     expect(after.rootElements).toBe(before.rootElements);
     expect(nestedData.objects[0].children).toEqual([]);

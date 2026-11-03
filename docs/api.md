@@ -14,7 +14,7 @@
 | GET | `/domains` | 参加している Domain | — |
 | GET | `/objects` | Object（アーカイブ済みは除く） | `domainId` |
 | GET | `/elements` | Element の一覧（既定 50 件、最大 200） | `domainId` `objectId` `status` `priority` `dueWithinDays` `overdueOnly` `limit` |
-| GET | `/elements/{id}` | Element の詳細（Subelement・ラベル・担当・直近のコメント） | — |
+| GET | `/elements/{id}` | Element の詳細（Sub-element・ラベル・担当・直近のコメント） | — |
 | GET | `/search` | タイトル・説明の部分一致 | `query`（必須） `domainId` `limit` |
 | GET | `/progress` | ステータスの内訳・完了率・遅延 | `domainId` か `objectId` |
 | GET | `/activity` | 最近の Element の変更 | `domainId` `objectId` `limit` |
@@ -26,14 +26,16 @@
 | POST | `/elements/{id}/comments` | コメントする（201） | `body`（必須） |
 | POST | `/elements/{id}/assignees` | Worker を担当にする | `workerId`（必須） |
 | PUT | `/elements/{id}/labels` | ラベルを置き換える | `labels`（必須） |
-| POST | `/elements/{id}/subelements` | Subelement を足す（201） | `title`（必須） |
-| PATCH | `/subelements/{id}` | Subelement を完了・再開する | `isCompleted`（省略で反転） |
+| POST | `/elements/{id}/subelements` | Sub-element を足す（201） | `title`（必須） |
+| PATCH | `/subelements/{id}` | Sub-element を完了（`done`）・再開（`todo`）する | `isCompleted`（省略で反転） |
 | POST | `/elements/{id}/claim` | 着手を宣言する（lease を取る） | `branch` `session` |
 | POST | `/elements/{id}/release` | lease を返す | `session` |
 | POST | `/elements/{id}/progress` | 計画・進捗を報告する（201） | `title`（必須） `detail` `steps` `session` |
 | POST | `/elements/{id}/outcome` | 作業を締めくくる（201） | `outcome`（必須。`completed / partial / blocked`） `summary`（必須） `message`（必須） `session` |
 
-`{id}` は Element なら UUID か display_id（`ELE_PLT-006` など）、Initiative と Subelement は UUID。GET の入力はクエリ文字列、それ以外は JSON の本文で渡す。`null` を渡せるのは `due_date`・`estimated_hours`・`description`（消す）だけ。ステータスは `backlog / todo / in_progress / review / done / blocked / cancelled`、優先度は `urgent / high / medium / low`、日付は `YYYY-MM-DD`。
+`{id}` は Element なら UUID か display_id（`ELE_PLT-006` など）、Initiative と Sub-element は UUID。GET の入力はクエリ文字列、それ以外は JSON の本文で渡す。`null` を渡せるのは `due_date`・`estimated_hours`・`description`（消す）だけ。ステータスは `backlog / todo / in_progress / review / done / blocked / cancelled`、優先度は `urgent / high / medium / low`、日付は `YYYY-MM-DD`。
+
+Sub-element は、親の Element（`parent_id`）を持つ普通の Element で、親と同じ Object に入る。`/elements/{id}` の `subElements` に並び、それ自体も Element として読み書きできる。
 
 削除、一括変更、Object 間の移動、Object の編集はできない（MCP と同じ）。見える範囲と書ける範囲は、アプリでの本人の権限（RLS）と同じ。担当にできるのは Element と同じ Space の Worker だけ。読み取りのみのトークンは GET だけが通る。着手・報告の4経路の振る舞いは [mcp.md](mcp.md) の「Element を進めるとき」と同じ。
 

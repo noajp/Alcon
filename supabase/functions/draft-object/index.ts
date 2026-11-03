@@ -26,7 +26,7 @@ const SYSTEM_PROMPT = `あなたは Alcon の Object (構造単位) と Element 
 Alcon の概念モデル:
 - Object = 部門 / プロジェクト / 作戦 / 案件 など業界横断の容れ物
 - Element = その中の最小の実行単位 (タスク / 案件 / 仕訳)
-- Subelement (Element のサブタスク) はこの流れでは生成しない。Element までに留める
+- Sub-element（Element の下に置く Element）はこの流れでは生成しない。Element までに留める
 
 与えられた Brief (Note から抽出された構造化情報) を元に、以下を提案してください:
 
@@ -44,7 +44,7 @@ Alcon の概念モデル:
 
 重要:
 - 原文に無い情報を盛らない。action_items を水増ししない
-- Subelement は出さない`;
+- Sub-element は出さない`;
 
 interface RequestBody {
   title?: string;

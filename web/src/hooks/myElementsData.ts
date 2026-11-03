@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Element, ElementAssignee, Subelement, Worker, ElementWithDetails } from '@/types/database';
+import type { Element, ElementAssignee, Worker, ElementWithDetails } from '@/types/database';
 
 export interface MyElementsData {
   elements: ElementWithDetails[];
@@ -52,20 +52,17 @@ async function fetchMyElementsClientSide(userId: string): Promise<MyElementsData
   }
   elementsRaw.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 
-  // 4. Hydrate subelements + assignees + worker details + home Objects.
+  // 4. Hydrate assignees + worker details + home Objects.
   const elementIds = elementsRaw.map((e) => e.id);
-  let subs: Subelement[] = [];
   let allAssignees: ElementAssignee[] = [];
   let allWorkers: Worker[] = [];
   const objectIdsByElement = new Map<string, string[]>();
   let objectNameById = new Map<string, string>();
   if (elementIds.length > 0) {
-    const [{ data: subData }, { data: assigneeData }, { data: eoData }] = await Promise.all([
-      supabase.from('subelements').select('*').in('element_id', elementIds).order('order_index'),
+    const [{ data: assigneeData }, { data: eoData }] = await Promise.all([
       supabase.from('element_assignees').select('*').in('element_id', elementIds),
       supabase.from('element_objects').select('element_id, object_id').in('element_id', elementIds),
     ]);
-    subs = (subData || []) as Subelement[];
     allAssignees = (assigneeData || []) as ElementAssignee[];
     for (const e of elementsRaw) {
       if (e.object_id) objectIdsByElement.set(e.id, [e.object_id]);
@@ -96,7 +93,6 @@ async function fetchMyElementsClientSide(userId: string): Promise<MyElementsData
       .filter((o) => o.name);
     return {
       ...e,
-      subelements: subs.filter((s) => s.element_id === e.id),
       assignees: allAssignees
         .filter((a) => a.element_id === e.id)
         .map((a) => ({ ...a, worker: allWorkers.find((w) => w.id === a.worker_id) })),

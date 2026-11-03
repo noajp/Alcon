@@ -16,7 +16,7 @@ import type { ElementWithDetails } from '@/types/database';
 
 type Times = { closedAt: Map<string, string>; truncated: boolean };
 const TIMES_KEY = ['elementClosedTimes', '2026-10-03T00:00:00.000Z'];
-const el = (id: string, status: string | null) => ({ id, status, subelements: [], assignees: [] }) as unknown as ElementWithDetails;
+const el = (id: string, status: string | null) => ({ id, status, assignees: [] }) as unknown as ElementWithDetails;
 const explorer = (): ExplorerData => ({
   objects: [{ id: 'o', name: 'O', elements: [el('open', 'todo'), el('done', 'done')] }] as ExplorerData['objects'],
   rootElements: [el('root', null)],

@@ -5,6 +5,8 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const SURFACE_MESSAGES: Record<string, Row> = {
+  'Sub-element of': ['親 Element', '상위 Element', 'Sous-element de', 'Sub-element de'],
+  'Mark as not done': ['未完了に戻す', '미완료로 되돌리기', 'Marquer comme non terminé', 'Marcar como no hecho'],
   'Sub-portfolios': ['Sub-portfolio', 'Sub-portfolio', 'Sub-portfolios', 'Sub-portfolios'],
   'Add sub-portfolio': ['Sub-portfolio を追加', 'Sub-portfolio 추가', 'Ajouter un sub-portfolio', 'Añadir sub-portfolio'],
   'Add existing…': ['既存から追加…', '기존에서 추가…', 'Ajouter un existant…', 'Añadir existente…'],

@@ -24,7 +24,7 @@ export interface TaskContext {
     labels: string[];
   };
   objectName: string | null;
-  subelements: { id: string; title: string; is_completed: boolean }[];
+  subElements: { id: string; title: string; done: boolean }[];
   initiatives: { name: string; description: string | null; intents: { kind: string | null; title: string; status: string | null }[] }[];
   comments: { author: string; kind: string; content: string; at: string }[];
   previousRuns: { at: string; status: string; summary: string | null }[];
@@ -62,7 +62,7 @@ function bullet(lines: string[], empty = "(なし)"): string {
 
 export function taskMessage(ctx: TaskContext): string {
   const el = ctx.element;
-  const subs = ctx.subelements.map((s) => `- [${s.is_completed ? "x" : " "}] ${s.title} (id: ${s.id})`);
+  const subs = ctx.subElements.map((s) => `- [${s.done ? "x" : " "}] ${s.title} (id: ${s.id})`);
   const inits = ctx.initiatives.map((i) => {
     const intents = i.intents.map((x) => `  - ${x.kind ?? "intent"}: ${x.title}${x.status ? `（${x.status}）` : ""}`);
     return `- ${i.name}${i.description ? ` — ${i.description}` : ""}${intents.length ? `\n${intents.join("\n")}` : ""}`;

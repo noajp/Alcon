@@ -334,7 +334,7 @@ export function useReviewInbox(spaceId: string | null, userId: string | null) {
 
 export interface ElementIntent {
   element: { id: string; display_id: string | null; title: string; description: string | null };
-  subelements: { title: string; is_completed: boolean }[];
+  subElements: { title: string; done: boolean }[];
   initiatives: {
     id: string;
     name: string;
@@ -355,7 +355,7 @@ export function useElementIntent(elementId: string | null) {
         .select('id, display_id, title, description, object_id').eq('id', elementId!).single();
       if (error) throw error;
       const [subs, links] = await Promise.all([
-        supabase.from('subelements').select('title, is_completed').eq('element_id', elementId!).order('order_index'),
+        supabase.from('elements').select('title, status').eq('parent_id', elementId!).order('order_index'),
         el.object_id
           ? supabase.from('strategy_objects').select('strategy_id').eq('object_id', el.object_id)
           : Promise.resolve({ data: [] as { strategy_id: string }[], error: null }),
@@ -371,7 +371,7 @@ export function useElementIntent(elementId: string | null) {
       const intentRows = (intents.data ?? []) as { id: string; strategy_id: string; kind: string | null; title: string; subtitle: string | null }[];
       return {
         element: { id: el.id, display_id: el.display_id, title: el.title, description: el.description },
-        subelements: ((subs.data ?? []) as { title: string; is_completed: boolean | null }[]).map((s) => ({ title: s.title, is_completed: !!s.is_completed })),
+        subElements: ((subs.data ?? []) as { title: string; status: string | null }[]).map((s) => ({ title: s.title, done: s.status === 'done' })),
         initiatives: ((strategies.data ?? []) as { id: string; name: string; description: string | null }[]).map((s) => ({
           ...s,
           intents: intentRows.filter((i) => i.strategy_id === s.id && i.title?.trim())

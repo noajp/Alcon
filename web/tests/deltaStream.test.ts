@@ -5,7 +5,7 @@ import type { ExplorerData } from '@/Function/sync/explorerPatch';
 import type { ElementComment, ElementWithDetails, Worker } from '@/types/database';
 
 const el = (id: string, extra: Partial<ElementWithDetails> = {}): ElementWithDetails =>
-  ({ id, title: id, object_id: 'obj-a', owner_id: null, subelements: [], assignees: [], ...extra }) as ElementWithDetails;
+  ({ id, title: id, object_id: 'obj-a', owner_id: null, assignees: [], ...extra }) as ElementWithDetails;
 
 function seed() {
   const qc = new QueryClient();
@@ -137,14 +137,6 @@ describe('applyWorkspaceDelta', () => {
     applyWorkspaceDelta(qc, ctx, delta('elements', 'DELETE', {}, { id: 'e1' }));
     expect(qc.getQueryData<ExplorerData>(['explorer', '__all__'])!.objects[0].elements!.map((e) => e.id)).toEqual(['e2']);
     expect(qc.getQueryData(['element', 'e1', 'comments'])).toBeUndefined();
-  });
-
-  it('a subelement INSERT then DELETE round-trips on the parent', () => {
-    const qc = seed();
-    applyWorkspaceDelta(qc, ctx, delta('subelements', 'INSERT', { id: 's1', element_id: 'e1', title: 's', order_index: 0 }));
-    expect(qc.getQueryData<ExplorerData>(['explorer', '__all__'])!.objects[0].elements![0].subelements!.length).toBe(1);
-    applyWorkspaceDelta(qc, ctx, delta('subelements', 'DELETE', {}, { id: 's1' }));
-    expect(qc.getQueryData<ExplorerData>(['explorer', '__all__'])!.objects[0].elements![0].subelements!.length).toBe(0);
   });
 
   it('an assignment resolves its worker from the caches', () => {

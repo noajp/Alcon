@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Board tools — Domain / Object / Element / Subelement reads and writes that
+// Board tools — Domain / Object / Element / Sub-element reads and writes that
 // run with the caller's JWT, so RLS decides what each call can see and touch.
 //
 // Shared by the in-app Copilot (alcon-copilot) and the MCP server
@@ -67,7 +67,7 @@ export const BOARD_TOOLS: ToolDef[] = [
   },
   {
     name: "getElement",
-    description: "Element 単体のフル詳細（subelements / labels / assignees / 所属 Object / 直近のコメント10件を含む）",
+    description: "Element 単体のフル詳細（Sub-element（この Element を親に持つ Element）/ labels / assignees / 所属 Object / 直近のコメント10件を含む）",
     input_schema: {
       type: "object",
       properties: { id: { type: "string", description: "Element UUID または ELE-NNN 形式の display_id" } },
@@ -171,7 +171,7 @@ export const BOARD_TOOLS: ToolDef[] = [
   },
   {
     name: "deleteElement",
-    description: "Element を削除する。subelements と element_objects は CASCADE で消える（DB 制約に従う）。破壊的なので必ず予告してから呼ぶ。",
+    description: "Element を削除する。Sub-element（子の Element）と element_objects は CASCADE で消える（DB 制約に従う）。破壊的なので必ず予告してから呼ぶ。",
     input_schema: {
       type: "object",
       properties: { id: { type: "string", description: "Element id (UUID または ELE-NNN)" } },
@@ -219,10 +219,10 @@ export const BOARD_TOOLS: ToolDef[] = [
     },
   },
 
-  // ── Write: Subelement ───────────────────────────────────────────────────
+  // ── Write: Sub-element (an Element under another) ───────────────────────
   {
     name: "createSubelement",
-    description: "Subelement (チェックリスト 1 行) を Element の下に作成する。",
+    description: "Sub-element を Element の下に作成する。Sub-element は親 Element（parent_id）を持つ普通の Element で、親と同じ Object に入る。",
     input_schema: {
       type: "object",
       properties: {
@@ -235,11 +235,11 @@ export const BOARD_TOOLS: ToolDef[] = [
   },
   {
     name: "toggleSubelementComplete",
-    description: "Subelement の完了状態をトグル、または指定値にセット。isCompleted を渡さない時は反転。",
+    description: "Sub-element を完了（status done）/ 再開（status todo）する。isCompleted を渡さない時は反転。",
     input_schema: {
       type: "object",
       properties: {
-        id: { type: "string", description: "Subelement UUID" },
+        id: { type: "string", description: "Sub-element の Element UUID" },
         isCompleted: { type: "boolean", description: "省略時は現在値を反転" },
       },
       required: ["id"],
@@ -248,13 +248,13 @@ export const BOARD_TOOLS: ToolDef[] = [
   },
   {
     name: "updateSubelement",
-    description: "Subelement のタイトル / 完了状態を更新。",
+    description: "Sub-element のタイトル / 完了状態を更新。",
     input_schema: {
       type: "object",
       properties: {
-        id: { type: "string", description: "Subelement UUID" },
+        id: { type: "string", description: "Sub-element の Element UUID" },
         title: { type: "string" },
-        is_completed: { type: "boolean" },
+        isCompleted: { type: "boolean", description: "true で status done、false で todo" },
       },
       required: ["id"],
       additionalProperties: false,
@@ -262,10 +262,10 @@ export const BOARD_TOOLS: ToolDef[] = [
   },
   {
     name: "deleteSubelement",
-    description: "Subelement を削除。",
+    description: "Sub-element を削除。",
     input_schema: {
       type: "object",
-      properties: { id: { type: "string", description: "Subelement UUID" } },
+      properties: { id: { type: "string", description: "Sub-element の Element UUID" } },
       required: ["id"],
       additionalProperties: false,
     },
@@ -455,15 +455,15 @@ export async function resolveElementId(supabase: SupabaseClient, idArg: string):
 }
 
 /**
- * The visible Element a Subelement belongs to, or null. subelements RLS is
- * wider than elements' (any signed-in user), so a Subelement id alone must
- * not reach a write: its parent has to pass resolveElementId first.
+ * The visible parent of a Sub-element (an Element with a parent_id), or
+ * null when the id is not a Sub-element the caller can see. The Sub-element
+ * tools act only on Elements under another, never on a top-level Element.
  */
 async function visibleSubelementParent(supabase: SupabaseClient, subelementId: string): Promise<string | null> {
   if (!UUID_RE.test(subelementId)) return null;
-  const { data } = await supabase.from("subelements").select("element_id").eq("id", subelementId).maybeSingle();
-  if (!data?.element_id) return null;
-  return await resolveElementId(supabase, data.element_id as string);
+  const { data } = await supabase.from("elements").select("parent_id").eq("id", subelementId).maybeSingle();
+  if (!data?.parent_id) return null;
+  return await resolveElementId(supabase, data.parent_id as string);
 }
 
 // "done" → progress 100; "todo" / "backlog" → null. Mirrors the client's
@@ -566,9 +566,10 @@ export async function runBoardTool(
         if (error) throw error;
         if (!el) return { ok: false, error: "Element not found" };
         const [subs, assignees, homes, comments] = await Promise.all([
-          supabase.from("subelements")
-            .select("id, seq_number, title, is_completed, order_index")
-            .eq("element_id", elementId).order("order_index", { ascending: true }),
+          supabase.from("elements")
+            .select("id, display_id, seq_number, title, status, order_index")
+            .eq("parent_id", elementId)
+            .order("order_index", { ascending: true }).order("seq_number", { ascending: true }),
           supabase.from("element_assignees")
             .select("worker_id, worker:workers(id, name)")
             .eq("element_id", elementId),
@@ -583,7 +584,7 @@ export async function runBoardTool(
           ok: true,
           data: {
             ...el,
-            subelements: subs.data ?? [],
+            subElements: subs.data ?? [],
             assignees: assignees.data ?? [],
             objects: homes.data ?? [],
             recentComments: comments.data ?? [],
@@ -825,62 +826,79 @@ export async function runBoardTool(
         return { ok: true, data: { id, objectId }, meta: { rows: 1 } };
       }
 
-      // ── Write: Subelement ─────────────────────────────────────────────
+      // ── Write: Sub-element (an Element under another) ─────────────────
       case "createSubelement": {
         const elementId = await resolveElementId(supabase, String(input.elementId ?? ""));
         if (!elementId) return { ok: false, error: "Element not found" };
         const title = String(input.title ?? "").trim();
         if (!title) return { ok: false, error: "title is required" };
+        // A Sub-element lives where its parent lives: the parent's Object, or
+        // the parent's owner when it sits in no Object.
+        const { data: parent, error: parentError } = await supabase
+          .from("elements").select("object_id, owner_id").eq("id", elementId).single();
+        if (parentError) throw parentError;
+        const { data: last } = await supabase
+          .from("elements").select("order_index").eq("parent_id", elementId)
+          .order("order_index", { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
         const { data, error } = await supabase
-          .from("subelements").insert({ element_id: elementId, title })
-          .select("id, seq_number, title, is_completed").single();
+          .from("elements").insert({
+            title, parent_id: elementId, status: "todo",
+            object_id: parent.object_id ?? null,
+            owner_id: parent.object_id ? null : parent.owner_id ?? null,
+            order_index: ((last?.order_index as number | null) ?? -1) + 1,
+          })
+          .select("id, display_id, seq_number, title, status, parent_id").single();
         if (error) throw error;
-        await audit(supabase, actor, elementId, `Added subelement “${title}”`);
+        await audit(supabase, actor, elementId, `Added sub-element “${title}”`);
         return { ok: true, data, meta: { rows: 1 } };
       }
 
       case "toggleSubelementComplete": {
         const id = String(input.id ?? "");
         if (!id) return { ok: false, error: "id is required" };
-        if (!(await visibleSubelementParent(supabase, id))) return { ok: false, error: "Subelement not found" };
-        let nextValue: boolean;
+        const parentId = await visibleSubelementParent(supabase, id);
+        if (!parentId) return { ok: false, error: "Sub-element not found" };
+        let nextDone: boolean;
         if (input.isCompleted !== undefined) {
-          nextValue = !!input.isCompleted;
+          nextDone = !!input.isCompleted;
         } else {
           const { data: cur } = await supabase
-            .from("subelements").select("is_completed").eq("id", id).maybeSingle();
-          if (!cur) return { ok: false, error: "Subelement not found" };
-          nextValue = !cur.is_completed;
+            .from("elements").select("status").eq("id", id).maybeSingle();
+          if (!cur) return { ok: false, error: "Sub-element not found" };
+          nextDone = cur.status !== "done";
         }
         const { data, error } = await supabase
-          .from("subelements").update({ is_completed: nextValue }).eq("id", id)
-          .select("id, element_id, title, is_completed").single();
+          .from("elements").update(normalizeStatusPatch({ status: nextDone ? "done" : "todo" }))
+          .eq("id", id).not("parent_id", "is", null)
+          .select("id, parent_id, title, status").single();
         if (error) throw error;
-        await audit(supabase, actor, data.element_id, `${nextValue ? "Completed" : "Reopened"} subelement “${data.title}”`);
+        await audit(supabase, actor, parentId, `${nextDone ? "Completed" : "Reopened"} sub-element “${data.title}”`);
         return { ok: true, data, meta: { rows: 1 } };
       }
 
       case "updateSubelement": {
         const id = String(input.id ?? "");
         if (!id) return { ok: false, error: "id is required" };
-        if (!(await visibleSubelementParent(supabase, id))) return { ok: false, error: "Subelement not found" };
-        const patch: Record<string, unknown> = {};
+        const parentId = await visibleSubelementParent(supabase, id);
+        if (!parentId) return { ok: false, error: "Sub-element not found" };
+        let patch: Record<string, unknown> = {};
         if (input.title !== undefined) patch.title = String(input.title);
-        if (input.is_completed !== undefined) patch.is_completed = !!input.is_completed;
+        if (input.isCompleted !== undefined) patch.status = input.isCompleted ? "done" : "todo";
         if (Object.keys(patch).length === 0) return { ok: false, error: "no fields to update" };
+        patch = normalizeStatusPatch(patch);
         const { data, error } = await supabase
-          .from("subelements").update(patch).eq("id", id)
-          .select("id, element_id, title, is_completed").single();
+          .from("elements").update(patch).eq("id", id).not("parent_id", "is", null)
+          .select("id, parent_id, title, status").single();
         if (error) throw error;
-        await audit(supabase, actor, data.element_id, `Updated subelement “${data.title}”`);
+        await audit(supabase, actor, parentId, `Updated sub-element “${data.title}”`);
         return { ok: true, data, meta: { rows: 1 } };
       }
 
       case "deleteSubelement": {
         const id = String(input.id ?? "");
         if (!id) return { ok: false, error: "id is required" };
-        if (!(await visibleSubelementParent(supabase, id))) return { ok: false, error: "Subelement not found" };
-        const { error } = await supabase.from("subelements").delete().eq("id", id);
+        if (!(await visibleSubelementParent(supabase, id))) return { ok: false, error: "Sub-element not found" };
+        const { error } = await supabase.from("elements").delete().eq("id", id).not("parent_id", "is", null);
         if (error) throw error;
         return { ok: true, data: { id, deleted: true }, meta: { rows: 1 } };
       }

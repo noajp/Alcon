@@ -73,7 +73,7 @@ const SYSTEM_PROMPT = `あなたは Alcon（組織活動支援ツール）の Co
 - Strategy: strategy で Vision / Portfolio / Initiative の一覧、Portfolio と Initiative の削除
 - 読み: 一覧 / 検索 / 詳細 / 進捗集計 / 履歴 / Worker 一覧
 - Element: 作成 / 更新 / 削除 / 別 Object へ移動 / multi-home 追加・解除
-- Subelement: 作成 / 完了切替 / 更新 / 削除
+- Sub-element（Element の下に置く Element）: 作成 / 完了切替 / 更新 / 削除
 - Object: 作成 / 更新 / 削除
 - 関連: assignee の追加・削除 / labels 設定 / comment 投稿
 - Bulk: 複数 Element の一括更新・一括削除

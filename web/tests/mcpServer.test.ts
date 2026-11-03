@@ -193,11 +193,11 @@ describe('board tools', () => {
     expect(writes).toEqual([]);
   });
 
-  it('does not toggle a subelement whose Element the caller cannot see', async () => {
+  it('does not toggle a Sub-element whose parent the caller cannot see', async () => {
     const SUB = 'aaaaaaaa-aaaa-aaaa-aaaa-000000000001';
-    const { db, writes } = fakeDb({ elements: [], subelements: [{ id: SUB, element_id: OTHER, title: 'hidden', is_completed: false }] });
+    const { db, writes } = fakeDb({ elements: [{ id: SUB, parent_id: OTHER, title: 'hidden', status: 'todo' }] });
     const res = await runBoardTool(db, 'toggleSubelementComplete', { id: SUB, isCompleted: true }, { agent: 'AI (MCP)', userId: 'user-1' });
-    expect(res).toEqual({ ok: false, error: 'Subelement not found' });
+    expect(res).toEqual({ ok: false, error: 'Sub-element not found' });
     expect(writes).toEqual([]);
   });
 
