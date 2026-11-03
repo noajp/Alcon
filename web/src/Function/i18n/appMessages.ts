@@ -463,6 +463,14 @@ const APP_MESSAGES: Record<string, Row> = {
   "Action": ["行動", "작업", "Action", "Acción"],
   "To do": ["未着手", "할 일", "À faire", "Por hacer"],
   "No target": ["目標値なし", "목표값 없음", "Sans cible", "Sin objetivo"],
+  "Alcon (AI platform)": ["Alcon（AI 基盤）", "Alcon(AI 플랫폼)", "Alcon (plateforme IA)", "Alcon (plataforma de IA)"],
+  "Hand to Claude Code": ["Claude Code に渡す", "Claude Code에 넘기기", "Confier à Claude Code", "Pasar a Claude Code"],
+  "Hand {n} to Claude Code": ["{n} 件を Claude Code に渡す", "{n}건을 Claude Code에 넘기기", "Confier {n} à Claude Code", "Pasar {n} a Claude Code"],
+  "Handed to Claude Code": ["Claude Code に渡し済み", "Claude Code에 넘김", "Confié à Claude Code", "Pasado a Claude Code"],
+  "Handing over…": ["渡しています…", "넘기는 중…", "Transmission…", "Pasando…"],
+  "Runs on": ["実行する場所", "실행 위치", "S’exécute sur", "Se ejecuta en"],
+  "Work handed to this agent runs in Claude Code on a developer's machine, started by the dev loop's dispatcher. It is not charged to the Space's AI budget.": ["このエージェントに渡した仕事は、開発者のマシン上の Claude Code で実行されます。開発ループの dispatcher が起動し、Space の AI 予算には計上されません。", "이 에이전트에게 넘긴 작업은 개발자 머신의 Claude Code에서 실행됩니다. 개발 루프의 dispatcher가 시작하며 Space의 AI 예산에 포함되지 않습니다.", "Le travail confié à cet agent s’exécute dans Claude Code sur la machine d’un développeur, lancé par le dispatcher de la boucle de développement. Il n’est pas imputé au budget IA de l’espace.", "El trabajo que se pasa a este agente se ejecuta en Claude Code en la máquina de un desarrollador, iniciado por el dispatcher del ciclo de desarrollo. No se carga al presupuesto de IA del Space."],
+  "{n} could not be handed to Claude Code.": ["{n} 件を Claude Code に渡せませんでした。", "{n}건을 Claude Code에 넘기지 못했습니다.", "{n} n’ont pas pu être confiés à Claude Code.", "No se pudieron pasar {n} a Claude Code."],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(APP_MESSAGES).map(([key, row]) => [key, row[index]]));

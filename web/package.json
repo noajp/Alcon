@@ -19,6 +19,7 @@
     "unwired-lint:update": "node scripts/unwired-lint.mjs --update",
     "gen:types": "head -2 src/types/supabase.ts > src/types/supabase.ts.tmp && npx supabase@2.65.5 gen types typescript --project-id rkugtcqztkkacvoylupw --schema public >> src/types/supabase.ts.tmp && mv src/types/supabase.ts.tmp src/types/supabase.ts",
     "sync": "node ../.claude/ops/git-sync.mjs",
+    "dispatch": "node ../.claude/ops/dispatch.mjs",
     "sync:dry": "node ../.claude/ops/git-sync.mjs --dry-run"
   },
   "overrides": {

@@ -7,7 +7,7 @@ Alcon を Alcon で開発するための規約。普段のセッションでは�
 
 ## 前提
 
-- 開発の仕事は、Domain「Alcon開発」の Object にある Element として管理する。外部の TODO リストを作らない
+- 開発の仕事は、開発 Domain（`dev_control.domain_id`）の Object にある Element として管理する。外部の TODO リストを作らない
 - ユーザーの判断が要るものは、Object「Decisions — 判断」に Element として作る
 - アプリ内の AI（`alcon-copilot` / `run-agent` など）はこの開発では使わない。API の費用がかかるため
 - ID（Worker・Domain・Object）はこのファイルに書かず、毎回 DB から引く
@@ -41,6 +41,17 @@ order by (e.phase_id is not null) desc,
 6. **完了を書く** — `node .claude/ops/lease.mjs release <display_id> --text "✔ 完了 — 結果"`。`progress=100`、`status=done`
 
 途中経過は `node .claude/ops/lease.mjs comment <id> --text "…"` で Element にコメントする。このコメントが、その Element を作業中として押さえておく期限（`claim_expires_at`）を延ばす。書き出しは `▶ 着手` / `● 進捗` / `⬆ PR — URL` / `✔ 完了` / `■ Blocked — 原因と必要な判断`。
+
+## Alcon から渡された仕事（dispatcher）
+
+人が Element を Claude Code に渡すと、その Element に `dispatch` ラベルが付く（Initiative の計画タブで案を承認したとき、実行タブの「Claude Code に渡す」）。primary checkout で `cd web && npm run dispatch` を動かしておくと、`.claude/ops/dispatch.mjs` が1分ごとに次の Element を探し、1件ずつ新しい worktree（`.claude/worktrees/agent-<display_id>`）で headless の Claude Code を起動する。
+
+- 開発 Domain（`dev_control.domain_id`）にあり、`dispatch` ラベル付き、`todo` か `in_progress`
+- 担当に `ai_config.runner = 'claude-code'` の Worker がいる
+- lease を誰も持っていない（期限切れを含む）
+- 同時に動かすのは `dev_control.max_concurrent` 件まで。`paused` の間は起動しない
+
+起動されたセッションは `.claude/ops/prompts/implement.md` の指示で、この skill の手順どおりに1件だけ進め、完了か Blocked で `dispatch` ラベルを外して終わる。ログは `$TMPDIR/dev-loop-<key>-agent-<display_id>.log`、終了は `dev_events` の `agent_exited`。`dispatch` の付いていない Element（Claude に割り当て済みの過去の backlog など）は起動しない。
 
 ## 止まるのは4つだけ
 
@@ -116,7 +127,7 @@ Initiative のコメントで `@Claude` を含むものだけが依頼。それ�
 
 | スクリプト | 役割 |
 |---|---|
-| `board-listen.mjs` | Alcon開発 Domain の変化を realtime で受けてログに書く。通知が欲しいセッションは `tail -n0 -F $TMPDIR/dev-loop-*-board-listen.log` を Monitor で見る。他の worktree が動かしているものを止めない |
+| `board-listen.mjs` | 開発 Domain の変化を realtime で受けてログに書く。通知が欲しいセッションは `tail -n0 -F $TMPDIR/dev-loop-*-board-listen.log` を Monitor で見る。他の worktree が動かしているものを止めない |
 | `stall-check.mjs` | `in_progress` のまま25分コメントがない Element を `STALLED` と出す。`--once` で一度だけ確認 |
 | `lease.mjs` | Element を作業中として押さえる・コメントする・離す（`elements.claimed_by` / `branch` / `claim_expires_at`）。`whoami` で自分の名前。同じフォルダ名の checkout が2つあるときは `LOOP_HOLDER` で名前を固定する |
 | `loop-report.mjs` | 直近24時間の動きとスクリプトの状態。`--post <file> --author <名前> --initiative <Initiative 名>` でコメントとして投稿 |
