@@ -187,14 +187,10 @@ function PortfolioTree({ tree, byPortfolio, healthById, talliesById, onOpen, onN
   const [folded, setFolded] = useState<Set<string>>(new Set());
   const isOpen = (id: string) => !folded.has(id);
   const rows = useMemo(() => flattenTree(tree, (id) => !folded.has(id)), [tree, folded]);
-  // The fold arrows take a gutter at the left of each row — but only when
-  // something nests. A flat list keeps its cards flush with the page, like
-  // the Initiative list.
-  const gutter = tree.some((n) => n.children.length > 0);
   return (
     <>
       {rows.map((node) => (
-        <PortfolioTreeRow key={node.portfolio.id} node={node} tree={tree} gutter={gutter}
+        <PortfolioTreeRow key={node.portfolio.id} node={node} tree={tree}
           rollup={rollupPortfolio(node, byPortfolio, healthById, talliesById)}
           open={isOpen(node.portfolio.id)}
           onToggle={() => setFolded((prev) => { const n = new Set(prev); if (n.has(node.portfolio.id)) n.delete(node.portfolio.id); else n.add(node.portfolio.id); return n; })}
@@ -204,8 +200,8 @@ function PortfolioTree({ tree, byPortfolio, healthById, talliesById, onOpen, onN
   );
 }
 
-function PortfolioTreeRow({ node, tree, gutter, rollup, open, onToggle, onOpen, onNewInside }: {
-  node: PortfolioNode; tree: PortfolioNode[]; gutter: boolean; rollup: PortfolioRollup;
+function PortfolioTreeRow({ node, tree, rollup, open, onToggle, onOpen, onNewInside }: {
+  node: PortfolioNode; tree: PortfolioNode[]; rollup: PortfolioRollup;
   open: boolean; onToggle: () => void; onOpen: () => void; onNewInside: () => void;
 }) {
   const { t } = useI18n();
@@ -226,7 +222,7 @@ function PortfolioTreeRow({ node, tree, gutter, rollup, open, onToggle, onOpen, 
               aria-label={open ? t('Collapse {name}', { name: portfolio.name }) : t('Expand {name}', { name: portfolio.name })} aria-expanded={open}>
               <DisclosureTriangle open={open} />
             </button>
-          ) : gutter ? <span aria-hidden className="size-6 shrink-0" /> : undefined}
+          ) : undefined}
           renameField={renaming ? (
             <RenameInput initial={portfolio.name} className="text-[13px] font-semibold"
               onCommit={(v) => { setRenaming(false); if (v.trim() && v.trim() !== portfolio.name) void guarded(() => updatePortfolio(portfolio.id, { name: v.trim() })); }}

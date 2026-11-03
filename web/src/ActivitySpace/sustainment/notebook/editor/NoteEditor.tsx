@@ -1099,7 +1099,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         }
         .note-editor table[data-note-table="true"] th,
         .note-editor table[data-note-table="true"] td {
-          border: 1px solid var(--border);
+          /* Ruled so a table reads as one: --border alone is too faint to
+             see on the dark ground. */
+          border: 1px solid color-mix(in oklab, var(--foreground) 20%, transparent);
           padding: 0.4rem 0.6rem;
           text-align: left;
           vertical-align: top;
