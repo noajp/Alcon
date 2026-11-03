@@ -24,17 +24,18 @@ export interface StarterInitiative {
   objectKeys: string[];
 }
 
-export interface StarterPortfolio {
+/** A top-level Initiative and the Initiatives nested in it. */
+export interface StarterInitiativeGroup {
   name: string;
   description: string;
-  initiatives: StarterInitiative[];
+  children: StarterInitiative[];
 }
 
 export interface StarterContent {
   domain: { name: string; identifier: string; description: string };
   objects: StarterObject[];
   vision: { name: string; statement: string };
-  portfolios: StarterPortfolio[];
+  initiatives: StarterInitiativeGroup[];
 }
 
 const ja: StarterContent = {
@@ -105,11 +106,11 @@ const ja: StarterContent = {
     name: 'アプリの使い方をマスターする',
     statement: 'チームの全員が、意図（Strategy）と行動（Execution）を Alcon の上で行き来できる。',
   },
-  portfolios: [
+  initiatives: [
     {
       name: '基本を身につける',
       description: '考え方を理解し、Space を使える状態にする。',
-      initiatives: [
+      children: [
         { name: 'Alcon の考え方を理解する', description: '3 つの分類と Domain → Object → Element の階層を、自分の言葉で説明できるようになる。', objectKeys: ['concepts'] },
         { name: 'Space を使える状態にする', description: 'メンバー・AI エージェント・通知・表示を整え、チームで使い始められるようにする。', objectKeys: ['space'] },
       ],
@@ -117,7 +118,7 @@ const ja: StarterContent = {
     {
       name: '実務で使いこなす',
       description: '実際の仕事を Alcon に乗せ、意図と結びつける。',
-      initiatives: [
+      children: [
         { name: '日々の実行を Element にする', description: '自分たちの Domain・Object・Element を作り、担当と期限を持たせる。', objectKeys: ['execution'] },
         { name: '意図と実行を結びつける', description: 'Vision と Initiative を書き、Object を結びつけて、目的と実行状況を行き来できるようにする。', objectKeys: ['strategy'] },
         { name: '仕事道具を活用する', description: 'Notebook・Table・Calendar・Workload を日常の仕事に組み込む。', objectKeys: ['sustainment'] },
@@ -194,11 +195,11 @@ const en: StarterContent = {
     name: 'Master the app',
     statement: 'Everyone on the team moves between intent (Strategy) and action (Execution) in Alcon.',
   },
-  portfolios: [
+  initiatives: [
     {
       name: 'Learn the basics',
       description: 'Understand the model and get the Space ready.',
-      initiatives: [
+      children: [
         { name: 'Understand how Alcon thinks', description: 'Be able to explain the three areas and Domain → Object → Element in your own words.', objectKeys: ['concepts'] },
         { name: 'Get the Space ready', description: 'Set up members, AI agents, notifications and appearance so the team can start.', objectKeys: ['space'] },
       ],
@@ -206,7 +207,7 @@ const en: StarterContent = {
     {
       name: 'Use it for real work',
       description: 'Put actual work into Alcon and tie it to intent.',
-      initiatives: [
+      children: [
         { name: 'Put daily execution on the board', description: 'Create your own Domains, Objects and Elements with assignees and due dates.', objectKeys: ['execution'] },
         { name: 'Connect intent and execution', description: 'Write a Vision and Initiatives and link Objects, so purpose and progress are one click apart.', objectKeys: ['strategy'] },
         { name: 'Put the tools to work', description: 'Bring Notebook, Table, Calendar and Workload into everyday work.', objectKeys: ['sustainment'] },
@@ -346,11 +347,11 @@ const ko: StarterContent = {
     "name": "앱 사용법 마스터하기",
     "statement": "팀 전원이 Alcon에서 의도(Strategy)와 행동(Execution)을 오갈 수 있다."
   },
-  "portfolios": [
+  "initiatives": [
     {
       "name": "기본 익히기",
       "description": "사고방식을 이해하고 Space를 쓸 수 있는 상태로 만듭니다.",
-      "initiatives": [
+      "children": [
         {
           "name": "Alcon의 사고방식 이해하기",
           "description": "세 영역과 Domain → Object → Element 계층을 자신의 말로 설명할 수 있게 됩니다.",
@@ -370,7 +371,7 @@ const ko: StarterContent = {
     {
       "name": "실무에서 활용하기",
       "description": "실제 업무를 Alcon에 올리고 의도와 연결합니다.",
-      "initiatives": [
+      "children": [
         {
           "name": "일상의 실행을 보드에 올리기",
           "description": "우리 Domain·Object·Element를 만들고 담당자와 기한을 둡니다.",
@@ -528,11 +529,11 @@ const fr: StarterContent = {
     "name": "Maîtriser l’application",
     "statement": "Toute l’équipe passe de l’intention (Strategy) à l’action (Execution) dans Alcon."
   },
-  "portfolios": [
+  "initiatives": [
     {
       "name": "Apprendre les bases",
       "description": "Comprendre le modèle et préparer le Space.",
-      "initiatives": [
+      "children": [
         {
           "name": "Comprendre la logique d’Alcon",
           "description": "Savoir expliquer avec ses propres mots les trois domaines et Domain → Object → Element.",
@@ -552,7 +553,7 @@ const fr: StarterContent = {
     {
       "name": "L’utiliser pour le vrai travail",
       "description": "Mettre le travail réel dans Alcon et le relier à l’intention.",
-      "initiatives": [
+      "children": [
         {
           "name": "Mettre l’exécution quotidienne sur le tableau",
           "description": "Créer vos propres Domains, Objects et Elements, avec responsables et échéances.",
@@ -710,11 +711,11 @@ const es: StarterContent = {
     "name": "Dominar la aplicación",
     "statement": "Todo el equipo se mueve entre la intención (Strategy) y la acción (Execution) en Alcon."
   },
-  "portfolios": [
+  "initiatives": [
     {
       "name": "Aprender lo básico",
       "description": "Entender el modelo y dejar listo el Space.",
-      "initiatives": [
+      "children": [
         {
           "name": "Entender cómo piensa Alcon",
           "description": "Poder explicar con tus palabras las tres áreas y Domain → Object → Element.",
@@ -734,7 +735,7 @@ const es: StarterContent = {
     {
       "name": "Usarla en el trabajo real",
       "description": "Llevar el trabajo real a Alcon y unirlo a la intención.",
-      "initiatives": [
+      "children": [
         {
           "name": "Llevar la ejecución diaria al tablero",
           "description": "Crear vuestros propios Domains, Objects y Elements con responsables y fechas límite.",

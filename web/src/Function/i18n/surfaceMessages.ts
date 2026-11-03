@@ -5,15 +5,9 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const SURFACE_MESSAGES: Record<string, Row> = {
-  'Sub-portfolios': ['Sub-portfolio', 'Sub-portfolio', 'Sub-portfolios', 'Sub-portfolios'],
-  'Add sub-portfolio': ['Sub-portfolio を追加', 'Sub-portfolio 추가', 'Ajouter un sub-portfolio', 'Añadir sub-portfolio'],
-  'Add existing…': ['既存から追加…', '기존에서 추가…', 'Ajouter un existant…', 'Añadir existente…'],
-  'Sub-portfolio of': ['親 Portfolio', '상위 Portfolio', 'Sous-portfolio de', 'Sub-portfolio de'],
-  'Find a Portfolio…': ['Portfolio を探す…', 'Portfolio 찾기…', 'Trouver un Portfolio…', 'Buscar un Portfolio…'],
-  'Take out of this Portfolio': ['この Portfolio から外す', '이 Portfolio에서 빼기', 'Sortir de ce Portfolio', 'Sacar de este Portfolio'],
   'Follow': ['フォロー', '팔로우', 'Suivre', 'Seguir'],
   'Unfollow': ['フォローをやめる', '팔로우 취소', 'Ne plus suivre', 'Dejar de seguir'],
-  'Your Domains': ['あなたの Domain', '내 Domain', 'Vos Domains', 'Tus Domains'],
+  'Your Execution': ['あなたの Execution', '내 Execution', 'Votre Execution', 'Tu Execution'],
   'Show as': ['表示', '표시', 'Afficher en', 'Mostrar como'],
   'Preview': ['プレビュー', '미리보기', 'Aperçu', 'Vista previa'],
   'Code': ['コード', '코드', 'Code', 'Código'],
@@ -140,11 +134,7 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   '{error} — change reverted': ['{error} — 変更を元に戻しました', '{error} — 변경을 되돌렸습니다', '{error} — modification annulée', '{error} — cambio revertido'],
   "Only the Initiative's owner can edit it": ['この Initiative を編集できるのはオーナーだけです', '이 Initiative는 소유자만 편집할 수 있습니다', 'Seul le propriétaire de l’Initiative peut la modifier', 'Solo el propietario de la Initiative puede editarla'],
 
-  // ── Portfolio page ────────────────────────────────────────────
-  'Alerts': ['注意', '알림', 'Alertes', 'Alertas'],
-  'Inside': ['所属', '상위', 'Dans', 'Dentro de'],
-  'No Initiatives': ['Initiative なし', 'Initiative 없음', 'Aucune Initiative', 'Sin Initiatives'],
-  'Portfolio name': ['Portfolio 名', 'Portfolio 이름', 'Nom du Portfolio', 'Nombre del Portfolio'],
+  // ── Index pages ───────────────────────────────────────────────
 
   // ── Profile ───────────────────────────────────────────────────
   'Profile sections': ['プロフィールの項目', '프로필 항목', 'Sections du profil', 'Secciones del perfil'],

@@ -6,13 +6,13 @@ Next.js 16 + Supabase + Tailwind CSS + recharts。企業・軍事作戦・病院
 
 | 分類 | 何を扱うか | 単位 |
 |---|---|---|
-| **Strategy** | 何を達成し、どう勝つか | Vision（Space が目指す姿）→ Portfolio（Initiative の束、入れ子可）→ Initiative（複数で戦略を構成）。Phase（活動を期間で区切る単位）はナビに出さない |
+| **Strategy** | 何を達成し、どう勝つか | Vision（Space が目指す姿）→ Initiative（複数で戦略を構成。入れ子にでき、束ねる側も Initiative）。Phase（活動を期間で区切る単位）はナビに出さない |
 | **Execution** | 実際に行動する | Domain（活動の場）→ Object（成果物）→ Element（行動の最小単位） |
 | **Sustainment** | 仕事道具 | Audit / Notebook / Table / Slides / Artifacts / People / Calendar |
 
 Initiative は目的・前提・意思決定・成功条件を持ち、担当や進捗は持たない。担当・期限・進捗・依存は Execution 側で扱う。ほかに分類を横断して使う個人向けの画面 **Home** と、Object ごとに定義して Element に値を持たせる **Property** がある。Worker は `human | ai_agent`。
 
-**Strategy と Execution は一つの Workspace に並べる。** ModeRail の一番上にある Space のロゴで開き、サイドバーには Strategy（Vision → Portfolio → Initiative）の節と、Domain の節を並べる。「意図」と「行動」は節で区別し、Initiative には配下の Object と実行上のリスク・負荷を、Object には貢献先の Initiative と意図を常に表示する。目的と実行状況を一クリックで行き来できることを重視する。
+**Strategy と Execution は一つの Workspace に並べる。** ModeRail の一番上にある Space のロゴで開き、サイドバーには Strategy の節（Vision と Initiative の一覧への入口。階層はメインアイランドの List で見せる）と、Your Execution の節（Domain → Object / Element）を並べる。「意図」と「行動」は節で区別し、Initiative には配下の Object と実行上のリスク・負荷を、Object には貢献先の Initiative と意図を常に表示する。目的と実行状況を一クリックで行き来できることを重視する。
 
 ## Alcon の Element から開発するとき
 

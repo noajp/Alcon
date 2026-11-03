@@ -15,7 +15,7 @@ import { FONT } from '@/shared/designTokens';
 //     …inline actions, then <PageSection>s…
 //   </div>
 //
-// Domain, Portfolio and Vision are built this way, so moving between them
+// Domain, Initiative and Vision are built this way, so moving between them
 // (and into an Element) never changes where the title sits or how wide the
 // page is. A section is a small muted heading and flat rows — no box.
 // =============================================================
@@ -110,7 +110,7 @@ export function PageHead({
   onSaveTitle, onSaveDescription, under,
 }: {
   /** A line between the title and the description — where it sits
-   *  ("Sub-portfolio of …"). */
+   *  ("Inside …"). */
   under?: ReactNode;
   /** The concept's icon, shown above the title (18px). */
   icon?: ReactNode;

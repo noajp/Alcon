@@ -9,11 +9,11 @@ import { errorMessage, type ToolDef, type ToolResult } from "./boardTools.ts";
 export const STRATEGY_TOOLS: ToolDef[] = [
   {
     name: "listInitiatives",
-    description: "閲覧できる Initiative（戦略の単位）の一覧。portfolioId で絞れる。",
+    description: "閲覧できる Initiative（戦略の単位）の一覧。parentId を渡すと、その Initiative の中に入れ子になったものだけを返す。",
     input_schema: {
       type: "object",
       properties: {
-        portfolioId: { type: "string", description: "Portfolio UUID（省略可）" },
+        parentId: { type: "string", description: "親 Initiative の UUID（省略可）" },
         status: { type: "string", description: "active / archived など（省略可）" },
       },
       additionalProperties: false,
@@ -41,10 +41,14 @@ export async function runStrategyTool(
       case "listInitiatives": {
         let q = supabase
           .from("strategies")
-          .select("id, name, description, status, portfolio_id, updated_at")
+          .select("id, name, description, status, vision_id, updated_at")
           .order("updated_at", { ascending: false })
           .limit(200);
-        if (input.portfolioId) q = q.eq("portfolio_id", String(input.portfolioId));
+        if (input.parentId) {
+          const edges = await supabase.from("strategy_children").select("child_strategy_id").eq("parent_strategy_id", String(input.parentId));
+          if (edges.error) throw edges.error;
+          q = q.in("id", (edges.data ?? []).map((e) => e.child_strategy_id));
+        }
         if (input.status) q = q.eq("status", String(input.status));
         const { data, error } = await q;
         if (error) throw error;
@@ -56,7 +60,7 @@ export async function runStrategyTool(
         if (!id) return { ok: false, error: "id is required" };
         const { data: initiative, error } = await supabase
           .from("strategies")
-          .select("id, name, description, status, portfolio_id, created_at, updated_at")
+          .select("id, name, description, status, vision_id, created_at, updated_at")
           .eq("id", id).maybeSingle();
         if (error) throw error;
         if (!initiative) return { ok: false, error: "Initiative not found" };

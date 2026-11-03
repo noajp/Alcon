@@ -2,7 +2,7 @@
 
 import { IslandHeader } from '@/Function/shared/MainIsland';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Calendar, Plus, X } from '@/ui/icons';
+import { Calendar, Plus, Settings, X } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
@@ -24,32 +24,32 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useInitiativeHealth } from '@/ActivitySpace/strategy/initiative/useInitiativeHealth';
 import { useInitiativeMeasureTallies } from '@/ActivitySpace/strategy/initiative/useInitiativeMeasureTallies';
 import { MeasureStatus } from '@/ActivitySpace/strategy/initiative/MeasureStatus';
-import { usePortfolios } from '@/hooks/portfolioData';
-import { buildPortfolioTree, groupByPortfolio, initiativesInSpace, rollupPortfolio } from '@/ActivitySpace/strategy/portfolio/portfolioGroups';
-import { NavPortfolioIcon, NavStrategyIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
+import { initiativesInSpace } from '@/ActivitySpace/strategy/initiative/initiativeTree';
+import { NavStrategyIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
+import { StrategySettingsModal } from '@/Function/settings/StrategySettingsModal';
 import type { StrategyWithObjects, Vision, VisionUpdate } from '@/types/database';
-import { createVision, resolveVision, setStrategyVision, updateVision, useVisions } from '@/hooks/visionData';
+import { createVision, setStrategyVision, updateVision, useVisions } from '@/hooks/visionData';
 import { useSpaceRoleQuery } from '@/Function/space/data';
 
 // Strategy > Vision — what the Space aims for. A Space holds any number of
-// Visions, the way it holds Domains: each one has a name, the aim in one
-// statement, by when, why, and how the Space will know it got there; under
-// it sit its Portfolios and the Initiatives placed directly under it. A
-// Vision is edited by whoever wrote it or by a Space owner; every member
-// reads it. Each field saves on blur.
-export function VisionView({ visionId, createRequested, onCreateHandled, onSelectVision, onOpenPortfolio, onSelectStrategy }: {
+// Visions, the way it holds Domains: the page lists them, and one opens to
+// its name, the aim in one statement, by when, why, how the Space will know
+// it got there, and the Initiatives at its top. A Vision is edited by
+// whoever wrote it or by a Space owner; every member reads it. Each field
+// saves on blur.
+export function VisionView({ visionId, createRequested, onCreateHandled, onSelectVision, onSelectStrategy }: {
+  /** The open Vision; null = the list. */
   visionId: string | null;
   createRequested: boolean;
   onCreateHandled: () => void;
-  onSelectVision: (id: string) => void;
-  onOpenPortfolio: (id: string) => void;
+  onSelectVision: (id: string | null) => void;
   onSelectStrategy: (id: string) => void;
 }) {
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
   const userId = useCurrentUserId();
   const { data: visions, loading } = useVisions(spaceId);
-  const vision = resolveVision(visions, visionId);
+  const vision = visionId ? visions.find((v) => v.id === visionId) ?? null : null;
 
   // The viewer's seat in the Space: an owner may edit any Vision.
   const role = useSpaceRoleQuery(spaceId);
@@ -61,14 +61,24 @@ export function VisionView({ visionId, createRequested, onCreateHandled, onSelec
 
   return (
     <div className="flex flex-col h-full bg-card">
-      <IslandHeader crumbs={[{ id: 'vision', label: vision?.name ?? t('Vision') }]} />
+      <IslandHeader crumbs={[
+        { id: 'visions', label: t('Visions'), onClick: vision ? () => onSelectVision(null) : undefined },
+        ...(vision ? [{ id: 'vision', label: vision.name }] : []),
+      ]} actions={!vision && (
+        <ButtonAppearanceProvider appearance="navigation">
+          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setLocalNew(true)}>
+            <Plus size={14} />{t('Add Vision')}</Button>
+        </ButtonAppearanceProvider>
+      )} />
       <div className="flex-1 overflow-y-auto">
-        {loading || role.isPending ? null : !vision ? (
+        {loading || role.isPending ? null : visions.length === 0 ? (
           <EmptyState art="vision" title="Set your Vision"
-            description="A Vision says what this Space aims for. Portfolios and Initiatives hang under it, the way Objects and Elements hang under a Domain."
+            description="A Vision says what this Space aims for. Initiatives hang under it, the way Objects and Elements hang under a Domain."
             cta="Create Vision" onCta={() => setLocalNew(true)} />
+        ) : vision ? (
+          <VisionPage key={vision.id} vision={vision} canEdit={canEdit} onSelectStrategy={onSelectStrategy} />
         ) : (
-          <VisionPage key={vision.id} vision={vision} canEdit={canEdit} onOpenPortfolio={onOpenPortfolio} onSelectStrategy={onSelectStrategy} />
+          <VisionList visions={visions} spaceId={spaceId} owner={role.data === 'owner'} userId={userId} onOpen={onSelectVision} />
         )}
       </div>
 
@@ -104,12 +114,39 @@ function normalizeConditions(value: unknown): string[] {
   return list.length === 0 ? NO_CONDITIONS : list;
 }
 
+// Every Vision of the Space, one row each: its statement and how many
+// Initiatives sit at its top. The "…" opens its settings (and its delete).
+function VisionList({ visions, spaceId, owner, userId, onOpen }: {
+  visions: Vision[]; spaceId: string | null; owner: boolean; userId: string | null | undefined; onOpen: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  const { roots } = useVisionScope(spaceId);
+  const [settingsId, setSettingsId] = useState<string | null>(null);
+  const settings = visions.find((v) => v.id === settingsId) ?? null;
+  return (
+    <div className="px-2 py-2">
+      {visions.map((v) => {
+        const count = roots.filter((s) => s.vision_id === v.id).length;
+        return (
+          <ContentRow key={v.id} icon={<NavVisionIcon size={16} />} name={v.name} description={v.statement ?? undefined}
+            onOpen={() => onOpen(v.id)}
+            meta={<span className="w-6 text-right" title={t('Initiatives')}>{count}</span>}
+            actions={<ContentRowAction label={t('Vision settings')} onClick={() => setSettingsId(v.id)}><Settings size={12} /></ContentRowAction>} />
+        );
+      })}
+      {settings && (
+        <StrategySettingsModal vision={settings} canEdit={settings.created_by === userId || owner}
+          onClose={() => setSettingsId(null)} onDeleted={() => setSettingsId(null)} />
+      )}
+    </div>
+  );
+}
+
 // The Vision's page, laid out like every concept page: the document on the
 // left (icon, name, the statement, then the Why and the conditions, then the
-// Portfolios and Initiatives under it), its facts on the right as an island.
-function VisionPage({ vision, canEdit, onOpenPortfolio, onSelectStrategy }: {
-  vision: Vision; canEdit: boolean;
-  onOpenPortfolio: (id: string) => void; onSelectStrategy: (id: string) => void;
+// Initiatives at its top), its facts on the right as an island.
+function VisionPage({ vision, canEdit, onSelectStrategy }: {
+  vision: Vision; canEdit: boolean; onSelectStrategy: (id: string) => void;
 }) {
   const { t, locale } = useI18n();
   const [state, setState] = useState<SaveState>('idle');
@@ -127,8 +164,7 @@ function VisionPage({ vision, canEdit, onOpenPortfolio, onSelectStrategy }: {
   const horizon = vision.horizon ?? null;
   const horizonText = horizon ? fromDateOnlyString(horizon)?.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' }) : null;
   const conditions = useMemo(() => normalizeConditions(vision.conditions), [vision.conditions]);
-  const { portfolios, roots } = useVisionScope(vision.activity_space_id);
-  const portfolioCount = portfolios.filter((p) => p.vision_id === vision.id).length;
+  const { roots } = useVisionScope(vision.activity_space_id);
   const initiativeCount = roots.filter((s) => s.vision_id === vision.id).length;
 
   const rail = (
@@ -144,7 +180,6 @@ function VisionPage({ vision, canEdit, onOpenPortfolio, onSelectStrategy }: {
         <RailRow icon={<Calendar className="size-3.5 text-muted-foreground" />} name={t('By when')}
           label={horizonText ?? t('No horizon yet')} placeholder={!horizon} dense />
       )}
-      <RailRow icon={<NavPortfolioIcon size={14} />} name={t('Portfolios')} label={String(portfolioCount)} placeholder={portfolioCount === 0} dense />
       <RailRow icon={<NavStrategyIcon size={14} />} name={t('Initiatives')} label={String(initiativeCount)} placeholder={initiativeCount === 0} dense />
     </RailCard>
   );
@@ -177,7 +212,6 @@ function VisionPage({ vision, canEdit, onOpenPortfolio, onSelectStrategy }: {
         </ButtonAppearanceProvider>
       </PageSection>
 
-      <PortfoliosTowardVision spaceId={vision.activity_space_id} visionId={vision.id} onOpenPortfolio={onOpenPortfolio} />
       <DirectInitiatives visionId={vision.id} onSelectStrategy={onSelectStrategy} />
     </PageLayout>
   );
@@ -273,10 +307,9 @@ function ConditionsList({ canEdit, initial, onCommit }: { canEdit: boolean; init
   );
 }
 
-// Shared read for the two sections below: the Space's Initiatives and their
-// health, the same numbers the Portfolio page shows.
+// Shared read for the list and the page: the Space's top-level Initiatives
+// and their health, the same numbers the Initiative list shows.
 function useVisionScope(spaceId: string | null) {
-  const { data: portfolios } = usePortfolios(spaceId);
   const { data: allStrategies } = useStrategies();
   const { data: domains } = useDomains();
   const { data: explorer } = useObjects();
@@ -287,45 +320,17 @@ function useVisionScope(spaceId: string | null) {
   const roots = useMemo(() => strategies.filter((s) => s.parentIds.length === 0), [strategies]);
   const { byId: healthById } = useInitiativeHealth(roots);
   const talliesById = useInitiativeMeasureTallies(roots.map((s) => s.id));
-  return { portfolios, roots, healthById, talliesById };
+  return { roots, healthById, talliesById };
 }
 
-// The Portfolios under the Vision, top level, with what each adds up to.
-function PortfoliosTowardVision({ spaceId, visionId, onOpenPortfolio }: { spaceId: string; visionId: string; onOpenPortfolio: (id: string) => void }) {
-  const { t } = useI18n();
-  const { portfolios: all, roots, healthById, talliesById } = useVisionScope(spaceId);
-  const portfolios = useMemo(() => all.filter((p) => p.vision_id === visionId), [all, visionId]);
-  const { byPortfolio } = useMemo(() => groupByPortfolio(portfolios, roots.filter((s) => s.vision_id === visionId)), [portfolios, roots, visionId]);
-  const tree = useMemo(() => buildPortfolioTree(portfolios), [portfolios]);
-  if (tree.length === 0) return null;
-  return (
-    <FoldSection title={t('Portfolios')} count={String(tree.length)}>
-      {tree.map((node) => {
-        const r = rollupPortfolio(node, byPortfolio, healthById, talliesById);
-        return (
-          <ContentRow key={node.portfolio.id} icon={<NavPortfolioIcon size={16} />} name={node.portfolio.name} description={node.portfolio.description}
-            onOpen={() => onOpenPortfolio(node.portfolio.id)}
-            meta={<>
-              {r.initiatives > 0 && <MeasureStatus tally={r.measures} />}
-              {r.progressPct !== null && (
-                <span className="flex w-24 items-center gap-1.5"><SegmentedProgress value={r.progressPct} className="flex-1" /><span className="w-7 text-right">{r.progressPct}%</span></span>
-              )}
-              {r.alerts > 0 && <span className="text-destructive">{t('{n} alerts', { n: String(r.alerts) })}</span>}
-              <span className="w-6 text-right" title={t('Initiatives')}>{r.initiatives}</span>
-            </>} />
-        );
-      })}
-    </FoldSection>
-  );
-}
-
-// Initiatives placed directly under the Vision — in no Portfolio — and the
-// picker that brings one in from outside the Vision.
+// The Initiatives at the top of the Vision (nested ones show under their
+// parent on the Initiative list), and the picker that brings one in from
+// outside the Vision.
 function DirectInitiatives({ visionId, onSelectStrategy }: { visionId: string; onSelectStrategy: (id: string) => void }) {
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
   const { roots, healthById, talliesById } = useVisionScope(spaceId);
-  const direct = roots.filter((s) => s.vision_id === visionId && !s.portfolio_id);
+  const direct = roots.filter((s) => s.vision_id === visionId);
   const candidates = roots.filter((s) => s.vision_id !== visionId);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');

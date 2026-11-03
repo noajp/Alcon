@@ -20,7 +20,6 @@ const viewLoading = () => (
 const InboxView = dynamic(() => import('@/ActivitySpace/home/InboxView').then(m => m.InboxView), { ssr: false, loading: viewLoading });
 const StrategyShell = dynamic(() => import('@/ActivitySpace/strategy/initiative/StrategyShell').then(m => m.StrategyShell), { ssr: false, loading: viewLoading });
 const VisionView = dynamic(() => import('@/ActivitySpace/strategy/vision/VisionView').then(m => m.VisionView), { ssr: false, loading: viewLoading });
-const PortfolioView = dynamic(() => import('@/ActivitySpace/strategy/portfolio/PortfolioView').then(m => m.PortfolioView), { ssr: false, loading: viewLoading });
 const PhaseView = dynamic(() => import('@/ActivitySpace/strategy/phase/PhaseView').then(m => m.PhaseView), { ssr: false, loading: viewLoading });
 const PeopleView = dynamic(() => import('@/ActivitySpace/sustainment/team/PeopleView').then(m => m.PeopleView), { ssr: false, loading: viewLoading });
 const TimelineView = dynamic(() => import('@/ActivitySpace/strategy/timeline/TimelineView').then(m => m.TimelineView), { ssr: false, loading: viewLoading });
@@ -100,26 +99,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 createRequested={!!navigation.visionCreate}
                 onCreateHandled={() => onNavigate({ visionCreate: null })}
                 onSelectVision={(id) => onNavigate({ visionId: id })}
-                onOpenPortfolio={(id) => { onNavigate({ portfolioId: id }); onViewChange?.('portfolio'); }}
                 onSelectStrategy={(id) => { onNavigate({ strategyId: id }); onViewChange?.('strategy'); }}
-              />
-            </div>
-          )}
-
-          {activeActivity === 'portfolio' && (
-            <div className="flex-1 overflow-hidden bg-card">
-              <PortfolioView
-                visionId={navigation.visionId ?? null}
-                onRequestVision={() => { onNavigate({ visionCreate: true }); onViewChange?.('vision'); }}
-                onOpenVision={() => onViewChange?.('vision')}
-                activePortfolioId={navigation.portfolioId ?? null}
-                onSelectPortfolio={(id) => onNavigate({ portfolioId: id })}
-                createRequested={!!navigation.portfolioCreate}
-                onCreateHandled={() => onNavigate({ portfolioCreate: null })}
-                onSelectStrategy={(id) => {
-                  onNavigate({ strategyId: id });
-                  onViewChange?.('strategy');
-                }}
               />
             </div>
           )}

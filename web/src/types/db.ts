@@ -283,7 +283,6 @@ interface RowChecks {
   object_tabs: Compatible<TableRow<'object_tabs'>, H.ObjectTab>
   strategies: Compatible<TableRow<'strategies'>, H.Strategy>
   visions: Compatible<TableRow<'visions'>, H.Vision>
-  portfolios: Compatible<TableRow<'portfolios'>, H.Portfolio>
   strategy_objects: Compatible<TableRow<'strategy_objects'>, H.StrategyObject>
   strategy_comments: Compatible<TableRow<'strategy_comments'>, H.StrategyComment>
   phases: Compatible<TableRow<'phases'>, H.Phase>

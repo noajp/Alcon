@@ -8,28 +8,28 @@ import { ActionsButton, ActionsContextMenu, type ActionItem } from '@/Function/s
 import { MenuShell } from '@/Function/shared/menu';
 import { Popover, PopoverAnchor } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
-import { NavPortfolioIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
+import { NavStrategyIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useSpaceRole } from '@/Function/space/data';
 import { canEditInitiative } from '@/Function/strategy/initiativeAccess';
-import { deleteStrategy } from '@/hooks/strategyData';
-import { PortfolioMoveRefused, setStrategyPortfolio, usePortfolios } from '@/hooks/portfolioData';
-import { setStrategyVision, useVisions } from '@/hooks/visionData';
+import { deleteStrategy, moveInitiative, useStrategies } from '@/hooks/strategyData';
+import { useVisions } from '@/hooks/visionData';
 
 /** The Initiative a menu acts on — where it sits and who made it. */
 interface InitiativeRef {
   id: string;
   name: string;
   vision_id: string | null;
-  portfolio_id: string | null;
+  /** The Initiatives it is nested in. */
+  parentIds: string[];
   created_by: string | null;
   activity_space_id?: string | null;
 }
 
 /**
- * An Initiative's actions, wherever it is shown: move it under a Vision or
- * into a Portfolio, and delete it. Only its creator may change it (the
+ * An Initiative's actions, wherever it is shown: move it to the top of a
+ * Vision or into another Initiative, and delete it. Only its creator may change it (the
  * strategies policy), so for anyone else there are no actions. Deleting
  * leaves the linked Objects and their Elements alone; a refusal is said, not
  * swallowed.
@@ -85,30 +85,31 @@ export function InitiativeActionsButton({ initiative, onDelete }: { initiative: 
   );
 }
 
-// Where an Initiative can go: directly under any of the Space's Visions, into
-// any of their Portfolios, or out of every Vision. The current place is
-// checked.
+// Where an Initiative can go: to the top of any of the Space's Visions, into
+// any other Initiative under it, or out of every Vision. The current place
+// is checked.
 function InitiativeMovePicker({ initiative, onClose }: { initiative: InitiativeRef; onClose: () => void }) {
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
   const { data: visions } = useVisions(spaceId);
-  const { data: portfolios } = usePortfolios(spaceId);
+  const { data: strategies } = useStrategies();
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
   const groups = useMemo(() => visions.map((v) => ({
     vision: v,
-    portfolios: portfolios.filter((p) => p.vision_id === v.id && (!q || p.name.toLowerCase().includes(q))),
-  })).filter((g) => !q || g.vision.name.toLowerCase().includes(q) || g.portfolios.length > 0), [visions, portfolios, q]);
+    parents: strategies.filter((s) => s.vision_id === v.id && s.id !== initiative.id && (!q || s.name.toLowerCase().includes(q))),
+  })).filter((g) => !q || g.vision.name.toLowerCase().includes(q) || g.parents.length > 0), [visions, strategies, initiative.id, q]);
 
-  const go = async (write: () => Promise<void>) => {
+  const go = async (to: { parentId: string | null; visionId: string | null }) => {
     onClose();
-    try { await write(); }
+    try { await moveInitiative(initiative.id, to, initiative.parentIds); }
     catch (e) {
-      await appDialog.alert(e instanceof PortfolioMoveRefused ? t("Only the Initiative's owner can move it.") : e instanceof Error ? e.message : t("Couldn't save"));
+      // 23514: the target sits inside this Initiative.
+      const code = (e as { code?: string } | null)?.code;
+      await appDialog.alert(code === '23514' ? t("An Initiative can't go inside one of its own.") : e instanceof Error ? e.message : t("Couldn't save"));
     }
   };
-  const here = (visionId: string | null, portfolioId: string | null) =>
-    initiative.vision_id === visionId && initiative.portfolio_id === portfolioId;
+  const atTop = initiative.parentIds.length === 0;
 
   return (
     <Popover open onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -118,22 +119,22 @@ function InitiativeMovePicker({ initiative, onClose }: { initiative: InitiativeR
           <CommandInput value={query} onValueChange={setQuery} placeholder={t('Move to…')} autoFocus />
           <CommandList>
             <CommandEmpty>{t('No matches.')}</CommandEmpty>
-            {groups.map(({ vision, portfolios: inside }) => (
+            {groups.map(({ vision, parents }) => (
               <div key={vision.id}>
-                <CommandItem value={`vision ${vision.id}`} onSelect={() => void go(() => setStrategyVision(initiative.id, vision.id))}>
+                <CommandItem value={`vision ${vision.id}`} onSelect={() => void go({ parentId: null, visionId: vision.id })}>
                   <NavVisionIcon size={12} /><span className="flex-1 truncate">{vision.name}</span>
-                  {here(vision.id, null) && <Check size={12} />}
+                  {atTop && initiative.vision_id === vision.id && <Check size={12} />}
                 </CommandItem>
-                {inside.map((p) => (
-                  <CommandItem key={p.id} value={`portfolio ${p.id}`} onSelect={() => void go(() => setStrategyPortfolio(initiative.id, p))}>
-                    <span className="w-2.5" /><NavPortfolioIcon size={12} /><span className="flex-1 truncate">{p.name}</span>
-                    {here(p.vision_id, p.id) && <Check size={12} />}
+                {parents.map((p) => (
+                  <CommandItem key={p.id} value={`initiative ${p.id}`} onSelect={() => void go({ parentId: p.id, visionId: vision.id })}>
+                    <span className="w-2.5" /><NavStrategyIcon size={12} /><span className="flex-1 truncate">{p.name}</span>
+                    {initiative.parentIds.includes(p.id) && <Check size={12} />}
                   </CommandItem>
                 ))}
               </div>
             ))}
-            {initiative.vision_id && !q && (
-              <CommandItem value="__none" onSelect={() => void go(() => setStrategyVision(initiative.id, null))}>
+            {(initiative.vision_id || !atTop) && !q && (
+              <CommandItem value="__none" onSelect={() => void go({ parentId: null, visionId: null })}>
                 <span className="flex-1 text-muted-foreground">{t('Not in a Vision')}</span>
               </CommandItem>
             )}

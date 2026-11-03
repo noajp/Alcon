@@ -7,8 +7,8 @@ describe('starterContent', () => {
     const content = starterContent(locale);
     const keys = content.objects.map((object) => object.key);
     expect(new Set(keys).size).toBe(keys.length);
-    for (const portfolio of content.portfolios) {
-      for (const initiative of portfolio.initiatives) {
+    for (const group of content.initiatives) {
+      for (const initiative of group.children) {
         expect(initiative.objectKeys.length).toBeGreaterThan(0);
         for (const key of initiative.objectKeys) expect(keys).toContain(key);
       }
@@ -19,6 +19,6 @@ describe('starterContent', () => {
     const content = starterContent(locale);
     const english = starterContent('en');
     expect(content.objects.map((o) => [o.key, o.elements.length])).toEqual(english.objects.map((o) => [o.key, o.elements.length]));
-    expect(content.portfolios.map((p) => p.initiatives.map((i) => i.objectKeys))).toEqual(english.portfolios.map((p) => p.initiatives.map((i) => i.objectKeys)));
+    expect(content.initiatives.map((g) => g.children.map((i) => i.objectKeys))).toEqual(english.initiatives.map((g) => g.children.map((i) => i.objectKeys)));
   });
 });

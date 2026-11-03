@@ -9,14 +9,11 @@ import { FONT } from '@/shared/designTokens';
 
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { ReviewsSidebar } from '@/ActivitySpace/execution/code/ReviewsSidebar';
-import { StrategyNavigation } from './sidebar/StrategyNavigation';
 import { SettingsModal } from '@/Function/settings/SettingsModal';
-import { StrategySettingsModal } from '@/Function/settings/StrategySettingsModal';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { resolveVision, useVisions } from '@/hooks/visionData';
-import { useActiveSpaceScope, useSpaceRole } from '@/Function/space/data';
-import { useCurrentUserId } from '@/providers/authContext';
-import { NavPortfolioIcon, NavStrategyIcon, NavVisionIcon } from './sidebar/NavIcons';
+import { useActiveSpaceScope } from '@/Function/space/data';
+import { NavStrategyIcon, NavVisionIcon } from './sidebar/NavIcons';
 import { NotebookTree } from './sidebar/NotebookTree';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
@@ -97,9 +94,9 @@ interface AppSidebarProps {
 
 // Workspace — Strategy and Execution in one sidebar, a section each.
 // Strategy is what we're trying to achieve and how we intend to win: Vision
-// (view id 'vision') is what the Space aims for; a Portfolio ('portfolio')
-// bundles Initiatives; Initiative ('strategy') is the unit. Phase is reached
-// from an Initiative or a Domain, not from here. Execution is the fighting:
+// (view id 'vision') is what the Space aims for; Initiative ('strategy') is
+// the unit, and Initiatives nest. Phase is reached from an Initiative or a
+// Domain, not from here. Execution is the fighting:
 // the Domain tree, whose rows carry the D/O/E surfaces below.
 
 const SIDEBAR_MIN_WIDTH = 220;
@@ -210,15 +207,9 @@ export function AppSidebar({
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
-  // Strategy: the Space's Visions (the sidebar's rows) and the one whose
-  // settings modal is open.
-  const strategySpaceId = useActiveSpaceId();
-  const { data: visions } = useVisions(strategySpaceId);
+  // The Vision a new Initiative is made under: the open one, else the first.
+  const { data: visions } = useVisions(useActiveSpaceId());
   const activeVision = resolveVision(visions, navigation.visionId);
-  const [settingsVisionId, setSettingsVisionId] = useState<string | null>(null);
-  const settingsVision = visions.find((v) => v.id === settingsVisionId) ?? null;
-  const visionViewerId = useCurrentUserId();
-  const visionViewerRole = useSpaceRole(strategySpaceId);
   const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const railMode = railModeOf(activeView);
@@ -240,7 +231,7 @@ export function AppSidebar({
 
   // The "+" at the top of the sidebar creates whatever the current mode is
   // about: a Notebook, a Table, a scheduled Element, or (in the Workspace)
-  // a Vision, Portfolio, Initiative, Domain or Object from a small menu. Modes with nothing to
+  // a Vision, Initiative, Domain or Object from a small menu. Modes with nothing to
   // create show no "+".
   const calendarDay = useCalendarDay();
   // Slides makes nothing until the Space's decks are loaded; the load would replace it.
@@ -442,17 +433,17 @@ export function AppSidebar({
           <>
 
 
-          {/* ── Workspace ── Strategy first (the Vision tree, what we aim for),
-              then Execution (the Domains, where the work is done). */}
+          {/* ── Workspace ── Strategy first (what we aim for: the Visions and
+              the Initiatives, each a list in the main island where the
+              Initiatives' nesting shows), then Execution (the Domains, where
+              the work is done). */}
           {railMode === 'workspace' && (
           <>
-          <SidebarFold id="workspace-strategy" label={t('Workspace')}>
-          <StrategyNavigation visions={visions} activeVisionId={activeVision?.id ?? null} activeView={activeView}
-            onSelect={(visionId, view) => {
-              onNavigate({ visionId, strategyId: null, portfolioId: null });
-              onViewChange(view);
-            }}
-            onOpenSettings={setSettingsVisionId} />
+          <SidebarFold id="workspace-strategy" label={t('Strategy')}>
+            <SidebarRow active={activeView === 'vision'} icon={<NavVisionIcon size={16} />} label={t('Vision')}
+              onClick={() => { onNavigate({ visionId: null }); onViewChange('vision'); }} />
+            <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Initiative')}
+              onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />
           </SidebarFold>
 
           <FollowSection activeObjectId={navigation.objectId ?? null} onOpen={(f) => {
@@ -462,7 +453,7 @@ export function AppSidebar({
             onViewChange('objects');
           }} />
 
-          <SidebarFold id="execution-domains" label={t('Your Domains')}>
+          <SidebarFold id="execution-domains" label={t('Your Execution')}>
 
           {/* All domains — the name opens the overview; the chevron expands the tree.
               Opening one does NOT collapse the others (multiple expanded at a time).
@@ -609,9 +600,9 @@ export function AppSidebar({
               </>
             ) : (
               <>
-                {/* Vision → Portfolio → Initiative, the Strategy tree. Each
-                    page opens its own create card once mounted; Portfolio
-                    and Initiative are made under the active Vision. */}
+                {/* Vision and Initiative, the Strategy's two layers. Each page
+                    opens its own create card once mounted; an Initiative is
+                    made under the open Vision, else the first. */}
                 <CreateMenuItem
                   icon={<NavVisionIcon size={16} />}
                   label={t('Vision')}
@@ -619,20 +610,12 @@ export function AppSidebar({
                   onClick={() => { setCreateMenuOpen(false); onNavigate({ visionCreate: true }); onViewChange('vision'); }}
                 />
                 {activeVision && (
-                  <>
-                    <CreateMenuItem
-                      icon={<NavPortfolioIcon size={16} />}
-                      label={t('Portfolio')}
-                      desc={t('A bundle of Initiatives in {name}', { name: activeVision.name })}
-                      onClick={() => { setCreateMenuOpen(false); onNavigate({ visionId: activeVision.id, portfolioId: null, portfolioCreate: true }); onViewChange('portfolio'); }}
-                    />
-                    <CreateMenuItem
-                      icon={<NavStrategyIcon size={16} />}
-                      label={t('Initiative')}
-                      desc={t('An outcome to win in {name}', { name: activeVision.name })}
-                      onClick={() => { setCreateMenuOpen(false); onNavigate({ visionId: activeVision.id, strategyId: null, strategyCreate: true }); onViewChange('strategy'); }}
-                    />
-                  </>
+                  <CreateMenuItem
+                    icon={<NavStrategyIcon size={16} />}
+                    label={t('Initiative')}
+                    desc={t('An outcome to win in {name}', { name: activeVision.name })}
+                    onClick={() => { setCreateMenuOpen(false); onNavigate({ visionId: activeVision.id, strategyId: null, strategyCreate: true }); onViewChange('strategy'); }}
+                  />
                 )}
                 <div className="my-1 h-px bg-border" />
                 <CreateMenuItem
@@ -653,11 +636,6 @@ export function AppSidebar({
         </>
       )}
 
-      {settingsVision && (
-        <StrategySettingsModal vision={settingsVision} canEdit={settingsVision.created_by === visionViewerId || visionViewerRole === 'owner'}
-          onClose={() => setSettingsVisionId(null)}
-          onDeleted={() => { setSettingsVisionId(null); onNavigate({ visionId: null, portfolioId: null }); }} />
-      )}
       {settingsDomain && (
         <DomainSettingsModal
           domain={settingsDomain}

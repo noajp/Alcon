@@ -3,13 +3,13 @@
 import type { ReactNode } from 'react';
 
 // =============================================================
-// IndexList — a concept's index page: every Initiative, every Portfolio.
+// IndexList — a concept's index page: every Initiative, every Domain.
 //
 // Three columns, the same on each: the name, how it is going (Health), and a
 // count of what is inside it. A row is a line on the page, not a card: the
 // whole row lights up on hover, and the headings above name the columns once.
 //
-// Initiatives and Portfolios are the same shape of page, so they share this
+// Index pages are the same shape, so they share this
 // rather than each drawing its own: a row's name, its health cell and its
 // count are the caller's, the geometry is here.
 // =============================================================

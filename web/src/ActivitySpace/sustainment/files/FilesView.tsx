@@ -28,7 +28,7 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { FilesRoute } from '@/Function/files/filesRoute';
 
 const OWNER_LABEL: Record<AttachmentOwnerKind, string> = {
-  element: 'Element', object: 'Object', strategy: 'Initiative', portfolio: 'Portfolio', folder: 'Folder',
+  element: 'Element', object: 'Object', strategy: 'Initiative', folder: 'Folder',
 };
 
 const nameOf = (f: SpaceFile) => { const dot = f.name.lastIndexOf('.'); return dot > 0 ? f.name.slice(0, dot) : f.name; };

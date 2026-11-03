@@ -60,7 +60,7 @@ function VisionGeneral({ vision, canEdit, onDeleted }: { vision: Vision; canEdit
     catch (e) { setError(e instanceof Error ? e.message : t("Couldn't save")); setName(vision.name); }
   };
   const remove = async () => {
-    if (!await appDialog.confirm(t('Delete the Vision "{name}"? Its Portfolios are deleted with it; its Initiatives stay, outside any Vision.', { name: vision.name }))) return;
+    if (!await appDialog.confirm(t('Delete the Vision "{name}"? Its Initiatives stay, outside any Vision.', { name: vision.name }))) return;
     try { await deleteVision(vision.id); onDeleted(); }
     catch (e) { setError(e instanceof Error ? e.message : t("Couldn't save")); }
   };
@@ -77,7 +77,7 @@ function VisionGeneral({ vision, canEdit, onDeleted }: { vision: Vision; canEdit
       <div className="flex items-center justify-between gap-4 pt-4">
         <div>
           <div className="text-[12px] font-semibold text-foreground">{t('Delete Vision')}</div>
-          <p className="mt-0.5 text-[12px] text-muted-foreground">{t('Its Portfolios are deleted with it; its Initiatives stay, outside any Vision.')}</p>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">{t('Its Initiatives stay, outside any Vision.')}</p>
         </div>
         <Button variant="danger" disabled={!canEdit} onClick={() => void remove()}>{t('Delete')}</Button>
       </div>

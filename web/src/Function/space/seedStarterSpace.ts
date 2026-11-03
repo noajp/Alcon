@@ -1,7 +1,6 @@
 import { createDomain, createObject, createElement } from '@/hooks/useSupabase';
 import { createVision } from '@/hooks/visionData';
-import { createPortfolio } from '@/hooks/portfolioData';
-import { createStrategy } from '@/hooks/strategyData';
+import { addStrategyChild, createStrategy } from '@/hooks/strategyData';
 import type { Locale } from '@/Function/i18n/locales';
 import { starterContent } from './starterContent';
 
@@ -44,24 +43,14 @@ export async function seedStarterSpace(spaceId: string, userId: string, locale: 
     statement: content.vision.statement,
     order_index: 0,
   });
-  for (const [index, portfolio] of content.portfolios.entries()) {
-    const created = await createPortfolio({
-      activity_space_id: spaceId,
-      vision_id: vision.id,
-      name: portfolio.name,
-      description: portfolio.description,
-      order_index: index,
-    });
-    for (const initiative of portfolio.initiatives) {
-      await createStrategy(
-        {
-          name: initiative.name,
-          description: initiative.description,
-          vision_id: vision.id,
-          portfolio_id: created.id,
-        },
+  for (const group of content.initiatives) {
+    const parent = await createStrategy({ name: group.name, description: group.description, vision_id: vision.id }, []);
+    for (const initiative of group.children) {
+      const child = await createStrategy(
+        { name: initiative.name, description: initiative.description, vision_id: vision.id },
         initiative.objectKeys.flatMap((key) => objectIds.get(key) ?? []),
       );
+      await addStrategyChild(parent.id, child.id);
     }
   }
 }

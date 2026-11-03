@@ -67,8 +67,7 @@ export async function updateVision(id: string, updates: VisionUpdate): Promise<v
   void invalidateVisions();
 }
 
-/** Deleting a Vision deletes its Portfolios (cascade); its Initiatives stay,
- *  outside any Vision. */
+/** Deleting a Vision leaves its Initiatives, outside any Vision. */
 export async function deleteVision(id: string): Promise<void> {
   const { data, error } = await supabase.from('visions').delete().eq('id', id).select('id');
   if (error) throw error;
@@ -76,19 +75,16 @@ export async function deleteVision(id: string): Promise<void> {
   const qc = getQueryClient();
   await Promise.all([
     invalidateVisions(),
-    qc.invalidateQueries({ queryKey: ['portfolios'] }),
     qc.invalidateQueries({ queryKey: ['strategies'] }),
   ]);
 }
 
-/** Puts an Initiative directly under a Vision (or outside every Vision with
- *  null). Either way it leaves the Portfolio it was in — a Portfolio belongs
- *  to one Vision. The write is on the Initiative, so only its creator can. */
+/** Puts an Initiative under a Vision (or outside every Vision with null).
+ *  The write is on the Initiative, so only its creator can. */
 export async function setStrategyVision(strategyId: string, visionId: string | null): Promise<void> {
-  const patch = { vision_id: visionId, portfolio_id: null };
   const { data, error } = await supabase
     .from('strategies')
-    .update({ ...patch, updated_at: new Date().toISOString() })
+    .update({ vision_id: visionId, updated_at: new Date().toISOString() })
     .eq('id', strategyId)
     .select('id');
   if (error) throw error;

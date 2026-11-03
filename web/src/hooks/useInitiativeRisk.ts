@@ -55,7 +55,7 @@ interface InitiativeRiskData {
 export async function fetchLastProgressAt(elementIds: string[]): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   if (elementIds.length === 0) return out;
-  // Chunked: a portfolio-wide list hands this every Element on the board, and
+  // Chunked: a Space-wide list hands this every Element on the board, and
   // one `.in()` over 249 ids measured a 9.8KB request line — past the budget
   // chunkedIn.ts exists to respect. The max-per-Element reduce below does not
   // care which chunk a row arrived in.

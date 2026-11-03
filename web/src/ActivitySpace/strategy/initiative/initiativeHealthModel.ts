@@ -3,7 +3,7 @@
 // The Initiative page already has the full cross-section (initiativeRiskModel:
 // overdue / stalled / blocked / due-soon, per Object, per Worker). A list row
 // cannot carry that and should not try; it needs the three things a person
-// scans a portfolio for: how far along, how recently anything moved, and
+// scans the Initiative list for: how far along, how recently anything moved, and
 // whether something is on fire. This file derives exactly those, and reuses
 // the risk model's own predicates so the row and the page can never disagree
 // about what "stalled" or "overdue" means — provided the caller hands it the

@@ -40,20 +40,15 @@ export interface NavigationState {
    *  lives in the sidebar; this is which one the main pane shows. */
   tableId?: string | null;
   /** Strategy currently open in the Strategy surface (a `strategies` row
-   *  id). null = the portfolio root list. Lets other surfaces (e.g. an
+   *  id). null = the Initiative list. Lets other surfaces (e.g. an
    *  Object's Properties rail) deep-link straight into a Strategy. */
   strategyId?: string | null;
   /** The sidebar's "+" in Strategy mode asked for a new Initiative. The
-   *  portfolio root opens its create dialog and clears this. Carried in
+   *  Initiative list opens its create dialog and clears this. Carried in
    *  navigation so the request lands in this tab's surface once it is
    *  mounted, not in whichever listener happened to exist. */
   strategyCreate?: boolean | null;
-  /** The sidebar's "+" on the Portfolio page asked for a new Portfolio. */
-  portfolioCreate?: boolean | null;
-  /** Portfolio open on the Portfolio page; null = the tree. */
-  portfolioId?: string | null;
-  /** The Vision the Strategy pages show (its Portfolios, its Initiatives);
-   *  null = the Space's first Vision. */
+  /** The Vision open on the Vision page; null = the list of Visions. */
   visionId?: string | null;
   /** The sidebar's "+" asked for a new Vision. */
   visionCreate?: boolean | null;

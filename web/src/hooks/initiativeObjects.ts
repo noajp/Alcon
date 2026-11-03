@@ -17,8 +17,8 @@ export function assembleStrategies(
     byStrategy.get(link.strategy_id)!.push(link.object_id);
   }
   // child_strategy_id -> its parent_strategy_id[] (DAG — multi-parent
-  // allowed). Empty parentIds means the Strategy is top-level and shows
-  // in the portfolio root list.
+  // allowed). Empty parentIds means the Initiative is top-level, at the
+  // root of the Initiative list.
   const byChild = new Map<string, string[]>();
   for (const edge of nesting) {
     if (!byChild.has(edge.child_strategy_id)) byChild.set(edge.child_strategy_id, []);
