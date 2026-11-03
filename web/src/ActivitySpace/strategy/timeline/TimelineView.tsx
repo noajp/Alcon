@@ -23,7 +23,7 @@ import {
 import { daysBetween, startOfDay, parseDateOnly } from '@/Function/shared/dateUtils';
 
 // =============================================================
-// Timeline — Linear-Roadmap-style portfolio timeline for the
+// Timeline — Linear-Roadmap-style Initiative timeline for the
 // Strategy layer. One row per top-level Initiative, grouped in the
 // left list by the quarter its span ends in ("Q3 2026"…), with
 // undated Initiatives collected under "Upcoming". The right side is
@@ -67,8 +67,8 @@ export function TimelineView({
     return new Map<string, AlconObject>(explorerObjects.map((o) => [o.id, o]));
   }, [explorerObjects]);
 
-  // Portfolio scope: top-level Initiatives only — nested ones are part of
-  // their parent's story, same rule as the Initiative portfolio list.
+  // Top-level Initiatives only — nested ones are part of
+  // their parent's story, same rule as the Vision page.
   const rootStrategies = useMemo(
     () => strategies.filter((s) => s.parentIds.length === 0),
     [strategies],

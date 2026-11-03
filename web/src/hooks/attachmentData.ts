@@ -10,7 +10,7 @@ import { latestVersions, versionChain, versionsPastKeeping } from '@/Function/sh
 import { fileText } from '@/Function/office/fileText';
 
 // Files attached to one thing in the Space — an Element, an Object, an
-// Initiative, a Portfolio, or one of the Space's folders — from the person's
+// Initiative, or one of the Space's folders — from the person's
 // computer. The file is evidence for what it is attached to: it is seen by
 // exactly those who can see that thing (attachments' RLS asks the owner's),
 // and goes with it. The bytes live in the private `element-files` bucket
@@ -36,16 +36,16 @@ export const TRASH_DAYS = 30;
 const DAY = 86_400_000;
 
 /** What a file can be attached to, and the column that names it. */
-export type AttachmentOwnerKind = 'element' | 'object' | 'strategy' | 'portfolio' | 'folder';
+export type AttachmentOwnerKind = 'element' | 'object' | 'strategy' | 'folder';
 export interface AttachmentOwner { kind: AttachmentOwnerKind; id: string }
 /** Pure. What a board's subject attaches files as (null: it cannot hold files). */
 export function attachmentOwnerOf(subject: { kind: string; id: string | null }): AttachmentOwner | null {
   const kind = ({ element: 'element', object: 'object', initiative: 'strategy' } as Record<string, AttachmentOwnerKind>)[subject.kind];
   return kind && subject.id ? { kind, id: subject.id } : null;
 }
-type OwnerColumn = 'element_id' | 'object_id' | 'strategy_id' | 'portfolio_id' | 'folder_id';
+type OwnerColumn = 'element_id' | 'object_id' | 'strategy_id' | 'folder_id';
 const OWNER_COLUMN: Record<AttachmentOwnerKind, OwnerColumn> = {
-  element: 'element_id', object: 'object_id', strategy: 'strategy_id', portfolio: 'portfolio_id', folder: 'folder_id',
+  element: 'element_id', object: 'object_id', strategy: 'strategy_id', folder: 'folder_id',
 };
 
 export interface Attachment {
@@ -62,11 +62,10 @@ export interface Attachment {
   element_id: string | null;
   object_id: string | null;
   strategy_id: string | null;
-  portfolio_id: string | null;
   folder_id: string | null;
 }
 
-const COLUMNS = 'id, path, name, size, mime_type, uploaded_by, created_at, deleted_at, previous_id, element_id, object_id, strategy_id, portfolio_id, folder_id';
+const COLUMNS = 'id, path, name, size, mime_type, uploaded_by, created_at, deleted_at, previous_id, element_id, object_id, strategy_id, folder_id';
 const EMPTY: Attachment[] = [];
 
 /** Pure. What a file is attached to (exactly one owner column is set). */
@@ -298,7 +297,7 @@ export interface SpaceFile extends Attachment {
   owner_label: string | null;
   /** For a file on an Element: the Object it is in, to open it there. */
   element_object_id: string | null;
-  /** The Domain it sits in (through its Element, Object or folder); none for an Initiative's or a Portfolio's. */
+  /** The Domain it sits in (through its Element, Object or folder); none for an Initiative's. */
   domain_id: string | null;
   versions: number;
 }
@@ -379,10 +378,10 @@ export async function indexSpaceFiles(spaceId: string): Promise<void> {
 }
 
 /** A file found by its name, what it is attached to, or its words. */
-export interface FoundFile extends Pick<Attachment, 'id' | 'name' | 'mime_type' | 'element_id' | 'object_id' | 'strategy_id' | 'portfolio_id' | 'folder_id'> {
+export interface FoundFile extends Pick<Attachment, 'id' | 'name' | 'mime_type' | 'element_id' | 'object_id' | 'strategy_id' | 'folder_id'> {
   owner_label: string | null;
   element_object_id: string | null;
-  /** The Domain it sits in (none for an Initiative's or a Portfolio's). */
+  /** The Domain it sits in (none for an Initiative's). */
   domain_id: string | null;
   /** The words around where the text matched (null when the name did). */
   snippet: string | null;

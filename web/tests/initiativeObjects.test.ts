@@ -19,7 +19,6 @@ function strategy(id: string, scope: Record<string, unknown> = {}): Strategy {
     scope: scope as Strategy['scope'],
     color: null,
     icon: null,
-    portfolio_id: null,
     vision_id: null,
     activity_space_id: null,
     created_by: null,

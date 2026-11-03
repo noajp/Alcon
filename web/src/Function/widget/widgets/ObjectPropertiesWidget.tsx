@@ -144,7 +144,7 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
 
   return (
     <>
-      {/* Initiative — which portfolio(s) this Object is grouped under (a
+      {/* Initiative — which Initiative(s) this Object is grouped under (a
           Initiative can span Domains, so an Object can belong to more than
           one). A gap, not a line, separates it from the Object's own fields
           below, since it reads more like provenance than an editable

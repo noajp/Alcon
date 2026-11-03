@@ -6,7 +6,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { EmptyArt, type EmptyArtKind } from './EmptyArt';
 
 // The one "nothing here yet" surface for a list — Domains, Objects, Elements,
-// and the Strategy pages (Vision, Portfolios, Initiatives, Phases, Timeline).
+// and the Strategy pages (Vision, Initiatives, Phases, Timeline).
 // Laid out the way an empty list reads in Linear: the concept's line drawing,
 // one heading, a sentence or two, and then the one decisive action that
 // starts the list, as the accent-blue primary button (with its key, when it

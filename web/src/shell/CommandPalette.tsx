@@ -134,7 +134,7 @@ export function CommandPalette({ scope, returnTo, onNavigate, onViewChange, onOp
   // open hook: StrategyShell.tsx owns Initiative creation entirely internally
   // (a local `newOpen` state + an unexported dialog, no prop/callback/event
   // to trigger it from outside), and that file is out of scope for this
-  // change. Landing on the Initiative portfolio root is the closest reachable
+  // change. Landing on the Initiative list is the closest reachable
   // approximation — "+ Add Initiative" is one click away there — rather than
   // reaching into StrategyShell to add an opener.
   const handleCreateCommand = (id: CreateCommandId) => {

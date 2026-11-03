@@ -3,8 +3,8 @@
 import type { ReactNode } from 'react';
 
 // =============================================================
-// ContentRow — one row in a list on a concept's page (the Portfolios under a
-// Vision, the Initiatives under a Portfolio, the Initiatives a Domain serves).
+// ContentRow — one row in a list on a concept's page (the Visions of a
+// Space, the Initiatives under a Vision, the Initiatives a Domain serves).
 //
 // The same row as a sidebar list, for the content area: the ROW is the hover
 // and focus target, so the name, the figures and the trailing "×" light up as
@@ -38,7 +38,8 @@ export function ContentRow({ icon, name, description, meta, actions, onOpen, ind
         <button type="button" onClick={onOpen} disabled={!onOpen}
           className="flex h-8 min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 text-left text-[13px] font-medium text-foreground outline-none disabled:cursor-default">
           {icon && <span className="flex w-4 shrink-0 items-center justify-center text-muted-foreground">{icon}</span>}
-          <span className="truncate">{name}</span>
+          {/* The name keeps its width; a long description is what gets cut. */}
+          <span className={description ? 'max-w-[60%] shrink-0 truncate' : 'truncate'}>{name}</span>
           {description && <span className="hidden min-w-0 truncate text-[12px] font-normal text-muted-foreground sm:inline">{description}</span>}
         </button>
       )}

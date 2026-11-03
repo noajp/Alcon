@@ -15,7 +15,6 @@ import {
   Spearhead,
   Milestone,
   GuidingStar,
-  Portfolio,
   CompassRose,
   Users,
   AiGraph,
@@ -48,9 +47,8 @@ export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => <Users size={s
 // ModeRail layer marks.
 export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => <CompassRose size={size} />;
 export const NavSustainmentModeIcon = ({ size = 20 }: { size?: number }) => <Grip size={size} strokeWidth={2} />;
-// Strategy's units: the Vision above, its Portfolios of Initiatives below.
+// Strategy's top unit: the Vision, with its Initiatives below.
 export const NavVisionIcon = ({ size = 20 }: { size?: number }) => <GuidingStar size={size} />;
-export const NavPortfolioIcon = ({ size = 20 }: { size?: number }) => <Portfolio size={size} />;
 // Phase — a Domain's period, reachable from an Initiative rather than the nav.
 export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} />;
 

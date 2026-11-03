@@ -4,13 +4,12 @@ import type { ReactNode } from 'react';
 
 // Line drawings for an empty list, one per concept, all built from the same
 // rounded isometric blocks: a Domain is a stack of layers, Objects a cluster
-// of blocks, Elements tiles on a grid; a Vision is a stepped summit, a
-// Portfolio a row of bets, an Initiative a path to an outcome, Phases
-// segments laid end to end. Drawn in the text color; each block is filled
+// of blocks, Elements tiles on a grid; a Vision is a stepped summit, an
+// Initiative a path to an outcome, Phases segments laid end to end. Drawn in the text color; each block is filled
 // with the pane's own background so blocks in front hide the lines behind
 // them.
 
-export type EmptyArtKind = 'domain' | 'objects' | 'elements' | 'vision' | 'portfolio' | 'initiative' | 'phase';
+export type EmptyArtKind = 'domain' | 'objects' | 'elements' | 'vision' | 'initiative' | 'phase';
 
 const COS = Math.cos(Math.PI / 6);
 const R = 1.6;
@@ -134,24 +133,6 @@ function VisionArt() {
   );
 }
 
-function PortfolioArt() {
-  // A row of bets of different sizes.
-  const heights = [36, 26, 16];
-  const s = 19, a = 16;
-  return (
-    <>
-      {heights.map((h, q) => {
-        const { x, y } = cell(0, q, 0, s, 64, 48);
-        return (
-          <g key={q}>
-            <Box x={x} y={y + a - h} w={a} d={a} h={h} />
-          </g>
-        );
-      })}
-    </>
-  );
-}
-
 function InitiativeArt() {
   // A path of two tiles leading to a block: the way to an outcome.
   const s = 20, a = 20;
@@ -189,7 +170,6 @@ const ART: Record<EmptyArtKind, () => ReactNode> = {
   objects: ObjectsArt,
   elements: ElementsArt,
   vision: VisionArt,
-  portfolio: PortfolioArt,
   initiative: InitiativeArt,
   phase: PhaseArt,
 };

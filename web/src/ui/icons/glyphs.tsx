@@ -625,13 +625,6 @@ export const GuidingStar = glyph('GuidingStar', {
   line: <path d="M1.75 14.25h12.5" />,
 });
 
-// A Portfolio: a folder holding a spearhead — Initiatives kept together.
-// (Files' plain folder carries no mark.)
-export const Portfolio = glyph('Portfolio', {
-  solid: FOLDER_SHAPE,
-  cut: <path d="M8 6.75 10.35 11.6 8 10.35 5.65 11.6Z" style={{ ...hole, stroke: hole.fill, strokeWidth: 0.6, strokeLinejoin: 'round' }} />,
-});
-
 // An Initiative: a spearhead, the axis of advance.
 export const Spearhead = glyph('Spearhead', {
   solid: <path d="M8 1.9 13.55 13.1 8 10.2 2.45 13.1Z" {...SOFT} />,
