@@ -11,7 +11,8 @@ import { MenuShell } from '@/Function/shared/menu';
 import { EmptyState } from '@/Function/shared/EmptyState';
 import { QuickCreatePopup } from '@/Function/shared/QuickCreatePopup';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
-import { PageHead, PageLayout, PageSection } from '@/Function/shared/PageHead';
+import { PageHead, PageLayout } from '@/Function/shared/PageHead';
+import { FoldSection, FoldSectionAddRow } from '@/Function/shared/FoldSection';
 import { RailCard } from '@/Function/shared/RailCard';
 import { RailRow } from '@/Function/shared/RailRow';
 import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
@@ -45,7 +46,9 @@ import {
 // the Portfolios inside it and its Initiatives with their health. An
 // Initiative sits in at most one Portfolio. Root Initiatives outside every
 // Portfolio are listed under the tree.
-export function PortfolioView({ visionId, activePortfolioId, createRequested, onCreateHandled, onSelectPortfolio, onSelectStrategy, onRequestVision }: {
+export function PortfolioView({ visionId, activePortfolioId, createRequested, onCreateHandled, onSelectPortfolio, onSelectStrategy, onRequestVision, onOpenVision }: {
+  /** The Vision's own page (the header's first crumb). */
+  onOpenVision: () => void;
   /** The Vision whose Portfolios the page shows (null = the Space's first). */
   visionId: string | null;
   /** No Vision exists yet — the page asks for one first. */
@@ -102,10 +105,11 @@ export function PortfolioView({ visionId, activePortfolioId, createRequested, on
         <PortfolioDetail key={open.portfolio.id} node={open} tree={tree} visionName={vision?.name ?? null} portfolios={portfolios} byPortfolio={byPortfolio} healthById={healthById} talliesById={talliesById}
           candidates={roots.filter((s) => s.portfolio_id !== open.portfolio.id)}
           onOpenPortfolio={onSelectPortfolio} onSelectStrategy={onSelectStrategy}
-          onNewInside={() => setLocalNew({ parentId: open.portfolio.id })} />
+          onNewInside={() => setLocalNew({ parentId: open.portfolio.id })}
+          onOpenVision={onOpenVision} onChanged={refetch} />
       ) : (
         <>
-          <IslandHeader crumbs={[...(vision ? [{ id: 'vision', label: vision.name }] : []), { id: 'portfolios', label: t('Portfolios') }]}
+          <IslandHeader crumbs={[...(vision ? [{ id: 'vision', label: vision.name, onClick: onOpenVision }] : []), { id: 'portfolios', label: t('Portfolios') }]}
             actions={vision && (
               <ButtonAppearanceProvider appearance="navigation">
                 <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setLocalNew({ parentId: null })}>
@@ -379,7 +383,7 @@ function RollupFigures({ rollup }: { rollup: PortfolioRollup }) {
 }
 
 // ── One Portfolio, opened ───────────────────────────────────────────────
-function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, healthById, talliesById, candidates, onOpenPortfolio, onSelectStrategy, onNewInside }: {
+function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, healthById, talliesById, candidates, onOpenPortfolio, onSelectStrategy, onNewInside, onOpenVision, onChanged }: {
   node: PortfolioNode;
   tree: PortfolioNode[];
   /** The Vision this Portfolio sits under. */
@@ -392,6 +396,9 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
   onOpenPortfolio: (id: string | null) => void;
   onSelectStrategy: (id: string) => void;
   onNewInside: () => void;
+  onOpenVision: () => void;
+  /** After a Portfolio is made inside this one. */
+  onChanged: () => Promise<unknown>;
 }) {
   const { t } = useI18n();
   const { portfolio } = node;
@@ -401,7 +408,6 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
   const [query, setQuery] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<'initiatives' | 'portfolios'>('initiatives');
   const [portfolioQuery, setPortfolioQuery] = useState('');
   const [portfolioPickerOpen, setPortfolioPickerOpen] = useState(false);
   const q = query.trim().toLowerCase();
@@ -437,20 +443,11 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
     <>
       <IslandHeader
         crumbs={[
+          ...(visionName ? [{ id: 'vision', label: visionName, onClick: onOpenVision }] : []),
           { id: 'portfolios', label: t('Portfolio'), onClick: () => onOpenPortfolio(null) },
           ...path.map((p) => p.id === portfolio.id ? { id: p.id, label: p.name } : { id: p.id, label: p.name, onClick: () => onOpenPortfolio(p.id) }),
         ]}
         after={<><ActionsButton items={items} label={t('Portfolio actions')} />{picker}</>} />
-      {/* What it bundles, one kind per tab — its Initiatives, and the
-          Portfolios it holds — under the header, as Initiative's views sit. */}
-      <div role="tablist" aria-label={t('Portfolio views')} className="flex flex-shrink-0 items-center gap-0.5 py-2 pl-[19px] pr-4">
-        {([['initiatives', t('Initiatives'), initiatives.length], ['portfolios', t('Portfolios'), node.children.length]] as const).map(([id, label, n]) => (
-          <Button key={id} type="button" shape="tab" role="tab" aria-selected={tab === id}
-            variant={tab === id ? 'secondary' : 'ghost'} onClick={() => setTab(id)}>
-            {label}<span className="tabular-nums text-muted-foreground">{n}</span>
-          </Button>
-        ))}
-      </div>
       <div className="flex-1 overflow-y-auto">
         <PageLayout rail={
           <RailCard title={t('Properties')}>
@@ -484,26 +481,39 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
             titleLabel={t('Portfolio name')} titlePlaceholder={t('Portfolio name…')}
             descriptionLabel={t('Description')} descriptionPlaceholder={t('What this Portfolio is a bet on, and what it should add up to.')}
             onSaveTitle={(name) => void updatePortfolio(portfolio.id, { name })}
-            onSaveDescription={(description) => void updatePortfolio(portfolio.id, { description: description || null })} />
+            onSaveDescription={(description) => void updatePortfolio(portfolio.id, { description: description || null })}
+            under={parent && (
+              <button type="button" onClick={() => onOpenPortfolio(parent.id)}
+                className="flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground">
+                {t('Sub-portfolio of')}<NavPortfolioIcon size={14} /><span className="font-medium text-foreground">{parent.name}</span>
+              </button>
+            )} />
 
-          {tab === 'portfolios' ? (
-          <PageSection title={t('Portfolios inside')}>
-            {node.children.length === 0 && (
-              <p className="px-2 py-2 text-[12px] text-muted-foreground">{t('No Portfolios inside this one yet.')}</p>
-            )}
+          {/* What it bundles, each a section under the description the way
+              an Element's Sub-elements sit: the Portfolios inside it, then
+              its Initiatives. */}
+          <FoldSection title={t('Sub-portfolios')} count={node.children.length ? String(node.children.length) : undefined}>
             {node.children.map((child) => (
               <ContentRow key={child.portfolio.id} icon={<NavPortfolioIcon size={16} />} name={child.portfolio.name}
                 onOpen={() => onOpenPortfolio(child.portfolio.id)}
                 meta={<RollupFigures rollup={rollupPortfolio(child, byPortfolio, healthById, talliesById)} />}
                 actions={<ContentRowAction label={t('Take out of this Portfolio')} onClick={() => void nest(child.portfolio.id, portfolio.parent_id)}><X size={12} /></ContentRowAction>} />
             ))}
-            <ButtonAppearanceProvider appearance="inline">
-              <div className="flex items-center">
+            <FoldSectionAddRow icon={<NavPortfolioIcon size={16} />} placeholder={t('Add sub-portfolio')}
+              onAdd={async (name) => {
+                setError(null);
+                try {
+                  await createPortfolio({ activity_space_id: portfolio.activity_space_id, vision_id: portfolio.vision_id, parent_id: portfolio.id,
+                    name, description: null, order_index: node.children.length });
+                  await onChanged();
+                } catch (e) { setError(e instanceof Error ? e.message : t("Couldn't save")); }
+              }}
+              trailing={
                 <Popover open={portfolioPickerOpen} onOpenChange={(v) => { setPortfolioPickerOpen(v); if (!v) setPortfolioQuery(''); }}>
                   <PopoverTrigger asChild>
-                    <Button variant="ghost" size="sm" align="start" className="text-muted-foreground"><Plus size={13} strokeWidth={2.5} />{t('Add Portfolio')}</Button>
+                    <Button variant="ghost" size="xs" className="text-muted-foreground">{t('Add existing…')}</Button>
                   </PopoverTrigger>
-                  <MenuShell width="wide" align="start">
+                  <MenuShell width="wide" align="end">
                     <Command shouldFilter={false}>
                       <CommandInput value={portfolioQuery} onValueChange={setPortfolioQuery} placeholder={t('Find a Portfolio…')} />
                       <CommandList>
@@ -517,18 +527,10 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
                     </Command>
                   </MenuShell>
                 </Popover>
-                <Button variant="ghost" size="sm" align="start" className="text-muted-foreground" onClick={onNewInside}>
-                  <Plus size={13} strokeWidth={2.5} />{t('New Portfolio inside')}
-                </Button>
-              </div>
-            </ButtonAppearanceProvider>
-            {error && <div className="px-2 py-1 text-[11px] text-destructive">{error}</div>}
-          </PageSection>
-          ) : (
-          <PageSection title={t('Initiatives')}>
-            {initiatives.length === 0 && (
-              <p className="px-2 py-2 text-[12px] text-muted-foreground">{t('No Initiatives in this Portfolio yet.')}</p>
-            )}
+              } />
+          </FoldSection>
+
+          <FoldSection title={t('Initiatives')} count={initiatives.length ? String(initiatives.length) : undefined}>
             {initiatives.map((s) => (
               <InitiativeRow key={s.id} strategy={s} health={healthById.get(s.id)} measures={talliesById.get(s.id)} onOpen={() => onSelectStrategy(s.id)} onRemove={() => void move(s.id, null)} />
             ))}
@@ -553,9 +555,8 @@ function PortfolioDetail({ node, tree, visionName, portfolios, byPortfolio, heal
                 </MenuShell>
               </Popover>
             </ButtonAppearanceProvider>
-            {error && <div className="px-2 py-1 text-[11px] text-destructive">{error}</div>}
-          </PageSection>
-          )}
+          </FoldSection>
+          {error && <div role="alert" className="text-[11px] text-destructive">{error}</div>}
         </PageLayout>
       </div>
     </>

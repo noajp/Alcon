@@ -12,6 +12,7 @@ import { EmptyState } from '@/Function/shared/EmptyState';
 import { QuickCreatePopup } from '@/Function/shared/QuickCreatePopup';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { PageHead, PageLayout, PageSection } from '@/Function/shared/PageHead';
+import { FoldSection } from '@/Function/shared/FoldSection';
 import { RailCard } from '@/Function/shared/RailCard';
 import { RailRow } from '@/Function/shared/RailRow';
 import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
@@ -298,7 +299,7 @@ function PortfoliosTowardVision({ spaceId, visionId, onOpenPortfolio }: { spaceI
   const tree = useMemo(() => buildPortfolioTree(portfolios), [portfolios]);
   if (tree.length === 0) return null;
   return (
-    <PageSection title={t('Portfolios')}>
+    <FoldSection title={t('Portfolios')} count={String(tree.length)}>
       {tree.map((node) => {
         const r = rollupPortfolio(node, byPortfolio, healthById, talliesById);
         return (
@@ -314,7 +315,7 @@ function PortfoliosTowardVision({ spaceId, visionId, onOpenPortfolio }: { spaceI
             </>} />
         );
       })}
-    </PageSection>
+    </FoldSection>
   );
 }
 
@@ -337,7 +338,7 @@ function DirectInitiatives({ visionId, onSelectStrategy }: { visionId: string; o
     catch (e) { setError(e instanceof Error ? e.message : t("Couldn't save")); }
   };
   return (
-    <PageSection title={t('Initiatives')}>
+    <FoldSection title={t('Initiatives')} count={direct.length ? String(direct.length) : undefined}>
       {direct.map((s) => {
         const h = healthById.get(s.id);
         return (
@@ -373,6 +374,6 @@ function DirectInitiatives({ visionId, onSelectStrategy }: { visionId: string; o
         </Popover>
       </ButtonAppearanceProvider>
       {error && <div className="px-2 py-1 text-[11px] text-destructive">{error}</div>}
-    </PageSection>
+    </FoldSection>
   );
 }
