@@ -18,7 +18,8 @@ begin
   for f in
     select p.oid::regprocedure
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'alcon_internal' and p.proname like 'crm\_%'
+    where n.nspname = 'alcon_internal'
+      and (p.proname like 'crm\_%' or p.proname = 'intents_refresh_crm_measures')
   loop
     execute format('drop function %s', f);
   end loop;
