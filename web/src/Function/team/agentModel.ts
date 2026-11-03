@@ -11,7 +11,19 @@
 
 import type { Json } from '@/types/database';
 
+/** Where an AI agent's work runs: on Alcon's AI 基盤 (run-agent), or in Claude
+ *  Code on a developer's machine, started by the dev loop's dispatcher. */
+export type AgentRunner = 'alcon' | 'claude-code';
+const CLAUDE_CODE_RUNNER = 'claude-code';
+
+/** Pure. Whether a Worker's work runs in Claude Code. */
+export function runsInClaudeCode(aiConfig: unknown): boolean {
+  return !!aiConfig && typeof aiConfig === 'object' && !Array.isArray(aiConfig)
+    && (aiConfig as Record<string, unknown>).runner === CLAUDE_CODE_RUNNER;
+}
+
 export interface AgentModelDraft {
+  runner: AgentRunner;
   /** The model connection's id; null for Anthropic. */
   providerId: string | null;
   model: string;
@@ -32,6 +44,7 @@ function priceText(v: unknown): string {
 export function agentModelDraft(worker: { ai_model: string | null; ai_config: Json | null }): AgentModelDraft {
   const c = record(worker.ai_config);
   return {
+    runner: runsInClaudeCode(c) ? 'claude-code' : 'alcon',
     providerId: typeof c.provider === 'string' && c.provider ? c.provider : null,
     model: worker.ai_model ?? '',
     priceInput: priceText(c.price_input),
@@ -52,10 +65,15 @@ function readPrice(raw: string): number | null | undefined {
  *  in ai_config other than the model's (instructions, turn limit) are kept. */
 export function agentModelPatch(aiConfig: Json | null, draft: AgentModelDraft): AgentModelPatch {
   const config = record(aiConfig);
+  delete config.runner;
   delete config.provider;
   delete config.price_input;
   delete config.price_output;
   const model = draft.model.trim();
+  if (draft.runner === 'claude-code') {
+    config.runner = CLAUDE_CODE_RUNNER;
+    return { ok: true, patch: { ai_model: model || null, ai_config: config } };
+  }
   if (!draft.providerId) return { ok: true, patch: { ai_model: model || null, ai_config: config } };
 
   if (!model) return { ok: false, error: 'Enter the model name.' };

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   actionState, buildMissionGraph, draftGraph, latestRuns, missionBarriers, missionSummary, normalizePlan,
-  type MissionElementRow, type MissionMeasureRow, type MissionRunRow,
+  type MissionElementRow, type MissionMeasureRow, type MissionRunRow, handOverLabels, isHandedOver
 } from '@/ActivitySpace/strategy/initiative/mission/missionModel';
 
 const el = (id: string, status: string | null = 'todo'): MissionElementRow => ({ id, title: `Task ${id}`, status, display_id: null, object_id: 'o1' });
@@ -99,5 +99,27 @@ describe('normalizePlan', () => {
     expect(g.edges).toContainEqual({ from: 'o:o2', to: 't:t1', kind: 'serves', draft: true });
     expect(g.edges).toContainEqual({ from: 'initiative', to: 't:t2', kind: 'serves', draft: true });
     expect(g.edges).toContainEqual({ from: 't:t1', to: 't:t2', kind: 'depends', draft: true });
+  });
+});
+
+describe('Claude Code work', () => {
+  const el = (over: Partial<MissionElementRow> = {}): MissionElementRow => ({
+    id: 'e1', title: 't', status: 'todo', display_id: null, object_id: 'o1', claudeCode: true, ...over,
+  });
+
+  it('reads a held lease as running and ignores run rows', () => {
+    expect(actionState(el({ status: 'in_progress', leased: true }), undefined)).toBe('running');
+    expect(actionState(el({ status: 'in_progress', leased: false }), undefined)).toBe('todo');
+    expect(actionState(el({ status: 'review' }), undefined)).toBe('waiting');
+    expect(actionState(el({ status: 'blocked' }), undefined)).toBe('blocked');
+    expect(actionState(el({ status: 'done' }), undefined)).toBe('done');
+  });
+
+  it('hands over by adding the dispatch label once', () => {
+    expect(isHandedOver(el({ labels: ['ui', 'dispatch'] }))).toBe(true);
+    expect(isHandedOver(el({ labels: null }))).toBe(false);
+    expect(handOverLabels(['ui'])).toEqual(['ui', 'dispatch']);
+    expect(handOverLabels(['dispatch'])).toEqual(['dispatch']);
+    expect(handOverLabels(null)).toEqual(['dispatch']);
   });
 });

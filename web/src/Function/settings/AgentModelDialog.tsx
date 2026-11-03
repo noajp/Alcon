@@ -57,47 +57,67 @@ export function AgentModelDialog({ worker, spaceId, onClose, onSaved }: {
         </DialogHeader>
 
         <div className="space-y-4">
-          <Field label={t('Provider')}>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" align="start">
-                  <span>{providerLabel}</span>
-                  <ChevronDown size={12} aria-hidden="true" className="opacity-60" />
+          <Field label={t('Runs on')}>
+            <div className="flex gap-1" role="radiogroup" aria-label={t('Runs on')}>
+              {(['alcon', 'claude-code'] as const).map((r) => (
+                <Button key={r} shape="tab" role="radio" aria-checked={draft.runner === r}
+                  variant={draft.runner === r ? 'secondary' : 'ghost'} onClick={() => setDraft({ ...draft, runner: r })}>
+                  {r === 'alcon' ? t('Alcon (AI platform)') : t('Claude Code')}
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[200px]">
-                <DropdownMenuItem onSelect={() => setDraft({ ...draft, providerId: null })} className="gap-2 text-[12px]">
-                  <span className="flex-1">{t('Anthropic (Alcon default)')}</span>
-                  {!draft.providerId && <Check size={12} />}
-                </DropdownMenuItem>
-                {providers.map((p) => (
-                  <DropdownMenuItem key={p.id} onSelect={() => setDraft({ ...draft, providerId: p.id })} className="gap-2 text-[12px]">
-                    <span className="flex-1">{p.name}{p.enabled ? '' : ` (${t('Off')})`}</span>
-                    {draft.providerId === p.id && <Check size={12} />}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </Field>
-
-          <Field label={t('Model')}>
-            <Input value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })}
-              placeholder={draft.providerId ? t('The model name in the provider\'s docs') : 'claude-sonnet-5-5'}
-              className="h-8 font-mono text-[12px] md:text-[12px]" />
-          </Field>
-
-          {draft.providerId && (
-            <Field label={t('Price (USD per million tokens, optional)')}>
-              <div className="flex items-center gap-2">
-                <Input value={draft.priceInput} onChange={(e) => setDraft({ ...draft, priceInput: e.target.value })} inputMode="decimal"
-                  aria-label={t('Input')} placeholder={t('Input')} className="h-8 text-[13px] md:text-[13px]" />
-                <Input value={draft.priceOutput} onChange={(e) => setDraft({ ...draft, priceOutput: e.target.value })} inputMode="decimal"
-                  aria-label={t('Output')} placeholder={t('Output')} className="h-8 text-[13px] md:text-[13px]" />
-              </div>
+              ))}
+            </div>
+            {draft.runner === 'claude-code' && (
               <p className="mt-1.5 text-[12px] text-muted-foreground">
-                {t('Without a price, runs are charged against the budget at Claude Sonnet\'s price.')}
+                {t('Work handed to this agent runs in Claude Code on a developer\'s machine, started by the dev loop\'s dispatcher. It is not charged to the Space\'s AI budget.')}
               </p>
+            )}
+          </Field>
+
+          {draft.runner === 'alcon' && (
+            <>
+            <Field label={t('Provider')}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" align="start">
+                    <span>{providerLabel}</span>
+                    <ChevronDown size={12} aria-hidden="true" className="opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-[200px]">
+                  <DropdownMenuItem onSelect={() => setDraft({ ...draft, providerId: null })} className="gap-2 text-[12px]">
+                    <span className="flex-1">{t('Anthropic (Alcon default)')}</span>
+                    {!draft.providerId && <Check size={12} />}
+                  </DropdownMenuItem>
+                  {providers.map((p) => (
+                    <DropdownMenuItem key={p.id} onSelect={() => setDraft({ ...draft, providerId: p.id })} className="gap-2 text-[12px]">
+                      <span className="flex-1">{p.name}{p.enabled ? '' : ` (${t('Off')})`}</span>
+                      {draft.providerId === p.id && <Check size={12} />}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </Field>
+
+            <Field label={t('Model')}>
+              <Input value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })}
+                placeholder={draft.providerId ? t('The model name in the provider\'s docs') : 'claude-sonnet-5-5'}
+                className="h-8 font-mono text-[12px] md:text-[12px]" />
+            </Field>
+
+            {draft.providerId && (
+              <Field label={t('Price (USD per million tokens, optional)')}>
+                <div className="flex items-center gap-2">
+                  <Input value={draft.priceInput} onChange={(e) => setDraft({ ...draft, priceInput: e.target.value })} inputMode="decimal"
+                    aria-label={t('Input')} placeholder={t('Input')} className="h-8 text-[13px] md:text-[13px]" />
+                  <Input value={draft.priceOutput} onChange={(e) => setDraft({ ...draft, priceOutput: e.target.value })} inputMode="decimal"
+                    aria-label={t('Output')} placeholder={t('Output')} className="h-8 text-[13px] md:text-[13px]" />
+                </div>
+                <p className="mt-1.5 text-[12px] text-muted-foreground">
+                  {t('Without a price, runs are charged against the budget at Claude Sonnet\'s price.')}
+                </p>
+              </Field>
+            )}
+            </>
           )}
         </div>
 
