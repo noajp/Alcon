@@ -12,7 +12,7 @@ Next.js 16 + Supabase + Tailwind CSS + recharts。企業・軍事作戦・病院
 
 Initiative は目的・前提・意思決定・成功条件を持ち、担当や進捗は持たない。担当・期限・進捗・依存は Execution 側で扱う。ほかに分類を横断して使う個人向けの画面 **Home** と、Object ごとに定義して Element に値を持たせる **Property** がある。Worker は `human | ai_agent`。
 
-**Strategy と Execution は分けて表示し、相互に参照できるようにする。** 「意図」と「行動」を区別しつつ、Initiative には配下の Object と実行上のリスク・負荷を、Object には貢献先の Initiative と意図を常に表示する。目的と実行状況を一クリックで行き来できることを重視する。
+**Strategy と Execution は一つの Workspace に並べる。** ModeRail の一番上にある Space のロゴで開き、サイドバーには Strategy（Vision → Portfolio → Initiative）の節と、Domain の節を並べる。「意図」と「行動」は節で区別し、Initiative には配下の Object と実行上のリスク・負荷を、Object には貢献先の Initiative と意図を常に表示する。目的と実行状況を一クリックで行き来できることを重視する。
 
 ## Alcon の Element から開発するとき
 

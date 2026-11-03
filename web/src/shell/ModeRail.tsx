@@ -5,7 +5,6 @@ import { Check } from '@/ui/icons';
 import { NavSustainmentModeIcon } from '@/shell/sidebar/NavIcons';
 import {
   APP_GROUPS,
-  CORE_MODES,
   MODE_META,
   isAppMode,
   railModeOf,
@@ -19,6 +18,9 @@ import { MenuShell, MenuSectionLabel } from '@/Function/shared/menu';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { viewInScope, type SpaceScope } from '@/Function/space/spaceScope';
+import { SpaceMark } from '@/Function/space/SpaceSwitcher';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { useActivitySpaces } from '@/hooks/useSupabase';
 
 export type { RailMode };
 
@@ -29,17 +31,13 @@ const AUDIT_RAIL_APPS: RailMode[] = ['team', 'audit'];
 // AppSidebar's contents to that mode's surfaces. Unlike the sidebar it never
 // collapses — it's the app's primary spine.
 //
-// Strategy and Execution are separate modes on purpose. Strategy is what we're
-// trying to achieve and how we intend to win — Initiatives, bundled into a
-// strategy. Execution is the fighting itself — Elements bundled into Objects,
-// Objects gathered into Domains. Listing both
-// in one surface flattens that distinction, so the rail keeps them apart. The
-// link between them is never cut, though: a Initiative shows its member Objects
-// and an Object shows the Initiatives it contributes to, and because the rail
-// highlight follows `activeView`, following either link swaps modes on its
-// own. One click each way.
+// At the top sits the Space's logo, which opens the Workspace: Strategy (the
+// Vision → Portfolio → Initiative tree) and Execution (the Domains, with their
+// Objects and Elements) in one sidebar, one section each. An Initiative shows
+// its member Objects and an Object the Initiatives it serves, so moving
+// between intent and action never leaves the mode.
 //
-// Below the fixed entries sits the launcher: the apps a person has added, then the
+// Below it sits the launcher: the apps a person has added, then the
 // Sustainment launcher that adds them.
 
 export { railModeOf } from '@/shell/railApps';
@@ -69,6 +67,31 @@ function RailButton({
       }`}
     >
       <Icon size={18} />
+    </button>
+  );
+}
+
+// The Space's logo — the Workspace's entry, the way a company's mark heads
+// its own tools.
+function WorkspaceRailButton({ active, onClick }: { active: boolean; onClick?: () => void }) {
+  const { t } = useI18n();
+  const { data: spaces } = useActivitySpaces();
+  const activeId = useActiveSpaceId();
+  const space = spaces.find((s) => s.id === activeId) ?? spaces[0];
+  const label = space?.name ?? t('Workspace');
+  if (!onClick) return <span className="flex h-8 w-8 items-center justify-center" title={label}><SpaceMark space={space} size={24} /></span>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+      className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+        active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/50'
+      }`}
+    >
+      <SpaceMark space={space} size={24} />
     </button>
   );
 }
@@ -125,7 +148,7 @@ export function ModeRail({
   // An audit Space (ADR 0048) keeps People and Audit on the rail and offers
   // nothing else to add.
   const audit = scope === 'audit';
-  const coreModes = CORE_MODES.filter((mode) => viewInScope(MODE_META[mode].defaultView, scope));
+  const workspace = viewInScope(MODE_META.workspace.defaultView, scope);
   const railApps = audit
     ? AUDIT_RAIL_APPS
     : activeMode && isAppMode(activeMode) && !apps.includes(activeMode)
@@ -141,15 +164,8 @@ export function ModeRail({
   return (
     <ButtonAppearanceProvider appearance="navigation"><Popover open={launcherOpen} onOpenChange={setLauncherOpen}>
     <div className="flex w-10 shrink-0 flex-col items-center gap-1 bg-background py-2">
-      {coreModes.map((mode) => (
-        <RailButton
-          key={mode}
-          label={t(MODE_META[mode].label)}
-          icon={MODE_META[mode].icon}
-          active={mode === activeMode}
-          onClick={() => open(mode)}
-        />
-      ))}
+      {/* An audit Space shows its mark but has no Workspace to open. */}
+      <WorkspaceRailButton active={activeMode === 'workspace'} onClick={workspace ? () => open('workspace') : undefined} />
 
       {/* Below the line is the part each person builds: the apps they added,
           then the Sustainment launcher that adds them. */}

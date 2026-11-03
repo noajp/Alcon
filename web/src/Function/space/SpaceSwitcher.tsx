@@ -211,7 +211,7 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
 /** A Space's mark — its logo (an emoji or an image) where it has one, else
  *  its initial — drawn the same at every size, so the switcher's button and
  *  its list agree. */
-function SpaceMark({ space, size }: { space: { name: string; logo?: string | null } | null | undefined; size: number }) {
+export function SpaceMark({ space, size }: { space: { name: string; logo?: string | null } | null | undefined; size: number }) {
   const logo = space?.logo ?? null;
   const box = { width: size, height: size };
   const radius = size >= 22 ? 'rounded-md' : 'rounded';
