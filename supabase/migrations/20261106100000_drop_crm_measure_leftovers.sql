@@ -5,10 +5,15 @@
 do $$
 declare
   f regprocedure;
+  v_scheduled boolean := false;
 begin
-  if to_regnamespace('cron') is not null
-     and exists (select 1 from cron.job where jobname = 'crm-measures-daily') then
-    perform cron.unschedule('crm-measures-daily');
+  -- cron.job is named only through execute: a preview database has no
+  -- pg_cron, and a direct reference fails when the block is planned.
+  if to_regclass('cron.job') is not null then
+    execute 'select exists (select 1 from cron.job where jobname = ''crm-measures-daily'')' into v_scheduled;
+    if v_scheduled then
+      execute 'select cron.unschedule(''crm-measures-daily'')';
+    end if;
   end if;
 
   if to_regnamespace('alcon_internal') is null then
