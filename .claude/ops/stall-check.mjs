@@ -27,6 +27,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createFaultReporter, shouldEscalate } from './faultReporter.mjs'
 import { attachLog, claimLease, noteLease } from './singleLease.mjs'
+import { devDomainId } from './devDomain.mjs'
 
 // `--once` is a question, not a watch: it prints an answer and leaves. Holding
 // it against the running watcher would make the one command a person reaches
@@ -41,7 +42,6 @@ const HOOK = process.env.LOOP_HOOK === '1'
 if (HOOK && !ONCE) attachLog('stall-check')
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const DEV_DOMAIN = 'e3a72eca-f276-4776-9999-4abd4797a6b2'
 
 function arg(flag, fallback) {
   const i = process.argv.indexOf(flag)
@@ -79,6 +79,7 @@ function loadEnv() {
 }
 
 const { url: SUPABASE_URL, key: SERVICE_KEY } = loadEnv()
+const DEV_DOMAIN = await devDomainId(SUPABASE_URL, SERVICE_KEY)
 
 // PostgREST rather than a SQL RPC: no helper function to install, and the
 // embedded comment resource gives us the last report per element in one round

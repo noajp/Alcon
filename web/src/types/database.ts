@@ -434,6 +434,10 @@ export interface Element {
   approval_state: ApprovalState | null
   note_id: string | null          // Optional pinned Note (Note style HTML in note_contents.html)
   phase_id: string | null         // UUID FK → phases.id。所属 Phase (Linear の Cycle 相当、高々1つ)
+  /** The Initiative this Element was cut from. A proposal (status 'backlog',
+   *  label 'proposal') keeps the link after approval, so the Initiative finds
+   *  its work in any Object. */
+  strategy_id?: string | null
   /** 何度 Phase を越して持ち越されたか。3周目の Element は1周目とは別のことを言っている */
   carried_over_count: number
   /** Lease — who is working on this and until when. Text, not an FK: a holder
@@ -472,6 +476,7 @@ export interface ElementInsert {
   approval_state?: ApprovalState | null
   note_id?: string | null
   phase_id?: string | null
+  strategy_id?: string | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -500,6 +505,7 @@ export interface ElementUpdate {
   approval_state?: ApprovalState | null
   note_id?: string | null
   phase_id?: string | null
+  strategy_id?: string | null
   carried_over_count?: number
   created_at?: string | null
   updated_at?: string | null
