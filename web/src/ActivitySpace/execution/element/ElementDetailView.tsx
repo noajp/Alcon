@@ -84,8 +84,7 @@ import { RailRow } from '@/Function/shared/RailRow';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { ElementTypeIcon, ObjectIcon } from '@/shell/icons';
 import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
-import { htmlToMarkdown, markdownToHtml } from '@/Function/shared/markdownHtml';
-import { NoteEditor } from '@/ActivitySpace/sustainment/notebook/editor/NoteEditor';
+import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { CodeChangesSection } from '../code/CodeChangesSection';
@@ -239,15 +238,9 @@ function ElementDetailBody({
     el.style.height = `${el.scrollHeight}px`;
   }, [title]);
   const { t } = useI18n();
-  // The description editor starts from the Markdown as HTML. It restarts
-  // when the Element changes, or its description changes elsewhere while
-  // nobody here is typing in it (an agent's edit, a teammate's).
-  const descriptionFocused = useRef(false);
-  const [descriptionRev, setDescriptionRev] = useState(0);
-  // A description put back from an unsaved draft seeds the next restart
-  // instead of the saved one; any change from outside clears it again.
+  // A description put back from an unsaved draft is what the editor starts
+  // from instead of the saved one; any change from outside clears it again.
   const [restoredDescription, setRestoredDescription] = useState<string | null>(null);
-  const descriptionHtml = useMemo(() => markdownToHtml(restoredDescription ?? element.description ?? ''), [element.id, descriptionRev]); // eslint-disable-line react-hooks/exhaustive-deps -- restarts only on purpose (above)
 
   // What was typed but did not save (offline, refused) — kept in this
   // browser so it can be put back and saved again rather than lost to the
@@ -494,7 +487,6 @@ function ElementDetailBody({
     setTitle(element.title);
     setDescription(element.description || '');
     setRestoredDescription(null);
-    if (!descriptionFocused.current) setDescriptionRev((n) => n + 1);
     setEstimatedHours(element.estimated_hours?.toString() || '');
   }, [element.id, element.title, element.description, element.estimated_hours]);
 
@@ -596,7 +588,6 @@ function ElementDetailBody({
     if (draft.description !== undefined) {
       setRestoredDescription(draft.description);
       setDescription(draft.description);
-      setDescriptionRev((n) => n + 1);
       void handleDescriptionSave(draft.description);
     }
   };
@@ -879,13 +870,10 @@ function ElementDetailBody({
                 <Button variant="ghost" size="sm" onClick={() => forgetUnsaved()}>{t('Discard')}</Button>
               </div>
             )}
-            <div onFocus={() => { descriptionFocused.current = true; }}
-              onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) { descriptionFocused.current = false; void handleDescriptionSave(); } }}>
-              <NoteEditor key={`${element.id}:${descriptionRev}`} compact initialHtml={descriptionHtml}
-                placeholder={t('Add description…')}
-                onChange={(html) => setDescription(htmlToMarkdown(html))}
-                onCommit={(html) => { void handleDescriptionSave(htmlToMarkdown(html)); }} />
-            </div>
+            <DescriptionEditor key={element.id} value={restoredDescription ?? element.description ?? ''}
+              placeholder={t('Add description…')}
+              onChange={setDescription}
+              onSave={(next) => handleDescriptionSave(next)} />
           </div>
 
           {/* One row under the description, as Linear keeps a single line

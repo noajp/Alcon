@@ -49,7 +49,8 @@ export function IndexRow({ icon, name, description, health, count, onOpen, inden
   onOpen?: () => void;
   /** Pixels of left indent, for a tree of rows. */
   indent?: number;
-  /** Outside the card, before it — a tree's fold arrow. */
+  /** A tree's fold arrow: in the card's left margin, near the edge, so the
+   *  icon stays under the "Name" heading. */
   lead?: ReactNode;
   /** Replaces the name while it is being renamed. The card is not a button then. */
   renameField?: ReactNode;
@@ -73,8 +74,8 @@ export function IndexRow({ icon, name, description, health, count, onOpen, inden
     </>
   );
   return (
-    <div className="group flex items-center gap-1" style={indent ? { paddingLeft: indent } : undefined}>
-      {lead}
+    <div className="group relative flex items-center gap-1" style={indent ? { paddingLeft: indent } : undefined}>
+      {lead && <div className="absolute top-1/2 z-[1] -translate-y-1/2" style={{ left: indent - 6 }}>{lead}</div>}
       {renameField
         ? <div className={card}>{content}</div>
         : <button type="button" onClick={onOpen} className={`${card} bg-transparent outline-none hover:bg-muted/40 focus-visible:bg-muted/40`}>{content}</button>}

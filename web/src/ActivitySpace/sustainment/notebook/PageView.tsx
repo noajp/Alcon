@@ -9,7 +9,7 @@ import {
   NoteEditor,
   type NoteEditorHandle,
   type BulletContextInfo,
-} from '@/ActivitySpace/sustainment/notebook/editor/NoteEditor';
+} from '@/Function/notebook/editor/NoteEditor';
 import { BulletExtractDialog } from './BulletExtractDialog';
 import { useI18n, translate } from '@/Function/i18n/I18nProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';

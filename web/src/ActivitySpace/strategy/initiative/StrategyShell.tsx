@@ -1,5 +1,6 @@
 'use client';
 
+import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { IslandHeader } from '@/Function/shared/MainIsland';
 import { appDialog } from '@/Function/shared/appDialogStore';
 
@@ -456,7 +457,6 @@ function StrategyDetailView({
 }) {
   const { t } = useI18n();
   const [name, setName] = useState(strategy.name);
-  const [description, setDescription] = useState(strategy.description ?? '');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(strategy.objectIds));
   const [query, setQuery] = useState('');
   // Objects section starts collapsed to the selected chips — "+" reveals
@@ -496,7 +496,6 @@ function StrategyDetailView({
   useEffect(() => {
     setName(strategy.name);
     setSaveError(null);
-    setDescription(strategy.description ?? '');
     setSelectedIds(new Set(strategy.objectIds));
   }, [strategy.id, strategy.name, strategy.description, strategy.objectIds]);
 
@@ -507,9 +506,7 @@ function StrategyDetailView({
   }, [strategy.id]);
 
   const nameRef = useRef<HTMLTextAreaElement | null>(null);
-  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   useAutoGrowTextarea(nameRef, name);
-  useAutoGrowTextarea(descriptionRef, description);
 
   const { data: domains, refetch: refetchDomains } = useDomains();
   const { objects: allObjects, refetch: refetchObjects } = useAllObjects();
@@ -685,17 +682,15 @@ function StrategyDetailView({
     }
   };
 
-  const saveDescription = async () => {
+  const saveDescription = async (description: string) => {
     const trimmed = description.trim() || null;
-    if (trimmed === (strategy.description ?? null)) return;
-    if (!canEdit) { setDescription(strategy.description ?? ''); return; }
+    if (trimmed === (strategy.description ?? null) || !canEdit) return;
     try {
       await updateStrategy(strategy.id, { description: trimmed });
       setSaveError(null);
       onSaved();
     } catch (e) {
       console.error('Failed to save Initiative description:', e);
-      setDescription(strategy.description ?? '');
       setSaveError(t('Could not save the description'));
     }
   };
@@ -878,26 +873,8 @@ function StrategyDetailView({
               style={PAGE_TITLE_WEIGHT}
             />
           </div>
-          <textarea
-            ref={descriptionRef}
-            value={description}
-            rows={1}
-            onChange={(e) => setDescription(e.target.value)}
-            onBlur={saveDescription}
-            onKeyDown={(e) => {
-              // Multi-line: Enter is a newline; Cmd/Ctrl+Enter and Escape
-              // end the edit and save.
-              if (isSubmitChord(e) || isCancelKey(e)) {
-                e.preventDefault();
-                e.currentTarget.blur();
-              }
-            }}
-            placeholder={canEdit ? t('Add description…') : ''}
-            readOnly={!canEdit}
-            aria-readonly={!canEdit}
-            tabIndex={canEdit ? undefined : -1}
-            className="w-full text-[14px] text-[var(--text-secondary)] leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
-          />
+          <DescriptionEditor key={strategy.id} value={strategy.description ?? ''} readOnly={!canEdit}
+            placeholder={t('Add description…')} onSave={saveDescription} />
 
 
           {tab === 'overview' && (

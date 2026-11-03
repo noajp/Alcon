@@ -9,7 +9,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 // Editor is heavy and only mounts when a linked note is expanded — load it
 // on demand.
-const NoteEditor = dynamic(() => import('./editor/NoteEditor').then((m) => m.NoteEditor), {
+const NoteEditor = dynamic(() => import('@/Function/notebook/editor/NoteEditor').then((m) => m.NoteEditor), {
   ssr: false,
   loading: () => <EditorLoading />,
 });

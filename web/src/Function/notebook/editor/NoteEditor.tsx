@@ -1099,7 +1099,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         }
         .note-editor table[data-note-table="true"] th,
         .note-editor table[data-note-table="true"] td {
-          border: 1px solid var(--border);
+          /* Ruled so a table reads as one: --border alone is too faint to
+             see on the dark ground. */
+          border: 1px solid color-mix(in oklab, var(--foreground) 20%, transparent);
           padding: 0.4rem 0.6rem;
           text-align: left;
           vertical-align: top;
@@ -1930,11 +1932,12 @@ function liIsRegularText(li: HTMLLIElement): boolean {
 const CHECK_BOX_HIT_PX = 20;
 
 // True when the editor holds no user content — blank text and no embedded
-// media. Empty paragraphs, empty headings, and stray empty bullets all
-// count as empty so the "Start writing…" placeholder shows.
+// media. Empty paragraphs and empty headings count as empty so the "Start
+// writing…" placeholder shows; an empty list does not, since its own bullet
+// or checklist marks would sit on top of the placeholder.
 function isEditorEmpty(el: HTMLElement): boolean {
   if ((el.textContent ?? '').replace(/\u200B/g, '').trim() !== '') return false;
-  return !el.querySelector('img, table, hr');
+  return !el.querySelector('img, table, hr, ul, ol');
 }
 
 // Move a run of block elements into a single checklist <ul>, one <li> per
