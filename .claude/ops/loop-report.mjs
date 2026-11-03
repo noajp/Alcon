@@ -27,6 +27,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readLease } from './singleLease.mjs'
 import { readReportPost } from './reportPost.mjs'
+import { devDomainId } from './devDomain.mjs'
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const INITIATIVE = (() => { const i = process.argv.indexOf('--initiative'); return i === -1 ? null : process.argv[i + 1] })()
@@ -140,7 +141,7 @@ const MARKERS = [['▶', '着手'], ['●', '進捗'], ['⬆', 'PR'], ['✔', '�
 
 async function activity() {
   const [objects] = await Promise.all([
-    rest(`objects?domain_id=eq.e3a72eca-f276-4776-9999-4abd4797a6b2&select=id,prefix`),
+    rest(`objects?domain_id=eq.${await devDomainId(URL_BASE, KEY)}&select=id,prefix`),
   ])
   const ids = objects.map((o) => o.id)
   if (!ids.length) return { lines: ['- 対象 Object なし'], counts: {} }

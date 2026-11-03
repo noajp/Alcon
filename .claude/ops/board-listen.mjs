@@ -39,6 +39,7 @@ import { fileURLToPath } from 'node:url'
 import { createFaultReporter } from './faultReporter.mjs'
 import { AGENT_MENTION, classifyElementComment, isOurElement, resolveElementName } from './elementScope.mjs'
 import { attachLog, claimLease, noteLease } from './singleLease.mjs'
+import { devDomainId } from './devDomain.mjs'
 
 // Before anything else — before reading a key, before opening a socket. A
 // second listener that got as far as connecting would deliver every board
@@ -58,9 +59,10 @@ if (HOOK) attachLog('board-listen')
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
-// The dev Domain (Alcon開発). Everything the self-build loop cares about hangs off
-// it; anything on another domain is the user's real work and none of our business.
-const DEV_DOMAIN = 'e3a72eca-f276-4776-9999-4abd4797a6b2'
+// The dev Domain, read from dev_control at start. Everything the self-build loop
+// cares about hangs off it; anything on another domain is the user's real work
+// and none of our business.
+let DEV_DOMAIN = null
 
 // Our own comments echo back off the stream. Waking the loop for its own
 // writes is how you build a machine that talks to itself forever.
@@ -597,6 +599,7 @@ function noteState() {
 // ── Start ────────────────────────────────────────────────────────────────────
 
 try {
+  DEV_DOMAIN = await devDomainId(SUPABASE_URL, SERVICE_KEY)
   await refreshObjects()
   await seedElements()
   await refreshStrategies()

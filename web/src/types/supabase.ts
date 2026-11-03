@@ -1450,6 +1450,7 @@ export type Database = {
       }
       dev_control: {
         Row: {
+          domain_id: string | null
           id: number
           max_concurrent: number
           note: string | null
@@ -1457,6 +1458,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          domain_id?: string | null
           id?: number
           max_concurrent?: number
           note?: string | null
@@ -1464,6 +1466,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          domain_id?: string | null
           id?: number
           max_concurrent?: number
           note?: string | null
