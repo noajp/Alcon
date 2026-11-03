@@ -1,5 +1,6 @@
 'use client';
 
+import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { setActiveDomainId } from '@/Function/space/domainsStore';
 
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
@@ -87,21 +88,18 @@ export function OverviewView({
 }: OverviewViewProps) {
   const { t } = useI18n();
   const explorerData = useExplorerData();
-  // Name + description as always-editable seamless textareas, mirroring
+  // The name as an always-editable seamless textarea, mirroring
   // ElementDetailView's inline header (transparent, no border/ring,
-  // auto-grow, save on blur — no Edit button, no view/edit toggle).
+  // auto-grow, save on blur — no Edit button, no view/edit toggle); the
+  // description is the shared DescriptionEditor.
   const [title, setTitle] = useState(object.name);
-  const [description, setDescription] = useState(object.description || '');
   const titleRef = useRef<HTMLTextAreaElement | null>(null);
-  const descRef = useRef<HTMLTextAreaElement | null>(null);
   useAutoGrowTextarea(titleRef, title);
-  useAutoGrowTextarea(descRef, description);
 
   // Re-sync from props when the Object switches or is saved elsewhere.
   useEffect(() => {
     setTitle(object.name);
-    setDescription(object.description || '');
-  }, [object.id, object.name, object.description]);
+  }, [object.id, object.name]);
 
   const handleTitleSave = async () => {
     const next = title.trim();
@@ -115,7 +113,7 @@ export function OverviewView({
     }
   };
 
-  const handleDescriptionSave = async () => {
+  const handleDescriptionSave = async (description: string) => {
     if (description !== (object.description || '')) {
       try {
         await updateObject(object.id, { description: description || null });
@@ -185,15 +183,8 @@ export function OverviewView({
               </div>
 
               <section>
-                <textarea
-                  ref={descRef}
-                  value={description}
-                  rows={1}
-                  onChange={(e) => setDescription(e.target.value)}
-                  onBlur={handleDescriptionSave}
-                  placeholder={t('Add description…')}
-                  className="w-full text-[14px] text-[var(--text-secondary)] leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
-                />
+                <DescriptionEditor key={object.id} value={object.description ?? ''}
+                  placeholder={t('Add description…')} onSave={handleDescriptionSave} />
               </section>
 
               <WidgetZone zone="main" columns={1} />

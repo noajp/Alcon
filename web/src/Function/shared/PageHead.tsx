@@ -1,5 +1,6 @@
 'use client';
 
+import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { isCancelKey, isCommitEnter, isSubmitChord } from '@/Function/shared/keyboard';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -128,7 +129,6 @@ export function PageHead({
 }) {
   const { t } = useI18n();
   const [titleDraft, setTitleDraft, savedTitle] = useDraft(title);
-  const [descDraft, setDescDraft, savedDesc] = useDraft(description);
   const [error, setError] = useState<string | null>(null);
 
   const commitTitle = async () => {
@@ -139,9 +139,9 @@ export function PageHead({
     if (next === savedTitle.trim()) return;
     try { await onSaveTitle(next); setError(null); } catch (e) { setError(message(e, t("Couldn't save"))); }
   };
-  const commitDescription = async () => {
-    const next = descDraft.trim();
-    if (!onSaveDescription || next === savedDesc.trim()) return;
+  const commitDescription = async (markdown: string) => {
+    const next = markdown.trim();
+    if (!onSaveDescription || next === description.trim()) return;
     try { await onSaveDescription(next); setError(null); } catch (e) { setError(message(e, t("Couldn't save"))); }
   };
 
@@ -150,9 +150,9 @@ export function PageHead({
       <div>
         {icon && <PageIcon>{icon}</PageIcon>}
         <h1 className={PAGE_TITLE} style={PAGE_TITLE_WEIGHT}>{title}</h1>
-        {description
-          ? <p className="mt-4 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-[var(--text-secondary)]">{description}</p>
-          : emptyDescription && <p className="mt-4 text-[14px] leading-relaxed text-muted-foreground">{emptyDescription}</p>}
+        <div className="mt-4">
+          <DescriptionEditor readOnly value={description} emptyText={emptyDescription} placeholder="" onSave={() => {}} />
+        </div>
       </div>
     );
   }
@@ -169,16 +169,10 @@ export function PageHead({
         }}
         className={`w-full resize-none overflow-hidden border-none bg-transparent focus:outline-none ${PAGE_TITLE}`}
         style={PAGE_TITLE_WEIGHT} />
-      {!onSaveDescription ? (
-        description && <p className="mt-3 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-muted-foreground">{description}</p>
-      ) : <div className="mt-3">
-        <AutoField label={descriptionLabel} placeholder={descriptionPlaceholder} value={descDraft} onChange={setDescDraft} onBlur={() => void commitDescription()}
-          onKeyDown={(e) => {
-            // Enter is a newline; ⌘Enter and Escape end the edit, which saves it.
-            if (isSubmitChord(e) || isCancelKey(e)) { e.preventDefault(); e.currentTarget.blur(); }
-          }}
-          className="min-h-[36px] w-full resize-none overflow-hidden border-none bg-transparent text-[14px] leading-relaxed text-[var(--text-secondary)] focus:outline-none" />
-      </div>}
+      <div className="mt-3" aria-label={descriptionLabel}>
+        <DescriptionEditor value={description} readOnly={!onSaveDescription}
+          placeholder={descriptionPlaceholder} onSave={commitDescription} />
+      </div>
       {error && <div role="alert" className="text-[11px] text-destructive">{error}</div>}
     </div>
   );
