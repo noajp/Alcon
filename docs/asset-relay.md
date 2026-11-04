@@ -21,8 +21,19 @@
 | POST | `/hello` | — | 名乗り。`space`（Space の id、必須）`name`（必須）`kind`（`app` / `ai_agent` / `script` / `service` / `other`）`manifest`（16KB まで）。201 で `{ asset_id, token, status }`。`token` を同梱した名乗りは再起動の報告で、manifest を更新して 200 `{ asset_id, status }` |
 | POST | `/events` | Bearer | `{ events: [{ kind, summary, payload?, occurred_at? }] }`（1 回 50 件、payload は 8KB まで）か、出来事 1 件。200 `{ recorded, status }` |
 | GET | `/status` | Bearer | `{ asset_id, name, status, space, claimed_at }` |
+| POST | `/calls/next` | Bearer | AI の実行がこの資産に頼んだ次の仕事。最長 20 秒待って `{ call: { id, tool, input } \| null }`。承諾済みの資産だけが受け取る。呼ぶたびに `last_seen_at` が更新される（生存確認を兼ねる） |
+| POST | `/calls/<id>/result` | Bearer | `{ ok, result?, error? }`（result は 256KB まで）。受け取った仕事の答え。200 `{ recorded: true }` |
 
 エラーは `{ "error": { "code", "message" } }`。400（形が違う）、401（トークンが不明）、403（取り消し済み）、404（Space が無い）、413（大きすぎる）、429（その Space の未承諾の資産が 100 件を超えている）、500。
+
+## 仕事を受ける資産（実行役）
+
+`manifest.capabilities` に `"browser"` を持つ資産は、ブラウザを貸す実行役として扱われる（`sdk/node/runner/alcon-runner.mjs`）。
+
+- 使えるのは、その資産を承諾した人が始めた AI の実行だけ。直近 2 分以内に `/calls/next` を呼んでいる実行役が「つながっている」とみなされる
+- run-agent は `pc_open` / `pc_read` / `pc_click` / `pc_type` / `pc_back` を道具として持ち、呼ばれると `asset_calls` に仕事を書いて、答えを最長 60 秒待つ
+- 実行役は外へ取りに行くだけで、外から接続されない。既定は読み取りのみ（フォームを送る画面遷移は止める）
+- 90 秒以上取りに来られなかった仕事は `expired` になる
 
 ## データ
 
@@ -30,6 +41,7 @@
 |---|---|
 | `assets` | 名前・種類・状態（`unclaimed` / `active` / `revoked`）・`manifest`（自己申告）・`observed`（受け口が見たもの）・トークンのハッシュと先頭・承諾した人と日時・最終確認・出来事の件数。メンバーは読める（ハッシュを除く） |
 | `asset_events` | `kind` / `summary` / `payload` / `occurred_at`。メンバーは読める |
+| `asset_calls` | 資産に頼んだ仕事：`tool` / `input` / `status`（`pending` / `claimed` / `done` / `failed` / `expired`）/ `result` / `error`、どの実行（`run_id`）からか。メンバーは読める。書くのは run-agent と受け口だけ |
 | `announce_asset` / `resolve_asset_token` / `touch_asset` / `record_asset_events` | service role だけが呼ぶ。関数が使う |
 | `accept_asset` / `revoke_asset` | Space のオーナーが呼ぶ |
 

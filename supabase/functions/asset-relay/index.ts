@@ -22,6 +22,13 @@
 //                  { events: [{ kind, summary, payload?, occurred_at? }] } or one event
 //                  → 200 { recorded }
 //   GET  /status   Authorization: Bearer <token> → { asset_id, name, status, space }
+//   POST /calls/next          Authorization: Bearer <token>
+//                  The next thing an agent asked this asset to do, waiting
+//                  up to ~20 s for one: → { call: { id, tool, input } | null }.
+//                  Only an accepted asset receives calls. Doubles as the
+//                  asset's heartbeat (last_seen_at).
+//   POST /calls/<id>/result   Authorization: Bearer <token>
+//                  { ok, result?, error? } → { recorded: true }
 //
 // Errors: { "error": { "code", "message" } } with 400, 401, 403 (revoked),
 // 404 (unknown Space), 405, 413 (too large), 429 (too many unrecognized
@@ -215,6 +222,52 @@ async function events(req: Request, db: SupabaseClient, asset: ResolvedAsset): P
   return json(200, { recorded: data, status: asset.status });
 }
 
+const CALL_WAIT_MS = 20_000;
+const CALL_POLL_MS = 800;
+/** A call nobody picked up for this long is stale: the run has given up on it. */
+const CALL_STALE_MS = 90_000;
+const MAX_RESULT_BYTES = 256 * 1024;
+
+/** Hands the oldest pending call to the asset, waiting a while for one. */
+async function nextCall(db: SupabaseClient, asset: ResolvedAsset): Promise<Response> {
+  if (asset.status !== "active") return json(200, { call: null, status: asset.status });
+  await db.from("assets").update({ last_seen_at: new Date().toISOString() }).eq("id", asset.id);
+  const until = Date.now() + CALL_WAIT_MS;
+  while (true) {
+    const { data: pending } = await db.from("asset_calls").select("id, tool, input, created_at")
+      .eq("asset_id", asset.id).eq("status", "pending").order("created_at").limit(5);
+    for (const c of (pending ?? []) as { id: string; tool: string; input: unknown; created_at: string }[]) {
+      if (Date.now() - new Date(c.created_at).getTime() > CALL_STALE_MS) {
+        await db.from("asset_calls").update({ status: "expired", finished_at: new Date().toISOString() }).eq("id", c.id).eq("status", "pending");
+        continue;
+      }
+      // Claimed only if still pending: two pollers never take the same call.
+      const { data: claimed } = await db.from("asset_calls").update({ status: "claimed", claimed_at: new Date().toISOString() })
+        .eq("id", c.id).eq("status", "pending").select("id").maybeSingle();
+      if (claimed) return json(200, { call: { id: c.id, tool: c.tool, input: c.input } });
+    }
+    if (Date.now() + CALL_POLL_MS > until) return json(200, { call: null, status: asset.status });
+    await new Promise((r) => setTimeout(r, CALL_POLL_MS));
+  }
+}
+
+async function callResult(req: Request, db: SupabaseClient, asset: ResolvedAsset, callId: string): Promise<Response> {
+  if (!UUID_RE.test(callId)) return fail(400, "invalid_call", "no such call");
+  let body: unknown;
+  try { body = await req.json(); } catch { return fail(400, "invalid_json", "the body is not JSON"); }
+  if (!isObject(body)) return fail(400, "invalid_body", "the body must be an object");
+  if (byteLength(body.result) > MAX_RESULT_BYTES) return fail(413, "result_too_large", `result must be under ${MAX_RESULT_BYTES} bytes`);
+  const ok = body.ok !== false;
+  const { data } = await db.from("asset_calls").update({
+    status: ok ? "done" : "failed",
+    result: ok ? (body.result ?? null) : null,
+    error: ok ? null : String(body.error ?? "failed").slice(0, 2000),
+    finished_at: new Date().toISOString(),
+  }).eq("id", callId).eq("asset_id", asset.id).eq("status", "claimed").select("id").maybeSingle();
+  if (!data) return fail(409, "not_claimed", "this call is not waiting for this asset's answer");
+  return json(200, { recorded: true });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const path = relayPath(new URL(req.url).pathname);
@@ -248,6 +301,16 @@ Deno.serve(async (req: Request) => {
       }
       if (req.method !== "POST") return fail(405, "method_not_allowed", "POST /events");
       return await events(req, db, asset);
+    }
+    const callRoute = /^\/calls\/(next|[0-9a-f-]{36}\/result)$/i.exec(path);
+    if (callRoute) {
+      if (req.method !== "POST") return fail(405, "method_not_allowed", "POST");
+      const token = bearer(req);
+      if (!token) return fail(401, "unauthorized", "missing bearer token");
+      const asset = await resolve(db, token);
+      if (!asset) return fail(401, "unauthorized", "the token is not known");
+      if (asset.status === "revoked") return fail(403, "revoked", "this asset was revoked by a Space owner");
+      return callRoute[1] === "next" ? await nextCall(db, asset) : await callResult(req, db, asset, callRoute[1].slice(0, 36));
     }
     return fail(404, "not_found", "no such route");
   } catch (e) {

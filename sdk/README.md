@@ -44,3 +44,17 @@ Alcon 側では、アプリが言ったこと（自己申告）と、受け口�
 - 受け口に届かない、トークンが取り消された、設定が無い——どの場合もアプリは止まらず、一行の記録を出して以後は送らない
 - 出来事は 5 秒ごとにまとめて送り、1 回 50 件まで。未送信が 500 件を超えたら古いものから捨てる
 - 停止は best effort。強制終了では送られず、`last_seen_at` が止まることが停止のしるしになる
+
+## 実行役：自分の PC のブラウザを AI に貸す
+
+`sdk/node/runner/` は、Alcon の AI の実行に、自分の PC の Google Chrome を貸す常駐プログラム。AI は、検索では中身が取れない一覧・検索結果・詳細ページをブラウザで開き、絞り込み・ページ送り・詳細を開くといった操作をする。
+
+```bash
+cd sdk/node/runner && npm install
+ALCON_RELAY=https://<project>.supabase.co/functions/v1/asset-relay ALCON_SPACE=<Space の id> node alcon-runner.mjs
+```
+
+- 初回は Space に名乗り出る。Settings › Integrations › Connected assets で承諾すると、承諾した人の AI の実行から使えるようになる
+- ブラウザは専用のプロフィール（`~/.alcon/browser`）で開き、画面に見えるので AI の操作を見守れる。普段の Chrome のログインは共有しない。AI に見せたいサイトだけ、そのウィンドウでログインする
+- 既定は読み取りのみ。フォームを送る画面遷移は止める。`--allow-writes` で外す。`--headless` で画面を出さない
+- トークンとプロフィールは `~/.alcon/`（`ALCON_HOME` で変更）。止めるときは Ctrl+C、Alcon 側で Revoke すると次の呼び出しで止まる

@@ -44,6 +44,7 @@ import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
+import { isRunnerTool, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
 import {
   runLoop, appendDecisionResults, canonicalCalls,
   type LoopState, type ToolCall, type ToolKind, type ToolResult, type PendingApproval, type FinishPayload, type Msg,
@@ -443,11 +444,22 @@ async function execute(a: ExecArgs): Promise<void> {
   // The tool list is frozen at the first slice: later slices send the same
   // definitions (thinking blocks are bound to that prefix). A tool whose
   // integration went away since answers with an error instead.
-  const liveTools: ToolDef[] = [...baseAgentTools(), ...integrationDefs];
+  // The browser on the person's own computer, when they run one and it is on.
+  const { data: runnerRows } = run.activity_space_id && run.triggered_by
+    ? await admin.from("assets").select("id, name, manifest, last_seen_at")
+      .eq("activity_space_id", run.activity_space_id).eq("status", "active").eq("claimed_by", run.triggered_by)
+      .order("last_seen_at", { ascending: false }).limit(10)
+    : { data: [] };
+  const runner = pickRunner((runnerRows ?? []) as RunnerRow[], Date.now());
+  if (runner) integrationSummary.push({ name: `この人の PC のブラウザ（${runner.name}）`, kind: "PC", delegation: "read_only", tools: RUNNER_TOOLS.length });
+
+  const liveTools: ToolDef[] = [...baseAgentTools(), ...(runner ? RUNNER_TOOLS : []), ...integrationDefs];
   const tools: ToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : liveTools;
   const kindOf = (name: string): ToolKind => {
     const base = baseKindOf(name);
     if (base) return base;
+    // The runner only reads unless its owner started it to write.
+    if (isRunnerTool(name)) return "read";
     return "write"; // decided per call below
   };
   const isRead = (call: ToolCall): boolean => {
@@ -498,6 +510,25 @@ async function execute(a: ExecArgs): Promise<void> {
     }
   };
 
+  // A call to the person's PC: queued for its runner, answered within a
+  // minute or given up (the runner may have gone offline since).
+  const callRunner = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
+    if (!runner) return { content: "この人の PC のブラウザは今つながっていません。Web 検索で進めるか、つながっていないことを報告してください。", is_error: true };
+    await addStep(admin, run.id, "action", runnerStep(call.name, call.input));
+    const { data: queued, error } = await admin.from("asset_calls")
+      .insert({ asset_id: runner.id, run_id: run.id, tool: runnerOperation(call.name), input: call.input }).select("id").single();
+    if (error || !queued) return { content: `PC に依頼できませんでした: ${error?.message ?? "unknown"}`, is_error: true };
+    const until = Math.min(Date.now() + 60_000, deadline - 5_000);
+    while (Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 700));
+      const { data: c } = await admin.from("asset_calls").select("status, result, error").eq("id", queued.id).maybeSingle();
+      if (c?.status === "done") return { content: runnerResultText(c.result) };
+      if (c?.status === "failed") return { content: `PC のブラウザで失敗しました: ${c.error ?? ""}`, is_error: true };
+    }
+    await admin.from("asset_calls").update({ status: "expired", finished_at: new Date().toISOString() }).eq("id", queued.id).in("status", ["pending", "claimed"]);
+    return { content: "PC のブラウザから時間内に答えがありませんでした（PC が眠っているか、実行役が止まっている可能性）。", is_error: true };
+  };
+
   const executeCall = async (call: ToolCall): Promise<{ content: string; is_error?: boolean; finish?: FinishPayload }> => {
     const input = call.input;
     switch (call.name) {
@@ -536,6 +567,7 @@ async function execute(a: ExecArgs): Promise<void> {
         return { content: "完了報告を受け取りました。", finish };
       }
     }
+    if (isRunnerTool(call.name)) return await callRunner(call);
     if (baseKindOf(call.name) === "board") {
       const r = isStrategyTool(call.name) ? await runStrategyTool(userDb, call.name, input) : await runBoardTool(userDb, call.name, input, actor);
       await addStep(admin, run.id, "action", `Alcon: ${call.name}`, r.ok ? null : r.error);

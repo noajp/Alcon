@@ -6,6 +6,7 @@ const ctx = await import(new URL('../../supabase/functions/run-agent/context.ts'
 const pricing = await import(new URL('../../supabase/functions/_shared/aiPricing.ts', import.meta.url).pathname);
 const verify = await import(new URL('../../supabase/functions/run-agent/verify.ts', import.meta.url).pathname);
 const advance = await import(new URL('../../supabase/functions/run-agent/advance.ts', import.meta.url).pathname);
+const runner = await import(new URL('../../supabase/functions/run-agent/runnerTools.ts', import.meta.url).pathname);
 const client = await import(new URL('../../supabase/functions/_shared/integrationClient.ts', import.meta.url).pathname);
 
 const { runLoop, appendDecisionResults, canonicalCalls, orderResults } = loop;
@@ -228,6 +229,27 @@ describe('auto-advance', () => {
     // b: its other prerequisite is cancelled. c waits on x. d is a person's,
     // e is already running, f is not open.
     expect(next).toEqual(['b']);
+  });
+});
+
+describe('PC runner', () => {
+  const now = Date.parse('2026-11-04T12:00:00Z');
+  const row = (id: string, caps: unknown, seenSecsAgo: number | null) => ({
+    id, name: id, manifest: { capabilities: caps }, last_seen_at: seenSecsAgo == null ? null : new Date(now - seenSecsAgo * 1000).toISOString(),
+  });
+
+  it('picks the most recently seen runner that offers a browser and is on', () => {
+    expect(runner.pickRunner([row('old', ['browser'], 90), row('new', ['browser'], 5), row('nobrowser', ['files'], 1), row('off', ['browser'], 600), row('never', ['browser'], null)], now)?.id).toBe('new');
+    expect(runner.pickRunner([row('off', ['browser'], 600)], now)).toBeNull();
+  });
+
+  it('names the runner\'s operation, logs the call and reads the answer', () => {
+    expect(runner.runnerOperation('pc_open')).toBe('open');
+    expect(runner.isRunnerTool('pc_click')).toBe(true);
+    expect(runner.isRunnerTool('getElement')).toBe(false);
+    expect(runner.runnerStep('pc_open', { url: 'https://suumo.jp' })).toBe('PC: 開く https://suumo.jp');
+    const text = runner.runnerResultText({ url: 'https://x', title: 'T', text: '本文', links: [{ text: '次へ', href: 'https://x?p=2' }], note: 'n' });
+    for (const t of ['URL: https://x', 'タイトル: T', '本文', '- 次へ → https://x?p=2', '注: n']) expect(text).toContain(t);
   });
 });
 
