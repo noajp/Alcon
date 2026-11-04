@@ -4,7 +4,7 @@
 //   DAG: one Initiative may sit under several parents, and then shows under
 //   each of them).
 
-export interface InitiativeMember { id: string; name: string; vision_id: string | null; activity_space_id?: string | null; created_at?: string; parentIds: string[]; objectIds: string[] }
+export interface InitiativeMember { id: string; name: string; activity_space_id?: string | null; created_at?: string; parentIds: string[]; objectIds: string[] }
 
 /** Whether an Initiative belongs to this Space. One with a Space of its own
  *  answers directly; one without (written before Initiatives had a Space)

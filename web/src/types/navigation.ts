@@ -48,10 +48,6 @@ export interface NavigationState {
    *  navigation so the request lands in this tab's surface once it is
    *  mounted, not in whichever listener happened to exist. */
   strategyCreate?: boolean | null;
-  /** The Vision open on the Vision page; null = the list of Visions. */
-  visionId?: string | null;
-  /** The sidebar's "+" asked for a new Vision. */
-  visionCreate?: boolean | null;
   /** What the Home main island is showing, when on the Home view. A pinned
    *  item's content renders in place (no layer/view switch) instead of the
    *  welcome. null = the welcome landing. */

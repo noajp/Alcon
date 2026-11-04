@@ -225,7 +225,7 @@ export async function createStrategy(
   if (!createdBy) throw new Error('Not signed in');
   const { data, error } = await supabase
     .from('strategies')
-    // The Space it is created in; a Vision overrides it (DB trigger).
+    // The Space it is created in.
     .insert({ ...input, created_by: createdBy, activity_space_id: input.activity_space_id ?? getActiveSpaceId() })
     .select()
     .single();
@@ -333,16 +333,12 @@ export async function removeStrategyChild(parentStrategyId: string, childStrateg
   if (error) throw error;
 }
 
-/** Moves an Initiative: into another Initiative (it takes that one's Vision)
- *  or, with `parentId` null, to the top of a Vision (or of no Vision). It
- *  leaves the parents it had. A move that would put it inside itself is
- *  refused by the database. */
-export async function moveInitiative(id: string, to: { parentId: string | null; visionId: string | null }, fromParentIds: string[]): Promise<void> {
+/** Moves a Strategy into another Strategy, or with `parentId` null to the
+ *  top. It leaves the parents it had. A move that would put it inside
+ *  itself is refused by the database. */
+export async function moveInitiative(id: string, to: { parentId: string | null }, fromParentIds: string[]): Promise<void> {
   if (to.parentId && !fromParentIds.includes(to.parentId)) await addStrategyChild(to.parentId, id);
   for (const parent of fromParentIds) if (parent !== to.parentId) await removeStrategyChild(parent, id);
-  const { error } = await supabase.from('strategies')
-    .update({ vision_id: to.visionId, updated_at: new Date().toISOString() }).eq('id', id);
-  if (error) throw error;
   invalidateStrategies();
 }
 

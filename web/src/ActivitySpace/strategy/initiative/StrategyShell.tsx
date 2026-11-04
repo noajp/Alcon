@@ -80,7 +80,6 @@ import {
 import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { resolveVision, useVisions } from '@/hooks/visionData';
 import { buildInitiativeTree, flattenInitiativeTree, inSpace, type InitiativeNode } from './initiativeTree';
 import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 
@@ -124,7 +123,6 @@ function InitiativeBoard({ surface, defaults, subjectId, host, zones, children }
 // =============================================================
 
 export function StrategyShell({
-  visionId,
   activeStrategyId,
   onSelectStrategy,
   onOpenObject,
@@ -132,9 +130,6 @@ export function StrategyShell({
   createRequested,
   onCreateHandled,
 }: {
-  /** The Vision whose Initiatives the root list shows (null = the Space's
-   *  first). With no Vision in the Space the list shows every Initiative. */
-  visionId?: string | null;
   /** Which Initiative the detail page shows; null = the root Initiative list.
    *  Controlled by the caller (navigation.strategyId) so other surfaces can
    *  deep-link straight into a Initiative. */
@@ -167,21 +162,11 @@ export function StrategyShell({
     () => strategies.find((s) => s.id === openStrategyId) ?? null,
     [strategies, openStrategyId],
   );
-  // The list is the Space's Initiatives as a tree — nested ones under their
-  // parent — one section per Vision, then the ones no Vision holds yet. A
-  // new Initiative goes under the open Vision, else the first.
+  // The list is the Space's Strategies as one tree, nested ones under their
+  // parent, as deep as they go.
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
-  const { data: visions } = useVisions(spaceId);
-  const vision = resolveVision(visions, visionId);
-  const sections = useMemo(() => {
-    const tree = buildInitiativeTree(strategies.filter((s) => inSpace(s, spaceId, () => true)));
-    const known = new Set(visions.map((v) => v.id));
-    return [
-      ...visions.map((v) => ({ id: v.id, label: v.name, nodes: tree.filter((n) => n.initiative.vision_id === v.id) })),
-      { id: 'unplaced', label: t('Not in a Vision'), nodes: tree.filter((n) => !n.initiative.vision_id || !known.has(n.initiative.vision_id)) },
-    ].filter((section) => section.nodes.length > 0);
-  }, [strategies, spaceId, visions, t]);
+  const tree = useMemo(() => buildInitiativeTree(strategies.filter((s) => inSpace(s, spaceId, () => true))), [strategies, spaceId]);
 
   if (openStrategy) {
     return (
@@ -207,25 +192,19 @@ export function StrategyShell({
       } />
 
       <div className="flex-1 overflow-hidden">
-        {loading ? null : sections.length === 0 ? (
+        {loading ? null : tree.length === 0 ? (
           <EmptyState art="initiative" title="Create your first Initiative"
             description="An Initiative groups Objects across Domains around one outcome."
             cta="Create Initiative" onCta={() => setNewOpen(true)} />
         ) : (
           <div className="h-full overflow-auto">
-            {sections.map((section, i) => (
-              <div key={section.id}>
-                <div className="px-6 pt-4 text-[12px] font-medium text-muted-foreground/80">{section.label}</div>
-                <StrategyListView nodes={section.nodes} onSelectStrategy={(s) => setOpenStrategyId(s.id)} showHeader={i === 0} />
-              </div>
-            ))}
+            <StrategyListView nodes={tree} onSelectStrategy={(s) => setOpenStrategyId(s.id)} />
           </div>
         )}
       </div>
 
       {newOpen && (
         <StrategyCreateDialog
-          visionId={vision?.id ?? null}
           onClose={() => setNewOpen(false)}
           onCreated={(id) => {
             setNewOpen(false);
@@ -301,13 +280,10 @@ function InitiativeHealthCell({ health, measures }: { health: InitiativeHealth |
 function StrategyListView({
   nodes,
   onSelectStrategy,
-  showHeader = true,
 }: {
   /** The tree's roots; a parent folds its children away with its arrow. */
   nodes: InitiativeNode<StrategyWithObjects>[];
   onSelectStrategy: (strategy: StrategyWithObjects) => void;
-  /** The column headings; a second list under the first leaves them out. */
-  showHeader?: boolean;
 }) {
   const { t } = useI18n();
   const [folded, setFolded] = useState<Set<string>>(new Set());
@@ -323,7 +299,7 @@ function StrategyListView({
   // honestly while the list stays open; the cells re-render with this view.
   useNow();
   return (
-    <IndexList headers={[t('Name'), t('Health'), t('Objects')]} showHeader={showHeader} withActions>
+    <IndexList headers={[t('Name'), t('Health'), t('Objects')]} withActions>
       {rows.map(({ initiative: s, key, depth, children }) => (
         <InitiativeMenu key={key} initiative={s}>
           <div>
@@ -1155,8 +1131,6 @@ function StrategyDetailView({
     </WidgetActionSlotProvider>
     {newChildOpen && (
       <StrategyCreateDialog
-        // A nested Initiative sits in its parent's Vision.
-        visionId={strategy.vision_id}
         onClose={() => setNewChildOpen(false)}
         onCreated={async (id) => {
           setNewChildOpen(false);
@@ -1179,12 +1153,9 @@ function StrategyDetailView({
 // push into a detail page for).
 // =============================================================
 function StrategyCreateDialog({
-  visionId,
   onClose,
   onCreated,
 }: {
-  /** The Vision the new Initiative is placed under. */
-  visionId: string | null;
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
@@ -1214,7 +1185,7 @@ function StrategyCreateDialog({
       namePlaceholder={t('Initiative name…')}
       onClose={onClose}
       onSubmit={async ({ name, description }) => {
-        const created = await createStrategy({ name, description, vision_id: visionId }, Array.from(selectedIds));
+        const created = await createStrategy({ name, description }, Array.from(selectedIds));
         onCreated(created.id);
       }}
     >

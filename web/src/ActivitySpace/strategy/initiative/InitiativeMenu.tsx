@@ -8,19 +8,18 @@ import { ActionsButton, ActionsContextMenu, type ActionItem } from '@/Function/s
 import { MenuShell } from '@/Function/shared/menu';
 import { Popover, PopoverAnchor } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
-import { NavStrategyIcon, NavVisionIcon } from '@/shell/sidebar/NavIcons';
+import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useSpaceRole } from '@/Function/space/data';
 import { canEditInitiative } from '@/Function/strategy/initiativeAccess';
 import { deleteStrategy, moveInitiative, useStrategies } from '@/hooks/strategyData';
-import { useVisions } from '@/hooks/visionData';
+import { buildInitiativeTree, flattenInitiativeTree, inSpace } from './initiativeTree';
 
 /** The Initiative a menu acts on — where it sits and who made it. */
 interface InitiativeRef {
   id: string;
   name: string;
-  vision_id: string | null;
   /** The Initiatives it is nested in. */
   parentIds: string[];
   created_by: string | null;
@@ -28,8 +27,8 @@ interface InitiativeRef {
 }
 
 /**
- * An Initiative's actions, wherever it is shown: move it to the top of a
- * Vision or into another Initiative, and delete it. Only its creator may change it (the
+ * A Strategy's actions, wherever it is shown: move it to the top or into
+ * another Strategy, and delete it. Only its creator may change it (the
  * strategies policy), so for anyone else there are no actions. Deleting
  * leaves the linked Objects and their Elements alone; a refusal is said, not
  * swallowed.
@@ -85,28 +84,37 @@ export function InitiativeActionsButton({ initiative, onDelete }: { initiative: 
   );
 }
 
-// Where an Initiative can go: to the top of any of the Space's Visions, into
-// any other Initiative under it, or out of every Vision. The current place
-// is checked.
+// Where a Strategy can go: to the top, or into any other Strategy of the
+// Space that is not inside it, listed as the tree. The current place is
+// checked.
 function InitiativeMovePicker({ initiative, onClose }: { initiative: InitiativeRef; onClose: () => void }) {
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
-  const { data: visions } = useVisions(spaceId);
   const { data: strategies } = useStrategies();
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
-  const groups = useMemo(() => visions.map((v) => ({
-    vision: v,
-    parents: strategies.filter((s) => s.vision_id === v.id && s.id !== initiative.id && (!q || s.name.toLowerCase().includes(q))),
-  })).filter((g) => !q || g.vision.name.toLowerCase().includes(q) || g.parents.length > 0), [visions, strategies, initiative.id, q]);
+  const targets = useMemo(() => {
+    const inside = new Set<string>([initiative.id]);
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const s of strategies) if (!inside.has(s.id) && s.parentIds.some((p) => inside.has(p))) { inside.add(s.id); grew = true; }
+    }
+    const rows = flattenInitiativeTree(buildInitiativeTree(strategies.filter((s) => inSpace(s, spaceId, () => true))), () => true);
+    const seen = new Set<string>();
+    return rows.filter(({ initiative: s }) => {
+      if (inside.has(s.id) || seen.has(s.id)) return false;
+      seen.add(s.id);
+      return !q || s.name.toLowerCase().includes(q);
+    });
+  }, [strategies, spaceId, initiative.id, q]);
 
-  const go = async (to: { parentId: string | null; visionId: string | null }) => {
+  const go = async (to: { parentId: string | null }) => {
     onClose();
     try { await moveInitiative(initiative.id, to, initiative.parentIds); }
     catch (e) {
-      // 23514: the target sits inside this Initiative.
+      // 23514: the target sits inside this Strategy.
       const code = (e as { code?: string } | null)?.code;
-      await appDialog.alert(code === '23514' ? t("An Initiative can't go inside one of its own.") : e instanceof Error ? e.message : t("Couldn't save"));
+      await appDialog.alert(code === '23514' ? t("A Strategy can't go inside one of its own.") : e instanceof Error ? e.message : t("Couldn't save"));
     }
   };
   const atTop = initiative.parentIds.length === 0;
@@ -122,25 +130,18 @@ function InitiativeMovePicker({ initiative, onClose }: { initiative: InitiativeR
           <CommandInput value={query} onValueChange={setQuery} placeholder={t('Move to…')} autoFocus />
           <CommandList>
             <CommandEmpty>{t('No matches.')}</CommandEmpty>
-            {groups.map(({ vision, parents }) => (
-              <div key={vision.id}>
-                <CommandItem value={`vision ${vision.id}`} onSelect={() => void go({ parentId: null, visionId: vision.id })}>
-                  <NavVisionIcon size={12} /><span className="flex-1 truncate">{vision.name}</span>
-                  {atTop && initiative.vision_id === vision.id && <Check size={12} />}
-                </CommandItem>
-                {parents.map((p) => (
-                  <CommandItem key={p.id} value={`initiative ${p.id}`} onSelect={() => void go({ parentId: p.id, visionId: vision.id })}>
-                    <span className="w-2.5" /><NavStrategyIcon size={12} /><span className="flex-1 truncate">{p.name}</span>
-                    {initiative.parentIds.includes(p.id) && <Check size={12} />}
-                  </CommandItem>
-                ))}
-              </div>
-            ))}
-            {(initiative.vision_id || !atTop) && !q && (
-              <CommandItem value="__none" onSelect={() => void go({ parentId: null, visionId: null })}>
-                <span className="flex-1 text-muted-foreground">{t('Not in a Vision')}</span>
+            {!q && (
+              <CommandItem value="__top" onSelect={() => void go({ parentId: null })}>
+                <span className="flex-1 text-muted-foreground">{t('Top level')}</span>
+                {atTop && <Check size={12} />}
               </CommandItem>
             )}
+            {targets.map(({ initiative: p, depth, key }) => (
+              <CommandItem key={key} value={`strategy ${p.id}`} onSelect={() => void go({ parentId: p.id })}>
+                <span style={{ width: q ? 0 : depth * 12 }} className="shrink-0" /><NavStrategyIcon size={12} /><span className="flex-1 truncate">{p.name}</span>
+                {initiative.parentIds.includes(p.id) && <Check size={12} />}
+              </CommandItem>
+            ))}
           </CommandList>
         </Command>
       </MenuShell>

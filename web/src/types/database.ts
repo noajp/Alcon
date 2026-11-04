@@ -1429,43 +1429,10 @@ export interface Strategy {
   scope: StrategyScope
   color: string | null
   icon: string | null
-  vision_id: string | null     // Strategy > Vision the Initiative works toward
-  activity_space_id: string | null  // the Space it belongs to — its Vision's when that is set
+  activity_space_id: string | null  // the Space it belongs to
   created_by: string | null
   created_at: string
   updated_at: string
-}
-
-// Strategy > Vision — what a Space aims for. A Space holds any number of
-// Visions; Initiatives hang under one (and nest in each other), the way
-// Objects and Elements hang under a Domain.
-export interface Vision {
-  id: string
-  activity_space_id: string
-  name: string
-  statement: string | null    // the aim, in one statement
-  horizon: string | null      // 'YYYY-MM-DD' — by when
-  narrative: string | null    // why this, and what changes
-  conditions: string[]        // how the Space will know it got there
-  order_index: number
-  created_by: string
-  created_at: string
-  updated_at: string
-}
-export interface VisionInsert {
-  id?: string
-  activity_space_id: string
-  name: string
-  statement?: string | null
-  order_index?: number
-}
-export interface VisionUpdate {
-  name?: string
-  statement?: string | null
-  horizon?: string | null
-  narrative?: string | null
-  conditions?: string[]
-  order_index?: number
 }
 
 export interface StrategyInsert {
@@ -1476,7 +1443,6 @@ export interface StrategyInsert {
   scope?: StrategyScope
   color?: string | null
   icon?: string | null
-  vision_id?: string | null
   activity_space_id?: string | null
   created_by?: string
 }
@@ -1488,7 +1454,6 @@ export interface StrategyUpdate {
   scope?: StrategyScope
   color?: string | null
   icon?: string | null
-  vision_id?: string | null
   updated_at?: string
 }
 

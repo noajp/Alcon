@@ -3772,7 +3772,6 @@ export type Database = {
           scope: Json
           status: string | null
           updated_at: string
-          vision_id: string | null
         }
         Insert: {
           activity_space_id?: string | null
@@ -3786,7 +3785,6 @@ export type Database = {
           scope?: Json
           status?: string | null
           updated_at?: string
-          vision_id?: string | null
         }
         Update: {
           activity_space_id?: string | null
@@ -3800,7 +3798,6 @@ export type Database = {
           scope?: Json
           status?: string | null
           updated_at?: string
-          vision_id?: string | null
         }
         Relationships: [
           {
@@ -3808,13 +3805,6 @@ export type Database = {
             columns: ["activity_space_id"]
             isOneToOne: false
             referencedRelation: "activity_spaces"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "strategies_vision_id_fkey"
-            columns: ["vision_id"]
-            isOneToOne: false
-            referencedRelation: "visions"
             referencedColumns: ["id"]
           },
         ]
@@ -4161,56 +4151,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
-      }
-      visions: {
-        Row: {
-          activity_space_id: string
-          conditions: Json
-          created_at: string
-          created_by: string
-          horizon: string | null
-          id: string
-          name: string
-          narrative: string | null
-          order_index: number
-          statement: string | null
-          updated_at: string
-        }
-        Insert: {
-          activity_space_id: string
-          conditions?: Json
-          created_at?: string
-          created_by?: string
-          horizon?: string | null
-          id?: string
-          name: string
-          narrative?: string | null
-          order_index?: number
-          statement?: string | null
-          updated_at?: string
-        }
-        Update: {
-          activity_space_id?: string
-          conditions?: Json
-          created_at?: string
-          created_by?: string
-          horizon?: string | null
-          id?: string
-          name?: string
-          narrative?: string | null
-          order_index?: number
-          statement?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "visions_activity_space_id_fkey"
-            columns: ["activity_space_id"]
-            isOneToOne: false
-            referencedRelation: "activity_spaces"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       widget_boards: {
         Row: {
