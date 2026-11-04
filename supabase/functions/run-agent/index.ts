@@ -44,6 +44,7 @@ import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
+import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
 import { isRunnerTool, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
 import {
   runLoop, appendDecisionResults, canonicalCalls,
@@ -561,8 +562,12 @@ async function execute(a: ExecArgs): Promise<void> {
           ? await userDb.from("agent_artifacts").update({ content, format, run_id: run.id, updated_at: new Date().toISOString() }).eq("id", existing.id).select("id").single()
           : await userDb.from("agent_artifacts").insert({ element_id: run.element_id, run_id: run.id, title, content, format, author_name: agentName }).select("id").single();
         if (res.error) return { content: res.error.message, is_error: true };
-        await addStep(admin, run.id, "artifact", `成果物を保存: ${title}`, `${content.length} 文字`);
-        return { content: `成果物「${title}」を保存しました。` };
+        // Also a file in the Space's Artifacts, on this Element. The output
+        // above is saved either way; a file that could not be written says so.
+        const file = await saveArtifactFile(userDb, run.element_id, title, content, format);
+        const fileNote = "error" in file ? `（Artifacts への保存に失敗: ${file.error}）` : `、Artifacts に ${artifactFileName(title, format)}`;
+        await addStep(admin, run.id, "artifact", `成果物を保存: ${title}`, `${content.length} 文字${fileNote}`);
+        return { content: `成果物「${title}」を保存しました${"error" in file ? "" : `（Artifacts のファイル ${artifactFileName(title, format)}）`}。` };
       }
       case "finish": {
         const outcome = ["completed", "partial", "blocked"].includes(String(input.outcome)) ? String(input.outcome) as FinishPayload["outcome"] : "completed";

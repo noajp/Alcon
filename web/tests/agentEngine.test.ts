@@ -7,6 +7,7 @@ const pricing = await import(new URL('../../supabase/functions/_shared/aiPricing
 const verify = await import(new URL('../../supabase/functions/run-agent/verify.ts', import.meta.url).pathname);
 const advance = await import(new URL('../../supabase/functions/run-agent/advance.ts', import.meta.url).pathname);
 const runner = await import(new URL('../../supabase/functions/run-agent/runnerTools.ts', import.meta.url).pathname);
+const artifactFile = await import(new URL('../../supabase/functions/run-agent/artifactFile.ts', import.meta.url).pathname);
 const client = await import(new URL('../../supabase/functions/_shared/integrationClient.ts', import.meta.url).pathname);
 
 const { runLoop, appendDecisionResults, canonicalCalls, orderResults } = loop;
@@ -250,6 +251,15 @@ describe('PC runner', () => {
     expect(runner.runnerStep('pc_open', { url: 'https://suumo.jp' })).toBe('PC: 開く https://suumo.jp');
     const text = runner.runnerResultText({ url: 'https://x', title: 'T', text: '本文', links: [{ text: '次へ', href: 'https://x?p=2' }], note: 'n' });
     for (const t of ['URL: https://x', 'タイトル: T', '本文', '- 次へ → https://x?p=2', '注: n']) expect(text).toContain(t);
+  });
+});
+
+describe('artifact files', () => {
+  it('names an output\'s file by its title and format, safe for a file name', () => {
+    expect(artifactFile.artifactFileName('候補物件の比較レポート（第2版）', 'markdown')).toBe('候補物件の比較レポート（第2版）.md');
+    expect(artifactFile.artifactFileName('a/b: c?', 'csv')).toBe('a b c.csv');
+    expect(artifactFile.artifactFileName('   ', 'json')).toBe('output.json');
+    expect(artifactFile.artifactFileName('x', 'unknown')).toBe('x.md');
   });
 });
 

@@ -40,7 +40,7 @@ export const INTERNAL_TOOLS: ToolDef[] = [
   },
   {
     name: "save_artifact",
-    description: "成果物（文書・表・下書き・データなど）を Element に保存する。Element を見られる人なら誰でも読める。同じ title で呼ぶと上書きする。任務が成果物を求めるときだけ使う。",
+    description: "成果物（文書・表・下書き・データなど）を Element に保存する。Space の Artifacts にもファイル（markdown なら .md）として置かれ、Element を見られる人なら誰でも読める。title には版番号や日付を入れない：同じ title で保存し直すと、同じファイルの新しい版になる。任務が成果物を求めるときだけ使う。",
     input_schema: {
       type: "object",
       properties: {
