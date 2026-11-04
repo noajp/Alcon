@@ -588,9 +588,10 @@ function StrategyDetailView({
       onNavigate: (nav) => {
         if (nav.objectId) onOpenObject?.(nav.objectId, nav.domainId ?? null);
         else if (nav.domainId) onOpenDomain?.(nav.domainId);
+        else if (nav.tableId) onOpenTable?.(nav.tableId);
       },
     }),
-    [strategy.id, initiativeElements, onSaved, onOpenObject, onOpenDomain],
+    [strategy.id, initiativeElements, onSaved, onOpenObject, onOpenDomain, onOpenTable],
   );
   const grouped = useObjectPicker(query);
   const missionProps = {
@@ -604,7 +605,6 @@ function StrategyDetailView({
     onDefinitionChange: async (id: string | null) => { await setStrategyDefinition(strategy.id, id); onSaved(); },
     onChanged: () => { void refetchObjects(); onSaved(); },
     onOpenObject,
-    onOpenTable,
   };
 
   const childStrategies = useMemo(
