@@ -41,9 +41,11 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
       { id: 'workspace', label: 'Activity space', icon: Globe },
       { id: 'members', label: 'Member', icon: Users },
       {
-        id: 'integrations', label: 'Integrations', icon: Blocks,
+        id: 'integrations', label: 'Customize', icon: Blocks,
         tabs: [
-          { id: 'external', label: 'Connect external services' },
+          { id: 'definitions', label: 'Definitions' },
+          { id: 'external', label: 'Connectors' },
+          { id: 'packs', label: 'Packs' },
           { id: 'alcon', label: 'Connect to Alcon' },
           { id: 'assets', label: 'Connected assets' },
         ],

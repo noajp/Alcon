@@ -6,7 +6,7 @@
 //   ALCON_SPACE=<Space id> node alcon-runner.mjs
 //
 // It announces itself to the Space through the asset relay (kind ai_agent,
-// capability "browser"). Accept it in Alcon › Settings › Integrations ›
+// capability "browser"). Accept it in Alcon › Settings › Customize ›
 // Connected assets; from then on, AI runs started by the person who accepted
 // it may ask it to open, read and click pages. It asks the relay for work and
 // answers; nothing on this computer is reachable from outside.
@@ -88,13 +88,13 @@ async function announce() {
   if (state?.token) {
     const r = await relay('/hello', { token: state.token, name: NAME, kind: 'ai_agent', manifest });
     log(`Connected as "${NAME}" (${r.status}).`);
-    if (r.status !== 'active') log('Waiting to be accepted in Alcon › Settings › Integrations › Connected assets.');
+    if (r.status !== 'active') log('Waiting to be accepted in Alcon › Settings › Customize › Connected assets.');
     return state.token;
   }
   if (!SPACE) { log('First run: ALCON_SPACE (or --space) is required.'); process.exit(1); }
   const r = await relay('/hello', { space: SPACE, name: NAME, kind: 'ai_agent', manifest });
   saveState({ token: r.token, asset_id: r.asset_id, space: SPACE });
-  log(`Announced "${NAME}" to the Space. Accept it in Alcon › Settings › Integrations › Connected assets.`);
+  log(`Announced "${NAME}" to the Space. Accept it in Alcon › Settings › Customize › Connected assets.`);
   return r.token;
 }
 

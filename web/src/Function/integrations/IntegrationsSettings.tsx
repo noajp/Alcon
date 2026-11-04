@@ -21,25 +21,37 @@ import { IntegrationDetailDialog, IntegrationIcon, SourceChip } from './Integrat
 import { AlconConnectPanel } from './AlconConnectPanel';
 import { AssetRelayPanel } from './AssetRelayPanel';
 import { setOAuthOutcome, useOAuthOutcome } from './oauthReturn';
+import { DefinitionsPanel } from '@/Function/customize/DefinitionsPanel';
+import { PacksPanel } from '@/Function/customize/PacksPanel';
+import { RegistrySection } from '@/Function/customize/RegistrySection';
+import { YoursDiscover, type CustomizeMode } from '@/Function/customize/YoursDiscover';
+import type { DirectoryEntry } from '@/hooks/customizeData';
 
-// Settings › Integrations (ADR 0027). Two tabs:
-//   external  connect a Space's external services so agents can use them on
-//             Elements — a catalog modelled on Supabase's Integrations page,
-//             then the Space's connections.
-//   alcon     the other direction: point an MCP client or script at Alcon
-//             with an OAuth sign-in or a personal access token
-//             (AlconConnectPanel, ADR 0032 / 0034).
-//   assets    the apps and AIs that joined the Space by adding one line to
-//             their backend (AssetRelayPanel, ADR 0036).
+// Settings › Customize (ADR 0027): what a Space adds to how its agents work.
+//   definitions  how work is carried out (DefinitionsPanel)
+//   external     connectors: Yours is the Space's connections; Discover is
+//                Alcon's catalog (modelled on Supabase's Integrations page)
+//                and the public MCP Registry (RegistrySection)
+//   packs        definitions and connectors bundled for a kind of work (PacksPanel)
+//   alcon        the other direction: point an MCP client or script at Alcon
+//                with an OAuth sign-in or a personal access token
+//                (AlconConnectPanel, ADR 0032 / 0034).
+//   assets       the apps and AIs that joined the Space by adding one line to
+//                their backend (AssetRelayPanel, ADR 0036).
 // Members see everything read-only; only owners can connect or change.
 
 const DOCS_URL = 'https://github.com/noajp/Alcon/blob/main/docs/mcp.md';
 
 export function IntegrationsSettings({ tab }: { tab: string | null }) {
-  return tab === 'alcon' ? <AlconConnectPanel /> : tab === 'assets' ? <AssetRelayPanel /> : <ExternalServicesPanel />;
+  return tab === 'alcon' ? <AlconConnectPanel />
+    : tab === 'assets' ? <AssetRelayPanel />
+    : tab === 'definitions' ? <DefinitionsPanel />
+    : tab === 'packs' ? <PacksPanel />
+    : tab === 'external' ? <ExternalServicesPanel />
+    : <DefinitionsPanel />;
 }
 
-type Opened = { preset: IntegrationPreset; integration: Integration | null } | null;
+type Opened = { preset: IntegrationPreset; integration: Integration | null; initial?: { name: string; endpoint: string; auth: 'none' | 'bearer' | 'header'; authHeader: string | null } } | null;
 
 function ExternalServicesPanel() {
   const { t } = useI18n();
@@ -50,6 +62,8 @@ function ExternalServicesPanel() {
   const [filter, setFilter] = useState<CatalogFilter>(EMPTY_FILTER);
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const [opened, setOpened] = useState<Opened>(null);
+  // Yours first: what the Space has, where a sign-in coming back lands too.
+  const [mode, setMode] = useState<CustomizeMode>('yours');
   const oauthOutcome = useOAuthOutcome();
   const oauthReturnName = oauthOutcome?.integrationId ? integrations.find((i) => i.id === oauthOutcome.integrationId)?.name ?? null : null;
   // A confirmed sign-in changed the row (account, last test): read it again.
@@ -78,15 +92,22 @@ function ExternalServicesPanel() {
   // dialog holds the row it opened with.
   const openedIntegration = opened?.integration ? integrations.find((i) => i.id === opened.integration!.id) ?? null : null;
 
+  const connectedEndpoints = useMemo(() => new Set(integrations.map((i) => i.endpoint)), [integrations]);
+  const addFromRegistry = (e: DirectoryEntry) => setOpened({
+    preset: customPresetFor('mcp'), integration: null,
+    initial: { name: e.title, endpoint: e.endpoint, auth: e.auth, authHeader: e.authHeader },
+  });
+
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h2 className={`${FONT.lg} text-foreground`}>{t('Connect apps')}</h2>
+          <h2 className={`${FONT.lg} text-foreground`}>{t('Connectors')}</h2>
           <p className="mt-1 text-[12px] text-muted-foreground">
             {t('Connect external services and AI agents can use them while working on Elements. Writes to an external service wait for your approval every time by default.')}
           </p>
         </div>
+        <YoursDiscover mode={mode} onChange={setMode} />
         <Button asChild variant="ghost" size="sm">
           <a href={DOCS_URL} target="_blank" rel="noreferrer">
             <ExternalLink size={14} aria-hidden="true" />
@@ -117,7 +138,7 @@ function ExternalServicesPanel() {
         <p className="text-[12px] text-muted-foreground">{t('Only Space owners can connect or change integrations. You can see what is connected.')}</p>
       )}
 
-      {!filtering && (
+      {mode === 'discover' && !filtering && (
         <section className="space-y-3">
           <h3 className={`${FONT.lg} text-foreground`}>{t('Featured')}</h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
@@ -129,7 +150,7 @@ function ExternalServicesPanel() {
         </section>
       )}
 
-      <section className="space-y-3">
+      {mode === 'discover' && <section className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[180px] flex-1">
             <Search size={14} aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -158,9 +179,11 @@ function ExternalServicesPanel() {
             {visible.map((p) => <PresetRow key={p.id} preset={p} installed={installed.has(p.id)} onOpen={() => openPreset(p)} />)}
           </div>
         )}
-      </section>
+      </section>}
 
-      <section className="space-y-3">
+      {mode === 'discover' && <RegistrySection connectedEndpoints={connectedEndpoints} canAdd={isOwner} onAdd={addFromRegistry} />}
+
+      {mode === 'yours' && <section className="space-y-3">
         <h3 className={`${FONT.lg} text-foreground`}>{t('Connected')}</h3>
         {error ? (
           <p className="text-[12px] text-[var(--status-danger)]">{t("Couldn't load integrations: {error}", { error: error.message })}</p>
@@ -173,7 +196,7 @@ function ExternalServicesPanel() {
             {integrations.map((i) => <ConnectedRow key={i.id} integration={i} onOpen={() => openIntegration(i)} />)}
           </div>
         )}
-      </section>
+      </section>}
 
       {opened && spaceId && (
         <IntegrationDetailDialog
@@ -182,8 +205,9 @@ function ExternalServicesPanel() {
           preset={opened.preset}
           integration={opened.integration ? openedIntegration ?? opened.integration : null}
           canEdit={isOwner}
+          initial={opened.initial}
           onClose={() => setOpened(null)}
-          onCreated={(created) => setOpened({ preset: opened.preset, integration: created })}
+          onCreated={(created) => { setMode('yours'); setOpened({ preset: opened.preset, integration: created }); }}
         />
       )}
     </div>

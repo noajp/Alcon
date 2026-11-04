@@ -451,7 +451,7 @@ Object.assign(es, {
   'Today': 'Hoy', 'People': 'Personas', 'Previous month': 'Mes anterior', 'Next month': 'Mes siguiente', 'Show all': 'Mostrar todo', 'Edit profile': 'Editar perfil', 'New Strategy': 'Nueva Strategy', 'Add schedule': 'Añadir al calendario', 'New section': 'Nueva sección', 'New page': 'Nueva página', 'Rename': 'Renombrar', 'Delete notebook': 'Eliminar cuaderno', 'Delete section': 'Eliminar sección', 'Delete page': 'Eliminar página', 'Untitled': 'Sin título', 'Back': 'Atrás', 'Select a notebook to see its pages': 'Elige un cuaderno para ver sus páginas', 'My Notes': 'Mis notas', 'No notes yet.': 'Aún no hay notas.', 'No one is scheduled here.': 'Nadie está programado aquí.',
 });
 
-// Settings › Integrations. Service names, "Integrations", "Docs", "Featured",
+// Settings › Customize. Service names, "Integrations", "Docs", "Featured",
 // "Installed", "Built by …", the search placeholder and the filter names stay
 // as written, like the catalog pages they follow.
 Object.assign(ja, {
@@ -969,7 +969,7 @@ Object.assign(es, {
   'Permanently delete this Domain for every member. Move or delete its Objects first.': 'Elimina este Domain de forma permanente para todos los miembros. Primero mueve o elimina sus Objects.',
 });
 
-// Settings › Integrations › Connect to Alcon — personal access tokens (ADR 0032).
+// Settings › Customize › Connect to Alcon — personal access tokens (ADR 0032).
 Object.assign(ja, {
   "Generate a token, then run this command with it in place of <token>:": "<token> をトークンに置き換えて、次のコマンドを実行します。",
   "Any MCP client or script that can send an Authorization header connects the same way.": "Authorization ヘッダーを送れる MCP クライアントやスクリプトなら、同じ方法で接続できます。",
@@ -1127,7 +1127,7 @@ Object.assign(es, {
   "Generate": "Generar",
 });
 
-// Settings › Integrations › Connected apps and the OAuth consent screen (ADR 0034).
+// Settings › Customize › Connected apps and the OAuth consent screen (ADR 0034).
 Object.assign(ja, {
   "This link has no authorization request. Start connecting again from the app.": "このリンクには認可のリクエストが含まれていません。アプリからもう一度接続してください。",
   "This request has expired or is no longer valid. Start connecting again from the app.": "このリクエストは期限切れか、無効になっています。アプリからもう一度接続してください。",
@@ -1139,7 +1139,7 @@ Object.assign(ja, {
   "An app": "アプリ",
   "After you decide, you return to {host}.": "決めると、{host} に戻ります。",
   "It acts as {email}: it sees and changes only what you can, in every Space you belong to.": "{email} として動きます。見られるもの・変えられるものは、あなたが属するすべての Space で、あなたと同じです。",
-  "It cannot delete, bulk-edit, move Elements between Objects, or edit Objects. Disconnect it any time in Settings › Integrations.": "削除、一括変更、Object 間での Element の移動、Object の編集はできません。Settings › Integrations でいつでも切断できます。",
+  "It cannot delete, bulk-edit, move Elements between Objects, or edit Objects. Disconnect it any time in Settings › Customize.": "削除、一括変更、Object 間での Element の移動、Object の編集はできません。Settings › Customize でいつでも切断できます。",
   "Read the board. Every write to the board is refused.": "Alcon のデータを読みます。書き込みはすべて拒否されます。",
   "Approve": "承認",
   "The access could not be changed. Try again.": "権限を変更できませんでした。もう一度お試しください。",
@@ -1164,7 +1164,7 @@ Object.assign(ko, {
   "An app": "앱",
   "After you decide, you return to {host}.": "결정하면 {host}(으)로 돌아갑니다.",
   "It acts as {email}: it sees and changes only what you can, in every Space you belong to.": "{email}(으)로 동작합니다. 속한 모든 Space에서 회원님이 보고 바꿀 수 있는 것만 보고 바꿉니다.",
-  "It cannot delete, bulk-edit, move Elements between Objects, or edit Objects. Disconnect it any time in Settings › Integrations.": "삭제, 일괄 변경, Object 간 Element 이동, Object 편집은 할 수 없습니다. Settings › Integrations에서 언제든 연결을 해제할 수 있습니다.",
+  "It cannot delete, bulk-edit, move Elements between Objects, or edit Objects. Disconnect it any time in Settings › Customize.": "삭제, 일괄 변경, Object 간 Element 이동, Object 편집은 할 수 없습니다. Settings › Customize에서 언제든 연결을 해제할 수 있습니다.",
   "Read the board. Every write to the board is refused.": "보드를 읽습니다. 보드에 대한 모든 쓰기는 거부됩니다.",
   "Approve": "승인",
   "The access could not be changed. Try again.": "권한을 변경하지 못했습니다. 다시 시도하세요.",
@@ -1189,7 +1189,7 @@ Object.assign(fr, {
   "An app": "Une application",
   "After you decide, you return to {host}.": "Une fois votre choix fait, vous revenez sur {host}.",
   "It acts as {email}: it sees and changes only what you can, in every Space you belong to.": "Elle agit en tant que {email} : elle voit et modifie uniquement ce que vous pouvez, dans chaque Space dont vous êtes membre.",
-  "It cannot delete, bulk-edit, move Elements between Objects, or edit Objects. Disconnect it any time in Settings › Integrations.": "Elle ne peut pas supprimer, modifier en masse, déplacer des Elements entre Objects ni modifier des Objects. Déconnectez-la à tout moment dans Settings › Integrations.",
+  "It cannot delete, bulk-edit, move Elements between Objects, or edit Objects. Disconnect it any time in Settings › Customize.": "Elle ne peut pas supprimer, modifier en masse, déplacer des Elements entre Objects ni modifier des Objects. Déconnectez-la à tout moment dans Settings › Customize.",
   "Read the board. Every write to the board is refused.": "Lit le tableau. Toute écriture sur le tableau est refusée.",
   "Approve": "Approuver",
   "The access could not be changed. Try again.": "L’accès n’a pas pu être modifié. Réessayez.",
@@ -1214,7 +1214,7 @@ Object.assign(es, {
   "An app": "Una aplicación",
   "After you decide, you return to {host}.": "Cuando decidas, volverás a {host}.",
   "It acts as {email}: it sees and changes only what you can, in every Space you belong to.": "Actúa como {email}: ve y cambia solo lo que tú puedes, en todos los Spaces a los que perteneces.",
-  "It cannot delete, bulk-edit, move Elements between Objects, or edit Objects. Disconnect it any time in Settings › Integrations.": "No puede eliminar, editar en bloque, mover Elements entre Objects ni editar Objects. Desconéctala cuando quieras en Settings › Integrations.",
+  "It cannot delete, bulk-edit, move Elements between Objects, or edit Objects. Disconnect it any time in Settings › Customize.": "No puede eliminar, editar en bloque, mover Elements entre Objects ni editar Objects. Desconéctala cuando quieras en Settings › Customize.",
   "Read the board. Every write to the board is refused.": "Lee el tablero. Toda escritura en el tablero se rechaza.",
   "Approve": "Aprobar",
   "The access could not be changed. Try again.": "No se pudo cambiar el acceso. Inténtalo de nuevo.",
@@ -1261,7 +1261,7 @@ Object.assign(ko, AUDIT_TRANSLATIONS.ko);
 Object.assign(fr, AUDIT_TRANSLATIONS.fr);
 Object.assign(es, AUDIT_TRANSLATIONS.es);
 
-// Settings › Integrations: Google sign-in (OAuth) for Google Drive.
+// Settings › Customize: Google sign-in (OAuth) for Google Drive.
 Object.assign(ja, {
   'Search, read, create and update Google Drive files. Agents see only files Alcon created or that you chose.': 'Google Drive のファイルを検索・読み取り・作成・更新します。エージェントが扱えるのは、Alcon が作ったファイルとあなたが選んだファイルだけです。',
   'Not connected — sign in with Google': '未接続 — Google でサインインしてください',

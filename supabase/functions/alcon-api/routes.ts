@@ -386,7 +386,7 @@ export function openApiDocument(serverUrl: string): Record<string, unknown> {
     paths,
     components: {
       securitySchemes: {
-        bearerAuth: { type: "http", scheme: "bearer", description: "A personal access token (alc_pat_…) from Settings › Integrations" },
+        bearerAuth: { type: "http", scheme: "bearer", description: "A personal access token (alc_pat_…) from Settings › Customize" },
       },
       responses: {
         Data: {

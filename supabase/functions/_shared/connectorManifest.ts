@@ -159,3 +159,39 @@ export function requestFor(c: ManifestCommand, input: Record<string, unknown>): 
   }
   return { method: c.http.method, path, query, body };
 }
+
+/** Pure. A command name from a tool's: lower case, letters, digits and _. */
+export function commandNameOf(tool: string): string {
+  const base = tool.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+  return (/^[a-z]/.test(base) ? base : `t_${base}`).slice(0, 48) || "tool";
+}
+
+/**
+ * Pure. An MCP integration's manifest from the tools its server lists: one
+ * command per tool, read or write as the server marks it, under the defaults
+ * (read allowed, write asked). A command a person already set keeps its
+ * permission; a tool the server no longer lists drops out; a hand-declared
+ * API command stays. Written by integration-test after each connection test,
+ * so what a person sees in the dialog is what the engine enforces.
+ */
+export function manifestFromTools(tools: { name: string; description?: string; readOnly: boolean }[], existing: unknown): Record<string, unknown> {
+  const prior = obj(existing);
+  const priorCommands = (Array.isArray(prior?.commands) ? prior!.commands : []).map(obj).filter((c): c is Record<string, unknown> => !!c);
+  const byTool = new Map(priorCommands.filter((c) => typeof c.mcp === "string").map((c) => [c.mcp as string, c]));
+  const used = new Set<string>(priorCommands.filter((c) => !c.mcp && typeof c.name === "string").map((c) => c.name as string));
+  const commands: Record<string, unknown>[] = priorCommands.filter((c) => !c.mcp);
+  for (const t of tools) {
+    const before = byTool.get(t.name);
+    let name = typeof before?.name === "string" && NAME.test(before.name) ? before.name : commandNameOf(t.name);
+    for (let i = 2; used.has(name); i++) name = `${commandNameOf(t.name).slice(0, 44)}_${i}`;
+    used.add(name);
+    const effect: Effect = t.readOnly ? "read" : "write";
+    commands.push({
+      name, action: typeof before?.action === "string" ? before.action : name, effect,
+      ...(typeof before?.permission === "string" && PERMISSIONS.has(before.permission) ? { permission: before.permission } : {}),
+      description: (t.description ?? "").slice(0, 1000),
+      mcp: t.name,
+    });
+  }
+  return { version: 1, defaults: obj(prior?.defaults) ?? { read: "allow", write: "ask" }, commands, ...(obj(prior?.aliases) ? { aliases: prior!.aliases } : {}) };
+}

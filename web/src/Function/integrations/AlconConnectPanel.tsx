@@ -7,7 +7,7 @@ import { ConnectedApps } from './ConnectedApps';
 import { PersonalAccessTokens } from './PersonalAccessTokens';
 import { ALCON_MCP_URL, claudeMcpAddCommand } from './patData';
 
-// Settings › Integrations › Connect to Alcon: point an MCP client or a script
+// Settings › Customize › Connect to Alcon: point an MCP client or a script
 // at Alcon. The client acts as the signed-in person — through a personal
 // access token (ADR 0032) or an OAuth sign-in from claude.ai / ChatGPT
 // (ADR 0034) — and sees and changes only what that person can.

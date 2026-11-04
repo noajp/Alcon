@@ -3,7 +3,7 @@
 // An app announces itself with no credential (POST /hello { space, name,
 // … }), gets back an asset token, and from then on reports what it does
 // (POST /events) with that token. The asset is "unclaimed" until a Space
-// owner accepts it in Settings › Integrations › Connected assets; events
+// owner accepts it in Settings › Customize › Connected assets; events
 // sent before that are kept but shown as unverified. A revoked asset is
 // refused on its next call.
 //
@@ -172,7 +172,7 @@ async function hello(req: Request, db: SupabaseClient): Promise<Response> {
     asset_id: data,
     token,
     status: "unclaimed",
-    next: "A Space owner accepts this asset in Alcon › Settings › Integrations › Connected assets. Keep the token: it identifies this asset from now on.",
+    next: "A Space owner accepts this asset in Alcon › Settings › Customize › Connected assets. Keep the token: it identifies this asset from now on.",
   });
 }
 

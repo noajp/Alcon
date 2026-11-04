@@ -372,10 +372,10 @@ async function execute(a: ExecArgs): Promise<void> {
       : { data: null };
     const provider = p as { id: string; name: string; endpoint: string; enabled: boolean } | null;
     if (!provider) { await refuse(`${agentName} の接続先が、この Space の AI モデルの接続に見つかりません。チーム設定で接続先を選び直してください。`); return; }
-    if (!provider.enabled) { await refuse(`接続先「${provider.name}」は無効になっています。設定 › 連携で有効にすると実行できます。`); return; }
+    if (!provider.enabled) { await refuse(`接続先「${provider.name}」は無効になっています。設定 › カスタマイズで有効にすると実行できます。`); return; }
     if (!isSafeEndpoint(provider.endpoint)) { await refuse(`接続先「${provider.name}」のアドレスは使えません（https の公開ホストだけが使えます）。`); return; }
     const { data: key } = await admin.rpc("get_integration_secret", { p_integration_id: provider.id });
-    if (!key) { await refuse(`接続先「${provider.name}」の API キーが設定されていません。設定 › 連携で入力すると実行できます。`); return; }
+    if (!key) { await refuse(`接続先「${provider.name}」の API キーが設定されていません。設定 › カスタマイズで入力すると実行できます。`); return; }
     // Providers differ in which header carries the key; both carry it.
     modelClient = new Anthropic({ apiKey: key as string, authToken: key as string, baseURL: provider.endpoint.replace(/\/+$/, "") });
   } else {
@@ -441,12 +441,12 @@ async function execute(a: ExecArgs): Promise<void> {
         // when due); other credentials pass through as stored.
         const secret = await resolveCredential(admin, row, (raw as string | null) ?? null);
         if (isGithubOAuthRow(row) && !secret) {
-          await addStep(admin, run.id, "error", `連携「${row.name}」は GitHub への接続が必要です`, "Settings › Integrations で GitHub にサインインし直すと使えます。");
+          await addStep(admin, run.id, "error", `連携「${row.name}」は GitHub への接続が必要です`, "Settings › Customize で GitHub にサインインし直すと使えます。");
           continue;
         }
         if (isGoogleDriveRow(row)) {
           if (!secret) {
-            await addStep(admin, run.id, "error", `連携「${row.name}」は Google への接続が必要です`, "Settings › Integrations で Google にサインインし直すと使えます。");
+            await addStep(admin, run.id, "error", `連携「${row.name}」は Google への接続が必要です`, "Settings › Customize で Google にサインインし直すと使えます。");
             continue;
           }
           for (const t of DRIVE_TOOLS) {

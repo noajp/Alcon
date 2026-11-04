@@ -1,5 +1,5 @@
 // Apps connected to Alcon over OAuth (ELE_PLT-004, ADR 0034): pure helpers
-// shared by the consent screen and Settings › Integrations.
+// shared by the consent screen and Settings › Customize.
 
 export type OAuthAccess = 'read' | 'read_write';
 

@@ -1321,7 +1321,7 @@ export interface Integration {
 }
 
 export type IntegrationUpdate = Partial<Pick<Integration,
-  'name' | 'description' | 'endpoint' | 'auth_type' | 'auth_header' | 'delegation' | 'enabled'>>
+  'name' | 'description' | 'endpoint' | 'auth_type' | 'auth_header' | 'delegation' | 'enabled' | 'manifest'>>
 
 export type AssetKind = 'app' | 'ai_agent' | 'script' | 'service' | 'other'
 export type AssetStatus = 'unclaimed' | 'active' | 'revoked'

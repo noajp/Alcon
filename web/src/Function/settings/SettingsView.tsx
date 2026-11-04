@@ -66,7 +66,7 @@ export function SettingsView() {
         ) : active === 'members' ? (
           <PanelShell title={t('Member')}><MemberSettings /></PanelShell>
         ) : active === 'integrations' ? (
-          <TabbedPanel id="integrations" tab={tab}><IntegrationsSettings tab={tab} /></TabbedPanel>
+          <TabbedPanel id="integrations" tab={tab ?? 'definitions'}><IntegrationsSettings tab={tab ?? 'definitions'} /></TabbedPanel>
         ) : active === 'notifications' ? (
           <PanelShell title={t('Notifications')}><NotificationSettings /></PanelShell>
         ) : active === 'elements' ? (
