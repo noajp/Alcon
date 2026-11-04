@@ -5,6 +5,7 @@ import { PageSection } from '@/Function/shared/PageHead';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import type { MissionData } from '@/hooks/initiativeMissionData';
+import type { StrategyDelegation } from '@/types/database';
 import {
   measureStateOf, missionBarriers, missionSummary,
   type ActionState, type MissionBindingRow, type MissionElementRow, type MissionMeasureRow,
@@ -28,6 +29,9 @@ export interface MissionContext {
   mission: MissionData;
   /** False until the runs and dependencies are read; until then nothing counts as ready. */
   missionLoaded: boolean;
+  /** How far the Strategy's AI work goes on its own. */
+  delegation: StrategyDelegation;
+  setDelegation: (d: StrategyDelegation) => Promise<void>;
   refetch: () => void;
   /** Elements open their Object, as everywhere on this page. */
   onOpenElement: (elementId: string) => void;

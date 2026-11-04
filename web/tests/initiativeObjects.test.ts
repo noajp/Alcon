@@ -17,6 +17,7 @@ function strategy(id: string, scope: Record<string, unknown> = {}): Strategy {
     status: 'active',
     // The jsonb column is untyped at the wire; a stray key rides in as-is.
     scope: scope as Strategy['scope'],
+    delegation: 'manual',
     color: null,
     icon: null,
     activity_space_id: null,

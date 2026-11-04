@@ -12,7 +12,7 @@ import { startElementRun } from '@/Function/copilot/agentData';
 import { runsInClaudeCode } from '@/Function/team/agentModel';
 import { updateElement } from '@/hooks/useSupabase';
 import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMissionData';
-import type { ElementWithDetails, Worker } from '@/types/database';
+import type { ElementWithDetails, StrategyDelegation, Worker } from '@/types/database';
 import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import {
@@ -431,6 +431,19 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
             sub={t('in {input} · out {output}', { input: compact(summary.inputTokens), output: compact(summary.outputTokens) })} />
           <Stat label={t('AI cost')} value={`$${summary.costUsd.toFixed(2)}`} />
         </div>
+
+        <label className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted-foreground">
+          {t('When an AI finishes')}
+          <select value={ctx.delegation} disabled={!ctx.canEdit}
+            onChange={(e) => void ctx.setDelegation(e.target.value as StrategyDelegation)}
+            className="rounded-md border border-border/60 bg-transparent px-1.5 py-1 text-foreground">
+            <option value="manual">{t('A person reviews each result')}</option>
+            <option value="auto">{t('Verified results go on to the next step')}</option>
+          </select>
+          <span>{ctx.delegation === 'auto'
+            ? t("Stops at a person's Element, an approval or a blocked run.")
+            : t('Nothing starts until you approve the result.')}</span>
+        </label>
 
         <div className="flex items-start gap-2">
           <textarea value={guidance} onChange={(e) => setGuidance(e.target.value)} rows={2}

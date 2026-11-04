@@ -5,6 +5,7 @@ const tools = await import(new URL('../../supabase/functions/run-agent/agentTool
 const ctx = await import(new URL('../../supabase/functions/run-agent/context.ts', import.meta.url).pathname);
 const pricing = await import(new URL('../../supabase/functions/_shared/aiPricing.ts', import.meta.url).pathname);
 const verify = await import(new URL('../../supabase/functions/run-agent/verify.ts', import.meta.url).pathname);
+const advance = await import(new URL('../../supabase/functions/run-agent/advance.ts', import.meta.url).pathname);
 const client = await import(new URL('../../supabase/functions/_shared/integrationClient.ts', import.meta.url).pathname);
 
 const { runLoop, appendDecisionResults, canonicalCalls, orderResults } = loop;
@@ -204,6 +205,29 @@ describe('agent loop', () => {
 
   it('fills a missing result rather than leaving a tool_use unanswered', () => {
     expect(orderResults([{ id: 'a', name: 'n', input: {} }], [])).toEqual([{ type: 'tool_result', tool_use_id: 'a', content: 'No result.', is_error: true }]);
+  });
+});
+
+describe('auto-advance', () => {
+  const edge = (from_element: string, to_element: string) => ({ from_element, to_element });
+  const cand = (id: string, over = {}) => ({ id, status: 'todo', ai: true, openRun: false, ...over });
+
+  it('goes on only when every Strategy the Element serves allows it', () => {
+    expect(advance.delegationOf([{ delegation: 'auto' }, { delegation: 'auto' }])).toBe('auto');
+    expect(advance.delegationOf([{ delegation: 'auto' }, { delegation: 'manual' }])).toBe('manual');
+    expect(advance.delegationOf([])).toBe('manual');
+  });
+
+  it('starts the AI Elements the finished one unblocks, once all their prerequisites are settled', () => {
+    const next = advance.readyDownstream({
+      doneId: 'a',
+      edges: [edge('a', 'b'), edge('a', 'c'), edge('x', 'c'), edge('a', 'd'), edge('a', 'e'), edge('a', 'f'), edge('y', 'b')],
+      candidates: [cand('b'), cand('c'), cand('d', { ai: false }), cand('e', { openRun: true }), cand('f', { status: 'review' })],
+      statusOf: new Map([['x', 'in_progress'], ['y', 'cancelled']]),
+    });
+    // b: its other prerequisite is cancelled. c waits on x. d is a person's,
+    // e is already running, f is not open.
+    expect(next).toEqual(['b']);
   });
 });
 

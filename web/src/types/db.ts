@@ -26,7 +26,7 @@ import type {
   IntentEscalationTrigger, IntentKind, IntentLineageKind, IntentNextActionStatus, IntentPredictionRole,
   IntentRelationship, IntentStatus, InvitationRole, InvitationStatus, MeasureDirection,
   MeasureReadingSource, MemberRole, NotificationKind, ObjectTabType, PersonalAccessTokenAccess,
-  PhaseStatus, StrategyScope, StrategyStatus, WorkerAvailabilityKind, WorkerSkillLevel,
+  PhaseStatus, StrategyDelegation, StrategyScope, StrategyStatus, WorkerAvailabilityKind, WorkerSkillLevel,
   Element, ElementComment, IssuedPersonalAccessToken,
 } from './database'
 import type { ElementImportResult, ElementImportRow } from '@/Function/shared/element/intakeModel'
@@ -78,7 +78,7 @@ interface ColumnOverrides {
   notifications: { kind: NotificationKind }
   custom_columns: { column_type: CustomColumnType; options: CustomColumnOptions }
   object_tabs: { tab_type: ObjectTabType }
-  strategies: { status: StrategyStatus; scope: StrategyScope }
+  strategies: { status: StrategyStatus; scope: StrategyScope; delegation: StrategyDelegation }
   strategy_comments: { author_kind: CommentAuthorKind }
   phases: { status: PhaseStatus }
   tables: { status: DataTableStatus }

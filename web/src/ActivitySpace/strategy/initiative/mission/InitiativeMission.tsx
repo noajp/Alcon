@@ -9,17 +9,19 @@ import { useNowMinute } from '@/Function/shared/useNow';
 import { useInitiativeIntentContext } from '../InitiativeIntent';
 import { MissionEvaluatePanel, type MissionContext } from './MissionPanels';
 import { MissionExecutionPanel } from './MissionExecution';
-import type { ElementWithDetails } from '@/types/database';
+import type { ElementWithDetails, StrategyDelegation } from '@/types/database';
 import type { MissionElementRow, MissionMeasureRow } from './missionModel';
 
 // The mission part of one Strategy tab (Execution or Evaluate). Reads the Strategy's intents from
 // the page's InitiativeIntentProvider and the runs, artifacts, approvals and
 // dependencies of the Elements under its Objects, once per tab.
 
-export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, objects, onChanged, onOpenObject }: {
+export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, objects, delegation, onDelegationChange, onChanged, onOpenObject }: {
   tab: 'execution' | 'audit';
   initiativeId: string;
   initiativeName: string;
+  delegation: StrategyDelegation;
+  onDelegationChange: (d: StrategyDelegation) => Promise<void>;
   spaceId: string | null;
   /** The Strategy's Objects with their Elements. */
   objects: { id: string; name: string; domain_id: string | null; elements?: ElementWithDetails[] }[];
@@ -65,6 +67,8 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
     elements,
     mission: mission.data,
     missionLoaded: !mission.loading,
+    delegation,
+    setDelegation: onDelegationChange,
     refetch: () => { void mission.refetch(); intent?.refetch(); onChanged(); },
     onOpenElement: (elementId) => {
       const object = objects.find((o) => (o.elements ?? []).some((e) => e.id === elementId));

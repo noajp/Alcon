@@ -40,6 +40,7 @@ import { approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrat
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
+import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
 import {
   runLoop, appendDecisionResults, canonicalCalls,
   type LoopState, type ToolCall, type ToolKind, type ToolResult, type PendingApproval, type FinishPayload, type Msg,
@@ -835,20 +836,25 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
   const { data: live } = await admin.from("agent_runs").select("status").eq("id", run.id).maybeSingle();
   if (live?.status !== "running") return;
 
+  // Under a Strategy that lets its AI work go on ('auto'), work that passed
+  // the verifier is done and unblocks the next; otherwise it waits for review.
+  const auto = run.mode !== "reply" && status !== "paused" && finish.outcome === "completed"
+    && (await elementDelegation(userDb, run.element_id)) === "auto";
+
   // In execute mode the Element moves on first — done work waits for a
-  // person's review, blocked work says so — so that when the run reads as
-  // finished, the Element already shows where it went. A reply leaves the
-  // status alone.
+  // person's review (or is done, under 'auto'), blocked work says so — so
+  // that when the run reads as finished, the Element already shows where it
+  // went. A reply leaves the status alone.
   if (run.mode !== "reply" && status !== "paused") {
     const { data: el } = await userDb.from("elements").select("status").eq("id", run.element_id).maybeSingle();
-    const next = finish.outcome === "completed" ? "review" : finish.outcome === "blocked" ? "blocked" : null;
+    const next = finish.outcome === "completed" ? (auto ? "done" : "review") : finish.outcome === "blocked" ? "blocked" : null;
     if (el && next && !["done", "cancelled"].includes(el.status ?? "") && el.status !== next) {
       await runBoardTool(userDb, "updateElement", { id: run.element_id, status: next }, { agent: `${agentName}（AI）`, userId: user.id });
-      await addStep(admin, run.id, "status", next === "review" ? "Element をレビュー待ちに移動" : "Element をブロック中に移動");
+      await addStep(admin, run.id, "status", next === "review" ? "Element をレビュー待ちに移動" : next === "done" ? "Element を完了に移動（自動で進める設定）" : "Element をブロック中に移動");
     }
   }
 
-  const runStatus = status ?? (finish.outcome === "completed" && run.mode !== "reply" ? "awaiting_review" : "completed");
+  const runStatus = status ?? (finish.outcome === "completed" && run.mode !== "reply" && !auto ? "awaiting_review" : "completed");
   const { data: closed } = await admin.from("agent_runs").update({
     status: runStatus, summary: finish.summary, result: finish.message, finished_at: status ? null : new Date().toISOString(),
     error: status === "paused" ? finish.summary : null, continuation_token: null,
@@ -877,6 +883,77 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
       title: `${agentName}: ${label}`, body: finish.summary,
     }).then(() => {}, () => {});
   }
+
+  if (auto) {
+    try {
+      const started = await advanceFrom(a, run.element_id);
+      if (started.length) await addStep(admin, run.id, "status", `次の作業を ${started.length} 件開始しました`);
+    } catch (e) {
+      console.error("run-agent: advance failed", errorMessage(e));
+    }
+  }
+}
+
+/** The delegation of the Strategies an Element's Object serves. */
+async function elementDelegation(userDb: SupabaseClient, elementId: string): Promise<"manual" | "auto"> {
+  const { data: el } = await userDb.from("elements").select("object_id").eq("id", elementId).maybeSingle();
+  if (!el?.object_id) return "manual";
+  const { data: links } = await userDb.from("strategy_objects").select("strategy_id").eq("object_id", el.object_id);
+  const ids = ((links ?? []) as { strategy_id: string }[]).map((l) => l.strategy_id);
+  if (ids.length === 0) return "manual";
+  const { data: strategies } = await userDb.from("strategies").select("delegation").in("id", ids);
+  return delegationOf((strategies ?? []) as { delegation: string | null }[]);
+}
+
+const OPEN_RUN = ["queued", "running", "awaiting_approval", "paused"];
+
+/**
+ * Starts the AI Elements that `doneId` unblocks, as the same person, each as
+ * its own run. Everything is read with that person's JWT, so the chain only
+ * reaches what they could start by hand. A JWT that has expired meanwhile
+ * fails the start; the Elements stay ready on the Execution tab.
+ */
+async function advanceFrom(a: ExecArgs, doneId: string): Promise<string[]> {
+  const { admin, userDb, user } = a;
+  const { data: out } = await userDb.from("element_edges").select("from_element, to_element").eq("from_element", doneId).eq("edge_type", "depends_on");
+  const downIds = [...new Set(((out ?? []) as { to_element: string }[]).map((e) => e.to_element))];
+  if (downIds.length === 0) return [];
+  const [{ data: inEdges }, { data: els }, { data: assignees }, { data: open }] = await Promise.all([
+    userDb.from("element_edges").select("from_element, to_element").in("to_element", downIds).eq("edge_type", "depends_on"),
+    userDb.from("elements").select("id, status, object_id, objects(domain_id)").in("id", downIds),
+    userDb.from("element_assignees").select("element_id, role, workers(type, ai_config)").in("element_id", downIds),
+    admin.from("agent_runs").select("element_id").in("element_id", downIds).in("status", OPEN_RUN),
+  ]);
+  const edges = (inEdges ?? []) as { from_element: string; to_element: string }[];
+  const prereqIds = [...new Set(edges.map((e) => e.from_element))];
+  const { data: prereqs } = prereqIds.length ? await userDb.from("elements").select("id, status").in("id", prereqIds) : { data: [] };
+  const statusOf = new Map(((prereqs ?? []) as { id: string; status: string | null }[]).map((p) => [p.id, p.status]));
+  type AssigneeRow = { element_id: string; role: string | null; workers: { type: string; ai_config: unknown } | null };
+  const isAi = (id: string) => ((assignees ?? []) as unknown as AssigneeRow[]).some((r) => r.element_id === id && r.role !== "reviewer"
+    && r.workers?.type === "ai_agent"
+    && !(r.workers.ai_config && typeof r.workers.ai_config === "object" && (r.workers.ai_config as Record<string, unknown>).runner === "claude-code"));
+  const busy = new Set(((open ?? []) as { element_id: string }[]).map((r) => r.element_id));
+  type ElementRow = { id: string; status: string | null; objects: { domain_id: string | null } | null };
+  const rows = (els ?? []) as unknown as ElementRow[];
+  const candidates: AdvanceCandidate[] = rows.map((e) => ({ id: e.id, status: e.status, ai: isAi(e.id), openRun: busy.has(e.id) }));
+  const ready = readyDownstream({ doneId, edges: [...((out ?? []) as { from_element: string; to_element: string }[]), ...edges], candidates, statusOf });
+
+  const started: string[] = [];
+  for (const id of ready) {
+    const domainId = rows.find((e) => e.id === id)?.objects?.domain_id ?? null;
+    const { data: next, error } = await userDb.from("agent_runs").insert({
+      element_id: id, domain_id: domainId, triggered_from: "board", triggered_by: user.id, status: "queued", mode: "execute",
+    }).select("id").single();
+    if (error || !next) continue; // another start won the race
+    const res = await fetch(`${a.supabaseUrl}/functions/v1/run-agent`, {
+      method: "POST",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${a.jwt}` },
+      body: JSON.stringify({ runId: next.id }),
+    }).catch(() => null);
+    if (res && res.ok) started.push(id);
+    else await admin.from("agent_runs").update({ status: "cancelled", finished_at: new Date().toISOString() }).eq("id", next.id).eq("status", "queued");
+  }
+  return started;
 }
 
 /** What the Elements this one waits on left behind: their latest report, their

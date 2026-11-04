@@ -3766,6 +3766,7 @@ export type Database = {
           created_at: string
           created_by: string
           description: string | null
+          delegation: string
           icon: string | null
           id: string
           name: string
@@ -3779,6 +3780,7 @@ export type Database = {
           created_at?: string
           created_by: string
           description?: string | null
+          delegation?: string
           icon?: string | null
           id?: string
           name: string
@@ -3792,6 +3794,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           description?: string | null
+          delegation?: string
           icon?: string | null
           id?: string
           name?: string

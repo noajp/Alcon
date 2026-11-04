@@ -1421,12 +1421,18 @@ export interface StrategyScope {
   display?: ListControlsState['display']
 }
 
+/** How far a Strategy's AI work goes on its own: 'manual' waits for a
+ *  person's review of every AI result; 'auto' marks verified AI work done and
+ *  starts the AI Elements it unblocks, stopping at a person's Element. */
+export type StrategyDelegation = 'manual' | 'auto'
+
 export interface Strategy {
   id: string
   name: string
   description: string | null
   status: StrategyStatus | null
   scope: StrategyScope
+  delegation: StrategyDelegation
   color: string | null
   icon: string | null
   activity_space_id: string | null  // the Space it belongs to
@@ -1452,6 +1458,7 @@ export interface StrategyUpdate {
   description?: string | null
   status?: StrategyStatus
   scope?: StrategyScope
+  delegation?: StrategyDelegation
   color?: string | null
   icon?: string | null
   updated_at?: string
