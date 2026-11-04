@@ -9,7 +9,7 @@ import { useNowMinute } from '@/Function/shared/useNow';
 import { useInitiativeIntentContext } from '../InitiativeIntent';
 import { MissionEvaluatePanel, type MissionContext } from './MissionPanels';
 import { MissionExecutionPanel } from './MissionExecution';
-import type { Worker } from '@/types/database';
+import type { ElementWithDetails } from '@/types/database';
 import type { MissionElementRow, MissionMeasureRow } from './missionModel';
 
 // The mission part of one Strategy tab (Execution or Evaluate). Reads the Strategy's intents from
@@ -22,12 +22,7 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
   initiativeName: string;
   spaceId: string | null;
   /** The Strategy's Objects with their Elements. */
-  objects: { id: string; name: string; domain_id: string | null; elements?: {
-    id: string; title: string; status: string | null; display_id?: string | null; labels?: string[] | null;
-    claimed_by?: string | null; claim_expires_at?: string | null; branch?: string | null;
-    due_date?: string | null;
-    assignees?: { role?: string | null; worker?: { type?: Worker['type'] | null; name?: string | null; avatar_url?: string | null; ai_model?: string | null; ai_config?: unknown } | null }[];
-  }[] }[];
+  objects: { id: string; name: string; domain_id: string | null; elements?: ElementWithDetails[] }[];
   /** Elements or measures were written: the page re-reads its Objects. */
   onChanged: () => void;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
@@ -53,6 +48,8 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
     }));
   }, [objects, now]);
   const elementIds = useMemo(() => elements.map((e) => e.id), [elements]);
+  // The Elements as the shared card reads them, for the Execution tab.
+  const details = useMemo(() => new Map(objects.flatMap((o) => (o.elements ?? []).map((e) => [e.id, e] as const))), [objects]);
   const mission = useInitiativeMission(initiativeId, elementIds);
 
   const measures = useMemo<MissionMeasureRow[]>(() => (intent?.data?.subs ?? [])
@@ -76,7 +73,7 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
 
   if (tab === 'execution') {
     return (
-      <MissionExecutionPanel ctx={ctx}
+      <MissionExecutionPanel ctx={ctx} details={details}
         objects={objects.map((o) => ({ id: o.id, name: o.name, domain_id: o.domain_id }))}
         domains={domains.filter((d) => !spaceId || d.activity_space_id === spaceId).map((d) => ({ id: d.id, name: d.name }))}
         aiWorkers={workers.filter((w) => w.type === 'ai_agent' && w.status !== 'inactive')}

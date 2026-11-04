@@ -1,20 +1,19 @@
 'use client';
 
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CalendarDays, Check, Clock, Flag, Hand, Pause } from '@/ui/icons';
+import { AlertTriangle, Check, Clock, Flag, Hand, Pause } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { cn } from '@/lib/utils';
 import { ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
 import { PageSection } from '@/Function/shared/PageHead';
-import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { formatDateOnly, isOverdue } from '@/Function/shared/dateUtils';
 import { startElementRun } from '@/Function/copilot/agentData';
 import { runsInClaudeCode } from '@/Function/team/agentModel';
 import { updateElement } from '@/hooks/useSupabase';
 import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMissionData';
-import type { Worker } from '@/types/database';
+import type { ElementWithDetails, Worker } from '@/types/database';
+import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard';
 import {
   buildFleet, draftFleet, handOverLabels, missionSummary, moveDraftTask, normalizePlan, startableTasks, UNPLACED,
   type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft,
@@ -34,6 +33,8 @@ import { STATE_LABEL, Stat, compact, stateColor, type MissionContext } from './M
 const CARD = 'rounded-lg border border-[var(--border-subtle)] bg-card dark:bg-muted shadow-[var(--shadow-island)]';
 /** The drag payload: a card's key in the Element column. */
 const DRAG_TYPE = 'application/x-alcon-mission-element';
+/** What a written Element card carries when dragged (ElementCard). */
+const ELEMENT_DRAG_TYPE = 'text/id';
 
 function StateIcon({ state }: { state: ActionState }) {
   switch (state) {
@@ -60,14 +61,6 @@ function StateBadge({ state }: { state: ActionState }) {
 function DraftTag() {
   const { t } = useI18n();
   return <span className="shrink-0 rounded-md border border-dashed border-border px-1.5 py-0.5 text-[11px] text-muted-foreground">{t('Draft')}</span>;
-}
-
-function IconTile({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-background text-muted-foreground">
-      {children}
-    </span>
-  );
 }
 
 function ObjectCard({ object, domainName, selected, dropTarget, onSelect, onDragOver, onDragLeave, onDrop }: {
@@ -99,7 +92,7 @@ function ObjectCard({ object, domainName, selected, dropTarget, onSelect, onDrag
         dropTarget && 'opacity-100 ring-2 ring-[var(--accent-default)]',
       )}>
       <div className="flex items-start gap-2.5">
-        <IconTile><ObjectIcon size={13} /></IconTile>
+        <ObjectIcon size={14} className="mt-[3px] shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[14px] font-semibold leading-5 text-foreground">
             {unplaced ? t('Not placed in an Object') : object.name}
@@ -122,70 +115,55 @@ function ObjectCard({ object, domainName, selected, dropTarget, onSelect, onDrag
   );
 }
 
-function ElementCard({ element, busy, draggable, onRun, onHandOver, onOpen }: {
-  element: FleetElement;
-  busy: boolean;
-  draggable: boolean;
-  onRun?: () => void;
-  onHandOver?: () => void;
-  onOpen?: () => void;
-}) {
-  const { t, locale } = useI18n();
-  const needsPerson = element.state === 'waiting' || element.state === 'failed' || element.state === 'blocked';
-  const done = element.status === 'done' || element.status === 'cancelled';
-  const due = formatDateOnly(element.dueDate, locale);
-  const who = element.assigneeName ?? (element.assignee === 'human' ? t('A person') : element.assignee === 'ai' ? t('AI') : t('Unassigned'));
+/** What the Execution tab adds under a card's title: what it delivers,
+ *  what it waits on, the model that ran it and what that cost, and a hand-off
+ *  to Claude Code. */
+function MissionLines({ element, busy, onHandOver }: { element: FleetElement; busy: boolean; onHandOver?: () => void }) {
+  const { t } = useI18n();
+  const meta = [element.model, element.costUsd > 0 ? `$${element.costUsd.toFixed(2)}` : null].filter(Boolean).join(' · ');
+  if (!element.serves.length && !element.waitsOn.length && !meta && !onHandOver) return null;
+  return (
+    <div className="mt-1.5 space-y-0.5 text-[12px] leading-5 text-muted-foreground">
+      {element.serves.length > 0 && (
+        <div className="flex min-w-0 items-center gap-1.5"><Flag size={12} className="shrink-0" /><span className="truncate">{element.serves.join(', ')}</span></div>
+      )}
+      {element.waitsOn.length > 0 && (
+        <div className="flex min-w-0 items-center gap-1.5"><Clock size={12} className="shrink-0" /><span className="truncate">{t('After {items}', { items: element.waitsOn.join(', ') })}</span></div>
+      )}
+      {(meta || onHandOver) && (
+        <div className="flex items-center gap-2 tabular-nums">
+          {meta && <span className="truncate">{meta}</span>}
+          {onHandOver && (
+            <Button variant="ghost" size="xs" className="ml-auto" onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onHandOver(); }} disabled={busy}>
+              {t('Hand to Claude Code')}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A task of the Planner's draft, drawn as the Element card it will become —
+ *  dashed, and not editable until it is created. */
+function DraftCard({ element, draggable }: { element: FleetElement; draggable: boolean }) {
+  const { t } = useI18n();
   return (
     <div
       draggable={draggable}
       onDragStart={(e) => { e.dataTransfer.setData(DRAG_TYPE, element.key); e.dataTransfer.effectAllowed = 'move'; }}
-      className={cn(CARD, 'px-3.5 py-3', element.draft && 'border-dashed border-border', draggable && 'cursor-grab active:cursor-grabbing', done && 'opacity-60')}>
-      <div className="flex items-start gap-2.5">
-        <IconTile><ElementIcon size={13} /></IconTile>
-        <div className="min-w-0 flex-1">
-          {onOpen ? (
-            <button type="button" onClick={onOpen} className="block w-full truncate text-left text-[14px] font-semibold leading-5 text-foreground hover:underline">{element.title}</button>
-          ) : (
-            <div className="truncate text-[14px] font-semibold leading-5 text-foreground">{element.title}</div>
-          )}
-          {element.model && <div className="truncate text-[12px] text-muted-foreground">{element.model}</div>}
-        </div>
-        {element.draft ? <DraftTag /> : <StateBadge state={element.state} />}
+      className={cn(CARD, 'border-dashed border-border px-3 py-2.5', draggable && 'cursor-grab active:cursor-grabbing')}>
+      <div className="flex items-start gap-2">
+        <p className="min-w-0 flex-1 text-[13px] font-medium leading-5 text-foreground line-clamp-3 break-words">{element.title}</p>
+        <DraftTag />
       </div>
-      {(element.serves.length > 0 || element.waitsOn.length > 0) && (
-        <div className="mt-2 space-y-0.5 text-[12px] text-muted-foreground">
-          {element.serves.length > 0 && (
-            <div className="flex min-w-0 items-center gap-1.5"><Flag size={12} className="shrink-0" /><span className="truncate">{element.serves.join(', ')}</span></div>
-          )}
-          {element.waitsOn.length > 0 && (
-            <div className="flex min-w-0 items-center gap-1.5"><Clock size={12} className="shrink-0" /><span className="truncate">{t('After {items}', { items: element.waitsOn.join(', ') })}</span></div>
-          )}
-        </div>
-      )}
-      <div className="mt-2.5 flex min-h-6 items-center gap-2.5 text-[12px] tabular-nums text-muted-foreground">
-        {/* Who carries it out, with their avatar — the card's one state is the badge above. */}
-        <span className="inline-flex min-w-0 items-center gap-1.5">
-          {element.assigneeWorker
-            ? <WorkerAvatar worker={element.assigneeWorker} size={16} />
-            : <span className="h-4 w-4 shrink-0 rounded-full border border-dashed border-border" />}
-          <span className="truncate">{who}</span>
+      <MissionLines element={element} busy={false} />
+      <div className="mt-2 flex items-center justify-end gap-1.5 text-[12px] text-muted-foreground">
+        {element.assignee === 'human' ? t('A person') : t('AI')}
+        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-border">
+          <ElementIcon size={11} />
         </span>
-        {due && (
-          <span className="inline-flex items-center gap-1"
-            style={isOverdue(element.dueDate, done) ? { color: 'var(--status-danger)' } : undefined}>
-            <CalendarDays size={12} />{due}
-          </span>
-        )}
-        {element.costUsd > 0 && <span className="text-foreground">${element.costUsd.toFixed(2)}</span>}
-        <div className="ml-auto flex items-center gap-1">
-          {onHandOver && <Button variant="ghost" size="xs" onClick={onHandOver} disabled={busy}>{t('Hand to Claude Code')}</Button>}
-          {onRun && (
-            <Button variant="ghost" size="xs" onClick={onRun} disabled={busy}>
-              {busy ? t('Starting…') : element.state === 'failed' ? t('Retry with AI') : t('Run with AI')}
-            </Button>
-          )}
-          {needsPerson && onOpen && <Button variant="secondary" size="xs" onClick={onOpen}>{t('Resolve')}</Button>}
-        </div>
       </div>
     </div>
   );
@@ -202,14 +180,26 @@ function Connectors({ root, objectCards, fromKey, elementCards, elements }: {
   elementCards: React.RefObject<Map<string, HTMLElement>>;
   elements: readonly FleetElement[];
 }) {
-  const [paths, setPaths] = useState<{ d: string; open: boolean; draft: boolean }[]>([]);
-  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [drawing, setDrawing] = useState<{ paths: { d: string; open: boolean; draft: boolean }[]; w: number; h: number }>({ paths: [], w: 0, h: 0 });
+  // Measured after every render (cards load, wrap, and are edited in place)
+  // and whenever the columns resize; stored only when a line moved.
+  const [resized, setResized] = useState(0);
   useLayoutEffect(() => {
     const box = root.current;
     if (!box) return;
+    const observer = new ResizeObserver(() => setResized((n) => n + 1));
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [root]);
+  useLayoutEffect(() => {
+    const box = root.current;
+    if (!box) return;
+    const store = (next: typeof drawing) => {
+      setDrawing((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+    };
     const draw = () => {
       const from = fromKey ? objectCards.current.get(fromKey) : undefined;
-      if (!from || window.matchMedia('(max-width: 767px)').matches) { setPaths([]); return; }
+      if (!from || window.matchMedia('(max-width: 767px)').matches) { store({ paths: [], w: 0, h: 0 }); return; }
       const b = box.getBoundingClientRect();
       const f = from.getBoundingClientRect();
       const sx = f.right - b.left;
@@ -230,19 +220,16 @@ function Connectors({ root, objectCards, fromKey, elementCards, elements }: {
             + ` V ${ey - Math.sign(dy) * radius} Q ${spine} ${ey} ${spine + radius} ${ey} H ${ex}`;
         next.push({ d, open: e.state !== 'done' && e.state !== 'cancelled', draft: e.draft });
       }
-      setPaths(next);
-      setSize({ w: b.width, h: b.height });
+      store({ paths: next, w: b.width, h: b.height });
     };
     draw();
-    const observer = new ResizeObserver(draw);
-    observer.observe(box);
-    return () => observer.disconnect();
-  }, [root, objectCards, fromKey, elementCards, elements]);
-  if (paths.length === 0) return null;
+  });
+  void resized;
+  if (drawing.paths.length === 0) return null;
   return (
-    <svg aria-hidden className="pointer-events-none absolute inset-0 hidden md:block" width={size.w} height={size.h}>
+    <svg aria-hidden className="pointer-events-none absolute inset-0 hidden md:block" width={drawing.w} height={drawing.h}>
       {/* The open ones last, so they draw over the grey along the shared spine. */}
-      {[...paths].sort((a, b) => Number(a.open) - Number(b.open)).map((p, i) => (
+      {[...drawing.paths].sort((a, b) => Number(a.open) - Number(b.open)).map((p, i) => (
         <path key={i} d={p.d} fill="none" strokeWidth={1.5} strokeDasharray={p.draft ? '4 4' : undefined}
           stroke={p.open ? 'var(--accent-default)' : 'var(--border-default)'} opacity={p.open ? 0.75 : 1} />
       ))}
@@ -250,8 +237,10 @@ function Connectors({ root, objectCards, fromKey, elementCards, elements }: {
   );
 }
 
-export function MissionExecutionPanel({ ctx, objects, domains, aiWorkers, ensureRoot }: {
+export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorkers, ensureRoot }: {
   ctx: MissionContext;
+  /** The written Elements, by id, as the shared Element card reads them. */
+  details: ReadonlyMap<string, ElementWithDetails>;
   /** The Strategy's Objects, in order. */
   objects: FleetObjectRow[];
   /** The Space's Domains — where a new Object can go. */
@@ -350,13 +339,6 @@ export function MissionExecutionPanel({ ctx, objects, domains, aiWorkers, ensure
     }
   };
 
-  const runOne = async (elementId: string) => {
-    setBusy(elementId); setNotice(null);
-    const failed = await start([elementId]);
-    setBusy(null);
-    if (failed) setNotice(t('Could not start the run.'));
-    ctx.refetch();
-  };
 
   const runReady = async () => {
     if (!await appDialog.confirm(t('Start AI runs for {n} actions? Each run spends from this Space\'s AI budget.', { n: ready.length }))) return;
@@ -383,13 +365,14 @@ export function MissionExecutionPanel({ ctx, objects, domains, aiWorkers, ensure
   // the Object it will be created in; a written Element moves there.
   const mayDrop = (o: FleetObject) => o.key !== focus?.key && (!!o.objectId || !!draft);
   const dragOver = (o: FleetObject) => (e: React.DragEvent) => {
-    if (!e.dataTransfer.types.includes(DRAG_TYPE) || !mayDrop(o)) return;
+    const types = e.dataTransfer.types;
+    if (!(types.includes(DRAG_TYPE) || types.includes(ELEMENT_DRAG_TYPE)) || !mayDrop(o)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (dropKey !== o.key) setDropKey(o.key);
   };
   const drop = (o: FleetObject) => async (e: React.DragEvent) => {
-    const key = e.dataTransfer.getData(DRAG_TYPE);
+    const key = e.dataTransfer.getData(DRAG_TYPE) || e.dataTransfer.getData(ELEMENT_DRAG_TYPE);
     setDropKey(null);
     if (!key || !mayDrop(o)) return;
     e.preventDefault();
@@ -536,11 +519,15 @@ export function MissionExecutionPanel({ ctx, objects, domains, aiWorkers, ensure
             <div className="min-w-0 space-y-3">
               {focus && focus.elements.length > 0 ? focus.elements.map((e) => (
                 <div key={e.key} ref={(el) => track(elementCards.current, e.key, el)}>
-                  <ElementCard element={e} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
-                    draggable={e.draft ? ctx.canEdit : true}
-                    onOpen={e.elementId ? () => ctx.onOpenElement(e.elementId!) : undefined}
-                    onRun={!draft && e.ready ? () => void runOne(e.elementId!) : undefined}
-                    onHandOver={!draft && e.handable ? () => void handOver([e.elementId!]) : undefined} />
+                  {e.elementId && details.get(e.elementId) ? (
+                    <ElementCard element={details.get(e.elementId)!} onRefresh={ctx.refetch}
+                      onOpen={() => ctx.onOpenElement(e.elementId!)}
+                      badge={<StateBadge state={e.state} />}
+                      extra={<MissionLines element={e} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
+                        onHandOver={!draft && e.handable ? () => void handOver([e.elementId!]) : undefined} />} />
+                  ) : (
+                    <DraftCard element={e} draggable={ctx.canEdit} />
+                  )}
                 </div>
               )) : (
                 <p className="px-1 py-2 text-[12px] text-muted-foreground">{t('No Elements in this Object yet.')}</p>
