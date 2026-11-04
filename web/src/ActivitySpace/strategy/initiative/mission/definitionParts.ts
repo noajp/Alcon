@@ -4,7 +4,7 @@
 
 export type DefinitionPart = 'goal' | 'conditions' | 'metric' | 'procedure' | 'stop' | 'checks' | 'output';
 
-export const DEFINITION_PARTS: [DefinitionPart, RegExp][] = [
+const DEFINITION_PARTS: [DefinitionPart, RegExp][] = [
   ['goal', /^(目的|ゴール|goal|purpose)/i],
   ['conditions', /^(条件|前提|ルール|conditions?|rules)/i],
   ['metric', /^(指標|評価指標|metric|score)/i],
