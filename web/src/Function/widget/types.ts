@@ -49,7 +49,7 @@ export const ZONE_VARIANT: Record<Zone, FrameVariant> = {
 };
 
 /** Grouping in the picker. Sentence-case labels live in WidgetPicker. */
-export type WidgetGroup = 'core' | 'progress' | 'chart' | 'list' | 'plan';
+export type WidgetGroup = 'content' | 'strategy' | 'related' | 'progress' | 'schedule' | 'chart' | 'list';
 
 export interface WidgetSubject {
   kind: SubjectKind;

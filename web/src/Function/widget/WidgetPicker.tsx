@@ -9,17 +9,19 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { WIDGET_REGISTRY } from './registry';
 import type { SubjectKind, WidgetDefinition, WidgetGroup, Zone } from './types';
 
-// Sentence case, in the order a board is usually built: what the thing is,
-// then how it is going, then the detail.
+// Named for what the widgets in it are about, in the order a board is
+// usually built: what the thing is, then how it is going, then the detail.
 const GROUP_LABEL: Record<WidgetGroup, string> = {
-  core: 'Core',
+  content: 'Documents & data',
+  strategy: 'Intent & judgment',
+  related: 'Connections',
   progress: 'Progress',
-  plan: 'Plan',
+  schedule: 'Schedule',
   chart: 'Charts',
   list: 'Lists',
 };
 
-const GROUP_ORDER: WidgetGroup[] = ['core', 'progress', 'plan', 'chart', 'list'];
+const GROUP_ORDER: WidgetGroup[] = ['strategy', 'progress', 'schedule', 'content', 'related', 'chart', 'list'];
 
 /**
  * The one + on a surface, top right.
@@ -95,7 +97,7 @@ export function WidgetPicker({
           {t('Add widget')}
         </Button>
       </PopoverTrigger>
-      <MenuShell align="end" width="wide">
+      <MenuShell align="end" width="wide" className="max-h-[min(70vh,560px)] overflow-y-auto">
         {/* Verb-phrase placeholder, no ring, no border. */}
         <input
           autoFocus
@@ -116,31 +118,28 @@ export function WidgetPicker({
           <div key={group}>
             <MenuSectionLabel>{t(GROUP_LABEL[group])}</MenuSectionLabel>
             {entries.map(({ def, zone }) => (
-              // One line per widget: its name, then what it shows, cut to the
-              // row — the whole sentence is the row's tooltip. A menu whose
-              // rows wrap to three lines reads as a page, not a list.
+              // The name, and under it what the widget shows — whole, up to
+              // two lines, so a widget can be chosen without trying it first.
               <button
                 key={def.type}
                 type="button"
-                title={def.description ? t(def.description) : undefined}
-                className={MENU_ROW}
+                className="flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50"
                 onClick={() => {
                   onAdd(zone, def.type);
                   setOpen(false);
                 }}
               >
-                <span className="shrink-0 text-foreground">{t(def.label)}</span>
+                <span className="text-[13px] text-foreground">{t(def.label)}</span>
                 {def.description && (
-                  <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">{t(def.description)}</span>
+                  <span className="line-clamp-2 text-[12px] leading-snug text-muted-foreground">{t(def.description)}</span>
                 )}
               </button>
             ))}
           </div>
         ))}
 
-        {/* The keyboard route into arrange mode. A long press is the fast way
-            in and the only one most people will ever use, but it cannot be
-            reached from a keyboard, so the mode has to be nameable somewhere. */}
+        {/* The named route into arrange mode, beside the long press on a
+            widget and each widget's own "…" menu. */}
         {!arranging && (
           <>
             <div className={MENU_SEPARATOR} />
@@ -154,7 +153,6 @@ export function WidgetPicker({
             >
               <LayoutGrid size={14} className="text-muted-foreground" />
               <span className="flex-1">{t('Arrange widgets')}</span>
-              <span className="text-[11px] text-muted-foreground">{t('Hold')}</span>
             </button>
           </>
         )}

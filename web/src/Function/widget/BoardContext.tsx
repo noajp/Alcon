@@ -12,6 +12,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { Button } from '@/ui/button';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 import { WidgetPicker } from './WidgetPicker';
 import { BoardPresence } from './BoardPresence';
 import { useWidgetActionSlot } from './WidgetActionSlot';
@@ -68,6 +69,7 @@ export function WidgetSurface({
   children: React.ReactNode;
   className?: string;
 }) {
+  const { t } = useI18n();
   const [arranging, setArrangingState] = useState(false);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const setArranging = useCallback((next: boolean) => setArrangingState(next), []);
@@ -142,10 +144,17 @@ export function WidgetSurface({
 
   // Who else is here sits beside the one +: the board is shared, and this is
   // where that shows.
+  // While arranging, the chrome says what the mode is and how to leave it —
+  // Escape and a click outside also work, but neither is visible.
   const chrome = (
     <div className="flex items-center gap-2">
       <BoardPresence subject={host.subject} />
-      {picker}
+      {arranging ? (
+        <>
+          <span className="text-[12px] text-muted-foreground">{t('Drag to reorder')}</span>
+          <Button variant="secondary" size="sm" onClick={() => setArrangingState(false)}>{t('Done')}</Button>
+        </>
+      ) : picker}
     </div>
   );
 
@@ -157,10 +166,10 @@ export function WidgetSurface({
       {board.error ? (
         <div role="alert" className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
           {board.error}
-          <Button variant="ghost" size="sm" onClick={board.retry}>Reload</Button>
+          <Button variant="ghost" size="sm" onClick={board.retry}>{t('Reload')}</Button>
         </div>
       ) : (board.loading || board.saving) && (
-        <span role="status" className="sr-only">{board.loading ? 'Loading widgets…' : 'Saving layout…'}</span>
+        <span role="status" className="sr-only">{board.loading ? t('Loading widgets…') : t('Saving layout…')}</span>
       )}
       {/* One + for the whole surface. A widget knows its own zone, so there
           is nothing to choose before choosing the widget. It renders in the
