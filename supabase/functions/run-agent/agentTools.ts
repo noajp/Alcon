@@ -40,13 +40,13 @@ export const INTERNAL_TOOLS: ToolDef[] = [
   },
   {
     name: "save_artifact",
-    description: "成果物（文書・表・下書き・データなど）を Element に保存する。Element を見られる人なら誰でも読める。同じ title で呼ぶと上書きする。任務が成果物を求めるときだけ使う。",
+    description: "成果物（文書・表・下書き・データなど）を Element に保存する。Space の Artifacts にもファイル（markdown なら .md）として置かれ、Element を見られる人なら誰でも読める。title には版番号や日付を入れない：同じ title で保存し直すと、同じファイルの新しい版になる。任務が成果物を求めるときだけ使う。",
     input_schema: {
       type: "object",
       properties: {
         title: { type: "string" },
         content: { type: "string", description: "成果物の本文" },
-        format: { type: "string", enum: ["markdown", "text", "csv", "json"] },
+        format: { type: "string", enum: ["markdown", "html", "text", "csv", "json"] },
       },
       required: ["title", "content"],
       additionalProperties: false,
@@ -68,6 +68,35 @@ export const INTERNAL_TOOLS: ToolDef[] = [
   },
 ];
 
+/**
+ * Anthropic's server tools: web search and page fetch run on Anthropic's side
+ * within the same model call, so they need no executor here. The current
+ * Sonnet and Opus take the variants that filter results with code; other
+ * models get plain search only. `max_uses` caps one model call; research
+ * needs room (5 ran out before a single market survey had its numbers), and
+ * the run's cost cap still bounds the whole.
+ */
+export function webTools(model: string): Record<string, unknown>[] {
+  const filtering = model === "claude-sonnet-5-5" || model === "claude-opus-5-5";
+  if (!filtering) return [{ type: "web_search_20250305", name: "web_search", max_uses: 15 }];
+  return [
+    { type: "web_search_20260209", name: "web_search", max_uses: 15 },
+    { type: "web_fetch_20260209", name: "web_fetch", max_uses: 10 },
+  ];
+}
+
+/** Pure. One line for the run log per server-tool call in a response. */
+export function webSteps(content: { type: string; name?: string; input?: unknown }[]): string[] {
+  return content.filter((b) => b.type === "server_tool_use").map((b) => {
+    const input = (b.input && typeof b.input === "object" ? b.input : {}) as Record<string, unknown>;
+    if (b.name === "web_search") return `Web 検索: ${String(input.query ?? "")}`;
+    if (b.name === "web_fetch") return `Web ページ: ${String(input.url ?? "")}`;
+    // The search tools filter their results with code under the hood.
+    if (b.name === "code_execution") return "検索結果を絞り込み";
+    return `${b.name ?? "server tool"}`;
+  });
+}
+
 /** The board tools an agent may use: reads, and everyday writes. No deletes, no bulk writes. */
 export const AGENT_BOARD_TOOL_NAMES = [
   "listObjects", "listElements", "getElement", "findByText", "getProgress", "getRecentActivity", "listWorkers",
@@ -77,7 +106,24 @@ export const AGENT_BOARD_TOOL_NAMES = [
 
 export const AGENT_STRATEGY_TOOL_NAMES = ["listInitiatives", "getInitiative"] as const;
 
-const INTERNAL = new Set(INTERNAL_TOOLS.map((t) => t.name));
+/** A round of a loop, for an Element whose definition names a metric. */
+export const ROUND_TOOL: ToolDef = {
+  name: "record_round",
+  description: "ループの 1 周を記録する。計測した指標の値・変えたこと・残したか戻したかを書く。止める条件や点検の周に当たれば、答えで知らせる。",
+  input_schema: {
+    type: "object",
+    properties: {
+      value: { type: "number", description: "この周で計測した指標の値。計測できなかったら省く" },
+      change: { type: "string", description: "この周で変えたこと（仮説と変更）" },
+      kept: { type: "boolean", description: "変更を残したら true、戻したら false" },
+      note: { type: "string" },
+    },
+    required: ["change", "kept"],
+    additionalProperties: false,
+  },
+};
+
+const INTERNAL = new Set([...INTERNAL_TOOLS.map((t) => t.name), ROUND_TOOL.name]);
 const BOARD = new Set<string>(AGENT_BOARD_TOOL_NAMES);
 const STRATEGY = new Set<string>(AGENT_STRATEGY_TOOL_NAMES);
 

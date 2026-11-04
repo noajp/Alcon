@@ -6,7 +6,7 @@
 
 export const DOMAIN_AGENT_MODELS = [
   { value: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 — 標準' },
-  { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — 高速・低コスト' },
+  { value: 'claude-haiku-5-5', label: 'Claude Haiku 5.5 — 高速・低コスト' },
   { value: 'claude-opus-5-5', label: 'Claude Opus 5.5 — 高品質' },
 ] as const;
 

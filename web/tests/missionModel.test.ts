@@ -188,3 +188,65 @@ describe('Claude Code work', () => {
     expect(handOverLabels(null)).toEqual(['dispatch']);
   });
 });
+
+describe('Planner questions', () => {
+  it('keeps at most five questions with unique keys and at most five distinct options', async () => {
+    const { normalizeQuestions } = await import('@/ActivitySpace/strategy/initiative/mission/missionModel');
+    const qs = normalizeQuestions([
+      { key: 'q1', question: '購入か賃貸か', options: ['購入', '賃貸', '賃貸', ''] },
+      { key: 'q1', question: '重複', options: [] },
+      { key: 'q2', question: '', options: ['x'] },
+      { question: 'エリアは', options: 'not a list' },
+      ...Array.from({ length: 6 }, (_, i) => ({ key: `z${i}`, question: `問${i}`, options: ['a', 'b', 'c', 'd', 'e', 'f'] })),
+    ]);
+    expect(qs).toHaveLength(5);
+    expect(qs[0]).toEqual({ key: 'q1', question: '購入か賃貸か', options: ['購入', '賃貸'] });
+    expect(qs[1]).toEqual({ key: 'q2', question: 'エリアは', options: [] });
+    expect(qs[2].options).toHaveLength(5);
+    expect(normalizeQuestions(null)).toEqual([]);
+  });
+
+  it('passes on only the answered questions, in order', async () => {
+    const { answeredQuestions } = await import('@/ActivitySpace/strategy/initiative/mission/missionModel');
+    const qs = [{ key: 'a', question: 'A?', options: [] }, { key: 'b', question: 'B?', options: [] }, { key: 'c', question: 'C?', options: [] }];
+    expect(answeredQuestions(qs, { c: ' 3 ', a: '1', b: '  ' })).toEqual([{ question: 'A?', answer: '1' }, { question: 'C?', answer: '3' }]);
+  });
+});
+
+describe('your turn', () => {
+  it('lists what waits on a person, most pressing first, and a person\'s Element only once it is unblocked', async () => {
+    const { yourTurn } = await import('@/ActivitySpace/strategy/initiative/mission/missionModel');
+    const card = (id: string, over: Record<string, unknown> = {}) => ({
+      key: id, elementId: id, title: id, state: 'todo', draft: false, assignee: 'ai', assigneeName: null, assigneeWorker: null,
+      status: 'todo', dueDate: null, serves: [], waitsOn: [], ready: false, handable: false, model: null, costUsd: 0, ...over,
+    });
+    const fleet = [{
+      key: 'o', objectId: 'o', name: 'O', domainId: null, draft: false, state: 'todo', costUsd: 0,
+      tally: { total: 0, done: 0, running: 0, waiting: 0, stopped: 0 },
+      elements: [
+        card('human-ready', { assignee: 'human' }),
+        card('human-waiting', { assignee: 'human', waitsOn: ['x'] }),
+        card('reviewed'),
+        card('blocked'),
+        card('approval'),
+        card('done', { assignee: 'human' }),
+        card('draft', { draft: true, elementId: null }),
+      ],
+    }];
+    const row = (id: string, status: string) => ({ id, title: id, status } as never);
+    const run = (element_id: string, status: string, summary: string) =>
+      ({ element_id, status, summary, error: null, model: null, input_tokens: 0, output_tokens: 0, cost_usd: 0, created_at: '2026-11-04T00:00:00Z' } as never);
+    const turns = yourTurn({
+      fleet: fleet as never,
+      elements: [row('human-ready', 'todo'), row('human-waiting', 'todo'), row('reviewed', 'review'), row('blocked', 'blocked'), row('approval', 'in_progress'), row('done', 'done')],
+      runs: [run('reviewed', 'awaiting_review', '条件メモを作成'), run('blocked', 'completed', '賃料の上限を教えて'), run('approval', 'awaiting_approval', 'x')],
+      actions: [{ element_id: 'approval', summary: 'Gmail · 送信', status: 'pending' }],
+    });
+    expect(turns.map((x) => [x.kind, x.elementId, x.detail])).toEqual([
+      ['approve', 'approval', 'Gmail · 送信'],
+      ['answer', 'blocked', '賃料の上限を教えて'],
+      ['review', 'reviewed', '条件メモを作成'],
+      ['do', 'human-ready', null],
+    ]);
+  });
+});

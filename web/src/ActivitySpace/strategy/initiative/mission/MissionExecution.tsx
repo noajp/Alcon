@@ -8,17 +8,23 @@ import { ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
 import { PageSection } from '@/Function/shared/PageHead';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { startElementRun } from '@/Function/copilot/agentData';
+import { advanceFromElement, startElementRun } from '@/Function/copilot/agentData';
 import { runsInClaudeCode } from '@/Function/team/agentModel';
 import { updateElement } from '@/hooks/useSupabase';
 import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMissionData';
-import type { ElementWithDetails, Worker } from '@/types/database';
+import { createIntent } from '@/hooks/strategyData';
+import type { ElementWithDetails, StrategyDelegation, Worker } from '@/types/database';
 import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard';
+import { StatusPicker } from '@/Function/shared/StatusPicker';
 import {
-  buildFleet, draftFleet, handOverLabels, missionSummary, moveDraftTask, normalizePlan, startableTasks, UNPLACED,
-  type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft,
+  answeredQuestions, buildFleet, draftFleet, handOverLabels, missionSummary, moveDraftTask, normalizePlan, normalizeQuestions,
+  startableTasks, UNPLACED, yourTurn,
+  type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft, type PlanQuestion,
 } from './missionModel';
 import { STATE_LABEL, Stat, compact, stateColor, type MissionContext } from './MissionPanels';
+import { YourTurnTray } from './YourTurnTray';
+import { DefinitionPanel } from './DefinitionPanel';
+import { setElementDefinition, useDefinitions, useRunRounds, type Definition, type RoundSummary } from '@/hooks/definitionData';
 
 // The Execution tab's mission: the Strategy's Objects in one column and the
 // Elements of the chosen Object in the next, joined by lines from the chosen
@@ -118,10 +124,34 @@ function ObjectCard({ object, domainName, selected, dropTarget, onSelect, onDrag
 /** What the Execution tab adds under a card's title: what it delivers,
  *  what it waits on, the model that ran it and what that cost, and a hand-off
  *  to Claude Code. */
-function MissionLines({ element, busy, onHandOver }: { element: FleetElement; busy: boolean; onHandOver?: () => void }) {
+/** The Element's own definition, chosen on its card: its output shape and its
+ *  loop are enforced for it (a Strategy's definition only directs). */
+function DefinitionPick({ value, definitions, onChange }: { value: string | null; definitions: Definition[]; onChange: (id: string | null) => void }) {
+  const { t } = useI18n();
+  if (definitions.length === 0 && !value) return null;
+  return (
+    <label className="flex min-w-0 items-center gap-1.5" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+      <span className="shrink-0">{t('Definition')}</span>
+      <select value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}
+        className="min-w-0 flex-1 truncate rounded border border-border/60 bg-transparent px-1 py-0.5 text-[12px] text-foreground">
+        <option value="">{t('The Strategy\'s')}</option>
+        {definitions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function MissionLines({ element, busy, onHandOver, rounds, definitionPick }: { element: FleetElement; busy: boolean; onHandOver?: () => void; rounds?: RoundSummary; definitionPick?: React.ReactNode }) {
   const { t } = useI18n();
   const meta = [element.model, element.costUsd > 0 ? `$${element.costUsd.toFixed(2)}` : null].filter(Boolean).join(' · ');
-  if (!element.serves.length && !element.waitsOn.length && !meta && !onHandOver) return null;
+  // A loop's progress: how many rounds, the latest value and the best.
+  const loop = rounds && rounds.rounds > 0
+    ? t('{n} rounds · latest {last} · best {best}', {
+      n: rounds.rounds, last: rounds.last ?? '—',
+      best: rounds.values.length ? Math.max(...rounds.values) : '—',
+    })
+    : null;
+  if (!element.serves.length && !element.waitsOn.length && !meta && !onHandOver && !loop && !definitionPick) return null;
   return (
     <div className="mt-1.5 space-y-0.5 text-[12px] leading-5 text-muted-foreground">
       {element.serves.length > 0 && (
@@ -130,6 +160,8 @@ function MissionLines({ element, busy, onHandOver }: { element: FleetElement; bu
       {element.waitsOn.length > 0 && (
         <div className="flex min-w-0 items-center gap-1.5"><Clock size={12} className="shrink-0" /><span className="truncate">{t('After {items}', { items: element.waitsOn.join(', ') })}</span></div>
       )}
+      {loop && <div className="tabular-nums">{loop}</div>}
+      {definitionPick}
       {(meta || onHandOver) && (
         <div className="flex items-center gap-2 tabular-nums">
           {meta && <span className="truncate">{meta}</span>}
@@ -252,6 +284,9 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const { t } = useI18n();
   const [guidance, setGuidance] = useState('');
   const [draft, setDraft] = useState<PlanDraft | null>(null);
+  // The Planner's questions, asked before it plans, and the answers typed.
+  const [questions, setQuestions] = useState<{ reason: string; items: PlanQuestion[] } | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [planning, setPlanning] = useState(false);
   const [applying, setApplying] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -281,16 +316,30 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     ?? fleet[0];
 
   const summary = missionSummary({ elements: ctx.elements, measures: ctx.measures, runs: ctx.mission.runs, artifacts: ctx.mission.artifacts });
-  const ready = current.flatMap((o) => o.elements.filter((e) => e.ready));
+  // Before the dependencies are read every AI Element would look ready.
+  const ready = ctx.missionLoaded ? current.flatMap((o) => o.elements.filter((e) => e.ready)) : [];
   const handable = current.flatMap((o) => o.elements.filter((e) => e.handable));
+  const rounds = useRunRounds(ctx.elements.map((e) => e.id));
+  const definitions = useDefinitions(ctx.spaceId);
+  const turns = useMemo(() => yourTurn({ fleet: current, elements: ctx.elements, runs: ctx.mission.runs, actions: ctx.mission.actions }),
+    [current, ctx.elements, ctx.mission.runs, ctx.mission.actions]);
 
-  const plan = async () => {
+  const plan = async (opts: { answers?: { question: string; answer: string }[]; noQuestions?: boolean } = {}) => {
     setPlanning(true); setError(null); setNotice(null);
     try {
-      const raw = await requestInitiativePlan(ctx.initiativeId, guidance);
-      const next = normalizePlan(raw, new Set(ctx.measures.map((m) => m.id)), {
+      const reply = await requestInitiativePlan(ctx.initiativeId, guidance, opts);
+      const asked = normalizeQuestions(reply.questions);
+      if (asked.length > 0) {
+        setQuestions({ reason: reply.reason, items: asked });
+        setAnswers({});
+        setDraft(null);
+        return;
+      }
+      setQuestions(null);
+      const next = normalizePlan(reply.plan, new Set(ctx.measures.map((m) => m.id)), {
         objects: new Map(objects.map((o) => [o.id, o.name])),
         domainIds: new Set(domains.map((d) => d.id)),
+        definitionIds: new Set(definitions.data.map((d) => d.id)),
       });
       if (next.tasks.length === 0) setError(t('The Planner returned no tasks. Add guidance and try again.'));
       else { setDraft(next); setSelected(null); }
@@ -299,6 +348,24 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     } finally {
       setPlanning(false);
     }
+  };
+
+  // The answers become the Strategy's assumptions — what every later run
+  // reads — and the Planner plans with them.
+  const answerAndPlan = async () => {
+    if (!questions) return;
+    const given = answeredQuestions(questions.items, answers);
+    if (ctx.canEdit && given.length > 0) {
+      const root = await ensureRoot().catch(() => null);
+      if (root) {
+        for (const g of given) {
+          await createIntent({ strategy_id: ctx.initiativeId, parent_intent_id: root, kind: 'assumption', title: `${g.question} → ${g.answer}` })
+            .catch(() => undefined);
+        }
+        ctx.refetch();
+      }
+    }
+    await plan({ answers: given, noQuestions: true });
   };
 
   const start = async (elementIds: string[]) => {
@@ -430,15 +497,71 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
           <Stat label={t('AI cost')} value={`$${summary.costUsd.toFixed(2)}`} />
         </div>
 
+        {ctx.missionLoaded && (
+          <YourTurnTray items={turns} canEdit={ctx.canEdit} onOpen={ctx.onOpenElement} onChanged={ctx.refetch} />
+        )}
+
+        <label className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted-foreground">
+          {t('When an AI finishes')}
+          <select value={ctx.delegation} disabled={!ctx.canEdit}
+            onChange={(e) => void ctx.setDelegation(e.target.value as StrategyDelegation)}
+            className="rounded-md border border-border/60 bg-transparent px-1.5 py-1 text-foreground">
+            <option value="manual">{t('A person reviews each result')}</option>
+            <option value="auto">{t('Verified results go on to the next step')}</option>
+          </select>
+          <span>{ctx.delegation === 'auto'
+            ? t("Stops at a person's Element, an approval or a blocked run.")
+            : t('Nothing starts until you approve the result.')}</span>
+        </label>
+
+        <DefinitionPanel spaceId={ctx.spaceId} definitionId={ctx.definitionId} canEdit={ctx.canEdit} onChange={ctx.setDefinition} />
+
         <div className="flex items-start gap-2">
           <textarea value={guidance} onChange={(e) => setGuidance(e.target.value)} rows={2}
             placeholder={t('Guidance for the Planner (optional): scope, constraints, what to leave out…')}
             className="min-h-[52px] flex-1 resize-y rounded-md border border-border/60 bg-transparent px-2.5 py-1.5 text-[13px] outline-none focus:bg-muted/30" />
-          <Button variant={draft ? 'secondary' : 'primary'} size="sm" onClick={() => void plan()} disabled={planning || applying}>
+          <Button variant={draft ? 'secondary' : 'primary'} size="sm" onClick={() => void plan()} disabled={planning || applying || !!questions}>
             {planning ? t('Planning…') : draft ? t('Plan again') : t('Break down with AI')}
           </Button>
         </div>
-        {!draft && (
+        {questions && (
+          <div className="space-y-3 rounded-lg border border-border bg-muted/20 px-3 py-3">
+            <div>
+              <p className="text-[13px] font-medium text-foreground">{t('Before breaking this down, the Planner needs to know')}</p>
+              {questions.reason && <p className="mt-0.5 text-[12px] text-muted-foreground">{questions.reason}</p>}
+            </div>
+            {questions.items.map((q) => (
+              <div key={q.key} className="space-y-1.5">
+                <p className="text-[13px] text-foreground">{q.question}</p>
+                {q.options.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {q.options.map((o) => (
+                      <button key={o} type="button" onClick={() => setAnswers((a) => ({ ...a, [q.key]: a[q.key] === o ? '' : o }))}
+                        className={cn('rounded-md border px-2 py-1 text-[12px] transition-colors',
+                          answers[q.key] === o ? 'border-[var(--accent-default)] bg-[var(--accent-default)]/10 text-foreground' : 'border-border/60 text-muted-foreground hover:bg-muted/40')}>
+                        {o}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <input value={q.options.includes(answers[q.key] ?? '') ? '' : (answers[q.key] ?? '')}
+                  onChange={(e) => setAnswers((a) => ({ ...a, [q.key]: e.target.value }))}
+                  placeholder={q.options.length > 0 ? t('Or write your own') : t('Your answer')}
+                  className="w-full rounded-md border border-border/60 bg-transparent px-2 py-1 text-[12px] outline-none focus:bg-muted/30" />
+              </div>
+            ))}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => { setQuestions(null); void plan({ noQuestions: true }); }} disabled={planning}>
+                {t('Skip and break down')}
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => void answerAndPlan()} disabled={planning}>
+                {planning ? t('Planning…') : t('Answer and break down')}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {!draft && !questions && (
           <p className="text-[12px] text-muted-foreground">
             {t('The Planner reads this Strategy and breaks it down into Objects and Elements. Nothing is created until you approve the draft.')}
           </p>
@@ -522,8 +645,20 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
                   {e.elementId && details.get(e.elementId) ? (
                     <ElementCard element={details.get(e.elementId)!} onRefresh={ctx.refetch}
                       onOpen={() => ctx.onOpenElement(e.elementId!)}
-                      badge={<StateBadge state={e.state} />}
-                      extra={<MissionLines element={e} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
+                      badge={ctx.canEdit ? (
+                        // The badge opens the status menu: work an agent left
+                        // for review is approved (Done) right from its card.
+                        <span onPointerDown={(ev) => ev.stopPropagation()} onClick={(ev) => ev.stopPropagation()}>
+                          <StatusPicker element={details.get(e.elementId)!}
+                            onChanged={(s) => { if (s === 'done' || s === 'cancelled') void advanceFromElement(e.elementId!).then(() => ctx.refetch()); else ctx.refetch(); }}
+                            trigger={<button type="button" className="cursor-pointer" aria-label={t('Change status')}><StateBadge state={e.state} /></button>} />
+                        </span>
+                      ) : <StateBadge state={e.state} />}
+                      extra={<MissionLines element={e} rounds={rounds.get(e.elementId)} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
+                        definitionPick={ctx.canEdit ? (
+                          <DefinitionPick value={details.get(e.elementId)?.definition_id ?? null} definitions={definitions.data}
+                            onChange={(id) => void setElementDefinition(e.elementId!, id).then(() => ctx.refetch())} />
+                        ) : undefined}
                         onHandOver={!draft && e.handable ? () => void handOver([e.elementId!]) : undefined} />} />
                   ) : (
                     <DraftCard element={e} draggable={ctx.canEdit} />

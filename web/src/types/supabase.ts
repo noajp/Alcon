@@ -1,6 +1,5 @@
 // Generated from the live database schema by Supabase (generate_typescript_types).
 // Do not edit by hand: regenerate with `npm run gen:types` after a migration.
-
 export type Json =
   | string
   | number
@@ -613,6 +612,63 @@ export type Database = {
             columns: ["approach_id"]
             isOneToOne: false
             referencedRelation: "domain_approaches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_calls: {
+        Row: {
+          asset_id: string
+          claimed_at: string | null
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          input: Json
+          result: Json | null
+          run_id: string | null
+          status: string
+          tool: string
+        }
+        Insert: {
+          asset_id: string
+          claimed_at?: string | null
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          input?: Json
+          result?: Json | null
+          run_id?: string | null
+          status?: string
+          tool: string
+        }
+        Update: {
+          asset_id?: string
+          claimed_at?: string | null
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          input?: Json
+          result?: Json | null
+          run_id?: string | null
+          status?: string
+          tool?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_calls_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_calls_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
             referencedColumns: ["id"]
           },
         ]
@@ -1368,6 +1424,44 @@ export type Database = {
           },
         ]
       }
+      definitions: {
+        Row: {
+          activity_space_id: string
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          activity_space_id: string
+          body: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          activity_space_id?: string
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "definitions_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deployment_grant_versions: {
         Row: {
           activity_space_id: string
@@ -1440,7 +1534,6 @@ export type Database = {
       }
       dev_control: {
         Row: {
-          domain_id: string | null
           id: number
           max_concurrent: number
           note: string | null
@@ -1448,7 +1541,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          domain_id?: string | null
           id?: number
           max_concurrent?: number
           note?: string | null
@@ -1456,7 +1548,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          domain_id?: string | null
           id?: number
           max_concurrent?: number
           note?: string | null
@@ -2139,6 +2230,7 @@ export type Database = {
           claimed_by: string | null
           color: string | null
           created_at: string | null
+          definition_id: string | null
           description: string | null
           direction: Json | null
           display_id: string | null
@@ -2173,6 +2265,7 @@ export type Database = {
           claimed_by?: string | null
           color?: string | null
           created_at?: string | null
+          definition_id?: string | null
           description?: string | null
           direction?: Json | null
           display_id?: string | null
@@ -2207,6 +2300,7 @@ export type Database = {
           claimed_by?: string | null
           color?: string | null
           created_at?: string | null
+          definition_id?: string | null
           description?: string | null
           direction?: Json | null
           display_id?: string | null
@@ -2234,6 +2328,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "elements_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "definitions"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "elements_note_id_fkey"
             columns: ["note_id"]
             isOneToOne: false
@@ -2245,6 +2346,13 @@ export type Database = {
             columns: ["object_id"]
             isOneToOne: false
             referencedRelation: "objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "elements_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "elements"
             referencedColumns: ["id"]
           },
           {
@@ -3759,12 +3867,65 @@ export type Database = {
         }
         Relationships: []
       }
+      run_iterations: {
+        Row: {
+          change: string | null
+          created_at: string
+          element_id: string
+          id: string
+          kept: boolean | null
+          n: number
+          note: string | null
+          run_id: string
+          value: number | null
+        }
+        Insert: {
+          change?: string | null
+          created_at?: string
+          element_id: string
+          id?: string
+          kept?: boolean | null
+          n: number
+          note?: string | null
+          run_id: string
+          value?: number | null
+        }
+        Update: {
+          change?: string | null
+          created_at?: string
+          element_id?: string
+          id?: string
+          kept?: boolean | null
+          n?: number
+          note?: string | null
+          run_id?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "run_iterations_element_id_fkey"
+            columns: ["element_id"]
+            isOneToOne: false
+            referencedRelation: "elements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_iterations_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       strategies: {
         Row: {
           activity_space_id: string | null
           color: string | null
           created_at: string
           created_by: string
+          definition_id: string | null
+          delegation: string
           description: string | null
           icon: string | null
           id: string
@@ -3778,6 +3939,8 @@ export type Database = {
           color?: string | null
           created_at?: string
           created_by: string
+          definition_id?: string | null
+          delegation?: string
           description?: string | null
           icon?: string | null
           id?: string
@@ -3791,6 +3954,8 @@ export type Database = {
           color?: string | null
           created_at?: string
           created_by?: string
+          definition_id?: string | null
+          delegation?: string
           description?: string | null
           icon?: string | null
           id?: string
@@ -3805,6 +3970,13 @@ export type Database = {
             columns: ["activity_space_id"]
             isOneToOne: false
             referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "strategies_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "definitions"
             referencedColumns: ["id"]
           },
         ]
@@ -5079,6 +5251,14 @@ export type Database = {
           p_space_id: string
         }
         Returns: Json
+      }
+      intent_measure_format: {
+        Args: { p_unit: string; p_value: number }
+        Returns: string
+      }
+      intent_measure_state: {
+        Args: { p_direction: string; p_target: number; p_value: number }
+        Returns: string
       }
       invite_member: {
         Args: {

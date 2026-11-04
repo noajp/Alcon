@@ -4,6 +4,10 @@ const loop = await import(new URL('../../supabase/functions/run-agent/loop.ts', 
 const tools = await import(new URL('../../supabase/functions/run-agent/agentTools.ts', import.meta.url).pathname);
 const ctx = await import(new URL('../../supabase/functions/run-agent/context.ts', import.meta.url).pathname);
 const pricing = await import(new URL('../../supabase/functions/_shared/aiPricing.ts', import.meta.url).pathname);
+const verify = await import(new URL('../../supabase/functions/run-agent/verify.ts', import.meta.url).pathname);
+const advance = await import(new URL('../../supabase/functions/run-agent/advance.ts', import.meta.url).pathname);
+const runner = await import(new URL('../../supabase/functions/run-agent/runnerTools.ts', import.meta.url).pathname);
+const artifactFile = await import(new URL('../../supabase/functions/run-agent/artifactFile.ts', import.meta.url).pathname);
 const client = await import(new URL('../../supabase/functions/_shared/integrationClient.ts', import.meta.url).pathname);
 
 const { runLoop, appendDecisionResults, canonicalCalls, orderResults } = loop;
@@ -50,9 +54,80 @@ function deps(model: ReturnType<typeof scripted>, over: Partial<Record<string, u
 }
 
 const limits = (over = {}) => ({ maxTurnsThisCall: 10, maxTotalTurns: 50, deadline: Date.now() + 60_000, ...over });
-const fresh = () => ({ messages: [{ role: "user", content: "task" }] as { role: string; content: unknown }[], turns: 0, nudges: 0 });
+const fresh = () => ({ messages: [{ role: "user", content: "task" }] as { role: string; content: unknown }[], turns: 0, nudges: 0, revisions: 0 as number | undefined });
 
 describe('agent loop', () => {
+  const finishTurn = (id: string) => ({ content: [toolUse(id, 'finish', { outcome: 'completed', summary: 's', message: 'm' })] });
+
+  it('sends a completed finish back with the verifier\'s gaps, then accepts the revised one', async () => {
+    const m = scripted([finishTurn('f1'), finishTurn('f2')]);
+    const verdicts = [{ pass: false, gaps: ['出典 URL がない'] }, { pass: true, gaps: [] }];
+    const { deps: d } = deps(m, { verify: async () => verdicts.shift() });
+    const state = fresh();
+    const out = await runLoop(state, d, limits());
+    expect(out.kind).toBe('finished');
+    expect(state.revisions).toBe(1);
+    const sentBack = state.messages[2] as { content: { is_error?: boolean; content: string }[] };
+    expect(sentBack.content[0].is_error).toBe(true);
+    expect(sentBack.content[0].content).toContain('出典 URL がない');
+  });
+
+  it('lets a finish stand after the revision limit, or when the verifier cannot answer', async () => {
+    const m = scripted([finishTurn('f1'), finishTurn('f2'), finishTurn('f3')]);
+    let calls = 0;
+    const { deps: d } = deps(m, { verify: async () => { calls++; return { pass: false, gaps: ['x'] }; } });
+    const out = await runLoop(fresh(), d, limits());
+    expect(out.kind).toBe('finished');
+    expect(calls).toBe(loop.MAX_REVISIONS);
+
+    const m2 = scripted([finishTurn('g1')]);
+    const { deps: d2 } = deps(m2, { verify: async () => null });
+    expect((await runLoop(fresh(), d2, limits())).kind).toBe('finished');
+  });
+
+  it('does not verify a partial or blocked finish', async () => {
+    const m = scripted([{ content: [toolUse('f', 'finish', { outcome: 'blocked', summary: 's', message: 'm' })] }]);
+    let called = false;
+    const { deps: d } = deps(m, { verify: async () => { called = true; return { pass: false, gaps: [] }; } });
+    await runLoop(fresh(), d, limits());
+    expect(called).toBe(false);
+  });
+
+  it('runs the tools of one turn at the same time, answering in their order', async () => {
+    const m = scripted([
+      { content: [toolUse('a', 'getElement', { id: '1' }), toolUse('b', 'getElement', { id: '2' })] },
+      { content: [toolUse('c', 'finish', { outcome: 'completed', summary: 's', message: 'm' })] },
+    ]);
+    let inFlight = 0; let peak = 0;
+    const { deps: d } = deps(m, {
+      execute: async (c: { name: string; input: Record<string, unknown> }) => {
+        if (c.name === 'finish') return { content: 'ok', finish: { outcome: 'completed', summary: 's', message: 'm' } };
+        inFlight++; peak = Math.max(peak, inFlight);
+        await new Promise((r) => setTimeout(r, c.input.id === '1' ? 10 : 1));
+        inFlight--;
+        return { content: `got ${c.input.id}` };
+      },
+    });
+    const state = fresh();
+    await runLoop(state, d, limits());
+    expect(peak).toBe(2);
+    const answer = state.messages[2] as { content: { tool_use_id: string; content: string }[] };
+    expect(answer.content.map((r) => r.content)).toEqual(['got 1', 'got 2']);
+  });
+
+  it('sends a paused server-tool turn straight back, with no user message between', async () => {
+    const m = scripted([
+      { content: [{ type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'q' } }], stop_reason: 'pause_turn' },
+      { content: [toolUse('c', 'finish', { outcome: 'completed', summary: 's', message: 'm' })] },
+    ]);
+    const { deps: d } = deps(m);
+    const state = fresh();
+    const out = await runLoop(state, d, limits());
+    expect(out.kind).toBe('finished');
+    const resent = m.sent[1] as { role: string }[];
+    expect(resent[resent.length - 1].role).toBe('assistant');
+  });
+
   it('runs tools, answers every tool_use in one user message, and finishes', async () => {
     const m = scripted([
       { content: [text('plan'), toolUse('a', 'getElement', { id: 'x' }), toolUse('b', 'log_progress', { title: 't' })] },
@@ -135,7 +210,88 @@ describe('agent loop', () => {
   });
 });
 
+describe('auto-advance', () => {
+  const edge = (from_element: string, to_element: string) => ({ from_element, to_element });
+  const cand = (id: string, over = {}) => ({ id, status: 'todo', ai: true, openRun: false, ...over });
+
+  it('goes on only when every Strategy the Element serves allows it', () => {
+    expect(advance.delegationOf([{ delegation: 'auto' }, { delegation: 'auto' }])).toBe('auto');
+    expect(advance.delegationOf([{ delegation: 'auto' }, { delegation: 'manual' }])).toBe('manual');
+    expect(advance.delegationOf([])).toBe('manual');
+  });
+
+  it('starts the AI Elements the finished one unblocks, once all their prerequisites are settled', () => {
+    const next = advance.readyDownstream({
+      doneId: 'a',
+      edges: [edge('a', 'b'), edge('a', 'c'), edge('x', 'c'), edge('a', 'd'), edge('a', 'e'), edge('a', 'f'), edge('y', 'b')],
+      candidates: [cand('b'), cand('c'), cand('d', { ai: false }), cand('e', { openRun: true }), cand('f', { status: 'review' })],
+      statusOf: new Map([['x', 'in_progress'], ['y', 'cancelled']]),
+    });
+    // b: its other prerequisite is cancelled. c waits on x. d is a person's,
+    // e is already running, f is not open.
+    expect(next).toEqual(['b']);
+  });
+});
+
+describe('PC runner', () => {
+  const now = Date.parse('2026-11-04T12:00:00Z');
+  const row = (id: string, caps: unknown, seenSecsAgo: number | null) => ({
+    id, name: id, manifest: { capabilities: caps }, last_seen_at: seenSecsAgo == null ? null : new Date(now - seenSecsAgo * 1000).toISOString(),
+  });
+
+  it('picks the most recently seen runner that offers a browser and is on', () => {
+    expect(runner.pickRunner([row('old', ['browser'], 90), row('new', ['browser'], 5), row('nobrowser', ['files'], 1), row('off', ['browser'], 600), row('never', ['browser'], null)], now)?.id).toBe('new');
+    expect(runner.pickRunner([row('off', ['browser'], 600)], now)).toBeNull();
+  });
+
+  it('names the runner\'s operation, logs the call and reads the answer', () => {
+    expect(runner.runnerOperation('pc_open')).toBe('open');
+    expect(runner.isRunnerTool('pc_click')).toBe(true);
+    expect(runner.isRunnerTool('getElement')).toBe(false);
+    expect(runner.runnerStep('pc_open', { url: 'https://suumo.jp' })).toBe('PC: 開く https://suumo.jp');
+    const text = runner.runnerResultText({ url: 'https://x', title: 'T', text: '本文', links: [{ text: '次へ', href: 'https://x?p=2' }], note: 'n' });
+    for (const t of ['URL: https://x', 'タイトル: T', '本文', '- 次へ → https://x?p=2', '注: n']) expect(text).toContain(t);
+  });
+});
+
+describe('artifact files', () => {
+  it('names an output\'s file by its title and format, safe for a file name', () => {
+    expect(artifactFile.artifactFileName('候補物件の比較レポート（第2版）', 'markdown')).toBe('候補物件の比較レポート（第2版）.md');
+    expect(artifactFile.artifactFileName('a/b: c?', 'csv')).toBe('a b c.csv');
+    expect(artifactFile.artifactFileName('   ', 'json')).toBe('output.json');
+    expect(artifactFile.artifactFileName('x', 'unknown')).toBe('x.md');
+  });
+});
+
+describe('verifier', () => {
+  it('reads a verdict, and nothing it cannot read', () => {
+    expect(verify.readVerdict('{"pass":false,"gaps":["a","",3,"b"]}')).toEqual({ pass: false, gaps: ['a', 'b'] });
+    expect(verify.readVerdict('{"gaps":[]}')).toBeNull();
+    expect(verify.readVerdict('not json')).toBeNull();
+  });
+
+  it('puts the task, the success conditions, the report and the outputs in front of the verifier', () => {
+    const p = verify.verifyPrompt({
+      element: { title: '物件を集める', description: '10 件以上' }, intents: ['成功条件: 候補を複数挙げる'],
+      finish: { outcome: 'completed', summary: '12 件集めた', message: '一覧を保存' },
+      artifacts: [{ title: '候補一覧', content: '| 物件 | URL |' }], usedWeb: true,
+    });
+    for (const t of ['物件を集める', '10 件以上', '候補を複数挙げる', '12 件集めた', '候補一覧', 'Web で調べている']) expect(p).toContain(t);
+  });
+});
+
 describe('agent tools', () => {
+  it('gives the web tools by model and logs each server-tool call', () => {
+    expect(tools.webTools('claude-sonnet-5-5').map((t: { type: string }) => t.type)).toEqual(['web_search_20260209', 'web_fetch_20260209']);
+    expect(tools.webSteps([{ type: 'server_tool_use', name: 'code_execution', input: {} }])).toEqual(['検索結果を絞り込み']);
+    expect(tools.webTools('claude-haiku-5-5').map((t: { type: string }) => t.type)).toEqual(['web_search_20250305']);
+    expect(tools.webSteps([
+      { type: 'text', text: 'x' },
+      { type: 'server_tool_use', name: 'web_search', input: { query: '古民家 東京' } },
+      { type: 'server_tool_use', name: 'web_fetch', input: { url: 'https://example.com' } },
+    ])).toEqual(['Web 検索: 古民家 東京', 'Web ページ: https://example.com']);
+  });
+
   it('offers reads and everyday writes on the board, never deletes or bulk writes', () => {
     const names = tools.baseAgentTools().map((t: { name: string }) => t.name);
     expect(names).toEqual(expect.arrayContaining(['finish', 'save_artifact', 'getElement', 'createElement', 'getInitiative']));
@@ -248,7 +404,8 @@ describe('pricing and prompts', () => {
     // 1M input on Sonnet 5.5 = $2; 1M output = $10; cache write 1.25x; read 0.1x.
     expect(pricing.costOf('claude-sonnet-5-5', { input_tokens: 1_000_000 })).toBe(2);
     expect(pricing.costOf('claude-sonnet-5-5', { output_tokens: 100_000 })).toBe(1);
-    expect(pricing.costOf('claude-haiku-4-5', { cache_creation_input_tokens: 1_000_000, cache_read_input_tokens: 1_000_000 })).toBe(1.35);
+    expect(pricing.costOf('claude-haiku-5-5', { cache_creation_input_tokens: 1_000_000, cache_read_input_tokens: 1_000_000 })).toBe(0.135);
+    expect(pricing.costOf('claude-sonnet-5-5', { server_tool_use: { web_search_requests: 3 } })).toBe(0.03);
     expect(pricing.costOf('claude-opus-5-5', { cache_read_input_tokens: 1_000_000 })).toBe(0.2);
     expect(pricing.costAt({ input: 0.3, output: 1.2, cacheRead: 0.3 }, { input_tokens: 1_000_000, output_tokens: 500_000 })).toBe(0.9);
     expect(pricing.isAgentModel('claude-opus-5-5')).toBe(true);
@@ -258,11 +415,24 @@ describe('pricing and prompts', () => {
   it('frames a reply around the comment and treats outside text as data', () => {
     const base = {
       mode: 'reply', prompt: '税込にして', element: { id: 'e', display_id: 'ELE_X-1', title: '経費処理', description: null, status: 'todo', priority: 'high', due_date: null, labels: [] },
-      objectName: null, subElements: [], initiatives: [], comments: [], previousRuns: [], artifacts: [], integrations: [], today: '2026-10-03',
+      objectName: null, subElements: [], initiatives: [], comments: [], previousRuns: [], artifacts: [], upstream: [], integrations: [], today: '2026-10-03',
     };
     const msg = ctx.taskMessage(base);
     expect(msg).toContain('税込にして');
     expect(msg).toContain('経費処理');
     expect(ctx.systemPrompt({ name: 'Claude', instructions: null })).toContain('データ');
+  });
+
+  it('hands over what the earlier Elements left: the person\'s words, the report and the outputs', () => {
+    const msg = ctx.taskMessage({
+      mode: 'execute', prompt: null, element: { id: 'e', display_id: 'ELE_B-1', title: '予算を試算する', description: null, status: 'todo', priority: null, due_date: null, labels: [] },
+      objectName: null, subElements: [], initiatives: [], comments: [], previousRuns: [], artifacts: [], integrations: [], today: '2026-11-04',
+      upstream: [{ display_id: 'ELE_A-1', title: '条件を確認する', status: 'done', report: '条件メモを作成', artifacts: [{ title: '条件メモ v1', content: 'エリア: 三鷹〜立川' }], comments: [{ author: 'TAKANORi', content: '賃貸がいいな' }] }],
+    });
+    expect(msg).toContain('ELE_A-1 条件を確認する（done）');
+    expect(msg).toContain('賃貸がいいな');
+    expect(msg).toContain('条件メモを作成');
+    expect(msg).toContain('成果物「条件メモ v1」');
+    expect(msg).toContain('エリア: 三鷹〜立川');
   });
 });

@@ -385,6 +385,8 @@ export interface PlanTask {
   object: string | null;
   dependsOn: string[];
   assignee: 'ai' | 'human';
+  /** The Space's definition the task follows, when the Planner found one that fits. */
+  definitionId?: string | null;
 }
 
 export interface PlanDraft { summary: string; objectives: PlanObjective[]; objects: PlanObject[]; tasks: PlanTask[] }
@@ -398,7 +400,7 @@ const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slic
 export function normalizePlan(
   raw: unknown,
   measureIds: ReadonlySet<string>,
-  known: { objects?: ReadonlyMap<string, string>; domainIds?: ReadonlySet<string> } = {},
+  known: { objects?: ReadonlyMap<string, string>; domainIds?: ReadonlySet<string>; definitionIds?: ReadonlySet<string> } = {},
 ): PlanDraft {
   const r = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
   const objectives: PlanObjective[] = [];
@@ -447,6 +449,7 @@ export function normalizePlan(
     tasks.push({
       key, title, description: text(x.description, 4000), objective, object, dependsOn,
       assignee: x.assignee === 'human' ? 'human' : 'ai',
+      definitionId: typeof x.definitionId === 'string' && known.definitionIds?.has(x.definitionId) ? x.definitionId : null,
     });
     if (tasks.length >= 30) break;
   }
@@ -460,6 +463,84 @@ export function normalizePlan(
   // An Object no task went into adds nothing.
   const used = new Set(tasks.map((t) => t.object));
   return { summary: text(r.summary, 1000), objectives, objects: objects.filter((o) => used.has(o.key)), tasks };
+}
+
+// ── Your turn ────────────────────────────────────────────────────────────────
+
+/** What a person is asked to do for the mission, most pressing first:
+ *  approve an AI's external write, answer an AI that stopped for them, review
+ *  an AI's result, or do their own Element. */
+export type YourTurnKind = 'approve' | 'answer' | 'review' | 'do';
+
+export interface YourTurn {
+  elementId: string;
+  title: string;
+  kind: YourTurnKind;
+  /** What the AI said (its summary, or the write it waits on). */
+  detail: string | null;
+}
+
+const TURN_ORDER: Record<YourTurnKind, number> = { approve: 0, answer: 1, review: 2, do: 3 };
+
+/** Pure. Everything in the mission that waits on a person, in one list. A
+ *  person's Element counts only once nothing it waits on is open. */
+export function yourTurn(input: {
+  fleet: readonly FleetObject[];
+  elements: readonly MissionElementRow[];
+  runs: readonly MissionRunRow[];
+  actions: readonly { element_id: string; summary: string; status: string }[];
+}): YourTurn[] {
+  const latest = latestRuns(input.runs);
+  const status = new Map(input.elements.map((e) => [e.id, e.status]));
+  const out: YourTurn[] = [];
+  for (const o of input.fleet) {
+    for (const e of o.elements) {
+      if (!e.elementId || e.draft) continue;
+      const run = latest.get(e.elementId);
+      const s = status.get(e.elementId);
+      if (s === 'done' || s === 'cancelled') continue;
+      if (run?.status === 'awaiting_approval') {
+        const action = input.actions.find((a) => a.element_id === e.elementId && a.status === 'pending');
+        out.push({ elementId: e.elementId, title: e.title, kind: 'approve', detail: action?.summary ?? run.summary });
+      } else if (e.assignee !== 'human' && s === 'blocked') {
+        out.push({ elementId: e.elementId, title: e.title, kind: 'answer', detail: run?.summary ?? run?.error ?? null });
+      } else if (s === 'review') {
+        out.push({ elementId: e.elementId, title: e.title, kind: 'review', detail: run?.summary ?? null });
+      } else if (e.assignee === 'human' && e.waitsOn.length === 0 && (e.state === 'todo' || e.state === 'running')) {
+        out.push({ elementId: e.elementId, title: e.title, kind: 'do', detail: null });
+      }
+    }
+  }
+  return out.sort((a, b) => TURN_ORDER[a.kind] - TURN_ORDER[b.kind]);
+}
+
+/** A question the Planner asks before it plans; `options` empty means free text. */
+export interface PlanQuestion { key: string; question: string; options: string[] }
+
+/** Pure. The Planner's questions as the screen may use them: keys unique,
+ *  at most five, each with at most five distinct options. */
+export function normalizeQuestions(raw: unknown): PlanQuestion[] {
+  const out: PlanQuestion[] = [];
+  const keys = new Set<string>();
+  for (const q of Array.isArray(raw) ? raw : []) {
+    const x = q && typeof q === 'object' ? q as Record<string, unknown> : {};
+    const key = text(x.key, 40) || `q${out.length + 1}`;
+    const question = text(x.question, 300);
+    if (!question || keys.has(key)) continue;
+    keys.add(key);
+    const options = [...new Set((Array.isArray(x.options) ? x.options : []).map((o) => text(o, 120)).filter(Boolean))].slice(0, 5);
+    out.push({ key, question, options });
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+
+/** Pure. The answered questions, in order, as the Planner and the Strategy's
+ *  assumptions take them. An unanswered question is left out. */
+export function answeredQuestions(questions: readonly PlanQuestion[], answers: Readonly<Record<string, string>>): { question: string; answer: string }[] {
+  return questions
+    .map((q) => ({ question: q.question, answer: (answers[q.key] ?? '').trim().slice(0, 1000) }))
+    .filter((x) => x.answer);
 }
 
 /** Pure. The draft's tasks that an AI may start as soon as they are written:

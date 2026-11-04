@@ -180,6 +180,36 @@ export async function startElementRun(elementId: string, domainId?: string | nul
   }
 }
 
+/** A person closed an Element (done or cancelled): under a Strategy set to go on by itself, the
+ *  engine starts the AI Elements it unblocks. Returns how many started; 0
+ *  when the Strategy waits for review, or on any failure. */
+export async function advanceFromElement(elementId: string): Promise<number> {
+  const { data, error } = await supabase.functions.invoke('run-agent', { body: { advance: elementId } });
+  if (error) return 0;
+  return Array.isArray((data as { started?: unknown })?.started) ? (data as { started: unknown[] }).started.length : 0;
+}
+
+/** Sends an Element back to its AI from outside its page (the Execution
+ *  tab's "your turn"): what to change, or the answer it stopped for. The
+ *  words are kept as the person's comment, the Element reopens, and the AI
+ *  works it again with them — a full run, so its result is verified and,
+ *  under a Strategy that goes on by itself, unblocks the next step. */
+export async function sendBackToAgent(elementId: string, text: string, authorName: string | null, domainId?: string | null): Promise<AgentStartOutcome> {
+  const content = text.trim();
+  if (!content) return 'failed';
+  try {
+    const userId = await getCurrentUserId();
+    const { error } = await supabase.from('element_comments')
+      .insert({ element_id: elementId, author_id: userId ?? null, author_kind: 'human', author_name: authorName, content });
+    if (error) throw error;
+    await supabase.from('elements').update({ status: 'todo' }).eq('id', elementId);
+    const { existing } = await startAgentRun({ elementId, domainId: domainId ?? null, mode: 'execute', prompt: content, triggeredFrom: 'board' });
+    return existing ? 'busy' : 'started';
+  } catch {
+    return 'failed';
+  }
+}
+
 async function cancelAgentRun(runId: string): Promise<void> {
   const { error } = await supabase
     .from('agent_runs')

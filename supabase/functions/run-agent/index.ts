@@ -14,6 +14,9 @@
 //                                               decide on a pending approval
 //   { runId, continue: true }                   internal: the next slice of a
 //                                               long run (self-invoked)
+//   { advance: elementId }                      a person finished an Element:
+//                                               start the AI Elements it unblocks
+//                                               (only under a Strategy set to 'auto')
 //   { ping: true }                              runtime check
 //
 // Every board / artifact / integration-listing call runs with the person's
@@ -36,9 +39,14 @@ import {
 import { isGoogleDriveRow } from "../_shared/googleOAuth.ts";
 import { fetchPull, pullUrlsIn, upsertCodeChange, withGithubToken } from "../_shared/github.ts";
 import { DRIVE_TOOLS, driveOperationLabel, runDriveTool } from "../_shared/googleDrive.ts";
-import { approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR } from "./agentTools.ts";
+import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR, webSteps, webTools } from "./agentTools.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
+import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
+import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
+import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
+import { checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
+import { isRunnerTool, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
 import {
   runLoop, appendDecisionResults, canonicalCalls,
   type LoopState, type ToolCall, type ToolKind, type ToolResult, type PendingApproval, type FinishPayload, type Msg,
@@ -58,6 +66,8 @@ const MAX_TOOLS = 120;
 const USER_MONTHLY_BUDGET_USD = 20;
 /** No single run may spend more than this, whatever the budget left. */
 const MAX_RUN_COST_USD = 5;
+/** A definition may raise a run's cap to its own budget, never past this. */
+const MAX_DEFINED_RUN_COST_USD = 50;
 /** A run that has written no step for this long is stuck; its starter may resume it. */
 const STALE_MS = 10 * 60_000;
 const SESSION_PAUSE = "セッションの期限が切れたため一時停止しました。Element を開くと続きから再開します。";
@@ -75,6 +85,8 @@ async function sha256(text: string): Promise<string> {
 type SavedPending = PendingApproval & { approved?: boolean; results?: ToolResult[] };
 type Transcript = {
   messages: Msg[]; turns: number; nudges: number;
+  /** Times the verifier sent a finish back. */
+  revisions?: number;
   /** Turns the run may take in all; grows when its starter resumes it. */
   turnBudget?: number;
   /** The tool definitions frozen at the first slice, so later slices send the same prefix. */
@@ -113,7 +125,7 @@ Deno.serve(async (req: Request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "server env not configured" }, 500);
 
-  let body: { runId?: string; ping?: boolean; resume?: boolean; continue?: boolean; token?: string; decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string } };
+  let body: { runId?: string; advance?: string; ping?: boolean; resume?: boolean; continue?: boolean; token?: string; decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string } };
   try { body = await req.json(); } catch { return json({ error: "invalid JSON body" }, 400); }
 
   if (body.ping) {
@@ -124,7 +136,7 @@ Deno.serve(async (req: Request) => {
   const jwt = authHeader.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
   if (!jwt || jwt === anonKey) return json({ error: "sign-in required" }, 401);
   const runId = body.runId;
-  if (!runId) return json({ error: "runId is required" }, 400);
+  if (!runId && !body.advance) return json({ error: "runId is required" }, 400);
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const userDb = createClient(supabaseUrl, anonKey, {
@@ -132,6 +144,19 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data: { user } } = await userDb.auth.getUser(jwt);
+
+  // A person closed an Element: under 'auto', what it unblocks starts, as
+  // that person — the same step an AI's finished run takes.
+  if (body.advance) {
+    if (!user) return json({ error: "session expired or invalid" }, 401);
+    const { data: el } = await userDb.from("elements").select("id, status").eq("id", body.advance).maybeSingle();
+    if (!el) return json({ error: "element not found" }, 404);
+    // Cancelled settles a prerequisite as much as done does.
+    if (!["done", "cancelled"].includes(el.status ?? "") || (await elementDelegation(userDb, el.id)) !== "auto") return json({ started: [] });
+    const started = await advanceFrom({ admin, userDb, user: { id: user.id, email: user.email ?? null }, jwt, supabaseUrl }, el.id);
+    return json({ started });
+  }
+  if (!runId) return json({ error: "runId is required" }, 400);
   if (!user) {
     // A slice whose session expired pauses the run — only with that slice's
     // own continuation token, so nobody else can pause someone's run.
@@ -227,9 +252,25 @@ function uniqueToolName(raw: string, taken: Map<string, unknown>): string {
   }
 }
 
+// Step numbers are read from the table once per invocation and counted here
+// after: the tools of a turn run at the same time, and each step used to cost
+// a read before its write.
+const stepBase = new Map<string, Promise<number>>();
+const stepNext = new Map<string, number>();
+
+async function nextStepIdx(admin: SupabaseClient, runId: string): Promise<number> {
+  if (!stepBase.has(runId)) {
+    stepBase.set(runId, Promise.resolve(admin.from("agent_run_steps").select("idx").eq("run_id", runId).order("idx", { ascending: false }).limit(1).maybeSingle())
+      .then(({ data }) => ((data as { idx?: number } | null)?.idx ?? -1) + 1));
+  }
+  const base = await stepBase.get(runId)!;
+  const idx = stepNext.get(runId) ?? base;
+  stepNext.set(runId, idx + 1);
+  return idx;
+}
+
 async function addStep(admin: SupabaseClient, runId: string, type: string, title: string, detail?: string | null) {
-  const { data: last } = await admin.from("agent_run_steps").select("idx").eq("run_id", runId).order("idx", { ascending: false }).limit(1).maybeSingle();
-  const idx = (last?.idx ?? -1) + 1;
+  const idx = await nextStepIdx(admin, runId);
   await admin.from("agent_run_steps").insert({ run_id: runId, idx, type, title: title.slice(0, 300), detail: detail ? String(detail).slice(0, 8000) : null });
   await admin.from("agent_runs").update({ step_count: idx + 1 }).eq("id", runId);
 }
@@ -241,6 +282,9 @@ interface ExecArgs {
 }
 
 async function execute(a: ExecArgs): Promise<void> {
+  // Another invocation may have written steps since this isolate last ran.
+  stepBase.delete(a.run.id);
+  stepNext.delete(a.run.id);
   const { run, admin, userDb, user } = a;
 
   // ── Agent profile ───────────────────────────────────────────────────────
@@ -282,7 +326,17 @@ async function execute(a: ExecArgs): Promise<void> {
     }
   }
   const config = resolveAgentConfig(worker, domain);
-  const { agentName, model, maxTotalTurns, instructions, domainInstructions } = config;
+  const { agentName, model, instructions, domainInstructions } = config;
+  // The definition the work follows: the Element's own, else its Strategy's.
+  const definition = await loadDefinition(userDb, run.element_id);
+  // A Strategy's definition is direction for all its Elements; the output
+  // shape and the loop are enforced only for an Element's own definition.
+  const parsedAll: ParsedDefinition | null = definition ? parseDefinition(definition.body) : null;
+  const parsed: ParsedDefinition | null = parsedAll && definition?.scope === "element" ? parsedAll : null;
+  // A loop runs for many rounds: it may take more turns, and spend up to the
+  // budget its definition names (never past a hard ceiling).
+  const maxTotalTurns = parsed?.metric ? Math.max(config.maxTotalTurns, 400) : config.maxTotalTurns;
+  const runCap = parsed?.stop.budgetUsd ? Math.min(Math.max(parsed.stop.budgetUsd, MAX_RUN_COST_USD), MAX_DEFINED_RUN_COST_USD) : MAX_RUN_COST_USD;
   const refuse = async (reason: string) => {
     await admin.from("element_comments").insert({
       element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
@@ -404,11 +458,22 @@ async function execute(a: ExecArgs): Promise<void> {
   // The tool list is frozen at the first slice: later slices send the same
   // definitions (thinking blocks are bound to that prefix). A tool whose
   // integration went away since answers with an error instead.
-  const liveTools: ToolDef[] = [...baseAgentTools(), ...integrationDefs];
+  // The browser on the person's own computer, when they run one and it is on.
+  const { data: runnerRows } = run.activity_space_id && run.triggered_by
+    ? await admin.from("assets").select("id, name, manifest, last_seen_at")
+      .eq("activity_space_id", run.activity_space_id).eq("status", "active").eq("claimed_by", run.triggered_by)
+      .order("last_seen_at", { ascending: false }).limit(10)
+    : { data: [] };
+  const runner = pickRunner((runnerRows ?? []) as RunnerRow[], Date.now());
+  if (runner) integrationSummary.push({ name: `この人の PC のブラウザ（${runner.name}）`, kind: "PC", delegation: "read_only", tools: RUNNER_TOOLS.length });
+
+  const liveTools: ToolDef[] = [...baseAgentTools(), ...(parsed?.metric ? [ROUND_TOOL] : []), ...(runner ? RUNNER_TOOLS : []), ...integrationDefs];
   const tools: ToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : liveTools;
   const kindOf = (name: string): ToolKind => {
     const base = baseKindOf(name);
     if (base) return base;
+    // The runner only reads unless its owner started it to write.
+    if (isRunnerTool(name)) return "read";
     return "write"; // decided per call below
   };
   const isRead = (call: ToolCall): boolean => {
@@ -459,6 +524,28 @@ async function execute(a: ExecArgs): Promise<void> {
     }
   };
 
+  // A call to the person's PC: queued for its runner, answered within a
+  // minute or given up (the runner may have gone offline since).
+  const callRunner = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
+    if (!runner) return { content: "この人の PC のブラウザは今つながっていません。Web 検索で進めるか、つながっていないことを報告してください。", is_error: true };
+    await addStep(admin, run.id, "action", runnerStep(call.name, call.input));
+    const { data: queued, error } = await admin.from("asset_calls")
+      .insert({ asset_id: runner.id, run_id: run.id, tool: runnerOperation(call.name), input: call.input }).select("id").single();
+    if (error || !queued) return { content: `PC に依頼できませんでした: ${error?.message ?? "unknown"}`, is_error: true };
+    // A page takes seconds; the slice's soft deadline may be near, but an
+    // answer thrown away costs the runner's work, so wait it out (within the
+    // platform's wall clock, which the slice deadline leaves room under).
+    const until = Date.now() + 45_000;
+    while (Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 700));
+      const { data: c } = await admin.from("asset_calls").select("status, result, error").eq("id", queued.id).maybeSingle();
+      if (c?.status === "done") return { content: runnerResultText(c.result) };
+      if (c?.status === "failed") return { content: `PC のブラウザで失敗しました: ${c.error ?? ""}`, is_error: true };
+    }
+    await admin.from("asset_calls").update({ status: "expired", finished_at: new Date().toISOString() }).eq("id", queued.id).in("status", ["pending", "claimed"]);
+    return { content: "PC のブラウザから時間内に答えがありませんでした（PC が眠っているか、実行役が止まっている可能性）。", is_error: true };
+  };
+
   const executeCall = async (call: ToolCall): Promise<{ content: string; is_error?: boolean; finish?: FinishPayload }> => {
     const input = call.input;
     switch (call.name) {
@@ -482,14 +569,50 @@ async function execute(a: ExecArgs): Promise<void> {
         const title = String(input.title ?? "").trim().slice(0, 200);
         const content = String(input.content ?? "");
         if (!title) return { content: "title が必要です。", is_error: true };
-        const format = ["markdown", "text", "csv", "json"].includes(String(input.format)) ? String(input.format) : "markdown";
+        const format = ["markdown", "html", "text", "csv", "json"].includes(String(input.format)) ? String(input.format) : "markdown";
+        // The definition's output shape is checked before anything is saved.
+        if (parsed?.output) {
+          const problems = checkOutput(parsed.output, content, format);
+          if (problems.length) {
+            await addStep(admin, run.id, "thought", "成果物の型から外れているため差し戻し", problems.join("\n"));
+            return { content: `成果物の型に合っていないため保存しませんでした。直してから保存し直してください。\n${problems.map((p) => `- ${p}`).join("\n")}`, is_error: true };
+          }
+        }
         const { data: existing } = await userDb.from("agent_artifacts").select("id").eq("element_id", run.element_id).eq("title", title).maybeSingle();
         const res = existing
           ? await userDb.from("agent_artifacts").update({ content, format, run_id: run.id, updated_at: new Date().toISOString() }).eq("id", existing.id).select("id").single()
           : await userDb.from("agent_artifacts").insert({ element_id: run.element_id, run_id: run.id, title, content, format, author_name: agentName }).select("id").single();
         if (res.error) return { content: res.error.message, is_error: true };
-        await addStep(admin, run.id, "artifact", `成果物を保存: ${title}`, `${content.length} 文字`);
-        return { content: `成果物「${title}」を保存しました。` };
+        // Also a file in the Space's Artifacts, on this Element. The output
+        // above is saved either way; a file that could not be written says so.
+        const file = await saveArtifactFile(userDb, run.element_id, title, content, format);
+        const fileNote = "error" in file ? `（Artifacts への保存に失敗: ${file.error}）` : `、Artifacts に ${artifactFileName(title, format)}`;
+        await addStep(admin, run.id, "artifact", `成果物を保存: ${title}`, `${content.length} 文字${fileNote}`);
+        return { content: `成果物「${title}」を保存しました${"error" in file ? "" : `（Artifacts のファイル ${artifactFileName(title, format)}）`}。` };
+      }
+      case "record_round": {
+        if (!parsed?.metric) return { content: "この Element の定義には指標がありません。", is_error: true };
+        const { count } = await admin.from("run_iterations").select("id", { count: "exact", head: true }).eq("run_id", run.id);
+        const n = (count ?? 0) + 1;
+        const value = typeof input.value === "number" && Number.isFinite(input.value) ? input.value : null;
+        await admin.from("run_iterations").insert({
+          run_id: run.id, element_id: run.element_id, n, value,
+          change: String(input.change ?? "").slice(0, 2000), kept: input.kept === true, note: input.note ? String(input.note).slice(0, 2000) : null,
+        });
+        await addStep(admin, run.id, "thought", `${n} 周目: ${parsed.metric.name} ${value ?? "—"}（${input.kept === true ? "残す" : "戻す"}）`, String(input.change ?? ""));
+        const { data: rounds } = await admin.from("run_iterations").select("value").eq("run_id", run.id).order("n");
+        const values = ((rounds ?? []) as { value: number | null }[]);
+        const best = values.map((r) => r.value).filter((v): v is number => v != null);
+        const bestText = best.length ? `最良 ${parsed.metric.direction === "max" ? Math.max(...best) : Math.min(...best)}` : "まだ値なし";
+        const stop = loopStop(parsed, values, usage.cost);
+        if (stop) {
+          await addStep(admin, run.id, "status", `止める条件: ${stop}`);
+          return { content: `${n} 周目を記録しました（${bestText}）。止める条件を満たしました: ${stop}\n定義の「止める条件」に最終確認があればそれを済ませ、最良の状態に戻っていることを確かめてから finish を呼んでください。` };
+        }
+        const checks = checksDue(parsed, n)
+          ? `\n点検の周です。次の項目に照らして直近の作業を見直し、log_progress に結果を残してから続けてください:\n${parsed.checks.items.map((c) => `- ${c}`).join("\n")}`
+          : "";
+        return { content: `${n} 周目を記録しました（${bestText}）。続けてください。${checks}` };
       }
       case "finish": {
         const outcome = ["completed", "partial", "blocked"].includes(String(input.outcome)) ? String(input.outcome) as FinishPayload["outcome"] : "completed";
@@ -497,6 +620,7 @@ async function execute(a: ExecArgs): Promise<void> {
         return { content: "完了報告を受け取りました。", finish };
       }
     }
+    if (isRunnerTool(call.name)) return await callRunner(call);
     if (baseKindOf(call.name) === "board") {
       const r = isStrategyTool(call.name) ? await runStrategyTool(userDb, call.name, input) : await runBoardTool(userDb, call.name, input, actor);
       await addStep(admin, run.id, "action", `Alcon: ${call.name}`, r.ok ? null : r.error);
@@ -517,19 +641,25 @@ async function execute(a: ExecArgs): Promise<void> {
   let turnBudget: number;
   let pending: SavedPending | undefined = run.transcript?.pending;
   if (run.transcript?.messages?.length) {
-    state = { messages: run.transcript.messages, turns: run.transcript.turns ?? 0, nudges: run.transcript.nudges ?? 0 };
+    state = { messages: run.transcript.messages, turns: run.transcript.turns ?? 0, nudges: run.transcript.nudges ?? 0, revisions: run.transcript.revisions ?? 0 };
     turnBudget = run.transcript.turnBudget ?? maxTotalTurns;
     // Resuming grants a fresh allowance on top of the turns already taken.
     if (a.body.resume) turnBudget = state.turns + maxTotalTurns;
   } else {
-    state = { messages: [{ role: "user", content: taskMessage(await loadContext(userDb, run, integrationSummary)) }], turns: 0, nudges: 0 };
+    const task = taskMessage(await loadContext(userDb, run, integrationSummary));
+    const defText = definition && parsedAll
+      ? definition.scope === "element"
+        ? definitionPrompt(definition.name, definition.body, parsedAll)
+        : `# Strategy の定義「${definition.name}」（この Strategy 全体の方針。依頼した人が定めたもので、従う。成果物の型とループはこの Element には課されない）\n${definition.body.slice(0, 40_000)}`
+      : null;
+    state = { messages: [{ role: "user", content: defText ? `${task}\n\n${defText}` : task }], turns: 0, nudges: 0 };
     turnBudget = maxTotalTurns;
     await addStep(admin, run.id, "status", run.mode === "reply" ? "依頼を受けて実行を開始" : "任務の実行を開始", `${agentName} / ${config.modelLabel}`);
   }
 
   const saveTranscript = async (p?: SavedPending) => {
     const transcript: Transcript = {
-      messages: state.messages, turns: state.turns, nudges: state.nudges, turnBudget, tools,
+      messages: state.messages, turns: state.turns, nudges: state.nudges, revisions: state.revisions ?? 0, turnBudget, tools,
       ...(p ? { pending: p } : {}),
     };
     // jsonb refuses NUL; tool output can carry it.
@@ -633,6 +763,57 @@ async function execute(a: ExecArgs): Promise<void> {
     ...(i === tools.length - 1 ? cache : {}),
   }));
 
+  const recordUsage = async (u: ModelUsage) => {
+    usage = {
+      input: usage.input + (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
+      output: usage.output + (u.output_tokens ?? 0),
+      cost: Math.round((usage.cost + costAt(config.price, u)) * 1_000_000) / 1_000_000,
+    };
+    await admin.from("agent_runs").update({ input_tokens: usage.input, output_tokens: usage.output, cost_usd: usage.cost }).eq("id", run.id);
+  };
+
+  // The verifier reads the task, the Strategy's success conditions and this
+  // run's outputs fresh, in its own context, on the run's model at low effort.
+  // Any failure to answer lets the finish stand rather than trap the run.
+  const verifyFinish = async (finish: FinishPayload) => {
+    try {
+      const [{ data: el }, { data: arts }] = await Promise.all([
+        userDb.from("elements").select("title, description, object_id").eq("id", run.element_id).maybeSingle(),
+        admin.from("agent_artifacts").select("title, content").eq("run_id", run.id),
+      ]);
+      if (!el) return null;
+      const intents: string[] = [];
+      if (el.object_id) {
+        const { data: links } = await userDb.from("strategy_objects").select("strategy_id").eq("object_id", el.object_id).limit(2);
+        for (const l of (links ?? []) as { strategy_id: string }[]) {
+          const r = await runStrategyTool(userDb, "getInitiative", { id: l.strategy_id });
+          if (!r.ok) continue;
+          const d = r.data as { name: string; description: string | null; intents?: { kind: string | null; title: string }[] };
+          intents.push(`${d.name}${d.description ? `：${d.description}` : ""}`);
+          for (const i of d.intents ?? []) if (i.kind === "measure") intents.push(`成功条件: ${i.title}`);
+        }
+      }
+      const usedWeb = state.messages.some((m) => Array.isArray(m.content) && m.content.some((b) => b.type === "server_tool_use"));
+      // deno-lint-ignore no-explicit-any
+      const res: any = await modelClient.messages.create({
+        model,
+        max_tokens: 4000,
+        system: VERIFY_SYSTEM,
+        messages: [{ role: "user", content: verifyPrompt({ element: el, intents, finish, artifacts: (arts ?? []) as { title: string; content: string }[], usedWeb, definition: definition?.body ?? null }) }],
+        output_config: { effort: "low", format: { type: "json_schema", schema: VERDICT_SCHEMA } },
+      // deno-lint-ignore no-explicit-any
+      } as any);
+      await recordUsage(res.usage ?? {});
+      const text = (res.content ?? []).find((b: { type: string }) => b.type === "text")?.text ?? "";
+      const verdict = readVerdict(text);
+      if (verdict) await addStep(admin, run.id, "thought", verdict.pass ? "検証: 合格" : `検証: 不足 ${verdict.gaps.length} 点`, verdict.gaps.join("\n") || null);
+      return verdict;
+    } catch (e) {
+      console.error("run-agent: verify failed", errorMessage(e));
+      return null;
+    }
+  };
+
   const outcome = await runLoop(state, {
     callModel: async (messages) => {
       if (external) {
@@ -654,13 +835,27 @@ async function execute(a: ExecArgs): Promise<void> {
         max_tokens: 16000,
         system,
         // deno-lint-ignore no-explicit-any
-        tools: toolParams as any,
+        // The web tools go first so the cache mark stays on the last of ours.
+        // deno-lint-ignore no-explicit-any
+        tools: [...webTools(model), ...toolParams] as any,
         // deno-lint-ignore no-explicit-any
         messages: messages as any,
+        // Medium thinking: these are working steps, not hard reasoning, and
+        // the default (high on Sonnet) made every turn slow.
+        output_config: { effort: "medium" },
         betas: ["context-management-2025-06-27"],
-        context_management: { edits: [{ type: "clear_tool_uses_20250919" }] },
+        // Old board results may be cleared to save room, never the web's:
+        // with them cleared the agent searched and fetched the same pages
+        // again until it ran out of uses.
+        context_management: { edits: [{
+          type: "clear_tool_uses_20250919",
+          trigger: { type: "input_tokens", value: 150_000 },
+          keep: { type: "tool_uses", value: 6 },
+          exclude_tools: ["web_search", "web_fetch"],
+        }] },
       // deno-lint-ignore no-explicit-any
       } as any);
+      for (const line of webSteps(res.content ?? [])) await addStep(admin, run.id, "action", line);
       return { content: res.content, stop_reason: res.stop_reason, usage: res.usage };
     },
     kindOf,
@@ -671,16 +866,10 @@ async function execute(a: ExecArgs): Promise<void> {
       return !it || it.integration.delegation !== "full_delegation";
     },
     execute: (call) => executeCall(call),
-    onUsage: async (u: ModelUsage) => {
-      usage = {
-        input: usage.input + (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
-        output: usage.output + (u.output_tokens ?? 0),
-        cost: Math.round((usage.cost + costAt(config.price, u)) * 1_000_000) / 1_000_000,
-      };
-      await admin.from("agent_runs").update({ input_tokens: usage.input, output_tokens: usage.output, cost_usd: usage.cost }).eq("id", run.id);
-    },
+    onUsage: recordUsage,
+    verify: run.mode === "reply" || external ? undefined : verifyFinish,
     afterTurn: () => saveTranscript(),
-    budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= MAX_RUN_COST_USD,
+    budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= runCap,
     cancelled: async () => {
       const { data } = await admin.from("agent_runs").select("status").eq("id", run.id).maybeSingle();
       return data?.status === "cancelled";
@@ -736,8 +925,8 @@ async function execute(a: ExecArgs): Promise<void> {
 
     case "budget": {
       await saveTranscript();
-      const why = usage.cost >= MAX_RUN_COST_USD
-        ? `1 回の実行の上限（$${MAX_RUN_COST_USD}）に達したため一時停止しました。`
+      const why = usage.cost >= runCap
+        ? `1 回の実行の上限（$${runCap}）に達したため一時停止しました。`
         : run.activity_space_id ? "この Space の今月の AI 予算の上限に達したため一時停止しました。" : "今月の AI 予算（個人）の上限に達したため一時停止しました。";
       await admin.from("agent_runs").update({ status: "paused", error: why }).eq("id", run.id).eq("status", "running");
       await addStep(admin, run.id, "error", "予算の上限に達しました", why);
@@ -762,20 +951,27 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
   const { data: live } = await admin.from("agent_runs").select("status").eq("id", run.id).maybeSingle();
   if (live?.status !== "running") return;
 
+  // Under a Strategy that lets its AI work go on ('auto'), work that passed
+  // the verifier is done and unblocks the next; otherwise it waits for review.
+  const auto = run.mode !== "reply" && status !== "paused" && finish.outcome === "completed"
+    && (await elementDelegation(userDb, run.element_id)) === "auto";
+
   // In execute mode the Element moves on first — done work waits for a
-  // person's review, blocked work says so — so that when the run reads as
-  // finished, the Element already shows where it went. A reply leaves the
-  // status alone.
+  // person's review (or is done, under 'auto'), blocked work says so — so
+  // that when the run reads as finished, the Element already shows where it
+  // went. A reply leaves the status alone.
   if (run.mode !== "reply" && status !== "paused") {
     const { data: el } = await userDb.from("elements").select("status").eq("id", run.element_id).maybeSingle();
-    const next = finish.outcome === "completed" ? "review" : finish.outcome === "blocked" ? "blocked" : null;
+    // Part done is a person's call — accept it, or send it back — so it lands
+    // in review rather than staying "to do" where nobody would see it.
+    const next = finish.outcome === "completed" ? (auto ? "done" : "review") : finish.outcome === "blocked" ? "blocked" : "review";
     if (el && next && !["done", "cancelled"].includes(el.status ?? "") && el.status !== next) {
       await runBoardTool(userDb, "updateElement", { id: run.element_id, status: next }, { agent: `${agentName}（AI）`, userId: user.id });
-      await addStep(admin, run.id, "status", next === "review" ? "Element をレビュー待ちに移動" : "Element をブロック中に移動");
+      await addStep(admin, run.id, "status", next === "review" ? "Element をレビュー待ちに移動" : next === "done" ? "Element を完了に移動（自動で進める設定）" : "Element をブロック中に移動");
     }
   }
 
-  const runStatus = status ?? (finish.outcome === "completed" && run.mode !== "reply" ? "awaiting_review" : "completed");
+  const runStatus = status ?? (finish.outcome === "completed" && run.mode !== "reply" && !auto ? "awaiting_review" : "completed");
   const { data: closed } = await admin.from("agent_runs").update({
     status: runStatus, summary: finish.summary, result: finish.message, finished_at: status ? null : new Date().toISOString(),
     error: status === "paused" ? finish.summary : null, continuation_token: null,
@@ -804,20 +1000,144 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
       title: `${agentName}: ${label}`, body: finish.summary,
     }).then(() => {}, () => {});
   }
+
+  if (auto) {
+    try {
+      const started = await advanceFrom(a, run.element_id);
+      if (started.length) await addStep(admin, run.id, "status", `次の作業を ${started.length} 件開始しました`);
+    } catch (e) {
+      console.error("run-agent: advance failed", errorMessage(e));
+    }
+  }
+}
+
+/** The definition an Element follows: its own, else the first of its Strategies'. */
+async function loadDefinition(userDb: SupabaseClient, elementId: string): Promise<{ name: string; body: string; scope: "element" | "strategy" } | null> {
+  const { data: el } = await userDb.from("elements").select("definition_id, object_id").eq("id", elementId).maybeSingle();
+  let id = (el as { definition_id?: string | null } | null)?.definition_id ?? null;
+  const scope: "element" | "strategy" = id ? "element" : "strategy";
+  if (!id && el?.object_id) {
+    const { data: links } = await userDb.from("strategy_objects").select("strategy_id").eq("object_id", el.object_id);
+    const ids = ((links ?? []) as { strategy_id: string }[]).map((l) => l.strategy_id);
+    if (ids.length) {
+      const { data: s } = await userDb.from("strategies").select("definition_id").in("id", ids).not("definition_id", "is", null).limit(1);
+      id = ((s ?? []) as { definition_id: string }[])[0]?.definition_id ?? null;
+    }
+  }
+  if (!id) return null;
+  const { data: d } = await userDb.from("definitions").select("name, body").eq("id", id).maybeSingle();
+  return d ? { ...(d as { name: string; body: string }), scope } : null;
+}
+
+/** The delegation of the Strategies an Element's Object serves. */
+async function elementDelegation(userDb: SupabaseClient, elementId: string): Promise<"manual" | "auto"> {
+  const { data: el } = await userDb.from("elements").select("object_id").eq("id", elementId).maybeSingle();
+  if (!el?.object_id) return "manual";
+  const { data: links } = await userDb.from("strategy_objects").select("strategy_id").eq("object_id", el.object_id);
+  const ids = ((links ?? []) as { strategy_id: string }[]).map((l) => l.strategy_id);
+  if (ids.length === 0) return "manual";
+  const { data: strategies } = await userDb.from("strategies").select("delegation").in("id", ids);
+  return delegationOf((strategies ?? []) as { delegation: string | null }[]);
+}
+
+const OPEN_RUN = ["queued", "running", "awaiting_approval", "paused"];
+
+/**
+ * Starts the AI Elements that `doneId` unblocks, as the same person, each as
+ * its own run. Everything is read with that person's JWT, so the chain only
+ * reaches what they could start by hand. A JWT that has expired meanwhile
+ * fails the start; the Elements stay ready on the Execution tab.
+ */
+async function advanceFrom(a: Pick<ExecArgs, "admin" | "userDb" | "user" | "jwt" | "supabaseUrl">, doneId: string): Promise<string[]> {
+  const { admin, userDb, user } = a;
+  const { data: out } = await userDb.from("element_edges").select("from_element, to_element").eq("from_element", doneId).eq("edge_type", "depends_on");
+  const downIds = [...new Set(((out ?? []) as { to_element: string }[]).map((e) => e.to_element))];
+  if (downIds.length === 0) return [];
+  const [{ data: inEdges }, { data: els }, { data: assignees }, { data: open }] = await Promise.all([
+    userDb.from("element_edges").select("from_element, to_element").in("to_element", downIds).eq("edge_type", "depends_on"),
+    userDb.from("elements").select("id, status, object_id, objects(domain_id)").in("id", downIds),
+    userDb.from("element_assignees").select("element_id, role, workers(type, ai_config)").in("element_id", downIds),
+    admin.from("agent_runs").select("element_id").in("element_id", downIds).in("status", OPEN_RUN),
+  ]);
+  const edges = (inEdges ?? []) as { from_element: string; to_element: string }[];
+  const prereqIds = [...new Set(edges.map((e) => e.from_element))];
+  const { data: prereqs } = prereqIds.length ? await userDb.from("elements").select("id, status").in("id", prereqIds) : { data: [] };
+  const statusOf = new Map(((prereqs ?? []) as { id: string; status: string | null }[]).map((p) => [p.id, p.status]));
+  type AssigneeRow = { element_id: string; role: string | null; workers: { type: string; ai_config: unknown } | null };
+  const isAi = (id: string) => ((assignees ?? []) as unknown as AssigneeRow[]).some((r) => r.element_id === id && r.role !== "reviewer"
+    && r.workers?.type === "ai_agent"
+    && !(r.workers.ai_config && typeof r.workers.ai_config === "object" && (r.workers.ai_config as Record<string, unknown>).runner === "claude-code"));
+  const busy = new Set(((open ?? []) as { element_id: string }[]).map((r) => r.element_id));
+  type ElementRow = { id: string; status: string | null; objects: { domain_id: string | null } | null };
+  const rows = (els ?? []) as unknown as ElementRow[];
+  const candidates: AdvanceCandidate[] = rows.map((e) => ({ id: e.id, status: e.status, ai: isAi(e.id), openRun: busy.has(e.id) }));
+  const ready = readyDownstream({ doneId, edges: [...((out ?? []) as { from_element: string; to_element: string }[]), ...edges], candidates, statusOf });
+
+  const started: string[] = [];
+  for (const id of ready) {
+    const domainId = rows.find((e) => e.id === id)?.objects?.domain_id ?? null;
+    const { data: next, error } = await userDb.from("agent_runs").insert({
+      element_id: id, domain_id: domainId, triggered_from: "board", triggered_by: user.id, status: "queued", mode: "execute",
+    }).select("id").single();
+    if (error || !next) continue; // another start won the race
+    const res = await fetch(`${a.supabaseUrl}/functions/v1/run-agent`, {
+      method: "POST",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${a.jwt}` },
+      body: JSON.stringify({ runId: next.id }),
+    }).catch(() => null);
+    if (res && res.ok) started.push(id);
+    else await admin.from("agent_runs").update({ status: "cancelled", finished_at: new Date().toISOString() }).eq("id", next.id).eq("status", "queued");
+  }
+  return started;
+}
+
+/** What the Elements this one waits on left behind: their latest report, their
+ *  outputs and what people said on them — the hand-off from the earlier step.
+ *  Read with the starter's JWT; capped so a long chain cannot flood the prompt. */
+async function loadUpstream(userDb: SupabaseClient, ids: string[]): Promise<TaskContext["upstream"]> {
+  if (ids.length === 0) return [];
+  const [els, runs, arts, comments] = await Promise.all([
+    userDb.from("elements").select("id, display_id, title, status").in("id", ids),
+    userDb.from("agent_runs").select("element_id, result, created_at").in("element_id", ids).not("result", "is", null).order("created_at", { ascending: false }),
+    userDb.from("agent_artifacts").select("element_id, title, content, updated_at").in("element_id", ids).order("updated_at", { ascending: false }),
+    userDb.from("element_comments").select("element_id, author_name, author_kind, content, created_at").in("element_id", ids).eq("author_kind", "human").order("created_at", { ascending: false }).limit(30),
+  ]);
+  let room = 24_000;
+  const take = (text: string, max: number) => {
+    const t = text.slice(0, Math.min(max, Math.max(0, room)));
+    room -= t.length;
+    return t.length < text.length ? `${t}…（以下略）` : t;
+  };
+  return ((els.data ?? []) as { id: string; display_id: string | null; title: string; status: string | null }[]).map((e) => {
+    const report = ((runs.data ?? []) as { element_id: string; result: unknown }[]).find((r) => r.element_id === e.id)?.result;
+    const reportText = typeof report === "string" ? report : report ? JSON.stringify(report) : "";
+    return {
+      display_id: e.display_id, title: e.title, status: e.status,
+      report: reportText ? take(reportText, 3_000) : null,
+      artifacts: ((arts.data ?? []) as { element_id: string; title: string; content: string | null }[])
+        .filter((a) => a.element_id === e.id).slice(0, 2)
+        .map((a) => ({ title: a.title, content: take(a.content ?? "", 8_000) })),
+      comments: ((comments.data ?? []) as { element_id: string; author_name: string | null; content: string | null }[])
+        .filter((c) => c.element_id === e.id).slice(0, 3).reverse()
+        .map((c) => ({ author: c.author_name ?? "不明", content: take(c.content ?? "", 1_200) })),
+    };
+  });
 }
 
 async function loadContext(userDb: SupabaseClient, run: Run, integrations: TaskContext["integrations"]): Promise<TaskContext> {
   const { data: el } = await userDb.from("elements")
     .select("id, display_id, title, description, status, priority, due_date, labels, object_id").eq("id", run.element_id).single();
   if (!el) throw new Error("対象の Element が見つかりません。");
-  const [subs, comments, runs, artifacts, obj, links] = await Promise.all([
+  const [subs, comments, runs, artifacts, obj, links, edges] = await Promise.all([
     userDb.from("elements").select("id, title, status").eq("parent_id", run.element_id).order("order_index").order("seq_number"),
     userDb.from("element_comments").select("author_name, author_kind, content, created_at").eq("element_id", run.element_id).order("created_at", { ascending: false }).limit(15),
     userDb.from("agent_runs").select("created_at, status, summary").eq("element_id", run.element_id).neq("id", run.id).order("created_at", { ascending: false }).limit(3),
     userDb.from("agent_artifacts").select("title").eq("element_id", run.element_id).order("created_at"),
     el?.object_id ? userDb.from("objects").select("name").eq("id", el.object_id).maybeSingle() : Promise.resolve({ data: null }),
     el?.object_id ? userDb.from("strategy_objects").select("strategy_id").eq("object_id", el.object_id) : Promise.resolve({ data: [] }),
+    userDb.from("element_edges").select("from_element").eq("to_element", run.element_id).eq("edge_type", "depends_on").limit(6),
   ]);
+  const upstream = await loadUpstream(userDb, ((edges.data ?? []) as { from_element: string }[]).map((e) => e.from_element));
   const initiatives: TaskContext["initiatives"] = [];
   for (const l of ((links.data ?? []) as { strategy_id: string }[]).slice(0, 3)) {
     const r = await runStrategyTool(userDb, "getInitiative", { id: l.strategy_id });
@@ -841,6 +1161,7 @@ async function loadContext(userDb: SupabaseClient, run: Run, integrations: TaskC
     previousRuns: ((runs.data ?? []) as { created_at: string; status: string; summary: string | null }[])
       .map((r) => ({ at: r.created_at.slice(0, 16).replace("T", " "), status: r.status, summary: r.summary })),
     artifacts: ((artifacts.data ?? []) as { title: string }[]).map((x) => x.title),
+    upstream,
     integrations,
     today: new Date().toISOString().slice(0, 10),
   };

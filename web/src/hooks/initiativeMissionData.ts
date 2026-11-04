@@ -7,6 +7,7 @@ import { createElement } from './elementData';
 import { createObject } from './objectData';
 import { addIntentBinding, createIntent } from './strategyData';
 import { setElementDependency } from './coordinationData';
+import { setElementDefinition } from './definitionData';
 
 // =============================================================
 // A Strategy's mission, read and written: the runs, artifacts, approvals
@@ -86,9 +87,20 @@ export function useInitiativeMission(initiativeId: string, elementIds: string[])
 
 // ── The Planner ─────────────────────────────────────────────────────────────
 
-/** Asks the Planner for a draft. The raw draft is checked by normalizePlan. */
-export async function requestInitiativePlan(initiativeId: string, guidance: string): Promise<unknown> {
-  const { data, error } = await supabase.functions.invoke('plan-initiative', { body: { initiativeId, guidance } });
+/** What the Planner answered: a draft, or questions to answer first. */
+export interface PlannerReply { plan: unknown; questions: unknown; reason: string }
+
+/** Asks the Planner for a draft. It may ask questions first, unless answers
+ *  are given or `noQuestions` is set. The raw reply is checked by
+ *  normalizePlan / normalizeQuestions. */
+export async function requestInitiativePlan(
+  initiativeId: string,
+  guidance: string,
+  opts: { answers?: { question: string; answer: string }[]; noQuestions?: boolean } = {},
+): Promise<PlannerReply> {
+  const { data, error } = await supabase.functions.invoke('plan-initiative', {
+    body: { initiativeId, guidance, answers: opts.answers ?? [], noQuestions: opts.noQuestions ?? false },
+  });
   if (error) {
     const ctx = (error as { context?: Response }).context;
     let message = error.message;
@@ -97,7 +109,8 @@ export async function requestInitiativePlan(initiativeId: string, guidance: stri
     }
     throw new Error(message);
   }
-  return (data as { plan?: unknown } | null)?.plan ?? null;
+  const d = (data ?? {}) as { plan?: unknown; questions?: unknown; reason?: unknown };
+  return { plan: d.plan ?? null, questions: d.questions ?? null, reason: typeof d.reason === 'string' ? d.reason : '' };
 }
 
 export interface ApplyPlanInput {
@@ -115,7 +128,7 @@ export interface ApplyPlanInput {
   dispatch?: boolean;
   objectives: { key: string; title: string; measureId: string | null }[];
   objects: { key: string; objectId: string | null; name: string; domainId: string | null }[];
-  tasks: { key: string; title: string; description: string; objective: string | null; object: string | null; dependsOn: string[]; assignee: 'ai' | 'human' }[];
+  tasks: { key: string; title: string; description: string; objective: string | null; object: string | null; dependsOn: string[]; assignee: 'ai' | 'human'; definitionId?: string | null }[];
 }
 
 export interface ApplyPlanResult {
@@ -128,8 +141,17 @@ export interface ApplyPlanResult {
 /** Writes an approved draft: new Objects in their Domains, linked to the
  *  Strategy; new objectives as measures (when the viewer may); each task an
  *  Element in its Object, bound with 'delivers' to the measure it serves,
- *  its predecessors as depends_on edges, and ai tasks assigned to the AI
- *  Worker. A step that fails is reported by name, not thrown; the rest go on. */
+ *  its predecessors as depends_on edges, ai tasks assigned to the AI Worker
+ *  and a person's tasks to whoever approved the draft — so each lands in
+ *  someone's queue. A step that fails is reported by name, not thrown; the rest go on. */
+/** The signed-in person's own Worker, or null when they have none. */
+async function approverWorkerId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase.from('workers').select('id').eq('user_id', user.id).eq('type', 'human').limit(1).maybeSingle();
+  return (data as { id: string } | null)?.id ?? null;
+}
+
 export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyPlanResult> {
   const failed: string[] = [];
   const objectFor = new Map<string, string>();
@@ -158,6 +180,7 @@ export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyP
       failed.push(o.title);
     }
   }
+  const humanWorkerId = input.tasks.some((t) => t.assignee === 'human') ? await approverWorkerId() : null;
   const elementFor = new Map<string, string>();
   for (const t of input.tasks) {
     const objectId = t.object ? objectFor.get(t.object) : input.fallbackObjectId;
@@ -171,12 +194,15 @@ export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyP
         ...(handOver ? { labels: ['dispatch'] } : {}),
       });
       elementFor.set(t.key, el.id);
+      // The definition the Planner matched to this task, from the Space's library.
+      if (t.definitionId) await setElementDefinition(el.id, t.definitionId);
       const measureId = t.objective ? measureFor.get(t.objective) : undefined;
       if (measureId) {
         await addIntentBinding({ intent_id: measureId, target_type: 'element', target_id: el.id, relationship_type: 'delivers' });
       }
-      if (t.assignee === 'ai' && input.aiWorkerId) {
-        const { error } = await supabase.from('element_assignees').insert({ element_id: el.id, worker_id: input.aiWorkerId, role: 'assignee' });
+      const workerId = t.assignee === 'ai' ? input.aiWorkerId : humanWorkerId;
+      if (workerId) {
+        const { error } = await supabase.from('element_assignees').insert({ element_id: el.id, worker_id: workerId, role: 'assignee' });
         if (error) throw new Error(error.message);
       }
     } catch {
