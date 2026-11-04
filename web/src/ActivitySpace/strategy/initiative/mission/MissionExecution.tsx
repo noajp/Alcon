@@ -13,7 +13,7 @@ import { runsInClaudeCode } from '@/Function/team/agentModel';
 import { updateElement } from '@/hooks/useSupabase';
 import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMissionData';
 import { createIntent } from '@/hooks/strategyData';
-import type { ElementWithDetails, StrategyDelegation, Worker } from '@/types/database';
+import { AI_WEIGHTS, isAiWeight, type AiWeight, type ElementWithDetails, type StrategyDelegation, type Worker } from '@/types/database';
 import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import {
@@ -24,7 +24,7 @@ import {
 import { STATE_LABEL, Stat, compact, stateColor, type MissionContext } from './MissionPanels';
 import { YourTurnTray } from './YourTurnTray';
 import { DefinitionPanel } from './DefinitionPanel';
-import { setElementDefinition, useDefinitions, useRunRounds, type Definition, type RoundSummary } from '@/hooks/definitionData';
+import { setElementAiWeight, setElementDefinition, useDefinitions, useRunRounds, type Definition, type RoundSummary } from '@/hooks/definitionData';
 
 // The Execution tab's mission: the Strategy's Objects in one column and the
 // Elements of the chosen Object in the next, joined by lines from the chosen
@@ -136,6 +136,22 @@ function DefinitionPick({ value, definitions, onChange }: { value: string | null
         className="min-w-0 flex-1 truncate rounded border border-border/60 bg-transparent px-1 py-0.5 text-[12px] text-foreground">
         <option value="">{t('The Strategy\'s')}</option>
         {definitions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+      </select>
+    </label>
+  );
+}
+
+const WEIGHT_LABEL: Record<AiWeight, string> = { light: 'Light (small model)', standard: 'Standard', heavy: 'Heavy (large model)' };
+
+/** How heavy the work is for an AI: the model a run picks when no setting names one. */
+function WeightPick({ value, onChange }: { value: AiWeight | null; onChange: (w: AiWeight | null) => void }) {
+  const { t } = useI18n();
+  return (
+    <label className="flex min-w-0 items-center gap-1.5" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+      <span className="shrink-0">{t('Weight')}</span>
+      <select value={value ?? 'standard'} onChange={(e) => onChange(e.target.value === 'standard' ? null : e.target.value as AiWeight)}
+        className="min-w-0 flex-1 truncate rounded border border-border/60 bg-transparent px-1 py-0.5 text-[12px] text-foreground">
+        {AI_WEIGHTS.map((w) => <option key={w} value={w}>{t(WEIGHT_LABEL[w])}</option>)}
       </select>
     </label>
   );
@@ -656,8 +672,14 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
                       ) : <StateBadge state={e.state} />}
                       extra={<MissionLines element={e} rounds={rounds.get(e.elementId)} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
                         definitionPick={ctx.canEdit ? (
-                          <DefinitionPick value={details.get(e.elementId)?.definition_id ?? null} definitions={definitions.data}
-                            onChange={(id) => void setElementDefinition(e.elementId!, id).then(() => ctx.refetch())} />
+                          <>
+                            <DefinitionPick value={details.get(e.elementId)?.definition_id ?? null} definitions={definitions.data}
+                              onChange={(id) => void setElementDefinition(e.elementId!, id).then(() => ctx.refetch())} />
+                            {e.assignee === 'ai' && (
+                              <WeightPick value={isAiWeight(details.get(e.elementId)?.ai_weight) ? details.get(e.elementId)!.ai_weight as AiWeight : null}
+                                onChange={(w) => void setElementAiWeight(e.elementId!, w).then(() => ctx.refetch())} />
+                            )}
+                          </>
                         ) : undefined}
                         onHandOver={!draft && e.handable ? () => void handOver([e.elementId!]) : undefined} />} />
                   ) : (

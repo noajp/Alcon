@@ -12,8 +12,26 @@
 // is Anthropic's, on a Claude model; a Worker whose model names another
 // provider's model and has no provider set does not run, rather than quietly
 // running on Claude under that name.
+//
+// With no model named on the Worker or the Domain, the Element's weight picks
+// one by cost: light work on the small model, heavy on the large one. A run
+// already under way keeps the Claude model it started on: its thinking is
+// bound to that model, and a changed setting applies from the next run.
 
-import { AGENT_MODELS, DEFAULT_AGENT_MODEL, UNPRICED_MODEL, isAgentModel, type ModelPrice } from "../_shared/aiPricing.ts";
+import { AGENT_MODELS, DEFAULT_AGENT_MODEL, UNPRICED_MODEL, isAgentModel, type AgentModel, type ModelPrice } from "../_shared/aiPricing.ts";
+
+export type AiWeight = "light" | "standard" | "heavy";
+
+/** The model each weight runs on when nothing names one. */
+export const WEIGHT_MODELS: Record<AiWeight, AgentModel> = {
+  light: "claude-haiku-5-5",
+  standard: DEFAULT_AGENT_MODEL,
+  heavy: "claude-opus-5-5",
+};
+
+export function isAiWeight(v: unknown): v is AiWeight {
+  return v === "light" || v === "standard" || v === "heavy";
+}
 
 export const MIN_AGENT_TURNS = 5;
 export const MAX_AGENT_TURNS = 200;
@@ -40,6 +58,8 @@ export interface ResolvedAgentConfig {
   instructions: string | null;
   /** The Domain's instructions, for every agent working in it. */
   domainInstructions: string | null;
+  /** The weight that picked the model; null when a setting named it. */
+  routedBy: AiWeight | null;
 }
 
 function record(v: unknown): Record<string, unknown> {
@@ -64,7 +84,7 @@ function claudeNamed(model: string): boolean {
   return /claude|anthropic/i.test(model);
 }
 
-export function resolveAgentConfig(worker: WorkerConfigRow | null, domain: DomainConfigRow | null): ResolvedAgentConfig {
+export function resolveAgentConfig(worker: WorkerConfigRow | null, domain: DomainConfigRow | null, weight: unknown = null, startedOn: string | null = null): ResolvedAgentConfig {
   const w = record(worker?.ai_config);
   const d = record(domain?.ai_config);
   const domainLabel = text(domain?.name) ? `「${text(domain?.name)}」` : "";
@@ -78,6 +98,7 @@ export function resolveAgentConfig(worker: WorkerConfigRow | null, domain: Domai
   let model: string;
   let modelPrice: ModelPrice;
   let modelLabel: string;
+  let routedBy: AiWeight | null = null;
   if (providerId) {
     model = workerModel ?? "";
     if (!model && !disabledReason) disabledReason = `${agentName} の接続先で使うモデル名が設定されていません。チーム設定でこのエージェントのモデルを入力すると実行できます。`;
@@ -89,10 +110,14 @@ export function resolveAgentConfig(worker: WorkerConfigRow | null, domain: Domai
     if (workerModel && !isAgentModel(w.model) && !isAgentModel(workerModel) && !claudeNamed(workerModel) && !disabledReason) {
       disabledReason = `${agentName} のモデル「${workerModel}」には接続先が設定されていません。設定 › 連携で AI モデルの接続を追加し、チーム設定でこのエージェントの接続先に選ぶと実行できます。`;
     }
-    const claude = isAgentModel(w.model) ? w.model
+    const named = isAgentModel(w.model) ? w.model
       : isAgentModel(workerModel) ? workerModel
       : isAgentModel(d.model) ? d.model
-      : DEFAULT_AGENT_MODEL;
+      : null;
+    if (!named && isAiWeight(weight)) routedBy = weight;
+    const routed = named ?? (routedBy ? WEIGHT_MODELS[routedBy] : DEFAULT_AGENT_MODEL);
+    const claude = isAgentModel(startedOn) ? startedOn : routed;
+    if (claude !== routed) routedBy = null;
     model = claude;
     modelPrice = AGENT_MODELS[claude];
     modelLabel = AGENT_MODELS[claude].label;
@@ -108,5 +133,6 @@ export function resolveAgentConfig(worker: WorkerConfigRow | null, domain: Domai
     maxTotalTurns: turns(w.max_turns) ?? turns(d.max_turns) ?? DEFAULT_MAX_TOTAL_TURNS,
     instructions: text(w.instructions),
     domainInstructions: text(d.instructions),
+    routedBy,
   };
 }

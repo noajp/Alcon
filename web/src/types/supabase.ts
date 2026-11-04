@@ -2223,6 +2223,7 @@ export type Database = {
       elements: {
         Row: {
           actual_hours: number | null
+          ai_weight: string | null
           approval_state: string | null
           branch: string | null
           carried_over_count: number
@@ -2258,6 +2259,7 @@ export type Database = {
         }
         Insert: {
           actual_hours?: number | null
+          ai_weight?: string | null
           approval_state?: string | null
           branch?: string | null
           carried_over_count?: number
@@ -2293,6 +2295,7 @@ export type Database = {
         }
         Update: {
           actual_hours?: number | null
+          ai_weight?: string | null
           approval_state?: string | null
           branch?: string | null
           carried_over_count?: number

@@ -39,12 +39,14 @@ import {
 import { isGoogleDriveRow } from "../_shared/googleOAuth.ts";
 import { fetchPull, pullUrlsIn, upsertCodeChange, withGithubToken } from "../_shared/github.ts";
 import { DRIVE_TOOLS, driveOperationLabel, runDriveTool } from "../_shared/googleDrive.ts";
+import { TOOL_SEARCH, needsToolSearch, toolParamsFor, withDeferral, type RunToolDef } from "./toolLoading.ts";
 import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR, webSteps, webTools } from "./agentTools.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
 import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
+import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
 import { commandSchema, offeredCommands, parseManifest, permissionOf, requestFor, type Manifest, type ManifestCommand } from "../_shared/connectorManifest.ts";
 import { checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
 import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
@@ -63,6 +65,7 @@ const MAX_TURNS_PER_SLICE = 14;
 const SLICE_MS = 110_000;          // stay well inside the platform's wall clock
 const MAX_CONTINUATIONS = 30;
 const MAX_TOOLS = 120;
+const WEIGHT_LABEL = { light: "軽い", standard: "標準", heavy: "重い" } as const;
 /** A person's own monthly budget for runs on Elements outside any Space. */
 const USER_MONTHLY_BUDGET_USD = 20;
 /** No single run may spend more than this, whatever the budget left. */
@@ -91,13 +94,13 @@ type Transcript = {
   /** Turns the run may take in all; grows when its starter resumes it. */
   turnBudget?: number;
   /** The tool definitions frozen at the first slice, so later slices send the same prefix. */
-  tools?: { name: string; description: string; input_schema: Record<string, unknown> }[];
+  tools?: RunToolDef[];
   pending?: SavedPending;
 };
 type Run = {
   id: string; element_id: string; domain_id: string | null; worker_id: string | null; status: string;
   mode: string; prompt: string | null; reply_to: string | null; triggered_by: string | null;
-  transcript: Transcript | null; step_count: number;
+  transcript: Transcript | null; step_count: number; model: string | null;
   input_tokens: number; output_tokens: number; cost_usd: number; activity_space_id: string | null;
   continuation_count: number; continuation_token: string | null;
 };
@@ -321,8 +324,10 @@ async function execute(a: ExecArgs): Promise<void> {
   // with the service role, so a switch-off holds whatever the starter's
   // role lets them read.
   let domain: DomainConfigRow | null = null;
+  let weight: unknown = null;
   {
-    const { data: el } = await admin.from("elements").select("object_id").eq("id", run.element_id).maybeSingle();
+    const { data: el } = await admin.from("elements").select("object_id, ai_weight").eq("id", run.element_id).maybeSingle();
+    weight = el?.ai_weight ?? null;
     if (el?.object_id) {
       const { data: obj } = await admin.from("objects").select("domain_id").eq("id", el.object_id).maybeSingle();
       if (obj?.domain_id) {
@@ -331,7 +336,7 @@ async function execute(a: ExecArgs): Promise<void> {
       }
     }
   }
-  const config = resolveAgentConfig(worker, domain);
+  const config = resolveAgentConfig(worker, domain, weight, run.transcript?.messages?.length ? run.model : null);
   const { agentName, model, instructions, domainInstructions } = config;
   // The definition the work follows: the Element's own, else its Strategy's.
   const definition = await loadDefinition(userDb, run.element_id);
@@ -420,14 +425,18 @@ async function execute(a: ExecArgs): Promise<void> {
         await addStep(admin, run.id, "error", `連携「${row.name}」は Alcon 自身を指しているため使いません`, "Alcon のデータの操作はエージェントの標準の道具で行います。");
         continue;
       }
-      // OAuth is Google Drive's sign-in; any other OAuth row has no way to authenticate.
-      if (row.auth_type === "oauth" && !isGoogleDriveRow(row)) continue;
+      // OAuth is Google Drive's or GitHub's sign-in; any other OAuth row has no way to authenticate.
+      if (row.auth_type === "oauth" && !isGoogleDriveRow(row) && !isGithubOAuthRow(row)) continue;
       const { data: raw } = await admin.rpc("get_integration_secret", { p_integration_id: row.id });
       const prefix = integrationPrefix(row.name, row.id);
       try {
         // An OAuth token set becomes a current access token here (refreshed
         // when due); other credentials pass through as stored.
         const secret = await resolveCredential(admin, row, (raw as string | null) ?? null);
+        if (isGithubOAuthRow(row) && !secret) {
+          await addStep(admin, run.id, "error", `連携「${row.name}」は GitHub への接続が必要です`, "Settings › Integrations で GitHub にサインインし直すと使えます。");
+          continue;
+        }
         if (isGoogleDriveRow(row)) {
           if (!secret) {
             await addStep(admin, run.id, "error", `連携「${row.name}」は Google への接続が必要です`, "Settings › Integrations で Google にサインインし直すと使えます。");
@@ -501,8 +510,12 @@ async function execute(a: ExecArgs): Promise<void> {
   const machine = pickRunner((runnerRows ?? []) as RunnerRow[], Date.now(), "shell");
   if (machine) integrationSummary.push({ name: `使い捨ての仮想マシン（${machine.name}）`, kind: "VM", delegation: "full_delegation", tools: MACHINE_TOOLS.length });
 
-  const liveTools: ToolDef[] = [...baseAgentTools(), ...(parsed?.metric ? [ROUND_TOOL] : []), ...(runner ? RUNNER_TOOLS : []), ...(machine ? MACHINE_TOOLS : []), ...integrationDefs];
-  const tools: ToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : liveTools;
+  // A connection's tools load when the model searches for them, once there are many.
+  const liveTools: RunToolDef[] = withDeferral(
+    [...baseAgentTools(), ...(parsed?.metric ? [ROUND_TOOL] : []), ...(runner ? RUNNER_TOOLS : []), ...(machine ? MACHINE_TOOLS : [])],
+    integrationDefs,
+  );
+  const tools: RunToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : liveTools;
   const kindOf = (name: string): ToolKind => {
     const base = baseKindOf(name);
     if (base) return base;
@@ -698,7 +711,7 @@ async function execute(a: ExecArgs): Promise<void> {
       : null;
     state = { messages: [{ role: "user", content: defText ? `${task}\n\n${defText}` : task }], turns: 0, nudges: 0 };
     turnBudget = maxTotalTurns;
-    await addStep(admin, run.id, "status", run.mode === "reply" ? "依頼を受けて実行を開始" : "任務の実行を開始", `${agentName} / ${config.modelLabel}`);
+    await addStep(admin, run.id, "status", run.mode === "reply" ? "依頼を受けて実行を開始" : "任務の実行を開始", `${agentName} / ${config.modelLabel}${config.routedBy ? `（重さ: ${WEIGHT_LABEL[config.routedBy]}）` : ""}`);
   }
 
   const saveTranscript = async (p?: SavedPending) => {
@@ -802,10 +815,8 @@ async function execute(a: ExecArgs): Promise<void> {
   // Another provider gets the plain Messages API: no betas, no cache marks.
   const cache = external ? {} : { cache_control: { type: "ephemeral" as const } };
   const system = [{ type: "text" as const, text: systemPrompt({ name: agentName, instructions, domainInstructions }), ...cache }];
-  const toolParams = tools.map((t, i) => ({
-    name: t.name, description: t.description, input_schema: t.input_schema,
-    ...(i === tools.length - 1 ? cache : {}),
-  }));
+  const toolParams = toolParamsFor(tools, cache, external);
+  const serverTools = [...webTools(model), ...(needsToolSearch(tools) ? [TOOL_SEARCH] : [])];
 
   const recordUsage = async (u: ModelUsage) => {
     usage = {
@@ -881,7 +892,7 @@ async function execute(a: ExecArgs): Promise<void> {
         // deno-lint-ignore no-explicit-any
         // The web tools go first so the cache mark stays on the last of ours.
         // deno-lint-ignore no-explicit-any
-        tools: [...webTools(model), ...toolParams] as any,
+        tools: [...serverTools, ...toolParams] as any,
         // deno-lint-ignore no-explicit-any
         messages: messages as any,
         // Medium thinking: these are working steps, not hard reasoning, and
@@ -890,12 +901,13 @@ async function execute(a: ExecArgs): Promise<void> {
         betas: ["context-management-2025-06-27"],
         // Old board results may be cleared to save room, never the web's:
         // with them cleared the agent searched and fetched the same pages
-        // again until it ran out of uses.
+        // again until it ran out of uses. Nor a tool search's: it is what
+        // loaded the tools the run goes on calling.
         context_management: { edits: [{
           type: "clear_tool_uses_20250919",
           trigger: { type: "input_tokens", value: 150_000 },
           keep: { type: "tool_uses", value: 6 },
-          exclude_tools: ["web_search", "web_fetch"],
+          exclude_tools: ["web_search", "web_fetch", TOOL_SEARCH.name],
         }] },
       // deno-lint-ignore no-explicit-any
       } as any);

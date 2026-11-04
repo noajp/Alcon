@@ -93,6 +93,7 @@ export function webSteps(content: { type: string; name?: string; input?: unknown
     if (b.name === "web_fetch") return `Web ページ: ${String(input.url ?? "")}`;
     // The search tools filter their results with code under the hood.
     if (b.name === "code_execution") return "検索結果を絞り込み";
+    if (b.name === "tool_search_tool_bm25") return `道具を探す: ${String(input.query ?? "")}`;
     return `${b.name ?? "server tool"}`;
   });
 }

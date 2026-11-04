@@ -292,6 +292,11 @@ const SHARED_MESSAGES: Record<string, Row> = {
   'Scope': ['範囲', '범위', 'Périmètre', 'Ámbito'],
   'Shared by the Space': ['Space で共有', 'Space 공유', 'Partagé dans le Space', 'Compartido en el Space'],
   'Unknown Domain': ['不明な Domain', '알 수 없는 Domain', 'Domain inconnu', 'Domain desconocido'],
+  // How heavy an Element's work is for an AI
+  'Weight': ['重さ', '무게', 'Poids', 'Peso'],
+  'Light (small model)': ['軽い（小さいモデル）', '가벼움(작은 모델)', 'Léger (petit modèle)', 'Ligero (modelo pequeño)'],
+  'Standard': ['標準', '표준', 'Standard', 'Estándar'],
+  'Heavy (large model)': ['重い（大きいモデル）', '무거움(큰 모델)', 'Lourd (grand modèle)', 'Pesado (modelo grande)'],
   // Connector manifest
   'Commands': ['コマンド', '명령', 'Commandes', 'Comandos'],
   'Declare the commands agents may use. With a manifest, agents see only these commands, and each one is allowed, asked for or denied.': ['エージェントが使えるコマンドを宣言します。manifest があると、エージェントにはここに書いたコマンドだけが見え、コマンドごとに許可・確認・禁止が決まります。', '에이전트가 사용할 수 있는 명령을 선언합니다. manifest가 있으면 에이전트에게는 여기 적은 명령만 보이며, 명령마다 허용·확인·금지가 정해집니다.', 'Déclarez les commandes que les agents peuvent utiliser. Avec un manifest, les agents ne voient que ces commandes, chacune autorisée, soumise à confirmation ou refusée.', 'Declara los comandos que pueden usar los agentes. Con un manifest, los agentes solo ven estos comandos, y cada uno se permite, se confirma o se deniega.'],
