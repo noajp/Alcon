@@ -118,6 +118,12 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
     }
 
     const calls = toolCalls(turn.content);
+    // A long server-tool turn (web search) paused mid-way: send the
+    // conversation back as it is and the model carries on.
+    if (calls.length === 0 && turn.stop_reason === "pause_turn") {
+      await deps.afterTurn?.();
+      continue;
+    }
     if (calls.length === 0) {
       if (turn.stop_reason === "max_tokens") {
         state.messages.push({ role: "user", content: "出力が上限で途中まで切れました。続きを、小さく分けて進めてください。" });

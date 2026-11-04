@@ -53,6 +53,19 @@ const limits = (over = {}) => ({ maxTurnsThisCall: 10, maxTotalTurns: 50, deadli
 const fresh = () => ({ messages: [{ role: "user", content: "task" }] as { role: string; content: unknown }[], turns: 0, nudges: 0 });
 
 describe('agent loop', () => {
+  it('sends a paused server-tool turn straight back, with no user message between', async () => {
+    const m = scripted([
+      { content: [{ type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'q' } }], stop_reason: 'pause_turn' },
+      { content: [toolUse('c', 'finish', { outcome: 'completed', summary: 's', message: 'm' })] },
+    ]);
+    const { deps: d } = deps(m);
+    const state = fresh();
+    const out = await runLoop(state, d, limits());
+    expect(out.kind).toBe('finished');
+    const resent = m.sent[1] as { role: string }[];
+    expect(resent[resent.length - 1].role).toBe('assistant');
+  });
+
   it('runs tools, answers every tool_use in one user message, and finishes', async () => {
     const m = scripted([
       { content: [text('plan'), toolUse('a', 'getElement', { id: 'x' }), toolUse('b', 'log_progress', { title: 't' })] },
@@ -136,6 +149,16 @@ describe('agent loop', () => {
 });
 
 describe('agent tools', () => {
+  it('gives the web tools by model and logs each server-tool call', () => {
+    expect(tools.webTools('claude-sonnet-5-5').map((t: { type: string }) => t.type)).toEqual(['web_search_20260209', 'web_fetch_20260209']);
+    expect(tools.webTools('claude-haiku-5-5').map((t: { type: string }) => t.type)).toEqual(['web_search_20250305']);
+    expect(tools.webSteps([
+      { type: 'text', text: 'x' },
+      { type: 'server_tool_use', name: 'web_search', input: { query: '古民家 東京' } },
+      { type: 'server_tool_use', name: 'web_fetch', input: { url: 'https://example.com' } },
+    ])).toEqual(['Web 検索: 古民家 東京', 'Web ページ: https://example.com']);
+  });
+
   it('offers reads and everyday writes on the board, never deletes or bulk writes', () => {
     const names = tools.baseAgentTools().map((t: { name: string }) => t.name);
     expect(names).toEqual(expect.arrayContaining(['finish', 'save_artifact', 'getElement', 'createElement', 'getInitiative']));
@@ -248,7 +271,8 @@ describe('pricing and prompts', () => {
     // 1M input on Sonnet 5.5 = $2; 1M output = $10; cache write 1.25x; read 0.1x.
     expect(pricing.costOf('claude-sonnet-5-5', { input_tokens: 1_000_000 })).toBe(2);
     expect(pricing.costOf('claude-sonnet-5-5', { output_tokens: 100_000 })).toBe(1);
-    expect(pricing.costOf('claude-haiku-4-5', { cache_creation_input_tokens: 1_000_000, cache_read_input_tokens: 1_000_000 })).toBe(1.35);
+    expect(pricing.costOf('claude-haiku-5-5', { cache_creation_input_tokens: 1_000_000, cache_read_input_tokens: 1_000_000 })).toBe(0.135);
+    expect(pricing.costOf('claude-sonnet-5-5', { server_tool_use: { web_search_requests: 3 } })).toBe(0.03);
     expect(pricing.costOf('claude-opus-5-5', { cache_read_input_tokens: 1_000_000 })).toBe(0.2);
     expect(pricing.costAt({ input: 0.3, output: 1.2, cacheRead: 0.3 }, { input_tokens: 1_000_000, output_tokens: 500_000 })).toBe(0.9);
     expect(pricing.isAgentModel('claude-opus-5-5')).toBe(true);

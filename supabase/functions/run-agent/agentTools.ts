@@ -68,6 +68,31 @@ export const INTERNAL_TOOLS: ToolDef[] = [
   },
 ];
 
+/**
+ * Anthropic's server tools: web search and page fetch run on Anthropic's side
+ * within the same model call, so they need no executor here. The current
+ * Sonnet and Opus take the variants that filter results with code; other
+ * models get plain search only. `max_uses` caps one model call.
+ */
+export function webTools(model: string): Record<string, unknown>[] {
+  const filtering = model === "claude-sonnet-5-5" || model === "claude-opus-5-5";
+  if (!filtering) return [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }];
+  return [
+    { type: "web_search_20260209", name: "web_search", max_uses: 5 },
+    { type: "web_fetch_20260209", name: "web_fetch", max_uses: 5 },
+  ];
+}
+
+/** Pure. One line for the run log per server-tool call in a response. */
+export function webSteps(content: { type: string; name?: string; input?: unknown }[]): string[] {
+  return content.filter((b) => b.type === "server_tool_use").map((b) => {
+    const input = (b.input && typeof b.input === "object" ? b.input : {}) as Record<string, unknown>;
+    if (b.name === "web_search") return `Web 検索: ${String(input.query ?? "")}`;
+    if (b.name === "web_fetch") return `Web ページ: ${String(input.url ?? "")}`;
+    return `${b.name ?? "server tool"}`;
+  });
+}
+
 /** The board tools an agent may use: reads, and everyday writes. No deletes, no bulk writes. */
 export const AGENT_BOARD_TOOL_NAMES = [
   "listObjects", "listElements", "getElement", "findByText", "getProgress", "getRecentActivity", "listWorkers",

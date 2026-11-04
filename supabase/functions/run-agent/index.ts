@@ -36,7 +36,7 @@ import {
 import { isGoogleDriveRow } from "../_shared/googleOAuth.ts";
 import { fetchPull, pullUrlsIn, upsertCodeChange, withGithubToken } from "../_shared/github.ts";
 import { DRIVE_TOOLS, driveOperationLabel, runDriveTool } from "../_shared/googleDrive.ts";
-import { approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR } from "./agentTools.ts";
+import { approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR, webSteps, webTools } from "./agentTools.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import {
@@ -654,13 +654,16 @@ async function execute(a: ExecArgs): Promise<void> {
         max_tokens: 16000,
         system,
         // deno-lint-ignore no-explicit-any
-        tools: toolParams as any,
+        // The web tools go first so the cache mark stays on the last of ours.
+        // deno-lint-ignore no-explicit-any
+        tools: [...webTools(model), ...toolParams] as any,
         // deno-lint-ignore no-explicit-any
         messages: messages as any,
         betas: ["context-management-2025-06-27"],
         context_management: { edits: [{ type: "clear_tool_uses_20250919" }] },
       // deno-lint-ignore no-explicit-any
       } as any);
+      for (const line of webSteps(res.content ?? [])) await addStep(admin, run.id, "action", line);
       return { content: res.content, stop_reason: res.stop_reason, usage: res.usage };
     },
     kindOf,

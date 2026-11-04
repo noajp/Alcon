@@ -20,7 +20,7 @@ describe('Domain agent settings screen', () => {
   });
 
   it('falls back to the default for a model the engine does not know', () => {
-    expect(domainAgentModel('claude-haiku-4-5')).toBe('claude-haiku-4-5');
+    expect(domainAgentModel('claude-haiku-5-5')).toBe('claude-haiku-5-5');
     expect(domainAgentModel('claude-sonnet-4-6')).toBe(DEFAULT_DOMAIN_AGENT_MODEL);
     expect(domainAgentModel(undefined)).toBe(DEFAULT_DOMAIN_AGENT_MODEL);
   });
@@ -55,14 +55,14 @@ describe('resolveAgentConfig', () => {
   });
 
   it('picks the model Worker config > Worker model > Domain > default', () => {
-    expect(resolveAgentConfig(worker({ model: 'claude-opus-5-5' }, 'claude-haiku-4-5'), domain({ model: 'claude-haiku-4-5' })).model).toBe('claude-opus-5-5');
-    expect(resolveAgentConfig(worker({}, 'claude-opus-5-5'), domain({ model: 'claude-haiku-4-5' })).model).toBe('claude-opus-5-5');
-    expect(resolveAgentConfig(worker({}), domain({ model: 'claude-haiku-4-5' })).model).toBe('claude-haiku-4-5');
+    expect(resolveAgentConfig(worker({ model: 'claude-opus-5-5' }, 'claude-haiku-5-5'), domain({ model: 'claude-haiku-5-5' })).model).toBe('claude-opus-5-5');
+    expect(resolveAgentConfig(worker({}, 'claude-opus-5-5'), domain({ model: 'claude-haiku-5-5' })).model).toBe('claude-opus-5-5');
+    expect(resolveAgentConfig(worker({}), domain({ model: 'claude-haiku-5-5' })).model).toBe('claude-haiku-5-5');
     expect(resolveAgentConfig(null, domain({ model: 'claude-sonnet-4-6' })).model).toBe(pricing.DEFAULT_AGENT_MODEL);
   });
 
   it('runs on the Worker\'s model connection with the model it names', () => {
-    const r = resolveAgentConfig(worker({ provider: 'int-1', price_input: 0.3, price_output: 1.2 }, 'deepseek-chat'), domain({ model: 'claude-haiku-4-5' }));
+    const r = resolveAgentConfig(worker({ provider: 'int-1', price_input: 0.3, price_output: 1.2 }, 'deepseek-chat'), domain({ model: 'claude-haiku-5-5' }));
     expect(r.disabledReason).toBeNull();
     expect(r.providerId).toBe('int-1');
     expect(r.model).toBe('deepseek-chat');

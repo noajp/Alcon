@@ -54,6 +54,9 @@ const SYSTEM_PROMPT = `あなたは組織の参謀です。Strategy（戦略の�
 const PLAN_TOOL = {
   name: "submit_plan",
   description: "作戦案を提出する。",
+  // Strict: the arguments always match the schema. Without it the model
+  // sometimes flattened the nested arrays into a string.
+  strict: true,
   input_schema: {
     type: "object",
     properties: {
@@ -68,6 +71,7 @@ const PLAN_TOOL = {
             measureId: { type: "string", description: "既存の成功条件の id。新しい目標なら省略" },
           },
           required: ["key", "title"],
+          additionalProperties: false,
         },
       },
       objects: {
@@ -81,6 +85,7 @@ const PLAN_TOOL = {
             domainId: { type: "string", description: "新しい Object を置く Domain の id" },
           },
           required: ["key", "name"],
+          additionalProperties: false,
         },
       },
       tasks: {
@@ -93,14 +98,16 @@ const PLAN_TOOL = {
             description: { type: "string", description: "何をして、何ができたら完了か" },
             objective: { type: "string", description: "効く目標の key" },
             object: { type: "string", description: "入れる Object の key" },
-            dependsOn: { type: "array", items: { type: "string" }, description: "先に終わっている必要があるタスクの key" },
+            dependsOn: { type: "array", items: { type: "string" }, description: "先に終わっている必要があるタスクの key。なければ空の配列" },
             assignee: { type: "string", enum: ["ai", "human"] },
           },
-          required: ["key", "title", "description", "objective", "object", "assignee"],
+          required: ["key", "title", "description", "objective", "object", "dependsOn", "assignee"],
+          additionalProperties: false,
         },
       },
     },
     required: ["summary", "objectives", "objects", "tasks"],
+    additionalProperties: false,
   },
 };
 
@@ -195,26 +202,34 @@ ${list(existing)}
 ${guidance ? `\n# 依頼した人からの補足\n${guidance}\n` : ""}
 この Strategy を達成するための作戦を submit_plan で提出してください。`;
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 8000,
-      system: SYSTEM_PROMPT,
-      // Current models take no forced tool choice; the prompt asks for the
-      // one call and a missing call is reported below.
-      tools: [PLAN_TOOL],
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-  if (!res.ok) {
-    const detail = (await res.text()).slice(0, 300);
-    console.error("plan-initiative: model error", res.status, detail);
-    return json({ error: `作戦案を作れませんでした（${res.status}）` }, 502);
+  // One retry: a draft whose lists did not come back as lists is no draft.
+  let failure = "作戦案が返ってきませんでした。";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 16000,
+        system: SYSTEM_PROMPT,
+        // Current models take no forced tool choice; the prompt asks for the
+        // one call and a missing call is retried, then reported.
+        tools: [PLAN_TOOL],
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (!res.ok) {
+      const detail = (await res.text()).slice(0, 300);
+      console.error("plan-initiative: model error", res.status, detail);
+      return json({ error: `作戦案を作れませんでした（${res.status}）` }, 502);
+    }
+    const out = await res.json() as { content?: { type: string; name?: string; input?: unknown }[]; usage?: unknown; stop_reason?: string };
+    const plan = out.content?.find((b) => b.type === "tool_use" && b.name === PLAN_TOOL.name)?.input as Row | undefined;
+    if (plan && Array.isArray(plan.tasks) && plan.tasks.length > 0 && Array.isArray(plan.objects) && Array.isArray(plan.objectives)) {
+      return json({ plan, usage: out.usage ?? null });
+    }
+    console.error("plan-initiative: unusable plan", out.stop_reason, JSON.stringify(plan ?? null).slice(0, 300));
+    failure = out.stop_reason === "max_tokens" ? "作戦案が長すぎて途中で切れました。補足で範囲を絞ってください。" : failure;
   }
-  const out = await res.json() as { content?: { type: string; name?: string; input?: unknown }[]; usage?: unknown };
-  const plan = out.content?.find((b) => b.type === "tool_use" && b.name === PLAN_TOOL.name)?.input;
-  if (!plan || typeof plan !== "object") return json({ error: "作戦案が返ってきませんでした。" }, 502);
-  return json({ plan, usage: out.usage ?? null });
+  return json({ error: failure }, 502);
 });
