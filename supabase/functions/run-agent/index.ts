@@ -45,6 +45,7 @@ import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
 import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
+import { commandSchema, offeredCommands, parseManifest, permissionOf, requestFor, type Manifest, type ManifestCommand } from "../_shared/connectorManifest.ts";
 import { checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
 import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
 import {
@@ -107,10 +108,15 @@ type Run = {
  * http_request. `drive` marks the Google Drive tools, which run through
  * runDriveTool with `secret` as the access token.
  */
-interface IntegrationTool { integration: IntegrationRow; remote: RemoteTool | null; secret: string | null; session: McpSession | null; drive?: boolean }
+interface IntegrationTool {
+  integration: IntegrationRow; remote: RemoteTool | null; secret: string | null; session: McpSession | null; drive?: boolean;
+  /** The declared command this tool is, when the integration has a manifest. */
+  command?: ManifestCommand; manifest?: Manifest;
+}
 
 /** The operation an integration call shows on the approval card and in the log. */
 function operationOf(it: IntegrationTool | undefined, input: Record<string, unknown>): string {
+  if (it?.command) return it.command.action;
   if (it?.drive && it.remote) return driveOperationLabel(it.remote.name, input);
   if (it?.remote) return it.remote.name;
   return `${input.method ?? ""} ${input.path ?? ""}`.trim();
@@ -395,10 +401,19 @@ async function execute(a: ExecArgs): Promise<void> {
   const integrationSummary: TaskContext["integrations"] = [];
   if (run.activity_space_id) {
     const { data: rows } = await userDb.from("integrations")
-      .select("id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled")
+      .select("id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled, manifest, guide")
       .eq("activity_space_id", run.activity_space_id).eq("enabled", true).in("kind", ["mcp", "http"]).order("created_at");
-    for (const row of (rows ?? []) as (IntegrationRow & { enabled: boolean })[]) {
+    for (const row of (rows ?? []) as (IntegrationRow & { enabled: boolean; manifest: unknown; guide: string | null })[]) {
       if (!isSafeEndpoint(row.endpoint)) continue;
+      // A manifest declares what the integration may be asked to do. One that
+      // declares nothing usable closes the integration rather than opening it.
+      let manifest: Manifest | null = null;
+      if (row.manifest != null && !isGoogleDriveRow(row)) {
+        const parsed = parseManifest(row.manifest);
+        if (parsed.errors.length) await addStep(admin, run.id, "error", `連携「${row.name}」の manifest に読めない所があります`, parsed.errors.join("\n"));
+        if (offeredCommands(parsed.manifest).length === 0) continue;
+        manifest = parsed.manifest;
+      }
       // Never Alcon itself: the board tools already act as the starter, and a
       // stored token would act outside this run.
       if (pointsAtAlcon(row.endpoint, Deno.env.get("SUPABASE_URL"))) {
@@ -432,13 +447,29 @@ async function execute(a: ExecArgs): Promise<void> {
           const session = new McpSession(row, secret);
           await session.initialize();
           const tools = await session.listTools();
+          // With a manifest, only the MCP tools it declares, under its commands' names and permissions.
+          const declared = manifest ? offeredCommands(manifest).filter((c) => c.mcp) : null;
+          let offered = 0;
           for (const t of tools) {
             if (integrationDefs.length >= MAX_TOOLS) break;
-            const name = uniqueToolName(`${prefix}${INTEGRATION_SEPARATOR}${t.name}`, integrationTools);
-            integrationTools.set(name, { integration: row, remote: t, secret, session });
-            integrationDefs.push({ name, description: `[${row.name}] ${t.description}`.slice(0, 1024), input_schema: t.inputSchema });
+            const command = declared?.find((c) => c.mcp === t.name);
+            if (declared && !command) continue;
+            const name = uniqueToolName(`${prefix}${INTEGRATION_SEPARATOR}${command?.name ?? t.name}`, integrationTools);
+            integrationTools.set(name, { integration: row, remote: t, secret, session, ...(command ? { command, manifest: manifest! } : {}) });
+            integrationDefs.push({ name, description: `[${row.name}] ${command?.description || t.description}`.slice(0, 1024), input_schema: t.inputSchema });
+            offered++;
           }
-          integrationSummary.push({ name: row.name, kind: "MCP", delegation: row.delegation, tools: tools.length });
+          integrationSummary.push({ name: row.name, kind: "MCP", delegation: row.delegation, tools: offered, declared: !!manifest, guide: row.guide });
+        } else if (manifest) {
+          // An API with a manifest: its declared commands, never a raw request.
+          const commands = offeredCommands(manifest).filter((c) => c.http);
+          for (const c of commands) {
+            if (integrationDefs.length >= MAX_TOOLS) break;
+            const name = uniqueToolName(`${prefix}${INTEGRATION_SEPARATOR}${c.name}`, integrationTools);
+            integrationTools.set(name, { integration: row, remote: null, secret, session: null, command: c, manifest });
+            integrationDefs.push({ name, description: `[${row.name}] ${c.description || c.action}（${c.effect === "read" ? "読み取り" : "書き込み"}）`.slice(0, 1024), input_schema: commandSchema(c) });
+          }
+          integrationSummary.push({ name: row.name, kind: "API", delegation: row.delegation, tools: commands.length, declared: true, guide: row.guide });
         } else {
           const name = `${prefix}${INTEGRATION_SEPARATOR}http_request`;
           integrationTools.set(name, { integration: row, remote: null, secret, session: null });
@@ -483,6 +514,7 @@ async function execute(a: ExecArgs): Promise<void> {
   const isRead = (call: ToolCall): boolean => {
     const it = integrationTools.get(call.name);
     if (!it) return false;
+    if (it.command) return it.command.effect === "read";
     return it.remote ? it.remote.readOnly : httpIsRead(call.input);
   };
 
@@ -498,11 +530,18 @@ async function execute(a: ExecArgs): Promise<void> {
   const callIntegration = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
     const it = integrationTools.get(call.name);
     if (!it) return { content: "Unknown tool.", is_error: true };
+    // A declared API command becomes exactly the request its manifest maps it to.
+    let httpInput: Record<string, unknown> = call.input;
+    if (it.command?.http) {
+      const req = requestFor(it.command, call.input);
+      if ("error" in req) return { content: req.error, is_error: true };
+      httpInput = req;
+    }
     const r = it.drive && it.remote
       ? await runDriveTool(it.remote.name, call.input, it.secret ?? "")
       : it.remote && it.session
         ? await it.session.callTool(it.remote.name, call.input)
-        : await callHttp(it.integration, it.secret, call.input);
+        : await callHttp(it.integration, it.secret, httpInput);
     if (!r.isError && isGithubRow(it.integration) && it.remote && /^(create|update)_pull_request$/i.test(it.remote.name)) {
       await linkOpenedPulls(r.text, it.secret);
     }
@@ -866,8 +905,13 @@ async function execute(a: ExecArgs): Promise<void> {
     kindOf,
     needsApproval: (call) => {
       if (kindOf(call.name) !== "write") return false;
-      if (isRead(call)) return false;
       const it = integrationTools.get(call.name);
+      // A declared command's own permission decides; a full delegation lifts "ask" only.
+      if (it?.command && it.manifest) {
+        const permission = permissionOf(it.manifest, it.command.action);
+        return permission === "ask" && it.integration.delegation !== "full_delegation";
+      }
+      if (isRead(call)) return false;
       return !it || it.integration.delegation !== "full_delegation";
     },
     execute: (call) => executeCall(call),

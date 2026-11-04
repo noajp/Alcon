@@ -38,7 +38,7 @@ export interface TaskContext {
     artifacts: { title: string; content: string }[];
     comments: { author: string; content: string }[];
   }[];
-  integrations: { name: string; kind: string; delegation: string; tools: number }[];
+  integrations: { name: string; kind: string; delegation: string; tools: number; declared?: boolean; guide?: string | null }[];
   today: string;
 }
 
@@ -88,7 +88,13 @@ export function taskMessage(ctx: TaskContext): string {
     u.report ? `完了報告:\n${u.report}` : "",
     ...u.artifacts.map((a) => `成果物「${a.title}」:\n${a.content}`),
   ].filter(Boolean).join("\n\n"));
-  const integrations = ctx.integrations.map((i) => `- ${i.name}（${i.kind}、道具 ${i.tools} 個、${i.delegation === "full_delegation" ? "全委任：承認なしで書き込める" : "書き込みは承認が必要"}）`);
+  const integrations = ctx.integrations.map((i) => {
+    const how = i.declared
+      ? "宣言されたコマンドだけ。コマンドごとに許可・確認が決まっている"
+      : i.delegation === "full_delegation" ? "全委任：承認なしで書き込める" : "書き込みは承認が必要";
+    const guide = i.guide ? `\n  使い方: ${i.guide.replace(/\s+/g, " ").slice(0, 2000)}` : "";
+    return `- ${i.name}（${i.kind}、道具 ${i.tools} 個、${how}）${guide}`;
+  });
 
   const head = ctx.mode === "reply"
     ? `# 依頼（Element のコメントで話しかけられた）\n${ctx.prompt ?? ""}\n\nこの依頼に応えてください。作業が要るなら道具で実行し、最後に finish の message で返事をしてください。`

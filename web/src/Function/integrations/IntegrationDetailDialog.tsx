@@ -17,6 +17,7 @@ import {
   type IntegrationAuthType, type IntegrationDelegation, type IntegrationPreset, type IntegrationSource,
 } from './catalog';
 import { useIntegrationActions, useIntegrationOAuthStatus } from './data';
+import { ConnectorManifestSection } from './ConnectorManifestSection';
 
 // One integration: connect a preset (or a custom MCP / API), or manage an
 // existing connection — credential, delegation, on/off, connection test,
@@ -425,6 +426,12 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
             <ToggleRow label={t('Enabled')} desc={isModel ? t('When off, AI agents on this connection do not run.') : t('When off, agents do not see this connection.')} value={enabled}
               disabled={readOnly} onChange={(v) => setLive({ enabled: v })} />
           </div>
+
+          {integration && !isModel && preset.id !== 'google-drive' && (
+            <Field label={t('Commands')}>
+              <ConnectorManifestSection key={integration.id} integration={integration} readOnly={readOnly} />
+            </Field>
+          )}
 
           {integration && (
             <Field label={t('Connection test')}>

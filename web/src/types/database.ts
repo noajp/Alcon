@@ -1300,13 +1300,17 @@ export interface Integration {
   last_test: Json | null
   /** The account an OAuth connection signed in as (the Google email). Written only by integration-oauth. */
   external_account: string | null
+  /** The commands agents may use, enforced by run-agent (supabase/functions/_shared/connectorManifest.ts). */
+  manifest: Json | null
+  /** How to use the connection, for agents. Not enforced. */
+  guide: string | null
   created_by: string | null
   created_at: string
   updated_at: string
 }
 
 export type IntegrationUpdate = Partial<Pick<Integration,
-  'name' | 'description' | 'endpoint' | 'auth_type' | 'auth_header' | 'delegation' | 'enabled'>>
+  'name' | 'description' | 'endpoint' | 'auth_type' | 'auth_header' | 'delegation' | 'enabled' | 'manifest' | 'guide'>>
 
 export type AssetKind = 'app' | 'ai_agent' | 'script' | 'service' | 'other'
 export type AssetStatus = 'unclaimed' | 'active' | 'revoked'

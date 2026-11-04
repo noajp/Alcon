@@ -2510,10 +2510,12 @@ export type Database = {
           enabled: boolean
           endpoint: string
           external_account: string | null
+          guide: string | null
           icon: string | null
           id: string
           kind: string
           last_test: Json | null
+          manifest: Json | null
           name: string
           preset: string | null
           secret_id: string | null
@@ -2530,10 +2532,12 @@ export type Database = {
           enabled?: boolean
           endpoint: string
           external_account?: string | null
+          guide?: string | null
           icon?: string | null
           id?: string
           kind: string
           last_test?: Json | null
+          manifest?: Json | null
           name: string
           preset?: string | null
           secret_id?: string | null
@@ -2550,10 +2554,12 @@ export type Database = {
           enabled?: boolean
           endpoint?: string
           external_account?: string | null
+          guide?: string | null
           icon?: string | null
           id?: string
           kind?: string
           last_test?: Json | null
+          manifest?: Json | null
           name?: string
           preset?: string | null
           secret_id?: string | null
