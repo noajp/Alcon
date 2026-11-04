@@ -433,8 +433,10 @@ export function AppSidebar({
               the work is done). */}
           {railMode === 'workspace' && (
           <>
-          <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
-            onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />
+          <div className="mt-5">
+            <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
+              onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />
+          </div>
 
           <FollowSection activeObjectId={navigation.objectId ?? null} onOpen={(f) => {
             if (f.domainId) setActiveDomainId(f.domainId);
