@@ -55,10 +55,9 @@ export {
   addElementAssignee,
   addElementToObject,
   createElement,
-  createSubelement,
+  createSubElement,
   decideApproval,
   deleteElement,
-  deleteSubelement,
   fetchElementApprovals,
   fetchElementWithDetails,
   getElementEdges,
@@ -67,13 +66,13 @@ export {
   reorderElements,
   restoreElementsField,
   setElementIsApproval,
-  toggleSubelementComplete,
   updateElement,
   updateElements,
   noticeElementSaveFailed,
   isElementSaveRefused,
-  updateSubelement,
   useElementBlockers,
+  useParentElement,
+  useSubElements,
 } from '@/hooks/elementData';
 
 export {

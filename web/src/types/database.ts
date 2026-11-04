@@ -6,7 +6,7 @@ import type { Json } from './supabase'
 export type { Json }
 
 // =====================================================
-// 3-Layer Structure: Objects (nestable) → Elements → Subelements
+// 3-Layer Structure: Objects → Elements (an Element may sit under another as its Sub-element)
 // =====================================================
 
 // =====================================================
@@ -346,7 +346,7 @@ export type ElementPriority = 'low' | 'medium' | 'high' | 'urgent'
 
 // Element Direction — 「この Element をどうしていくか」を一級フィールド化した
 // jsonb (elements.direction)。acceptance は宣言文で、チェック状態は持たない —
-// チェックリストは Subelement の領分。
+// チェックリストは Sub-element（親を持つ Element）の領分。
 //
 // 各行は id を持つ。direction は列まるごと書き戻すので、行に同一性が無いと
 // 2人が別々の行を編集したときにリスト全体が last-writer-wins になる。id が
@@ -411,6 +411,8 @@ export function normalizeDirection(raw: unknown): ElementDirection | null {
 export interface Element {
   id: string
   object_id: string | null
+  /** The Element this one is a Sub-element of; it lives in that Element's Object. */
+  parent_id?: string | null
   title: string
   description: string | null
   type: string | null             // ユーザー定義の型 (Task / Human ...)。domains.element_types から選ぶ
@@ -501,43 +503,6 @@ export interface ElementUpdate {
   note_id?: string | null
   phase_id?: string | null
   carried_over_count?: number
-  created_at?: string | null
-  updated_at?: string | null
-}
-
-// Subelement - Elementの構成要素
-export interface Subelement {
-  id: string
-  element_id: string
-  title: string
-  display_id: string | null       // e.g. "sub_PH1-001-01"
-  seq_number: number | null
-  is_completed: boolean | null
-  /** Same set as an Element's; kept in step with is_completed (Done ⇔ completed) by the DB. */
-  status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled'
-  due_date?: string | null        // 'YYYY-MM-DD'
-  assignee_id?: string | null     // workers.id
-  order_index: number | null
-  created_at: string | null
-  updated_at: string | null
-}
-
-export interface SubelementInsert {
-  id?: string
-  element_id: string
-  title: string
-  is_completed?: boolean | null
-  order_index?: number | null
-  created_at?: string | null
-  updated_at?: string | null
-}
-
-export interface SubelementUpdate {
-  id?: string
-  element_id?: string
-  title?: string
-  is_completed?: boolean | null
-  order_index?: number | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -827,7 +792,6 @@ export interface ElementCommentActivity {
 }
 
 export interface ElementWithDetails extends Element {
-  subelements?: Subelement[]
   assignees?: ElementAssigneeWithWorker[]
   edges?: {
     incoming: ElementEdgeWithElement[]  // Edges pointing TO this element

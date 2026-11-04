@@ -11,7 +11,6 @@ import type {
   Element,
   ElementAssigneeWithWorker,
   ElementWithDetails,
-  Subelement,
   Worker,
 } from '@/types/database';
 
@@ -23,7 +22,7 @@ export interface ExplorerData {
 export const EMPTY_EXPLORER_DATA: ExplorerData = { objects: [], rootElements: [] };
 
 /** Normalize RPC Object rows to the flat client model without touching their
- * Elements, assignments, or Subelements. Unchanged rows keep their identity. */
+ * Elements or assignments. Unchanged rows keep their identity. */
 export function normalizeExplorerData(data: ExplorerData | null | undefined): ExplorerData {
   if (!data) return EMPTY_EXPLORER_DATA;
   let changed = false;
@@ -76,30 +75,6 @@ export function appendElementToList(list: ElementWithDetails[], el: ElementWithD
 
 const byOrder = <T extends { order_index: number | null }>(a: T, b: T) =>
   (a.order_index ?? 0) - (b.order_index ?? 0);
-
-/** Insert or replace a Subelement on its parent Element. */
-export function upsertSubelementInList(list: ElementWithDetails[], sub: Subelement): ElementWithDetails[] {
-  return mapElementInList(list, sub.element_id, (el) => {
-    const subs = el.subelements ?? [];
-    const at = subs.findIndex((s) => s.id === sub.id);
-    const next = at === -1 ? [...subs, sub] : subs.map((s, i) => (i === at ? sub : s));
-    next.sort(byOrder);
-    return { ...el, subelements: next };
-  });
-}
-
-/** Remove a Subelement by id from whichever Element holds it (a DELETE row
- *  carries only the primary key). */
-export function removeSubelementFromList(list: ElementWithDetails[], subId: string): ElementWithDetails[] {
-  let hit = false;
-  const next = list.map((el) => {
-    const subs = el.subelements ?? [];
-    if (!subs.some((s) => s.id === subId)) return el;
-    hit = true;
-    return { ...el, subelements: subs.filter((s) => s.id !== subId) };
-  });
-  return hit ? next : list;
-}
 
 /** Insert or replace an assignment (with its Worker) on its Element. */
 export function upsertAssigneeInList(
@@ -167,12 +142,6 @@ function mapExplorerLists(
   return any ? { objects, rootElements } : data;
 }
 
-export function upsertSubelementInExplorer(data: ExplorerData, sub: Subelement): ExplorerData {
-  return mapExplorerLists(data, (l) => upsertSubelementInList(l, sub));
-}
-export function removeSubelementFromExplorer(data: ExplorerData, subId: string): ExplorerData {
-  return mapExplorerLists(data, (l) => removeSubelementFromList(l, subId));
-}
 export function upsertAssigneeInExplorer(data: ExplorerData, a: ElementAssigneeWithWorker): ExplorerData {
   return mapExplorerLists(data, (l) => upsertAssigneeInList(l, a));
 }
@@ -227,37 +196,6 @@ export function patchElementInExplorer(
   });
   const rootElements = patchList(data.rootElements);
   if (!any) return data; // id not in this cache → no-op, preserve identity
-  return { objects, rootElements };
-}
-
-export function patchSubelementInExplorer(
-  data: ExplorerData,
-  id: string,
-  patch: Partial<Subelement>,
-): ExplorerData {
-  let any = false;
-  const patchEl = (el: ElementWithDetails): ElementWithDetails => {
-    const subs = el.subelements ?? [];
-    let hit = false;
-    const nextSubs = subs.map(s => {
-      if (s.id !== id) return s;
-      hit = true; any = true;
-      return { ...s, ...patch };
-    });
-    return hit ? { ...el, subelements: nextSubs } : el;
-  };
-  const objects = data.objects.map(obj => {
-    const els = obj.elements ?? [];
-    let objHit = false;
-    const nextEls = els.map(el => {
-      const next = patchEl(el);
-      if (next !== el) objHit = true;
-      return next;
-    });
-    return objHit ? { ...obj, elements: nextEls } : obj;
-  });
-  const rootElements = data.rootElements.map(patchEl);
-  if (!any) return data;
   return { objects, rootElements };
 }
 

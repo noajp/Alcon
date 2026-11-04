@@ -20,7 +20,7 @@ export async function fetchExplorerData(domainId?: string | null): Promise<Explo
   // An empty active Domain is the new-Space state, not an all-Domains query.
   if (domainId === '') return EMPTY_EXPLORER_DATA;
   // Single round trip — the get_explorer_data RPC assembles the whole
-  // enriched tree (objects → elements → subelements / assignees+worker,
+  // enriched tree (objects → elements → assignees+worker,
   // plus domain-scope + object_members membership filtering and the
   // rootElements split) in Postgres. Replaces the previous ~6-query
   // client-side waterfall. SECURITY INVOKER so RLS still applies exactly as

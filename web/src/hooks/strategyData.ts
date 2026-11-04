@@ -32,7 +32,6 @@ import type {
   StrategyObject,
   StrategyUpdate,
   StrategyWithObjects,
-  Subelement,
   Worker,
 } from '@/types/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -112,18 +111,15 @@ export async function fetchStrategyElements(opts: {
 
   const elementIdsArr = Array.from(elementIdSet);
 
-  // 3. Fetch elements + subelements + assignees + workers in parallel.
+  // 3. Fetch elements + assignees + workers in parallel.
   //    start_date orders the whole set, so it is re-applied across chunks:
   //    ascending with the undated last, the way PostgREST hands it back.
-  const [elementsData, subs, assignees, junctions] = await Promise.all([
+  const [elementsData, assignees, junctions] = await Promise.all([
     selectIn(
       elementIdsArr,
       chunk => supabase.from('elements').select('*').in('id', chunk).order('start_date'),
       { compare: (a, b) => ascNullsLast(a.start_date, b.start_date) },
     ) as Promise<Element[]>,
-    selectIn(elementIdsArr, chunk =>
-      supabase.from('subelements').select('*').in('element_id', chunk),
-    ) as Promise<Subelement[]>,
     selectIn(elementIdsArr, chunk =>
       supabase.from('element_assignees').select('*').in('element_id', chunk),
     ) as Promise<ElementAssignee[]>,
@@ -147,7 +143,6 @@ export async function fetchStrategyElements(opts: {
     const objIds = objIdsByElement.get(el.id) || (el.object_id ? [el.object_id] : []);
     return {
       ...el,
-      subelements: subs.filter(s => s.element_id === el.id),
       assignees: assignees
         .filter(a => a.element_id === el.id)
         .map(a => ({ ...a, worker: workers.find(w => w.id === a.worker_id) })),

@@ -5,6 +5,8 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const SURFACE_MESSAGES: Record<string, Row> = {
+  'Sub-element of': ['親 Element', '상위 Element', 'Sous-element de', 'Sub-element de'],
+  'Mark as not done': ['未完了に戻す', '미완료로 되돌리기', 'Marquer comme non terminé', 'Marcar como no hecho'],
   'Follow': ['フォロー', '팔로우', 'Suivre', 'Seguir'],
   'Unfollow': ['フォローをやめる', '팔로우 취소', 'Ne plus suivre', 'Dejar de seguir'],
   'Your Execution': ['あなたの Execution', '내 Execution', 'Votre Execution', 'Tu Execution'],

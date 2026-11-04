@@ -7,7 +7,7 @@ import type { CallerAccess } from "./callerAuth.ts";
 // What a caller outside the app may do — through MCP (alcon-mcp) or REST
 // (alcon-api); both read this one list. Reads, plus the writes a person
 // delegates day to day: create and update Elements, comment, assign, label,
-// and tick subelements — and how an agent reports on the Element it works:
+// and add or complete Sub-elements — and how an agent reports on the Element it works:
 // take and return the lease, log progress, close with an outcome
 // (agentReportTools.ts). Deletes, bulk writes, moving between Objects and
 // Object edits stay in the app, where the person sees what they touch.

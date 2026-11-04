@@ -28,10 +28,6 @@ import { useRegisterPageCommand } from '@/Function/shared/pageCommands';
 import {
   updateElement,
   fetchElementWithDetails,
-  updateSubelement,
-  deleteSubelement,
-  createSubelement,
-  useAssignableWorkers,
   fetchAssignableWorkers,
   addElementAssignee,
   removeElementAssignee,
@@ -55,7 +51,7 @@ import {
   useElementCustomColumns,
 } from '@/hooks/elementDetailQueries';
 import { CustomColumnCell } from '@/Function/property/CustomColumnCell';
-import type { Subelement, Json } from '@/types/database';
+import type { Json } from '@/types/database';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
@@ -68,7 +64,6 @@ import { labelColor, labelColorKey, domainLabelNames, useLabelColors, setLabelCo
 import { LabelPaletteRows } from '@/Function/shared/LabelPaletteRows';
 import { MenuShell } from '@/Function/shared/menu';
 import { RailCard } from '@/Function/shared/RailCard';
-import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import {
   useBoard,
   WidgetSurface,
@@ -88,10 +83,7 @@ import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { CodeChangesSection } from '../code/CodeChangesSection';
-import { SubelementRow } from './SubelementRow';
-import { SubelementBulkBar } from './SubelementBulkBar';
-import { useElementSelection } from './useElementSelection';
-import { SubelementDetailModal } from './SubelementDetailModal';
+import { ParentLine, SubElementsSection } from './SubElementsSection';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ApprovalRequestBanner } from './ApprovalRequestBanner';
@@ -279,7 +271,7 @@ function ElementDetailBody({
   }, []);
 
   // Esc goes back to the list this Element was opened from — one level.
-  // Anything open above the page (a picker, the Subelement modal, a field
+  // Anything open above the page (a picker, a field
   // ending its own edit) takes the key first; the page gets the next one.
   // The root ref keeps an Escape typed into a field elsewhere (the sidebar's
   // rename, say) from counting as this page's.
@@ -290,34 +282,6 @@ function ElementDetailBody({
   const { reactions, refresh: refreshReactions } = useElementReactions(element.id);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   useEscapeLayer(emojiPickerOpen, () => setEmojiPickerOpen(false));
-  // Subelement create / detail modal — null when closed; { mode: 'create' }
-  // for the new-sub-element popup; { mode: 'detail', subelement } for editing.
-  // The Sub-elements section's fold: open when there are some, folded (▶)
-  // when there are none — unfolding it offers the "Add sub-element" line.
-  const [subsOpen, setSubsOpen] = useState(() => (element.subelements?.length ?? 0) > 0);
-  const [newSubTitle, setNewSubTitle] = useState('');
-  const [addingSub, setAddingSub] = useState(false);
-  // Who a sub-element can be put on: the parent Element's assignable people.
-  const { data: subWorkers } = useAssignableWorkers({ elementId: element.id }, subsOpen);
-  const addSubelement = async () => {
-    const title = newSubTitle.trim();
-    if (!title || addingSub) return;
-    setAddingSub(true);
-    try {
-      await createSubelement({ title, element_id: element.id });
-      setNewSubTitle('');
-      onRefresh?.();
-    } catch (e) {
-      noticeElementSaveFailed(e);
-    } finally {
-      setAddingSub(false);
-    }
-  };
-  const [subModal, setSubModal] = useState<
-    | { mode: 'create' }
-    | { mode: 'detail'; subelement: Subelement }
-    | null
-  >(null);
 
   // Edges — cached per Element.
   const allEdges = useElementEdges(element.id);
@@ -424,11 +388,6 @@ function ElementDetailBody({
   // deliverable as a comment — refresh the parent so the status updates.
   // (The comments panel re-reads its thread as the run moves on: refreshKey.)
   const agentWasActive = useRef(false);
-  // Multi-select for the sub-element checklist — same hook the Elements list
-  // uses. `hasSubSelectionRef` lets a plain row click replace the selection
-  // without re-rendering every row when the "anything selected" flag flips.
-  const subSelection = useElementSelection();
-  const hasSubSelectionRef = useRef(false);
   useEffect(() => {
     if (agent.isActive) {
       agentWasActive.current = true;
@@ -632,19 +591,6 @@ function ElementDetailBody({
     } catch (e) { noticeElementSaveFailed(e); }
   };
 
-  // Sub-element create / save now lives inside SubelementDetailModal. The
-  // detail view only needs to refresh + log when the modal reports back.
-  const handleSubelementSaved = (mode: 'create' | 'detail', titleHint?: string) => {
-    if (mode === 'create' && titleHint) {
-      log('subelement', `Added sub-element “${titleHint}”`);
-    }
-    onRefresh?.();
-  };
-  const handleSubelementDeleted = (titleHint?: string) => {
-    if (titleHint) log('subelement', `Deleted sub-element “${titleHint}”`);
-    onRefresh?.();
-  };
-
   const handleAddAssignee = async (workerId: string) => {
     try {
       const worker = allWorkers.find(w => w.id === workerId);
@@ -696,26 +642,6 @@ function ElementDetailBody({
     } catch (e) {
       noticeElementSaveFailed(e);
     }
-  };
-
-  const completedSubs = element.subelements?.filter(s => s.is_completed).length || 0;
-  const totalSubs = element.subelements?.length || 0;
-  hasSubSelectionRef.current = subSelection.selectedRowIds.size > 0;
-  const subIds = element.subelements?.map((s) => s.id) ?? [];
-  // Bulk actions over the selected sub-elements. Complete / un-complete go
-  // through the optimistic updateSubelement (instant); delete isn't cached,
-  // so we refresh afterwards. Either way the selection is cleared.
-  const bulkMarkSubs = async (done: boolean) => {
-    const ids = Array.from(subSelection.selectedRowIds);
-    await Promise.all(ids.map((id) => updateSubelement(id, { is_completed: done }).catch(() => {})));
-    subSelection.clearSelection();
-    onRefresh?.();
-  };
-  const bulkDeleteSubs = async () => {
-    const ids = Array.from(subSelection.selectedRowIds);
-    await Promise.all(ids.map((id) => deleteSubelement(id).catch(() => {})));
-    subSelection.clearSelection();
-    onRefresh?.();
   };
 
   // The breadcrumb's root segment: the Domain name when there is one, or —
@@ -840,6 +766,7 @@ function ElementDetailBody({
                 placeholder={t('Element title')}
               />
             </div>
+            {element.parent_id && onOpenElement && <ParentLine parentId={element.parent_id} onOpen={onOpenElement} />}
             <ApprovalRequestBanner element={element} onRefresh={onRefresh} />
             {layout === 'reader' && <div className="mb-5 flex flex-wrap items-center gap-2">
               <StatusPicker element={element} onChanged={handleStatusChange} trigger={
@@ -999,66 +926,8 @@ function ElementDetailBody({
           <AttachmentList owner={{ kind: 'element', id: element.id }}
             actions={(f) => (canImport(f.name) ? <FileImportActions file={f} /> : undefined)} />
 
-          {/* Sub-elements — a section like Comments: its heading folds the
-              list (▶). Unfolded, the rows read like the Elements list
-              (status, title, date, assignee, each set in place; the row opens
-              the SubelementDetailModal), and a grey "Add sub-element" line
-              under them takes a title and Enter. */}
-          <section className="w-full">
-            {/* Baseline-aligned, so the small done/total count sits on the
-                heading's line rather than floating at its middle. */}
-            <div className="mb-1 flex h-8 items-baseline gap-1 pt-1.5">
-              <button type="button" onClick={() => setSubsOpen((o) => !o)} aria-expanded={subsOpen}
-                className="flex items-center gap-2 rounded-md text-foreground">
-                <h2 className={`${FONT.lg} text-foreground`}>{t('Sub-elements')}</h2>
-                <DisclosureTriangle open={subsOpen} className="text-muted-foreground" />
-              </button>
-              {totalSubs > 0 && <span className="ml-1 text-[12px] tabular-nums text-muted-foreground">{completedSubs}/{totalSubs}</span>}
-            </div>
-            {subsOpen && (
-              <div
-                className="-mx-2 space-y-0 group/sublist"
-                data-has-selection={subSelection.selectedRowIds.size > 0 ? '' : undefined}
-              >
-                {element.subelements?.map((sub) => (
-                  <SubelementRow
-                    key={sub.id}
-                    subelement={sub}
-                    workers={subWorkers}
-                    onRefresh={onRefresh}
-                    onOpen={() => setSubModal({ mode: 'detail', subelement: sub })}
-                    canRowSelect
-                    isSelected={subSelection.selectedRowIds.has(sub.id)}
-                    hasSelectionRef={hasSubSelectionRef}
-                    onRowSelect={(id, mode) => subSelection.handleRowSelect(id, mode, subIds)}
-                  />
-                ))}
-                <div className="flex min-h-[2.125rem] items-center gap-2 px-2">
-                  <span className="flex opacity-40"><ElementProgressMark status="todo" size={16} /></span>
-                  <input
-                    value={newSubTitle}
-                    onChange={(e) => setNewSubTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); void addSubelement(); }
-                      else if (e.key === 'Escape') { e.preventDefault(); setNewSubTitle(''); e.currentTarget.blur(); }
-                    }}
-                    disabled={addingSub}
-                    placeholder={t('Add sub-element')}
-                    aria-label={t('Add sub-element')}
-                    className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground/60"
-                  />
-                </div>
-              </div>
-            )}
-          </section>
-
-          <SubelementBulkBar
-            count={subSelection.selectedRowIds.size}
-            onMarkDone={() => bulkMarkSubs(true)}
-            onMarkTodo={() => bulkMarkSubs(false)}
-            onDelete={bulkDeleteSubs}
-            onClear={subSelection.clearSelection}
-          />
+          {/* Sub-elements — Elements under this one, each with its own page. */}
+          <SubElementsSection element={element} onOpen={(id) => onOpenElement?.(id)} onAdded={(title) => log('subelement', `Added sub-element “${title}”`)} />
 
           <ElementDependencies elementId={element.id} spaceId={coordinationSpaceId ?? null}
             onOpenElement={onOpenElement} onChanged={onRefresh} openSignal={dependencySignal} />
@@ -1423,22 +1292,6 @@ function ElementDetailBody({
         </div>
       </div>
 
-      {subModal && (
-        <SubelementDetailModal
-          subelement={subModal.mode === 'detail' ? subModal.subelement : null}
-          parentElement={{ id: element.id, title: element.title }}
-          onClose={() => setSubModal(null)}
-          onSaved={() => {
-            const titleHint = subModal.mode === 'create' ? undefined : subModal.subelement.title;
-            handleSubelementSaved(subModal.mode, titleHint);
-          }}
-          onDeleted={() => {
-            handleSubelementDeleted(
-              subModal.mode === 'detail' ? subModal.subelement.title : undefined
-            );
-          }}
-        />
-      )}
     </div>
   );
 }

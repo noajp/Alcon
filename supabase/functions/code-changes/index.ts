@@ -315,7 +315,7 @@ async function merge(
 
 interface IntentContext {
   element: { display_id: string | null; title: string; description: string | null };
-  subelements: { title: string; is_completed: boolean }[];
+  subElements: { title: string; done: boolean }[];
   initiatives: { name: string; description: string | null; intents: { kind: string | null; title: string; subtitle: string | null; target: string | null }[] }[];
 }
 
@@ -323,7 +323,7 @@ async function loadIntent(userDb: SupabaseClient, elementId: string): Promise<In
   const { data: el } = await userDb.from("elements").select("display_id, title, description, object_id").eq("id", elementId).single();
   if (!el) throw new Error("Element not found");
   const [subs, links] = await Promise.all([
-    userDb.from("subelements").select("title, is_completed").eq("element_id", elementId).order("order_index"),
+    userDb.from("elements").select("title, status").eq("parent_id", elementId).order("order_index").order("seq_number"),
     el.object_id ? userDb.from("strategy_objects").select("strategy_id").eq("object_id", el.object_id) : Promise.resolve({ data: [] }),
   ]);
   // Read with the person's JWT, so RLS decides which Initiatives they see.
@@ -346,7 +346,7 @@ async function loadIntent(userDb: SupabaseClient, elementId: string): Promise<In
   }));
   return {
     element: { display_id: el.display_id, title: el.title, description: el.description },
-    subelements: ((subs.data ?? []) as { title: string; is_completed: boolean | null }[]).map((s) => ({ title: s.title, is_completed: !!s.is_completed })),
+    subElements: ((subs.data ?? []) as { title: string; status: string | null }[]).map((s) => ({ title: s.title, done: s.status === "done" })),
     initiatives,
   };
 }
@@ -422,7 +422,7 @@ function changeBrief(ctx: IntentContext, change: ChangeRow, files: GithubFile[])
 - ${ctx.element.display_id ?? ""} ${ctx.element.title}
 - 説明: ${ctx.element.description?.trim() || "(なし)"}
 - サブ要素:
-${ctx.subelements.map((s) => `  - [${s.is_completed ? "x" : " "}] ${s.title}`).join("\n") || "  (なし)"}
+${ctx.subElements.map((s) => `  - [${s.done ? "x" : " "}] ${s.title}`).join("\n") || "  (なし)"}
 
 # Initiative の意図
 ${inits.join("\n") || "(この Element の Object はどの Initiative にも属していません)"}

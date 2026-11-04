@@ -418,9 +418,11 @@ async function execute(a: ExecArgs): Promise<void> {
   };
 
   // ── Executors ───────────────────────────────────────────────────────────
+  // The Sub-elements of this Element (Elements whose parent it is): the only
+  // ones complete_subelement may close.
   const subelementIds = new Set<string>();
   {
-    const { data: subs } = await userDb.from("subelements").select("id").eq("element_id", run.element_id);
+    const { data: subs } = await userDb.from("elements").select("id").eq("parent_id", run.element_id);
     for (const s of subs ?? []) subelementIds.add(s.id as string);
   }
 
@@ -809,7 +811,7 @@ async function loadContext(userDb: SupabaseClient, run: Run, integrations: TaskC
     .select("id, display_id, title, description, status, priority, due_date, labels, object_id").eq("id", run.element_id).single();
   if (!el) throw new Error("対象の Element が見つかりません。");
   const [subs, comments, runs, artifacts, obj, links] = await Promise.all([
-    userDb.from("subelements").select("id, title, is_completed").eq("element_id", run.element_id).order("order_index"),
+    userDb.from("elements").select("id, title, status").eq("parent_id", run.element_id).order("order_index").order("seq_number"),
     userDb.from("element_comments").select("author_name, author_kind, content, created_at").eq("element_id", run.element_id).order("created_at", { ascending: false }).limit(15),
     userDb.from("agent_runs").select("created_at, status, summary").eq("element_id", run.element_id).neq("id", run.id).order("created_at", { ascending: false }).limit(3),
     userDb.from("agent_artifacts").select("title").eq("element_id", run.element_id).order("created_at"),
@@ -832,7 +834,7 @@ async function loadContext(userDb: SupabaseClient, run: Run, integrations: TaskC
       priority: el.priority, due_date: el.due_date, labels: Array.isArray(el.labels) ? el.labels : [],
     },
     objectName: (obj.data as { name?: string } | null)?.name ?? null,
-    subelements: (subs.data ?? []).map((s: { id: string; title: string; is_completed: boolean | null }) => ({ id: s.id, title: s.title, is_completed: !!s.is_completed })),
+    subElements: (subs.data ?? []).map((s: { id: string; title: string; status: string | null }) => ({ id: s.id, title: s.title, done: s.status === "done" })),
     initiatives,
     comments: ((comments.data ?? []) as { author_name: string | null; author_kind: string; content: string; created_at: string }[]).reverse()
       .map((c) => ({ author: c.author_name ?? "不明", kind: c.author_kind, content: c.content ?? "", at: c.created_at.slice(0, 16).replace("T", " ") })),

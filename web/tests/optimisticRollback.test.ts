@@ -14,7 +14,7 @@ import { getQueryClient } from '@/lib/queryClient';
 import type { ElementWithDetails } from '@/types/database';
 
 const el = (id: string, order_index: number, extra: Partial<ElementWithDetails> = {}): ElementWithDetails =>
-  ({ id, title: id, object_id: 'obj-a', order_index, subelements: [], assignees: [], ...extra }) as ElementWithDetails;
+  ({ id, title: id, object_id: 'obj-a', order_index, assignees: [], ...extra }) as ElementWithDetails;
 
 function tree(): ExplorerData {
   return {

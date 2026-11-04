@@ -16,10 +16,6 @@ import {
   removeElementFromExplorer,
   removeElementFromList,
   appendElementToList,
-  upsertSubelementInExplorer,
-  upsertSubelementInList,
-  removeSubelementFromExplorer,
-  removeSubelementFromList,
   upsertAssigneeInExplorer,
   upsertAssigneeInList,
   removeAssigneeFromExplorer,
@@ -37,7 +33,6 @@ import type {
   ElementReaction,
   ElementWithDetails,
   StrategyComment,
-  Subelement,
   Worker,
 } from '@/types/database';
 
@@ -45,8 +40,8 @@ import type {
 //
 // Every row that changes in a workspace-shaped table arrives here once, on
 // one websocket channel, and is applied to the normalised caches as a delta:
-// an Element UPDATE patches that Element wherever it is cached, a Subelement
-// INSERT lands on its parent, a comment INSERT lands on its thread and bumps
+// an Element UPDATE patches that Element wherever it is cached, an assignment
+// INSERT lands on its Element, a comment INSERT lands on its thread and bumps
 // the rollup. Whoever wrote the row (this tab, another tab, a teammate, an
 // agent, CI) takes the same path, so a surface is correct as long as it reads
 // the cache — no per-surface subscription, no writer-side invalidation to
@@ -59,7 +54,7 @@ import type {
 // caches for the id instead of trusting `old`.
 
 const WORKSPACE_TABLES = [
-  'elements', 'subelements', 'element_assignees', 'element_objects',
+  'elements', 'element_assignees', 'element_objects',
   'custom_column_values', 'custom_columns', 'custom_column_placements',
   'element_comments', 'element_reactions', 'element_edges', 'element_activity',
   'objects', 'workers', 'domains', 'worker_availability',
@@ -162,7 +157,6 @@ const facetIs = (facet: string) => (key: readonly unknown[]) => key[0] === 'elem
 function enrich(row: Element): ElementWithDetails {
   return {
     ...row,
-    subelements: [],
     assignees: [],
     objectIds: row.object_id ? [row.object_id] : [],
     isMultiHomed: false,
@@ -211,7 +205,7 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
     invalidateSoon(qc, ['initiativeRisk']);
   }
 
-  if (['elements', 'subelements', 'element_assignees', 'element_objects', 'element_edges', 'objects',
+  if (['elements', 'element_assignees', 'element_objects', 'element_edges', 'objects',
     'workers', 'domains', 'object_domains', 'activity_space_members', 'domain_members', 'object_members'].includes(d.table)) {
     invalidateSoon(qc, ['nowWork']);
     invalidateSoon(qc, ['coordination-element']);
@@ -232,6 +226,8 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
   switch (d.table) {
     case 'elements': {
       if (!id) return;
+      // A Sub-element is an Element: its parent's list of them reads anew.
+      invalidateSoon(qc, ['element-children']);
       if (d.type === 'UPDATE') {
         const patch = row as unknown as Partial<Element>;
         forEachExplorer(qc, (data) => patchElementInExplorer(data, id, patch));
@@ -270,19 +266,6 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
       // A move into done or cancelled moves the lists' "Completed Elements"
       // window (useClosedTimesSince).
       if (d.type === 'INSERT' && isMoveIntoClosed(a)) invalidateSoon(qc, ['elementClosedTimes']);
-      return;
-    }
-
-    case 'subelements': {
-      if (!id) return;
-      if (d.type === 'DELETE') {
-        forEachExplorer(qc, (data) => removeSubelementFromExplorer(data, id));
-        forEachMyElements(qc, (list) => removeSubelementFromList(list, id));
-        return;
-      }
-      const sub = row as unknown as Subelement;
-      forEachExplorer(qc, (data) => upsertSubelementInExplorer(data, sub));
-      forEachMyElements(qc, (list) => upsertSubelementInList(list, sub));
       return;
     }
 

@@ -2152,6 +2152,7 @@ export type Database = {
           object_id: string | null
           order_index: number | null
           owner_id: string | null
+          parent_id: string | null
           phase_id: string | null
           priority: string | null
           progress: number | null
@@ -2185,6 +2186,7 @@ export type Database = {
           object_id?: string | null
           order_index?: number | null
           owner_id?: string | null
+          parent_id?: string | null
           phase_id?: string | null
           priority?: string | null
           progress?: number | null
@@ -2218,6 +2220,7 @@ export type Database = {
           object_id?: string | null
           order_index?: number | null
           owner_id?: string | null
+          parent_id?: string | null
           phase_id?: string | null
           priority?: string | null
           progress?: number | null
@@ -3941,66 +3944,6 @@ export type Database = {
             columns: ["strategy_id"]
             isOneToOne: false
             referencedRelation: "strategies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      subelements: {
-        Row: {
-          assignee_id: string | null
-          created_at: string | null
-          display_id: string | null
-          due_date: string | null
-          element_id: string
-          id: string
-          is_completed: boolean | null
-          order_index: number | null
-          seq_number: number | null
-          status: string
-          title: string
-          updated_at: string | null
-        }
-        Insert: {
-          assignee_id?: string | null
-          created_at?: string | null
-          display_id?: string | null
-          due_date?: string | null
-          element_id: string
-          id?: string
-          is_completed?: boolean | null
-          order_index?: number | null
-          seq_number?: number | null
-          status?: string
-          title: string
-          updated_at?: string | null
-        }
-        Update: {
-          assignee_id?: string | null
-          created_at?: string | null
-          display_id?: string | null
-          due_date?: string | null
-          element_id?: string
-          id?: string
-          is_completed?: boolean | null
-          order_index?: number | null
-          seq_number?: number | null
-          status?: string
-          title?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subelements_assignee_id_fkey"
-            columns: ["assignee_id"]
-            isOneToOne: false
-            referencedRelation: "workers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "subelements_element_id_fkey"
-            columns: ["element_id"]
-            isOneToOne: false
-            referencedRelation: "elements"
             referencedColumns: ["id"]
           },
         ]

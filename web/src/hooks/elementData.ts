@@ -7,7 +7,6 @@ import {
   insertElementIntoExplorer,
   mapElementInExplorer,
   patchElementInExplorer,
-  patchSubelementInExplorer,
   removeElementFromExplorer,
   reorderElementsInExplorer,
 } from '@/Function/sync/explorerPatch';
@@ -29,7 +28,6 @@ import type {
   ElementAssigneeWithWorker,
   ElementEdgeWithElement,
   ElementWithDetails,
-  Subelement,
   Worker,
 } from '@/types/database';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
@@ -43,6 +41,8 @@ export async function createElement(element: {
   title: string;
   object_id?: string | null;  // null = Domain-direct Element (sidebar Elements view)
   owner_id?: string | null;   // set = personal Element (My Elements scope)
+  /** Set = a Sub-element of that Element (pass the parent's object_id too). */
+  parent_id?: string | null;
   description?: string | null;
   type?: string | null;        // Domain-shared Element type (TASK / Feature / Fix / …)
   labels?: string[];           // 自由文字列ラベル。省略時は空配列
@@ -74,6 +74,7 @@ export async function createElement(element: {
     title: element.title,
     object_id: element.object_id ?? null,
     owner_id: element.owner_id ?? null,
+    parent_id: element.parent_id ?? null,
     description: element.description || null,
     type: element.type ?? null,
     labels: element.labels ?? [],
@@ -105,7 +106,7 @@ export async function createElement(element: {
       carried_over_count: 0,
       claimed_by: null, claim_expires_at: null, branch: null,
       created_at: nowIso, updated_at: nowIso,
-      subelements: [], assignees: [],
+      assignees: [],
       objectIds: element.object_id ? [element.object_id] : [],
       isMultiHomed: false,
     } as ElementWithDetails;
@@ -143,7 +144,7 @@ export async function createElement(element: {
     if (isExplorerScoped) {
       const realEl = {
         ...data,
-        subelements: [], assignees: [],
+        assignees: [],
         objectIds: element.object_id ? [element.object_id] : [],
         isMultiHomed: false,
       } as ElementWithDetails;
@@ -327,8 +328,7 @@ export async function fetchElementWithDetails(elementId: string): Promise<Elemen
   if (!row) return null;
   const element = row as Element;
 
-  const [{ data: subs }, { data: assigneeRows }, { data: homes }] = await Promise.all([
-    supabase.from('subelements').select('*').eq('element_id', elementId).order('order_index'),
+  const [{ data: assigneeRows }, { data: homes }] = await Promise.all([
     supabase.from('element_assignees').select('*').eq('element_id', elementId),
     supabase.from('element_objects').select('object_id').eq('element_id', elementId),
   ]);
@@ -354,7 +354,6 @@ export async function fetchElementWithDetails(elementId: string): Promise<Elemen
 
   return {
     ...element,
-    subelements: (subs || []) as Subelement[],
     assignees: assignees.map(a => ({ ...a, worker: workers.find(w => w.id === a.worker_id) })),
     objectIds,
     isMultiHomed: objectIds.length > 1,
@@ -363,79 +362,40 @@ export async function fetchElementWithDetails(elementId: string): Promise<Elemen
 }
 
 // ============================================
-// Subelement CRUD
+// Sub-elements — Elements with a parent
 // ============================================
 
-export async function createSubelement(subelement: {
-  title: string;
-  element_id: string;
-  is_completed?: boolean;
-  order_index?: number;
-}): Promise<Subelement> {
-  const { data: existing } = await supabase
-    .from('subelements')
-    .select('order_index')
-    .eq('element_id', subelement.element_id)
-    .order('order_index', { ascending: false })
-    .limit(1);
-
-  const maxOrder = existing?.[0]?.order_index ?? -1;
-
-  const { data, error } = await supabase
-    .from('subelements')
-    .insert({
-      title: subelement.title,
-      element_id: subelement.element_id,
-      is_completed: subelement.is_completed ?? false,
-      order_index: subelement.order_index ?? maxOrder + 1,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+/** A new Sub-element of `parent`: an Element in the parent's Object (or the
+ *  parent owner's own Elements when it has none). */
+export async function createSubElement(parent: Pick<Element, 'id' | 'object_id' | 'owner_id'>, title: string): Promise<Element> {
+  return createElement({ title, parent_id: parent.id, object_id: parent.object_id, owner_id: parent.object_id ? null : parent.owner_id });
 }
 
-export async function updateSubelement(
-  id: string,
-  updates: Partial<Omit<Subelement, 'id' | 'created_at'>>
-): Promise<Subelement> {
-  // Optimistic — toggleSubelementComplete() delegates here, so the inline
-  // checklist checkbox feels instant for free. Status and completion move
-  // together on screen as the DB moves them (Done ⇔ completed).
-  const paired: Partial<Omit<Subelement, 'id' | 'created_at'>> = { ...updates };
-  if (updates.status !== undefined && updates.is_completed === undefined) paired.is_completed = updates.status === 'done';
-  else if (updates.is_completed !== undefined && updates.status === undefined) paired.status = updates.is_completed ? 'done' : 'todo';
-  const optimisticPatch = { ...paired, updated_at: new Date().toISOString() };
-  const rollback = applyOptimisticExplorerPatch(data =>
-    patchSubelementInExplorer(data, id, optimisticPatch)
-  );
-  try {
-    const { data, error } = await supabase
-      .from('subelements')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  } catch (err) {
-    rollback();
-    throw err;
-  }
+/** The Sub-elements of an Element, in their order. */
+export function useSubElements(parentId: string | null) {
+  return useQuery({
+    queryKey: ['element-children', parentId],
+    enabled: !!parentId,
+    queryFn: async (): Promise<Element[]> => {
+      const { data, error } = await supabase.from('elements').select('*').eq('parent_id', parentId!)
+        .order('order_index', { ascending: true, nullsFirst: false }).order('seq_number', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Element[];
+    },
+  });
 }
 
-export async function deleteSubelement(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('subelements')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw error;
-}
-
-export async function toggleSubelementComplete(id: string, isCompleted: boolean): Promise<Subelement> {
-  return updateSubelement(id, { is_completed: isCompleted });
+/** The Element an Element is a Sub-element of. */
+export function useParentElement(parentId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['element-parent', parentId],
+    enabled: !!parentId,
+    queryFn: async (): Promise<Pick<Element, 'id' | 'title' | 'status' | 'display_id' | 'object_id'> | null> => {
+      const { data, error } = await supabase.from('elements').select('id, title, status, display_id, object_id').eq('id', parentId!).maybeSingle();
+      if (error) throw error;
+      return data as Pick<Element, 'id' | 'title' | 'status' | 'display_id' | 'object_id'> | null;
+    },
+  });
 }
 
 // ============================================

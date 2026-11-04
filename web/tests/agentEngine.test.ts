@@ -258,7 +258,7 @@ describe('pricing and prompts', () => {
   it('frames a reply around the comment and treats outside text as data', () => {
     const base = {
       mode: 'reply', prompt: '税込にして', element: { id: 'e', display_id: 'ELE_X-1', title: '経費処理', description: null, status: 'todo', priority: 'high', due_date: null, labels: [] },
-      objectName: null, subelements: [], initiatives: [], comments: [], previousRuns: [], artifacts: [], integrations: [], today: '2026-10-03',
+      objectName: null, subElements: [], initiatives: [], comments: [], previousRuns: [], artifacts: [], integrations: [], today: '2026-10-03',
     };
     const msg = ctx.taskMessage(base);
     expect(msg).toContain('税込にして');
