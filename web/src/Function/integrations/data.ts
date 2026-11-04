@@ -19,7 +19,7 @@ import { useSpaceRoleQuery } from '@/Function/space/data';
 // integration-oauth Edge Function signs in with the provider and stores the tokens;
 // `external_account` says which account it signed in as.
 
-const COLUMNS = 'id, activity_space_id, preset, kind, name, description, icon, endpoint, auth_type, auth_header, secret_id, delegation, enabled, last_test, external_account, created_by, created_at, updated_at';
+const COLUMNS = 'id, activity_space_id, preset, kind, name, description, icon, endpoint, auth_type, auth_header, secret_id, delegation, enabled, last_test, external_account, manifest, guide, created_by, created_at, updated_at';
 
 const integrationsKey = (spaceId: string | null) => ['integrations', spaceId] as const;
 
@@ -212,6 +212,8 @@ export function useIntegrationActions(spaceId: string | null) {
     onSuccess: ({ id, lastTest }) => {
       qc.setQueryData<Integration[]>(key, (rows) => rows?.map((r) => (r.id === id ? { ...r, last_test: lastTest } : r)));
     },
+    // A test also rewrites the MCP connection's commands from its tool list.
+    onSettled: refresh,
   });
 
   const signIn = useMutation({ mutationFn: (id: string) => startIntegrationOAuth(id), meta: { silent: true } });

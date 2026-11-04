@@ -1012,6 +1012,39 @@ export type Database = {
         }
         Relationships: []
       }
+      catalog_items: {
+        Row: {
+          body: string | null
+          description: string
+          id: string
+          kind: string
+          name: string
+          payload: Json
+          sort: number
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          description?: string
+          id: string
+          kind: string
+          name: string
+          payload?: Json
+          sort?: number
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          description?: string
+          id?: string
+          kind?: string
+          name?: string
+          payload?: Json
+          sort?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       code_change_comments: {
         Row: {
           author_id: string
@@ -1468,6 +1501,7 @@ export type Database = {
           created_by: string | null
           id: string
           name: string
+          source_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1477,6 +1511,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           name: string
+          source_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1486,6 +1521,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           name?: string
+          source_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2208,6 +2244,13 @@ export type Database = {
             referencedRelation: "elements"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "element_reactions_strategy_id_fkey"
+            columns: ["strategy_id"]
+            isOneToOne: false
+            referencedRelation: "strategies"
+            referencedColumns: ["id"]
+          },
         ]
       }
       element_templates: {
@@ -2502,6 +2545,7 @@ export type Database = {
           id: string
           integration_id: string
           pending_account: string | null
+          return_origin: string | null
           state_hash: string | null
           ticket_expires_at: string
           ticket_hash: string | null
@@ -2517,6 +2561,7 @@ export type Database = {
           id?: string
           integration_id: string
           pending_account?: string | null
+          return_origin?: string | null
           state_hash?: string | null
           ticket_expires_at?: string
           ticket_hash?: string | null
@@ -2532,6 +2577,7 @@ export type Database = {
           id?: string
           integration_id?: string
           pending_account?: string | null
+          return_origin?: string | null
           state_hash?: string | null
           ticket_expires_at?: string
           ticket_hash?: string | null

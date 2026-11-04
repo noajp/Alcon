@@ -1,6 +1,6 @@
 import type { Asset, AssetStatus, Json } from '@/types/database';
 
-// Pure helpers for Settings › Integrations › Connected assets (ADR 0036):
+// Pure helpers for Settings › Customize › Connected assets (ADR 0036):
 // the install line a local app adds, how a manifest reads in one line, and
 // the order the list shows assets in. No browser or database dependency.
 

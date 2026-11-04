@@ -4,7 +4,7 @@
 
 - エンドポイント: `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/asset-relay`
 - 名乗り（`/hello`）は認証なし。以後は `Authorization: Bearer <資産トークン>`（`alc_ast_…`。名乗りの応答で一度だけ返る）
-- 画面: Settings › Integrations › Connected assets（受け口の URL と Space の id の表示、承諾・取り消し、活動の一覧）
+- 画面: Settings › Customize › Connected assets（受け口の URL と Space の id の表示、承諾・取り消し、活動の一覧）
 
 ## 流れ
 

@@ -134,7 +134,7 @@ async function announce() {
   if (r.data.token) { state.token = r.data.token; writeState({ token: r.data.token, asset_id: r.data.asset_id, relay: RELAY }); }
   else state.token = saved.token;
   note(r.data.token
-    ? `announced to Alcon as "${name}" — waiting for a Space owner to accept it (Settings › Integrations › Connected assets)`
+    ? `announced to Alcon as "${name}" — waiting for a Space owner to accept it (Settings › Customize › Connected assets)`
     : `connected to Alcon as "${name}" (${state.status})`);
   event('started', `${name} started`, { pid: process.pid, entry: body.manifest.entry });
 }

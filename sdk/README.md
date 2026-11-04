@@ -22,7 +22,7 @@ import alcon   # この一行
 
 | 変数 | 意味 |
 |---|---|
-| `ALCON_RELAY` | 受け口の URL。`https://<project>.supabase.co/functions/v1/asset-relay`。Alcon の Settings › Integrations › Connected assets に表示される |
+| `ALCON_RELAY` | 受け口の URL。`https://<project>.supabase.co/functions/v1/asset-relay`。Alcon の Settings › Customize › Connected assets に表示される |
 | `ALCON_SPACE` | 名乗り出る Space の id。同じ画面に表示される。初回だけ必要 |
 | `ALCON_NAME` | 資産の名前（省略時は package.json の name かフォルダ名） |
 | `ALCON_KIND` | `app` / `ai_agent` / `script` / `service` / `other`（省略時 `app`） |
@@ -54,7 +54,7 @@ cd sdk/node/runner && npm install
 ALCON_RELAY=https://<project>.supabase.co/functions/v1/asset-relay ALCON_SPACE=<Space の id> node alcon-runner.mjs
 ```
 
-- 初回は Space に名乗り出る。Settings › Integrations › Connected assets で承諾すると、承諾した人の AI の実行から使えるようになる
+- 初回は Space に名乗り出る。Settings › Customize › Connected assets で承諾すると、承諾した人の AI の実行から使えるようになる
 - ブラウザは専用のプロフィール（`~/.alcon/browser`）で開き、画面に見えるので AI の操作を見守れる。普段の Chrome のログインは共有しない。AI に見せたいサイトだけ、そのウィンドウでログインする
 - 既定は読み取りのみ。フォームを送る画面遷移は止める。`--allow-writes` で外す。`--headless` で画面を出さない
 - トークンとプロフィールは `~/.alcon/`（`ALCON_HOME` で変更）。止めるときは Ctrl+C、Alcon 側で Revoke すると次の呼び出しで止まる

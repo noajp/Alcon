@@ -1,5 +1,5 @@
 // integration-test — checks that a Space's external service answers with the
-// stored credential (ADR 0027). Settings › Integrations calls it from the
+// stored credential (ADR 0027). Settings › Customize calls it from the
 // 「接続テスト」 button.
 //
 // Request (POST JSON, Authorization: Bearer <the person's Supabase JWT>):
@@ -8,6 +8,8 @@
 //   { last_test: { ok, at, code, detail, tools?, tool_count?, status? } }
 //     mcp   initialize + tools/list → connected for a preset, reachable for
 //           a custom server; tool_count and up to 20 tools ({ name, readOnly }).
+//           The integration's manifest is rebuilt from every listed tool
+//           (manifestFromTools), keeping the permissions people set.
 //     http  a preset with a credential check (VERIFY) → connected or
 //           auth_failed. Any other API: GET on the base URL; a response
 //           below 500 other than 401 / 403 is only "reachable".
@@ -33,6 +35,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { McpSession, callHttp, isSafeEndpoint, readCapped, resolveCredential, type IntegrationRow } from "../_shared/integrationClient.ts";
 import { GOOGLE_ABOUT_URL, isGoogleDriveRow } from "../_shared/googleOAuth.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
+import { manifestFromTools } from "../_shared/connectorManifest.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,6 +57,8 @@ interface LastTest {
   /** A technical note for errors (already scrubbed of the secret); empty otherwise. */
   detail: string;
   tools?: { name: string; readOnly: boolean }[];
+  /** Every tool the server listed, for the manifest; never saved in last_test. */
+  all?: { name: string; description: string; readOnly: boolean }[];
   tool_count?: number;
   status?: number;
 }
@@ -113,6 +118,7 @@ async function runTest(row: IntegrationRow & { preset: string | null }, secret: 
         ok: true, at, code: row.preset ? "connected" : "reachable", detail: "",
         tool_count: tools.length,
         tools: tools.slice(0, MAX_LISTED_TOOLS).map((t) => ({ name: t.name, readOnly: t.readOnly })),
+        all: tools.map((t) => ({ name: t.name, description: t.description, readOnly: t.readOnly })),
       };
     }
     const verify = row.preset ? VERIFY[row.preset] : undefined;
@@ -219,9 +225,16 @@ Deno.serve(async (req: Request) => {
   const secret = typeof secretData === "string" && secretData.length > 0 ? secretData : null;
 
   const row = visible as IntegrationRow & { activity_space_id: string; preset: string | null };
-  const lastTest = row.auth_type === "oauth" ? await runOAuthTest(admin, row, secret) : await runTest(row, secret);
+  const { all, ...lastTest } = row.auth_type === "oauth" ? await runOAuthTest(admin, row, secret) : await runTest(row, secret);
 
-  const { error: writeErr } = await admin.from("integrations").update({ last_test: lastTest }).eq("id", integrationId);
+  // A server that listed its tools gets its manifest from them: one command
+  // per tool, keeping the permissions people set (manifestFromTools).
+  const patch: Record<string, unknown> = { last_test: lastTest };
+  if (all && lastTest.ok && row.kind === "mcp") {
+    const { data: cur } = await admin.from("integrations").select("manifest").eq("id", integrationId).maybeSingle();
+    patch.manifest = manifestFromTools(all, cur?.manifest ?? null);
+  }
+  const { error: writeErr } = await admin.from("integrations").update(patch).eq("id", integrationId);
   if (writeErr) return json({ error: "could not save the result", last_test: lastTest }, 500);
 
   return json({ last_test: lastTest });

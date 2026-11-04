@@ -20,7 +20,7 @@
 // Who may: anyone who can see the Element — checked with the person's JWT
 // (RLS) before the service role reads the Space's GitHub credential or
 // writes code_changes. Merging also takes membership of the Space. The
-// credential is the Space's GitHub integration (Settings › Integrations); a
+// credential is the Space's GitHub integration (Settings › Customize); a
 // public repository reads without one, but nothing is written without one —
 // and what is written goes as that token's GitHub account, so each post says
 // who wrote it in Alcon.
@@ -52,7 +52,7 @@ function json(payload: unknown, status = 200): Response {
 function githubFailure(e: unknown): Response {
   if (e instanceof GithubError) {
     if (e.status === 404 || e.status === 401 || e.status === 403) {
-      return json({ error: "GitHub could not show this pull request. Connect GitHub in Settings › Integrations with a token that can read the repository.", code: "github_access" }, 404);
+      return json({ error: "GitHub could not show this pull request. Connect GitHub in Settings › Customize with a token that can read the repository.", code: "github_access" }, 404);
     }
     return json({ error: e.message, code: "github_error" }, 502);
   }

@@ -160,7 +160,7 @@ def _announce():
     if data.get("token"):
         _state["token"] = data["token"]
         _write_state({"token": data["token"], "asset_id": data["asset_id"], "relay": _RELAY})
-        _note('announced to Alcon as "%s" — waiting for a Space owner to accept it (Settings › Integrations › Connected assets)' % name)
+        _note('announced to Alcon as "%s" — waiting for a Space owner to accept it (Settings › Customize › Connected assets)' % name)
     else:
         _state["token"] = saved["token"]
         _note('connected to Alcon as "%s" (%s)' % (name, _state["status"]))

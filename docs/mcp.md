@@ -33,7 +33,7 @@ lease は `claim_element()` / `release_element()` だけを通して書く。担
 
 ## 認証
 
-個人用アクセストークン（PAT）を使う。アプリの Settings › Integrations の「Alcon へ接続する」で発行する。
+個人用アクセストークン（PAT）を使う。アプリの Settings › Customize の「Alcon へ接続する」で発行する。
 
 - 名前、有効期限（30 日・90 日・無期限）、権限（読み取りと書き込み／読み取りのみ）を選ぶ。平文が表示されるのは発行したときの 1 回だけで、DB にはハッシュだけが残る
 - 一覧には、権限・有効期限・最終使用日時と接続元が出る。取り消すと、次の要求から 401 になる
@@ -52,7 +52,7 @@ Supabase のセッションの JWT（1 時間で切れる）も受け付ける�
 2. Alcon のサインイン画面が開く。サインインすると同意画面（`/oauth/consent`）に、クライアント名・戻り先・できること・できないことが出る
 3. 「読み取りと書き込み」か「読み取りのみ」を選んで承認する
 
-接続したアプリは、Settings › Integrations の「接続中のアプリ」に並ぶ。権限を替えたり、切断したりでき、切断すると次の呼び出しから 401 になる。OAuth で発行されたトークンでデータに届くのは、Alcon の MCP（と REST API）を通したときだけで、PostgREST などに直接持ち込んでもデータは読み書きできない。書き込みは「Claude (MCP · OAuth)」の形で記録される。
+接続したアプリは、Settings › Customize の「接続中のアプリ」に並ぶ。権限を替えたり、切断したりでき、切断すると次の呼び出しから 401 になる。OAuth で発行されたトークンでデータに届くのは、Alcon の MCP（と REST API）を通したときだけで、PostgREST などに直接持ち込んでもデータは読み書きできない。書き込みは「Claude (MCP · OAuth)」の形で記録される。
 
 仕組み：401 の `WWW-Authenticate` が `resource_metadata` で `…/alcon-mcp/.well-known/oauth-protected-resource` を指し、そこに認可サーバー（Supabase Auth の OAuth サーバー、`https://<ref>.supabase.co/auth/v1`）が書いてある。クライアントの登録・PKCE・トークンの発行と更新は Supabase が行う。
 
@@ -86,7 +86,7 @@ PAT と OAuth を受け付けるには、Edge Function のシークレット `AL
 
 ## 逆向き：Alcon のエージェントが外部サービスを使う
 
-この文書は外部の AI が Alcon を操作する入口を扱う。Alcon のエージェント（run-agent）が Linear・Asana・任意の MCP / API を道具として使う接続は、Settings › Integrations の「外部サービスをつなぐ」で Space の owner が設定する。資格情報は Vault に置かれ、外部への書き込みは既定で毎回承認を待つ。エージェントは Alcon 自身を指す連携を使わず、Alcon の PAT は連携の資格情報として保存できない（エージェントは開始した人の権限で、盤面の道具をすでに持っている）。
+この文書は外部の AI が Alcon を操作する入口を扱う。Alcon のエージェント（run-agent）が Linear・Asana・任意の MCP / API を道具として使う接続は、Settings › Customize の「コネクタ」で Space の owner が設定する。資格情報は Vault に置かれ、外部への書き込みは既定で毎回承認を待つ。エージェントは Alcon 自身を指す連携を使わず、Alcon の PAT は連携の資格情報として保存できない（エージェントは開始した人の権限で、盤面の道具をすでに持っている）。
 
 ### Google Drive（OAuth）
 
@@ -96,7 +96,7 @@ Google Drive は資格情報を貼り付けず、owner が Google にサイン�
 
 ### GitHub（OAuth）
 
-GitHub も資格情報を貼り付けず、owner が GitHub にサインインしてつなぐ（Settings › Integrations か、Reviews の「GitHub を接続」から。Reviews から始めたサインインは Reviews に戻る）。スコープは `repo` で、サインインした人が触れるリポジトリを読み書きできる。この接続を、Reviews（差分の取得、判定・行コメントの投稿、マージ）とエージェント（GitHub の MCP サーバー）の両方が使い、投稿・マージ・push はサインインした GitHub アカウントの名義になる。トークンは期限切れにならず、切断（GitHub の grant の取り消し）か、本人が GitHub の Settings › Applications で Alcon を外すまで使える。アクセスが GitHub アカウントに付き、一方の Space で切断すると同じアカウントの他の Space も切れるのは Google と同じ。
+GitHub も資格情報を貼り付けず、owner が GitHub にサインインしてつなぐ（Settings › Customize か、Reviews の「GitHub を接続」から。Reviews から始めたサインインは Reviews に戻る）。スコープは `repo` で、サインインした人が触れるリポジトリを読み書きできる。この接続を、Reviews（差分の取得、判定・行コメントの投稿、マージ）とエージェント（GitHub の MCP サーバー）の両方が使い、投稿・マージ・push はサインインした GitHub アカウントの名義になる。トークンは期限切れにならず、切断（GitHub の grant の取り消し）か、本人が GitHub の Settings › Applications で Alcon を外すまで使える。アクセスが GitHub アカウントに付き、一方の Space で切断すると同じアカウントの他の Space も切れるのは Google と同じ。
 
 ### サインインの流れ（共通）
 

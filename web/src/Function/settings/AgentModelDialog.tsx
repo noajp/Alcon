@@ -13,7 +13,7 @@ import { updateWorker } from '@/hooks/useSupabase';
 import type { Worker } from '@/types/database';
 
 // Settings › Team: which model an AI agent runs on — Anthropic, or one of the
-// Space's model connections (Settings › Integrations › AI models) with the
+// Space's model connections (Settings › Customize › AI models) with the
 // model's name there and, optionally, its price for the Space's budget.
 
 export function AgentModelDialog({ worker, spaceId, onClose, onSaved }: {
@@ -52,7 +52,7 @@ export function AgentModelDialog({ worker, spaceId, onClose, onSaved }: {
         <DialogHeader>
           <DialogTitle>{t('Model for {name}', { name: worker.name })}</DialogTitle>
           <DialogDescription className="text-[12px]">
-            {t('Runs on Anthropic by default. Add a model connection in Settings › Integrations to run this agent on another provider.')}
+            {t('Runs on Anthropic by default. Add a model connection in Settings › Customize to run this agent on another provider.')}
           </DialogDescription>
         </DialogHeader>
 

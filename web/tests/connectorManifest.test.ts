@@ -54,3 +54,33 @@ describe('connector manifests', () => {
     expect(cm.parseManifest('x').manifest.commands).toEqual([]);
   });
 });
+
+describe('manifestFromTools', () => {
+  const tools = [
+    { name: 'search_repositories', description: 'Search', readOnly: true },
+    { name: 'mergePullRequest', description: 'Merge', readOnly: false },
+    { name: '2fa-check', readOnly: true },
+  ];
+  it('declares one command per tool, read or write as the server marks it', () => {
+    const m = cm.manifestFromTools(tools, null);
+    expect(m.commands.map((c: { name: string; effect: string; mcp: string }) => [c.name, c.effect, c.mcp])).toEqual([
+      ['search_repositories', 'read', 'search_repositories'], ['merge_pull_request', 'write', 'mergePullRequest'], ['t_2fa_check', 'read', '2fa-check'],
+    ]);
+    const { manifest, errors } = cm.parseManifest(m);
+    expect(errors).toEqual([]);
+    expect(cm.permissionOf(manifest, 'merge_pull_request')).toBe('ask');
+    expect(cm.permissionOf(manifest, 'search_repositories')).toBe('allow');
+  });
+
+  it('keeps what a person set, drops tools that went away, keeps hand-declared API commands', () => {
+    const before = { commands: [
+      { name: 'merge_pull_request', action: 'merge_pull_request', effect: 'write', permission: 'deny', mcp: 'mergePullRequest' },
+      { name: 'old_tool', effect: 'read', mcp: 'old_tool' },
+      { name: 'ping', effect: 'read', http: { method: 'GET', path: '/ping' } },
+    ] };
+    const m = cm.manifestFromTools(tools, before);
+    const names = m.commands.map((c: { name: string }) => c.name);
+    expect(names).toEqual(['ping', 'search_repositories', 'merge_pull_request', 't_2fa_check']);
+    expect(m.commands.find((c: { name: string }) => c.name === 'merge_pull_request').permission).toBe('deny');
+  });
+});

@@ -16,7 +16,7 @@ import {
   ASSET_KIND_LABELS, ASSET_RELAY_URL, ASSET_STATUS_LABELS, describeManifest, describeObserved, isLive, relayEnvLines, sortAssets,
 } from './assetModel';
 
-// Settings › Integrations › Connected assets (ADR 0036): the apps and AIs
+// Settings › Customize › Connected assets (ADR 0036): the apps and AIs
 // that joined this Space by adding one line. The relay address and the Space
 // id are what that line needs; the list shows what announced itself, what it
 // says about itself (unverified) and what the relay saw of it, and lets an

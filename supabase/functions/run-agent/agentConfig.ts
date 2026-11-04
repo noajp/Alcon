@@ -108,7 +108,7 @@ export function resolveAgentConfig(worker: WorkerConfigRow | null, domain: Domai
     modelLabel = model;
   } else {
     if (workerModel && !isAgentModel(w.model) && !isAgentModel(workerModel) && !claudeNamed(workerModel) && !disabledReason) {
-      disabledReason = `${agentName} のモデル「${workerModel}」には接続先が設定されていません。設定 › 連携で AI モデルの接続を追加し、チーム設定でこのエージェントの接続先に選ぶと実行できます。`;
+      disabledReason = `${agentName} のモデル「${workerModel}」には接続先が設定されていません。設定 › カスタマイズで AI モデルの接続を追加し、チーム設定でこのエージェントの接続先に選ぶと実行できます。`;
     }
     const named = isAgentModel(w.model) ? w.model
       : isAgentModel(workerModel) ? workerModel

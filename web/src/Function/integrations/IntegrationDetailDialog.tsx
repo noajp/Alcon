@@ -16,6 +16,7 @@ import {
   type IntegrationAuthType, type IntegrationDelegation, type IntegrationPreset, type IntegrationSource,
 } from './catalog';
 import { useIntegrationActions, useIntegrationOAuthStatus } from './data';
+import { CommandPermissions } from './CommandPermissions';
 
 // One integration: connect a preset (or a custom MCP / API), or manage an
 // existing connection — credential, on/off, connection test,
@@ -105,10 +106,12 @@ function errorText(e: unknown): string {
   return String(e);
 }
 
-export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit, onClose, onCreated }: {
+export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit, onClose, onCreated, initial }: {
   spaceId: string;
   preset: IntegrationPreset;
   integration: Integration | null;
+  /** A new custom connection's starting values (a server found in the registry). */
+  initial?: { name: string; endpoint: string; auth: IntegrationAuthType; authHeader: string | null };
   canEdit: boolean;
   onClose: () => void;
   onCreated: (created: Integration) => void;
@@ -117,10 +120,10 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
   const actions = useIntegrationActions(spaceId);
   const isNew = !integration;
 
-  const [name, setName] = useState(integration?.name ?? '');
-  const [endpoint, setEndpoint] = useState(integration?.endpoint ?? preset.endpoint ?? '');
-  const [auth, setAuth] = useState<IntegrationAuthType>(integration?.auth_type ?? preset.auth);
-  const [authHeader, setAuthHeader] = useState(integration?.auth_header ?? '');
+  const [name, setName] = useState(integration?.name ?? initial?.name ?? '');
+  const [endpoint, setEndpoint] = useState(integration?.endpoint ?? initial?.endpoint ?? preset.endpoint ?? '');
+  const [auth, setAuth] = useState<IntegrationAuthType>(integration?.auth_type ?? initial?.auth ?? preset.auth);
+  const [authHeader, setAuthHeader] = useState(integration?.auth_header ?? initial?.authHeader ?? '');
   const [secretInput, setSecretInput] = useState('');
   const [editingSecret, setEditingSecret] = useState(false);
   const [newEnabled, setNewEnabled] = useState(true);
@@ -152,7 +155,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
 
   const draft = () => ({ name, endpoint, auth, authHeader, delegation, enabled });
 
-  /** Leaves the app for the provider's sign-in; it comes back to Settings › Integrations. */
+  /** Leaves the app for the provider's sign-in; it comes back to Settings › Customize. */
   const signIn = async (id: string) => {
     const url = await actions.signIn.mutateAsync(id);
     window.location.assign(url);
@@ -406,6 +409,12 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
             <ToggleRow label={t('Enabled')} desc={isModel ? t('When off, AI agents on this connection do not run.') : t('When off, agents do not see this connection.')} value={enabled}
               disabled={readOnly} onChange={(v) => setLive({ enabled: v })} />
           </div>
+
+          {integration && integration.kind === 'mcp' && (
+            <Field label={t('Commands')}>
+              <CommandPermissions integration={integration} spaceId={spaceId} readOnly={readOnly} />
+            </Field>
+          )}
 
           {integration && (
             <Field label={t('Connection test')}>

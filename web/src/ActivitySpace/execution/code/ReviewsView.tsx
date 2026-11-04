@@ -156,9 +156,9 @@ function GithubStatus({ lastTest, onManage }: { lastTest: unknown; onManage: () 
   const { t } = useI18n();
   const test = readLastTest(lastTest);
   return (
-    <button type="button" onClick={() => { setActiveSettingsSection('integrations'); onManage(); }}
+    <button type="button" onClick={() => { setActiveSettingsSection('integrations', 'external'); onManage(); }}
       className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-[var(--text-secondary)] hover:bg-[var(--surface-strong)]"
-      title={t('Manage in Settings › Integrations')}>
+      title={t('Manage in Settings › Customize')}>
       <Github size={14} />
       {test && !test.ok ? <span className="text-[var(--status-warning)]">{t('GitHub needs attention')}</span> : <><CheckCircle2 size={12} className="text-[var(--status-success)]" />{t('GitHub connected')}</>}
     </button>
@@ -234,7 +234,7 @@ function ConnectGithub({ spaceId, existing }: { spaceId: string; existing: Integ
         id = (await actions.create.mutateAsync({ row: built.row, secret: '' })).id;
       }
       const url = await actions.signIn.mutateAsync(id);
-      try { sessionStorage.setItem(OAUTH_RETURN_VIEW_KEY, 'reviews'); } catch { /* lands in Settings › Integrations instead */ }
+      try { sessionStorage.setItem(OAUTH_RETURN_VIEW_KEY, 'reviews'); } catch { /* lands in Settings › Customize instead */ }
       window.location.assign(url);
     } catch (e) {
       setError(t(e instanceof Error ? e.message : String(e)));

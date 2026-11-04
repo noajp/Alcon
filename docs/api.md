@@ -3,7 +3,7 @@
 スクリプト、ノーコードツール、他の SaaS から、トークンを発行した本人の権限で Alcon のデータを読み書きする入口。MCP（[mcp.md](mcp.md)）と同じツールを HTTP の形で出している。
 
 - ベース URL: `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/alcon-api`
-- 認証: `Authorization: Bearer <個人用アクセストークン>`（`alc_pat_…`。Settings › Integrations の「Alcon へ接続する」で発行）
+- 認証: `Authorization: Bearer <個人用アクセストークン>`（`alc_pat_…`。Settings › Customize の「Alcon へ接続する」で発行）
 - 名乗り（任意）: `X-Alcon-Client: n8n` を送ると、書き込みの記録が「n8n (API · token: ops)」になる。送らなければ「API · token: ops」
 - 機械可読の仕様: `GET /openapi.json`（OpenAPI 3.1。トークンなしで読める）
 

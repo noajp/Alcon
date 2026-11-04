@@ -18,9 +18,11 @@ export interface Definition {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** The catalog item it was added from (Settings › Customize), if any. */
+  source_id: string | null;
 }
 
-const COLUMNS = 'id, activity_space_id, name, body, created_by, created_at, updated_at';
+const COLUMNS = 'id, activity_space_id, name, body, created_by, created_at, updated_at, source_id';
 const key = (spaceId: string | null) => ['definitions', spaceId ?? 'none'] as const;
 
 export function useDefinitions(spaceId: string | null) {
@@ -41,9 +43,9 @@ export function useDefinitions(spaceId: string | null) {
   };
 }
 
-export async function createDefinition(input: { spaceId: string; name: string; body: string }): Promise<Definition> {
+export async function createDefinition(input: { spaceId: string; name: string; body: string; sourceId?: string | null }): Promise<Definition> {
   const { data, error } = await supabase.from('definitions')
-    .insert({ activity_space_id: input.spaceId, name: input.name.trim(), body: input.body })
+    .insert({ activity_space_id: input.spaceId, name: input.name.trim(), body: input.body, source_id: input.sourceId ?? null })
     .select(COLUMNS).single();
   if (error) throw error;
   return data as Definition;
@@ -51,6 +53,12 @@ export async function createDefinition(input: { spaceId: string; name: string; b
 
 export async function updateDefinition(id: string, updates: { name?: string; body?: string }): Promise<void> {
   const { error } = await supabase.from('definitions').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
+
+/** Takes a definition out of the library; Strategies and Elements that named it follow none. */
+export async function deleteDefinition(id: string): Promise<void> {
+  const { error } = await supabase.from('definitions').delete().eq('id', id);
   if (error) throw error;
 }
 
