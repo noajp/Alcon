@@ -28,6 +28,8 @@ begin
 
   drop trigger if exists strategies_guard_vision on public.strategies;
   drop function if exists public.guard_strategy_vision();
+  -- It also fired on a change of vision_id; it comes back below without it.
+  drop trigger if exists strategies_follow_space on public.strategies;
   alter table public.strategies drop column if exists vision_id;
   drop table public.visions;
   drop function if exists public.touch_visions_updated_at();
@@ -43,4 +45,6 @@ begin
       return new;
     end $body$
   $f$;
+  create trigger strategies_follow_space before insert or update of activity_space_id on public.strategies
+    for each row execute function public.strategies_follow_space();
 end $$;
