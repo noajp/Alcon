@@ -66,7 +66,7 @@ const SHARED_MESSAGES: Record<string, Row> = {
 
   // List table
   'Add Element': ['Element を追加', 'Element 추가', 'Ajouter un Element', 'Añadir Element'],
-  'Add Initiative': ['Initiative を追加', 'Initiative 추가', 'Ajouter une Initiative', 'Añadir Initiative'],
+  'Add Strategy': ['Strategy を追加', 'Strategy 추가', 'Ajouter une Strategy', 'Añadir Strategy'],
   'Add Object': ['Object を追加', 'Object 추가', 'Ajouter un Object', 'Añadir Object'],
   'Add Element to {name}': ['{name} に Element を追加', '{name}에 Element 추가', 'Ajouter un Element à {name}', 'Añadir Element a {name}'],
   'Select Element': ['Element を選択', 'Element 선택', 'Sélectionner l’Element', 'Seleccionar Element'],
@@ -252,7 +252,7 @@ const SHARED_MESSAGES: Record<string, Row> = {
   'Field name': ['項目名', '항목 이름', 'Nom du champ', 'Nombre del campo'],
   'Importing…': ['取り込み中…', '가져오는 중…', 'Import…', 'Importando…'],
   'Mine': ['自分', '내 것', 'Les miennes', 'Míos'],
-  'No Initiative': ['Initiative なし', 'Initiative 없음', 'Aucune Initiative', 'Sin Initiative'],
+  'No Strategy': ['Strategy なし', 'Strategy 없음', 'Aucune Strategy', 'Sin Strategy'],
   'Number': ['数値', '숫자', 'Nombre', 'Número'],
   'Open Element': ['Element を開く', 'Element 열기', 'Ouvrir l’Element', 'Abrir Element'],
   'Phone': ['電話', '전화', 'Téléphone', 'Teléfono'],

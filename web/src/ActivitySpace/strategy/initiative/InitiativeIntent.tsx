@@ -4,15 +4,15 @@ import { createContext, useContext } from 'react';
 import { useInitiativeIntent, type InitiativeIntentState } from '@/hooks/useInitiativeIntent';
 
 // =============================================================
-// One read, one root, shared by every Intent widget on a Initiative.
+// One read, one root, shared by every Intent widget on a Strategy.
 //
 // Measures, Assumptions and Decisions are three widgets now — separately
 // placed, separately removable — but they must not be three reads. `intents`
 // carries a partial unique index allowing exactly one parent-less row per
-// Initiative, and each of the three creates children under it; three widgets
+// Strategy, and each of the three creates children under it; three widgets
 // each holding their own `ensureRoot` would each insert on first use and the
-// losers would hit the index, on any Initiative that has never recorded
-// anything, which is every Initiative the first time. The bundle is eight
+// losers would hit the index, on any Strategy that has never recorded
+// anything, which is every Strategy the first time. The bundle is eight
 // queries besides.
 //
 // So the surface mounts the read and the widgets consume it. There is no
@@ -30,7 +30,7 @@ export function InitiativeIntentProvider({
 }: {
   initiativeId: string;
   initiativeName: string;
-  /** The Initiative's owner — the one viewer who may write intents. Omit when
+  /** The Strategy's owner — the one viewer who may write intents. Omit when
    *  the caller only knows the id; the hook asks once. */
   createdBy?: string | null;
   children: React.ReactNode;

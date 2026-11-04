@@ -6,7 +6,7 @@ import { ChevronRight, X } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 
-// The settings modal used by a Domain row's "…" and the Initiatives row's
+// The settings modal used by a Domain row's "…" and the Strategies row's
 // "…": a 50px header (the same height as an island header), a left column
 // of sections, and a panel that scrolls on its own.
 

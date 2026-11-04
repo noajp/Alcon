@@ -1,8 +1,8 @@
 // =============================================================
-// Initiative assumptions — the things being taken as true, and whether they
+// Strategy assumptions — the things being taken as true, and whether they
 // still are.
 //
-// A Initiative rests on statements nobody plans to verify: one person speaks the
+// A Strategy rests on statements nobody plans to verify: one person speaks the
 // language, the existing line runs on whatever is left over, the vendor ships
 // in March. They are not risks and not decisions — they are the ground the plan
 // is standing on, and the plan does not survive them being wrong.
@@ -10,7 +10,7 @@
 // The failure this exists to close is not that they go unwritten. It is that
 // they are written once, in prose, and then break somewhere else. The Element
 // that would have falsified the assumption goes blocked, or slides past its
-// date, and the Initiative page keeps the same face it had last week because
+// date, and the Strategy page keeps the same face it had last week because
 // nothing connects the two.
 //
 // So an assumption here carries what could falsify it, and the state of those
@@ -25,7 +25,7 @@
 // has done this before" is not a statement about any Element, and no Element's
 // status can contradict it. What contradicts it is that person having no hours,
 // which the board already records as an availability span. Both readings land
-// on the same `shaken`, because from the Initiative's side they are the same
+// on the same `shaken`, because from the Strategy's side they are the same
 // sentence.
 //
 // Pure on purpose: no React, no Supabase, no clock of its own. `now` is an
@@ -47,7 +47,7 @@ import { isOpenStatus } from '@/Function/shared/completion';
 /**
  * What marks an `intents` row as an assumption rather than a decision.
  *
- * Both hang off the Initiative's root Intent. This used to read `slug`, which
+ * Both hang off the Strategy's root Intent. This used to read `slug`, which
  * was free and meant something else — its documented job is naming a card for
  * cross-references, and a kind stored there is a kind nobody can look up.
  */
@@ -98,7 +98,7 @@ export interface WorkerWatchInput {
   name: string;
   role: string | null;
   /** The parts that decide a standing day. Null when the Worker has left the
-   *  roster this Initiative can read, which is not the same as being away. */
+   *  roster this Strategy can read, which is not the same as being away. */
   worker: CapacityWorker | null;
   /** Every availability span on record for them. */
   spans: readonly CapacitySpan[];

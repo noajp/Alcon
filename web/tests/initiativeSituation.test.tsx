@@ -11,7 +11,7 @@
 //
 //   - counting calendar days instead of business days (over-promises by ~40%),
 //   - counting Elements twice when they are multi-homed into two of the
-//     Initiative's Objects (inflates both scope and completed),
+//     Strategy's Objects (inflates both scope and completed),
 //   - projecting a rate off one or two elapsed days, where the multiplier onto
 //     the rest of the window turns whichever day landed in the sample into a
 //     headline,
@@ -96,8 +96,8 @@ describe('InitiativeSituation', () => {
     expect(screen.getByText(/12 short of scope/)).toBeTruthy();
   });
 
-  it('counts a multi-homed Element once across the Initiative\'s Objects', async () => {
-    // The same Element is reachable through two of the Initiative's Objects.
+  it('counts a multi-homed Element once across the Strategy\'s Objects', async () => {
+    // The same Element is reachable through two of the Strategy's Objects.
     // Counting it twice inflates scope and completed together, which keeps the
     // ratio plausible while both numbers are wrong.
     phases.push(phase('p1', '2026-09-07', '2026-09-25'));

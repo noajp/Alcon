@@ -4,7 +4,7 @@ import { InitiativeAssumptions } from '@/ActivitySpace/strategy/initiative/Initi
 import { useInitiativeIntentContext } from '@/ActivitySpace/strategy/initiative/InitiativeIntent';
 import type { WidgetHost } from '../types';
 
-/** Assumptions — one of the Initiative's hand-written Intent sections. Reads through
+/** Assumptions — one of the Strategy's hand-written Intent sections. Reads through
  *  the surface's shared Intent context; see InitiativeIntent.tsx for why the
  *  read cannot be per-widget. */
 export function InitiativeAssumptionsWidget({ host }: { host: WidgetHost }) {

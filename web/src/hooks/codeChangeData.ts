@@ -80,7 +80,7 @@ export function useCodeChanges(elementId: string | null) {
   return { data: query.data ?? EMPTY_CHANGES, loading: !!elementId && query.isPending, error: (query.error as Error | null) ?? null };
 }
 
-/** The code changes of many Elements at once — an Initiative's view of what
+/** The code changes of many Elements at once — a Strategy's view of what
  *  its Objects' work has shipped. */
 export function useCodeChangesForElements(elementIds: readonly string[]) {
   const ids = [...new Set(elementIds)].sort();
@@ -343,7 +343,7 @@ export interface ElementIntent {
   }[];
 }
 
-/** The Element's task and the intent of the Initiatives its Object serves —
+/** The Element's task and the intent of the Strategies its Object serves —
  *  what the review screen shows beside the diff. */
 export function useElementIntent(elementId: string | null) {
   return useQuery({

@@ -1,19 +1,19 @@
-// The Initiative list's shapes, kept pure so the rules are testable:
-// - which Initiatives belong on this Space's pages,
-// - the Initiative tree (Initiatives nest through strategy_children, as a
-//   DAG: one Initiative may sit under several parents, and then shows under
+// The Strategy list's shapes, kept pure so the rules are testable:
+// - which Strategies belong on this Space's pages,
+// - the Strategy tree (Strategies nest through strategy_children, as a
+//   DAG: one Strategy may sit under several parents, and then shows under
 //   each of them).
 
 export interface InitiativeMember { id: string; name: string; activity_space_id?: string | null; created_at?: string; parentIds: string[]; objectIds: string[] }
 
-/** Whether an Initiative belongs to this Space. One with a Space of its own
- *  answers directly; one without (written before Initiatives had a Space)
+/** Whether a Strategy belongs to this Space. One with a Space of its own
+ *  answers directly; one without (written before Strategies had a Space)
  *  is placed by the caller's fallback. */
 export function inSpace(s: { activity_space_id?: string | null }, spaceId: string | null, fallback: () => boolean): boolean {
   return s.activity_space_id ? s.activity_space_id === spaceId : fallback();
 }
 
-/** Initiatives that belong on this Space's pages: those whose Space it is.
+/** Strategies that belong on this Space's pages: those whose Space it is.
  *  One without a Space reaches it through its Objects' Domains — an Object
  *  in one of the Space's Domains counts, and so does having no Object yet
  *  (nothing places it elsewhere). */
@@ -34,15 +34,15 @@ export interface InitiativeNode<T> {
   initiative: T;
   depth: number;
   /** The ids from the root down to this node — unique per row, since an
-   *  Initiative with two parents appears twice. */
+   *  Strategy with two parents appears twice. */
   key: string;
   children: InitiativeNode<T>[];
 }
 
-/** The Initiative tree in display order (siblings oldest first). The roots
- *  are the Initiatives with no parent in the list. A link that would close
- *  a loop is not followed, and an Initiative the roots never reach (one
- *  caught in a loop) is lifted to the top — every Initiative appears. */
+/** The Strategy tree in display order (siblings oldest first). The roots
+ *  are the Strategies with no parent in the list. A link that would close
+ *  a loop is not followed, and a Strategy the roots never reach (one
+ *  caught in a loop) is lifted to the top — every Strategy appears. */
 export function buildInitiativeTree<T extends InitiativeMember>(initiatives: T[]): InitiativeNode<T>[] {
   const ids = new Set(initiatives.map((s) => s.id));
   const sorted = [...initiatives].sort((a, b) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')) || a.name.localeCompare(b.name));

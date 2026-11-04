@@ -161,7 +161,7 @@ describe('a notification is something you can follow', () => {
     expect(screen.queryByTestId('element-detail')).toBeNull();
   });
 
-  it('still follows a Initiative notification into the Initiative', async () => {
+  it('still follows a Strategy notification into the Strategy', async () => {
     feed = [notification({ element_id: null, comment_id: null, strategy_id: 's-1', title: 'Ana commented on Q3' })];
     const onViewChange = vi.fn();
     const onNavigate = vi.fn();
@@ -233,7 +233,7 @@ describe('the sidebar list tells the shell only when the reader opened', () => {
     render(<InboxList onOpen={onOpen} onViewChange={onViewChange} onNavigate={vi.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /commented on Q3/ }));
-    // Routed to the Initiative: the shell must not be told to stay on the Inbox.
+    // Routed to the Strategy: the shell must not be told to stay on the Inbox.
     expect(onViewChange).toHaveBeenCalledWith('strategy');
     expect(onOpen).not.toHaveBeenCalled();
 

@@ -10,7 +10,6 @@ import { FONT } from '@/shared/designTokens';
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { ReviewsSidebar } from '@/ActivitySpace/execution/code/ReviewsSidebar';
 import { SettingsModal } from '@/Function/settings/SettingsModal';
-import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useActiveSpaceScope } from '@/Function/space/data';
 import { NavStrategyIcon } from './sidebar/NavIcons';
 import { NotebookTree } from './sidebar/NotebookTree';
@@ -226,7 +225,7 @@ export function AppSidebar({
 
   // The "+" at the top of the sidebar creates whatever the current mode is
   // about: a Notebook, a Table, a scheduled Element, or (in the Workspace)
-  // a Vision, Initiative, Domain or Object from a small menu. Modes with nothing to
+  // a Strategy, Domain or Object from a small menu. Modes with nothing to
   // create show no "+".
   const calendarDay = useCalendarDay();
   // Slides makes nothing until the Space's decks are loaded; the load would replace it.

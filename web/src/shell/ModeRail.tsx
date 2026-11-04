@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Check } from '@/ui/icons';
-import { NavSustainmentModeIcon } from '@/shell/sidebar/NavIcons';
+import { NavSustainmentModeIcon, NavWorkspaceIcon } from '@/shell/sidebar/NavIcons';
 import {
   APP_GROUPS,
   MODE_META,
@@ -18,9 +18,6 @@ import { MenuShell, MenuSectionLabel } from '@/Function/shared/menu';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { viewInScope, type SpaceScope } from '@/Function/space/spaceScope';
-import { SpaceMark } from '@/Function/space/SpaceSwitcher';
-import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { useActivitySpaces } from '@/hooks/useSupabase';
 
 export type { RailMode };
 
@@ -31,10 +28,10 @@ const AUDIT_RAIL_APPS: RailMode[] = ['team', 'audit'];
 // AppSidebar's contents to that mode's surfaces. Unlike the sidebar it never
 // collapses — it's the app's primary spine.
 //
-// At the top sits the Space's logo, which opens the Workspace: Strategy (the
+// At the top sits the Workspace's icon, which opens the Workspace: Strategy (the
 // Strategies, which nest without limit) and Execution (the Domains, with their
-// Objects and Elements) in one sidebar, one section each. An Initiative shows
-// its member Objects and an Object the Initiatives it serves, so moving
+// Objects and Elements) in one sidebar, one section each. A Strategy shows
+// its member Objects and an Object the Strategies it serves, so moving
 // between intent and action never leaves the mode.
 //
 // Below it sits the launcher: the apps a person has added, then the
@@ -67,31 +64,6 @@ function RailButton({
       }`}
     >
       <Icon size={18} />
-    </button>
-  );
-}
-
-// The Space's logo — the Workspace's entry, the way a company's mark heads
-// its own tools.
-function WorkspaceRailButton({ active, onClick }: { active: boolean; onClick?: () => void }) {
-  const { t } = useI18n();
-  const { data: spaces } = useActivitySpaces();
-  const activeId = useActiveSpaceId();
-  const space = spaces.find((s) => s.id === activeId) ?? spaces[0];
-  const label = space?.name ?? t('Workspace');
-  if (!onClick) return <span className="flex h-8 w-8 items-center justify-center" title={label}><SpaceMark space={space} size={24} /></span>;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      aria-pressed={active}
-      className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
-        active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/50'
-      }`}
-    >
-      <SpaceMark space={space} size={24} />
     </button>
   );
 }
@@ -164,12 +136,12 @@ export function ModeRail({
   return (
     <ButtonAppearanceProvider appearance="navigation"><Popover open={launcherOpen} onOpenChange={setLauncherOpen}>
     <div className="flex w-10 shrink-0 flex-col items-center gap-1 bg-background py-2">
-      {/* An audit Space shows its mark but has no Workspace to open. */}
-      <WorkspaceRailButton active={activeMode === 'workspace'} onClick={workspace ? () => open('workspace') : undefined} />
-
-      {/* Below the line is the part each person builds: the apps they added,
-          then the Sustainment launcher that adds them. */}
-      <div className="my-1 h-px w-5 bg-border" />
+      {/* The Workspace first (an audit Space has none to open), then the
+          part each person builds: the apps they added, then the Sustainment
+          launcher that adds them. */}
+      {workspace && (
+        <RailButton label={t('Workspace')} icon={NavWorkspaceIcon} active={activeMode === 'workspace'} onClick={() => open('workspace')} />
+      )}
 
       {railApps.map((mode) => (
         <RailButton

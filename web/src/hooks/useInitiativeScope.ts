@@ -8,27 +8,27 @@ import type { Phase } from '@/types/database';
 import { displayIdOf } from '@/Function/shared/element/displayId';
 
 // =============================================================
-// What a Initiative can point at.
+// What a Strategy can point at.
 //
 // Both binding surfaces — a decision naming what it moved, an assumption naming
-// what could falsify it — need the same thing: the Objects this Initiative covers
+// what could falsify it — need the same thing: the Objects this Strategy covers
 // and the Elements living inside them, flat, with enough state on each Element
 // to say whether it has stopped. So the read is here once rather than in each
 // section, and the Object scope resolution is the same `strategy_objects` →
 // `fetchStrategyElements` path the risk surface already walks.
 //
 // Phases come with the Objects rather than beside them. A Phase belongs to a
-// Domain, so the ones a Initiative can name are the ones in the Domains its
+// Domain, so the ones a Strategy can name are the ones in the Domains its
 // Objects live in — the same reach, arrived at one hop later.
 //
-// Only the Initiative's own scope is offered. A decision can in principle move
+// Only the Strategy's own scope is offered. A decision can in principle move
 // anything in the Space, but a picker over every Element in the workspace is a
-// search problem, and the Objects a Initiative links are where its decisions land
+// search problem, and the Objects a Strategy links are where its decisions land
 // in every case this was built against.
 //
 // Workers are the exception and are not here. A Worker is not owned by a
-// Initiative — `workers.object_id` is optional and most of a roster carries none
-// — so scoping people by the Objects a Initiative happens to link would hide the
+// Strategy — `workers.object_id` is optional and most of a roster carries none
+// — so scoping people by the Objects a Strategy happens to link would hide the
 // person an assumption is about. The roster is read whole, from `useWorkers`.
 // =============================================================
 
@@ -80,7 +80,7 @@ async function loadInitiativeScope(initiativeId: string): Promise<InitiativeScop
 
   const { elements, objects } = await fetchStrategyElements({ domainIds: [], objectIds });
 
-  // The Initiative's own link order, not Postgres's. A picker that reshuffles
+  // The Strategy's own link order, not Postgres's. A picker that reshuffles
   // between openings makes the reader re-find the row they were reaching for.
   const byId = new Map(objects.map((o) => [o.id, o]));
   const scopeObjects: ScopeObject[] = objectIds
@@ -93,7 +93,7 @@ async function loadInitiativeScope(initiativeId: string): Promise<InitiativeScop
   const scopeElements: ScopeElement[] = elements.map((el) => {
     const homes = el.objectIds ?? (el.object_id ? [el.object_id] : []);
     // Multi-homed Elements are normal, so "which Object" is a choice. The one
-    // this Initiative actually covers is the useful answer; falling back to the
+    // this Strategy actually covers is the useful answer; falling back to the
     // primary FK keeps the row openable when none of its homes are in scope.
     const inScope = homes.find((id) => home.has(id)) ?? el.object_id ?? null;
     return {

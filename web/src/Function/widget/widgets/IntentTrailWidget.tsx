@@ -18,7 +18,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 // =============================================================
 // Decisions & assumptions — what this piece of work is standing on.
 //
-// The mirror of the Initiative's own Decisions and Assumptions sections, read
+// The mirror of the Strategy's own Decisions and Assumptions sections, read
 // from the other end: not "what did we bind this decision to" but "which
 // decisions and assumptions reach me". For an Element that is the answer to
 // "why does this exist"; for an Object it is every decision riding on its
@@ -26,7 +26,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 //
 // Hidden when nothing reaches here. An Element nobody has bound anything to
 // is the common case and an empty box would say "nobody wrote the strategy
-// down", which is the Initiative's problem to show, not this Element's.
+// down", which is the Strategy's problem to show, not this Element's.
 // =============================================================
 
 export function IntentTrailWidget({ host }: { host: WidgetHost }) {
@@ -60,7 +60,7 @@ export function IntentTrailWidget({ host }: { host: WidgetHost }) {
   // instant rather than a clock that moved between rows.
   const [now] = useState(() => new Date());
 
-  // Newest review per decision. `collectDecisionReviews` is the Initiative
+  // Newest review per decision. `collectDecisionReviews` is the Strategy
   // side's reader for the same rows, so the two surfaces agree on what
   // counts as an answer.
   const lastReviewedAt = useMemo(() => {
@@ -141,7 +141,7 @@ function TrailRowView({
   return (
     <div className="py-2 space-y-1">
       {/* Kind and edge on one line, state on the right. The verb is the
-          Initiative's own word for why the edge exists — kept, because
+          Strategy's own word for why the edge exists — kept, because
           "could falsify" and "delivers" are different reasons to care. */}
       <div className="flex items-center gap-1.5 text-[11px]">
         <span className="font-semibold text-muted-foreground">
@@ -174,7 +174,7 @@ function TrailRowView({
       >
         <NavStrategyIcon size={12} className="shrink-0 text-muted-foreground" />
         <span className="flex-1 min-w-0 truncate text-[11px] text-muted-foreground group-hover:text-foreground">
-          {row.initiativeName ?? t('Initiative')}
+          {row.initiativeName ?? t('Strategy')}
         </span>
         {canOpen && (
           <ChevronRight size={12} className="shrink-0 text-muted-foreground/40 group-hover:text-foreground transition-colors" />

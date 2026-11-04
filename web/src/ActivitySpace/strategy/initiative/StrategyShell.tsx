@@ -112,13 +112,13 @@ function InitiativeBoard({ surface, defaults, subjectId, host, zones, children }
 }
 
 // =============================================================
-// StrategyShell — the Strategy layer's "Initiative" app (code keeps the
+// StrategyShell — the Strategy layer's "Strategy" app (code keeps the
 // `strategy`/`strategies` naming — table, hooks, view id — display text says
-// "Initiative" throughout): a list-and-detail surface. The root is the
-// Initiative list — only TOP-LEVEL Initiatives (no parent in strategy_children)
-// show there; a Initiative nested inside another only appears in its parent's
-// "Initiatives" section. Selecting a row pushes into that Initiative's detail
-// page (title, description, nested Initiatives, Object scope — no Properties
+// "Strategy" throughout): a list-and-detail surface. The root is the
+// Strategy list — only TOP-LEVEL Strategies (no parent in strategy_children)
+// show there; a Strategy nested inside another only appears in its parent's
+// "Strategies" section. Selecting a row pushes into that Strategy's detail
+// page (title, description, nested Strategies, Object scope — no Properties
 // rail, mirrors ElementDetailView minus the side rail).
 // =============================================================
 
@@ -130,9 +130,9 @@ export function StrategyShell({
   createRequested,
   onCreateHandled,
 }: {
-  /** Which Initiative the detail page shows; null = the root Initiative list.
+  /** Which Strategy the detail page shows; null = the root Strategy list.
    *  Controlled by the caller (navigation.strategyId) so other surfaces can
-   *  deep-link straight into a Initiative. */
+   *  deep-link straight into a Strategy. */
   activeStrategyId?: string | null;
   onSelectStrategy?: (id: string | null) => void;
   /** Jump to an Object's detail (the Execution "objects" view). Objects can
@@ -140,7 +140,7 @@ export function StrategyShell({
    *  the active Domain context before navigating. */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
   onOpenDomain?: (domainId: string) => void;
-  /** The sidebar's "+" asked for a new Initiative (navigation.strategyCreate).
+  /** The sidebar's "+" asked for a new Strategy (navigation.strategyCreate).
    *  The dialog opens on the root list and `onCreateHandled` clears it. */
   createRequested?: boolean;
   onCreateHandled?: () => void;
@@ -184,18 +184,18 @@ export function StrategyShell({
 
   return (
     <div className="flex flex-col h-full bg-card">
-      <IslandHeader crumbs={[{ id: 'initiatives', label: t('Initiatives') }]} actions={
+      <IslandHeader crumbs={[{ id: 'initiatives', label: t('Strategies') }]} actions={
         <ButtonAppearanceProvider appearance="navigation">
           <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setNewOpen(true)}>
-            <Plus size={14} />{t('Add Initiative')}</Button>
+            <Plus size={14} />{t('Add Strategy')}</Button>
         </ButtonAppearanceProvider>
       } />
 
       <div className="flex-1 overflow-hidden">
         {loading ? null : tree.length === 0 ? (
-          <EmptyState art="initiative" title="Create your first Initiative"
-            description="An Initiative groups Objects across Domains around one outcome."
-            cta="Create Initiative" onCta={() => setNewOpen(true)} />
+          <EmptyState art="initiative" title="Create your first Strategy"
+            description="A Strategy groups Objects across Domains around one outcome."
+            cta="Create Strategy" onCta={() => setNewOpen(true)} />
         ) : (
           <div className="h-full overflow-auto">
             <StrategyListView nodes={tree} onSelectStrategy={(s) => setOpenStrategyId(s.id)} />
@@ -218,12 +218,12 @@ export function StrategyShell({
 }
 
 // =============================================================
-// Root Initiative list — the entire root view. Selecting a row pushes
-// into that Initiative's detail page.
+// Root Strategy list — the entire root view. Selecting a row pushes
+// into that Strategy's detail page.
 // =============================================================
 // What a person scans the list for, and nothing more: how far along, how
 // recently anything moved, and whether something is on fire. Counts come from
-// the same predicates the Initiative page uses (initiativeRiskModel), so the
+// the same predicates the Strategy page uses (initiativeRiskModel), so the
 // row never disagrees with the page it opens. Quiet register throughout — a
 // row is not the place to shout; the number is the signal.
 function InitiativeHealthCell({ health, measures }: { health: InitiativeHealth | undefined; measures: MeasureTally | undefined }) {
@@ -253,7 +253,7 @@ function InitiativeHealthCell({ health, measures }: { health: InitiativeHealth |
           <span className="w-7 text-right">{health.progressPct}%</span>
         </span>
       )}
-      {/* An empty Initiative already said "No Elements"; "No activity" would
+      {/* An empty Strategy already said "No Elements"; "No activity" would
           be the same fact twice. */}
       {!(health.total === 0 && moved === null) && (
         <span className="shrink-0 min-w-0 truncate text-muted-foreground/70" title={moved ? t('Last movement {when}', { when: moved }) : t('Nothing has reported yet')}>
@@ -452,7 +452,7 @@ function StrategyDetailView({
   const [newObjectName, setNewObjectName] = useState('');
   const [newObjectDomainId, setNewObjectDomainId] = useState<string | null>(null);
   const [creatingObject, setCreatingObject] = useState(false);
-  // Nested Initiatives — "+" offers picking an
+  // Nested Strategies — "+" offers picking an
   // existing top-level-or-unrelated Strategy or creating a fresh one, both
   // immediately nested via strategy_children.
   const [childPickerOpen, setChildPickerOpen] = useState(false);
@@ -475,7 +475,7 @@ function StrategyDetailView({
   const ownsItsSpace = useSpaceRole(strategy.activity_space_id) === 'owner';
   const canEdit = canEditInitiative(userId, strategy.created_by, ownsItsSpace);
   // The Object rows write to objects / domains, which answer to Object
-  // membership and Domain role — not to who owns the Initiative.
+  // membership and Domain role — not to who owns the Strategy.
   const { data: myObjects } = useMyObjectMemberships(userId);
   const { data: myDomainRoles } = useMyDomainRoles(userId);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -497,19 +497,19 @@ function StrategyDetailView({
 
   const { data: domains, refetch: refetchDomains } = useDomains();
   const { objects: allObjects, refetch: refetchObjects } = useAllObjects();
-  // Nested Initiatives' counts leave archived Objects out, like the list.
+  // Nested Strategies' counts leave archived Objects out, like the list.
   const countObjects = useActiveObjectCount();
 
-  // A Initiative's Elements are the union of its Objects' Elements. That one
+  // A Strategy's Elements are the union of its Objects' Elements. That one
   // line is all it takes for every Element-counting widget already in the
   // registry — Milestones, Overdue, Upcoming, Team, the charts — to answer
-  // for a Initiative as well as for an Object.
+  // for a Strategy as well as for an Object.
   const initiativeElements = useMemo(() => {
     const scope = new Set(strategy.objectIds);
     return allObjects.filter((o) => scope.has(o.id)).flatMap((o) => o.elements ?? []);
   }, [allObjects, strategy.objectIds]);
 
-  // Another Initiative opens on its Overview.
+  // Another Strategy opens on its Overview.
   const [tab, setTab] = useState<InitiativeTab>('overview');
   const [tabFor, setTabFor] = useState(strategy.id);
   if (tabFor !== strategy.id) { setTabFor(strategy.id); setTab('overview'); }
@@ -559,7 +559,7 @@ function StrategyDetailView({
     const existingChildIds = new Set(childStrategies.map((c) => c.id));
     const q = childQuery.trim().toLowerCase();
     // strategy_children's INSERT policy needs the caller to be able to edit
-    // the child as well as the parent, so a colleague's Initiative — readable
+    // the child as well as the parent, so a colleague's Strategy — readable
     // Space-wide — is offered only to an owner of its Space.
     return allStrategies.filter((s) =>
       !ancestorIds.has(s.id) &&
@@ -578,8 +578,8 @@ function StrategyDetailView({
       setChildPickerOpen(false);
       setChildQuery('');
     } catch (e) {
-      console.error('Failed to nest Initiative:', e);
-      setSaveError(t('Could not nest that Initiative'));
+      console.error('Failed to nest Strategy:', e);
+      setSaveError(t('Could not nest that Strategy'));
     } finally {
       setLinkingChildId(null);
     }
@@ -592,8 +592,8 @@ function StrategyDetailView({
       setSaveError(null);
       onSaved();
     } catch (e) {
-      console.error('Failed to un-nest Initiative:', e);
-      setSaveError(t('Could not remove that Initiative'));
+      console.error('Failed to un-nest Strategy:', e);
+      setSaveError(t('Could not remove that Strategy'));
     }
   };
 
@@ -645,8 +645,8 @@ function StrategyDetailView({
       onSaved();
       onBack();
     } catch (e) {
-      console.error('Failed to delete Initiative:', e);
-      setDeleteError(e instanceof Error ? e.message : t('Could not delete the Initiative'));
+      console.error('Failed to delete Strategy:', e);
+      setDeleteError(e instanceof Error ? e.message : t('Could not delete the Strategy'));
       setDeleting(false);
       setConfirmingDelete(false);
     }
@@ -663,7 +663,7 @@ function StrategyDetailView({
       setSaveError(null);
       onSaved();
     } catch (e) {
-      console.error('Failed to rename Initiative:', e);
+      console.error('Failed to rename Strategy:', e);
       setName(strategy.name);
       setSaveError(t('Could not save the name'));
     }
@@ -677,7 +677,7 @@ function StrategyDetailView({
       setSaveError(null);
       onSaved();
     } catch (e) {
-      console.error('Failed to save Initiative description:', e);
+      console.error('Failed to save Strategy description:', e);
       setSaveError(t('Could not save the description'));
     }
   };
@@ -694,7 +694,7 @@ function StrategyDetailView({
       setSaveError(null);
       onSaved();
     } catch (e) {
-      console.error('Failed to update Initiative Objects:', e);
+      console.error('Failed to update Strategy Objects:', e);
       setSelectedIds(previous);
       setSaveError(t('Could not change the Objects'));
     }
@@ -742,10 +742,10 @@ function StrategyDetailView({
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         <DropdownMenuItem onClick={() => setChildPickerOpen(true)}>
-          <Search size={13} className="mr-1.5" /> {t('Add existing Initiative')}
+          <Search size={13} className="mr-1.5" /> {t('Add existing Strategy')}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setNewChildOpen(true)}>
-          <Plus size={13} className="mr-1.5" /> {t('Create Initiative')}
+          <Plus size={13} className="mr-1.5" /> {t('Create Strategy')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -783,7 +783,7 @@ function StrategyDetailView({
           onClick={onBack}
           className="px-1.5 py-0.5 rounded text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
         >
-          {t('Initiative')}
+          {t('Strategy')}
         </button>
         <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
         <span className="px-1.5 py-0.5 text-[13px] font-semibold text-foreground truncate max-w-[240px]">
@@ -792,13 +792,13 @@ function StrategyDetailView({
         {/* Beside the name, as on an Object: move it, or delete it. */}
         <InitiativeActionsButton initiative={strategy} onDelete={() => { if (!deleting) setConfirmingDelete(true); }} />
         {!canEdit && (
-          // Said once, where the eye lands first. The Initiative's own
-          // structure — name, description, Objects, nested Initiatives —
+          // Said once, where the eye lands first. The Strategy's own
+          // structure — name, description, Objects, nested Strategies —
           // is locked to match. The board's intent sections keep their own
           // policy and report their own failures (ELE_STR-025).
           <span
             className="ml-1 px-1.5 py-0.5 text-[11px] text-muted-foreground"
-            title={t("Only the Initiative's owner can edit it")}
+            title={t("Only the Strategy's owner can edit it")}
           >
             {t('Read-only')}
           </span>
@@ -814,11 +814,11 @@ function StrategyDetailView({
         </div>
       </div>
 
-      {/* One Initiative, four readings — under the header, as the views of a
+      {/* One Strategy, four readings — under the header, as the views of a
           Domain or Object sit: how it is going (Overview), what the plan
           rests on (Plan), the work carrying it out (Execute), and the
           evidence it is judged on (Evaluate). */}
-      <div role="tablist" aria-label={t('Initiative views')} className="flex flex-shrink-0 items-center gap-0.5 py-2 pl-[19px] pr-4">
+      <div role="tablist" aria-label={t('Strategy views')} className="flex flex-shrink-0 items-center gap-0.5 py-2 pl-[19px] pr-4">
         {INITIATIVE_TABS.map((v) => (
           <Button key={v.id} type="button" shape="tab" role="tab" aria-selected={tab === v.id}
             variant={tab === v.id ? 'secondary' : 'ghost'} onClick={() => setTab(v.id)}>
@@ -852,7 +852,7 @@ function StrategyDetailView({
                   e.currentTarget.blur();
                 }
               }}
-              placeholder={t('Initiative name')}
+              placeholder={t('Strategy name')}
               readOnly={!canEdit}
               aria-readonly={!canEdit}
               tabIndex={canEdit ? undefined : -1}
@@ -882,13 +882,13 @@ function StrategyDetailView({
               <InitiativeMission tab="plan" {...missionProps} />
               {/* What the plan rests on and what was chosen on top of it. */}
               <WidgetZone zone="main" columns={1} />
-            {/* Nested Initiatives. With none, the section keeps no heading — only
+            {/* Nested Strategies. With none, the section keeps no heading — only
                 its "+ verb", like every concept page. */}
             {childStrategies.length > 0 || childPickerOpen ? (
-              <PageSection title={t('Initiatives')} action={canEdit ? (
+              <PageSection title={t('Strategies')} action={canEdit ? (
                 <ButtonAppearanceProvider appearance="navigation">
                   {nestedMenu(
-                    <Button variant="ghost" size="icon-xs" aria-label={t('Add nested Initiative')} className="text-muted-foreground">
+                    <Button variant="ghost" size="icon-xs" aria-label={t('Add nested Strategy')} className="text-muted-foreground">
                       <Plus size={13} />
                     </Button>,
                   )}
@@ -901,7 +901,7 @@ function StrategyDetailView({
                       onOpen={() => onOpenStrategy(child.id)}
                       meta={<span>{n === 1 ? t('1 Object') : t('{n} Objects', { n })}</span>}
                       actions={canEdit ? (
-                        <ContentRowAction label={t('Remove {name} from this Initiative', { name: child.name })} onClick={() => void unlinkChild(child.id)}>
+                        <ContentRowAction label={t('Remove {name} from this Strategy', { name: child.name })} onClick={() => void unlinkChild(child.id)}>
                           <X size={12} />
                         </ContentRowAction>
                       ) : undefined} />
@@ -915,7 +915,7 @@ function StrategyDetailView({
                       <input
                         value={childQuery}
                         onChange={(e) => setChildQuery(e.target.value)}
-                        placeholder={t('Search Initiatives…')}
+                        placeholder={t('Search Strategies…')}
                         className="flex-1 bg-transparent text-[13px] outline-none"
                         autoFocus
                       />
@@ -931,7 +931,7 @@ function StrategyDetailView({
                     <div className="max-h-72 overflow-auto">
                       {childCandidates.length === 0 && (
                         <div className="px-3 py-3 text-[12px] text-muted-foreground">
-                          {t('No Initiatives match.')}
+                          {t('No Strategies match.')}
                         </div>
                       )}
                       {childCandidates.map((s) => (
@@ -954,7 +954,7 @@ function StrategyDetailView({
               <ButtonAppearanceProvider appearance="inline">
                 {nestedMenu(
                   <Button variant="ghost" size="sm" align="start" className="-ml-2 self-start">
-                    <Plus size={13} strokeWidth={2.5} />{t('Add nested Initiative')}
+                    <Plus size={13} strokeWidth={2.5} />{t('Add nested Strategy')}
                   </Button>,
                 )}
               </ButtonAppearanceProvider>
@@ -1101,7 +1101,7 @@ function StrategyDetailView({
             ) : null}
 
               {/* What the work under these Objects has shipped as code, read
-                  against this Initiative's intent. */}
+                  against this Strategy's intent. */}
               <InitiativeCodeChanges objects={allObjects.filter((o) => selectedIds.has(o.id))} />
             </div>
           )}
@@ -1137,7 +1137,7 @@ function StrategyDetailView({
           try {
             await addStrategyChild(strategy.id, id);
           } catch (e) {
-            console.error('Failed to nest new Initiative:', e);
+            console.error('Failed to nest new Strategy:', e);
           }
           onSaved();
           onOpenStrategy(id);
@@ -1174,15 +1174,15 @@ function StrategyCreateDialog({
   };
 
   // The same quick-create card Objects and Elements use: name, description
-  // and one pill for the Objects the Initiative bundles. Objects can be
+  // and one pill for the Objects the Strategy bundles. Objects can be
   // chosen or left for later — the detail page has the same picker.
   return (
     <QuickCreatePopup
       open
       icon={<NavStrategyIcon size={12} />}
-      contextLabel={t('New Initiative')}
-      ariaLabel={t('Quick add Initiative')}
-      namePlaceholder={t('Initiative name…')}
+      contextLabel={t('New Strategy')}
+      ariaLabel={t('Quick add Strategy')}
+      namePlaceholder={t('Strategy name…')}
       onClose={onClose}
       onSubmit={async ({ name, description }) => {
         const created = await createStrategy({ name, description }, Array.from(selectedIds));

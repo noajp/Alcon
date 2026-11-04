@@ -3,8 +3,8 @@
 import type { ReactNode } from 'react';
 
 // =============================================================
-// ContentRow — one row in a list on a concept's page (the Visions of a
-// Space, the Initiatives under a Vision, the Initiatives a Domain serves).
+// ContentRow — one row in a list on a concept's page (the Strategies a
+// Domain serves, and the like).
 //
 // The same row as a sidebar list, for the content area: the ROW is the hover
 // and focus target, so the name, the figures and the trailing "×" light up as

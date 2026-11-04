@@ -5,7 +5,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { ActionState, MissionGraph as Graph, MissionNode } from './missionModel';
 import type { MeasureState } from '../initiativeMeasureModel';
 
-// The mission as a graph, left to right: the Initiative, what it is held to,
+// The mission as a graph, left to right: the Strategy, what it is held to,
 // the actions that serve each, what they produced. Columns, not a force
 // layout — a reader follows intent to outcome along one axis, and the same
 // mission draws the same way every time. Dependencies between actions are
@@ -18,7 +18,7 @@ const ROW_GAP = 14;
 const PAD = 16;
 
 const KIND_LABEL: Record<MissionNode['kind'], string> = {
-  initiative: 'Initiative',
+  initiative: 'Strategy',
   measure: 'Objective',
   action: 'Action',
   artifact: 'Deliverable',

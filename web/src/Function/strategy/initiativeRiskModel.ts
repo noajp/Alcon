@@ -1,7 +1,7 @@
 // =============================================================
-// Initiative risk — the cross-section, computed.
+// Strategy risk — the cross-section, computed.
 //
-// A Initiative's burn-up answers "will we make it". This answers the question
+// A Strategy's burn-up answers "will we make it". This answers the question
 // that comes next and is the only one a commander can act on: *what is hurting,
 // and where does the next person go*. Every number here is chosen so that
 // reading it moves somebody. A number that cannot move anybody is decoration,
@@ -42,7 +42,7 @@ export interface RiskObject {
    *  already parsed by the caller. Only stallMinutes / idleHours /
    *  dueSoonDays are honoured here — they are judgements about one Object's
    *  work. concentrationThreshold measures one Worker's share of the whole
-   *  Initiative and stays on `options`. */
+   *  Strategy and stays on `options`. */
   thresholds?: InitiativeRiskOptions;
 }
 
@@ -73,7 +73,7 @@ export interface WorkerLoad {
   workerId: string;
   name: string;
   open: number;
-  /** 0..1 of all assignment slots on open Elements in the Initiative. */
+  /** 0..1 of all assignment slots on open Elements in the Strategy. */
   share: number;
 }
 
@@ -85,7 +85,7 @@ export interface InitiativeRiskReport {
    *
    *  Overdue alone is a post-mortem instrument: by the time it moves, the date
    *  is already missed and no reassignment can undo it. This is the same
-   *  measurement taken early enough to act on, and on a real Initiative it is
+   *  measurement taken early enough to act on, and on a real Strategy it is
    *  the one that fires — measured on a live board, 0 Elements were overdue
    *  while 4 were due inside three days with nobody started on them. */
   dueSoon: number;
@@ -95,14 +95,14 @@ export interface InitiativeRiskReport {
   unstaffed: number;
   /** Open Elements carrying a due date. When this is 0 the schedule is not
    *  late — it is *unmeasured*, and the UI must say so rather than show
-   *  `overdue: 0` as if the Initiative were on time. */
+   *  `overdue: 0` as if the Strategy were on time. */
   scheduled: number;
   /** Only the Objects that fire, worst first. */
   objects: ObjectRisk[];
   /** Every Worker holding open work, heaviest first. */
   load: WorkerLoad[];
   /** Set when one Worker holds more than `concentrationThreshold` of the
-   *  Initiative's open work — the Initiative is single-threaded through them. */
+   *  Strategy's open work — the Strategy is single-threaded through them. */
   concentration: WorkerLoad | null;
 }
 
@@ -170,7 +170,7 @@ export function parseRiskThresholds(raw: unknown): InitiativeRiskOptions {
 /** Statuses that mean nobody has picked the work up yet. */
 const UNSTARTED = new Set(['backlog', 'todo']);
 
-/** Not done, not cancelled — the work still on the Initiative's plate. */
+/** Not done, not cancelled — the work still on the Strategy's plate. */
 function isOpen(el: RiskElement): boolean {
   return isOpenStatus(el.status);
 }
@@ -201,7 +201,7 @@ export function lastSignalAt(el: RiskElement): number | null {
  * Stalled, defined once. This is `.claude/ops/stall-check.mjs`'s predicate and must
  * stay it: in_progress, and no progress report for longer than the threshold.
  * If the loop's watcher and this pane disagreed about what "stalled" means,
- * the board and the screen would be reporting two different Initiatives.
+ * the board and the screen would be reporting two different Strategies.
  */
 export function isStalled(el: RiskElement, now: number, stallMinutes = DEFAULT_STALL_MINUTES): boolean {
   if (el.status !== 'in_progress') return false;
@@ -227,7 +227,7 @@ function isOverdue(el: RiskElement, today: string): boolean {
 /**
  * Due inside the horizon and nobody has started. `in_progress` and `review`
  * are excluded on purpose: work that is moving toward a near date is the
- * normal, healthy shape of a Initiative, and counting it would bury the rows
+ * normal, healthy shape of a Strategy, and counting it would bury the rows
  * that actually need somebody under the ones that already have somebody.
  */
 export function isDueSoon(el: RiskElement, today: string, horizon: string): boolean {
@@ -248,7 +248,7 @@ const REASON_RANK: Record<RiskReason, number> = {
 /**
  * The whole cross-section in one pass.
  *
- * `objects` is the Initiative's Object scope; `elements` is every Element homed
+ * `objects` is the Strategy's Object scope; `elements` is every Element homed
  * in any of them. Elements homed in none of the scoped Objects are ignored, so
  * the caller may pass a wider fetch without skewing the counts.
  */
@@ -293,8 +293,8 @@ export function computeInitiativeRisk(
   //
   // Stalled / due-soon / idle are judged with the thresholds of the Object
   // being assessed — its Domain's own idea of "too quiet" and "too close"
-  // (Settings > Elements > SLAs) — falling back to the Initiative-level
-  // options, then the defaults. The Initiative totals are the union across
+  // (Settings > Elements > SLAs) — falling back to the Strategy-level
+  // options, then the defaults. The Strategy totals are the union across
   // Objects: a multi-homed Element counts once, and counts if any home flags
   // it. With no per-Object thresholds this is the same arithmetic as one
   // global pass.

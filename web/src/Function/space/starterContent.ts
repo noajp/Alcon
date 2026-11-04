@@ -1,7 +1,7 @@
 import type { Locale } from '@/Function/i18n/locales';
 
 // What a brand-new Space starts with: one Domain whose Objects walk through
-// setup, and one Vision whose Initiatives point at those Objects — so the
+// setup, and one Strategy whose nested Strategies point at those Objects — so the
 // first thing a person sees is the product's own model, filled in. It is
 // ordinary data once written; the owner edits or deletes it like anything else.
 
@@ -11,7 +11,7 @@ export interface StarterElement {
 }
 
 export interface StarterObject {
-  /** Stable handle an Initiative uses to name the Object it draws on. */
+  /** Stable handle a Strategy uses to name the Object it draws on. */
   key: string;
   name: string;
   description: string;
@@ -24,7 +24,7 @@ export interface StarterInitiative {
   objectKeys: string[];
 }
 
-/** A top-level Initiative and the Initiatives nested in it. */
+/** A top-level Strategy and the Strategies nested in it. */
 export interface StarterInitiativeGroup {
   name: string;
   description: string;
@@ -34,8 +34,8 @@ export interface StarterInitiativeGroup {
 export interface StarterContent {
   domain: { name: string; identifier: string; description: string };
   objects: StarterObject[];
-  vision: { name: string; statement: string };
-  initiatives: StarterInitiativeGroup[];
+  strategy: { name: string; description: string };
+  strategies: StarterInitiativeGroup[];
 }
 
 const ja: StarterContent = {
@@ -84,10 +84,10 @@ const ja: StarterContent = {
       name: 'Strategy と結びつける',
       description: '意図と行動を行き来できるようにする。',
       elements: [
-        { title: 'Vision を書く', description: 'Vision は Space が目指す姿です。Strategy の Vision から追加します。' },
-        { title: 'Initiative を作り、Object を結びつける', description: 'Initiative は目的・前提・意思決定・成功条件を持ちます。担当や進捗は持たず、結びつけた Object の実行状況を参照します。' },
-        { title: '成功条件を数値で置く', description: 'Initiative に測定できる成功条件を置くと、目標と実績の差を追えます。' },
-        { title: 'Initiative と Object を行き来する', description: 'Initiative からは配下の Object を、Object からは貢献先の Initiative を開けます。' },
+        { title: '最上位の Strategy を書く', description: '最上位の Strategy に Space が目指す姿を書き、その下に Strategy を入れ子にしていきます。' },
+        { title: 'Strategy を作り、Object を結びつける', description: 'Strategy は目的・前提・意思決定・成功条件を持ちます。担当や進捗は持たず、結びつけた Object の実行状況を参照します。' },
+        { title: '成功条件を数値で置く', description: 'Strategy に測定できる成功条件を置くと、目標と実績の差を追えます。' },
+        { title: 'Strategy と Object を行き来する', description: 'Strategy からは配下の Object を、Object からは貢献先の Strategy を開けます。' },
       ],
     },
     {
@@ -102,11 +102,11 @@ const ja: StarterContent = {
       ],
     },
   ],
-  vision: {
+  strategy: {
     name: 'アプリの使い方をマスターする',
-    statement: 'チームの全員が、意図（Strategy）と行動（Execution）を Alcon の上で行き来できる。',
+    description: 'チームの全員が、意図（Strategy）と行動（Execution）を Alcon の上で行き来できる。',
   },
-  initiatives: [
+  strategies: [
     {
       name: '基本を身につける',
       description: '考え方を理解し、Space を使える状態にする。',
@@ -120,7 +120,7 @@ const ja: StarterContent = {
       description: '実際の仕事を Alcon に乗せ、意図と結びつける。',
       children: [
         { name: '日々の実行を Element にする', description: '自分たちの Domain・Object・Element を作り、担当と期限を持たせる。', objectKeys: ['execution'] },
-        { name: '意図と実行を結びつける', description: 'Vision と Initiative を書き、Object を結びつけて、目的と実行状況を行き来できるようにする。', objectKeys: ['strategy'] },
+        { name: '意図と実行を結びつける', description: 'Strategy を書いて入れ子にし、Object を結びつけて、目的と実行状況を行き来できるようにする。', objectKeys: ['strategy'] },
         { name: '仕事道具を活用する', description: 'Notebook・Table・Calendar・Workload を日常の仕事に組み込む。', objectKeys: ['sustainment'] },
       ],
     },
@@ -173,10 +173,10 @@ const en: StarterContent = {
       name: 'Connect to Strategy',
       description: 'Move between intent and action.',
       elements: [
-        { title: 'Write a Vision', description: 'A Vision is what the Space aims for. Add one under Strategy.' },
-        { title: 'Create an Initiative and link Objects', description: 'An Initiative holds purpose, assumptions, decisions and success conditions. It has no assignee or progress of its own — it reads those from its linked Objects.' },
-        { title: 'Set a measurable success condition', description: 'A measurable condition on an Initiative lets you track the gap between target and actual.' },
-        { title: 'Move between an Initiative and its Objects', description: 'An Initiative opens its Objects, and an Object opens the Initiatives it contributes to.' },
+        { title: 'Write a top-level Strategy', description: 'The top-level Strategy says what the Space aims for; nest the Strategies that win it underneath.' },
+        { title: 'Create a Strategy and link Objects', description: 'A Strategy holds purpose, assumptions, decisions and success conditions. It has no assignee or progress of its own — it reads those from its linked Objects.' },
+        { title: 'Set a measurable success condition', description: 'A measurable condition on a Strategy lets you track the gap between target and actual.' },
+        { title: 'Move between a Strategy and its Objects', description: 'A Strategy opens its Objects, and an Object opens the Strategies it contributes to.' },
       ],
     },
     {
@@ -191,11 +191,11 @@ const en: StarterContent = {
       ],
     },
   ],
-  vision: {
+  strategy: {
     name: 'Master the app',
-    statement: 'Everyone on the team moves between intent (Strategy) and action (Execution) in Alcon.',
+    description: 'Everyone on the team moves between intent (Strategy) and action (Execution) in Alcon.',
   },
-  initiatives: [
+  strategies: [
     {
       name: 'Learn the basics',
       description: 'Understand the model and get the Space ready.',
@@ -209,7 +209,7 @@ const en: StarterContent = {
       description: 'Put actual work into Alcon and tie it to intent.',
       children: [
         { name: 'Put daily execution on the board', description: 'Create your own Domains, Objects and Elements with assignees and due dates.', objectKeys: ['execution'] },
-        { name: 'Connect intent and execution', description: 'Write a Vision and Initiatives and link Objects, so purpose and progress are one click apart.', objectKeys: ['strategy'] },
+        { name: 'Connect intent and execution', description: 'Write and nest Strategies and link Objects, so purpose and progress are one click apart.', objectKeys: ['strategy'] },
         { name: 'Put the tools to work', description: 'Bring Notebook, Table, Calendar and Workload into everyday work.', objectKeys: ['sustainment'] },
       ],
     },
@@ -302,20 +302,20 @@ const ko: StarterContent = {
       "description": "의도와 행동을 오갈 수 있게 합니다.",
       "elements": [
         {
-          "title": "Vision 쓰기",
-          "description": "Vision은 Space가 지향하는 모습입니다. Strategy에서 추가합니다."
+          "title": "최상위 Strategy 쓰기",
+          "description": "최상위 Strategy에 Space가 지향하는 모습을 쓰고, 그 아래에 Strategy를 중첩합니다."
         },
         {
-          "title": "Initiative를 만들고 Object 연결하기",
-          "description": "Initiative는 목적, 전제, 의사결정, 성공 조건을 가집니다. 담당자나 진행률은 갖지 않고, 연결된 Object의 실행 상황을 참조합니다."
+          "title": "Strategy를 만들고 Object 연결하기",
+          "description": "Strategy는 목적, 전제, 의사결정, 성공 조건을 가집니다. 담당자나 진행률은 갖지 않고, 연결된 Object의 실행 상황을 참조합니다."
         },
         {
           "title": "측정 가능한 성공 조건 두기",
-          "description": "Initiative에 측정 가능한 조건을 두면 목표와 실적의 차이를 추적할 수 있습니다."
+          "description": "Strategy에 측정 가능한 조건을 두면 목표와 실적의 차이를 추적할 수 있습니다."
         },
         {
-          "title": "Initiative와 Object 오가기",
-          "description": "Initiative에서는 연결된 Object를, Object에서는 기여하는 Initiative를 열 수 있습니다."
+          "title": "Strategy와 Object 오가기",
+          "description": "Strategy에서는 연결된 Object를, Object에서는 기여하는 Strategy를 열 수 있습니다."
         }
       ]
     },
@@ -343,11 +343,11 @@ const ko: StarterContent = {
       ]
     }
   ],
-  "vision": {
+  "strategy": {
     "name": "앱 사용법 마스터하기",
-    "statement": "팀 전원이 Alcon에서 의도(Strategy)와 행동(Execution)을 오갈 수 있다."
+    "description": "팀 전원이 Alcon에서 의도(Strategy)와 행동(Execution)을 오갈 수 있다."
   },
-  "initiatives": [
+  "strategies": [
     {
       "name": "기본 익히기",
       "description": "사고방식을 이해하고 Space를 쓸 수 있는 상태로 만듭니다.",
@@ -381,7 +381,7 @@ const ko: StarterContent = {
         },
         {
           "name": "의도와 실행 연결하기",
-          "description": "Vision과 Initiative를 쓰고 Object를 연결해 목적과 실행 상황을 오갈 수 있게 합니다.",
+          "description": "Strategy를 쓰고 중첩한 뒤 Object를 연결해 목적과 실행 상황을 오갈 수 있게 합니다.",
           "objectKeys": [
             "strategy"
           ]
@@ -484,20 +484,20 @@ const fr: StarterContent = {
       "description": "Passer de l’intention à l’action, et inversement.",
       "elements": [
         {
-          "title": "Rédiger une Vision",
-          "description": "Une Vision est ce que vise le Space. Ajoutez-en une dans Strategy."
+          "title": "Rédiger une Strategy de premier niveau",
+          "description": "La Strategy de premier niveau dit ce que vise le Space ; imbriquez dessous les Strategies qui y mènent."
         },
         {
-          "title": "Créer une Initiative et y relier des Objects",
-          "description": "Une Initiative porte l’objectif, les hypothèses, les décisions et les conditions de réussite. Elle n’a ni responsable ni progression propres : elle les lit dans les Objects reliés."
+          "title": "Créer une Strategy et y relier des Objects",
+          "description": "Une Strategy porte l’objectif, les hypothèses, les décisions et les conditions de réussite. Elle n’a ni responsable ni progression propres : elle les lit dans les Objects reliés."
         },
         {
           "title": "Fixer une condition de réussite mesurable",
-          "description": "Une condition mesurable sur une Initiative permet de suivre l’écart entre cible et réel."
+          "description": "Une condition mesurable sur une Strategy permet de suivre l’écart entre cible et réel."
         },
         {
-          "title": "Naviguer entre une Initiative et ses Objects",
-          "description": "Une Initiative ouvre ses Objects, et un Object ouvre les Initiatives auxquelles il contribue."
+          "title": "Naviguer entre une Strategy et ses Objects",
+          "description": "Une Strategy ouvre ses Objects, et un Object ouvre les Strategies auxquelles il contribue."
         }
       ]
     },
@@ -525,11 +525,11 @@ const fr: StarterContent = {
       ]
     }
   ],
-  "vision": {
+  "strategy": {
     "name": "Maîtriser l’application",
-    "statement": "Toute l’équipe passe de l’intention (Strategy) à l’action (Execution) dans Alcon."
+    "description": "Toute l’équipe passe de l’intention (Strategy) à l’action (Execution) dans Alcon."
   },
-  "initiatives": [
+  "strategies": [
     {
       "name": "Apprendre les bases",
       "description": "Comprendre le modèle et préparer le Space.",
@@ -563,7 +563,7 @@ const fr: StarterContent = {
         },
         {
           "name": "Relier intention et exécution",
-          "description": "Rédiger une Vision et des Initiatives et y relier des Objects, pour passer de l’objectif à l’avancement en un clic.",
+          "description": "Rédiger et imbriquer des Strategies et y relier des Objects, pour passer de l’objectif à l’avancement en un clic.",
           "objectKeys": [
             "strategy"
           ]
@@ -666,20 +666,20 @@ const es: StarterContent = {
       "description": "Moverse entre la intención y la acción.",
       "elements": [
         {
-          "title": "Escribir una Vision",
-          "description": "Una Vision es a lo que aspira el Space. Añade una en Strategy."
+          "title": "Escribir una Strategy de nivel superior",
+          "description": "La Strategy de nivel superior dice a qué aspira el Space; anida debajo las Strategies que lo logran."
         },
         {
-          "title": "Crear una Initiative y vincular Objects",
-          "description": "Una Initiative contiene propósito, supuestos, decisiones y condiciones de éxito. No tiene responsable ni progreso propios: los lee de sus Objects vinculados."
+          "title": "Crear una Strategy y vincular Objects",
+          "description": "Una Strategy contiene propósito, supuestos, decisiones y condiciones de éxito. No tiene responsable ni progreso propios: los lee de sus Objects vinculados."
         },
         {
           "title": "Fijar una condición de éxito medible",
-          "description": "Una condición medible en una Initiative permite seguir la diferencia entre objetivo y real."
+          "description": "Una condición medible en una Strategy permite seguir la diferencia entre objetivo y real."
         },
         {
-          "title": "Moverse entre una Initiative y sus Objects",
-          "description": "Una Initiative abre sus Objects, y un Object abre las Initiatives a las que contribuye."
+          "title": "Moverse entre una Strategy y sus Objects",
+          "description": "Una Strategy abre sus Objects, y un Object abre las Strategies a las que contribuye."
         }
       ]
     },
@@ -707,11 +707,11 @@ const es: StarterContent = {
       ]
     }
   ],
-  "vision": {
+  "strategy": {
     "name": "Dominar la aplicación",
-    "statement": "Todo el equipo se mueve entre la intención (Strategy) y la acción (Execution) en Alcon."
+    "description": "Todo el equipo se mueve entre la intención (Strategy) y la acción (Execution) en Alcon."
   },
-  "initiatives": [
+  "strategies": [
     {
       "name": "Aprender lo básico",
       "description": "Entender el modelo y dejar listo el Space.",
@@ -745,7 +745,7 @@ const es: StarterContent = {
         },
         {
           "name": "Conectar intención y ejecución",
-          "description": "Escribir una Vision e Initiatives y vincular Objects, para pasar del propósito al avance con un clic.",
+          "description": "Escribir y anidar Strategies y vincular Objects, para pasar del propósito al avance con un clic.",
           "objectKeys": [
             "strategy"
           ]

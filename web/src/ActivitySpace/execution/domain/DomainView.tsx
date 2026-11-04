@@ -113,7 +113,7 @@ interface DomainViewProps {
   onRefresh?: () => void;
   activeDomainId?: string | null;
   /** Switch the active top-level activity — e.g. the Object Overview's
-   *  "Initiative" property row jumps out to the Strategy surface. */
+   *  "Strategy" property row jumps out to the Strategy surface. */
   onViewChange?: (view: string) => void;
 }
 
@@ -485,7 +485,7 @@ interface DomainTabContentProps {
    *  Workload. */
   domainName?: string | null;
   /** The tools' Element detail borrows these to reach an Object or an
-   *  Initiative — the one-click round trip the List tab already has. */
+   *  Strategy — the one-click round trip the List tab already has. */
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
 }

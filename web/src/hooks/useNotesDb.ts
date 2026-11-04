@@ -57,16 +57,16 @@ const APP_GUIDE_README_HTML = `<h1>Alcon へようこそ</h1>
 <h2>三分類</h2>
 <p>機能は Strategy / Execution / Sustainment の三つに分類されます。全体の体系はクラウゼヴィッツ『戦争論』の 戦略・戦闘・兵站 に着想を得ています。</p>
 <ul>
-<li><strong>Strategy（戦略）</strong> — 何を達成し、どう勝つか。Initiative が単位で、複数の Initiative を束ねると戦略になる。</li>
+<li><strong>Strategy（戦略）</strong> — 何を達成し、どう勝つか。Strategy が単位で、複数の Strategy を束ねると戦略になる。</li>
 <li><strong>Execution（戦闘）</strong> — 実際に行動する。Element → Object → Domain。</li>
 <li><strong>Sustainment（兵站）</strong> — 行動を支える仕事道具。</li>
 </ul>
 <h2>機能</h2>
 <h3>Strategy</h3>
 <ul>
-<li><strong>Initiative</strong> — 複数の Object を束ね、意図・前提・決定・成功条件を持つ。Initiative は Initiative を内包できる</li>
+<li><strong>Strategy</strong> — 複数の Object を束ね、意図・前提・決定・成功条件を持つ。Strategy は Strategy を内包できる</li>
 <li><strong>Phase</strong> — 努力をどの段階に配分するかの時間箱</li>
-<li><strong>Timeline</strong> — Initiative の期間・シーケンスを Gantt で俯瞰</li>
+<li><strong>Timeline</strong> — Strategy の期間・シーケンスを Gantt で俯瞰</li>
 </ul>
 <h3>Execution</h3>
 <p>三層はアーレント『人間の条件』の 労働・仕事・活動 に着想を得ています。</p>

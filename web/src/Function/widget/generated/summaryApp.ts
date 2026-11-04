@@ -24,9 +24,9 @@ async function load(){
   const open=data.elements.filter(e=>!['done','cancelled'].includes(e.status));
   const overdue=open.filter(e=>e.due_date&&e.due_date<today);
   const metrics=node('div',undefined,'metrics');
-  for(const [label,value] of [['Done / All Elements',done.length+' / '+data.elements.length],['Overdue',overdue.length],['Related Initiatives',data.initiatives.length]]){const card=node('div',undefined,'metric');card.append(node('strong',String(value)),node('span',label));metrics.append(card);}root.append(metrics);
+  for(const [label,value] of [['Done / All Elements',done.length+' / '+data.elements.length],['Overdue',overdue.length],['Related Strategies',data.initiatives.length]]){const card=node('div',undefined,'metric');card.append(node('strong',String(value)),node('span',label));metrics.append(card);}root.append(metrics);
   root.append(node('p',data.object.name+' · Due '+(data.object.due_date||'Not set')+' · '+(data.domains.map(d=>d.name).join(' / ')||'No visible Domains'),'source'));
-  section('Strategy · Purpose and success criteria',data.initiatives.length?data.initiatives.map(i=>i.name+'\n'+(i.description||'No purpose described yet')):['No related Initiatives are visible.']);
+  section('Strategy · Purpose and success criteria',data.initiatives.length?data.initiatives.map(i=>i.name+'\n'+(i.description||'No purpose described yet')):['No related Strategies are visible.']);
   if(data.intents.length)section('Intent · Decisions and measures',data.intents.map(i=>{const parent=data.initiatives.find(s=>s.id===i.strategy_id);return (parent?parent.name+' / ':'')+i.title+' ['+i.kind+']'+(i.superseded_by_intent_id?' (superseded)':'')+(i.kind==='measure'?' — Actual '+(i.actual_value===null?'Not measured':i.actual_value)+' / Target '+(i.target_value===null?'Not set':i.target_value)+' '+(i.unit||'')+' · '+(i.direction==='at_most'?'At most':i.direction==='at_least'?'At least':'Direction not set')+' · Measured '+(i.measured_at||'Not recorded'):'')+(i.subtitle?'\n'+i.subtitle:'');}));
   const ordered=[...open].sort((a,b)=>(a.due_date||'9999').localeCompare(b.due_date||'9999'));
   section('Execution · Elements to review next',ordered.length?ordered.slice(0,8).map(e=>(e.display_id||e.id)+' · '+e.title+'\n'+e.status+' · Due '+(e.due_date||'Not set')+(e.due_date&&e.due_date<today?' · Overdue':'')):['No open Elements.']);

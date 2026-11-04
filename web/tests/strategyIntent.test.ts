@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { extractStrategyIntent } from '@/ActivitySpace/execution/object/overview/strategyIntent';
 
-// extractStrategyIntent is what stands between a Initiative description and a
+// extractStrategyIntent is what stands between a Strategy description and a
 // side rail a few rows tall. Its contract: cut only on seams the author wrote
 // (headings, paragraph breaks, list boundaries) — never mid-sentence — keep the
 // sections that state what winning looks like, drop the ones about process and
-// means, and hand back an empty array (not a blank row) when a Initiative has
+// means, and hand back an empty array (not a blank row) when a Strategy has
 // said nothing at all.
 //
 // Both long fixtures below are the real `strategies.description` of the only
-// two Initiatives in the database that have one. They are deliberately different
+// two Strategies in the database that have one. They are deliberately different
 // shapes, because between them they are the whole problem:
 //
 //   OP KESTREL RELIEF — `## Ends` / `## Ways` / `## Means` / `## 成功条件`,
@@ -39,7 +39,7 @@ const KESTREL = `【架空演習】ケストレル火山噴火（アルダニア
 - Phase III 終了時点で全機能の移管合意が成立している`;
 
 // Verbatim: this line's wording is the actual strategies.description row,
-// written before the Campaign→Initiative rename — kept as "Campaign" here on
+// written before the Campaign→Strategy rename — kept as "Campaign" here on
 // purpose so this fixture stays true to what's really stored, not to what the
 // concept is called today.
 const SELF_BUILD = `Alcon 自身を Alcon 上で開発する Campaign。

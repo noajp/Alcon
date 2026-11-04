@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 
 // =============================================================
-// IndexList — a concept's index page: every Initiative, every Domain.
+// IndexList — a concept's index page: every Strategy, every Domain.
 //
 // Three columns, the same on each: the name, how it is going (Health), and a
 // count of what is inside it. A row is a line on the page, not a card: the

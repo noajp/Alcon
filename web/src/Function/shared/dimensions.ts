@@ -45,7 +45,7 @@ export type Dimension =
   | 'object'
   // Stored verbatim in WidgetInstance.params (a saved widget's chosen axis),
   // so the value stays 'campaign' even though the product now calls the
-  // concept "Initiative" everywhere else — renaming it would silently
+  // concept "Strategy" everywhere else — renaming it would silently
   // invalidate every board that already picked this axis.
   | 'campaign'
   // Who holds the lease (elements.claimed_by, el_TRJ-012). Bucketed by the
@@ -72,7 +72,7 @@ export const DIMENSION_LABEL: Record<Dimension, string> = {
   priority: 'Priority',
   assignee: 'Assignee',
   object: 'Object',
-  campaign: 'Initiative',
+  campaign: 'Strategy',
   holder: 'Holder',
   type: 'Type',
   label: 'Label',
@@ -88,7 +88,7 @@ const EMPTY_LABEL: Record<Dimension, string> = {
   priority: 'No priority',
   assignee: 'Unassigned',
   object: 'No Object',
-  campaign: 'No Initiative',
+  campaign: 'No Strategy',
   holder: 'Unclaimed',
   type: 'No type',
   label: 'No labels',
@@ -101,11 +101,11 @@ const EMPTY_LABEL: Record<Dimension, string> = {
  *
  * `object` and `initiative` bucket by uuid, and a figure has to print something
  * a person recognises. The caller owns these because only it knows which
- * Objects and Initiatives are in scope.
+ * Objects and Strategies are in scope.
  */
 export interface DimensionContext {
   objectNames?: Map<string, string>;
-  /** Object id → the Initiatives it feeds. */
+  /** Object id → the Strategies it feeds. */
   initiativesByObject?: Map<string, { id: string; name: string }[]>;
 }
 
@@ -194,8 +194,8 @@ export function bucketsOf(
       return [{ id, label: ctx.objectNames?.get(id) ?? translate('Object'), color: null }];
     }
     case 'campaign': {
-      // An Element reaches a Initiative through its Object, so an Object in two
-      // Initiatives puts its Elements in both — the same shape as two assignees.
+      // An Element reaches a Strategy through its Object, so an Object in two
+      // Strategies puts its Elements in both — the same shape as two assignees.
       const owning = element.object_id
         ? ctx.initiativesByObject?.get(element.object_id) ?? []
         : [];

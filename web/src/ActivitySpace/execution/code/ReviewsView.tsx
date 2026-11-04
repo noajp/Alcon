@@ -189,7 +189,7 @@ function Intro({ spaceId, existing, onDismiss }: { spaceId: string | null; exist
         <div className="max-w-xl space-y-4">
           <h2 className="text-xl font-semibold text-foreground">{t('Review code against the intent')}</h2>
           <p className="text-[14px] leading-relaxed text-[var(--text-secondary)]">
-            {t('See pull requests beside the Elements they carry out and the Initiatives they serve. Check whether the software does what was intended, discuss it line by line, and merge — without switching to GitHub.')}
+            {t('See pull requests beside the Elements they carry out and the Strategies they serve. Check whether the software does what was intended, discuss it line by line, and merge — without switching to GitHub.')}
           </p>
           {isOwner && spaceId ? (
             <ConnectGithub spaceId={spaceId} existing={existing} />

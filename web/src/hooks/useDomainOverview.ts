@@ -22,10 +22,10 @@ export async function fetchDomainOverview(domainId: string) {
   ]);
   if (error) throw error;
   if (!domain) throw new Error('Domain unavailable');
-  const links = await readAllIn<{ strategy_id: string; object_id: string }>('Domain Initiative links', explorer.objects.map(object => object.id),
+  const links = await readAllIn<{ strategy_id: string; object_id: string }>('Domain Strategy links', explorer.objects.map(object => object.id),
     (ids, from, to) => supabase.from('strategy_objects').select('strategy_id,object_id', { count: 'exact' }).in('object_id', ids).order('strategy_id').order('object_id').range(from, to),
     link => `${link.strategy_id}:${link.object_id}`);
-  const initiatives = await readAllIn<InitiativeRelation['initiative']>('Domain Initiatives', links.map(link => link.strategy_id),
+  const initiatives = await readAllIn<InitiativeRelation['initiative']>('Domain Strategies', links.map(link => link.strategy_id),
     (ids, from, to) => supabase.from('strategies').select('id,name,description,status', { count: 'exact' }).in('id', ids).order('id').range(from, to),
     initiative => initiative.id);
   return {
@@ -49,15 +49,15 @@ export function useDomainOverview(domainId: string | null) {
 export async function fetchInitiativeDomains(initiativeId: string, viewableDomainIds: readonly string[]) {
   const { error } = await supabase.from('strategies').select('id').eq('id', initiativeId).single();
   if (error) throw error;
-  const links = await readAllPages<{ object_id: string }>('Initiative Object links', (from, to) => supabase.from('strategy_objects')
+  const links = await readAllPages<{ object_id: string }>('Strategy Object links', (from, to) => supabase.from('strategy_objects')
     .select('object_id', { count: 'exact' }).eq('strategy_id', initiativeId).order('object_id').range(from, to), link => link.object_id);
-  const objects = await readAllIn<Pick<AlconObject, 'id' | 'name' | 'domain_id'>>('Initiative Objects', links.map(link => link.object_id),
+  const objects = await readAllIn<Pick<AlconObject, 'id' | 'name' | 'domain_id'>>('Strategy Objects', links.map(link => link.object_id),
     (ids, from, to) => onlyActiveObjects(supabase.from('objects').select('id,name,domain_id', { count: 'exact' }).in('id', ids)).order('id').range(from, to), object => object.id);
   const homes = await readAllIn<{ object_id: string; domain_id: string }>('Object Domains', objects.map(object => object.id),
     (ids, from, to) => supabase.from('object_domains').select('object_id,domain_id', { count: 'exact' }).in('object_id', ids).order('object_id').order('domain_id').range(from, to), link => `${link.object_id}:${link.domain_id}`);
   const scope = new Set(viewableDomainIds);
   const domainIds = [...homes.map(home => home.domain_id), ...objects.flatMap(object => object.domain_id ? [object.domain_id] : [])].filter(id => scope.has(id));
-  const domains = await readAllIn<Pick<Domain, 'id' | 'name' | 'description'>>('Initiative Domains', domainIds,
+  const domains = await readAllIn<Pick<Domain, 'id' | 'name' | 'description'>>('Strategy Domains', domainIds,
     (ids, from, to) => supabase.from('domains').select('id,name,description', { count: 'exact' }).in('id', ids).order('id').range(from, to), domain => domain.id);
   return domainsForObjects(objects, domains, homes);
 }

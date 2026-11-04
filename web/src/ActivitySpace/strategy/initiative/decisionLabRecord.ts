@@ -8,16 +8,16 @@ export function decisionLabRecord(input: DecisionLabInput, comparison: DecisionL
   const names = new Map(input.elements.map((element) => [element.id, `${displayIdOf(element) ?? element.id} · ${element.title}`]));
   const changed = comparison.changes.filter((change) => change.change !== 'unchanged');
   const sacrificed = changed.filter((change) => change.change === 'worsened');
-  const row = (change: (typeof changed)[number]) => `${names.get(change.elementId) ?? change.elementId}: ${change.before.finish ?? 'Unestimated'} → ${change.after.finish ?? 'Unestimated'}${change.after.reason ? ` (${change.after.reason})` : ''}${change.after.inScope ? '' : ' [outside Initiative]'}`;
+  const row = (change: (typeof changed)[number]) => `${names.get(change.elementId) ?? change.elementId}: ${change.before.finish ?? 'Unestimated'} → ${change.after.finish ?? 'Unestimated'}${change.after.reason ? ` (${change.after.reason})` : ''}${change.after.inScope ? '' : ' [outside Strategy]'}`;
   return {
-    title: `${label}: ${target?.title ?? 'Initiative plan'}`,
+    title: `${label}: ${target?.title ?? 'Strategy plan'}`,
     subtitle: [
       `Decision Lab · conditional schedule · calculated ${input.today}`,
       `Why: ${reason.trim()}`,
       `Plan: ${label}${scenario.workerId ? ` · ${input.workers.find((worker) => worker.id === scenario.workerId)?.name ?? 'Worker unavailable'}` : ''}`,
       'Execution: proposal recorded. Open the linked Elements to put the decision into action; dates and assignees have not been changed.',
-      `Initiative late Elements: ${comparison.baseline.scope.late} → ${comparison.scenario.scope.late}`,
-      `Initiative unestimated Elements: ${comparison.baseline.scope.unknown} → ${comparison.scenario.scope.unknown}`,
+      `Strategy late Elements: ${comparison.baseline.scope.late} → ${comparison.scenario.scope.late}`,
+      `Strategy unestimated Elements: ${comparison.baseline.scope.unknown} → ${comparison.scenario.scope.unknown}`,
       `Other work late Elements: ${comparison.baseline.outside.late} → ${comparison.scenario.outside.late}`,
       `Other work unestimated Elements: ${comparison.baseline.outside.unknown} → ${comparison.scenario.outside.unknown}`,
       'Changes:',

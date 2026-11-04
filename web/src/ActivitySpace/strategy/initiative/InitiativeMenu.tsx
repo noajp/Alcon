@@ -16,11 +16,11 @@ import { canEditInitiative } from '@/Function/strategy/initiativeAccess';
 import { deleteStrategy, moveInitiative, useStrategies } from '@/hooks/strategyData';
 import { buildInitiativeTree, flattenInitiativeTree, inSpace } from './initiativeTree';
 
-/** The Initiative a menu acts on — where it sits and who made it. */
+/** The Strategy a menu acts on — where it sits and who made it. */
 interface InitiativeRef {
   id: string;
   name: string;
-  /** The Initiatives it is nested in. */
+  /** The Strategies it is nested in. */
   parentIds: string[];
   created_by: string | null;
   activity_space_id?: string | null;
@@ -46,7 +46,7 @@ function useInitiativeActions(initiative: InitiativeRef, opts: { onDelete?: () =
     );
     if (!ok) return;
     try { await deleteStrategy(initiative.id); }
-    catch (e) { await appDialog.alert(e instanceof Error ? e.message : t('Could not delete the Initiative')); }
+    catch (e) { await appDialog.alert(e instanceof Error ? e.message : t('Could not delete the Strategy')); }
   };
 
   const items: ActionItem[] = canEdit ? [
@@ -60,7 +60,7 @@ function useInitiativeActions(initiative: InitiativeRef, opts: { onDelete?: () =
   return { items, picker };
 }
 
-/** Right-click on an Initiative row opens its actions. */
+/** Right-click on a Strategy row opens its actions. */
 export function InitiativeMenu({ initiative, children }: { initiative: InitiativeRef; children: ReactNode }) {
   const { items, picker } = useInitiativeActions(initiative);
   return (
@@ -71,14 +71,14 @@ export function InitiativeMenu({ initiative, children }: { initiative: Initiativ
   );
 }
 
-/** The "…" for an Initiative — on its row, or beside its name on its page.
+/** The "…" for a Strategy — on its row, or beside its name on its page.
  *  `onDelete` replaces the plain confirm (the page asks in its own dialog). */
 export function InitiativeActionsButton({ initiative, onDelete }: { initiative: InitiativeRef; onDelete?: () => void }) {
   const { t } = useI18n();
   const { items, picker } = useInitiativeActions(initiative, { onDelete });
   return (
     <>
-      <ActionsButton items={items} label={t('Initiative actions')} />
+      <ActionsButton items={items} label={t('Strategy actions')} />
       {picker}
     </>
   );

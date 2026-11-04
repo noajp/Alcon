@@ -40,11 +40,11 @@ export interface NavigationState {
    *  lives in the sidebar; this is which one the main pane shows. */
   tableId?: string | null;
   /** Strategy currently open in the Strategy surface (a `strategies` row
-   *  id). null = the Initiative list. Lets other surfaces (e.g. an
+   *  id). null = the Strategy list. Lets other surfaces (e.g. an
    *  Object's Properties rail) deep-link straight into a Strategy. */
   strategyId?: string | null;
-  /** The sidebar's "+" in Strategy mode asked for a new Initiative. The
-   *  Initiative list opens its create dialog and clears this. Carried in
+  /** The sidebar's "+" in Strategy mode asked for a new Strategy. The
+   *  Strategy list opens its create dialog and clears this. Carried in
    *  navigation so the request lands in this tab's surface once it is
    *  mounted, not in whichever listener happened to exist. */
   strategyCreate?: boolean | null;

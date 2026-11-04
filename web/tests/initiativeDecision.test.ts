@@ -193,7 +193,7 @@ describe('orderDecisions', () => {
     expect(only.decidedBy).toBe('Cdr. Hale');
   });
 
-  it('returns an empty list for an empty Initiative rather than a placeholder row', () => {
+  it('returns an empty list for an empty Strategy rather than a placeholder row', () => {
     expect(orderDecisions([], AT_D0)).toEqual([]);
   });
 });

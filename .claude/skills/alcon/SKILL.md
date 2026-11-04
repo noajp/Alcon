@@ -44,7 +44,7 @@ order by (e.phase_id is not null) desc,
 
 ## Alcon から渡された仕事（dispatcher）
 
-人が Element を Claude Code に渡すと、その Element に `dispatch` ラベルが付く（Initiative の計画タブで案を承認したとき、実行タブの「Claude Code に渡す」）。primary checkout で `cd web && npm run dispatch` を動かしておくと、`.claude/ops/dispatch.mjs` が1分ごとに次の Element を探し、1件ずつ新しい worktree（`.claude/worktrees/agent-<display_id>`）で headless の Claude Code を起動する。
+人が Element を Claude Code に渡すと、その Element に `dispatch` ラベルが付く（Strategy の計画タブで案を承認したとき、実行タブの「Claude Code に渡す」）。primary checkout で `cd web && npm run dispatch` を動かしておくと、`.claude/ops/dispatch.mjs` が1分ごとに次の Element を探し、1件ずつ新しい worktree（`.claude/worktrees/agent-<display_id>`）で headless の Claude Code を起動する。
 
 - 開発 Domain（`dev_control.domain_id`）にあり、`dispatch` ラベル付き、`todo` か `in_progress`
 - 担当に `ai_config.runner = 'claude-code'` の Worker がいる
@@ -63,9 +63,9 @@ order by (e.phase_id is not null) desc,
 - description は「何を決めるか / 選択肢（推奨を先頭）/ なぜ判断が要るか / 承認後に起きること」
 - 返事がないことは承認ではない。決まったら `✔ 完了 — 何を選んだか` を書いて `done`
 
-## Initiative のコメントからの依頼
+## Strategy のコメントからの依頼
 
-Initiative のコメントで `@Claude` を含むものだけが依頼。それ以外は背景として読み、着手しない。依頼を受けたら、作る Element の案を「Decisions — 判断」に Element として作り（Initiative には `◆ 提案 — <その Element の display_id>` とコメントする）、承認されてから作る。書き込みは `author_kind='ai_agent'` / `author_id=NULL` / `author_name='Claude'`、`mentions` に `strategies.created_by` を入れる（入れないと誰にも通知されない。AI Worker の id を入れると INSERT が失敗する）。
+Strategy のコメントで `@Claude` を含むものだけが依頼。それ以外は背景として読み、着手しない。依頼を受けたら、作る Element の案を「Decisions — 判断」に Element として作り（Strategy には `◆ 提案 — <その Element の display_id>` とコメントする）、承認されてから作る。書き込みは `author_kind='ai_agent'` / `author_id=NULL` / `author_name='Claude'`、`mentions` に `strategies.created_by` を入れる（入れないと誰にも通知されない。AI Worker の id を入れると INSERT が失敗する）。
 
 ## 実装の規則
 
@@ -113,13 +113,13 @@ Initiative のコメントで `@Claude` を含むものだけが依頼。それ�
 着手できる Element がないときに行う。仕事を探すのではなく、架空の組織と案件を Alcon で実際に回し、使いにくかった所を次に作るものにする。
 
 - Alcon に実データで作る。Domain 1、Phase 数個、Object 4〜6、Element 8〜16、架空の Worker。description に `【架空】` と書く。このデータは消さない
-- Initiative の description に「崩れたら困る前提」を書き、途中でそれを崩す。順調な計画からは何も見つからない
+- Strategy の description に「崩れたら困る前提」を書き、途中でそれを崩す。順調な計画からは何も見つからない
 - 1回の流れ：前回直した所をもう一度試す → 1日か1週分進める → 画面を実際に見て数える → 「なぜ〜なのか」の形で問う → 既存のコードを読んでから直し方を考える → Element を作る
 - 問いの基準は製品自身の説明（[CLAUDE.md](../../CLAUDE.md) の概念モデル）。説明と実装が食い違う所を探す
 - 作る Element の description は `## 観察`（数字を入れる）/ `## 疑問` / `## 既にあるもの` / `## 仮説`（最小の案を含める）/ `## 受け入れ条件`
 - 直った所を試すときは PR の説明を読まず、元の観察だけで確かめる。結果は `◎ 解消` / `○ 部分的` / `△ 未解消` / `＋ 別の問題` を一行の根拠つきでコメントする
-- 毎回 Initiative に状況を、終わりにふりかえりを1本書き、次はそのふりかえりが挙げた問題の種類を狙う
-- 続きから始めるときは、description に `【架空】` を含む最新の Domain と、その Initiative の最後のコメントを読む
+- 毎回 Strategy に状況を、終わりにふりかえりを1本書き、次はそのふりかえりが挙げた問題の種類を狙う
+- 続きから始めるときは、description に `【架空】` を含む最新の Domain と、その Strategy の最後のコメントを読む
 
 ## 補助スクリプト（`.claude/ops/`）
 
@@ -130,7 +130,7 @@ Initiative のコメントで `@Claude` を含むものだけが依頼。それ�
 | `board-listen.mjs` | 開発 Domain の変化を realtime で受けてログに書く。通知が欲しいセッションは `tail -n0 -F $TMPDIR/dev-loop-*-board-listen.log` を Monitor で見る。他の worktree が動かしているものを止めない |
 | `stall-check.mjs` | `in_progress` のまま25分コメントがない Element を `STALLED` と出す。`--once` で一度だけ確認 |
 | `lease.mjs` | Element を作業中として押さえる・コメントする・離す（`elements.claimed_by` / `branch` / `claim_expires_at`）。`whoami` で自分の名前。同じフォルダ名の checkout が2つあるときは `LOOP_HOLDER` で名前を固定する |
-| `loop-report.mjs` | 直近24時間の動きとスクリプトの状態。`--post <file> --author <名前> --initiative <Initiative 名>` でコメントとして投稿 |
+| `loop-report.mjs` | 直近24時間の動きとスクリプトの状態。`--post <file> --author <名前> --initiative <Strategy 名>` でコメントとして投稿 |
 | `git-sync.mjs` | `npm run sync` の本体。マージ済みのブランチと worktree の掃除 |
 | `rename-product.mjs` | 製品名を一括で変える。`npm run rename-product <新しい名前>`（`--dry-run` で数だけ） |
 
@@ -152,11 +152,11 @@ Initiative のコメントで `@Claude` を含むものだけが依頼。それ�
 - **0005** 開発の流れはイベント（エージェントの完了・Element の realtime・`dev_events`）で動く。時計を使うのは `stall-check` だけで、見るのは「作業中なのに黙っていないか」
 - **0007** 人の判断待ちは `in_progress` ではなく `blocked` に置く。停滞の検知に例外を作らないため
 - **0009** SessionStart hook が全セッションで `board-listen` と `stall-check` を起動し、`git-common-dir` ごとのロックで1つだけ残す。負けた側は黙って終わる
-- **0010** エージェントが Initiative に書いたコメントは、`mentions` に入れた人にだけ通知する（trigger `notify_strategy_comment`）
+- **0010** エージェントが Strategy に書いたコメントは、`mentions` に入れた人にだけ通知する（trigger `notify_strategy_comment`）
 - **0011** スクリプトの生存状態（state / `joinedAt` / `seenAt`）はロックファイルに書く。ログはそのプロセスが持つ
-- **0012** Initiative のコメントは `@Claude` を含むときだけ依頼になる
+- **0012** Strategy のコメントは `@Claude` を含むときだけ依頼になる
 - **0013** 規約を変える PR も独立したレビューを通し、通れば自分でマージする。規約は増やす前に削れないかを問う
 - **0014** 障害は、起きた・倍増した・種類が変わった・直った、のときだけ報告する（`faultReporter.mjs`）
-- **0015** 判断は Initiative のコメントで求めず、「Decisions — 判断」の Element にして人に割り当てる
+- **0015** 判断は Strategy のコメントで求めず、「Decisions — 判断」の Element にして人に割り当てる
 - **0016** 通知は `board-listen` のログを tail して受ける。他のプロセスを奪わない。セッションを閉じても動かし続ける（scheduled task）には「Decisions — 判断」での承認が要る
 - **0021** Element を作業中として押さえるのは `claim_element()` だけ。押さえた人はセッションの名前で記録し、その名前のコメントが期限を延ばす。直接の書き込みはトリガが拒む

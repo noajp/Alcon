@@ -24,7 +24,7 @@ export interface DomainAIConfig {
   max_turns?: number       // turns a run may take in all (5–200, default 60); an AI Worker's own limit wins
 }
 
-// Per-Domain thresholds for the Initiative risk cross-section, stored in
+// Per-Domain thresholds for the Strategy risk cross-section, stored in
 // domains.risk_thresholds (jsonb). Every key optional; absent = the default
 // in Function/strategy/initiativeRiskModel.ts. Edited from Settings >
 // Elements > SLAs.
@@ -61,7 +61,7 @@ export interface Domain {
   activity_space_id: string | null  // owning ActivitySpace (company / enterprise)
   ai_config: DomainAIConfig | null
   element_types: string[]       // Element (Task層) の型カタログ (Task / Human ...)
-  object_types: string[]        // Object (Project層) の型カタログ (Project / Initiative ...) — element_types とは別レイヤー
+  object_types: string[]        // Object (Project層) の型カタログ (Project / Strategy ...) — element_types とは別レイヤー
   label_colors: Record<string, string>  // Label 名 → パレットキー (e.g. {"Bug":"red"})。色は Domain 共通
   risk_thresholds: DomainRiskThresholds // Settings > Elements > SLAs。未設定は {}（DB 既定）
   phase_defaults: DomainPhaseDefaults   // Settings > Strategy > Phase。未設定は {}（DB 既定）
@@ -1079,8 +1079,8 @@ export interface Notification {
   kind: NotificationKind
   element_id: string | null
   comment_id: string | null
-  /** Initiative thread: comment_id's FK points at element_comments, so a
-   *  Initiative comment hangs off these two instead. */
+  /** Strategy thread: comment_id's FK points at element_comments, so a
+   *  Strategy comment hangs off these two instead. */
   strategy_id: string | null
   /** The decision a review-due notification is about, or the success
    *  condition a measure-missed one is about. */
@@ -1401,7 +1401,7 @@ export interface AgentOutput {
 }
 
 // =====================================================
-// Strategy — cross-Domain Object groupings (Linear Initiative-style)
+// Strategy — cross-Domain Object groupings (Linear Strategy-style)
 //
 // The set of Objects a Strategy bundles lives in the strategy_objects
 // junction and nowhere else (ADR 0017). Strategies can also nest other
@@ -1479,7 +1479,7 @@ export interface StrategyChildInsert {
   order_index?: number
 }
 
-// Initiative thread — same shape as ElementComment so one renderer serves both.
+// Strategy thread — same shape as ElementComment so one renderer serves both.
 // author_id is null for an ai_agent (the FK points at auth.users and an agent
 // has no auth user); author_kind + author_name say who wrote it instead.
 export interface StrategyComment {
@@ -1517,7 +1517,7 @@ export interface StrategyCommentUpdate {
 export interface StrategyWithObjects extends Strategy {
   objectIds: string[]
   /** Parent Strategy ids from strategy_children (DAG — multi-parent allowed).
-   *  Empty = a top-level Initiative, shown at the root of the list. */
+   *  Empty = a top-level Strategy, shown at the root of the list. */
   parentIds: string[]
 }
 
@@ -1580,7 +1580,7 @@ export type IntentStatus = 'on_track' | 'at_risk' | 'off_track' | 'done'
 // Sub-Intents nest under it. Captured + uncaptured dimensions
 // are first-class arrays so the UI can render the "what you
 // failed to measure" pills without parsing prose.
-// What a row under a Initiative is. `master` is the root spine one Initiative
+// What a row under a Strategy is. `master` is the root spine one Strategy
 // gets (never listed as a decision); the other two are the surfaces' rows.
 export type IntentKind = 'decision' | 'assumption' | 'measure' | 'master'
 

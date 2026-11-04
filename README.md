@@ -4,7 +4,7 @@
 
 | 分類 | 何を扱うか | 単位 |
 |---|---|---|
-| **Strategy** | 何を達成するか、なぜか | Vision → Initiative（入れ子可） |
+| **Strategy** | 何を達成するか、なぜか | Strategy（際限なく入れ子にできる） |
 | **Execution** | 誰が何をしているか | Domain → Object → Element |
 | **Sustainment** | 仕事に使う道具 | Workload / Audit / Notebook / Table / Slides / People / Calendar |
 

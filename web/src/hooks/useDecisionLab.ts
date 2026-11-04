@@ -47,20 +47,20 @@ export async function fetchDecisionLabData(
       .from('domains').select('id', { count: 'exact' }).eq('activity_space_id', spaceId)
       .order('id').range(from, to).abortSignal(signal), rowId),
   ]);
-  if (initiativeError) throw new Error(`Unable to read Initiative: ${initiativeError.message}`);
-  if (!initiative) throw new Error('This Initiative is no longer visible.');
+  if (initiativeError) throw new Error(`Unable to read Strategy: ${initiativeError.message}`);
+  if (!initiative) throw new Error('This Strategy is no longer visible.');
 
-  // Follow only visible child Initiatives. A Set also terminates malformed
+  // Follow only visible child Strategies. A Set also terminates malformed
   // cycles and collapses a child reached through multiple parents.
   const initiativeIds = new Set([initiativeId]);
   let frontier = [initiativeId];
   while (frontier.length > 0) {
-    const nesting = await readAllIn<StrategyChild>('Initiative children', frontier, (chunk, from, to) => supabase
+    const nesting = await readAllIn<StrategyChild>('Strategy children', frontier, (chunk, from, to) => supabase
       .from('strategy_children').select('*', { count: 'exact' }).in('parent_strategy_id', chunk)
       .order('parent_strategy_id').order('child_strategy_id').range(from, to).abortSignal(signal),
     (row) => `${row.parent_strategy_id}:${row.child_strategy_id}`);
     const unreadIds = [...new Set(nesting.map((row) => row.child_strategy_id))].filter((id) => !initiativeIds.has(id));
-    const children = await readAllIn<{ id: string }>('Child Initiatives', unreadIds, (chunk, from, to) => supabase
+    const children = await readAllIn<{ id: string }>('Child Strategies', unreadIds, (chunk, from, to) => supabase
       .from('strategies').select('id', { count: 'exact' }).in('id', chunk)
       .order('id').range(from, to).abortSignal(signal), rowId);
     frontier = children.map((row) => row.id);
@@ -69,7 +69,7 @@ export async function fetchDecisionLabData(
 
   const domainIds = domains.map((row) => row.id);
   const [initiativeLinks, objectLinks, directObjects, spaceMembers, domainMembers] = await Promise.all([
-    readAllIn<StrategyObject>('Initiative Objects', [...initiativeIds], (chunk, from, to) => supabase
+    readAllIn<StrategyObject>('Strategy Objects', [...initiativeIds], (chunk, from, to) => supabase
       .from('strategy_objects').select('*', { count: 'exact' }).in('strategy_id', chunk)
       .order('id').range(from, to).abortSignal(signal), rowId),
     readAllIn<{ object_id: string; domain_id: string }>('Object Domains', domainIds, (chunk, from, to) => supabase
@@ -98,7 +98,7 @@ export async function fetchDecisionLabData(
   const objectSet = new Set(objectIds);
   const scopeObjectIds = new Set(initiativeLinks.map((row) => row.object_id).filter((id) => objectSet.has(id)));
   if (initiativeLinks.length > 0 && scopeObjectIds.size === 0) {
-    throw new Error('This Initiative has no visible Objects in the current Space. Switch to its Space to forecast.');
+    throw new Error('This Strategy has no visible Objects in the current Space. Switch to its Space to forecast.');
   }
 
   const [elementHomes, directElements, memberWorkers, objectWorkers] = await Promise.all([
@@ -195,12 +195,12 @@ export function useDecisionLab(initiativeId: string | null) {
     staleTime: 0,
     gcTime: 60_000,
     refetchOnWindowFocus: true,
-    // No placeholderData: results from another user/Space/Initiative must
+    // No placeholderData: results from another user/Space/Strategy must
     // never survive a context switch. This root is not in the persisted cache.
   });
   const refetch = query.refetch;
   const refresh = useCallback(async (): Promise<DecisionLabData> => {
-    if (!enabled || getActiveSpaceId() !== spaceId) throw new Error('Select a Space and Initiative before forecasting.');
+    if (!enabled || getActiveSpaceId() !== spaceId) throw new Error('Select a Space and Strategy before forecasting.');
     const result = await refetch({ throwOnError: true, cancelRefetch: true });
     if (getActiveSpaceId() !== spaceId) throw new Error('The active Space changed. Run the forecast again.');
     if (!result.data) throw new Error('Decision Lab data is unavailable.');

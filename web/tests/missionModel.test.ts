@@ -30,7 +30,7 @@ describe('actionState', () => {
 });
 
 describe('buildMissionGraph', () => {
-  it('hangs actions off the measures they deliver, and the rest off the Initiative', () => {
+  it('hangs actions off the measures they deliver, and the rest off the Strategy', () => {
     const g = buildMissionGraph({
       initiativeName: 'Win', measures: [measure('m1', 12)], elements: [el('a'), el('b')],
       bindings: [{ intent_id: 'm1', target_type: 'element', target_id: 'a', relationship_type: 'delivers' }],

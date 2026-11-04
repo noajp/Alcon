@@ -1,6 +1,6 @@
 // Code changes and their review against the intent (ActivitySpace/execution/
 // code), one row per message: [ja, ko, fr, es]. Concept names (Element,
-// Initiative, Object…) stay English in every language.
+// Strategy, Object…) stay English in every language.
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const CODE_REVIEW_MESSAGES: Record<string, Row> = {
@@ -40,7 +40,7 @@ const CODE_REVIEW_MESSAGES: Record<string, Row> = {
   'New commits since this check': ['この判定のあとに新しいコミットがあります', '이 확인 이후 새 커밋이 있습니다', 'Nouveaux commits depuis cette vérification', 'Hay commits nuevos desde esta comprobación'],
   'Outside the intent': ['意図の範囲外', '의도 범위 밖', 'Hors de l’intention', 'Fuera de la intención'],
   'Team review': ['チームの判定', '팀 리뷰', 'Avis de l’équipe', 'Revisión del equipo'],
-  'This Element’s Object serves no Initiative, so only the Element itself is the intent.': ['この Element の Object はどの Initiative にも属していないため、Element そのものを意図として扱います。', '이 Element의 Object는 어떤 Initiative에도 속하지 않아 Element 자체를 의도로 봅니다.', 'L’Object de cet Element ne sert aucune Initiative : seul l’Element lui-même sert d’intention.', 'El Object de este Element no sirve a ninguna Initiative, así que solo el propio Element es la intención.'],
+  'This Element’s Object serves no Strategy, so only the Element itself is the intent.': ['この Element の Object はどの Strategy にも属していないため、Element そのものを意図として扱います。', '이 Element의 Object는 어떤 Strategy에도 속하지 않아 Element 자체를 의도로 봅니다.', 'L’Object de cet Element ne sert aucune Strategy : seul l’Element lui-même sert d’intention.', 'El Object de este Element no sirve a ninguna Strategy, así que solo el propio Element es la intención.'],
   'What matches or misses the intent…': ['意図に合っている点・外れている点…', '의도에 맞거나 어긋나는 점…', 'Ce qui correspond ou non à l’intention…', 'Qué cumple o no la intención…'],
   'older commit': ['古いコミット', '이전 커밋', 'ancien commit', 'commit anterior'],
   // Labels read from tables (codeChangeLabels.tsx)
@@ -122,7 +122,7 @@ const CODE_REVIEW_MESSAGES: Record<string, Row> = {
   'Get started': ['はじめる', '시작하기', 'Commencer', 'Empezar'],
   'I don’t do code review': ['コードレビューはしない', '코드 리뷰를 하지 않음', 'Je ne fais pas de revue de code', 'No hago revisión de código'],
   'Review code against the intent': ['意図に照らしてコードをレビューする', '의도에 비추어 코드를 리뷰하기', 'Relire le code au regard de l’intention', 'Revisar el código frente a la intención'],
-  'See pull requests beside the Elements they carry out and the Initiatives they serve. Check whether the software does what was intended, discuss it line by line, and merge — without switching to GitHub.': ['Pull Request を、それが実行する Element と、貢献する Initiative の隣で見られます。ソフトウェアが意図どおりかを確かめ、行ごとに議論し、マージまで、GitHub に切り替えずに行えます。', 'Pull Request를 그것이 수행하는 Element, 기여하는 Initiative 옆에서 봅니다. 소프트웨어가 의도대로인지 확인하고, 줄마다 논의하고, 병합까지 GitHub로 전환하지 않고 할 수 있습니다.', 'Voyez les pull requests à côté des Elements qu’elles réalisent et des Initiatives qu’elles servent. Vérifiez que le logiciel fait ce qui était voulu, discutez ligne par ligne et fusionnez — sans passer par GitHub.', 'Ve las pull requests junto a los Elements que llevan a cabo y las Initiatives a las que sirven. Comprueba si el software hace lo previsto, coméntalo línea por línea y fusiona, sin cambiar a GitHub.'],
+  'See pull requests beside the Elements they carry out and the Strategies they serve. Check whether the software does what was intended, discuss it line by line, and merge — without switching to GitHub.': ['Pull Request を、それが実行する Element と、貢献する Strategy の隣で見られます。ソフトウェアが意図どおりかを確かめ、行ごとに議論し、マージまで、GitHub に切り替えずに行えます。', 'Pull Request를 그것이 수행하는 Element, 기여하는 Strategy 옆에서 봅니다. 소프트웨어가 의도대로인지 확인하고, 줄마다 논의하고, 병합까지 GitHub로 전환하지 않고 할 수 있습니다.', 'Voyez les pull requests à côté des Elements qu’elles réalisent et des Strategies qu’elles servent. Vérifiez que le logiciel fait ce qui était voulu, discutez ligne par ligne et fusionnez — sans passer par GitHub.', 'Ve las pull requests junto a los Elements que llevan a cabo y las Strategies a las que sirven. Comprueba si el software hace lo previsto, coméntalo línea por línea y fusiona, sin cambiar a GitHub.'],
   'An owner of this Space connects GitHub. Public repositories can be reviewed without it.': ['GitHub の接続は、この Space のオーナーが行います。公開リポジトリは接続なしでもレビューできます。', 'GitHub 연결은 이 Space의 소유자가 합니다. 공개 저장소는 연결 없이도 리뷰할 수 있습니다.', 'Un propriétaire de ce Space connecte GitHub. Les dépôts publics peuvent être relus sans connexion.', 'Un propietario de este Space conecta GitHub. Los repositorios públicos se pueden revisar sin conexión.'],
   'Guided reviews': ['ガイド付きレビュー', '가이드 리뷰', 'Revues guidées', 'Revisiones guiadas'],
   'Review a large pull request one meaningful section at a time. The guide says what each part changes, and why.': ['大きな Pull Request を、意味のまとまりごとに順にレビュー。ガイドが、各部分で何をなぜ変えたかを示します。', '큰 Pull Request를 의미 있는 묶음별로 차례로 리뷰. 가이드가 각 부분이 무엇을 왜 바꿨는지 알려 줍니다.', 'Relisez une grande pull request une section cohérente à la fois. Le guide dit ce que chaque partie change, et pourquoi.', 'Revisa una pull request grande una sección con sentido a la vez. La guía dice qué cambia cada parte y por qué.'],

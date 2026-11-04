@@ -9,8 +9,8 @@ import { CodeChangeRow } from './CodeChangesSection';
 import { CodeReviewDialog } from './CodeReviewDialog';
 import { INTENT_META, Pill } from './codeChangeLabels';
 
-// The code changes shipped by the work under an Initiative's Objects, each
-// with the AI's verdict against the intent — so the Initiative's owner sees
+// The code changes shipped by the work under a Strategy's Objects, each
+// with the AI's verdict against the intent — so the Strategy's owner sees
 // whether the software being built is the software that was meant, and opens
 // the diff in one click. Hidden while there are none.
 

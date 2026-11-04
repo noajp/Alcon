@@ -15,7 +15,7 @@ import { FONT } from '@/shared/designTokens';
 //     …inline actions, then <PageSection>s…
 //   </div>
 //
-// Domain, Initiative and Vision are built this way, so moving between them
+// Domain and Strategy are built this way, so moving between them
 // (and into an Element) never changes where the title sits or how wide the
 // page is. A section is a small muted heading and flat rows — no box.
 // =============================================================
@@ -34,7 +34,7 @@ const PAGE_BODY = 'w-full max-w-7xl py-8 pl-[30px] pr-8';
 
 /** A concept page's title type — the one place its size, tracking and colour
  *  are set. Pages that edit their title in a field of their own (Element,
- *  Object, Initiative, Phase) use it too, so every title sits the same. The
+ *  Object, Strategy, Phase) use it too, so every title sits the same. The
  *  weight is set inline (`PAGE_TITLE_WEIGHT`): the base resets typed content
  *  to 400, which beats a utility. */
 export const PAGE_TITLE = 'text-2xl leading-tight tracking-[-0.012em] text-foreground';

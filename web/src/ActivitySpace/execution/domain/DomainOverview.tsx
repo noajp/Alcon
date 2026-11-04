@@ -59,7 +59,7 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
           <button type="button" className="w-full" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('domain-elements'); }}>
             <RailRow icon={<ElementIcon size={14} />} name="Elements" label={String(elements.length)} dense />
           </button>
-          <RailRow icon={<NavStrategyIcon size={14} />} name="Initiatives" label={String(initiatives.length)} placeholder={initiatives.length === 0} dense />
+          <RailRow icon={<NavStrategyIcon size={14} />} name="Strategies" label={String(initiatives.length)} placeholder={initiatives.length === 0} dense />
         </RailCard>
       }>
         {query.isError && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm"><p>{t('Unable to refresh this Domain. Showing the last loaded data; drafts are retained.')}</p><Button variant="ghost" onClick={() => void query.refetch()}>{t('Retry')}</Button></div>}

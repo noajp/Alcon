@@ -8,7 +8,7 @@
 //   - a decision bound to an Object AND to one of its Elements is one row,
 //     and "via" is dropped because the direct binding is the stronger claim
 //   - the root Intent and measures never appear — the root is scope, not
-//     intent, and a measure is the Initiative's own number
+//     intent, and a measure is the Strategy's own number
 //   - a binding on something outside the scope is not ours, even when its
 //     intent is
 //   - a review that is due floats above everything, including an off-track
@@ -167,7 +167,7 @@ describe('intentTrailRows', () => {
     expect(rows.map((r) => r.intentId)).toEqual(['live', 'closed']);
   });
 
-  it('groups by Initiative before falling back to a per-Initiative order_index', () => {
+  it('groups by Strategy before falling back to a per-Strategy order_index', () => {
     const rows = intentTrailRows(
       [
         binding({ intent_id: 'b0', target_id: 'el-1' }),

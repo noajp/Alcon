@@ -47,7 +47,7 @@ import { parseDateOnly, toDateOnlyString, isOverdue } from '@/Function/shared/da
 // moved, removed, and re-added — and the ability to appear on a surface that
 // did not hard-code it.
 //
-// It fetches its own Domains / Workers / Initiatives / custom columns. The host
+// It fetches its own Domains / Workers / Strategies / custom columns. The host
 // hands it the Object and the Object's Elements; everything else is this
 // widget's business, which is what stops the host contract from growing a
 // field per widget.
@@ -144,8 +144,8 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
 
   return (
     <>
-      {/* Initiative — which Initiative(s) this Object is grouped under (a
-          Initiative can span Domains, so an Object can belong to more than
+      {/* Strategy — which Strategy(s) this Object is grouped under (a
+          Strategy can span Domains, so an Object can belong to more than
           one). A gap, not a line, separates it from the Object's own fields
           below, since it reads more like provenance than an editable
           property. */}
@@ -160,7 +160,7 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
             >
               <RailRow
                 icon={<NavStrategyIcon size={12} className="text-muted-foreground" />}
-                name={t('Initiative')}
+                name={t('Strategy')}
                 label={s.name}
               />
             </button>

@@ -45,7 +45,7 @@ const ja: TranslationMap = {
   "Don't have an account? ": 'アカウントをお持ちでないですか？ ', 'Email': 'メールアドレス',
   'Elements': 'Elements', 'Execution': 'Execution', 'First day of the week': '週の開始曜日', 'Font size': 'フォントサイズ',
   'General': '一般', 'Get started with Alcon': 'Alcon を始めましょう', 'Home': 'ホーム', 'Inbox': 'Inbox',
-  'Initiatives': 'Initiatives', 'Interface and theme': 'インターフェースとテーマ', 'Language': '言語',
+  'Strategies': 'Strategies', 'Interface and theme': 'インターフェースとテーマ', 'Language': '言語',
   'Loading…': '読み込み中…', 'Member': 'メンバー', 'My Elements': '自分の Elements', 'Name': '名前', 'No results.': '結果はありません。', 'Notebook': 'Notebook',
   'Notifications': '通知', 'Now': '現在', 'Objects': 'Objects', 'Password': 'パスワード', 'Personal': '個人',
   'Phase': 'Phase', 'Preferences': '設定', 'Profile': 'Profile', 'Search': '検索', 'Search settings…': '設定を検索…',
@@ -104,7 +104,7 @@ const ko: TranslationMap = {
   'Customize': '사용자 설정', 'Default': '기본', 'Default home view': '기본 홈 뷰', 'Discover': '탐색', 'Display names': '이름 표시',
   'Domain': 'Domain', 'Domain overview': 'Domain 개요', 'Domains': 'Domains', "Don't have an account? ": '계정이 없으신가요? ',
   'Email': '이메일', 'Elements': 'Elements', 'Execution': 'Execution', 'First day of the week': '주 시작일', 'Font size': '글자 크기',
-  'General': '일반', 'Get started with Alcon': 'Alcon 시작하기', 'Home': '홈', 'Inbox': 'Inbox', 'Initiatives': 'Initiatives',
+  'General': '일반', 'Get started with Alcon': 'Alcon 시작하기', 'Home': '홈', 'Inbox': 'Inbox', 'Strategies': 'Strategies',
   'Interface and theme': '인터페이스 및 테마', 'Language': '언어', 'Loading…': '로딩 중…', 'Member': '멤버',
   'My Elements': '내 Elements', 'Name': '이름', 'No results.': '결과가 없습니다.', 'Notebook': 'Notebook',
   'Notifications': '알림', 'Now': '지금', 'Objects': 'Objects', 'Password': '비밀번호', 'Personal': '개인', 'Phase': 'Phase',
@@ -182,7 +182,7 @@ const fr: TranslationMap = {
   'Default': 'Par défaut', 'Default home view': "Vue d’accueil par défaut", 'Discover': 'Découvrir', 'Display names': 'Affichage des noms',
   'Domain': 'Domain', 'Domain overview': 'Aperçu du Domain', 'Domains': 'Domains', "Don't have an account? ": "Vous n’avez pas de compte ? ",
   'Email': 'E-mail', 'Elements': 'Elements', 'Execution': 'Execution', 'First day of the week': 'Premier jour de la semaine', 'Font size': 'Taille du texte',
-  'General': 'Général', 'Get started with Alcon': 'Commencez avec Alcon', 'Home': 'Accueil', 'Inbox': 'Inbox', 'Initiatives': 'Initiatives',
+  'General': 'Général', 'Get started with Alcon': 'Commencez avec Alcon', 'Home': 'Accueil', 'Inbox': 'Inbox', 'Strategies': 'Strategies',
   'Interface and theme': 'Interface et thème', 'Language': 'Langue', 'Loading…': 'Chargement…', 'Member': 'Membre', 'My Elements': 'Mes Elements',
   'Name': 'Nom', 'No results.': 'Aucun résultat.', 'Notebook': 'Notebook', 'Notifications': 'Notifications', 'Now': 'Maintenant',
   'Objects': 'Objects', 'Password': 'Mot de passe', 'Personal': 'Personnel', 'Phase': 'Phase', 'Preferences': 'Préférences', 'Profile': 'Profile',
@@ -259,7 +259,7 @@ const es: TranslationMap = {
   'Default': 'Predeterminado', 'Default home view': 'Vista de inicio predeterminada', 'Discover': 'Descubrir', 'Display names': 'Visualización de nombres',
   'Domain': 'Domain', 'Domain overview': 'Resumen del Domain', 'Domains': 'Domains', "Don't have an account? ": '¿No tienes una cuenta? ',
   'Email': 'Correo electrónico', 'Elements': 'Elements', 'Execution': 'Execution', 'First day of the week': 'Primer día de la semana', 'Font size': 'Tamaño del texto',
-  'General': 'General', 'Get started with Alcon': 'Empieza a usar Alcon', 'Home': 'Inicio', 'Inbox': 'Inbox', 'Initiatives': 'Initiatives',
+  'General': 'General', 'Get started with Alcon': 'Empieza a usar Alcon', 'Home': 'Inicio', 'Inbox': 'Inbox', 'Strategies': 'Strategies',
   'Interface and theme': 'Interfaz y tema', 'Language': 'Idioma', 'Loading…': 'Cargando…', 'Member': 'Miembro', 'My Elements': 'Mis Elements',
   'Name': 'Nombre', 'No results.': 'No hay resultados.', 'Notebook': 'Notebook', 'Notifications': 'Notificaciones', 'Now': 'Ahora',
   'Objects': 'Objects', 'Password': 'Contraseña', 'Personal': 'Personal', 'Phase': 'Phase', 'Preferences': 'Preferencias', 'Profile': 'Profile',
@@ -378,60 +378,52 @@ Object.assign(es, {
 });
 
 const commonMessages: Record<Exclude<Locale, 'en'>, TranslationMap> = {
-  ja: {
-    "New Vision": "新しい Vision", "Add a Vision": "Vision を追加", "A Space can hold several Visions.": "Space には複数の Vision を持てます。", "Create Vision": "Vision を作成", "Vision name…": "Vision 名…", "The aim, in one statement…": "目指す姿を一文で…", "Vision name": "Vision 名", "No statement yet.": "まだ書かれていません。", "Remove from Vision": "Vision から外す", "In another Vision": "別の Vision に所属", "Add a Vision first": "先に Vision を追加", "Not in a Vision": "Vision に入っていない", "Vision settings": "Vision 設定", "Name and deletion": "名前と削除", "Delete Vision": "Vision を削除", "What this Space aims for": "この Space が目指す姿", "An outcome to win in {name}": "{name} で勝ち取る成果", "Only the Vision's author or a Space owner can change it.": "Vision を変更できるのは、書いた人か Space のオーナーだけです。",
-    "{n} Initiatives": "{n} 件の Initiative", "{n}% done": "{n}% 完了", "Description": "説明", "Write the Vision — the future this Space works toward, in one statement.": "Vision を書く — この Space が向かう未来を一文で。", "By when": "いつまでに", "Set a horizon": "期限を設定", "No horizon yet": "期限は未設定", "Why": "なぜ", "Why this, and what changes when it is true.": "なぜこれなのか、実現したら何が変わるのか。", "Not written yet.": "まだ書かれていません。", "We will know because": "達成の判断基準", "No conditions yet.": "条件はまだありません。", "Condition {n}": "条件 {n}", "Remove condition": "条件を削除", "Add a condition": "条件を追加",
-    "Only the Initiative's owner can move it.": "Initiative を動かせるのは作成者だけです。", "No nested Initiatives yet — group related Initiatives here.": "入れ子の Initiative はまだありません。関連する Initiative をここにまとめられます。",
-    "Vision": "Vision", "Add Initiative": "Initiative を追加", "Find an Initiative…": "Initiative を検索…", "Delete": "削除", "Saving…": "保存中…", "Saved": "保存しました",
+  ja: { "The aim, in one statement…": "目指す姿を一文で…", "No statement yet.": "まだ書かれていません。", "Name and deletion": "名前と削除", "What this Space aims for": "この Space が目指す姿", "An outcome to win in {name}": "{name} で勝ち取る成果",
+    "{n} Strategies": "{n} 件の Strategy", "{n}% done": "{n}% 完了", "Description": "説明", "By when": "いつまでに", "Set a horizon": "期限を設定", "No horizon yet": "期限は未設定", "Why": "なぜ", "Why this, and what changes when it is true.": "なぜこれなのか、実現したら何が変わるのか。", "Not written yet.": "まだ書かれていません。", "We will know because": "達成の判断基準", "No conditions yet.": "条件はまだありません。", "Condition {n}": "条件 {n}", "Remove condition": "条件を削除", "Add a condition": "条件を追加",
+    "Only the Strategy's owner can move it.": "Strategy を動かせるのは作成者だけです。", "No nested Strategies yet — group related Strategies here.": "入れ子の Strategy はまだありません。関連する Strategy をここにまとめられます。", "Add Strategy": "Strategy を追加", "Find a Strategy…": "Strategy を検索…", "Delete": "削除", "Saving…": "保存中…", "Saved": "保存しました",
     "Default length": "既定の長さ", "Days a new Phase spans, end date included": "新しい Phase の日数（終了日を含む）", "days": "日", "Start": "開始", "Where a new Phase begins": "新しい Phase の開始日の決め方", "After the last Phase": "最後の Phase の翌日", "How a new Phase starts out in each Domain. Leave the length blank to start with empty dates.": "Domain ごとに、新しい Phase の初期値を決めます。長さを空にすると日付は空のまま始まります。", "No Domains in this Space yet. Phase defaults are set per Domain.": "この Space にはまだ Domain がありません。Phase の既定値は Domain ごとに設定します。", "Window": "表示範囲", "Scale": "スケール", "Quarter": "四半期", "How much of the year one screen shows": "1 画面に収める期間", "Months back": "過去の月数", "How far before this month the window starts": "今月より前をどこまで表示するか", "Months ahead": "先の月数", "How far after this month the window runs": "今月より先をどこまで表示するか", "Marks": "目印", "Today marker": "今日の線", "A line through today across every row": "すべての行を貫く今日の線", "Progress fill": "進捗の塗り", "Shade each band by how much of its work is done": "帯を完了した割合だけ塗る",
-    'Domain settings': 'Domain 設定', 'Members': 'メンバー', 'Name and privacy': '名前と公開範囲', 'Name and membership': '名前とメンバーシップ', 'Manage team members': 'メンバーを管理', 'How Initiatives are judged': 'Initiative の評価のしかた', 'How Phases divide time': 'Phase による期間の区切り方', 'How the Timeline is drawn': 'Timeline の描き方', 'Close': '閉じる',
-    'Activity settings': 'Activity 設定', 'Strategy settings': 'Strategy 設定', 'Execution settings': 'Execution 設定', 'Sustainment settings': 'Sustainment 設定', 'Initiative': 'Initiative', '{title} settings are coming soon.': '{title} の設定は準備中です。',
+    'Domain settings': 'Domain 設定', 'Members': 'メンバー', 'Name and privacy': '名前と公開範囲', 'Name and membership': '名前とメンバーシップ', 'Manage team members': 'メンバーを管理', 'How Strategies are judged': 'Strategy の評価のしかた', 'How Phases divide time': 'Phase による期間の区切り方', 'How the Timeline is drawn': 'Timeline の描き方', 'Close': '閉じる',
+    'Activity settings': 'Activity 設定', 'Strategy settings': 'Strategy 設定', 'Execution settings': 'Execution 設定', 'Sustainment settings': 'Sustainment 設定', 'Strategy': 'Strategy', '{title} settings are coming soon.': '{title} の設定は準備中です。',
     'Day': '日', 'Week': '週', 'Month': '月', 'Choose scope': '範囲を選択', 'Choose calendar scope': 'Calendar の範囲を選択', 'Calendar scope lists': 'Calendar の範囲一覧', 'Find a calendar…': 'カレンダーを検索…', 'No matches.': '該当なし。',
     'Carbon': 'カーボン', "Couldn't save": '保存できませんでした', 'Domain Elements': 'Domain の Elements', 'Graphite': 'グラファイト',
     'Ivory': 'アイボリー', 'Mid-level structural unit': '中間レベルの構造単位', 'Midnight': 'ミッドナイト', 'Mist': 'ミスト',
-    'New Element': '新しい Element', 'New Initiative': '新しい Initiative', 'New Object': '新しい Object',
+    'New Element': '新しい Element', 'New Strategy': '新しい Strategy', 'New Object': '新しい Object',
     'Open Calendar': 'Calendar を開く', 'Open Inbox': 'Inbox を開く', 'Open Notebook': 'Notebook を開く', 'Open Table': 'Table を開く', 'Open People': 'People を開く', 'Open Workload': 'Workload を開く',
     'Go to Now': '現在へ移動', 'Snow': 'スノー', 'Something went wrong': '問題が発生しました', 'Strings like :) will be converted to 🙂': ':) などの文字を 🙂 に変換します', 'Sustainment apps': 'Sustainment アプリ',
   },
-  ko: {
-    "New Vision": "새 Vision", "Add a Vision": "Vision 추가", "A Space can hold several Visions.": "Space에는 여러 Vision을 둘 수 있습니다.", "Create Vision": "Vision 만들기", "Vision name…": "Vision 이름…", "The aim, in one statement…": "지향점을 한 문장으로…", "Vision name": "Vision 이름", "No statement yet.": "아직 작성되지 않았습니다.", "Remove from Vision": "Vision에서 제거", "In another Vision": "다른 Vision에 속함", "Add a Vision first": "먼저 Vision 추가", "Not in a Vision": "Vision에 속하지 않음", "Vision settings": "Vision 설정", "Name and deletion": "이름과 삭제", "Delete Vision": "Vision 삭제", "What this Space aims for": "이 Space가 지향하는 모습", "An outcome to win in {name}": "{name}에서 이룰 성과", "Only the Vision's author or a Space owner can change it.": "Vision은 작성자나 Space 소유자만 변경할 수 있습니다.",
-    "{n} Initiatives": "Initiative {n}개", "{n}% done": "{n}% 완료", "Description": "설명", "Write the Vision — the future this Space works toward, in one statement.": "Vision을 적으세요 — 이 Space가 향하는 미래를 한 문장으로.", "By when": "언제까지", "Set a horizon": "기한 설정", "No horizon yet": "기한 없음", "Why": "왜", "Why this, and what changes when it is true.": "왜 이것인지, 실현되면 무엇이 달라지는지.", "Not written yet.": "아직 작성되지 않았습니다.", "We will know because": "달성의 판단 기준", "No conditions yet.": "조건이 아직 없습니다.", "Condition {n}": "조건 {n}", "Remove condition": "조건 삭제", "Add a condition": "조건 추가",
-    "Only the Initiative's owner can move it.": "Initiative는 작성자만 옮길 수 있습니다.", "No nested Initiatives yet — group related Initiatives here.": "중첩된 Initiative가 아직 없습니다. 관련 Initiative를 여기에 묶을 수 있습니다.",
-    "Vision": "Vision", "Add Initiative": "Initiative 추가", "Find an Initiative…": "Initiative 검색…", "Delete": "삭제", "Saving…": "저장 중…", "Saved": "저장됨",
+  ko: { "The aim, in one statement…": "지향점을 한 문장으로…", "No statement yet.": "아직 작성되지 않았습니다.", "Name and deletion": "이름과 삭제", "What this Space aims for": "이 Space가 지향하는 모습", "An outcome to win in {name}": "{name}에서 이룰 성과",
+    "{n} Strategies": "Strategy {n}개", "{n}% done": "{n}% 완료", "Description": "설명", "By when": "언제까지", "Set a horizon": "기한 설정", "No horizon yet": "기한 없음", "Why": "왜", "Why this, and what changes when it is true.": "왜 이것인지, 실현되면 무엇이 달라지는지.", "Not written yet.": "아직 작성되지 않았습니다.", "We will know because": "달성의 판단 기준", "No conditions yet.": "조건이 아직 없습니다.", "Condition {n}": "조건 {n}", "Remove condition": "조건 삭제", "Add a condition": "조건 추가",
+    "Only the Strategy's owner can move it.": "Strategy는 작성자만 옮길 수 있습니다.", "No nested Strategies yet — group related Strategies here.": "중첩된 Strategy가 아직 없습니다. 관련 Strategy를 여기에 묶을 수 있습니다.", "Add Strategy": "Strategy 추가", "Find a Strategy…": "Strategy 검색…", "Delete": "삭제", "Saving…": "저장 중…", "Saved": "저장됨",
     "Default length": "기본 길이", "Days a new Phase spans, end date included": "새 Phase의 일수(종료일 포함)", "days": "일", "Start": "시작", "Where a new Phase begins": "새 Phase의 시작일을 정하는 방식", "After the last Phase": "마지막 Phase 다음 날", "How a new Phase starts out in each Domain. Leave the length blank to start with empty dates.": "Domain별로 새 Phase의 초기값을 정합니다. 길이를 비우면 날짜가 빈 채로 시작합니다.", "No Domains in this Space yet. Phase defaults are set per Domain.": "이 Space에는 아직 Domain이 없습니다. Phase 기본값은 Domain별로 설정합니다.", "Window": "표시 범위", "Scale": "배율", "Quarter": "분기", "How much of the year one screen shows": "한 화면에 담는 기간", "Months back": "이전 개월 수", "How far before this month the window starts": "이번 달 이전을 어디까지 표시할지", "Months ahead": "이후 개월 수", "How far after this month the window runs": "이번 달 이후를 어디까지 표시할지", "Marks": "표시", "Today marker": "오늘 선", "A line through today across every row": "모든 행을 지나는 오늘 선", "Progress fill": "진행률 채우기", "Shade each band by how much of its work is done": "완료한 비율만큼 막대를 채웁니다",
-    'Domain settings': 'Domain 설정', 'Members': '멤버', 'Name and privacy': '이름과 공개 범위', 'Name and membership': '이름과 멤버십', 'Manage team members': '멤버 관리', 'How Initiatives are judged': 'Initiative 평가 방식', 'How Phases divide time': 'Phase로 기간을 나누는 방식', 'How the Timeline is drawn': 'Timeline 표시 방식', 'Close': '닫기',
-    'Activity settings': 'Activity 설정', 'Strategy settings': 'Strategy 설정', 'Execution settings': 'Execution 설정', 'Sustainment settings': 'Sustainment 설정', 'Initiative': 'Initiative', '{title} settings are coming soon.': '{title} 설정은 준비 중입니다.',
+    'Domain settings': 'Domain 설정', 'Members': '멤버', 'Name and privacy': '이름과 공개 범위', 'Name and membership': '이름과 멤버십', 'Manage team members': '멤버 관리', 'How Strategies are judged': 'Strategy 평가 방식', 'How Phases divide time': 'Phase로 기간을 나누는 방식', 'How the Timeline is drawn': 'Timeline 표시 방식', 'Close': '닫기',
+    'Activity settings': 'Activity 설정', 'Strategy settings': 'Strategy 설정', 'Execution settings': 'Execution 설정', 'Sustainment settings': 'Sustainment 설정', 'Strategy': 'Strategy', '{title} settings are coming soon.': '{title} 설정은 준비 중입니다.',
     'Day': '일', 'Week': '주', 'Month': '월', 'Choose scope': '범위 선택', 'Choose calendar scope': 'Calendar 범위 선택', 'Calendar scope lists': 'Calendar 범위 목록', 'Find a calendar…': '캘린더 검색…', 'No matches.': '일치하는 항목이 없습니다.',
     'Carbon': '카본', "Couldn't save": '저장할 수 없습니다', 'Domain Elements': 'Domain Elements', 'Graphite': '그래파이트', 'Ivory': '아이보리',
-    'Mid-level structural unit': '중간 수준 구조 단위', 'Midnight': '미드나잇', 'Mist': '미스트', 'New Element': '새 Element', 'New Initiative': '새 Initiative', 'New Object': '새 Object',
+    'Mid-level structural unit': '중간 수준 구조 단위', 'Midnight': '미드나잇', 'Mist': '미스트', 'New Element': '새 Element', 'New Strategy': '새 Strategy', 'New Object': '새 Object',
     'Open Calendar': 'Calendar 열기', 'Open Inbox': 'Inbox 열기', 'Open Notebook': 'Notebook 열기', 'Open Table': 'Table 열기', 'Open People': 'People 열기', 'Open Workload': 'Workload 열기',
     'Go to Now': '지금으로 이동', 'Snow': '스노우', 'Something went wrong': '문제가 발생했습니다', 'Strings like :) will be converted to 🙂': ':)와 같은 문자열을 🙂로 변환합니다', 'Sustainment apps': 'Sustainment 앱',
   },
-  fr: {
-    "New Vision": "Nouvelle Vision", "Add a Vision": "Ajouter une Vision", "A Space can hold several Visions.": "Un Space peut porter plusieurs Visions.", "Create Vision": "Créer une Vision", "Vision name…": "Nom de la Vision…", "The aim, in one statement…": "Le but, en une phrase…", "Vision name": "Nom de la Vision", "No statement yet.": "Pas encore rédigé.", "Remove from Vision": "Retirer de la Vision", "In another Vision": "Dans une autre Vision", "Add a Vision first": "Ajoutez d’abord une Vision", "Not in a Vision": "Hors Vision", "Vision settings": "Paramètres de la Vision", "Name and deletion": "Nom et suppression", "Delete Vision": "Supprimer la Vision", "What this Space aims for": "Ce que vise ce Space", "An outcome to win in {name}": "Un résultat à obtenir dans {name}", "Only the Vision's author or a Space owner can change it.": "Seul l’auteur de la Vision ou un propriétaire du Space peut la modifier.",
-    "{n} Initiatives": "{n} Initiatives", "{n}% done": "{n} % terminé", "Description": "Description", "Write the Vision — the future this Space works toward, in one statement.": "Écrivez la Vision — l’avenir vers lequel ce Space travaille, en une phrase.", "By when": "Pour quand", "Set a horizon": "Définir un horizon", "No horizon yet": "Pas encore d’horizon", "Why": "Pourquoi", "Why this, and what changes when it is true.": "Pourquoi cela, et ce qui change une fois réalisé.", "Not written yet.": "Pas encore rédigé.", "We will know because": "Nous le saurons parce que", "No conditions yet.": "Pas encore de conditions.", "Condition {n}": "Condition {n}", "Remove condition": "Retirer la condition", "Add a condition": "Ajouter une condition",
-    "Only the Initiative's owner can move it.": "Seul le créateur de l’Initiative peut la déplacer.", "No nested Initiatives yet — group related Initiatives here.": "Pas encore d’Initiative imbriquée — regroupez ici les Initiatives liées.",
-    "Vision": "Vision", "Add Initiative": "Ajouter une Initiative", "Find an Initiative…": "Rechercher une Initiative…", "Delete": "Supprimer", "Saving…": "Enregistrement…", "Saved": "Enregistré",
+  fr: { "The aim, in one statement…": "Le but, en une phrase…", "No statement yet.": "Pas encore rédigé.", "Name and deletion": "Nom et suppression", "What this Space aims for": "Ce que vise ce Space", "An outcome to win in {name}": "Un résultat à obtenir dans {name}",
+    "{n} Strategies": "{n} Strategies", "{n}% done": "{n} % terminé", "Description": "Description", "By when": "Pour quand", "Set a horizon": "Définir un horizon", "No horizon yet": "Pas encore d’horizon", "Why": "Pourquoi", "Why this, and what changes when it is true.": "Pourquoi cela, et ce qui change une fois réalisé.", "Not written yet.": "Pas encore rédigé.", "We will know because": "Nous le saurons parce que", "No conditions yet.": "Pas encore de conditions.", "Condition {n}": "Condition {n}", "Remove condition": "Retirer la condition", "Add a condition": "Ajouter une condition",
+    "Only the Strategy's owner can move it.": "Seul le créateur de la Strategy peut la déplacer.", "No nested Strategies yet — group related Strategies here.": "Pas encore de Strategy imbriquée — regroupez ici les Strategies liées.", "Add Strategy": "Ajouter une Strategy", "Find a Strategy…": "Rechercher une Strategy…", "Delete": "Supprimer", "Saving…": "Enregistrement…", "Saved": "Enregistré",
     "Default length": "Durée par défaut", "Days a new Phase spans, end date included": "Jours couverts par une nouvelle Phase, date de fin incluse", "days": "jours", "Start": "Début", "Where a new Phase begins": "Où commence une nouvelle Phase", "After the last Phase": "Le lendemain de la dernière Phase", "How a new Phase starts out in each Domain. Leave the length blank to start with empty dates.": "Valeurs initiales d’une nouvelle Phase par Domain. Laissez la durée vide pour commencer sans dates.", "No Domains in this Space yet. Phase defaults are set per Domain.": "Aucun Domain dans ce Space. Les valeurs par défaut des Phases se règlent par Domain.", "Window": "Fenêtre", "Scale": "Échelle", "Quarter": "Trimestre", "How much of the year one screen shows": "Quelle part de l’année tient sur un écran", "Months back": "Mois en arrière", "How far before this month the window starts": "Jusqu’où la fenêtre commence avant ce mois", "Months ahead": "Mois en avant", "How far after this month the window runs": "Jusqu’où la fenêtre s’étend après ce mois", "Marks": "Repères", "Today marker": "Repère du jour", "A line through today across every row": "Une ligne sur aujourd’hui à travers toutes les lignes", "Progress fill": "Remplissage de progression", "Shade each band by how much of its work is done": "Teinter chaque bande selon la part de travail terminée",
-    'Domain settings': 'Paramètres du Domain', 'Members': 'Membres', 'Name and privacy': 'Nom et confidentialité', 'Name and membership': 'Nom et adhésion', 'Manage team members': 'Gérer les membres', 'How Initiatives are judged': 'Comment les Initiatives sont évaluées', 'How Phases divide time': 'Comment les Phases découpent le temps', 'How the Timeline is drawn': 'Comment la Timeline est tracée', 'Close': 'Fermer',
-    'Activity settings': 'Paramètres Activity', 'Strategy settings': 'Paramètres Strategy', 'Execution settings': 'Paramètres Execution', 'Sustainment settings': 'Paramètres Sustainment', 'Initiative': 'Initiative', '{title} settings are coming soon.': 'Les paramètres {title} arrivent bientôt.',
+    'Domain settings': 'Paramètres du Domain', 'Members': 'Membres', 'Name and privacy': 'Nom et confidentialité', 'Name and membership': 'Nom et adhésion', 'Manage team members': 'Gérer les membres', 'How Strategies are judged': 'Comment les Strategies sont évaluées', 'How Phases divide time': 'Comment les Phases découpent le temps', 'How the Timeline is drawn': 'Comment la Timeline est tracée', 'Close': 'Fermer',
+    'Activity settings': 'Paramètres Activity', 'Strategy settings': 'Paramètres Strategy', 'Execution settings': 'Paramètres Execution', 'Sustainment settings': 'Paramètres Sustainment', 'Strategy': 'Strategy', '{title} settings are coming soon.': 'Les paramètres {title} arrivent bientôt.',
     'Day': 'Jour', 'Week': 'Semaine', 'Month': 'Mois', 'Choose scope': 'Choisir la portée', 'Choose calendar scope': 'Choisir la portée du Calendar', 'Calendar scope lists': 'Listes de portée du Calendar', 'Find a calendar…': 'Rechercher un calendrier…', 'No matches.': 'Aucun résultat.',
     'Carbon': 'Carbone', "Couldn't save": 'Enregistrement impossible', 'Domain Elements': 'Elements du Domain', 'Graphite': 'Graphite', 'Ivory': 'Ivoire',
-    'Mid-level structural unit': 'Unité structurelle intermédiaire', 'Midnight': 'Minuit', 'Mist': 'Brume', 'New Element': 'Nouvel Element', 'New Initiative': 'Nouvelle Initiative', 'New Object': 'Nouvel Object',
+    'Mid-level structural unit': 'Unité structurelle intermédiaire', 'Midnight': 'Minuit', 'Mist': 'Brume', 'New Element': 'Nouvel Element', 'New Strategy': 'Nouvelle Strategy', 'New Object': 'Nouvel Object',
     'Open Calendar': 'Ouvrir Calendar', 'Open Inbox': 'Ouvrir Inbox', 'Open Notebook': 'Ouvrir Notebook', 'Open Table': 'Ouvrir Table', 'Open People': 'Ouvrir People', 'Open Workload': 'Ouvrir Workload',
     'Go to Now': 'Aller à Maintenant', 'Snow': 'Neige', 'Something went wrong': 'Un problème est survenu', 'Strings like :) will be converted to 🙂': 'Les chaînes comme :) seront converties en 🙂', 'Sustainment apps': 'Applications Sustainment',
   },
-  es: {
-    "New Vision": "Nueva Vision", "Add a Vision": "Añadir una Vision", "A Space can hold several Visions.": "Un Space puede tener varias Visions.", "Create Vision": "Crear Vision", "Vision name…": "Nombre de la Vision…", "The aim, in one statement…": "El objetivo, en una frase…", "Vision name": "Nombre de la Vision", "No statement yet.": "Aún sin escribir.", "Remove from Vision": "Quitar de la Vision", "In another Vision": "En otra Vision", "Add a Vision first": "Añade primero una Vision", "Not in a Vision": "Sin Vision", "Vision settings": "Ajustes de la Vision", "Name and deletion": "Nombre y eliminación", "Delete Vision": "Eliminar Vision", "What this Space aims for": "A qué aspira este Space", "An outcome to win in {name}": "Un resultado que lograr en {name}", "Only the Vision's author or a Space owner can change it.": "Solo quien escribió la Vision o un propietario del Space puede cambiarla.",
-    "{n} Initiatives": "{n} Initiatives", "{n}% done": "{n} % hecho", "Description": "Descripción", "Write the Vision — the future this Space works toward, in one statement.": "Escribe la Vision: el futuro hacia el que trabaja este Space, en una frase.", "By when": "Para cuándo", "Set a horizon": "Fijar un horizonte", "No horizon yet": "Sin horizonte aún", "Why": "Por qué", "Why this, and what changes when it is true.": "Por qué esto y qué cambia cuando se cumple.", "Not written yet.": "Aún sin escribir.", "We will know because": "Lo sabremos porque", "No conditions yet.": "Aún no hay condiciones.", "Condition {n}": "Condición {n}", "Remove condition": "Quitar condición", "Add a condition": "Añadir una condición",
-    "Only the Initiative's owner can move it.": "Solo quien creó la Initiative puede moverla.", "No nested Initiatives yet — group related Initiatives here.": "Aún no hay Initiatives anidadas; agrupa aquí las Initiatives relacionadas.",
-    "Vision": "Vision", "Add Initiative": "Añadir Initiative", "Find an Initiative…": "Buscar una Initiative…", "Delete": "Eliminar", "Saving…": "Guardando…", "Saved": "Guardado",
+  es: { "The aim, in one statement…": "El objetivo, en una frase…", "No statement yet.": "Aún sin escribir.", "Name and deletion": "Nombre y eliminación", "What this Space aims for": "A qué aspira este Space", "An outcome to win in {name}": "Un resultado que lograr en {name}",
+    "{n} Strategies": "{n} Strategies", "{n}% done": "{n} % hecho", "Description": "Descripción", "By when": "Para cuándo", "Set a horizon": "Fijar un horizonte", "No horizon yet": "Sin horizonte aún", "Why": "Por qué", "Why this, and what changes when it is true.": "Por qué esto y qué cambia cuando se cumple.", "Not written yet.": "Aún sin escribir.", "We will know because": "Lo sabremos porque", "No conditions yet.": "Aún no hay condiciones.", "Condition {n}": "Condición {n}", "Remove condition": "Quitar condición", "Add a condition": "Añadir una condición",
+    "Only the Strategy's owner can move it.": "Solo quien creó la Strategy puede moverla.", "No nested Strategies yet — group related Strategies here.": "Aún no hay Strategies anidadas; agrupa aquí las Strategies relacionadas.", "Add Strategy": "Añadir Strategy", "Find a Strategy…": "Buscar una Strategy…", "Delete": "Eliminar", "Saving…": "Guardando…", "Saved": "Guardado",
     "Default length": "Duración predeterminada", "Days a new Phase spans, end date included": "Días que abarca una Phase nueva, fecha de fin incluida", "days": "días", "Start": "Inicio", "Where a new Phase begins": "Dónde empieza una Phase nueva", "After the last Phase": "El día después de la última Phase", "How a new Phase starts out in each Domain. Leave the length blank to start with empty dates.": "Valores iniciales de una Phase nueva por Domain. Deja la duración vacía para empezar sin fechas.", "No Domains in this Space yet. Phase defaults are set per Domain.": "Aún no hay Domains en este Space. Los valores predeterminados de Phase se fijan por Domain.", "Window": "Ventana", "Scale": "Escala", "Quarter": "Trimestre", "How much of the year one screen shows": "Cuánto del año cabe en una pantalla", "Months back": "Meses atrás", "How far before this month the window starts": "Hasta dónde empieza la ventana antes de este mes", "Months ahead": "Meses adelante", "How far after this month the window runs": "Hasta dónde llega la ventana después de este mes", "Marks": "Marcas", "Today marker": "Marca de hoy", "A line through today across every row": "Una línea por hoy en todas las filas", "Progress fill": "Relleno de progreso", "Shade each band by how much of its work is done": "Sombrear cada banda según el trabajo terminado",
-    'Domain settings': 'Ajustes del Domain', 'Members': 'Miembros', 'Name and privacy': 'Nombre y privacidad', 'Name and membership': 'Nombre y pertenencia', 'Manage team members': 'Gestionar miembros', 'How Initiatives are judged': 'Cómo se evalúan las Initiatives', 'How Phases divide time': 'Cómo las Phases dividen el tiempo', 'How the Timeline is drawn': 'Cómo se dibuja la Timeline', 'Close': 'Cerrar',
-    'Activity settings': 'Ajustes de Activity', 'Strategy settings': 'Ajustes de Strategy', 'Execution settings': 'Ajustes de Execution', 'Sustainment settings': 'Ajustes de Sustainment', 'Initiative': 'Initiative', '{title} settings are coming soon.': 'Los ajustes de {title} llegarán pronto.',
+    'Domain settings': 'Ajustes del Domain', 'Members': 'Miembros', 'Name and privacy': 'Nombre y privacidad', 'Name and membership': 'Nombre y pertenencia', 'Manage team members': 'Gestionar miembros', 'How Strategies are judged': 'Cómo se evalúan las Strategies', 'How Phases divide time': 'Cómo las Phases dividen el tiempo', 'How the Timeline is drawn': 'Cómo se dibuja la Timeline', 'Close': 'Cerrar',
+    'Activity settings': 'Ajustes de Activity', 'Strategy settings': 'Ajustes de Strategy', 'Execution settings': 'Ajustes de Execution', 'Sustainment settings': 'Ajustes de Sustainment', 'Strategy': 'Strategy', '{title} settings are coming soon.': 'Los ajustes de {title} llegarán pronto.',
     'Day': 'Día', 'Week': 'Semana', 'Month': 'Mes', 'Choose scope': 'Elegir alcance', 'Choose calendar scope': 'Elegir el alcance del Calendar', 'Calendar scope lists': 'Listas de alcance del Calendar', 'Find a calendar…': 'Buscar un calendario…', 'No matches.': 'Sin coincidencias.',
     'Carbon': 'Carbono', "Couldn't save": 'No se pudo guardar', 'Domain Elements': 'Elements del Domain', 'Graphite': 'Grafito', 'Ivory': 'Marfil',
-    'Mid-level structural unit': 'Unidad estructural intermedia', 'Midnight': 'Medianoche', 'Mist': 'Niebla', 'New Element': 'Nuevo Element', 'New Initiative': 'Nueva Initiative', 'New Object': 'Nuevo Object',
+    'Mid-level structural unit': 'Unidad estructural intermedia', 'Midnight': 'Medianoche', 'Mist': 'Niebla', 'New Element': 'Nuevo Element', 'New Strategy': 'Nueva Strategy', 'New Object': 'Nuevo Object',
     'Open Calendar': 'Abrir Calendar', 'Open Inbox': 'Abrir Inbox', 'Open Notebook': 'Abrir Notebook', 'Open Table': 'Abrir Table', 'Open People': 'Abrir People', 'Open Workload': 'Abrir Workload',
     'Go to Now': 'Ir a Ahora', 'Snow': 'Nieve', 'Something went wrong': 'Algo salió mal', 'Strings like :) will be converted to 🙂': 'Las cadenas como :) se convertirán en 🙂', 'Sustainment apps': 'Aplicaciones Sustainment',
   },
@@ -444,19 +436,19 @@ for (const locale of Object.keys(commonMessages) as Array<Exclude<Locale, 'en'>>
 export const MESSAGES = MESSAGES_PLACEHOLDER;
 
 Object.assign(ja, {
-  'Today': '今日', 'People': 'メンバー', 'Previous month': '前の月', 'Next month': '次の月', 'Show all': 'すべて表示', 'Edit profile': 'プロフィールを編集', 'New Initiative': '新しい Initiative', 'Add schedule': '予定を追加', 'New section': '新しいセクション', 'New page': '新しいページ', 'Rename': '名前を変更', 'Delete notebook': 'ノートブックを削除', 'Delete section': 'セクションを削除', 'Delete page': 'ページを削除', 'Untitled': '無題', 'Back': '戻る', 'Select a notebook to see its pages': 'ノートブックを選ぶとページが表示されます', 'My Notes': 'マイノート', 'No notes yet.': 'ノートはまだありません。', 'No one is scheduled here.': 'この予定表に担当者はいません。',
+  'Today': '今日', 'People': 'メンバー', 'Previous month': '前の月', 'Next month': '次の月', 'Show all': 'すべて表示', 'Edit profile': 'プロフィールを編集', 'New Strategy': '新しい Strategy', 'Add schedule': '予定を追加', 'New section': '新しいセクション', 'New page': '新しいページ', 'Rename': '名前を変更', 'Delete notebook': 'ノートブックを削除', 'Delete section': 'セクションを削除', 'Delete page': 'ページを削除', 'Untitled': '無題', 'Back': '戻る', 'Select a notebook to see its pages': 'ノートブックを選ぶとページが表示されます', 'My Notes': 'マイノート', 'No notes yet.': 'ノートはまだありません。', 'No one is scheduled here.': 'この予定表に担当者はいません。',
 });
 
 Object.assign(ko, {
-  'Today': '오늘', 'People': '사람', 'Previous month': '이전 달', 'Next month': '다음 달', 'Show all': '모두 표시', 'Edit profile': '프로필 편집', 'New Initiative': '새 Initiative', 'Add schedule': '일정 추가', 'New section': '새 섹션', 'New page': '새 페이지', 'Rename': '이름 바꾸기', 'Delete notebook': '노트북 삭제', 'Delete section': '섹션 삭제', 'Delete page': '페이지 삭제', 'Untitled': '제목 없음', 'Back': '뒤로', 'Select a notebook to see its pages': '노트북을 선택하면 페이지가 표시됩니다', 'My Notes': '내 노트', 'No notes yet.': '아직 노트가 없습니다.', 'No one is scheduled here.': '이 캘린더에 배정된 사람이 없습니다.',
+  'Today': '오늘', 'People': '사람', 'Previous month': '이전 달', 'Next month': '다음 달', 'Show all': '모두 표시', 'Edit profile': '프로필 편집', 'New Strategy': '새 Strategy', 'Add schedule': '일정 추가', 'New section': '새 섹션', 'New page': '새 페이지', 'Rename': '이름 바꾸기', 'Delete notebook': '노트북 삭제', 'Delete section': '섹션 삭제', 'Delete page': '페이지 삭제', 'Untitled': '제목 없음', 'Back': '뒤로', 'Select a notebook to see its pages': '노트북을 선택하면 페이지가 표시됩니다', 'My Notes': '내 노트', 'No notes yet.': '아직 노트가 없습니다.', 'No one is scheduled here.': '이 캘린더에 배정된 사람이 없습니다.',
 });
 
 Object.assign(fr, {
-  'Today': "Aujourd'hui", 'People': 'Personnes', 'Previous month': 'Mois précédent', 'Next month': 'Mois suivant', 'Show all': 'Tout afficher', 'Edit profile': 'Modifier le profil', 'New Initiative': 'Nouvelle Initiative', 'Add schedule': 'Ajouter au calendrier', 'New section': 'Nouvelle section', 'New page': 'Nouvelle page', 'Rename': 'Renommer', 'Delete notebook': 'Supprimer le carnet', 'Delete section': 'Supprimer la section', 'Delete page': 'Supprimer la page', 'Untitled': 'Sans titre', 'Back': 'Retour', 'Select a notebook to see its pages': 'Choisissez un carnet pour voir ses pages', 'My Notes': 'Mes notes', 'No notes yet.': 'Aucune note pour l’instant.', 'No one is scheduled here.': 'Personne n’est planifié ici.',
+  'Today': "Aujourd'hui", 'People': 'Personnes', 'Previous month': 'Mois précédent', 'Next month': 'Mois suivant', 'Show all': 'Tout afficher', 'Edit profile': 'Modifier le profil', 'New Strategy': 'Nouvelle Strategy', 'Add schedule': 'Ajouter au calendrier', 'New section': 'Nouvelle section', 'New page': 'Nouvelle page', 'Rename': 'Renommer', 'Delete notebook': 'Supprimer le carnet', 'Delete section': 'Supprimer la section', 'Delete page': 'Supprimer la page', 'Untitled': 'Sans titre', 'Back': 'Retour', 'Select a notebook to see its pages': 'Choisissez un carnet pour voir ses pages', 'My Notes': 'Mes notes', 'No notes yet.': 'Aucune note pour l’instant.', 'No one is scheduled here.': 'Personne n’est planifié ici.',
 });
 
 Object.assign(es, {
-  'Today': 'Hoy', 'People': 'Personas', 'Previous month': 'Mes anterior', 'Next month': 'Mes siguiente', 'Show all': 'Mostrar todo', 'Edit profile': 'Editar perfil', 'New Initiative': 'Nueva Initiative', 'Add schedule': 'Añadir al calendario', 'New section': 'Nueva sección', 'New page': 'Nueva página', 'Rename': 'Renombrar', 'Delete notebook': 'Eliminar cuaderno', 'Delete section': 'Eliminar sección', 'Delete page': 'Eliminar página', 'Untitled': 'Sin título', 'Back': 'Atrás', 'Select a notebook to see its pages': 'Elige un cuaderno para ver sus páginas', 'My Notes': 'Mis notas', 'No notes yet.': 'Aún no hay notas.', 'No one is scheduled here.': 'Nadie está programado aquí.',
+  'Today': 'Hoy', 'People': 'Personas', 'Previous month': 'Mes anterior', 'Next month': 'Mes siguiente', 'Show all': 'Mostrar todo', 'Edit profile': 'Editar perfil', 'New Strategy': 'Nueva Strategy', 'Add schedule': 'Añadir al calendario', 'New section': 'Nueva sección', 'New page': 'Nueva página', 'Rename': 'Renombrar', 'Delete notebook': 'Eliminar cuaderno', 'Delete section': 'Eliminar sección', 'Delete page': 'Eliminar página', 'Untitled': 'Sin título', 'Back': 'Atrás', 'Select a notebook to see its pages': 'Elige un cuaderno para ver sus páginas', 'My Notes': 'Mis notas', 'No notes yet.': 'Aún no hay notas.', 'No one is scheduled here.': 'Nadie está programado aquí.',
 });
 
 // Settings › Integrations. Service names, "Integrations", "Docs", "Featured",
@@ -1387,10 +1379,10 @@ Object.assign(ja, {
   'A Phase time-boxes a stage of work — requirements, design, build.': 'Phase は活動を期間で区切る単位です（要件定義、設計、構築など）。',
   'Assign Objects and Elements to it and track what each period covers.': 'Object と Element を割り当てて、各期間で何を扱うかを追えます。',
   'Create Phase': 'Phase を作成',
-  'Add Initiatives': 'Initiative を追加',
-  'An Initiative groups Objects across Domains around one outcome — what to achieve and how to win.': 'Initiative は、一つの成果に向けて Domain をまたいで Object を束ねます。何を達成し、どう勝つかを表します。',
-  'Each Initiative gets its own timeline and resource view.': 'Initiative ごとにタイムラインとリソースの表示があります。',
-  'Create Initiative': 'Initiative を作成',
+  'Add Strategies': 'Strategy を追加',
+  'A Strategy groups Objects across Domains around one outcome — what to achieve and how to win.': 'Strategy は、一つの成果に向けて Domain をまたいで Object を束ねます。何を達成し、どう勝つかを表します。',
+  'Each Strategy gets its own timeline and resource view.': 'Strategy ごとにタイムラインとリソースの表示があります。',
+  'Create Strategy': 'Strategy を作成',
 });
 
 Object.assign(ko, {
@@ -1410,10 +1402,10 @@ Object.assign(ko, {
   "A Phase time-boxes a stage of work — requirements, design, build.": "Phase는 활동을 기간으로 구분하는 단위입니다(요구사항, 설계, 구축 등).",
   "Assign Objects and Elements to it and track what each period covers.": "Object와 Element를 배정해 각 기간에 무엇을 다루는지 추적합니다.",
   "Create Phase": "Phase 만들기",
-  "Add Initiatives": "Initiative 추가",
-  "An Initiative groups Objects across Domains around one outcome — what to achieve and how to win.": "Initiative는 하나의 성과를 향해 여러 Domain의 Object를 묶습니다. 무엇을 달성하고 어떻게 이길지를 나타냅니다.",
-  "Each Initiative gets its own timeline and resource view.": "Initiative마다 타임라인과 리소스 보기가 있습니다.",
-  "Create Initiative": "Initiative 만들기",
+  "Add Strategies": "Strategy 추가",
+  "A Strategy groups Objects across Domains around one outcome — what to achieve and how to win.": "Strategy는 하나의 성과를 향해 여러 Domain의 Object를 묶습니다. 무엇을 달성하고 어떻게 이길지를 나타냅니다.",
+  "Each Strategy gets its own timeline and resource view.": "Strategy마다 타임라인과 리소스 보기가 있습니다.",
+  "Create Strategy": "Strategy 만들기",
 });
 
 Object.assign(fr, {
@@ -1433,10 +1425,10 @@ Object.assign(fr, {
   "A Phase time-boxes a stage of work — requirements, design, build.": "Une Phase délimite une étape du travail dans le temps : exigences, conception, réalisation.",
   "Assign Objects and Elements to it and track what each period covers.": "Affectez-lui des Objects et des Elements et suivez ce que couvre chaque période.",
   "Create Phase": "Créer une Phase",
-  "Add Initiatives": "Ajouter des Initiatives",
-  "An Initiative groups Objects across Domains around one outcome — what to achieve and how to win.": "Une Initiative regroupe des Objects de plusieurs Domains autour d’un résultat : quoi atteindre et comment gagner.",
-  "Each Initiative gets its own timeline and resource view.": "Chaque Initiative dispose de sa propre chronologie et de sa vue des ressources.",
-  "Create Initiative": "Créer une Initiative",
+  "Add Strategies": "Ajouter des Strategies",
+  "A Strategy groups Objects across Domains around one outcome — what to achieve and how to win.": "Une Strategy regroupe des Objects de plusieurs Domains autour d’un résultat : quoi atteindre et comment gagner.",
+  "Each Strategy gets its own timeline and resource view.": "Chaque Strategy dispose de sa propre chronologie et de sa vue des ressources.",
+  "Create Strategy": "Créer une Strategy",
 });
 
 Object.assign(es, {
@@ -1456,10 +1448,10 @@ Object.assign(es, {
   "A Phase time-boxes a stage of work — requirements, design, build.": "Una Phase delimita en el tiempo una etapa del trabajo: requisitos, diseño, construcción.",
   "Assign Objects and Elements to it and track what each period covers.": "Asígnale Objects y Elements y sigue qué cubre cada periodo.",
   "Create Phase": "Crear Phase",
-  "Add Initiatives": "Añadir Initiatives",
-  "An Initiative groups Objects across Domains around one outcome — what to achieve and how to win.": "Una Initiative agrupa Objects de varios Domains en torno a un resultado: qué lograr y cómo ganar.",
-  "Each Initiative gets its own timeline and resource view.": "Cada Initiative tiene su propia línea de tiempo y vista de recursos.",
-  "Create Initiative": "Crear Initiative",
+  "Add Strategies": "Añadir Strategies",
+  "A Strategy groups Objects across Domains around one outcome — what to achieve and how to win.": "Una Strategy agrupa Objects de varios Domains en torno a un resultado: qué lograr y cómo ganar.",
+  "Each Strategy gets its own timeline and resource view.": "Cada Strategy tiene su propia línea de tiempo y vista de recursos.",
+  "Create Strategy": "Crear Strategy",
 });
 
 // Tool pages (Audit): the tab strip and the subject's head.

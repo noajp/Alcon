@@ -1,5 +1,5 @@
 // =============================================================
-// Initiative decisions — the record of what was chosen, computed.
+// Strategy decisions — the record of what was chosen, computed.
 //
 // A decision is not a status update. It has three parts and loses its worth if
 // any one of them is dropped: what was chosen, what was given up to choose it,

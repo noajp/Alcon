@@ -46,8 +46,8 @@ export function ApproachEditor({ target, data, objects, open, onOpenChange, onRe
   let fields: Field[];
   if (target.kind === 'approach') fields = [
     { name: 'title', label: t('Approach'), required: true },
-    { name: 'strategy_id', label: t('Contributes to Initiative'), type: 'select', required: true, disabled: Boolean(a), options: data.initiatives.map(i => ({ value: i.id, label: i.name })) },
-    { name: 'measure_id', label: t('Initiative success condition (optional)'), type: 'select', options: data.measures.filter(m => m.strategy_id === values.strategy_id).map(m => ({ value: m.id, label: m.title })) },
+    { name: 'strategy_id', label: t('Contributes to Strategy'), type: 'select', required: true, disabled: Boolean(a), options: data.initiatives.map(i => ({ value: i.id, label: i.name })) },
+    { name: 'measure_id', label: t('Strategy success condition (optional)'), type: 'select', options: data.measures.filter(m => m.strategy_id === values.strategy_id).map(m => ({ value: m.id, label: m.title })) },
     { name: 'expected_change', label: t('What should change?'), type: 'textarea', required: true },
     { name: 'hypothesis', label: t('Why should this combination of work produce that change?'), type: 'textarea', required: true },
     { name: 'assumptions', label: t('Assumptions and constraints'), type: 'textarea' },
@@ -77,7 +77,7 @@ export function ApproachEditor({ target, data, objects, open, onOpenChange, onRe
   else fields = [
     { name: 'action', label: t('Decision'), type: 'select', required: true, options: options({ continue: t('Continue'), change: t('Change'), stop: t('Stop') }) },
     { name: 'reasoning', label: t('Why, given the evidence and uncertainty?'), type: 'textarea', required: true },
-    { name: 'changes', label: t('What should change in the approach, Objects or Initiative?'), type: 'textarea', required: values.action === 'change' },
+    { name: 'changes', label: t('What should change in the approach, Objects or Strategy?'), type: 'textarea', required: values.action === 'change' },
     { name: 'next_review_date', label: t('Next review'), type: 'date' },
   ];
   const latest = data.approaches.find(row => row.id === a?.id);
@@ -120,7 +120,7 @@ export function ApproachEditor({ target, data, objects, open, onOpenChange, onRe
   return <Dialog open={open} onOpenChange={next => { if (!lock.current) onOpenChange(next); }}>
     <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
       <DialogTitle>{title}</DialogTitle>
-      <DialogDescription>{target.kind === 'approach' ? t('Connect an Initiative to a testable approach in this Domain. Readers need access to both.') : target.kind === 'review' ? t('The current approach, conditions and evidence are saved with this decision. Apply changes through the linked Objects or Initiative.') : target.kind === 'assessment' ? t('Keep observed facts separate from interpretation. Earlier assessments remain in the history.') : target.approach?.title}</DialogDescription>
+      <DialogDescription>{target.kind === 'approach' ? t('Connect a Strategy to a testable approach in this Domain. Readers need access to both.') : target.kind === 'review' ? t('The current approach, conditions and evidence are saved with this decision. Apply changes through the linked Objects or Strategy.') : target.kind === 'assessment' ? t('Keep observed facts separate from interpretation. Earlier assessments remain in the history.') : target.approach?.title}</DialogDescription>
       {target.kind === 'review' && <div className="space-y-2 text-xs">
         <p className="font-medium">{t('Current basis · {title}', { title: target.approach.title })}</p>
         {data.conditions.filter(c => c.approach_id === target.approach.id).map(c => <p key={c.id}>{c.required ? t('Required') : t('Supporting')} · {c.title} · {t(RESULT_LABELS[conditionAssessment(c, target.approach, data.assessments).status])}</p>)}

@@ -100,13 +100,13 @@ export function DecisionLab({ input, objects, refreshing, canRecord = true, onRe
 
   if (!candidates.length) return (
     <div className="space-y-2 py-2 text-sm text-muted-foreground">
-      <p>{t('Link an Object with active Elements to compare ways to deliver this Initiative.')}</p>
+      <p>{t('Link an Object with active Elements to compare ways to deliver this Strategy.')}</p>
       <p className="text-xs">{t('Start with an estimate, an assignee and a due date. Backlog and closed Elements are excluded from the plan.')}</p>
     </div>
   );
 
   if (!target) return <div className="space-y-2 py-2">
-    <p role="status" className="text-sm">{t('The selected Element is no longer active in this Initiative. Choose an Element to compare.')}</p>
+    <p role="status" className="text-sm">{t('The selected Element is no longer active in this Strategy. Choose an Element to compare.')}</p>
     <select aria-label={t('Choose another Element')} value="" onChange={(event) => { setSelectedId(event.target.value); resetResult(); }} className="h-8 w-full rounded-md border-0 bg-muted/40 px-2 text-sm focus:bg-muted/60">
       <option value="" disabled>{t('Choose an Element…')}</option>
       {candidates.map((element) => <option key={element.id} value={element.id}>{element.title}</option>)}
@@ -183,24 +183,24 @@ export function DecisionLab({ input, objects, refreshing, canRecord = true, onRe
           <caption className="sr-only">{t('Current plan and proposed plan comparison')}</caption>
           <thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="p-2 font-medium">{t('Conditional schedule')}</th><th className="p-2 font-medium">{t('Current')}</th><th className="p-2 font-medium">{t('This plan')}</th></tr></thead>
           <tbody>
-            <Metric label={t('Initiative finish')} before={dateLabel(baseline.scope.finish, t)} after={dateLabel(result.scope.finish, t)} />
-            <Metric label={t('Initiative · late Elements')} before={baseline.scope.late} after={result.scope.late} />
+            <Metric label={t('Strategy finish')} before={dateLabel(baseline.scope.finish, t)} after={dateLabel(result.scope.finish, t)} />
+            <Metric label={t('Strategy · late Elements')} before={baseline.scope.late} after={result.scope.late} />
             <Metric label={t('Other work · late Elements')} before={baseline.outside.late} after={result.outside.late} />
-            <Metric label={t('Not estimated · Initiative / other work')} before={`${baseline.scope.unknown} / ${baseline.outside.unknown}`} after={`${result.scope.unknown} / ${result.outside.unknown}`} />
+            <Metric label={t('Not estimated · Strategy / other work')} before={`${baseline.scope.unknown} / ${baseline.outside.unknown}`} after={`${result.scope.unknown} / ${result.outside.unknown}`} />
           </tbody>
         </table>
       </div>
 
       {(baseline.scope.unknown + baseline.outside.unknown > 0 || undated > 0) && <p className="text-xs text-[var(--status-warning)]">
         {baseline.scope.unknown + baseline.outside.unknown > 0 ? `${t('{n} Elements have no calculated schedule. Dates shown assume that unknown work consumes no additional capacity.', { n: baseline.scope.unknown + baseline.outside.unknown })} ` : ''}
-        {undated > 0 ? t('{n} active Initiative Elements have no due date, so their deadline risk is not measured.', { n: undated }) : ''}
+        {undated > 0 ? t('{n} active Strategy Elements have no due date, so their deadline risk is not measured.', { n: undated }) : ''}
       </p>}
 
       <div className="space-y-3" aria-live="polite">
-        <ImpactRows label={t('What changes in this Initiative')} changes={inside} input={input} objects={objects} onOpen={onOpenElement} />
+        <ImpactRows label={t('What changes in this Strategy')} changes={inside} input={input} objects={objects} onOpen={onOpenElement} />
         <ImpactRows label={t('Effects on other work')} changes={outside} input={input} objects={objects} onOpen={onOpenElement} />
         {unknown.length > 0 && <details className="text-sm">
-          <summary className="cursor-pointer rounded-md py-1 font-medium focus-visible:bg-muted">{t('{n} Initiative Elements cannot be estimated', { n: unknown.length })}</summary>
+          <summary className="cursor-pointer rounded-md py-1 font-medium focus-visible:bg-muted">{t('{n} Strategy Elements cannot be estimated', { n: unknown.length })}</summary>
           <div className="mt-1 space-y-1">{unknown.map((row) => <div key={row.elementId} className="flex flex-wrap items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => onOpenElement(row.elementId)} className="max-w-full justify-start"><span className="truncate">{input.elements.find((element) => element.id === row.elementId)?.title}</span></Button>
             <span className="text-xs text-[var(--status-warning)]">{row.reason ? t(row.reason.replaceAll('_', ' ')) : null}</span>
@@ -211,9 +211,9 @@ export function DecisionLab({ input, objects, refreshing, canRecord = true, onRe
       <details className="text-xs text-muted-foreground">
         <summary className="cursor-pointer rounded-md py-1 focus-visible:bg-muted">{t('Calculation assumptions and coverage')}</summary>
         <ul className="mt-2 list-disc space-y-1 pl-4">{result.assumptions.map((assumption) => <li key={assumption}>{assumptionLabel(assumption, t)}</li>)}
-          <li>{t('{scope} Initiative Elements and {outside} other Elements considered. {backlog} backlog Elements excluded.', { scope: baseline.scope.total, outside: baseline.outside.total, backlog: baseline.excludedBacklogCount })}</li>
+          <li>{t('{scope} Strategy Elements and {outside} other Elements considered. {backlog} backlog Elements excluded.', { scope: baseline.scope.total, outside: baseline.outside.total, backlog: baseline.excludedBacklogCount })}</li>
           <li>{t('Only work you can see in this Activity Space is included. Hidden work can consume additional capacity.')}</li>
-          <li>{t('These are conditional dates, not a probability or proof of achieving the Initiative\'s success conditions.')}</li>
+          <li>{t('These are conditional dates, not a probability or proof of achieving the Strategy\'s success conditions.')}</li>
         </ul>
       </details>
 
@@ -225,8 +225,8 @@ export function DecisionLab({ input, objects, refreshing, canRecord = true, onRe
           <Button variant="ghost" size="sm" disabled={saving} onClick={() => onOpenElement(target.id)}>{t('Open Element')} <ArrowRight className="size-3" /></Button>
         </div>
         <p className="text-xs text-muted-foreground">{t('Saves the reason, tradeoffs and calculation in Decisions. Open the Element to put the plan into action.')}</p>
-        {!canRecord && <p className="text-xs text-muted-foreground">{t('You can compare plans. Only the Initiative owner can record decisions.')}</p>}
-        {saved && <p role="status" className="text-xs text-[var(--status-success)]">{t('Recorded in this Initiative\'s Decisions. Live dates and assignees are unchanged.')}</p>}
+        {!canRecord && <p className="text-xs text-muted-foreground">{t('You can compare plans. Only the Strategy owner can record decisions.')}</p>}
+        {saved && <p role="status" className="text-xs text-[var(--status-success)]">{t('Recorded in this Strategy\'s Decisions. Live dates and assignees are unchanged.')}</p>}
         {failure && <p role="alert" className="text-sm text-[var(--status-danger)]">{failure}</p>}
       </div>
     </div>

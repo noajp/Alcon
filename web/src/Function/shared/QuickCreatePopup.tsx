@@ -16,7 +16,7 @@ interface QuickCreatePopupProps {
   open: boolean;
   /** Small icon before the context label — the concept being created. */
   icon: ReactNode;
-  /** "New Notebook", "New Initiative", … */
+  /** "New Notebook", "New Strategy", … */
   contextLabel: string;
   ariaLabel: string;
   namePlaceholder: string;
@@ -40,7 +40,7 @@ interface QuickCreatePopupProps {
  * bottom of the viewport with a context label, a big name field, an optional
  * description, a row of property pills and a Create button. Objects and
  * Elements set the pattern (QuickAddObjectPopup / QuickAddElementPopup); the
- * Notebook, Initiative and Table popups are built on this so a "+" anywhere
+ * Notebook, Strategy and Table popups are built on this so a "+" anywhere
  * opens the same kind of surface. Linear-style: no dimmer behind.
  */
 export function QuickCreatePopup({

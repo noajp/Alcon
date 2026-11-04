@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { assembleStrategies } from '@/hooks/initiativeObjects';
 import type { Strategy, StrategyChild, StrategyObject } from '@/types/database';
 
-// assembleStrategies is the one path that turns rows into a Initiative's
+// assembleStrategies is the one path that turns rows into a Strategy's
 // Object set (ADR 0017). The contract: objectIds comes from the
 // strategy_objects junction and from nothing else. Rows written before the
 // junction became the single source may still carry `object_ids` inside the
@@ -19,7 +19,6 @@ function strategy(id: string, scope: Record<string, unknown> = {}): Strategy {
     scope: scope as Strategy['scope'],
     color: null,
     icon: null,
-    vision_id: null,
     activity_space_id: null,
     created_by: null,
     created_at: '2026-08-31T00:00:00Z',
@@ -60,7 +59,7 @@ describe('assembleStrategies', () => {
     expect(out[0].scope).toEqual({ domain_ids: ['d1'], object_ids: ['o-stale', 'o1'] });
   });
 
-  it('gives a Initiative with no links an empty set, not one read from scope', () => {
+  it('gives a Strategy with no links an empty set, not one read from scope', () => {
     const out = assembleStrategies([strategy('s1', { object_ids: ['o1'] })], [], []);
     expect(out[0].objectIds).toEqual([]);
   });

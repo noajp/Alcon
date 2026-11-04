@@ -3,11 +3,11 @@ import { SUPPORTED_LOCALES } from '@/Function/i18n/locales';
 import { starterContent } from '@/Function/space/starterContent';
 
 describe('starterContent', () => {
-  it.each(SUPPORTED_LOCALES)('%s: every Initiative names Objects that exist', (locale) => {
+  it.each(SUPPORTED_LOCALES)('%s: every Strategy names Objects that exist', (locale) => {
     const content = starterContent(locale);
     const keys = content.objects.map((object) => object.key);
     expect(new Set(keys).size).toBe(keys.length);
-    for (const group of content.initiatives) {
+    for (const group of content.strategies) {
       for (const initiative of group.children) {
         expect(initiative.objectKeys.length).toBeGreaterThan(0);
         for (const key of initiative.objectKeys) expect(keys).toContain(key);
@@ -19,6 +19,6 @@ describe('starterContent', () => {
     const content = starterContent(locale);
     const english = starterContent('en');
     expect(content.objects.map((o) => [o.key, o.elements.length])).toEqual(english.objects.map((o) => [o.key, o.elements.length]));
-    expect(content.initiatives.map((g) => g.children.map((i) => i.objectKeys))).toEqual(english.initiatives.map((g) => g.children.map((i) => i.objectKeys)));
+    expect(content.strategies.map((g) => g.children.map((i) => i.objectKeys))).toEqual(english.strategies.map((g) => g.children.map((i) => i.objectKeys)));
   });
 });

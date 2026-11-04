@@ -66,9 +66,9 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
       <Button variant="ghost" size="sm" disabled={locked} onClick={() => void run(() => store.discard())}>{t('Discard preview')}</Button>
     </div>}
     {source?.usesObjectData && (app?.draft_app || store.dataConnected
-      ? <p className="text-xs text-muted-foreground">{t('Object data connected · Reads this Object’s Elements, related Initiatives and Intents with your access permissions. Data reflects the time it was fetched.')}</p>
+      ? <p className="text-xs text-muted-foreground">{t('Object data connected · Reads this Object’s Elements, related Strategies and Intents with your access permissions. Data reflects the time it was fetched.')}</p>
       : <div className="flex flex-wrap items-center gap-2">
-        <p className="mr-auto text-xs text-muted-foreground">{t('Object data not connected · Once connected, this version reads this Object’s Elements, related Initiatives and Intents with your access, and can save what it reads where everyone on this widget sees it.')}</p>
+        <p className="mr-auto text-xs text-muted-foreground">{t('Object data not connected · Once connected, this version reads this Object’s Elements, related Strategies and Intents with your access, and can save what it reads where everyone on this widget sees it.')}</p>
         <Button variant="secondary" size="sm" disabled={locked} onClick={() => void run(() => store.connectData())}>{t('Connect Object data')}</Button>
       </div>)}
     {source && <AppRuntime key={`${epoch}:${app?.draft_app ? 'draft' : store.dataConnected ? 'live' : 'unconnected'}:${JSON.stringify(source)}`} source={source} state={store.state} objectId={host.subject.id ?? ''} objectName={host.object?.name ?? ''} preview={!!app?.draft_app} readOnly={!!host.readOnly || !!store.error} onSave={async (value, base) => { try { return await store.saveState(value, base); } catch (e) { setError(e instanceof Error ? e.message : t('Could not save app data.')); throw e; } }} onReadContext={source.usesObjectData && (app?.draft_app || store.dataConnected) ? store.readContext : undefined} onReady={setReady} />}

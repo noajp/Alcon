@@ -1,7 +1,7 @@
 // Board and page surfaces: widget names and descriptions, the widget picker,
 // the Calendar grid, Create Domain, and the overview widgets' own copy.
 // One row per message: [ja, ko, fr, es]. Concept names (Domain, Object,
-// Element, Initiative, Space, Worker, Phase) stay English in every language.
+// Element, Strategy, Space, Worker, Phase) stay English in every language.
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const SURFACE_MESSAGES: Record<string, Row> = {
@@ -23,8 +23,8 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   'Domain approaches': ['Domain のアプローチ', 'Domain 접근 방식', 'Approches des Domains', 'Enfoques de los Domains'],
   'Approaches': ['アプローチ', '접근 방식', 'Approches', 'Enfoques'],
   'Related Domains': ['関連する Domain', '관련 Domain', 'Domains liés', 'Domains relacionados'],
-  'Related Initiatives': ['関連する Initiative', '관련 Initiative', 'Initiatives liées', 'Initiatives relacionadas'],
-  'Initiative intent': ['Initiative の意図', 'Initiative 의도', 'Intention de l’Initiative', 'Intención de la Initiative'],
+  'Related Strategies': ['関連する Strategy', '관련 Strategy', 'Strategies liées', 'Strategies relacionadas'],
+  'Strategy intent': ['Strategy の意図', 'Strategy 의도', 'Intention de la Strategy', 'Intención de la Strategy'],
   'Linked Note': ['リンクしたノート', '연결된 노트', 'Note liée', 'Nota vinculada'],
   'Situation': ['状況', '상황', 'Situation', 'Situación'],
   'Decision Lab': ['意思決定ラボ', '의사결정 랩', 'Labo de décision', 'Laboratorio de decisiones'],
@@ -52,16 +52,16 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   'A Note from Notebook, written in place': ['Notebook のノートを、その場で書く', 'Notebook의 노트를 그 자리에서 작성', 'Une note du Notebook, écrite sur place', 'Una nota del Notebook, escrita aquí mismo'],
   'Your table data as editable rows, grouped cards, or a chart': ['Table のデータを、編集できる行・グループ化したカード・グラフで表示', 'Table 데이터를 편집 가능한 행, 그룹 카드, 차트로', 'Les données de votre Table en lignes modifiables, cartes groupées ou graphique', 'Los datos de tu Table como filas editables, tarjetas agrupadas o gráfico'],
   'Type, dates, lead, progress': ['種類・日付・担当・進捗', '유형, 날짜, 책임자, 진행률', 'Type, dates, responsable, progression', 'Tipo, fechas, responsable, progreso'],
-  'Why this exists, from the Initiative it feeds': ['これがある理由を、貢献先の Initiative から示す', '기여하는 Initiative에서 본 존재 이유', 'Pourquoi il existe, d’après l’Initiative qu’il sert', 'Por qué existe, según la Initiative a la que contribuye'],
+  'Why this exists, from the Strategy it feeds': ['これがある理由を、貢献先の Strategy から示す', '기여하는 Strategy에서 본 존재 이유', 'Pourquoi il existe, d’après la Strategy qu’il sert', 'Por qué existe, según la Strategy a la que contribuye'],
   'Pin a Note to this Object': ['この Object にノートを固定する', '이 Object에 노트 고정', 'Épingler une note à cet Object', 'Fijar una nota a este Object'],
-  'Whether this Initiative is going to land': ['この Initiative が達成できそうか', '이 Initiative가 달성될지', 'Si cette Initiative va aboutir', 'Si esta Initiative va a cumplirse'],
+  'Whether this Strategy is going to land': ['この Strategy が達成できそうか', '이 Strategy가 달성될지', 'Si cette Strategy va aboutir', 'Si esta Strategy va a cumplirse'],
   'Compare ways to protect a commitment and see the cost to other work': ['約束を守る方法を比べ、ほかの仕事への影響を見る', '약속을 지킬 방법을 비교하고 다른 일에 미치는 비용 보기', 'Comparer les façons de tenir un engagement et voir le coût pour le reste', 'Compara formas de cumplir un compromiso y mira el coste para el resto del trabajo'],
   'Which Object is hurting, and who is carrying it': ['どの Object が苦しく、誰が抱えているか', '어느 Object가 힘들고 누가 맡고 있는지', 'Quel Object souffre, et qui le porte', 'Qué Object sufre y quién lo sostiene'],
-  'What this is standing on, and the Initiative it belongs to': ['何を前提にしているか、どの Initiative に属するか', '무엇을 전제로 하는지, 어느 Initiative에 속하는지', 'Sur quoi il repose, et l’Initiative dont il relève', 'En qué se apoya y a qué Initiative pertenece'],
-  'Assignments flowing from Worker to Object to Initiative': ['Worker から Object、Initiative へとつながる担当', 'Worker에서 Object, Initiative로 이어지는 배정', 'Les affectations, du Worker à l’Object puis à l’Initiative', 'Asignaciones del Worker al Object y a la Initiative'],
-  'The Initiative cascade, with its measures as key results': ['Initiative の連なりを、成功条件を主要な結果として表示', 'Initiative 계층과 성공 조건을 핵심 결과로', 'La cascade d’Initiatives, avec leurs mesures comme résultats clés', 'La cascada de Initiatives, con sus medidas como resultados clave'],
+  'What this is standing on, and the Strategy it belongs to': ['何を前提にしているか、どの Strategy に属するか', '무엇을 전제로 하는지, 어느 Strategy에 속하는지', 'Sur quoi il repose, et la Strategy dont il relève', 'En qué se apoya y a qué Strategy pertenece'],
+  'Assignments flowing from Worker to Object to Strategy': ['Worker から Object、Strategy へとつながる担当', 'Worker에서 Object, Strategy로 이어지는 배정', 'Les affectations, du Worker à l’Object puis à la Strategy', 'Asignaciones del Worker al Object y a la Strategy'],
+  'The Strategy cascade, with its measures as key results': ['Strategy の連なりを、成功条件を主要な結果として表示', 'Strategy 계층과 성공 조건을 핵심 결과로', 'La cascade de Strategies, avec leurs mesures comme résultats clés', 'La cascada de Strategies, con sus medidas como resultados clave'],
   'How far each reading is from the condition it is judged against': ['各計測値が判断基準からどれだけ離れているか', '각 측정값이 판단 기준에서 얼마나 떨어져 있는지', 'L’écart entre chaque mesure et sa condition de réussite', 'Cuánto se aleja cada lectura de la condición con que se juzga'],
-  'The conditions this Initiative is held to': ['この Initiative の成功条件', '이 Initiative의 성공 조건', 'Les conditions de réussite de cette Initiative', 'Las condiciones que debe cumplir esta Initiative'],
+  'The conditions this Strategy is held to': ['この Strategy の成功条件', '이 Strategy의 성공 조건', 'Les conditions de réussite de cette Strategy', 'Las condiciones que debe cumplir esta Strategy'],
   'What the plan takes as given': ['計画が前提にしていること', '계획이 전제로 하는 것', 'Ce que le plan tient pour acquis', 'Lo que el plan da por sentado'],
   'What was chosen, and when it is due for review': ['何を選んだか、いつ見直すか', '무엇을 골랐고 언제 다시 볼지', 'Ce qui a été choisi, et quand le revoir', 'Qué se eligió y cuándo revisarlo'],
   'Completion across the whole subject, as a bar': ['全体の完了率を棒で表示', '전체 완료율을 막대로', 'L’avancement global, en barre', 'El avance total, como barra'],
@@ -103,14 +103,14 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   'No hours tracked': ['工数の記録はありません', '기록된 시간이 없습니다', 'Aucune heure saisie', 'No hay horas registradas'],
   'No Objects in this Domain yet.': ['この Domain にはまだ Object がありません。', '이 Domain에는 아직 Object가 없습니다.', 'Aucun Object dans ce Domain pour l’instant.', 'Este Domain aún no tiene Objects.'],
   'Through': ['経由', '경유', 'Via', 'A través de'],
-  'Loading Initiatives…': ['Initiative を読み込み中…', 'Initiative 불러오는 중…', 'Chargement des Initiatives…', 'Cargando Initiatives…'],
-  'Unable to load related Initiatives.': ['関連する Initiative を読み込めませんでした。', '관련 Initiative를 불러오지 못했습니다.', 'Impossible de charger les Initiatives liées.', 'No se pudieron cargar las Initiatives relacionadas.'],
-  'No Initiatives linked yet. Add this Domain’s Objects to an Initiative to connect intent and execution.': ['まだ Initiative とつながっていません。この Domain の Object を Initiative に加えると、意図と実行がつながります。', '아직 연결된 Initiative가 없습니다. 이 Domain의 Object를 Initiative에 추가하면 의도와 실행이 연결됩니다.', 'Aucune Initiative liée. Ajoutez les Objects de ce Domain à une Initiative pour relier l’intention et l’exécution.', 'Aún no hay Initiatives vinculadas. Añade los Objects de este Domain a una Initiative para unir intención y ejecución.'],
-  'Initiatives supported by Objects in this Domain.': ['この Domain の Object が支えている Initiative。', '이 Domain의 Object가 뒷받침하는 Initiative.', 'Initiatives portées par des Objects de ce Domain.', 'Initiatives que apoyan los Objects de este Domain.'],
+  'Loading Strategies…': ['Strategy を読み込み中…', 'Strategy 불러오는 중…', 'Chargement des Strategies…', 'Cargando Strategies…'],
+  'Unable to load related Strategies.': ['関連する Strategy を読み込めませんでした。', '관련 Strategy를 불러오지 못했습니다.', 'Impossible de charger les Strategies liées.', 'No se pudieron cargar las Strategies relacionadas.'],
+  'No Strategies linked yet. Add this Domain’s Objects to a Strategy to connect intent and execution.': ['まだ Strategy とつながっていません。この Domain の Object を Strategy に加えると、意図と実行がつながります。', '아직 연결된 Strategy가 없습니다. 이 Domain의 Object를 Strategy에 추가하면 의도와 실행이 연결됩니다.', 'Aucune Strategy liée. Ajoutez les Objects de ce Domain à une Strategy pour relier l’intention et l’exécution.', 'Aún no hay Strategies vinculadas. Añade los Objects de este Domain a una Strategy para unir intención y ejecución.'],
+  'Strategies supported by Objects in this Domain.': ['この Domain の Object が支えている Strategy。', '이 Domain의 Object가 뒷받침하는 Strategy.', 'Strategies portées par des Objects de ce Domain.', 'Strategies que apoyan los Objects de este Domain.'],
   'Loading Domains…': ['Domain を読み込み中…', 'Domain 불러오는 중…', 'Chargement des Domains…', 'Cargando Domains…'],
   'Unable to load related Domains.': ['関連する Domain を読み込めませんでした。', '관련 Domain을 불러오지 못했습니다.', 'Impossible de charger les Domains liés.', 'No se pudieron cargar los Domains relacionados.'],
-  'No related Domains in this Space or shared with you. Link Objects to this Initiative to connect the work.': ['この Space や共有されたものに、関連する Domain はありません。Object をこの Initiative に紐づけると仕事がつながります。', '이 Space나 공유받은 것 중 관련 Domain이 없습니다. Object를 이 Initiative에 연결하면 일이 이어집니다.', 'Aucun Domain lié dans ce Space ou partagé avec vous. Liez des Objects à cette Initiative pour relier le travail.', 'No hay Domains relacionados en este Space ni compartidos contigo. Vincula Objects a esta Initiative para conectar el trabajo.'],
-  'Domains in this Space or shared with you, connected through this Initiative’s Objects.': ['この Initiative の Object を通じてつながる、この Space と共有された Domain。', '이 Initiative의 Object를 통해 이어진, 이 Space나 공유받은 Domain.', 'Domains de ce Space ou partagés avec vous, reliés par les Objects de cette Initiative.', 'Domains de este Space o compartidos contigo, conectados por los Objects de esta Initiative.'],
+  'No related Domains in this Space or shared with you. Link Objects to this Strategy to connect the work.': ['この Space や共有されたものに、関連する Domain はありません。Object をこの Strategy に紐づけると仕事がつながります。', '이 Space나 공유받은 것 중 관련 Domain이 없습니다. Object를 이 Strategy에 연결하면 일이 이어집니다.', 'Aucun Domain lié dans ce Space ou partagé avec vous. Liez des Objects à cette Strategy pour relier le travail.', 'No hay Domains relacionados en este Space ni compartidos contigo. Vincula Objects a esta Strategy para conectar el trabajo.'],
+  'Domains in this Space or shared with you, connected through this Strategy’s Objects.': ['この Strategy の Object を通じてつながる、この Space と共有された Domain。', '이 Strategy의 Object를 통해 이어진, 이 Space나 공유받은 Domain.', 'Domains de ce Space ou partagés avec vous, reliés par les Objects de cette Strategy.', 'Domains de este Space o compartidos contigo, conectados por los Objects de esta Strategy.'],
 
   // ── Domain overview ───────────────────────────────────────────
   'Choose a Domain from the sidebar.': ['サイドバーから Domain を選んでください。', '사이드바에서 Domain을 선택하세요.', 'Choisissez un Domain dans la barre latérale.', 'Elige un Domain en la barra lateral.'],
@@ -121,20 +121,20 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   'What this Domain is for…': ['この Domain の目的…', '이 Domain의 목적…', 'À quoi sert ce Domain…', 'Para qué sirve este Domain…'],
   'No description yet.': ['説明はまだありません。', '아직 설명이 없습니다.', 'Pas encore de description.', 'Aún no hay descripción.'],
 
-  // ── Initiative page ───────────────────────────────────────────
+  // ── Strategy page ───────────────────────────────────────────
   'Add Objects': ['Object を追加', 'Object 추가', 'Ajouter des Objects', 'Añadir Objects'],
   'Add description…': ['説明を追加…', '설명 추가…', 'Ajouter une description…', 'Añadir descripción…'],
-  'Add existing Initiative': ['既存の Initiative を追加', '기존 Initiative 추가', 'Ajouter une Initiative existante', 'Añadir una Initiative existente'],
-  'Add nested Initiative': ['配下に Initiative を追加', '하위 Initiative 추가', 'Ajouter une Initiative imbriquée', 'Añadir una Initiative anidada'],
-  'Initiative actions': ['Initiative の操作', 'Initiative 작업', 'Actions sur l’Initiative', 'Acciones de la Initiative'],
-  'Initiative name': ['Initiative 名', 'Initiative 이름', 'Nom de l’Initiative', 'Nombre de la Initiative'],
+  'Add existing Strategy': ['既存の Strategy を追加', '기존 Strategy 추가', 'Ajouter une Strategy existante', 'Añadir una Strategy existente'],
+  'Add nested Strategy': ['配下に Strategy を追加', '하위 Strategy 추가', 'Ajouter une Strategy imbriquée', 'Añadir una Strategy anidada'],
+  'Strategy actions': ['Strategy の操作', 'Strategy 작업', 'Actions sur la Strategy', 'Acciones de la Strategy'],
+  'Strategy name': ['Strategy 名', 'Strategy 이름', 'Nom de la Strategy', 'Nombre de la Strategy'],
   'No Objects match.': ['該当する Object はありません。', '일치하는 Object가 없습니다.', 'Aucun Object ne correspond.', 'Ningún Object coincide.'],
   'Object name': ['Object 名', 'Object 이름', 'Nom de l’Object', 'Nombre del Object'],
   'Read-only': ['閲覧のみ', '읽기 전용', 'Lecture seule', 'Solo lectura'],
-  'Search Initiatives…': ['Initiative を検索…', 'Initiative 검색…', 'Chercher des Initiatives…', 'Buscar Initiatives…'],
+  'Search Strategies…': ['Strategy を検索…', 'Strategy 검색…', 'Chercher des Strategies…', 'Buscar Strategies…'],
   'Search Objects across Domains…': ['Domain をまたいで Object を検索…', 'Domain 전체에서 Object 검색…', 'Chercher des Objects dans tous les Domains…', 'Buscar Objects en todos los Domains…'],
   '{error} — change reverted': ['{error} — 変更を元に戻しました', '{error} — 변경을 되돌렸습니다', '{error} — modification annulée', '{error} — cambio revertido'],
-  "Only the Initiative's owner can edit it": ['この Initiative を編集できるのはオーナーだけです', '이 Initiative는 소유자만 편집할 수 있습니다', 'Seul le propriétaire de l’Initiative peut la modifier', 'Solo el propietario de la Initiative puede editarla'],
+  "Only the Strategy's owner can edit it": ['この Strategy を編集できるのはオーナーだけです', '이 Strategy는 소유자만 편집할 수 있습니다', 'Seul le propriétaire de la Strategy peut la modifier', 'Solo el propietario de la Strategy puede editarla'],
 
   // ── Index pages ───────────────────────────────────────────────
 
@@ -165,6 +165,8 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   'Privacy': ['公開範囲', '공개 범위', 'Confidentialité', 'Privacidad'],
   'Control who can find and access this Domain.': ['この Domain を見つけて開ける人を決めます。', '이 Domain을 찾고 열 수 있는 사람을 정합니다.', 'Choisissez qui peut trouver et ouvrir ce Domain.', 'Controla quién puede encontrar y abrir este Domain.'],
   'Workspace': ['Space 全体', 'Space 전체', 'Tout le Space', 'Todo el Space'],
+  'Top level': ['最上位', '최상위', 'Premier niveau', 'Nivel superior'],
+  'What this Space aims for, and how it wins': ['この Space が目指すことと、その勝ち方', '이 Space가 지향하는 것과 이기는 방법', 'Ce que vise ce Space, et comment il gagne', 'A qué aspira este Space y cómo gana'],
   'Anyone in the Space can find and access.': ['Space の全員が見つけて開けます。', 'Space의 누구나 찾고 열 수 있습니다.', 'Tout membre du Space peut le trouver et l’ouvrir.', 'Cualquiera del Space puede encontrarlo y abrirlo.'],
   'Private': ['非公開', '비공개', 'Privé', 'Privado'],
   'Only invited members can find and access.': ['招待されたメンバーだけが見つけて開けます。', '초대된 멤버만 찾고 열 수 있습니다.', 'Seuls les membres invités peuvent le trouver et l’ouvrir.', 'Solo los miembros invitados pueden encontrarlo y abrirlo.'],

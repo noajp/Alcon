@@ -22,7 +22,7 @@ import type { WidgetProps } from '../types';
 export type FileWidgetShow = 'file' | 'chart' | 'value';
 
 /**
- * The board subject's artifacts — an Object's or an Initiative's own
+ * The board subject's artifacts — an Object's or a Strategy's own
  * evidence: the proposal, the analysis, the minutes. By default every one,
  * each previewed in place (Word and Excel editable, saved as versions) and
  * able to become a Note, a Table or a deck; the paperclip attaches more.

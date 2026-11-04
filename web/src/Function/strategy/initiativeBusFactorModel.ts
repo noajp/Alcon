@@ -1,5 +1,5 @@
 // =============================================================
-// Initiative bus factor — the work nobody else is on.
+// Strategy bus factor — the work nobody else is on.
 //
 // Load asks how full somebody is. This asks whether anybody else could take
 // over. They are not the same reading and they do not come due at the same
@@ -51,7 +51,7 @@ export interface BusWorkerInput {
   id: string;
   name: string;
   /** The parts that decide a standing day. Null when the Worker is not on the
-   *  roster this Initiative can read, which is not the same as being away. */
+   *  roster this Strategy can read, which is not the same as being away. */
   worker: CapacityWorker | null;
   /** Every availability span on record for them. */
   spans: readonly CapacitySpan[];
@@ -62,7 +62,7 @@ export interface SoleHolder {
   name: string;
   /** Open Elements nobody else is on. */
   sole: number;
-  /** 0..1 of the Initiative's open Elements. */
+  /** 0..1 of the Strategy's open Elements. */
   share: number;
   /** Days in the window they have no hours at all. */
   awayDays: number;
@@ -91,7 +91,7 @@ export interface InitiativeBusFactor {
   holders: SoleHolder[];
 }
 
-/** Not done, not cancelled — the work still on the Initiative's plate. */
+/** Not done, not cancelled — the work still on the Strategy's plate. */
 function isOpen(el: BusElement): boolean {
   return isOpenStatus(el.status);
 }
@@ -110,14 +110,14 @@ function windowDays(now: Date, length: number): Date[] {
 /**
  * Who is alone on what.
  *
- * `elements` may be wider than the Initiative — the caller has already scoped it.
+ * `elements` may be wider than the Strategy — the caller has already scoped it.
  * A Worker named on an Element but missing from `workers` still counts as a
- * second person on it: they exist, they are simply not one this Initiative can
+ * second person on it: they exist, they are simply not one this Strategy can
  * read a calendar for, and treating them as absent would manufacture a bus
  * factor out of a failed lookup.
  *
  * The absence window is the assumptions pane's `ABSENCE_WINDOW_DAYS`. The
- * Initiative page should ask about the future with one horizon, so the reader
+ * Strategy page should ask about the future with one horizon, so the reader
  * learns a single number rather than a rule about which surface uses which.
  */
 export function computeBusFactor(

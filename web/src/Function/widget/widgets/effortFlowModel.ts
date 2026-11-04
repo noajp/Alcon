@@ -1,7 +1,7 @@
 // =============================================================
 // A flow between any two or three dimensions of the same Elements.
 //
-// This began as Worker → Object → Initiative with the question welded in, which
+// This began as Worker → Object → Strategy with the question welded in, which
 // is the thing that made it a diagram of one sentence rather than a tool. The
 // columns are dimensions now — the same vocabulary the Display menu groups a
 // list by — so the figure answers "where are the people" and "which labels
@@ -65,7 +65,7 @@ export interface EffortFlow {
  * How many rows a column shows before the tail is folded into one.
  *
  * Eight is what the figure can label without the text colliding. The tail is
- * folded rather than dropped — "six Initiatives with one person each" is a
+ * folded rather than dropped — "six Strategies with one person each" is a
  * finding, and cutting it would hide exactly that.
  */
 const MAX_ROWS = 8;
@@ -162,7 +162,7 @@ export function effortFlow(
   });
 
   // A column whose every Element lands in one bucket separates nothing. The
-  // Initiative page is the case this exists for: one Initiative, one box, every
+  // Strategy page is the case this exists for: one Strategy, one box, every
   // ribbon into it.
   const keep = wanted.map((_, i) => i === 0 || i === 1 || columnRows[i].size > 1);
   const columns = wanted.filter((_, i) => keep[i]);

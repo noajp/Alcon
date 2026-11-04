@@ -5,7 +5,7 @@ import { NoteEditor } from '@/Function/notebook/editor/NoteEditor';
 import { htmlToMarkdown, markdownToHtml } from '@/Function/shared/markdownHtml';
 
 // The description of anything — an Element, an Object, a Domain, an
-// Initiative, a Vision — written and read the same way: a short
+// Strategy — written and read the same way: a short
 // Note body kept as Markdown, edited in place, with its headings, lists,
 // tables and diagrams. It saves when the focus leaves it (or at once for a
 // one-click edit such as a checklist box), and starts over from the saved

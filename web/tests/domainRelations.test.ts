@@ -7,7 +7,7 @@ const initiatives = [{ id: 'i1', name: 'A', description: null, status: 'active' 
 const objects = [{ id: 'o1', name: 'Shared Object', domain_id: 'd1' }, { id: 'o2', name: 'Other Object', domain_id: 'd2' }];
 const domains = [{ id: 'd1', name: 'A', description: null }, { id: 'd2', name: 'B', description: null }];
 
-describe('Domain and Initiative relationships', () => {
+describe('Domain and Strategy relationships', () => {
   it('includes only visible endpoints in this Domain and deduplicates links', () => {
     expect(initiativesForObjects(['o1'], initiatives, [
       { strategy_id: 'i1', object_id: 'o1' }, { strategy_id: 'i1', object_id: 'o1' },

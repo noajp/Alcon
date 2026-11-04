@@ -47,7 +47,9 @@ export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => <Users size={s
 // ModeRail layer marks.
 export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => <CompassRose size={size} />;
 export const NavSustainmentModeIcon = ({ size = 20 }: { size?: number }) => <Grip size={size} strokeWidth={2} />;
-// Phase — a Domain's period, reachable from an Initiative rather than the nav.
+// The Workspace's entry at the top of the ModeRail.
+export const NavWorkspaceIcon = ({ size = 20 }: { size?: number }) => <GuidingStar size={size} />;
+// Phase — a Domain's period, reachable from a Strategy rather than the nav.
 export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} />;
 
 export const NavFilesIcon = FilesIcon;

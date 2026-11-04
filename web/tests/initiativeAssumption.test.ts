@@ -77,7 +77,7 @@ describe('isAssumption — telling the two kinds of Intent apart', () => {
   it('reads the kind column and nothing else', () => {
     expect(isAssumption('assumption')).toBe(true);
     expect(isAssumption('decision')).toBe(false);
-    // The Initiative's root Intent is a spine, not a row either surface lists.
+    // The Strategy's root Intent is a spine, not a row either surface lists.
     expect(isAssumption('master')).toBe(false);
     // A row written before the column existed reads as null until migrated.
     expect(isAssumption(null)).toBe(false);
@@ -259,7 +259,7 @@ describe('evaluateWorkerWatch — one person, read for a signal', () => {
   });
 });
 
-describe('evaluateAssumption — the mark on the Initiative', () => {
+describe('evaluateAssumption — the mark on the Strategy', () => {
   it('is steady while everything it watches is moving', () => {
     const a = evaluateAssumption(
       assumption({ watches: [watch({ elementId: 'e1' }), watch({ elementId: 'e2' })] }),

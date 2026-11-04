@@ -9,7 +9,7 @@ import {
 } from '@/ActivitySpace/strategy/initiative/initiativeMeasureModel';
 
 // A list row reads its success conditions from one batch for the whole list.
-// The split must give every listed Initiative an entry (an empty one means
+// The split must give every listed Strategy an entry (an empty one means
 // "no success conditions", which the row says out loud), and the summary must
 // name misses and unread conditions before anything else.
 
@@ -18,7 +18,7 @@ function row(initiativeId: string, id: string, target: number | null, actual: nu
 }
 
 describe('talliesByInitiative', () => {
-  it('splits one batch per Initiative and gives the empty ones an empty tally', () => {
+  it('splits one batch per Strategy and gives the empty ones an empty tally', () => {
     const tallies = talliesByInitiative(['a', 'b', 'c'], [
       row('a', 'a1', 80, 90), // met
       row('a', 'a2', 80, 70), // missed

@@ -8,7 +8,7 @@ import { addIntentBinding, createIntent } from './strategyData';
 import { setElementDependency } from './coordinationData';
 
 // =============================================================
-// An Initiative's mission, read and written: the runs, artifacts, approvals
+// A Strategy's mission, read and written: the runs, artifacts, approvals
 // and dependencies of the Elements under its Objects (the Plan, Execute and
 // Evaluate tabs), the Planner's draft (plan-initiative), and the draft turned
 // into Elements bound to the measures they serve.
@@ -104,7 +104,7 @@ export interface ApplyPlanInput {
   spaceId: string | null;
   /** The Object the new Elements go into. */
   objectId: string;
-  /** The Initiative's root intent, for new objectives; null when the viewer may not write intents. */
+  /** The Strategy's root intent, for new objectives; null when the viewer may not write intents. */
   rootIntentId: string | null;
   /** The AI Worker the ai tasks are assigned to; null leaves them unassigned. */
   aiWorkerId: string | null;

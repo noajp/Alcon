@@ -40,11 +40,11 @@ describe('Domain overview data reads', () => {
     expect(mock.rpc).toHaveBeenCalledWith('get_explorer_data', { p_domain_id: 'd1' });
     expect(data.initiatives.map(row => row.objectIds)).toEqual([['o1', 'o2'], ['o2']]);
   });
-  it('reads all Initiative Objects and includes their secondary Domains', async () => {
+  it('reads all Strategy Objects and includes their secondary Domains', async () => {
     const data = await fetchInitiativeDomains('i1', ['d1', 'd2']);
     expect(data.map(row => [row.domain.id, row.objects.map(object => object.id)])).toEqual([['d1', ['o1', 'o2']], ['d2', ['o1']]]);
   });
-  it('leaves archived Objects out of an Initiative\'s Domains', async () => {
+  it('leaves archived Objects out of a Strategy\'s Domains', async () => {
     tables.objects = [tables.objects[0], { ...tables.objects[1], archived_at: '2026-10-03T00:00:00Z' }];
     const data = await fetchInitiativeDomains('i1', ['d1', 'd2']);
     expect(data.map(row => [row.domain.id, row.objects.map(object => object.id)])).toEqual([['d1', ['o1']], ['d2', ['o1']]]);
@@ -57,7 +57,7 @@ describe('Domain overview data reads', () => {
     mock.rpc.mockResolvedValue({ data: { objects: tables.objects.map(row => ({ ...row, elements: [] })), rootElements: [{ id: 'unassigned' }] }, error: null });
     expect((await fetchDomainOverview('d1')).explorer.rootElements).toEqual([]);
   });
-  it('does not query every Initiative when the Domain is empty', async () => {
+  it('does not query every Strategy when the Domain is empty', async () => {
     mock.rpc.mockResolvedValue({ data: { objects: [], rootElements: [] }, error: null });
     expect((await fetchDomainOverview('d2')).initiatives).toEqual([]);
     expect(reads).toEqual(['domains']);

@@ -9,7 +9,7 @@ const TONE: Record<MeasureSummaryTone, string> = {
   met: 'text-muted-foreground',
 };
 
-/** Where an Initiative (or a group of Initiatives) stands against its
+/** Where a Strategy (or a group of Strategies) stands against its
  *  success conditions, for a list row. Renders nothing until loaded. */
 export function MeasureStatus({ tally, className = '' }: { tally: MeasureTally | undefined | null; className?: string }) {
   if (!tally) return null;

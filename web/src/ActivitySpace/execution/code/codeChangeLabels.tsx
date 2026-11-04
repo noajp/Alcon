@@ -6,7 +6,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { CriterionVerdict, IntentVerdict, ReviewState } from '@/Function/codeReview/diffModel';
 
 // The words and tones a code change is shown with — in the Element's list, on
-// the Initiative, and in the review screen. Labels are English source strings
+// the Strategy, and in the review screen. Labels are English source strings
 // for t().
 
 /** The mark for code review as a whole (the rail, the Reviews page). */
