@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { replyToElementAgent } from '@/Function/copilot/agentData';
+import { advanceFromElement, sendBackToAgent } from '@/Function/copilot/agentData';
 import { formatDisplayName, getCachedDisplayNames } from '@/Function/settings/preferencesStore';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateElement } from '@/hooks/useSupabase';
@@ -53,6 +53,7 @@ function TurnRow({ item, canEdit, onOpen, onChanged }: { item: YourTurn; canEdit
     setBusy(true); setError(null);
     try {
       await updateElement(item.elementId, { status: 'done' });
+      await advanceFromElement(item.elementId);
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -64,7 +65,7 @@ function TurnRow({ item, canEdit, onOpen, onChanged }: { item: YourTurn; canEdit
   const send = async () => {
     setBusy(true); setError(null);
     const authorName = formatDisplayName(profile?.display_name, user?.email, getCachedDisplayNames());
-    const outcome = await replyToElementAgent(item.elementId, text, authorName);
+    const outcome = await sendBackToAgent(item.elementId, text, authorName);
     setBusy(false);
     if (outcome === 'failed') { setError(t('Could not send. Open the Element and try there.')); return; }
     if (outcome === 'busy') { setError(t('The AI is already working on this Element.')); return; }

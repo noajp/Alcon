@@ -8,7 +8,7 @@ import { ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
 import { PageSection } from '@/Function/shared/PageHead';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { startElementRun } from '@/Function/copilot/agentData';
+import { advanceFromElement, startElementRun } from '@/Function/copilot/agentData';
 import { runsInClaudeCode } from '@/Function/team/agentModel';
 import { updateElement } from '@/hooks/useSupabase';
 import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMissionData';
@@ -616,7 +616,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
                         // The badge opens the status menu: work an agent left
                         // for review is approved (Done) right from its card.
                         <span onPointerDown={(ev) => ev.stopPropagation()} onClick={(ev) => ev.stopPropagation()}>
-                          <StatusPicker element={details.get(e.elementId)!} onChanged={() => ctx.refetch()}
+                          <StatusPicker element={details.get(e.elementId)!}
+                            onChanged={(s) => { if (s === 'done' || s === 'cancelled') void advanceFromElement(e.elementId!).then(() => ctx.refetch()); else ctx.refetch(); }}
                             trigger={<button type="button" className="cursor-pointer" aria-label={t('Change status')}><StateBadge state={e.state} /></button>} />
                         </span>
                       ) : <StateBadge state={e.state} />}

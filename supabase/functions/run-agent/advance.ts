@@ -33,6 +33,7 @@ export function readyDownstream(input: {
   statusOf: ReadonlyMap<string, string | null>;
 }): string[] {
   const byId = new Map(input.candidates.map((c) => [c.id, c]));
+  // The finished Element counts as settled whether it was done or cancelled.
   const settled = (id: string) => {
     const s = id === input.doneId ? "done" : input.statusOf.get(id);
     return s === "done" || s === "cancelled";

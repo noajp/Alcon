@@ -251,6 +251,7 @@ describe('verifier', () => {
 describe('agent tools', () => {
   it('gives the web tools by model and logs each server-tool call', () => {
     expect(tools.webTools('claude-sonnet-5-5').map((t: { type: string }) => t.type)).toEqual(['web_search_20260209', 'web_fetch_20260209']);
+    expect(tools.webSteps([{ type: 'server_tool_use', name: 'code_execution', input: {} }])).toEqual(['検索結果を絞り込み']);
     expect(tools.webTools('claude-haiku-5-5').map((t: { type: string }) => t.type)).toEqual(['web_search_20250305']);
     expect(tools.webSteps([
       { type: 'text', text: 'x' },

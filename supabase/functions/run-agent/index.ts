@@ -14,6 +14,9 @@
 //                                               decide on a pending approval
 //   { runId, continue: true }                   internal: the next slice of a
 //                                               long run (self-invoked)
+//   { advance: elementId }                      a person finished an Element:
+//                                               start the AI Elements it unblocks
+//                                               (only under a Strategy set to 'auto')
 //   { ping: true }                              runtime check
 //
 // Every board / artifact / integration-listing call runs with the person's
@@ -117,7 +120,7 @@ Deno.serve(async (req: Request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "server env not configured" }, 500);
 
-  let body: { runId?: string; ping?: boolean; resume?: boolean; continue?: boolean; token?: string; decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string } };
+  let body: { runId?: string; advance?: string; ping?: boolean; resume?: boolean; continue?: boolean; token?: string; decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string } };
   try { body = await req.json(); } catch { return json({ error: "invalid JSON body" }, 400); }
 
   if (body.ping) {
@@ -128,7 +131,7 @@ Deno.serve(async (req: Request) => {
   const jwt = authHeader.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
   if (!jwt || jwt === anonKey) return json({ error: "sign-in required" }, 401);
   const runId = body.runId;
-  if (!runId) return json({ error: "runId is required" }, 400);
+  if (!runId && !body.advance) return json({ error: "runId is required" }, 400);
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const userDb = createClient(supabaseUrl, anonKey, {
@@ -136,6 +139,19 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data: { user } } = await userDb.auth.getUser(jwt);
+
+  // A person closed an Element: under 'auto', what it unblocks starts, as
+  // that person — the same step an AI's finished run takes.
+  if (body.advance) {
+    if (!user) return json({ error: "session expired or invalid" }, 401);
+    const { data: el } = await userDb.from("elements").select("id, status").eq("id", body.advance).maybeSingle();
+    if (!el) return json({ error: "element not found" }, 404);
+    // Cancelled settles a prerequisite as much as done does.
+    if (!["done", "cancelled"].includes(el.status ?? "") || (await elementDelegation(userDb, el.id)) !== "auto") return json({ started: [] });
+    const started = await advanceFrom({ admin, userDb, user: { id: user.id, email: user.email ?? null }, jwt, supabaseUrl }, el.id);
+    return json({ started });
+  }
+  if (!runId) return json({ error: "runId is required" }, 400);
   if (!user) {
     // A slice whose session expired pauses the run — only with that slice's
     // own continuation token, so nobody else can pause someone's run.
@@ -737,7 +753,15 @@ async function execute(a: ExecArgs): Promise<void> {
         // the default (high on Sonnet) made every turn slow.
         output_config: { effort: "medium" },
         betas: ["context-management-2025-06-27"],
-        context_management: { edits: [{ type: "clear_tool_uses_20250919" }] },
+        // Old board results may be cleared to save room, never the web's:
+        // with them cleared the agent searched and fetched the same pages
+        // again until it ran out of uses.
+        context_management: { edits: [{
+          type: "clear_tool_uses_20250919",
+          trigger: { type: "input_tokens", value: 150_000 },
+          keep: { type: "tool_uses", value: 6 },
+          exclude_tools: ["web_search", "web_fetch"],
+        }] },
       // deno-lint-ignore no-explicit-any
       } as any);
       for (const line of webSteps(res.content ?? [])) await addStep(admin, run.id, "action", line);
@@ -847,7 +871,9 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
   // went. A reply leaves the status alone.
   if (run.mode !== "reply" && status !== "paused") {
     const { data: el } = await userDb.from("elements").select("status").eq("id", run.element_id).maybeSingle();
-    const next = finish.outcome === "completed" ? (auto ? "done" : "review") : finish.outcome === "blocked" ? "blocked" : null;
+    // Part done is a person's call — accept it, or send it back — so it lands
+    // in review rather than staying "to do" where nobody would see it.
+    const next = finish.outcome === "completed" ? (auto ? "done" : "review") : finish.outcome === "blocked" ? "blocked" : "review";
     if (el && next && !["done", "cancelled"].includes(el.status ?? "") && el.status !== next) {
       await runBoardTool(userDb, "updateElement", { id: run.element_id, status: next }, { agent: `${agentName}（AI）`, userId: user.id });
       await addStep(admin, run.id, "status", next === "review" ? "Element をレビュー待ちに移動" : next === "done" ? "Element を完了に移動（自動で進める設定）" : "Element をブロック中に移動");
@@ -913,7 +939,7 @@ const OPEN_RUN = ["queued", "running", "awaiting_approval", "paused"];
  * reaches what they could start by hand. A JWT that has expired meanwhile
  * fails the start; the Elements stay ready on the Execution tab.
  */
-async function advanceFrom(a: ExecArgs, doneId: string): Promise<string[]> {
+async function advanceFrom(a: Pick<ExecArgs, "admin" | "userDb" | "user" | "jwt" | "supabaseUrl">, doneId: string): Promise<string[]> {
   const { admin, userDb, user } = a;
   const { data: out } = await userDb.from("element_edges").select("from_element, to_element").eq("from_element", doneId).eq("edge_type", "depends_on");
   const downIds = [...new Set(((out ?? []) as { to_element: string }[]).map((e) => e.to_element))];

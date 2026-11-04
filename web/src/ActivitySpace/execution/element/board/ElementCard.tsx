@@ -257,7 +257,10 @@ export function ElementCard({ element, onRefresh, onOpen, badge, extra }: Elemen
           <div className="flex items-center gap-1">
             {/* Same signal the list rows and the Activity column show. */}
             <ActivitySignal activity={element.activity} className="mr-1" />
-            <CardAgentControl elementId={element.id} onFinished={onRefresh} />
+            {/* A closed Element has nothing left for an AI to do. */}
+            {element.status !== 'done' && element.status !== 'cancelled' && (
+              <CardAgentControl elementId={element.id} onFinished={onRefresh} />
+            )}
             {/* Assignee — click to assign / change. */}
             <DropdownMenu open={assigneeMenuOpen} onOpenChange={setAssigneeMenuOpen}>
               <DropdownMenuTrigger asChild>
