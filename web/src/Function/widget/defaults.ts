@@ -82,7 +82,7 @@ export const INITIATIVE_BOARD: BoardLayout = {
 };
 
 /**
- * Strategy detail, Plan tab: what the plan rests on and what was chosen on
+ * Strategy detail, Execution tab: what the plan rests on and what was chosen on
  * top of it — the sections written by hand that outlive the people who wrote
  * them, with the approaches they draw on.
  */

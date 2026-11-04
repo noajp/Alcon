@@ -88,17 +88,17 @@ import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 const OVERVIEW_ZONES: Zone[] = ['band', 'main'];
 const MAIN_ZONES: Zone[] = ['main'];
 
-type InitiativeTab = 'overview' | 'plan' | 'execution' | 'audit';
+type InitiativeTab = 'overview' | 'execution' | 'audit';
 const INITIATIVE_TABS: { id: InitiativeTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
-  { id: 'plan', label: 'Plan' },
-  { id: 'execution', label: 'Execute' },
+  { id: 'execution', label: 'Execution' },
   { id: 'audit', label: 'Evaluate' },
 ];
 
 /** One tab's widget board. Each tab keeps its own board, so a widget placed
- *  on Plan stays on Plan. The Overview's surface key stays 'campaign' — it is
- *  the persisted boards.surface, not a display string. */
+ *  on Execution stays on Execution. The surface keys are the persisted
+ *  boards.surface, not display strings: the Overview's stays 'campaign' and
+ *  Execution's 'initiative-plan'. */
 function InitiativeBoard({ surface, defaults, subjectId, host, zones, children }: {
   surface: string;
   defaults: BoardLayout;
@@ -814,10 +814,10 @@ function StrategyDetailView({
         </div>
       </div>
 
-      {/* One Strategy, four readings — under the header, as the views of a
-          Domain or Object sit: how it is going (Overview), what the plan
-          rests on (Plan), the work carrying it out (Execute), and the
-          evidence it is judged on (Evaluate). */}
+      {/* One Strategy, three readings — under the header, as the views of a
+          Domain or Object sit: how it is going (Overview), how it breaks
+          down into Objects and Elements and the work carrying it out
+          (Execution), and the evidence it is judged on (Evaluate). */}
       <div role="tablist" aria-label={t('Strategy views')} className="flex flex-shrink-0 items-center gap-0.5 py-2 pl-[19px] pr-4">
         {INITIATIVE_TABS.map((v) => (
           <Button key={v.id} type="button" shape="tab" role="tab" aria-selected={tab === v.id}
@@ -875,96 +875,10 @@ function StrategyDetailView({
             </InitiativeBoard>
           )}
 
-          {tab === 'plan' && (
-            <InitiativeBoard surface="initiative-plan" defaults={INITIATIVE_PLAN_BOARD} subjectId={strategy.id} host={host} zones={MAIN_ZONES}>
-              {/* The mission: the Planner's draft, or the objectives and
-                  actions as they stand. */}
-              <InitiativeMission tab="plan" {...missionProps} />
-              {/* What the plan rests on and what was chosen on top of it. */}
-              <WidgetZone zone="main" columns={1} />
-            {/* Nested Strategies. With none, the section keeps no heading — only
-                its "+ verb", like every concept page. */}
-            {childStrategies.length > 0 || childPickerOpen ? (
-              <PageSection title={t('Strategies')} action={canEdit ? (
-                <ButtonAppearanceProvider appearance="navigation">
-                  {nestedMenu(
-                    <Button variant="ghost" size="icon-xs" aria-label={t('Add nested Strategy')} className="text-muted-foreground">
-                      <Plus size={13} />
-                    </Button>,
-                  )}
-                </ButtonAppearanceProvider>
-              ) : undefined}>
-                {childStrategies.map((child) => {
-                  const n = countObjects(child.objectIds);
-                  return (
-                    <ContentRow key={child.id} icon={<NavStrategyIcon size={13} />} name={child.name}
-                      onOpen={() => onOpenStrategy(child.id)}
-                      meta={<span>{n === 1 ? t('1 Object') : t('{n} Objects', { n })}</span>}
-                      actions={canEdit ? (
-                        <ContentRowAction label={t('Remove {name} from this Strategy', { name: child.name })} onClick={() => void unlinkChild(child.id)}>
-                          <X size={12} />
-                        </ContentRowAction>
-                      ) : undefined} />
-                  );
-                })}
-
-                {childPickerOpen && (
-                  <div className="mt-1">
-                    <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-1">
-                      <Search size={12} className="text-muted-foreground" />
-                      <input
-                        value={childQuery}
-                        onChange={(e) => setChildQuery(e.target.value)}
-                        placeholder={t('Search Strategies…')}
-                        className="flex-1 bg-transparent text-[13px] outline-none"
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        onClick={() => { setChildPickerOpen(false); setChildQuery(''); }}
-                        aria-label={t('Close')}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                    <div className="max-h-72 overflow-auto">
-                      {childCandidates.length === 0 && (
-                        <div className="px-3 py-3 text-[12px] text-muted-foreground">
-                          {t('No Strategies match.')}
-                        </div>
-                      )}
-                      {childCandidates.map((s) => (
-                        <button
-                          type="button"
-                          key={s.id}
-                          disabled={linkingChildId === s.id}
-                          onClick={() => linkChild(s.id)}
-                          className="w-full flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] hover:bg-muted/40 text-left disabled:opacity-50"
-                        >
-                          <NavStrategyIcon size={11} />
-                          <span className="flex-1 truncate text-foreground">{s.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </PageSection>
-            ) : canEdit ? (
-              <ButtonAppearanceProvider appearance="inline">
-                {nestedMenu(
-                  <Button variant="ghost" size="sm" align="start" className="-ml-2 self-start">
-                    <Plus size={13} strokeWidth={2.5} />{t('Add nested Strategy')}
-                  </Button>,
-                )}
-              </ButtonAppearanceProvider>
-            ) : null}
-            </InitiativeBoard>
-          )}
-
           {tab === 'execution' && (
-            <div className="space-y-5">
-              {/* What is running, waiting and blocked, and what it costs. */}
+            <InitiativeBoard surface="initiative-plan" defaults={INITIATIVE_PLAN_BOARD} subjectId={strategy.id} host={host} zones={MAIN_ZONES}>
+              {/* How the Strategy breaks down into Objects and Elements — or
+                  the Planner's draft of it — and the work as it runs. */}
               <InitiativeMission tab="execution" {...missionProps} />
             {selectedIds.size > 0 || pickerMode !== 'closed' ? (
               <PageSection title={t('Objects')} action={canEdit ? (
@@ -1100,10 +1014,89 @@ function StrategyDetailView({
               </ButtonAppearanceProvider>
             ) : null}
 
+            {/* Nested Strategies. With none, the section keeps no heading — only
+                its "+ verb", like every concept page. */}
+            {childStrategies.length > 0 || childPickerOpen ? (
+              <PageSection title={t('Strategies')} action={canEdit ? (
+                <ButtonAppearanceProvider appearance="navigation">
+                  {nestedMenu(
+                    <Button variant="ghost" size="icon-xs" aria-label={t('Add nested Strategy')} className="text-muted-foreground">
+                      <Plus size={13} />
+                    </Button>,
+                  )}
+                </ButtonAppearanceProvider>
+              ) : undefined}>
+                {childStrategies.map((child) => {
+                  const n = countObjects(child.objectIds);
+                  return (
+                    <ContentRow key={child.id} icon={<NavStrategyIcon size={13} />} name={child.name}
+                      onOpen={() => onOpenStrategy(child.id)}
+                      meta={<span>{n === 1 ? t('1 Object') : t('{n} Objects', { n })}</span>}
+                      actions={canEdit ? (
+                        <ContentRowAction label={t('Remove {name} from this Strategy', { name: child.name })} onClick={() => void unlinkChild(child.id)}>
+                          <X size={12} />
+                        </ContentRowAction>
+                      ) : undefined} />
+                  );
+                })}
+
+                {childPickerOpen && (
+                  <div className="mt-1">
+                    <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-1">
+                      <Search size={12} className="text-muted-foreground" />
+                      <input
+                        value={childQuery}
+                        onChange={(e) => setChildQuery(e.target.value)}
+                        placeholder={t('Search Strategies…')}
+                        className="flex-1 bg-transparent text-[13px] outline-none"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setChildPickerOpen(false); setChildQuery(''); }}
+                        aria-label={t('Close')}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                    <div className="max-h-72 overflow-auto">
+                      {childCandidates.length === 0 && (
+                        <div className="px-3 py-3 text-[12px] text-muted-foreground">
+                          {t('No Strategies match.')}
+                        </div>
+                      )}
+                      {childCandidates.map((s) => (
+                        <button
+                          type="button"
+                          key={s.id}
+                          disabled={linkingChildId === s.id}
+                          onClick={() => linkChild(s.id)}
+                          className="w-full flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] hover:bg-muted/40 text-left disabled:opacity-50"
+                        >
+                          <NavStrategyIcon size={11} />
+                          <span className="flex-1 truncate text-foreground">{s.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </PageSection>
+            ) : canEdit ? (
+              <ButtonAppearanceProvider appearance="inline">
+                {nestedMenu(
+                  <Button variant="ghost" size="sm" align="start" className="-ml-2 self-start">
+                    <Plus size={13} strokeWidth={2.5} />{t('Add nested Strategy')}
+                  </Button>,
+                )}
+              </ButtonAppearanceProvider>
+            ) : null}
               {/* What the work under these Objects has shipped as code, read
                   against this Strategy's intent. */}
               <InitiativeCodeChanges objects={allObjects.filter((o) => selectedIds.has(o.id))} />
-            </div>
+              {/* What the plan rests on and what was chosen on top of it. */}
+              <WidgetZone zone="main" columns={1} />
+            </InitiativeBoard>
           )}
 
           {tab === 'audit' && (

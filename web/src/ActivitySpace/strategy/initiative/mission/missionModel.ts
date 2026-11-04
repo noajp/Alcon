@@ -1,13 +1,14 @@
 // A Strategy read as a mission: what it is held to (its measures), the
-// actions that serve them (Elements, bound with 'delivers'), the order they
-// run in (depends_on edges) and what they produced (artifacts) — the graph on
-// the Plan tab, the tallies on Execute and Evaluate, and the Planner's draft
-// before anything is written.
+// Objects its work sits in and the Elements that carry it out (bound to the
+// measures with 'delivers'), the order they run in (depends_on edges) and
+// what they produced (artifacts) — the Object and Element columns on the
+// Execution tab, with the Planner's draft laid over them before anything is
+// written, and the tallies on Execution and Evaluate.
 //
 // Pure — hooks/initiativeMissionData.ts reads the rows, the Strategy's
 // tabs draw them; tests/missionModel.test.ts checks this file.
 
-import type { AgentRunStatus } from '@/types/database';
+import type { AgentRunStatus, Worker } from '@/types/database';
 import { measureState, type MeasureState } from '../initiativeMeasureModel';
 
 export interface MissionElementRow {
@@ -21,7 +22,16 @@ export interface MissionElementRow {
   claudeCode?: boolean;
   /** A session holds an unexpired lease on it (Function/shared/element/lease.ts). */
   leased?: boolean;
+  /** Who carries it out: an AI Worker, a person, or nobody yet. */
+  assignee?: 'ai' | 'human' | null;
+  assigneeName?: string | null;
+  /** The Worker itself, for its avatar. */
+  assigneeWorker?: MissionWorker | null;
+  due_date?: string | null;
 }
+
+/** What a card needs of a Worker to draw its avatar. */
+export interface MissionWorker { name?: string | null; type?: Worker['type'] | null; avatar_url?: string | null; ai_model?: string | null }
 
 /** The label that hands an Element to the dev loop's dispatcher. */
 const DISPATCH_LABEL = 'dispatch';
@@ -105,85 +115,171 @@ export function actionState(element: MissionElementRow, run: MissionRunRow | und
   return 'todo';
 }
 
-// ── Graph ──────────────────────────────────────────────────────────────────
+// ── Objects and Elements ─────────────────────────────────────────────────────
 
-export type MissionNodeKind = 'initiative' | 'measure' | 'action' | 'artifact';
-
-export interface MissionNode {
-  id: string;
-  kind: MissionNodeKind;
-  label: string;
-  /** The column it is drawn in, left to right. */
-  column: 0 | 1 | 2 | 3;
-  /** Actions: where they stand. Measures: the reading against the target. */
-  state: ActionState | MeasureState | null;
-  /** True for a node of the Planner's draft, not yet written. */
-  draft?: boolean;
-  /** The Element it opens, for actions. */
-  elementId?: string;
+/** One Element as a card in the Object's column — written, or a task of the
+ *  Planner's draft. */
+export interface FleetElement {
+  /** The Element's id, or `t:<task key>` for a draft task. */
+  key: string;
+  elementId: string | null;
+  title: string;
+  state: ActionState;
+  draft: boolean;
+  assignee: 'ai' | 'human' | null;
+  assigneeName: string | null;
+  assigneeWorker: MissionWorker | null;
+  /** The Element's own status; a draft task is 'todo'. */
+  status: string;
+  dueDate: string | null;
+  /** The measures it delivers, by title. */
+  serves: string[];
+  /** Predecessors not done yet, by title. */
+  waitsOn: string[];
+  /** An AI may start it now: not a person's, not Claude Code's, open, and
+   *  nothing it waits on is unfinished. */
+  ready: boolean;
+  /** Claude Code work waiting to be handed to the dispatcher. */
+  handable: boolean;
+  model: string | null;
+  costUsd: number;
 }
 
-export interface MissionEdge {
-  from: string;
-  to: string;
-  kind: 'serves' | 'depends' | 'produces';
-  draft?: boolean;
+export interface FleetTally { total: number; done: number; running: number; waiting: number; stopped: number }
+
+/** One Object as a card, with the Elements under it. */
+export interface FleetObject {
+  /** The Object's id, or `b:<object key>` for one the draft adds. */
+  key: string;
+  objectId: string | null;
+  name: string;
+  domainId: string | null;
+  draft: boolean;
+  elements: FleetElement[];
+  tally: FleetTally;
+  /** The state that most needs a look: stopped, then waiting, running, open, done. */
+  state: ActionState;
+  costUsd: number;
 }
 
-export interface MissionGraph { nodes: MissionNode[]; edges: MissionEdge[] }
+export interface FleetObjectRow { id: string; name: string; domain_id: string | null }
 
-/** The node id of the Strategy itself; actions serving no measure hang off it. */
-const ROOT = 'initiative';
+const roundCost = (n: number) => Math.round(n * 100) / 100;
 
-/** Pure. The mission as it stands: measures, the Elements under the
- *  Strategy's Objects, what each serves, what each waits on, what each made. */
-export function buildMissionGraph(input: {
-  initiativeName: string;
-  measures: readonly MissionMeasureRow[];
+/** What needs a look comes first: stopped, waiting on a person, running, not
+ *  started, then finished. */
+const CARD_ORDER: Record<ActionState, number> = { failed: 0, blocked: 0, waiting: 1, running: 2, todo: 3, done: 4, cancelled: 5 };
+
+function tallyOf(elements: readonly FleetElement[]): FleetTally {
+  const live = elements.filter((e) => e.state !== 'cancelled');
+  return {
+    total: live.length,
+    done: live.filter((e) => e.state === 'done').length,
+    running: live.filter((e) => e.state === 'running').length,
+    waiting: live.filter((e) => e.state === 'waiting').length,
+    stopped: live.filter((e) => e.state === 'blocked' || e.state === 'failed').length,
+  };
+}
+
+function objectState(t: FleetTally, elements: readonly FleetElement[]): ActionState {
+  if (t.stopped) return elements.some((e) => e.state === 'failed') ? 'failed' : 'blocked';
+  if (t.waiting) return 'waiting';
+  if (t.running) return 'running';
+  if (t.total > 0 && t.done === t.total) return 'done';
+  return 'todo';
+}
+
+function withTally(o: Omit<FleetObject, 'tally' | 'state' | 'costUsd'>): FleetObject {
+  const tally = tallyOf(o.elements);
+  return { ...o, tally, state: objectState(tally, o.elements), costUsd: roundCost(o.elements.reduce((n, e) => n + e.costUsd, 0)) };
+}
+
+/** Pure. The Strategy's Objects in their order, each with its Elements —
+ *  what needs a look first — and where each stands, who carries it out, what it delivers, what it waits on, and
+ *  whether an AI may start it now. */
+export function buildFleet(input: {
+  objects: readonly FleetObjectRow[];
   elements: readonly MissionElementRow[];
+  measures: readonly MissionMeasureRow[];
   bindings: readonly MissionBindingRow[];
   edges: readonly MissionEdgeRow[];
   runs: readonly MissionRunRow[];
-  artifacts: readonly MissionArtifactRow[];
-}): MissionGraph {
-  const nodes: MissionNode[] = [{ id: ROOT, kind: 'initiative', label: input.initiativeName, column: 0, state: null }];
-  const edges: MissionEdge[] = [];
-  const measureIds = new Set(input.measures.map((m) => m.id));
-  for (const m of input.measures) {
-    nodes.push({
-      id: `m:${m.id}`, kind: 'measure', label: m.title, column: 1,
-      state: measureStateOf(m),
-    });
-    edges.push({ from: ROOT, to: `m:${m.id}`, kind: 'serves' });
-  }
-  const runs = latestRuns(input.runs);
-  const elementIds = new Set(input.elements.map((e) => e.id));
-  const served = new Map<string, string[]>();
+}): FleetObject[] {
+  const latest = latestRuns(input.runs);
+  const costs = new Map<string, number>();
+  for (const r of input.runs) costs.set(r.element_id, (costs.get(r.element_id) ?? 0) + Number(r.cost_usd || 0));
+  const state = new Map(input.elements.map((e) => [e.id, actionState(e, latest.get(e.id))]));
+  const title = new Map(input.elements.map((e) => [e.id, e.display_id ? `${e.display_id} ${e.title}` : e.title]));
+  const measureTitle = new Map(input.measures.map((m) => [m.id, m.title]));
+  const serves = new Map<string, string[]>();
   for (const b of input.bindings) {
     if (b.target_type !== 'element' || b.relationship_type !== 'delivers') continue;
-    if (!measureIds.has(b.intent_id) || !elementIds.has(b.target_id)) continue;
-    served.set(b.target_id, [...(served.get(b.target_id) ?? []), b.intent_id]);
+    const m = measureTitle.get(b.intent_id);
+    if (m) serves.set(b.target_id, [...(serves.get(b.target_id) ?? []), m]);
   }
-  for (const e of input.elements) {
-    nodes.push({
-      id: `e:${e.id}`, kind: 'action', label: e.display_id ? `${e.display_id} ${e.title}` : e.title, column: 2,
-      state: actionState(e, runs.get(e.id)), elementId: e.id,
-    });
-    const targets = served.get(e.id);
-    if (targets?.length) for (const t of targets) edges.push({ from: `m:${t}`, to: `e:${e.id}`, kind: 'serves' });
-    else edges.push({ from: ROOT, to: `e:${e.id}`, kind: 'serves' });
-  }
+  const upstream = new Map<string, string[]>();
   for (const d of input.edges) {
-    if (elementIds.has(d.from_element) && elementIds.has(d.to_element)) {
-      edges.push({ from: `e:${d.from_element}`, to: `e:${d.to_element}`, kind: 'depends' });
-    }
+    if (state.has(d.from_element)) upstream.set(d.to_element, [...(upstream.get(d.to_element) ?? []), d.from_element]);
   }
-  for (const a of input.artifacts) {
-    if (!elementIds.has(a.element_id)) continue;
-    nodes.push({ id: `a:${a.id}`, kind: 'artifact', label: a.title, column: 3, state: null });
-    edges.push({ from: `e:${a.element_id}`, to: `a:${a.id}`, kind: 'produces' });
+  const card = (e: MissionElementRow): FleetElement => {
+    const s = state.get(e.id)!;
+    const waitsOn = (upstream.get(e.id) ?? []).filter((u) => state.get(u) !== 'done' && state.get(u) !== 'cancelled').map((u) => title.get(u)!);
+    const open = s === 'todo' || s === 'failed';
+    const run = latest.get(e.id);
+    return {
+      key: e.id, elementId: e.id, title: title.get(e.id)!, state: s, draft: false,
+      assignee: e.assignee ?? null, assigneeName: e.assigneeName ?? null, assigneeWorker: e.assigneeWorker ?? null,
+      status: e.status ?? 'todo', dueDate: e.due_date ?? null,
+      serves: serves.get(e.id) ?? [], waitsOn,
+      ready: open && !e.claudeCode && e.assignee !== 'human' && waitsOn.length === 0,
+      handable: !!e.claudeCode && s === 'todo' && !isHandedOver(e),
+      model: run?.model ?? null, costUsd: roundCost(costs.get(e.id) ?? 0),
+    };
+  };
+  return input.objects.map((o) => withTally({
+    key: o.id, objectId: o.id, name: o.name, domainId: o.domain_id, draft: false,
+    elements: input.elements.filter((e) => e.object_id === o.id).map(card)
+      .map((c, i) => ({ c, i }))
+      .sort((x, y) => CARD_ORDER[x.c.state] - CARD_ORDER[y.c.state] || x.i - y.i)
+      .map(({ c }) => c),
+  }));
+}
+
+/** The key of the column that holds draft tasks the Planner put in no Object. */
+export const UNPLACED = 'b:';
+
+/** Pure. The draft laid over the Objects as they stand: its tasks join the
+ *  Objects they name (dashed), the Objects it adds follow (dashed), and tasks
+ *  it put nowhere gather in one column for the person to place. */
+export function draftFleet(current: readonly FleetObject[], measures: readonly MissionMeasureRow[], draft: PlanDraft): FleetObject[] {
+  const objectiveTitle = new Map(draft.objectives.map((o) => [
+    o.key, (o.measureId && measures.find((m) => m.id === o.measureId)?.title) || o.title,
+  ]));
+  const taskTitle = new Map(draft.tasks.map((t) => [t.key, t.title]));
+  const columnOf = new Map<string, string>();
+  for (const o of draft.objects) columnOf.set(o.key, o.objectId && current.some((c) => c.objectId === o.objectId) ? o.objectId : `b:${o.key}`);
+  const added = new Map<string, FleetElement[]>();
+  for (const t of draft.tasks) {
+    const column = (t.object && columnOf.get(t.object)) || UNPLACED;
+    const objective = t.objective ? objectiveTitle.get(t.objective) : undefined;
+    added.set(column, [...(added.get(column) ?? []), {
+      key: `t:${t.key}`, elementId: null, title: t.title, state: 'todo', draft: true,
+      assignee: t.assignee, assigneeName: null, assigneeWorker: null, status: 'todo', dueDate: null,
+      serves: objective ? [objective] : [],
+      waitsOn: t.dependsOn.map((d) => taskTitle.get(d)!).filter(Boolean),
+      ready: false, handable: false, model: null, costUsd: 0,
+    }]);
   }
-  return { nodes, edges };
+  const out = current.map((o) => (added.has(o.key) ? withTally({ ...o, elements: [...o.elements, ...added.get(o.key)!] }) : o));
+  for (const o of draft.objects) {
+    const key = columnOf.get(o.key)!;
+    if (!key.startsWith('b:') || out.some((x) => x.key === key)) continue;
+    out.push(withTally({ key, objectId: null, name: o.name, domainId: o.domainId, draft: true, elements: added.get(key) ?? [] }));
+  }
+  if (added.has(UNPLACED)) {
+    out.push(withTally({ key: UNPLACED, objectId: null, name: '', domainId: null, draft: true, elements: added.get(UNPLACED)! }));
+  }
+  return out;
 }
 
 // ── Tallies ────────────────────────────────────────────────────────────────
@@ -270,23 +366,40 @@ export interface PlanObjective {
   measureId: string | null;
 }
 
+/** An Object the draft puts work in: one of the Strategy's, or a new one. */
+export interface PlanObject {
+  key: string;
+  /** One of the Strategy's Objects; null for a new one. */
+  objectId: string | null;
+  name: string;
+  /** Where a new Object goes; null when the Planner named no Domain the Space has. */
+  domainId: string | null;
+}
+
 export interface PlanTask {
   key: string;
   title: string;
   description: string;
   objective: string | null;
+  /** The key of the Object it goes into; null when the Planner placed it nowhere. */
+  object: string | null;
   dependsOn: string[];
   assignee: 'ai' | 'human';
 }
 
-export interface PlanDraft { summary: string; objectives: PlanObjective[]; tasks: PlanTask[] }
+export interface PlanDraft { summary: string; objectives: PlanObjective[]; objects: PlanObject[]; tasks: PlanTask[] }
 
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
 /** Pure. The Planner's answer as the screen may use it: keys unique, every
  *  reference pointing at something in the draft, measure ids only ones this
- *  Strategy has, dependencies without cycles. Anything else is dropped. */
-export function normalizePlan(raw: unknown, measureIds: ReadonlySet<string>): PlanDraft {
+ *  Strategy has, Object ids only its Objects, Domain ids only the Space's,
+ *  dependencies without cycles. Anything else is dropped. */
+export function normalizePlan(
+  raw: unknown,
+  measureIds: ReadonlySet<string>,
+  known: { objects?: ReadonlyMap<string, string>; domainIds?: ReadonlySet<string> } = {},
+): PlanDraft {
   const r = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
   const objectives: PlanObjective[] = [];
   const objectiveKeys = new Set<string>();
@@ -299,6 +412,27 @@ export function normalizePlan(raw: unknown, measureIds: ReadonlySet<string>): Pl
     objectiveKeys.add(key);
     objectives.push({ key, title, measureId });
   }
+  const objects: PlanObject[] = [];
+  // Two keys for one existing Object read as the first.
+  const objectKey = new Map<string, string>();
+  for (const o of Array.isArray(r.objects) ? r.objects : []) {
+    const x = o && typeof o === 'object' ? o as Record<string, unknown> : {};
+    const key = text(x.key, 40);
+    if (!key || objectKey.has(key)) continue;
+    const objectId = typeof x.objectId === 'string' && known.objects?.has(x.objectId) ? x.objectId : null;
+    if (objectId) {
+      const first = objects.find((b) => b.objectId === objectId);
+      if (first) { objectKey.set(key, first.key); continue; }
+      objectKey.set(key, key);
+      objects.push({ key, objectId, name: known.objects!.get(objectId)!, domainId: null });
+      continue;
+    }
+    const name = text(x.name, 200);
+    if (!name) continue;
+    const domainId = typeof x.domainId === 'string' && known.domainIds?.has(x.domainId) ? x.domainId : null;
+    objectKey.set(key, key);
+    objects.push({ key, objectId: null, name, domainId });
+  }
   const tasks: PlanTask[] = [];
   const taskKeys = new Set<string>();
   for (const t of Array.isArray(r.tasks) ? r.tasks : []) {
@@ -308,9 +442,10 @@ export function normalizePlan(raw: unknown, measureIds: ReadonlySet<string>): Pl
     if (!key || !title || taskKeys.has(key)) continue;
     taskKeys.add(key);
     const objective = typeof x.objective === 'string' && objectiveKeys.has(x.objective) ? x.objective : null;
+    const object = typeof x.object === 'string' ? objectKey.get(x.object) ?? null : null;
     const dependsOn = (Array.isArray(x.dependsOn) ? x.dependsOn : []).filter((d): d is string => typeof d === 'string');
     tasks.push({
-      key, title, description: text(x.description, 4000), objective, dependsOn,
+      key, title, description: text(x.description, 4000), objective, object, dependsOn,
       assignee: x.assignee === 'human' ? 'human' : 'ai',
     });
     if (tasks.length >= 30) break;
@@ -322,31 +457,36 @@ export function normalizePlan(raw: unknown, measureIds: ReadonlySet<string>): Pl
     t.dependsOn = [...new Set(t.dependsOn)].filter((d) => seen.has(d));
     seen.add(t.key);
   }
-  return { summary: text(r.summary, 1000), objectives, tasks };
+  // An Object no task went into adds nothing.
+  const used = new Set(tasks.map((t) => t.object));
+  return { summary: text(r.summary, 1000), objectives, objects: objects.filter((o) => used.has(o.key)), tasks };
 }
 
-/** Pure. The draft drawn on the same graph, its nodes marked as draft. */
-export function draftGraph(initiativeName: string, measures: readonly MissionMeasureRow[], draft: PlanDraft): MissionGraph {
-  const nodes: MissionNode[] = [{ id: ROOT, kind: 'initiative', label: initiativeName, column: 0, state: null }];
-  const edges: MissionEdge[] = [];
-  const objectiveNode = new Map<string, string>();
-  for (const o of draft.objectives) {
-    const existing = o.measureId ? measures.find((m) => m.id === o.measureId) : undefined;
-    const id = existing ? `m:${existing.id}` : `o:${o.key}`;
-    objectiveNode.set(o.key, id);
-    if (nodes.some((n) => n.id === id)) continue;
-    nodes.push({
-      id, kind: 'measure', label: existing?.title ?? o.title, column: 1,
-      state: existing ? measureStateOf(existing) : null,
-      draft: !existing,
-    });
-    edges.push({ from: ROOT, to: id, kind: 'serves', draft: !existing });
+/** Pure. The draft's tasks that an AI may start as soon as they are written:
+ *  an AI's, and waiting on nothing. */
+export function startableTasks(draft: PlanDraft): string[] {
+  return draft.tasks.filter((t) => t.assignee === 'ai' && t.dependsOn.length === 0).map((t) => t.key);
+}
+
+/** Pure. The draft with one task moved to another Object column: one of the
+ *  Strategy's Objects (`objectId`), an Object the draft adds (`draftKey`), or
+ *  none (both null — it waits to be placed). An Object of the Strategy the
+ *  draft did not use yet joins its Objects. */
+export function moveDraftTask(draft: PlanDraft, taskKey: string, to: { objectId: string | null; name?: string; draftKey: string | null }): PlanDraft {
+  let objects = draft.objects;
+  let target: string | null = to.draftKey;
+  if (to.objectId) {
+    const known = objects.find((o) => o.objectId === to.objectId);
+    if (known) target = known.key;
+    else {
+      let key = `x${objects.length + 1}`;
+      while (objects.some((o) => o.key === key)) key = `${key}_`;
+      objects = [...objects, { key, objectId: to.objectId, name: to.name ?? '', domainId: null }];
+      target = key;
+    }
   }
-  for (const t of draft.tasks) {
-    nodes.push({ id: `t:${t.key}`, kind: 'action', label: t.title, column: 2, state: 'todo', draft: true });
-    const parent = (t.objective && objectiveNode.get(t.objective)) || ROOT;
-    edges.push({ from: parent, to: `t:${t.key}`, kind: 'serves', draft: true });
-    for (const d of t.dependsOn) edges.push({ from: `t:${d}`, to: `t:${t.key}`, kind: 'depends', draft: true });
-  }
-  return { nodes, edges };
+  const tasks = draft.tasks.map((t) => (t.key === taskKey ? { ...t, object: target } : t));
+  // An Object the draft adds keeps its column only while work is in it.
+  const used = new Set(tasks.map((t) => t.object));
+  return { ...draft, objects: objects.filter((o) => o.objectId || used.has(o.key)), tasks };
 }
