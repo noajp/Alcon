@@ -58,3 +58,19 @@ ALCON_RELAY=https://<project>.supabase.co/functions/v1/asset-relay ALCON_SPACE=<
 - ブラウザは専用のプロフィール（`~/.alcon/browser`）で開き、画面に見えるので AI の操作を見守れる。普段の Chrome のログインは共有しない。AI に見せたいサイトだけ、そのウィンドウでログインする
 - 既定は読み取りのみ。フォームを送る画面遷移は止める。`--allow-writes` で外す。`--headless` で画面を出さない
 - トークンとプロフィールは `~/.alcon/`（`ALCON_HOME` で変更）。止めるときは Ctrl+C、Alcon 側で Revoke すると次の呼び出しで止まる
+
+### 使い捨ての仮想マシンで動かす（シェル・ファイルも使える）
+
+Vercel Sandbox のような使い捨ての仮想マシンの中では、`--isolated --shell` を付けて起動する。AI はブラウザに加えて、コマンドの実行（`vm_shell`、1 回 40 秒まで、長い処理は裏に回す）とファイルの読み書き（`vm_write_file` / `vm_read_file`）を使える。手元の PC では付けない。
+
+```bash
+vercel sandbox create --name alcon-vm-1 --timeout 45m --region hnd1
+vercel sandbox copy sdk/node/runner/alcon-runner.mjs alcon-vm-1:/vercel/sandbox/runner/alcon-runner.mjs
+vercel sandbox copy sdk/node/runner/package.json alcon-vm-1:/vercel/sandbox/runner/package.json
+vercel sandbox exec alcon-vm-1 -- bash -lc "cd /vercel/sandbox/runner && npm install && sudo PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64 npx playwright-core install --with-deps chromium && PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64 npx playwright-core install chromium"
+vercel sandbox exec alcon-vm-1 -- bash -lc "cd /vercel/sandbox/runner && ALCON_HOME=/vercel/sandbox/.alcon ALCON_WORKDIR=/vercel/sandbox/work ALCON_RELAY=… ALCON_SPACE=… nohup node alcon-runner.mjs --browser chromium --headless --isolated --shell > /vercel/sandbox/runner.log 2>&1 &"
+```
+
+- `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE` は、Playwright 1.56 が Ubuntu 26.04 をまだ知らないための指定
+- 仮想マシンが止まるとプロセスも止まる（ファイルは残る）。再開したら最後のコマンドで起動し直す
+- AI がシェルを使えるのは `isolated` と申告し、承諾された実行役だけ

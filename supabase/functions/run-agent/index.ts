@@ -45,8 +45,9 @@ import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
 import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
+import { commandSchema, offeredCommands, parseManifest, permissionOf, requestFor, type Manifest, type ManifestCommand } from "../_shared/connectorManifest.ts";
 import { checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
-import { isRunnerTool, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
+import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
 import {
   runLoop, appendDecisionResults, canonicalCalls,
   type LoopState, type ToolCall, type ToolKind, type ToolResult, type PendingApproval, type FinishPayload, type Msg,
@@ -107,10 +108,15 @@ type Run = {
  * http_request. `drive` marks the Google Drive tools, which run through
  * runDriveTool with `secret` as the access token.
  */
-interface IntegrationTool { integration: IntegrationRow; remote: RemoteTool | null; secret: string | null; session: McpSession | null; drive?: boolean }
+interface IntegrationTool {
+  integration: IntegrationRow; remote: RemoteTool | null; secret: string | null; session: McpSession | null; drive?: boolean;
+  /** The declared command this tool is, when the integration has a manifest. */
+  command?: ManifestCommand; manifest?: Manifest;
+}
 
 /** The operation an integration call shows on the approval card and in the log. */
 function operationOf(it: IntegrationTool | undefined, input: Record<string, unknown>): string {
+  if (it?.command) return it.command.action;
   if (it?.drive && it.remote) return driveOperationLabel(it.remote.name, input);
   if (it?.remote) return it.remote.name;
   return `${input.method ?? ""} ${input.path ?? ""}`.trim();
@@ -395,10 +401,19 @@ async function execute(a: ExecArgs): Promise<void> {
   const integrationSummary: TaskContext["integrations"] = [];
   if (run.activity_space_id) {
     const { data: rows } = await userDb.from("integrations")
-      .select("id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled")
+      .select("id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled, manifest, guide")
       .eq("activity_space_id", run.activity_space_id).eq("enabled", true).in("kind", ["mcp", "http"]).order("created_at");
-    for (const row of (rows ?? []) as (IntegrationRow & { enabled: boolean })[]) {
+    for (const row of (rows ?? []) as (IntegrationRow & { enabled: boolean; manifest: unknown; guide: string | null })[]) {
       if (!isSafeEndpoint(row.endpoint)) continue;
+      // A manifest declares what the integration may be asked to do. One that
+      // declares nothing usable closes the integration rather than opening it.
+      let manifest: Manifest | null = null;
+      if (row.manifest != null && !isGoogleDriveRow(row)) {
+        const parsed = parseManifest(row.manifest);
+        if (parsed.errors.length) await addStep(admin, run.id, "error", `連携「${row.name}」の manifest に読めない所があります`, parsed.errors.join("\n"));
+        if (offeredCommands(parsed.manifest).length === 0) continue;
+        manifest = parsed.manifest;
+      }
       // Never Alcon itself: the board tools already act as the starter, and a
       // stored token would act outside this run.
       if (pointsAtAlcon(row.endpoint, Deno.env.get("SUPABASE_URL"))) {
@@ -432,13 +447,29 @@ async function execute(a: ExecArgs): Promise<void> {
           const session = new McpSession(row, secret);
           await session.initialize();
           const tools = await session.listTools();
+          // With a manifest, only the MCP tools it declares, under its commands' names and permissions.
+          const declared = manifest ? offeredCommands(manifest).filter((c) => c.mcp) : null;
+          let offered = 0;
           for (const t of tools) {
             if (integrationDefs.length >= MAX_TOOLS) break;
-            const name = uniqueToolName(`${prefix}${INTEGRATION_SEPARATOR}${t.name}`, integrationTools);
-            integrationTools.set(name, { integration: row, remote: t, secret, session });
-            integrationDefs.push({ name, description: `[${row.name}] ${t.description}`.slice(0, 1024), input_schema: t.inputSchema });
+            const command = declared?.find((c) => c.mcp === t.name);
+            if (declared && !command) continue;
+            const name = uniqueToolName(`${prefix}${INTEGRATION_SEPARATOR}${command?.name ?? t.name}`, integrationTools);
+            integrationTools.set(name, { integration: row, remote: t, secret, session, ...(command ? { command, manifest: manifest! } : {}) });
+            integrationDefs.push({ name, description: `[${row.name}] ${command?.description || t.description}`.slice(0, 1024), input_schema: t.inputSchema });
+            offered++;
           }
-          integrationSummary.push({ name: row.name, kind: "MCP", delegation: row.delegation, tools: tools.length });
+          integrationSummary.push({ name: row.name, kind: "MCP", delegation: row.delegation, tools: offered, declared: !!manifest, guide: row.guide });
+        } else if (manifest) {
+          // An API with a manifest: its declared commands, never a raw request.
+          const commands = offeredCommands(manifest).filter((c) => c.http);
+          for (const c of commands) {
+            if (integrationDefs.length >= MAX_TOOLS) break;
+            const name = uniqueToolName(`${prefix}${INTEGRATION_SEPARATOR}${c.name}`, integrationTools);
+            integrationTools.set(name, { integration: row, remote: null, secret, session: null, command: c, manifest });
+            integrationDefs.push({ name, description: `[${row.name}] ${c.description || c.action}（${c.effect === "read" ? "読み取り" : "書き込み"}）`.slice(0, 1024), input_schema: commandSchema(c) });
+          }
+          integrationSummary.push({ name: row.name, kind: "API", delegation: row.delegation, tools: commands.length, declared: true, guide: row.guide });
         } else {
           const name = `${prefix}${INTEGRATION_SEPARATOR}http_request`;
           integrationTools.set(name, { integration: row, remote: null, secret, session: null });
@@ -466,19 +497,24 @@ async function execute(a: ExecArgs): Promise<void> {
     : { data: [] };
   const runner = pickRunner((runnerRows ?? []) as RunnerRow[], Date.now());
   if (runner) integrationSummary.push({ name: `この人の PC のブラウザ（${runner.name}）`, kind: "PC", delegation: "read_only", tools: RUNNER_TOOLS.length });
+  // A disposable machine of theirs, when one is on: commands and files there.
+  const machine = pickRunner((runnerRows ?? []) as RunnerRow[], Date.now(), "shell");
+  if (machine) integrationSummary.push({ name: `使い捨ての仮想マシン（${machine.name}）`, kind: "VM", delegation: "full_delegation", tools: MACHINE_TOOLS.length });
 
-  const liveTools: ToolDef[] = [...baseAgentTools(), ...(parsed?.metric ? [ROUND_TOOL] : []), ...(runner ? RUNNER_TOOLS : []), ...integrationDefs];
+  const liveTools: ToolDef[] = [...baseAgentTools(), ...(parsed?.metric ? [ROUND_TOOL] : []), ...(runner ? RUNNER_TOOLS : []), ...(machine ? MACHINE_TOOLS : []), ...integrationDefs];
   const tools: ToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : liveTools;
   const kindOf = (name: string): ToolKind => {
     const base = baseKindOf(name);
     if (base) return base;
-    // The runner only reads unless its owner started it to write.
-    if (isRunnerTool(name)) return "read";
+    // The runner only reads unless its owner started it to write; a
+    // disposable machine changes nothing outside itself.
+    if (isRunnerTool(name) || isMachineTool(name)) return "read";
     return "write"; // decided per call below
   };
   const isRead = (call: ToolCall): boolean => {
     const it = integrationTools.get(call.name);
     if (!it) return false;
+    if (it.command) return it.command.effect === "read";
     return it.remote ? it.remote.readOnly : httpIsRead(call.input);
   };
 
@@ -494,11 +530,18 @@ async function execute(a: ExecArgs): Promise<void> {
   const callIntegration = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
     const it = integrationTools.get(call.name);
     if (!it) return { content: "Unknown tool.", is_error: true };
+    // A declared API command becomes exactly the request its manifest maps it to.
+    let httpInput: Record<string, unknown> = call.input;
+    if (it.command?.http) {
+      const req = requestFor(it.command, call.input);
+      if ("error" in req) return { content: req.error, is_error: true };
+      httpInput = req;
+    }
     const r = it.drive && it.remote
       ? await runDriveTool(it.remote.name, call.input, it.secret ?? "")
       : it.remote && it.session
         ? await it.session.callTool(it.remote.name, call.input)
-        : await callHttp(it.integration, it.secret, call.input);
+        : await callHttp(it.integration, it.secret, httpInput);
     if (!r.isError && isGithubRow(it.integration) && it.remote && /^(create|update)_pull_request$/i.test(it.remote.name)) {
       await linkOpenedPulls(r.text, it.secret);
     }
@@ -526,11 +569,11 @@ async function execute(a: ExecArgs): Promise<void> {
 
   // A call to the person's PC: queued for its runner, answered within a
   // minute or given up (the runner may have gone offline since).
-  const callRunner = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
-    if (!runner) return { content: "この人の PC のブラウザは今つながっていません。Web 検索で進めるか、つながっていないことを報告してください。", is_error: true };
+  const callRunner = async (call: ToolCall, target: RunnerRow | null, read: (result: unknown) => string): Promise<{ content: string; is_error?: boolean }> => {
+    if (!target) return { content: "この道具の実行役は今つながっていません。ほかの道具で進めるか、つながっていないことを報告してください。", is_error: true };
     await addStep(admin, run.id, "action", runnerStep(call.name, call.input));
     const { data: queued, error } = await admin.from("asset_calls")
-      .insert({ asset_id: runner.id, run_id: run.id, tool: runnerOperation(call.name), input: call.input }).select("id").single();
+      .insert({ asset_id: target.id, run_id: run.id, tool: runnerOperation(call.name), input: call.input }).select("id").single();
     if (error || !queued) return { content: `PC に依頼できませんでした: ${error?.message ?? "unknown"}`, is_error: true };
     // A page takes seconds; the slice's soft deadline may be near, but an
     // answer thrown away costs the runner's work, so wait it out (within the
@@ -539,7 +582,7 @@ async function execute(a: ExecArgs): Promise<void> {
     while (Date.now() < until) {
       await new Promise((r) => setTimeout(r, 700));
       const { data: c } = await admin.from("asset_calls").select("status, result, error").eq("id", queued.id).maybeSingle();
-      if (c?.status === "done") return { content: runnerResultText(c.result) };
+      if (c?.status === "done") return { content: read(c.result) };
       if (c?.status === "failed") return { content: `PC のブラウザで失敗しました: ${c.error ?? ""}`, is_error: true };
     }
     await admin.from("asset_calls").update({ status: "expired", finished_at: new Date().toISOString() }).eq("id", queued.id).in("status", ["pending", "claimed"]);
@@ -620,7 +663,8 @@ async function execute(a: ExecArgs): Promise<void> {
         return { content: "完了報告を受け取りました。", finish };
       }
     }
-    if (isRunnerTool(call.name)) return await callRunner(call);
+    if (isRunnerTool(call.name)) return await callRunner(call, runner, runnerResultText);
+    if (isMachineTool(call.name)) return await callRunner(call, machine, machineResultText);
     if (baseKindOf(call.name) === "board") {
       const r = isStrategyTool(call.name) ? await runStrategyTool(userDb, call.name, input) : await runBoardTool(userDb, call.name, input, actor);
       await addStep(admin, run.id, "action", `Alcon: ${call.name}`, r.ok ? null : r.error);
@@ -861,8 +905,13 @@ async function execute(a: ExecArgs): Promise<void> {
     kindOf,
     needsApproval: (call) => {
       if (kindOf(call.name) !== "write") return false;
-      if (isRead(call)) return false;
       const it = integrationTools.get(call.name);
+      // A declared command's own permission decides; a full delegation lifts "ask" only.
+      if (it?.command && it.manifest) {
+        const permission = permissionOf(it.manifest, it.command.action);
+        return permission === "ask" && it.integration.delegation !== "full_delegation";
+      }
+      if (isRead(call)) return false;
       return !it || it.integration.delegation !== "full_delegation";
     },
     execute: (call) => executeCall(call),

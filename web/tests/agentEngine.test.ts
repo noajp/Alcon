@@ -244,6 +244,17 @@ describe('PC runner', () => {
     expect(runner.pickRunner([row('off', ['browser'], 600)], now)).toBeNull();
   });
 
+  it('gives a shell only to an isolated runner', () => {
+    const vm = { id: 'vm', name: 'vm', manifest: { capabilities: ['browser', 'shell', 'files'], isolated: true }, last_seen_at: new Date(now - 5000).toISOString() };
+    const pcWithShell = { id: 'pc', name: 'pc', manifest: { capabilities: ['browser', 'shell'] }, last_seen_at: new Date(now - 1000).toISOString() };
+    expect(runner.pickRunner([vm, pcWithShell], now, 'shell')?.id).toBe('vm');
+    expect(runner.pickRunner([pcWithShell], now, 'shell')).toBeNull();
+    expect(runner.pickRunner([vm, pcWithShell], now, 'browser')?.id).toBe('pc');
+    expect(runner.runnerOperation('vm_shell')).toBe('shell');
+    expect(runner.isMachineTool('vm_write_file')).toBe(true);
+    expect(runner.machineResultText({ exit_code: 0, stdout: 'hi', stderr: '' })).toBe('exit 0\n--- stdout\nhi');
+  });
+
   it('names the runner\'s operation, logs the call and reads the answer', () => {
     expect(runner.runnerOperation('pc_open')).toBe('open');
     expect(runner.isRunnerTool('pc_click')).toBe(true);
