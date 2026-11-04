@@ -57,43 +57,28 @@ export const HOME_BOARD: BoardLayout = {
 };
 
 /**
- * Strategy detail, Overview tab: how it is going. The summary line under
- * the name, then whether it lands (Situation), where it hurts (Risk), and the
- * conditions it is held to with the frameworks that read them back.
+ * Strategy detail, Overview tab: what it aims for and how it wins — the
+ * Strategy's own record. How far along it is, then the conditions it is
+ * judged on, what it stands on, and what was decided. The nested Strategies
+ * sit above these, drawn by the page.
  */
 export const INITIATIVE_BOARD: BoardLayout = {
-  // The summary line under the name: how much of the work under it is done,
-  // and what is still open or late.
   band: [{ id: 'initiative-progress', type: 'progress-band' }],
   main: [
-    // Situation before Risk: whether it lands is the question someone opened
-    // the page with; where it hurts is only actionable once that is known.
-    { id: 'cmp-situation', type: 'campaign-situation' },
-    { id: 'cmp-risk', type: 'campaign-risk' },
     { id: 'cmp-measures', type: 'campaign-measures' },
-    // The frameworks read those same measures back — OKR as a cascade of
-    // Objectives, Gap as the distance to each condition — so they sit under
-    // the section that records them.
-    { id: 'cmp-okr', type: 'framework-okr' },
-    { id: 'cmp-gap', type: 'framework-gap' },
-    { id: 'initiative-domains', type: 'initiative-domains' },
+    { id: 'cmp-assumptions', type: 'campaign-assumptions' },
+    { id: 'cmp-decisions', type: 'campaign-decisions' },
   ],
   rail: [],
 };
 
 /**
- * Strategy detail, Execution tab: what the plan rests on and what was chosen on
- * top of it — the sections written by hand that outlive the people who wrote
- * them, with the approaches they draw on.
+ * Strategy detail, Execution tab: the work carrying it out. The Objects and
+ * the AI's runs are drawn by the page; under them, where that work hurts.
  */
 export const INITIATIVE_PLAN_BOARD: BoardLayout = {
   band: [],
-  main: [
-    { id: 'initiative-approaches', type: 'approach-references' },
-    { id: 'cmp-assumptions', type: 'campaign-assumptions' },
-    { id: 'cmp-decisions', type: 'campaign-decisions' },
-    { id: 'cmp-decision-lab', type: 'decision-lab' },
-  ],
+  main: [{ id: 'cmp-risk', type: 'campaign-risk' }],
   rail: [],
 };
 
