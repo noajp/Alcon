@@ -96,12 +96,14 @@ export function runnerResultText(result: unknown): string {
     `URL: ${String(r.url ?? "")}`,
     `タイトル: ${String(r.title ?? "")}`,
     "",
-    String(r.text ?? "").slice(0, 14_000),
+    // Pages are long and stay in the context for the rest of the run: keep
+    // what an agent reads per page modest.
+    String(r.text ?? "").slice(0, 8_000),
   ];
   if (links.length) {
     lines.push("", "# リンク");
-    for (const l of links.slice(0, 120)) lines.push(`- ${String(l.text ?? "").slice(0, 80)} → ${String(l.href ?? "")}`);
+    for (const l of links.slice(0, 80)) lines.push(`- ${String(l.text ?? "").slice(0, 80)} → ${String(l.href ?? "")}`);
   }
   if (r.note) lines.push("", `注: ${String(r.note)}`);
-  return lines.join("\n").slice(0, 20_000);
+  return lines.join("\n").slice(0, 12_000);
 }

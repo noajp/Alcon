@@ -104,7 +104,9 @@ async function browser() {
       await context.route('**/*', (route) => {
         const req = route.request();
         if (req.isNavigationRequest() && req.method() !== 'GET' && req.method() !== 'HEAD') {
-          log(`Stopped a ${req.method()} to ${req.url()} (read-only)`);
+          // Only the page's own submissions are worth a line; trackers in
+          // hidden frames are stopped quietly.
+          if (req.frame() === req.frame().page()?.mainFrame()) log(`Stopped a ${req.method()} to ${req.url()} (read-only)`);
           return route.abort('blockedbyclient');
         }
         return route.continue();

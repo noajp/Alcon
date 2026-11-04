@@ -518,7 +518,10 @@ async function execute(a: ExecArgs): Promise<void> {
     const { data: queued, error } = await admin.from("asset_calls")
       .insert({ asset_id: runner.id, run_id: run.id, tool: runnerOperation(call.name), input: call.input }).select("id").single();
     if (error || !queued) return { content: `PC に依頼できませんでした: ${error?.message ?? "unknown"}`, is_error: true };
-    const until = Math.min(Date.now() + 60_000, deadline - 5_000);
+    // A page takes seconds; the slice's soft deadline may be near, but an
+    // answer thrown away costs the runner's work, so wait it out (within the
+    // platform's wall clock, which the slice deadline leaves room under).
+    const until = Date.now() + 45_000;
     while (Date.now() < until) {
       await new Promise((r) => setTimeout(r, 700));
       const { data: c } = await admin.from("asset_calls").select("status, result, error").eq("id", queued.id).maybeSingle();
