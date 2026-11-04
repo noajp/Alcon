@@ -354,6 +354,42 @@ export type Database = {
           },
         ]
       }
+      agent_table_reads: {
+        Row: {
+          element_id: string
+          read_at: string
+          run_id: string | null
+          table_id: string
+        }
+        Insert: {
+          element_id: string
+          read_at?: string
+          run_id?: string | null
+          table_id: string
+        }
+        Update: {
+          element_id?: string
+          read_at?: string
+          run_id?: string | null
+          table_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_table_reads_element_id_fkey"
+            columns: ["element_id"]
+            isOneToOne: false
+            referencedRelation: "elements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_table_reads_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_folders: {
         Row: {
           activity_space_id: string
@@ -2223,6 +2259,7 @@ export type Database = {
       elements: {
         Row: {
           actual_hours: number | null
+          ai_weight: string | null
           approval_state: string | null
           branch: string | null
           carried_over_count: number
@@ -2258,6 +2295,7 @@ export type Database = {
         }
         Insert: {
           actual_hours?: number | null
+          ai_weight?: string | null
           approval_state?: string | null
           branch?: string | null
           carried_over_count?: number
@@ -2293,6 +2331,7 @@ export type Database = {
         }
         Update: {
           actual_hours?: number | null
+          ai_weight?: string | null
           approval_state?: string | null
           branch?: string | null
           carried_over_count?: number
@@ -4235,6 +4274,7 @@ export type Database = {
           name: string
           order_index: number | null
           status: string
+          strategy_id: string | null
           updated_at: string
         }
         Insert: {
@@ -4249,6 +4289,7 @@ export type Database = {
           name: string
           order_index?: number | null
           status?: string
+          strategy_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -4263,6 +4304,7 @@ export type Database = {
           name?: string
           order_index?: number | null
           status?: string
+          strategy_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -4278,6 +4320,13 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tables_strategy_id_fkey"
+            columns: ["strategy_id"]
+            isOneToOne: false
+            referencedRelation: "strategies"
             referencedColumns: ["id"]
           },
         ]

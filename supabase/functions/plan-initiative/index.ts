@@ -15,7 +15,7 @@
 // otherwise:
 //   { plan: { summary, objectives: [{ key, title, measureId? }],
 //             objects: [{ key, objectId?, name, domainId? }],
-//             tasks: [{ key, title, description, objective, object, dependsOn, assignee }] } }
+//             tasks: [{ key, title, description, objective, object, dependsOn, assignee, weight }] } }
 //
 // Every read runs with the caller's JWT, so RLS decides what the Planner
 // sees. The model is told the Strategy's text is data to plan from, not
@@ -48,6 +48,7 @@ const SYSTEM_PROMPT = `あなたは組織の参謀です。Strategy（戦略の�
 - 順序がある場合だけ dependsOn に先行タスクの key を入れる。並べられるものは並べる。
 - assignee は、調査・下書き・集計・分析・文書化・コードなど AI エージェントが道具で完了できるものを ai、人の判断・合意・対外的な約束・現物の作業が要るものを human にする。
 - 既にある Element と同じことはタスクにしない。
+- weight は AI がやるときの重さ。転記・整形・短い要約・決まった手順の作業は light、調べて書く普通の仕事は standard、設計・難しい判断・長い推論が要るものは heavy。迷ったら standard。重いほど費用が高いので、light にできるものは light にする。
 - 入力の「定義」に、タスクの仕事に合うもの（その仕事の進め方や成果物の型を決めたもの）があれば、そのタスクの definitionId にその id を入れる。
 - 前提（assumption）が崩れていないかを確かめるタスクが要るなら入れる。
 - 推測で固有名詞や数値をでっち上げない。分からないことは、それを確かめるタスクにする。
@@ -110,9 +111,10 @@ const PLAN_TOOL = {
             object: { type: "string", description: "入れる Object の key" },
             dependsOn: { type: "array", items: { type: "string" }, description: "先に終わっている必要があるタスクの key。なければ空の配列" },
             assignee: { type: "string", enum: ["ai", "human"] },
+            weight: { type: "string", enum: ["light", "standard", "heavy"], description: "AI がやるときの重さ。費用の安いモデルから順に light / standard / heavy" },
             definitionId: { type: "string", description: "このタスクが従う定義の id（入力の「定義」から合うものがあれば）。なければ省略" },
           },
-          required: ["key", "title", "description", "objective", "object", "dependsOn", "assignee"],
+          required: ["key", "title", "description", "objective", "object", "dependsOn", "assignee", "weight"],
           additionalProperties: false,
         },
       },

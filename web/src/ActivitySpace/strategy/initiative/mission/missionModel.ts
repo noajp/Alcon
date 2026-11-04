@@ -8,7 +8,7 @@
 // Pure — hooks/initiativeMissionData.ts reads the rows, the Strategy's
 // tabs draw them; tests/missionModel.test.ts checks this file.
 
-import type { AgentRunStatus, Worker } from '@/types/database';
+import { isAiWeight, type AgentRunStatus, type AiWeight, type Worker } from '@/types/database';
 import { measureState, type MeasureState } from '../initiativeMeasureModel';
 
 export interface MissionElementRow {
@@ -387,6 +387,8 @@ export interface PlanTask {
   assignee: 'ai' | 'human';
   /** The Space's definition the task follows, when the Planner found one that fits. */
   definitionId?: string | null;
+  /** How heavy the work is for an AI; picks the model by cost. */
+  weight?: AiWeight | null;
 }
 
 export interface PlanDraft { summary: string; objectives: PlanObjective[]; objects: PlanObject[]; tasks: PlanTask[] }
@@ -450,6 +452,7 @@ export function normalizePlan(
       key, title, description: text(x.description, 4000), objective, object, dependsOn,
       assignee: x.assignee === 'human' ? 'human' : 'ai',
       definitionId: typeof x.definitionId === 'string' && known.definitionIds?.has(x.definitionId) ? x.definitionId : null,
+      weight: isAiWeight(x.weight) ? x.weight : null,
     });
     if (tasks.length >= 30) break;
   }

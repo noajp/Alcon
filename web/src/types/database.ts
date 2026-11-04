@@ -408,11 +408,22 @@ export function normalizeDirection(raw: unknown): ElementDirection | null {
 // Element - 最小作業単位
 // object_id は nullable — Object 配下の Element と Domain 直下の Element の
 // 両方を許す (前者: per-Object UI で生成 / 後者: サイドバー Elements で生成)。
+/** How heavy an Element's work is for an AI (supabase/functions/run-agent/agentConfig.ts). */
+export type AiWeight = 'light' | 'standard' | 'heavy'
+
+export const AI_WEIGHTS: readonly AiWeight[] = ['light', 'standard', 'heavy']
+
+export function isAiWeight(v: unknown): v is AiWeight {
+  return v === 'light' || v === 'standard' || v === 'heavy'
+}
+
 export interface Element {
   id: string
   object_id: string | null
   /** This Element's own definition (its output shape, its loop), over its Strategy's. */
   definition_id?: string | null
+  /** How heavy its work is for an AI: picks the model by cost when no setting names one. */
+  ai_weight?: string | null  // an AiWeight; read through isAiWeight
   /** The Element this one is a Sub-element of; it lives in that Element's Object. */
   parent_id?: string | null
   title: string
@@ -1310,7 +1321,7 @@ export interface Integration {
 }
 
 export type IntegrationUpdate = Partial<Pick<Integration,
-  'name' | 'description' | 'endpoint' | 'auth_type' | 'auth_header' | 'delegation' | 'enabled' | 'manifest' | 'guide'>>
+  'name' | 'description' | 'endpoint' | 'auth_type' | 'auth_header' | 'delegation' | 'enabled'>>
 
 export type AssetKind = 'app' | 'ai_agent' | 'script' | 'service' | 'other'
 export type AssetStatus = 'unclaimed' | 'active' | 'revoked'

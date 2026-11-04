@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import type { AiWeight } from '@/types/database';
 
 // Definitions: how a goal is to be carried out, written once by a person and
 // followed by the agent engine (supabase/functions/_shared/definition.ts reads
@@ -60,6 +61,12 @@ export async function setStrategyDefinition(strategyId: string, definitionId: st
 }
 
 /** An Element's own definition, over its Strategy's (null: its Strategy's). */
+/** How heavy an Element's work is for an AI (null: the standard model). */
+export async function setElementAiWeight(elementId: string, weight: AiWeight | null): Promise<void> {
+  const { error } = await supabase.from('elements').update({ ai_weight: weight }).eq('id', elementId);
+  if (error) throw error;
+}
+
 export async function setElementDefinition(elementId: string, definitionId: string | null): Promise<void> {
   const { error } = await supabase.from('elements').update({ definition_id: definitionId }).eq('id', elementId);
   if (error) throw error;

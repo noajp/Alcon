@@ -1,4 +1,5 @@
 import { BOARD_TOOLS, type ToolDef } from "../_shared/boardTools.ts";
+import { RECORD_TOOLS } from "./records.ts";
 import { STRATEGY_TOOLS } from "../_shared/strategyTools.ts";
 import type { ToolKind } from "./loop.ts";
 
@@ -93,6 +94,7 @@ export function webSteps(content: { type: string; name?: string; input?: unknown
     if (b.name === "web_fetch") return `Web ページ: ${String(input.url ?? "")}`;
     // The search tools filter their results with code under the hood.
     if (b.name === "code_execution") return "検索結果を絞り込み";
+    if (b.name === "tool_search_tool_bm25") return `道具を探す: ${String(input.query ?? "")}`;
     return `${b.name ?? "server tool"}`;
   });
 }
@@ -123,7 +125,8 @@ export const ROUND_TOOL: ToolDef = {
   },
 };
 
-const INTERNAL = new Set([...INTERNAL_TOOLS.map((t) => t.name), ROUND_TOOL.name]);
+// Saving and reading the Strategy's Tables is the run's own work, like saving an artifact.
+const INTERNAL = new Set([...INTERNAL_TOOLS.map((t) => t.name), ROUND_TOOL.name, ...RECORD_TOOLS.map((t) => t.name)]);
 const BOARD = new Set<string>(AGENT_BOARD_TOOL_NAMES);
 const STRATEGY = new Set<string>(AGENT_STRATEGY_TOOL_NAMES);
 
