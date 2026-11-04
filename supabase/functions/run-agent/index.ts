@@ -39,6 +39,7 @@ import { DRIVE_TOOLS, driveOperationLabel, runDriveTool } from "../_shared/googl
 import { approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR, webSteps, webTools } from "./agentTools.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
+import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
 import {
   runLoop, appendDecisionResults, canonicalCalls,
   type LoopState, type ToolCall, type ToolKind, type ToolResult, type PendingApproval, type FinishPayload, type Msg,
@@ -75,6 +76,8 @@ async function sha256(text: string): Promise<string> {
 type SavedPending = PendingApproval & { approved?: boolean; results?: ToolResult[] };
 type Transcript = {
   messages: Msg[]; turns: number; nudges: number;
+  /** Times the verifier sent a finish back. */
+  revisions?: number;
   /** Turns the run may take in all; grows when its starter resumes it. */
   turnBudget?: number;
   /** The tool definitions frozen at the first slice, so later slices send the same prefix. */
@@ -227,9 +230,25 @@ function uniqueToolName(raw: string, taken: Map<string, unknown>): string {
   }
 }
 
+// Step numbers are read from the table once per invocation and counted here
+// after: the tools of a turn run at the same time, and each step used to cost
+// a read before its write.
+const stepBase = new Map<string, Promise<number>>();
+const stepNext = new Map<string, number>();
+
+async function nextStepIdx(admin: SupabaseClient, runId: string): Promise<number> {
+  if (!stepBase.has(runId)) {
+    stepBase.set(runId, Promise.resolve(admin.from("agent_run_steps").select("idx").eq("run_id", runId).order("idx", { ascending: false }).limit(1).maybeSingle())
+      .then(({ data }) => ((data as { idx?: number } | null)?.idx ?? -1) + 1));
+  }
+  const base = await stepBase.get(runId)!;
+  const idx = stepNext.get(runId) ?? base;
+  stepNext.set(runId, idx + 1);
+  return idx;
+}
+
 async function addStep(admin: SupabaseClient, runId: string, type: string, title: string, detail?: string | null) {
-  const { data: last } = await admin.from("agent_run_steps").select("idx").eq("run_id", runId).order("idx", { ascending: false }).limit(1).maybeSingle();
-  const idx = (last?.idx ?? -1) + 1;
+  const idx = await nextStepIdx(admin, runId);
   await admin.from("agent_run_steps").insert({ run_id: runId, idx, type, title: title.slice(0, 300), detail: detail ? String(detail).slice(0, 8000) : null });
   await admin.from("agent_runs").update({ step_count: idx + 1 }).eq("id", runId);
 }
@@ -241,6 +260,9 @@ interface ExecArgs {
 }
 
 async function execute(a: ExecArgs): Promise<void> {
+  // Another invocation may have written steps since this isolate last ran.
+  stepBase.delete(a.run.id);
+  stepNext.delete(a.run.id);
   const { run, admin, userDb, user } = a;
 
   // ── Agent profile ───────────────────────────────────────────────────────
@@ -517,7 +539,7 @@ async function execute(a: ExecArgs): Promise<void> {
   let turnBudget: number;
   let pending: SavedPending | undefined = run.transcript?.pending;
   if (run.transcript?.messages?.length) {
-    state = { messages: run.transcript.messages, turns: run.transcript.turns ?? 0, nudges: run.transcript.nudges ?? 0 };
+    state = { messages: run.transcript.messages, turns: run.transcript.turns ?? 0, nudges: run.transcript.nudges ?? 0, revisions: run.transcript.revisions ?? 0 };
     turnBudget = run.transcript.turnBudget ?? maxTotalTurns;
     // Resuming grants a fresh allowance on top of the turns already taken.
     if (a.body.resume) turnBudget = state.turns + maxTotalTurns;
@@ -529,7 +551,7 @@ async function execute(a: ExecArgs): Promise<void> {
 
   const saveTranscript = async (p?: SavedPending) => {
     const transcript: Transcript = {
-      messages: state.messages, turns: state.turns, nudges: state.nudges, turnBudget, tools,
+      messages: state.messages, turns: state.turns, nudges: state.nudges, revisions: state.revisions ?? 0, turnBudget, tools,
       ...(p ? { pending: p } : {}),
     };
     // jsonb refuses NUL; tool output can carry it.
@@ -633,6 +655,57 @@ async function execute(a: ExecArgs): Promise<void> {
     ...(i === tools.length - 1 ? cache : {}),
   }));
 
+  const recordUsage = async (u: ModelUsage) => {
+    usage = {
+      input: usage.input + (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
+      output: usage.output + (u.output_tokens ?? 0),
+      cost: Math.round((usage.cost + costAt(config.price, u)) * 1_000_000) / 1_000_000,
+    };
+    await admin.from("agent_runs").update({ input_tokens: usage.input, output_tokens: usage.output, cost_usd: usage.cost }).eq("id", run.id);
+  };
+
+  // The verifier reads the task, the Strategy's success conditions and this
+  // run's outputs fresh, in its own context, on the run's model at low effort.
+  // Any failure to answer lets the finish stand rather than trap the run.
+  const verifyFinish = async (finish: FinishPayload) => {
+    try {
+      const [{ data: el }, { data: arts }] = await Promise.all([
+        userDb.from("elements").select("title, description, object_id").eq("id", run.element_id).maybeSingle(),
+        admin.from("agent_artifacts").select("title, content").eq("run_id", run.id),
+      ]);
+      if (!el) return null;
+      const intents: string[] = [];
+      if (el.object_id) {
+        const { data: links } = await userDb.from("strategy_objects").select("strategy_id").eq("object_id", el.object_id).limit(2);
+        for (const l of (links ?? []) as { strategy_id: string }[]) {
+          const r = await runStrategyTool(userDb, "getInitiative", { id: l.strategy_id });
+          if (!r.ok) continue;
+          const d = r.data as { name: string; description: string | null; intents?: { kind: string | null; title: string }[] };
+          intents.push(`${d.name}${d.description ? `：${d.description}` : ""}`);
+          for (const i of d.intents ?? []) if (i.kind === "measure") intents.push(`成功条件: ${i.title}`);
+        }
+      }
+      const usedWeb = state.messages.some((m) => Array.isArray(m.content) && m.content.some((b) => b.type === "server_tool_use"));
+      // deno-lint-ignore no-explicit-any
+      const res: any = await modelClient.messages.create({
+        model,
+        max_tokens: 4000,
+        system: VERIFY_SYSTEM,
+        messages: [{ role: "user", content: verifyPrompt({ element: el, intents, finish, artifacts: (arts ?? []) as { title: string; content: string }[], usedWeb }) }],
+        output_config: { effort: "low", format: { type: "json_schema", schema: VERDICT_SCHEMA } },
+      // deno-lint-ignore no-explicit-any
+      } as any);
+      await recordUsage(res.usage ?? {});
+      const text = (res.content ?? []).find((b: { type: string }) => b.type === "text")?.text ?? "";
+      const verdict = readVerdict(text);
+      if (verdict) await addStep(admin, run.id, "thought", verdict.pass ? "検証: 合格" : `検証: 不足 ${verdict.gaps.length} 点`, verdict.gaps.join("\n") || null);
+      return verdict;
+    } catch (e) {
+      console.error("run-agent: verify failed", errorMessage(e));
+      return null;
+    }
+  };
+
   const outcome = await runLoop(state, {
     callModel: async (messages) => {
       if (external) {
@@ -659,6 +732,9 @@ async function execute(a: ExecArgs): Promise<void> {
         tools: [...webTools(model), ...toolParams] as any,
         // deno-lint-ignore no-explicit-any
         messages: messages as any,
+        // Medium thinking: these are working steps, not hard reasoning, and
+        // the default (high on Sonnet) made every turn slow.
+        output_config: { effort: "medium" },
         betas: ["context-management-2025-06-27"],
         context_management: { edits: [{ type: "clear_tool_uses_20250919" }] },
       // deno-lint-ignore no-explicit-any
@@ -674,14 +750,8 @@ async function execute(a: ExecArgs): Promise<void> {
       return !it || it.integration.delegation !== "full_delegation";
     },
     execute: (call) => executeCall(call),
-    onUsage: async (u: ModelUsage) => {
-      usage = {
-        input: usage.input + (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
-        output: usage.output + (u.output_tokens ?? 0),
-        cost: Math.round((usage.cost + costAt(config.price, u)) * 1_000_000) / 1_000_000,
-      };
-      await admin.from("agent_runs").update({ input_tokens: usage.input, output_tokens: usage.output, cost_usd: usage.cost }).eq("id", run.id);
-    },
+    onUsage: recordUsage,
+    verify: run.mode === "reply" || external ? undefined : verifyFinish,
     afterTurn: () => saveTranscript(),
     budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= MAX_RUN_COST_USD,
     cancelled: async () => {

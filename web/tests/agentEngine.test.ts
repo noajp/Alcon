@@ -4,6 +4,7 @@ const loop = await import(new URL('../../supabase/functions/run-agent/loop.ts', 
 const tools = await import(new URL('../../supabase/functions/run-agent/agentTools.ts', import.meta.url).pathname);
 const ctx = await import(new URL('../../supabase/functions/run-agent/context.ts', import.meta.url).pathname);
 const pricing = await import(new URL('../../supabase/functions/_shared/aiPricing.ts', import.meta.url).pathname);
+const verify = await import(new URL('../../supabase/functions/run-agent/verify.ts', import.meta.url).pathname);
 const client = await import(new URL('../../supabase/functions/_shared/integrationClient.ts', import.meta.url).pathname);
 
 const { runLoop, appendDecisionResults, canonicalCalls, orderResults } = loop;
@@ -50,9 +51,67 @@ function deps(model: ReturnType<typeof scripted>, over: Partial<Record<string, u
 }
 
 const limits = (over = {}) => ({ maxTurnsThisCall: 10, maxTotalTurns: 50, deadline: Date.now() + 60_000, ...over });
-const fresh = () => ({ messages: [{ role: "user", content: "task" }] as { role: string; content: unknown }[], turns: 0, nudges: 0 });
+const fresh = () => ({ messages: [{ role: "user", content: "task" }] as { role: string; content: unknown }[], turns: 0, nudges: 0, revisions: 0 as number | undefined });
 
 describe('agent loop', () => {
+  const finishTurn = (id: string) => ({ content: [toolUse(id, 'finish', { outcome: 'completed', summary: 's', message: 'm' })] });
+
+  it('sends a completed finish back with the verifier\'s gaps, then accepts the revised one', async () => {
+    const m = scripted([finishTurn('f1'), finishTurn('f2')]);
+    const verdicts = [{ pass: false, gaps: ['出典 URL がない'] }, { pass: true, gaps: [] }];
+    const { deps: d } = deps(m, { verify: async () => verdicts.shift() });
+    const state = fresh();
+    const out = await runLoop(state, d, limits());
+    expect(out.kind).toBe('finished');
+    expect(state.revisions).toBe(1);
+    const sentBack = state.messages[2] as { content: { is_error?: boolean; content: string }[] };
+    expect(sentBack.content[0].is_error).toBe(true);
+    expect(sentBack.content[0].content).toContain('出典 URL がない');
+  });
+
+  it('lets a finish stand after the revision limit, or when the verifier cannot answer', async () => {
+    const m = scripted([finishTurn('f1'), finishTurn('f2'), finishTurn('f3')]);
+    let calls = 0;
+    const { deps: d } = deps(m, { verify: async () => { calls++; return { pass: false, gaps: ['x'] }; } });
+    const out = await runLoop(fresh(), d, limits());
+    expect(out.kind).toBe('finished');
+    expect(calls).toBe(loop.MAX_REVISIONS);
+
+    const m2 = scripted([finishTurn('g1')]);
+    const { deps: d2 } = deps(m2, { verify: async () => null });
+    expect((await runLoop(fresh(), d2, limits())).kind).toBe('finished');
+  });
+
+  it('does not verify a partial or blocked finish', async () => {
+    const m = scripted([{ content: [toolUse('f', 'finish', { outcome: 'blocked', summary: 's', message: 'm' })] }]);
+    let called = false;
+    const { deps: d } = deps(m, { verify: async () => { called = true; return { pass: false, gaps: [] }; } });
+    await runLoop(fresh(), d, limits());
+    expect(called).toBe(false);
+  });
+
+  it('runs the tools of one turn at the same time, answering in their order', async () => {
+    const m = scripted([
+      { content: [toolUse('a', 'getElement', { id: '1' }), toolUse('b', 'getElement', { id: '2' })] },
+      { content: [toolUse('c', 'finish', { outcome: 'completed', summary: 's', message: 'm' })] },
+    ]);
+    let inFlight = 0; let peak = 0;
+    const { deps: d } = deps(m, {
+      execute: async (c: { name: string; input: Record<string, unknown> }) => {
+        if (c.name === 'finish') return { content: 'ok', finish: { outcome: 'completed', summary: 's', message: 'm' } };
+        inFlight++; peak = Math.max(peak, inFlight);
+        await new Promise((r) => setTimeout(r, c.input.id === '1' ? 10 : 1));
+        inFlight--;
+        return { content: `got ${c.input.id}` };
+      },
+    });
+    const state = fresh();
+    await runLoop(state, d, limits());
+    expect(peak).toBe(2);
+    const answer = state.messages[2] as { content: { tool_use_id: string; content: string }[] };
+    expect(answer.content.map((r) => r.content)).toEqual(['got 1', 'got 2']);
+  });
+
   it('sends a paused server-tool turn straight back, with no user message between', async () => {
     const m = scripted([
       { content: [{ type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'q' } }], stop_reason: 'pause_turn' },
@@ -145,6 +204,23 @@ describe('agent loop', () => {
 
   it('fills a missing result rather than leaving a tool_use unanswered', () => {
     expect(orderResults([{ id: 'a', name: 'n', input: {} }], [])).toEqual([{ type: 'tool_result', tool_use_id: 'a', content: 'No result.', is_error: true }]);
+  });
+});
+
+describe('verifier', () => {
+  it('reads a verdict, and nothing it cannot read', () => {
+    expect(verify.readVerdict('{"pass":false,"gaps":["a","",3,"b"]}')).toEqual({ pass: false, gaps: ['a', 'b'] });
+    expect(verify.readVerdict('{"gaps":[]}')).toBeNull();
+    expect(verify.readVerdict('not json')).toBeNull();
+  });
+
+  it('puts the task, the success conditions, the report and the outputs in front of the verifier', () => {
+    const p = verify.verifyPrompt({
+      element: { title: '物件を集める', description: '10 件以上' }, intents: ['成功条件: 候補を複数挙げる'],
+      finish: { outcome: 'completed', summary: '12 件集めた', message: '一覧を保存' },
+      artifacts: [{ title: '候補一覧', content: '| 物件 | URL |' }], usedWeb: true,
+    });
+    for (const t of ['物件を集める', '10 件以上', '候補を複数挙げる', '12 件集めた', '候補一覧', 'Web で調べている']) expect(p).toContain(t);
   });
 });
 

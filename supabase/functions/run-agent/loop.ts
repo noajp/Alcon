@@ -47,7 +47,18 @@ export interface LoopDeps {
   cancelled(): Promise<boolean>;
   /** After every completed turn (its tool results appended): persist progress. */
   afterTurn?(): Promise<void>;
+  /**
+   * A second reader's check of a "completed" finish against the task, before
+   * the run may end on it. Null skips the check (no verifier, or it failed to
+   * answer); { pass: false } sends the gaps back to the agent.
+   */
+  verify?(finish: FinishPayload): Promise<Verdict | null>;
 }
+
+export interface Verdict { pass: boolean; gaps: string[] }
+
+/** How many times a run's "completed" may be sent back before it stands. */
+export const MAX_REVISIONS = 2;
 
 export interface LoopLimits {
   /** Turns this invocation may take before yielding to a continuation. */
@@ -58,7 +69,11 @@ export interface LoopLimits {
   deadline: number;
 }
 
-export interface LoopState { messages: Msg[]; turns: number; nudges: number }
+export interface LoopState {
+  messages: Msg[]; turns: number; nudges: number;
+  /** Times the verifier has sent a finish back. */
+  revisions?: number;
+}
 
 export interface PendingApproval {
   /** The external writes waiting, in the order the model asked for them. */
@@ -142,15 +157,16 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
     const finishCall = calls.find((c) => deps.kindOf(c.name) === "finish");
     const immediate = calls.filter((c) => !writes.includes(c) && c !== finishCall);
 
-    const results: ToolResult[] = [];
-    for (const c of immediate) {
+    // The turn's other tools run at the same time; the model asked for them
+    // together, so none waits on another's result.
+    const results: ToolResult[] = await Promise.all(immediate.map(async (c): Promise<ToolResult> => {
       try {
         const r = await deps.execute(c);
-        results.push({ type: "tool_result", tool_use_id: c.id, content: r.content, ...(r.is_error ? { is_error: true } : {}) });
+        return { type: "tool_result", tool_use_id: c.id, content: r.content, ...(r.is_error ? { is_error: true } : {}) };
       } catch (e) {
-        results.push({ type: "tool_result", tool_use_id: c.id, content: `Error: ${e instanceof Error ? e.message : String(e)}`, is_error: true });
+        return { type: "tool_result", tool_use_id: c.id, content: `Error: ${e instanceof Error ? e.message : String(e)}`, is_error: true };
       }
-    }
+    }));
 
     if (writes.length > 0) {
       // A finish in the same turn as writes waiting for approval is
@@ -163,6 +179,18 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
 
     if (finishCall) {
       const r = await deps.execute(finishCall);
+      // A "completed" is checked by a second reader; gaps go back to the
+      // agent as the finish call's answer, and the run carries on.
+      if (r.finish?.outcome === "completed" && deps.verify && (state.revisions ?? 0) < MAX_REVISIONS) {
+        const verdict = await deps.verify(r.finish);
+        if (verdict && !verdict.pass) {
+          state.revisions = (state.revisions ?? 0) + 1;
+          results.push({ type: "tool_result", tool_use_id: finishCall.id, is_error: true, content: revisionRequest(verdict) });
+          state.messages.push({ role: "user", content: orderResults(calls, results) });
+          await deps.afterTurn?.();
+          continue;
+        }
+      }
       results.push({ type: "tool_result", tool_use_id: finishCall.id, content: r.content, ...(r.is_error ? { is_error: true } : {}) });
       state.messages.push({ role: "user", content: orderResults(calls, results) });
       if (r.finish) return { kind: "finished", finish: r.finish };
@@ -173,6 +201,12 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
     state.messages.push({ role: "user", content: orderResults(calls, results) });
     await deps.afterTurn?.();
   }
+}
+
+/** Pure. What the agent is told when the verifier sends its finish back. */
+export function revisionRequest(verdict: Verdict): string {
+  const gaps = verdict.gaps.length ? verdict.gaps.map((g) => `- ${g}`).join("\n") : "- 任務の完了条件を満たしていません。";
+  return `完了はまだ受け付けられません。検証で次の不足が見つかりました。\n${gaps}\n\n道具を使って不足を埋め、成果物と報告を直してから、もう一度 finish を呼んでください。どうしても埋められない点は、報告に「未確認」として明記したうえで finish してください。`;
 }
 
 /**
