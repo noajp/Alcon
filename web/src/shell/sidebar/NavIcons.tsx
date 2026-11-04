@@ -12,7 +12,6 @@ import {
   ChartNoAxesColumn,
   ChartGantt,
   Grip,
-  Spearhead,
   Milestone,
   GuidingStar,
   CompassRose,
@@ -38,8 +37,9 @@ export const NavInboxIcon = ({ size = 20 }: { size?: number }) => <Bell size={si
 export const NavCalendarIcon = ({ size = 20 }: { size?: number }) => <Calendar size={size} strokeWidth={2} />;
 export const NavNoteIcon = ({ size = 20 }: { size?: number }) => <BookOpen size={size} strokeWidth={2} />;
 export const NavDomainIcon = DomainIcon;
+// A Strategy's mark: the guiding star — what it aims for.
 export const NavStrategyIcon = ({ size = 20, className }: { size?: number; className?: string }) => (
-  <Spearhead size={size} className={className} />
+  <GuidingStar size={size} className={className} />
 );
 export const NavWorkloadIcon = ({ size = 20 }: { size?: number }) => <ChartNoAxesColumn size={size} strokeWidth={2} />;
 export const NavTimelineIcon = ({ size = 20 }: { size?: number }) => <ChartGantt size={size} strokeWidth={2} />;

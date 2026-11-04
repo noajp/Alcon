@@ -11,8 +11,10 @@ export function ChoiceCard({ selected, label, children, className, ...props }: O
   label: string;
   children: ReactNode;
 }) {
-  return <Button {...props} variant="ghost" shape="tab" multiline align="start" aria-pressed={selected}
-    className={cn('w-full min-w-0 flex-col items-stretch gap-3 p-3 text-left leading-normal aria-pressed:border-[var(--accent-default)]', selected ? 'bg-[var(--accent-subtle)]' : 'bg-muted/20', className)}>
+  return <Button {...props} variant="ghost" multiline align="start" aria-pressed={selected}
+    // A card, not a pill: square-ish corners and a border that lights when chosen.
+    className={cn('w-full min-w-0 flex-col items-stretch gap-3 rounded-lg border p-3 text-left leading-normal',
+      selected ? 'border-[var(--accent-default)] bg-[var(--accent-subtle)] hover:bg-[var(--accent-subtle)]' : 'border-[var(--border-default)] bg-muted/20', className)}>
     <span className="flex w-full items-center justify-between gap-3 text-[13px] font-medium">
       <span>{label}</span>
       <Check size={14} aria-hidden="true" className={selected ? 'text-[var(--accent-default)]' : 'invisible'} />

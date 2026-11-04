@@ -5,7 +5,6 @@ import { ChevronDown, Check } from '@/ui/icons';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
-import { ChoiceCard } from '@/ui/choice-card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { appDialog } from '@/Function/shared/appDialogStore';
@@ -19,7 +18,7 @@ import {
 import { useIntegrationActions, useIntegrationOAuthStatus } from './data';
 
 // One integration: connect a preset (or a custom MCP / API), or manage an
-// existing connection — credential, delegation, on/off, connection test,
+// existing connection — credential, on/off, connection test,
 // disconnect. The credential is write-only: it is sent to Vault and the
 // dialog only ever knows whether one is set (`secret_id`).
 //
@@ -30,7 +29,8 @@ import { useIntegrationActions, useIntegrationOAuthStatus } from './data';
 // deleting the row. Until the server has that provider's OAuth client,
 // Connect stays disabled with a note saying so.
 //
-// For an existing connection, delegation and on/off apply at once
+// Agents act in a connected service without asking each time; whether they
+// may use it at all is the on/off. For an existing connection, on/off applies at once
 // (optimistically, rolled back on failure); custom name / endpoint / auth are
 // saved with 「保存」. Members see the same dialog read-only.
 
@@ -123,11 +123,11 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
   const [authHeader, setAuthHeader] = useState(integration?.auth_header ?? '');
   const [secretInput, setSecretInput] = useState('');
   const [editingSecret, setEditingSecret] = useState(false);
-  const [newDelegation, setNewDelegation] = useState<IntegrationDelegation>('approve_each');
   const [newEnabled, setNewEnabled] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const delegation = integration?.delegation ?? newDelegation;
+  // Agents act in a connected service without asking each time.
+  const delegation: IntegrationDelegation = 'full_delegation';
   const enabled = integration?.enabled ?? newEnabled;
   const needsSecret = auth === 'bearer' || auth === 'header';
   const hasSecret = !!integration?.secret_id;
@@ -135,7 +135,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
   const unavailable = preset.unavailableReason;
   const readOnly = !canEdit || !!unavailable;
   const oauth = signsInWithOAuth(preset);
-  // A model provider is not a tool agents call, so it has no delegation.
+  // A model provider is not a tool agents call.
   const isModel = preset.kind === 'model';
   const provider = oauthProviderOf(preset) ?? 'google';
   const copy = OAUTH_COPY[provider];
@@ -181,9 +181,8 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
     try { await signIn(integration.id); } catch (e) { setError(t(errorText(e))); }
   };
 
-  const setLive = (patch: { delegation?: IntegrationDelegation; enabled?: boolean }) => {
+  const setLive = (patch: { enabled?: boolean }) => {
     if (!integration) {
-      if (patch.delegation) setNewDelegation(patch.delegation);
       if (patch.enabled !== undefined) setNewEnabled(patch.enabled);
       return;
     }
@@ -293,14 +292,14 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
             </Field>
           )}
 
-          <Field label={preset.kind === 'mcp' ? t('Endpoint') : t('Base URL')}>
-            {preset.custom ? (
+          {/* A preset's address is the provider's business, not the person's —
+              only a custom connection asks for one. */}
+          {preset.custom && (
+            <Field label={preset.kind === 'mcp' ? t('Endpoint') : t('Base URL')}>
               <Input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} disabled={readOnly} inputMode="url"
                 placeholder="https://" className="h-8 font-mono text-[12px] md:text-[12px]" />
-            ) : (
-              <code className="block truncate font-mono text-[12px] text-foreground">{preset.endpoint}</code>
-            )}
-          </Field>
+            </Field>
+          )}
 
           {preset.custom && !isModel && (
             <Field label={t('Authentication')}>
@@ -396,24 +395,6 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
               )}
             </Field>
           )}
-
-          {!isModel && <Field label={t('Delegation')}>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <ChoiceCard selected={delegation === 'approve_each'} label={t('Approve each time (recommended)')}
-                disabled={readOnly} onClick={() => setLive({ delegation: 'approve_each' })}>
-                <span className="text-[12px] text-muted-foreground">{t('Agents read freely and wait for your approval before writing to this service.')}</span>
-              </ChoiceCard>
-              <ChoiceCard selected={delegation === 'full_delegation'} label={t('Full delegation (no approval)')}
-                disabled={readOnly} onClick={() => setLive({ delegation: 'full_delegation' })}>
-                <span className="text-[12px] text-muted-foreground">{t('Agents write to this service without asking.')}</span>
-              </ChoiceCard>
-            </div>
-            {delegation === 'full_delegation' && (
-              <p className="mt-2 text-[12px] text-[var(--status-warning)]">
-                {t('With full delegation, agents send, update and delete in this service without asking. Use it only for services you trust.')}
-              </p>
-            )}
-          </Field>}
 
           {isModel && (
             <p className="text-[12px] text-muted-foreground">

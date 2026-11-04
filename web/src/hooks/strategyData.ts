@@ -313,6 +313,34 @@ export async function linkObjectToStrategy(strategyId: string, objectId: string)
   invalidateStrategies();
 }
 
+/** Puts a Strategy where it was dropped in the Strategy list: under
+ *  `toParentId` (null: the top), with `siblingIds` the new order of that
+ *  level, the moved one included. `fromParentId` is the parent it was dragged
+ *  out of — any other parent it has keeps it. Only the order numbers that
+ *  change are written. */
+export async function placeStrategy(
+  id: string,
+  from: { parentId: string | null },
+  to: { parentId: string | null; siblingIds: string[] },
+  currentOrder: Map<string, number | null | undefined>,
+): Promise<void> {
+  try {
+    if (to.parentId !== from.parentId) {
+      if (to.parentId) await addStrategyChild(to.parentId, id);
+      if (from.parentId) await removeStrategyChild(from.parentId, id);
+    }
+    const writes = to.siblingIds
+      .map((sid, i) => ({ sid, i }))
+      .filter(({ sid, i }) => currentOrder.get(sid) !== i);
+    for (const { sid, i } of writes) {
+      const { error } = await supabase.from('strategies').update({ order_index: i }).eq('id', sid);
+      if (error) throw error;
+    }
+  } finally {
+    invalidateStrategies();
+  }
+}
+
 // Strategy nesting — a Strategy can hold other Strategies as children,
 // DAG so multi-parent is allowed. The DB refuses
 // any edge that would close a cycle (23514); the picker also hides the

@@ -2165,6 +2165,7 @@ export type Database = {
           element_id: string | null
           emoji: string
           id: string
+          strategy_id: string | null
           user_id: string
         }
         Insert: {
@@ -2173,6 +2174,7 @@ export type Database = {
           element_id?: string | null
           emoji: string
           id?: string
+          strategy_id?: string | null
           user_id: string
         }
         Update: {
@@ -2181,9 +2183,17 @@ export type Database = {
           element_id?: string | null
           emoji?: string
           id?: string
+          strategy_id?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "element_reactions_strategy_id_fkey"
+            columns: ["strategy_id"]
+            isOneToOne: false
+            referencedRelation: "strategies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "element_reactions_comment_id_fkey"
             columns: ["comment_id"]
@@ -3975,6 +3985,7 @@ export type Database = {
           icon: string | null
           id: string
           name: string
+          order_index: number | null
           scope: Json
           status: string | null
           updated_at: string
@@ -3990,6 +4001,7 @@ export type Database = {
           icon?: string | null
           id?: string
           name: string
+          order_index?: number | null
           scope?: Json
           status?: string | null
           updated_at?: string
@@ -4005,6 +4017,7 @@ export type Database = {
           icon?: string | null
           id?: string
           name?: string
+          order_index?: number | null
           scope?: Json
           status?: string | null
           updated_at?: string

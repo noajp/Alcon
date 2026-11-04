@@ -7,8 +7,9 @@ import { cn } from '@/lib/utils';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { formatRelative } from '@/Function/shared/dateUtils';
 import type { Asset, AssetEvent } from '@/types/database';
-import { CopyField } from './CopyField';
+import { CopyButton } from './CopyField';
 import { useIsSpaceOwner } from './data';
 import { useAssetActions, useAssetEvents, useAssets } from './assetData';
 import {
@@ -56,10 +57,10 @@ export function AssetRelayPanel() {
         </p>
       </div>
 
-      <section className="space-y-2">
+      <section className="flex flex-col gap-2">
         <h3 className="text-[13px] font-medium text-foreground">{t('The one line')}</h3>
-        <p className="text-[12px] text-muted-foreground">{t('Copy sdk/node/alcon.mjs or sdk/python/alcon.py into the app, import it first, and give the app these two variables:')}</p>
-        {spaceId ? <CopyField value={relayEnvLines(ASSET_RELAY_URL, spaceId)} multiline /> : <CopyField value={ASSET_RELAY_URL} />}
+        <p className="text-[12px] text-muted-foreground">{t("Add Alcon's SDK (Node or Python) to the app and import it first, then paste these settings into the app's environment.")}</p>
+        {spaceId && <CopyButton value={relayEnvLines(ASSET_RELAY_URL, spaceId)} label={t('Copy settings')} />}
         <p className="text-[12px] text-muted-foreground">
           {t('No key to issue: the app receives its own token on first contact and keeps it. What it reports about itself is unverified until you accept it.')}
         </p>
@@ -114,8 +115,7 @@ function AssetRow({ asset, now, open, isOwner, busy, onToggle, onAccept, onRevok
   asset: Asset; now: number; open: boolean; isOwner: boolean; busy: boolean;
   onToggle: () => void; onAccept: () => void; onRevoke: () => void;
 }) {
-  const { t, locale } = useI18n();
-  const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(locale) : null);
+  const { t } = useI18n();
   const self = describeManifest(asset.manifest);
   const seen = describeObserved(asset.observed);
   const Chevron = open ? ChevronDown : ChevronRight;
@@ -133,9 +133,7 @@ function AssetRow({ asset, now, open, isOwner, busy, onToggle, onAccept, onRevok
           </div>
           <div className="truncate text-[12px] text-muted-foreground">
             {[
-              self ? `${t('Says')}: ${self}` : null,
-              seen ? `${t('Seen')}: ${seen}` : null,
-              asset.last_seen_at ? t('Last seen {date}', { date: when(asset.last_seen_at)! }) : null,
+              asset.last_seen_at ? t('Last seen {date}', { date: formatRelative(asset.last_seen_at) }) : null,
               t('{n} event(s)', { n: asset.event_count }),
             ].filter(Boolean).join(' · ')}
           </div>
@@ -147,17 +145,24 @@ function AssetRow({ asset, now, open, isOwner, busy, onToggle, onAccept, onRevok
           <Button variant="danger" size="xs" onClick={onRevoke} disabled={busy}>{t('Revoke')}</Button>
         )}
       </div>
-      {open && <AssetActivity asset={asset} />}
+      {open && <AssetActivity asset={asset} self={self} seen={seen} />}
     </div>
   );
 }
 
-function AssetActivity({ asset }: { asset: Asset }) {
-  const { t, locale } = useI18n();
+function AssetActivity({ asset, self, seen }: { asset: Asset; self: string | null; seen: string | null }) {
+  const { t } = useI18n();
   const { data: events, loading, error } = useAssetEvents(asset.id);
-  const when = (iso: string) => new Date(iso).toLocaleString(locale);
+  const when = (iso: string) => formatRelative(iso);
   return (
     <div className="border-t border-border/40 bg-[var(--surface-rail)]/40 px-3 py-2.5">
+      {/* What it says about itself and where it was seen from — kept here,
+          for when someone looks, rather than on the row. */}
+      {(self || seen) && (
+        <p className="mb-2 truncate text-[11px] text-muted-foreground">
+          {[self ? `${t('Says')}: ${self}` : null, seen ? `${t('Seen')}: ${seen}` : null].filter(Boolean).join(' · ')}
+        </p>
+      )}
       {asset.status === 'unclaimed' && (
         <p className="mb-2 text-[12px] text-muted-foreground">{t('Not accepted yet: everything below is what the app says, unverified.')}</p>
       )}
@@ -177,15 +182,14 @@ function AssetActivity({ asset }: { asset: Asset }) {
 }
 
 function EventLine({ event, when }: { event: AssetEvent; when: (iso: string) => string }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [showPayload, setShowPayload] = useState(false);
   const hasPayload = event.payload !== null && event.payload !== undefined;
   return (
     <li className="text-[12px]">
       <div className="flex items-baseline gap-2">
-        <time dateTime={event.occurred_at} className="shrink-0 font-mono text-[11px] text-muted-foreground">{when(event.occurred_at)}</time>
-        <code className="shrink-0 font-mono text-[11px] text-[var(--text-secondary)]">{event.kind}</code>
         <span className="min-w-0 flex-1 truncate text-foreground">{event.summary}</span>
+        <time dateTime={event.occurred_at} title={new Date(event.occurred_at).toLocaleString(locale)} className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{when(event.occurred_at)}</time>
         {hasPayload && (
           <Button variant="ghost" size="xs" onClick={() => setShowPayload(v => !v)}>{t(showPayload ? 'Hide details' : 'Details')}</Button>
         )}

@@ -26,3 +26,22 @@ export function CopyField({ value, multiline = false, label }: { value: string; 
     </div>
   );
 }
+
+/** A button that copies `value` without showing it — for an address, a
+ *  setting or a command the person pastes elsewhere and never needs to read. */
+export function CopyButton({ value, label }: { value: string; label: string }) {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard unavailable */ }
+  };
+  return (
+    <Button variant="secondary" size="sm" onClick={copy} className="self-start">
+      {copied ? <Check size={13} /> : <Copy size={13} />}{copied ? t('Copied') : label}
+    </Button>
+  );
+}

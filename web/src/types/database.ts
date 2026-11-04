@@ -1055,6 +1055,7 @@ export interface ElementReaction {
   id: string
   element_id: string | null
   comment_id: string | null
+  strategy_id: string | null
   user_id: string
   emoji: string
   created_at: string
@@ -1063,6 +1064,7 @@ export interface ElementReaction {
 export interface ElementReactionInsert {
   element_id?: string | null
   comment_id?: string | null
+  strategy_id?: string | null
   user_id: string
   emoji: string
 }
@@ -1455,6 +1457,8 @@ export interface Strategy {
   color: string | null
   icon: string | null
   activity_space_id: string | null  // the Space it belongs to
+  /** Order among its siblings in the Strategy list; null sorts after, oldest first. */
+  order_index?: number | null
   created_by: string | null
   created_at: string
   updated_at: string
