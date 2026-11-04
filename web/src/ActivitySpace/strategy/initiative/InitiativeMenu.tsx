@@ -114,7 +114,10 @@ function InitiativeMovePicker({ initiative, onClose }: { initiative: InitiativeR
   return (
     <Popover open onOpenChange={(v) => { if (!v) onClose(); }}>
       <PopoverAnchor className="h-0" />
-      <MenuShell width="wide" align="start">
+      {/* Opened from a right-click menu, it appears as that menu closes and
+          hands focus back — a focus move that is not the person leaving it.
+          A click elsewhere or Escape still closes it. */}
+      <MenuShell width="wide" align="start" onFocusOutside={(e) => e.preventDefault()}>
         <Command shouldFilter={false}>
           <CommandInput value={query} onValueChange={setQuery} placeholder={t('Move to…')} autoFocus />
           <CommandList>
