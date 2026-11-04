@@ -46,7 +46,7 @@ import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./veri
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
 import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
 import { checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
-import { isRunnerTool, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
+import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
 import {
   runLoop, appendDecisionResults, canonicalCalls,
   type LoopState, type ToolCall, type ToolKind, type ToolResult, type PendingApproval, type FinishPayload, type Msg,
@@ -466,14 +466,18 @@ async function execute(a: ExecArgs): Promise<void> {
     : { data: [] };
   const runner = pickRunner((runnerRows ?? []) as RunnerRow[], Date.now());
   if (runner) integrationSummary.push({ name: `この人の PC のブラウザ（${runner.name}）`, kind: "PC", delegation: "read_only", tools: RUNNER_TOOLS.length });
+  // A disposable machine of theirs, when one is on: commands and files there.
+  const machine = pickRunner((runnerRows ?? []) as RunnerRow[], Date.now(), "shell");
+  if (machine) integrationSummary.push({ name: `使い捨ての仮想マシン（${machine.name}）`, kind: "VM", delegation: "full_delegation", tools: MACHINE_TOOLS.length });
 
-  const liveTools: ToolDef[] = [...baseAgentTools(), ...(parsed?.metric ? [ROUND_TOOL] : []), ...(runner ? RUNNER_TOOLS : []), ...integrationDefs];
+  const liveTools: ToolDef[] = [...baseAgentTools(), ...(parsed?.metric ? [ROUND_TOOL] : []), ...(runner ? RUNNER_TOOLS : []), ...(machine ? MACHINE_TOOLS : []), ...integrationDefs];
   const tools: ToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : liveTools;
   const kindOf = (name: string): ToolKind => {
     const base = baseKindOf(name);
     if (base) return base;
-    // The runner only reads unless its owner started it to write.
-    if (isRunnerTool(name)) return "read";
+    // The runner only reads unless its owner started it to write; a
+    // disposable machine changes nothing outside itself.
+    if (isRunnerTool(name) || isMachineTool(name)) return "read";
     return "write"; // decided per call below
   };
   const isRead = (call: ToolCall): boolean => {
@@ -526,11 +530,11 @@ async function execute(a: ExecArgs): Promise<void> {
 
   // A call to the person's PC: queued for its runner, answered within a
   // minute or given up (the runner may have gone offline since).
-  const callRunner = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
-    if (!runner) return { content: "この人の PC のブラウザは今つながっていません。Web 検索で進めるか、つながっていないことを報告してください。", is_error: true };
+  const callRunner = async (call: ToolCall, target: RunnerRow | null, read: (result: unknown) => string): Promise<{ content: string; is_error?: boolean }> => {
+    if (!target) return { content: "この道具の実行役は今つながっていません。ほかの道具で進めるか、つながっていないことを報告してください。", is_error: true };
     await addStep(admin, run.id, "action", runnerStep(call.name, call.input));
     const { data: queued, error } = await admin.from("asset_calls")
-      .insert({ asset_id: runner.id, run_id: run.id, tool: runnerOperation(call.name), input: call.input }).select("id").single();
+      .insert({ asset_id: target.id, run_id: run.id, tool: runnerOperation(call.name), input: call.input }).select("id").single();
     if (error || !queued) return { content: `PC に依頼できませんでした: ${error?.message ?? "unknown"}`, is_error: true };
     // A page takes seconds; the slice's soft deadline may be near, but an
     // answer thrown away costs the runner's work, so wait it out (within the
@@ -539,7 +543,7 @@ async function execute(a: ExecArgs): Promise<void> {
     while (Date.now() < until) {
       await new Promise((r) => setTimeout(r, 700));
       const { data: c } = await admin.from("asset_calls").select("status, result, error").eq("id", queued.id).maybeSingle();
-      if (c?.status === "done") return { content: runnerResultText(c.result) };
+      if (c?.status === "done") return { content: read(c.result) };
       if (c?.status === "failed") return { content: `PC のブラウザで失敗しました: ${c.error ?? ""}`, is_error: true };
     }
     await admin.from("asset_calls").update({ status: "expired", finished_at: new Date().toISOString() }).eq("id", queued.id).in("status", ["pending", "claimed"]);
@@ -620,7 +624,8 @@ async function execute(a: ExecArgs): Promise<void> {
         return { content: "完了報告を受け取りました。", finish };
       }
     }
-    if (isRunnerTool(call.name)) return await callRunner(call);
+    if (isRunnerTool(call.name)) return await callRunner(call, runner, runnerResultText);
+    if (isMachineTool(call.name)) return await callRunner(call, machine, machineResultText);
     if (baseKindOf(call.name) === "board") {
       const r = isStrategyTool(call.name) ? await runStrategyTool(userDb, call.name, input) : await runBoardTool(userDb, call.name, input, actor);
       await addStep(admin, run.id, "action", `Alcon: ${call.name}`, r.ok ? null : r.error);

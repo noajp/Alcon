@@ -23,12 +23,19 @@
 //   ALCON_NAME  / --name        the runner's name (default: "<host>'s browser")
 //   --headless                  no visible window
 //   --allow-writes              let pages submit forms
+//   --browser chromium          use Playwright's bundled Chromium instead of Google Chrome
+//   --isolated --shell          this runner is a disposable VM (e.g. a Vercel Sandbox):
+//                               it also runs shell commands and reads/writes files.
+//                               Never pass these on a computer someone works on.
 //   ALCON_HOME                  where token and profile live (default ~/.alcon)
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir, hostname, platform } from 'node:os';
 import { chromium } from 'playwright-core';
+import { spawn } from 'node:child_process';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(`--${name}`);
@@ -41,6 +48,11 @@ const HOME = process.env.ALCON_HOME ?? join(homedir(), '.alcon');
 const STATE = join(HOME, 'runner.json');
 const PROFILE = join(HOME, 'browser');
 const HEADLESS = flag('headless');
+const BROWSER = opt('browser') ?? 'chrome';
+const ISOLATED = flag('isolated');
+const SHELL = ISOLATED && flag('shell');
+/** Where shell commands run and relative file paths point. */
+const WORKDIR = process.env.ALCON_WORKDIR ?? join(HOME, 'work');
 const ALLOW_WRITES = flag('allow-writes');
 const VERSION = '0.1.0';
 
@@ -48,8 +60,8 @@ const log = (...m) => console.error(`[alcon-runner ${new Date().toLocaleTimeStri
 if (!RELAY) { log('ALCON_RELAY (or --relay) is required'); process.exit(1); }
 
 const manifest = {
-  runner: 'alcon-runner', version: VERSION, capabilities: ['browser'],
-  host: hostname(), platform: platform(), read_only: !ALLOW_WRITES, headless: HEADLESS,
+  runner: 'alcon-runner', version: VERSION, capabilities: SHELL ? ['browser', 'shell', 'files'] : ['browser'],
+  host: hostname(), platform: platform(), read_only: !ALLOW_WRITES, headless: HEADLESS, isolated: ISOLATED,
 };
 
 function loadState() {
@@ -96,7 +108,7 @@ async function browser() {
   if (!context) {
     mkdirSync(PROFILE, { recursive: true });
     context = await chromium.launchPersistentContext(PROFILE, {
-      channel: 'chrome', headless: HEADLESS, viewport: { width: 1280, height: 900 }, locale: 'ja-JP',
+      ...(BROWSER === 'chrome' ? { channel: 'chrome' } : {}), headless: HEADLESS, viewport: { width: 1280, height: 900 }, locale: 'ja-JP',
     });
     if (!ALLOW_WRITES) {
       // Read-only: a navigation that would send a form is stopped. Pages
@@ -169,7 +181,46 @@ async function fieldFor(p, field) {
   return null;
 }
 
+// ── The machine (only on an isolated runner) ─────────────────────────────────
+
+const SHELL_TIMEOUT_MS = 40_000;
+const MAX_OUT = 20_000;
+
+/** Runs a bash command in the work directory; long work belongs in the background. */
+function runShell(command, timeoutS) {
+  return new Promise((done) => {
+    const limit = Math.min(Math.max(Number(timeoutS) || 30, 1) * 1000, SHELL_TIMEOUT_MS);
+    const child = spawn('bash', ['-lc', String(command)], { cwd: WORKDIR, env: process.env });
+    let out = '', err = '';
+    child.stdout.on('data', (d) => { if (out.length < MAX_OUT) out += d; });
+    child.stderr.on('data', (d) => { if (err.length < MAX_OUT) err += d; });
+    const timer = setTimeout(() => { child.kill('SIGKILL'); err += `\n(stopped after ${limit / 1000}s; run long work in the background with nohup … & and check on it)`; }, limit);
+    child.on('close', (code) => { clearTimeout(timer); done({ exit_code: code, stdout: out.slice(0, MAX_OUT), stderr: err.slice(0, MAX_OUT), cwd: WORKDIR }); });
+  });
+}
+
+const fileAt = (p) => resolve(WORKDIR, String(p ?? ''));
+
+const MACHINE = {
+  async shell({ command, timeout_s }) {
+    await mkdir(WORKDIR, { recursive: true });
+    return runShell(command, timeout_s);
+  },
+  async write_file({ path, content }) {
+    const target = fileAt(path);
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, String(content ?? ''));
+    return { path: target, bytes: Buffer.byteLength(String(content ?? '')) };
+  },
+  async read_file({ path }) {
+    const target = fileAt(path);
+    const text = await readFile(target, 'utf8');
+    return { path: target, content: text.slice(0, 60_000), truncated: text.length > 60_000 };
+  },
+};
+
 const TOOLS = {
+  ...(SHELL ? MACHINE : {}),
   async open({ url }) {
     if (typeof url !== 'string' || !/^https?:\/\//.test(url)) throw new Error('url must start with http(s)://');
     const p = await browser();

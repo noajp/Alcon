@@ -52,27 +52,73 @@ export const RUNNER_TOOLS: ToolDef[] = [
   },
 ];
 
+/**
+ * A disposable machine (a runner that declared itself isolated, e.g. a
+ * Vercel Sandbox): the agent may run commands and read and write files there.
+ * Never offered for a runner on a computer someone works on.
+ */
+export const MACHINE_PREFIX = "vm_";
+
+export const MACHINE_TOOLS: ToolDef[] = [
+  {
+    name: "vm_shell",
+    description: "使い捨ての仮想マシン（Linux、Node・Python 入り、ネット可）で bash コマンドを実行し、終了コード・標準出力・標準エラーを返す。1 回 40 秒まで。インストールやビルドのような長い処理は nohup … > log 2>&1 & で裏に回し、後で tail で確かめる。sudo 可。作業フォルダは呼び出しをまたいで残る。",
+    input_schema: {
+      type: "object",
+      properties: { command: { type: "string" }, timeout_s: { type: "number", description: "秒（最大 40）" } },
+      required: ["command"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "vm_write_file",
+    description: "仮想マシンにファイルを書く（作業フォルダからの相対パスか絶対パス）。コードや設定を置くのに使う。",
+    input_schema: {
+      type: "object",
+      properties: { path: { type: "string" }, content: { type: "string" } },
+      required: ["path", "content"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "vm_read_file",
+    description: "仮想マシンのファイルを読む（最大 60,000 文字）。",
+    input_schema: { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false },
+  },
+];
+
 const NAMES = new Set(RUNNER_TOOLS.map((t) => t.name));
+const MACHINE_NAMES = new Set(MACHINE_TOOLS.map((t) => t.name));
 
 export function isRunnerTool(name: string): boolean {
   return NAMES.has(name);
 }
 
-/** Pure. The runner's own name for a tool: pc_open → open. */
+export function isMachineTool(name: string): boolean {
+  return MACHINE_NAMES.has(name);
+}
+
+/** Pure. The runner's own name for a tool: pc_open → open, vm_shell → shell. */
 export function runnerOperation(name: string): string {
-  return name.startsWith(RUNNER_PREFIX) ? name.slice(RUNNER_PREFIX.length) : name;
+  if (name.startsWith(RUNNER_PREFIX)) return name.slice(RUNNER_PREFIX.length);
+  if (name.startsWith(MACHINE_PREFIX)) return name.slice(MACHINE_PREFIX.length);
+  return name;
 }
 
 export interface RunnerRow { id: string; name: string; manifest: unknown; last_seen_at: string | null }
 
-/** Pure. The runner a run may use: one that offers a browser and asked for
- *  work recently, the most recent first. */
-export function pickRunner(rows: readonly RunnerRow[], now: number): RunnerRow | null {
-  const live = rows.filter((r) => {
-    const caps = r.manifest && typeof r.manifest === "object" ? (r.manifest as { capabilities?: unknown }).capabilities : null;
-    const browser = Array.isArray(caps) && caps.includes("browser");
-    return browser && !!r.last_seen_at && now - new Date(r.last_seen_at).getTime() <= RUNNER_ONLINE_MS;
-  });
+const capsOf = (r: RunnerRow): string[] => {
+  const caps = r.manifest && typeof r.manifest === "object" ? (r.manifest as { capabilities?: unknown }).capabilities : null;
+  return Array.isArray(caps) ? caps.filter((c): c is string => typeof c === "string") : [];
+};
+const isolatedOf = (r: RunnerRow) => !!(r.manifest && typeof r.manifest === "object" && (r.manifest as { isolated?: unknown }).isolated === true);
+
+/** Pure. The runner a run may use for a capability: one that offers it and
+ *  asked for work recently, the most recent first. "shell" is only ever an
+ *  isolated runner's. */
+export function pickRunner(rows: readonly RunnerRow[], now: number, capability: "browser" | "shell" = "browser"): RunnerRow | null {
+  const live = rows.filter((r) => capsOf(r).includes(capability) && (capability !== "shell" || isolatedOf(r))
+    && !!r.last_seen_at && now - new Date(r.last_seen_at).getTime() <= RUNNER_ONLINE_MS);
   live.sort((a, b) => new Date(b.last_seen_at!).getTime() - new Date(a.last_seen_at!).getTime());
   return live[0] ?? null;
 }
@@ -84,8 +130,22 @@ export function runnerStep(name: string, input: Record<string, unknown>): string
     case "pc_click": return `PC: クリック「${String(input.text ?? "")}」`;
     case "pc_type": return `PC: 入力「${String(input.field ?? "")}」← ${String(input.text ?? "")}`;
     case "pc_back": return "PC: 戻る";
+    case "vm_shell": return `VM: $ ${String(input.command ?? "").slice(0, 200)}`;
+    case "vm_write_file": return `VM: 書く ${String(input.path ?? "")}`;
+    case "vm_read_file": return `VM: 読む ${String(input.path ?? "")}`;
     default: return "PC: 読む";
   }
+}
+
+/** Pure. A machine's answer as the agent reads it. */
+export function machineResultText(result: unknown): string {
+  const r = result && typeof result === "object" ? result as Record<string, unknown> : {};
+  if ("exit_code" in r) {
+    return [`exit ${String(r.exit_code)}`, r.stdout ? `--- stdout\n${String(r.stdout)}` : "", r.stderr ? `--- stderr\n${String(r.stderr)}` : ""]
+      .filter(Boolean).join("\n").slice(0, 16_000);
+  }
+  if ("content" in r) return `${String(r.path ?? "")}${r.truncated ? "（途中まで）" : ""}\n${String(r.content ?? "")}`.slice(0, 60_000);
+  return JSON.stringify(r).slice(0, 4_000);
 }
 
 /** Pure. The runner's answer as the agent reads it. */
