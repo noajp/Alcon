@@ -411,6 +411,8 @@ export function normalizeDirection(raw: unknown): ElementDirection | null {
 export interface Element {
   id: string
   object_id: string | null
+  /** This Element's own definition (its output shape, its loop), over its Strategy's. */
+  definition_id?: string | null
   /** The Element this one is a Sub-element of; it lives in that Element's Object. */
   parent_id?: string | null
   title: string
@@ -1433,6 +1435,8 @@ export interface Strategy {
   status: StrategyStatus | null
   scope: StrategyScope
   delegation: StrategyDelegation
+  /** The definition its Elements follow (Function: definitions), or null. */
+  definition_id: string | null
   color: string | null
   icon: string | null
   activity_space_id: string | null  // the Space it belongs to

@@ -39,12 +39,13 @@ import {
 import { isGoogleDriveRow } from "../_shared/googleOAuth.ts";
 import { fetchPull, pullUrlsIn, upsertCodeChange, withGithubToken } from "../_shared/github.ts";
 import { DRIVE_TOOLS, driveOperationLabel, runDriveTool } from "../_shared/googleDrive.ts";
-import { approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR, webSteps, webTools } from "./agentTools.ts";
+import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR, webSteps, webTools } from "./agentTools.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
 import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
+import { checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
 import { isRunnerTool, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
 import {
   runLoop, appendDecisionResults, canonicalCalls,
@@ -65,6 +66,8 @@ const MAX_TOOLS = 120;
 const USER_MONTHLY_BUDGET_USD = 20;
 /** No single run may spend more than this, whatever the budget left. */
 const MAX_RUN_COST_USD = 5;
+/** A definition may raise a run's cap to its own budget, never past this. */
+const MAX_DEFINED_RUN_COST_USD = 50;
 /** A run that has written no step for this long is stuck; its starter may resume it. */
 const STALE_MS = 10 * 60_000;
 const SESSION_PAUSE = "セッションの期限が切れたため一時停止しました。Element を開くと続きから再開します。";
@@ -323,7 +326,17 @@ async function execute(a: ExecArgs): Promise<void> {
     }
   }
   const config = resolveAgentConfig(worker, domain);
-  const { agentName, model, maxTotalTurns, instructions, domainInstructions } = config;
+  const { agentName, model, instructions, domainInstructions } = config;
+  // The definition the work follows: the Element's own, else its Strategy's.
+  const definition = await loadDefinition(userDb, run.element_id);
+  // A Strategy's definition is direction for all its Elements; the output
+  // shape and the loop are enforced only for an Element's own definition.
+  const parsedAll: ParsedDefinition | null = definition ? parseDefinition(definition.body) : null;
+  const parsed: ParsedDefinition | null = parsedAll && definition?.scope === "element" ? parsedAll : null;
+  // A loop runs for many rounds: it may take more turns, and spend up to the
+  // budget its definition names (never past a hard ceiling).
+  const maxTotalTurns = parsed?.metric ? Math.max(config.maxTotalTurns, 400) : config.maxTotalTurns;
+  const runCap = parsed?.stop.budgetUsd ? Math.min(Math.max(parsed.stop.budgetUsd, MAX_RUN_COST_USD), MAX_DEFINED_RUN_COST_USD) : MAX_RUN_COST_USD;
   const refuse = async (reason: string) => {
     await admin.from("element_comments").insert({
       element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
@@ -454,7 +467,7 @@ async function execute(a: ExecArgs): Promise<void> {
   const runner = pickRunner((runnerRows ?? []) as RunnerRow[], Date.now());
   if (runner) integrationSummary.push({ name: `この人の PC のブラウザ（${runner.name}）`, kind: "PC", delegation: "read_only", tools: RUNNER_TOOLS.length });
 
-  const liveTools: ToolDef[] = [...baseAgentTools(), ...(runner ? RUNNER_TOOLS : []), ...integrationDefs];
+  const liveTools: ToolDef[] = [...baseAgentTools(), ...(parsed?.metric ? [ROUND_TOOL] : []), ...(runner ? RUNNER_TOOLS : []), ...integrationDefs];
   const tools: ToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : liveTools;
   const kindOf = (name: string): ToolKind => {
     const base = baseKindOf(name);
@@ -556,7 +569,15 @@ async function execute(a: ExecArgs): Promise<void> {
         const title = String(input.title ?? "").trim().slice(0, 200);
         const content = String(input.content ?? "");
         if (!title) return { content: "title が必要です。", is_error: true };
-        const format = ["markdown", "text", "csv", "json"].includes(String(input.format)) ? String(input.format) : "markdown";
+        const format = ["markdown", "html", "text", "csv", "json"].includes(String(input.format)) ? String(input.format) : "markdown";
+        // The definition's output shape is checked before anything is saved.
+        if (parsed?.output) {
+          const problems = checkOutput(parsed.output, content, format);
+          if (problems.length) {
+            await addStep(admin, run.id, "thought", "成果物の型から外れているため差し戻し", problems.join("\n"));
+            return { content: `成果物の型に合っていないため保存しませんでした。直してから保存し直してください。\n${problems.map((p) => `- ${p}`).join("\n")}`, is_error: true };
+          }
+        }
         const { data: existing } = await userDb.from("agent_artifacts").select("id").eq("element_id", run.element_id).eq("title", title).maybeSingle();
         const res = existing
           ? await userDb.from("agent_artifacts").update({ content, format, run_id: run.id, updated_at: new Date().toISOString() }).eq("id", existing.id).select("id").single()
@@ -568,6 +589,30 @@ async function execute(a: ExecArgs): Promise<void> {
         const fileNote = "error" in file ? `（Artifacts への保存に失敗: ${file.error}）` : `、Artifacts に ${artifactFileName(title, format)}`;
         await addStep(admin, run.id, "artifact", `成果物を保存: ${title}`, `${content.length} 文字${fileNote}`);
         return { content: `成果物「${title}」を保存しました${"error" in file ? "" : `（Artifacts のファイル ${artifactFileName(title, format)}）`}。` };
+      }
+      case "record_round": {
+        if (!parsed?.metric) return { content: "この Element の定義には指標がありません。", is_error: true };
+        const { count } = await admin.from("run_iterations").select("id", { count: "exact", head: true }).eq("run_id", run.id);
+        const n = (count ?? 0) + 1;
+        const value = typeof input.value === "number" && Number.isFinite(input.value) ? input.value : null;
+        await admin.from("run_iterations").insert({
+          run_id: run.id, element_id: run.element_id, n, value,
+          change: String(input.change ?? "").slice(0, 2000), kept: input.kept === true, note: input.note ? String(input.note).slice(0, 2000) : null,
+        });
+        await addStep(admin, run.id, "thought", `${n} 周目: ${parsed.metric.name} ${value ?? "—"}（${input.kept === true ? "残す" : "戻す"}）`, String(input.change ?? ""));
+        const { data: rounds } = await admin.from("run_iterations").select("value").eq("run_id", run.id).order("n");
+        const values = ((rounds ?? []) as { value: number | null }[]);
+        const best = values.map((r) => r.value).filter((v): v is number => v != null);
+        const bestText = best.length ? `最良 ${parsed.metric.direction === "max" ? Math.max(...best) : Math.min(...best)}` : "まだ値なし";
+        const stop = loopStop(parsed, values, usage.cost);
+        if (stop) {
+          await addStep(admin, run.id, "status", `止める条件: ${stop}`);
+          return { content: `${n} 周目を記録しました（${bestText}）。止める条件を満たしました: ${stop}\n定義の「止める条件」に最終確認があればそれを済ませ、最良の状態に戻っていることを確かめてから finish を呼んでください。` };
+        }
+        const checks = checksDue(parsed, n)
+          ? `\n点検の周です。次の項目に照らして直近の作業を見直し、log_progress に結果を残してから続けてください:\n${parsed.checks.items.map((c) => `- ${c}`).join("\n")}`
+          : "";
+        return { content: `${n} 周目を記録しました（${bestText}）。続けてください。${checks}` };
       }
       case "finish": {
         const outcome = ["completed", "partial", "blocked"].includes(String(input.outcome)) ? String(input.outcome) as FinishPayload["outcome"] : "completed";
@@ -601,7 +646,13 @@ async function execute(a: ExecArgs): Promise<void> {
     // Resuming grants a fresh allowance on top of the turns already taken.
     if (a.body.resume) turnBudget = state.turns + maxTotalTurns;
   } else {
-    state = { messages: [{ role: "user", content: taskMessage(await loadContext(userDb, run, integrationSummary)) }], turns: 0, nudges: 0 };
+    const task = taskMessage(await loadContext(userDb, run, integrationSummary));
+    const defText = definition && parsedAll
+      ? definition.scope === "element"
+        ? definitionPrompt(definition.name, definition.body, parsedAll)
+        : `# Strategy の定義「${definition.name}」（この Strategy 全体の方針。依頼した人が定めたもので、従う。成果物の型とループはこの Element には課されない）\n${definition.body.slice(0, 40_000)}`
+      : null;
+    state = { messages: [{ role: "user", content: defText ? `${task}\n\n${defText}` : task }], turns: 0, nudges: 0 };
     turnBudget = maxTotalTurns;
     await addStep(admin, run.id, "status", run.mode === "reply" ? "依頼を受けて実行を開始" : "任務の実行を開始", `${agentName} / ${config.modelLabel}`);
   }
@@ -748,7 +799,7 @@ async function execute(a: ExecArgs): Promise<void> {
         model,
         max_tokens: 4000,
         system: VERIFY_SYSTEM,
-        messages: [{ role: "user", content: verifyPrompt({ element: el, intents, finish, artifacts: (arts ?? []) as { title: string; content: string }[], usedWeb }) }],
+        messages: [{ role: "user", content: verifyPrompt({ element: el, intents, finish, artifacts: (arts ?? []) as { title: string; content: string }[], usedWeb, definition: definition?.body ?? null }) }],
         output_config: { effort: "low", format: { type: "json_schema", schema: VERDICT_SCHEMA } },
       // deno-lint-ignore no-explicit-any
       } as any);
@@ -818,7 +869,7 @@ async function execute(a: ExecArgs): Promise<void> {
     onUsage: recordUsage,
     verify: run.mode === "reply" || external ? undefined : verifyFinish,
     afterTurn: () => saveTranscript(),
-    budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= MAX_RUN_COST_USD,
+    budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= runCap,
     cancelled: async () => {
       const { data } = await admin.from("agent_runs").select("status").eq("id", run.id).maybeSingle();
       return data?.status === "cancelled";
@@ -874,8 +925,8 @@ async function execute(a: ExecArgs): Promise<void> {
 
     case "budget": {
       await saveTranscript();
-      const why = usage.cost >= MAX_RUN_COST_USD
-        ? `1 回の実行の上限（$${MAX_RUN_COST_USD}）に達したため一時停止しました。`
+      const why = usage.cost >= runCap
+        ? `1 回の実行の上限（$${runCap}）に達したため一時停止しました。`
         : run.activity_space_id ? "この Space の今月の AI 予算の上限に達したため一時停止しました。" : "今月の AI 予算（個人）の上限に達したため一時停止しました。";
       await admin.from("agent_runs").update({ status: "paused", error: why }).eq("id", run.id).eq("status", "running");
       await addStep(admin, run.id, "error", "予算の上限に達しました", why);
@@ -958,6 +1009,24 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
       console.error("run-agent: advance failed", errorMessage(e));
     }
   }
+}
+
+/** The definition an Element follows: its own, else the first of its Strategies'. */
+async function loadDefinition(userDb: SupabaseClient, elementId: string): Promise<{ name: string; body: string; scope: "element" | "strategy" } | null> {
+  const { data: el } = await userDb.from("elements").select("definition_id, object_id").eq("id", elementId).maybeSingle();
+  let id = (el as { definition_id?: string | null } | null)?.definition_id ?? null;
+  const scope: "element" | "strategy" = id ? "element" : "strategy";
+  if (!id && el?.object_id) {
+    const { data: links } = await userDb.from("strategy_objects").select("strategy_id").eq("object_id", el.object_id);
+    const ids = ((links ?? []) as { strategy_id: string }[]).map((l) => l.strategy_id);
+    if (ids.length) {
+      const { data: s } = await userDb.from("strategies").select("definition_id").in("id", ids).not("definition_id", "is", null).limit(1);
+      id = ((s ?? []) as { definition_id: string }[])[0]?.definition_id ?? null;
+    }
+  }
+  if (!id) return null;
+  const { data: d } = await userDb.from("definitions").select("name, body").eq("id", id).maybeSingle();
+  return d ? { ...(d as { name: string; body: string }), scope } : null;
 }
 
 /** The delegation of the Strategies an Element's Object serves. */

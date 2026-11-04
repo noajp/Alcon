@@ -23,6 +23,8 @@ import {
 } from './missionModel';
 import { STATE_LABEL, Stat, compact, stateColor, type MissionContext } from './MissionPanels';
 import { YourTurnTray } from './YourTurnTray';
+import { DefinitionPanel } from './DefinitionPanel';
+import { setElementDefinition, useDefinitions, useRunRounds, type Definition, type RoundSummary } from '@/hooks/definitionData';
 
 // The Execution tab's mission: the Strategy's Objects in one column and the
 // Elements of the chosen Object in the next, joined by lines from the chosen
@@ -122,10 +124,34 @@ function ObjectCard({ object, domainName, selected, dropTarget, onSelect, onDrag
 /** What the Execution tab adds under a card's title: what it delivers,
  *  what it waits on, the model that ran it and what that cost, and a hand-off
  *  to Claude Code. */
-function MissionLines({ element, busy, onHandOver }: { element: FleetElement; busy: boolean; onHandOver?: () => void }) {
+/** The Element's own definition, chosen on its card: its output shape and its
+ *  loop are enforced for it (a Strategy's definition only directs). */
+function DefinitionPick({ value, definitions, onChange }: { value: string | null; definitions: Definition[]; onChange: (id: string | null) => void }) {
+  const { t } = useI18n();
+  if (definitions.length === 0 && !value) return null;
+  return (
+    <label className="flex min-w-0 items-center gap-1.5" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+      <span className="shrink-0">{t('Definition')}</span>
+      <select value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}
+        className="min-w-0 flex-1 truncate rounded border border-border/60 bg-transparent px-1 py-0.5 text-[12px] text-foreground">
+        <option value="">{t('The Strategy\'s')}</option>
+        {definitions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function MissionLines({ element, busy, onHandOver, rounds, definitionPick }: { element: FleetElement; busy: boolean; onHandOver?: () => void; rounds?: RoundSummary; definitionPick?: React.ReactNode }) {
   const { t } = useI18n();
   const meta = [element.model, element.costUsd > 0 ? `$${element.costUsd.toFixed(2)}` : null].filter(Boolean).join(' · ');
-  if (!element.serves.length && !element.waitsOn.length && !meta && !onHandOver) return null;
+  // A loop's progress: how many rounds, the latest value and the best.
+  const loop = rounds && rounds.rounds > 0
+    ? t('{n} rounds · latest {last} · best {best}', {
+      n: rounds.rounds, last: rounds.last ?? '—',
+      best: rounds.values.length ? Math.max(...rounds.values) : '—',
+    })
+    : null;
+  if (!element.serves.length && !element.waitsOn.length && !meta && !onHandOver && !loop && !definitionPick) return null;
   return (
     <div className="mt-1.5 space-y-0.5 text-[12px] leading-5 text-muted-foreground">
       {element.serves.length > 0 && (
@@ -134,6 +160,8 @@ function MissionLines({ element, busy, onHandOver }: { element: FleetElement; bu
       {element.waitsOn.length > 0 && (
         <div className="flex min-w-0 items-center gap-1.5"><Clock size={12} className="shrink-0" /><span className="truncate">{t('After {items}', { items: element.waitsOn.join(', ') })}</span></div>
       )}
+      {loop && <div className="tabular-nums">{loop}</div>}
+      {definitionPick}
       {(meta || onHandOver) && (
         <div className="flex items-center gap-2 tabular-nums">
           {meta && <span className="truncate">{meta}</span>}
@@ -291,6 +319,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   // Before the dependencies are read every AI Element would look ready.
   const ready = ctx.missionLoaded ? current.flatMap((o) => o.elements.filter((e) => e.ready)) : [];
   const handable = current.flatMap((o) => o.elements.filter((e) => e.handable));
+  const rounds = useRunRounds(ctx.elements.map((e) => e.id));
+  const definitions = useDefinitions(ctx.spaceId);
   const turns = useMemo(() => yourTurn({ fleet: current, elements: ctx.elements, runs: ctx.mission.runs, actions: ctx.mission.actions }),
     [current, ctx.elements, ctx.mission.runs, ctx.mission.actions]);
 
@@ -309,6 +339,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
       const next = normalizePlan(reply.plan, new Set(ctx.measures.map((m) => m.id)), {
         objects: new Map(objects.map((o) => [o.id, o.name])),
         domainIds: new Set(domains.map((d) => d.id)),
+        definitionIds: new Set(definitions.data.map((d) => d.id)),
       });
       if (next.tasks.length === 0) setError(t('The Planner returned no tasks. Add guidance and try again.'));
       else { setDraft(next); setSelected(null); }
@@ -483,6 +514,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
             : t('Nothing starts until you approve the result.')}</span>
         </label>
 
+        <DefinitionPanel spaceId={ctx.spaceId} definitionId={ctx.definitionId} canEdit={ctx.canEdit} onChange={ctx.setDefinition} />
+
         <div className="flex items-start gap-2">
           <textarea value={guidance} onChange={(e) => setGuidance(e.target.value)} rows={2}
             placeholder={t('Guidance for the Planner (optional): scope, constraints, what to leave out…')}
@@ -621,7 +654,11 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
                             trigger={<button type="button" className="cursor-pointer" aria-label={t('Change status')}><StateBadge state={e.state} /></button>} />
                         </span>
                       ) : <StateBadge state={e.state} />}
-                      extra={<MissionLines element={e} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
+                      extra={<MissionLines element={e} rounds={rounds.get(e.elementId)} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
+                        definitionPick={ctx.canEdit ? (
+                          <DefinitionPick value={details.get(e.elementId)?.definition_id ?? null} definitions={definitions.data}
+                            onChange={(id) => void setElementDefinition(e.elementId!, id).then(() => ctx.refetch())} />
+                        ) : undefined}
                         onHandOver={!draft && e.handable ? () => void handOver([e.elementId!]) : undefined} />} />
                   ) : (
                     <DraftCard element={e} draggable={ctx.canEdit} />

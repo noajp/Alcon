@@ -32,6 +32,9 @@ export interface MissionContext {
   /** How far the Strategy's AI work goes on its own. */
   delegation: StrategyDelegation;
   setDelegation: (d: StrategyDelegation) => Promise<void>;
+  /** The definition the Strategy's Elements follow. */
+  definitionId: string | null;
+  setDefinition: (id: string | null) => Promise<void>;
   refetch: () => void;
   /** Elements open their Object, as everywhere on this page. */
   onOpenElement: (elementId: string) => void;

@@ -46,7 +46,7 @@ export const INTERNAL_TOOLS: ToolDef[] = [
       properties: {
         title: { type: "string" },
         content: { type: "string", description: "成果物の本文" },
-        format: { type: "string", enum: ["markdown", "text", "csv", "json"] },
+        format: { type: "string", enum: ["markdown", "html", "text", "csv", "json"] },
       },
       required: ["title", "content"],
       additionalProperties: false,
@@ -106,7 +106,24 @@ export const AGENT_BOARD_TOOL_NAMES = [
 
 export const AGENT_STRATEGY_TOOL_NAMES = ["listInitiatives", "getInitiative"] as const;
 
-const INTERNAL = new Set(INTERNAL_TOOLS.map((t) => t.name));
+/** A round of a loop, for an Element whose definition names a metric. */
+export const ROUND_TOOL: ToolDef = {
+  name: "record_round",
+  description: "ループの 1 周を記録する。計測した指標の値・変えたこと・残したか戻したかを書く。止める条件や点検の周に当たれば、答えで知らせる。",
+  input_schema: {
+    type: "object",
+    properties: {
+      value: { type: "number", description: "この周で計測した指標の値。計測できなかったら省く" },
+      change: { type: "string", description: "この周で変えたこと（仮説と変更）" },
+      kept: { type: "boolean", description: "変更を残したら true、戻したら false" },
+      note: { type: "string" },
+    },
+    required: ["change", "kept"],
+    additionalProperties: false,
+  },
+};
+
+const INTERNAL = new Set([...INTERNAL_TOOLS.map((t) => t.name), ROUND_TOOL.name]);
 const BOARD = new Set<string>(AGENT_BOARD_TOOL_NAMES);
 const STRATEGY = new Set<string>(AGENT_STRATEGY_TOOL_NAMES);
 

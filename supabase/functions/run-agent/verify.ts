@@ -14,6 +14,8 @@ export interface VerifyInput {
   artifacts: { title: string; content: string }[];
   /** The run used web search or fetch: facts it states should carry a source. */
   usedWeb: boolean;
+  /** The definition the work follows (its checks and output shape are criteria). */
+  definition?: string | null;
 }
 
 export const VERIFY_SYSTEM = `あなたは成果物の検証役です。AI エージェントが「任務を完了した」と報告しました。任務と成功条件に照らして、本当に完了と言えるかを判定します。
@@ -62,6 +64,7 @@ ${take(v.finish.message, 8_000)}
 
 # 保存された成果物
 ${artifacts || "(なし)"}
+${v.definition ? `\n# この仕事の定義（点検項目と成果物の型は判定基準に含める）\n${take(v.definition, 12_000)}\n` : ""}
 
 # 補足
 ${v.usedWeb ? "このエージェントは Web で調べている。" : "このエージェントは Web を使っていない。"}

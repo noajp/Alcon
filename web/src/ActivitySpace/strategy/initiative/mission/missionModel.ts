@@ -385,6 +385,8 @@ export interface PlanTask {
   object: string | null;
   dependsOn: string[];
   assignee: 'ai' | 'human';
+  /** The Space's definition the task follows, when the Planner found one that fits. */
+  definitionId?: string | null;
 }
 
 export interface PlanDraft { summary: string; objectives: PlanObjective[]; objects: PlanObject[]; tasks: PlanTask[] }
@@ -398,7 +400,7 @@ const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slic
 export function normalizePlan(
   raw: unknown,
   measureIds: ReadonlySet<string>,
-  known: { objects?: ReadonlyMap<string, string>; domainIds?: ReadonlySet<string> } = {},
+  known: { objects?: ReadonlyMap<string, string>; domainIds?: ReadonlySet<string>; definitionIds?: ReadonlySet<string> } = {},
 ): PlanDraft {
   const r = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
   const objectives: PlanObjective[] = [];
@@ -447,6 +449,7 @@ export function normalizePlan(
     tasks.push({
       key, title, description: text(x.description, 4000), objective, object, dependsOn,
       assignee: x.assignee === 'human' ? 'human' : 'ai',
+      definitionId: typeof x.definitionId === 'string' && known.definitionIds?.has(x.definitionId) ? x.definitionId : null,
     });
     if (tasks.length >= 30) break;
   }

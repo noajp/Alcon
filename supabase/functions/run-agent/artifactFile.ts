@@ -13,6 +13,7 @@ const EXT: Record<string, { ext: string; mime: string }> = {
   text: { ext: "txt", mime: "text/plain" },
   csv: { ext: "csv", mime: "text/csv" },
   json: { ext: "json", mime: "application/json" },
+  html: { ext: "html", mime: "text/html" },
 };
 
 /** Pure. The file name an output is kept under: its title, made safe for a

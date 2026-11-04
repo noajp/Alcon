@@ -7,6 +7,7 @@ import { createElement } from './elementData';
 import { createObject } from './objectData';
 import { addIntentBinding, createIntent } from './strategyData';
 import { setElementDependency } from './coordinationData';
+import { setElementDefinition } from './definitionData';
 
 // =============================================================
 // A Strategy's mission, read and written: the runs, artifacts, approvals
@@ -127,7 +128,7 @@ export interface ApplyPlanInput {
   dispatch?: boolean;
   objectives: { key: string; title: string; measureId: string | null }[];
   objects: { key: string; objectId: string | null; name: string; domainId: string | null }[];
-  tasks: { key: string; title: string; description: string; objective: string | null; object: string | null; dependsOn: string[]; assignee: 'ai' | 'human' }[];
+  tasks: { key: string; title: string; description: string; objective: string | null; object: string | null; dependsOn: string[]; assignee: 'ai' | 'human'; definitionId?: string | null }[];
 }
 
 export interface ApplyPlanResult {
@@ -193,6 +194,8 @@ export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyP
         ...(handOver ? { labels: ['dispatch'] } : {}),
       });
       elementFor.set(t.key, el.id);
+      // The definition the Planner matched to this task, from the Space's library.
+      if (t.definitionId) await setElementDefinition(el.id, t.definitionId);
       const measureId = t.objective ? measureFor.get(t.objective) : undefined;
       if (measureId) {
         await addIntentBinding({ intent_id: measureId, target_type: 'element', target_id: el.id, relationship_type: 'delivers' });

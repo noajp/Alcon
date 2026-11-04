@@ -40,6 +40,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import type { StrategyDelegation } from '@/types/database';
+import { setStrategyDefinition } from '@/hooks/definitionData';
 import { ObjectIcon } from '@/shell/icons';
 import { InitiativeIntentProvider } from '@/ActivitySpace/strategy/initiative/InitiativeIntent';
 import { StrategyCommentsPanel } from '@/ActivitySpace/strategy/initiative/StrategyCommentsPanel';
@@ -534,6 +535,8 @@ function StrategyDetailView({
     objects: allObjects.filter((o) => selectedIds.has(o.id)),
     delegation: strategy.delegation ?? 'manual',
     onDelegationChange: async (delegation: StrategyDelegation) => { await updateStrategy(strategy.id, { delegation }); onSaved(); },
+    definitionId: strategy.definition_id ?? null,
+    onDefinitionChange: async (id: string | null) => { await setStrategyDefinition(strategy.id, id); onSaved(); },
     onChanged: () => { void refetchObjects(); onSaved(); },
     onOpenObject,
   };
