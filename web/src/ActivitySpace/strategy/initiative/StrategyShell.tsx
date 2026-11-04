@@ -129,6 +129,7 @@ export function StrategyShell({
   onSelectStrategy,
   onOpenObject,
   onOpenDomain,
+  onOpenTable,
   createRequested,
   onCreateHandled,
 }: {
@@ -142,6 +143,8 @@ export function StrategyShell({
    *  the active Domain context before navigating. */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
   onOpenDomain?: (domainId: string) => void;
+  /** Open one of the Strategy's Tables in the Table view. */
+  onOpenTable?: (tableId: string) => void;
   /** The sidebar's "+" asked for a new Strategy (navigation.strategyCreate).
    *  The dialog opens on the root list and `onCreateHandled` clears it. */
   createRequested?: boolean;
@@ -180,6 +183,7 @@ export function StrategyShell({
         onSaved={() => refetchStrategies()}
         onOpenObject={onOpenObject}
         onOpenDomain={onOpenDomain}
+        onOpenTable={onOpenTable}
       />
     );
   }
@@ -433,6 +437,7 @@ function StrategyDetailView({
   onSaved,
   onOpenObject,
   onOpenDomain,
+  onOpenTable,
 }: {
   strategy: StrategyWithObjects;
   /** Every Strategy, so this page can list/pick its nested children. */
@@ -443,6 +448,7 @@ function StrategyDetailView({
   onSaved: () => void;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
   onOpenDomain?: (domainId: string) => void;
+  onOpenTable?: (tableId: string) => void;
 }) {
   const { t } = useI18n();
   const [name, setName] = useState(strategy.name);
@@ -539,6 +545,7 @@ function StrategyDetailView({
     onDefinitionChange: async (id: string | null) => { await setStrategyDefinition(strategy.id, id); onSaved(); },
     onChanged: () => { void refetchObjects(); onSaved(); },
     onOpenObject,
+    onOpenTable,
   };
 
   const childStrategies = useMemo(

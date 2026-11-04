@@ -1,4 +1,5 @@
 import { BOARD_TOOLS, type ToolDef } from "../_shared/boardTools.ts";
+import { RECORD_TOOLS } from "./records.ts";
 import { STRATEGY_TOOLS } from "../_shared/strategyTools.ts";
 import type { ToolKind } from "./loop.ts";
 
@@ -124,7 +125,8 @@ export const ROUND_TOOL: ToolDef = {
   },
 };
 
-const INTERNAL = new Set([...INTERNAL_TOOLS.map((t) => t.name), ROUND_TOOL.name]);
+// Saving and reading the Strategy's Tables is the run's own work, like saving an artifact.
+const INTERNAL = new Set([...INTERNAL_TOOLS.map((t) => t.name), ROUND_TOOL.name, ...RECORD_TOOLS.map((t) => t.name)]);
 const BOARD = new Set<string>(AGENT_BOARD_TOOL_NAMES);
 const STRATEGY = new Set<string>(AGENT_STRATEGY_TOOL_NAMES);
 

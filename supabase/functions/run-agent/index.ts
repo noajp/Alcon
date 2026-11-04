@@ -39,6 +39,8 @@ import {
 import { isGoogleDriveRow } from "../_shared/googleOAuth.ts";
 import { fetchPull, pullUrlsIn, upsertCodeChange, withGithubToken } from "../_shared/github.ts";
 import { DRIVE_TOOLS, driveOperationLabel, runDriveTool } from "../_shared/googleDrive.ts";
+import { RECORD_TOOLS } from "./records.ts";
+import { readRecords, saveRecords, strategyOfElement, strategyTableLines, type RecordScope } from "./recordStore.ts";
 import { TOOL_SEARCH, needsToolSearch, toolParamsFor, withDeferral, type RunToolDef } from "./toolLoading.ts";
 import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR, webSteps, webTools } from "./agentTools.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
@@ -382,6 +384,11 @@ async function execute(a: ExecArgs): Promise<void> {
   }
   await admin.from("agent_runs").update({ model, worker_id: workerId }).eq("id", run.id);
   const actor: BoardActor = { agent: `${agentName}（AI）`, userId: user.id };
+  // The Strategy the Element serves: its Tables are where the run keeps what it found.
+  const served = await strategyOfElement(userDb, run.element_id);
+  const recordScope: RecordScope | null = served
+    ? { strategyId: served.strategyId, domainId: served.domainId, elementId: run.element_id, runId: run.id, userId: user.id, agentName }
+    : null;
 
   // ── Budget ──────────────────────────────────────────────────────────────
   // The Space's monthly budget; for an Element outside any Space, its
@@ -512,7 +519,7 @@ async function execute(a: ExecArgs): Promise<void> {
 
   // A connection's tools load when the model searches for them, once there are many.
   const liveTools: RunToolDef[] = withDeferral(
-    [...baseAgentTools(), ...(parsed?.metric ? [ROUND_TOOL] : []), ...(runner ? RUNNER_TOOLS : []), ...(machine ? MACHINE_TOOLS : [])],
+    [...baseAgentTools(), ...(recordScope ? RECORD_TOOLS : []), ...(parsed?.metric ? [ROUND_TOOL] : []), ...(runner ? RUNNER_TOOLS : []), ...(machine ? MACHINE_TOOLS : [])],
     integrationDefs,
   );
   const tools: RunToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : liveTools;
@@ -676,6 +683,22 @@ async function execute(a: ExecArgs): Promise<void> {
         return { content: "完了報告を受け取りました。", finish };
       }
     }
+    if (call.name === "save_records" || call.name === "read_records") {
+      if (!recordScope) return { content: "この Element は Strategy に属していないので、表は使えません。", is_error: true };
+      try {
+        if (call.name === "read_records") {
+          const text = await readRecords(userDb, admin, recordScope, input);
+          await addStep(admin, run.id, "action", `表を読む: ${String(input.table ?? "")}`);
+          return { content: text };
+        }
+        const r = await saveRecords(userDb, admin, recordScope, input);
+        const line = `表「${r.table}」${r.created ? "（新規）" : ""}: 追加 ${r.added}・更新 ${r.updated}・変化なし ${r.unchanged}`;
+        await addStep(admin, run.id, "artifact", `表に保存: ${r.table}`, [line, ...r.skipped, r.notified ? `見直しを依頼した Element: ${r.notified} 件` : ""].filter(Boolean).join("\n"));
+        return { content: `${line}${r.skipped.length ? `\n保存しなかったもの:\n${r.skipped.map((s) => `- ${s}`).join("\n")}` : ""}${r.notified ? `\nこの表を使って完了していた Element ${r.notified} 件を見直しに戻しました。` : ""}` };
+      } catch (e) {
+        return { content: errorMessage(e), is_error: true };
+      }
+    }
     if (isRunnerTool(call.name)) return await callRunner(call, runner, runnerResultText);
     if (isMachineTool(call.name)) return await callRunner(call, machine, machineResultText);
     if (baseKindOf(call.name) === "board") {
@@ -703,7 +726,7 @@ async function execute(a: ExecArgs): Promise<void> {
     // Resuming grants a fresh allowance on top of the turns already taken.
     if (a.body.resume) turnBudget = state.turns + maxTotalTurns;
   } else {
-    const task = taskMessage(await loadContext(userDb, run, integrationSummary));
+    const task = taskMessage(await loadContext(userDb, run, integrationSummary, recordScope ? await strategyTableLines(userDb, recordScope.strategyId) : null));
     const defText = definition && parsedAll
       ? definition.scope === "element"
         ? definitionPrompt(definition.name, definition.body, parsedAll)
@@ -1185,7 +1208,7 @@ async function loadUpstream(userDb: SupabaseClient, ids: string[]): Promise<Task
   });
 }
 
-async function loadContext(userDb: SupabaseClient, run: Run, integrations: TaskContext["integrations"]): Promise<TaskContext> {
+async function loadContext(userDb: SupabaseClient, run: Run, integrations: TaskContext["integrations"], tables: string[] | null): Promise<TaskContext> {
   const { data: el } = await userDb.from("elements")
     .select("id, display_id, title, description, status, priority, due_date, labels, object_id").eq("id", run.element_id).single();
   if (!el) throw new Error("対象の Element が見つかりません。");
@@ -1224,6 +1247,7 @@ async function loadContext(userDb: SupabaseClient, run: Run, integrations: TaskC
     artifacts: ((artifacts.data ?? []) as { title: string }[]).map((x) => x.title),
     upstream,
     integrations,
+    tables,
     today: new Date().toISOString().slice(0, 10),
   };
 }

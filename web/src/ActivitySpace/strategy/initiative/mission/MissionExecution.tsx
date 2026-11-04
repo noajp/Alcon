@@ -24,6 +24,7 @@ import {
 import { STATE_LABEL, Stat, compact, stateColor, type MissionContext } from './MissionPanels';
 import { YourTurnTray } from './YourTurnTray';
 import { DefinitionPanel } from './DefinitionPanel';
+import { StrategyTables } from './StrategyTables';
 import { setElementAiWeight, setElementDefinition, useDefinitions, useRunRounds, type Definition, type RoundSummary } from '@/hooks/definitionData';
 
 // The Execution tab's mission: the Strategy's Objects in one column and the
@@ -531,6 +532,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
         </label>
 
         <DefinitionPanel spaceId={ctx.spaceId} definitionId={ctx.definitionId} canEdit={ctx.canEdit} onChange={ctx.setDefinition} />
+
+        <StrategyTables strategyId={ctx.initiativeId} onOpen={ctx.onOpenTable} />
 
         <div className="flex items-start gap-2">
           <textarea value={guidance} onChange={(e) => setGuidance(e.target.value)} rows={2}
