@@ -124,7 +124,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
         }}>
           <SortableContext items={tabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
             <div className="min-w-0 overflow-x-auto">
-              <div className="flex w-max items-center gap-0.5">
+              <div className="flex w-max items-center gap-1.5">
               {tabs.map(tab => <SortableViewTab key={tab.id} tab={tab} active={tab.id === activeTabId}
                 sortable={!!onTabReorder} onSelect={() => onTabSelect(tab.id)} onContextMenu={e => handleContextMenu(e, tab)} />)}
               </div>
