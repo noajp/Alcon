@@ -1,9 +1,9 @@
-// One Initiative's health, read off its Elements — for a list row.
+// One Strategy's health, read off its Elements — for a list row.
 //
-// The Initiative page already has the full cross-section (initiativeRiskModel:
+// The Strategy page already has the full cross-section (initiativeRiskModel:
 // overdue / stalled / blocked / due-soon, per Object, per Worker). A list row
 // cannot carry that and should not try; it needs the three things a person
-// scans the Initiative list for: how far along, how recently anything moved, and
+// scans the Strategy list for: how far along, how recently anything moved, and
 // whether something is on fire. This file derives exactly those, and reuses
 // the risk model's own predicates so the row and the page can never disagree
 // about what "stalled" or "overdue" means — provided the caller hands it the
@@ -24,15 +24,15 @@ import {
 import { completionOf } from '@/Function/shared/completion';
 
 export interface InitiativeHealth {
-  /** Elements homed in the Initiative's Objects, cancelled ones excluded. */
+  /** Elements homed in the Strategy's Objects, cancelled ones excluded. */
   total: number;
   done: number;
   /** 0–100, or null when there is nothing to measure against. */
   progressPct: number | null;
-  /** Newest progress signal across the Initiative's Elements, or null when no
+  /** Newest progress signal across the Strategy's Elements, or null when no
    *  Element has ever reported. */
   lastActivityAt: number | null;
-  /** The risk model's counts for this Initiative's scope. */
+  /** The risk model's counts for this Strategy's scope. */
   risk: Pick<InitiativeRiskReport, 'openTotal' | 'overdue' | 'stalled' | 'blocked' | 'scheduled'>;
   /**
    * Whether "overdue" is a measurement here at all. With no dated open
@@ -60,7 +60,7 @@ export function computeInitiativeHealth(
   }
 
   // The caller attaches each Object's Domain thresholds, so "stalled" here is
-  // the same judgement the Initiative page makes — not the model default.
+  // the same judgement the Strategy page makes — not the model default.
   const report = computeInitiativeRisk(objects, scoped, now, options);
 
   return {

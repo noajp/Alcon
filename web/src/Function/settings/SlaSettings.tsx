@@ -9,7 +9,7 @@ import { SettingsSection, SettingsRow } from './SettingsSection';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // Settings > Elements > SLAs. An SLA here is not another due date — it is the
-// threshold policy the Initiative cross-section (initiativeRiskModel) judges a
+// threshold policy the Strategy cross-section (initiativeRiskModel) judges a
 // Domain's work by: how close a date has to be before unstarted work is "due
 // soon", how long in-flight work may go without a progress comment before it
 // is "stalled", how long an Object with open, unstarted work may sit before it
@@ -138,7 +138,7 @@ export function SlaSettings() {
   return (
     <div className="space-y-6">
       <p className="text-[12px] text-muted-foreground -mt-2">
-        {t('How the Initiative cross-section judges each Domain’s work. Leave a field blank to use the default shown. Changes take effect the next time an Initiative’s risk is computed.')}
+        {t('How the Strategy cross-section judges each Domain’s work. Leave a field blank to use the default shown. Changes take effect the next time a Strategy’s risk is computed.')}
       </p>
 
       {domains.map((domain) => {

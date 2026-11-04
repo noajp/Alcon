@@ -197,9 +197,9 @@ export function useStrategies() {
   };
 }
 
-/** The Initiatives a Space-wide list shows: useStrategies without those of
+/** The Strategies a Space-wide list shows: useStrategies without those of
  *  the viewer's other Spaces (showsInSpace). Lookups by id or by Object use
- *  useStrategies, so an Object still shows an Initiative of another Space. */
+ *  useStrategies, so an Object still shows a Strategy of another Space. */
 export function useStrategiesInSpace() {
   const strategies = useStrategies();
   const activeSpaceId = useActiveSpaceId();
@@ -225,7 +225,7 @@ export async function createStrategy(
   if (!createdBy) throw new Error('Not signed in');
   const { data, error } = await supabase
     .from('strategies')
-    // The Space it is created in; a Vision overrides it (DB trigger).
+    // The Space it is created in.
     .insert({ ...input, created_by: createdBy, activity_space_id: input.activity_space_id ?? getActiveSpaceId() })
     .select()
     .single();
@@ -235,7 +235,7 @@ export async function createStrategy(
     const rows = objectIds.map((object_id) => ({ strategy_id: strategy.id, object_id }));
     const { error: linkErr } = await supabase.from('strategy_objects').insert(rows);
     if (linkErr) {
-      // Take the half-made Initiative back out, so trying again does not
+      // Take the half-made Strategy back out, so trying again does not
       // leave two of it.
       await supabase.from('strategies').delete().eq('id', strategy.id);
       throw linkErr;
@@ -261,14 +261,14 @@ export async function deleteStrategy(id: string): Promise<void> {
   const { data, error } = await supabase.from('strategies').delete().eq('id', id).select('id');
   if (error) {
     // domain_approaches.strategy_id is ON DELETE RESTRICT.
-    if (error.code === '23503') throw new Error('A Domain approach still points at this Initiative — remove it first.');
+    if (error.code === '23503') throw new Error('A Domain approach still points at this Strategy — remove it first.');
     throw error;
   }
-  if (!data?.length) throw new Error("Only the Initiative's owner can delete it.");
+  if (!data?.length) throw new Error("Only the Strategy's owner can delete it.");
   invalidateStrategies();
 }
 
-/** Makes an Initiative's Objects exactly `objectIds`, writing only the
+/** Makes a Strategy's Objects exactly `objectIds`, writing only the
  *  difference: links to add first, then links to drop — so a failure part
  *  way leaves extra links rather than none (the old delete-all-then-insert
  *  lost every link when the insert failed). */
@@ -291,7 +291,7 @@ export async function setStrategyObjects(strategyId: string, objectIds: string[]
     const { data: dropped, error } = await supabase.from('strategy_objects').delete()
       .eq('strategy_id', strategyId).in('object_id', toRemove).select('object_id');
     if (error) throw error;
-    if ((dropped?.length ?? 0) < toRemove.length) throw new Error(translate('Some Objects could not be unlinked from this Initiative.'));
+    if ((dropped?.length ?? 0) < toRemove.length) throw new Error(translate('Some Objects could not be unlinked from this Strategy.'));
   }
 }
 
@@ -305,7 +305,7 @@ export function diffLinks(current: readonly string[], next: readonly string[]): 
   };
 }
 
-/** Adds one Object to an Initiative (a link that already exists is kept). */
+/** Adds one Object to a Strategy (a link that already exists is kept). */
 export async function linkObjectToStrategy(strategyId: string, objectId: string): Promise<void> {
   const { error } = await supabase.from('strategy_objects')
     .upsert({ strategy_id: strategyId, object_id: objectId }, { onConflict: 'strategy_id,object_id', ignoreDuplicates: true });
@@ -313,7 +313,7 @@ export async function linkObjectToStrategy(strategyId: string, objectId: string)
   invalidateStrategies();
 }
 
-// Initiative nesting — an Initiative can hold other Initiatives as children,
+// Strategy nesting — a Strategy can hold other Strategies as children,
 // DAG so multi-parent is allowed. The DB refuses
 // any edge that would close a cycle (23514); the picker also hides the
 // current Strategy's ancestors so that is rarely reached.
@@ -333,21 +333,17 @@ export async function removeStrategyChild(parentStrategyId: string, childStrateg
   if (error) throw error;
 }
 
-/** Moves an Initiative: into another Initiative (it takes that one's Vision)
- *  or, with `parentId` null, to the top of a Vision (or of no Vision). It
- *  leaves the parents it had. A move that would put it inside itself is
- *  refused by the database. */
-export async function moveInitiative(id: string, to: { parentId: string | null; visionId: string | null }, fromParentIds: string[]): Promise<void> {
+/** Moves a Strategy into another Strategy, or with `parentId` null to the
+ *  top. It leaves the parents it had. A move that would put it inside
+ *  itself is refused by the database. */
+export async function moveInitiative(id: string, to: { parentId: string | null }, fromParentIds: string[]): Promise<void> {
   if (to.parentId && !fromParentIds.includes(to.parentId)) await addStrategyChild(to.parentId, id);
   for (const parent of fromParentIds) if (parent !== to.parentId) await removeStrategyChild(parent, id);
-  const { error } = await supabase.from('strategies')
-    .update({ vision_id: to.visionId, updated_at: new Date().toISOString() }).eq('id', id);
-  if (error) throw error;
   invalidateStrategies();
 }
 
 // ============================================
-// Initiative comments — the Strategy layer's thread
+// Strategy comments — the Strategy layer's thread
 // ============================================
 //
 // Same shape as element comments, and deliberately the same call signatures,
@@ -385,9 +381,9 @@ const STRATEGY_COMMENTS_PREFIX = ['strategy-comments'] as const;
 const NO_STRATEGY_COMMENTS: StrategyComment[] = [];
 
 /**
- * One Initiative's thread, live. The realtime subscription is the point: the
+ * One Strategy's thread, live. The realtime subscription is the point: the
  * comments that matter most here are written by agents over the API while
- * the Initiative sits open on screen, and a thread that only refreshes on
+ * the Strategy sits open on screen, and a thread that only refreshes on
  * navigation would show a stale answer to a question just asked.
  */
 export function useStrategyComments(strategyId: string | null) {
@@ -400,7 +396,7 @@ export function useStrategyComments(strategyId: string | null) {
         // The cache keeps whatever is on screen — a blank thread would read
         // as "nothing was ever said here" — but say so rather than failing
         // silently.
-        console.error('Failed to load Initiative comments:', e);
+        console.error('Failed to load Strategy comments:', e);
         throw e;
       }),
     enabled: !!strategyId,
@@ -526,7 +522,7 @@ export function useStrategyIntentBundle(strategyId: string | null) {
 /**
  * The bindings that land on a set of targets, and the Intents behind them —
  * the round trip read from the Execution side. `useStrategyIntentBundle`
- * reads a Initiative's edges outward; this reads an Element's (or an Object's,
+ * reads a Strategy's edges outward; this reads an Element's (or an Object's,
  * or a Phase's) inward, which is the direction nothing could read before.
  *
  * Filters by target id only. Ids are uuids, so a collision across target

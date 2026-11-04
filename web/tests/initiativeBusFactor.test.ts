@@ -5,7 +5,7 @@
 // What is pinned here is the arithmetic that decision rests on: what counts as
 // a second person, that finished work cannot be depended on, that an absence
 // inside the window is read off the same capacity model the load chart uses,
-// and that a Worker the Initiative cannot resolve is treated as present rather
+// and that a Worker the Strategy cannot resolve is treated as present rather
 // than as away.
 
 import { describe, expect, it } from 'vitest';

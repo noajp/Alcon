@@ -71,7 +71,7 @@ function createCommandIcon(id: CreateCommandId): React.ComponentType<{ size?: nu
   switch (id) {
     case 'create-element':  return ElementIcon;
     case 'create-object':   return ObjectIcon;
-    case 'create-initiative': return NavStrategyIcon;
+    case 'create-strategy': return NavStrategyIcon;
   }
 }
 
@@ -130,16 +130,16 @@ export function CommandPalette({ scope, returnTo, onNavigate, onViewChange, onOp
     close();
   };
 
-  // "New Initiative" is the one Create command that can't reach an existing
-  // open hook: StrategyShell.tsx owns Initiative creation entirely internally
+  // "New Strategy" is the one Create command that can't reach an existing
+  // open hook: StrategyShell.tsx owns Strategy creation entirely internally
   // (a local `newOpen` state + an unexported dialog, no prop/callback/event
   // to trigger it from outside), and that file is out of scope for this
-  // change. Landing on the Initiative list is the closest reachable
-  // approximation — "+ Add Initiative" is one click away there — rather than
+  // change. Landing on the Strategy list is the closest reachable
+  // approximation — "+ Add Strategy" is one click away there — rather than
   // reaching into StrategyShell to add an opener.
   const handleCreateCommand = (id: CreateCommandId) => {
-    if (id === 'create-initiative') {
-      handleNav('strategy', { strategyId: null });
+    if (id === 'create-strategy') {
+      handleNav('strategy', { strategyId: null, strategyCreate: true });
       return;
     }
     close();

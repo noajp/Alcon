@@ -128,7 +128,7 @@ export function PhaseView({
   activeDomainId: string | null;
   /** Jump to an Object's detail (the Execution "objects" view). */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
-  /** Jump to the Initiative a decision was recorded under. */
+  /** Jump to the Strategy a decision was recorded under. */
   onOpenInitiative?: (strategyId: string) => void;
 }) {
   const { t } = useI18n();
@@ -691,7 +691,7 @@ function PhaseDetailView({
 //
 // The two fields above say when the Phase runs. They cannot say why, and a box
 // that has slid two quarters is exactly the one where the why is the only thing
-// worth reading. The answer is recorded on the Initiative — what was chosen, what
+// worth reading. The answer is recorded on the Strategy — what was chosen, what
 // it gave up, who called it — and bound here, so the question can be asked from
 // the side that raises it.
 //
@@ -728,8 +728,8 @@ function PhaseReschedules({
   );
 }
 
-// One recorded call. Three lines, matching the Initiative's own decision row:
-// what was chosen, what it cost, and who said so — with the Initiative name as
+// One recorded call. Three lines, matching the Strategy's own decision row:
+// what was chosen, what it cost, and who said so — with the Strategy name as
 // the way back to the rest of the record.
 function ReschedulingDecision({
   entry,
@@ -747,7 +747,7 @@ function ReschedulingDecision({
         <span className="text-[13px] font-[550] text-foreground truncate min-w-0 flex-1">
           {entry.title}
         </span>
-        {/* The way back to the Initiative is a quiet link, not a capsule. */}
+        {/* The way back to the Strategy is a quiet link, not a capsule. */}
         {onOpenInitiative && (
           <button
             type="button"
@@ -760,7 +760,7 @@ function ReschedulingDecision({
         )}
       </div>
 
-      {/* Kept visible when empty, as it is on the Initiative: a decision recorded
+      {/* Kept visible when empty, as it is on the Strategy: a decision recorded
           without what it gave up is a decision half written. */}
       <p className="text-[12px] text-muted-foreground pl-3.5 mt-0.5">
         {entry.abandoned ? (

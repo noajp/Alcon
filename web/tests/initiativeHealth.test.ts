@@ -21,7 +21,7 @@ describe('computeInitiativeHealth', () => {
     expect(h.progressPct).toBe(50);
   });
 
-  it('has no percentage for an empty Initiative rather than a fake 0', () => {
+  it('has no percentage for an empty Strategy rather than a fake 0', () => {
     expect(computeInitiativeHealth([{ id: 'obj-a', name: 'A' }], [], NOW).progressPct).toBeNull();
   });
 
@@ -56,7 +56,7 @@ describe('computeInitiativeHealth', () => {
     expect(h.scheduleMeasured).toBe(true);
   });
 
-  it("judges 'stalled' with the Object's Domain thresholds, like the Initiative page", () => {
+  it("judges 'stalled' with the Object's Domain thresholds, like the Strategy page", () => {
     const quiet = [el({ id: 'q', status: 'in_progress', lastProgressAt: NOW - 3 * 60 * 60_000 })];
     // Default 25 minutes → stalled. A Domain SLA of 8 hours → not stalled.
     expect(computeInitiativeHealth([{ id: 'obj-a', name: 'A' }], quiet, NOW).risk.stalled).toBe(1);

@@ -49,11 +49,11 @@ import { WidgetHeaderAction } from '@/Function/widget';
 // =============================================================
 // InitiativeDecisions — where the choice gets written down.
 //
-// The sections above this one report how the Initiative is going. This one
+// The sections above this one report how the Strategy is going. This one
 // reports why it is going that way, and it is the only place in the app that
 // keeps the two halves a decision is actually made of: the option that was
 // taken, and the option that was thrown away to take it. A decision recorded as
-// a comment on one Element keeps neither — the person reading the Initiative
+// a comment on one Element keeps neither — the person reading the Strategy
 // cannot see it, and the cost is gone the moment the thread scrolls.
 //
 // So every row states three things: what was chosen, what was given up, and the
@@ -66,7 +66,7 @@ import { WidgetHeaderAction } from '@/Function/widget';
 // choice rather than only its latest state.
 //
 // The last line of a row is where the choice touches the board. A decision to
-// slide a date is the largest thing a Initiative does, and until it is bound to
+// slide a date is the largest thing a Strategy does, and until it is bound to
 // something it stays a paragraph: three months later the question "why is this
 // running into October" has an answer here that the Phase it happened to
 // cannot reach. Binding does not move any date — nothing on this surface
@@ -90,10 +90,10 @@ function relationshipFor(type: PickerTarget['type']) {
   return type === 'phase' ? RESCHEDULES : LANDS_ON;
 }
 
-/** One `intents` row per decision, hung under the Initiative's root Intent.
- *  The table allows exactly one parent-less Intent per Initiative (a partial
+/** One `intents` row per decision, hung under the Strategy's root Intent.
+ *  The table allows exactly one parent-less Intent per Strategy (a partial
  *  unique index), so the root is a spine rather than a decision: it is created
- *  on the first record, carries the Initiative's name, and is never listed. Every
+ *  on the first record, carries the Strategy's name, and is never listed. Every
  *  decision is its child, which also means deleting one cannot cascade into
  *  the others. */
 export function InitiativeDecisions({
@@ -447,9 +447,9 @@ export function InitiativeDecisions({
             </span>
           )}
           {/* Held until the fetch lands: the root Intent is created only when
-              this Initiative has none, and that is not known yet. Opening the
+              this Strategy has none, and that is not known yet. Opening the
               composer early would let a submit race the answer and lose to the
-              one-root-per-Initiative index. */}
+              one-root-per-Strategy index. */}
           <button
             type="button"
             aria-label={t('Record a decision')}
@@ -473,17 +473,17 @@ export function InitiativeDecisions({
 
       {error ? (
         <p className="text-[12px] text-[var(--status-danger)] py-1">
-          {t("Could not read this Initiative's decisions.")}
+          {t("Could not read this Strategy's decisions.")}
         </p>
       ) : !data ? (
         // Not `loading`: the hook reports false on the first render, before the
         // fetch it is about to start. Keying on the absence of the bundle keeps
-        // "nothing decided here" from flashing over a Initiative that has a
+        // "nothing decided here" from flashing over a Strategy that has a
         // decision record, which is the same lie as a fabricated zero.
         <p className="text-[12px] text-muted-foreground/50 py-1">{t('Reading the record…')}</p>
       ) : decisions.length === 0 ? (
         <p className="text-[12px] text-muted-foreground/50 py-1">
-          {t('Nothing decided here yet — record a call and what it cost, so the Initiative carries the reason and not just the result.')}
+          {t('Nothing decided here yet — record a call and what it cost, so the Strategy carries the reason and not just the result.')}
         </p>
       ) : (
         <div className="flex flex-col">
@@ -551,14 +551,14 @@ export function InitiativeDecisions({
   );
 }
 
-/** One bound target, resolved against the Initiative's scope. */
+/** One bound target, resolved against the Strategy's scope. */
 interface Landing {
   bindingId: string;
   type: PickerTarget['type'];
   targetId: string;
   label: string;
   hint: string | null;
-  /** Where clicking it goes. Null when the target has left the Initiative's
+  /** Where clicking it goes. Null when the target has left the Strategy's
    *  scope, when it is an Element with no Object in scope, or when it is a
    *  Phase — the Phase surface is Domain-scoped and has no route to one box. */
   objectId: string | null;
@@ -575,7 +575,7 @@ function phaseHint(start: string | null, end: string | null): string | null {
   return from ?? to ?? null;
 }
 
-/** A binding whose target is no longer in this Initiative's scope still shows.
+/** A binding whose target is no longer in this Strategy's scope still shows.
  *  Hiding it would quietly drop a link the record holds, and unlinking it is
  *  the only thing a reader can do about it. */
 function toLanding(
@@ -598,7 +598,7 @@ function toLanding(
     const object = objects.get(binding.target_id);
     return object
       ? { ...base, type: 'object', label: object.name, objectId: object.id, domainId: object.domainId }
-      : { ...base, type: 'object', label: translate('Object outside this Initiative') };
+      : { ...base, type: 'object', label: translate('Object outside this Strategy') };
   }
   if (binding.target_type === 'element') {
     const element = elements.get(binding.target_id);
@@ -611,7 +611,7 @@ function toLanding(
           objectId: element.objectId,
           domainId: element.domainId,
         }
-      : { ...base, type: 'element', label: translate('Element outside this Initiative') };
+      : { ...base, type: 'element', label: translate('Element outside this Strategy') };
   }
   if (binding.target_type === 'phase') {
     const phase = phases.get(binding.target_id);
@@ -622,7 +622,7 @@ function toLanding(
           label: phase.name,
           hint: phaseHint(phase.startDate, phase.endDate),
         }
-      : { ...base, type: 'phase', label: translate('Phase outside this Initiative') };
+      : { ...base, type: 'phase', label: translate('Phase outside this Strategy') };
   }
   // A Domain or Worker binding — nothing on this surface writes either, but the
   // table takes them and the assumptions section writes Workers. Shown as
@@ -657,7 +657,7 @@ const EMPTY_DRAFT: ReviewDraft = { outcome: null, reason: '', alsoStatus: true, 
  *  one concern, and nine loose props would read as nine. */
 interface RowReview {
   entries: DecisionReview[];
-  /** The Initiative's other decisions, offered when a review reverses this
+  /** The Strategy's other decisions, offered when a review reverses this
    *  one. Empty when this is the only decision on the board. */
   siblings: { id: string; title: string }[];
   open: boolean;
@@ -835,7 +835,7 @@ function DecisionRow({
       )}
 
       {/* Where the choice landed. The row above says what was decided; this
-          says what in the Initiative now carries it, which is the half that
+          says what in the Strategy now carries it, which is the half that
           exists nowhere else — the Object's own surface has no way to name the
           decision that moved it. Linking changes no date; a person does that. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-3.5 mt-1">
@@ -860,8 +860,8 @@ function DecisionRow({
             onPick={onLink}
             empty={
               scopeError
-                ? t("Could not read this Initiative's Objects, Elements and Phases.")
-                : t('This Initiative covers no Objects yet — add some to link what a decision moved.')
+                ? t("Could not read this Strategy's Objects, Elements and Phases.")
+                : t('This Strategy covers no Objects yet — add some to link what a decision moved.')
             }
           />
         )}
@@ -948,7 +948,7 @@ function ReviewComposer({
       {/* Only a reversal asks this, and only when there is something to point
           at. The replacement is usually recorded first — a person reverses a
           call because they have made another one — so this offers the
-          Initiative's other decisions rather than creating one. */}
+          Strategy's other decisions rather than creating one. */}
       {draft.outcome === 'reversed' && siblings.length > 0 && (
         <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
           {t('Replaced by')}
@@ -1096,7 +1096,7 @@ function Composer({
   );
 }
 
-/** The severity ramp, not the Element status ramp: a Initiative decision going
+/** The severity ramp, not the Element status ramp: a Strategy decision going
  *  off track is the same kind of claim a warning badge makes, and an Element
  *  being `blocked` is not. */
 function statusVar(status: DecisionStatus): string {

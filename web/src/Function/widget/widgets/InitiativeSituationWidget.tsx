@@ -6,7 +6,7 @@ import { InitiativeSituation } from '@/ActivitySpace/strategy/initiative/Initiat
 import type { WidgetHost } from '../types';
 
 /**
- * Situation — is this Initiative going to land.
+ * Situation — is this Strategy going to land.
  *
  * Reads the Phases its Objects' Elements sit in, so it needs the Objects
  * themselves rather than the flattened Element list the host resolves. It

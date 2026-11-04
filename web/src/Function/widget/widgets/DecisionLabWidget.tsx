@@ -45,23 +45,23 @@ function DecisionLabSession({ host, query }: { host: WidgetHost; query: ReturnTy
   }
 
   async function record(choice: DecisionLabChoice) {
-    if (!initiative || !data || !input) throw new Error(t('The Initiative is not ready. Refresh and try again.'));
-    if (!query.canRecord) throw new Error(t('Only the Initiative owner can record decisions.'));
-    if (initiative.initiativeId !== host.subject.id) throw new Error(t('The Initiative changed. Reopen Decision Lab.'));
+    if (!initiative || !data || !input) throw new Error(t('The Strategy is not ready. Refresh and try again.'));
+    if (!query.canRecord) throw new Error(t('Only the Strategy owner can record decisions.'));
+    if (initiative.initiativeId !== host.subject.id) throw new Error(t('The Strategy changed. Reopen Decision Lab.'));
     const record = decisionLabRecord(choice.input, choice.comparison, choice.scenario, choice.label, choice.reason);
     if (!record.targetId) throw new Error(t('Choose an Element first.'));
     const key = JSON.stringify([host.subject.id, choice.comparison.fingerprint, record]);
     const retry = identity.current?.key === key;
     if (!retry) {
       const latest = await refresh();
-      if (!alive.current) throw new Error(t('The Initiative changed. Reopen Decision Lab.'));
+      if (!alive.current) throw new Error(t('The Strategy changed. Reopen Decision Lab.'));
       const current = compareDecisionLab({ ...latest, today: toDateOnlyString(new Date()), workweek: choice.input.workweek }, choice.scenario);
       if (current.fingerprint !== choice.comparison.fingerprint) throw new Error(t('The source plan changed. The comparison has been refreshed; review it before recording.'));
       identity.current = { key, decisionId: crypto.randomUUID(), bindingId: crypto.randomUUID(), at: new Date().toISOString() };
     }
     const pending = identity.current!;
     const parentId = await initiative.ensureRoot();
-    if (!alive.current) throw new Error(t('The Initiative changed. Reopen Decision Lab.'));
+    if (!alive.current) throw new Error(t('The Strategy changed. Reopen Decision Lab.'));
     await recordDecisionLabDecision({
       id: pending.decisionId, strategy_id: initiative.initiativeId, parent_intent_id: parentId,
       kind: 'decision', slug: 'decision-lab', title: record.title, subtitle: record.subtitle,

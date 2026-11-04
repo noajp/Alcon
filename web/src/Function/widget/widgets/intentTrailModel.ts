@@ -1,9 +1,9 @@
 // =============================================================
 // The return leg of the round trip — what a piece of work is standing on.
 //
-// The Initiative already binds decisions and assumptions to the Elements,
+// The Strategy already binds decisions and assumptions to the Elements,
 // Objects and Phases they touch (`intent_bindings`). Until now that edge could
-// only be read from the Initiative's side: an Element existed because of a
+// only be read from the Strategy's side: an Element existed because of a
 // decision and had no way to say so, and the person holding it never saw the
 // assumption that would fall over if they stopped. the product names this as
 // the founding pain — "タスクはそもそもの意図を失っている" — and this model
@@ -55,8 +55,8 @@ export interface TrailRow {
   initiativeName: string | null;
 }
 
-/** Only the two kinds a Initiative writes by hand. The root is scope, not
- *  intent; a measure is a number, which the Initiative's own section shows. */
+/** Only the two kinds a Strategy writes by hand. The root is scope, not
+ *  intent; a measure is a number, which the Strategy's own section shows. */
 function isTrailKind(kind: Intent['kind']): kind is 'decision' | 'assumption' {
   return kind === 'decision' || kind === 'assumption';
 }
@@ -154,10 +154,10 @@ export function intentTrailRows(
     });
   }
 
-  // What needs somebody today floats up; within a band, the Initiative's own
+  // What needs somebody today floats up; within a band, the Strategy's own
   // order, so the list reads the way its author arranged it. `order_index` is
-  // per Initiative, so an Object contributing to two of them would interleave
-  // by a number that means nothing across the pair — group by Initiative first.
+  // per Strategy, so an Object contributing to two of them would interleave
+  // by a number that means nothing across the pair — group by Strategy first.
   return out.sort((a, b) => {
     const u = urgency(b) - urgency(a);
     if (u !== 0) return u;
@@ -167,7 +167,7 @@ export function intentTrailRows(
   });
 }
 
-/** The verb the Initiative side attached to the edge, as a phrase. */
+/** The verb the Strategy side attached to the edge, as a phrase. */
 export const RELATIONSHIP_LABEL: Record<IntentRelationship, string> = {
   delivers: 'delivers',
   tests: 'could falsify',

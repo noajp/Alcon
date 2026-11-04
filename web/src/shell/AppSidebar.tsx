@@ -10,10 +10,8 @@ import { FONT } from '@/shared/designTokens';
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { ReviewsSidebar } from '@/ActivitySpace/execution/code/ReviewsSidebar';
 import { SettingsModal } from '@/Function/settings/SettingsModal';
-import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { resolveVision, useVisions } from '@/hooks/visionData';
 import { useActiveSpaceScope } from '@/Function/space/data';
-import { NavStrategyIcon, NavVisionIcon } from './sidebar/NavIcons';
+import { NavStrategyIcon } from './sidebar/NavIcons';
 import { NotebookTree } from './sidebar/NotebookTree';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
@@ -93,10 +91,9 @@ interface AppSidebarProps {
 // surfaces.
 
 // Workspace — Strategy and Execution in one sidebar, a section each.
-// Strategy is what we're trying to achieve and how we intend to win: Vision
-// (view id 'vision') is what the Space aims for; Initiative ('strategy') is
-// the unit, and Initiatives nest. Phase is reached from an Initiative or a
-// Domain, not from here. Execution is the fighting:
+// Strategy is what we're trying to achieve and how we intend to win: one
+// row opens the Strategies (view id 'strategy'), which nest without limit.
+// Phase is reached from a Strategy or a Domain, not from here. Execution is the fighting:
 // the Domain tree, whose rows carry the D/O/E surfaces below.
 
 const SIDEBAR_MIN_WIDTH = 220;
@@ -207,9 +204,6 @@ export function AppSidebar({
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
-  // The Vision a new Initiative is made under: the open one, else the first.
-  const { data: visions } = useVisions(useActiveSpaceId());
-  const activeVision = resolveVision(visions, navigation.visionId);
   const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const railMode = railModeOf(activeView);
@@ -231,7 +225,7 @@ export function AppSidebar({
 
   // The "+" at the top of the sidebar creates whatever the current mode is
   // about: a Notebook, a Table, a scheduled Element, or (in the Workspace)
-  // a Vision, Initiative, Domain or Object from a small menu. Modes with nothing to
+  // a Strategy, Domain or Object from a small menu. Modes with nothing to
   // create show no "+".
   const calendarDay = useCalendarDay();
   // Slides makes nothing until the Space's decks are loaded; the load would replace it.
@@ -433,18 +427,16 @@ export function AppSidebar({
           <>
 
 
-          {/* ── Workspace ── Strategy first (what we aim for: the Visions and
-              the Initiatives, each a list in the main island where the
-              Initiatives' nesting shows), then Execution (the Domains, where
+          {/* ── Workspace ── Strategy first (what we aim for: the Strategies,
+              a list in the main island where their nesting shows), then
+              Execution (the Domains, where
               the work is done). */}
           {railMode === 'workspace' && (
           <>
-          <SidebarFold id="workspace-strategy" label={t('Strategy')}>
-            <SidebarRow active={activeView === 'vision'} icon={<NavVisionIcon size={16} />} label={t('Vision')}
-              onClick={() => { onNavigate({ visionId: null }); onViewChange('vision'); }} />
-            <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Initiative')}
+          <div className="mt-5">
+            <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
               onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />
-          </SidebarFold>
+          </div>
 
           <FollowSection activeObjectId={navigation.objectId ?? null} onOpen={(f) => {
             if (f.domainId) setActiveDomainId(f.domainId);
@@ -600,23 +592,14 @@ export function AppSidebar({
               </>
             ) : (
               <>
-                {/* Vision and Initiative, the Strategy's two layers. Each page
-                    opens its own create card once mounted; an Initiative is
-                    made under the open Vision, else the first. */}
+                {/* A Strategy at the top; the page opens its create card once
+                    mounted. */}
                 <CreateMenuItem
-                  icon={<NavVisionIcon size={16} />}
-                  label={t('Vision')}
-                  desc={t('What this Space aims for')}
-                  onClick={() => { setCreateMenuOpen(false); onNavigate({ visionCreate: true }); onViewChange('vision'); }}
+                  icon={<NavStrategyIcon size={16} />}
+                  label={t('Strategy')}
+                  desc={t('What this Space aims for, and how it wins')}
+                  onClick={() => { setCreateMenuOpen(false); onNavigate({ strategyId: null, strategyCreate: true }); onViewChange('strategy'); }}
                 />
-                {activeVision && (
-                  <CreateMenuItem
-                    icon={<NavStrategyIcon size={16} />}
-                    label={t('Initiative')}
-                    desc={t('An outcome to win in {name}', { name: activeVision.name })}
-                    onClick={() => { setCreateMenuOpen(false); onNavigate({ visionId: activeVision.id, strategyId: null, strategyCreate: true }); onViewChange('strategy'); }}
-                  />
-                )}
                 <div className="my-1 h-px bg-border" />
                 <CreateMenuItem
                   icon={<DomainIcon size={16} />}

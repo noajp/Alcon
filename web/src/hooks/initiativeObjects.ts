@@ -1,6 +1,6 @@
 import type { Strategy, StrategyChild, StrategyObject, StrategyWithObjects } from '@/types/database';
 
-// The only place a Initiative's Object set is derived (ADR 0017). The set is
+// The only place a Strategy's Object set is derived (ADR 0017). The set is
 // read from the strategy_objects junction and from nothing else — in
 // particular not from `strategies.scope`, whose jsonb may still list
 // Objects on rows written before the junction became the single source.
@@ -17,8 +17,8 @@ export function assembleStrategies(
     byStrategy.get(link.strategy_id)!.push(link.object_id);
   }
   // child_strategy_id -> its parent_strategy_id[] (DAG — multi-parent
-  // allowed). Empty parentIds means the Initiative is top-level, at the
-  // root of the Initiative list.
+  // allowed). Empty parentIds means the Strategy is top-level, at the
+  // root of the Strategy list.
   const byChild = new Map<string, string[]>();
   for (const edge of nesting) {
     if (!byChild.has(edge.child_strategy_id)) byChild.set(edge.child_strategy_id, []);

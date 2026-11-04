@@ -2,7 +2,7 @@
 //
 // A cancelled Element is not unfinished work: it left the plate. Counting it
 // in the denominator made an Object with 2 done / 1 cancelled / 1 todo read
-// 50% on its own page and 67% in the Initiative list that opens it
+// 50% on its own page and 67% in the Strategy list that opens it
 // (ELE_STR-024) — two answers to one question, at exactly the place a person
 // compares them. Every progress bar, the KPI completion rate, the overdue
 // filters beside them and the models' notion of "open" read this one set, so

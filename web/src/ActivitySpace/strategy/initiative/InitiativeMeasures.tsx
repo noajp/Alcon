@@ -303,7 +303,7 @@ function InitiativeMeasuresContent({
       )}
       {error ? (
         <p role="alert" className="py-1 text-xs text-[var(--status-danger)]">
-          {t("Could not read this Initiative's conditions.")}
+          {t("Could not read this Strategy's conditions.")}
           <Button variant="ghost" size="xs" onClick={refetch}>
             {t("Retry")}
           </Button>
@@ -314,7 +314,7 @@ function InitiativeMeasuresContent({
         </p>
       ) : measures.length === 0 ? (
         <p className="py-1 text-xs text-muted-foreground">
-          {t("Add a condition with a target, unit and reading to track this Initiative's success.")}
+          {t("Add a condition with a target, unit and reading to track this Strategy's success.")}
         </p>
       ) : (
         <div className="flex flex-col">
@@ -749,7 +749,7 @@ function Composer({
           autoFocus
           disabled={saving}
           onChange={(e) => onTitle(e.target.value)}
-          placeholder={t("What this Initiative is held to")}
+          placeholder={t("What this Strategy is held to")}
           className={`${FIELD} h-auto resize-none py-2`}
         />
       </label>
@@ -837,7 +837,7 @@ function Composer({
 }
 
 /** The severity ramp, not the Element status ramp: a condition set outside the
- *  Initiative and not being met is the same claim a danger badge makes. */
+ *  Strategy and not being met is the same claim a danger badge makes. */
 function stateVar(state: MeasureState): string {
   switch (state) {
     case "missed":

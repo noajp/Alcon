@@ -8,23 +8,23 @@ import { extractStrategyIntent } from './strategyIntent';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /**
- * "Initiative intent" — the Strategy half of the round trip, seen from Execution.
+ * "Strategy intent" — the Strategy half of the round trip, seen from Execution.
  *
  * Body only: the card around it is the widget frame (`Function/widget`), so this
  * renders rows and nothing else.
  *
- * The Properties rail already names the Initiative(s) this Object contributes to,
+ * The Properties rail already names the Strategy(s) this Object contributes to,
  * which answers *where* it belongs but not *why it exists*. That "why" is
- * written in the Initiative's description — the win condition and the success
+ * written in the Strategy's description — the win condition and the success
  * criteria — and until now it lived only on the Strategy surface. An Object
  * could be opened, worked and closed without its intent ever being in view.
  *
  * So the card carries the intent down to the Execution side, excerpted by
  * {@link extractStrategyIntent}, and keeps the one-click trip back up: the
- * Initiative name is the same navigation target the Properties row offers.
+ * Strategy name is the same navigation target the Properties row offers.
  *
- * A Initiative that has stated no intent says so rather than being hidden. Three
- * of the four Initiatives in the database have an empty description, and an
+ * A Strategy that has stated no intent says so rather than being hidden. Three
+ * of the four Strategies in the database have an empty description, and an
  * Object silently showing nothing would read as "there is no strategy here"
  * instead of "nobody has written it down" — which is the fact worth acting on.
  */
@@ -32,9 +32,9 @@ export function StrategyIntentBody({
   strategies,
   onOpenStrategy,
 }: {
-  /** The Initiatives this Object contributes to, in the order the rail lists them. */
+  /** The Strategies this Object contributes to, in the order the rail lists them. */
   strategies: StrategyWithObjects[];
-  /** Open a Initiative on the Strategy surface. */
+  /** Open a Strategy on the Strategy surface. */
   onOpenStrategy: (strategyId: string) => void;
 }) {
   const { t } = useI18n();
@@ -47,8 +47,8 @@ export function StrategyIntentBody({
     <>
       {entries.map(({ strategy, sections }, idx) => (
         <div key={strategy.id}>
-          {/* An Object can contribute to more than one Initiative; spacing
-              separates them, not a rule or a heading per Initiative. */}
+          {/* An Object can contribute to more than one Strategy; spacing
+              separates them, not a rule or a heading per Strategy. */}
           {idx > 0 && <div className="h-3" />}
 
           <button
@@ -77,7 +77,7 @@ export function StrategyIntentBody({
               {sections.map((section, i) => (
                 <div key={section.heading ?? `lead-${i}`}>
                   {/* The lead paragraph has no heading of its own — it is the
-                      Initiative's own opening sentence, so it stands unlabelled. */}
+                      Strategy's own opening sentence, so it stands unlabelled. */}
                   {section.heading && (
                     <div className="text-[11px] font-semibold text-muted-foreground truncate">
                       {section.heading}
@@ -88,7 +88,7 @@ export function StrategyIntentBody({
                       distinct aims rather than one run-on sentence. Each is
                       clamped rather than truncated in the excerpt itself, so a
                       cut lands on a line boundary and the full text stays one
-                      click away on the Initiative. */}
+                      click away on the Strategy. */}
                   {section.items.length === 1 ? (
                     <p className="text-[11px] leading-5 text-foreground/80 line-clamp-3 break-words">
                       {section.items[0]}

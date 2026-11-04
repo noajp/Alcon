@@ -43,7 +43,7 @@ const initiatives: ObjectiveInput[] = [
 ];
 
 describe('objectiveTree', () => {
-  it('walks the cascade depth-first and leaves unrelated Initiatives out', () => {
+  it('walks the cascade depth-first and leaves unrelated Strategies out', () => {
     const tree = objectiveTree('root', initiatives, new Map());
     expect(tree.map((o) => [o.id, o.depth])).toEqual([
       ['root', 0],
@@ -73,7 +73,7 @@ describe('objectiveTree', () => {
     expect(tree.map((o) => o.id)).toEqual(['a', 'b']);
   });
 
-  it('reports a Initiative that is not in the list as nothing, not as a crash', () => {
+  it('reports a Strategy that is not in the list as nothing, not as a crash', () => {
     expect(objectiveTree('missing', initiatives, new Map())).toEqual([]);
   });
 });

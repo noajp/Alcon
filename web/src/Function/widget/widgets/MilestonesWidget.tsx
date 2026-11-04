@@ -20,7 +20,7 @@ import { WidgetHeaderAction, useWidgetEmpty, useWidgetMeta } from '../WidgetFram
 import type { WidgetProps } from '../types';
 
 /** The Objects a board's milestones come from: the Object itself, or — on a
- *  Home or Initiative board — the Objects its Elements sit in. */
+ *  Home or Strategy board — the Objects its Elements sit in. */
 function scopeObjects(host: WidgetProps['host']): { ids: string[]; names: Map<string, string> } {
   const names = new Map<string, string>();
   if (host.subject.kind === 'object' && host.subject.id) {

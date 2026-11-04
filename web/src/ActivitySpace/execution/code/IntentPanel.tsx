@@ -14,7 +14,7 @@ import type { CodeChange } from '@/types/database';
 import { CRITERION_META, INTENT_KIND_LABEL, INTENT_META, Pill, TEAM_META } from './codeChangeLabels';
 
 // The right-hand column of the review screen: what the change was meant to
-// do (the Element and its Initiatives' intent), the AI's reading of whether
+// do (the Element and its Strategies' intent), the AI's reading of whether
 // the diff does it, and the team's verdicts. The point of the screen is this
 // column — the diff is the evidence.
 
@@ -59,7 +59,7 @@ export function IntentPanel({ change, onCheck, checking, checkError, onOpenFile 
               )}
             </div>
             {intent.data.initiatives.length === 0 && (
-              <p className="text-[12px] text-muted-foreground">{t('This Element’s Object serves no Initiative, so only the Element itself is the intent.')}</p>
+              <p className="text-[12px] text-muted-foreground">{t('This Element’s Object serves no Strategy, so only the Element itself is the intent.')}</p>
             )}
             {intent.data.initiatives.map((ini) => (
               <div key={ini.id} className="rounded-md bg-[var(--surface-raised)] p-2.5">

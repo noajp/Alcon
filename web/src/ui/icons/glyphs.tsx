@@ -619,13 +619,13 @@ export const CompassRose = glyph('CompassRose', {
   cut: <circle cx="8" cy="8" r="1.05" style={hole} />,
 });
 
-// The Vision: the guiding star over the horizon.
+// The guiding star over the horizon.
 export const GuidingStar = glyph('GuidingStar', {
   solid: <path d="M8 1.7 9.1 5.65 13.05 6.75 9.1 7.85 8 11.8 6.9 7.85 2.95 6.75 6.9 5.65Z" {...SOFT} />,
   line: <path d="M1.75 14.25h12.5" />,
 });
 
-// An Initiative: a spearhead, the axis of advance.
+// A Strategy: a spearhead, the axis of advance.
 export const Spearhead = glyph('Spearhead', {
   solid: <path d="M8 1.9 13.55 13.1 8 10.2 2.45 13.1Z" {...SOFT} />,
 });

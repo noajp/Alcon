@@ -28,7 +28,7 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { FilesRoute } from '@/Function/files/filesRoute';
 
 const OWNER_LABEL: Record<AttachmentOwnerKind, string> = {
-  element: 'Element', object: 'Object', strategy: 'Initiative', folder: 'Folder',
+  element: 'Element', object: 'Object', strategy: 'Strategy', folder: 'Folder',
 };
 
 const nameOf = (f: SpaceFile) => { const dot = f.name.lastIndexOf('.'); return dot > 0 ? f.name.slice(0, dot) : f.name; };
@@ -122,7 +122,7 @@ function FilesHome({ domainId, go }: { domainId: string; go: (next: FilesRoute) 
               <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(f.created_at, true)}</span>
             </button>
           ))}
-          {!files.length && <p className="px-[18px] py-4 text-[13px] text-muted-foreground">{t('No artifacts yet. Make a folder and drop files into it, or attach them to Elements, Objects or Initiatives.')}</p>}
+          {!files.length && <p className="px-[18px] py-4 text-[13px] text-muted-foreground">{t('No artifacts yet. Make a folder and drop files into it, or attach them to Elements, Objects or Strategies.')}</p>}
         </div>
       </div>
     </div>
@@ -202,7 +202,7 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
           onDragLeave={folder ? () => setDropping(false) : undefined}
           onDrop={folder ? (e) => { e.preventDefault(); setDropping(false); drop(e.dataTransfer.files); } : undefined}>
           {loading ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{t('Loading…')}</p>
-            : !shown.length ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{folder ? t('This folder is empty. Drop files here, or add them with the paperclip.') : files.length ? t('No files match.') : t('No artifacts yet. Make a folder and drop files into it, or attach them to Elements, Objects or Initiatives.')}</p>
+            : !shown.length ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{folder ? t('This folder is empty. Drop files here, or add them with the paperclip.') : files.length ? t('No files match.') : t('No artifacts yet. Make a folder and drop files into it, or attach them to Elements, Objects or Strategies.')}</p>
             : shown.map((f) => {
               const owner = ownerOf(f);
               const active = open?.id === f.id;

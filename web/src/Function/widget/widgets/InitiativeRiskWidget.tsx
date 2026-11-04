@@ -94,7 +94,7 @@ export function InitiativeRiskWidget({ host }: { host: WidgetHost }) {
             })}
             {!loading && !error && visible.length === 0 && (
               <p className="py-2 text-sm text-muted-foreground">
-                {elements.length ? t('No matching Elements.') : objects.length ? t('No Elements yet. Open an Object above to add work.') : t('Link an Object to this Initiative to add and manage its Elements.')}
+                {elements.length ? t('No matching Elements.') : objects.length ? t('No Elements yet. Open an Object above to add work.') : t('Link an Object to this Strategy to add and manage its Elements.')}
               </p>
             )}
           </div>
@@ -111,8 +111,8 @@ export function InitiativeRiskWidget({ host }: { host: WidgetHost }) {
               onOpenStrategy={(strategyId) => { close(); host.onNavigate?.({ strategyId }); }} />
           ) : (
             <div className="space-y-2 p-4">
-              <p className="text-sm">{t('This Element is no longer available in this Initiative.')}</p>
-              <Button variant="ghost" size="sm" onClick={close}>{t('Back to Initiative')}</Button>
+              <p className="text-sm">{t('This Element is no longer available in this Strategy.')}</p>
+              <Button variant="ghost" size="sm" onClick={close}>{t('Back to Strategy')}</Button>
             </div>
           )}
         </DialogContent>

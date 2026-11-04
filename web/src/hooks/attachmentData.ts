@@ -10,7 +10,7 @@ import { latestVersions, versionChain, versionsPastKeeping } from '@/Function/sh
 import { fileText } from '@/Function/office/fileText';
 
 // Files attached to one thing in the Space — an Element, an Object, an
-// Initiative, or one of the Space's folders — from the person's
+// Strategy, or one of the Space's folders — from the person's
 // computer. The file is evidence for what it is attached to: it is seen by
 // exactly those who can see that thing (attachments' RLS asks the owner's),
 // and goes with it. The bytes live in the private `element-files` bucket
@@ -297,7 +297,7 @@ export interface SpaceFile extends Attachment {
   owner_label: string | null;
   /** For a file on an Element: the Object it is in, to open it there. */
   element_object_id: string | null;
-  /** The Domain it sits in (through its Element, Object or folder); none for an Initiative's. */
+  /** The Domain it sits in (through its Element, Object or folder); none for a Strategy's. */
   domain_id: string | null;
   versions: number;
 }
@@ -381,7 +381,7 @@ export async function indexSpaceFiles(spaceId: string): Promise<void> {
 export interface FoundFile extends Pick<Attachment, 'id' | 'name' | 'mime_type' | 'element_id' | 'object_id' | 'strategy_id' | 'folder_id'> {
   owner_label: string | null;
   element_object_id: string | null;
-  /** The Domain it sits in (none for an Initiative's). */
+  /** The Domain it sits in (none for a Strategy's). */
   domain_id: string | null;
   /** The words around where the text matched (null when the name did). */
   snippet: string | null;

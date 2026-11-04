@@ -19,10 +19,10 @@ import type { WidgetHost } from '../types';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // =============================================================
-// OKR — the Initiative cascade, with its measures read as key results.
+// OKR — the Strategy cascade, with its measures read as key results.
 //
-// Nothing here is stored. An Objective is a Initiative, its sub-Objectives are
-// the Initiatives nested under it, and its key results are that Initiative's
+// Nothing here is stored. An Objective is a Strategy, its sub-Objectives are
+// the Strategies nested under it, and its key results are that Strategy's
 // measures — rows that already carry a target, a reading, a unit and a
 // direction. The lens adds one claim the Measures section cannot make: an
 // Objective that states no key result at all, which is the classic OKR failure
@@ -65,7 +65,7 @@ export function FrameworkOkrWidget({ host }: { host: WidgetHost }) {
   // The root's own measures come from the surface's shared Intent bundle,
   // which the Measures section refetches after every write — a private fetch
   // would leave this lens disagreeing with the section directly above it
-  // until the page remounted. Only the nested Initiatives need asking for, and
+  // until the page remounted. Only the nested Strategies need asking for, and
   // those cannot be edited from this page.
   const initiative = useInitiativeIntentContext();
   const descendantIds = useMemo(() => treeIds.filter((id) => id !== rootId), [treeIds, rootId]);
@@ -94,7 +94,7 @@ export function FrameworkOkrWidget({ host }: { host: WidgetHost }) {
   if (error) {
     return (
       <p className="py-1 text-[12px] text-[var(--status-danger)]">
-        {t('Could not read this Initiative’s key results.')}
+        {t('Could not read this Strategy’s key results.')}
       </p>
     );
   }
@@ -169,7 +169,7 @@ function ObjectiveRow({
 
       {!objective.stated && isRoot && (
         <p className="pb-1.5 text-[11px] leading-5 text-muted-foreground">
-          {t('Nothing here says how this Initiative would be judged. Record a condition in Measures and it becomes a key result.')}
+          {t('Nothing here says how this Strategy would be judged. Record a condition in Measures and it becomes a key result.')}
         </p>
       )}
 

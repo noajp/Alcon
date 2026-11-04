@@ -79,7 +79,6 @@ interface ColumnOverrides {
   custom_columns: { column_type: CustomColumnType; options: CustomColumnOptions }
   object_tabs: { tab_type: ObjectTabType }
   strategies: { status: StrategyStatus; scope: StrategyScope }
-  visions: { conditions: string[] }
   strategy_comments: { author_kind: CommentAuthorKind }
   phases: { status: PhaseStatus }
   tables: { status: DataTableStatus }
@@ -280,7 +279,6 @@ interface RowChecks {
   custom_column_placements: Compatible<TableRow<'custom_column_placements'>, H.CustomColumnPlacement>
   object_tabs: Compatible<TableRow<'object_tabs'>, H.ObjectTab>
   strategies: Compatible<TableRow<'strategies'>, H.Strategy>
-  visions: Compatible<TableRow<'visions'>, H.Vision>
   strategy_objects: Compatible<TableRow<'strategy_objects'>, H.StrategyObject>
   strategy_comments: Compatible<TableRow<'strategy_comments'>, H.StrategyComment>
   phases: Compatible<TableRow<'phases'>, H.Phase>

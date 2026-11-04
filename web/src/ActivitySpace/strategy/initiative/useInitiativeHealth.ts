@@ -7,13 +7,13 @@ import { computeInitiativeHealth, type InitiativeHealth } from './initiativeHeal
 import type { StrategyWithObjects } from '@/types/database';
 
 // =============================================================
-// Health for every Initiative in a list, from one read.
+// Health for every Strategy in a list, from one read.
 //
-// The Initiative page fetches its own Elements when opened. A list of twelve
-// Initiatives must not open twelve of those: it takes the union of their
+// The Strategy page fetches its own Elements when opened. A list of twelve
+// Strategies must not open twelve of those: it takes the union of their
 // Object scopes, fetches the Elements once (the same `fetchStrategyElements`
 // the page and the Workload surface use), reads the progress heartbeat once,
-// and partitions per Initiative in memory. An Object in two Initiatives is
+// and partitions per Strategy in memory. An Object in two Strategies is
 // fetched once and counted in both — the same shape as an Element with two
 // assignees.
 // =============================================================
@@ -39,8 +39,8 @@ async function loadHealth(strategies: StrategyWithObjects[]): Promise<Map<string
   ]);
   const rows = toRiskElements(elements, heartbeats);
   const byId = new Map(objects.map((o) => [o.id, o]));
-  // Each Initiative is judged with its Objects' own Domain thresholds — the
-  // same RiskObjects the Initiative page builds — so the row and the page
+  // Each Strategy is judged with its Objects' own Domain thresholds — the
+  // same RiskObjects the Strategy page builds — so the row and the page
   // agree on "stalled" even once a Domain sets its SLAs.
   return new Map(
     strategies.map((s) => [s.id, computeInitiativeHealth(toRiskObjects(s.objectIds, byId, thresholdsByDomain), rows, now)]),
@@ -48,7 +48,7 @@ async function loadHealth(strategies: StrategyWithObjects[]): Promise<Map<string
 }
 
 export function useInitiativeHealth(strategies: StrategyWithObjects[]): InitiativeHealthState {
-  // The key is the scope, not the Initiative list's identity: two renders
+  // The key is the scope, not the Strategy list's identity: two renders
   // with the same Objects share one read.
   const scopeKey = strategies
     .map((s) => `${s.id}:${[...s.objectIds].sort().join(',')}`)

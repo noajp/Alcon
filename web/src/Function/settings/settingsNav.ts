@@ -53,7 +53,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
   {
     title: 'Strategy settings',
     items: [
-      { id: 'initiative', label: 'Initiative', icon: NavStrategyIcon },
+      { id: 'initiative', label: 'Strategy', icon: NavStrategyIcon },
       { id: 'phase', label: 'Phase', icon: NavPhaseIcon },
     ],
   },

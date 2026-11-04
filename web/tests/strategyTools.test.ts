@@ -10,18 +10,18 @@ function deletingDb(rows: unknown[] | null, tables: string[]) {
 }
 
 describe('Copilot strategy tool', () => {
-  it('deletes an Initiative from strategies — never objects', async () => {
+  it('deletes a Strategy from strategies — never objects', async () => {
     const tables: string[] = [];
-    expect((await runStrategyTool(deletingDb([{ id }], tables) as never, { action: 'deleteInitiative', id })).ok).toBe(true);
+    expect((await runStrategyTool(deletingDb([{ id }], tables) as never, { action: 'deleteStrategy', id })).ok).toBe(true);
     expect(tables).toEqual(['strategies']);
   });
 
   it('reports a delete RLS refused (no row removed) as a failure', async () => {
-    const result = await runStrategyTool(deletingDb([], []) as never, { action: 'deleteInitiative', id });
+    const result = await runStrategyTool(deletingDb([], []) as never, { action: 'deleteStrategy', id });
     expect(result.ok).toBe(false);
   });
 
   it('rejects ids that are not UUIDs', async () => {
-    await expect(runStrategyTool(deletingDb([], []) as never, { action: 'deleteInitiative', id: 'INI-1' })).rejects.toThrow('UUID');
+    await expect(runStrategyTool(deletingDb([], []) as never, { action: 'deleteStrategy', id: 'INI-1' })).rejects.toThrow('UUID');
   });
 });

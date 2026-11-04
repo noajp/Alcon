@@ -6,13 +6,13 @@ const s = (id: string, parentIds: string[] = [], objectIds: string[] = [], creat
 
 describe('initiativesInSpace', () => {
   const objectDomain = new Map<string, string | null>([['o1', 'd1'], ['o2', 'd2'], ['o3', null]]);
-  it("keeps Initiatives with an Object in one of the Space's Domains, and Object-less ones", () => {
+  it("keeps Strategies with an Object in one of the Space's Domains, and Object-less ones", () => {
     const kept = initiativesInSpace(
       [s('here', [], ['o1']), s('elsewhere', [], ['o2']), s('fresh'), s('mixed', [], ['o2', 'o1']), s('undomained', [], ['o3'])],
       objectDomain, new Set(['d1']));
     expect(kept.map((i) => i.id)).toEqual(['here', 'fresh', 'mixed']);
   });
-  it('answers from the Initiative’s own Space when it has one', () => {
+  it('answers from the Strategy’s own Space when it has one', () => {
     const own = { ...s('own', [], ['o2']), activity_space_id: 'sp' };
     const other = { ...s('other'), activity_space_id: 'sp2' };
     expect(initiativesInSpace([own, other], objectDomain, new Set(['d1']), 'sp').map((i) => i.id)).toEqual(['own']);
@@ -38,11 +38,11 @@ describe('buildInitiativeTree', () => {
     expect(flattenInitiativeTree(tree, () => true).map((n) => n.initiative.id)).toEqual(['A', 'A1', 'A1x', 'A2', 'lost', 'B']);
     expect(flattenInitiativeTree(tree, (key) => key !== 'A/A1').map((n) => n.initiative.id)).toEqual(['A', 'A1', 'A2', 'lost', 'B']);
   });
-  it('shows an Initiative under each of its parents', () => {
+  it('shows a Strategy under each of its parents', () => {
     const tree = buildInitiativeTree([s('P'), s('Q'), s('shared', ['P', 'Q'])]);
     expect(flattenInitiativeTree(tree, () => true).map((n) => n.key)).toEqual(['P', 'P/shared', 'Q', 'Q/shared']);
   });
-  it('lifts Initiatives caught in a loop so each appears', () => {
+  it('lifts Strategies caught in a loop so each appears', () => {
     const tree = buildInitiativeTree([s('X', ['Y']), s('Y', ['X']), s('C')]);
     const all = flattenInitiativeTree(tree, () => true).map((n) => n.initiative.id);
     expect(new Set(all)).toEqual(new Set(['X', 'Y', 'C']));

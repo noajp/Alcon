@@ -49,7 +49,7 @@ export function DomainApproachesPanel({ data, objects, host, onSave }: {
     {actionError && <p role="alert" className="text-sm text-destructive">{actionError}</p>}
     <WidgetHeaderAction>{data.canEdit && <Button variant="ghost" size="xs" onClick={() => edit({ kind: 'approach' })}><Plus size={14} />{t('New approach')}</Button>}</WidgetHeaderAction>
     {!data.approaches.length ? <div className="space-y-3 py-4">
-      <p className="text-sm">{t('How will the work in this Domain realize an Initiative?')}</p>
+      <p className="text-sm">{t('How will the work in this Domain realize a Strategy?')}</p>
       <p className="max-w-2xl text-xs text-muted-foreground">{t('Describe the expected change, define what must become true, and connect the Objects that can make it happen. Assess the evidence before deciding what to continue, change or stop.')}</p>
       {data.canEdit && <Button variant="primary" size="sm" onClick={() => edit({ kind: 'approach' })}>{t('Create the first approach')}</Button>}
     </div> : <>
@@ -92,7 +92,7 @@ export function DomainApproachesPanel({ data, objects, host, onSave }: {
     return <section aria-label={a.title} className="space-y-5">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="break-words text-base font-semibold">{a.title}</h3>{data.canEdit && <div className="flex gap-1"><Button variant="ghost" onClick={() => edit({ kind: 'approach', approach: a })}>{t('Edit approach')}</Button><Button variant="secondary" onClick={() => edit({ kind: 'review', approach: a })}>{t('Review')}</Button></div>}</div>
-        <Button variant="ghost" align="start" className="h-auto max-w-full whitespace-normal text-left" onClick={() => host.onNavigate?.({ strategyId: a.strategy_id })}>{t('Initiative · {name}', { name: initiative?.name ?? t('Unavailable') })}</Button>
+        <Button variant="ghost" align="start" className="h-auto max-w-full whitespace-normal text-left" onClick={() => host.onNavigate?.({ strategyId: a.strategy_id })}>{t('Strategy · {name}', { name: initiative?.name ?? t('Unavailable') })}</Button>
         {a.measure_id && <p className="text-xs text-muted-foreground">{t('Success condition · {title}', { title: measure?.title ?? t('Unavailable') })}</p>}
         <p className="whitespace-pre-wrap break-words text-sm">{a.expected_change}</p>
         <dl className="space-y-2 text-xs">
@@ -131,7 +131,7 @@ export function DomainApproachesPanel({ data, objects, host, onSave }: {
           {r.snapshot.conditions.map(c => <div key={c.id}><p className="font-medium">{c.title} · {t(RESULT_LABELS[conditionAssessment(c, r.snapshot.approach, r.snapshot.assessments).status])}</p><p className="text-muted-foreground">{c.success_criteria}</p></div>)}
           <details><summary className="cursor-pointer py-1">{t('Evidence recorded at that time')}</summary>{r.snapshot.assessments.map(evidence)}</details>
           <div className="flex flex-wrap items-center gap-1"><span>{t('Affected work')}</span>{[...new Set(r.snapshot.contributions.map(c => c.object_id))].map(objectButton)}</div>
-          <Button variant="ghost" size="xs" onClick={() => host.onNavigate?.({ strategyId: a.strategy_id })}>{t('Open Initiative to revisit intent')}</Button>
+          <Button variant="ghost" size="xs" onClick={() => host.onNavigate?.({ strategyId: a.strategy_id })}>{t('Open Strategy to revisit intent')}</Button>
         </div>
       </details>)}</div>
     </section>;

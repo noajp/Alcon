@@ -91,7 +91,7 @@ export function BoundTarget({
   hint: string | null;
   signal?: { text: string; tone: string; title?: string } | null;
   onOpen?: () => void;
-  /** Absent for a reader who may not change the Initiative — the chip
+  /** Absent for a reader who may not change the Strategy — the chip
    *  then shows the link without offering to break it. */
   onRemove?: () => void;
 }) {
@@ -253,8 +253,8 @@ export function IntentTargetPicker({
             setCursor(0);
           }}
           onKeyDown={onKeyDown}
-          placeholder={t('Search this Initiative')}
-          aria-label={t('Search this Initiative')}
+          placeholder={t('Search this Strategy')}
+          aria-label={t('Search this Strategy')}
           className="w-full h-9 px-2 bg-transparent border-none text-[13px] text-foreground placeholder:text-muted-foreground/60"
         />
         <div className={`${MENU_SEPARATOR} mx-0`} />

@@ -10,13 +10,13 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { WidgetParams, WidgetProps } from '../types';
 
 // =============================================================
-// Where the people are — Worker → Object → Initiative.
+// Where the people are — Worker → Object → Strategy.
 //
 // Drawn by hand rather than reached for from a chart library. Two reasons,
 // and only one of them is weight: the app already carries recharts (which has
 // no Sankey), so a second engine would be two theming paths and two idioms
 // for one figure. The other reason is that the nodes here are rows — a Worker,
-// an Object, a Initiative — and a ribbon whose ends open the thing they stand
+// an Object, a Strategy — and a ribbon whose ends open the thing they stand
 // for is the whole point. A chart library's node is a datum.
 //
 // Every colour is a token. There are eight themes, and a palette chosen by
@@ -41,7 +41,7 @@ export function EffortFlowWidget({ host, params, setParams }: WidgetProps) {
   const { t } = useI18n();
   const { dimensions } = params as unknown as FlowParams;
   const { data: strategies } = useStrategies();
-  // Object and Initiative buckets are uuids; the names come from the explorer,
+  // Object and Strategy buckets are uuids; the names come from the explorer,
   // not from `element.objects`, which the type documents as populated only on
   // the views that need it.
   const { data: explorer } = useObjects(null);

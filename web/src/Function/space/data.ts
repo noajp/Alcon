@@ -124,7 +124,7 @@ export function useActiveSpaceScope(): SpaceScope {
 }
 
 /** The viewer's seat in a Space ('owner' | 'member'), or null while unknown.
- *  An owner may change any Vision; `pending` lets a page wait instead of
+ *  An owner may change anything in the Space; `pending` lets a page wait instead of
  *  flashing its read-only form. */
 export function useSpaceRole(spaceId: string | null): 'owner' | 'member' | null {
   return useSpaceRoleQuery(spaceId).data ?? null;

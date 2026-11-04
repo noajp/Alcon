@@ -32,7 +32,7 @@ function plan(): DecisionLabInput {
 }
 
 describe('Decision Lab durable decision record', () => {
-  it('preserves why the plan was adopted, its target, and the cost to work outside the Initiative', () => {
+  it('preserves why the plan was adopted, its target, and the cost to work outside the Strategy', () => {
     const input = plan();
     const scenario = { focusElementId: 'launch' };
     const record = decisionLabRecord(input, compareDecisionLab(input, scenario), scenario, 'Focus first', '  Meet the customer launch commitment.  ');
@@ -41,8 +41,8 @@ describe('Decision Lab durable decision record', () => {
     expect(record.subtitle).toContain('Why: Meet the customer launch commitment.');
     expect(record.subtitle).toContain('Plan: Focus first');
     expect(record.subtitle).toContain('launch · launch delivery: 2026-09-08 → 2026-09-07');
-    expect(record.subtitle).toContain('outside · outside delivery: 2026-09-07 → 2026-09-08 [outside Initiative]');
-    expect(record.abandoned).toContain('outside · outside delivery: 2026-09-07 → 2026-09-08 [outside Initiative]');
+    expect(record.subtitle).toContain('outside · outside delivery: 2026-09-07 → 2026-09-08 [outside Strategy]');
+    expect(record.abandoned).toContain('outside · outside delivery: 2026-09-07 → 2026-09-08 [outside Strategy]');
     expect(record.subtitle).toContain('Other work late Elements: 0 → 1');
   });
 
@@ -51,7 +51,7 @@ describe('Decision Lab durable decision record', () => {
     const scenario = { focusElementId: 'launch' };
     const comparison = compareDecisionLab(input, scenario);
     const record = decisionLabRecord(input, comparison, scenario, 'Focus first', 'Protect launch.');
-    expect(record.subtitle).toContain('Initiative unestimated Elements: 1 → 1');
+    expect(record.subtitle).toContain('Strategy unestimated Elements: 1 → 1');
     expect(record.subtitle).toContain('unknown · unknown delivery: Unestimated → Unestimated (missing_estimate)');
     expect(record.subtitle).toContain('Other work unestimated Elements: 0 → 0');
     expect(record.subtitle).toContain('Assumptions:');

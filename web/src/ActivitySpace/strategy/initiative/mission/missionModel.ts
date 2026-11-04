@@ -1,10 +1,10 @@
-// An Initiative read as a mission: what it is held to (its measures), the
+// A Strategy read as a mission: what it is held to (its measures), the
 // actions that serve them (Elements, bound with 'delivers'), the order they
 // run in (depends_on edges) and what they produced (artifacts) — the graph on
 // the Plan tab, the tallies on Execute and Evaluate, and the Planner's draft
 // before anything is written.
 //
-// Pure — hooks/initiativeMissionData.ts reads the rows, the Initiative's
+// Pure — hooks/initiativeMissionData.ts reads the rows, the Strategy's
 // tabs draw them; tests/missionModel.test.ts checks this file.
 
 import type { AgentRunStatus } from '@/types/database';
@@ -132,11 +132,11 @@ export interface MissionEdge {
 
 export interface MissionGraph { nodes: MissionNode[]; edges: MissionEdge[] }
 
-/** The node id of the Initiative itself; actions serving no measure hang off it. */
+/** The node id of the Strategy itself; actions serving no measure hang off it. */
 const ROOT = 'initiative';
 
 /** Pure. The mission as it stands: measures, the Elements under the
- *  Initiative's Objects, what each serves, what each waits on, what each made. */
+ *  Strategy's Objects, what each serves, what each waits on, what each made. */
 export function buildMissionGraph(input: {
   initiativeName: string;
   measures: readonly MissionMeasureRow[];
@@ -285,7 +285,7 @@ const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slic
 
 /** Pure. The Planner's answer as the screen may use it: keys unique, every
  *  reference pointing at something in the draft, measure ids only ones this
- *  Initiative has, dependencies without cycles. Anything else is dropped. */
+ *  Strategy has, dependencies without cycles. Anything else is dropped. */
 export function normalizePlan(raw: unknown, measureIds: ReadonlySet<string>): PlanDraft {
   const r = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
   const objectives: PlanObjective[] = [];

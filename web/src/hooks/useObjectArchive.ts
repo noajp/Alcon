@@ -106,7 +106,7 @@ export async function countDomainObjects(domainId: string): Promise<number> {
 }
 
 /**
- * Counts an Initiative's linked Objects the way its Object list shows them:
+ * Counts a Strategy's linked Objects the way its Object list shows them:
  * the visible Objects still in use (the all-Domains explorer, shared cache).
  */
 export function useActiveObjectCount(): (objectIds: readonly string[]) => number {

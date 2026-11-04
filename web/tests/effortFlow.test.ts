@@ -67,7 +67,7 @@ describe('effortFlow', () => {
     for (let c = 0; c < flow.columns.length; c += 1) {
       const sum = flow.nodes.filter((n) => n.column === c).reduce((s, n) => s + n.value, 0);
       // Three Elements in, three Elements out of every column — even the one
-      // where an Object feeds two Initiatives.
+      // where an Object feeds two Strategies.
       expect(sum).toBeCloseTo(3);
     }
   });
@@ -95,8 +95,8 @@ describe('effortFlow', () => {
   });
 
   it('drops a third column that holds only one bucket', () => {
-    // Every Element in one Object, and that Object in one Initiative: the
-    // Initiative column would be a single box every ribbon lands in.
+    // Every Element in one Object, and that Object in one Strategy: the
+    // Strategy column would be a single box every ribbon lands in.
     const single: DimensionContext = {
       ...ctx,
       initiativesByObject: new Map([['o1', [{ id: 'c1', name: 'ALPHA' }]]]),
@@ -164,6 +164,6 @@ describe('effortFlow', () => {
   });
 
   it('names the columns for the header', () => {
-    expect(flowTitle(['assignee', 'object', 'campaign'])).toBe('Assignee → Object → Initiative');
+    expect(flowTitle(['assignee', 'object', 'campaign'])).toBe('Assignee → Object → Strategy');
   });
 });

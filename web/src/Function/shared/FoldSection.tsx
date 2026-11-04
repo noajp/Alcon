@@ -6,7 +6,7 @@ import { FONT } from '@/shared/designTokens';
 
 /** A section of a detail page whose heading folds it (▶), with a quiet count
  *  on the heading's line — the shape of an Element's Sub-elements, shared by
- *  an Initiative's nested Initiatives and its Objects. Open when it holds
+ *  a Strategy's nested Strategies and its Objects. Open when it holds
  *  something; folded while empty. */
 export function FoldSection({ title, count, children }: {
   title: string;

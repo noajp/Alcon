@@ -6,10 +6,10 @@ import { talliesByInitiative, type MeasureTally } from './initiativeMeasureModel
 
 const EMPTY = new Map<string, MeasureTally>();
 
-/** Success-condition tallies for every Initiative in a list, from one read of
+/** Success-condition tallies for every Strategy in a list, from one read of
  *  their measures. Empty until the read lands, so a row shows nothing rather
  *  than a premature "no success conditions". Shares the `initiative-measures`
- *  cache key, so an edit on the Initiative page refreshes the list. */
+ *  cache key, so an edit on the Strategy page refreshes the list. */
 export function useInitiativeMeasureTallies(initiativeIds: string[]): Map<string, MeasureTally> {
   const { measures, loading, error } = useInitiativeMeasures(initiativeIds);
   const key = [...new Set(initiativeIds)].sort().join(',');

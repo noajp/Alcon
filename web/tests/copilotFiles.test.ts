@@ -21,6 +21,6 @@ describe('AI step wording', () => {
     expect(toolVerb('createElement')).toBe('Creating');
     expect(toolVerb('updateElement')).toBe('Updating');
     expect(toolVerb('strategy', { action: 'list' })).toBe('Reading');
-    expect(toolVerb('strategy', { action: 'deleteInitiative' })).toBe('Deleting');
+    expect(toolVerb('strategy', { action: 'deleteStrategy' })).toBe('Deleting');
   });
 });

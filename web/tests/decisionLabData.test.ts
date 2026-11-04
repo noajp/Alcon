@@ -167,7 +167,7 @@ describe('Space-scoped Decision Lab data', () => {
     await expect(fetchDecisionLabData('initiative', 'space')).rejects.toThrow('Unable to read Worker availability');
   });
 
-  it('rejects an Initiative belonging only to a different Space', async () => {
+  it('rejects a Strategy belonging only to a different Space', async () => {
     fixture.tables.strategy_objects = [{ id: 'foreign-link', strategy_id: 'initiative', object_id: 'foreign' }];
     await expect(fetchDecisionLabData('initiative', 'space')).rejects.toThrow('no visible Objects in the current Space');
   });

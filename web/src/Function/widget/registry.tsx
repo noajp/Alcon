@@ -59,7 +59,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   // boards placed before the two were one; it is no longer offered.
   'attachments': {
     type: 'attachments', label: 'Artifacts',
-    description: 'The artifacts of this Object or Initiative — previewed in place, editable, turned into Notes, Tables or decks — or one of them pinned: the whole file, a chart, or a cell as a key number',
+    description: 'The artifacts of this Object or Strategy — previewed in place, editable, turned into Notes, Tables or decks — or one of them pinned: the whole file, a chart, or a cell as a key number',
     group: 'core', accepts: ['domain', 'object', 'initiative'], zones: ['main', 'rail'], defaultSize: 'full',
     normalizeParams: artifactParams,
     load: async () => (await import('./widgets/ArtifactsWidget')).ArtifactsWidget,
@@ -98,7 +98,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     load: async () => (await import('./widgets/InitiativeDomainsWidget')).InitiativeDomainsWidget,
   },
   'domain-initiatives': {
-    type: 'domain-initiatives', label: 'Related Initiatives', group: 'core',
+    type: 'domain-initiatives', label: 'Related Strategies', group: 'core',
     accepts: ['domain'], zones: ['main'], singleton: true, defaultSize: 'full',
     load: async () => (await import('./widgets/DomainInitiativesWidget')).DomainInitiativesWidget,
   },
@@ -130,8 +130,8 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   },
   'campaign-intent': {
     type: 'campaign-intent',
-    label: 'Initiative intent',
-    description: 'Why this exists, from the Initiative it feeds',
+    label: 'Strategy intent',
+    description: 'Why this exists, from the Strategy it feeds',
     group: 'core',
     accepts: ['object'],
     zones: ['rail', 'main'],
@@ -161,7 +161,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'campaign-situation': {
     type: 'campaign-situation',
     label: 'Situation',
-    description: 'Whether this Initiative is going to land',
+    description: 'Whether this Strategy is going to land',
     group: 'core',
     accepts: ['initiative'],
     zones: ['main'],
@@ -204,7 +204,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'intent-trail': {
     type: 'intent-trail',
     label: 'Decisions & assumptions',
-    description: 'What this is standing on, and the Initiative it belongs to',
+    description: 'What this is standing on, and the Strategy it belongs to',
     group: 'core',
     // Not `phase` yet: PhaseView hand-renders the decisions that moved its
     // dates (`usePhaseReschedules`), and accepting the subject before that
@@ -222,7 +222,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'effort-flow': {
     type: 'effort-flow',
     label: 'Where the people are',
-    description: 'Assignments flowing from Worker to Object to Initiative',
+    description: 'Assignments flowing from Worker to Object to Strategy',
     group: 'chart',
     accepts: ['me', 'initiative', 'domain', 'object'],
     zones: ['main'],
@@ -245,12 +245,12 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   },
 
   // ─── Frameworks — lenses over rows the board already holds ─────
-  // Frameworks read persistent source rows. Initiative lenses use intents;
+  // Frameworks read persistent source rows. Strategy lenses use intents;
   // user-defined categories and fields use Table data through data-view.
   'framework-okr': {
     type: 'framework-okr',
     label: 'OKR',
-    description: 'The Initiative cascade, with its measures as key results',
+    description: 'The Strategy cascade, with its measures as key results',
     group: 'plan',
     accepts: ['initiative'],
     zones: ['main'],
@@ -278,17 +278,17 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     },
   },
 
-  // The three sections a Initiative is written by hand. Order in the default
+  // The three sections a Strategy is written by hand. Order in the default
   // board runs outward-in, and that ordering is the reason it is a default
   // rather than a rule: Measures first because the conditions are usually set
-  // by somebody outside the Initiative and whether they are met is the question
+  // by somebody outside the Strategy and whether they are met is the question
   // a reader arrives with; Assumptions next, being what the plan takes as
   // given and what invalidates everything below when shaken; Decisions last,
   // because a choice read without the ground under it looks arbitrary.
   'campaign-measures': {
     type: 'campaign-measures',
     label: 'Measures',
-    description: 'The conditions this Initiative is held to',
+    description: 'The conditions this Strategy is held to',
     group: 'core',
     accepts: ['initiative'],
     zones: ['main'],

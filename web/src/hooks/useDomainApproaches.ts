@@ -24,7 +24,7 @@ export async function fetchDomainApproaches(domainId: string): Promise<DomainApp
     .select('*', { count: 'exact' }).eq('domain_id', domainId).order('id').range(from, to), r => r.id);
   const [approaches, permission, initiatives] = await Promise.all([
     readApproaches(), supabase.rpc('can_edit_domain_approaches', { p_domain_id: domainId }),
-    readAllPages<InitiativeOption>('Initiatives', (from, to) => supabase.from('strategies').select('id,name', { count: 'exact' }).order('id').range(from, to), r => r.id),
+    readAllPages<InitiativeOption>('Strategies', (from, to) => supabase.from('strategies').select('id,name', { count: 'exact' }).order('id').range(from, to), r => r.id),
   ]);
   if (permission.error) throw permission.error;
   const ids = approaches.map(a => a.id);

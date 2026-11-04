@@ -22,7 +22,7 @@ import type { AlconObject, ElementWithDetails } from '@/types/database';
 import type { CapacitySpan } from '@/Function/shared/workerCapacity';
 
 // =============================================================
-// The read side of <InitiativeRisk>. Everything a Initiative's cross-section
+// The read side of <InitiativeRisk>. Everything a Strategy's cross-section
 // needs, in one place, so no other surface has to grow a column for it.
 //
 // Deliberately not a new query in `hooks/useSupabase.ts`: the Object scope
@@ -35,7 +35,7 @@ export interface InitiativeRiskState {
   elements: ElementWithDetails[];
   objects: AlconObject[];
   report: InitiativeRiskReport | null;
-  /** Who the Initiative's open work rests on alone. Null on the same terms as
+  /** Who the Strategy's open work rests on alone. Null on the same terms as
    *  `report` — the two are read from one fetch and arrive together. */
   busFactor: InitiativeBusFactor | null;
   loading: boolean;
@@ -158,7 +158,7 @@ async function loadInitiativeRisk(
 
   const { elements, objects } = await fetchStrategyElements({ domainIds: [], objectIds });
 
-  // The Initiative's Object scope, in the order the Initiative links them —
+  // The Strategy's Object scope, in the order the Strategy links them —
   // `fetchStrategyElements` returns Objects in whatever order Postgres hands
   // them back, and a findings list that reshuffles between refreshes is
   // unreadable.

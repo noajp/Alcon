@@ -11,7 +11,7 @@ import type { WidgetParams } from './types';
 // =============================================================
 // The axis control, in the frame's own header.
 //
-// It rides the header slot the Initiative's composers already use, so a figure's
+// It rides the header slot the Strategy's composers already use, so a figure's
 // configuration sits where its name is rather than inside the figure — the
 // reader is not asked to look past a chart to find out what the chart is
 // counting.

@@ -17,9 +17,9 @@ import {
 } from '@/Function/strategy/initiativeBusFactorModel';
 
 // =============================================================
-// InitiativeRisk — the Initiative's cross-section.
+// InitiativeRisk — the Strategy's cross-section.
 //
-// The burn-up above it says whether the Initiative is late. This says *what is
+// The burn-up above it says whether the Strategy is late. This says *what is
 // hurting and where the next person goes*, which is the half a schedule can
 // never answer. Read top to bottom it is one sentence: this much is wrong (the
 // signal row), it is wrong here (the findings), this is who is already carrying
@@ -27,11 +27,11 @@ import {
 //
 // Nothing on this surface is a count for its own sake. A row appears only when
 // it fires, and a signal that cannot be measured says so instead of showing a
-// confident zero — an unset due date is not an on-time Initiative.
+// confident zero — an unset due date is not an on-time Strategy.
 // =============================================================
 
 /** The pane, rendered against a report the caller has already read. The read
- *  is the caller's because the Initiative widget also needs the open count for
+ *  is the caller's because the Strategy widget also needs the open count for
  *  its frame header, and a container that hid the report could not give it. */
 export function InitiativeRiskView({
   report,
@@ -51,13 +51,13 @@ export function InitiativeRiskView({
     <>
       {error ? (
         <p className="text-[12px] text-[var(--status-danger)] py-1">
-          {t("Could not read the Initiative's execution state.")}
+          {t("Could not read the Strategy's execution state.")}
         </p>
       ) : loading && !report ? (
         <p className="text-[12px] text-muted-foreground/50 py-1">{t('Reading execution state…')}</p>
       ) : !report || report.openTotal === 0 ? (
         <p className="text-[12px] text-muted-foreground/50 py-1">
-          {t('No open Elements under this Initiative yet — add Objects with live work to see where it hurts.')}
+          {t('No open Elements under this Strategy yet — add Objects with live work to see where it hurts.')}
         </p>
       ) : (
         <div className="space-y-4">
@@ -70,12 +70,12 @@ export function InitiativeRiskView({
           />
 
           {/* Unmeasured and on-time are not the same reading, and only one of
-              them is good news. A Initiative whose Elements carry no due dates
+              them is good news. A Strategy whose Elements carry no due dates
               cannot be late — it can only be unmeasured, and saying "0 overdue"
               there would report the absence of data as the absence of risk. */}
           {report.scheduled === 0 ? (
             <p className="text-[11px] text-[var(--status-warning)]">
-              {t("No due dates on any of the {n} open Elements — this Initiative's schedule is unmeasured, not clear.", { n: report.openTotal })}
+              {t("No due dates on any of the {n} open Elements — this Strategy's schedule is unmeasured, not clear.", { n: report.openTotal })}
             </p>
           ) : report.scheduled < report.openTotal ? (
             <p className="text-[11px] text-muted-foreground">
@@ -136,7 +136,7 @@ function SignalRow({
   stalled: number;
   blocked: number;
 }) {
-  // Both date signals go dark together: with no due dates in the Initiative
+  // Both date signals go dark together: with no due dates in the Strategy
   // neither of them is measuring anything, and a grey zero would read as calm.
   const dated = scheduled > 0;
   const { t } = useI18n();
@@ -213,7 +213,7 @@ function Findings({
   if (risks.length === 0) {
     return (
       <p className="text-[12px] text-muted-foreground/50 py-1">
-        {t('Every Object under this Initiative is moving — nothing needs reassigning right now.')}
+        {t('Every Object under this Strategy is moving — nothing needs reassigning right now.')}
       </p>
     );
   }
@@ -281,12 +281,12 @@ function short(date: string | null, t: T, locale: string): string {
 }
 
 // =============================================================
-// Load — who is already carrying this Initiative.
+// Load — who is already carrying this Strategy.
 //
 // Headcount of open Elements per Worker, off `element_assignees` (the same
 // edge the Workload surface aggregates). Not Workload's hour model: that one
 // spreads estimated hours across start / due dates, and every Worker reads
-// flat zero on a Initiative whose Elements carry no dates.
+// flat zero on a Strategy whose Elements carry no dates.
 // =============================================================
 function Load({
   rows,
@@ -341,7 +341,7 @@ function Load({
       )}
       {concentrated && (
         <p className="text-[11px] text-[var(--status-warning)] mt-1.5">
-          {t('{name} holds {pct}% of the open work — this Initiative runs through one Worker. Add capacity or cut scope.', { name: top.name, pct: Math.round(top.share * 100) })}
+          {t('{name} holds {pct}% of the open work — this Strategy runs through one Worker. Add capacity or cut scope.', { name: top.name, pct: Math.round(top.share * 100) })}
         </p>
       )}
     </div>

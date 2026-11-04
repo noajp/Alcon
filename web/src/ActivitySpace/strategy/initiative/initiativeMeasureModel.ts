@@ -1,11 +1,11 @@
 // =============================================================
-// Initiative measures — the number the condition names, the number somebody
+// Strategy measures — the number the condition names, the number somebody
 // read, and whether one meets the other.
 //
-// Three tabletop exercises wrote their success conditions into a Initiative
+// Three tabletop exercises wrote their success conditions into a Strategy
 // description and then watched the board fail to read them. The third made it
 // undeniable: an accreditation review whose conditions were five numbers set by
-// somebody outside the Initiative — hand hygiene at or above 80%, discharge
+// somebody outside the Strategy — hand hygiene at or above 80%, discharge
 // summaries at or above 90%, mandatory training at 100%, falls assessment at or
 // above 95%, unclosed safety corrections at zero. The weekly readings came back
 // in the same units. Three of the five were already failing and the board knew
@@ -15,7 +15,7 @@
 // So the judgement lives here, on numbers, and it is three-valued rather than
 // two. A condition nobody has read is not a condition that is failing — it is
 // one nobody can speak for, which is a different sentence and needs a different
-// answer. Collapsing the two would let a Initiative report a miss it never
+// answer. Collapsing the two would let a Strategy report a miss it never
 // observed, or a pass it never earned.
 //
 // `direction` is read, never inferred. Zero unclosed corrections and one
@@ -30,7 +30,7 @@ import type { IntentKind, MeasureDirection } from '@/types/database';
 import { translate } from '@/Function/i18n/I18nProvider';
 
 /** What marks an `intents` row as a measure rather than a decision or an
- *  assumption. All three hang off the Initiative's root Intent and arrive in the
+ *  assumption. All three hang off the Strategy's root Intent and arrive in the
  *  same query, so every surface reading that list filters on `kind`. */
 export function isMeasure(kind: IntentKind | null | undefined): boolean {
   return kind === 'measure';
@@ -258,15 +258,15 @@ export function parseMeasureValue(text: string): ParsedValue {
 }
 
 // ── Lists ────────────────────────────────────────────────────────────────
-// A list of Initiatives reads every measure in one query and splits it here,
-// so the row can say "2 missed" without a query per row. An Initiative with no
+// A list of Strategies reads every measure in one query and splits it here,
+// so the row can say "2 missed" without a query per row. A Strategy with no
 // measure gets an empty tally rather than none at all: "no success conditions"
 // is a fact about it, and an absent entry means only "not loaded yet".
 
 export const EMPTY_TALLY: MeasureTally = { met: 0, missed: 0, unmeasured: 0, unstated: 0, total: 0 };
 
-/** Every listed Initiative's tally from one batch of measures. Rows for
- *  Initiatives outside `initiativeIds` are ignored. */
+/** Every listed Strategy's tally from one batch of measures. Rows for
+ *  Strategies outside `initiativeIds` are ignored. */
 export function talliesByInitiative(
   initiativeIds: string[],
   rows: Array<MeasureInput & { initiativeId: string }>,

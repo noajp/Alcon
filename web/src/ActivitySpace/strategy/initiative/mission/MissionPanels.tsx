@@ -71,10 +71,10 @@ const compact = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M
 
 export function MissionPlanPanel({ ctx, objects, aiWorkers, ensureRoot }: {
   ctx: MissionContext;
-  /** The Initiative's Objects — where new Elements can go. */
+  /** The Strategy's Objects — where new Elements can go. */
   objects: { id: string; name: string }[];
   aiWorkers: Worker[];
-  /** The Initiative's root intent; new objectives hang under it. */
+  /** The Strategy's root intent; new objectives hang under it. */
   ensureRoot: () => Promise<string>;
 }) {
   const { t } = useI18n();
@@ -136,7 +136,7 @@ export function MissionPlanPanel({ ctx, objects, aiWorkers, ensureRoot }: {
     <PageSection title={t('Mission')}>
       <div className="space-y-3">
         <p className="text-[12px] text-muted-foreground">
-          {t('The Planner reads this Initiative — its purpose, success conditions, assumptions and decisions — and drafts the actions that carry it out. Nothing is created until you approve the draft.')}
+          {t('The Planner reads this Strategy — its purpose, success conditions, assumptions and decisions — and drafts the actions that carry it out. Nothing is created until you approve the draft.')}
         </p>
         <div className="flex items-start gap-2">
           <textarea value={guidance} onChange={(e) => setGuidance(e.target.value)} rows={2}
@@ -179,7 +179,7 @@ export function MissionPlanPanel({ ctx, objects, aiWorkers, ensureRoot }: {
               </div>
             ) : (
               <p className="text-[12px] text-muted-foreground">
-                {ctx.canEdit ? t('Link an Object on the Execute tab first — the actions are created in it.') : t("Only the Initiative's owner can turn the draft into Elements.")}
+                {ctx.canEdit ? t('Link an Object on the Execute tab first — the actions are created in it.') : t("Only the Strategy's owner can turn the draft into Elements.")}
               </p>
             )}
           </div>

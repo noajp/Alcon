@@ -9,11 +9,11 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { fetchPhasesByIds } from '@/hooks/phaseData';
 
 // =============================================================
-// InitiativeSituation — what a Initiative is doing, derived rather than written.
+// InitiativeSituation — what a Strategy is doing, derived rather than written.
 //
 // The Strategy layer exists to say what we are trying to achieve and whether
-// we are winning. Until now a Initiative could only say what it *contains*:
-// nested Initiatives, an Object list, and a done-ratio bar per Object. A ratio
+// we are winning. Until now a Strategy could only say what it *contains*:
+// nested Strategies, an Object list, and a done-ratio bar per Object. A ratio
 // answers "how much is finished", never "will it land" — so the answer to the
 // second question kept being typed into the comment stream as prose.
 //
@@ -44,9 +44,9 @@ type Tally = { phase: Phase; scope: number; started: number; completed: number }
 const MIN_SAMPLE_DAYS = 3;
 
 /**
- * The Phases this Initiative's own Elements sit in.
+ * The Phases this Strategy's own Elements sit in.
  *
- * Not "the Phases of this Initiative's Domain" — a Initiative deliberately spans
+ * Not "the Phases of this Strategy's Domain" — a Strategy deliberately spans
  * Domains, and Phases are Domain-scoped, so there is no single Phase to ask
  * for. The Elements themselves are the only honest answer to which time boxes
  * this effort is actually being run inside.
@@ -133,12 +133,12 @@ export function InitiativeSituation({
   objectIds,
   allObjects,
 }: {
-  /** The Initiative's Object scope (`strategy_objects`). */
+  /** The Strategy's Object scope (`strategy_objects`). */
   objectIds: string[];
   allObjects: AlconObjectWithChildren[];
 }) {
   const { t } = useI18n();
-  // Every Element this Initiative owns, through its Objects.
+  // Every Element this Strategy owns, through its Objects.
   const elements = useMemo(() => {
     const seen = new Set<string>();
     const out = [];
@@ -221,11 +221,11 @@ export function InitiativeSituation({
           <InitiativeRisk objectIds={objectIds} allObjects={allObjects} />
           goes exactly here, below the burn-up.
           Order is deliberate. Time axis first: "are we late" is the question a
-          Initiative is opened to answer, and it is the one that decides whether
+          Strategy is opened to answer, and it is the one that decides whether
           the cross-section is worth reading at all. The cross-section then says
           where to push, which is only actionable once you know you need to.
-          Same props as this component — the Objects are the Initiative's scope
-          and their Elements are the rows. Nothing here needs the Initiative row
+          Same props as this component — the Objects are the Strategy's scope
+          and their Elements are the rows. Nothing here needs the Strategy row
           itself, so neither should that.
           Kept as two components because they answer different questions from
           different data: this one reads phases, that one reads due dates,

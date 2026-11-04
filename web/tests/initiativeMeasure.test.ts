@@ -198,7 +198,7 @@ describe('tallyMeasures', () => {
     expect(tally).toEqual({ met: 1, missed: 1, unmeasured: 1, unstated: 1, total: 4 });
   });
 
-  it('counts nothing on an empty Initiative', () => {
+  it('counts nothing on an empty Strategy', () => {
     expect(tallyMeasures([])).toEqual({
       met: 0,
       missed: 0,

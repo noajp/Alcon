@@ -41,7 +41,7 @@ export async function runStrategyTool(
       case "listInitiatives": {
         let q = supabase
           .from("strategies")
-          .select("id, name, description, status, vision_id, updated_at")
+          .select("id, name, description, status, updated_at")
           .order("updated_at", { ascending: false })
           .limit(200);
         if (input.parentId) {
@@ -60,7 +60,7 @@ export async function runStrategyTool(
         if (!id) return { ok: false, error: "id is required" };
         const { data: initiative, error } = await supabase
           .from("strategies")
-          .select("id, name, description, status, vision_id, created_at, updated_at")
+          .select("id, name, description, status, created_at, updated_at")
           .eq("id", id).maybeSingle();
         if (error) throw error;
         if (!initiative) return { ok: false, error: "Initiative not found" };

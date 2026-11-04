@@ -10,7 +10,7 @@ import { useInitiativeIntentContext } from '../InitiativeIntent';
 import { MissionEvaluatePanel, MissionExecutePanel, MissionPlanPanel, type MissionContext } from './MissionPanels';
 import type { MissionElementRow, MissionMeasureRow } from './missionModel';
 
-// The mission part of one Initiative tab. Reads the Initiative's intents from
+// The mission part of one Strategy tab. Reads the Strategy's intents from
 // the page's InitiativeIntentProvider and the runs, artifacts, approvals and
 // dependencies of the Elements under its Objects, once per tab.
 
@@ -19,7 +19,7 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
   initiativeId: string;
   initiativeName: string;
   spaceId: string | null;
-  /** The Initiative's Objects with their Elements. */
+  /** The Strategy's Objects with their Elements. */
   objects: { id: string; name: string; domain_id: string | null; elements?: {
     id: string; title: string; status: string | null; display_id?: string | null; labels?: string[] | null;
     claimed_by?: string | null; claim_expires_at?: string | null; branch?: string | null;

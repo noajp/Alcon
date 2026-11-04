@@ -4,7 +4,7 @@
 // here (not JSX) so the matching rules are unit-testable without rendering
 // the palette — see web/tests/paletteCreateCommands.test.ts.
 
-export type CreateCommandId = 'create-element' | 'create-object' | 'create-initiative';
+export type CreateCommandId = 'create-element' | 'create-object' | 'create-strategy';
 
 export interface CreateCommandSpec {
   id: CreateCommandId;
@@ -32,9 +32,9 @@ export const CREATE_COMMANDS: CreateCommandSpec[] = [
     aliases: ['create', '作成', 'オブジェクト'],
   },
   {
-    id: 'create-initiative',
-    label: 'New Initiative',
-    aliases: ['create', '作成', 'キャンペーン'],
+    id: 'create-strategy',
+    label: 'New Strategy',
+    aliases: ['create', '作成', '戦略'],
   },
 ];
 

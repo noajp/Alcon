@@ -74,7 +74,7 @@ export function SettingsView() {
             {tab === 'templates' ? <ElementTemplateSettings /> : tab === 'slas' ? <SlaSettings /> : <LabelSettings />}
           </TabbedPanel>
         ) : active === 'initiative' ? (
-          <PanelShell title={t('Initiative')}><InitiativeJudgementSettings /></PanelShell>
+          <PanelShell title={t('Strategy')}><InitiativeJudgementSettings /></PanelShell>
         ) : active === 'phase' ? (
           <PanelShell title={t('Phase')}><PhaseDefaultsSettings /></PanelShell>
         ) : active === 'objects' ? (

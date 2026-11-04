@@ -1,7 +1,7 @@
 // =============================================================
 // Strategy frameworks, read off the board rather than typed into it.
 //
-// The Initiative had a "Frameworks" slot that was three free-text boxes in
+// The Strategy had a "Frameworks" slot that was three free-text boxes in
 // localStorage: Goal, Gap, Current State. It could hold one framework, it had
 // no column in `strategies`, and — the part that matters — nothing it said was
 // connected to anything. A goal typed there and a measure recorded twenty
@@ -31,18 +31,18 @@ import {
   type MeasureTally,
 } from '@/ActivitySpace/strategy/initiative/initiativeMeasureModel';
 
-/** One Initiative, as the OKR lens sees it. */
+/** One Strategy, as the OKR lens sees it. */
 export interface ObjectiveInput {
   id: string;
   name: string;
-  /** Initiative ids this one hangs under. Empty for a top-level Initiative. */
+  /** Strategy ids this one hangs under. Empty for a top-level Strategy. */
   parentIds: string[];
 }
 
 export interface Objective {
   id: string;
   name: string;
-  /** 0 for the Initiative the widget is about; 1+ for nested Initiatives. */
+  /** 0 for the Strategy the widget is about; 1+ for nested Strategies. */
   depth: number;
   /** Its own measures, worst-first — `orderMeasures`' ordering. */
   keyResults: Measure[];
@@ -51,7 +51,7 @@ export interface Objective {
    * True when this Objective states no key result at all.
    *
    * The classic OKR failure, and the only claim this lens makes that the
-   * Measures section cannot: a Initiative can look busy — Objects, Elements,
+   * Measures section cannot: a Strategy can look busy — Objects, Elements,
    * decisions — while naming nothing that would tell anyone whether it
    * succeeded. Kept separate from `tally.total === 0` at the call site so the
    * reason a row is flagged is legible in the type.
@@ -60,12 +60,12 @@ export interface Objective {
 }
 
 /**
- * The Objective cascade under one Initiative.
+ * The Objective cascade under one Strategy.
  *
  * Depth-first through `strategy_children`, so a reader sees a parent and the
- * Initiatives it decomposes into in the order they nest. Cycles cannot render —
+ * Strategies it decomposes into in the order they nest. Cycles cannot render —
  * the table permits a DAG and nothing stops a loop being written — so a
- * Initiative already on the path is not descended into a second time.
+ * Strategy already on the path is not descended into a second time.
  */
 export function objectiveTree(
   rootId: string,

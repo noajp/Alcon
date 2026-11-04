@@ -89,7 +89,7 @@ export function CodeChangesSection({ elementId, openSignal = 0 }: {
 
 export function CodeChangeRow({ change, onOpen, onUnlink, context }: {
   change: CodeChange; onOpen: () => void; onUnlink?: () => void;
-  /** Shown before the title — e.g. the Element on an Initiative's list. */
+  /** Shown before the title — e.g. the Element on a Strategy's list. */
   context?: React.ReactNode;
 }) {
   const { t } = useI18n();

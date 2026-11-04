@@ -29,9 +29,9 @@ const AUDIT_RAIL_APPS: RailMode[] = ['team', 'audit'];
 // collapses — it's the app's primary spine.
 //
 // At the top sits the Workspace's icon, which opens the Workspace: Strategy (the
-// Visions and the Initiatives, which nest) and Execution (the Domains, with their
-// Objects and Elements) in one sidebar, one section each. An Initiative shows
-// its member Objects and an Object the Initiatives it serves, so moving
+// Strategies, which nest without limit) and Execution (the Domains, with their
+// Objects and Elements) in one sidebar, one section each. A Strategy shows
+// its member Objects and an Object the Strategies it serves, so moving
 // between intent and action never leaves the mode.
 //
 // Below it sits the launcher: the apps a person has added, then the

@@ -51,9 +51,9 @@ import { WidgetHeaderAction } from '@/Function/widget';
 //
 // An assumption written down still fails silently. It breaks inside an Element
 // — the work that depended on it goes blocked, or slides past its date — and
-// the Initiative page keeps last week's face because nothing joins the two. So an
+// the Strategy page keeps last week's face because nothing joins the two. So an
 // assumption here names what could falsify it, and that state is read back onto
-// it. The mark is not a verdict; it is the Initiative saying somebody should go
+// it. The mark is not a verdict; it is the Strategy saying somebody should go
 // and look.
 //
 // Half of these assumptions have a person as their subject, and those cannot be
@@ -130,8 +130,8 @@ export function InitiativeAssumptions({
     [bindings],
   );
   const { byWorker: availability } = useWorkerAvailability(boundWorkerIds);
-  // The whole roster, not the Initiative's slice of it: a Worker is not owned by
-  // a Initiative, and the person an assumption rests on is often the one with no
+  // The whole roster, not the Strategy's slice of it: a Worker is not owned by
+  // a Strategy, and the person an assumption rests on is often the one with no
   // Object of their own. A bound Worker outside the active Space's roster is
   // read by id so it still shows by name.
   const { data: roster } = useWorkers();
@@ -272,7 +272,7 @@ export function InitiativeAssumptions({
             </span>
           )}
           {/* Held until the fetch lands, for the same reason the decisions
-              composer is: the root Intent is created only when this Initiative
+              composer is: the root Intent is created only when this Strategy
               has none, and that is not known yet. */}
           <button
             type="button"
@@ -294,13 +294,13 @@ export function InitiativeAssumptions({
 
       {error ? (
         <p className="text-[12px] text-[var(--status-danger)] py-1">
-          {t("Could not read this Initiative's assumptions.")}
+          {t("Could not read this Strategy's assumptions.")}
         </p>
       ) : !data ? (
         <p className="text-[12px] text-muted-foreground/50 py-1">{t('Reading the record…')}</p>
       ) : assumptions.length === 0 ? (
         <p className="text-[12px] text-muted-foreground/50 py-1">
-          {t('Nothing written down as assumed — name what this Initiative is standing on, and the Elements that would tell you it stopped being true.')}
+          {t('Nothing written down as assumed — name what this Strategy is standing on, and the Elements that would tell you it stopped being true.')}
         </p>
       ) : (
         <div className="flex flex-col">
@@ -358,7 +358,7 @@ export function InitiativeAssumptions({
   );
 }
 
-/** A binding whose Element is not in this Initiative's scope — moved out, or
+/** A binding whose Element is not in this Strategy's scope — moved out, or
  *  deleted. It is still shown: dropping the row would hide a link the record
  *  holds, and the only thing a reader can do about it is unlink it. */
 function toWatch(binding: IntentBinding, element: WatchSource | undefined): WatchInput {
@@ -367,7 +367,7 @@ function toWatch(binding: IntentBinding, element: WatchSource | undefined): Watc
       bindingId: binding.id,
       elementId: binding.target_id,
       displayId: null,
-      title: translate('Element outside this Initiative'),
+      title: translate('Element outside this Strategy'),
       status: null,
       dueDate: null,
       objectId: null,
@@ -543,7 +543,7 @@ function AssumptionRow({
         {/* People sit in the same row as Elements, after them. They are the
             same claim — "this is what would tell you the assumption stopped
             being true" — and splitting them into two lines would make the
-            Initiative read as if a person were a different kind of evidence. */}
+            Strategy read as if a person were a different kind of evidence. */}
         {assumption.workers.map((w) => (
           <BoundTarget
             key={w.bindingId}
@@ -561,7 +561,7 @@ function AssumptionRow({
             onPick={onWatch}
             empty={
               scopeError
-                ? t("Could not read this Initiative's Elements.")
+                ? t("Could not read this Strategy's Elements.")
                 : t('Nothing left to watch — link Objects with work in them, or add Workers.')
             }
           />
@@ -659,7 +659,7 @@ function Composer({
         rows={1}
         autoFocus
         onChange={(e) => onStatement(e.target.value)}
-        placeholder={t('What this Initiative is taking as true')}
+        placeholder={t('What this Strategy is taking as true')}
         className={`${FIELD} text-[13px] leading-relaxed resize-none`}
       />
       <textarea

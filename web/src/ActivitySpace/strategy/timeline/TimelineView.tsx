@@ -23,15 +23,15 @@ import {
 import { daysBetween, startOfDay, parseDateOnly } from '@/Function/shared/dateUtils';
 
 // =============================================================
-// Timeline — Linear-Roadmap-style Initiative timeline for the
-// Strategy layer. One row per top-level Initiative, grouped in the
+// Timeline — Linear-Roadmap-style Strategy timeline for the
+// Strategy layer. One row per top-level Strategy, grouped in the
 // left list by the quarter its span ends in ("Q3 2026"…), with
-// undated Initiatives collected under "Upcoming". The right side is
-// a month-scale axis; each Initiative draws as a rounded band whose
+// undated Strategies collected under "Upcoming". The right side is
+// a month-scale axis; each Strategy draws as a rounded band whose
 // inner fill shows its done-Element progress. Expanding a row
 // reveals its member Objects as thinner bars on the same axis.
 //
-// A Initiative's span = the union of its Objects' spans, where each
+// A Strategy's span = the union of its Objects' spans, where each
 // Object uses its own start/due dates and falls back to the union
 // of its Elements' dates.
 // =============================================================
@@ -55,7 +55,7 @@ export function TimelineView({
   onSelectStrategy,
   onOpenObject,
 }: {
-  /** Open a Initiative's detail page (the 'strategy' view). */
+  /** Open a Strategy's detail page (the 'strategy' view). */
   onSelectStrategy?: (id: string) => void;
   /** Jump to an Object's detail (the Execution "objects" view). */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
@@ -67,8 +67,8 @@ export function TimelineView({
     return new Map<string, AlconObject>(explorerObjects.map((o) => [o.id, o]));
   }, [explorerObjects]);
 
-  // Top-level Initiatives only — nested ones are part of
-  // their parent's story, same rule as the Vision page.
+  // Top-level Strategies only — nested ones are part of
+  // their parent's story, same rule as the Strategy list.
   const rootStrategies = useMemo(
     () => strategies.filter((s) => s.parentIds.length === 0),
     [strategies],
@@ -163,7 +163,7 @@ export function TimelineView({
     return daysBetween(windowStart, t) * dayW + dayW / 2;
   }, [windowStart, windowEnd, dayW, showToday]);
 
-  // ── Rows: span + progress per Initiative, grouped by quarter ─
+  // ── Rows: span + progress per Strategy, grouped by quarter ─
   type InitiativeRow = {
     strategy: StrategyWithObjects;
     range: DateRange | null;
@@ -191,8 +191,8 @@ export function TimelineView({
       return { strategy: s, range, progress, objects };
     });
 
-    // Bucket by the quarter each Initiative lands in (its end date);
-    // undated Initiatives go to a trailing "Upcoming" bucket.
+    // Bucket by the quarter each Strategy lands in (its end date);
+    // undated Strategies go to a trailing "Upcoming" bucket.
     const byQuarter = new Map<string, { label: string; order: number; rows: InitiativeRow[] }>();
     for (const row of rows) {
       const key = row.range ? quarterKey(row.range.end) : 'upcoming';
@@ -234,7 +234,7 @@ export function TimelineView({
       <div className="h-[50px] flex flex-shrink-0 items-center gap-1 border-b border-border/60 bg-card pl-6 pr-2">
         <span className="px-1.5 py-0.5 text-[13px] font-semibold text-foreground">{t('Timeline')}</span>
         <span className="ml-0.5 text-[12px] text-muted-foreground">
-          {loading ? t('Loading…') : rootStrategies.length === 1 ? t('1 Initiative') : t('{n} Initiatives', { n: rootStrategies.length })}
+          {loading ? t('Loading…') : rootStrategies.length === 1 ? t('1 Strategy') : t('{n} Strategies', { n: rootStrategies.length })}
         </span>
         <div className="flex-1" />
         <div className="flex items-center gap-1">
@@ -273,7 +273,7 @@ export function TimelineView({
       <div className="flex-1 overflow-auto">
         {!loading && rootStrategies.length === 0 ? (
           <EmptyState art="initiative" title="Nothing on the Timeline yet"
-            description="Create an Initiative and give its Objects start and due dates to see them here." />
+            description="Create a Strategy and give its Objects start and due dates to see them here." />
         ) : (
           <div className="min-w-fit">
             {/* Month axis */}
@@ -362,7 +362,7 @@ export function TimelineView({
                           className="sticky left-0 z-[1] bg-card flex items-center text-[11px] text-muted-foreground border-r border-border/30 flex-shrink-0"
                           style={{ width: LEFT_COL_W, paddingLeft: 36 }}
                         >
-                          {t('No Objects in this Initiative yet')}
+                          {t('No Objects in this Strategy yet')}
                         </div>
                         <div className="flex-shrink-0" style={{ width: totalW }} />
                       </div>
@@ -379,7 +379,7 @@ export function TimelineView({
 }
 
 // =============================================================
-// Initiative row — rounded band with a progress fill inside
+// Strategy row — rounded band with a progress fill inside
 // =============================================================
 function InitiativeTimelineRow({
   row,

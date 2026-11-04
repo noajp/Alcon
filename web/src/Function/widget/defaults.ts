@@ -22,7 +22,7 @@ export const OBJECT_OVERVIEW_BOARD: BoardLayout = {
     // trying to win before it answers who owns it and when it is due.
     { id: 'ov-approaches', type: 'approach-references' },
     { id: 'ov-intent', type: 'campaign-intent' },
-    // The return leg. The Initiative's written intent says why this Object
+    // The return leg. The Strategy's written intent says why this Object
     // exists in prose; this says which decisions and assumptions actually
     // reach it, and whether any of them needs somebody today.
     { id: 'ov-trail', type: 'intent-trail' },
@@ -57,7 +57,7 @@ export const HOME_BOARD: BoardLayout = {
 };
 
 /**
- * Initiative detail, Overview tab: how it is going. The summary line under
+ * Strategy detail, Overview tab: how it is going. The summary line under
  * the name, then whether it lands (Situation), where it hurts (Risk), and the
  * conditions it is held to with the frameworks that read them back.
  */
@@ -82,7 +82,7 @@ export const INITIATIVE_BOARD: BoardLayout = {
 };
 
 /**
- * Initiative detail, Plan tab: what the plan rests on and what was chosen on
+ * Strategy detail, Plan tab: what the plan rests on and what was chosen on
  * top of it — the sections written by hand that outlive the people who wrote
  * them, with the approaches they draw on.
  */
@@ -97,7 +97,7 @@ export const INITIATIVE_PLAN_BOARD: BoardLayout = {
   rail: [],
 };
 
-/** Initiative detail, Audit tab: the evidence the Initiative is judged on. */
+/** Strategy detail, Audit tab: the evidence the Strategy is judged on. */
 export const INITIATIVE_AUDIT_BOARD: BoardLayout = {
   band: [],
   main: [{ id: 'initiative-attachments', type: 'attachments' }],

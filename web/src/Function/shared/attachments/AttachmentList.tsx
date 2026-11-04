@@ -22,7 +22,7 @@ import {
 } from '@/hooks/attachmentData';
 
 /**
- * The files attached to one thing — an Element, an Object, an Initiative,
+ * The files attached to one thing — an Element, an Object, a Strategy,
  * a deal… — one row each: its kind's icon and title, then ▶ to open its
  * preview right under it (where Word and Excel can be edited and saved as
  * a new version). A bin moves a file to the trash, kept out of the list

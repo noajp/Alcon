@@ -10,11 +10,11 @@ import { SettingsSection, SettingsRow } from './SettingsSection';
 import { SelectControl } from './SettingsControls';
 
 // The two Strategy settings panels, shared by Settings > Strategy and the
-// Initiatives row's settings modal.
+// Strategies row's settings modal.
 
-// ── Initiative — how Initiatives are judged ────────────────────────────
+// ── Strategy — how Strategies are judged ────────────────────────────
 // The thresholds are each Domain's risk_thresholds — the numbers the
-// Initiative list row, the Initiative page and the due-soon notifications
+// Strategy list row, the Strategy page and the due-soon notifications
 // all read. One store, one editor (also reachable as Elements > SLAs).
 export function InitiativeJudgementSettings() {
   return <SlaSettings />;

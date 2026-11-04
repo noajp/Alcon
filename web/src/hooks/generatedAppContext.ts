@@ -27,7 +27,7 @@ export async function readGeneratedAppContext(objectId: string, expectedUserId: 
   const [primary, homes, strategyLinks, domainLinks] = await Promise.all([
     readAllPages<{ id: string }>('Object Elements', (from, to) => supabase.from('elements').select('id', { count: 'exact' }).eq('object_id', objectId).order('id').range(from, to), r => r.id),
     readAllPages<{ element_id: string }>('Element homes', (from, to) => supabase.from('element_objects').select('element_id', { count: 'exact' }).eq('object_id', objectId).order('element_id').range(from, to), r => r.element_id),
-    readAllPages<{ strategy_id: string }>('Initiative links', (from, to) => supabase.from('strategy_objects').select('strategy_id', { count: 'exact' }).eq('object_id', objectId).order('strategy_id').range(from, to), r => r.strategy_id),
+    readAllPages<{ strategy_id: string }>('Strategy links', (from, to) => supabase.from('strategy_objects').select('strategy_id', { count: 'exact' }).eq('object_id', objectId).order('strategy_id').range(from, to), r => r.strategy_id),
     readAllPages<{ domain_id: string }>('Domain links', (from, to) => supabase.from('object_domains').select('domain_id', { count: 'exact' }).eq('object_id', objectId).order('domain_id').range(from, to), r => r.domain_id),
   ]);
   const elements = await readAllIn<AppContextSnapshot['elements'][number]>('Elements', [...primary.map(r => r.id), ...homes.map(r => r.element_id)],
@@ -36,10 +36,10 @@ export async function readGeneratedAppContext(objectId: string, expectedUserId: 
     (ids, from, to) => supabase.from('intent_bindings').select('id,intent_id,target_type,target_id,relationship_type', { count: 'exact' }).in('target_id', ids).in('target_type', ['object', 'element']).order('id').range(from, to), r => r.id);
   const directIntents = await readAllIn<AppContextSnapshot['intents'][number]>('Bound intents', bindings.map(b => b.intent_id),
     (ids, from, to) => supabase.from('intents').select('id,strategy_id,parent_intent_id,kind,title,subtitle,status,target_value,actual_value,unit,direction,measured_at,horizon,superseded_by_intent_id', { count: 'exact' }).in('id', ids).order('id').range(from, to), r => r.id);
-  const initiatives = await readAllIn<AppContextSnapshot['initiatives'][number]>('Initiatives', [...strategyLinks.map(r => r.strategy_id), ...directIntents.map(i => i.strategy_id)],
+  const initiatives = await readAllIn<AppContextSnapshot['initiatives'][number]>('Strategies', [...strategyLinks.map(r => r.strategy_id), ...directIntents.map(i => i.strategy_id)],
     (ids, from, to) => supabase.from('strategies').select('id,name,description,status', { count: 'exact' }).in('id', ids).order('id').range(from, to), r => r.id);
   const [intents, domains, phases] = await Promise.all([
-    readAllIn<AppContextSnapshot['intents'][number]>('Initiative intents', initiatives.map(i => i.id),
+    readAllIn<AppContextSnapshot['intents'][number]>('Strategy intents', initiatives.map(i => i.id),
       (ids, from, to) => supabase.from('intents').select('id,strategy_id,parent_intent_id,kind,title,subtitle,status,target_value,actual_value,unit,direction,measured_at,horizon,superseded_by_intent_id', { count: 'exact' }).in('strategy_id', ids).order('id').range(from, to), r => r.id),
     readAllIn<AppContextSnapshot['domains'][number]>('Domains', [...domainLinks.map(r => r.domain_id), ...(object.domain_id ? [object.domain_id] : [])],
       (ids, from, to) => supabase.from('domains').select('id,name', { count: 'exact' }).in('id', ids).order('id').range(from, to), r => r.id),

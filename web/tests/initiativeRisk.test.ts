@@ -155,7 +155,7 @@ describe('computeInitiativeRisk — signals', () => {
     expect(r.openTotal).toBe(2);
   });
 
-  it('ignores Elements homed outside the Initiative scope', () => {
+  it('ignores Elements homed outside the Strategy scope', () => {
     const r = computeInitiativeRisk(OBJ, [el({ id: 'a' }), el({ id: 'b', objectIds: ['other'] })], NOW);
     expect(r.openTotal).toBe(1);
   });
@@ -406,7 +406,7 @@ describe('computeInitiativeRisk — load', () => {
 
   // The measured reading on the real board: one Worker holds 42 of 57 open
   // Elements. That is the decision the pane exists to surface.
-  it('flags a Initiative that runs through one Worker', () => {
+  it('flags a Strategy that runs through one Worker', () => {
     const ada = { id: 'w1', name: 'Ada' };
     const grace = { id: 'w2', name: 'Grace' };
     const r = computeInitiativeRisk(
@@ -422,7 +422,7 @@ describe('computeInitiativeRisk — load', () => {
     expect(r.concentration?.name).toBe('Ada');
   });
 
-  it('leaves an evenly-staffed Initiative unflagged', () => {
+  it('leaves an evenly-staffed Strategy unflagged', () => {
     const r = computeInitiativeRisk(
       OBJ,
       [
@@ -434,13 +434,13 @@ describe('computeInitiativeRisk — load', () => {
     expect(r.concentration).toBeNull();
   });
 
-  it('gives an empty Initiative a report rather than throwing', () => {
+  it('gives an empty Strategy a report rather than throwing', () => {
     const r = computeInitiativeRisk([], [], NOW);
     expect(r).toMatchObject({ openTotal: 0, load: [], objects: [], concentration: null });
   });
 });
 
-// The acceptance case, taken from a live Initiative rather than invented: five
+// The acceptance case, taken from a live Strategy rather than invented: five
 // Task Forces, sixteen dated Elements, six Workers. Read as a fixed instant so
 // it does not rot next week — the whole reason `now` is an argument.
 describe('computeInitiativeRisk — Op Kestrel Relief, as measured', () => {
@@ -490,7 +490,7 @@ describe('computeInitiativeRisk — Op Kestrel Relief, as measured', () => {
     expect(r.unstaffed).toBe(0);
   });
 
-  // Overdue alone would report this Initiative as entirely healthy. It is not:
+  // Overdue alone would report this Strategy as entirely healthy. It is not:
   // three Elements are due within three days and nobody has started any of them.
   it('names TF-AIR as where the next person goes', () => {
     expect(r.dueSoon).toBe(3);
@@ -501,7 +501,7 @@ describe('computeInitiativeRisk — Op Kestrel Relief, as measured', () => {
   });
 
   // AIR-003 is homed in both Task Forces, so it appears on both rows — but the
-  // Initiative-level count is of Elements, not of rows, and must not double it.
+  // Strategy-level count is of Elements, not of rows, and must not double it.
   it('shows the multi-homed Element on both Objects without counting it twice', () => {
     expect(r.objects.map((o) => o.object.name)).toEqual(['TF-AIR', 'TF-MED']);
     expect(r.objects[1].dueSoon).toBe(1);
@@ -509,7 +509,7 @@ describe('computeInitiativeRisk — Op Kestrel Relief, as measured', () => {
     expect(r.dueSoon).toBe(3);
   });
 
-  it('does not flag concentration on a Initiative staffed across six Workers', () => {
+  it('does not flag concentration on a Strategy staffed across six Workers', () => {
     expect(r.load[0]).toMatchObject({ name: 'Dr. Lindqvist', open: 5 });
     expect(r.concentration).toBeNull();
   });
@@ -608,7 +608,7 @@ describe('computeInitiativeRisk — per-Object thresholds (Settings > Elements >
     expect(report.objects.map((r) => r.object.id)).toEqual(['b']);
   });
 
-  it('Object thresholds win over Initiative-level options, which win over defaults', () => {
+  it('Object thresholds win over Strategy-level options, which win over defaults', () => {
     const objects: RiskObject[] = [
       { id: 'a', name: 'A' },
       { id: 'b', name: 'B', thresholds: { stallMinutes: 10 } },
@@ -617,7 +617,7 @@ describe('computeInitiativeRisk — per-Object thresholds (Settings > Elements >
       el({ id: 'e1', status: 'in_progress', objectIds: ['a'], lastProgressAt: NOW - 20 * MIN }),
       el({ id: 'e2', status: 'in_progress', objectIds: ['b'], lastProgressAt: NOW - 20 * MIN }),
     ];
-    // Initiative says 30m: A is quiet 20m → fine; B overrides to 10m → stalled.
+    // Strategy says 30m: A is quiet 20m → fine; B overrides to 10m → stalled.
     const report = computeInitiativeRisk(objects, elements, NOW, { stallMinutes: 30 });
     expect(report.objects.map((r) => [r.object.id, r.reason])).toEqual([['b', 'stalled']]);
   });

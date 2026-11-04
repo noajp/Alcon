@@ -4,12 +4,11 @@ import type { ReactNode } from 'react';
 
 // Line drawings for an empty list, one per concept, all built from the same
 // rounded isometric blocks: a Domain is a stack of layers, Objects a cluster
-// of blocks, Elements tiles on a grid; a Vision is a stepped summit, an
-// Initiative a path to an outcome, Phases segments laid end to end. Drawn in the text color; each block is filled
+// of blocks, Elements tiles on a grid; a Strategy a path to an outcome, Phases segments laid end to end. Drawn in the text color; each block is filled
 // with the pane's own background so blocks in front hide the lines behind
 // them.
 
-export type EmptyArtKind = 'domain' | 'objects' | 'elements' | 'vision' | 'initiative' | 'phase';
+export type EmptyArtKind = 'domain' | 'objects' | 'elements' | 'initiative' | 'phase';
 
 const COS = Math.cos(Math.PI / 6);
 const R = 1.6;
@@ -119,20 +118,6 @@ function ElementsArt() {
   );
 }
 
-function VisionArt() {
-  // A stepped summit: three tiers, each smaller, stacked on one centre.
-  const tiers = [42, 28, 14];
-  return (
-    <>
-      {tiers.map((w, n) => (
-        <g key={n}>
-          <Box x={48} y={45 - n * 9 + w / 2} w={w} d={w} h={9} />
-        </g>
-      ))}
-    </>
-  );
-}
-
 function InitiativeArt() {
   // A path of two tiles leading to a block: the way to an outcome.
   const s = 20, a = 20;
@@ -169,7 +154,6 @@ const ART: Record<EmptyArtKind, () => ReactNode> = {
   domain: DomainArt,
   objects: ObjectsArt,
   elements: ElementsArt,
-  vision: VisionArt,
   initiative: InitiativeArt,
   phase: PhaseArt,
 };

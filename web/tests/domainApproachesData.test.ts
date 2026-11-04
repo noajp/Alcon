@@ -52,7 +52,7 @@ describe('Domain approach data', () => {
     mock.rpc.mockResolvedValue({ data: false, error: null });
     expect((await fetchDomainApproaches('d')).canEdit).toBe(false);
   });
-  it('compares approach revision and Domain on edits and never moves the Initiative', async () => {
+  it('compares approach revision and Domain on edits and never moves the Strategy', async () => {
     await saveDomainApproach('d', { kind: 'approach', id: 'a', revision: 2, values: { title: 'A', expected_change: 'B', hypothesis: 'C', assumptions: '', review_date: null, review_trigger: '', measure_id: null, strategy_id: 's' } });
     expect(writes[0].filters).toEqual([['domain_id', 'd'], ['id', 'a'], ['revision', 2]]);
     expect(writes[0].values).not.toHaveProperty('strategy_id');

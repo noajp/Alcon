@@ -37,7 +37,7 @@ export function canManageObject(
 }
 
 /**
- * How many of an Initiative's linked Objects are in use. The links
+ * How many of a Strategy's linked Objects are in use. The links
  * (strategy_objects) keep archived Objects; counts shown next to the list of
  * Objects count only the ones the list shows (`activeIds`).
  */

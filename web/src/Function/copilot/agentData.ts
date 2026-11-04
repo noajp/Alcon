@@ -169,7 +169,7 @@ async function startAgentRun(opts: StartOptions, retried = false): Promise<{ run
 /** What became of a request to start a run. */
 export type AgentStartOutcome = 'started' | 'busy' | 'failed';
 
-/** Starts an Element's run from outside its page (an Initiative's Execute
+/** Starts an Element's run from outside its page (a Strategy's Execute
  *  tab): 'busy' when it already has an open run. */
 export async function startElementRun(elementId: string, domainId?: string | null): Promise<AgentStartOutcome> {
   try {

@@ -48,7 +48,7 @@ export function BreakdownWidget({ host, params, setParams }: WidgetProps) {
   const { data: strategies } = useStrategies();
   const { data: explorer } = useObjects(null);
 
-  // Only the Object and Initiative dimensions need names the rows cannot supply.
+  // Only the Object and Strategy dimensions need names the rows cannot supply.
   const ctx = useMemo<DimensionContext>(() => {
     const objectNames = new Map(explorer.objects.map((o) => [o.id, o.name]));
 

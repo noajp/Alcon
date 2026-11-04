@@ -16,7 +16,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 // =============================================================
 // Gap Analysis — the distance between the reading and the condition.
 //
-// The Initiative used to hold this as three free-text boxes in localStorage:
+// The Strategy used to hold this as three free-text boxes in localStorage:
 // Goal, Gap, Current State. Every one of them was a sentence somebody typed
 // beside numbers that already said the same thing, and neither could correct
 // the other. Here Goal is the measure's target, Current is its reading, and
@@ -27,7 +27,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 // corrections are not on one scale and a shared axis would claim they were.
 // =============================================================
 
-/** Takes no host: the Initiative it reads is the one whose Intent bundle the
+/** Takes no host: the Strategy it reads is the one whose Intent bundle the
  *  surface mounted, and asking for the subject as well would give it two
  *  sources for the same answer. */
 export function FrameworkGapWidget() {
@@ -56,7 +56,7 @@ export function FrameworkGapWidget() {
   if (error) {
     return (
       <p className="py-1 text-[12px] text-[var(--status-danger)]">
-        {t('Could not read this Initiative’s conditions.')}
+        {t('Could not read this Strategy’s conditions.')}
       </p>
     );
   }
@@ -64,7 +64,7 @@ export function FrameworkGapWidget() {
 
   return (
     <div className="py-1">
-      <InitiativeMeasureEditor initiativeId={initiative.initiativeId} initiativeName={initiative.data?.master?.title ?? t('Initiative')}>
+      <InitiativeMeasureEditor initiativeId={initiative.initiativeId} initiativeName={initiative.data?.master?.title ?? t('Strategy')}>
       {rows.map((row) => (
         <GapTrack key={row.id} row={row} />
       ))}

@@ -23,7 +23,7 @@ import { IntentPanel } from './IntentPanel';
 
 // The review screen for one code change: files on the left, the diff in the
 // middle, and on the right what the change was meant to do — the Element and
-// its Initiatives' intent — with the AI's check and the team's verdicts.
+// its Strategies' intent — with the AI's check and the team's verdicts.
 //
 // A large change reads as a guided review: the AI splits it into a few
 // sections, each with what it changes and why, and the reviewer steps through
@@ -103,7 +103,7 @@ export function CodeReviewDialog({ change, open, onOpenChange }: { change: CodeC
 }
 
 /** The review screen itself — in the Reviews mode's main pane, or in a
- *  dialog over an Element or an Initiative. */
+ *  dialog over an Element or a Strategy. */
 export function CodeReviewScreen({ change: given, inDialog = false }: { change: CodeChange; inDialog?: boolean }) {
   const { t } = useI18n();
   const { user, profile } = useAuthContext();

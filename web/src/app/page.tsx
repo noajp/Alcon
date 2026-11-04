@@ -382,8 +382,8 @@ function WorkspaceContent({
     setActiveView(lastViewRef.current);
     handleCopilotOpenChange(true);
   };
-  // Nothing is created up front: a Space may start from Strategy (a Vision or
-  // an Initiative) as well as from a Domain, so the person picks where to begin.
+  // Nothing is created up front: a Space may start from a Strategy as well
+  // as from a Domain, so the person picks where to begin.
   const [createType, setCreateType] = useState<CreateType | null>(null);
   const [pendingNewNote, setPendingNewNote] = useState(0);
   // The workspace owns the Object creation popup.
@@ -655,7 +655,7 @@ function WorkspaceContent({
       />}
 
       {/* Quick-create cards — one shape for every "+": the Notebook card and
-          the Object card here (Linear-style, no full-page form); Initiative
+          the Object card here (Linear-style, no full-page form); Strategy
           and Table cards live in their surfaces. */}
       <QuickAddNotebookPopup
         open={notebookPopupOpen}
