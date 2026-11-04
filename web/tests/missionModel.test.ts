@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  actionState, buildMissionGraph, draftGraph, latestRuns, missionBarriers, missionSummary, normalizePlan,
+  actionState, buildFleet, draftFleet, latestRuns, moveDraftTask, startableTasks, UNPLACED, missionBarriers, missionSummary, normalizePlan,
   type MissionElementRow, type MissionMeasureRow, type MissionRunRow, handOverLabels, isHandedOver
 } from '@/ActivitySpace/strategy/initiative/mission/missionModel';
 
@@ -29,21 +29,32 @@ describe('actionState', () => {
   });
 });
 
-describe('buildMissionGraph', () => {
-  it('hangs actions off the measures they deliver, and the rest off the Strategy', () => {
-    const g = buildMissionGraph({
-      initiativeName: 'Win', measures: [measure('m1', 12)], elements: [el('a'), el('b')],
-      bindings: [{ intent_id: 'm1', target_type: 'element', target_id: 'a', relationship_type: 'delivers' }],
-      edges: [{ from_element: 'a', to_element: 'b' }, { from_element: 'a', to_element: 'outside' }],
-      runs: [], artifacts: [{ id: 'x', element_id: 'a', title: 'Report' }, { id: 'y', element_id: 'gone', title: 'Lost' }],
+describe('buildFleet', () => {
+  it('puts each Element under its Object with what it delivers, waits on, and whether an AI may start it', () => {
+    const fleet = buildFleet({
+      objects: [{ id: 'o1', name: 'Site', domain_id: 'd1' }, { id: 'o2', name: 'Empty', domain_id: null }],
+      elements: [
+        { ...el('a', 'done'), assignee: 'ai' },
+        { ...el('b'), assignee: 'ai', assigneeName: 'Writer' },
+        { ...el('c'), assignee: 'human' },
+        { ...el('d'), claudeCode: true },
+        el('e', 'cancelled'),
+      ],
+      measures: [measure('m1', 12)],
+      bindings: [{ intent_id: 'm1', target_type: 'element', target_id: 'b', relationship_type: 'delivers' }],
+      edges: [{ from_element: 'a', to_element: 'b' }, { from_element: 'b', to_element: 'c' }, { from_element: 'outside', to_element: 'c' }],
+      runs: [run('b', 'failed', '1', { cost_usd: 0.25 }), run('b', 'completed', '0', { cost_usd: 0.1 })],
     });
-    expect(g.nodes.map((n) => n.id)).toEqual(['initiative', 'm:m1', 'e:a', 'e:b', 'a:x']);
-    expect(g.nodes.find((n) => n.id === 'm:m1')?.state).toBe('met');
-    expect(g.edges).toContainEqual({ from: 'm:m1', to: 'e:a', kind: 'serves' });
-    expect(g.edges).toContainEqual({ from: 'initiative', to: 'e:b', kind: 'serves' });
-    expect(g.edges).toContainEqual({ from: 'e:a', to: 'e:b', kind: 'depends' });
-    expect(g.edges.some((e) => e.to === 'e:outside')).toBe(false);
-    expect(g.edges).toContainEqual({ from: 'e:a', to: 'a:x', kind: 'produces' });
+    expect(fleet.map((o) => [o.key, o.elements.map((e) => e.key)])).toEqual([['o1', ['b', 'c', 'd', 'a', 'e']], ['o2', []]]);
+    const [site] = fleet;
+    const b = site.elements.find((e) => e.key === 'b')!;
+    expect(b).toMatchObject({ state: 'failed', serves: ['Measure m1'], waitsOn: [], ready: true, assigneeName: 'Writer', costUsd: 0.35 });
+    const c = site.elements.find((e) => e.key === 'c')!;
+    expect(c).toMatchObject({ waitsOn: ['Task b'], ready: false });
+    expect(site.elements.find((e) => e.key === 'd')).toMatchObject({ ready: false, handable: true });
+    expect(site.tally).toEqual({ total: 4, done: 1, running: 0, waiting: 0, stopped: 1 });
+    expect(site.state).toBe('failed');
+    expect(fleet[1].state).toBe('todo');
   });
 });
 
@@ -78,6 +89,7 @@ describe('normalizePlan', () => {
       ],
     }, new Set(['m1']));
     expect(plan.summary).toBe('Do it');
+    expect(plan.objects).toEqual([]);
     expect(plan.objectives).toEqual([{ key: 'o1', title: 'Grow', measureId: 'm1' }, { key: 'o2', title: 'New', measureId: null }]);
     expect(plan.tasks.map((t) => [t.key, t.objective, t.dependsOn, t.assignee])).toEqual([
       ['t1', 'o1', [], 'ai'], ['t2', null, ['t1'], 'human'], ['t3', null, [], 'ai'],
@@ -85,20 +97,73 @@ describe('normalizePlan', () => {
   });
 
   it('survives a malformed answer', () => {
-    expect(normalizePlan(null, new Set())).toEqual({ summary: '', objectives: [], tasks: [] });
+    expect(normalizePlan(null, new Set())).toEqual({ summary: '', objectives: [], objects: [], tasks: [] });
   });
 
-  it('draws the draft with its new nodes marked', () => {
+  it('places tasks in the Strategy\'s Objects or new ones, and only in Domains the Space has', () => {
+    const plan = normalizePlan({
+      objects: [
+        { key: 'b1', objectId: 'o1', name: 'ignored' },
+        { key: 'b2', objectId: 'o1' },
+        { key: 'b3', objectId: 'not-ours', name: 'Guide', domainId: 'd1' },
+        { key: 'b4', name: 'Kit', domainId: 'elsewhere' },
+        { key: 'b5', name: 'Unused', domainId: 'd1' },
+        { key: 'b6' },
+      ],
+      tasks: [
+        { key: 't1', title: 'A', object: 'b1' }, { key: 't2', title: 'B', object: 'b2' },
+        { key: 't3', title: 'C', object: 'b3' }, { key: 't4', title: 'D', object: 'b4' }, { key: 't5', title: 'E', object: 'b6' },
+      ],
+    }, new Set(), { objects: new Map([['o1', 'Site']]), domainIds: new Set(['d1']) });
+    expect(plan.objects).toEqual([
+      { key: 'b1', objectId: 'o1', name: 'Site', domainId: null },
+      { key: 'b3', objectId: null, name: 'Guide', domainId: 'd1' },
+      { key: 'b4', objectId: null, name: 'Kit', domainId: null },
+    ]);
+    expect(plan.tasks.map((t) => t.object)).toEqual(['b1', 'b1', 'b3', 'b4', null]);
+  });
+
+  it('lays the draft over the Objects: tasks join their Object, new Objects and unplaced work follow, dashed', () => {
+    const current = buildFleet({
+      objects: [{ id: 'o1', name: 'Site', domain_id: 'd1' }], elements: [el('a', 'done')],
+      measures: [measure('m1', null)], bindings: [], edges: [], runs: [],
+    });
     const draft = normalizePlan({
-      objectives: [{ key: 'o1', title: 'Grow', measureId: 'm1' }, { key: 'o2', title: 'New' }],
-      tasks: [{ key: 't1', title: 'A', objective: 'o2' }, { key: 't2', title: 'B', dependsOn: ['t1'] }],
-    }, new Set(['m1']));
-    const g = draftGraph('Win', [measure('m1', null)], draft);
-    expect(g.nodes.find((n) => n.id === 'm:m1')?.draft).toBe(false);
-    expect(g.nodes.find((n) => n.id === 'o:o2')?.draft).toBe(true);
-    expect(g.edges).toContainEqual({ from: 'o:o2', to: 't:t1', kind: 'serves', draft: true });
-    expect(g.edges).toContainEqual({ from: 'initiative', to: 't:t2', kind: 'serves', draft: true });
-    expect(g.edges).toContainEqual({ from: 't:t1', to: 't:t2', kind: 'depends', draft: true });
+      objectives: [{ key: 'g1', title: 'Grow', measureId: 'm1' }],
+      objects: [{ key: 'b1', objectId: 'o1' }, { key: 'b2', name: 'Guide', domainId: 'd1' }],
+      tasks: [
+        { key: 't1', title: 'Write', objective: 'g1', object: 'b2' },
+        { key: 't2', title: 'Publish', object: 'b1', dependsOn: ['t1'], assignee: 'human' },
+        { key: 't3', title: 'Loose' },
+      ],
+    }, new Set(['m1']), { objects: new Map([['o1', 'Site']]), domainIds: new Set(['d1']) });
+    const fleet = draftFleet(current, [measure('m1', null)], draft);
+    expect(fleet.map((o) => [o.key, o.draft, o.elements.map((e) => e.key)])).toEqual([
+      ['o1', false, ['a', 't:t2']],
+      ['b:b2', true, ['t:t1']],
+      [UNPLACED, true, ['t:t3']],
+    ]);
+    expect(fleet[0].elements[1]).toMatchObject({ draft: true, waitsOn: ['Write'], assignee: 'human' });
+    expect(fleet[1].elements[0]).toMatchObject({ serves: ['Measure m1'], ready: false });
+    expect(startableTasks(draft)).toEqual(['t1', 't3']);
+  });
+});
+
+describe('moveDraftTask', () => {
+  const draft = normalizePlan({
+    objects: [{ key: 'b1', objectId: 'o1' }, { key: 'b2', name: 'Guide', domainId: 'd1' }],
+    tasks: [{ key: 't1', title: 'A', object: 'b1' }, { key: 't2', title: 'B', object: 'b2' }],
+  }, new Set(), { objects: new Map([['o1', 'Site'], ['o2', 'Shop']]), domainIds: new Set(['d1']) });
+
+  it('moves a task into one of the Strategy\'s Objects, adding it to the draft, and drops a new Object left empty', () => {
+    const moved = moveDraftTask(draft, 't2', { objectId: 'o2', name: 'Shop', draftKey: null });
+    expect(moved.objects.map((o) => [o.objectId, o.name])).toEqual([['o1', 'Site'], ['o2', 'Shop']]);
+    expect(moved.tasks.find((t) => t.key === 't2')?.object).toBe(moved.objects[1].key);
+  });
+
+  it('moves a task into an Object the draft adds, or leaves it unplaced', () => {
+    expect(moveDraftTask(draft, 't1', { objectId: null, draftKey: 'b2' }).tasks.map((t) => t.object)).toEqual(['b2', 'b2']);
+    expect(moveDraftTask(draft, 't1', { objectId: null, draftKey: null }).tasks[0].object).toBeNull();
   });
 });
 

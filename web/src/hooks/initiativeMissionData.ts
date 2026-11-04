@@ -4,14 +4,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { AgentRunStatus } from '@/types/database';
 import { createElement } from './elementData';
+import { createObject } from './objectData';
 import { addIntentBinding, createIntent } from './strategyData';
 import { setElementDependency } from './coordinationData';
 
 // =============================================================
 // A Strategy's mission, read and written: the runs, artifacts, approvals
-// and dependencies of the Elements under its Objects (the Plan, Execute and
+// and dependencies of the Elements under its Objects (the Execution and
 // Evaluate tabs), the Planner's draft (plan-initiative), and the draft turned
-// into Elements bound to the measures they serve.
+// into Objects and Elements bound to the measures they serve.
 // =============================================================
 
 export interface MissionRun {
@@ -102,8 +103,10 @@ export async function requestInitiativePlan(initiativeId: string, guidance: stri
 export interface ApplyPlanInput {
   initiativeId: string;
   spaceId: string | null;
-  /** The Object the new Elements go into. */
-  objectId: string;
+  /** Where tasks the Planner placed in no Object go; null leaves them out. */
+  fallbackObjectId: string | null;
+  /** Where a new Object goes when the Planner named no Domain. */
+  fallbackDomainId: string | null;
   /** The Strategy's root intent, for new objectives; null when the viewer may not write intents. */
   rootIntentId: string | null;
   /** The AI Worker the ai tasks are assigned to; null leaves them unassigned. */
@@ -111,17 +114,39 @@ export interface ApplyPlanInput {
   /** The AI Worker runs in Claude Code: hand its tasks over on creation. */
   dispatch?: boolean;
   objectives: { key: string; title: string; measureId: string | null }[];
-  tasks: { key: string; title: string; description: string; objective: string | null; dependsOn: string[]; assignee: 'ai' | 'human' }[];
+  objects: { key: string; objectId: string | null; name: string; domainId: string | null }[];
+  tasks: { key: string; title: string; description: string; objective: string | null; object: string | null; dependsOn: string[]; assignee: 'ai' | 'human' }[];
 }
 
-export interface ApplyPlanResult { created: number; failed: string[] }
+export interface ApplyPlanResult {
+  created: number;
+  failed: string[];
+  /** The Element written for each task, by task key. */
+  elementIds: Record<string, string>;
+}
 
-/** Writes an approved draft: new objectives become measures (when the viewer
- *  may), each task an Element bound with 'delivers' to the measure it serves,
+/** Writes an approved draft: new Objects in their Domains, linked to the
+ *  Strategy; new objectives as measures (when the viewer may); each task an
+ *  Element in its Object, bound with 'delivers' to the measure it serves,
  *  its predecessors as depends_on edges, and ai tasks assigned to the AI
- *  Worker. A step that fails is reported by task, not thrown; the rest go on. */
+ *  Worker. A step that fails is reported by name, not thrown; the rest go on. */
 export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyPlanResult> {
   const failed: string[] = [];
+  const objectFor = new Map<string, string>();
+  for (const o of input.objects) {
+    if (o.objectId) { objectFor.set(o.key, o.objectId); continue; }
+    const domainId = o.domainId ?? input.fallbackDomainId;
+    try {
+      if (!domainId) throw new Error('no Domain');
+      const created = await createObject({ name: o.name, domain_id: domainId, domain_ids: [domainId] });
+      const { error } = await supabase.from('strategy_objects')
+        .upsert({ strategy_id: input.initiativeId, object_id: created.id }, { onConflict: 'strategy_id,object_id', ignoreDuplicates: true });
+      if (error) throw new Error(error.message);
+      objectFor.set(o.key, created.id);
+    } catch {
+      failed.push(o.name);
+    }
+  }
   const measureFor = new Map<string, string>();
   for (const o of input.objectives) {
     if (o.measureId) { measureFor.set(o.key, o.measureId); continue; }
@@ -135,12 +160,14 @@ export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyP
   }
   const elementFor = new Map<string, string>();
   for (const t of input.tasks) {
+    const objectId = t.object ? objectFor.get(t.object) : input.fallbackObjectId;
+    if (!objectId) { failed.push(t.title); continue; }
     try {
       // Work for a Claude Code agent is handed over with the plan's approval:
       // the 'dispatch' label is what the dev loop's dispatcher starts.
       const handOver = t.assignee === 'ai' && !!input.aiWorkerId && !!input.dispatch;
       const el = await createElement({
-        title: t.title, description: t.description || null, object_id: input.objectId, status: 'todo',
+        title: t.title, description: t.description || null, object_id: objectId, status: 'todo',
         ...(handOver ? { labels: ['dispatch'] } : {}),
       });
       elementFor.set(t.key, el.id);
@@ -171,5 +198,5 @@ export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyP
       }
     }
   }
-  return { created: elementFor.size, failed: [...new Set(failed)] };
+  return { created: elementFor.size, failed: [...new Set(failed)], elementIds: Object.fromEntries(elementFor) };
 }

@@ -305,8 +305,28 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   'Move to…': ['移動…', '이동…', 'Déplacer vers…', 'Mover a…'],
   'Collapse {name}': ['{name} を折りたたむ', '{name} 접기', 'Replier {name}', 'Contraer {name}'],
   'Expand {name}': ['{name} を展開', '{name} 펼치기', 'Déplier {name}', 'Expandir {name}'],
+  // Execution tab: the Strategy broken down into Objects and Elements
+  'Not placed in an Object': ['Object 未割り当て', 'Object 미배정', 'Dans aucun Object', 'Sin Object'],
+  '{done}/{all} done': ['{done}/{all} 完了', '{done}/{all} 완료', '{done}/{all} terminés', '{done}/{all} hechos'],
+  '{n} stopped': ['{n} 件停止', '{n}건 중단', '{n} arrêtés', '{n} detenidos'],
+  'After {items}': ['{items} の後', '{items} 이후', 'Après {items}', 'Después de {items}'],
+  'Started {n} AI runs.': ['AI の実行を {n} 件始めました。', 'AI 실행을 {n}건 시작했습니다.', '{n} exécutions IA lancées.', 'Se iniciaron {n} ejecuciones de IA.'],
+  'Run {n} ready with AI': ['準備できた {n} 件を AI で実行', '준비된 {n}건을 AI로 실행', 'Exécuter les {n} prêts avec l’IA', 'Ejecutar con IA los {n} listos'],
+  'Break down with AI': ['AI で分解', 'AI로 분해', 'Décomposer avec l’IA', 'Desglosar con IA'],
+  'The Planner reads this Strategy and breaks it down into Objects and Elements. Nothing is created until you approve the draft.': ['Planner がこの Strategy を読み、Object と Element に分解します。下書きを承認するまで何も作られません。', 'Planner가 이 Strategy를 읽고 Object와 Element로 분해합니다. 초안을 승인하기 전에는 아무것도 만들어지지 않습니다.', 'Le Planner lit cette Strategy et la décompose en Objects et Elements. Rien n’est créé avant votre approbation.', 'El Planner lee esta Strategy y la desglosa en Objects y Elements. No se crea nada hasta que apruebes el borrador.'],
+  '{tasks} Elements in {objects} Objects, {fresh} of them new. Dashed cards are not created yet.': ['{objects} 個の Object に {tasks} 件の Element（新しい Object は {fresh} 個）。点線のカードはまだ作られていません。', '{objects}개 Object에 {tasks}개 Element(새 Object {fresh}개). 점선 카드는 아직 만들어지지 않았습니다.', '{tasks} Elements dans {objects} Objects, dont {fresh} nouveaux. Les cartes en pointillés ne sont pas encore créées.', '{tasks} Elements en {objects} Objects, {fresh} de ellos nuevos. Las tarjetas punteadas aún no se han creado.'],
+  'Unplaced work goes to': ['未割り当ての作業の入れ先', '미배정 작업을 넣을 곳', 'Le travail non placé va dans', 'El trabajo sin Object va a'],
+  'No Objects yet': ['Object はまだありません', '아직 Object가 없습니다', 'Aucun Object pour l’instant', 'Aún no hay Objects'],
+  'New Objects go to': ['新しい Object の置き場所', '새 Object를 둘 곳', 'Les nouveaux Objects vont dans', 'Los nuevos Objects van a'],
+  'Create and run {n} with AI': ['作成して {n} 件を AI で実行', '만들고 {n}건을 AI로 실행', 'Créer et exécuter {n} avec l’IA', 'Crear y ejecutar {n} con IA'],
+  'No Objects yet. Break the Strategy down with AI, or add Objects below.': ['Object はまだありません。AI で Strategy を分解するか、下で Object を追加してください。', '아직 Object가 없습니다. AI로 Strategy를 분해하거나 아래에서 Object를 추가하세요.', 'Aucun Object pour l’instant. Décomposez la Strategy avec l’IA ou ajoutez des Objects ci-dessous.', 'Aún no hay Objects. Desglosa la Strategy con IA o añade Objects abajo.'],
+  'Drag each card onto an Object, or choose one above': ['カードを Object へドラッグするか、上で入れ先を選んでください', '카드를 Object로 끌어 놓거나 위에서 넣을 곳을 선택하세요', 'Glissez chaque carte sur un Object, ou choisissez-en un ci-dessus', 'Arrastra cada tarjeta a un Object o elige uno arriba'],
+  'All {n} done': ['{n} 件すべて完了', '{n}건 모두 완료', 'Les {n} terminés', 'Los {n} hechos'],
+  '{n}/{all} running': ['{n}/{all} 件実行中', '{n}/{all}건 실행 중', '{n}/{all} en cours', '{n}/{all} en curso'],
+  'No Elements in this Object yet.': ['この Object にはまだ Element がありません。', '이 Object에는 아직 Element가 없습니다.', 'Aucun Element dans cet Object pour l’instant.', 'Aún no hay Elements en este Object.'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(STRATEGY_MESSAGES).map(([key, row]) => [key, row[index]]));
 
-export const STRATEGY_TRANSLATIONS = { ja: column(0), ko: column(1), fr: column(2), es: column(3) };
+export const STRATEGY_TRANSLATIONS = { ja: column(0), ko: column(1), fr: column(2), es: column(3) 
+};

@@ -2,20 +2,22 @@
 
 import { useMemo } from 'react';
 import { useInitiativeMission } from '@/hooks/initiativeMissionData';
-import { useWorkers } from '@/hooks/useSupabase';
+import { useDomains, useWorkers } from '@/hooks/useSupabase';
 import { runsInClaudeCode } from '@/Function/team/agentModel';
 import { liveLease } from '@/Function/shared/element/lease';
 import { useNowMinute } from '@/Function/shared/useNow';
 import { useInitiativeIntentContext } from '../InitiativeIntent';
-import { MissionEvaluatePanel, MissionExecutePanel, MissionPlanPanel, type MissionContext } from './MissionPanels';
+import { MissionEvaluatePanel, type MissionContext } from './MissionPanels';
+import { MissionExecutionPanel } from './MissionExecution';
+import type { Worker } from '@/types/database';
 import type { MissionElementRow, MissionMeasureRow } from './missionModel';
 
-// The mission part of one Strategy tab. Reads the Strategy's intents from
+// The mission part of one Strategy tab (Execution or Evaluate). Reads the Strategy's intents from
 // the page's InitiativeIntentProvider and the runs, artifacts, approvals and
 // dependencies of the Elements under its Objects, once per tab.
 
 export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, objects, onChanged, onOpenObject }: {
-  tab: 'plan' | 'execution' | 'audit';
+  tab: 'execution' | 'audit';
   initiativeId: string;
   initiativeName: string;
   spaceId: string | null;
@@ -23,7 +25,8 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
   objects: { id: string; name: string; domain_id: string | null; elements?: {
     id: string; title: string; status: string | null; display_id?: string | null; labels?: string[] | null;
     claimed_by?: string | null; claim_expires_at?: string | null; branch?: string | null;
-    assignees?: { role?: string | null; worker?: { ai_config?: unknown } | null }[];
+    due_date?: string | null;
+    assignees?: { role?: string | null; worker?: { type?: Worker['type'] | null; name?: string | null; avatar_url?: string | null; ai_model?: string | null; ai_config?: unknown } | null }[];
   }[] }[];
   /** Elements or measures were written: the page re-reads its Objects. */
   onChanged: () => void;
@@ -31,15 +34,23 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
 }) {
   const intent = useInitiativeIntentContext();
   const { data: workers } = useWorkers();
+  const { data: domains } = useDomains();
   // Ticks, so a lease that lapses while the tab is open stops reading as running.
   const now = useNowMinute(true);
   const elements = useMemo<MissionElementRow[]>(() => {
-    return objects.flatMap((o) => (o.elements ?? []).map((e) => ({
+    return objects.flatMap((o) => (o.elements ?? []).map((e) => {
+      const doer = (e.assignees ?? []).find((a) => a.role !== 'reviewer' && a.worker)?.worker;
+      return {
       id: e.id, title: e.title, status: e.status, display_id: e.display_id ?? null, object_id: o.id,
       labels: e.labels ?? null,
+      assignee: doer ? (doer.type === 'ai_agent' ? 'ai' as const : 'human' as const) : null,
+      assigneeName: doer?.name ?? null,
+      assigneeWorker: doer ?? null,
+      due_date: e.due_date ?? null,
       claudeCode: (e.assignees ?? []).some((a) => a.role !== 'reviewer' && runsInClaudeCode(a.worker?.ai_config)),
       leased: !!liveLease({ claimed_by: e.claimed_by ?? null, claim_expires_at: e.claim_expires_at ?? null, branch: e.branch ?? null }, now),
-    })));
+      };
+    }));
   }, [objects, now]);
   const elementIds = useMemo(() => elements.map((e) => e.id), [elements]);
   const mission = useInitiativeMission(initiativeId, elementIds);
@@ -63,14 +74,14 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
     },
   };
 
-  if (tab === 'plan') {
+  if (tab === 'execution') {
     return (
-      <MissionPlanPanel ctx={ctx}
-        objects={objects.map((o) => ({ id: o.id, name: o.name }))}
+      <MissionExecutionPanel ctx={ctx}
+        objects={objects.map((o) => ({ id: o.id, name: o.name, domain_id: o.domain_id }))}
+        domains={domains.filter((d) => !spaceId || d.activity_space_id === spaceId).map((d) => ({ id: d.id, name: d.name }))}
         aiWorkers={workers.filter((w) => w.type === 'ai_agent' && w.status !== 'inactive')}
         ensureRoot={intent?.ensureRoot ?? (() => Promise.reject(new Error('no intent')))} />
     );
   }
-  if (tab === 'execution') return <MissionExecutePanel ctx={ctx} />;
   return <MissionEvaluatePanel ctx={ctx} />;
 }
