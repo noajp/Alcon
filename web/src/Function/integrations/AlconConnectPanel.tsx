@@ -2,10 +2,10 @@
 
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { FONT } from '@/shared/designTokens';
-import { CopyField } from './CopyField';
+import { CopyButton } from './CopyField';
 import { ConnectedApps } from './ConnectedApps';
 import { PersonalAccessTokens } from './PersonalAccessTokens';
-import { ALCON_MCP_URL, claudeMcpAddCommand } from './patData';
+import { ALCON_MCP_URL } from './patData';
 
 // Settings › Integrations › Connect to Alcon: point an MCP client or a script
 // at Alcon. The client acts as the signed-in person — through a personal
@@ -22,9 +22,10 @@ export function AlconConnectPanel() {
         </p>
       </div>
 
-      <section className="space-y-2">
+      <section className="flex flex-col gap-2">
         <h3 className={`${FONT.lg} text-foreground`}>{t('Endpoint')}</h3>
-        <CopyField value={ALCON_MCP_URL} />
+        <p className="text-[12px] text-muted-foreground">{t("Paste it into the MCP client as the server's address.")}</p>
+        <CopyButton value={ALCON_MCP_URL} label={t('Copy endpoint')} />
       </section>
 
       <ConnectedApps />
@@ -33,8 +34,7 @@ export function AlconConnectPanel() {
 
       <section className="space-y-2">
         <h3 className={`${FONT.lg} text-foreground`}>Claude Code</h3>
-        <p className="text-[12px] text-muted-foreground">{t('Generate a token, then run this command with it in place of <token>:')}</p>
-        <CopyField value={claudeMcpAddCommand('<token>')} multiline />
+        <p className="text-[12px] text-muted-foreground">{t('Generate a token: the command that connects Claude Code comes with it, ready to paste into a terminal.')}</p>
         <p className="text-[12px] text-muted-foreground">
           {t('Any MCP client or script that can send an Authorization header connects the same way.')}
         </p>

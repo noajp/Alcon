@@ -459,7 +459,7 @@ Object.assign(ja, {
   'Connected assets': '接続中の資産',
   'A local app or AI adds one line to its backend and announces itself here. It is recognized when an owner accepts it; from then on what it does is recorded in this Space.': 'ローカルのアプリや AI がバックエンドに一行足すと、ここに名乗り出ます。オーナーが承諾した時点で認識され、以後その活動がこの Space に記録されます。',
   'The one line': 'その一行',
-  'Copy sdk/node/alcon.mjs or sdk/python/alcon.py into the app, import it first, and give the app these two variables:': 'sdk/node/alcon.mjs か sdk/python/alcon.py をアプリにコピーして最初に読み込み、アプリに次の 2 つの環境変数を渡してください：',
+  "Add Alcon's SDK (Node or Python) to the app and import it first, then paste these settings into the app's environment.": "Alcon の SDK（Node か Python）をアプリに入れて最初に読み込み、この設定をアプリの環境変数に貼り付けます。", "Copy settings": "設定をコピー", "Copy endpoint": "エンドポイントをコピー", "Paste it into the MCP client as the server's address.": "MCP クライアントにサーバーのアドレスとして貼り付けます。", "Copy command": "コマンドをコピー",
   'No key to issue: the app receives its own token on first contact and keeps it. What it reports about itself is unverified until you accept it.': '鍵の発行は要りません。アプリは初回の名乗りで自分のトークンを受け取って保持します。承諾するまで、アプリの自己申告は未確認のままです。',
   'Assets': '資産', '{n} waiting for acceptance': '{n} 件が承諾待ち',
   'Only Space owners can accept or revoke assets. You can see what is connected.': '資産の承諾・取り消しは Space のオーナーだけができます。接続済みの内容は確認できます。',
@@ -529,7 +529,7 @@ Object.assign(ko, {
   'Connected assets': '연결된 자산',
   'A local app or AI adds one line to its backend and announces itself here. It is recognized when an owner accepts it; from then on what it does is recorded in this Space.': '로컬 앱이나 AI가 백엔드에 한 줄을 추가하면 여기에 자신을 알립니다. 소유자가 수락하면 인식되고, 그 이후의 활동이 이 Space에 기록됩니다.',
   'The one line': '그 한 줄',
-  'Copy sdk/node/alcon.mjs or sdk/python/alcon.py into the app, import it first, and give the app these two variables:': 'sdk/node/alcon.mjs 또는 sdk/python/alcon.py를 앱에 복사해 가장 먼저 불러오고, 앱에 다음 두 환경 변수를 전달하세요:',
+  "Add Alcon's SDK (Node or Python) to the app and import it first, then paste these settings into the app's environment.": "Alcon SDK(Node 또는 Python)를 앱에 넣어 가장 먼저 불러온 뒤, 이 설정을 앱의 환경 변수에 붙여 넣으세요.", "Copy settings": "설정 복사", "Copy endpoint": "엔드포인트 복사", "Paste it into the MCP client as the server's address.": "MCP 클라이언트에 서버 주소로 붙여 넣으세요.", "Copy command": "명령 복사",
   'No key to issue: the app receives its own token on first contact and keeps it. What it reports about itself is unverified until you accept it.': '발급할 키가 없습니다. 앱은 첫 접촉에서 자신의 토큰을 받아 보관합니다. 수락하기 전까지 앱의 자기 보고는 확인되지 않은 상태입니다.',
   'Assets': '자산', '{n} waiting for acceptance': '{n}개가 수락 대기 중',
   'Only Space owners can accept or revoke assets. You can see what is connected.': '자산의 수락과 취소는 Space 소유자만 할 수 있습니다. 연결된 내용은 볼 수 있습니다.',
@@ -599,7 +599,7 @@ Object.assign(fr, {
   'Connected assets': 'Actifs connectés',
   'A local app or AI adds one line to its backend and announces itself here. It is recognized when an owner accepts it; from then on what it does is recorded in this Space.': "Une application locale ou une IA ajoute une ligne à son backend et s'annonce ici. Elle est reconnue quand un propriétaire l'accepte ; dès lors, ce qu'elle fait est enregistré dans ce Space.",
   'The one line': 'La ligne',
-  'Copy sdk/node/alcon.mjs or sdk/python/alcon.py into the app, import it first, and give the app these two variables:': "Copiez sdk/node/alcon.mjs ou sdk/python/alcon.py dans l'application, importez-le en premier et donnez-lui ces deux variables :",
+  "Add Alcon's SDK (Node or Python) to the app and import it first, then paste these settings into the app's environment.": "Ajoutez le SDK d'Alcon (Node ou Python) à l'app, importez-le en premier, puis collez ces réglages dans son environnement.", "Copy settings": "Copier les réglages", "Copy endpoint": "Copier l'endpoint", "Paste it into the MCP client as the server's address.": "Collez-le dans le client MCP comme adresse du serveur.", "Copy command": "Copier la commande",
   'No key to issue: the app receives its own token on first contact and keeps it. What it reports about itself is unverified until you accept it.': "Aucune clé à émettre : l'application reçoit son propre jeton au premier contact et le conserve. Ce qu'elle déclare sur elle-même n'est pas vérifié tant que vous ne l'acceptez pas.",
   'Assets': 'Actifs', '{n} waiting for acceptance': "{n} en attente d'acceptation",
   'Only Space owners can accept or revoke assets. You can see what is connected.': 'Seuls les propriétaires du Space peuvent accepter ou révoquer des actifs. Vous pouvez voir ce qui est connecté.',
@@ -669,7 +669,7 @@ Object.assign(es, {
   'Connected assets': 'Activos conectados',
   'A local app or AI adds one line to its backend and announces itself here. It is recognized when an owner accepts it; from then on what it does is recorded in this Space.': 'Una app local o una IA añade una línea a su backend y se anuncia aquí. Se reconoce cuando un propietario la acepta; desde entonces, lo que hace queda registrado en este Space.',
   'The one line': 'La línea',
-  'Copy sdk/node/alcon.mjs or sdk/python/alcon.py into the app, import it first, and give the app these two variables:': 'Copia sdk/node/alcon.mjs o sdk/python/alcon.py en la app, impórtalo primero y dale a la app estas dos variables:',
+  "Add Alcon's SDK (Node or Python) to the app and import it first, then paste these settings into the app's environment.": "Añade el SDK de Alcon (Node o Python) a la app, impórtalo primero y pega estos ajustes en su entorno.", "Copy settings": "Copiar ajustes", "Copy endpoint": "Copiar endpoint", "Paste it into the MCP client as the server's address.": "Pégalo en el cliente MCP como dirección del servidor.", "Copy command": "Copiar comando",
   'No key to issue: the app receives its own token on first contact and keeps it. What it reports about itself is unverified until you accept it.': 'No hay clave que emitir: la app recibe su propio token en el primer contacto y lo guarda. Lo que informa sobre sí misma no está verificado hasta que la aceptes.',
   'Assets': 'Activos', '{n} waiting for acceptance': '{n} esperando aceptación',
   'Only Space owners can accept or revoke assets. You can see what is connected.': 'Solo los propietarios del Space pueden aceptar o revocar activos. Puedes ver lo que está conectado.',
@@ -955,7 +955,7 @@ Object.assign(es, {
 
 // Settings › Integrations › Connect to Alcon — personal access tokens (ADR 0032).
 Object.assign(ja, {
-  "Generate a token, then run this command with it in place of <token>:": "<token> をトークンに置き換えて、次のコマンドを実行します。",
+  "Generate a token: the command that connects Claude Code comes with it, ready to paste into a terminal.": "トークンを作成すると、Claude Code をつなぐコマンドが一緒に出ます。そのままターミナルに貼り付けてください。",
   "Any MCP client or script that can send an Authorization header connects the same way.": "Authorization ヘッダーを送れる MCP クライアントやスクリプトなら、同じ方法で接続できます。",
   "Personal access tokens": "個人用アクセストークン",
   "A token lets an MCP client or script act as you. It sees and changes only what you can. Revoke it to cut it off at once.": "トークンを使うと、MCP クライアントやスクリプトがあなたとして動きます。見られるもの・変えられるものはあなたと同じです。取り消すとすぐに使えなくなります。",
@@ -994,7 +994,7 @@ Object.assign(ja, {
   "Generate": "発行",
 });
 Object.assign(ko, {
-  "Generate a token, then run this command with it in place of <token>:": "<token>을 토큰으로 바꿔 다음 명령을 실행하세요.",
+  "Generate a token: the command that connects Claude Code comes with it, ready to paste into a terminal.": "토큰을 만들면 Claude Code를 연결하는 명령이 함께 나옵니다. 그대로 터미널에 붙여 넣으세요.",
   "Any MCP client or script that can send an Authorization header connects the same way.": "Authorization 헤더를 보낼 수 있는 MCP 클라이언트나 스크립트라면 같은 방법으로 연결할 수 있습니다.",
   "Personal access tokens": "개인 액세스 토큰",
   "A token lets an MCP client or script act as you. It sees and changes only what you can. Revoke it to cut it off at once.": "토큰을 사용하면 MCP 클라이언트나 스크립트가 사용자로서 동작합니다. 볼 수 있고 바꿀 수 있는 범위는 사용자와 같습니다. 폐기하면 즉시 사용할 수 없습니다.",
@@ -1033,7 +1033,7 @@ Object.assign(ko, {
   "Generate": "발급",
 });
 Object.assign(fr, {
-  "Generate a token, then run this command with it in place of <token>:": "Générez un jeton, puis exécutez cette commande en remplaçant <token> par celui-ci :",
+  "Generate a token: the command that connects Claude Code comes with it, ready to paste into a terminal.": "Générez un jeton : la commande qui connecte Claude Code l'accompagne, prête à coller dans un terminal.",
   "Any MCP client or script that can send an Authorization header connects the same way.": "Tout client MCP ou script capable d’envoyer un en-tête Authorization se connecte de la même façon.",
   "Personal access tokens": "Jetons d’accès personnels",
   "A token lets an MCP client or script act as you. It sees and changes only what you can. Revoke it to cut it off at once.": "Un jeton permet à un client MCP ou à un script d’agir en votre nom. Il voit et modifie uniquement ce que vous pouvez. Révoquez-le pour le couper immédiatement.",
@@ -1072,7 +1072,7 @@ Object.assign(fr, {
   "Generate": "Générer",
 });
 Object.assign(es, {
-  "Generate a token, then run this command with it in place of <token>:": "Genera un token y ejecuta este comando sustituyendo <token> por él:",
+  "Generate a token: the command that connects Claude Code comes with it, ready to paste into a terminal.": "Genera un token: el comando que conecta Claude Code viene con él, listo para pegar en una terminal.",
   "Any MCP client or script that can send an Authorization header connects the same way.": "Cualquier cliente MCP o script que pueda enviar un encabezado Authorization se conecta del mismo modo.",
   "Personal access tokens": "Tokens de acceso personal",
   "A token lets an MCP client or script act as you. It sees and changes only what you can. Revoke it to cut it off at once.": "Un token permite que un cliente MCP o un script actúe en tu nombre. Ve y cambia solo lo que tú puedes. Revócalo para cortarlo al instante.",

@@ -293,14 +293,14 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
             </Field>
           )}
 
-          <Field label={preset.kind === 'mcp' ? t('Endpoint') : t('Base URL')}>
-            {preset.custom ? (
+          {/* A preset's address is the provider's business, not the person's —
+              only a custom connection asks for one. */}
+          {preset.custom && (
+            <Field label={preset.kind === 'mcp' ? t('Endpoint') : t('Base URL')}>
               <Input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} disabled={readOnly} inputMode="url"
                 placeholder="https://" className="h-8 font-mono text-[12px] md:text-[12px]" />
-            ) : (
-              <code className="block truncate font-mono text-[12px] text-foreground">{preset.endpoint}</code>
-            )}
-          </Field>
+            </Field>
+          )}
 
           {preset.custom && !isModel && (
             <Field label={t('Authentication')}>

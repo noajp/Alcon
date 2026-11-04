@@ -10,7 +10,7 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { FONT } from '@/shared/designTokens';
 import type { PersonalAccessToken, PersonalAccessTokenAccess } from '@/types/database';
-import { CopyField } from './CopyField';
+import { CopyButton, CopyField } from './CopyField';
 import { claudeMcpAddCommand, usePersonalAccessTokenActions, usePersonalAccessTokens, type TokenExpiryDays } from './patData';
 
 // The signed-in person's personal access tokens (ADR 0032): list them with
@@ -159,7 +159,7 @@ function GenerateTokenDialog({ onClose }: { onClose: () => void }) {
               <CopyField value={issued} label={t('Token')} />
             </Field>
             <Field label={t('Connect Claude Code')}>
-              <CopyField value={claudeMcpAddCommand(issued)} multiline />
+              <CopyButton value={claudeMcpAddCommand(issued)} label={t('Copy command')} />
             </Field>
           </div>
         ) : (
