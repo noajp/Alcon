@@ -42,7 +42,7 @@ describe('resolveAgentConfig', () => {
       disabledReason: null, agentName: 'Alcon Agent', model: pricing.DEFAULT_AGENT_MODEL,
       providerId: null, price: pricing.AGENT_MODELS[pricing.DEFAULT_AGENT_MODEL],
       modelLabel: pricing.AGENT_MODELS[pricing.DEFAULT_AGENT_MODEL].label,
-      maxTotalTurns: cfg.DEFAULT_MAX_TOTAL_TURNS, instructions: null, domainInstructions: null,
+      maxTotalTurns: cfg.DEFAULT_MAX_TOTAL_TURNS, instructions: null, domainInstructions: null, routedBy: null,
     });
   });
 

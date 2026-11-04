@@ -306,3 +306,27 @@ export async function importDataTable(
   }
   return table.id;
 }
+
+// =====================================================
+// A Strategy's Tables (the things it is about, kept by its runs)
+// =====================================================
+
+export interface StrategyTable { id: string; name: string; rowCount: number }
+
+async function fetchStrategyTables(strategyId: string): Promise<StrategyTable[]> {
+  const { data, error } = await supabase.from('tables').select('id, name')
+    .eq('strategy_id', strategyId).eq('status', 'active').order('created_at');
+  if (error) throw error;
+  const tables = (data ?? []) as { id: string; name: string }[];
+  if (!tables.length) return [];
+  const { data: counts, error: ce } = await supabase.rpc('table_row_counts', { p_table_ids: tables.map((t) => t.id) });
+  if (ce) throw ce;
+  const count = new Map(((counts ?? []) as { table_id: string; row_count: number }[]).map((c) => [c.table_id, Number(c.row_count)]));
+  return tables.map((t) => ({ id: t.id, name: t.name, rowCount: count.get(t.id) ?? 0 }));
+}
+
+/** The Tables a Strategy's runs keep what they found in (tables.strategy_id). */
+export function useStrategyTables(strategyId: string) {
+  const query = useQuery({ queryKey: ['strategy-tables', strategyId], queryFn: () => fetchStrategyTables(strategyId), refetchInterval: 15_000 });
+  return { data: query.data ?? [], loading: query.isPending };
+}

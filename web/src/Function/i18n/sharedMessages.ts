@@ -292,16 +292,11 @@ const SHARED_MESSAGES: Record<string, Row> = {
   'Scope': ['範囲', '범위', 'Périmètre', 'Ámbito'],
   'Shared by the Space': ['Space で共有', 'Space 공유', 'Partagé dans le Space', 'Compartido en el Space'],
   'Unknown Domain': ['不明な Domain', '알 수 없는 Domain', 'Domain inconnu', 'Domain desconocido'],
-  // Connector manifest
-  'Commands': ['コマンド', '명령', 'Commandes', 'Comandos'],
-  'Declare the commands agents may use. With a manifest, agents see only these commands, and each one is allowed, asked for or denied.': ['エージェントが使えるコマンドを宣言します。manifest があると、エージェントにはここに書いたコマンドだけが見え、コマンドごとに許可・確認・禁止が決まります。', '에이전트가 사용할 수 있는 명령을 선언합니다. manifest가 있으면 에이전트에게는 여기 적은 명령만 보이며, 명령마다 허용·확인·금지가 정해집니다.', 'Déclarez les commandes que les agents peuvent utiliser. Avec un manifest, les agents ne voient que ces commandes, chacune autorisée, soumise à confirmation ou refusée.', 'Declara los comandos que pueden usar los agentes. Con un manifest, los agentes solo ven estos comandos, y cada uno se permite, se confirma o se deniega.'],
-  'This is not valid JSON.': ['JSON として読めません。', '올바른 JSON이 아닙니다.', 'Ce n’est pas du JSON valide.', 'No es un JSON válido.'],
-  'The manifest must be a JSON object.': ['manifest は JSON のオブジェクトにしてください。', 'manifest는 JSON 객체여야 합니다.', 'Le manifest doit être un objet JSON.', 'El manifest debe ser un objeto JSON.'],
-  'No commands are declared, so agents cannot use this connection.': ['コマンドが宣言されていないため、エージェントはこの連携を使えません。', '선언된 명령이 없어 에이전트가 이 연결을 사용할 수 없습니다.', 'Aucune commande n’est déclarée : les agents ne peuvent pas utiliser cette connexion.', 'No hay comandos declarados, así que los agentes no pueden usar esta conexión.'],
-  'Allowed': ['許可', '허용', 'Autorisé', 'Permitido'],
-  'Asks first': ['確認する', '먼저 확인', 'Demande d’abord', 'Pregunta antes'],
-  'Denied': ['禁止', '금지', 'Refusé', 'Denegado'],
-  'How to use this connection, for agents (not enforced)': ['エージェント向けの使い方（強制はされません）', '에이전트용 사용법(강제되지 않음)', 'Mode d’emploi pour les agents (non imposé)', 'Cómo usar esta conexión, para agentes (no se impone)'],
+  // How heavy an Element's work is for an AI
+  'Weight': ['重さ', '무게', 'Poids', 'Peso'],
+  'Light (small model)': ['軽い（小さいモデル）', '가벼움(작은 모델)', 'Léger (petit modèle)', 'Ligero (modelo pequeño)'],
+  'Standard': ['標準', '표준', 'Standard', 'Estándar'],
+  'Heavy (large model)': ['重い（大きいモデル）', '무거움(큰 모델)', 'Lourd (grand modèle)', 'Pesado (modelo grande)'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(SHARED_MESSAGES).map(([key, row]) => [key, row[index]]));
