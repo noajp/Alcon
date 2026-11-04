@@ -16,6 +16,25 @@ export interface MissionElementRow {
   status: string | null;
   display_id: string | null;
   object_id: string | null;
+  labels?: readonly string[] | null;
+  /** An assignee runs in Claude Code: the dev loop's dispatcher starts it, not run-agent. */
+  claudeCode?: boolean;
+  /** A session holds an unexpired lease on it (Function/shared/element/lease.ts). */
+  leased?: boolean;
+}
+
+/** The label that hands an Element to the dev loop's dispatcher. */
+const DISPATCH_LABEL = 'dispatch';
+
+/** Pure. Claude Code work has been handed over (the dispatcher will start it). */
+export function isHandedOver(element: MissionElementRow): boolean {
+  return (element.labels ?? []).includes(DISPATCH_LABEL);
+}
+
+/** Pure. The labels that hand an Element over. */
+export function handOverLabels(labels: readonly string[] | null | undefined): string[] {
+  const current = [...(labels ?? [])];
+  return current.includes(DISPATCH_LABEL) ? current : [...current, DISPATCH_LABEL];
 }
 
 export interface MissionMeasureRow {
@@ -71,6 +90,11 @@ export function actionState(element: MissionElementRow, run: MissionRunRow | und
   if (element.status === 'done') return 'done';
   if (element.status === 'cancelled') return 'cancelled';
   if (element.status === 'blocked') return 'blocked';
+  // Claude Code work has no run row: a held lease is the session working on it.
+  if (element.claudeCode) {
+    if (element.status === 'review') return 'waiting';
+    return element.leased ? 'running' : 'todo';
+  }
   if (run) {
     if (run.status === 'queued' || run.status === 'running') return 'running';
     if (run.status === 'awaiting_approval' || run.status === 'paused') return 'waiting';

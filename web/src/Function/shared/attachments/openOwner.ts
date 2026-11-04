@@ -4,7 +4,6 @@ import { requestElementDetail } from '@/Function/shared/element/elementDetailReq
 /** What a file is attached to, as a search result or a list row has it. */
 export interface FileOwnerRef {
   element_id: string | null; object_id: string | null; strategy_id: string | null;
-  portfolio_id: string | null;
   folder_id?: string | null;
   /** For a file on an Element: the Object it is in. */
   element_object_id: string | null;
@@ -21,6 +20,5 @@ export function openAttachmentOwner(f: FileOwnerRef): void {
   }
   else if (f.object_id) openInApp('objects', { objectId: f.object_id, objectDomainId: f.domain_id ?? undefined });
   else if (f.strategy_id) openInApp('strategy', { strategyId: f.strategy_id });
-  else if (f.portfolio_id) openInApp('portfolio', { portfolioId: f.portfolio_id });
   else if (f.folder_id) openInApp('files', { files: { folderId: f.folder_id } });
 }

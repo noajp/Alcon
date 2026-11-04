@@ -108,6 +108,8 @@ export interface ApplyPlanInput {
   rootIntentId: string | null;
   /** The AI Worker the ai tasks are assigned to; null leaves them unassigned. */
   aiWorkerId: string | null;
+  /** The AI Worker runs in Claude Code: hand its tasks over on creation. */
+  dispatch?: boolean;
   objectives: { key: string; title: string; measureId: string | null }[];
   tasks: { key: string; title: string; description: string; objective: string | null; dependsOn: string[]; assignee: 'ai' | 'human' }[];
 }
@@ -134,7 +136,13 @@ export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyP
   const elementFor = new Map<string, string>();
   for (const t of input.tasks) {
     try {
-      const el = await createElement({ title: t.title, description: t.description || null, object_id: input.objectId, status: 'todo' });
+      // Work for a Claude Code agent is handed over with the plan's approval:
+      // the 'dispatch' label is what the dev loop's dispatcher starts.
+      const handOver = t.assignee === 'ai' && !!input.aiWorkerId && !!input.dispatch;
+      const el = await createElement({
+        title: t.title, description: t.description || null, object_id: input.objectId, status: 'todo',
+        ...(handOver ? { labels: ['dispatch'] } : {}),
+      });
       elementFor.set(t.key, el.id);
       const measureId = t.objective ? measureFor.get(t.objective) : undefined;
       if (measureId) {

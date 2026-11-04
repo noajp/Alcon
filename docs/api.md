@@ -19,7 +19,7 @@
 | GET | `/progress` | ステータスの内訳・完了率・遅延 | `domainId` か `objectId` |
 | GET | `/activity` | 最近の Element の変更 | `domainId` `objectId` `limit` |
 | GET | `/workers` | 担当にできる Worker | `elementId` `objectId` `domainId` |
-| GET | `/initiatives` | 見える Initiative | `portfolioId` `status` |
+| GET | `/initiatives` | 見える Initiative | `parentId` `status` |
 | GET | `/initiatives/{id}` | Initiative の意図と、実行する Object | — |
 | POST | `/elements` | Element を作る（201） | `objectId` `title`（必須） `description` `status` `priority` `type` `due_date` `labels` `assigneeWorkerIds` |
 | PATCH | `/elements/{id}` | Element を更新する | `title` `description` `status` `priority` `type` `due_date`（`null` で解除） `estimated_hours` `labels` |

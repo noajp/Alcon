@@ -9,6 +9,7 @@ import { Check, ChevronDown, ChevronRight, Plus, Search, X } from '@/ui/icons';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { IndexList, IndexRow } from '@/Function/shared/IndexList';
+import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import { InitiativeActionsButton, InitiativeMenu } from './InitiativeMenu';
 import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
@@ -80,7 +81,7 @@ import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { resolveVision, useVisions } from '@/hooks/visionData';
-import { initiativesOfVision, inSpace } from '@/ActivitySpace/strategy/portfolio/portfolioGroups';
+import { buildInitiativeTree, flattenInitiativeTree, inSpace, type InitiativeNode } from './initiativeTree';
 import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 
 /** The Overview tab has a band and one column of readings; the other boards
@@ -166,20 +167,21 @@ export function StrategyShell({
     () => strategies.find((s) => s.id === openStrategyId) ?? null,
     [strategies, openStrategyId],
   );
-  // The root list only shows top-level Initiatives — nested ones surface
-  // inside their parent's "Initiatives" section instead.
-  const rootStrategies = useMemo(() => strategies.filter((s) => s.parentIds.length === 0), [strategies]);
-  // Initiatives hang under a Vision, like Elements under a Domain: the list
-  // is the active Vision's, followed by the ones no Vision holds yet.
+  // The list is the Space's Initiatives as a tree — nested ones under their
+  // parent — one section per Vision, then the ones no Vision holds yet. A
+  // new Initiative goes under the open Vision, else the first.
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
   const { data: visions } = useVisions(spaceId);
   const vision = resolveVision(visions, visionId);
-  const { inVision, unplaced } = useMemo(
-    () => (vision
-      ? initiativesOfVision(strategies, vision.id, spaceId)
-      : { inVision: rootStrategies.filter((s) => inSpace(s, spaceId, () => true)), unplaced: [] }),
-    [strategies, rootStrategies, vision, spaceId]);
+  const sections = useMemo(() => {
+    const tree = buildInitiativeTree(strategies.filter((s) => inSpace(s, spaceId, () => true)));
+    const known = new Set(visions.map((v) => v.id));
+    return [
+      ...visions.map((v) => ({ id: v.id, label: v.name, nodes: tree.filter((n) => n.initiative.vision_id === v.id) })),
+      { id: 'unplaced', label: t('Not in a Vision'), nodes: tree.filter((n) => !n.initiative.vision_id || !known.has(n.initiative.vision_id)) },
+    ].filter((section) => section.nodes.length > 0);
+  }, [strategies, spaceId, visions, t]);
 
   if (openStrategy) {
     return (
@@ -205,21 +207,18 @@ export function StrategyShell({
       } />
 
       <div className="flex-1 overflow-hidden">
-        {loading ? null : inVision.length === 0 && unplaced.length === 0 ? (
+        {loading ? null : sections.length === 0 ? (
           <EmptyState art="initiative" title="Create your first Initiative"
             description="An Initiative groups Objects across Domains around one outcome."
             cta="Create Initiative" onCta={() => setNewOpen(true)} />
         ) : (
           <div className="h-full overflow-auto">
-            {inVision.length > 0 && (
-              <StrategyListView strategies={inVision} onSelectStrategy={(s) => setOpenStrategyId(s.id)} />
-            )}
-            {unplaced.length > 0 && (
-              <>
-                <div className="px-6 pt-4 text-[12px] font-medium text-muted-foreground/80">{t('Not in a Vision')}</div>
-                <StrategyListView strategies={unplaced} onSelectStrategy={(s) => setOpenStrategyId(s.id)} showHeader={inVision.length === 0} />
-              </>
-            )}
+            {sections.map((section, i) => (
+              <div key={section.id}>
+                <div className="px-6 pt-4 text-[12px] font-medium text-muted-foreground/80">{section.label}</div>
+                <StrategyListView nodes={section.nodes} onSelectStrategy={(s) => setOpenStrategyId(s.id)} showHeader={i === 0} />
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -300,16 +299,20 @@ function InitiativeHealthCell({ health, measures }: { health: InitiativeHealth |
 }
 
 function StrategyListView({
-  strategies,
+  nodes,
   onSelectStrategy,
   showHeader = true,
 }: {
-  strategies: StrategyWithObjects[];
+  /** The tree's roots; a parent folds its children away with its arrow. */
+  nodes: InitiativeNode<StrategyWithObjects>[];
   onSelectStrategy: (strategy: StrategyWithObjects) => void;
   /** The column headings; a second list under the first leaves them out. */
   showHeader?: boolean;
 }) {
   const { t } = useI18n();
+  const [folded, setFolded] = useState<Set<string>>(new Set());
+  const rows = useMemo(() => flattenInitiativeTree(nodes, (key) => !folded.has(key)), [nodes, folded]);
+  const strategies = useMemo(() => rows.map((n) => n.initiative), [rows]);
   // Health for every row from one read (progress / last movement / risk).
   const { byId: health } = useInitiativeHealth(strategies);
   // Success-condition tallies for every row from one read of their measures.
@@ -321,10 +324,18 @@ function StrategyListView({
   useNow();
   return (
     <IndexList headers={[t('Name'), t('Health'), t('Objects')]} showHeader={showHeader} withActions>
-      {strategies.map((s) => (
-        <InitiativeMenu key={s.id} initiative={s}>
+      {rows.map(({ initiative: s, key, depth, children }) => (
+        <InitiativeMenu key={key} initiative={s}>
           <div>
-            <IndexRow icon={<NavStrategyIcon size={16} />} name={s.name}
+            <IndexRow indent={depth * 20} icon={<NavStrategyIcon size={16} />} name={s.name}
+              lead={children.length > 0 ? (
+                <button type="button"
+                  onClick={() => setFolded((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; })}
+                  className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground"
+                  aria-label={folded.has(key) ? t('Expand {name}', { name: s.name }) : t('Collapse {name}', { name: s.name })} aria-expanded={!folded.has(key)}>
+                  <DisclosureTriangle open={!folded.has(key)} />
+                </button>
+              ) : undefined}
               health={<InitiativeHealthCell health={health.get(s.id)} measures={tallies.get(s.id)} />}
               count={countObjects(s.objectIds)}
               onOpen={() => onSelectStrategy(s)}

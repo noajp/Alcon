@@ -1,5 +1,5 @@
 // Strategy page strings (Initiative list and page, Situation, Risk, Measures,
-// Assumptions, Decisions, Phase, Timeline, Portfolio, Vision), one row per
+// Assumptions, Decisions, Phase, Timeline, Vision), one row per
 // message: [ja, ko, fr, es]. Words shared with the rest of the product (Cancel,
 // Create, Objects…) keep their existing translations elsewhere.
 type Row = [ja: string, ko: string, fr: string, es: string];
@@ -300,14 +300,15 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   'No Objects in this Initiative yet': ['この Initiative に Object はまだありません', '이 Initiative에 아직 Object가 없습니다', 'Aucun Object dans cette Initiative pour l’instant', 'Aún no hay Objects en esta Initiative'],
   'Collapse Objects': ['Object を折りたたむ', 'Object 접기', 'Replier les Objects', 'Contraer Objects'],
   'Expand Objects': ['Object を展開', 'Object 펼치기', 'Déplier les Objects', 'Expandir Objects'],
-  // Portfolio
-  'Start with a Vision': ['まず Vision から', 'Vision부터 시작하기', 'Commencez par une Vision', 'Empieza por una Vision'],
-  'Portfolios belong to a Vision, the way Objects belong to a Domain.': ['Object が Domain に属するように、Portfolio は Vision に属します。', 'Object가 Domain에 속하듯 Portfolio는 Vision에 속합니다.', 'Les Portfolios appartiennent à une Vision, comme les Objects à un Domain.', 'Los Portfolios pertenecen a una Vision, como los Objects a un Domain.'],
+  'Visions': ['Vision', 'Vision', 'Visions', 'Visions'],
+  'Add Vision': ['Vision を追加', 'Vision 추가', 'Ajouter une Vision', 'Añadir Vision'],
+  'A Vision says what this Space aims for. Initiatives hang under it, the way Objects and Elements hang under a Domain.': ['Vision は、この Space が目指す姿です。Domain の下に Object と Element があるように、Vision の下に Initiative を置きます。', 'Vision은 이 Space가 지향하는 모습입니다. Domain 아래에 Object와 Element가 있듯이 Vision 아래에 Initiative를 둡니다.', 'Une Vision dit ce que vise ce Space. Les Initiatives se placent dessous, comme les Objects et les Elements sous un Domain.', 'Una Vision dice a qué aspira este Space. Las Initiatives cuelgan de ella, como los Objects y los Elements de un Domain.'],
+  "An Initiative can't go inside one of its own.": ['Initiative を自分の配下の Initiative の中には移動できません。', 'Initiative를 자신의 하위 Initiative 안으로 옮길 수 없습니다.', 'Une Initiative ne peut pas aller dans l’une des siennes.', 'Una Initiative no puede ir dentro de una de las suyas.'],
+  'Delete the Vision "{name}"? Its Initiatives stay, outside any Vision.': ['Vision「{name}」を削除しますか？ Initiative は残り、どの Vision にも入らない状態になります。', 'Vision "{name}"을(를) 삭제할까요? Initiative는 남아 어떤 Vision에도 속하지 않게 됩니다.', 'Supprimer la Vision « {name} » ? Ses Initiatives restent, hors de toute Vision.', '¿Eliminar la Vision "{name}"? Sus Initiatives se quedan, fuera de toda Vision.'],
+  'Its Initiatives stay, outside any Vision.': ['Initiative は残り、どの Vision にも入らない状態になります。', 'Initiative는 남아 어떤 Vision에도 속하지 않게 됩니다.', 'Ses Initiatives restent, hors de toute Vision.', 'Sus Initiatives se quedan, fuera de toda Vision.'],
   'Set your Vision': ['Vision を定める', 'Vision 정하기', 'Définissez votre Vision', 'Define tu Vision'],
-  'Create your first Portfolio': ['最初の Portfolio を作成', '첫 Portfolio 만들기', 'Créez votre premier Portfolio', 'Crea tu primer Portfolio'],
   'Choose a Domain': ['Domain を選択', 'Domain 선택', 'Choisissez un Domain', 'Elige un Domain'],
   'Move to…': ['移動…', '이동…', 'Déplacer vers…', 'Mover a…'],
-  'Portfolio actions': ['Portfolio の操作', 'Portfolio 작업', 'Actions du Portfolio', 'Acciones del Portfolio'],
   'Collapse {name}': ['{name} を折りたたむ', '{name} 접기', 'Replier {name}', 'Contraer {name}'],
   'Expand {name}': ['{name} を展開', '{name} 펼치기', 'Déplier {name}', 'Expandir {name}'],
 };

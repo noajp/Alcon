@@ -6,12 +6,14 @@ import { PageSection } from '@/Function/shared/PageHead';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { startElementRun } from '@/Function/copilot/agentData';
+import { runsInClaudeCode } from '@/Function/team/agentModel';
+import { updateElement } from '@/hooks/useSupabase';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import { applyInitiativePlan, requestInitiativePlan, type MissionData } from '@/hooks/initiativeMissionData';
 import type { Worker } from '@/types/database';
 import { MissionGraph } from './MissionGraph';
 import {
-  actionState, buildMissionGraph, draftGraph, latestRuns, measureStateOf, missionBarriers, missionSummary, normalizePlan,
+  actionState, buildMissionGraph, draftGraph, handOverLabels, isHandedOver, latestRuns, measureStateOf, missionBarriers, missionSummary, normalizePlan,
   type ActionState, type MissionBindingRow, type MissionElementRow, type MissionMeasureRow, type PlanDraft,
 } from './missionModel';
 import { measureStateLabel } from '../initiativeMeasureModel';
@@ -116,6 +118,7 @@ export function MissionPlanPanel({ ctx, objects, aiWorkers, ensureRoot }: {
       const result = await applyInitiativePlan({
         initiativeId: ctx.initiativeId, spaceId: ctx.spaceId, objectId: targetObject, rootIntentId,
         aiWorkerId: aiWorker || null, objectives: draft.objectives, tasks: draft.tasks,
+        dispatch: runsInClaudeCode(aiWorkers.find((w) => w.id === aiWorker)?.ai_config),
       });
       setDraft(null);
       setNotice(result.failed.length
@@ -206,7 +209,22 @@ export function MissionExecutePanel({ ctx }: { ctx: MissionContext }) {
   const rows = ctx.elements
     .map((e) => ({ element: e, run: runs.get(e.id), state: actionState(e, runs.get(e.id)) }))
     .filter((r) => r.state !== 'cancelled');
-  const startable = rows.filter((r) => r.state === 'todo' || r.state === 'failed');
+  // run-agent starts only work that is not Claude Code's; Claude Code work is
+  // handed to the dev loop's dispatcher instead, which starts it on a Mac.
+  const startable = rows.filter((r) => !r.element.claudeCode && (r.state === 'todo' || r.state === 'failed'));
+  const handable = rows.filter((r) => r.element.claudeCode && r.state === 'todo' && !isHandedOver(r.element));
+
+  const handOver = async (ids: string[]) => {
+    setBusy(ids.length === 1 ? ids[0] : 'all'); setNotice(null);
+    let failed = 0;
+    for (const id of ids) {
+      const element = ctx.elements.find((e) => e.id === id);
+      try { await updateElement(id, { labels: handOverLabels(element?.labels) }); } catch { failed += 1; }
+    }
+    setBusy(null);
+    if (failed) setNotice(t('{n} could not be handed to Claude Code.', { n: failed }));
+    ctx.refetch();
+  };
 
   const run = async (elementId: string) => {
     setBusy(elementId); setNotice(null);
@@ -227,10 +245,19 @@ export function MissionExecutePanel({ ctx }: { ctx: MissionContext }) {
   };
 
   return (
-    <PageSection title={t('Execution status')} action={startable.length > 0 ? (
-      <Button variant="secondary" size="sm" onClick={() => void runAll()} disabled={busy !== null}>
-        {t('Run {n} with AI', { n: startable.length })}
-      </Button>
+    <PageSection title={t('Execution status')} action={startable.length > 0 || handable.length > 0 ? (
+      <>
+        {handable.length > 0 && (
+          <Button variant="secondary" size="sm" onClick={() => void handOver(handable.map((r) => r.element.id))} disabled={busy !== null}>
+            {t('Hand {n} to Claude Code', { n: handable.length })}
+          </Button>
+        )}
+        {startable.length > 0 && (
+          <Button variant="secondary" size="sm" onClick={() => void runAll()} disabled={busy !== null}>
+            {t('Run {n} with AI', { n: startable.length })}
+          </Button>
+        )}
+      </>
     ) : undefined}>
       <div className="space-y-3">
         <div className="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] gap-2">
@@ -260,7 +287,14 @@ export function MissionExecutePanel({ ctx }: { ctx: MissionContext }) {
                     {latest.model ?? ''} · {compact(latest.input_tokens + latest.output_tokens)} · ${Number(latest.cost_usd || 0).toFixed(2)}
                   </span>
                 )}
-                {(state === 'todo' || state === 'failed') && (
+                {element.claudeCode && state === 'todo' && (isHandedOver(element) ? (
+                  <span className="shrink-0 text-[11px] text-muted-foreground">{t('Handed to Claude Code')}</span>
+                ) : (
+                  <Button variant="ghost" size="xs" onClick={() => void handOver([element.id])} disabled={busy !== null}>
+                    {busy === element.id ? t('Handing over…') : t('Hand to Claude Code')}
+                  </Button>
+                ))}
+                {!element.claudeCode && (state === 'todo' || state === 'failed') && (
                   <Button variant="ghost" size="xs" onClick={() => void run(element.id)} disabled={busy !== null}>
                     {busy === element.id ? t('Starting…') : state === 'failed' ? t('Retry with AI') : t('Run with AI')}
                   </Button>

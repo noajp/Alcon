@@ -6,7 +6,7 @@ import { FONT } from '@/shared/designTokens';
 
 /** A section of a detail page whose heading folds it (▶), with a quiet count
  *  on the heading's line — the shape of an Element's Sub-elements, shared by
- *  a Portfolio's sub-Portfolios and its Initiatives. Open when it holds
+ *  an Initiative's nested Initiatives and its Objects. Open when it holds
  *  something; folded while empty. */
 export function FoldSection({ title, count, children }: {
   title: string;
@@ -31,12 +31,10 @@ export function FoldSection({ title, count, children }: {
 }
 
 /** The grey line under a section's rows that takes a name and Enter. */
-export function FoldSectionAddRow({ icon, placeholder, onAdd, trailing }: {
+export function FoldSectionAddRow({ icon, placeholder, onAdd }: {
   icon: ReactNode;
   placeholder: string;
   onAdd: (name: string) => Promise<void> | void;
-  /** After the field — another way to add (pick an existing one). */
-  trailing?: ReactNode;
 }) {
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
@@ -56,7 +54,6 @@ export function FoldSectionAddRow({ icon, placeholder, onAdd, trailing }: {
         }}
         placeholder={placeholder} aria-label={placeholder}
         className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground/60" />
-      {trailing}
     </div>
   );
 }

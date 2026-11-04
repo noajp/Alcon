@@ -12,7 +12,6 @@ import {
   NavFilesIcon,
   NavTeamsIcon,
   NavStrategyModeIcon,
-  NavExecutionModeIcon,
   NavCalendarIcon,
   NavSlidesIcon,
   NavAiIcon,
@@ -21,10 +20,11 @@ import type { ViewId } from '@/shell/viewRegistry';
 
 // The ModeRail's top-level modes, and which of them are permanent.
 //
-// Strategy and Execution are the permanent rail entries. Inbox, Calendar and
-// the AI sit at the right of the status bar, Notebook and Slides at its left.
-// Personal pages are reached through the avatar; other tools use the launcher.
-export type RailMode = 'personal' | 'inbox' | 'strategy' | 'execution' | 'reviews' | 'notebook' | 'tables' | 'files' | 'slides' | 'team' | 'calendar' | 'audit' | 'ai';
+// Workspace — Strategy and Execution in one sidebar — is the permanent rail
+// entry, opened by the Space's logo at the top. Inbox, Calendar and the AI sit
+// at the right of the status bar, Notebook and Slides at its left. Personal
+// pages are reached through the avatar; other tools use the launcher.
+export type RailMode = 'personal' | 'inbox' | 'workspace' | 'reviews' | 'notebook' | 'tables' | 'files' | 'slides' | 'team' | 'calendar' | 'audit' | 'ai';
 
 export interface ModeMeta {
   label: string;
@@ -36,10 +36,11 @@ export interface ModeMeta {
 export const MODE_META: Record<RailMode, ModeMeta> = {
   personal:  { label: 'Profile',   icon: NavPersonalIcon, defaultView: 'profile', views: ['home', 'my-elements', 'profile'] },
   inbox:     { label: 'Inbox',     icon: NavInboxIcon, defaultView: 'inbox', views: ['inbox'] },
-  // Vision opens first (the row at the top of the mode); Phase stays
+  // Strategy (Vision and Initiative) and the Domains with their Objects and
+  // Elements. Vision opens first, the sidebar's top row; Phase stays
   // routable but is not in the nav.
-  strategy:  { label: 'Strategy',  icon: NavStrategyModeIcon, defaultView: 'vision', views: ['vision', 'portfolio', 'strategy', 'phase'] },
-  execution: { label: 'Execution', icon: NavExecutionModeIcon, defaultView: 'objects', views: ['objects', 'domain-elements', 'domains', 'domain-overview'] },
+  workspace: { label: 'Workspace', icon: NavStrategyModeIcon, defaultView: 'vision',
+    views: ['vision', 'strategy', 'phase', 'objects', 'domain-elements', 'domains', 'domain-overview'] },
   reviews:   { label: 'Reviews',   icon: GitCompare, defaultView: 'reviews', views: ['reviews'] },
   notebook:  { label: 'Notebook',  icon: NavNoteIcon, defaultView: 'note', views: ['note'] },
   tables:    { label: 'Table',     icon: NavTableIcon, defaultView: 'tables', views: ['tables'] },
@@ -57,8 +58,6 @@ export function railModeOf(view: string): RailMode | null {
   return (Object.keys(MODE_META) as RailMode[]).find(mode =>
     MODE_META[mode].views.some(id => id === view)) ?? null;
 }
-
-export const CORE_MODES: RailMode[] = ['strategy', 'execution'];
 
 /** The document tools at the left of the status bar. */
 export const BAR_TOOLS: RailMode[] = ['notebook', 'slides'];

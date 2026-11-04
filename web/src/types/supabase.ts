@@ -758,7 +758,6 @@ export type Database = {
           name: string
           object_id: string | null
           path: string
-          portfolio_id: string | null
           previous_id: string | null
           size: number
           strategy_id: string | null
@@ -775,7 +774,6 @@ export type Database = {
           name: string
           object_id?: string | null
           path: string
-          portfolio_id?: string | null
           previous_id?: string | null
           size?: number
           strategy_id?: string | null
@@ -792,7 +790,6 @@ export type Database = {
           name?: string
           object_id?: string | null
           path?: string
-          portfolio_id?: string | null
           previous_id?: string | null
           size?: number
           strategy_id?: string | null
@@ -811,13 +808,6 @@ export type Database = {
             columns: ["object_id"]
             isOneToOne: false
             referencedRelation: "objects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "attachments_portfolio_id_fkey"
-            columns: ["portfolio_id"]
-            isOneToOne: false
-            referencedRelation: "portfolios"
             referencedColumns: ["id"]
           },
           {
@@ -3742,67 +3732,6 @@ export type Database = {
           },
         ]
       }
-      portfolios: {
-        Row: {
-          activity_space_id: string
-          created_at: string
-          created_by: string
-          description: string | null
-          id: string
-          name: string
-          order_index: number
-          parent_id: string | null
-          updated_at: string
-          vision_id: string | null
-        }
-        Insert: {
-          activity_space_id: string
-          created_at?: string
-          created_by?: string
-          description?: string | null
-          id?: string
-          name: string
-          order_index?: number
-          parent_id?: string | null
-          updated_at?: string
-          vision_id?: string | null
-        }
-        Update: {
-          activity_space_id?: string
-          created_at?: string
-          created_by?: string
-          description?: string | null
-          id?: string
-          name?: string
-          order_index?: number
-          parent_id?: string | null
-          updated_at?: string
-          vision_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "portfolios_activity_space_id_fkey"
-            columns: ["activity_space_id"]
-            isOneToOne: false
-            referencedRelation: "activity_spaces"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "portfolios_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "portfolios"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "portfolios_vision_id_fkey"
-            columns: ["vision_id"]
-            isOneToOne: false
-            referencedRelation: "visions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -3840,7 +3769,6 @@ export type Database = {
           icon: string | null
           id: string
           name: string
-          portfolio_id: string | null
           scope: Json
           status: string | null
           updated_at: string
@@ -3855,7 +3783,6 @@ export type Database = {
           icon?: string | null
           id?: string
           name: string
-          portfolio_id?: string | null
           scope?: Json
           status?: string | null
           updated_at?: string
@@ -3870,7 +3797,6 @@ export type Database = {
           icon?: string | null
           id?: string
           name?: string
-          portfolio_id?: string | null
           scope?: Json
           status?: string | null
           updated_at?: string
@@ -3882,13 +3808,6 @@ export type Database = {
             columns: ["activity_space_id"]
             isOneToOne: false
             referencedRelation: "activity_spaces"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "strategies_portfolio_id_fkey"
-            columns: ["portfolio_id"]
-            isOneToOne: false
-            referencedRelation: "portfolios"
             referencedColumns: ["id"]
           },
           {
@@ -5414,7 +5333,6 @@ export type Database = {
           name: string
           object_id: string
           owner_label: string
-          portfolio_id: string
           snippet: string
           strategy_id: string
         }[]
@@ -5459,7 +5377,6 @@ export type Database = {
           object_id: string
           owner_label: string
           path: string
-          portfolio_id: string
           previous_id: string
           size: number
           strategy_id: string

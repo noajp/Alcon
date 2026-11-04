@@ -35,7 +35,7 @@ import {
 export interface ObjectiveInput {
   id: string;
   name: string;
-  /** Initiative ids this one hangs under. Empty for a portfolio root. */
+  /** Initiative ids this one hangs under. Empty for a top-level Initiative. */
   parentIds: string[];
 }
 

@@ -1429,17 +1429,16 @@ export interface Strategy {
   scope: StrategyScope
   color: string | null
   icon: string | null
-  portfolio_id: string | null  // Strategy > Portfolio the Initiative belongs to (at most one)
   vision_id: string | null     // Strategy > Vision the Initiative works toward
-  activity_space_id: string | null  // the Space it belongs to — its Portfolio's or Vision's when those are set
+  activity_space_id: string | null  // the Space it belongs to — its Vision's when that is set
   created_by: string | null
   created_at: string
   updated_at: string
 }
 
 // Strategy > Vision — what a Space aims for. A Space holds any number of
-// Visions; Portfolios and Initiatives hang under one, the way Objects and
-// Elements hang under a Domain.
+// Visions; Initiatives hang under one (and nest in each other), the way
+// Objects and Elements hang under a Domain.
 export interface Vision {
   id: string
   activity_space_id: string
@@ -1469,37 +1468,6 @@ export interface VisionUpdate {
   order_index?: number
 }
 
-// Strategy > Portfolio — a named bundle of Initiatives under a Vision;
-// Portfolios nest. An Initiative belongs to at most one Portfolio
-// (strategies.portfolio_id).
-export interface Portfolio {
-  id: string
-  activity_space_id: string
-  vision_id: string | null   // the Vision it works toward
-  parent_id: string | null   // the Portfolio this one nests in; null = top level
-  name: string
-  description: string | null
-  order_index: number
-  created_by: string
-  created_at: string
-  updated_at: string
-}
-export interface PortfolioInsert {
-  id?: string
-  activity_space_id: string
-  vision_id?: string | null
-  parent_id?: string | null
-  name: string
-  description?: string | null
-  order_index?: number
-}
-export interface PortfolioUpdate {
-  parent_id?: string | null
-  name?: string
-  description?: string | null
-  order_index?: number
-}
-
 export interface StrategyInsert {
   id?: string
   name: string
@@ -1508,7 +1476,6 @@ export interface StrategyInsert {
   scope?: StrategyScope
   color?: string | null
   icon?: string | null
-  portfolio_id?: string | null
   vision_id?: string | null
   activity_space_id?: string | null
   created_by?: string
@@ -1521,7 +1488,6 @@ export interface StrategyUpdate {
   scope?: StrategyScope
   color?: string | null
   icon?: string | null
-  portfolio_id?: string | null
   vision_id?: string | null
   updated_at?: string
 }
@@ -1586,7 +1552,7 @@ export interface StrategyCommentUpdate {
 export interface StrategyWithObjects extends Strategy {
   objectIds: string[]
   /** Parent Strategy ids from strategy_children (DAG — multi-parent allowed).
-   *  Empty = a root/top-level Strategy, shown in the portfolio list. */
+   *  Empty = a top-level Initiative, shown at the root of the list. */
   parentIds: string[]
 }
 

@@ -40,8 +40,8 @@ import type {
 //
 // Every row that changes in a workspace-shaped table arrives here once, on
 // one websocket channel, and is applied to the normalised caches as a delta:
-// an Element UPDATE patches that Element wherever it is cached, a Subelement
-// INSERT lands on its parent, a comment INSERT lands on its thread and bumps
+// an Element UPDATE patches that Element wherever it is cached, an assignment
+// INSERT lands on its Element, a comment INSERT lands on its thread and bumps
 // the rollup. Whoever wrote the row (this tab, another tab, a teammate, an
 // agent, CI) takes the same path, so a surface is correct as long as it reads
 // the cache — no per-surface subscription, no writer-side invalidation to
@@ -60,7 +60,7 @@ const WORKSPACE_TABLES = [
   'objects', 'workers', 'domains', 'worker_availability',
   'domain_members', 'object_members', 'activity_space_members', 'object_domains',
   'membership_invitations', 'boards', 'board_placements', 'widgets', 'widget_documents', 'tables', 'table_columns', 'table_rows', 'table_cells',
-  'strategies', 'strategy_objects', 'strategy_children', 'strategy_comments', 'portfolios', 'visions',
+  'strategies', 'strategy_objects', 'strategy_children', 'strategy_comments', 'visions',
   'phases', 'domain_approaches', 'approach_conditions', 'approach_contributions', 'approach_assessments', 'approach_reviews',
   'intents', 'intent_bindings', 'intent_lineage', 'intent_next_actions',
   'intent_escalations', 'intent_alignments', 'intent_audits', 'intent_predictions', 'intent_resources',
@@ -450,10 +450,6 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
     case 'strategy_objects':
     case 'strategy_children':
       invalidateSoon(qc, ['strategies']);
-      return;
-
-    case 'portfolios':
-      invalidateSoon(qc, ['portfolios']);
       return;
 
     case 'visions':

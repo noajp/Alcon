@@ -58,7 +58,6 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   'Discard': ['破棄', '취소', 'Abandonner', 'Descartar'],
   'Attached to': ['添付先', '첨부된 곳', 'Joint à', 'Adjunto a'],
   'Added by': ['追加した人', '추가한 사람', 'Ajouté par', 'Añadido por'],
-  'Portfolios': ['Portfolio', 'Portfolio', 'Portfolios', 'Portfolios'],
   'Deleted': ['削除済み', '삭제됨', 'Supprimés', 'Eliminados'],
   'Removed files can be restored for {days} days, then they are erased.': ['削除したファイルは {days} 日間戻せます。その後は完全に消えます。', '삭제한 파일은 {days}일 동안 복원할 수 있으며, 이후에는 완전히 지워집니다.', 'Les fichiers retirés peuvent être restaurés pendant {days} jours, puis ils sont effacés.', 'Los archivos eliminados se pueden restaurar durante {days} días; después se borran.'],
   'Erased in': ['完全に消えるまで', '완전 삭제까지', 'Effacé dans', 'Se borra en'],
