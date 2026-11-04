@@ -462,6 +462,55 @@ export function normalizePlan(
   return { summary: text(r.summary, 1000), objectives, objects: objects.filter((o) => used.has(o.key)), tasks };
 }
 
+// ── Your turn ────────────────────────────────────────────────────────────────
+
+/** What a person is asked to do for the mission, most pressing first:
+ *  approve an AI's external write, answer an AI that stopped for them, review
+ *  an AI's result, or do their own Element. */
+export type YourTurnKind = 'approve' | 'answer' | 'review' | 'do';
+
+export interface YourTurn {
+  elementId: string;
+  title: string;
+  kind: YourTurnKind;
+  /** What the AI said (its summary, or the write it waits on). */
+  detail: string | null;
+}
+
+const TURN_ORDER: Record<YourTurnKind, number> = { approve: 0, answer: 1, review: 2, do: 3 };
+
+/** Pure. Everything in the mission that waits on a person, in one list. A
+ *  person's Element counts only once nothing it waits on is open. */
+export function yourTurn(input: {
+  fleet: readonly FleetObject[];
+  elements: readonly MissionElementRow[];
+  runs: readonly MissionRunRow[];
+  actions: readonly { element_id: string; summary: string; status: string }[];
+}): YourTurn[] {
+  const latest = latestRuns(input.runs);
+  const status = new Map(input.elements.map((e) => [e.id, e.status]));
+  const out: YourTurn[] = [];
+  for (const o of input.fleet) {
+    for (const e of o.elements) {
+      if (!e.elementId || e.draft) continue;
+      const run = latest.get(e.elementId);
+      const s = status.get(e.elementId);
+      if (s === 'done' || s === 'cancelled') continue;
+      if (run?.status === 'awaiting_approval') {
+        const action = input.actions.find((a) => a.element_id === e.elementId && a.status === 'pending');
+        out.push({ elementId: e.elementId, title: e.title, kind: 'approve', detail: action?.summary ?? run.summary });
+      } else if (e.assignee !== 'human' && s === 'blocked') {
+        out.push({ elementId: e.elementId, title: e.title, kind: 'answer', detail: run?.summary ?? run?.error ?? null });
+      } else if (s === 'review') {
+        out.push({ elementId: e.elementId, title: e.title, kind: 'review', detail: run?.summary ?? null });
+      } else if (e.assignee === 'human' && e.waitsOn.length === 0 && (e.state === 'todo' || e.state === 'running')) {
+        out.push({ elementId: e.elementId, title: e.title, kind: 'do', detail: null });
+      }
+    }
+  }
+  return out.sort((a, b) => TURN_ORDER[a.kind] - TURN_ORDER[b.kind]);
+}
+
 /** A question the Planner asks before it plans; `options` empty means free text. */
 export interface PlanQuestion { key: string; question: string; options: string[] }
 

@@ -18,10 +18,11 @@ import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import {
   answeredQuestions, buildFleet, draftFleet, handOverLabels, missionSummary, moveDraftTask, normalizePlan, normalizeQuestions,
-  startableTasks, UNPLACED,
+  startableTasks, UNPLACED, yourTurn,
   type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft, type PlanQuestion,
 } from './missionModel';
 import { STATE_LABEL, Stat, compact, stateColor, type MissionContext } from './MissionPanels';
+import { YourTurnTray } from './YourTurnTray';
 
 // The Execution tab's mission: the Strategy's Objects in one column and the
 // Elements of the chosen Object in the next, joined by lines from the chosen
@@ -290,6 +291,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   // Before the dependencies are read every AI Element would look ready.
   const ready = ctx.missionLoaded ? current.flatMap((o) => o.elements.filter((e) => e.ready)) : [];
   const handable = current.flatMap((o) => o.elements.filter((e) => e.handable));
+  const turns = useMemo(() => yourTurn({ fleet: current, elements: ctx.elements, runs: ctx.mission.runs, actions: ctx.mission.actions }),
+    [current, ctx.elements, ctx.mission.runs, ctx.mission.actions]);
 
   const plan = async (opts: { answers?: { question: string; answer: string }[]; noQuestions?: boolean } = {}) => {
     setPlanning(true); setError(null); setNotice(null);
@@ -462,6 +465,10 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
             sub={t('in {input} · out {output}', { input: compact(summary.inputTokens), output: compact(summary.outputTokens) })} />
           <Stat label={t('AI cost')} value={`$${summary.costUsd.toFixed(2)}`} />
         </div>
+
+        {ctx.missionLoaded && (
+          <YourTurnTray items={turns} canEdit={ctx.canEdit} onOpen={ctx.onOpenElement} onChanged={ctx.refetch} />
+        )}
 
         <label className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted-foreground">
           {t('When an AI finishes')}

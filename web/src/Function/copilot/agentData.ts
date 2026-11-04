@@ -180,6 +180,25 @@ export async function startElementRun(elementId: string, domainId?: string | nul
   }
 }
 
+/** Answers an Element's AI from outside its page (the Execution tab's "your
+ *  turn"): the words are kept as the person's comment, and the AI takes them
+ *  up in a reply run, as an @AI comment would. */
+export async function replyToElementAgent(elementId: string, text: string, authorName: string | null, domainId?: string | null): Promise<AgentStartOutcome> {
+  const content = text.trim();
+  if (!content) return 'failed';
+  try {
+    const userId = await getCurrentUserId();
+    const { data: comment, error } = await supabase.from('element_comments')
+      .insert({ element_id: elementId, author_id: userId ?? null, author_kind: 'human', author_name: authorName, content })
+      .select('id').single();
+    if (error) throw error;
+    const { existing } = await startAgentRun({ elementId, domainId: domainId ?? null, mode: 'reply', prompt: content, replyTo: (comment as { id: string }).id, triggeredFrom: 'comment' });
+    return existing ? 'busy' : 'started';
+  } catch {
+    return 'failed';
+  }
+}
+
 async function cancelAgentRun(runId: string): Promise<void> {
   const { error } = await supabase
     .from('agent_runs')

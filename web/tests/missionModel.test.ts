@@ -212,3 +212,41 @@ describe('Planner questions', () => {
     expect(answeredQuestions(qs, { c: ' 3 ', a: '1', b: '  ' })).toEqual([{ question: 'A?', answer: '1' }, { question: 'C?', answer: '3' }]);
   });
 });
+
+describe('your turn', () => {
+  it('lists what waits on a person, most pressing first, and a person\'s Element only once it is unblocked', async () => {
+    const { yourTurn } = await import('@/ActivitySpace/strategy/initiative/mission/missionModel');
+    const card = (id: string, over: Record<string, unknown> = {}) => ({
+      key: id, elementId: id, title: id, state: 'todo', draft: false, assignee: 'ai', assigneeName: null, assigneeWorker: null,
+      status: 'todo', dueDate: null, serves: [], waitsOn: [], ready: false, handable: false, model: null, costUsd: 0, ...over,
+    });
+    const fleet = [{
+      key: 'o', objectId: 'o', name: 'O', domainId: null, draft: false, state: 'todo', costUsd: 0,
+      tally: { total: 0, done: 0, running: 0, waiting: 0, stopped: 0 },
+      elements: [
+        card('human-ready', { assignee: 'human' }),
+        card('human-waiting', { assignee: 'human', waitsOn: ['x'] }),
+        card('reviewed'),
+        card('blocked'),
+        card('approval'),
+        card('done', { assignee: 'human' }),
+        card('draft', { draft: true, elementId: null }),
+      ],
+    }];
+    const row = (id: string, status: string) => ({ id, title: id, status } as never);
+    const run = (element_id: string, status: string, summary: string) =>
+      ({ element_id, status, summary, error: null, model: null, input_tokens: 0, output_tokens: 0, cost_usd: 0, created_at: '2026-11-04T00:00:00Z' } as never);
+    const turns = yourTurn({
+      fleet: fleet as never,
+      elements: [row('human-ready', 'todo'), row('human-waiting', 'todo'), row('reviewed', 'review'), row('blocked', 'blocked'), row('approval', 'in_progress'), row('done', 'done')],
+      runs: [run('reviewed', 'awaiting_review', '条件メモを作成'), run('blocked', 'completed', '賃料の上限を教えて'), run('approval', 'awaiting_approval', 'x')],
+      actions: [{ element_id: 'approval', summary: 'Gmail · 送信', status: 'pending' }],
+    });
+    expect(turns.map((x) => [x.kind, x.elementId, x.detail])).toEqual([
+      ['approve', 'approval', 'Gmail · 送信'],
+      ['answer', 'blocked', '賃料の上限を教えて'],
+      ['review', 'reviewed', '条件メモを作成'],
+      ['do', 'human-ready', null],
+    ]);
+  });
+});
