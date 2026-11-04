@@ -64,6 +64,7 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
     bindings: intent?.data?.bindings ?? [],
     elements,
     mission: mission.data,
+    missionLoaded: !mission.loading,
     refetch: () => { void mission.refetch(); intent?.refetch(); onChanged(); },
     onOpenElement: (elementId) => {
       const object = objects.find((o) => (o.elements ?? []).some((e) => e.id === elementId));

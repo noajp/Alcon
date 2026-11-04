@@ -29,6 +29,15 @@ export interface TaskContext {
   comments: { author: string; kind: string; content: string; at: string }[];
   previousRuns: { at: string; status: string; summary: string | null }[];
   artifacts: string[];
+  /** The Elements this one waits on (depends_on), with what they left behind. */
+  upstream: {
+    display_id: string | null;
+    title: string;
+    status: string | null;
+    report: string | null;
+    artifacts: { title: string; content: string }[];
+    comments: { author: string; content: string }[];
+  }[];
   integrations: { name: string; kind: string; delegation: string; tools: number }[];
   today: string;
 }
@@ -70,6 +79,12 @@ export function taskMessage(ctx: TaskContext): string {
   });
   const comments = ctx.comments.map((c) => `- ${c.author}${c.kind === "ai_agent" ? "（AI）" : ""} ${c.at}: ${c.content.slice(0, 1200)}`);
   const runs = ctx.previousRuns.map((r) => `- ${r.at} ${r.status}: ${r.summary ?? ""}`);
+  const upstream = ctx.upstream.map((u) => [
+    `## ${u.display_id ? `${u.display_id} ` : ""}${u.title}（${u.status ?? "todo"}）`,
+    u.comments.length ? `人のコメント:\n${u.comments.map((c) => `- ${c.author}: ${c.content}`).join("\n")}` : "",
+    u.report ? `完了報告:\n${u.report}` : "",
+    ...u.artifacts.map((a) => `成果物「${a.title}」:\n${a.content}`),
+  ].filter(Boolean).join("\n\n"));
   const integrations = ctx.integrations.map((i) => `- ${i.name}（${i.kind}、道具 ${i.tools} 個、${i.delegation === "full_delegation" ? "全委任：承認なしで書き込める" : "書き込みは承認が必要"}）`);
 
   const head = ctx.mode === "reply"
@@ -99,6 +114,9 @@ ${bullet(runs)}
 
 # 保存済みの成果物
 ${bullet(ctx.artifacts.map((t) => `- ${t}`))}
+
+# 先に終えた作業（この Element が待っていた Element の成果。ここにあるものは探し直さずに使う）
+${bullet(upstream)}
 
 # 使える外部連携
 ${bullet(integrations, "(なし — 外部サービスへの操作が要る任務なら、finish(blocked) で連携の追加を依頼する)")}

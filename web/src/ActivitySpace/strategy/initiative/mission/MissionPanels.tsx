@@ -26,6 +26,8 @@ export interface MissionContext {
   bindings: MissionBindingRow[];
   elements: MissionElementRow[];
   mission: MissionData;
+  /** False until the runs and dependencies are read; until then nothing counts as ready. */
+  missionLoaded: boolean;
   refetch: () => void;
   /** Elements open their Object, as everywhere on this page. */
   onOpenElement: (elementId: string) => void;

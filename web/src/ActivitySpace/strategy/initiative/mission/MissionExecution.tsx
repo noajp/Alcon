@@ -14,6 +14,7 @@ import { updateElement } from '@/hooks/useSupabase';
 import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMissionData';
 import type { ElementWithDetails, Worker } from '@/types/database';
 import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard';
+import { StatusPicker } from '@/Function/shared/StatusPicker';
 import {
   buildFleet, draftFleet, handOverLabels, missionSummary, moveDraftTask, normalizePlan, startableTasks, UNPLACED,
   type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft,
@@ -281,7 +282,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     ?? fleet[0];
 
   const summary = missionSummary({ elements: ctx.elements, measures: ctx.measures, runs: ctx.mission.runs, artifacts: ctx.mission.artifacts });
-  const ready = current.flatMap((o) => o.elements.filter((e) => e.ready));
+  // Before the dependencies are read every AI Element would look ready.
+  const ready = ctx.missionLoaded ? current.flatMap((o) => o.elements.filter((e) => e.ready)) : [];
   const handable = current.flatMap((o) => o.elements.filter((e) => e.handable));
 
   const plan = async () => {
@@ -522,7 +524,14 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
                   {e.elementId && details.get(e.elementId) ? (
                     <ElementCard element={details.get(e.elementId)!} onRefresh={ctx.refetch}
                       onOpen={() => ctx.onOpenElement(e.elementId!)}
-                      badge={<StateBadge state={e.state} />}
+                      badge={ctx.canEdit ? (
+                        // The badge opens the status menu: work an agent left
+                        // for review is approved (Done) right from its card.
+                        <span onPointerDown={(ev) => ev.stopPropagation()} onClick={(ev) => ev.stopPropagation()}>
+                          <StatusPicker element={details.get(e.elementId)!} onChanged={() => ctx.refetch()}
+                            trigger={<button type="button" className="cursor-pointer" aria-label={t('Change status')}><StateBadge state={e.state} /></button>} />
+                        </span>
+                      ) : <StateBadge state={e.state} />}
                       extra={<MissionLines element={e} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
                         onHandOver={!draft && e.handable ? () => void handOver([e.elementId!]) : undefined} />} />
                   ) : (

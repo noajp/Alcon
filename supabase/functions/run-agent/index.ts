@@ -809,18 +809,53 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
   }
 }
 
+/** What the Elements this one waits on left behind: their latest report, their
+ *  outputs and what people said on them — the hand-off from the earlier step.
+ *  Read with the starter's JWT; capped so a long chain cannot flood the prompt. */
+async function loadUpstream(userDb: SupabaseClient, ids: string[]): Promise<TaskContext["upstream"]> {
+  if (ids.length === 0) return [];
+  const [els, runs, arts, comments] = await Promise.all([
+    userDb.from("elements").select("id, display_id, title, status").in("id", ids),
+    userDb.from("agent_runs").select("element_id, result, created_at").in("element_id", ids).not("result", "is", null).order("created_at", { ascending: false }),
+    userDb.from("agent_artifacts").select("element_id, title, content, updated_at").in("element_id", ids).order("updated_at", { ascending: false }),
+    userDb.from("element_comments").select("element_id, author_name, author_kind, content, created_at").in("element_id", ids).eq("author_kind", "human").order("created_at", { ascending: false }).limit(30),
+  ]);
+  let room = 24_000;
+  const take = (text: string, max: number) => {
+    const t = text.slice(0, Math.min(max, Math.max(0, room)));
+    room -= t.length;
+    return t.length < text.length ? `${t}…（以下略）` : t;
+  };
+  return ((els.data ?? []) as { id: string; display_id: string | null; title: string; status: string | null }[]).map((e) => {
+    const report = ((runs.data ?? []) as { element_id: string; result: unknown }[]).find((r) => r.element_id === e.id)?.result;
+    const reportText = typeof report === "string" ? report : report ? JSON.stringify(report) : "";
+    return {
+      display_id: e.display_id, title: e.title, status: e.status,
+      report: reportText ? take(reportText, 3_000) : null,
+      artifacts: ((arts.data ?? []) as { element_id: string; title: string; content: string | null }[])
+        .filter((a) => a.element_id === e.id).slice(0, 2)
+        .map((a) => ({ title: a.title, content: take(a.content ?? "", 8_000) })),
+      comments: ((comments.data ?? []) as { element_id: string; author_name: string | null; content: string | null }[])
+        .filter((c) => c.element_id === e.id).slice(0, 3).reverse()
+        .map((c) => ({ author: c.author_name ?? "不明", content: take(c.content ?? "", 1_200) })),
+    };
+  });
+}
+
 async function loadContext(userDb: SupabaseClient, run: Run, integrations: TaskContext["integrations"]): Promise<TaskContext> {
   const { data: el } = await userDb.from("elements")
     .select("id, display_id, title, description, status, priority, due_date, labels, object_id").eq("id", run.element_id).single();
   if (!el) throw new Error("対象の Element が見つかりません。");
-  const [subs, comments, runs, artifacts, obj, links] = await Promise.all([
+  const [subs, comments, runs, artifacts, obj, links, edges] = await Promise.all([
     userDb.from("elements").select("id, title, status").eq("parent_id", run.element_id).order("order_index").order("seq_number"),
     userDb.from("element_comments").select("author_name, author_kind, content, created_at").eq("element_id", run.element_id).order("created_at", { ascending: false }).limit(15),
     userDb.from("agent_runs").select("created_at, status, summary").eq("element_id", run.element_id).neq("id", run.id).order("created_at", { ascending: false }).limit(3),
     userDb.from("agent_artifacts").select("title").eq("element_id", run.element_id).order("created_at"),
     el?.object_id ? userDb.from("objects").select("name").eq("id", el.object_id).maybeSingle() : Promise.resolve({ data: null }),
     el?.object_id ? userDb.from("strategy_objects").select("strategy_id").eq("object_id", el.object_id) : Promise.resolve({ data: [] }),
+    userDb.from("element_edges").select("from_element").eq("to_element", run.element_id).eq("edge_type", "depends_on").limit(6),
   ]);
+  const upstream = await loadUpstream(userDb, ((edges.data ?? []) as { from_element: string }[]).map((e) => e.from_element));
   const initiatives: TaskContext["initiatives"] = [];
   for (const l of ((links.data ?? []) as { strategy_id: string }[]).slice(0, 3)) {
     const r = await runStrategyTool(userDb, "getInitiative", { id: l.strategy_id });
@@ -844,6 +879,7 @@ async function loadContext(userDb: SupabaseClient, run: Run, integrations: TaskC
     previousRuns: ((runs.data ?? []) as { created_at: string; status: string; summary: string | null }[])
       .map((r) => ({ at: r.created_at.slice(0, 16).replace("T", " "), status: r.status, summary: r.summary })),
     artifacts: ((artifacts.data ?? []) as { title: string }[]).map((x) => x.title),
+    upstream,
     integrations,
     today: new Date().toISOString().slice(0, 10),
   };

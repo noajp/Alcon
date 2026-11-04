@@ -282,11 +282,24 @@ describe('pricing and prompts', () => {
   it('frames a reply around the comment and treats outside text as data', () => {
     const base = {
       mode: 'reply', prompt: '税込にして', element: { id: 'e', display_id: 'ELE_X-1', title: '経費処理', description: null, status: 'todo', priority: 'high', due_date: null, labels: [] },
-      objectName: null, subElements: [], initiatives: [], comments: [], previousRuns: [], artifacts: [], integrations: [], today: '2026-10-03',
+      objectName: null, subElements: [], initiatives: [], comments: [], previousRuns: [], artifacts: [], upstream: [], integrations: [], today: '2026-10-03',
     };
     const msg = ctx.taskMessage(base);
     expect(msg).toContain('税込にして');
     expect(msg).toContain('経費処理');
     expect(ctx.systemPrompt({ name: 'Claude', instructions: null })).toContain('データ');
+  });
+
+  it('hands over what the earlier Elements left: the person\'s words, the report and the outputs', () => {
+    const msg = ctx.taskMessage({
+      mode: 'execute', prompt: null, element: { id: 'e', display_id: 'ELE_B-1', title: '予算を試算する', description: null, status: 'todo', priority: null, due_date: null, labels: [] },
+      objectName: null, subElements: [], initiatives: [], comments: [], previousRuns: [], artifacts: [], integrations: [], today: '2026-11-04',
+      upstream: [{ display_id: 'ELE_A-1', title: '条件を確認する', status: 'done', report: '条件メモを作成', artifacts: [{ title: '条件メモ v1', content: 'エリア: 三鷹〜立川' }], comments: [{ author: 'TAKANORi', content: '賃貸がいいな' }] }],
+    });
+    expect(msg).toContain('ELE_A-1 条件を確認する（done）');
+    expect(msg).toContain('賃貸がいいな');
+    expect(msg).toContain('条件メモを作成');
+    expect(msg).toContain('成果物「条件メモ v1」');
+    expect(msg).toContain('エリア: 三鷹〜立川');
   });
 });
