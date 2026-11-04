@@ -12,12 +12,14 @@ import { startElementRun } from '@/Function/copilot/agentData';
 import { runsInClaudeCode } from '@/Function/team/agentModel';
 import { updateElement } from '@/hooks/useSupabase';
 import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMissionData';
+import { createIntent } from '@/hooks/strategyData';
 import type { ElementWithDetails, StrategyDelegation, Worker } from '@/types/database';
 import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import {
-  buildFleet, draftFleet, handOverLabels, missionSummary, moveDraftTask, normalizePlan, startableTasks, UNPLACED,
-  type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft,
+  answeredQuestions, buildFleet, draftFleet, handOverLabels, missionSummary, moveDraftTask, normalizePlan, normalizeQuestions,
+  startableTasks, UNPLACED,
+  type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft, type PlanQuestion,
 } from './missionModel';
 import { STATE_LABEL, Stat, compact, stateColor, type MissionContext } from './MissionPanels';
 
@@ -253,6 +255,9 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const { t } = useI18n();
   const [guidance, setGuidance] = useState('');
   const [draft, setDraft] = useState<PlanDraft | null>(null);
+  // The Planner's questions, asked before it plans, and the answers typed.
+  const [questions, setQuestions] = useState<{ reason: string; items: PlanQuestion[] } | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [planning, setPlanning] = useState(false);
   const [applying, setApplying] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -286,11 +291,19 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const ready = ctx.missionLoaded ? current.flatMap((o) => o.elements.filter((e) => e.ready)) : [];
   const handable = current.flatMap((o) => o.elements.filter((e) => e.handable));
 
-  const plan = async () => {
+  const plan = async (opts: { answers?: { question: string; answer: string }[]; noQuestions?: boolean } = {}) => {
     setPlanning(true); setError(null); setNotice(null);
     try {
-      const raw = await requestInitiativePlan(ctx.initiativeId, guidance);
-      const next = normalizePlan(raw, new Set(ctx.measures.map((m) => m.id)), {
+      const reply = await requestInitiativePlan(ctx.initiativeId, guidance, opts);
+      const asked = normalizeQuestions(reply.questions);
+      if (asked.length > 0) {
+        setQuestions({ reason: reply.reason, items: asked });
+        setAnswers({});
+        setDraft(null);
+        return;
+      }
+      setQuestions(null);
+      const next = normalizePlan(reply.plan, new Set(ctx.measures.map((m) => m.id)), {
         objects: new Map(objects.map((o) => [o.id, o.name])),
         domainIds: new Set(domains.map((d) => d.id)),
       });
@@ -301,6 +314,24 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     } finally {
       setPlanning(false);
     }
+  };
+
+  // The answers become the Strategy's assumptions — what every later run
+  // reads — and the Planner plans with them.
+  const answerAndPlan = async () => {
+    if (!questions) return;
+    const given = answeredQuestions(questions.items, answers);
+    if (ctx.canEdit && given.length > 0) {
+      const root = await ensureRoot().catch(() => null);
+      if (root) {
+        for (const g of given) {
+          await createIntent({ strategy_id: ctx.initiativeId, parent_intent_id: root, kind: 'assumption', title: `${g.question} → ${g.answer}` })
+            .catch(() => undefined);
+        }
+        ctx.refetch();
+      }
+    }
+    await plan({ answers: given, noQuestions: true });
   };
 
   const start = async (elementIds: string[]) => {
@@ -449,11 +480,48 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
           <textarea value={guidance} onChange={(e) => setGuidance(e.target.value)} rows={2}
             placeholder={t('Guidance for the Planner (optional): scope, constraints, what to leave out…')}
             className="min-h-[52px] flex-1 resize-y rounded-md border border-border/60 bg-transparent px-2.5 py-1.5 text-[13px] outline-none focus:bg-muted/30" />
-          <Button variant={draft ? 'secondary' : 'primary'} size="sm" onClick={() => void plan()} disabled={planning || applying}>
+          <Button variant={draft ? 'secondary' : 'primary'} size="sm" onClick={() => void plan()} disabled={planning || applying || !!questions}>
             {planning ? t('Planning…') : draft ? t('Plan again') : t('Break down with AI')}
           </Button>
         </div>
-        {!draft && (
+        {questions && (
+          <div className="space-y-3 rounded-lg border border-border bg-muted/20 px-3 py-3">
+            <div>
+              <p className="text-[13px] font-medium text-foreground">{t('Before breaking this down, the Planner needs to know')}</p>
+              {questions.reason && <p className="mt-0.5 text-[12px] text-muted-foreground">{questions.reason}</p>}
+            </div>
+            {questions.items.map((q) => (
+              <div key={q.key} className="space-y-1.5">
+                <p className="text-[13px] text-foreground">{q.question}</p>
+                {q.options.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {q.options.map((o) => (
+                      <button key={o} type="button" onClick={() => setAnswers((a) => ({ ...a, [q.key]: a[q.key] === o ? '' : o }))}
+                        className={cn('rounded-md border px-2 py-1 text-[12px] transition-colors',
+                          answers[q.key] === o ? 'border-[var(--accent-default)] bg-[var(--accent-default)]/10 text-foreground' : 'border-border/60 text-muted-foreground hover:bg-muted/40')}>
+                        {o}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <input value={q.options.includes(answers[q.key] ?? '') ? '' : (answers[q.key] ?? '')}
+                  onChange={(e) => setAnswers((a) => ({ ...a, [q.key]: e.target.value }))}
+                  placeholder={q.options.length > 0 ? t('Or write your own') : t('Your answer')}
+                  className="w-full rounded-md border border-border/60 bg-transparent px-2 py-1 text-[12px] outline-none focus:bg-muted/30" />
+              </div>
+            ))}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => { setQuestions(null); void plan({ noQuestions: true }); }} disabled={planning}>
+                {t('Skip and break down')}
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => void answerAndPlan()} disabled={planning}>
+                {planning ? t('Planning…') : t('Answer and break down')}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {!draft && !questions && (
           <p className="text-[12px] text-muted-foreground">
             {t('The Planner reads this Strategy and breaks it down into Objects and Elements. Nothing is created until you approve the draft.')}
           </p>

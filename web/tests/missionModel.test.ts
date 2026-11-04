@@ -188,3 +188,27 @@ describe('Claude Code work', () => {
     expect(handOverLabels(null)).toEqual(['dispatch']);
   });
 });
+
+describe('Planner questions', () => {
+  it('keeps at most five questions with unique keys and at most five distinct options', async () => {
+    const { normalizeQuestions } = await import('@/ActivitySpace/strategy/initiative/mission/missionModel');
+    const qs = normalizeQuestions([
+      { key: 'q1', question: '購入か賃貸か', options: ['購入', '賃貸', '賃貸', ''] },
+      { key: 'q1', question: '重複', options: [] },
+      { key: 'q2', question: '', options: ['x'] },
+      { question: 'エリアは', options: 'not a list' },
+      ...Array.from({ length: 6 }, (_, i) => ({ key: `z${i}`, question: `問${i}`, options: ['a', 'b', 'c', 'd', 'e', 'f'] })),
+    ]);
+    expect(qs).toHaveLength(5);
+    expect(qs[0]).toEqual({ key: 'q1', question: '購入か賃貸か', options: ['購入', '賃貸'] });
+    expect(qs[1]).toEqual({ key: 'q2', question: 'エリアは', options: [] });
+    expect(qs[2].options).toHaveLength(5);
+    expect(normalizeQuestions(null)).toEqual([]);
+  });
+
+  it('passes on only the answered questions, in order', async () => {
+    const { answeredQuestions } = await import('@/ActivitySpace/strategy/initiative/mission/missionModel');
+    const qs = [{ key: 'a', question: 'A?', options: [] }, { key: 'b', question: 'B?', options: [] }, { key: 'c', question: 'C?', options: [] }];
+    expect(answeredQuestions(qs, { c: ' 3 ', a: '1', b: '  ' })).toEqual([{ question: 'A?', answer: '1' }, { question: 'C?', answer: '3' }]);
+  });
+});

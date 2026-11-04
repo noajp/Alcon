@@ -462,6 +462,35 @@ export function normalizePlan(
   return { summary: text(r.summary, 1000), objectives, objects: objects.filter((o) => used.has(o.key)), tasks };
 }
 
+/** A question the Planner asks before it plans; `options` empty means free text. */
+export interface PlanQuestion { key: string; question: string; options: string[] }
+
+/** Pure. The Planner's questions as the screen may use them: keys unique,
+ *  at most five, each with at most five distinct options. */
+export function normalizeQuestions(raw: unknown): PlanQuestion[] {
+  const out: PlanQuestion[] = [];
+  const keys = new Set<string>();
+  for (const q of Array.isArray(raw) ? raw : []) {
+    const x = q && typeof q === 'object' ? q as Record<string, unknown> : {};
+    const key = text(x.key, 40) || `q${out.length + 1}`;
+    const question = text(x.question, 300);
+    if (!question || keys.has(key)) continue;
+    keys.add(key);
+    const options = [...new Set((Array.isArray(x.options) ? x.options : []).map((o) => text(o, 120)).filter(Boolean))].slice(0, 5);
+    out.push({ key, question, options });
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+
+/** Pure. The answered questions, in order, as the Planner and the Strategy's
+ *  assumptions take them. An unanswered question is left out. */
+export function answeredQuestions(questions: readonly PlanQuestion[], answers: Readonly<Record<string, string>>): { question: string; answer: string }[] {
+  return questions
+    .map((q) => ({ question: q.question, answer: (answers[q.key] ?? '').trim().slice(0, 1000) }))
+    .filter((x) => x.answer);
+}
+
 /** Pure. The draft's tasks that an AI may start as soon as they are written:
  *  an AI's, and waiting on nothing. */
 export function startableTasks(draft: PlanDraft): string[] {

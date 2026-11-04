@@ -86,9 +86,20 @@ export function useInitiativeMission(initiativeId: string, elementIds: string[])
 
 // ── The Planner ─────────────────────────────────────────────────────────────
 
-/** Asks the Planner for a draft. The raw draft is checked by normalizePlan. */
-export async function requestInitiativePlan(initiativeId: string, guidance: string): Promise<unknown> {
-  const { data, error } = await supabase.functions.invoke('plan-initiative', { body: { initiativeId, guidance } });
+/** What the Planner answered: a draft, or questions to answer first. */
+export interface PlannerReply { plan: unknown; questions: unknown; reason: string }
+
+/** Asks the Planner for a draft. It may ask questions first, unless answers
+ *  are given or `noQuestions` is set. The raw reply is checked by
+ *  normalizePlan / normalizeQuestions. */
+export async function requestInitiativePlan(
+  initiativeId: string,
+  guidance: string,
+  opts: { answers?: { question: string; answer: string }[]; noQuestions?: boolean } = {},
+): Promise<PlannerReply> {
+  const { data, error } = await supabase.functions.invoke('plan-initiative', {
+    body: { initiativeId, guidance, answers: opts.answers ?? [], noQuestions: opts.noQuestions ?? false },
+  });
   if (error) {
     const ctx = (error as { context?: Response }).context;
     let message = error.message;
@@ -97,7 +108,8 @@ export async function requestInitiativePlan(initiativeId: string, guidance: stri
     }
     throw new Error(message);
   }
-  return (data as { plan?: unknown } | null)?.plan ?? null;
+  const d = (data ?? {}) as { plan?: unknown; questions?: unknown; reason?: unknown };
+  return { plan: d.plan ?? null, questions: d.questions ?? null, reason: typeof d.reason === 'string' ? d.reason : '' };
 }
 
 export interface ApplyPlanInput {
