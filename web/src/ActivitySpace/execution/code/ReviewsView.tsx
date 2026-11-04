@@ -229,7 +229,7 @@ function ConnectGithub({ spaceId, existing }: { spaceId: string; existing: Integ
       if (!id) {
         const preset = presetById('github');
         if (!preset) return;
-        const built = buildIntegrationRow(preset, spaceId, { delegation: 'approve_each', enabled: true });
+        const built = buildIntegrationRow(preset, spaceId, { delegation: 'full_delegation', enabled: true });
         if (!built.ok) { setError(t(built.error)); return; }
         id = (await actions.create.mutateAsync({ row: built.row, secret: '' })).id;
       }

@@ -282,7 +282,6 @@ function ConnectedRow({ integration, onOpen }: { integration: Integration; onOpe
         <div className="truncate text-[12px] text-muted-foreground">
           {[
             t(KIND_LABELS[integration.kind]),
-            integration.kind === 'model' ? null : integration.delegation === 'full_delegation' ? t('Full delegation') : t('Approve each time'),
             last?.toolCount != null ? t('{count} tools', { count: last.toolCount }) : null,
           ].filter(Boolean).join(' · ')}
         </div>
