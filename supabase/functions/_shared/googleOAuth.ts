@@ -150,7 +150,26 @@ export function appOrigin(raw: string | null | undefined): string | null {
 }
 
 /**
- * The URL to send the browser back to: the fixed app origin with the result.
+ * Pure. Where a sign-in returns: the origin the app that started it runs on,
+ * when that is the app (APP_ORIGIN), one listed in APP_RETURN_ORIGINS
+ * (comma-separated), or this machine (localhost / 127.0.0.1, any port, for
+ * development). Anything else returns to APP_ORIGIN. The handle it carries
+ * is useless without the starter's own session (/finish checks it), so the
+ * list only decides where the browser lands, never who may finish.
+ */
+export function returnOrigin(requested: unknown, appRaw: string | null | undefined, listRaw: string | null | undefined): string | null {
+  const app = appOrigin(appRaw);
+  const asked = typeof requested === "string" ? appOrigin(requested) : null;
+  if (!asked) return app;
+  if (asked === app) return asked;
+  const host = new URL(asked).hostname;
+  if (host === "localhost" || host === "127.0.0.1") return asked;
+  const listed = (listRaw ?? "").split(",").map((s) => appOrigin(s.trim())).filter((o): o is string => !!o);
+  return listed.includes(asked) ? asked : app;
+}
+
+/**
+ * The URL to send the browser back to: the app's origin with the result.
  *   finish   Google answered; the app confirms with POST /finish {handle}
  *            under the signed-in person's JWT, and only then is anything
  *            stored.
