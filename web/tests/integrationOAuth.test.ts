@@ -88,6 +88,20 @@ describe('cookie and return URL', () => {
 
   const HANDLE = 'h'.repeat(20) + '_-' + 'K'.repeat(21);
 
+  it('returns to the app that started the sign-in only when it is allowed', () => {
+    const app = 'https://alcon.example.com';
+    expect(oauth.returnOrigin('https://alcon.example.com', app, null)).toBe(app);
+    expect(oauth.returnOrigin('http://localhost:3000', app, null)).toBe('http://localhost:3000');
+    expect(oauth.returnOrigin('http://127.0.0.1:3001', app, null)).toBe('http://127.0.0.1:3001');
+    expect(oauth.returnOrigin('https://preview-1.example.app', app, 'https://preview-1.example.app, https://x.example')).toBe('https://preview-1.example.app');
+    // Anything else, or nothing usable, goes back to the app.
+    expect(oauth.returnOrigin('https://evil.example', app, 'https://preview-1.example.app')).toBe(app);
+    expect(oauth.returnOrigin('http://evil.example', app, 'http://evil.example')).toBe(app);
+    expect(oauth.returnOrigin('https://alcon.example.com/next', app, null)).toBe(app);
+    expect(oauth.returnOrigin(42, app, null)).toBe(app);
+    expect(oauth.returnOrigin(undefined, null, null)).toBeNull();
+  });
+
   it('returns only to a bare https app origin, with the completion handle on finish', () => {
     expect(oauth.appReturnUrl('https://alcon.example.com', 'finish', INTEGRATION, HANDLE))
       .toBe(`https://alcon.example.com/?integration_oauth=finish&integration=${INTEGRATION}&handle=${HANDLE}`);

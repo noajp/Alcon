@@ -9,9 +9,11 @@
 //                                whether each sign-in is configured (client +
 //                                APP_ORIGIN). No secrets.
 //   POST /start { integrationId } (JWT, Space owner) → { url }
-//                                Creates a sign-in row with a PKCE verifier
-//                                and a one-time ticket (2 minutes). The app
-//                                navigates to `url`.
+//          { returnTo }          Creates a sign-in row with a PKCE verifier,
+//                                a one-time ticket (2 minutes) and where to
+//                                return (returnOrigin: the starting app's
+//                                origin when allowed, else APP_ORIGIN). The
+//                                app navigates to `url`.
 //   GET  /go?ticket              Consumes the ticket, sets the HttpOnly
 //                                cookie `ioauth=<nonce>` and redirects to
 //                                the provider with state + S256 challenge.
@@ -23,8 +25,8 @@
 //                                login). Stores NOTHING on the integration: the
 //                                token set is held in Vault against a one-time
 //                                completion handle (10 minutes), and the
-//                                browser goes to
-//                                APP_ORIGIN/?integration_oauth=finish&handle=….
+//                                browser goes back to where it started
+//                                (/?integration_oauth=finish&handle=…).
 //   POST /finish { handle }      (JWT) Takes the held token set once. Stores
 //                                it only when the caller is the person who
 //                                called /start and still owns the Space;
@@ -38,7 +40,8 @@
 //                                provider could not confirm it. Disconnect
 //                                calls it before deleting the row.
 //
-// Secrets: APP_ORIGIN, and per provider GOOGLE_OAUTH_CLIENT_ID /
+// Secrets: APP_ORIGIN (and optionally APP_RETURN_ORIGINS, more origins a
+// sign-in may return to), and per provider GOOGLE_OAUTH_CLIENT_ID /
 // GOOGLE_OAUTH_CLIENT_SECRET, GITHUB_OAUTH_CLIENT_ID /
 // GITHUB_OAUTH_CLIENT_SECRET. A provider without its client, or any without
 // APP_ORIGIN, fails closed (not_configured) on every route but /status and
@@ -53,7 +56,7 @@ import {
 } from "../_shared/githubOAuth.ts";
 import {
   GOOGLE_ABOUT_URL, GOOGLE_REVOKE_URL, GOOGLE_TOKEN_URL, NONCE_COOKIE, STATE_TTL_MS, TICKET_TTL_MS,
-  appOrigin, appReturnUrl, buildAuthorizeUrl, clearNonceCookie, finishDecision, hasScope, isExpired, isGoogleDriveRow,
+  appOrigin, appReturnUrl, buildAuthorizeUrl, returnOrigin, clearNonceCookie, finishDecision, hasScope, isExpired, isGoogleDriveRow,
   nonceCookie, parseOAuthSecret, randomToken, readCookie, redirectUriFor, s256Challenge, secretFromTokenResponse, sha256Hex,
 } from "../_shared/googleOAuth.ts";
 
@@ -93,10 +96,11 @@ function route(pathname: string): string {
   return p.replace(/\/+$/, "") || "/";
 }
 
-/** Sends the browser back to the app. Supabase serves HTML from Edge
- *  Functions as plain text, so without APP_ORIGIN the answer is text. */
-function backToApp(result: "finish" | "error", integrationId: string | null, handle?: string): Response {
-  const target = appReturnUrl(Deno.env.get("APP_ORIGIN"), result, integrationId, handle);
+/** Sends the browser back to the app: to where the sign-in started (see
+ *  returnOrigin), else APP_ORIGIN. Supabase serves HTML from Edge Functions
+ *  as plain text, so without an origin the answer is text. */
+function backToApp(result: "finish" | "error", integrationId: string | null, handle?: string, origin?: string | null): Response {
+  const target = appReturnUrl(origin ?? Deno.env.get("APP_ORIGIN"), result, integrationId, handle);
   if (!target) return text(result === "error" ? "The connection could not be completed. You can close this tab and try again from Alcon." : NO_APP_ORIGIN, 400);
   return new Response(null, { status: 302, headers: { "set-cookie": clearNonceCookie(), "cache-control": "no-store", location: target } });
 }
@@ -153,9 +157,12 @@ async function readBody(req: Request): Promise<Record<string, unknown> | Respons
   }
 }
 
-async function readIntegrationId(req: Request): Promise<string | Response> {
-  const body = await readBody(req);
-  if (body instanceof Response) return body;
+async function readIntegrationId(req: Request, body?: Record<string, unknown>): Promise<string | Response> {
+  if (!body) {
+    const read = await readBody(req);
+    if (read instanceof Response) return read;
+    body = read;
+  }
   const id = typeof body.integrationId === "string" ? body.integrationId : "";
   if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "integrationId is required" }, 400);
   return id;
@@ -291,12 +298,16 @@ Deno.serve(async (req: Request) => {
   // ── POST /start ─────────────────────────────────────────────────────────
   if (path === "/start") {
     if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
-    const integrationId = await readIntegrationId(req);
+    const body = await readBody(req);
+    if (body instanceof Response) return body;
+    const integrationId = await readIntegrationId(req, body);
     if (integrationId instanceof Response) return integrationId;
     const owned = await ownedIntegration(req, env, integrationId);
     if (owned instanceof Response) return owned;
     const provider = providerOf(owned.row);
     if (!provider) return json({ error: "this integration does not sign in with OAuth", code: "not_oauth" }, 400);
+    // Back to the app that started it (its origin, when allowed).
+    const returnTo = returnOrigin(body.returnTo, Deno.env.get("APP_ORIGIN"), Deno.env.get("APP_RETURN_ORIGINS"));
     const refused = notConfigured(provider);
     if (refused) return refused;
 
@@ -310,6 +321,7 @@ Deno.serve(async (req: Request) => {
       code_verifier: randomToken(48),
       ticket_expires_at: new Date(now + TICKET_TTL_MS).toISOString(),
       expires_at: new Date(now + STATE_TTL_MS).toISOString(),
+      return_origin: returnTo,
     });
     if (error) return json({ error: "could not start the sign-in" }, 500);
     return json({ url: `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/integration-oauth/go?ticket=${encodeURIComponent(ticket)}` });
@@ -353,14 +365,15 @@ Deno.serve(async (req: Request) => {
     const { data: flow } = await admin.from("integration_oauth_states")
       .update({ state_hash: null })
       .eq("state_hash", await sha256Hex(state))
-      .select("id, integration_id, code_verifier, browser_nonce_hash, expires_at")
+      .select("id, integration_id, code_verifier, browser_nonce_hash, expires_at, return_origin")
       .maybeSingle();
     if (!flow) return backToApp("error", null);
     const flowId = flow.id as string;
     const integrationId = flow.integration_id as string;
+    const back = (flow.return_origin as string | null) ?? null;
     const fail = async () => {
       await admin.from("integration_oauth_states").delete().eq("id", flowId);
-      return backToApp("error", integrationId);
+      return backToApp("error", integrationId, undefined, back);
     };
     if (isExpired(flow.expires_at as string, Date.now())) return await fail();
     const cookieNonce = readCookie(req.headers.get("cookie"), NONCE_COOKIE);
@@ -398,7 +411,7 @@ Deno.serve(async (req: Request) => {
       p_flow_id: flowId, p_secret: held.secret, p_account: held.account, p_completion_hash: await sha256Hex(handle),
     });
     if (stashErr) return await fail();
-    return backToApp("finish", integrationId, handle);
+    return backToApp("finish", integrationId, handle, back);
   }
 
   // ── POST /finish ────────────────────────────────────────────────────────

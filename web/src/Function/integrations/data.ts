@@ -80,7 +80,8 @@ async function testIntegration(integrationId: string): Promise<Json> {
 
 /** Starts the sign-in for an OAuth integration; returns the URL to navigate to. */
 async function startIntegrationOAuth(integrationId: string): Promise<string> {
-  const { data, error } = await supabase.functions.invoke('integration-oauth/start', { body: { integrationId } });
+  // The sign-in comes back to this app (production, a preview or localhost), when the server allows it.
+  const { data, error } = await supabase.functions.invoke('integration-oauth/start', { body: { integrationId, returnTo: window.location.origin } });
   if (error) throw await functionError(error);
   const url = (data as { url?: unknown } | null)?.url;
   if (typeof url !== 'string' || !url.startsWith('https://')) throw new Error('Sign-in could not be started.');
