@@ -88,9 +88,10 @@ import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ApprovalRequestBanner } from './ApprovalRequestBanner';
 import { ElementActionsMenu } from './ElementActionsMenu';
-import { Smile, FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal } from '@/ui/icons';
+import { FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal } from '@/ui/icons';
 import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
 import { AttachButton } from '@/Function/shared/attachments/AttachButton';
+import { ReactionChips, ReactionPicker } from '@/Function/shared/ReactionControls';
 import { FileImportActions, canImport } from './FileImportActions';
 import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckRequest';
 import { openInApp } from '@/Function/shared/appNavigation';
@@ -280,8 +281,6 @@ function ElementDetailBody({
 
   // Reactions on this Element — cached per Element, refreshed on toggle.
   const { reactions, refresh: refreshReactions } = useElementReactions(element.id);
-  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  useEscapeLayer(emojiPickerOpen, () => setEmojiPickerOpen(false));
 
   // Edges — cached per Element.
   const allEdges = useElementEdges(element.id);
@@ -340,9 +339,7 @@ function ElementDetailBody({
 
   // Emoji picker → element_reactions toggle. Quick set mirrors the
   // comments panel so users see a familiar palette.
-  const QUICK_EMOJI = useMemo(() => ['👍', '🎉', '❤️', '👀', '🚀', '✅'], []);
   const handleEmojiPick = async (emoji: string) => {
-    setEmojiPickerOpen(false);
     if (!user?.id) return;
     try {
       const action = await toggleReaction({ userId: user.id, emoji, elementId: element.id });
@@ -814,39 +811,8 @@ function ElementDetailBody({
           <div className="relative -ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
           <ButtonAppearanceProvider appearance="inline">
           <div className="flex items-center gap-0.5">
-            {/* Smile button → quick-emoji popover that toggles a
-                reaction on this Element. */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setEmojiPickerOpen((o) => !o)}
-                className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-                title={t('Add reaction')}
-                aria-label={t('Add reaction')}
-              >
-                <Smile size={15} />
-              </button>
-              {emojiPickerOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setEmojiPickerOpen(false)}
-                  />
-                  <div className="absolute top-full left-0 mt-1 z-50 bg-popover border border-border rounded-md shadow-lg flex p-1 gap-0.5">
-                    {QUICK_EMOJI.map((e) => (
-                      <button
-                        key={e}
-                        type="button"
-                        onClick={() => handleEmojiPick(e)}
-                        className="w-7 h-7 hover:bg-accent rounded text-base"
-                      >
-                        {e}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+            {/* Reactions on this Element: the smile opens the palette; the chips end the row. */}
+            <ReactionPicker onToggle={(e) => void handleEmojiPick(e)} />
 
             {/* Attach a file from this computer — it lists under the row and
                 opens through a short-lived link (attachments). */}
@@ -894,32 +860,8 @@ function ElementDetailBody({
                 Request changes / Reject). */}
             <ElementApprovalMenu element={element} onRefresh={onRefresh} openSignal={approvalSignal} />
 
-            {/* Existing reactions as toggleable chips, aggregated by
-                emoji so two thumbs-ups read as 👍 ×2 with my own
-                participation highlighted. */}
-            {(() => {
-              const counts: Record<string, number> = {};
-              for (const r of reactions) counts[r.emoji] = (counts[r.emoji] || 0) + 1;
-              const mine = new Set(
-                reactions.filter((r) => r.user_id === user?.id).map((r) => r.emoji),
-              );
-              return Object.entries(counts).map(([emoji, n]) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => handleEmojiPick(emoji)}
-                  className={
-                    'text-[11px] px-1.5 h-7 inline-flex items-center gap-1 rounded-full transition-colors ' +
-                    (mine.has(emoji)
-                      ? 'bg-primary/15 text-foreground'
-                      : 'hover:bg-muted text-foreground/80')
-                  }
-                >
-                  <span>{emoji}</span>
-                  <span className="tabular-nums">{n}</span>
-                </button>
-              ));
-            })()}
+            <ReactionChips reactions={reactions} userId={user?.id ?? null} onToggle={(e) => void handleEmojiPick(e)} />
+
           </div>
           </ButtonAppearanceProvider>
           {/* Attached files, and the trash under them. */}

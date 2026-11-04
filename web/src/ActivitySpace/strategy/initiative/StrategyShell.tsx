@@ -5,8 +5,14 @@ import { IslandHeader } from '@/Function/shared/MainIsland';
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronRight, Plus, Search, X } from '@/ui/icons';
-import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
+import { Check, ChevronDown, ChevronRight, MoreHorizontal, Plus, Search, X } from '@/ui/icons';
+import { FoldSection, FoldSectionAddRow } from '@/Function/shared/FoldSection';
+import { ReactionChips, ReactionPicker } from '@/Function/shared/ReactionControls';
+import { AttachButton } from '@/Function/shared/attachments/AttachButton';
+import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
+import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckRequest';
+import { openInApp } from '@/Function/shared/appNavigation';
+import { NavSlidesIcon, NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { IndexList, IndexRow } from '@/Function/shared/IndexList';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
@@ -30,6 +36,9 @@ import {
   setStrategyObjects,
   updateObject,
   updateStrategy,
+  placeStrategy,
+  toggleReaction,
+  useStrategyReactions,
   deleteStrategy,
   useDomains,
   useObjects,
@@ -82,7 +91,7 @@ import {
 import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { buildInitiativeTree, flattenInitiativeTree, inSpace, type InitiativeNode } from './initiativeTree';
+import { buildInitiativeTree, flattenInitiativeTree, inSpace, planInitiativeDrop, siblingOrder, type InitiativeDropPlace, type InitiativeNode } from './initiativeTree';
 import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 
 /** The Overview tab has a band and one column of readings; the other boards
@@ -279,6 +288,12 @@ function InitiativeHealthCell({ health, measures }: { health: InitiativeHealth |
   );
 }
 
+/** Top quarter of a row: above it. Bottom quarter: below it. Between: inside it. */
+function dropPlaceAt(clientY: number, rect: DOMRect): InitiativeDropPlace {
+  const y = (clientY - rect.top) / Math.max(rect.height, 1);
+  return y < 0.25 ? 'before' : y > 0.75 ? 'after' : 'inside';
+}
+
 function StrategyListView({
   nodes,
   onSelectStrategy,
@@ -300,11 +315,55 @@ function StrategyListView({
   // Subscribe to the shared tick so "Today" / "3m ago" in the cells ages
   // honestly while the list stays open; the cells re-render with this view.
   useNow();
+
+  // Drag a row to reorder it, or onto the middle of another row to put it
+  // inside that one. The pointer's height in the row picks which.
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  const [drop, setDrop] = useState<{ key: string; place: InitiativeDropPlace } | null>(null);
+  const dropOn = async (from: string, to: string, place: InitiativeDropPlace) => {
+    const plan = planInitiativeDrop(nodes, from, to, place);
+    if (!plan) return;
+    if (place === 'inside') setFolded((prev) => { const n = new Set(prev); n.delete(to); return n; });
+    const order = new Map<string, number | null | undefined>();
+    const walk = (list: InitiativeNode<StrategyWithObjects>[]) => { for (const n of list) { order.set(n.initiative.id, n.initiative.order_index); walk(n.children); } };
+    walk(nodes);
+    try {
+      await placeStrategy(plan.id, { parentId: plan.fromParentId }, { parentId: plan.toParentId, siblingIds: plan.siblingIds }, order);
+    } catch (e) {
+      console.error('Failed to move Strategy:', e);
+      void appDialog.alert(t('Could not move the Strategy — only its owner can'));
+    }
+  };
   return (
     <IndexList headers={[t('Name'), t('Health'), t('Objects')]} withActions>
-      {rows.map(({ initiative: s, key, depth, children }) => (
+      {rows.map(({ initiative: s, key, depth, children }) => {
+        const over = drop?.key === key && dragKey !== null ? drop.place : null;
+        return (
         <InitiativeMenu key={key} initiative={s}>
-          <div>
+          <div draggable
+            onDragStart={(e) => { setDragKey(key); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', s.id); }}
+            onDragEnd={() => { setDragKey(null); setDrop(null); }}
+            onDragOver={(e) => {
+              if (!dragKey) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              const place = dropPlaceAt(e.clientY, e.currentTarget.getBoundingClientRect());
+              if (drop?.key !== key || drop.place !== place) setDrop({ key, place });
+            }}
+            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDrop((d) => (d?.key === key ? null : d)); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const from = dragKey;
+              setDragKey(null); setDrop(null);
+              if (!from) return;
+              void dropOn(from, key, dropPlaceAt(e.clientY, e.currentTarget.getBoundingClientRect()));
+            }}
+            className={`relative rounded-md ${dragKey === key ? 'opacity-40' : ''} ${over === 'inside' ? 'bg-primary/10' : ''}`}>
+            {/* Where the row lands: a line above or below, or the row lit when it goes inside. */}
+            {(over === 'before' || over === 'after') && (
+              <div aria-hidden className={`pointer-events-none absolute right-0 h-0.5 rounded-full bg-primary ${over === 'before' ? '-top-px' : '-bottom-px'}`}
+                style={{ left: depth * 20 + 22 }} />
+            )}
             <IndexRow indent={depth * 20} icon={<NavStrategyIcon size={16} />} name={s.name}
               lead={children.length > 0 ? (
                 <button type="button"
@@ -320,7 +379,8 @@ function StrategyListView({
               actions={<InitiativeActionsButton initiative={s} />} />
           </div>
         </InitiativeMenu>
-      ))}
+        );
+      })}
     </IndexList>
   );
 }
@@ -459,7 +519,6 @@ function StrategyDetailView({
   // immediately nested via strategy_children.
   const [childPickerOpen, setChildPickerOpen] = useState(false);
   const [childQuery, setChildQuery] = useState('');
-  const [newChildOpen, setNewChildOpen] = useState(false);
   const [linkingChildId, setLinkingChildId] = useState<string | null>(null);
 
   // Esc leaves the page for the root list — one level back. Anything
@@ -542,7 +601,8 @@ function StrategyDetailView({
   };
 
   const childStrategies = useMemo(
-    () => allStrategies.filter((s) => s.parentIds.includes(strategy.id)),
+    // In the order the Strategy list shows them.
+    () => allStrategies.filter((s) => s.parentIds.includes(strategy.id)).sort(siblingOrder),
     [allStrategies, strategy.id],
   );
   // This Strategy + everything above it in the DAG — excluded from the
@@ -600,6 +660,35 @@ function StrategyDetailView({
     } catch (e) {
       console.error('Failed to un-nest Strategy:', e);
       setSaveError(t('Could not remove that Strategy'));
+    }
+  };
+
+  // A Sub Strategy typed into the section's last line: made in this Space
+  // and put under this one.
+  const createChild = async (name: string) => {
+    if (!canEdit) return;
+    try {
+      const created = await createStrategy({ name, activity_space_id: strategy.activity_space_id });
+      await addStrategyChild(strategy.id, created.id);
+      setSaveError(null);
+    } catch (e) {
+      console.error('Failed to add Sub Strategy:', e);
+      setSaveError(t('Could not add the Sub Strategy'));
+    } finally {
+      onSaved();
+    }
+  };
+
+  // Reactions on this Strategy, as an Element has them.
+  const { reactions, refresh: refreshReactions } = useStrategyReactions(strategy.id);
+  const reactWith = async (emoji: string) => {
+    if (!userId) return;
+    try {
+      await toggleReaction({ userId, emoji, strategyId: strategy.id });
+    } catch (e) {
+      console.error('Failed to react to Strategy:', e);
+    } finally {
+      void refreshReactions();
     }
   };
 
@@ -741,21 +830,8 @@ function StrategyDetailView({
     }
   };
 
-  // The two "+" menus — each opens from the section heading once the section
-  // has content, and from its inline "+ verb" while it has none.
-  const nestedMenu = (trigger: React.ReactNode) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        <DropdownMenuItem onClick={() => setChildPickerOpen(true)}>
-          <Search size={13} className="mr-1.5" /> {t('Add existing Strategy')}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setNewChildOpen(true)}>
-          <Plus size={13} className="mr-1.5" /> {t('Create Strategy')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+  // The Objects "+" menu — from the section heading once the section has
+  // content, and from its inline "+ verb" while it has none.
   const objectsMenu = (trigger: React.ReactNode) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
@@ -869,31 +945,44 @@ function StrategyDetailView({
           <DescriptionEditor key={strategy.id} value={strategy.description ?? ''} readOnly={!canEdit}
             placeholder={t('Add description…')} onSave={saveDescription} />
 
-
+          {/* Under the description, as on an Element: one quiet row —
+              reactions, attaching a file, and the "…" of other things to add
+              — then the attached files and the Sub Strategies (how it is
+              won), each a section of its own. */}
           {tab === 'overview' && (
-            <InitiativeBoard surface="campaign" defaults={INITIATIVE_BOARD} subjectId={strategy.id} host={host} zones={OVERVIEW_ZONES}>
-              {/* Band — how it is going (a progress line by default), before
-                  the readings below. */}
-              <WidgetZone zone="band" />
-              {/* The Strategies under it — how it is won — then its own
-                  record: the conditions it is judged on, what it stands on,
-                  and what was decided. */}
-            {/* Nested Strategies. With none, the section keeps no heading — only
-                its "+ verb", like every concept page. */}
-            {childStrategies.length > 0 || childPickerOpen ? (
-              <PageSection title={t('Strategies')} action={canEdit ? (
-                <ButtonAppearanceProvider appearance="navigation">
-                  {nestedMenu(
-                    <Button variant="ghost" size="icon-xs" aria-label={t('Add nested Strategy')} className="text-muted-foreground">
-                      <Plus size={13} />
-                    </Button>,
-                  )}
-                </ButtonAppearanceProvider>
-              ) : undefined}>
+            <div className="relative -ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
+              <ButtonAppearanceProvider appearance="inline">
+                <div className="flex items-center gap-0.5">
+                  <ReactionPicker onToggle={(e) => void reactWith(e)} />
+                  <AttachButton owner={{ kind: 'strategy', id: strategy.id }}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button type="button" title={t('More')} aria-label={t('More')}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=open]:bg-muted data-[state=open]:text-foreground">
+                        <MoreHorizontal size={15} />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="min-w-[200px]">
+                      {canEdit && (
+                        <DropdownMenuItem onSelect={() => setTimeout(() => setChildPickerOpen(true), 0)} className="gap-2.5 py-1.5 text-[13px]">
+                          <NavStrategyIcon size={15} />{t('Add existing Strategy')}
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onSelect={() => { requestNewDeck(strategy.name); openInApp('slides'); }} className="gap-2.5 py-1.5 text-[13px]">
+                        <NavSlidesIcon size={15} />{t('Slide')}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <ReactionChips reactions={reactions} userId={userId} onToggle={(e) => void reactWith(e)} />
+                </div>
+              </ButtonAppearanceProvider>
+              <AttachmentList owner={{ kind: 'strategy', id: strategy.id }} />
+              <FoldSection title={t('Sub Strategies')} count={childStrategies.length ? String(childStrategies.length) : undefined}>
                 {childStrategies.map((child) => {
                   const n = countObjects(child.objectIds);
                   return (
-                    <ContentRow key={child.id} icon={<NavStrategyIcon size={13} />} name={child.name}
+                    <ContentRow key={child.id} icon={<NavStrategyIcon size={14} />} name={child.name}
                       onOpen={() => onOpenStrategy(child.id)}
                       meta={<span>{n === 1 ? t('1 Object') : t('{n} Objects', { n })}</span>}
                       actions={canEdit ? (
@@ -903,58 +992,46 @@ function StrategyDetailView({
                       ) : undefined} />
                   );
                 })}
-
                 {childPickerOpen && (
-                  <div className="mt-1">
-                    <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-1">
+                  <div className="mt-1 px-2">
+                    <div className="mb-1 flex items-center gap-2 rounded-md bg-muted/30 px-2 py-1.5">
                       <Search size={12} className="text-muted-foreground" />
-                      <input
-                        value={childQuery}
-                        onChange={(e) => setChildQuery(e.target.value)}
-                        placeholder={t('Search Strategies…')}
-                        className="flex-1 bg-transparent text-[13px] outline-none"
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        onClick={() => { setChildPickerOpen(false); setChildQuery(''); }}
-                        aria-label={t('Close')}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
+                      <input value={childQuery} onChange={(e) => setChildQuery(e.target.value)}
+                        placeholder={t('Search Strategies…')} className="flex-1 bg-transparent text-[13px] outline-none" autoFocus />
+                      <button type="button" onClick={() => { setChildPickerOpen(false); setChildQuery(''); }}
+                        aria-label={t('Close')} className="text-muted-foreground hover:text-foreground">
                         <X size={12} />
                       </button>
                     </div>
                     <div className="max-h-72 overflow-auto">
                       {childCandidates.length === 0 && (
-                        <div className="px-3 py-3 text-[12px] text-muted-foreground">
-                          {t('No Strategies match.')}
-                        </div>
+                        <div className="px-3 py-3 text-[12px] text-muted-foreground">{t('No Strategies match.')}</div>
                       )}
-                      {childCandidates.map((s) => (
-                        <button
-                          type="button"
-                          key={s.id}
-                          disabled={linkingChildId === s.id}
-                          onClick={() => linkChild(s.id)}
-                          className="w-full flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] hover:bg-muted/40 text-left disabled:opacity-50"
-                        >
+                      {childCandidates.map((c) => (
+                        <button type="button" key={c.id} disabled={linkingChildId === c.id} onClick={() => linkChild(c.id)}
+                          className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-[12px] hover:bg-muted/40 disabled:opacity-50">
                           <NavStrategyIcon size={11} />
-                          <span className="flex-1 truncate text-foreground">{s.name}</span>
+                          <span className="flex-1 truncate text-foreground">{c.name}</span>
                         </button>
                       ))}
                     </div>
                   </div>
                 )}
-              </PageSection>
-            ) : canEdit ? (
-              <ButtonAppearanceProvider appearance="inline">
-                {nestedMenu(
-                  <Button variant="ghost" size="sm" align="start" className="-ml-2 self-start">
-                    <Plus size={13} strokeWidth={2.5} />{t('Add nested Strategy')}
-                  </Button>,
+                {canEdit && (
+                  <FoldSectionAddRow icon={<NavStrategyIcon size={14} />} placeholder={t('Add Sub Strategy')} onAdd={createChild} />
                 )}
-              </ButtonAppearanceProvider>
-            ) : null}
+              </FoldSection>
+            </div>
+          )}
+
+
+          {tab === 'overview' && (
+            <InitiativeBoard surface="campaign" defaults={INITIATIVE_BOARD} subjectId={strategy.id} host={host} zones={OVERVIEW_ZONES}>
+              {/* Band — how it is going (a progress line by default), before
+                  the readings below. */}
+              <WidgetZone zone="band" />
+              {/* Its own record: the conditions it is judged on, what it
+                  stands on, and what was decided. */}
               <WidgetZone zone="main" columns={1} />
             </InitiativeBoard>
           )}
@@ -1129,21 +1206,6 @@ function StrategyDetailView({
       </div>
     </div>
     </WidgetActionSlotProvider>
-    {newChildOpen && (
-      <StrategyCreateDialog
-        onClose={() => setNewChildOpen(false)}
-        onCreated={async (id) => {
-          setNewChildOpen(false);
-          try {
-            await addStrategyChild(strategy.id, id);
-          } catch (e) {
-            console.error('Failed to nest new Strategy:', e);
-          }
-          onSaved();
-          onOpenStrategy(id);
-        }}
-      />
-    )}
     </>
   );
 }

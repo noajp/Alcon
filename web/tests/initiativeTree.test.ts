@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildInitiativeTree, flattenInitiativeTree, initiativesInSpace } from '../src/ActivitySpace/strategy/initiative/initiativeTree';
+import { buildInitiativeTree, flattenInitiativeTree, initiativesInSpace, planInitiativeDrop } from '../src/ActivitySpace/strategy/initiative/initiativeTree';
 
 const s = (id: string, parentIds: string[] = [], objectIds: string[] = [], created_at = '2026-11-01T00:00:00Z') =>
   ({ id, name: id, vision_id: null, parentIds, objectIds, created_at });
@@ -47,5 +47,38 @@ describe('buildInitiativeTree', () => {
     const all = flattenInitiativeTree(tree, () => true).map((n) => n.initiative.id);
     expect(new Set(all)).toEqual(new Set(['X', 'Y', 'C']));
     expect(all.length).toBe(3);
+  });
+});
+
+describe('sibling order', () => {
+  it('puts dragged-into order first, then the unmoved oldest first', () => {
+    const tree = buildInitiativeTree([
+      { ...s('a', [], [], '2026-11-01T00:00:00Z') },
+      { ...s('b', [], [], '2026-11-02T00:00:00Z'), order_index: 1 },
+      { ...s('c', [], [], '2026-11-03T00:00:00Z'), order_index: 0 },
+    ]);
+    expect(tree.map((n) => n.initiative.id)).toEqual(['c', 'b', 'a']);
+  });
+});
+
+describe('planInitiativeDrop', () => {
+  const tree = buildInitiativeTree([
+    s('a', [], [], '2026-11-01T00:00:00Z'),
+    s('b', [], [], '2026-11-02T00:00:00Z'),
+    s('a1', ['a'], [], '2026-11-03T00:00:00Z'),
+    s('a2', ['a'], [], '2026-11-04T00:00:00Z'),
+  ]);
+  it('reorders within a level', () => {
+    expect(planInitiativeDrop(tree, 'a/a2', 'a/a1', 'before')).toEqual({ id: 'a2', fromParentId: 'a', toParentId: 'a', siblingIds: ['a2', 'a1'] });
+  });
+  it('moves a row to the top level', () => {
+    expect(planInitiativeDrop(tree, 'a/a1', 'b', 'after')).toEqual({ id: 'a1', fromParentId: 'a', toParentId: null, siblingIds: ['a', 'b', 'a1'] });
+  });
+  it('nests a row inside another, last', () => {
+    expect(planInitiativeDrop(tree, 'b', 'a', 'inside')).toEqual({ id: 'b', fromParentId: null, toParentId: 'a', siblingIds: ['a1', 'a2', 'b'] });
+  });
+  it('refuses a drop onto itself or into its own branch', () => {
+    expect(planInitiativeDrop(tree, 'a', 'a', 'inside')).toBeNull();
+    expect(planInitiativeDrop(tree, 'a', 'a/a1', 'after')).toBeNull();
   });
 });

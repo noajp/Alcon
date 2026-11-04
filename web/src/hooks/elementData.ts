@@ -371,16 +371,19 @@ export async function createSubElement(parent: Pick<Element, 'id' | 'object_id' 
   return createElement({ title, parent_id: parent.id, object_id: parent.object_id, owner_id: parent.object_id ? null : parent.owner_id });
 }
 
+/** A Sub-element as its row shows it: the Element and who is on it. */
+export type SubElement = Element & { assignees: Pick<ElementAssignee, 'id' | 'worker_id' | 'role'>[] };
+
 /** The Sub-elements of an Element, in their order. */
 export function useSubElements(parentId: string | null) {
   return useQuery({
     queryKey: ['element-children', parentId],
     enabled: !!parentId,
-    queryFn: async (): Promise<Element[]> => {
-      const { data, error } = await supabase.from('elements').select('*').eq('parent_id', parentId!)
+    queryFn: async (): Promise<SubElement[]> => {
+      const { data, error } = await supabase.from('elements').select('*, assignees:element_assignees(id, worker_id, role)').eq('parent_id', parentId!)
         .order('order_index', { ascending: true, nullsFirst: false }).order('seq_number', { ascending: true });
       if (error) throw error;
-      return (data ?? []) as Element[];
+      return (data ?? []) as SubElement[];
     },
   });
 }

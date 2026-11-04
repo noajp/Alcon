@@ -271,10 +271,11 @@ export async function toggleReaction(params: {
   emoji: string;
   elementId?: string | null;
   commentId?: string | null;
+  strategyId?: string | null;
 }): Promise<'added' | 'removed'> {
-  const { userId, emoji, elementId, commentId } = params;
+  const { userId, emoji, elementId, commentId, strategyId } = params;
   let q = supabase.from('element_reactions').select('id').eq('user_id', userId).eq('emoji', emoji);
-  q = elementId ? q.eq('element_id', elementId) : q.eq('comment_id', commentId!);
+  q = elementId ? q.eq('element_id', elementId) : strategyId ? q.eq('strategy_id', strategyId) : q.eq('comment_id', commentId!);
   const { data: existing } = await q.maybeSingle();
   if (existing) {
     await removeReaction(existing.id);
@@ -285,6 +286,24 @@ export async function toggleReaction(params: {
     emoji,
     element_id: elementId ?? null,
     comment_id: commentId ?? null,
+    strategy_id: strategyId ?? null,
   });
   return 'added';
 }
+
+/** The reactions on a Strategy — cached per Strategy, refreshed after a toggle. */
+export function useStrategyReactions(strategyId: string) {
+  const qc = useQueryClient();
+  const key = useMemo(() => ['strategy-reactions', strategyId] as const, [strategyId]);
+  const query = useQuery({
+    queryKey: key,
+    queryFn: async (): Promise<ElementReaction[]> => {
+      const { data, error } = await supabase.from('element_reactions').select('*').eq('strategy_id', strategyId);
+      if (error) throw error;
+      return (data ?? []) as ElementReaction[];
+    },
+  });
+  const refresh = useCallback(() => qc.invalidateQueries({ queryKey: key }), [qc, key]);
+  return { reactions: query.data ?? NO_STRATEGY_REACTIONS, refresh };
+}
+const NO_STRATEGY_REACTIONS: ElementReaction[] = [];

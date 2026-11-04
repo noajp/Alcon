@@ -73,6 +73,7 @@ export {
   useElementBlockers,
   useParentElement,
   useSubElements,
+  type SubElement,
 } from '@/hooks/elementData';
 
 export {
@@ -161,6 +162,7 @@ export {
   fetchElementComments,
   invalidateCarryOverReasons,
   toggleReaction,
+  useStrategyReactions,
   updateElementComment,
   useCarryOverReasons,
   useElementCommentActivity,
@@ -193,6 +195,7 @@ export {
   linkObjectToStrategy,
   updateIntent,
   updateStrategy,
+  placeStrategy,
   useIntentBindingsForTargets,
   useStrategies,
   useStrategiesInSpace,

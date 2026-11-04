@@ -231,6 +231,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
           id: `tmp-${Date.now()}`,
           comment_id: commentId,
           element_id: null,
+          strategy_id: null,
           user_id: user.id,
           emoji,
           created_at: new Date().toISOString(),
