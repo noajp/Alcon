@@ -8,8 +8,6 @@
 | **Execution** | 誰が何をしているか | Domain → Object → Element |
 | **Sustainment** | 仕事に使う道具 | Workload / Audit / Notebook / Table / Slides / People / Calendar |
 
-開発の規則は [.claude/CLAUDE.md](.claude/CLAUDE.md)。
-
 ## 構成
 
 - `web/` — アプリ本体（Next.js 16 + Supabase + Tailwind CSS）
