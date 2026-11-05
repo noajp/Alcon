@@ -32,7 +32,9 @@ import { scopedView, viewInScope } from '@/Function/space/spaceScope';
 import { OnboardingCreate } from '@/Function/space/OnboardingCreate';
 import { MyInvitations } from '@/Function/membership/MyInvitations';
 import { getCachedHomeViewId } from '@/Function/settings/preferencesStore';
-import { setActiveSettingsSection } from '@/Function/settings/settingsNav';
+import { setActiveSettingsSection, useActiveSettingsSection, useActiveSettingsTab } from '@/Function/settings/settingsNav';
+import { readOpenScreen, writeOpenScreen, type OpenScreen } from '@/shell/openScreen';
+import { VIEW_REGISTRY } from '@/shell/viewRegistry';
 import { completeOAuthReturn, readOAuthReturn, stripOAuthReturn, takeOAuthReturnView } from '@/Function/integrations/oauthReturn';
 import { finishIntegrationOAuth } from '@/Function/integrations/data';
 import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
@@ -97,13 +99,15 @@ function AppShellSkeleton() {
   );
 }
 
-function makeNewTab(activeView = 'inbox'): AppTab {
+function makeNewTab(activeView = 'inbox', navigation: NavigationState = { objectId: null }): AppTab {
   return {
     id: `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     activeView,
-    navigation: { objectId: null },
+    navigation,
   };
 }
+
+const isShellView = (view: string) => Object.prototype.hasOwnProperty.call(VIEW_REGISTRY, view);
 
 // Below this viewport width the left sidebar auto-collapses so list/board
 // content keeps a usable width (matches Linear's narrow-window behavior).
@@ -268,11 +272,16 @@ function WorkspaceContent({
   // internal state (Domain tab selection, expand state, scroll position …)
   // survives while another view is shown; the page shows one at a time and
   // has no tab strip — this is a browser tab already.
-  const initialTabRef = useRef<AppTab | null>(null);
-  // Settings > Preferences > "Default home view" — honoured at launch.
-  if (initialTabRef.current === null) initialTabRef.current = makeNewTab(getCachedHomeViewId());
-  const [tabs, setTabs] = useState<AppTab[]>(() => [initialTabRef.current!]);
-  const [activeTabId] = useState<string>(() => initialTabRef.current!.id);
+  // A reload opens the screen this browser tab had open in this Space;
+  // otherwise Settings > Preferences > "Default home view" — honoured at launch.
+  const [restored] = useState<OpenScreen | null>(() => {
+    const screen = typeof window === 'undefined' ? null : readOpenScreen(activeSpaceId, isShellView);
+    if (screen?.settings) setActiveSettingsSection(screen.settings.section, screen.settings.tab ?? undefined);
+    return screen;
+  });
+  const [initialTab] = useState<AppTab>(() => (restored ? makeNewTab(restored.view, restored.navigation) : makeNewTab(getCachedHomeViewId())));
+  const [tabs, setTabs] = useState<AppTab[]>(() => [initialTab]);
+  const activeTabId = initialTab.id;
 
   const storedTab = tabs.find(t => t.id === activeTabId) ?? tabs[0];
   // A tab opened on a view the Space does not show (it was switched to
@@ -322,7 +331,18 @@ function WorkspaceContent({
   // Settings opens in place and remembers where it came from, so the
   // sidebar's Back returns to that view — the one navigation target a
   // viewer needs a way back FROM, not just a way to switch away from.
-  const [settingsReturnView, setSettingsReturnView] = useState<string | null>(null);
+  const [settingsReturnView, setSettingsReturnView] = useState<string | null>(() => restored?.settingsReturn ?? null);
+  // Remember the open screen for a reload of this browser tab.
+  const settingsSection = useActiveSettingsSection();
+  const settingsTab = useActiveSettingsTab();
+  useEffect(() => {
+    writeOpenScreen(activeSpaceId, {
+      view: storedTab.activeView,
+      navigation: storedTab.navigation,
+      settingsReturn: storedTab.activeView === 'settings' ? settingsReturnView : null,
+      settings: { section: settingsSection, tab: settingsTab },
+    });
+  }, [activeSpaceId, storedTab.activeView, storedTab.navigation, settingsReturnView, settingsSection, settingsTab]);
   const handleOpenSettings = () => {
     if (activeTab.activeView === 'settings') return;
     setSettingsReturnView(activeTab.activeView);
@@ -336,17 +356,18 @@ function WorkspaceContent({
     const result = readOAuthReturn(window.location.search);
     if (!result) return;
     window.history.replaceState(window.history.state, '', stripOAuthReturn(window.location.href));
-    void completeOAuthReturn(result, finishIntegrationOAuth);
     const returnView = takeOAuthReturnView();
-    if (!returnView) {
-      setActiveSettingsSection('integrations', 'external');
-      const launchView = initialTabRef.current?.activeView ?? 'inbox';
-      if (launchView !== 'settings') setSettingsReturnView(launchView);
-    }
-    setTabs(prev => prev.map(t => (t.id === activeTabId ? { ...t, activeView: returnView ?? 'settings' } : t)));
+    // Settings' Back then returns to the view the app launched on.
+    if (!returnView) setActiveSettingsSection('integrations', 'external');
+    // The reload usually restored that screen already; a fresh tab opens it
+    // once the sign-in is confirmed.
+    void completeOAuthReturn(result, finishIntegrationOAuth).finally(() => {
+      setTabs(prev => prev.map(t => (t.id === activeTabId ? { ...t, activeView: returnView ?? 'settings' } : t)));
+    });
   }, [activeTabId]);
   const handleCloseSettings = () => {
-    setActiveView(settingsReturnView && settingsReturnView !== 'settings' ? settingsReturnView : 'inbox');
+    const back = settingsReturnView ?? initialTab.activeView;
+    setActiveView(back && back !== 'settings' ? back : 'inbox');
     setSettingsReturnView(null);
   };
 
