@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertCircle, CheckCircle2, ChevronRight, Circle, CircleDashed, Globe, ListChecks, Loader2, PenLine, Search,
+  AlertCircle, ChevronRight, Globe, ListChecks, Loader2, PenLine, Search,
 } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { SendIcon } from '@/Function/shared/SendIcon';
+import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
+import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { useStrategyConversation } from '@/hooks/strategyConversationData';
 import type { ElementWithDetails } from '@/types/database';
 import { conversationItems, workTally, type AgentSegment, type WorkItem } from './conversationModel';
@@ -219,7 +221,6 @@ function PlanHandOff({ guidance, onPlan }: { guidance: string; onPlan: (guidance
 }
 
 const DONE = new Set(['done']);
-const MOVING = new Set(['in_progress', 'review']);
 
 /** The plan as it stands: the Strategy's Elements by Object, checked off as they are done. */
 function PlanCard({ objects, onPlan }: { objects: { id: string; name: string; elements?: ElementWithDetails[] }[]; onPlan: () => void }) {
@@ -242,13 +243,12 @@ function PlanCard({ objects, onPlan }: { objects: { id: string; name: string; el
         <ul className="mt-2 space-y-1.5">
           {shown.map(({ e, object }) => (
             <li key={e.id} className="flex min-w-0 items-center gap-2 text-[13px]">
-              {DONE.has(e.status ?? '')
-                ? <CheckCircle2 size={15} className="shrink-0 text-[var(--status-success)]" />
-                : MOVING.has(e.status ?? '')
-                  ? <Circle size={15} className="shrink-0 text-[var(--status-info)]" />
-                  : <CircleDashed size={15} className="shrink-0 text-muted-foreground" />}
-              <span className={cn('min-w-0 truncate', DONE.has(e.status ?? '') ? 'text-muted-foreground line-through' : 'text-foreground')}>{e.title}</span>
-              <span className="shrink-0 text-[11px] text-muted-foreground">{object}</span>
+              <span className="inline-flex shrink-0"><ElementProgressMark status={e.status} progress={getElementProgress(e)} size={15} /></span>
+              <span className={cn('min-w-0 truncate', DONE.has(e.status ?? '') ? 'text-muted-foreground' : 'text-foreground')}>{e.title}</span>
+              <span className="inline-flex h-[20px] max-w-[140px] shrink-0 items-center gap-1 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-[var(--text-secondary)]" title={object}>
+                <span className="inline-flex shrink-0"><ObjectIcon size={10} /></span>
+                <span className="truncate">{object}</span>
+              </span>
             </li>
           ))}
           {rows.length > 10 && (

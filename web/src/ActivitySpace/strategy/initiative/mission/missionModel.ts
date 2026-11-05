@@ -465,7 +465,7 @@ export function normalizePlan(
   }
   // An Object no task went into adds nothing.
   const used = new Set(tasks.map((t) => t.object));
-  return { summary: text(r.summary, 1000), objectives, objects: objects.filter((o) => used.has(o.key)), tasks };
+  return { summary: text(r.summary, 4000), objectives, objects: objects.filter((o) => used.has(o.key)), tasks };
 }
 
 // ── Your turn ────────────────────────────────────────────────────────────────

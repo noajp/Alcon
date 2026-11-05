@@ -25,6 +25,7 @@ import { STATE_LABEL, Stat, compact, stateColor, type MissionContext } from './M
 import { YourTurnTray } from './YourTurnTray';
 import { DefinitionPanel } from './DefinitionPanel';
 import { listenForPlanRequests } from './plannerRequest';
+import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { setElementAiWeight, setElementDefinition, useDefinitions, useRunRounds, type Definition, type RoundSummary } from '@/hooks/definitionData';
 
 // The Execution tab's mission: the Strategy's Objects in one column and the
@@ -602,7 +603,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
 
         {draft && (
           <div className="space-y-2 rounded-lg border border-dashed border-border px-3 py-2.5">
-            {draft.summary && <p className="text-[13px] text-foreground">{draft.summary}</p>}
+            {draft.summary && <MarkdownLite text={draft.summary} className="text-[13px] leading-relaxed text-foreground" />}
             <p className="text-[12px] text-muted-foreground">
               {t('{tasks} Elements in {objects} Objects, {fresh} of them new. Dashed cards are not created yet.', {
                 tasks: draftTasks, objects: new Set(draft.tasks.map((x) => x.object).filter(Boolean)).size, fresh: draftNewObjects,
