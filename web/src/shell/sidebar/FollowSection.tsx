@@ -21,7 +21,7 @@ export function FollowSection({ activeObjectId, onOpen }: { activeObjectId: stri
         {follows.map((f) => (
           <SidebarRow key={`${f.kind}:${f.id}`} label={f.label} title={f.label}
             active={f.kind === 'object' && f.objectId === activeObjectId}
-            icon={f.kind === 'object' ? <ObjectIcon size={16} /> : <ElementProgressMark status={f.status as ElementWithDetails['status']} size={14} />}
+            icon={f.kind === 'object' ? <ObjectIcon size={16} /> : <ElementProgressMark status={f.status as ElementWithDetails['status']} size={16} />}
             onClick={() => onOpen(f)} />
         ))}
       </div>
