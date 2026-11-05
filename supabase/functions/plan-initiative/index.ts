@@ -19,7 +19,7 @@
 //
 // How the Strategy is broken down follows its harness's "# 分け方": the
 // Strategy's own harness, else the Space's default, else the rules below
-// alone. The draft names the harness it followed (plan.harness).
+// alone.
 //
 // Every read runs with the caller's JWT, so RLS decides what the Planner
 // sees. The model is told the Strategy's text is data to plan from, not
@@ -311,7 +311,7 @@ ${mayAsk ? "この Strategy を達成するための作戦を submit_plan で提
     }
     const plan = out.content?.find((b) => b.type === "tool_use" && b.name === PLAN_TOOL.name)?.input as Row | undefined;
     if (plan && Array.isArray(plan.tasks) && plan.tasks.length > 0 && Array.isArray(plan.objects) && Array.isArray(plan.objectives)) {
-      return json({ plan: { ...plan, harness: harness?.breakdown ? harness.name : null }, usage: out.usage ?? null });
+      return json({ plan, usage: out.usage ?? null });
     }
     console.error("plan-initiative: unusable plan", out.stop_reason, JSON.stringify(plan ?? null).slice(0, 300));
     failure = out.stop_reason === "max_tokens" ? "作戦案が長すぎて途中で切れました。補足で範囲を絞ってください。" : failure;

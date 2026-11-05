@@ -642,7 +642,6 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
 
         {draft && (
           <div className="space-y-2 rounded-lg border border-dashed border-border px-3 py-2.5">
-            {draft.harness && <p className="text-[11px] text-muted-foreground">{t('Broken down by the harness “{name}”.', { name: draft.harness })}</p>}
             {draft.summary && <MarkdownLite text={draft.summary} className="text-[13px] leading-relaxed text-foreground" />}
             <p className="text-[12px] text-muted-foreground">
               {t('{tasks} Elements in {objects} Objects, {fresh} of them new. Dashed cards are not created yet.', {

@@ -328,7 +328,6 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   'The AI is already working on this Element.': ['AI がこの Element で作業中です。', 'AI가 이 Element에서 작업 중입니다.', 'L’IA travaille déjà sur cet Element.', 'La IA ya está trabajando en este Element.'],
   'Harness': ['ハーネス', '하네스', 'Harnais', 'Arnés'],
   'The Space’s default': ['Space の既定', 'Space 기본값', 'Le défaut du Space', 'El predeterminado del Space'],
-  'Broken down by the harness “{name}”.': ['ハーネス「{name}」の分け方で分解しました。', '하네스 “{name}”의 방식으로 분해했습니다.', 'Découpé selon le harnais « {name} ».', 'Dividido según el arnés «{name}».'],
   'Breakdown': ['分け方', '분해 방식', 'Découpage', 'División'],
   "The Strategy's": ['Strategy のもの', 'Strategy의 것', 'Celle de la Strategy', 'La de la Strategy'],
   'Hide': ['閉じる', '닫기', 'Masquer', 'Ocultar'],

@@ -401,11 +401,7 @@ export interface PlanTask {
   action?: ElementAction | null;
 }
 
-export interface PlanDraft {
-  summary: string; objectives: PlanObjective[]; objects: PlanObject[]; tasks: PlanTask[];
-  /** The harness whose breakdown the Planner followed (null: Alcon's built-in way). */
-  harness: string | null;
-}
+export interface PlanDraft { summary: string; objectives: PlanObjective[]; objects: PlanObject[]; tasks: PlanTask[] }
 
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
@@ -480,7 +476,7 @@ export function normalizePlan(
   }
   // An Object no task went into adds nothing.
   const used = new Set(tasks.map((t) => t.object));
-  return { summary: text(r.summary, 4000), objectives, objects: objects.filter((o) => used.has(o.key)), tasks, harness: text(r.harness, 200) || null };
+  return { summary: text(r.summary, 4000), objectives, objects: objects.filter((o) => used.has(o.key)), tasks };
 }
 
 // ── Your turn ────────────────────────────────────────────────────────────────

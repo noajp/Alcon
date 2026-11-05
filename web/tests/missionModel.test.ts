@@ -97,7 +97,7 @@ describe('normalizePlan', () => {
   });
 
   it('survives a malformed answer', () => {
-    expect(normalizePlan(null, new Set())).toEqual({ summary: '', objectives: [], objects: [], tasks: [], harness: null });
+    expect(normalizePlan(null, new Set())).toEqual({ summary: '', objectives: [], objects: [], tasks: [] });
   });
 
   it('places tasks in the Strategy\'s Objects or new ones, and only in Domains the Space has', () => {
