@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
-import { DynamicIcon, iconNames, type IconName } from '@/ui/icons/dynamic';
+import { iconNames } from '@/ui/icons/dynamic';
+import { standardIconKey, useStandardIcons } from '@/ui/icons/standardIcons';
 import { Search } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ALCON_GLYPHS, ItemIcon } from './ItemIcon';
 import {
-  ITEM_COLORS, glyphIcon, isPaletteColor, itemColor, lucideIcon, matchesSearch,
+  ITEM_COLORS, STANDARD_ICON_STROKE, glyphIcon, isPaletteColor, itemColor, lucideIcon, matchesSearch,
   parseItemIcon, readRecentEmoji, rememberEmoji,
 } from './itemIconValue';
 
@@ -34,7 +35,7 @@ function loadEmoji(): Promise<EmojiRow[]> {
   return emojiCache;
 }
 
-const PAGE = 160;
+const PAGE = 400;
 
 /** The custom-colour swatch before a colour is chosen: every swatch colour in a ring. */
 const RAINBOW = `conic-gradient(${[...ITEM_COLORS.slice(2), ITEM_COLORS[2]].map((c) => c.hex).join(', ')})`;
@@ -124,7 +125,9 @@ function IconGrid({ query, value, onPick }: { query: string; value: ItemLook; on
   const { t } = useI18n();
   const tone = itemColor(value.color);
   const alcon = useMemo(() => ALCON_GLYPHS.filter(([name]) => matchesSearch(query, name)), [query]);
-  const standard = useMemo(() => iconNames.filter((name) => matchesSearch(query, name)), [query]);
+  const icons = useStandardIcons();
+  // Names the loaded set exports (old aliases of the same drawings dropped).
+  const standard = useMemo(() => (icons ? iconNames.filter((name) => icons[standardIconKey(name)] && matchesSearch(query, name)) : []), [icons, query]);
   // How many of the standard set are shown, counted per search.
   const [paging, setPaging] = useState({ query, shown: PAGE });
   const shown = paging.query === query ? paging.shown : PAGE;
@@ -153,8 +156,10 @@ function IconGrid({ query, value, onPick }: { query: string; value: ItemLook; on
         {alcon.map(([name, Glyph]) => cell(`g-${name}`, glyphIcon(name), name, <Glyph size={16} />))}
       </Section>}
       {standard.length > 0 && <Section title={t('Standard')}>
-        {standard.slice(0, shown).map((name) => cell(`l-${name}`, lucideIcon(name), name,
-          <DynamicIcon name={name as IconName} size={16} strokeWidth={2} fallback={() => <span className="size-4" />} />))}
+        {icons && standard.slice(0, shown).map((name) => {
+          const Icon = icons[standardIconKey(name)];
+          return cell(`l-${name}`, lucideIcon(name), name, <Icon size={16} strokeWidth={STANDARD_ICON_STROKE} />);
+        })}
       </Section>}
       {shown < standard.length && <div ref={sentinel} className="h-6" />}
       {alcon.length === 0 && standard.length === 0 && <Empty>{t('No icons match.')}</Empty>}

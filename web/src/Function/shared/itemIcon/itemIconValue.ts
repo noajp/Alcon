@@ -38,6 +38,10 @@ export function parseItemIcon(raw: string | null | undefined): ItemIconValue | n
 export function glyphIcon(name: string): string { return `glyph:${name}`; }
 export function lucideIcon(name: string): string { return `lucide:${name}`; }
 
+/** The line weight of the standard set: a little heavier than its default,
+ *  so it sits beside Alcon's solid drawings without looking faint. */
+export const STANDARD_ICON_STROKE = 2.5;
+
 /** The colours offered as swatches, in the order the picker shows them. */
 export const ITEM_COLORS = LABEL_PALETTE;
 

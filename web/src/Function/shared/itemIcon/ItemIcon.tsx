@@ -3,8 +3,9 @@
 import { createElement, type ComponentType, type ReactNode } from 'react';
 import * as GLYPH_MODULE from '@/ui/icons/glyphs';
 import { DynamicIcon, type IconName } from '@/ui/icons/dynamic';
+import { standardIconKey, useStandardIcons } from '@/ui/icons/standardIcons';
 import type { IconProps } from '@/ui/icons/glyph';
-import { itemColor, parseItemIcon } from './itemIconValue';
+import { STANDARD_ICON_STROKE, itemColor, parseItemIcon } from './itemIconValue';
 
 type Glyph = ComponentType<IconProps>;
 
@@ -54,11 +55,17 @@ export function ItemIcon({ icon, color, fallback, size = 16, className = '' }: {
     if (Glyph) return <span aria-hidden className={wrap} style={style}>{createElement(Glyph, { size })}</span>;
   }
   if (value?.kind === 'lucide') {
-    return (
-      <span aria-hidden className={wrap} style={style}>
-        <DynamicIcon name={value.name as IconName} size={size} strokeWidth={2} fallback={() => <span style={box} />} />
-      </span>
-    );
+    return <span aria-hidden className={wrap} style={style}><StandardIcon name={value.name} size={size} /></span>;
   }
   return <span aria-hidden className={wrap} style={style}>{fallback}</span>;
+}
+
+/** One of the standard set by its kebab-case name, from the set loaded once;
+ *  an old alias name the set no longer exports is fetched on its own. */
+function StandardIcon({ name, size }: { name: string; size: number }) {
+  const icons = useStandardIcons();
+  if (!icons) return <span style={{ width: size, height: size }} />;
+  const Icon = icons[standardIconKey(name)];
+  if (!Icon) return <DynamicIcon name={name as IconName} size={size} strokeWidth={STANDARD_ICON_STROKE} fallback={() => <span style={{ width: size, height: size }} />} />;
+  return createElement(Icon, { size, strokeWidth: STANDARD_ICON_STROKE });
 }
