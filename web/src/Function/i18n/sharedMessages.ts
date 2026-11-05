@@ -323,6 +323,8 @@ const SHARED_MESSAGES: Record<string, Row> = {
   'Asks first': ['確認する', '먼저 확인', 'Demande d’abord', 'Pregunta antes'],
   'Not allowed': ['禁止', '금지', 'Interdit', 'No permitido'],
   'Full delegation is on, so commands set to “Asks first” run without asking. Conditions and “Not allowed” still hold.': ['全委任がオンなので、「確認する」のコマンドは確認なしで実行されます。条件と「許可しない」は効きます。', '전체 위임이 켜져 있어 “먼저 확인” 명령은 확인 없이 실행됩니다. 조건과 “허용 안 함”은 유지됩니다.', 'La délégation complète est activée : les commandes « Demande d’abord » s’exécutent sans demander. Les conditions et « Non autorisé » s’appliquent toujours.', 'La delegación completa está activada: los comandos «Pregunta antes» se ejecutan sin preguntar. Las condiciones y «No permitido» siguen aplicándose.'],
+  'Sign in again': ['サインインし直す', '다시 로그인', 'Se reconnecter', 'Volver a iniciar sesión'],
+  'Authentication failed': ['認証に失敗', '인증 실패', 'Échec de l’authentification', 'Error de autenticación'],
   'Try': ['試す', '시험해 보기', 'Essayer', 'Probar'],
   'The Element was made, but its AI could not start. Open it and start the run there.': ['Element は作りましたが、AI を開始できませんでした。Element を開いて、そこから実行してください。', 'Element는 만들었지만 AI를 시작할 수 없었습니다. Element를 열어 거기서 실행하세요.', 'L’Element a été créé, mais son IA n’a pas pu démarrer. Ouvrez-le et lancez l’exécution depuis celui-ci.', 'Se creó el Element, pero su IA no pudo empezar. Ábralo e inicie la ejecución desde allí.'],
   'Try “{name}”': ['「{name}」を試す', '“{name}” 시험해 보기', 'Essayer « {name} »', 'Probar «{name}»'],

@@ -465,3 +465,9 @@ export async function resolveCredential(
   if (error) throw new Error("could not save the refreshed token");
   return written === false ? null : next.access_token;
 }
+
+/** Pure. True when a connection failed because its credential was refused
+ *  (McpSession's 認証に失敗, an HTTP 401 / 403, or the service saying so). */
+export function isAuthFailure(message: string): boolean {
+  return /認証に失敗|\b(401|403)\b|unauthori[sz]ed|bad credentials|credential expired/i.test(message);
+}

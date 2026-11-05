@@ -434,6 +434,28 @@ describe('pricing and prompts', () => {
     expect(ctx.systemPrompt({ name: 'Claude', instructions: null })).toContain('データ');
   });
 
+  it('tells the agent which connections are down, and to stop and ask rather than work around them', () => {
+    const msg = ctx.taskMessage({
+      mode: 'execute', prompt: null, element: { id: 'e', display_id: 'ELE_R-1', title: 'リファクタ候補', description: null, status: 'todo', priority: null, due_date: null, labels: [] },
+      objectName: null, subElements: [], initiatives: [], comments: [], previousRuns: [], artifacts: [], upstream: [], today: '2026-11-05',
+      integrations: [{ name: 'GitHub', kind: '使えない', delegation: '', tools: 0, down: '認証が切れている（Settings › Customize でサインインし直す必要がある）' }],
+    });
+    expect(msg).toContain('今は使えない外部連携');
+    expect(msg).toContain('- GitHub: 認証が切れている');
+    expect(msg).toContain('finish(blocked)');
+    // A down GitHub is not offered as a usable one, nor its software-task rules.
+    expect(msg).toContain('(なし — 外部サービスへの操作が要る任務なら');
+    expect(msg).not.toContain('ソフトウェアを作る任務のとき');
+  });
+
+  it('recognizes a refused credential among connection errors', () => {
+    expect(client.isAuthFailure('GitHub: 認証に失敗しました（401）')).toBe(true);
+    expect(client.isAuthFailure('unauthorized: token authentication failed: credential expired')).toBe(true);
+    expect(client.isAuthFailure('HTTP 403 Forbidden')).toBe(true);
+    expect(client.isAuthFailure('fetch failed: connection reset')).toBe(false);
+    expect(client.isAuthFailure('took 4010 ms')).toBe(false);
+  });
+
   it('hands over what the earlier Elements left: the person\'s words, the report and the outputs', () => {
     const msg = ctx.taskMessage({
       mode: 'execute', prompt: null, element: { id: 'e', display_id: 'ELE_B-1', title: '予算を試算する', description: null, status: 'todo', priority: null, due_date: null, labels: [] },
