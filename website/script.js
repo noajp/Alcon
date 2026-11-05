@@ -1,5 +1,5 @@
 // Fade sections in as they scroll into view.
-const targets = document.querySelectorAll('.section .wrap > *, .feature, .closing .wrap');
+const targets = document.querySelectorAll('.section .wrap > *, .chapter .wrap > *, .usecase .wrap > *, .closing .wrap');
 targets.forEach(el => el.classList.add('reveal'));
 
 if ('IntersectionObserver' in window) {
