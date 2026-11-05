@@ -31,9 +31,9 @@ export function YourTurnTray({ items, canEdit, onOpen, onChanged }: {
   const { t } = useI18n();
   if (items.length === 0) return null;
   return (
-    <div className="space-y-1.5 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+    <div className="space-y-0.5 border-l-2 border-[var(--status-warning)] pl-3">
       <p className="text-[13px] font-medium text-foreground">{t('Your turn ({n})', { n: items.length })}</p>
-      <ul className="divide-y divide-border/60">
+      <ul className="divide-y divide-border/40">
         {items.map((item) => <TurnRow key={`${item.kind}:${item.elementId}`} item={item} canEdit={canEdit} onOpen={onOpen} onChanged={onChanged} />)}
       </ul>
     </div>

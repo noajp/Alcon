@@ -6,6 +6,9 @@ type Row = [ja: string, ko: string, fr: string, es: string];
 
 const STRATEGY_MESSAGES: Record<string, Row> = {
   // Strategy list and page
+  '{open} open · {alone} alone': ['未完了 {open} · 単独 {alone}', '미완료 {open} · 단독 {alone}', '{open} ouverts · {alone} seul', '{open} abiertos · {alone} en solitario'],
+  '{n} tokens': ['{n} トークン', '{n} 토큰', '{n} jetons', '{n} tokens'],
+  'Add guidance': ['方針を書き添える', '지침 추가', 'Ajouter des consignes', 'Añadir indicaciones'],
   'This Object contributes to no Strategy yet.': ['この Object はまだどの Strategy にも貢献していません。', '이 Object는 아직 어떤 Strategy에도 기여하지 않습니다.', 'Cet Object ne contribue encore à aucune Strategy.', 'Este Object aún no contribuye a ninguna Strategy.'],
   'Link to a Strategy': ['Strategy に紐づける', 'Strategy에 연결', 'Lier à une Strategy', 'Vincular a una Strategy'],
   'Link to a Strategy…': ['Strategy に紐づける…', 'Strategy에 연결…', 'Lier à une Strategy…', 'Vincular a una Strategy…'],
@@ -59,7 +62,6 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   'No due dates on any of the {n} open Elements — this Strategy\'s schedule is unmeasured, not clear.': ['未完了の Element {n} 件のどれにも期限がありません。この Strategy のスケジュールは問題なしではなく、測定できていない状態です。', '열린 Element {n}개 모두 마감일이 없습니다. 이 Strategy의 일정은 문제없는 것이 아니라 측정되지 않은 상태입니다.', 'Aucun des {n} Elements ouverts n’a d’échéance — le calendrier de cette Strategy n’est pas mesuré, il n’est pas sain pour autant.', 'Ninguno de los {n} Elements abiertos tiene fecha límite: el calendario de esta Strategy no está medido, no despejado.'],
   'Measured against the {scheduled} of {total} open Elements that carry a due date.': ['未完了の Element {total} 件のうち、期限のある {scheduled} 件で測定しています。', '열린 Element {total}개 중 마감일이 있는 {scheduled}개를 기준으로 측정합니다.', 'Mesuré sur les {scheduled} des {total} Elements ouverts qui ont une échéance.', 'Medido sobre los {scheduled} de {total} Elements abiertos que tienen fecha límite.'],
   'Carried by': ['担っている人', '맡은 사람', 'Porté par', 'A cargo de'],
-  'Nobody else on it': ['ほかに担当者がいない', '다른 담당자 없음', 'Personne d’autre dessus', 'Nadie más en ello'],
   'Due soon, not started': ['期限間近・未着手', '곧 마감, 미착수', 'Bientôt dû, non commencé', 'Vence pronto, sin empezar'],
   'Stalled': ['停滞', '정체', 'Au point mort', 'Estancado'],
   'Due soon': ['期限間近', '곧 마감', 'Bientôt dû', 'Vence pronto'],
@@ -79,17 +81,12 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   '1 open Element has nobody on it.': ['未完了の Element 1 件に担当者がいません。', '열린 Element 1개에 담당자가 없습니다.', '1 Element ouvert n’a personne dessus.', '1 Element abierto no tiene a nadie.'],
   '{n} open Elements have nobody on them.': ['未完了の Element {n} 件に担当者がいません。', '열린 Element {n}개에 담당자가 없습니다.', '{n} Elements ouverts n’ont personne dessus.', '{n} Elements abiertos no tienen a nadie.'],
   '{name} holds {pct}% of the open work — this Strategy runs through one Worker. Add capacity or cut scope.': ['{name} が未完了の作業の {pct}% を抱えています。この Strategy は 1 人の Worker に依存しています。人を増やすかスコープを削ってください。', '{name}이(가) 열린 작업의 {pct}%를 맡고 있습니다. 이 Strategy는 Worker 한 명에 의존합니다. 인력을 늘리거나 범위를 줄이세요.', '{name} porte {pct} % du travail ouvert — cette Strategy repose sur un seul Worker. Ajoutez de la capacité ou réduisez le périmètre.', '{name} tiene el {pct} % del trabajo abierto: esta Strategy depende de un solo Worker. Añade capacidad o recorta el alcance.'],
-  'No open Elements to cover.': ['カバーすべき未完了の Element はありません。', '대비할 열린 Element가 없습니다.', 'Aucun Element ouvert à couvrir.', 'No hay Elements abiertos que cubrir.'],
-  'Every staffed Element here has a second person on it — no single Worker is holding work alone.': ['担当者のいる Element にはすべて 2 人目がついています。1 人で抱えている Worker はいません。', '담당자가 있는 모든 Element에 두 번째 사람이 있습니다. 혼자 작업을 맡은 Worker는 없습니다.', 'Chaque Element staffé a une deuxième personne — aucun Worker ne porte seul du travail.', 'Cada Element con responsable tiene una segunda persona: ningún Worker sostiene trabajo en solitario.'],
-  '1 of {total} open Elements has exactly one person on it.': ['未完了の Element {total} 件のうち 1 件は担当者が 1 人だけです。', '열린 Element {total}개 중 1개는 담당자가 한 명뿐입니다.', '1 des {total} Elements ouverts n’a qu’une seule personne.', '1 de {total} Elements abiertos tiene exactamente una persona.'],
-  '{n} of {total} open Elements have exactly one person on them.': ['未完了の Element {total} 件のうち {n} 件は担当者が 1 人だけです。', '열린 Element {total}개 중 {n}개는 담당자가 한 명뿐입니다.', '{n} des {total} Elements ouverts n’ont qu’une seule personne.', '{n} de {total} Elements abiertos tienen exactamente una persona.'],
   '1 open Element': ['未完了の Element 1 件', '열린 Element 1개', '1 Element ouvert', '1 Element abierto'],
   '{n} open Elements': ['未完了の Element {n} 件', '열린 Element {n}개', '{n} Elements ouverts', '{n} Elements abiertos'],
   '{name} has no hours on {away} of the next {window} days and is the only person on {elements}, {due} of them due while away. Brief a second person or move the dates.': ['{name} は今後 {window} 日のうち {away} 日の稼働がなく、{elements}をひとりで担当しています。うち {due} 件は不在中に期限を迎えます。2 人目に引き継ぐか日付を動かしてください。', '{name}은(는) 향후 {window}일 중 {away}일 동안 근무 시간이 없고, {elements}을(를) 혼자 맡고 있으며 그중 {due}개는 부재 중 마감입니다. 두 번째 사람에게 인계하거나 날짜를 옮기세요.', '{name} n’a pas d’heures sur {away} des {window} prochains jours et est seul·e sur {elements}, dont {due} dus pendant l’absence. Briefez une deuxième personne ou déplacez les dates.', '{name} no tiene horas en {away} de los próximos {window} días y es la única persona en {elements}, {due} de ellos vencen durante la ausencia. Informa a una segunda persona o mueve las fechas.'],
   '{name} has no hours on {away} of the next {window} days and is the only person on {elements}. Brief a second person or move the dates.': ['{name} は今後 {window} 日のうち {away} 日の稼働がなく、{elements}をひとりで担当しています。2 人目に引き継ぐか日付を動かしてください。', '{name}은(는) 향후 {window}일 중 {away}일 동안 근무 시간이 없고, {elements}을(를) 혼자 맡고 있습니다. 두 번째 사람에게 인계하거나 날짜를 옮기세요.', '{name} n’a pas d’heures sur {away} des {window} prochains jours et est seul·e sur {elements}. Briefez une deuxième personne ou déplacez les dates.', '{name} no tiene horas en {away} de los próximos {window} días y es la única persona en {elements}. Informa a una segunda persona o mueve las fechas.'],
   '1 more sole holder is away in the same window.': ['ほかにも 1 人、ひとりで担当している人が同じ期間に不在です。', '같은 기간에 혼자 맡은 사람 1명이 더 부재합니다.', '1 autre personne seule sur son travail est absente sur la même période.', 'Otra persona que lleva trabajo en solitario está ausente en el mismo periodo.'],
   '{n} more sole holders are away in the same window.': ['ほかにも {n} 人、ひとりで担当している人が同じ期間に不在です。', '같은 기간에 혼자 맡은 사람 {n}명이 더 부재합니다.', '{n} autres personnes seules sur leur travail sont absentes sur la même période.', 'Otras {n} personas que llevan trabajo en solitario están ausentes en el mismo periodo.'],
-  '{n} alone': ['ひとりで {n} 件', '혼자 {n}개', '{n} seul·e', '{n} en solitario'],
   'Away {n}d': ['{n} 日不在', '{n}일 부재', 'Absent {n} j', 'Ausente {n} d'],
   'Away in {n}d': ['{n} 日後に不在', '{n}일 후 부재', 'Absent dans {n} j', 'Ausente en {n} d'],
   // Measures

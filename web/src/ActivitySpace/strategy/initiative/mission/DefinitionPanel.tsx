@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
+import { OptionMenu } from '@/Function/shared/OptionMenu';
 import { createDefinition, updateDefinition, useDefinitions } from '@/hooks/definitionData';
 import { DEFINITION_EXAMPLE, definitionParts, type DefinitionPart } from './definitionParts';
 
@@ -16,6 +17,8 @@ const PART_LABEL: Record<DefinitionPart, string> = {
   goal: 'Goal', conditions: 'Conditions', metric: 'Metric (a loop)', procedure: 'Procedure',
   stop: 'Stop rules', checks: 'Checks', output: 'Output shape',
 };
+
+const NONE = '__none';
 
 export function DefinitionPanel({ spaceId, definitionId, canEdit, onChange }: {
   spaceId: string | null;
@@ -58,29 +61,22 @@ export function DefinitionPanel({ spaceId, definitionId, canEdit, onChange }: {
   const parts = current ? definitionParts(current.body) : [];
 
   return (
-    <div className="space-y-2 rounded-lg border border-border/60 px-3 py-2.5">
-      <div className="flex flex-wrap items-center gap-2 text-[12px]">
-        <span className="text-muted-foreground">{t('Definition')}</span>
-        <select value={definitionId ?? ''} disabled={!canEdit || busy}
-          onChange={(e) => void onChange(e.target.value || null)}
-          className="rounded-md border border-border/60 bg-transparent px-1.5 py-1 text-foreground">
-          <option value="">{t('None — the agent decides how')}</option>
-          {library.data.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-x-2 text-[12px] text-muted-foreground">
+        <span className="w-36 shrink-0">{t('Definition')}</span>
+        <OptionMenu label={t('Definition')} value={definitionId ?? NONE} disabled={!canEdit || busy}
+          onChange={(v) => void onChange(v === NONE ? null : v)}
+          options={[{ value: NONE, label: t('None — the agent decides how') }, ...library.data.map((d) => ({ value: d.id, label: d.name }))]} />
         {current && (
-          <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setOpen((o) => !o)}>
+          <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={() => setOpen((o) => !o)}>
             {open ? t('Hide') : t('Show')}
-          </button>
+          </Button>
         )}
-        {canEdit && (
-          <span className="ml-auto flex gap-1">
-            {current && mode === 'view' && <Button variant="ghost" size="xs" onClick={startEdit}>{t('Edit')}</Button>}
-            {mode === 'view' && <Button variant="ghost" size="xs" onClick={startPaste}>{t('Paste a new definition')}</Button>}
-          </span>
-        )}
+        {canEdit && current && mode === 'view' && <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={startEdit}>{t('Edit')}</Button>}
+        {canEdit && mode === 'view' && <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={startPaste}>{t('Paste a new definition')}</Button>}
       </div>
 
-      {current && mode === 'view' && (
+      {current && mode === 'view' && open && (
         <div className="flex flex-wrap gap-1">
           {parts.length === 0
             ? <span className="text-[12px] text-muted-foreground">{t('No known headings — the agent reads it as instructions.')}</span>
