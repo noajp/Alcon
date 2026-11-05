@@ -1,5 +1,6 @@
 'use client';
 
+import { markElementCommentsRead } from '@/hooks/notificationData';
 import { FollowButton } from '@/Function/shared/FollowButton';
 import { AiWorkingMark } from '@/Function/shared/element/AiWorkingMark';
 import { useQuery } from '@tanstack/react-query';
@@ -349,6 +350,11 @@ function ElementDetailBody({
 
   // Auth context for notifications + comment authorship
   const { user, profile } = useAuthContext();
+
+  // Opening the Element reads its comments: the lists' unread mark clears.
+  useEffect(() => {
+    if (user?.id) void markElementCommentsRead(user.id, element.id);
+  }, [user?.id, element.id]);
 
   // Emoji picker → element_reactions toggle. Quick set mirrors the
   // comments panel so users see a familiar palette.

@@ -1,5 +1,6 @@
 'use client';
 
+import { useUnreadCommentElementIds } from '@/hooks/notificationData';
 import { AiWorkingMark } from '@/Function/shared/element/AiWorkingMark';
 import { liveLease } from '@/Function/shared/element/lease';
 import { useNow } from '@/Function/shared/useNow';
@@ -452,7 +453,7 @@ export function ElementCell({
     );
   }
   if (column.id === 'activity') {
-    return <td className="table-cell px-2 py-1"><ActivitySignal activity={el.activity} /></td>;
+    return <UpdatesCell el={el} />;
   }
   if (column.id === 'labels') {
     return <td className="table-cell px-2 py-1"><div className="flex gap-1 overflow-hidden">{(el.labels ?? []).map((label) => <LabelChip key={label} label={label} />)}</div></td>;
@@ -493,7 +494,7 @@ export function ElementCell({
             {homes.slice(0, 2).map((o) => (
               <span
                 key={o.id}
-                className="inline-flex h-[22px] items-center gap-1.5 shrink-0 max-w-[140px] px-2 rounded-full border border-[var(--border-default)] text-[12px] font-normal text-[var(--text-secondary)]"
+                className="inline-flex h-[22px] items-center gap-1.5 min-w-0 max-w-[140px] px-2 rounded-full border border-[var(--border-default)] text-[12px] font-normal text-[var(--text-secondary)]"
                 title={o.name}
               >
                 <span className="shrink-0 inline-flex"><ObjectIcon size={10} /></span>
@@ -888,4 +889,10 @@ function PriorityCell({
       trigger={trigger}
     />
   );
+}
+
+/** The Updates column: the comment count, with a dot when one is unread. */
+function UpdatesCell({ el }: { el: ElementWithDetails }) {
+  const unread = useUnreadCommentElementIds().has(el.id);
+  return <td className="table-cell px-2 py-1"><ActivitySignal activity={el.activity} unread={unread} /></td>;
 }

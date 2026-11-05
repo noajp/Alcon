@@ -74,7 +74,7 @@ const ELEMENT_BUILTIN_COLUMNS: DataColumn[] = [
   { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: true, defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'due_date', label: 'Due date', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'assignee', label: 'Assignee', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
-  { id: 'activity', label: 'Activity', kind: 'builtin', toggleable: true,  defaultWidth: 120 },
+  { id: 'activity', label: 'Updates', kind: 'builtin', toggleable: true,  defaultWidth: 120 },
 ];
 const OBJECT_BUILTIN_COLUMNS: DataColumn[] = [
   { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: false, defaultWidth: DEFAULT_COLUMN_WIDTH },
