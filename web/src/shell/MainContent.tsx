@@ -159,7 +159,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
-          {activeActivity === 'domain-overview' && (
+          {/* Objects without one chosen is the Domain itself: its page lists them. */}
+          {(activeActivity === 'domain-overview' || (activeActivity === 'objects' && !navigation.objectId)) && (
             <DomainOverview key={activeDomainId} domainId={activeDomainId ?? null} onNavigate={onNavigate} onViewChange={onViewChange} />
           )}
 
@@ -198,7 +199,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
-          {activeActivity === 'objects' && (
+          {activeActivity === 'objects' && navigation.objectId && (
             <DomainView
               navigation={navigation}
               onNavigate={onNavigate}
