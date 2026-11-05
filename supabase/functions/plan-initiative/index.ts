@@ -15,7 +15,7 @@
 // otherwise:
 //   { plan: { summary, objectives: [{ key, title, measureId? }],
 //             objects: [{ key, objectId?, name, domainId? }],
-//             tasks: [{ key, title, description, objective, object, dependsOn, assignee, weight }] } }
+//             tasks: [{ key, title, description, objective, object, dependsOn, assignee, weight, action }] } }
 //
 // Every read runs with the caller's JWT, so RLS decides what the Planner
 // sees. The model is told the Strategy's text is data to plan from, not
@@ -47,6 +47,8 @@ const SYSTEM_PROMPT = `あなたは組織の参謀です。Strategy（戦略の�
 - タスクは、一人（または一つの AI エージェント）が一度の作業で終えられる大きさにする。3〜12 個が目安。
 - 順序がある場合だけ dependsOn に先行タスクの key を入れる。並べられるものは並べる。
 - assignee は、調査・下書き・集計・分析・文書化・コードなど AI エージェントが道具で完了できるものを ai、人の判断・合意・対外的な約束・現物の作業が要るものを human にする。
+- action は、そのタスクが求める行動を一語で選ぶ。人が下す判断（選択肢を量る）は judge、決めて確定させる（決裁）は decide、人の承認が要るものは approve、人に聞かないと分からないこと（事実・好み・社内事情の確認）は answer。これらは assignee を human にする。AI ができる行動は、分解・計画 plan、調査・収集 research、作成・下書き create、実行 execute、検証・点検 verify、報告・まとめ report、送信・連携 send、委任・依頼 delegate、監視・見守り monitor。
+- 人の判断・決定・確認が要るところは、AI のタスクに埋め込まず、judge / decide / answer のタスクとして分けて出す。その title には、判断してほしい問いそのもの（何と何から選ぶのか、何を決めるのか）を書く。
 - 既にある Element と同じことはタスクにしない。
 - weight は AI がやるときの重さ。転記・整形・短い要約・決まった手順の作業は light、調べて書く普通の仕事は standard、設計・難しい判断・長い推論が要るものは heavy。迷ったら standard。重いほど費用が高いので、light にできるものは light にする。
 - 入力の「定義」に、タスクの仕事に合うもの（その仕事の進め方や成果物の型を決めたもの）があれば、そのタスクの definitionId にその id を入れる。
@@ -115,10 +117,11 @@ const PLAN_TOOL = {
             object: { type: "string", description: "入れる Object の key" },
             dependsOn: { type: "array", items: { type: "string" }, description: "先に終わっている必要があるタスクの key。なければ空の配列" },
             assignee: { type: "string", enum: ["ai", "human"] },
+            action: { type: "string", enum: ["judge", "decide", "approve", "answer", "plan", "research", "create", "execute", "verify", "report", "send", "delegate", "monitor"], description: "そのタスクが求める行動" },
             weight: { type: "string", enum: ["light", "standard", "heavy"], description: "AI がやるときの重さ。費用の安いモデルから順に light / standard / heavy" },
             definitionId: { type: "string", description: "このタスクが従う定義の id（入力の「定義」から合うものがあれば）。なければ省略" },
           },
-          required: ["key", "title", "description", "objective", "object", "dependsOn", "assignee", "weight"],
+          required: ["key", "title", "description", "objective", "object", "dependsOn", "assignee", "weight", "action"],
           additionalProperties: false,
         },
       },

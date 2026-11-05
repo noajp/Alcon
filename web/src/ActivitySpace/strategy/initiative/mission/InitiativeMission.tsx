@@ -1,5 +1,6 @@
 'use client';
 
+import { isElementAction } from '@/Function/shared/elementActionKinds';
 import { useMemo } from 'react';
 import { useInitiativeMission } from '@/hooks/initiativeMissionData';
 import { useDomains, useWorkers } from '@/hooks/useSupabase';
@@ -45,6 +46,7 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
       id: e.id, title: e.title, status: e.status, display_id: e.display_id ?? null, object_id: o.id,
       labels: e.labels ?? null,
       assignee: doer ? (doer.type === 'ai_agent' ? 'ai' as const : 'human' as const) : null,
+      action: isElementAction(e.action) ? e.action : null,
       assigneeName: doer?.name ?? null,
       assigneeWorker: doer ?? null,
       due_date: e.due_date ?? null,
