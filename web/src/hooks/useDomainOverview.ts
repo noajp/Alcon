@@ -17,7 +17,7 @@ export async function fetchDomainOverview(domainId: string) {
   // Read a fresh, explicitly scoped snapshot. Never use the explorer hook's
   // previous-Domain placeholder under the destination Domain's heading.
   const [{ data: domain, error }, explorer] = await Promise.all([
-    supabase.from('domains').select('id,name,description,identifier,privacy').eq('id', domainId).single(),
+    supabase.from('domains').select('id,name,description,identifier,privacy,icon,color').eq('id', domainId).single(),
     fetchExplorerData(domainId),
   ]);
   if (error) throw error;
@@ -29,7 +29,7 @@ export async function fetchDomainOverview(domainId: string) {
     (ids, from, to) => supabase.from('strategies').select('id,name,description,status', { count: 'exact' }).in('id', ids).order('id').range(from, to),
     initiative => initiative.id);
   return {
-    domain: domain as Pick<Domain, 'id' | 'name' | 'description' | 'identifier' | 'privacy'>,
+    domain: domain as Pick<Domain, 'id' | 'name' | 'description' | 'identifier' | 'privacy' | 'icon' | 'color'>,
     // Unassigned root Elements have no Domain association in the RPC.
     explorer: { ...explorer, rootElements: [] },
     initiatives: initiativesForObjects(explorer.objects.map(object => object.id), initiatives, links),

@@ -1,5 +1,6 @@
 'use client';
 
+import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { SidebarFold } from '@/Function/shared/SidebarFold';
 import { FollowSection } from '@/shell/sidebar/FollowSection';
 import { requestElementDetail, requestObjectPage } from '@/Function/shared/element/elementDetailRequest';
@@ -100,9 +101,6 @@ const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
 
-function isEmojiIcon(s: string) {
-  return /^\p{Emoji}/u.test(s) && s.length <= 4;
-}
 
 // Names the mode the sidebar is currently showing — one quiet label at the top
 // of every mode, no affordance of its own.
@@ -698,10 +696,10 @@ function SortableDomainRow({
 
 function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
   // Domain is the size reference; the other sidebar glyphs are sized up to
-  // match this concept icon. An uploaded image replaces the chip entirely
-  // (it's already a complete mark); an emoji or the bare 3-layer glyph sits
-  // inside a color chip when the Domain has a color, or shows bare otherwise.
-  if (domain.icon && !isEmojiIcon(domain.icon)) {
+  // match this concept icon. An uploaded image is a complete mark of its own;
+  // otherwise the Domain's icon and colour are drawn as a Strategy's or an
+  // Object's are (ItemIcon), with the Domain mark when it has none.
+  if (domain.icon && /^(https?:|data:|\/)/.test(domain.icon)) {
     return (
       // A Domain icon is whatever file its owner uploaded. Routing it through
       // next/image would put every one of them through the deployment's image
@@ -716,20 +714,7 @@ function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
       />
     );
   }
-  const inner = domain.icon ? (
-    <span style={{ fontSize: Math.max(10, size - 4), lineHeight: 1 }}>{domain.icon}</span>
-  ) : (
-    <DomainIcon size={Math.max(12, size - 2)} />
-  );
-  if (!domain.color) return domain.icon ? inner : <DomainIcon size={size} />;
-  return (
-    <span
-      className="rounded flex items-center justify-center text-white flex-shrink-0"
-      style={{ width: size + 2, height: size + 2, backgroundColor: domain.color }}
-    >
-      {inner}
-    </span>
-  );
+  return <ItemIcon icon={domain.icon} color={domain.color} size={size} fallback={<DomainIcon size={size} />} />;
 }
 
 
