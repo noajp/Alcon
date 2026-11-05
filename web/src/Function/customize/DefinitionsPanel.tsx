@@ -12,11 +12,13 @@ import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { createDefinition, deleteDefinition, updateDefinition, useDefinitions, type Definition } from '@/hooks/definitionData';
 import { useCatalog, type CatalogDefinition } from '@/hooks/customizeData';
 import { YoursDiscover, type CustomizeMode } from './YoursDiscover';
+import { TryDefinition } from './TryDefinition';
 
 // Settings › Customize › Definitions: how work is to be carried out, as
 // Markdown the engine follows (the goal, the loop, stop rules, the output's
 // shape). Yours is the Space's library, shared by its members; Discover is
 // the catalog Alcon offers to start from, added by copying into the library.
+// Try runs one from the library once, as an Element under a chosen Object.
 
 export function DefinitionsPanel() {
   const { t } = useI18n();
@@ -26,6 +28,7 @@ export function DefinitionsPanel() {
   const [mode, setMode] = useState<CustomizeMode>('yours');
   const [editing, setEditing] = useState<Definition | 'new' | null>(null);
   const [preview, setPreview] = useState<CatalogDefinition | null>(null);
+  const [trying, setTrying] = useState<Definition | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const added = new Set(library.data.map((d) => d.source_id).filter(Boolean));
@@ -61,15 +64,18 @@ export function DefinitionsPanel() {
           ) : (
             <div>
               {library.data.map((d) => (
-                <button key={d.id} type="button" onClick={() => setEditing(d)}
-                  className="-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-md px-2 py-2 text-left outline-none transition-colors hover:bg-[var(--surface-strong)] focus-visible:bg-[var(--surface-strong)]">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-medium text-foreground">{d.name}</div>
-                    <div className="truncate text-[12px] text-muted-foreground">{firstLine(d.body)}</div>
-                  </div>
-                  {d.source_id && <span className="shrink-0 text-[11px] text-muted-foreground">{t('From the catalog')}</span>}
-                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{d.updated_at.slice(0, 10)}</span>
-                </button>
+                <div key={d.id} className="-mx-2 flex w-[calc(100%+16px)] items-center gap-2 rounded-md px-2 transition-colors hover:bg-[var(--surface-strong)]">
+                  <button type="button" onClick={() => setEditing(d)}
+                    className="flex min-w-0 flex-1 items-center gap-3 py-2 text-left outline-none focus-visible:underline">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-medium text-foreground">{d.name}</div>
+                      <div className="truncate text-[12px] text-muted-foreground">{firstLine(d.body)}</div>
+                    </div>
+                    {d.source_id && <span className="shrink-0 text-[11px] text-muted-foreground">{t('From the catalog')}</span>}
+                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{d.updated_at.slice(0, 10)}</span>
+                  </button>
+                  <Button size="xs" variant="ghost" onClick={() => setTrying(d)}>{t('Try')}</Button>
+                </div>
               ))}
             </div>
           )
@@ -103,6 +109,8 @@ export function DefinitionsPanel() {
           </DialogContent>
         </Dialog>
       )}
+
+      {trying && <TryDefinition definition={trying} onClose={() => setTrying(null)} />}
 
       {editing && spaceId && (
         <DefinitionEditor spaceId={spaceId} definition={editing === 'new' ? null : editing}
