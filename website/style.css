@@ -427,3 +427,6 @@ h1 { font-weight: 500; letter-spacing: -.045em; line-height: 1.08; font-size: cl
   .plan:first-child { border-top: 0; padding-top: 0; }
   .plans { gap: 48px; }
 }
+
+.story blockquote cite { display: flex; align-items: center; gap: 10px; }
+.story blockquote cite img { width: 32px; height: 32px; border-radius: 50%; }
