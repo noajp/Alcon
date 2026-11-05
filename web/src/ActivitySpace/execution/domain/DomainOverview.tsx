@@ -43,7 +43,7 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
     onViewChange,
   };
   // No header bar: it only repeated the Domain's name, which the page opens
-  // with, and held "Add widget". The page shows the Domain, not tools.
+  // with, and held "Add widget", which now sits quietly above the widgets.
   return <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
     <div className="min-h-0 flex-1 overflow-y-auto">
       <PageLayout rail={
@@ -72,7 +72,7 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
           emptyDescription={t('No description yet.')}
           onSaveTitle={async (name) => { await updateDomain(domain.id, { name }); await query.refetch(); }}
           onSaveDescription={async (description) => { await updateDomain(domain.id, { description: description || null }); await query.refetch(); }} />
-        <WidgetSurface key={`board-${domain.id}`} board={board} host={host} zones={['main']} addable={false}>
+        <WidgetSurface key={`board-${domain.id}`} board={board} host={host} zones={['main']}>
           <WidgetZone zone="main" columns={1} />
         </WidgetSurface>
       </PageLayout>
