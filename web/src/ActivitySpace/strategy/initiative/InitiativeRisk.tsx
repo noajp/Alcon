@@ -13,7 +13,6 @@ import { ABSENCE_WINDOW_DAYS } from '@/Function/strategy/initiativeAssumptionMod
 import {
   holderAbsenceLabel,
   type InitiativeBusFactor,
-  type SoleHolder,
 } from '@/Function/strategy/initiativeBusFactorModel';
 
 // =============================================================
@@ -83,23 +82,22 @@ export function InitiativeRiskView({
             </p>
           ) : null}
 
-          <Block label={t('Needs attention')}>
-            <Findings risks={report.objects} onOpenObject={onOpenObject} />
-          </Block>
+          {report.objects.length > 0 && (
+            <Block label={t('Needs attention')}>
+              <Findings risks={report.objects} onOpenObject={onOpenObject} />
+            </Block>
+          )}
 
+          {/* Who carries it, and how much of that they carry alone — one
+              table, a row per Worker. */}
           <Block label={t('Carried by')}>
             <Load
               rows={report.load}
               concentrated={report.concentration !== null}
               unstaffed={report.unstaffed}
+              busFactor={busFactor ?? null}
             />
           </Block>
-
-          {busFactor && (
-            <Block label={t('Nobody else on it')}>
-              <Cover busFactor={busFactor} />
-            </Block>
-          )}
         </div>
       )}
     </>
@@ -140,9 +138,9 @@ function SignalRow({
   // neither of them is measuring anything, and a grey zero would read as calm.
   const dated = scheduled > 0;
   const { t } = useI18n();
-  // Figures side by side, held apart by spacing rather than boxed as tiles.
+  // One line of counts: a zero stays quiet, a firing count takes its tone.
   return (
-    <div className="grid grid-cols-4 gap-4">
+    <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
       <Signal label={t('Overdue')} value={dated ? overdue : null} tone="text-[var(--status-danger)]" />
       <Signal
         label={t('Due soon, not started')}
@@ -166,16 +164,16 @@ function Signal({
   tone: string;
 }) {
   return (
-    <div className="min-w-0">
-      <div
-        className={`text-[18px] leading-[26px] font-semibold tabular-nums ${
-          value === null ? 'text-muted-foreground/40' : value > 0 ? tone : 'text-foreground'
+    <span className="flex items-baseline gap-1.5 text-[12px] text-muted-foreground">
+      <span
+        className={`text-[15px] font-semibold tabular-nums ${
+          value === null ? 'text-muted-foreground/40' : value > 0 ? tone : 'text-muted-foreground'
         }`}
       >
         {value === null ? '—' : value}
-      </div>
-      <div className="text-[11px] text-muted-foreground">{label}</div>
-    </div>
+      </span>
+      {label}
+    </span>
   );
 }
 
@@ -292,12 +290,15 @@ function Load({
   rows,
   concentrated,
   unstaffed,
+  busFactor,
 }: {
   rows: { workerId: string; name: string; open: number; share: number }[];
   concentrated: boolean;
   /** Open Elements with nobody on them — the staffing gap belongs next to the
    *  staffing list, which is where the reader decides who picks it up. */
   unstaffed: number;
+  /** Who holds work alone, read into each row's "alone" figure. */
+  busFactor: InitiativeBusFactor | null;
 }) {
   const { t } = useI18n();
   if (rows.length === 0) {
@@ -314,20 +315,27 @@ function Load({
   return (
     <div>
       <div className="flex flex-col">
-        {visible.map((row) => (
-          <div key={row.workerId} className="flex items-center gap-2 h-7">
-            <span className="text-[12px] text-foreground truncate w-32 shrink-0">{row.name}</span>
-            <span className="h-1.5 flex-1 rounded-full bg-[var(--surface-strong)] overflow-hidden">
-              <span
-                className="block h-full rounded-full bg-[var(--accent-default)]"
-                style={{ width: `${Math.round(row.share * 100)}%` }}
-              />
-            </span>
-            <span className="text-[11px] text-muted-foreground tabular-nums w-16 text-right shrink-0">
-              {t('{n} open', { n: row.open })}
-            </span>
-          </div>
-        ))}
+        {visible.map((row) => {
+          const holder = busFactor?.holders.find((h) => h.workerId === row.workerId);
+          const absence = holder ? holderAbsenceLabel(holder) : null;
+          return (
+            <div key={row.workerId} className="flex items-center gap-3 h-7">
+              <span className="text-[12px] text-foreground truncate w-32 shrink-0">{row.name}</span>
+              <span className="h-1 w-40 shrink-0 rounded-full bg-[var(--surface-strong)] overflow-hidden">
+                <span
+                  className="block h-full rounded-full bg-[var(--accent-default)]"
+                  style={{ width: `${Math.round(row.share * 100)}%` }}
+                />
+              </span>
+              <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
+                {holder && holder.sole > 0
+                  ? t('{open} open · {alone} alone', { open: row.open, alone: holder.sole })
+                  : t('{n} open', { n: row.open })}
+              </span>
+              {absence && <span className="text-[11px] font-medium text-[var(--status-warning)] shrink-0">{absence}</span>}
+            </div>
+          );
+        })}
       </div>
       {rest > 0 && (
         <p className="text-[11px] text-muted-foreground mt-1">
@@ -339,6 +347,7 @@ function Load({
           {unstaffed === 1 ? t('1 open Element has nobody on it.') : t('{n} open Elements have nobody on them.', { n: unstaffed })}
         </p>
       )}
+      {busFactor && <CoverWarning busFactor={busFactor} />}
       {concentrated && (
         <p className="text-[11px] text-[var(--status-warning)] mt-1.5">
           {t('{name} holds {pct}% of the open work — this Strategy runs through one Worker. Add capacity or cut scope.', { name: top.name, pct: Math.round(top.share * 100) })}
@@ -349,87 +358,26 @@ function Load({
 }
 
 // =============================================================
-// Cover — what stops if one of them goes.
-//
-// The load list above answers how full each Worker is, which is a question
-// about this week and is solved by moving work. This one answers whether
-// anybody else could pick their work up, which is solved by teaching somebody
-// or hiring them and therefore has to be seen months earlier. Two lists,
-// because a single "at risk" number would let the slow problem hide inside the
-// fast one until the day it fires.
-//
-// The denominator is stated rather than assumed. On a board where one assignee
-// per Element is the ordinary shape, a large count here is a description of the
-// board and not yet an alarm; what makes it an alarm is a name against a date.
+// Cover — what stops if one of them goes. The rows above say how much each
+// Worker holds alone; this warns when one of those sole holders is away
+// before the work falls due, which is solved by briefing a second person and
+// so has to be seen early.
 // =============================================================
-function Cover({ busFactor }: { busFactor: InitiativeBusFactor }) {
+function CoverWarning({ busFactor }: { busFactor: InitiativeBusFactor }) {
   const { t } = useI18n();
-  const { holders, single, openTotal } = busFactor;
-  if (holders.length === 0) {
-    return (
-      <p className="text-[12px] text-muted-foreground/50 py-1">
-        {openTotal === 0
-          ? t('No open Elements to cover.')
-          : t('Every staffed Element here has a second person on it — no single Worker is holding work alone.')}
-      </p>
-    );
-  }
-
-  const visible = holders.slice(0, 5);
-  const rest = holders.length - visible.length;
-  const exposed = holders.filter((h) => h.away);
-  const soleCount = exposed[0]?.sole ?? 0;
+  const exposed = busFactor.holders.filter((h) => h.away);
+  if (exposed.length === 0) return null;
+  const soleCount = exposed[0].sole;
   const soleElements = soleCount === 1 ? t('1 open Element') : t('{n} open Elements', { n: soleCount });
-
+  // One sentence, for the worst of them; the rows above carry each one's dates.
   return (
-    <div>
-      <div className="flex flex-col">
-        {visible.map((holder) => (
-          <HolderRow key={holder.workerId} holder={holder} />
-        ))}
-      </div>
-      {rest > 0 && (
-        <p className="text-[11px] text-muted-foreground mt-1">
-          {rest === 1 ? t('and 1 more Worker') : t('and {n} more Workers', { n: rest })}
-        </p>
-      )}
-      <p className="text-[11px] text-muted-foreground mt-1.5">
-        {single === 1
-          ? t('1 of {total} open Elements has exactly one person on it.', { total: openTotal })
-          : t('{n} of {total} open Elements have exactly one person on them.', { n: single, total: openTotal })}
-      </p>
-      {/* One sentence, for the worst of them. The rest are named in the rows
-          above with their own dates; repeating the whole reading per Worker
-          would turn the warning into a wall nobody finishes. */}
-      {exposed.length > 0 && (
-        <p className="text-[11px] text-[var(--status-warning)] mt-1.5">
-          {exposed[0].dueWhileAway > 0
-            ? t('{name} has no hours on {away} of the next {window} days and is the only person on {elements}, {due} of them due while away. Brief a second person or move the dates.', { name: exposed[0].name, away: exposed[0].awayDays, window: ABSENCE_WINDOW_DAYS, elements: soleElements, due: exposed[0].dueWhileAway })
-            : t('{name} has no hours on {away} of the next {window} days and is the only person on {elements}. Brief a second person or move the dates.', { name: exposed[0].name, away: exposed[0].awayDays, window: ABSENCE_WINDOW_DAYS, elements: soleElements })}
-          {exposed.length > 1
-            ? ` ${exposed.length === 2 ? t('1 more sole holder is away in the same window.') : t('{n} more sole holders are away in the same window.', { n: exposed.length - 1 })}`
-            : ''}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function HolderRow({ holder }: { holder: SoleHolder }) {
-  const { t } = useI18n();
-  const absence = holderAbsenceLabel(holder);
-  return (
-    <div className="flex items-center gap-2 h-7">
-      <span className="text-[12px] text-foreground truncate w-32 shrink-0">{holder.name}</span>
-      {absence && (
-        <span className="text-[11px] font-medium text-[var(--status-warning)] shrink-0">
-          {absence}
-        </span>
-      )}
-      <span className="flex-1" />
-      <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
-        {t('{n} alone', { n: holder.sole })}
-      </span>
-    </div>
+    <p className="text-[11px] text-[var(--status-warning)] mt-1.5">
+      {exposed[0].dueWhileAway > 0
+        ? t('{name} has no hours on {away} of the next {window} days and is the only person on {elements}, {due} of them due while away. Brief a second person or move the dates.', { name: exposed[0].name, away: exposed[0].awayDays, window: ABSENCE_WINDOW_DAYS, elements: soleElements, due: exposed[0].dueWhileAway })
+        : t('{name} has no hours on {away} of the next {window} days and is the only person on {elements}. Brief a second person or move the dates.', { name: exposed[0].name, away: exposed[0].awayDays, window: ABSENCE_WINDOW_DAYS, elements: soleElements })}
+      {exposed.length > 1
+        ? ` ${exposed.length === 2 ? t('1 more sole holder is away in the same window.') : t('{n} more sole holders are away in the same window.', { n: exposed.length - 1 })}`
+        : ''}
+    </p>
   );
 }

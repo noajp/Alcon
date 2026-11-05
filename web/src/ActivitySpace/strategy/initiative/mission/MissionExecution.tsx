@@ -16,12 +16,15 @@ import { createIntent } from '@/hooks/strategyData';
 import { AI_WEIGHTS, isAiWeight, type AiWeight, type ElementWithDetails, type StrategyDelegation, type Worker } from '@/types/database';
 import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
+import { OptionMenu } from '@/Function/shared/OptionMenu';
+import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
+import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import {
   answeredQuestions, buildFleet, draftFleet, handOverLabels, missionSummary, moveDraftTask, normalizePlan, normalizeQuestions,
   startableTasks, UNPLACED, yourTurn,
   type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft, type PlanQuestion,
 } from './missionModel';
-import { STATE_LABEL, Stat, compact, stateColor, type MissionContext } from './MissionPanels';
+import { STATE_LABEL, compact, stateColor, type MissionContext } from './MissionPanels';
 import { YourTurnTray } from './YourTurnTray';
 import { DefinitionPanel } from './DefinitionPanel';
 import { listenForPlanRequests } from './plannerRequest';
@@ -64,6 +67,25 @@ function StateBadge({ state }: { state: ActionState }) {
       {t(STATE_LABEL[state])}
     </span>
   );
+}
+
+/** One count of the summary line: quiet at zero, coloured when it asks for something. */
+function Fact({ label, n, tone }: { label: string; n: number; tone?: 'warning' | 'danger' }) {
+  const color = n > 0 && tone ? `var(--status-${tone})` : undefined;
+  return (
+    <span style={color ? { color } : undefined}>
+      <span className={n > 0 ? 'font-medium text-foreground' : ''} style={color ? { color } : undefined}>{n}</span> {label}
+    </span>
+  );
+}
+
+/** Whether the card's state comes from an AI run rather than the Element's
+ *  Status — the one case the card still needs a badge for. */
+function runOnlyState(state: ActionState, status: string | null): boolean {
+  if (state === 'failed') return true;
+  if (state === 'running') return status !== 'in_progress';
+  if (state === 'waiting') return status !== 'review';
+  return false;
 }
 
 function DraftTag() {
@@ -123,23 +145,20 @@ function ObjectCard({ object, domainName, selected, dropTarget, onSelect, onDrag
   );
 }
 
-/** What the Execution tab adds under a card's title: what it delivers,
- *  what it waits on, the model that ran it and what that cost, and a hand-off
- *  to Claude Code. */
+const STRATEGY_DEFINITION = '__strategy';
+
 /** The Element's own definition, chosen on its card: its output shape and its
  *  loop are enforced for it (a Strategy's definition only directs). */
 function DefinitionPick({ value, definitions, onChange }: { value: string | null; definitions: Definition[]; onChange: (id: string | null) => void }) {
   const { t } = useI18n();
   if (definitions.length === 0 && !value) return null;
   return (
-    <label className="flex min-w-0 items-center gap-1.5" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+    <span className="flex min-w-0 items-center gap-0.5">
       <span className="shrink-0">{t('Definition')}</span>
-      <select value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}
-        className="min-w-0 flex-1 truncate rounded border border-border/60 bg-transparent px-1 py-0.5 text-[12px] text-foreground">
-        <option value="">{t('The Strategy\'s')}</option>
-        {definitions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-      </select>
-    </label>
+      <OptionMenu label={t('Definition')} value={value ?? STRATEGY_DEFINITION}
+        options={[{ value: STRATEGY_DEFINITION, label: t('The Strategy\'s') }, ...definitions.map((d) => ({ value: d.id, label: d.name }))]}
+        onChange={(v) => onChange(v === STRATEGY_DEFINITION ? null : v)} />
+    </span>
   );
 }
 
@@ -149,16 +168,18 @@ const WEIGHT_LABEL: Record<AiWeight, string> = { light: 'Light (small model)', s
 function WeightPick({ value, onChange }: { value: AiWeight | null; onChange: (w: AiWeight | null) => void }) {
   const { t } = useI18n();
   return (
-    <label className="flex min-w-0 items-center gap-1.5" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+    <span className="flex min-w-0 items-center gap-0.5">
       <span className="shrink-0">{t('Weight')}</span>
-      <select value={value ?? 'standard'} onChange={(e) => onChange(e.target.value === 'standard' ? null : e.target.value as AiWeight)}
-        className="min-w-0 flex-1 truncate rounded border border-border/60 bg-transparent px-1 py-0.5 text-[12px] text-foreground">
-        {AI_WEIGHTS.map((w) => <option key={w} value={w}>{t(WEIGHT_LABEL[w])}</option>)}
-      </select>
-    </label>
+      <OptionMenu label={t('Weight')} value={value ?? 'standard'}
+        options={AI_WEIGHTS.map((w) => ({ value: w, label: t(WEIGHT_LABEL[w]) }))}
+        onChange={(w) => onChange(w === 'standard' ? null : w)} />
+    </span>
   );
 }
 
+/** What the Execution tab adds under a card's title: what it delivers,
+ *  what it waits on, the model that ran it and what that cost, and a hand-off
+ *  to Claude Code. */
 function MissionLines({ element, busy, onHandOver, rounds, definitionPick }: { element: FleetElement; busy: boolean; onHandOver?: () => void; rounds?: RoundSummary; definitionPick?: React.ReactNode }) {
   const { t } = useI18n();
   const meta = [element.model, element.costUsd > 0 ? `$${element.costUsd.toFixed(2)}` : null].filter(Boolean).join(' · ');
@@ -179,7 +200,7 @@ function MissionLines({ element, busy, onHandOver, rounds, definitionPick }: { e
         <div className="flex min-w-0 items-center gap-1.5"><Clock size={12} className="shrink-0" /><span className="truncate">{t('After {items}', { items: element.waitsOn.join(', ') })}</span></div>
       )}
       {loop && <div className="tabular-nums">{loop}</div>}
-      {definitionPick}
+      {definitionPick && <div className="flex min-w-0 flex-wrap items-center gap-x-3">{definitionPick}</div>}
       {(meta || onHandOver) && (
         <div className="flex items-center gap-2 tabular-nums">
           {meta && <span className="truncate">{meta}</span>}
@@ -301,6 +322,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
 }) {
   const { t } = useI18n();
   const [guidance, setGuidance] = useState('');
+  const [guidanceOpen, setGuidanceOpen] = useState(false);
   const [draft, setDraft] = useState<PlanDraft | null>(null);
   // The Planner's questions, asked before it plans, and the answers typed.
   const [questions, setQuestions] = useState<{ reason: string; items: PlanQuestion[] } | null>(null);
@@ -514,41 +536,51 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
       </>
     ) : undefined}>
       <div className="space-y-3">
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] gap-2">
-          <Stat label={t('Progress')} value={`${summary.progress}%`} sub={t('{done} of {all} actions', { done: summary.done, all: summary.actions })} />
-          <Stat label={t('Running')} value={String(summary.running)} />
-          <Stat label={t('Waiting on a person')} value={String(summary.waiting)} />
-          <Stat label={t('Blocked or failed')} value={String(summary.blocked + summary.failed)} />
-          <Stat label={t('Tokens')} value={compact(summary.inputTokens + summary.outputTokens)}
-            sub={t('in {input} · out {output}', { input: compact(summary.inputTokens), output: compact(summary.outputTokens) })} />
-          <Stat label={t('AI cost')} value={`$${summary.costUsd.toFixed(2)}`} />
+        {/* How it stands, as one line: how far along, then only the counts
+            that ask for something, then what the AI has cost. */}
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+            <span className="flex items-baseline gap-2">
+              <span className="text-[22px] font-semibold tabular-nums text-foreground">{summary.progress}%</span>
+              <span className="text-[12px] text-muted-foreground">{t('{done} of {all} actions', { done: summary.done, all: summary.actions })}</span>
+            </span>
+            <span className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[12px] tabular-nums text-muted-foreground">
+              <Fact label={t('Running')} n={summary.running} />
+              <Fact label={t('Waiting on a person')} n={summary.waiting} tone="warning" />
+              <Fact label={t('Blocked or failed')} n={summary.blocked + summary.failed} tone="danger" />
+              <span title={t('in {input} · out {output}', { input: compact(summary.inputTokens), output: compact(summary.outputTokens) })}>
+                {`$${summary.costUsd.toFixed(2)} · ${t('{n} tokens', { n: compact(summary.inputTokens + summary.outputTokens) })}`}
+              </span>
+            </span>
+          </div>
+          <SegmentedProgress value={summary.progress} className="max-w-md" />
         </div>
 
         {ctx.missionLoaded && (
           <YourTurnTray items={turns} canEdit={ctx.canEdit} onOpen={ctx.onOpenElement} onChanged={ctx.refetch} />
         )}
 
-        <label className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted-foreground">
-          {t('When an AI finishes')}
-          <select value={ctx.delegation} disabled={!ctx.canEdit}
-            onChange={(e) => void ctx.setDelegation(e.target.value as StrategyDelegation)}
-            className="rounded-md border border-border/60 bg-transparent px-1.5 py-1 text-foreground">
-            <option value="manual">{t('A person reviews each result')}</option>
-            <option value="auto">{t('Verified results go on to the next step')}</option>
-          </select>
-          <span>{ctx.delegation === 'auto'
-            ? t("Stops at a person's Element, an approval or a blocked run.")
-            : t('Nothing starts until you approve the result.')}</span>
-        </label>
+        {/* How the AI works here: two settings, each one line. */}
+        <div className="space-y-1 text-[12px] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-2">
+            <span className="w-36 shrink-0">{t('When an AI finishes')}</span>
+            <OptionMenu label={t('When an AI finishes')} value={ctx.delegation} disabled={!ctx.canEdit}
+              onChange={(v) => void ctx.setDelegation(v)}
+              options={[
+                { value: 'manual' as StrategyDelegation, label: t('A person reviews each result'), hint: t('Nothing starts until you approve the result.') },
+                { value: 'auto' as StrategyDelegation, label: t('Verified results go on to the next step'), hint: t("Stops at a person's Element, an approval or a blocked run.") },
+              ]} />
+          </div>
+          <DefinitionPanel spaceId={ctx.spaceId} definitionId={ctx.definitionId} canEdit={ctx.canEdit} onChange={ctx.setDefinition} />
+        </div>
 
-        <DefinitionPanel spaceId={ctx.spaceId} definitionId={ctx.definitionId} canEdit={ctx.canEdit} onChange={ctx.setDefinition} />
-
-        <div className="flex items-start gap-2">
-          <textarea value={guidance} onChange={(e) => setGuidance(e.target.value)} rows={2}
-            placeholder={t('Guidance for the Planner (optional): scope, constraints, what to leave out…')}
-            className="min-h-[52px] flex-1 resize-y rounded-md border border-border/60 bg-transparent px-2.5 py-1.5 text-[13px] outline-none focus:bg-muted/30" />
-          <div className="flex flex-col items-stretch gap-1">
-            <Button variant={draft ? 'secondary' : 'primary'} size="sm" onClick={() => void plan()} disabled={planning || applying || !!questions}>
+        {/* Breaking it down: the Planner drafts Objects and Elements, and
+            nothing is created until the draft is approved. Guidance is
+            optional, so its field waits behind a link. */}
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant={draft ? 'secondary' : 'primary'} size="sm" onClick={() => void plan()} disabled={planning || applying || !!questions}
+              title={t('The Planner reads this Strategy and breaks it down into Objects and Elements. Nothing is created until you approve the draft.')}>
               {planning ? t('Planning…') : draft ? t('Plan again') : t('Break down with AI')}
             </Button>
             {ctx.onTalk && (
@@ -556,7 +588,17 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
                 {t('Talk it through')}
               </Button>
             )}
+            {!guidanceOpen && (
+              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setGuidanceOpen(true)}>
+                {t('Add guidance')}
+              </Button>
+            )}
           </div>
+          {guidanceOpen && (
+            <textarea value={guidance} onChange={(e) => setGuidance(e.target.value)} rows={2} autoFocus
+              placeholder={t('Guidance for the Planner (optional): scope, constraints, what to leave out…')}
+              className="min-h-[52px] w-full resize-y rounded-md border border-border/60 bg-transparent px-2.5 py-1.5 text-[13px] outline-none focus:bg-muted/30" />
+          )}
         </div>
         {questions && (
           <div className="space-y-3 rounded-lg border border-border bg-muted/20 px-3 py-3">
@@ -595,12 +637,6 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
           </div>
         )}
 
-        {!draft && !questions && (
-          <p className="text-[12px] text-muted-foreground">
-            {t('The Planner reads this Strategy and breaks it down into Objects and Elements. Nothing is created until you approve the draft.')}
-          </p>
-        )}
-
         {draft && (
           <div className="space-y-2 rounded-lg border border-dashed border-border px-3 py-2.5">
             {draft.summary && <MarkdownLite text={draft.summary} className="text-[13px] leading-relaxed text-foreground" />}
@@ -611,32 +647,24 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
             </p>
             {ctx.canEdit ? (
               <div className="flex flex-wrap items-center gap-2 text-[12px]">
-                <label className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="flex items-center gap-0.5 text-muted-foreground">
                   {t('AI actions go to')}
-                  <select value={aiWorker} onChange={(e) => setAiWorkerId(e.target.value)}
-                    className="rounded-md border border-border/60 bg-transparent px-1.5 py-1 text-foreground">
-                    <option value="">{t('Nobody (assign later)')}</option>
-                    {aiWorkers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                  </select>
-                </label>
+                  <OptionMenu label={t('AI actions go to')} value={aiWorker} onChange={setAiWorkerId}
+                    options={[{ value: '', label: t('Nobody (assign later)') }, ...aiWorkers.map((w) => ({ value: w.id, label: w.name }))]} />
+                </span>
                 {unplaced && (
-                  <label className="flex items-center gap-1.5 text-muted-foreground">
+                  <span className="flex items-center gap-0.5 text-muted-foreground">
                     {t('Unplaced work goes to')}
-                    <select value={placeIn} onChange={(e) => setFallbackObjectId(e.target.value)}
-                      className="rounded-md border border-border/60 bg-transparent px-1.5 py-1 text-foreground">
-                      {objects.length === 0 && <option value="">{t('No Objects yet')}</option>}
-                      {objects.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-                    </select>
-                  </label>
+                    <OptionMenu label={t('Unplaced work goes to')} value={placeIn} onChange={setFallbackObjectId}
+                      options={objects.length === 0 ? [{ value: '', label: t('No Objects yet') }] : objects.map((o) => ({ value: o.id, label: o.name }))} />
+                  </span>
                 )}
                 {domainless && (
-                  <label className="flex items-center gap-1.5 text-muted-foreground">
+                  <span className="flex items-center gap-0.5 text-muted-foreground">
                     {t('New Objects go to')}
-                    <select value={newObjectsIn} onChange={(e) => setFallbackDomainId(e.target.value)}
-                      className="rounded-md border border-border/60 bg-transparent px-1.5 py-1 text-foreground">
-                      {domains.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </select>
-                  </label>
+                    <OptionMenu label={t('New Objects go to')} value={newObjectsIn} onChange={setFallbackDomainId}
+                      options={domains.map((d) => ({ value: d.id, label: d.name }))} />
+                  </span>
                 )}
                 <div className="ml-auto flex items-center gap-1.5">
                   <Button variant="ghost" size="sm" onClick={() => { setDraft(null); setSelected(null); }} disabled={applying}>{t('Discard')}</Button>
@@ -679,15 +707,20 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
                   {e.elementId && details.get(e.elementId) ? (
                     <ElementCard element={details.get(e.elementId)!} onRefresh={ctx.refetch}
                       onOpen={() => ctx.onOpenElement(e.elementId!)}
-                      badge={ctx.canEdit ? (
-                        // The badge opens the status menu: work an agent left
-                        // for review is approved (Done) right from its card.
-                        <span onPointerDown={(ev) => ev.stopPropagation()} onClick={(ev) => ev.stopPropagation()}>
+                      // The Element's Status, as every list shows it: the mark
+                      // opens the status menu, so work an agent left for
+                      // review is approved (Done) right from its card.
+                      lead={ctx.canEdit ? (
+                        <span onPointerDown={(ev) => ev.stopPropagation()} onClick={(ev) => ev.stopPropagation()} className="flex">
                           <StatusPicker element={details.get(e.elementId)!}
-                            onChanged={(s) => { if (s === 'done' || s === 'cancelled') void advanceFromElement(e.elementId!).then(() => ctx.refetch()); else ctx.refetch(); }}
-                            trigger={<button type="button" className="cursor-pointer" aria-label={t('Change status')}><StateBadge state={e.state} /></button>} />
+                            onChanged={(s) => { if (s === 'done' || s === 'cancelled') void advanceFromElement(e.elementId!).then(() => ctx.refetch()); else ctx.refetch(); }} />
                         </span>
-                      ) : <StateBadge state={e.state} />}
+                      ) : (
+                        <ElementProgressMark status={details.get(e.elementId)!.status} progress={getElementProgress(details.get(e.elementId)!)} size={16} />
+                      )}
+                      // Only what the Status cannot say: an AI run that is
+                      // going, waiting on someone, or has failed.
+                      badge={runOnlyState(e.state, details.get(e.elementId)!.status) ? <StateBadge state={e.state} /> : undefined}
                       extra={<MissionLines element={e} rounds={rounds.get(e.elementId)} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
                         definitionPick={ctx.canEdit ? (
                           <>
