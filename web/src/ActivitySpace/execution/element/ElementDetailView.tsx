@@ -79,6 +79,7 @@ import { RailRow } from '@/Function/shared/RailRow';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { ElementTypeIcon, ObjectIcon } from '@/shell/icons';
 import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
+import { ItemIconButton, useItemLook } from '@/Function/shared/itemIcon/IconPicker';
 import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
@@ -220,6 +221,8 @@ function ElementDetailBody({
     [element, onRefresh, onOpenStrategy],
   );
   const [title, setTitle] = useState(element.title);
+  const [look, changeLook] = useItemLook({ icon: element.icon ?? null, color: element.color },
+    async (next) => { await updateElement(element.id, next); onRefresh?.(); });
   const [description, setDescription] = useState(element.description || '');
   // Auto-grow the title textarea so long titles wrap into multiple
   // visible rows. We re-measure on value change.
@@ -733,7 +736,9 @@ function ElementDetailBody({
 
           {/* Title & description — under the concept's icon, like every concept page */}
           <div>
-            <PageIcon><ElementIcon size={18} /></PageIcon>
+            <PageIcon>
+              <ItemIconButton value={look} onChange={changeLook} defaultIcon={<ElementIcon size={18} />} />
+            </PageIcon>
             <div className="flex items-start gap-2 mb-3">
               {/* Auto-grow textarea so long titles wrap to multiple
                   lines instead of being clipped. Enter and Escape both

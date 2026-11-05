@@ -5,6 +5,27 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const SHARED_MESSAGES: Record<string, Row> = {
+  // Icon and colour picker (Strategy, Object, Element)
+  'Icons': ['アイコン', '아이콘', 'Icônes', 'Iconos'],
+  'Emojis': ['絵文字', '이모지', 'Émojis', 'Emojis'],
+  'Search icons…': ['アイコンを検索…', '아이콘 검색…', 'Rechercher une icône…', 'Buscar iconos…'],
+  'Search emoji…': ['絵文字を検索…', '이모지 검색…', 'Rechercher un émoji…', 'Buscar emojis…'],
+  'Default colour': ['既定の色', '기본 색', 'Couleur par défaut', 'Color predeterminado'],
+  'Custom colour': ['色を選ぶ', '색 직접 선택', 'Couleur personnalisée', 'Color personalizado'],
+  'No icons match.': ['一致するアイコンはありません。', '일치하는 아이콘이 없습니다.', 'Aucune icône ne correspond.', 'Ningún icono coincide.'],
+  'Could not load emoji.': ['絵文字を読み込めませんでした。', '이모지를 불러오지 못했습니다.', 'Impossible de charger les émojis.', 'No se pudieron cargar los emojis.'],
+  'Results': ['検索結果', '검색 결과', 'Résultats', 'Resultados'],
+  'No emoji match.': ['一致する絵文字はありません。', '일치하는 이모지가 없습니다.', 'Aucun émoji ne correspond.', 'Ningún emoji coincide.'],
+  'Frequently used': ['よく使う絵文字', '자주 사용', 'Fréquents', 'Usados con frecuencia'],
+  'Change icon': ['アイコンを変更', '아이콘 변경', 'Changer l’icône', 'Cambiar icono'],
+  'Smileys & Emotion': ['顔と感情', '표정과 감정', 'Smileys et émotions', 'Caras y emociones'],
+  'People & Body': ['人と体', '사람과 신체', 'Personnes et corps', 'Personas y cuerpo'],
+  'Animals & Nature': ['動物と自然', '동물과 자연', 'Animaux et nature', 'Animales y naturaleza'],
+  'Food & Drink': ['食べ物と飲み物', '음식과 음료', 'Nourriture et boissons', 'Comida y bebida'],
+  'Travel & Places': ['旅行と場所', '여행과 장소', 'Voyages et lieux', 'Viajes y lugares'],
+  'Activities': ['アクティビティ', '활동', 'Activités', 'Actividades'],
+  'Symbols': ['記号', '기호', 'Symboles', 'Símbolos'],
+  'Flags': ['旗', '깃발', 'Drapeaux', 'Banderas'],
   // Built-in fields, statuses and priorities
   'Also here: {names}': ['ほかに開いている人：{names}', '함께 보는 사람: {names}', 'Aussi ici : {names}', 'También aquí: {names}'],
   'Status': ['ステータス', '상태', 'Statut', 'Estado'],

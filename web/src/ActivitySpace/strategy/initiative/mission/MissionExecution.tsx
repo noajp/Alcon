@@ -5,6 +5,7 @@ import { AlertTriangle, Check, Clock, Flag, Hand, Pause } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { cn } from '@/lib/utils';
 import { ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
+import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { PageSection } from '@/Function/shared/PageHead';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -100,7 +101,7 @@ function ObjectCard({ object, domainName, selected, dropTarget, onSelect, onDrag
         dropTarget && 'opacity-100 ring-2 ring-[var(--accent-default)]',
       )}>
       <div className="flex items-start gap-2.5">
-        <ObjectIcon size={14} className="mt-[3px] shrink-0 text-muted-foreground" />
+        <ItemIcon icon={object.icon} color={object.color} size={14} className="mt-[3px] text-muted-foreground" fallback={<ObjectIcon size={14} />} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[14px] font-semibold leading-5 text-foreground">
             {unplaced ? t('Not placed in an Object') : object.name}
