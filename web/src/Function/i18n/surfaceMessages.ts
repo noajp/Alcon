@@ -152,6 +152,7 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   'Delegate': ['委任', '위임', 'Déléguer', 'Delegar'],
   'Monitor': ['監視', '모니터링', 'Surveiller', 'Supervisar'],
   'Set action': ['行動を設定', '행동 설정', "Définir l'action", 'Definir la acción'],
+  'New comments': ['未読のコメント', '읽지 않은 댓글', 'Nouveaux commentaires', 'Comentarios nuevos'],
   'Add existing Strategy': ['既存の Strategy を追加', '기존 Strategy 추가', 'Ajouter une Strategy existante', 'Añadir una Strategy existente'],
   'Sub Strategies': ['Sub Strategy', 'Sub Strategy', 'Sous-Strategies', 'Sub Strategies'],
   'Add Sub Strategy': ['Sub Strategy を追加', 'Sub Strategy 추가', 'Ajouter une sous-Strategy', 'Añadir una Sub Strategy'],

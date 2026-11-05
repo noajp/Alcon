@@ -2,6 +2,7 @@
 
 import { supabase } from '@/lib/supabase';
 import type { Notification } from '@/types/database';
+import { useCurrentUserId } from '@/providers/authContext';
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 
 
@@ -265,4 +266,36 @@ export async function notifyAboutElement(
     p_worker_id: workerId ?? null,
   });
   if (error) console.error('notifyAboutElement failed:', error);
+}
+
+/** Comment and mention notifications are what "a new comment you have not
+ *  read" means on an Element. */
+const COMMENT_KINDS: Notification['kind'][] = ['comment', 'mention'];
+
+/** The Elements with a comment the signed-in person has not read yet — from
+ *  the Inbox's own store, so reading one there clears the mark in lists too. */
+export function useUnreadCommentElementIds(): ReadonlySet<string> {
+  const userId = useCurrentUserId();
+  const { notifications } = useNotifications(userId);
+  return useMemo(() => new Set(notifications
+    .filter((n) => !n.is_read && !n.is_archived && n.element_id && COMMENT_KINDS.includes(n.kind))
+    .map((n) => n.element_id!)), [notifications]);
+}
+
+/** Opening an Element reads its comments: its unread comment and mention
+ *  notifications for this person become read. */
+export async function markElementCommentsRead(recipientId: string, elementId: string): Promise<void> {
+  const unread = inboxStore.snapshot.notifications.some((n) =>
+    !n.is_read && n.element_id === elementId && COMMENT_KINDS.includes(n.kind));
+  if (!unread) return;
+  setInboxNotifications((prev) => prev.map((n) =>
+    n.element_id === elementId && COMMENT_KINDS.includes(n.kind) ? { ...n, is_read: true } : n));
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('recipient_id', recipientId)
+    .eq('element_id', elementId)
+    .in('kind', COMMENT_KINDS)
+    .eq('is_read', false);
+  if (error) console.error('Could not mark the comments read:', error);
 }

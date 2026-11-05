@@ -544,15 +544,12 @@ export function ListTable({
       <table
         ref={tableRef}
         // `min-w-full` so the table fills the wrap (rows + section bands span
-        // the full width). One track is given width:100% and soaks up the
-        // surplus on wide screens: Name while it is unsized (see nameFluid),
-        // otherwise the trailing column, leaving the sized columns packed
-        // flush left. (An UNSIZED col does NOT absorb the surplus in
-        // fixed-table layout — the browser instead spreads it proportionally
-        // across the sized columns, stretching everything.)
-        style={nameFluid
-          ? { width: '100%', minWidth: packedWidth }
-          : { width: packedWidth }}
+        // the full width). The title track is given width:100% and soaks up
+        // the surplus on wide screens, so the data columns sit against the
+        // right edge; a width set on Name is its least. (An UNSIZED col does
+        // NOT absorb the surplus in fixed-table layout — the browser instead
+        // spreads it proportionally across the sized columns.)
+        style={{ width: '100%', minWidth: packedWidth }}
         className="group/list min-w-full table-fixed bg-card border-separate border-spacing-0 text-[14px] [--cell-text:14px]"
         data-has-selection={hasSelection ? '' : undefined}
       >
@@ -560,9 +557,7 @@ export function ListTable({
             track absorbs only the remaining space. */}
         <colgroup>
           <col style={{ width: 52, minWidth: 52 }} />
-          <col style={nameFluid
-            ? { width: '100%', minWidth: titleWidth }
-            : { width: titleWidth, minWidth: titleWidth }} />
+          <col style={{ width: '100%', minWidth: titleWidth }} />
           <col style={{ width: 'var(--signals-w, 0px)', minWidth: 'var(--signals-w, 0px)' }} />
           {visibleColumns.map((c) => {
             const w = drawnWidth(c);
@@ -571,7 +566,7 @@ export function ListTable({
             // an empty gap and force horizontal scroll in narrow panels.
             return <col key={c.id} className="table-column" style={{ width: w, minWidth: w }} />;
           })}
-          {hasTrailingCol && <col className="table-column" style={nameFluid ? { width: 80, minWidth: 80 } : { width: '100%', minWidth: 80 }} />}
+          {hasTrailingCol && <col className="table-column" style={{ width: 80, minWidth: 80 }} />}
         </colgroup>
         <thead className="sticky top-0 z-20 bg-card">
           <tr>

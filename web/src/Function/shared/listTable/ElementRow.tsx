@@ -16,7 +16,9 @@ import { ElementProgressMark, getElementProgress } from '@/Function/shared/Eleme
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent } from '@/ui/context-menu';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '@/shared/designTokens';
-import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
+import { UnreadDot } from '@/Function/shared/element/ActivitySignal';
+import { MessageIcon } from '@/Function/shared/conceptIcons';
+import { useUnreadCommentElementIds } from '@/hooks/notificationData';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { type DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { type ElementUpdate, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, selectionSquareClass, STICKY_TINT_SELECTED, STICKY_TINT_HOVER, LEAD_CELL, LEAD_CELL_HOVER, LEAD_CELL_SELECTED } from './shared';
@@ -80,6 +82,7 @@ export const ElementRow = memo(function ElementRow({
   const { t, locale } = useI18n();
   const overdue = isOverdue(el.due_date, el.status === 'done');
   const showsActivityColumn = visibleColumns.some((c) => c.id === 'activity');
+  const unreadComments = useUnreadCommentElementIds().has(el.id);
   // Drag-to-reorder: the whole row is the handle. PointerSensor's distance
   // constraint (set on the DndContext) keeps clicks/selection working — only
   // a real drag moves the row. We DON'T apply the sortable transform: rows
@@ -191,10 +194,15 @@ export const ElementRow = memo(function ElementRow({
           same 20px after the title). */}
       <td className="p-0 max-w-0 overflow-hidden">
         <div data-row-signals className="ml-auto flex w-max items-center gap-5 pl-5 pr-0.5">
-          {/* The comment count stands in for the Activity column, so it
-              steps aside when that column is on: the same number twice on
-              one row reads as two different facts. */}
-          {!showsActivityColumn && <ActivitySignal activity={el.activity} />}
+          {/* Comments themselves are the Updates column, shown when it is
+              toggled on; the row only says when there is one the viewer has
+              not read, as the Inbox marks it. */}
+          {!showsActivityColumn && unreadComments && (
+            <span className="relative flex size-3 shrink-0 items-center justify-center text-muted-foreground/70" title={t('New comments')}>
+              <MessageIcon size={12} />
+              <UnreadDot className="-right-1 -top-1" />
+            </span>
+          )}
           {blockers && blockers.length > 0 && (
             // Waiting on an unfinished dependency — the same quiet register:
             // a row that cannot be started is not an error.
