@@ -7,7 +7,7 @@ import { useSyncExternalStore } from 'react';
 //   /?integration_oauth=finish&handle=<one-time handle>&integration=<id>
 //   /?integration_oauth=error&integration=<id>
 // The page reads that once, removes it from the address, opens the screen the
-// sign-in started from (Settings › Customize, or Reviews when it began
+// sign-in started from (Settings › AI, or Reviews when it began
 // there) and, for `finish`, confirms the sign-in with POST /finish under the
 // signed-in person's JWT — nothing is stored until then, and only for the
 // person who started it. The outcome is left here for that screen to show.
@@ -49,7 +49,7 @@ export function stripOAuthReturn(href: string): string {
 export const OAUTH_RETURN_VIEW_KEY = 'alcon.integrationOAuth.returnView';
 const RETURN_VIEWS = new Set(['reviews']);
 
-/** The view to come back to, read once; null means Settings › Customize. */
+/** The view to come back to, read once; null means Settings › AI. */
 export function takeOAuthReturnView(): string | null {
   try {
     const view = sessionStorage.getItem(OAUTH_RETURN_VIEW_KEY);

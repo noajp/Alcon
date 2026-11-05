@@ -8,14 +8,14 @@ import { OptionMenu } from '@/Function/shared/OptionMenu';
 import { createDefinition, updateDefinition, useDefinitions } from '@/hooks/definitionData';
 import { DEFINITION_EXAMPLE, definitionParts, type DefinitionPart } from './definitionParts';
 
-// The Strategy's definition on its Execution tab: which one its Elements
-// follow (from the Space's library), what the engine will act on in it, and a
-// box to paste a new one. Pasting is the whole authoring step — the headings
+// The Strategy's harness on its Execution tab: which one it is worked by
+// (from the Space's library; none means the Space's default), what the
+// engine will act on in it, and a box to paste a new one. Pasting is the whole authoring step — the headings
 // do the rest.
 
 const PART_LABEL: Record<DefinitionPart, string> = {
   goal: 'Goal', conditions: 'Conditions', metric: 'Metric (a loop)', procedure: 'Procedure',
-  stop: 'Stop rules', checks: 'Checks', output: 'Output shape',
+  stop: 'Stop rules', checks: 'Checks', output: 'Output shape', connectors: 'Connectors', breakdown: 'Breakdown',
 };
 
 const NONE = '__none';
@@ -63,17 +63,17 @@ export function DefinitionPanel({ spaceId, definitionId, canEdit, onChange }: {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-x-2 text-[12px] text-muted-foreground">
-        <span className="w-36 shrink-0">{t('Definition')}</span>
-        <OptionMenu label={t('Definition')} value={definitionId ?? NONE} disabled={!canEdit || busy}
+        <span className="w-36 shrink-0">{t('Harness')}</span>
+        <OptionMenu label={t('Harness')} value={definitionId ?? NONE} disabled={!canEdit || busy}
           onChange={(v) => void onChange(v === NONE ? null : v)}
-          options={[{ value: NONE, label: t('None — the agent decides how') }, ...library.data.map((d) => ({ value: d.id, label: d.name }))]} />
+          options={[{ value: NONE, label: t('The Space’s default') }, ...library.data.map((d) => ({ value: d.id, label: d.name }))]} />
         {current && (
           <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={() => setOpen((o) => !o)}>
             {open ? t('Hide') : t('Show')}
           </Button>
         )}
         {canEdit && current && mode === 'view' && <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={startEdit}>{t('Edit')}</Button>}
-        {canEdit && mode === 'view' && <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={startPaste}>{t('Paste a new definition')}</Button>}
+        {canEdit && mode === 'view' && <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={startPaste}>{t('Paste a new harness')}</Button>}
       </div>
 
       {current && mode === 'view' && open && (

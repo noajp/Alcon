@@ -51,6 +51,7 @@ export type Database = {
           color: string | null
           created_at: string
           created_by: string
+          default_definition_id: string | null
           id: string
           identifier: string | null
           logo: string | null
@@ -64,6 +65,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           created_by?: string
+          default_definition_id?: string | null
           id?: string
           identifier?: string | null
           logo?: string | null
@@ -77,6 +79,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           created_by?: string
+          default_definition_id?: string | null
           id?: string
           identifier?: string | null
           logo?: string | null

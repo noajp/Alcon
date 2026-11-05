@@ -4,11 +4,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { AiWeight } from '@/types/database';
 
-// Definitions: how a goal is to be carried out, written once by a person and
-// followed by the agent engine (supabase/functions/_shared/definition.ts reads
-// them). A Space keeps a library; a Strategy names the one its Elements
-// follow, an Element may name its own. Members of the Space read and write
-// (RLS); the author or a Space owner deletes.
+// Harnesses (stored as `definitions`): how a kind of work is carried out by
+// AI, written once by a person and followed by the agent engine
+// (supabase/functions/_shared/definition.ts reads and checks them). A Space
+// keeps a library and may name one as its default, which a Strategy is
+// worked by when it names none; an Element may name its own. Members of the
+// Space read and write (RLS); the author or a Space owner deletes.
 
 export interface Definition {
   id: string;
@@ -18,7 +19,7 @@ export interface Definition {
   created_by: string | null;
   created_at: string;
   updated_at: string;
-  /** The catalog item it was added from (Settings › Customize), if any. */
+  /** The catalog item it was added from (Settings › AI), if any. */
   source_id: string | null;
 }
 
@@ -60,6 +61,29 @@ export async function updateDefinition(id: string, updates: { name?: string; bod
 export async function deleteDefinition(id: string): Promise<void> {
   const { error } = await supabase.from('definitions').delete().eq('id', id);
   if (error) throw error;
+}
+
+/** The harness the Space's Strategies are worked by when they name none (null: Alcon's built-in way). */
+export function useSpaceDefaultHarness(spaceId: string | null) {
+  const qc = useQueryClient();
+  const k = ['space-default-harness', spaceId ?? 'none'] as const;
+  const query = useQuery({
+    queryKey: k,
+    enabled: !!spaceId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('activity_spaces').select('default_definition_id').eq('id', spaceId!).maybeSingle();
+      if (error) throw error;
+      return ((data as { default_definition_id: string | null } | null)?.default_definition_id) ?? null;
+    },
+  });
+  return {
+    data: query.data ?? null,
+    set: async (definitionId: string | null) => {
+      const { error } = await supabase.from('activity_spaces').update({ default_definition_id: definitionId }).eq('id', spaceId!);
+      if (error) throw error;
+      await qc.invalidateQueries({ queryKey: k });
+    },
+  };
 }
 
 /** The definition a Strategy's Elements follow (null: none). */

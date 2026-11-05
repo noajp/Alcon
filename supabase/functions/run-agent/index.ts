@@ -1297,7 +1297,12 @@ async function loadConversationContext(userDb: SupabaseClient, run: Run, strateg
       ? userDb.from("integrations").select("name, kind, delegation").eq("activity_space_id", run.activity_space_id).eq("enabled", true).in("kind", ["mcp", "http"])
       : Promise.resolve({ data: [] }),
   ]);
-  const definitionId = (row as { definition_id?: string | null } | null)?.definition_id ?? null;
+  // The harness the Strategy is worked by: its own, else the Space's default.
+  let definitionId = (row as { definition_id?: string | null } | null)?.definition_id ?? null;
+  if (!definitionId && run.activity_space_id) {
+    const { data: space } = await userDb.from("activity_spaces").select("default_definition_id").eq("id", run.activity_space_id).maybeSingle();
+    definitionId = (space as { default_definition_id?: string | null } | null)?.default_definition_id ?? null;
+  }
   const { data: def } = definitionId ? await userDb.from("definitions").select("name, body").eq("id", definitionId).maybeSingle() : { data: null };
   return {
     strategy: {

@@ -21,19 +21,19 @@ import { IntegrationDetailDialog, IntegrationIcon, SourceChip } from './Integrat
 import { AlconConnectPanel } from './AlconConnectPanel';
 import { AssetRelayPanel } from './AssetRelayPanel';
 import { setOAuthOutcome, useOAuthOutcome } from './oauthReturn';
-import { DefinitionsPanel } from '@/Function/customize/DefinitionsPanel';
-import { PacksPanel } from '@/Function/customize/PacksPanel';
+import { HarnessesPanel } from '@/Function/customize/HarnessesPanel';
 import { RegistrySection } from '@/Function/customize/RegistrySection';
 import { YoursDiscover, type CustomizeMode } from '@/Function/customize/YoursDiscover';
 import type { DirectoryEntry } from '@/hooks/customizeData';
 
-// Settings › Customize (ADR 0027): what a Space adds to how its agents work.
-//   definitions  how work is carried out (DefinitionsPanel)
+// Settings › AI: how the Space's AI works.
+//   definitions  harnesses — how a kind of work is carried out, the connectors
+//                it uses and where it stops (HarnessesPanel)
 //   external     connectors: Yours is the Space's connections; Discover is
 //                Alcon's catalog (modelled on Supabase's Integrations page)
 //                and the public MCP Registry (RegistrySection)
-//   packs        definitions and connectors bundled for a kind of work (PacksPanel)
-//   alcon        the other direction: point an MCP client or script at Alcon
+// Settings › API & access: the other direction.
+//   alcon        point an MCP client or script at Alcon
 //                with an OAuth sign-in or a personal access token
 //                (AlconConnectPanel, ADR 0032 / 0034).
 //   assets       the apps and AIs that joined the Space by adding one line to
@@ -45,10 +45,9 @@ const DOCS_URL = 'https://github.com/noajp/Alcon/blob/main/docs/mcp.md';
 export function IntegrationsSettings({ tab }: { tab: string | null }) {
   return tab === 'alcon' ? <AlconConnectPanel />
     : tab === 'assets' ? <AssetRelayPanel />
-    : tab === 'definitions' ? <DefinitionsPanel />
-    : tab === 'packs' ? <PacksPanel />
+    : tab === 'definitions' ? <HarnessesPanel />
     : tab === 'external' ? <ExternalServicesPanel />
-    : <DefinitionsPanel />;
+    : <HarnessesPanel />;
 }
 
 type Opened = { preset: IntegrationPreset; integration: Integration | null; initial?: { name: string; endpoint: string; auth: 'none' | 'bearer' | 'header'; authHeader: string | null } } | null;

@@ -5,7 +5,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export type CustomizeMode = 'yours' | 'discover';
 
-/** Yours (what this Space has) / Discover (what can be added), as on every Customize tab. */
+/** Yours (what this Space has) / Discover (what can be added), as on every Settings › AI tab. */
 export function YoursDiscover({ mode, onChange }: { mode: CustomizeMode; onChange: (m: CustomizeMode) => void }) {
   const { t } = useI18n();
   return (

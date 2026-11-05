@@ -16,7 +16,7 @@ const AUDIT_HOME_VIEW = 'audit';
 /** The settings pages an audit Space shows: the Space, its members and
  *  integrations, People, and the person's own. */
 const AUDIT_SETTINGS: ReadonlySet<string> = new Set([
-  'workspace', 'members', 'integrations', 'team',
+  'workspace', 'members', 'integrations', 'access', 'team',
   'preferences', 'profile', 'notifications', 'security', 'connected',
 ]);
 

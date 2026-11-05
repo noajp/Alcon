@@ -1,8 +1,13 @@
-// A definition: how a goal is to be carried out, as a person wrote it. It is
-// Markdown with known headings; this file reads the parts the engine itself
-// enforces (the metric a loop improves, the hard stops, how often to check,
-// the output's shape) and leaves the rest as text the agent follows. Pure,
-// so run-agent, the Planner and the tests read a definition the same way.
+// A harness: how a kind of work is carried out by AI, as a person wrote it.
+// It is Markdown with known headings (stored in the `definitions` table);
+// this file reads the parts the engine itself enforces (the metric a loop
+// improves, the hard stops, how often to check, the output's shape, the
+// connectors it uses, how a Strategy is broken down) and leaves the rest as
+// text the agent follows, and checks a harness before it is used
+// (checkHarness). Pure, so run-agent, the Planner, the editor and the tests
+// read a harness the same way. The editor's copy,
+// web/src/Function/customize/harnessDefinition.ts, is this file byte for
+// byte (a test keeps them equal): change this one and copy it over.
 //
 //   # 目的 / Goal              what the work is for
 //   # 条件 / Conditions        the rules it works under
@@ -11,6 +16,8 @@
 //   # 止める条件 / Stop        目標 600,000 / $30 まで / 50 周まで, and free text
 //   # 点検 / Checks (10周ごと)  the list a reviewer holds the work to
 //   # 成果物の型 / Output       a fenced block (md / html / csv / json) the output must follow
+//   # 使うコネクタ / Connectors "- GitHub": the connectors the work needs
+//   # 分け方 / Breakdown       how the Planner breaks a Strategy into Objects and Elements
 
 export type OutputFormat = "markdown" | "html" | "csv" | "json";
 
@@ -25,9 +32,11 @@ export interface ParsedDefinition {
   stop: DefinitionStop;
   checks: DefinitionChecks;
   output: DefinitionOutput | null;
+  /** The connectors the work needs, by name as the Space connected them. */
+  connectors: string[];
 }
 
-export type SectionKey = "goal" | "conditions" | "metric" | "procedure" | "stop" | "checks" | "output";
+export type SectionKey = "goal" | "conditions" | "metric" | "procedure" | "stop" | "checks" | "output" | "connectors" | "breakdown";
 
 const SECTION_NAMES: [SectionKey, RegExp][] = [
   ["goal", /^(目的|ゴール|goal|purpose)/i],
@@ -37,6 +46,8 @@ const SECTION_NAMES: [SectionKey, RegExp][] = [
   ["stop", /^(止める条件|終了条件|停止条件|stop)/i],
   ["checks", /^(点検|チェック|監査|checks?|audit)/i],
   ["output", /^(成果物の型|出力の型|成果物|output)/i],
+  ["connectors", /^(使うコネクタ|コネクタ|connectors?)/i],
+  ["breakdown", /^(分け方|分解の仕方|分解|breakdown|decomposition)/i],
 ];
 
 /** Pure. The section a heading names, or null for a heading of the author's own. */
@@ -57,7 +68,7 @@ function num(raw: string): number | null {
 }
 
 export function parseDefinition(body: string): ParsedDefinition {
-  const sections = { goal: "", conditions: "", metric: "", procedure: "", stop: "", checks: "", output: "" } as Record<SectionKey, string>;
+  const sections = { goal: "", conditions: "", metric: "", procedure: "", stop: "", checks: "", output: "", connectors: "", breakdown: "" } as Record<SectionKey, string>;
   let current: SectionKey | null = null;
   let checksHeading = "";
   let inFence = false;
@@ -101,7 +112,60 @@ export function parseDefinition(body: string): ParsedDefinition {
     const body = (fence ? fence[2] : sections.output).trim();
     if (body) output = { format, body };
   }
-  return { sections, metric, stop, checks, output };
+  const connectors = [...new Set(bullets(sections.connectors).map((c) => c.split(/[（(:：]/)[0].trim()).filter(Boolean))];
+  return { sections, metric, stop, checks, output, connectors };
+}
+
+// ── Checking a harness ───────────────────────────────────────────────────────
+
+export type Severity = "error" | "warning" | "hint";
+
+/** One thing a check found: a stable code, how serious it is, and how to fix it. */
+export interface Diagnostic {
+  code: string;
+  severity: Severity;
+  message: string;
+  fix?: string;
+}
+
+/** What a harness is checked against: the Space's connections (name or preset), when known. */
+export interface HarnessContext {
+  connected?: string[] | null;
+}
+
+const fold = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "");
+
+/**
+ * Pure. What is wrong or missing in a harness, errors first. An error means
+ * the engine cannot run it as written (a loop that never stops); a warning,
+ * that it runs but not as the author likely meant; a hint, something worth
+ * adding. Codes are stable so the editor and tests can refer to them.
+ */
+export function checkHarness(def: ParsedDefinition, ctx: HarnessContext = {}): Diagnostic[] {
+  const out: Diagnostic[] = [];
+  const machineStop = def.stop.target != null || def.stop.budgetUsd != null || def.stop.maxRounds != null;
+  if (!def.sections.goal) {
+    out.push({ code: "H001", severity: "error", message: "目的がありません。", fix: "「# 目的」の見出しを作り、この仕事が何のためかを 1〜2 行で書いてください。" });
+  }
+  if (def.metric && !machineStop) {
+    out.push({ code: "H002", severity: "error", message: "指標を改善し続けるループなのに、エンジンが判定できる止める条件がありません。止まらずに回り続けます。", fix: "「# 止める条件」に「- 50 周まで」「- 費用 $30 まで」「- 目標 600,000」のどれかを書いてください。" });
+  }
+  if (!def.metric && !def.sections.stop) {
+    out.push({ code: "H003", severity: "warning", message: "止める条件がありません。", fix: "「# 止める条件」に、どこまでやったら終わりか、どこで人に聞くかを書いてください。" });
+  } else if (def.sections.stop && !machineStop) {
+    out.push({ code: "H004", severity: "hint", message: "止める条件に数値がないので、エンジンは判定せず、文章として AI に渡します。", fix: "上限を強制したいときは「- 費用 $10 まで」や「- 20 周まで」を足してください。" });
+  }
+  if (ctx.connected) {
+    const have = new Set(ctx.connected.map(fold));
+    for (const c of def.connectors) {
+      if (!have.has(fold(c))) out.push({ code: "H005", severity: "warning", message: `コネクタ「${c}」がこの Space につながっていません。`, fix: "設定 › AI › コネクタでつなぐか、「# 使うコネクタ」から外してください。" });
+    }
+  }
+  if (!def.output) {
+    out.push({ code: "H006", severity: "hint", message: "成果物の型がないので、保存時に形を確かめません。", fix: "「# 成果物の型」に、見出しだけの Markdown などを ``` で囲んで書いてください。" });
+  }
+  const rank: Record<Severity, number> = { error: 0, warning: 1, hint: 2 };
+  return out.sort((a, b) => rank[a.severity] - rank[b.severity]);
 }
 
 // ── The output's shape ───────────────────────────────────────────────────────

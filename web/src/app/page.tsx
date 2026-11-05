@@ -351,7 +351,7 @@ function WorkspaceContent({
   // Back from an integration sign-in (integration-oauth): drop the parameters
   // from the URL, confirm the sign-in as this person (POST /finish — nothing
   // is stored before that) and open the screen it started from — Reviews, or
-  // Settings › Customize — to show the outcome.
+  // Settings › AI — to show the outcome.
   useEffect(() => {
     const result = readOAuthReturn(window.location.search);
     if (!result) return;

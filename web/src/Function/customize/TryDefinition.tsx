@@ -60,7 +60,7 @@ export function TryDefinition({ definition, onClose }: { definition: Definition;
       <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle>{t('Try “{name}”', { name: definition.name })}</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <p className="text-[12px] text-muted-foreground">{t('Runs once as an Element under the Object you choose. The AI follows this definition, and the result stays on that Element.')}</p>
+          <p className="text-[12px] text-muted-foreground">{t('Runs once as an Element under the Object you choose. The AI follows this harness, and the result stays on that Element.')}</p>
           <Textarea autoFocus value={task} onChange={(e) => setTask(e.target.value)} rows={4} disabled={busy}
             placeholder={t('What should it work on? The first line becomes the Element’s title.')} className="text-[13px]" />
           <select value={objectId} onChange={(e) => setObjectId(e.target.value)} disabled={busy} aria-label={t('Object')}

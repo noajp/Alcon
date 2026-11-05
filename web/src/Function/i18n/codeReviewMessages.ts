@@ -115,7 +115,7 @@ const CODE_REVIEW_MESSAGES: Record<string, Row> = {
   'Nothing merged or closed yet.': ['マージ・クローズされたものはまだありません。', '아직 병합되거나 종료된 것이 없습니다.', 'Rien n’a encore été fusionné ni fermé.', 'Aún no hay nada fusionado ni cerrado.'],
   'No pull requests yet. An agent working on an Element opens one, or link one from the Element’s Code changes.': ['まだ Pull Request がありません。Element で作業するエージェントが開くか、Element の「コード変更」から紐付けてください。', '아직 Pull Request가 없습니다. Element에서 작업하는 에이전트가 열거나, Element의 코드 변경에서 연결하세요.', 'Aucune pull request pour l’instant. Un agent qui travaille sur un Element en ouvre une, ou liez-en une depuis les modifications de code de l’Element.', 'Aún no hay pull requests. Un agente que trabaja en un Element abre una, o vincula una desde los cambios de código del Element.'],
   'Connect GitHub': ['GitHub を接続', 'GitHub 연결', 'Connecter GitHub', 'Conectar GitHub'],
-  'Manage in Settings › Customize': ['Settings › Customize で管理', 'Settings › Customize에서 관리', 'Gérer dans Settings › Customize', 'Gestionar en Settings › Customize'],
+  'Manage in Settings › AI': ['設定 › AI で管理', '설정 › AI에서 관리', 'Gérer dans Réglages › IA', 'Gestionar en Ajustes › IA'],
   'GitHub needs attention': ['GitHub の接続を確認してください', 'GitHub 연결을 확인하세요', 'GitHub demande votre attention', 'GitHub necesita atención'],
   'GitHub connected': ['GitHub 接続済み', 'GitHub 연결됨', 'GitHub connecté', 'GitHub conectado'],
   'Code review': ['コードレビュー', '코드 리뷰', 'Revue de code', 'Revisión de código'],
@@ -132,7 +132,7 @@ const CODE_REVIEW_MESSAGES: Record<string, Row> = {
   'Verdicts, line comments and merges made here go to the pull request on GitHub; comments written on GitHub show here.': ['ここでの判定・行コメント・マージは GitHub の Pull Request に反映され、GitHub で書かれたコメントはここに表示されます。', '여기서 한 판단·줄 댓글·병합은 GitHub의 Pull Request에 반영되고, GitHub에서 쓴 댓글은 여기에 표시됩니다.', 'Les avis, commentaires de ligne et fusions faits ici vont sur la pull request GitHub ; les commentaires écrits sur GitHub s’affichent ici.', 'Los veredictos, comentarios de línea y fusiones hechos aquí van a la pull request de GitHub; los comentarios escritos en GitHub se muestran aquí.'],
   'Iterate': ['反復', '반복', 'Itérer', 'Iterar'],
   'Ask the Element’s agent to address the open comments; it pushes to the same branch and the diff follows.': ['未解決のコメントへの対応を Element のエージェントに頼めます。同じブランチに push し、差分も追従します。', '해결되지 않은 댓글 대응을 Element의 에이전트에게 맡깁니다. 같은 브랜치에 push하고 diff도 따라갑니다.', 'Demandez à l’agent de l’Element de traiter les commentaires ouverts ; il pousse sur la même branche et le diff suit.', 'Pide al agente del Element que atienda los comentarios abiertos; hace push a la misma rama y el diff lo sigue.'],
-  // GitHub sign-in (Reviews and Settings › Customize)
+  // GitHub sign-in (Reviews and Settings › AI)
   'GitHub account': ['GitHub アカウント', 'GitHub 계정', 'Compte GitHub', 'Cuenta de GitHub'],
   'Opening GitHub…': ['GitHub を開いています…', 'GitHub를 여는 중…', 'Ouverture de GitHub…', 'Abriendo GitHub…'],
   'Sign in with GitHub': ['GitHub でサインイン', 'GitHub로 로그인', 'Se connecter avec GitHub', 'Iniciar sesión con GitHub'],
@@ -146,7 +146,7 @@ const CODE_REVIEW_MESSAGES: Record<string, Row> = {
   'GitHub sign-in is not set up yet': ['GitHub サインインはまだ設定されていません', 'GitHub 로그인이 아직 설정되지 않았습니다', 'La connexion GitHub n’est pas encore configurée', 'El inicio de sesión con GitHub aún no está configurado'],
   'The sign-in could not be finished. Connect again.': ['サインインを完了できませんでした。もう一度接続してください。', '로그인을 마무리하지 못했습니다. 다시 연결하세요.', 'La connexion n’a pas pu être finalisée. Connectez-vous de nouveau.', 'No se pudo terminar el inicio de sesión. Vuelve a conectar.'],
   // Errors from the code-changes Edge Function
-  'GitHub could not show this pull request. Connect GitHub in Settings › Customize with a token that can read the repository.': ['GitHub がこの Pull Request を表示できませんでした。Settings › Customize で、このリポジトリを読めるトークンで GitHub を接続してください。', 'GitHub에서 이 Pull Request를 표시할 수 없습니다. Settings › Customize에서 이 저장소를 읽을 수 있는 토큰으로 GitHub를 연결하세요.', 'GitHub n’a pas pu afficher cette pull request. Connectez GitHub dans Settings › Customize avec un jeton qui peut lire le dépôt.', 'GitHub no pudo mostrar esta pull request. Conecta GitHub en Settings › Customize con un token que pueda leer el repositorio.'],
+  'GitHub could not show this pull request. Connect GitHub in Settings › AI with a token that can read the repository.': ['GitHub がこの Pull Request を表示できませんでした。Settings › AI で、このリポジトリを読めるトークンで GitHub を接続してください。', 'GitHub에서 이 Pull Request를 표시할 수 없습니다. Settings › AI에서 이 저장소를 읽을 수 있는 토큰으로 GitHub를 연결하세요.', 'GitHub n’a pas pu afficher cette pull request. Connectez GitHub dans Settings › AI avec un jeton qui peut lire le dépôt.', 'GitHub no pudo mostrar esta pull request. Conecta GitHub en Settings › AI con un token que pueda leer el repositorio.'],
   'Paste a GitHub pull request URL (https://github.com/owner/repo/pull/123).': ['GitHub の Pull Request の URL を貼り付けてください（https://github.com/owner/repo/pull/123）。', 'GitHub Pull Request URL을 붙여 넣으세요 (https://github.com/owner/repo/pull/123).', 'Collez l’URL d’une pull request GitHub (https://github.com/owner/repo/pull/123).', 'Pega la URL de una pull request de GitHub (https://github.com/owner/repo/pull/123).'],
 };
 

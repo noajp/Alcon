@@ -195,7 +195,7 @@ function ApprovalCard({ agent }: { agent: Agent }) {
             })}
           </div>
           {remember.length > 0 && (
-            <div className="mt-1 text-[12px] text-muted-foreground">{t('Approving also saves this as a rule on the connector. You can remove it in Settings › Customize.')}</div>
+            <div className="mt-1 text-[12px] text-muted-foreground">{t('Approving also saves this as a rule on the connector. You can remove it in Settings › AI.')}</div>
           )}
         </div>
       )}

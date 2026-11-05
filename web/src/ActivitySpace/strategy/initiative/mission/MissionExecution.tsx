@@ -156,8 +156,8 @@ function DefinitionPick({ value, definitions, onChange }: { value: string | null
   if (definitions.length === 0 && !value) return null;
   return (
     <span className="flex min-w-0 items-center gap-0.5">
-      <span className="shrink-0">{t('Definition')}</span>
-      <OptionMenu label={t('Definition')} value={value ?? STRATEGY_DEFINITION}
+      <span className="shrink-0">{t('Harness')}</span>
+      <OptionMenu label={t('Harness')} value={value ?? STRATEGY_DEFINITION}
         options={[{ value: STRATEGY_DEFINITION, label: t('The Strategy\'s') }, ...definitions.map((d) => ({ value: d.id, label: d.name }))]}
         onChange={(v) => onChange(v === STRATEGY_DEFINITION ? null : v)} />
     </span>
