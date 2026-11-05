@@ -22,12 +22,13 @@ import { ActionTag } from '@/Function/shared/elementAction';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import {
-  answeredQuestions, buildFleet, draftFleet, handOverLabels, missionSummary, moveDraftTask, normalizePlan, normalizeQuestions,
+  answeredQuestions, buildFleet, draftFleet, handOverLabels, measureStateOf, missionSummary, moveDraftTask, normalizePlan, normalizeQuestions,
   startableTasks, UNPLACED, yourTurn,
   type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft, type PlanQuestion,
 } from './missionModel';
 import { STATE_LABEL, compact, stateColor, type MissionContext } from './MissionPanels';
 import { YourTurnTray } from './YourTurnTray';
+import { measureStateLabel } from '../initiativeMeasureModel';
 import { DefinitionPanel } from './DefinitionPanel';
 import { listenForPlanRequests } from './plannerRequest';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
@@ -558,6 +559,33 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
           </div>
           <SegmentedProgress value={summary.progress} className="max-w-md" />
         </div>
+
+        {/* What the work is judged on: each success condition, its actual
+            against its target. Work done is not the same as the Strategy won. */}
+        {ctx.measures.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[12px] text-muted-foreground">
+              {t('Success conditions')} <span className="tabular-nums">{summary.measuresMet} / {summary.measures}</span>
+            </p>
+            <ul className="space-y-1">
+              {ctx.measures.map((m) => {
+                const state = measureStateOf(m);
+                return (
+                  <li key={m.id} className="flex items-center gap-2 text-[13px]">
+                    <span className="min-w-0 flex-1 truncate text-foreground">{m.title}</span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                      {m.actual_value ?? '—'}{m.target_value != null ? ` / ${m.target_value}` : ''}{m.unit ?? ''}
+                    </span>
+                    <span className="w-24 shrink-0 text-right text-[11px]"
+                      style={{ color: state === 'met' ? 'var(--status-success)' : state === 'missed' ? 'var(--status-danger)' : 'var(--muted-foreground)' }}>
+                      {measureStateLabel(state)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {ctx.missionLoaded && (
           <YourTurnTray items={turns} canEdit={ctx.canEdit} onOpen={ctx.onOpenElement} onChanged={ctx.refetch} />

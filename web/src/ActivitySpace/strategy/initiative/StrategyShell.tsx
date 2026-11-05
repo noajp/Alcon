@@ -5,7 +5,7 @@ import { IslandHeader } from '@/Function/shared/MainIsland';
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronRight, MoreHorizontal, Plus, Search, X } from '@/ui/icons';
+import { Check, ChevronDown, ChevronRight, MessageCircle, MoreHorizontal, Plus, Search, X } from '@/ui/icons';
 import { FoldSection, FoldSectionAddRow } from '@/Function/shared/FoldSection';
 import { ReactionChips, ReactionPicker } from '@/Function/shared/ReactionControls';
 import { AttachButton } from '@/Function/shared/attachments/AttachButton';
@@ -80,8 +80,6 @@ import {
   WidgetActionSlotProvider,
   WidgetActionSlotTarget,
   INITIATIVE_BOARD,
-  INITIATIVE_PLAN_BOARD,
-  INITIATIVE_AUDIT_BOARD,
   type BoardLayout,
   type WidgetHost,
   type Zone,
@@ -99,23 +97,11 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { buildInitiativeTree, flattenInitiativeTree, inSpace, planInitiativeDrop, siblingOrder, type InitiativeDropPlace, type InitiativeNode } from './initiativeTree';
 import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 
-/** The Overview tab has a band and one column of readings; the other boards
- *  one column; none has a side rail. */
-const OVERVIEW_ZONES: Zone[] = ['band', 'main'];
-const MAIN_ZONES: Zone[] = ['main'];
+/** The page's one board: a band for how far it is, and one column below. */
+const BOARD_ZONES: Zone[] = ['band', 'main'];
 
-type InitiativeTab = 'overview' | 'conversation' | 'execution' | 'audit';
-const INITIATIVE_TABS: { id: InitiativeTab; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'conversation', label: 'Conversation' },
-  { id: 'execution', label: 'Execution' },
-  { id: 'audit', label: 'Evaluate' },
-];
-
-/** One tab's widget board. Each tab keeps its own board, so a widget placed
- *  on Execution stays on Execution. The surface keys are the persisted
- *  boards.surface, not display strings: the Overview's stays 'campaign' and
- *  Execution's 'initiative-plan'. */
+/** The Strategy's widget board. The surface key is the persisted
+ *  boards.surface, not a display string: it stays 'campaign'. */
 function InitiativeBoard({ surface, defaults, subjectId, host, zones, children }: {
   surface: string;
   defaults: BoardLayout;
@@ -584,10 +570,10 @@ function StrategyDetailView({
     return allObjects.filter((o) => scope.has(o.id)).flatMap((o) => o.elements ?? []);
   }, [allObjects, strategy.objectIds]);
 
-  // Another Strategy opens on its Overview.
-  const [tab, setTab] = useState<InitiativeTab>('overview');
-  const [tabFor, setTabFor] = useState(strategy.id);
-  if (tabFor !== strategy.id) { setTabFor(strategy.id); setTab('overview'); }
+  // The conversation opens on request; another Strategy opens without it.
+  const [talking, setTalking] = useState(false);
+  const [talkingFor, setTalkingFor] = useState(strategy.id);
+  if (talkingFor !== strategy.id) { setTalkingFor(strategy.id); setTalking(false); }
   const host = useMemo<WidgetHost>(
     () => ({
       subject: { kind: 'initiative', id: strategy.id },
@@ -613,12 +599,12 @@ function StrategyDetailView({
     onDefinitionChange: async (id: string | null) => { await setStrategyDefinition(strategy.id, id); onSaved(); },
     onChanged: () => { void refetchObjects(); onSaved(); },
     onOpenObject,
-    onTalk: () => setTab('conversation'),
+    onTalk: () => setTalking(true),
   };
   const queryClient = useQueryClient();
-  // The conversation hands the breakdown to the Planner, on the Execution tab.
+  // The conversation hands the breakdown to the Planner, in the work below.
   const planFromConversation = (guidance: string) => {
-    setTab('execution');
+    setTalking(false);
     requestPlan(strategy.id, guidance);
   };
   // An answer may have written the Strategy's purpose, intents or definition.
@@ -924,19 +910,6 @@ function StrategyDetailView({
         </div>
       </div>
 
-      {/* One Strategy, four readings — under the header, as the views of a
-          Domain or Object sit: what it aims for and how it wins (Overview),
-          settling that by talking it through (Conversation), the work
-          carrying it out (Execution), and the evidence it is judged on
-          (Evaluate). */}
-      <div role="tablist" aria-label={t('Strategy views')} className="flex flex-shrink-0 items-center gap-0.5 py-2 pl-[19px] pr-4">
-        {INITIATIVE_TABS.map((v) => (
-          <Button key={v.id} type="button" shape="tab" role="tab" aria-selected={tab === v.id}
-            variant={tab === v.id ? 'secondary' : 'ghost'} onClick={() => setTab(v.id)}>
-            {t(v.label)}
-          </Button>
-        ))}
-      </div>
 
       <div className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto px-8 py-8">
@@ -977,11 +950,9 @@ function StrategyDetailView({
             placeholder={t('Add description…')} onSave={saveDescription} />
 
           {/* Under the description, as on an Element: one quiet row —
-              reactions, attaching a file, and the "…" of other things to add
-              — then the attached files and the Sub Strategies (how it is
-              won), each a section of its own. */}
-          {tab === 'overview' && (
-            <div className="relative -ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
+              reactions, attaching a file, and the "…" of other things to do
+              (talking it through among them) — then the attached files. */}
+          <div className="relative -ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
               <ButtonAppearanceProvider appearance="inline">
                 <div className="flex items-center gap-0.5">
                   <ReactionPicker onToggle={(e) => void reactWith(e)} />
@@ -995,6 +966,9 @@ function StrategyDetailView({
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="min-w-[200px]">
+                      <DropdownMenuItem onSelect={() => setTalking(true)} className="gap-2.5 py-1.5 text-[13px]">
+                        <MessageCircle size={15} />{t('Talk it through')}
+                      </DropdownMenuItem>
                       {canEdit && (
                         <DropdownMenuItem onSelect={() => setTimeout(() => setChildPickerOpen(true), 0)} className="gap-2.5 py-1.5 text-[13px]">
                           <NavStrategyIcon size={15} />{t('Add existing Strategy')}
@@ -1009,73 +983,27 @@ function StrategyDetailView({
                 </div>
               </ButtonAppearanceProvider>
               <AttachmentList owner={{ kind: 'strategy', id: strategy.id }} />
-              <FoldSection title={t('Sub Strategies')} count={childStrategies.length ? String(childStrategies.length) : undefined}>
-                {childStrategies.map((child) => {
-                  const n = countObjects(child.objectIds);
-                  return (
-                    <ContentRow key={child.id} icon={<ItemIcon icon={child.icon} color={child.color} size={14} fallback={<NavStrategyIcon size={14} />} />} name={child.name}
-                      onOpen={() => onOpenStrategy(child.id)}
-                      meta={<span>{n === 1 ? t('1 Object') : t('{n} Objects', { n })}</span>}
-                      actions={canEdit ? (
-                        <ContentRowAction label={t('Remove {name} from this Strategy', { name: child.name })} onClick={() => void unlinkChild(child.id)}>
-                          <X size={12} />
-                        </ContentRowAction>
-                      ) : undefined} />
-                  );
-                })}
-                {childPickerOpen && (
-                  <div className="mt-1 px-2">
-                    <div className="mb-1 flex items-center gap-2 rounded-md bg-muted/30 px-2 py-1.5">
-                      <Search size={12} className="text-muted-foreground" />
-                      <input value={childQuery} onChange={(e) => setChildQuery(e.target.value)}
-                        placeholder={t('Search Strategies…')} className="flex-1 bg-transparent text-[13px] outline-none" autoFocus />
-                      <button type="button" onClick={() => { setChildPickerOpen(false); setChildQuery(''); }}
-                        aria-label={t('Close')} className="text-muted-foreground hover:text-foreground">
-                        <X size={12} />
-                      </button>
-                    </div>
-                    <div className="max-h-72 overflow-auto">
-                      {childCandidates.length === 0 && (
-                        <div className="px-3 py-3 text-[12px] text-muted-foreground">{t('No Strategies match.')}</div>
-                      )}
-                      {childCandidates.map((c) => (
-                        <button type="button" key={c.id} disabled={linkingChildId === c.id} onClick={() => linkChild(c.id)}
-                          className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-[12px] hover:bg-muted/40 disabled:opacity-50">
-                          <NavStrategyIcon size={11} />
-                          <span className="flex-1 truncate text-foreground">{c.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {canEdit && (
-                  <FoldSectionAddRow icon={<NavStrategyIcon size={14} />} placeholder={t('Add Sub Strategy')} onAdd={createChild} />
-                )}
-              </FoldSection>
-            </div>
+          </div>
+
+
+          {/* Talking it through is called up, not a tab: it opens here when
+              asked for, and hands its breakdown to the work below. */}
+          {talking && (
+            <PageSection title={t('Talk it through')} action={
+              <Button variant="ghost" size="icon-xs" aria-label={t('Close')} className="text-muted-foreground" onClick={() => setTalking(false)}>
+                <X size={13} />
+              </Button>
+            }>
+              <StrategyConversation strategyId={strategy.id}
+                objects={missionProps.objects} onPlan={planFromConversation} onAnswered={rereadAfterConversation} />
+            </PageSection>
           )}
 
-
-          {tab === 'overview' && (
-            <InitiativeBoard surface="campaign" defaults={INITIATIVE_BOARD} subjectId={strategy.id} host={host} zones={OVERVIEW_ZONES}>
-              {/* Band — how it is going (a progress line by default), before
-                  the readings below. */}
+          {/* One page, read top to bottom: how far it is, what waits on you
+              and the work as it runs, how it is won, what it produced, then
+              the discussion. Widgets are what someone chose to add. */}
+          <InitiativeBoard surface="campaign" defaults={INITIATIVE_BOARD} subjectId={strategy.id} host={host} zones={BOARD_ZONES}>
               <WidgetZone zone="band" />
-              {/* Its own record: the conditions it is judged on, what it
-                  stands on, and what was decided. */}
-              <WidgetZone zone="main" columns={1} />
-            </InitiativeBoard>
-          )}
-
-          {tab === 'conversation' && (
-            <StrategyConversation strategyId={strategy.id}
-              objects={missionProps.objects} onPlan={planFromConversation} onAnswered={rereadAfterConversation} />
-          )}
-
-          {tab === 'execution' && (
-            <InitiativeBoard surface="initiative-plan" defaults={INITIATIVE_PLAN_BOARD} subjectId={strategy.id} host={host} zones={MAIN_ZONES}>
-              {/* How the Strategy breaks down into Objects and Elements — or
-                  the Planner's draft of it — and the work as it runs. */}
               <InitiativeMission tab="execution" {...missionProps} />
             {selectedIds.size > 0 || pickerMode !== 'closed' ? (
               <PageSection title={t('Objects')} action={canEdit ? (
@@ -1214,18 +1142,55 @@ function StrategyDetailView({
               {/* What the work under these Objects has shipped as code, read
                   against this Strategy's intent. */}
               <InitiativeCodeChanges objects={allObjects.filter((o) => selectedIds.has(o.id))} />
-              {/* Where the work hurts. */}
+              <div className="w-full">
+              <FoldSection title={t('Sub Strategies')} count={childStrategies.length ? String(childStrategies.length) : undefined}>
+                {childStrategies.map((child) => {
+                  const n = countObjects(child.objectIds);
+                  return (
+                    <ContentRow key={child.id} icon={<ItemIcon icon={child.icon} color={child.color} size={14} fallback={<NavStrategyIcon size={14} />} />} name={child.name}
+                      onOpen={() => onOpenStrategy(child.id)}
+                      meta={<span>{n === 1 ? t('1 Object') : t('{n} Objects', { n })}</span>}
+                      actions={canEdit ? (
+                        <ContentRowAction label={t('Remove {name} from this Strategy', { name: child.name })} onClick={() => void unlinkChild(child.id)}>
+                          <X size={12} />
+                        </ContentRowAction>
+                      ) : undefined} />
+                  );
+                })}
+                {childPickerOpen && (
+                  <div className="mt-1 px-2">
+                    <div className="mb-1 flex items-center gap-2 rounded-md bg-muted/30 px-2 py-1.5">
+                      <Search size={12} className="text-muted-foreground" />
+                      <input value={childQuery} onChange={(e) => setChildQuery(e.target.value)}
+                        placeholder={t('Search Strategies…')} className="flex-1 bg-transparent text-[13px] outline-none" autoFocus />
+                      <button type="button" onClick={() => { setChildPickerOpen(false); setChildQuery(''); }}
+                        aria-label={t('Close')} className="text-muted-foreground hover:text-foreground">
+                        <X size={12} />
+                      </button>
+                    </div>
+                    <div className="max-h-72 overflow-auto">
+                      {childCandidates.length === 0 && (
+                        <div className="px-3 py-3 text-[12px] text-muted-foreground">{t('No Strategies match.')}</div>
+                      )}
+                      {childCandidates.map((c) => (
+                        <button type="button" key={c.id} disabled={linkingChildId === c.id} onClick={() => linkChild(c.id)}
+                          className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-[12px] hover:bg-muted/40 disabled:opacity-50">
+                          <NavStrategyIcon size={11} />
+                          <span className="flex-1 truncate text-foreground">{c.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {canEdit && (
+                  <FoldSectionAddRow icon={<NavStrategyIcon size={14} />} placeholder={t('Add Sub Strategy')} onAdd={createChild} />
+                )}
+              </FoldSection>
+              </div>
               <WidgetZone zone="main" columns={1} />
-            </InitiativeBoard>
-          )}
-
-          {tab === 'audit' && (
-            <InitiativeBoard surface="initiative-audit" defaults={INITIATIVE_AUDIT_BOARD} subjectId={strategy.id} host={host} zones={MAIN_ZONES}>
-              {/* What was achieved, what stands in the way, what was produced
-                  and approved. */}
+              {/* What the work produced and what was approved, then the
+                  discussion — last, because it grows. */}
               <InitiativeMission tab="audit" {...missionProps} />
-              {/* The evidence, then the discussion — last, because it grows. */}
-              <WidgetZone zone="main" columns={1} />
               <PageSection title={t('Activity')}>
                 <StrategyCommentsPanel
                   strategyId={strategy.id}
@@ -1234,8 +1199,7 @@ function StrategyDetailView({
                   workers={workers}
                 />
               </PageSection>
-            </InitiativeBoard>
-          )}
+          </InitiativeBoard>
         </div>
         </InitiativeIntentProvider>
         </div>

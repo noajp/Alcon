@@ -7,14 +7,12 @@ import { formatRelative } from '@/Function/shared/dateUtils';
 import type { MissionData } from '@/hooks/initiativeMissionData';
 import type { StrategyDelegation } from '@/types/database';
 import {
-  measureStateOf, missionBarriers, missionSummary,
   type ActionState, type MissionBindingRow, type MissionElementRow, type MissionMeasureRow,
 } from './missionModel';
-import { measureStateLabel } from '../initiativeMeasureModel';
 
-// What the Execution and Evaluate tabs share, and the Evaluate tab's own
-// parts — what was achieved, what stands in the way, what was produced and
-// what was approved. The Execution tab's Objects and Elements are in
+// What the Strategy page's work and its record share, and the record's own
+// parts — what was produced and what was approved, each shown once there is
+// any. The Execution tab's Objects and Elements are in
 // MissionExecution. The tabs place them above their widget boards
 // (StrategyShell).
 
@@ -56,10 +54,6 @@ export function stateColor(state: ActionState): string {
   }
 }
 
-function StateDot({ state }: { state: ActionState }) {
-  return <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: stateColor(state) }} />;
-}
-
 export function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-lg border border-border/60 px-3 py-2.5">
@@ -77,62 +71,14 @@ export const compact = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFix
 export function MissionEvaluatePanel({ ctx }: { ctx: MissionContext }) {
   const { t } = useI18n();
   const [open, setOpen] = useState<string | null>(null);
-  const summary = missionSummary({ elements: ctx.elements, measures: ctx.measures, runs: ctx.mission.runs, artifacts: ctx.mission.artifacts });
-  const barriers = missionBarriers(ctx.elements, ctx.mission.runs);
   const titleOf = new Map(ctx.elements.map((e) => [e.id, e.display_id ? `${e.display_id} ${e.title}` : e.title]));
   const decided = ctx.mission.actions;
   const finishedRuns = ctx.mission.runs.filter((r) => r.finished_at);
 
   return (
     <div className="space-y-6">
-      <PageSection title={t('Achievement')}>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] gap-2">
-          <Stat label={t('Success conditions met')} value={`${summary.measuresMet} / ${summary.measures}`} />
-          <Stat label={t('Actions done')} value={`${summary.progress}%`} sub={t('{done} of {all} actions', { done: summary.done, all: summary.actions })} />
-          <Stat label={t('Deliverables')} value={String(summary.artifacts)} />
-          <Stat label={t('AI cost')} value={`$${summary.costUsd.toFixed(2)}`} />
-        </div>
-        {ctx.measures.length > 0 && (
-          <ul className="mt-2 space-y-1">
-            {ctx.measures.map((m) => {
-              const state = measureStateOf(m);
-              return (
-                <li key={m.id} className="flex items-center gap-2 text-[13px]">
-                  <span className="min-w-0 flex-1 truncate text-foreground">{m.title}</span>
-                  <span className="shrink-0 tabular-nums text-muted-foreground">
-                    {m.actual_value ?? '—'}{m.target_value != null ? ` / ${m.target_value}` : ''}{m.unit ?? ''}
-                  </span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">{measureStateLabel(state)}</span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </PageSection>
-
-      <PageSection title={t('Barriers')}>
-        {barriers.length === 0 ? (
-          <p className="text-[12px] text-muted-foreground">{t('Nothing is blocked, failed or waiting on a person.')}</p>
-        ) : (
-          <ul className="space-y-1.5">
-            {barriers.map((b) => (
-              <li key={b.elementId} className="flex items-start gap-2 text-[13px]">
-                <StateDot state={b.kind} />
-                <div className="min-w-0 flex-1">
-                  <button type="button" onClick={() => ctx.onOpenElement(b.elementId)} className="block w-full truncate text-left text-foreground hover:underline">{b.label}</button>
-                  {b.detail && <p className="line-clamp-2 text-[12px] text-muted-foreground">{b.detail}</p>}
-                </div>
-                <span className="shrink-0 text-[11px]" style={{ color: stateColor(b.kind) }}>{t(STATE_LABEL[b.kind])}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </PageSection>
-
-      <PageSection title={t('Deliverables')}>
-        {ctx.mission.artifacts.length === 0 ? (
-          <p className="text-[12px] text-muted-foreground">{t('No deliverables yet. What AI runs save to their Elements appears here.')}</p>
-        ) : (
+      {ctx.mission.artifacts.length > 0 && <PageSection title={t('Deliverables')}>
+        {(
           <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
             {ctx.mission.artifacts.map((a) => (
               <li key={a.id} className="px-3 py-2">
@@ -148,12 +94,10 @@ export function MissionEvaluatePanel({ ctx }: { ctx: MissionContext }) {
             ))}
           </ul>
         )}
-      </PageSection>
+      </PageSection>}
 
-      <PageSection title={t('Audit trail')}>
-        {decided.length === 0 && finishedRuns.length === 0 ? (
-          <p className="text-[12px] text-muted-foreground">{t('No AI runs or approvals yet.')}</p>
-        ) : (
+      {(decided.length > 0 || finishedRuns.length > 0) && <PageSection title={t('Audit trail')}>
+        {(
           <ul className="space-y-1.5 text-[13px]">
             {decided.map((a) => (
               <li key={`a:${a.id}`}>
@@ -171,7 +115,7 @@ export function MissionEvaluatePanel({ ctx }: { ctx: MissionContext }) {
             ))}
           </ul>
         )}
-      </PageSection>
+      </PageSection>}
     </div>
   );
 }
