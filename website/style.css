@@ -451,3 +451,11 @@ h1 { font-weight: 500; letter-spacing: -.045em; line-height: 1.08; font-size: cl
   .flow li { padding: 24px 0 4px; border-left: 0; border-top: 1px solid var(--line); }
   .flow li:first-child { border-top: 0; }
 }
+
+/* Full-window screenshots: the app's panels sit 8px (at 2x) inside the
+   image with a 16px corner, so the frame's corner is 24px at the same
+   scale. Percentages keep it concentric at any width. */
+.shot-window { border-radius: calc(24 / 2876 * 100%) / calc(24 / 1738 * 100%); }
+
+/* Pricing checks in the key colour */
+.plan li::before { background-color: var(--c-blue); background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'><path d='M5 9.4l2.6 2.5L13 6.3' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>"); }
