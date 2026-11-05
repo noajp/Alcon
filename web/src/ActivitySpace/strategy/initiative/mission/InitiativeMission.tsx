@@ -16,7 +16,7 @@ import type { MissionElementRow, MissionMeasureRow } from './missionModel';
 // the page's InitiativeIntentProvider and the runs, artifacts, approvals and
 // dependencies of the Elements under its Objects, once per tab.
 
-export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, objects, delegation, onDelegationChange, definitionId, onDefinitionChange, onChanged, onOpenObject }: {
+export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, objects, delegation, onDelegationChange, definitionId, onDefinitionChange, onChanged, onOpenObject, onTalk }: {
   tab: 'execution' | 'audit';
   initiativeId: string;
   initiativeName: string;
@@ -30,6 +30,8 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
   /** Elements or measures were written: the page re-reads its Objects. */
   onChanged: () => void;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
+  /** Opens the Strategy's conversation. */
+  onTalk?: () => void;
 }) {
   const intent = useInitiativeIntentContext();
   const { data: workers } = useWorkers();
@@ -74,6 +76,7 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
     definitionId,
     setDefinition: onDefinitionChange,
     refetch: () => { void mission.refetch(); intent?.refetch(); onChanged(); },
+    onTalk,
     onOpenElement: (elementId) => {
       const object = objects.find((o) => (o.elements ?? []).some((e) => e.id === elementId));
       if (object) onOpenObject?.(object.id, object.domain_id);

@@ -1147,6 +1147,7 @@ export interface ElementApprovalInsert {
 export type AgentRunStatus =
   | 'queued'
   | 'running'
+  | 'awaiting_input'
   | 'awaiting_approval'
   | 'paused'
   | 'awaiting_review'
@@ -1154,7 +1155,7 @@ export type AgentRunStatus =
   | 'failed'
   | 'cancelled'
 
-export type AgentRunMode = 'execute' | 'reply'
+export type AgentRunMode = 'execute' | 'reply' | 'converse'
 
 export type AgentRunStepType =
   | 'plan'
@@ -1167,10 +1168,19 @@ export type AgentRunStepType =
   | 'error'
   | 'approval'
   | 'artifact'
+  // A conversation on a Strategy: the person's message, the agent's reply,
+  // a write to the Strategy, and a hand-over to the Planner.
+  | 'message'
+  | 'reply'
+  | 'write'
+  | 'plan_request'
 
 export interface AgentRun {
   id: string
-  element_id: string
+  /** The Element whose task this run carries out; null for a conversation on a Strategy. */
+  element_id: string | null
+  /** The Strategy a conversation run is about; null for an Element's run. */
+  strategy_id: string | null
   domain_id: string | null
   worker_id: string | null
   status: AgentRunStatus

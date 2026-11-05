@@ -53,6 +53,9 @@ import { setStrategyDefinition } from '@/hooks/definitionData';
 import { ObjectIcon } from '@/shell/icons';
 import { InitiativeIntentProvider } from '@/ActivitySpace/strategy/initiative/InitiativeIntent';
 import { StrategyCommentsPanel } from '@/ActivitySpace/strategy/initiative/StrategyCommentsPanel';
+import { StrategyConversation } from './StrategyConversation';
+import { requestPlan } from './mission/plannerRequest';
+import { useQueryClient } from '@tanstack/react-query';
 import { InitiativeCodeChanges } from '@/ActivitySpace/execution/code/InitiativeCodeChanges';
 import { InitiativeMission } from './mission/InitiativeMission';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
@@ -99,9 +102,10 @@ import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 const OVERVIEW_ZONES: Zone[] = ['band', 'main'];
 const MAIN_ZONES: Zone[] = ['main'];
 
-type InitiativeTab = 'overview' | 'execution' | 'audit';
+type InitiativeTab = 'overview' | 'conversation' | 'execution' | 'audit';
 const INITIATIVE_TABS: { id: InitiativeTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
+  { id: 'conversation', label: 'Conversation' },
   { id: 'execution', label: 'Execution' },
   { id: 'audit', label: 'Evaluate' },
 ];
@@ -605,6 +609,19 @@ function StrategyDetailView({
     onDefinitionChange: async (id: string | null) => { await setStrategyDefinition(strategy.id, id); onSaved(); },
     onChanged: () => { void refetchObjects(); onSaved(); },
     onOpenObject,
+    onTalk: () => setTab('conversation'),
+  };
+  const queryClient = useQueryClient();
+  // The conversation hands the breakdown to the Planner, on the Execution tab.
+  const planFromConversation = (guidance: string) => {
+    setTab('execution');
+    requestPlan(strategy.id, guidance);
+  };
+  // An answer may have written the Strategy's purpose, intents or definition.
+  const rereadAfterConversation = () => {
+    void queryClient.invalidateQueries();
+    void refetchObjects();
+    onSaved();
   };
 
   const childStrategies = useMemo(
@@ -903,10 +920,11 @@ function StrategyDetailView({
         </div>
       </div>
 
-      {/* One Strategy, three readings — under the header, as the views of a
+      {/* One Strategy, four readings — under the header, as the views of a
           Domain or Object sit: what it aims for and how it wins (Overview),
-          the work carrying it out (Execution), and the evidence it is judged
-          on (Evaluate). */}
+          settling that by talking it through (Conversation), the work
+          carrying it out (Execution), and the evidence it is judged on
+          (Evaluate). */}
       <div role="tablist" aria-label={t('Strategy views')} className="flex flex-shrink-0 items-center gap-0.5 py-2 pl-[19px] pr-4">
         {INITIATIVE_TABS.map((v) => (
           <Button key={v.id} type="button" shape="tab" role="tab" aria-selected={tab === v.id}
@@ -1041,6 +1059,11 @@ function StrategyDetailView({
                   stands on, and what was decided. */}
               <WidgetZone zone="main" columns={1} />
             </InitiativeBoard>
+          )}
+
+          {tab === 'conversation' && (
+            <StrategyConversation strategyId={strategy.id}
+              objects={missionProps.objects} onPlan={planFromConversation} onAnswered={rereadAfterConversation} />
           )}
 
           {tab === 'execution' && (

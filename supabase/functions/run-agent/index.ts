@@ -16,6 +16,10 @@
 //                                               also lets the same command with
 //                                               the same values run without
 //                                               asking from now on
+//   { runId, message }                          a conversation on a Strategy
+//                                               (conversation.ts): the person's
+//                                               next message; the run answers
+//                                               and waits for the one after
 //   { runId, continue: true }                   internal: the next slice of a
 //                                               long run (self-invoked)
 //   { advance: elementId }                      a person finished an Element:
@@ -35,7 +39,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Anthropic from "npm:@anthropic-ai/sdk@0.110.0";
 import { runBoardTool, errorMessage, type BoardActor, type ToolDef } from "../_shared/boardTools.ts";
-import { runStrategyTool } from "../_shared/strategyTools.ts";
+import { isStrategyWriteTool, runStrategyTool, runStrategyWriteTool } from "../_shared/strategyTools.ts";
 import { AGENT_MODELS, DEFAULT_AGENT_MODEL, costAt, type ModelUsage } from "../_shared/aiPricing.ts";
 import {
   McpSession, callHttp, httpIsRead, HTTP_REQUEST_SCHEMA, isAuthFailure, isSafeEndpoint, pointsAtAlcon, resolveCredential, type IntegrationRow, type RemoteTool,
@@ -48,6 +52,7 @@ import { readRecords, saveRecords, strategyOfElement, strategyTableLines, type R
 import { TOOL_SEARCH, needsToolSearch, toolParamsFor, withDeferral, type RunToolDef } from "./toolLoading.ts";
 import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, isStrategyTool, INTEGRATION_SEPARATOR, webSteps, webTools } from "./agentTools.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
+import { conversationKindOf, conversationOpening, conversationSystemPrompt, conversationTools, isConversationStrategyTool, PLANNER_TOOL, type ConversationContext } from "./conversation.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
@@ -104,7 +109,7 @@ type Transcript = {
   pending?: SavedPending;
 };
 type Run = {
-  id: string; element_id: string; domain_id: string | null; worker_id: string | null; status: string;
+  id: string; element_id: string; strategy_id: string | null; domain_id: string | null; worker_id: string | null; status: string;
   mode: string; prompt: string | null; reply_to: string | null; triggered_by: string | null;
   transcript: Transcript | null; step_count: number; model: string | null;
   input_tokens: number; output_tokens: number; cost_usd: number; activity_space_id: string | null;
@@ -145,7 +150,7 @@ Deno.serve(async (req: Request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "server env not configured" }, 500);
 
-  let body: { runId?: string; advance?: string; ping?: boolean; resume?: boolean; continue?: boolean; token?: string; decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string; remember?: string[] } };
+  let body: { runId?: string; advance?: string; ping?: boolean; resume?: boolean; continue?: boolean; token?: string; message?: string; decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string; remember?: string[] } };
   try { body = await req.json(); } catch { return json({ error: "invalid JSON body" }, 400); }
 
   if (body.ping) {
@@ -206,9 +211,22 @@ Deno.serve(async (req: Request) => {
     if (d.inputHash !== action.input_hash || runningHash !== action.input_hash) return json({ error: "承認の内容が提示したものと一致しません。画面を更新してやり直してください。" }, 409);
   }
 
+  // A conversation goes on with the person's next message.
+  const conversation = !!run.strategy_id && !run.element_id;
+  const said = typeof body.message === "string" ? body.message.trim() : "";
+  if (body.message !== undefined) {
+    if (!conversation) return json({ error: "この実行は会話ではありません。" }, 400);
+    if (!said) return json({ error: "message が空です。" }, 400);
+    if (said.length > 20_000) return json({ error: "message は 20000 文字までです。" }, 400);
+  } else if (conversation && !body.continue) return json({ error: "会話には message を送ってください。" }, 400);
+
   // Claim the run atomically for the transition this request makes.
   let claim = admin.from("agent_runs").update({ status: "running", error: null, continuation_token: null }).eq("id", runId);
-  if (body.decision) claim = claim.eq("status", "awaiting_approval");
+  if (body.message !== undefined) {
+    if (run.status === "running") return json({ error: "応答中です。返事を待ってから送ってください。" }, 409);
+    claim = admin.from("agent_runs").update({ status: "running", error: null, continuation_token: null, started_at: run.status === "queued" ? new Date().toISOString() : undefined })
+      .eq("id", runId).in("status", ["queued", "awaiting_input", "paused"]);
+  } else if (body.decision) claim = claim.eq("status", "awaiting_approval");
   else if (body.continue) claim = claim.eq("status", "running").eq("continuation_token", body.token ?? "\u0000");
   else if (body.resume) {
     if (run.status === "running") {
@@ -222,7 +240,8 @@ Deno.serve(async (req: Request) => {
   const { data: claimed } = await claim.select("id").maybeSingle();
   if (!claimed) return json({ error: `この実行は今その操作を受け付けません（${run.status}）。` }, 409);
 
-  const work = execute({ req, run, user: { id: user.id, email: user.email ?? null }, jwt, admin, userDb, anthropicKey: anthropicKey ?? null, body, supabaseUrl })
+  const args: ExecArgs = { req, run, user: { id: user.id, email: user.email ?? null }, jwt, admin, userDb, anthropicKey: anthropicKey ?? null, body, supabaseUrl };
+  const work = (conversation ? converse(args, said) : execute(args))
     .catch(async (e) => {
       console.error("run-agent error", e);
       await pauseOnError(admin, run, errorMessage(e));
@@ -300,7 +319,7 @@ async function addStep(admin: SupabaseClient, runId: string, type: string, title
 interface ExecArgs {
   req: Request; run: Run; user: { id: string; email: string | null }; jwt: string;
   admin: SupabaseClient; userDb: SupabaseClient; anthropicKey: string | null; supabaseUrl: string;
-  body: { continue?: boolean; resume?: boolean; token?: string; decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string; remember?: string[] } };
+  body: { continue?: boolean; resume?: boolean; token?: string; message?: string; decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string; remember?: string[] } };
 }
 
 async function execute(a: ExecArgs): Promise<void> {
@@ -1083,6 +1102,214 @@ async function execute(a: ExecArgs): Promise<void> {
       await failRun(admin, run, `モデルがこの依頼を断りました: ${outcome.detail.slice(0, 300)}`);
       return;
   }
+}
+
+/**
+ * A conversation on a Strategy (conversation.ts): the person's message is
+ * added to the run's transcript and the same loop answers it, with the
+ * Strategy's tools. A plain answer is the agent's reply: the run waits for
+ * the person's next message ('awaiting_input'). Budget, slices and
+ * cancellation work as for an Element's run; nothing here needs approval,
+ * since the conversation writes only the Strategy's own record.
+ */
+async function converse(a: ExecArgs, said: string): Promise<void> {
+  stepBase.delete(a.run.id);
+  stepNext.delete(a.run.id);
+  const { run, admin, userDb, user } = a;
+  const strategyId = run.strategy_id!;
+
+  const config = resolveAgentConfig(null, null, null, run.transcript?.messages?.length ? run.model : null);
+  const { agentName, model } = config;
+  if (!a.anthropicKey) { await failRun(admin, run, "ANTHROPIC_API_KEY が設定されていません。"); return; }
+  const modelClient = new Anthropic({ apiKey: a.anthropicKey });
+  await admin.from("agent_runs").update({ model }).eq("id", run.id);
+  const actor: BoardActor = { agent: `${agentName}（AI）`, userId: user.id };
+
+  // ── Budget (as for an Element's run) ────────────────────────────────────
+  const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
+  let budget = USER_MONTHLY_BUDGET_USD;
+  let spentQuery = admin.from("agent_runs").select("cost_usd").gte("created_at", monthStart.toISOString()).neq("id", run.id);
+  if (run.activity_space_id) {
+    const { data: space } = await admin.from("activity_spaces").select("ai_monthly_budget_usd").eq("id", run.activity_space_id).maybeSingle();
+    budget = Number(space?.ai_monthly_budget_usd ?? 20);
+    spentQuery = spentQuery.eq("activity_space_id", run.activity_space_id);
+  } else {
+    spentQuery = spentQuery.is("activity_space_id", null).eq("triggered_by", user.id);
+  }
+  const { data: spent } = await spentQuery;
+  const spentBefore = (spent ?? []).reduce((s: number, r: { cost_usd: number | string }) => s + Number(r.cost_usd || 0), 0);
+  let usage = { input: run.input_tokens, output: run.output_tokens, cost: Number(run.cost_usd || 0) };
+
+  // ── State: the conversation so far, and the person's new message ────────
+  const tools: RunToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : conversationTools();
+  let state: LoopState;
+  if (run.transcript?.messages?.length) {
+    state = { messages: run.transcript.messages, turns: run.transcript.turns ?? 0, nudges: 0, revisions: 0 };
+    if (said) state.messages.push({ role: "user", content: said });
+  } else {
+    const ctx = await loadConversationContext(userDb, run, strategyId, user.id);
+    state = { messages: [{ role: "user", content: conversationOpening(ctx, said) }], turns: 0, nudges: 0 };
+    await addStep(admin, run.id, "status", "会話を開始", `${agentName} / ${config.modelLabel}`);
+  }
+  // Each message gets its own allowance of turns.
+  const turnBudget = state.turns + config.maxTotalTurns;
+  if (said) await addStep(admin, run.id, "message", said.split("\n")[0].slice(0, 200), said);
+
+  const saveTranscript = async () => {
+    const transcript: Transcript = { messages: state.messages, turns: state.turns, nudges: 0, revisions: 0, turnBudget, tools };
+    const clean = JSON.parse(JSON.stringify(transcript).replace(/\\u0000/g, ""));
+    const { error } = await admin.from("agent_runs").update({ transcript: clean }).eq("id", run.id);
+    if (error) throw new Error(`経過を保存できませんでした: ${error.message}`);
+  };
+  await saveTranscript();
+
+  const executeCall = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
+    if (call.name === PLANNER_TOOL.name) {
+      const guidance = String(call.input.guidance ?? "").trim().slice(0, 4000);
+      await addStep(admin, run.id, "plan_request", "計画を Planner に渡す準備をしました", guidance || null);
+      return { content: "会話に「計画を作る」カードを出しました。人が押すと Execution タブで Planner が下書きを作ります。下書きは人が確かめて採用します。ここで計画の中身を作らないでください。" };
+    }
+    const r = isStrategyWriteTool(call.name)
+      ? await runStrategyWriteTool(userDb, call.name, call.input)
+      : isConversationStrategyTool(call.name)
+        ? await runStrategyTool(userDb, call.name, call.input)
+        : await runBoardTool(userDb, call.name, call.input, actor);
+    // The page draws the conversation from these steps: what was done, about what, and whether it failed.
+    await addStep(admin, run.id, !r.ok ? "error" : isStrategyWriteTool(call.name) ? "write" : "action", `Alcon: ${call.name}`, r.ok ? conversationStepDetail(call.input) : r.error);
+    return r.ok ? { content: JSON.stringify(r.data).slice(0, 20_000) } : { content: r.error, is_error: true };
+  };
+
+  const recordUsage = async (u: ModelUsage) => {
+    usage = {
+      input: usage.input + (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
+      output: usage.output + (u.output_tokens ?? 0),
+      cost: Math.round((usage.cost + costAt(config.price, u)) * 1_000_000) / 1_000_000,
+    };
+    await admin.from("agent_runs").update({ input_tokens: usage.input, output_tokens: usage.output, cost_usd: usage.cost }).eq("id", run.id);
+  };
+
+  const cache = { cache_control: { type: "ephemeral" as const } };
+  const system = [{ type: "text" as const, text: conversationSystemPrompt(agentName), ...cache }];
+  const toolParams = toolParamsFor(tools, cache, false);
+  const serverTools = webTools(model);
+  const deadline = Date.now() + SLICE_MS;
+
+  const outcome = await runLoop(state, {
+    callModel: async (messages) => {
+      // deno-lint-ignore no-explicit-any
+      const res: any = await modelClient.beta.messages.create({
+        model,
+        max_tokens: 16000,
+        system,
+        // deno-lint-ignore no-explicit-any
+        tools: [...serverTools, ...toolParams] as any,
+        // deno-lint-ignore no-explicit-any
+        messages: messages as any,
+        // A conversation is answered while the person waits.
+        output_config: { effort: "low" },
+      // deno-lint-ignore no-explicit-any
+      } as any);
+      // Words said on the way, before the tools they lead into, are part of the conversation.
+      const blocks = (res.content ?? []) as { type: string; text?: string }[];
+      const words = blocks.filter((b) => b.type === "text" && b.text?.trim()).map((b) => b.text!.trim()).join("\n\n");
+      if (words && blocks.some((b) => b.type === "tool_use")) await addStep(admin, run.id, "reply", words.split("\n")[0].slice(0, 200), words);
+      for (const line of webSteps(res.content ?? [])) await addStep(admin, run.id, "action", line);
+      return { content: res.content, stop_reason: res.stop_reason, usage: res.usage };
+    },
+    kindOf: conversationKindOf,
+    needsApproval: () => false,
+    execute: (call) => executeCall(call),
+    onUsage: recordUsage,
+    afterTurn: () => saveTranscript(),
+    budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= MAX_RUN_COST_USD,
+    cancelled: async () => {
+      const { data } = await admin.from("agent_runs").select("status").eq("id", run.id).maybeSingle();
+      return data?.status === "cancelled";
+    },
+  }, { maxTurnsThisCall: MAX_TURNS_PER_SLICE, maxTotalTurns: turnBudget, deadline });
+
+  await saveTranscript();
+  const wait = async (summary: string, error: string | null = null, status = "awaiting_input") => {
+    await admin.from("agent_runs").update({ status, summary: summary.slice(0, 300), error, continuation_token: null })
+      .eq("id", run.id).eq("status", "running");
+  };
+  switch (outcome.kind) {
+    case "finished":
+      await wait(outcome.finish.summary);
+      await addStep(admin, run.id, "reply", outcome.finish.summary, outcome.finish.message);
+      return;
+    case "yield": {
+      // The answer is still being worked out: the next slice carries on.
+      const token = crypto.randomUUID();
+      const { data: armed } = await admin.from("agent_runs").update({ continuation_token: token, continuation_count: run.continuation_count + 1 })
+        .eq("id", run.id).eq("status", "running").select("id").maybeSingle();
+      if (!armed) return;
+      await fetch(`${a.supabaseUrl}/functions/v1/run-agent`, {
+        method: "POST",
+        headers: { "content-type": "application/json", Authorization: `Bearer ${a.jwt}` },
+        body: JSON.stringify({ runId: run.id, continue: true, token }),
+      }).catch(async (e) => wait("続きを開始できませんでした", errorMessage(e), "paused"));
+      return;
+    }
+    case "approval":
+      // Nothing in a conversation asks for approval; answer it as refused.
+      await wait("承認が要る操作は会話ではできません", "承認が要る操作は会話ではできません", "paused");
+      return;
+    case "limit":
+      await wait("この発言への作業が上限に達しました。続けるには、もう一度話しかけてください。");
+      return;
+    case "budget": {
+      const why = usage.cost >= MAX_RUN_COST_USD
+        ? `この会話の上限（$${MAX_RUN_COST_USD}）に達しました。新しい会話を始めてください。`
+        : run.activity_space_id ? "この Space の今月の AI 予算の上限に達しました。" : "今月の AI 予算（個人）の上限に達しました。";
+      await wait("予算の上限に達しました", why, "paused");
+      await addStep(admin, run.id, "error", "予算の上限に達しました", why);
+      return;
+    }
+    case "cancelled":
+      await addStep(admin, run.id, "status", "停止しました");
+      return;
+    case "refusal":
+      await wait("モデルがこの依頼を断りました", outcome.detail.slice(0, 300));
+      return;
+  }
+}
+
+/** Pure. What a conversation's tool call was about, for its step. */
+function conversationStepDetail(input: Record<string, unknown>): string | null {
+  for (const k of ["title", "name", "description", "query", "body"]) {
+    const v = input[k];
+    if (typeof v === "string" && v.trim()) return v.trim().replace(/\s+/g, " ").slice(0, 300);
+  }
+  return null;
+}
+
+/** What a conversation starts from: the Strategy as recorded, and the Space's connections. */
+async function loadConversationContext(userDb: SupabaseClient, run: Run, strategyId: string, userId: string): Promise<ConversationContext> {
+  const r = await runStrategyTool(userDb, "getInitiative", { id: strategyId });
+  if (!r.ok) throw new Error(`Strategy を読めませんでした: ${r.error}`);
+  const d = r.data as { id: string; name: string; description: string | null; intents: { id: string; kind: string | null; title: string; status: string | null }[]; objects: { id: string; name: string }[]; childInitiativeIds: string[] };
+  const [{ data: row }, { data: children }, { data: elements }, { data: integrations }] = await Promise.all([
+    userDb.from("strategies").select("created_by, definition_id").eq("id", strategyId).maybeSingle(),
+    d.childInitiativeIds.length ? userDb.from("strategies").select("name").in("id", d.childInitiativeIds) : Promise.resolve({ data: [] }),
+    d.objects.length ? userDb.from("elements").select("title, status").in("object_id", d.objects.map((o) => o.id)).is("parent_id", null).limit(300) : Promise.resolve({ data: [] }),
+    run.activity_space_id
+      ? userDb.from("integrations").select("name, kind, delegation").eq("activity_space_id", run.activity_space_id).eq("enabled", true).in("kind", ["mcp", "http"])
+      : Promise.resolve({ data: [] }),
+  ]);
+  const definitionId = (row as { definition_id?: string | null } | null)?.definition_id ?? null;
+  const { data: def } = definitionId ? await userDb.from("definitions").select("name, body").eq("id", definitionId).maybeSingle() : { data: null };
+  return {
+    strategy: {
+      id: d.id, name: d.name, description: d.description, intents: d.intents, objects: d.objects,
+      children: (children ?? []) as { name: string }[],
+      elements: (elements ?? []) as { title: string; status: string | null }[],
+    },
+    canEdit: (row as { created_by?: string } | null)?.created_by === userId,
+    definition: (def as { name: string; body: string } | null) ?? null,
+    integrations: (integrations ?? []) as { name: string; kind: string; delegation: string }[],
+    today: new Date().toISOString().slice(0, 10),
+  };
 }
 
 async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: FinishPayload, status?: "paused") {

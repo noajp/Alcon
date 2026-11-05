@@ -183,3 +183,25 @@ export function definitionPrompt(name: string, body: string, def: ParsedDefiniti
   return `# 定義「${name}」（依頼した人が定めた進め方。これに従う）
 ${body.slice(0, 40_000)}${loop}${shape}`;
 }
+
+/** Pure. How the engine read a definition — what it will enforce and what
+ *  it found missing — so the person can check the reading before any work
+ *  runs on it. */
+export function definitionReading(def: ParsedDefinition): { reads: string[]; missing: string[] } {
+  const reads: string[] = [];
+  const missing: string[] = [];
+  if (def.sections.goal) reads.push(`目的: ${def.sections.goal.split("\n")[0].slice(0, 120)}`);
+  else missing.push("目的（# 目的）がありません");
+  if (def.metric) reads.push(`指標: ${def.metric.name}（${def.metric.direction === "max" ? "大きいほど良い" : "小さいほど良い"}）。ループ型として 1 周ごとに記録させます`);
+  const stop: string[] = [];
+  if (def.stop.target != null) stop.push(`目標値 ${def.stop.target}`);
+  if (def.stop.budgetUsd != null) stop.push(`費用 $${def.stop.budgetUsd}`);
+  if (def.stop.maxRounds != null) stop.push(`${def.stop.maxRounds} 周`);
+  if (stop.length) reads.push(`止める条件（エンジンが判定）: ${stop.join("・")}`);
+  else if (def.sections.stop) reads.push("止める条件: 数値として読み取れるものはなく、文章としてエージェントに渡します");
+  else missing.push(def.metric ? "ループ型なのに止める条件（# 止める条件）がありません" : "止める条件（# 止める条件）がありません");
+  if (def.checks.items.length) reads.push(`点検: ${def.checks.items.length} 項目${def.checks.every ? `、${def.checks.every} 周ごと` : ""}`);
+  if (def.output) reads.push(`成果物の型: ${def.output.format}${def.output.format === "markdown" ? `（見出し ${shapeHeadings(def.output.body).length} 個を保存時に確かめます）` : ""}`);
+  else missing.push("成果物の型（# 成果物の型）がないため、保存時に型を確かめません");
+  return { reads, missing };
+}

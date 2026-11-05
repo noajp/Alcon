@@ -38,6 +38,8 @@ export interface MissionContext {
   refetch: () => void;
   /** Elements open their Object, as everywhere on this page. */
   onOpenElement: (elementId: string) => void;
+  /** Opens the Strategy's conversation, to settle what the Planner needs by talking. */
+  onTalk?: () => void;
 }
 
 export const STATE_LABEL: Record<ActionState, string> = {
