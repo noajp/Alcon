@@ -143,6 +143,11 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   // ── Strategy page ───────────────────────────────────────────
   'Add Objects': ['Object を追加', 'Object 추가', 'Ajouter des Objects', 'Añadir Objects'],
   'Add description…': ['説明を追加…', '설명 추가…', 'Ajouter une description…', 'Añadir descripción…'],
+  'Could not change the icon — only members of this Object can': ['アイコンを変えられませんでした — 変えられるのはこの Object のメンバーだけです', '아이콘을 바꾸지 못했습니다 — 이 Object의 멤버만 바꿀 수 있습니다', "Impossible de changer l'icône — seuls les membres de cet Object le peuvent", 'No se pudo cambiar el icono — solo los miembros de este Object pueden'],
+  'Change icon and colour': ['アイコンと色を変える', '아이콘과 색 변경', "Changer l'icône et la couleur", 'Cambiar icono y color'],
+  'Colour': ['色', '색', 'Couleur', 'Color'],
+  'No colour': ['色なし', '색 없음', 'Sans couleur', 'Sin color'],
+  'Icon': ['アイコン', '아이콘', 'Icône', 'Icono'],
   'Add existing Strategy': ['既存の Strategy を追加', '기존 Strategy 추가', 'Ajouter une Strategy existante', 'Añadir una Strategy existente'],
   'Sub Strategies': ['Sub Strategy', 'Sub Strategy', 'Sous-Strategies', 'Sub Strategies'],
   'Add Sub Strategy': ['Sub Strategy を追加', 'Sub Strategy 추가', 'Ajouter une sous-Strategy', 'Añadir una Sub Strategy'],

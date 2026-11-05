@@ -3676,6 +3676,7 @@ export type Database = {
           display_id: string | null
           domain_id: string | null
           due_date: string | null
+          icon: string | null
           id: string
           lead_id: string | null
           name: string
@@ -3698,6 +3699,7 @@ export type Database = {
           display_id?: string | null
           domain_id?: string | null
           due_date?: string | null
+          icon?: string | null
           id?: string
           lead_id?: string | null
           name: string
@@ -3720,6 +3722,7 @@ export type Database = {
           display_id?: string | null
           domain_id?: string | null
           due_date?: string | null
+          icon?: string | null
           id?: string
           lead_id?: string | null
           name?: string

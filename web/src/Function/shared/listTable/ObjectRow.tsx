@@ -1,10 +1,10 @@
 'use client';
 
+import { ObjectMark } from '@/Function/shared/ObjectMark';
 import { memo } from 'react';
 import type { AlconObjectWithChildren, Worker } from '@/hooks/useSupabase';
 import { useSortable } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
-import { ObjectIcon } from '@/shell/icons';
 import { type DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { OBJECT_DRAG_PREFIX, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, ROW_ROUND_TO_LAST, LEAD_CELL, LEAD_CELL_HOVER, LEAD_CELL_SELECTED, selectionSquareClass, selectionSquareClassToLast } from './shared';
 import { ObjectCell } from './cells';
@@ -90,7 +90,7 @@ export const ObjectRow = memo(function ObjectRow({
       {/* No checkbox: Shift- or ⌘-click selects (the bulk bar appears). */}
       <td className={`sticky left-0 z-10 bg-card w-13 pl-7.5 pr-1.5 py-2 ${LEAD_CELL} ${isSelected ? LEAD_CELL_SELECTED : LEAD_CELL_HOVER}`}>
         <div className="flex items-center text-muted-foreground/70">
-          <ObjectIcon size={16} />
+          <ObjectMark object={obj} size={16} />
         </div>
       </td>
       <td className="md:sticky md:left-13 z-10 bg-card pl-3.5 pr-0.5 py-2 min-w-0 max-w-0">

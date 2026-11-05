@@ -8,7 +8,8 @@ import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { updateObject } from '@/hooks/useSupabase';
-import { ObjectIcon } from '@/shell/icons';
+import { ObjectMarkPicker } from '@/Function/shared/ObjectMark';
+import { appDialog } from '@/Function/shared/appDialogStore';
 import { PageIcon, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import {
@@ -113,6 +114,24 @@ export function OverviewView({
     }
   };
 
+  // The Object's icon and colour, shown at once and written behind.
+  // The picks made here, kept for this Object until its data catches up.
+  type MarkPatch = { icon?: string | null; color?: string | null };
+  const [picked, setPicked] = useState<{ id: string; patch: MarkPatch } | null>(null);
+  const mark = { icon: object.icon ?? null, color: object.color ?? null, ...(picked?.id === object.id ? picked.patch : {}) };
+  const saveMark = async (patch: MarkPatch) => {
+    const before = picked;
+    setPicked({ id: object.id, patch: { ...(picked?.id === object.id ? picked.patch : {}), ...patch } });
+    try {
+      await updateObject(object.id, patch);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to save the Object icon:', err);
+      setPicked(before);
+      void appDialog.alert(t('Could not change the icon — only members of this Object can'));
+    }
+  };
+
   const handleDescriptionSave = async (description: string) => {
     if (description !== (object.description || '')) {
       try {
@@ -160,7 +179,7 @@ export function OverviewView({
               {/* Icon stacked above the name; the name sits flush with the
                   column's left edge so it lines up with the description. */}
               <div>
-                <PageIcon><ObjectIcon size={18} /></PageIcon>
+                <PageIcon><ObjectMarkPicker object={mark} onChange={(patch) => void saveMark(patch)} /></PageIcon>
                 <textarea
                   ref={titleRef}
                   value={title}

@@ -1,5 +1,6 @@
 'use client';
 
+import { ObjectMark } from '@/Function/shared/ObjectMark';
 import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { IslandHeader } from '@/Function/shared/MainIsland';
 import { appDialog } from '@/Function/shared/appDialogStore';
@@ -1100,7 +1101,7 @@ function StrategyDetailView({
                         // fraction of a px taller and visibly nudged the row).
                         className={`flex items-center gap-2 px-2 py-1 min-h-[2.375rem] rounded-md hover:bg-muted/40 transition-colors ${onOpenObject ? 'cursor-pointer' : ''}`}
                       >
-                        <ObjectIcon size={13} className="text-muted-foreground shrink-0" />
+                        <ObjectMark object={obj} size={13} className="text-muted-foreground" />
                         <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{obj.name}</span>
                         {/* The cells already draw read-only when handed no handler;
                             membership decides whether they get one. */}

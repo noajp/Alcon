@@ -283,7 +283,8 @@ export interface AlconObject {
   id: string
   name: string
   description: string | null
-  color: string | null
+  color: string | null             // a LABEL_PALETTE key; null draws the mark uncoloured
+  icon?: string | null             // OBJECT_GLYPHS key or an emoji; null draws the Object mark
   prefix: string | null            // ID prefix e.g. "PH1"
   display_id: string | null        // e.g. "OBJ_PH1"
   order_index: number | null
@@ -306,6 +307,7 @@ export interface AlconObjectInsert {
   name: string
   description?: string | null
   color?: string | null
+  icon?: string | null
   order_index?: number | null
   created_at?: string | null
   updated_at?: string | null
@@ -324,6 +326,7 @@ export interface AlconObjectUpdate {
   name?: string
   description?: string | null
   color?: string | null
+  icon?: string | null
   order_index?: number | null
   created_at?: string | null
   updated_at?: string | null

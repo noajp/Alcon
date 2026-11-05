@@ -1,8 +1,8 @@
 'use client';
 
+import { ObjectMark } from '@/Function/shared/ObjectMark';
 import { completionOf } from '@/Function/shared/completion';
 import { ContentRow } from '@/Function/shared/ContentRow';
-import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { WidgetProps } from '../types';
 
@@ -13,7 +13,7 @@ export function DomainObjectsWidget({ host }: WidgetProps) {
   return <div className="-mx-2">
     {objects.map(object => {
       const { done, total } = completionOf(object.elements ?? []);
-      return <ContentRow key={object.id} icon={<ObjectIcon size={14} />} name={object.name}
+      return <ContentRow key={object.id} icon={<ObjectMark object={object} size={14} />} name={object.name}
         meta={total ? `${done} / ${total}` : '—'}
         onOpen={() => host.onNavigate?.({ objectId: object.id, domainId: host.subject.id })} />;
     })}

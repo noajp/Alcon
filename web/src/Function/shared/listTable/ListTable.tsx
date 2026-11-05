@@ -1,5 +1,6 @@
 'use client';
 
+import { ObjectMark } from '@/Function/shared/ObjectMark';
 import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import { Plus } from '@/ui/icons';
@@ -847,7 +848,7 @@ function DragCard({
       ) : (
         <>
           <span className="shrink-0 flex items-center justify-center text-muted-foreground/70">
-            <ObjectIcon size={14} />
+            <ObjectMark object={data.obj} size={14} />
           </span>
           <span className="font-semibold text-foreground truncate">{data.obj.name}</span>
         </>
