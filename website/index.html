@@ -28,7 +28,7 @@
     <h1><span class="nw">「あの件、</span><span class="nw">どうなった？」</span><br>が、なくなる。</h1>
     <div class="hero-row">
       <p class="lead">決めたことが、いまどこまで進んでいるか。<br class="pc">確認のための会議も、報告のための資料も、もう要りません。</p>
-      <a class="hero-link" href="#problem"><b>課題</b> 進捗確認の会議に、週何時間？ <span aria-hidden="true">→</span></a>
+      <a class="hero-link" href="#aip"><b>AIP</b> 任せた仕事を AI が実行する <span aria-hidden="true">→</span></a>
     </div>
   </div>
 
@@ -119,6 +119,30 @@
   </div>
 </section>
 
+<!-- AIP -->
+<section class="section" id="aip">
+  <div class="wrap">
+    <div class="section-head"><div><p class="kicker">AIP — AI Platform</p>
+      <h2 class="h2">任せた仕事を、<br>AI が最後まで実行する。</h2></div>
+      <p class="sub">AIP は、Alcon の仕事（Element）を AI に実行させる仕組みです。AI は任せた人の権限の範囲で作業し、メールの送信やファイルの書き込みのように外部に影響する操作は、実行する前に人の承認を待ちます。</p>
+    </div>
+    <ol class="flow">
+      <li><span>01</span><h3>任せる</h3><p>仕事の担当に AI を選びます。AI は仕事の説明に加えて、その仕事が属する方針の目的・成功条件・関連する表を読んでから始めます。</p></li>
+      <li><span>02</span><h3>作業する</h3><p>連携したサービス（Google Drive、GitHub など）、作業用の仮想マシン、任せた人の PC のブラウザを使って、調べる・作る・操作するまで行います。</p></li>
+      <li><span>03</span><h3>承認を待つ</h3><p>外部に送る・書き込む操作の前で止まり、「あなたの番」に承認依頼を出します。承認されるまで実行しません。</p></li>
+      <li><span>04</span><h3>確かめて記録する</h3><p>終わったら、別の AI が成功条件と照らして完了かどうかを確かめます。報告・作ったファイル・操作の記録が仕事に残ります。</p></li>
+    </ol>
+    <ul class="points">
+      <li><b>権限を超えない</b><span>AI が読み書きできるのは、任せた人が読み書きできるデータだけです。</span></li>
+      <li><b>使う金額に上限</b><span>1 回の実行で使える金額に上限があり、Space ごとに月の上限も決められます。</span></li>
+      <li><b>次の仕事も自動で</b><span>方針で「自動」を選ぶと、AI の仕事が終わったときに、それを待っていた次の AI の仕事が始まります。</span></li>
+    </ul>
+    <figure class="shot shot-aip"><img src="assets/app-approval.png" width="2240" height="500" alt="「あなたの番」の一覧。AI からの値引きの承認依頼と、人が完了にする仕事が並んでいる" loading="lazy"></figure>
+    <p class="caption">「あなたの番」。AI からの承認依頼が、人がやる仕事と同じ一覧に並びます。</p>
+    <a class="more-link" href="features.html#ai">AIP について詳しく <span aria-hidden="true">→</span></a>
+  </div>
+</section>
+
 <!-- BEFORE / AFTER -->
 <section class="section" id="before-after">
   <div class="wrap">
@@ -132,7 +156,7 @@
       <div class="compare-row" role="row"><span role="cell" class="before">誰も更新しない進捗表</span><span class="arrow" aria-hidden="true">→</span><span role="cell" class="after">仕事をすれば、進み具合はそのまま残る</span></div>
       <div class="compare-row" role="row"><span role="cell" class="before">止まっていることに、気づくのが遅い</span><span class="arrow" aria-hidden="true">→</span><span role="cell" class="after">止まった仕事が、方針の横に赤く出る</span></div>
       <div class="compare-row" role="row"><span role="cell" class="before">担当交代で消える「なぜ」</span><span class="arrow" aria-hidden="true">→</span><span role="cell" class="after">決めた理由と前提が、仕事と一緒に残る</span></div>
-      <div class="compare-row" role="row"><span role="cell" class="before">AI に任せる範囲が決められない</span><span class="arrow" aria-hidden="true">→</span><span role="cell" class="after">AI に任せる。決めるべきことだけ届く</span></div>
+      <div class="compare-row" role="row"><span role="cell" class="before">AI に任せる範囲が決められない</span><span class="arrow" aria-hidden="true">→</span><span role="cell" class="after">AI は AIP で作業し、承認が必要な操作だけ人に回す</span></div>
     </div>
   </div>
 </section>

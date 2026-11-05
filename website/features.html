@@ -27,12 +27,12 @@
   <div class="wrap">
     <p class="kicker">機能</p>
     <h1>方針・仕事・記録を、<br>ひとつの場所に。</h1>
-    <p class="lead">Alcon の中心にあるのは三つです。曖昧な方針を実行できる仕事に分けること、その仕事を最後まで進めること、決めたことを残すこと。</p>
+    <p class="lead">Alcon の中心にあるのは四つです。方針を実行できる仕事に分けること、仕事を管理すること、決めたことを文書に残すこと、そして仕事を AI に実行させる AIP です。</p>
     <div class="toc">
       <a class="c-amber" href="#plan">01 方針を実行に</a>
       <a class="c-blue" href="#tasks">02 タスク管理</a>
       <a class="c-green" href="#docs">03 ドキュメント</a>
-      <a class="c-rose" href="#ai">04 AI との分担</a>
+      <a class="c-rose" href="#ai">04 AIP（AI Platform）</a>
     </div>
   </div>
 </section>
@@ -93,11 +93,25 @@
 <section class="chapter c-rose" id="ai">
   <div class="wrap">
     <div class="chapter-head">
-      <div><p class="kicker">04 — AI との分担</p><h2 class="h2">AI に任せて、<br>人は判断だけする。</h2></div>
-      <p class="sub">仕事を AI に任せると、AI は方針を読んで手を動かします。値引きのように人が決めるべきことは、実行する前に「あなたの番」に届きます。</p>
+      <div><p class="kicker">04 — AIP（AI Platform）</p><h2 class="h2">任せた仕事を、<br>AI が最後まで実行する。</h2></div>
+      <p class="sub">AIP は、仕事（Element）を AI に実行させる仕組みです。AI は方針を読んで作業し、外部に影響する操作は人の承認を待ってから行います。何をしたかはすべて仕事に記録されます。</p>
     </div>
+    <ol class="flow">
+      <li><span>01</span><h3>任せる</h3><p>仕事の担当に AI を選びます。AI は仕事の説明と、その仕事が属する方針の目的・成功条件・関連する表を読みます。</p></li>
+      <li><span>02</span><h3>作業する</h3><p>連携したサービス、作業用の仮想マシン（コマンド・ファイル・ブラウザ）、任せた人の PC のブラウザを使います。</p></li>
+      <li><span>03</span><h3>承認を待つ</h3><p>メールの送信やファイルの書き込みなど、外部に影響する操作の前で止まり、「あなたの番」に承認依頼を出します。</p></li>
+      <li><span>04</span><h3>確かめて記録する</h3><p>別の AI が、成功条件と成果物を照らして完了かどうかを判定します。報告・ファイル・操作の記録が仕事に残ります。</p></li>
+    </ol>
+    <ul class="points">
+      <li><b>任せた人の権限で動く</b><span>AI が読み書きできるのは、任せた人が読み書きできるデータだけです。</span></li>
+      <li><b>連携先の操作を絞れる</b><span>連携したサービスごとに AI が使える操作が決まっていて、操作ごとに承認が必要かを設定できます。</span></li>
+      <li><b>使う金額に上限</b><span>1 回の実行で使える金額に上限があり、Space ごとに月の上限も決められます。</span></li>
+      <li><b>仕事の重さでモデルを選ぶ</b><span>軽い・標準・重いの見積もりに合わせて、使う AI モデルを選びます。</span></li>
+      <li><b>進め方を書いておける</b><span>目的・条件・止める条件・点検項目・成果物の形式を書いた「定義」を渡すと、AI はそれに従って作業します。</span></li>
+      <li><b>次の仕事も自動で</b><span>方針で「自動」を選ぶと、AI の仕事が終わったときに、それを待っていた次の AI の仕事が始まります。</span></li>
+    </ul>
     <figure class="shot"><img src="assets/app-approval.png" width="2240" height="500" alt="「あなたの番」の一覧。AI からの承認依頼と、AI が終えたら毎回人が確認する設定" loading="lazy"></figure>
-    <p class="caption">AI の結果を毎回確認するか、任せきるかは方針ごとに選べます。誰が、何を、なぜやったかは記録に残ります。</p>
+    <p class="caption">「あなたの番」。AI の結果を毎回人が確認するか、自動で次へ進めるかは方針ごとに選べます。</p>
   </div>
 </section>
 
