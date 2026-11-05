@@ -27,30 +27,37 @@
   <div class="wrap">
     <h1>想定ユースケース</h1>
     <p class="lead">組織が違っても、止まる場所は似ています。よくある課題に、Alcon をどう使うか。具体的な場面で紹介します。</p>
+    <div class="filters" aria-label="業種で絞り込む">
+      <button class="on" data-f="all">すべて</button>
+      <button data-f="saas">SaaS</button>
+      <button data-f="mfg">製造</button>
+      <button data-f="sales">営業</button>
+      <button data-f="health">医療</button>
+    </div>
     <div class="cases">
-      <a class="case c-rose" href="usecase-churn.html">
-        <div class="thumb"><span class="thumb-label">B2B SaaS・カスタマーサクセス</span><img src="assets/thumb-churn.png" alt="" loading="lazy"></div>
+      <a class="case c-rose" data-f="saas" href="usecase-churn.html">
+        <div class="thumb"><span class="thumb-label">カスタマーサクセス部</span><img src="assets/thumb-churn.png" alt="" loading="lazy"></div>
         <h3>解約率 5.0% → 4.1%。休眠顧客への連絡が、一度も止まらなくなった</h3>
         <p>8 人のカスタマーサクセスチームが、解約防止の仕事を AI と分け合った話。</p>
-        <span class="case-more">エピソードを読む →</span>
+        <span class="case-more">読む <span aria-hidden="true">→</span></span>
       </a>
-      <a class="case c-amber" href="usecase-newbiz.html">
-        <div class="thumb"><span class="thumb-label">製造業・新規事業室</span><img src="assets/thumb-newbiz.png" alt="" loading="lazy"></div>
+      <a class="case c-amber" data-f="mfg" href="usecase-newbiz.html">
+        <div class="thumb"><span class="thumb-label">新規事業室</span><img src="assets/thumb-newbiz.png" alt="" loading="lazy"></div>
         <h3>3 か月言い直していた方針が、翌日には 10 件の仕事になった</h3>
         <p>「何から手をつけるか分からない」新規事業室が、曖昧な方針を AI と一緒に分けた話。</p>
-        <span class="case-more">エピソードを読む →</span>
+        <span class="case-more">読む <span aria-hidden="true">→</span></span>
       </a>
-      <a class="case c-green" href="usecase-meeting.html">
-        <div class="thumb"><span class="thumb-label">人材サービス・営業部</span><img src="assets/thumb-meeting.png" alt="" loading="lazy"></div>
+      <a class="case c-green" data-f="sales" href="usecase-meeting.html">
+        <div class="thumb"><span class="thumb-label">営業部</span><img src="assets/thumb-meeting.png" alt="" loading="lazy"></div>
         <h3>週 90 分の部門定例が、30 分になった</h3>
         <p>5 つの課をまとめる営業部長が、進捗の読み上げをやめた話。</p>
-        <span class="case-more">エピソードを読む →</span>
+        <span class="case-more">読む <span aria-hidden="true">→</span></span>
       </a>
-      <a class="case c-teal" href="usecase-handover.html">
-        <div class="thumb"><span class="thumb-label">病院・業務改善委員会</span><img src="assets/thumb-handover.png" alt="" loading="lazy"></div>
+      <a class="case c-teal" data-f="health" href="usecase-handover.html">
+        <div class="thumb"><span class="thumb-label">業務改善委員会</span><img src="assets/thumb-handover.png" alt="" loading="lazy"></div>
         <h3>担当が 3 回変わっても、改善活動が止まらなかった</h3>
         <p>異動の多い病院の業務改善委員会が、引き継ぎ資料をつくるのをやめた話。</p>
-        <span class="case-more">エピソードを読む →</span>
+        <span class="case-more">読む <span aria-hidden="true">→</span></span>
       </a>
     </div>
     <p class="note">※ 想定ユースケースです。登場する組織・人物・数値は、Alcon の使い方を説明するための架空のものです。画面は実際の Alcon です。</p>

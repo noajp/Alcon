@@ -15,3 +15,12 @@ if ('IntersectionObserver' in window) {
 } else {
   targets.forEach(el => el.classList.add('in'));
 }
+
+// Use-case filter tabs.
+const filters = document.querySelectorAll('.filters button');
+filters.forEach(btn => btn.addEventListener('click', () => {
+  filters.forEach(b => { b.classList.toggle('on', b === btn); b.setAttribute('aria-selected', b === btn); });
+  const f = btn.dataset.f;
+  document.querySelector('.cases').classList.toggle('filtered', f !== 'all');
+  document.querySelectorAll('.case').forEach(c => { c.hidden = f !== 'all' && c.dataset.f !== f; });
+}));
