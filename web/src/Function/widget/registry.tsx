@@ -375,31 +375,6 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultSize: 'full',
     load: async () => (await import('./widgets/MilestonesWidget')).MilestonesWidget,
   },
-  'mini-gantt': {
-    type: 'mini-gantt',
-    label: 'Mini Gantt',
-    description: 'Compact timeline preview',
-    group: 'schedule',
-    accepts: ['object', 'me', 'initiative'],
-    zones: ['main'],
-    defaultSize: 'full',
-    load: async () => {
-      const { MiniGanttWidget } = await import('./widgets/MiniGanttWidget');
-      return adapt((host) => <MiniGanttWidget elements={host.elements} />);
-    },
-  },
-  'mini-calendar': {
-    type: 'mini-calendar',
-    label: 'Mini calendar',
-    description: 'Current month, with due dates marked',
-    group: 'schedule',
-    accepts: ['object', 'me', 'initiative'],
-    zones: ['main', 'rail'],
-    load: async () => {
-      const { MiniCalendarWidget } = await import('./widgets/MiniCalendarWidget');
-      return adapt((host) => <MiniCalendarWidget elements={host.elements} />);
-    },
-  },
 
   // ─── Charts ───────────────────────────────────────────────
 
