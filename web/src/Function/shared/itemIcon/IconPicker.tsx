@@ -45,7 +45,7 @@ const RAINBOW = `conic-gradient(${[...ITEM_COLORS.slice(2), ITEM_COLORS[2]].map(
  * drawings and the standard set (tinted by the colour above them), or an
  * emoji. Nothing is saved here — `onChange` gets the new look.
  */
-export function IconPicker({ value, onChange, children, defaultIcon, align = 'start' }: {
+function IconPicker({ value, onChange, children, defaultIcon, align = 'start' }: {
   value: ItemLook;
   onChange: (next: ItemLook) => void;
   children: ReactNode;
