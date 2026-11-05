@@ -1,5 +1,5 @@
 // Which model an AI agent Worker runs on: Anthropic (Alcon's own key), or a
-// model connection of its Space (Settings › Customize, kind 'model') with
+// model connection of its Space (Settings › AI, kind 'model') with
 // the model named in ai_model. run-agent reads the same fields
 // (supabase/functions/run-agent/agentConfig.ts): ai_config.provider is the
 // connection's id, ai_config.price_input / price_output its price in USD per

@@ -31,7 +31,7 @@ const WORK_LABEL: Record<string, string> = {
   addIntent: 'Recorded',
   updateIntent: 'Revised',
   removeIntent: 'Removed',
-  writeInitiativeDefinition: 'Wrote the definition',
+  writeInitiativeDefinition: 'Wrote the harness',
   getInitiative: 'Read the Strategy',
   listInitiatives: 'Listed Strategies',
   hand_to_planner: 'Handed to the Planner',

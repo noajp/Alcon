@@ -110,3 +110,38 @@ describe('the screen reads a definition as the engine does', () => {
     }
   });
 });
+
+describe('checking a harness', () => {
+  const codes = (body: string, connected?: string[]) => def.checkHarness(def.parseDefinition(body), { connected }).map((d: { code: string }) => d.code);
+
+  it('finds a loop that never stops, and a missing goal', () => {
+    expect(codes('# 指標\n- スコア（大きいほど良い）: ベンチ\n')).toEqual(['H001', 'H002', 'H006']);
+    expect(codes(ISUCON)).toEqual(['H006']);
+  });
+
+  it('tells a stop the engine reads from one it only passes on', () => {
+    expect(codes('# 目的\nx\n')).toContain('H003');
+    expect(codes('# 目的\nx\n# 止める条件\n- 迷ったら聞く\n')).toContain('H004');
+    expect(codes('# 目的\nx\n# 止める条件\n- 費用 $5 まで\n')).not.toContain('H004');
+  });
+
+  it('reads the connectors a harness uses and checks them against the Space', () => {
+    const body = '# 目的\nx\n# 止める条件\n- 10 周まで\n# 使うコネクタ\n- GitHub\n- Notion（議事録）\n';
+    expect(def.parseDefinition(body).connectors).toEqual(['GitHub', 'Notion']);
+    expect(codes(body, ['github'])).toEqual(['H005', 'H006']);
+    expect(codes(body)).not.toContain('H005');
+  });
+
+  it('reads how a Strategy is broken down', () => {
+    expect(def.parseDefinition('# 目的\nx\n# 分け方\n- 画面ごとに Object を分ける\n').sections.breakdown).toBe('- 画面ごとに Object を分ける');
+  });
+});
+
+describe('the web copy of the harness reader', () => {
+  it('is the same file run-agent and the Planner use', async () => {
+    const { readFileSync } = await import('node:fs');
+    const fn = readFileSync(new URL('../../supabase/functions/_shared/definition.ts', import.meta.url), 'utf8');
+    const web = readFileSync(new URL('../src/Function/customize/harnessDefinition.ts', import.meta.url), 'utf8');
+    expect(web).toBe(fn);
+  });
+});

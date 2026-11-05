@@ -1,33 +1,23 @@
-// Which parts of a definition the engine will act on, for the screen. The
-// headings mirror supabase/functions/_shared/definition.ts (sectionOf);
-// tests/definition.test.ts keeps the two in step.
+// Which parts of a harness the engine will act on, for the screen, read by
+// the editor's copy of the engine's reader (sectionOf).
+import { sectionOf, type SectionKey } from '@/Function/customize/harnessDefinition';
 
-export type DefinitionPart = 'goal' | 'conditions' | 'metric' | 'procedure' | 'stop' | 'checks' | 'output';
+export type DefinitionPart = SectionKey;
 
-const DEFINITION_PARTS: [DefinitionPart, RegExp][] = [
-  ['goal', /^(目的|ゴール|goal|purpose)/i],
-  ['conditions', /^(条件|前提|ルール|conditions?|rules)/i],
-  ['metric', /^(指標|評価指標|metric|score)/i],
-  ['procedure', /^(進め方|手順|ループ|procedure|steps|loop)/i],
-  ['stop', /^(止める条件|終了条件|停止条件|stop)/i],
-  ['checks', /^(点検|チェック|監査|checks?|audit)/i],
-  ['output', /^(成果物の型|出力の型|成果物|output)/i],
-];
-
-/** Pure. The parts a definition has, in the order it has them. */
+/** Pure. The parts a harness has, in the order it has them. */
 export function definitionParts(body: string): DefinitionPart[] {
   const found: DefinitionPart[] = [];
   let inFence = false;
   for (const line of body.split('\n')) {
     if (/^\s*```/.test(line)) inFence = !inFence;
     const h = !inFence ? /^#{1,3}\s+(.+?)\s*$/.exec(line) : null;
-    const part = h ? DEFINITION_PARTS.find(([, re]) => re.test(h[1].trim()))?.[0] : undefined;
+    const part = h ? sectionOf(h[1]) : null;
     if (part && !found.includes(part)) found.push(part);
   }
   return found;
 }
 
-/** A definition to start from, for the paste box. */
+/** A harness to start from, for the paste box. */
 export const DEFINITION_EXAMPLE = `# 目的
 （この仕事で何を達成するか）
 

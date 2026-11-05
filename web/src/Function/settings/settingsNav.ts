@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { useSyncExternalStore } from 'react';
-import { SlidersHorizontal, User, Bell, KeyRound, Plug, Globe, Users, Blocks } from '@/ui/icons';
+import { SlidersHorizontal, User, Bell, KeyRound, Plug, Globe, Users, Sparkles, Link2 } from '@/ui/icons';
 import { DomainIcon, ObjectIcon, ElementIcon } from '@/Function/shared/conceptIcons';
 import {
   NavStrategyIcon, NavPhaseIcon,
@@ -41,11 +41,15 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
       { id: 'workspace', label: 'Activity space', icon: Globe },
       { id: 'members', label: 'Member', icon: Users },
       {
-        id: 'integrations', label: 'Customize', icon: Blocks,
+        id: 'integrations', label: 'AI', icon: Sparkles,
         tabs: [
-          { id: 'definitions', label: 'Definitions' },
+          { id: 'definitions', label: 'Harnesses' },
           { id: 'external', label: 'Connectors' },
-          { id: 'packs', label: 'Packs' },
+        ],
+      },
+      {
+        id: 'access', label: 'API & access', icon: Link2,
+        tabs: [
           { id: 'alcon', label: 'Connect to Alcon' },
           { id: 'assets', label: 'Connected assets' },
         ],
