@@ -38,7 +38,7 @@ import { runBoardTool, errorMessage, type BoardActor, type ToolDef } from "../_s
 import { runStrategyTool } from "../_shared/strategyTools.ts";
 import { AGENT_MODELS, DEFAULT_AGENT_MODEL, costAt, type ModelUsage } from "../_shared/aiPricing.ts";
 import {
-  McpSession, callHttp, httpIsRead, HTTP_REQUEST_SCHEMA, isSafeEndpoint, pointsAtAlcon, resolveCredential, type IntegrationRow, type RemoteTool,
+  McpSession, callHttp, httpIsRead, HTTP_REQUEST_SCHEMA, isAuthFailure, isSafeEndpoint, pointsAtAlcon, resolveCredential, type IntegrationRow, type RemoteTool,
 } from "../_shared/integrationClient.ts";
 import { isGoogleDriveRow } from "../_shared/googleOAuth.ts";
 import { fetchPull, pullUrlsIn, upsertCodeChange, withGithubToken } from "../_shared/github.ts";
@@ -121,6 +121,11 @@ interface IntegrationTool {
   integration: IntegrationRow; remote: RemoteTool | null; secret: string | null; session: McpSession | null; drive?: boolean;
   /** The declared command this tool is, when the integration has a manifest. */
   command?: ManifestCommand; manifest?: Manifest;
+}
+
+/** An integration this run cannot use, told to the agent with the reason. */
+function downIntegration(name: string, reason: string): TaskContext["integrations"][number] {
+  return { name, kind: "使えない", delegation: "", tools: 0, down: reason };
 }
 
 /** The operation an integration call shows on the approval card and in the log. */
@@ -448,11 +453,13 @@ async function execute(a: ExecArgs): Promise<void> {
         const secret = await resolveCredential(admin, row, (raw as string | null) ?? null);
         if (isGithubOAuthRow(row) && !secret) {
           await addStep(admin, run.id, "error", `連携「${row.name}」は GitHub への接続が必要です`, "Settings › Customize で GitHub にサインインし直すと使えます。");
+          integrationSummary.push(downIntegration(row.name, "GitHub にサインインしていない（Settings › Customize でサインインが必要）"));
           continue;
         }
         if (isGoogleDriveRow(row)) {
           if (!secret) {
             await addStep(admin, run.id, "error", `連携「${row.name}」は Google への接続が必要です`, "Settings › Customize で Google にサインインし直すと使えます。");
+            integrationSummary.push(downIntegration(row.name, "Google にサインインしていない（Settings › Customize でサインインが必要）"));
             continue;
           }
           for (const t of DRIVE_TOOLS) {
@@ -503,7 +510,16 @@ async function execute(a: ExecArgs): Promise<void> {
           integrationSummary.push({ name: row.name, kind: "API", delegation: row.delegation, tools: 1 });
         }
       } catch (e) {
-        await addStep(admin, run.id, "error", `連携「${row.name}」に接続できませんでした`, errorMessage(e));
+        const message = errorMessage(e);
+        await addStep(admin, run.id, "error", `連携「${row.name}」に接続できませんでした`, message);
+        // A refused credential is the connection's state, not this run's:
+        // the connector shows it, so a person knows to sign in again.
+        if (isAuthFailure(message)) {
+          await admin.from("integrations").update({ last_test: { ok: false, at: new Date().toISOString(), code: "auth_failed", detail: message.slice(0, 300) } }).eq("id", row.id);
+        }
+        integrationSummary.push(downIntegration(row.name, isAuthFailure(message)
+          ? (row.auth_type === "oauth" ? "認証が切れている（Settings › Customize でサインインし直す必要がある）" : "認証に失敗した（Settings › Customize で認証情報を直す必要がある）")
+          : `接続できない: ${message.slice(0, 200)}`));
       }
     }
   }

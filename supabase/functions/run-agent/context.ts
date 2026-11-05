@@ -38,7 +38,9 @@ export interface TaskContext {
     artifacts: { title: string; content: string }[];
     comments: { author: string; content: string }[];
   }[];
-  integrations: { name: string; kind: string; delegation: string; tools: number; declared?: boolean; guide?: string | null }[];
+  integrations: { name: string; kind: string; delegation: string; tools: number; declared?: boolean; guide?: string | null;
+    /** Set when the integration is configured but this run cannot use it: why. */
+    down?: string }[];
   /** The Strategy's Tables, one line each; null when the Element serves no Strategy. */
   tables: string[] | null;
   today: string;
@@ -91,7 +93,9 @@ export function taskMessage(ctx: TaskContext): string {
     u.report ? `完了報告:\n${u.report}` : "",
     ...u.artifacts.map((a) => `成果物「${a.title}」:\n${a.content}`),
   ].filter(Boolean).join("\n\n"));
-  const integrations = ctx.integrations.map((i) => {
+  const usable = ctx.integrations.filter((i) => !i.down);
+  const down = ctx.integrations.filter((i) => i.down).map((i) => `- ${i.name}: ${i.down}`);
+  const integrations = usable.map((i) => {
     const how = i.declared
       ? "宣言されたコマンドだけ。コマンドごとに許可・確認が決まっている"
       : i.delegation === "full_delegation" ? "全委任：承認なしで書き込める" : "書き込みは承認が必要";
@@ -135,7 +139,11 @@ ${ctx.tables == null ? "(この Element は Strategy に属していないので
 
 # 使える外部連携
 ${bullet(integrations, "(なし — 外部サービスへの操作が要る任務なら、finish(blocked) で連携の追加を依頼する)")}
-${ctx.integrations.some((i) => /github/i.test(i.name)) ? `
+${down.length ? `
+# 設定されているが、今は使えない外部連携
+${down.join("\n")}
+- この任務にこれらが要るなら、別の手段で代わりの成果を作らず、finish(blocked) で止まり、どの連携をどう直せばよいか（例: GitHub にサインインし直す）を人に伝える
+` : ""}${usable.some((i) => /github/i.test(i.name)) ? `
 # ソフトウェアを作る任務のとき（GitHub）
 - 既定のブランチに直接コミットしない。ブランチ \`alcon/${(el.display_id ?? el.id).toLowerCase()}\` を作り、そこにコミットして Pull Request を開く
 - PR のタイトルの先頭に「${el.display_id ?? ""}」を付ける。本文には、この Element の任務と、関連する Initiative のどの成功条件・意思決定に応える変更かを書く

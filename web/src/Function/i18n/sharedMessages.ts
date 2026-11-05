@@ -323,6 +323,8 @@ const SHARED_MESSAGES: Record<string, Row> = {
   'Asks first': ['確認する', '먼저 확인', 'Demande d’abord', 'Pregunta antes'],
   'Not allowed': ['禁止', '금지', 'Interdit', 'No permitido'],
   'Full delegation is on, so commands set to “Asks first” run without asking. Conditions and “Not allowed” still hold.': ['全委任がオンなので、「確認する」のコマンドは確認なしで実行されます。条件と「許可しない」は効きます。', '전체 위임이 켜져 있어 “먼저 확인” 명령은 확인 없이 실행됩니다. 조건과 “허용 안 함”은 유지됩니다.', 'La délégation complète est activée : les commandes « Demande d’abord » s’exécutent sans demander. Les conditions et « Non autorisé » s’appliquent toujours.', 'La delegación completa está activada: los comandos «Pregunta antes» se ejecutan sin preguntar. Las condiciones y «No permitido» siguen aplicándose.'],
+  'Sign in again': ['サインインし直す', '다시 로그인', 'Se reconnecter', 'Volver a iniciar sesión'],
+  'Authentication failed': ['認証に失敗', '인증 실패', 'Échec de l’authentification', 'Error de autenticación'],
   'Don’t ask again for this operation when': ['次の条件なら、この操作を次から確認しない', '다음 조건이면 이 작업을 다시 묻지 않음', 'Ne plus demander pour cette opération quand', 'No volver a preguntar por esta operación cuando'],
   'Approving also saves this as a rule on the connector. You can remove it in Settings › Customize.': ['承認すると、この条件をコネクタのルールとして保存します。設定 › カスタマイズ で外せます。', '승인하면 이 조건을 커넥터 규칙으로 저장합니다. 설정 › 사용자 설정에서 삭제할 수 있습니다.', 'Approuver enregistre aussi cette règle sur le connecteur. Vous pouvez la retirer dans Réglages › Personnaliser.', 'Aprobar también guarda esto como regla del conector. Puede quitarla en Ajustes › Personalizar.'],
   'When': ['条件', '조건', 'Quand', 'Cuando'],

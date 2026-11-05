@@ -322,6 +322,8 @@ function TestStatus({ integration }: { integration: Integration }) {
   // Only a checked credential is "Connected"; a custom API that merely
   // answered is "Reachable", in a neutral tone.
   const tone = last.code === 'connected' ? 'success' : last.ok ? 'neutral' : 'danger';
+  // A refused credential (a test, or an agent's run that met it) asks for one thing.
+  const refused = !last.ok && (last.code === 'auth_failed' || last.code === 'oauth_expired' || last.code === 'oauth_required');
   return (
     <span
       title={t(testOutcomeLabel(last.code))}
@@ -330,7 +332,7 @@ function TestStatus({ integration }: { integration: Integration }) {
     >
       <span aria-hidden="true" className={cn('size-1.5 rounded-full',
         tone === 'success' ? 'bg-[var(--status-success)]' : tone === 'danger' ? 'bg-[var(--status-danger)]' : 'bg-muted-foreground')} />
-      {tone === 'success' ? t('Connected') : tone === 'neutral' ? t('Reachable') : t('Error')}
+      {tone === 'success' ? t('Connected') : tone === 'neutral' ? t('Reachable') : refused ? t(integration.auth_type === 'oauth' ? 'Sign in again' : 'Authentication failed') : t('Error')}
     </span>
   );
 }
