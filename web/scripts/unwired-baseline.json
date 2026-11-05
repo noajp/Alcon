@@ -6,6 +6,7 @@
     "src/ActivitySpace/sustainment/slides/kata/": "Kata（プレゼン編集アプリ）から移した編集画面一式（ADR 0042）。純粋な模型の関数は tests/slides/ が直接検証しており、編集画面の部品は Kata 側の構成のまま残している。export を個別に配線させず、Kata の単位で扱う"
   },
   "accepted": {
-    "src/ActivitySpace/sustainment/slides/SlidesAssistant.tsx#SlidesAssistant": "AI パネル（AlconCopilotPanel）が Slides のときだけ next/dynamic で読み込む。動的 import は静的な走査から見えない"
+    "src/ActivitySpace/sustainment/slides/SlidesAssistant.tsx#SlidesAssistant": "AI パネル（AlconCopilotPanel）が Slides のときだけ next/dynamic で読み込む。動的 import は静的な走査から見えない",
+    "src/shell/openScreen.ts#openScreenFrom": "readOpenScreen の中身（保存値の読み取りと検証）。sessionStorage のない node のテストから直接確かめるために export している"
   }
 }
