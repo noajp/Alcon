@@ -1106,7 +1106,7 @@ function StrategyDetailView({
                         // fraction of a px taller and visibly nudged the row).
                         className={`flex items-center gap-2 px-2 py-1 min-h-[2.375rem] rounded-md hover:bg-muted/40 transition-colors ${onOpenObject ? 'cursor-pointer' : ''}`}
                       >
-                        <ObjectIcon size={13} className="text-muted-foreground shrink-0" />
+                        <ItemIcon icon={obj.icon} color={obj.color} size={13} className="text-muted-foreground" fallback={<ObjectIcon size={13} />} />
                         <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{obj.name}</span>
                         {/* The cells already draw read-only when handed no handler;
                             membership decides whether they get one. */}
