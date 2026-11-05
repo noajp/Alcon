@@ -76,7 +76,7 @@ export interface MissionEdgeRow { from_element: string; to_element: string }
 export interface MissionArtifactRow { id: string; element_id: string; title: string }
 
 /** Pure. A measure's reading against its target. */
-export function measureStateOf(m: MissionMeasureRow): MeasureState {
+function measureStateOf(m: MissionMeasureRow): MeasureState {
   return measureState({
     id: m.id, title: m.title, target: m.target_value, actual: m.actual_value, unit: m.unit,
     direction: m.direction, measuredAt: null, orderIndex: 0,

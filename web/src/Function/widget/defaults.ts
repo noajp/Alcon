@@ -57,40 +57,15 @@ export const HOME_BOARD: BoardLayout = {
 };
 
 /**
- * Strategy detail, Overview tab: what it aims for and how it wins — the
- * Strategy's own record. How far along it is, then the conditions it is
- * judged on, what it stands on, and what was decided. The nested Strategies
- * sit above these, drawn by the page.
+ * Strategy detail — one page. The work the page draws already says how far
+ * it is, so the band starts empty; under the work, the Tables its AI runs
+ * keep (hidden until there is one).
+ * Success conditions, premises, decisions and the rest are widgets someone
+ * adds when they want them.
  */
 export const INITIATIVE_BOARD: BoardLayout = {
-  band: [{ id: 'initiative-progress', type: 'progress-band' }],
-  main: [
-    { id: 'cmp-measures', type: 'campaign-measures' },
-    { id: 'cmp-assumptions', type: 'campaign-assumptions' },
-    { id: 'cmp-decisions', type: 'campaign-decisions' },
-  ],
-  rail: [],
-};
-
-/**
- * Strategy detail, Execution tab: the work carrying it out. The Objects and
- * the AI's runs are drawn by the page; under them, the Tables those runs keep
- * (the candidates, compared side by side — hidden until there is one), then
- * where that work hurts.
- */
-export const INITIATIVE_PLAN_BOARD: BoardLayout = {
   band: [],
-  main: [
-    { id: 'cmp-tables', type: 'data-view' },
-    { id: 'cmp-risk', type: 'campaign-risk' },
-  ],
-  rail: [],
-};
-
-/** Strategy detail, Audit tab: the evidence the Strategy is judged on. */
-export const INITIATIVE_AUDIT_BOARD: BoardLayout = {
-  band: [],
-  main: [{ id: 'initiative-attachments', type: 'attachments' }],
+  main: [{ id: 'cmp-tables', type: 'data-view' }],
   rail: [],
 };
 
