@@ -26,7 +26,7 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
   onDefinitionChange: (id: string | null) => Promise<void>;
   spaceId: string | null;
   /** The Strategy's Objects with their Elements. */
-  objects: { id: string; name: string; domain_id: string | null; elements?: ElementWithDetails[] }[];
+  objects: { id: string; name: string; domain_id: string | null; icon?: string | null; color?: string | null; elements?: ElementWithDetails[] }[];
   /** Elements or measures were written: the page re-reads its Objects. */
   onChanged: () => void;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
@@ -86,7 +86,7 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
   if (tab === 'execution') {
     return (
       <MissionExecutionPanel ctx={ctx} details={details}
-        objects={objects.map((o) => ({ id: o.id, name: o.name, domain_id: o.domain_id }))}
+        objects={objects.map((o) => ({ id: o.id, name: o.name, domain_id: o.domain_id, icon: o.icon ?? null, color: o.color ?? null }))}
         domains={domains.filter((d) => !spaceId || d.activity_space_id === spaceId).map((d) => ({ id: d.id, name: d.name }))}
         aiWorkers={workers.filter((w) => w.type === 'ai_agent' && w.status !== 'inactive')}
         ensureRoot={intent?.ensureRoot ?? (() => Promise.reject(new Error('no intent')))} />
