@@ -219,7 +219,6 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
 
   if (['domain_approaches', 'approach_conditions', 'approach_contributions', 'approach_assessments', 'approach_reviews',
     'domains', 'strategies', 'intents', 'objects', 'object_domains', 'domain_members', 'object_members', 'activity_space_members'].includes(d.table)) {
-    invalidateSoon(qc, ['domain-approaches']);
     invalidateSoon(qc, ['approach-references']);
   }
 

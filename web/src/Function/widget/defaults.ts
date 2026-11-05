@@ -111,9 +111,6 @@ export const OBJECT_SUMMARY_BOARD: BoardLayout = {
 export const DOMAIN_OVERVIEW_BOARD: BoardLayout = {
   band: [],
   main: [
-    { id: 'domain-approaches', type: 'domain-approaches' },
-    { id: 'domain-initiatives', type: 'domain-initiatives' },
-    { id: 'domain-kpi', type: 'kpi-cards' },
     { id: 'domain-objects', type: 'domain-objects' },
   ],
   rail: [],
